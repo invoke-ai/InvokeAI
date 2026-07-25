@@ -397,19 +397,33 @@ const CLIPSkip: SingleMetadataHandler<ParameterCLIPSkip> = {
 const Guidance: SingleMetadataHandler<ParameterGuidance> = {
   [SingleMetadataKey]: true,
   type: 'Guidance',
-  parse: (metadata, _store) => {
-    // Legacy FLUX.2 images may still carry a `guidance` field, but guidance_embeds
-    // is inert for all current Klein variants. Reject parsing for FLUX.2 metadata
-    // so the handler is skipped on both display and recall - avoids leaking a stale
-    // value into the shared guidance param (which is still used by FLUX.1).
+  parse: async (metadata, store) => {
+    // guidance_embeds is inert for FLUX.2 Klein but genuinely consumed by FLUX.2 [dev]
+    // (the graph sets guidance_embeds=True and passes the recorded guidance). So reject
+    // only for non-dev FLUX.2: this displays and recalls the value for [dev] while never
+    // leaking a stale value into the shared guidance param for Klein (shared with FLUX.1).
+    // Resolve the image's own model to read its variant; if it can't be resolved (e.g.
+    // uninstalled), fall back to skipping — same safe behavior as before for Klein.
     const rawModel = getProperty(metadata, 'model');
     const modelBase = (rawModel as { base?: unknown } | undefined)?.base;
     if (modelBase === 'flux2') {
-      throw new Error('Guidance is not used for FLUX.2 Klein models.');
+      let isDev = false;
+      try {
+        const config = await resolveModel(
+          rawModel as { key: string; hash?: string; name: string; base: string; type: string },
+          store
+        );
+        isDev = 'variant' in config && config.variant === 'dev';
+      } catch {
+        isDev = false;
+      }
+      if (!isDev) {
+        throw new Error('Guidance is not used for FLUX.2 Klein models.');
+      }
     }
     const raw = getProperty(metadata, 'guidance');
     const parsed = zParameterGuidance.parse(raw);
-    return Promise.resolve(parsed);
+    return parsed;
   },
   recall: (value, store) => {
     store.dispatch(setGuidance(value));

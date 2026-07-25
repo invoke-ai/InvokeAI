@@ -1034,12 +1034,14 @@ flux2_klein_9b_gguf_q8 = StarterModel(
 # Non-Commercial License.
 
 # --- Text encoders ---
-# Only the 30-layer "cow-mistral3-small" distillation works for FLUX.2 [dev].
-# BFL's joint attention was trained against hidden states at indices (10, 20, 30)
-# of a 30-layer Mistral — extracting from upstream Mistral Small 3.1 / 3.2 (40
-# layers) samples at different relative depths and produces off-distribution
-# embeddings. Both the gguf-org cow GGUFs and Comfy-Org's safetensors are the
-# same 30-layer cow weights, just packaged differently.
+# FLUX.2 [dev] reads Mistral hidden states at indices (10, 20, 30). Two encoders work:
+#   - The 40-layer Mistral Small 3 (24B) that BFL ships as the canonical
+#     FLUX.2-dev/text_encoder — the default; loads fine but has visibly weaker prompt
+#     adherence because those indices land at different relative depths.
+#   - The 30-layer "cow-mistral3-small" distillation — recommended for best adherence
+#     (on a 30-layer model the indices hit 1/3, 2/3, last, matching what the joint
+#     attention was trained against). The gguf-org cow GGUFs and Comfy-Org's safetensors
+#     are the same 30-layer cow weights, just packaged differently.
 
 # Comfy-Org safetensors (single-file, 30-layer cow, with embedded Tekken tokenizer).
 # Higher precision than the cow GGUFs and avoids the Tekken-via-HF-Hub fetch.

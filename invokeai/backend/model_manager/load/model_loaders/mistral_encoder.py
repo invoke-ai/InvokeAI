@@ -233,6 +233,27 @@ def _convert_for_bare_mistral_model(sd: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def _reinit_inv_freq(model: torch.nn.Module, config: Any, dtype: torch.dtype) -> None:
+    """Re-initialize any RoPE ``inv_freq`` buffers still on the meta device.
+
+    ``inv_freq`` is derived from config rather than stored in the checkpoint, so a
+    meta buffer here must be recomputed before ``_materialize_remaining_meta_tensors``
+    zero-fills it. NB: transformers 5.x moved ``rope_theta`` into the
+    ``rope_parameters``/``rope_scaling`` dict, so reading ``config.rope_theta``
+    directly raises ``AttributeError`` on the pinned version — fall back through both
+    (matching the z_image loaders).
+    """
+    rope_params = getattr(config, "rope_parameters", None) or getattr(config, "rope_scaling", None) or {}
+    rope_theta = rope_params.get("rope_theta") or getattr(config, "rope_theta", 1000000.0)
+    for name, buffer in list(model.named_buffers()):
+        if not (buffer.is_meta and name.endswith("inv_freq")):
+            continue
+        parts = name.rsplit(".", 1)
+        parent = model.get_submodule(parts[0]) if len(parts) == 2 else model
+        inv_freq = 1.0 / (rope_theta ** (torch.arange(0, config.head_dim, 2, dtype=torch.float32) / config.head_dim))
+        parent.register_buffer(parts[-1], inv_freq.to(dtype), persistent=False)
+
+
 def _materialize_remaining_meta_tensors(model: torch.nn.Module, dtype: torch.dtype, logger) -> None:
     """Replace any parameters/buffers still on the meta device after load_state_dict.
 
@@ -623,7 +644,9 @@ def _load_tokenizer_for_model(model_path: Path, logger: Any) -> AnyModel:
        the canonical Tekken JSON as a ``tekken_model`` U8 tensor; we extract it
        and wrap it via ``mistral_common``.
     2. **Sibling ``tokenizer/`` folder** — diffusers-style HuggingFace layouts.
-    3. **BFL HuggingFace fallback** — fetches the canonical tokenizer from
+    3. **Root-directory processor files** — standalone downloads that ship the
+       processor files alongside the encoder weights at the folder root.
+    4. **BFL HuggingFace fallback** — fetches the canonical tokenizer from
        ``black-forest-labs/FLUX.2-dev/tokenizer``.
     """
     # 1. Single-file with embedded Tekken
@@ -631,8 +654,8 @@ def _load_tokenizer_for_model(model_path: Path, logger: Any) -> AnyModel:
     if embedded is not None:
         return embedded
 
-    # 2. Diffusers folder with sibling tokenizer/
     if model_path.is_dir():
+        # 2. Diffusers folder with sibling tokenizer/
         tokenizer_dir = model_path / "tokenizer"
         if tokenizer_dir.exists():
             try:
@@ -649,8 +672,15 @@ def _load_tokenizer_for_model(model_path: Path, logger: Any) -> AnyModel:
                 embedded = _try_load_embedded_tekken(st, logger)
                 if embedded is not None:
                     return embedded
+        # 3. Processor files alongside the encoder weights at the folder root.
+        try:
+            obj = AutoProcessor.from_pretrained(model_path, local_files_only=True)
+            logger.info(f"Loaded Mistral tokenizer from model root: {type(obj).__name__}")
+            return obj
+        except (OSError, EnvironmentError, ValueError):
+            pass
 
-    # 3. HF fallback
+    # 4. HF fallback
     return _load_tokenizer_from_hf(logger)
 
 
@@ -676,15 +706,10 @@ class MistralEncoderDiffusersLoader(ModelLoader):
 
         model_path = Path(config.path)
         text_encoder_path = model_path / "text_encoder"
-        tokenizer_path = model_path / "tokenizer"
 
         # Standalone download: text_encoder files at the root.
         if not text_encoder_path.exists() and (model_path / "config.json").exists():
             text_encoder_path = model_path
-        if not tokenizer_path.exists():
-            # If tokenizer was not co-downloaded, fall back to root (some standalone
-            # downloads include processor files alongside the encoder weights).
-            tokenizer_path = model_path
 
         target_device = TorchDevice.choose_torch_device()
         model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
@@ -692,13 +717,8 @@ class MistralEncoderDiffusersLoader(ModelLoader):
         match submodel_type:
             case SubModelType.Tokenizer:
                 logger = InvokeAILogger.get_logger("MistralEncoderProcessor")
-                # Try the sibling tokenizer/ first when the diffusers folder ships one,
-                # else fall through to the multi-strategy loader (embedded Tekken / HF).
-                if tokenizer_path.exists() and tokenizer_path != model_path:
-                    try:
-                        return AutoProcessor.from_pretrained(tokenizer_path, local_files_only=True)
-                    except (OSError, EnvironmentError):
-                        pass
+                # Let the multi-strategy loader own the full ladder: embedded Tekken,
+                # sibling tokenizer/, root-level processor files, then the HF fallback.
                 return _load_tokenizer_for_model(model_path, logger)
             case SubModelType.TextEncoder:
                 # Lazy import: transformers may load `Mistral3ForConditionalGeneration`
@@ -720,6 +740,14 @@ class MistralEncoderDiffusersLoader(ModelLoader):
                 logger = InvokeAILogger.get_logger("MistralEncoderDiffusersLoader")
                 _strip_final_norm_for_cow(inner, config.variant, logger)
                 _warn_if_40_layer_mistral(config.variant, logger)
+                # The BFL `text_encoder` checkpoint maps to `Mistral3Model`, which ships a
+                # `vision_tower` + `multi_modal_projector` (~0.8GB of real weights). The
+                # invocation only ever runs `.language_model`, so drop the vision path to
+                # keep it out of the RAM cache and every cache->VRAM transfer. The
+                # checkpoint/GGUF loaders already build a bare `MistralModel`.
+                for unused in ("vision_tower", "multi_modal_projector"):
+                    if getattr(model, unused, None) is not None:
+                        setattr(model, unused, None)
                 return model
 
         raise ValueError(
@@ -814,15 +842,7 @@ class MistralEncoderCheckpointLoader(ModelLoader):
                         continue
 
         # Re-init any remaining meta buffers (e.g. RoPE inv_freq is computed from config).
-        for name, buffer in list(model.named_buffers()):
-            if buffer.is_meta and name.endswith("inv_freq"):
-                parts = name.rsplit(".", 1)
-                parent = model.get_submodule(parts[0]) if len(parts) == 2 else model
-                inv_freq = 1.0 / (
-                    mistral_config.rope_theta
-                    ** (torch.arange(0, mistral_config.head_dim, 2, dtype=torch.float32) / mistral_config.head_dim)
-                )
-                parent.register_buffer(parts[-1], inv_freq.to(model_dtype), persistent=False)
+        _reinit_inv_freq(model, mistral_config, model_dtype)
 
         _materialize_remaining_meta_tensors(model, model_dtype, logger)
         _strip_final_norm_for_cow(model, config.variant, logger)
@@ -918,15 +938,7 @@ class MistralEncoderGGUFLoader(ModelLoader):
         if isinstance(embed_weight, GGMLTensor):
             model.embed_tokens.weight = torch.nn.Parameter(embed_weight.get_dequantized_tensor(), requires_grad=False)
 
-        for name, buffer in list(model.named_buffers()):
-            if buffer.is_meta and name.endswith("inv_freq"):
-                parts = name.rsplit(".", 1)
-                parent = model.get_submodule(parts[0]) if len(parts) == 2 else model
-                inv_freq = 1.0 / (
-                    mistral_config.rope_theta
-                    ** (torch.arange(0, mistral_config.head_dim, 2, dtype=torch.float32) / mistral_config.head_dim)
-                )
-                parent.register_buffer(parts[-1], inv_freq.to(compute_dtype), persistent=False)
+        _reinit_inv_freq(model, mistral_config, compute_dtype)
 
         _materialize_remaining_meta_tensors(model, compute_dtype, logger)
         _strip_final_norm_for_cow(model, config.variant, logger)

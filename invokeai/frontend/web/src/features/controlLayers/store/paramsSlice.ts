@@ -776,8 +776,11 @@ export const paramsSliceConfig: SliceConfig<typeof slice> = {
       if (state._version === 3) {
         // v3 -> v4, merge the separate Klein / [dev] FLUX.2 VAE slots into one shared
         // flux2VaeModel (both drew from the same FLUX.2 VAE pool). Keep whichever was set.
+        // Also seed the new standalone [dev] Mistral encoder slot — it's nullable with no
+        // default, so a genuine v3 blob without the key fails zParamsState.parse() otherwise.
         state._version = 4;
         state.flux2VaeModel = state.kleinVaeModel ?? state.flux2DevVaeModel ?? null;
+        state.flux2DevMistralEncoderModel = null;
         delete state.kleinVaeModel;
         delete state.flux2DevVaeModel;
       }

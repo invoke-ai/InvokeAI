@@ -173,12 +173,22 @@ class Flux2KleinModelLoaderInvocation(BaseInvocation):
     def _validate_diffusers_format(
         self, context: InvocationContext, model: ModelIdentifierField, model_name: str
     ) -> None:
-        """Validate that a model is in Diffusers format."""
+        """Validate that a model is a Diffusers-format FLUX.2 Klein pipeline (not [dev])."""
         config = context.models.get_config(model)
         if config.format != ModelFormat.Diffusers:
             raise ValueError(
                 f"The {model_name} model must be a Diffusers format model. "
                 f"The selected model '{config.name}' is in {config.format.value} format."
+            )
+        # Mirror of the [dev] loader's guard: a [dev] pipeline's Mistral tokenizer + encoder are
+        # extracted here and paired with a Klein transformer, producing wrong-width conditioning
+        # that only surfaces as an opaque matmul error deep in denoise. Reject it up front.
+        variant = getattr(config, "variant", None)
+        if variant == Flux2VariantType.Dev:
+            raise ValueError(
+                f"The {model_name} model must be a FLUX.2 Klein pipeline, "
+                f"but the selected model '{config.name}' is FLUX.2 [dev]. "
+                "Its Mistral text encoder / VAE are incompatible with the Klein transformer."
             )
 
     def _validate_qwen3_encoder_variant(self, context: InvocationContext, main_config) -> None:

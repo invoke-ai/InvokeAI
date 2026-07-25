@@ -1,18 +1,23 @@
 """FLUX.2 [dev] text encoder invocation.
 
-FLUX.2 [dev] uses the BFL "cow-mistral3-small" 30-layer Mistral distillation as
-its sole text encoder (sometimes referred to as "Mistral Small 3" in BFL's
-documentation, but the shipped weights are the 30-layer cow variant — upstream
-40-layer Mistral Small 3.1 / 3.2 does not work):
+FLUX.2 [dev] uses a Mistral Small 3 (hidden_size=5120) text encoder. Two variants
+are supported (see ``MistralVariantType``), both read at the same hidden-state
+indices (10, 20, 30):
+
+- **Mistral24B** — the 40-layer encoder BFL ships in the canonical
+  ``black-forest-labs/FLUX.2-dev/text_encoder``. This is the default pipeline
+  encoder; the loader keeps its final RMSNorm.
+- **Cow** — the 30-layer "cow-mistral3-small" distillation, recommended for best
+  prompt adherence. On a 30-layer model the indices map to (1/3, 2/3, last), and
+  the loader drops the final RMSNorm to match ComfyUI's reference (``final_norm=False``).
+
+Pipeline, per generation:
 
 - A fixed system message biases the model toward structured image descriptions.
 - The user prompt is wrapped in Mistral's chat template via the multimodal
   AutoProcessor.
-- Three intermediate hidden states (layers 10, 20, 30) are stacked and flattened
-  to produce a (B, seq, 3 * hidden_size) = (B, seq, 15360) tensor matching the
-  FLUX.2 transformer's joint_attention_dim. For the 30-layer cow model those
-  indices map to (1/3, 2/3, last) — exactly what BFL's joint attention was
-  trained to consume.
+- The three hidden states are concatenated to a (B, seq, 3 * hidden_size) =
+  (B, seq, 15360) tensor matching the FLUX.2 transformer's joint_attention_dim.
 """
 
 from contextlib import ExitStack

@@ -159,7 +159,16 @@ class Flux2DevLoRACollectionLoader(BaseInvocation):
                 continue
             if not context.models.exists(lora.lora.key):
                 raise Exception(f"Unknown lora: {lora.lora.key}!")
-            assert lora.lora.base in (BaseModelType.Flux, BaseModelType.Flux2)
+
+            # A FLUX.1 LoRA (base `flux`) has no variant field, so `_assert_dev_lora` below
+            # would pass it through to model patching where it fails late. Fail fast here with
+            # a clear error instead, matching the Klein collection loader. (A bare `assert`
+            # would also be stripped under `python -O`.)
+            if lora.lora.base is not BaseModelType.Flux2:
+                raise ValueError(
+                    f"LoRA '{lora.lora.key}' is for {lora.lora.base.value if lora.lora.base else 'unknown'} models, "
+                    "not FLUX.2 [dev] models. Ensure you are using a FLUX.2 [dev] compatible LoRA."
+                )
 
             lora_config = context.models.get_config(lora.lora.key)
             # Reject variant-mismatched LoRAs, matching the single-LoRA loader above.

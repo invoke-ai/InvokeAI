@@ -11,6 +11,7 @@ import {
   selectIsExternal,
   selectIsFLUX,
   selectIsFlux2,
+  selectIsFlux2Dev,
   selectIsQwenImage,
   selectIsSD3,
   selectIsZImage,
@@ -49,6 +50,7 @@ export const GenerationSettingsAccordion = memo(() => {
   const modelConfig = useSelectedModelConfig();
   const isFLUX = useAppSelector(selectIsFLUX);
   const isFlux2 = useAppSelector(selectIsFlux2);
+  const isFlux2Dev = useAppSelector(selectIsFlux2Dev);
   const isSD3 = useAppSelector(selectIsSD3);
   const isCogView4 = useAppSelector(selectIsCogView4);
   const isZImage = useAppSelector(selectIsZImage);
@@ -113,6 +115,7 @@ export const GenerationSettingsAccordion = memo(() => {
                 {!isExternal && isFLUX && modelConfig && !isFluxFillMainModelModelConfig(modelConfig) && (
                   <ParamGuidance />
                 )}
+                {!isExternal && isFlux2Dev && <ParamGuidance />}
                 {!isExternal && !isFLUX && !isFlux2 && <ParamCFGScale />}
                 {!isExternal && isZImage && <ParamZImageShift />}
                 {!isExternal && isQwenImage && <ParamQwenImageShift />}

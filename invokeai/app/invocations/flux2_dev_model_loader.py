@@ -177,3 +177,14 @@ class Flux2DevModelLoaderInvocation(BaseInvocation):
                 f"The {model_name} model must be a Diffusers format model. "
                 f"The selected model '{config.name}' is in {config.format.value} format."
             )
+        # The source's VAE/tokenizer/encoder are extracted and paired with the [dev] transformer.
+        # A Klein pipeline's Qwen3 tokenizer + encoder silently pass the layer-count guard and
+        # produce a wrong-width conditioning that only surfaces as an opaque matmul error deep in
+        # denoise, so reject non-[dev] sources here where the user still gets a clear message.
+        variant = getattr(config, "variant", None)
+        if variant is not None and variant != Flux2VariantType.Dev:
+            raise ValueError(
+                f"The {model_name} model must be a FLUX.2 [dev] pipeline, "
+                f"but the selected model '{config.name}' is variant '{variant.value}'. "
+                "Its text encoder / VAE are incompatible with the [dev] transformer."
+            )
