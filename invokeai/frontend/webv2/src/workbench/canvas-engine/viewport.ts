@@ -29,7 +29,6 @@
 
 import type { Mat2d, Rect, Vec2 } from '@workbench/canvas-engine/types';
 
-import { applyToPoint, invert } from '@workbench/canvas-engine/math/mat2d';
 import { clampZoom, snapZoom } from '@workbench/canvas-engine/math/snapping';
 import {
   panBy as calculatePanBy,
@@ -102,17 +101,18 @@ export const createViewport = (initial?: Partial<ViewState>): Viewport => {
     }
   };
 
-  const cssMatrix = (): Mat2d => ({ a: zoom, b: 0, c: 0, d: zoom, e: pan.x, f: pan.y });
-
   const documentToScreen = (p: Vec2): Vec2 => ({ x: zoom * p.x + pan.x, y: zoom * p.y + pan.y });
 
-  const screenToDocument = (p: Vec2): Vec2 => {
-    const inverse = invert(cssMatrix());
-    if (!inverse) {
-      return { x: 0, y: 0 };
-    }
-    return applyToPoint(inverse, p);
-  };
+  /**
+   * Inverts the CSS view transform (`scale(zoom)` then `translate(pan)`)
+   * directly rather than through a general matrix inverse: the view is only ever
+   * a uniform scale plus a translation, so the inverse is one subtraction and
+   * one division. This runs once per coalesced
+   * pointer sample — a brush batch can carry dozens — which is enough for the
+   * matrix allocation to be worth skipping.
+   */
+  const screenToDocument = (p: Vec2): Vec2 =>
+    zoom === 0 ? { x: 0, y: 0 } : { x: (p.x - pan.x) / zoom, y: (p.y - pan.y) / zoom };
 
   const zoomAtPoint = (newZoom: number, screenAnchor: Vec2): void => {
     const next = calculateZoomAtPoint({ pan, zoom }, newZoom, screenAnchor, clampZoom);
