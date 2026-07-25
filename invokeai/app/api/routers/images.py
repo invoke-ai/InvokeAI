@@ -182,6 +182,7 @@ class ImageUploadEntry(BaseModel):
 
 @images_router.post("/", operation_id="create_image_upload_entry")
 async def create_image_upload_entry(
+    _: CurrentUserOrDefault,
     width: int = Body(description="The width of the image"),
     height: int = Body(description="The height of the image"),
     board_id: Optional[str] = Body(default=None, description="The board to add this image to, if any"),
