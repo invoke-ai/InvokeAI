@@ -81,9 +81,7 @@ def test_gemma_2_2b_gguf_matches(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.mark.parametrize("hidden_size", [3584, 4608])
 def test_incompatible_gemma_gguf_sizes_are_rejected(monkeypatch: pytest.MonkeyPatch, hidden_size: int) -> None:
-    monkeypatch.setattr(
-        gemma2_encoder_module, "_read_gguf_arch_and_hidden_size", lambda _p: ("gemma2", hidden_size)
-    )
+    monkeypatch.setattr(gemma2_encoder_module, "_read_gguf_arch_and_hidden_size", lambda _p: ("gemma2", hidden_size))
     with TemporaryDirectory() as tmpdir:
         mod = _make_gguf_file(Path(tmpdir))
         with pytest.raises(NotAMatchError, match="embedding_length"):
