@@ -411,32 +411,48 @@ export const createStrokeSession = (config: StrokeSessionConfig): StrokeSession 
       );
     }
 
-    // 4. Render the whole accumulated stroke into the scratch surface at full
-    //    alpha — one filled polygon, so no self-overlap darkening. The scratch is
-    //    region-local: translate the (layer-local) path by -region.origin.
+    // 4. Render the accumulated stroke into the scratch surface at full alpha.
+    //    The path is filled in ONE pass, so overlapping parts of a stroke union
+    //    rather than compounding — filling it in pieces across frames would let
+    //    the antialiased edges of successive batches blend into each other and
+    //    leave seams. The scratch is region-local: translate the (layer-local)
+    //    path by -region.origin.
     //
-    //    This stays whole-region rather than incremental: filling the complete
-    //    outline every frame is what guarantees the scratch holds ONE flat-alpha
-    //    silhouette. Accumulating it in pieces would let the antialiased edges of
-    //    successive batches blend into each other and leave seams inside the
-    //    stroke. It is also the cheap half of the frame — the readback was not.
+    //    Only the changed band is refreshed. The scratch persists between
+    //    frames, and outside that band the silhouette is by definition the same
+    //    one already sitting there — so re-clearing and re-filling the whole
+    //    region was redrawing pixels to their existing values. A region change
+    //    resizes the scratch, which clears it, so that case still refills whole.
+    const scratchCleared = !previousRect || !sameRect(previousRect, region);
+    const refresh = scratchCleared ? region : changed;
     const scratch = ensureStroke(region.width, region.height);
     const strokeCtx = scratch.ctx;
     strokeCtx.setTransform(1, 0, 0, 1, -region.x, -region.y);
-    strokeCtx.clearRect(region.x, region.y, region.width, region.height);
+    strokeCtx.save();
+    strokeCtx.beginPath();
+    strokeCtx.rect(refresh.x, refresh.y, refresh.width, refresh.height);
+    strokeCtx.clip();
+    strokeCtx.clearRect(refresh.x, refresh.y, refresh.width, refresh.height);
     strokeCtx.globalCompositeOperation = 'source-over';
     strokeCtx.globalAlpha = 1;
     strokeCtx.fillStyle = color;
     strokeCtx.fill(path);
+    strokeCtx.restore();
 
     // 4b. Selection clip: keep only the stroke pixels inside the selection mask.
     //     The mask is a placed surface; draw it at (maskOrigin - regionOrigin) in
-    //     the scratch's region-local space.
+    //     the scratch's region-local space. Confined to the same band — masking
+    //     already-masked pixels a second time would multiply their alpha again.
     if (clipMask) {
       strokeCtx.setTransform(1, 0, 0, 1, 0, 0);
+      strokeCtx.save();
+      strokeCtx.beginPath();
+      strokeCtx.rect(refresh.x - region.x, refresh.y - region.y, refresh.width, refresh.height);
+      strokeCtx.clip();
       strokeCtx.globalCompositeOperation = 'destination-in';
       strokeCtx.globalAlpha = 1;
       strokeCtx.drawImage(clipMask.surface.canvas, clipMask.rect.x - region.x, clipMask.rect.y - region.y);
+      strokeCtx.restore();
     }
 
     // 5. Composite the scratch stroke into the cache at the stroke opacity, using

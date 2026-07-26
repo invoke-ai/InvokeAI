@@ -5,8 +5,8 @@
  * The polygon math ({@link strokeOutlinePolygon}) is pure and DOM-free, so it is
  * fully unit-testable in node. `Path2D` does not exist in node, so building the
  * fillable path is split out into {@link strokeToPath}, which takes an injected
- * `createPath2D` factory (the engine passes `(d) => new Path2D(d)`; tests pass a
- * stub). This keeps the interesting geometry testable without a DOM.
+ * `createPath2D` factory (the engine passes `() => new Path2D()`; tests pass a
+ * recording stub). This keeps the interesting geometry testable without a DOM.
  *
  * ## Why this isn't a bare `getStroke` call
  *
@@ -37,8 +37,8 @@
  *    the two library stages separately lets that gate keep its small absolute
  *    value while the outline stage gets the real diameter.
  *
- * Finally, the outline is serialized with quadratic curves
- * ({@link polygonToSmoothSvgPath}) rather than the straight segments the lasso
+ * Finally, the outline is traced as quadratic curves
+ * ({@link traceSmoothPolygon}) rather than the straight segments the lasso
  * wants, so whatever facets remain read as curves.
  *
  * Zero React, zero import-time side effects.
@@ -84,11 +84,11 @@ const DEFAULT_THINNING = 0.5;
  * Target spacing (document units) between adjacent outline vertices, held
  * roughly constant across brush sizes by {@link outlineSmoothing}.
  *
- * Chosen against the QUADRATIC serialization, not straight segments: at this
- * spacing the rendered curve strays from the true offset curve by under 0.2
- * document pixels even where the stroke turns on a 60px radius. Going finer
- * only multiplies vertices — the outline is re-tessellated, re-serialized and
- * re-filled on every pointer batch, so vertex count is squarely on the hot path.
+ * Chosen against the QUADRATIC curve, not straight segments: at this spacing the
+ * rendered curve strays from the true offset curve by under 0.2 document pixels
+ * even where the stroke turns on a 60px radius. Going finer only multiplies
+ * vertices — the outline is re-tessellated and re-filled on every pointer batch,
+ * so vertex count is squarely on the hot path.
  */
 export const TARGET_VERTEX_SPACING = 24;
 
@@ -110,27 +110,6 @@ const SAMPLE_SPACING_RATIO = 0.02;
  * start-of-stroke noise gate — see the module docs. Never the real brush size.
  */
 export const START_GATE_SIZE = 24;
-
-/**
- * Coordinate precision (decimal places) used when serializing a stroke path.
- *
- * Layer caches are 1:1 with document pixels, so a hundredth of a unit is two
- * orders of magnitude below anything the rasterizer can resolve — while full
- * float precision costs ~25 characters per vertex in a string that is rebuilt
- * and re-parsed into a `Path2D` on every pointer batch.
- */
-const PATH_PRECISION = 100;
-
-/**
- * The most a serialized coordinate can move from its exact value — half a
- * precision step. A serialized path can therefore sit this far outside
- * {@link polygonBounds}, which callers absorb by rounding the rect outward
- * (`roundOut`) before using it as a dirty region.
- */
-export const PATH_ROUNDING_TOLERANCE = 0.5 / PATH_PRECISION;
-
-/** Rounds a coordinate to {@link PATH_PRECISION} for path serialization. */
-const round = (value: number): number => Math.round(value * PATH_PRECISION) / PATH_PRECISION;
 
 /** Squared distance between two sample points. */
 const dist2 = (a: StrokeSamplePoint, b: StrokeSamplePoint): number => {
@@ -238,37 +217,49 @@ export const polygonToSvgPath = (polygon: readonly Vec2[]): string => {
 };
 
 /**
- * Serializes an outline polygon to a smooth closed SVG path, treating each
+ * Traces an outline polygon onto `path` as a smooth closed curve, treating each
  * vertex as the control point of a quadratic segment running between the
  * midpoints of its two edges.
  *
  * The curve stays inside the convex hull of the polygon, so
- * {@link polygonBounds} of the polygon bounds the rendered shape to within
- * {@link PATH_ROUNDING_TOLERANCE} — which is what the dirty-rect accounting in
- * the stroke session relies on, and why it rounds that rect outward. Collinear
- * runs are reproduced exactly, so this only differs from
- * {@link polygonToSvgPath} where the outline actually turns.
+ * {@link polygonBounds} of the polygon bounds the rendered shape — which is what
+ * the dirty-rect accounting in the stroke session relies on. Collinear runs are
+ * reproduced exactly, so this only differs from {@link polygonToSvgPath} where
+ * the outline actually turns.
+ *
+ * Drawn with direct path calls rather than by building an SVG string for the
+ * browser to re-parse. A stroke's outline is re-traced on every pointer batch
+ * and runs to thousands of vertices, and at that size the round trip through a
+ * string costs an order of magnitude more than the drawing does — 3.31ms versus
+ * 0.18ms at 6000 samples — while describing exactly the same curve.
  *
  * Polygons with fewer than three vertices have no meaningful curvature and fall
- * back to the straight-segment form.
+ * back to straight segments.
  */
-export const polygonToSmoothSvgPath = (polygon: readonly Vec2[]): string => {
+export const traceSmoothPolygon = (path: Path2D, polygon: readonly Vec2[]): void => {
   const n = polygon.length;
-  if (n < 3) {
-    return polygonToSvgPath(polygon);
+  if (n === 0) {
+    return;
   }
-  const midX = (a: Vec2, b: Vec2): number => round((a.x + b.x) / 2);
-  const midY = (a: Vec2, b: Vec2): number => round((a.y + b.y) / 2);
+  if (n < 3) {
+    const [first, ...rest] = polygon;
+    path.moveTo(first!.x, first!.y);
+    for (const point of rest) {
+      path.lineTo(point.x, point.y);
+    }
+    path.closePath();
+    return;
+  }
   // Start on the seam midpoint so the ring closes as smoothly as it turns.
   const seamA = polygon[n - 1]!;
   const seamB = polygon[0]!;
-  let d = `M ${midX(seamA, seamB)} ${midY(seamA, seamB)}`;
+  path.moveTo((seamA.x + seamB.x) / 2, (seamA.y + seamB.y) / 2);
   for (let i = 0; i < n; i++) {
     const control = polygon[i]!;
     const next = polygon[(i + 1) % n]!;
-    d += ` Q ${round(control.x)} ${round(control.y)} ${midX(control, next)} ${midY(control, next)}`;
+    path.quadraticCurveTo(control.x, control.y, (control.x + next.x) / 2, (control.y + next.y) / 2);
   }
-  return `${d} Z`;
+  path.closePath();
 };
 
 /** Axis-aligned bounds of an outline polygon; an empty polygon yields a zero-size rect. */
@@ -303,10 +294,10 @@ export const polygonBounds = (polygon: readonly Vec2[]): Rect => {
  * path and the polygon's document-space {@link Rect} bounds so the caller can
  * derive the dirty region without recomputing the outline.
  *
- * The path is the smooth ({@link polygonToSmoothSvgPath}) serialization — the
- * outline is a coarse sampling of a curve, so joining its vertices with straight
- * lines would show as facets at large brush sizes. The returned bounds still
- * come from the polygon, which encloses the curve.
+ * The path is the smooth ({@link traceSmoothPolygon}) form — the outline is a
+ * coarse sampling of a curve, so joining its vertices with straight lines would
+ * show as facets at large brush sizes. The returned bounds still come from the
+ * polygon, which encloses the curve.
  */
 export const strokeToPath = (
   points: readonly StrokeSamplePoint[],
@@ -314,6 +305,7 @@ export const strokeToPath = (
   createPath2D: CreatePath2D
 ): { path: Path2D; polygon: Vec2[]; bounds: Rect } => {
   const polygon = strokeOutlinePolygon(points, opts);
-  const path = createPath2D(polygonToSmoothSvgPath(polygon));
+  const path = createPath2D();
+  traceSmoothPolygon(path, polygon);
   return { bounds: polygonBounds(polygon), path, polygon };
 };

@@ -46,7 +46,10 @@ const runStroke = (opts: { withMask: boolean }) => {
 
   const ctx = {
     backend,
-    createPath2D: (d?: string) => ({ d }) as unknown as Path2D,
+    createPath2D: () => {
+      const path = { closePath: () => {}, lineTo: () => {}, moveTo: () => {}, quadraticCurveTo: () => {} };
+      return path as unknown as Path2D;
+    },
     emitStrokeCommitted,
     invalidate: vi.fn(),
     layers,
@@ -119,7 +122,10 @@ describe('strokeSession: bbox-clipped painting', () => {
     const entry: LayerCacheEntry = layers.getOrCreate('L', 100, 100);
     const ctx = {
       backend,
-      createPath2D: (d?: string) => ({ d }) as unknown as Path2D,
+      createPath2D: () => {
+        const path = { closePath: () => {}, lineTo: () => {}, moveTo: () => {}, quadraticCurveTo: () => {} };
+        return path as unknown as Path2D;
+      },
       emitStrokeCommitted: vi.fn(),
       invalidate: vi.fn(),
       layers,
@@ -200,7 +206,10 @@ describe('strokeSession: content-sized cache growth', () => {
     const notifyLayerPainted = vi.fn();
     const ctx = {
       backend,
-      createPath2D: (d?: string) => ({ d }) as unknown as Path2D,
+      createPath2D: () => {
+        const path = { closePath: () => {}, lineTo: () => {}, moveTo: () => {}, quadraticCurveTo: () => {} };
+        return path as unknown as Path2D;
+      },
       emitStrokeCommitted,
       invalidate: vi.fn(),
       layers,
@@ -318,7 +327,10 @@ describe('strokeSession: cache version bump (live adjusted-surface invalidation)
     entry.stale = false;
     const ctx = {
       backend,
-      createPath2D: (d?: string) => ({ d }) as unknown as Path2D,
+      createPath2D: () => {
+        const path = { closePath: () => {}, lineTo: () => {}, moveTo: () => {}, quadraticCurveTo: () => {} };
+        return path as unknown as Path2D;
+      },
       emitStrokeCommitted: vi.fn(),
       invalidate: vi.fn(),
       layers,
@@ -367,7 +379,10 @@ describe('incremental "before" snapshot', () => {
     layers.getOrCreate('L', 0, 0);
     const ctx = {
       backend,
-      createPath2D: (d?: string) => ({ d }) as unknown as Path2D,
+      createPath2D: () => {
+        const path = { closePath: () => {}, lineTo: () => {}, moveTo: () => {}, quadraticCurveTo: () => {} };
+        return path as unknown as Path2D;
+      },
       emitStrokeCommitted: vi.fn(),
       invalidate: vi.fn(),
       layers,

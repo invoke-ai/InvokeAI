@@ -5,13 +5,12 @@ import {
   decimateSamples,
   MAX_SAMPLE_SPACING,
   outlineSmoothing,
-  PATH_ROUNDING_TOLERANCE,
   polygonBounds,
-  polygonToSmoothSvgPath,
   polygonToSvgPath,
   sampleSpacing,
   strokeOutlinePolygon,
   strokeToPath,
+  traceSmoothPolygon,
   TARGET_VERTEX_SPACING,
 } from '@workbench/canvas-engine/freehand';
 import { describe, expect, it } from 'vitest';
@@ -262,9 +261,35 @@ describe('polygonToSvgPath', () => {
   });
 });
 
-describe('polygonToSmoothSvgPath', () => {
+/**
+ * A node-safe `Path2D` double that records the commands traced onto it, so the
+ * curve can be asserted without a DOM.
+ */
+const recordingPath = () => {
+  const commands: string[] = [];
+  const points: Vec2[] = [];
+  const path = {
+    closePath: () => commands.push('Z'),
+    lineTo: (x: number, y: number) => {
+      commands.push(`L ${x} ${y}`);
+      points.push({ x, y });
+    },
+    moveTo: (x: number, y: number) => {
+      commands.push(`M ${x} ${y}`);
+      points.push({ x, y });
+    },
+    quadraticCurveTo: (cx: number, cy: number, x: number, y: number) => {
+      commands.push(`Q ${cx} ${cy} ${x} ${y}`);
+      points.push({ x: cx, y: cy }, { x, y });
+    },
+  };
+  return { commands, path: path as unknown as Path2D, points };
+};
+
+describe('traceSmoothPolygon', () => {
   it('runs a quadratic through each vertex, between its edge midpoints', () => {
-    const path = polygonToSmoothSvgPath([
+    const { commands, path } = recordingPath();
+    traceSmoothPolygon(path, [
       { x: 0, y: 0 },
       { x: 10, y: 0 },
       { x: 10, y: 10 },
@@ -272,56 +297,59 @@ describe('polygonToSmoothSvgPath', () => {
     ]);
     // Starts on the seam midpoint (between the last and first vertices) so the
     // ring closes as smoothly as it turns.
-    expect(path).toBe('M 0 5 Q 0 0 5 0 Q 10 0 10 5 Q 10 10 5 10 Q 0 10 0 5 Z');
+    expect(commands.join(' ')).toBe('M 0 5 Q 0 0 5 0 Q 10 0 10 5 Q 10 10 5 10 Q 0 10 0 5 Z');
   });
 
   it('falls back to straight segments when there is no curvature to describe', () => {
-    expect(polygonToSmoothSvgPath([])).toBe('');
-    expect(polygonToSmoothSvgPath([{ x: 1, y: 2 }])).toBe('M 1 2 Z');
-    expect(
-      polygonToSmoothSvgPath([
-        { x: 0, y: 0 },
-        { x: 4, y: 0 },
-      ])
-    ).toBe('M 0 0 L 4 0 Z');
+    const empty = recordingPath();
+    traceSmoothPolygon(empty.path, []);
+    expect(empty.commands).toEqual([]);
+
+    const dot = recordingPath();
+    traceSmoothPolygon(dot.path, [{ x: 1, y: 2 }]);
+    expect(dot.commands.join(' ')).toBe('M 1 2 Z');
+
+    const line = recordingPath();
+    traceSmoothPolygon(line.path, [
+      { x: 0, y: 0 },
+      { x: 4, y: 0 },
+    ]);
+    expect(line.commands.join(' ')).toBe('M 0 0 L 4 0 Z');
   });
 
   it('stays within the polygon bounds, so the dirty rect still encloses it', () => {
     // Every control point is a polygon vertex and every on-curve point an edge
     // midpoint, so the curve cannot leave the polygon's convex hull — which is
-    // what lets `strokeToPath` keep reporting the polygon's bounds. Serializing
-    // rounds coordinates, which can move one half a step outside; the caller
-    // rounds the dirty rect outward to whole pixels, absorbing it.
+    // what lets `strokeToPath` keep reporting the polygon's bounds.
     const polygon = strokeOutlinePolygon(arc(1000, Math.PI / 2), { last: true, size: 400, thinning: 0 });
     const bounds = polygonBounds(polygon);
-    const epsilon = PATH_ROUNDING_TOLERANCE;
-    for (const match of polygonToSmoothSvgPath(polygon).matchAll(/(-?[\d.]+) (-?[\d.]+)/g)) {
-      const x = Number(match[1]);
-      const y = Number(match[2]);
-      expect(x).toBeGreaterThanOrEqual(bounds.x - epsilon);
-      expect(x).toBeLessThanOrEqual(bounds.x + bounds.width + epsilon);
-      expect(y).toBeGreaterThanOrEqual(bounds.y - epsilon);
-      expect(y).toBeLessThanOrEqual(bounds.y + bounds.height + epsilon);
+    const { path, points } = recordingPath();
+    traceSmoothPolygon(path, polygon);
+    expect(points.length).toBeGreaterThan(2);
+    for (const point of points) {
+      expect(point.x).toBeGreaterThanOrEqual(bounds.x);
+      expect(point.x).toBeLessThanOrEqual(bounds.x + bounds.width);
+      expect(point.y).toBeGreaterThanOrEqual(bounds.y);
+      expect(point.y).toBeLessThanOrEqual(bounds.y + bounds.height);
     }
   });
 });
 
 describe('strokeToPath', () => {
-  it('builds the path via the injected factory and returns the polygon bounds', () => {
-    const seen: string[] = [];
-    const marker = { __brand: 'path' } as unknown as Path2D;
-    const createPath2D = (d?: string): Path2D => {
-      seen.push(d ?? '');
-      return marker;
+  it('traces onto a path from the injected factory and returns the polygon bounds', () => {
+    const recorder = recordingPath();
+    let calls = 0;
+    const createPath2D = (): Path2D => {
+      calls++;
+      return recorder.path;
     };
     const result = strokeToPath(horizontalLine(0.5), { size: 20, thinning: 0 }, createPath2D);
 
-    expect(result.path).toBe(marker);
-    expect(seen).toHaveLength(1);
-    expect(seen[0]).toMatch(/^M /);
-    // The smooth serialization — straight joins would show as facets at size.
-    expect(seen[0]).toContain(' Q ');
-    expect(seen[0]).toBe(polygonToSmoothSvgPath(result.polygon));
+    expect(result.path).toBe(recorder.path);
+    expect(calls).toBe(1);
+    expect(recorder.commands[0]).toMatch(/^M /);
+    // The smooth form — straight joins would show as facets at size.
+    expect(recorder.commands.some((command) => command.startsWith('Q '))).toBe(true);
     expect(result.polygon.length).toBeGreaterThan(2);
     expect(result.bounds).toEqual(polygonBounds(result.polygon));
   });

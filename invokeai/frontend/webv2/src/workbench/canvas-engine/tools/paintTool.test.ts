@@ -148,7 +148,10 @@ const createHarness = (
       createdIds.push(id);
       return id;
     },
-    createPath2D: (d) => ({ d }) as unknown as Path2D,
+    createPath2D: () => {
+      const path = { closePath: () => {}, lineTo: () => {}, moveTo: () => {}, quadraticCurveTo: () => {} };
+      return path as unknown as Path2D;
+    },
     dispatch: (action) => dispatched.push(action),
     emitStrokeCommitted: (event) => {
       painted.push(event.layerId);

@@ -663,7 +663,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     bitmapStore.markLayerDirty(layerId);
   };
 
-  const createPath2DImpl: CreatePath2D = (d) => new Path2D(d);
+  const createPath2DImpl: CreatePath2D = (d) => (d === undefined ? new Path2D() : new Path2D(d));
 
   /** Bumps a layer's cache version after a direct paint (pixels stay fresh) and recomposites. */
   const notifyLayerPainted = (layerId: string): void => {
