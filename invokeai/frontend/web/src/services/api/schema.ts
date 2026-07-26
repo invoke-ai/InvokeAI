@@ -26057,7 +26057,7 @@ export type components = {
              */
             image?: components["schemas"]["ImageField"] | null;
             /**
-             * @description FLUX-compatible VAE (FLUX.1, Z-Image, anything sharing the 16-channel encoder).
+             * @description FLUX AutoEncoder VAE. PiD upscale runs the FLUX backbone and applies FLUX VAE scaling, and the encode path only supports InvokeAI's FLUX AutoEncoder — a diffusers AutoencoderKL (e.g. Z-Image) is not supported here.
              * @default null
              */
             vae?: components["schemas"]["VAEField"] | null;
