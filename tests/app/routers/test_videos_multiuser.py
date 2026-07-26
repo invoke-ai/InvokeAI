@@ -12,6 +12,7 @@ filter is covered separately in tests/app/services/video_records.
 """
 
 import asyncio
+import time
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -26,11 +27,14 @@ from invokeai.app.api.routers import videos as videos_router_module
 from invokeai.app.api.routers.videos import (
     VideoNamesBatch,
     _is_mp4_file,
+    delete_uncategorized_videos,
+    delete_videos_from_list,
     get_video_thumbnail,
     star_videos_in_list,
     unstar_videos_in_list,
 )
 from invokeai.app.api_app import app
+from invokeai.app.services.auth.token_service import TokenData
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.users.users_common import UserCreateRequest
 from invokeai.app.services.videos.videos_common import VideoDTO
@@ -915,3 +919,71 @@ def test_delete_uncategorized_videos_deletes_only_owned(client: TestClient, mock
 def test_delete_uncategorized_videos_requires_auth(enable_multiuser_for_videos: Any, client: TestClient):
     response = client.delete("/api/v1/videos/uncategorized")
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+@pytest.fixture
+def anyio_backend() -> str:
+    return "asyncio"
+
+
+@pytest.mark.anyio
+async def test_delete_uncategorized_videos_does_not_block_the_event_loop(
+    enable_multiuser_for_videos: Any, mock_invoker: Invoker
+):
+    del enable_multiuser_for_videos
+    current_user = TokenData(user_id="user-1", email="user-1@example.com", is_admin=False)
+    names_result = MagicMock()
+    names_result.video_names = ["video.mp4"]
+    mock_invoker.services.videos.get_video_names.return_value = names_result
+    mock_invoker.services.video_records.get_user_id.return_value = current_user.user_id
+    mock_invoker.services.videos.delete.side_effect = lambda _video_name: time.sleep(0.1)
+    heartbeat_elapsed: list[float] = []
+    started = time.monotonic()
+
+    async def heartbeat() -> None:
+        await asyncio.sleep(0.01)
+        heartbeat_elapsed.append(time.monotonic() - started)
+
+    await asyncio.gather(heartbeat(), delete_uncategorized_videos(current_user))
+
+    assert heartbeat_elapsed[0] < 0.05
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "handler,slow_service",
+    [
+        (delete_videos_from_list, "delete"),
+        (star_videos_in_list, "update"),
+        (unstar_videos_in_list, "update"),
+    ],
+)
+async def test_video_batch_mutations_do_not_block_the_event_loop(
+    enable_multiuser_for_videos: Any,
+    mock_invoker: Invoker,
+    handler: Any,
+    slow_service: str,
+):
+    del enable_multiuser_for_videos
+    current_user = TokenData(user_id="user-1", email="user-1@example.com", is_admin=False)
+    mock_invoker.services.video_records.get_user_id.return_value = current_user.user_id
+    mock_invoker.services.videos.get_dto.return_value = MagicMock(board_id=None)
+
+    def slow_call(*_args: Any, **_kwargs: Any) -> MagicMock:
+        time.sleep(0.1)
+        return MagicMock(board_id=None)
+
+    getattr(mock_invoker.services.videos, slow_service).side_effect = slow_call
+    heartbeat_elapsed: list[float] = []
+    started = time.monotonic()
+
+    async def heartbeat() -> None:
+        await asyncio.sleep(0.01)
+        heartbeat_elapsed.append(time.monotonic() - started)
+
+    await asyncio.gather(
+        heartbeat(),
+        handler(current_user=current_user, batch=VideoNamesBatch(video_names=["video.mp4"])),
+    )
+
+    assert heartbeat_elapsed[0] < 0.05

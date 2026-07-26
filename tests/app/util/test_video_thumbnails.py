@@ -229,6 +229,56 @@ class TestStreamedDecoderIsBounded:
         with pytest.raises(CanceledException):
             next(iter_video_frames(target, timeout=5, is_canceled=canceled.is_set))
 
+    def test_cancellation_does_not_wait_for_stream_capacity(self, tmp_path: Path) -> None:
+        target = tmp_path / "never-opened.mp4"
+        errors: list[BaseException] = []
+        finished = Event()
+        assert video_thumbnails._VIDEO_STREAM_SLOTS.acquire(timeout=1)
+
+        def consume() -> None:
+            try:
+                next(iter_video_frames(target, timeout=5, is_canceled=lambda: True))
+            except BaseException as error:
+                errors.append(error)
+            finally:
+                finished.set()
+
+        thread = threading.Thread(target=consume)
+        thread.start()
+        try:
+            assert finished.wait(timeout=0.2), "canceled decoder waited for an occupied stream slot"
+        finally:
+            video_thumbnails._VIDEO_STREAM_SLOTS.release()
+            thread.join(timeout=2)
+
+        assert len(errors) == 1
+        assert isinstance(errors[0], CanceledException)
+
+    def test_timeout_includes_waiting_for_stream_capacity(self, tmp_path: Path) -> None:
+        target = tmp_path / "never-opened.mp4"
+        errors: list[BaseException] = []
+        finished = Event()
+        assert video_thumbnails._VIDEO_STREAM_SLOTS.acquire(timeout=1)
+
+        def consume() -> None:
+            try:
+                next(iter_video_frames(target, timeout=0.1))
+            except BaseException as error:
+                errors.append(error)
+            finally:
+                finished.set()
+
+        thread = threading.Thread(target=consume)
+        thread.start()
+        try:
+            assert finished.wait(timeout=0.3), "decoder timeout did not include the wait for stream capacity"
+        finally:
+            video_thumbnails._VIDEO_STREAM_SLOTS.release()
+            thread.join(timeout=2)
+
+        assert len(errors) == 1
+        assert isinstance(errors[0], TimeoutError)
+
     def test_midstream_worker_failure_includes_stderr(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         target = tmp_path / "failed.mp4"
         target.write_bytes(b"unused")

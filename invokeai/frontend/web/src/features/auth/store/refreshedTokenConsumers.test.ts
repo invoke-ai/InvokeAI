@@ -53,4 +53,14 @@ describe('refreshed token consumers', () => {
     // (shared with login/logout) can never be held indefinitely by a stalled request.
     expect(apiSource).toContain('AbortSignal.timeout(MEDIA_COOKIE_SYNC_TIMEOUT_MS)');
   });
+
+  it('adopts a refreshed token written by another tab', () => {
+    const protectedRouteSource = readFileSync(
+      fileURLToPath(new URL('../components/ProtectedRoute.tsx', import.meta.url)),
+      'utf8'
+    );
+
+    expect(protectedRouteSource).toContain("localStorage.getItem('auth_token')");
+    expect(protectedRouteSource).toContain('dispatch(tokenRefreshed(');
+  });
 });

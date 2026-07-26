@@ -30,4 +30,11 @@ describe('protected media consumers', () => {
     expect(source).toContain('useMediaUrl(');
     expect(source).not.toContain(rawUsage);
   });
+
+  it('waits for media-cookie self-heal before opening the video metadata link', () => {
+    const source = readConsumer('../../gallery/components/ImageMetadataViewer/VideoMetadataViewer.tsx');
+
+    expect(source).toContain('openMediaInNewTab');
+    expect(source).not.toContain('href={video.video_url}');
+  });
 });

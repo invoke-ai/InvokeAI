@@ -69,6 +69,24 @@ class TestAddVideosTables:
         # The video itself is not deleted, only its board association.
         assert db.execute("SELECT COUNT(*) FROM videos").fetchone()[0] == 1
 
+    def test_board_video_updated_at_changes_when_video_moves_boards(self, db: sqlite3.Connection):
+        AddVideosTablesCallback()(db.cursor())
+        db.execute("INSERT INTO boards (board_id, board_name) VALUES ('b1', 'Board 1'), ('b2', 'Board 2')")
+        db.execute(
+            "INSERT INTO videos (video_name, video_origin, video_category, width, height)"
+            " VALUES ('v1', 'internal', 'general', 640, 480)"
+        )
+        db.execute(
+            "INSERT INTO board_videos (board_id, video_name, updated_at) VALUES ('b1', 'v1', '2000-01-01 00:00:00.000')"
+        )
+
+        db.execute("UPDATE board_videos SET board_id = 'b2' WHERE video_name = 'v1'")
+
+        row = db.execute("SELECT board_id, updated_at FROM board_videos WHERE video_name = 'v1'").fetchone()
+        assert row is not None
+        assert row[0] == "b2"
+        assert row[1] != "2000-01-01 00:00:00.000"
+
     def test_idempotent_when_tables_exist(self, db: sqlite3.Connection):
         cursor = db.cursor()
         AddVideosTablesCallback()(cursor)
