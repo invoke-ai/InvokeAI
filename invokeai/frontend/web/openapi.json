@@ -1009,6 +1009,9 @@
                       "$ref": "#/components/schemas/Gemma2Encoder_Gemma2Encoder_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
                     },
                     {
@@ -1359,6 +1362,9 @@
                       "$ref": "#/components/schemas/Gemma2Encoder_Gemma2Encoder_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
                     },
                     {
@@ -1707,6 +1713,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Gemma2Encoder_Gemma2Encoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
@@ -2102,6 +2111,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Gemma2Encoder_Gemma2Encoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
@@ -2521,6 +2533,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Gemma2Encoder_Gemma2Encoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
@@ -3770,6 +3785,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Gemma2Encoder_Gemma2Encoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
@@ -12164,6 +12182,9 @@
           },
           {
             "$ref": "#/components/schemas/Gemma2Encoder_Gemma2Encoder_Config"
+          },
+          {
+            "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
           },
           {
             "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
@@ -29770,6 +29791,142 @@
         "required": ["output_meta", "gemma2_encoder", "type", "type"],
         "title": "Gemma2EncoderOutput",
         "type": "object"
+      },
+      "Gemma2Encoder_GGUF_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "base": {
+            "type": "string",
+            "const": "any",
+            "title": "Base",
+            "default": "any"
+          },
+          "type": {
+            "type": "string",
+            "const": "gemma2_encoder",
+            "title": "Type",
+            "default": "gemma2_encoder"
+          },
+          "format": {
+            "type": "string",
+            "const": "gguf_quantized",
+            "title": "Format",
+            "default": "gguf_quantized"
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "base",
+          "type",
+          "format",
+          "cpu_only"
+        ],
+        "title": "Gemma2Encoder_GGUF_Config",
+        "description": "Single-file GGUF-quantized Gemma-2-2b encoder for PiD (llama.cpp GGUF, e.g. gemma-2-2b-it-Q4_K_M.gguf).\n\nUnlike the diffusers-directory config, this is a single ``.gguf`` file. transformers dequantizes it\n(``gemma2`` is in its GGUF config mapping) and reads the tokenizer from the GGUF metadata, so no\ncompanion config.json / tokenizer files are required. Only Gemma-2-2b (2304-dim) is accepted, matching\nPiD's fixed caption projection; 9B/27B GGUFs are rejected here as for the directory config."
       },
       "Gemma2Encoder_Gemma2Encoder_Config": {
         "properties": {
@@ -57058,6 +57215,9 @@
                 "$ref": "#/components/schemas/Gemma2Encoder_Gemma2Encoder_Config"
               },
               {
+                "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
+              },
+              {
                 "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
               },
               {
@@ -57654,6 +57814,9 @@
                     "$ref": "#/components/schemas/Gemma2Encoder_Gemma2Encoder_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
                   },
                   {
@@ -58135,6 +58298,9 @@
                 "$ref": "#/components/schemas/Gemma2Encoder_Gemma2Encoder_Config"
               },
               {
+                "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
+              },
+              {
                 "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
               },
               {
@@ -58470,6 +58636,9 @@
               },
               {
                 "$ref": "#/components/schemas/Gemma2Encoder_Gemma2Encoder_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
               },
               {
                 "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
@@ -59261,6 +59430,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/Gemma2Encoder_Gemma2Encoder_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
                 },
                 {
                   "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
@@ -61706,7 +61878,7 @@
               }
             ],
             "default": null,
-            "description": "FLUX-compatible VAE (FLUX.1, Z-Image, anything sharing the 16-channel encoder).",
+            "description": "FLUX AutoEncoder VAE. PiD upscale runs the FLUX backbone and applies FLUX VAE scaling, and the encode path only supports InvokeAI's FLUX AutoEncoder \u2014 a diffusers AutoencoderKL (e.g. Z-Image) is not supported here.",
             "field_kind": "input",
             "input": "connection",
             "orig_required": true

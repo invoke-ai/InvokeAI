@@ -13,7 +13,10 @@ from typing import Optional
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
-from invokeai.backend.model_manager.configs.gemma2_encoder import Gemma2Encoder_Gemma2Encoder_Config
+from invokeai.backend.model_manager.configs.gemma2_encoder import (
+    Gemma2Encoder_Gemma2Encoder_Config,
+    Gemma2Encoder_GGUF_Config,
+)
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, ModelFormat, ModelType, SubModelType
@@ -51,6 +54,52 @@ class Gemma2EncoderLoader(ModelLoader):
                 # transformers 4.56 returns None for Gemma2, so we reach for
                 # `.model` (the underlying Gemma2Model) directly and let the
                 # rest of `causal_lm` (lm_head etc.) be garbage-collected.
+                inner = getattr(causal_lm, "get_decoder", lambda: None)() or causal_lm.model
+                inner.eval()
+                inner.requires_grad_(False)
+                return inner
+
+        raise ValueError(
+            f"Unsupported submodel type for Gemma2 encoder: {submodel_type!r}. Expected Tokenizer or TextEncoder."
+        )
+
+
+@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.Gemma2Encoder, format=ModelFormat.GGUFQuantized)
+class Gemma2EncoderGGUFLoader(ModelLoader):
+    """Loads a single-file GGUF Gemma-2-2b encoder and exposes its decoder + tokenizer.
+
+    transformers dequantizes the GGUF (``gemma2`` is in its GGUF config mapping) and reads the tokenizer
+    from the GGUF metadata, so `from_pretrained(<dir>, gguf_file=<name>)` needs no companion files. PiD
+    encodes the caption once and offloads the encoder immediately, so dequantizing at load (rather than
+    keeping it quantized) is acceptable here.
+    """
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        if not isinstance(config, Gemma2Encoder_GGUF_Config):
+            raise ValueError("Only Gemma2Encoder_GGUF_Config models are supported here.")
+
+        gguf_path = Path(config.path)
+        # transformers resolves the GGUF relative to a directory + filename.
+        model_dir = gguf_path.parent
+        gguf_file = gguf_path.name
+
+        match submodel_type:
+            case SubModelType.Tokenizer:
+                return AutoTokenizer.from_pretrained(model_dir, gguf_file=gguf_file, local_files_only=True)
+            case SubModelType.TextEncoder:
+                target_device = TorchDevice.choose_torch_device()
+                model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+                causal_lm = AutoModelForCausalLM.from_pretrained(
+                    model_dir,
+                    gguf_file=gguf_file,
+                    torch_dtype=model_dtype,
+                    local_files_only=True,
+                )
+                # PiD only uses the decoder block (see Gemma2EncoderLoader) — reach for `.model` directly.
                 inner = getattr(causal_lm, "get_decoder", lambda: None)() or causal_lm.model
                 inner.eval()
                 inner.requires_grad_(False)
