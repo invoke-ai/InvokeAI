@@ -165,8 +165,28 @@ const runAxeSurface = async (browser, surface) => {
   }
 };
 
+/**
+ * Roving-tabindex and focus-restore moves land on a later task than the key
+ * press that causes them, so sampling `document.activeElement` once races the
+ * behaviour under test. Poll to a deadline instead: the assertion is unchanged
+ * (focus must reach this element) but it no longer depends on scheduling.
+ */
 const expectFocused = async (locator, message) => {
-  assert.equal(await locator.evaluate((element) => element === document.activeElement), true, message);
+  const deadline = Date.now() + 5_000;
+
+  for (;;) {
+    if (await locator.evaluate((element) => element === document.activeElement)) {
+      return;
+    }
+
+    if (Date.now() >= deadline) {
+      assert.fail(message);
+    }
+
+    await new Promise((resolveWait) => {
+      setTimeout(resolveWait, 25);
+    });
+  }
 };
 
 const runKeyboardJourney = async (browser) => {
