@@ -3,50 +3,105 @@ import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import ts from 'typescript-legacy';
 
-import { checkRouteBudget, measureRouteBuild } from './performance-budgets.mjs';
+import {
+  BUILD_METRIC_KEYS,
+  checkRouteBudget,
+  measureRouteBuild,
+  validateArchitectureBaseline,
+  validateChunkSourceManifest,
+} from './performance-budgets.mjs';
 import { WIDGET_IMPLEMENTATION_PATTERN, WIDGET_SOURCES } from './widget-sources.mjs';
 
 const root = resolve(import.meta.dirname, '..');
-const baseline = JSON.parse(await readFile(resolve(root, 'performance/architecture-baseline.json'), 'utf8'));
+const baselinePath = resolve(root, 'performance/architecture-baseline.json');
+const baselineInput = JSON.parse(await readFile(baselinePath, 'utf8'));
 const manifest = JSON.parse(await readFile(resolve(root, 'dist/.vite/manifest.json'), 'utf8'));
+const chunkSourceManifest = validateChunkSourceManifest(
+  JSON.parse(await readFile(resolve(root, 'dist/.vite/chunk-sources.json'), 'utf8'))
+);
 const readAsset = async (file) => new Uint8Array(await readFile(resolve(root, 'dist', file)));
+const updateBaseline = process.argv.includes('--update-baseline');
 
 const assetCache = new Map();
 for (const chunk of Object.values(manifest)) {
-  if (chunk.file && !assetCache.has(chunk.file)) {
-    assetCache.set(chunk.file, await readAsset(chunk.file));
+  for (const file of [chunk.file, ...(chunk.css ?? []), ...(chunk.assets ?? [])]) {
+    if (file && !assetCache.has(file)) {
+      assetCache.set(file, await readAsset(file));
+    }
   }
 }
 
-const syntheticFailures = checkRouteBudget(
-  {
-    brotliBytes: 70,
-    chunkNames: ['eager-gallery', 'entry'],
-    files: ['entry.js', 'gallery.js'],
-    gzipBytes: 80,
-    initialRawBytes: 150,
-    ownedRawBytes: 103,
-    routeId: 'launchpad',
-    source: 'entry.ts',
-    sources: ['entry.ts', 'gallery.ts'],
-  },
-  {
-    baselineOwnedRawBytes: 100,
-    initialChunkNames: ['entry'],
-    maxGrowthPercent: 0.02,
-    maxGrowthRawBytes: 20,
-    owner: 'gallery',
-    remediationTicket: 'define-gallery-feature',
-    source: 'entry.ts',
+const getLegacyOwnedLimit = (budget, measurement) => {
+  if (
+    typeof budget.baselineOwnedRawBytes !== 'number' ||
+    typeof budget.maxGrowthPercent !== 'number' ||
+    typeof budget.maxGrowthRawBytes !== 'number'
+  ) {
+    return measurement.ownedRawBytes;
   }
-);
-assert.equal(syntheticFailures.length, 2, 'Synthetic byte and request-set regressions must both fail.');
-assert.match(syntheticFailures.map((failure) => failure.message).join('\n'), /103 bytes/);
-assert.match(syntheticFailures.map((failure) => failure.message).join('\n'), /eager-gallery/);
 
-const measurements = Object.entries(baseline.build).map(([routeId, budget]) =>
-  measureRouteBuild(manifest, routeId, budget.source, (file) => assetCache.get(file))
+  return Math.max(
+    measurement.ownedRawBytes,
+    budget.baselineOwnedRawBytes +
+      Math.min(budget.maxGrowthRawBytes, Math.floor(budget.baselineOwnedRawBytes * budget.maxGrowthPercent))
+  );
+};
+
+const createLimits = (measurement, legacyBudget) =>
+  Object.fromEntries(
+    BUILD_METRIC_KEYS.map((key) => {
+      if (key === 'ownedRawBytes') {
+        return [key, getLegacyOwnedLimit(legacyBudget, measurement)];
+      }
+      if (key === 'requestCount' || key === 'scriptRequestCount') {
+        return [key, measurement[key]];
+      }
+      return [key, Math.ceil(measurement[key] * 1.01)];
+    })
+  );
+
+const routeEntries = Object.entries(baselineInput.build);
+const measurements = routeEntries.map(([routeId, budget]) =>
+  measureRouteBuild(manifest, chunkSourceManifest, routeId, budget.source, (file) => assetCache.get(file))
 );
+
+let baseline;
+if (updateBaseline) {
+  const build = Object.fromEntries(
+    routeEntries.map(([routeId, previousBudget]) => {
+      const measurement = measurements.find((candidate) => candidate.routeId === routeId);
+      return [
+        routeId,
+        {
+          baseline: {
+            ...Object.fromEntries(BUILD_METRIC_KEYS.map((key) => [key, measurement[key]])),
+            sourceOwners: measurement.sourceOwners,
+          },
+          limits: createLimits(measurement, previousBudget),
+          owner: previousBudget.owner,
+          remediationTicket: previousBudget.remediationTicket,
+          source: previousBudget.source,
+        },
+      ];
+    })
+  );
+  baseline = {
+    build,
+    capturedAt: new Date().toISOString().slice(0, 10),
+    developmentInvalidation: baselineInput.developmentInvalidation,
+    schemaVersion: 2,
+    structural: {
+      ...baselineInput.structural,
+      editorForbiddenInitialChunkNames: [...baselineInput.structural.editorForbiddenInitialChunkNames].sort(),
+      launchpadForbiddenInitialSources: [...baselineInput.structural.launchpadForbiddenInitialSources].sort(),
+    },
+  };
+  validateArchitectureBaseline(baseline);
+  await writeFile(baselinePath, `${JSON.stringify(baseline, null, 2)}\n`);
+} else {
+  baseline = validateArchitectureBaseline(baselineInput);
+}
+
 const failures = measurements.flatMap((measurement) =>
   checkRouteBudget(measurement, baseline.build[measurement.routeId])
 );

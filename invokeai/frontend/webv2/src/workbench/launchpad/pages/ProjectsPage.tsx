@@ -2,6 +2,7 @@ import type { SystemStyleObject } from '@chakra-ui/react';
 
 import { Flex, Heading, HStack, Stack, Text } from '@chakra-ui/react';
 import { useAuthSession } from '@features/identity';
+import { LAUNCHPAD_READY_MARK, markSemanticReady } from '@platform/performance/semanticReady';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import {
   assertAccountScopeCurrent,
@@ -38,7 +39,13 @@ export const ProjectsPage = () => {
   const { t } = useTranslation();
 
   useMountEffect(() => {
-    void refreshProjectLibrary();
+    const owner = captureAccountScope();
+
+    void refreshProjectLibrary().then(() => {
+      if (isAccountScopeCurrent(owner)) {
+        markSemanticReady(LAUNCHPAD_READY_MARK);
+      }
+    });
   });
 
   const displayName = session.user?.display_name?.trim();

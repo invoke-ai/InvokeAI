@@ -3,10 +3,13 @@ import react, { reactCompilerPreset } from '@vitejs/plugin-react';
 import { fileURLToPath, URL } from 'node:url';
 import { defineConfig } from 'vite';
 
+import { chunkSourceManifest } from './scripts/chunk-source-manifest.mjs';
+
 // Override with e.g. INVOKEAI_DEV_BACKEND=http://127.0.0.1:9091 when the
 // backend dev server runs on a non-default port.
 const BACKEND_URL = process.env.INVOKEAI_DEV_BACKEND ?? 'http://127.0.0.1:9090';
 const BACKEND_WS_URL = BACKEND_URL.replace(/^http/, 'ws');
+const PROJECT_ROOT = fileURLToPath(new URL('.', import.meta.url));
 
 export default defineConfig({
   base: './',
@@ -21,7 +24,8 @@ export default defineConfig({
           if (
             id.endsWith('/platform/state/selectors.ts') ||
             id.endsWith('/workbench/palette/paletteStore.ts') ||
-            id.endsWith('/platform/search/dateTokens.ts')
+            id.endsWith('/platform/search/dateTokens.ts') ||
+            id.endsWith('/platform/performance/semanticReady.ts')
           ) {
             return 'shared';
           }
@@ -60,6 +64,7 @@ export default defineConfig({
     babel({
       presets: [reactCompilerPreset()],
     }),
+    chunkSourceManifest({ projectRoot: PROJECT_ROOT }),
   ],
   resolve: {
     alias: {
