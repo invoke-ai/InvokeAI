@@ -11,8 +11,8 @@ build it explicitly and load the prequantized state dict — mirroring how Invok
 FLUX nf4. Both transformer branches are returned as a single ``Ideogram4TransformerPair``.
 """
 
+import itertools
 import json
-import warnings
 from pathlib import Path
 from typing import Optional
 
@@ -45,6 +45,29 @@ def _load_local_state_dict(folder: Path, basename: str) -> dict[str, torch.Tenso
             sd.update(load_file(folder / shard))
         return sd
     return load_file(folder / f"{basename}.safetensors")
+
+
+def _verify_encoder_fully_materialized(model: torch.nn.Module, *, context: str) -> None:
+    """Fail if any parameter is still on the meta device after loading the text encoder.
+
+    The encoder is built under ``accelerate.init_empty_weights()`` (every param starts on the meta
+    device) and then filled from the checkpoint. Missing keys are only acceptable for tied weights, which
+    ``transformers`` materializes via ``tie_weights()``; any other missing key leaves a meta tensor that
+    would pass loading but fail later during device movement or encoding. Re-tie, then hard-fail if any
+    meta tensor remains so a bad/mismatched encoder is rejected at load time instead.
+    """
+    if hasattr(model, "tie_weights"):
+        model.tie_weights()
+    meta = [
+        name
+        for name, tensor in itertools.chain(model.named_parameters(), model.named_buffers())
+        if getattr(tensor, "is_meta", False)
+    ]
+    if meta:
+        raise RuntimeError(
+            f"{context}: {len(meta)} parameter(s) remain on the meta device after loading "
+            f"(missing or mismatched weights): {meta[:10]}"
+        )
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Ideogram4, type=ModelType.Main, format=ModelFormat.Diffusers)
@@ -166,6 +189,7 @@ class Ideogram4DiffusersModel(ModelLoader):
                 model: torch.nn.Module = AutoModel.from_config(cfg)
                 swap_linears_to_fp8(model, sd, compute_dtype=compute_dtype)
             load_fp8_state_dict(model, sd, device=torch.device("cpu"), dtype=compute_dtype, assign=True, strict=False)
+            _verify_encoder_fully_materialized(model, context="Ideogram 4 fp8 text encoder")
             model.eval()
             return model
 
@@ -176,15 +200,13 @@ class Ideogram4DiffusersModel(ModelLoader):
             if is_bnb_nf4:
                 model = quantize_model_nf4(model, modules_to_not_convert=set(), compute_dtype=compute_dtype)
 
-        missing, unexpected = model.load_state_dict(sd, strict=False, assign=True)
-        # Mirror the fp8 helper's policy (load_fp8_state_dict): unexpected keys signal a wrong or
-        # contaminated checkpoint and must hard-fail; missing keys are expected only for tied weights
-        # that transformers re-ties itself, so downgrade those to a warning rather than silently
-        # accepting a partial load that would fail later during encoding.
+        _, unexpected = model.load_state_dict(sd, strict=False, assign=True)
+        # Unexpected keys signal a wrong or contaminated checkpoint and must hard-fail. Missing keys are
+        # acceptable only for tied weights (resolved by _verify_encoder_fully_materialized via
+        # tie_weights); any genuinely missing non-tied weight is caught there as a leftover meta tensor.
         if unexpected:
             raise RuntimeError(f"unexpected keys loading Ideogram 4 text encoder: {unexpected[:10]}")
-        if missing:
-            warnings.warn(f"missing keys loading Ideogram 4 text encoder: {missing[:10]}", stacklevel=2)
+        _verify_encoder_fully_materialized(model, context="Ideogram 4 text encoder")
         if not is_bnb_nf4:
             model = model.to(compute_dtype)
         model.eval()
