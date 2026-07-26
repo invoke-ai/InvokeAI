@@ -4,9 +4,8 @@ import { InvokeMark } from '@platform/ui/InvokeMark';
 import { Link } from '@tanstack/react-router';
 import { PaletteButton } from '@workbench/palette/PaletteButton';
 import { ProjectTabs } from '@workbench/projects/components';
+import { SettingsButton } from '@workbench/settings/SettingsButton';
 import { useTranslation } from 'react-i18next';
-
-import { SettingsButton } from '@/workbench/settings';
 
 import { BatchCountField } from './BatchCountField';
 import { InvokeControl } from './InvokeControl';

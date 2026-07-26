@@ -50,6 +50,20 @@ export default defineConfig({
             return 'react-icons';
           }
 
+          // The Workflow editor's graph canvas. XYFlow and the d3 modules it
+          // pulls in are reachable only from the Workflow widget, which is
+          // lazy — but the `vendor` catch-all below made them launchpad-eager.
+          if (id.includes('/node_modules/@xyflow/') || /\/node_modules\/d3-[^/]+\//.test(id)) {
+            return 'workflow-vendor';
+          }
+
+          // Editor-only pointer and drag interaction libraries: perfect-freehand
+          // belongs to Canvas stroke geometry, dnd-kit to widget and tab
+          // reordering. Neither is reachable from the launchpad.
+          if (id.includes('/node_modules/perfect-freehand/') || id.includes('/node_modules/@dnd-kit/')) {
+            return 'editor-interactions';
+          }
+
           if (id.includes('/node_modules/@chakra-ui/') || id.includes('/node_modules/@emotion/')) {
             return 'chakra';
           }
