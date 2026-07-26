@@ -8,6 +8,7 @@ import {
   InputGroup,
   Menu,
   Portal,
+  SegmentGroup,
   Slider,
   Spacer,
   Stack,
@@ -16,7 +17,7 @@ import {
 } from '@chakra-ui/react';
 import { isDateBoardId } from '@features/gallery/data/backend';
 import { describeDateRange, findInvalidDateToken, formatIsoDate, parseDateTokens } from '@platform/search/dateTokens';
-import { Button, CloseButton, IconButton, Tabs } from '@platform/ui';
+import { Button, CloseButton, IconButton } from '@platform/ui';
 import { SearchIcon, SettingsIcon, UploadIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -41,7 +42,11 @@ export const GalleryToolbar = ({ layout }: { layout: 'stacked' | 'wide' }) => {
   const isWide = layout === 'wide';
 
   const handleViewChange = useCallback(
-    (event: { value: string }) => actions.setView(event.value as GalleryView),
+    (event: { value: string | null }) => {
+      if (event.value) {
+        actions.setView(event.value as GalleryView);
+      }
+    },
     [actions]
   );
 
@@ -62,15 +67,20 @@ export const GalleryToolbar = ({ layout }: { layout: 'stacked' | 'wide' }) => {
 
   const viewTabs = useMemo(
     () => (
-      <Tabs.Root size="sm" variant="subtle" value={gallery.galleryView} onValueChange={handleViewChange}>
-        <Tabs.List>
-          {galleryViewTabs.map((item) => (
-            <Tabs.Trigger key={item.value} value={item.value} fontSize="xs">
-              {t(item.labelKey)}
-            </Tabs.Trigger>
-          ))}
-        </Tabs.List>
-      </Tabs.Root>
+      <SegmentGroup.Root
+        aria-label={t('common.view')}
+        size="sm"
+        value={gallery.galleryView}
+        onValueChange={handleViewChange}
+      >
+        <SegmentGroup.Indicator />
+        {galleryViewTabs.map((item) => (
+          <SegmentGroup.Item key={item.value} value={item.value}>
+            <SegmentGroup.ItemHiddenInput />
+            <SegmentGroup.ItemText fontSize="xs">{t(item.labelKey)}</SegmentGroup.ItemText>
+          </SegmentGroup.Item>
+        ))}
+      </SegmentGroup.Root>
     ),
     [gallery.galleryView, handleViewChange, t]
   );
@@ -146,7 +156,7 @@ export const GalleryToolbar = ({ layout }: { layout: 'stacked' | 'wide' }) => {
         </InputGroup>
         {dateHint ? (
           <Text
-            color={dateHint.isInvalid ? 'fg.error' : 'fg.subtle'}
+            color={dateHint.isInvalid ? 'fg.error' : 'fg.muted'}
             fontSize="2xs"
             id={SEARCH_DATE_HINT_ID}
             role="status"

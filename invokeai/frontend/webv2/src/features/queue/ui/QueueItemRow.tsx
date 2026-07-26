@@ -90,7 +90,7 @@ export const QueueItemRow = memo(
               </Text>
               <HStack gap="1.5" minW="0">
                 <QueueStatusDot status={item.status} />
-                <Text color="fg.subtle" fontSize="2xs" fontVariantNumeric="tabular-nums" truncate>
+                <Text color="fg.muted" fontSize="2xs" fontVariantNumeric="tabular-nums" truncate>
                   {[statusLabel, ageLabel].filter(Boolean).join(' · ')}
                 </Text>
               </HStack>

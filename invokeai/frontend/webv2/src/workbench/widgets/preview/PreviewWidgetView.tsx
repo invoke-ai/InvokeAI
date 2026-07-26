@@ -605,6 +605,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
         h="full"
         minH="0"
         outline="none"
+        role="region"
         tabIndex={0}
         w="full"
         onKeyDown={handleNavigationKeyDown}
@@ -796,7 +797,7 @@ const EmptyPreview = () => {
         <Text fontSize="sm" fontWeight="800">
           {t('widgets.preview.noGallerySelection')}
         </Text>
-        <Text color="fg.subtle" fontSize="2xs">
+        <Text color="fg.muted" fontSize="2xs">
           {t('widgets.preview.emptyDescription')}
         </Text>
       </Stack>

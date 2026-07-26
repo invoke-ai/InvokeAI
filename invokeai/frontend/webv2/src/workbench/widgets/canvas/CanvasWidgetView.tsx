@@ -448,7 +448,15 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
   const canvasSurface = useMemo(() => (engine ? <CanvasSurface engine={engine} /> : null), [engine]);
 
   return (
-    <Box aria-label={t('widgets.canvas.surface')} bg="bg.inset" h="full" overflow="hidden" position="relative" w="full">
+    <Box
+      aria-label={t('widgets.canvas.surface')}
+      bg="bg.inset"
+      h="full"
+      overflow="hidden"
+      position="relative"
+      role="region"
+      w="full"
+    >
       <CanvasSurfaceContextLayout surface={canvasSurface} onContextMenu={handleSurfaceContextMenu}>
         <CanvasImageDropOverlay
           isDocumentEditingLocked={interactionCapabilities.isDocumentEditingLocked}

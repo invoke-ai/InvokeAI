@@ -66,7 +66,7 @@ export const StarterList = ({
 
   if (models.length === 0) {
     return (
-      <Text color="fg.subtle" fontSize="2xs" py="6" textAlign="center">
+      <Text color="fg.muted" fontSize="2xs" py="6" textAlign="center">
         {isInstallable ? t('models.noStarterModelsPull') : t('models.noStarterModelsSearch')}
       </Text>
     );

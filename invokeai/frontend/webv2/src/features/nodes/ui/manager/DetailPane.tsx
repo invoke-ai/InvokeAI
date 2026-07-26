@@ -21,15 +21,17 @@ export const DetailPane = () => {
   const detailLabel = activePack?.name ?? t('nodes.details');
 
   return (
-    <Flex direction="column" flex="1" minH="0" minW="0">
-      <Flex align="flex-end" borderBottomWidth={1} flexShrink={0} minH={HEADER_MIN_HEIGHT} px="2">
-        <Tabs.Root
-          size="sm"
-          mb="-1px"
-          value={activeTab}
-          onValueChange={(event) => updateNodesUi({ activeTab: event.value as NodesManagerTab })}
-        >
-          <Tabs.List h="full">
+    <Tabs.Root
+      asChild
+      lazyMount
+      size="sm"
+      unmountOnExit
+      value={activeTab}
+      onValueChange={(event) => updateNodesUi({ activeTab: event.value as NodesManagerTab })}
+    >
+      <Flex direction="column" flex="1" minH="0" minW="0">
+        <Flex align="flex-end" borderBottomWidth={1} flexShrink={0} minH={HEADER_MIN_HEIGHT} px="2">
+          <Tabs.List h="full" mb="-1px">
             <Tabs.Trigger fontSize="xs" value="details">
               <Icon as={BlocksIcon} boxSize="3" />
               <Text maxW="14rem" truncate>
@@ -41,16 +43,20 @@ export const DetailPane = () => {
               {t('nodes.addNodes')}
             </Tabs.Trigger>
           </Tabs.List>
-        </Tabs.Root>
+        </Flex>
+
+        <Box flex="1" minH="0">
+          <Tabs.Content h="full" p="0" value="details">
+            <DetailTab packName={activePackName} />
+          </Tabs.Content>
+          <Tabs.Content h="full" p="0" value="add">
+            <AddNodesView />
+          </Tabs.Content>
+        </Box>
+
+        <NodeActivityBar />
       </Flex>
-
-      <Box flex="1" minH="0">
-        {activeTab === 'details' ? <DetailTab packName={activePackName} /> : null}
-        {activeTab === 'add' ? <AddNodesView /> : null}
-      </Box>
-
-      <NodeActivityBar />
-    </Flex>
+    </Tabs.Root>
   );
 };
 
@@ -66,7 +72,7 @@ const DetailTab = ({ packName }: { packName: string | null }) => {
         <Text color="fg.muted" fontSize="sm" fontWeight="600">
           {t('nodes.selectPack')}
         </Text>
-        <Text color="fg.subtle" fontSize="xs" maxW="22rem" textAlign="center">
+        <Text color="fg.muted" fontSize="xs" maxW="22rem" textAlign="center">
           {t('nodes.selectPackDescription')}
         </Text>
       </Flex>

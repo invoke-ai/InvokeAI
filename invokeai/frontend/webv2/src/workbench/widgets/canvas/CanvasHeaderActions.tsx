@@ -181,13 +181,20 @@ const CanvasHeaderActionsInner = ({
       </Menu.Root>
 
       <Tooltip content={t('widgets.canvas.controls.fitToView')}>
-        <IconButton color="fg.muted" size="2xs" variant="ghost" onClick={() => engine.viewport.fitToView()}>
+        <IconButton
+          aria-label={t('widgets.canvas.controls.fitToView')}
+          color="fg.muted"
+          size="2xs"
+          variant="ghost"
+          onClick={() => engine.viewport.fitToView()}
+        >
           <MaximizeIcon />
         </IconButton>
       </Tooltip>
 
       <Tooltip content={t('widgets.canvas.controls.fitBboxToLayers')}>
         <IconButton
+          aria-label={t('widgets.canvas.controls.fitBboxToLayers')}
           color="fg.muted"
           disabled={editingLocked || !fitLayersRect}
           size="2xs"
@@ -200,6 +207,7 @@ const CanvasHeaderActionsInner = ({
 
       <Tooltip content={t('widgets.canvas.controls.fitBboxToMasks')}>
         <IconButton
+          aria-label={t('widgets.canvas.controls.fitBboxToMasks')}
           color="fg.muted"
           disabled={editingLocked || !fitMasksRect}
           size="2xs"
@@ -214,6 +222,7 @@ const CanvasHeaderActionsInner = ({
 
       <Tooltip content={t('widgets.canvas.commands.undo')}>
         <IconButton
+          aria-label={t('widgets.canvas.commands.undo')}
           color="fg.muted"
           disabled={editingLocked || !canUndo}
           size="2xs"
@@ -226,6 +235,7 @@ const CanvasHeaderActionsInner = ({
 
       <Tooltip content={t('widgets.canvas.commands.redo')}>
         <IconButton
+          aria-label={t('widgets.canvas.commands.redo')}
           color="fg.muted"
           disabled={editingLocked || !canRedo}
           size="2xs"

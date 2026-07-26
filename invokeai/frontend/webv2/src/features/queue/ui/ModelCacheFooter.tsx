@@ -20,7 +20,7 @@ const INDICATOR_OPEN = { transform: 'rotate(180deg)' } as const;
 const TRIGGER_HOVER = { color: 'fg' } as const;
 
 const CacheStat = ({ label, value }: { label: string; value: number }) => (
-  <Text color="fg.subtle" fontSize="2xs">
+  <Text color="fg.muted" fontSize="2xs">
     {label}{' '}
     <Text as="span" color="fg" fontVariantNumeric="tabular-nums" fontWeight="600">
       {value}
@@ -93,12 +93,16 @@ export const ModelCacheFooter = () => {
       <Stack gap="0">
         <Progress.Root
           aria-label={t('widgets.queue.modelCache.usage')}
+          aria-valuemax={1}
+          aria-valuemin={0}
+          aria-valuenow={ratio}
           aria-valuetext={t('widgets.queue.modelCache.usedOfTotal', {
             total: formatModelCacheBytes(total),
             used: formatModelCacheBytes(used),
           })}
           colorPalette="accent"
           max={1}
+          role="progressbar"
           size="xs"
           value={ratio}
         >
@@ -129,7 +133,7 @@ export const ModelCacheFooter = () => {
           >
             {t('widgets.queue.modelCache.label')}
           </Text>
-          <Text color="fg.subtle" fontSize="2xs" fontVariantNumeric="tabular-nums">
+          <Text color="fg.muted" fontSize="2xs" fontVariantNumeric="tabular-nums">
             {formatModelCacheBytes(used)} / {formatModelCacheBytes(total)}
           </Text>
           <Collapsible.Indicator _open={INDICATOR_OPEN} transition="transform var(--wb-motion-duration-slow)">

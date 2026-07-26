@@ -436,20 +436,20 @@ const StagingPlaceholderProgress = ({ percentage }: { percentage: number | null 
   const { t } = useTranslation();
 
   return (
-    <Flex
-      align="center"
-      aria-label={
-        percentage === null
-          ? t('widgets.gallery.generationProgress')
-          : t('widgets.gallery.generationProgressPercent', { percentage })
-      }
-      inset="0"
-      justify="center"
-      pointerEvents="none"
-      position="absolute"
-      zIndex="1"
-    >
-      <ProgressCircle.Root bg="bg/85" borderWidth={1} p={0.5} rounded="full" size="xs" value={percentage}>
+    <Flex align="center" inset="0" justify="center" pointerEvents="none" position="absolute" zIndex="1">
+      <ProgressCircle.Root
+        aria-label={
+          percentage === null
+            ? t('widgets.gallery.generationProgress')
+            : t('widgets.gallery.generationProgressPercent', { percentage })
+        }
+        bg="bg/85"
+        borderWidth={1}
+        p={0.5}
+        rounded="full"
+        size="xs"
+        value={percentage}
+      >
         <ProgressCircle.Circle>
           <ProgressCircle.Track />
           <ProgressCircle.Range />

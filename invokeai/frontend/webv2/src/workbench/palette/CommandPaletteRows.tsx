@@ -282,8 +282,15 @@ export const CommandPaletteRows = ({
 
   return (
     <ScrollArea.Root maxH="min(400px, 55dvh)" size="xs" variant="hover" w="full">
-      <ScrollArea.Viewport ref={setScrollElement} aria-label={t('commandPalette.resultsLabel')} maxH="inherit" w="full">
-        <ScrollArea.Content id={RESULT_LIST_ID} aria-busy={isBusy} pb="1.5" role="listbox" w="full">
+      <ScrollArea.Viewport ref={setScrollElement} maxH="inherit" w="full">
+        <ScrollArea.Content
+          id={RESULT_LIST_ID}
+          aria-busy={isBusy}
+          aria-label={t('commandPalette.resultsLabel')}
+          pb="1.5"
+          role="listbox"
+          w="full"
+        >
           <Box h={`${virtualizer.getTotalSize()}px`} position="relative" w="full">
             {virtualizer.getVirtualItems().map((virtualRow) => {
               const row = rows[virtualRow.index];

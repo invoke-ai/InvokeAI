@@ -60,11 +60,11 @@ const getWidgetEnableMenuTriggerButton = (label: string, trigger: WidgetEnableMe
       aria-label={label}
       as="button"
       color="fg"
-      h={isBottom ? '5' : '9'}
+      h={isBottom ? '6' : '9'}
       justify="center"
       rounded={isBottom ? 'sm' : 'md'}
       transition="background var(--wb-motion-duration-fast) ease, color var(--wb-motion-duration-fast) ease"
-      w={isBottom ? '5' : '9'}
+      w={isBottom ? '6' : '9'}
       _hover={TRIGGER_HOVER_PROPS}
     >
       <Icon as={MoreHorizontalIcon} boxSize={isBottom ? '4' : '5'} />

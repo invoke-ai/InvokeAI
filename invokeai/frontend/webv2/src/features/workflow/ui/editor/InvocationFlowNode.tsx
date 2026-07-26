@@ -579,7 +579,7 @@ const CompactNodeBody = ({ inputCount, outputCount }: { inputCount: number; outp
     borderBottomRadius="lg"
     borderTopWidth="1px"
     borderColor="border.subtle"
-    color="fg.subtle"
+    color="fg.muted"
     fontSize="2xs"
     gap="2"
     px="3"
@@ -688,7 +688,8 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
         <IconButton
           aria-label={isOpen ? 'Collapse node' : 'Expand node'}
           className="nodrag"
-          size="2xs"
+          ms="2"
+          size="xs"
           variant="ghost"
           onClick={() => editGraph({ isOpen: !isOpen, nodeId: node.id, type: 'setNodeIsOpen' })}
         >

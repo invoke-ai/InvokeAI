@@ -779,6 +779,7 @@
     "actionsLabel": "{{label}} actions",
     "loadingLabel": "Loading {{label}}",
     "removeWidget": "Remove {{label}}",
+    "panelLabel": "{{region}} widget panel",
     "resizePanel": "Resize {{region}} widget panel",
     "settingsLabel": "{{label}} settings",
     "visibilityLabel": "{{region}} widget visibility",

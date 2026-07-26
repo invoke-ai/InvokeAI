@@ -63,6 +63,7 @@ export const WidgetPanelFrame = ({
   region: Exclude<WidgetRegion, 'center'>;
   typeId?: WidgetTypeId;
 }) => {
+  const { t } = useTranslation();
   const regionState = useActiveProjectSelector((project) => project.widgetRegions[region]);
   const { layout } = useWorkbenchCommands();
   const [dragSizePx, setDragSizePx] = useState<number | null>(null);
@@ -151,6 +152,7 @@ export const WidgetPanelFrame = ({
 
   return (
     <Flex
+      aria-label={t('widgets.panelLabel', { region })}
       as="aside"
       bg="bg.subtle"
       borderColor="border.subtle"

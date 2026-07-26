@@ -34,7 +34,8 @@ import { useGalleryWidget } from './GalleryWidgetContext';
 
 const GRID_GAP_PX = 4;
 const THUMBNAIL_HOVER_CSS = {
-  '&:hover .gallery-thumb-overlay': { opacity: 1 },
+  '&:hover .gallery-thumb-overlay, &:focus-within .gallery-thumb-overlay': { opacity: 1 },
+  '&:focus-within': { outline: '2px solid {colors.accent.solid}', outlineOffset: '-2px' },
 } as const;
 const THUMBNAIL_BUTTON_STYLE = {
   background: 'transparent',
@@ -410,23 +411,15 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
       onDrop={handleDrop}
     >
       {isEmpty ? (
-        <Flex align="center" color="fg.subtle" h="full" justify="center" minH="8rem">
-          <Text fontSize="2xs">
+        <Flex align="center" color="fg.muted" h="full" justify="center" minH="8rem">
+          <Text fontSize="xs">
             {gallery.isLoading ? t('widgets.gallery.loadingBackendGallery') : t('widgets.gallery.noImagesMatch')}
           </Text>
         </Flex>
       ) : (
         <ScrollArea.Root h="full" minH="0" size="xs" variant="hover" w="full">
-          <ScrollArea.Viewport
-            ref={viewportRef}
-            aria-label={t('widgets.gallery.imagesAriaLabel')}
-            h="full"
-            role="listbox"
-            tabIndex={0}
-            w="full"
-            outline="none"
-          >
-            <ScrollArea.Content>
+          <ScrollArea.Viewport ref={viewportRef} h="full" w="full" outline="none">
+            <ScrollArea.Content aria-label={t('widgets.gallery.imagesAriaLabel')} role="list">
               <Box h={`${virtualizer.totalSize}px`} position="relative" w="full">
                 {virtualRows.map((virtualRow) => (
                   <Box
@@ -436,6 +429,7 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
                     gridTemplateColumns={`repeat(${columnCount}, minmax(0, 1fr))`}
                     left="0"
                     position="absolute"
+                    role="presentation"
                     top="0"
                     transform={`translateY(${virtualRow.start}px)`}
                     w="full"
@@ -542,33 +536,33 @@ const GalleryQueuePlaceholderCell = ({
   const percentage = typeof progress?.percentage === 'number' ? Math.round(progress.percentage * 100) : null;
 
   return (
-    <Box
-      as="button"
-      aria-label={t('widgets.preview.showInProgressDiffusion')}
-      aria-selected={isSelected}
-      aspectRatio={1}
-      bg="bg"
-      borderColor={isSelected ? 'accent.solid' : 'border.subtle'}
-      borderWidth={isSelected ? '2px' : '1px'}
-      cursor="pointer"
-      minW="0"
-      rounded="md"
-      overflow="hidden"
-      position="relative"
-      role="option"
-      w="full"
-      onClick={onClick}
-    >
-      <StreamingImageFrame
-        fit={fit === 'aspect' ? 'contain' : 'cover'}
+    <Box aspectRatio={1} minW="0" role="listitem" w="full">
+      <Box
+        as="button"
+        aria-label={t('widgets.preview.showInProgressDiffusion')}
+        aria-pressed={isSelected}
+        bg="bg"
+        borderColor={isSelected ? 'accent.solid' : 'border.subtle'}
+        borderWidth={isSelected ? '2px' : '1px'}
+        cursor="pointer"
         h="full"
-        liveImage={progressImageToStreamingSource(progressImage)}
-        shouldAntialiasLiveImage={antialiasProgressImages}
+        overflow="hidden"
+        position="relative"
+        rounded="md"
         w="full"
+        onClick={onClick}
       >
-        <Skeleton h="full" w="full" />
-      </StreamingImageFrame>
-      {isActive ? <GalleryPlaceholderCircularProgress percentage={percentage} /> : null}
+        <StreamingImageFrame
+          fit={fit === 'aspect' ? 'contain' : 'cover'}
+          h="full"
+          liveImage={progressImageToStreamingSource(progressImage)}
+          shouldAntialiasLiveImage={antialiasProgressImages}
+          w="full"
+        >
+          <Skeleton h="full" w="full" />
+        </StreamingImageFrame>
+        {isActive ? <GalleryPlaceholderCircularProgress percentage={percentage} /> : null}
+      </Box>
     </Box>
   );
 };
@@ -579,11 +573,6 @@ const GalleryPlaceholderCircularProgress = ({ percentage }: { percentage: number
   return (
     <Flex
       align="center"
-      aria-label={
-        percentage === null
-          ? t('widgets.gallery.generationProgress')
-          : t('widgets.gallery.generationProgressPercent', { percentage })
-      }
       justify="center"
       alignItems="center"
       pointerEvents="none"
@@ -591,7 +580,19 @@ const GalleryPlaceholderCircularProgress = ({ percentage }: { percentage: number
       inset="0"
       zIndex="1"
     >
-      <ProgressCircle.Root value={percentage} size="xs" bg="bg/85" rounded="full" borderWidth={1} p={0.5}>
+      <ProgressCircle.Root
+        aria-label={
+          percentage === null
+            ? t('widgets.gallery.generationProgress')
+            : t('widgets.gallery.generationProgressPercent', { percentage })
+        }
+        bg="bg/85"
+        borderWidth={1}
+        p={0.5}
+        rounded="full"
+        size="xs"
+        value={percentage}
+      >
         <ProgressCircle.Circle>
           <ProgressCircle.Track />
           <ProgressCircle.Range />
@@ -679,8 +680,7 @@ const GalleryThumbnail = ({
       minW="0"
       opacity={isDragging ? 0.55 : undefined}
       overflow="hidden"
-      role="option"
-      aria-selected={isSelected}
+      role="listitem"
       position="relative"
       rounded="md"
       style={containerStyle}
@@ -690,9 +690,10 @@ const GalleryThumbnail = ({
       onContextMenu={handleContextMenu}
     >
       <button
+        aria-current={isPrimary ? 'true' : undefined}
         aria-label={t('widgets.gallery.selectImageForPreview', { name: image.imageName })}
+        aria-pressed={isSelected}
         style={THUMBNAIL_BUTTON_STYLE}
-        tabIndex={isPrimary ? 0 : -1}
         type="button"
         onClick={handleClick}
       >

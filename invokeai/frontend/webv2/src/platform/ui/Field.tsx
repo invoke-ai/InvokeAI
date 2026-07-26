@@ -69,7 +69,7 @@ export const Field = ({
       {error}
     </ChakraField.ErrorText>
   ) : helpText ? (
-    <ChakraField.HelperText color="fg.subtle" fontSize="2xs">
+    <ChakraField.HelperText color="fg.muted" fontSize="2xs">
       {helpText}
     </ChakraField.HelperText>
   ) : null;

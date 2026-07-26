@@ -62,9 +62,9 @@ const FieldTooltip = ({
   return (
     <Stack gap="0.5" maxW="18rem">
       <Text fontWeight="700">{template.title}</Text>
-      <Text color="fg.subtle">{t('nodes.fieldName', { name: template.name })}</Text>
-      <Text color="fg.subtle">{t('nodes.fieldType', { type: getFieldTypeLabel(template.type) })}</Text>
-      <Text color="fg.subtle">{t(direction === 'input' ? 'nodes.input' : 'nodes.output')}</Text>
+      <Text color="fg.muted">{t('nodes.fieldName', { name: template.name })}</Text>
+      <Text color="fg.muted">{t('nodes.fieldType', { type: getFieldTypeLabel(template.type) })}</Text>
+      <Text color="fg.muted">{t(direction === 'input' ? 'nodes.input' : 'nodes.output')}</Text>
       {description ? <Text>{description}</Text> : null}
     </Stack>
   );
@@ -111,9 +111,9 @@ const NodeInfoTooltip = ({ template }: { template: InvocationTemplate }) => {
   return (
     <Stack gap="1" maxW="20rem">
       <Text fontWeight="700">{template.title}</Text>
-      <Text color="fg.subtle">{t('nodes.nodeType', { type: template.type })}</Text>
-      <Text color="fg.subtle">{t('nodes.nodeCategory', { category: template.category })}</Text>
-      <Text color="fg.subtle">{t('nodes.nodeVersion', { version: template.version })}</Text>
+      <Text color="fg.muted">{t('nodes.nodeType', { type: template.type })}</Text>
+      <Text color="fg.muted">{t('nodes.nodeCategory', { category: template.category })}</Text>
+      <Text color="fg.muted">{t('nodes.nodeVersion', { version: template.version })}</Text>
       {template.description ? <Text fontStyle="italic">{template.description}</Text> : null}
     </Stack>
   );
@@ -156,7 +156,7 @@ export const NodePreviewCard = ({ template }: { template: InvocationTemplate }) 
             ))}
           </>
         ) : (
-          <Text color="fg.subtle" fontSize="2xs" px="3" py="1">
+          <Text color="fg.muted" fontSize="2xs" px="3" py="1">
             No exposed fields.
           </Text>
         )}

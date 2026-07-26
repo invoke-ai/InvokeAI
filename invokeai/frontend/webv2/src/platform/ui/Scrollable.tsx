@@ -23,7 +23,7 @@ export const Scrollable = ({
   label?: string;
 }) => (
   <ScrollArea.Root size="xs" variant="hover" {...rootProps}>
-    <ScrollArea.Viewport aria-label={label} h="full" w="full">
+    <ScrollArea.Viewport aria-label={label} h="full" role={label ? 'region' : undefined} w="full">
       <ScrollArea.Content w="full" {...contentProps}>
         {children}
       </ScrollArea.Content>
