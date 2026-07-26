@@ -2,7 +2,7 @@ import os
 import re
 import tempfile
 import traceback
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Annotated, BinaryIO, Optional
 
@@ -681,19 +681,13 @@ async def get_video_thumbnail(
     except Exception:
         raise HTTPException(status_code=404)
     try:
-        thumbnail_file = open(path, "rb")
+        with open(path, "rb") as thumbnail_file:
+            thumbnail = thumbnail_file.read()
     except OSError:
         raise HTTPException(status_code=404)
 
-    async def iter_thumbnail() -> AsyncIterator[bytes]:
-        try:
-            while chunk := thumbnail_file.read(RANGE_CHUNK_SIZE):
-                yield chunk
-        finally:
-            thumbnail_file.close()
-
-    return StreamingResponse(
-        iter_thumbnail(),
+    return Response(
+        thumbnail,
         media_type="image/webp",
         headers={"Cache-Control": _get_video_cache_control()},
     )

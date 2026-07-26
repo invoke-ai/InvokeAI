@@ -661,7 +661,7 @@ def test_get_video_thumbnail_missing_file_returns_404(
     mock_invoker.services.videos.get_path.assert_called_once_with("some_video.mp4", thumbnail=True)
 
 
-def test_get_video_thumbnail_stream_survives_delete_after_route_returns(
+def test_get_video_thumbnail_closes_file_before_route_returns(
     enable_multiuser_for_videos: Any,
     mock_invoker: Invoker,
     tmp_path: Path,
@@ -672,13 +672,12 @@ def test_get_video_thumbnail_stream_survives_delete_after_route_returns(
     mock_invoker.services.videos.get_path.return_value = str(thumbnail_path)
     current_user = MagicMock(is_admin=True)
 
-    async def consume_after_delete() -> bytes:
+    async def get_thumbnail_after_delete() -> bytes:
         response = await get_video_thumbnail(current_user=current_user, video_name="video.mp4")
         thumbnail_path.unlink()
-        chunks = [chunk async for chunk in response.body_iterator]  # type: ignore[attr-defined]
-        return b"".join(chunks)
+        return bytes(response.body)
 
-    assert asyncio.run(consume_after_delete()) == b"thumbnail-data"
+    assert asyncio.run(get_thumbnail_after_delete()) == b"thumbnail-data"
 
 
 @pytest.mark.parametrize(
