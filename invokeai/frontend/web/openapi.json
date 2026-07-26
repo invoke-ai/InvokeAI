@@ -78345,6 +78345,7 @@
           "width": {
             "default": 1024,
             "description": "Width of the generated image.",
+            "exclusiveMinimum": 0,
             "field_kind": "input",
             "input": "any",
             "multipleOf": 16,
@@ -78356,6 +78357,7 @@
           "height": {
             "default": 1024,
             "description": "Height of the generated image.",
+            "exclusiveMinimum": 0,
             "field_kind": "input",
             "input": "any",
             "multipleOf": 16,
@@ -79338,6 +79340,7 @@
           "width": {
             "default": 1024,
             "description": "Width to resize the reference image to (must match denoise width).",
+            "exclusiveMinimum": 0,
             "field_kind": "input",
             "input": "any",
             "multipleOf": 16,
@@ -79349,6 +79352,7 @@
           "height": {
             "default": 1024,
             "description": "Height to resize the reference image to (must match denoise height).",
+            "exclusiveMinimum": 0,
             "field_kind": "input",
             "input": "any",
             "multipleOf": 16,
@@ -79944,6 +79948,7 @@
           "width": {
             "default": 832,
             "description": "Width of the generated video.",
+            "exclusiveMinimum": 0,
             "field_kind": "input",
             "input": "any",
             "multipleOf": 16,
@@ -79955,6 +79960,7 @@
           "height": {
             "default": 480,
             "description": "Height of the generated video.",
+            "exclusiveMinimum": 0,
             "field_kind": "input",
             "input": "any",
             "multipleOf": 16,

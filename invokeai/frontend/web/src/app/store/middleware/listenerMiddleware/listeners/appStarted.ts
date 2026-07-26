@@ -1,4 +1,4 @@
-import { createAction } from '@reduxjs/toolkit';
+import { createAction, isAnyOf } from '@reduxjs/toolkit';
 import type { AppStartListening } from 'app/store/store';
 import { noop } from 'es-toolkit';
 import { setInfillMethod } from 'features/controlLayers/store/paramsSlice';
@@ -6,6 +6,7 @@ import { selectLastSelectedItem } from 'features/gallery/store/gallerySelectors'
 import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { appInfoApi } from 'services/api/endpoints/appInfo';
 import { galleryApi } from 'services/api/endpoints/gallery';
+import { virtualBoardsApi } from 'services/api/endpoints/virtual_boards';
 
 export const appStarted = createAction('app/appStarted');
 
@@ -37,7 +38,13 @@ export const addAppStartedListener = (startAppListening: AppStartListening) => {
       // The effect must be async and await take() so that RTK keeps the listener's AbortController
       // alive until the query resolves; a synchronous effect causes the controller to be aborted
       // immediately after the effect returns, before any network response arrives.
-      const firstLoad = await take(galleryApi.endpoints.getGalleryItemNames.matchFulfilled, 5000);
+      const firstLoad = await take(
+        isAnyOf(
+          galleryApi.endpoints.getGalleryItemNames.matchFulfilled,
+          virtualBoardsApi.endpoints.getVirtualBoardItemNamesByDate.matchFulfilled
+        ),
+        5000
+      );
       if (firstLoad === null) {
         // timeout or cancelled
         return;

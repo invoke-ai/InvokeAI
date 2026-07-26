@@ -377,7 +377,7 @@ async def delete_video(
 
 
 @videos_router.post("/delete", operation_id="delete_videos_from_list", response_model=DeleteVideosResult)
-async def delete_videos_from_list(
+def delete_videos_from_list(
     current_user: CurrentUserOrDefault,
     batch: VideoNamesBatch,
 ) -> DeleteVideosResult:
@@ -416,7 +416,7 @@ async def delete_videos_from_list(
 
 
 @videos_router.delete("/uncategorized", operation_id="delete_uncategorized_videos", response_model=DeleteVideosResult)
-async def delete_uncategorized_videos(
+def delete_uncategorized_videos(
     current_user: CurrentUserOrDefault,
 ) -> DeleteVideosResult:
     """Deletes all uncategorized videos owned by the current user (or all if admin).
@@ -781,7 +781,7 @@ async def get_video_names(
 
 
 @videos_router.post("/star", operation_id="star_videos_in_list", response_model=StarredVideosResult)
-async def star_videos_in_list(
+def star_videos_in_list(
     current_user: CurrentUserOrDefault,
     batch: VideoNamesBatch,
 ) -> StarredVideosResult:
@@ -812,7 +812,7 @@ async def star_videos_in_list(
 
 
 @videos_router.post("/unstar", operation_id="unstar_videos_in_list", response_model=UnstarredVideosResult)
-async def unstar_videos_in_list(
+def unstar_videos_in_list(
     current_user: CurrentUserOrDefault,
     batch: VideoNamesBatch,
 ) -> UnstarredVideosResult:

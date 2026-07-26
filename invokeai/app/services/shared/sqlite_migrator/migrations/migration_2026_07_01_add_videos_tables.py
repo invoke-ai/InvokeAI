@@ -102,7 +102,7 @@ class AddVideosTablesCallback:
             ON board_videos FOR EACH ROW
             BEGIN
                 UPDATE board_videos SET updated_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')
-                    WHERE board_id = old.board_id AND video_name = old.video_name;
+                    WHERE board_id = new.board_id AND video_name = old.video_name;
             END;
             """
         ]

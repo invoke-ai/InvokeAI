@@ -17,7 +17,7 @@ export type VirtualSubBoard = {
 
 const buildVirtualBoardsUrl = (path: string = '') => buildV1Url(`virtual_boards/${path}`);
 
-const virtualBoardsApi = api.injectEndpoints({
+export const virtualBoardsApi = api.injectEndpoints({
   endpoints: (build) => ({
     listVirtualBoardsByDate: build.query<VirtualSubBoard[], void>({
       query: () => ({

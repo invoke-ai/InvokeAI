@@ -1,6 +1,7 @@
 import asyncio
+import inspect
 import logging
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -202,6 +203,10 @@ def _identify_video_upload_user(scope: Scope) -> tuple[bool, str | None]:
     return True, token_data.user_id
 
 
+async def _identify_video_upload_user_async(scope: Scope) -> tuple[bool, str | None]:
+    return await run_in_threadpool(_identify_video_upload_user, scope)
+
+
 class VideoUploadLimitASGIMiddleware:
     """Bound video-upload ingress *before* FastAPI's multipart parser runs.
 
@@ -220,7 +225,7 @@ class VideoUploadLimitASGIMiddleware:
         max_body_bytes: int,
         max_concurrent: int,
         max_concurrent_per_user: int | None = None,
-        identify_user: Callable[[Scope], tuple[bool, str | None]] | None = None,
+        identify_user: Callable[[Scope], tuple[bool, str | None] | Awaitable[tuple[bool, str | None]]] | None = None,
         idle_timeout_seconds: float = 120.0,
         max_upload_duration_seconds: float = 30 * 60,
     ) -> None:
@@ -244,7 +249,10 @@ class VideoUploadLimitASGIMiddleware:
 
         per_user_key: str | None = None
         if self.identify_user is not None:
-            authenticated, per_user_key = self.identify_user(scope)
+            identity = self.identify_user(scope)
+            if inspect.isawaitable(identity):
+                identity = await identity
+            authenticated, per_user_key = identity
             if not authenticated:
                 response = JSONResponse(
                     {"detail": "Authentication required"},
@@ -368,7 +376,7 @@ app.add_middleware(
     max_body_bytes=videos.MAX_UPLOAD_REQUEST_SIZE,
     max_concurrent=videos.MAX_CONCURRENT_VIDEO_UPLOADS,
     max_concurrent_per_user=videos.MAX_CONCURRENT_VIDEO_UPLOADS_PER_USER,
-    identify_user=_identify_video_upload_user,
+    identify_user=_identify_video_upload_user_async,
 )
 
 

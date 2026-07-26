@@ -22,6 +22,28 @@ const zAuthState = z.object({
 type User = z.infer<typeof zUser>;
 type AuthState = z.infer<typeof zAuthState>;
 
+const getTokenUserId = (token: string | null): string | null => {
+  if (!token) {
+    return null;
+  }
+  try {
+    const encodedPayload = token.split('.')[1];
+    if (!encodedPayload) {
+      return null;
+    }
+    const normalizedPayload = encodedPayload.replace(/-/g, '+').replace(/_/g, '/');
+    const payload = JSON.parse(atob(normalizedPayload.padEnd(Math.ceil(normalizedPayload.length / 4) * 4, '=')));
+    return typeof payload.user_id === 'string' ? payload.user_id : null;
+  } catch {
+    return null;
+  }
+};
+
+export const tokensBelongToSameUser = (first: string | null, second: string | null): boolean => {
+  const firstUserId = getTokenUserId(first);
+  return firstUserId !== null && firstUserId === getTokenUserId(second);
+};
+
 // Helper to safely access localStorage (not available in test environment)
 const getStoredAuthToken = (): string | null => {
   if (typeof window !== 'undefined' && window.localStorage) {
@@ -59,6 +81,17 @@ const authSlice = createSlice({
         localStorage.setItem('auth_token', action.payload);
       }
     },
+    externalTokenAdopted: (state, action: PayloadAction<string>) => {
+      if (!tokensBelongToSameUser(state.token, action.payload)) {
+        state.user = null;
+      }
+      state.token = action.payload;
+      state.isAuthenticated = true;
+      state.sessionExpired = false;
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.setItem('auth_token', action.payload);
+      }
+    },
     currentUserUpdated: (state, action: PayloadAction<User>) => {
       state.user = action.payload;
     },
@@ -86,8 +119,15 @@ const authSlice = createSlice({
   },
 });
 
-export const { setCredentials, tokenRefreshed, currentUserUpdated, logout, sessionExpiredLogout, setLoading } =
-  authSlice.actions;
+export const {
+  setCredentials,
+  tokenRefreshed,
+  externalTokenAdopted,
+  currentUserUpdated,
+  logout,
+  sessionExpiredLogout,
+  setLoading,
+} = authSlice.actions;
 
 export const authSliceConfig: SliceConfig<typeof authSlice> = {
   slice: authSlice,

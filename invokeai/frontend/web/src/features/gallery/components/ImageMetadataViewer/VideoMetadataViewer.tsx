@@ -1,5 +1,6 @@
 import { ExternalLink, Flex, Tab, TabList, TabPanel, TabPanels, Tabs, Text } from '@invoke-ai/ui-library';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import { openMediaInNewTab } from 'features/auth/hooks/useMediaCookieRefresh';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetVideoMetadataQuery, useGetVideoWorkflowQuery } from 'services/api/endpoints/videos';
@@ -20,6 +21,7 @@ const VideoMetadataViewer = ({ video }: Props) => {
   const { t } = useTranslation();
   const { data: metadata } = useGetVideoMetadataQuery(video.video_name);
   const { data: workflowAndGraph } = useGetVideoWorkflowQuery(video.video_name, { skip: !video.has_workflow });
+  const videoUrl = video.video_url;
 
   return (
     <Flex
@@ -33,7 +35,20 @@ const VideoMetadataViewer = ({ video }: Props) => {
       position="absolute"
       overflow="hidden"
     >
-      <ExternalLink href={video.video_url} label={video.video_name} />
+      <ExternalLink
+        href="#"
+        label={video.video_name}
+        onClick={(event) => {
+          event.preventDefault();
+          openMediaInNewTab(videoUrl);
+        }}
+        onAuxClick={(event) => {
+          if (event.button === 1) {
+            event.preventDefault();
+            openMediaInNewTab(videoUrl);
+          }
+        }}
+      />
 
       <Tabs variant="line" sx={{ display: 'flex', flexDir: 'column', w: 'full', h: 'full' }}>
         <TabList>

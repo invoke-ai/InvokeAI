@@ -78,7 +78,9 @@ describe('virtual board gallery consumers', () => {
         }
       )
     );
-    await new Promise((resolve) => setTimeout(resolve, 5));
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 5);
+    });
     await store.dispatch(
       virtualBoardsApi.util.upsertQueryData(
         'getVirtualBoardItemNamesByDate',

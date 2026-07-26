@@ -208,8 +208,16 @@ def _run_worker_unbounded(args: list[str], timeout: float, raise_on_timeout: boo
 
 
 def _run_worker(args: list[str], timeout: float, raise_on_timeout: bool = False) -> Optional[dict[str, Any]]:
-    with _VIDEO_DECODER_SLOTS:
-        return _run_worker_unbounded(args, timeout, raise_on_timeout)
+    deadline = time.monotonic() + timeout
+    if not _VIDEO_DECODER_SLOTS.acquire(timeout=timeout):
+        if raise_on_timeout:
+            raise VideoDecodeTimeoutError(f"Video decode worker timed out after {timeout}s")
+        return None
+    try:
+        remaining = max(0.0, deadline - time.monotonic())
+        return _run_worker_unbounded(args, remaining, raise_on_timeout)
+    finally:
+        _VIDEO_DECODER_SLOTS.release()
 
 
 def _iter_video_frames_unbounded(
@@ -328,9 +336,23 @@ def iter_video_frames(
     timeout: float = VIDEO_DECODE_TIMEOUT_SECONDS,
     is_canceled: Optional[Callable[[], bool]] = None,
 ) -> Iterator[np.ndarray]:
-    with _VIDEO_STREAM_SLOTS:
-        with _VIDEO_DECODER_SLOTS:
-            yield from _iter_video_frames_unbounded(video_path, timeout, is_canceled)
+    acquired: list[threading.BoundedSemaphore] = []
+    capacity_deadline = time.monotonic() + timeout
+    try:
+        for slot in (_VIDEO_STREAM_SLOTS, _VIDEO_DECODER_SLOTS):
+            while True:
+                if is_canceled is not None and is_canceled():
+                    raise CanceledException
+                remaining = capacity_deadline - time.monotonic()
+                if remaining <= 0:
+                    raise TimeoutError(f"Timed out waiting to decode frames from {video_path}")
+                if slot.acquire(timeout=min(0.1, remaining)):
+                    acquired.append(slot)
+                    break
+        yield from _iter_video_frames_unbounded(video_path, timeout, is_canceled)
+    finally:
+        for slot in reversed(acquired):
+            slot.release()
 
 
 def extract_video_frame(

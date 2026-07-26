@@ -301,7 +301,9 @@ class WanGGUFCheckpointModel(ModelLoader):
         with accelerate.init_empty_weights():
             model = WanTransformer3DModel(**model_config)
 
-        model.load_state_dict(sd, strict=False, assign=True)
+        incompatible_keys = model.load_state_dict(sd, strict=False, assign=True)
+        if incompatible_keys.missing_keys:
+            raise RuntimeError(f"GGUF state dict is missing model parameters: {incompatible_keys.missing_keys}")
         return model
 
 

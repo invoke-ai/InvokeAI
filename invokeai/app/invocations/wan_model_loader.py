@@ -115,10 +115,13 @@ class WanModelLoaderInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> WanModelLoaderOutput:
         main_config = context.models.get_config(self.model)
+        self._validate_main_config(main_config, "Wan main")
         main_format = main_config.format
         main_is_diffusers = main_format == ModelFormat.Diffusers
         main_is_gguf = main_format == ModelFormat.GGUFQuantized
         main_variant = getattr(main_config, "variant", None)
+        if main_is_gguf and self.component_source is not None:
+            self._validate_component_source_format(context, self.component_source)
 
         # Resolve transformer + dual-expert wiring + boundary_ratio.
         #
@@ -152,6 +155,7 @@ class WanModelLoaderInvocation(BaseInvocation):
 
             if self.transformer_low_noise_model is not None and main_variant != WanVariantType.TI2V_5B:
                 low_config = context.models.get_config(self.transformer_low_noise_model)
+                self._validate_main_config(low_config, "Transformer (Low Noise)")
                 if low_config.format != ModelFormat.GGUFQuantized:
                     raise ValueError(
                         f"'Transformer (Low Noise)' must be a GGUF-format Wan model. "
@@ -221,6 +225,9 @@ class WanModelLoaderInvocation(BaseInvocation):
 
         # Tokenizer + text encoder: standalone override > main (if Diffusers) > component source.
         if self.wan_t5_encoder_model is not None:
+            t5_config = context.models.get_config(self.wan_t5_encoder_model)
+            if t5_config.type != ModelType.WanT5Encoder or t5_config.format != ModelFormat.WanT5Encoder:
+                raise ValueError("The Wan T5 Encoder must resolve to a standalone Wan T5 encoder model.")
             tokenizer = self.wan_t5_encoder_model.model_copy(update={"submodel_type": SubModelType.Tokenizer})
             text_encoder = self.wan_t5_encoder_model.model_copy(update={"submodel_type": SubModelType.TextEncoder})
         elif main_is_diffusers:
@@ -248,8 +255,15 @@ class WanModelLoaderInvocation(BaseInvocation):
         )
 
     @staticmethod
+    def _validate_main_config(config: object, label: str) -> None:
+        if getattr(config, "base", None) != BaseModelType.Wan or getattr(config, "type", None) != ModelType.Main:
+            raise ValueError(f"The {label} model must resolve to a Wan main model.")
+
+    @staticmethod
     def _validate_component_source_format(context: InvocationContext, model: ModelIdentifierField) -> None:
         source_config = context.models.get_config(model)
+        if source_config.base != BaseModelType.Wan or source_config.type != ModelType.Main:
+            raise ValueError("The Component Source model must resolve to a Wan main model.")
         if source_config.format != ModelFormat.Diffusers:
             raise ValueError(
                 f"The Component Source model must be in Diffusers format. "
@@ -276,6 +290,8 @@ class WanModelLoaderInvocation(BaseInvocation):
         context: InvocationContext, model: ModelIdentifierField, main_variant: WanVariantType
     ) -> None:
         vae_config = context.models.get_config(model)
+        if vae_config.base != BaseModelType.Wan or vae_config.type != ModelType.VAE:
+            raise ValueError("The VAE must resolve to a standalone Wan VAE model.")
         expected_channels = 48 if main_variant == WanVariantType.TI2V_5B else 16
         if vae_config.latent_channels != expected_channels:
             raise ValueError(

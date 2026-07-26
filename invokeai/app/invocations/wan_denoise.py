@@ -350,8 +350,8 @@ class WanDenoiseInvocation(BaseInvocation):
     # 8x spatial scale, generated H/W must be a multiple of 16 (not just 8)
     # or the patch round-trip lands off-by-one and the scheduler step fails
     # with a spatial-dim mismatch.
-    width: int = InputField(default=1024, multiple_of=16, description="Width of the generated image.")
-    height: int = InputField(default=1024, multiple_of=16, description="Height of the generated image.")
+    width: int = InputField(default=1024, gt=0, multiple_of=16, description="Width of the generated image.")
+    height: int = InputField(default=1024, gt=0, multiple_of=16, description="Height of the generated image.")
     steps: int = InputField(default=40, gt=0, description="Number of denoising steps.")
     seed: int = InputField(default=0, description="Randomness seed for reproducibility.")
 
@@ -448,8 +448,33 @@ class WanDenoiseInvocation(BaseInvocation):
         init_latents_5d: torch.Tensor | None = None
         if self.latents is not None:
             loaded = context.tensors.load(self.latents.latents_name).to(device=device, dtype=latent_dtype)
+            if loaded.ndim not in (4, 5):
+                raise ValueError(
+                    f"Wan image denoise expects a 4D or 5D initial latent tensor; got {tuple(loaded.shape)}."
+                )
+            if loaded.shape[0] != 1:
+                raise ValueError(
+                    f"Wan image denoise requires initial latents with batch size 1; got {loaded.shape[0]}."
+                )
+            if loaded.ndim == 5 and loaded.shape[2] != 1:
+                raise ValueError(
+                    f"Wan image denoise requires single-frame initial latents; got {loaded.shape[2]} frames."
+                )
             if loaded.ndim == 4:
                 loaded = loaded.unsqueeze(2)
+            expected_channels = 48 if variant == WanVariantType.TI2V_5B else 16
+            if loaded.shape[1] != expected_channels:
+                raise ValueError(
+                    f"Wan {variant.value} image denoise expects {expected_channels} channels in initial latents; "
+                    f"got {loaded.shape[1]}."
+                )
+            expected_height = self.height // spatial_scale
+            expected_width = self.width // spatial_scale
+            if loaded.shape[-2:] != (expected_height, expected_width):
+                raise ValueError(
+                    f"Wan image denoise expects initial latent dimensions {expected_height}x{expected_width}; "
+                    f"got {loaded.shape[-2]}x{loaded.shape[-1]}."
+                )
             init_latents_5d = loaded
 
         # Determine the latent channel count. Prefer init_latents shape; otherwise

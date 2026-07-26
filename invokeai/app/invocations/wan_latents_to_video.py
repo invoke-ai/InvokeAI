@@ -98,6 +98,8 @@ class WanLatentsToVideoInvocation(BaseInvocation, WithMetadata, WithBoard):
             raise ValueError(
                 f"Wan latents-to-video expects a 5D latent tensor [B, C, T, H, W]; got {tuple(latents.shape)}."
             )
+        if any(size == 0 for size in latents.shape[2:]):
+            raise ValueError("Wan latents-to-video requires non-empty temporal and spatial dimensions.")
 
         vae_info = context.models.load(self.vae.vae)
         if not isinstance(vae_info.model, AutoencoderKLWan):

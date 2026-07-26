@@ -119,7 +119,7 @@ async def update_board(
 
 
 @boards_router.delete("/{board_id}", operation_id="delete_board", response_model=DeleteBoardResult)
-async def delete_board(
+def delete_board(
     current_user: CurrentUserOrDefault,
     board_id: str = Path(description="The id of board to delete"),
     include_images: Optional[bool] = Query(

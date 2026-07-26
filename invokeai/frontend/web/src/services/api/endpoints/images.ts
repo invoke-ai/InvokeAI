@@ -338,10 +338,12 @@ export const imagesApi = api.injectEndpoints({
       // and the video list both need invalidation in addition to the board tag.
       invalidatesTags: (result) => [
         { type: 'Board', id: LIST_TAG },
+        'VirtualBoards',
         { type: 'VideoList', id: LIST_TAG },
         'VideoNameList',
         'GalleryItemList',
         'GalleryItemNameList',
+        ...getTagsToInvalidateForBoardAffectingMutation(['none']),
         // Deleted media must drop out of their per-item caches (so DTO queries become
         // 404s instead of serving stale entries, e.g. to node inputs still referencing
         // them). Only server-confirmed deletions are listed in the result.

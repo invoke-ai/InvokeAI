@@ -25,6 +25,7 @@ from invokeai.app.api_app import (
     SubPathASGIMiddleware,
     VideoUploadLimitASGIMiddleware,
     _identify_video_upload_user,
+    _identify_video_upload_user_async,
 )
 from invokeai.app.services.auth.token_service import TokenData, create_access_token, set_jwt_secret
 from invokeai.app.services.image_records.image_records_common import ImageCategory
@@ -384,12 +385,20 @@ def test_production_upload_authentication(
     assert _identify_video_upload_user({"headers": headers}) == expected  # type: ignore[arg-type]
 
 
-def test_upload_authentication_does_not_block_the_event_loop(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.anyio
+async def test_upload_authentication_does_not_block_the_event_loop(monkeypatch: pytest.MonkeyPatch) -> None:
     set_jwt_secret("test-secret-key-for-unit-tests-only-do-not-use-in-production")
     token = create_access_token(TokenData(user_id="user", email="user@example.com", is_admin=False))
+    offloaded: list[Any] = []
+
+    async def run_in_threadpool(func: Any, *args: Any) -> Any:
+        offloaded.append(func)
+        await asyncio.sleep(0.1)
+        return func(*args)
+
+    monkeypatch.setattr(api_app, "run_in_threadpool", run_in_threadpool)
 
     def slow_get(_user_id: str) -> SimpleNamespace:
-        time.sleep(0.1)
         return SimpleNamespace(is_active=True)
 
     invoker = SimpleNamespace(
@@ -407,10 +416,11 @@ def test_upload_authentication_does_not_block_the_event_loop(monkeypatch: pytest
         inner_app,
         max_body_bytes=MAX_BODY,
         max_concurrent=MAX_CONCURRENT,
-        identify_user=_identify_video_upload_user,
+        identify_user=_identify_video_upload_user_async,
     )
     scope = {
         "type": "http",
+        "asgi": {"spec_version": "2.4"},
         "method": "POST",
         "path": "/api/v1/videos/upload",
         "root_path": "",
@@ -423,15 +433,14 @@ def test_upload_authentication_does_not_block_the_event_loop(monkeypatch: pytest
     async def send(_message: dict[str, Any]) -> None:
         pass
 
-    async def run() -> float:
-        started = time.monotonic()
-        upload = asyncio.create_task(middleware(scope, receive, send))  # type: ignore[arg-type]
-        await asyncio.sleep(0.01)
-        heartbeat_elapsed = time.monotonic() - started
-        await upload
-        return heartbeat_elapsed
+    started = time.monotonic()
+    upload = asyncio.create_task(middleware(scope, receive, send))  # type: ignore[arg-type]
+    await asyncio.sleep(0.01)
+    heartbeat_elapsed = time.monotonic() - started
+    await upload
 
-    assert asyncio.run(run()) < 0.05
+    assert heartbeat_elapsed < 0.05
+    assert offloaded == [_identify_video_upload_user]
 
 
 def test_upload_video_closes_tmp_handle_when_stream_copy_fails():

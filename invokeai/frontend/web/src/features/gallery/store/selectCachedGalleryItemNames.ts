@@ -1,5 +1,7 @@
 import type { AppGetState } from 'app/store/store';
+import { getDateFromVirtualBoardId, isVirtualBoardId } from 'features/gallery/store/types';
 import { galleryApi } from 'services/api/endpoints/gallery';
+import { virtualBoardsApi } from 'services/api/endpoints/virtual_boards';
 import type { GetGalleryItemNamesArgs } from 'services/api/types';
 
 import { selectGetImageNamesQueryArgs } from './gallerySelectors';
@@ -22,6 +24,43 @@ import { selectGetImageNamesQueryArgs } from './gallerySelectors';
  */
 export const selectCachedGalleryItemNames = (state: ReturnType<AppGetState>): string[] => {
   const args = selectGetImageNamesQueryArgs(state);
+  if (args.board_id && isVirtualBoardId(args.board_id)) {
+    const virtualArgs = {
+      date: getDateFromVirtualBoardId(args.board_id),
+      categories: args.categories ?? undefined,
+      search_term: args.search_term || undefined,
+      order_dir: args.order_dir,
+      starred_first: args.starred_first,
+    };
+    const virtual = virtualBoardsApi.endpoints.getVirtualBoardItemNamesByDate.select(virtualArgs)(state).data;
+    if (virtual) {
+      return virtual.items.map((ref) => ref.name);
+    }
+    const entries = virtualBoardsApi.util.selectInvalidatedBy(state, ['GalleryItemNameList']);
+    let mostRecent:
+      | {
+          names: string[];
+          fulfilledTimeStamp: number;
+        }
+      | undefined;
+    for (const entry of entries) {
+      if (entry.endpointName !== 'getVirtualBoardItemNamesByDate') {
+        continue;
+      }
+      const entryArgs = entry.originalArgs as typeof virtualArgs;
+      if (entryArgs.date !== virtualArgs.date) {
+        continue;
+      }
+      const query = virtualBoardsApi.endpoints.getVirtualBoardItemNamesByDate.select(entryArgs)(state);
+      if (query.data && (query.fulfilledTimeStamp ?? 0) >= (mostRecent?.fulfilledTimeStamp ?? -1)) {
+        mostRecent = {
+          names: query.data.items.map((ref) => ref.name),
+          fulfilledTimeStamp: query.fulfilledTimeStamp ?? 0,
+        };
+      }
+    }
+    return mostRecent?.names ?? [];
+  }
   // Exact match: the entry the grid is actively subscribed to. This is the common case.
   const exact = galleryApi.endpoints.getGalleryItemNames.select(args)(state).data;
   if (exact) {

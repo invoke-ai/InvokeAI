@@ -54,6 +54,8 @@ class WanLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
             raise ValueError(
                 f"Wan latents-to-image expects a 4D or 5D latent tensor [B, C, (T), H, W]; got {tuple(latents.shape)}."
             )
+        if latents.shape[0] != 1:
+            raise ValueError(f"Wan latents-to-image requires batch size 1; got {latents.shape[0]}.")
 
         # This node decodes exactly one image. Multi-frame video latents would otherwise
         # run the full (expensive) multi-frame VAE decode — under a working-memory

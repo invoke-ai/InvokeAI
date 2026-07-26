@@ -78,11 +78,13 @@ class WanRefImageEncoderInvocation(BaseInvocation):
     # Wan's transformer patch_size=(1, 2, 2) needs latent H/W to be even.
     width: int = InputField(
         default=1024,
+        gt=0,
         multiple_of=16,
         description="Width to resize the reference image to (must match denoise width).",
     )
     height: int = InputField(
         default=1024,
+        gt=0,
         multiple_of=16,
         description="Height to resize the reference image to (must match denoise height).",
     )

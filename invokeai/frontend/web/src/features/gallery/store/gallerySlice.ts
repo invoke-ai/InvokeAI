@@ -59,7 +59,8 @@ const slice = createSlice({
     },
     selectionChanged: (state, action: PayloadAction<string[]>) => {
       state.selection = uniq(action.payload);
-      if (state.selection.some(isVideoName)) {
+      const activeItem = action.payload.at(-1);
+      if (activeItem && isVideoName(activeItem)) {
         state.imageToCompare = null;
       }
     },

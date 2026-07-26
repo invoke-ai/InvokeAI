@@ -120,8 +120,8 @@ class WanVideoDenoiseInvocation(BaseInvocation):
     )
 
     # Wan transformer patch_size=(1, 2, 2) × VAE spatial 8x => H/W multiple of 16.
-    width: int = InputField(default=832, multiple_of=16, description="Width of the generated video.")
-    height: int = InputField(default=480, multiple_of=16, description="Height of the generated video.")
+    width: int = InputField(default=832, gt=0, multiple_of=16, description="Width of the generated video.")
+    height: int = InputField(default=480, gt=0, multiple_of=16, description="Height of the generated video.")
     num_frames: int = InputField(
         default=81,
         ge=5,
