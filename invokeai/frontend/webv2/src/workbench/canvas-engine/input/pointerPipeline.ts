@@ -142,10 +142,17 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
   let bboxQuickTap = false;
   let bboxTapTimer: ReturnType<typeof setTimeout> | null = null;
 
-  const buildPointerInput = (event: PointerEvent): PointerInput => {
-    const el = deps.getInputElement();
-    const rect = el?.getBoundingClientRect() ?? ({ left: 0, top: 0 } as DOMRect);
-    const screenPoint: Vec2 = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+  /**
+   * Reads the input element's viewport offset. Hoisted out of
+   * {@link buildPointerInput} so a coalesced batch pays for one layout read
+   * instead of one per sample — the whole batch comes from a single event, so
+   * the element cannot have moved between its samples.
+   */
+  const inputOrigin = (): { left: number; top: number } =>
+    deps.getInputElement()?.getBoundingClientRect() ?? { left: 0, top: 0 };
+
+  const buildPointerInput = (event: PointerEvent, origin = inputOrigin()): PointerInput => {
+    const screenPoint: Vec2 = { x: event.clientX - origin.left, y: event.clientY - origin.top };
     return {
       buttons: event.buttons,
       documentPoint: deps.viewport.screenToDocument(screenPoint),
@@ -158,11 +165,12 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
   };
 
   const buildBatch = (event: PointerEvent): PointerInput[] => {
+    const origin = inputOrigin();
     const coalesced = event.getCoalescedEvents?.();
     if (coalesced && coalesced.length > 0) {
-      return coalesced.map(buildPointerInput);
+      return coalesced.map((sample) => buildPointerInput(sample, origin));
     }
-    return [buildPointerInput(event)];
+    return [buildPointerInput(event, origin)];
   };
 
   const releaseCapture = (pointerId: number): void => {

@@ -100,6 +100,11 @@ const createStubCtx = (callLog: RasterCallLogEntry[]): OffscreenCanvasRenderingC
         addColorStop: (...stopArgs: unknown[]) => log('addColorStop', stopArgs),
       } as unknown as CanvasGradient;
     },
+    createImageData: (...args: unknown[]) => {
+      const [width, height] = args as [number, number];
+      log('createImageData', [width, height]);
+      return createStubImageData(width, height);
+    },
     drawImage: (...args: unknown[]) => log('drawImage', args),
     ellipse: (...args: unknown[]) => log('ellipse', args),
     fill: (...args: unknown[]) => log('fill', args),

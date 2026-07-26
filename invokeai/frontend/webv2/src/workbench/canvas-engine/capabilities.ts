@@ -7,7 +7,6 @@ import type {
 } from '@workbench/canvas-engine/contracts';
 import type { StrokeCommittedEvent } from '@workbench/canvas-engine/tools/tool';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
-import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 
 import type { NewRasterLayerResult } from './controllers/newRasterLayerController';
 import type { CanvasEditGate } from './editGate';
@@ -26,6 +25,7 @@ import type {
   TransformSession,
 } from './engineStores';
 import type { RasterCompositeExportRequest, RasterCompositeExportResult } from './exportRasterComposite';
+import type { CanvasProjectMutation } from './mutationContracts';
 import type { Rect, ToolId, Vec2 } from './types';
 import type { Viewport } from './viewport';
 
@@ -180,6 +180,13 @@ export interface CanvasExportCapability {
 }
 
 export type { RasterCompositeExportRequest, RasterCompositeExportResult } from './exportRasterComposite';
+
+/**
+ * The canvas mutation vocabulary. Declared under `canvas-engine` (see
+ * `mutationContracts.ts`) and surfaced here so workbench callers reach it
+ * through the public API instead of the engine importing upward for it.
+ */
+export type { CanvasLayerBasePatch, CanvasLayerConfigPatch, CanvasProjectMutation } from './mutationContracts';
 
 export interface ExportLayerPixelsOptions {
   includeDisabled?: boolean;

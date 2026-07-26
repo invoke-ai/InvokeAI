@@ -11,18 +11,12 @@ import type {
   WidgetRegion,
   WidgetRegionState,
 } from './layoutContracts';
+import type { ProjectEvent } from './projectEventContracts';
 import type { WorkbenchQueueState } from './queueHistoryContracts';
 import type { ProjectSettings } from './settings/contracts';
 import type { WidgetFailure, WidgetInstanceContract, WidgetInstanceId, WidgetTypeId } from './widgetContracts';
 
-export type ProjectEventType =
-  | 'project-created'
-  | 'layout-updated'
-  | 'invocation-updated'
-  | 'queue-submitted'
-  | 'canvas-layer-accepted'
-  | 'graph-replaced'
-  | 'graph-snapshot-saved';
+export type { ProjectEvent, ProjectEventType } from './projectEventContracts';
 
 export interface Project {
   id: string;
@@ -123,14 +117,6 @@ export interface ProjectUndoSnapshot {
 export interface UndoRedoHistory {
   past: UndoRedoEntry[];
   future: UndoRedoEntry[];
-}
-
-export interface ProjectEvent {
-  id: string;
-  type: ProjectEventType;
-  createdAt: string;
-  summary: string;
-  runId?: string;
 }
 
 export interface AutosaveState {

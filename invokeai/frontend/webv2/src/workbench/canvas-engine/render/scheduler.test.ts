@@ -1,4 +1,4 @@
-import type { RenderFlags } from '@workbench/canvas-engine/types';
+import type { LayerDamage, RenderFlags } from '@workbench/canvas-engine/types';
 
 import { describe, expect, it, vi } from 'vitest';
 
@@ -210,5 +210,91 @@ describe('createRenderScheduler', () => {
     expect(scheduler.isPaused).toBe(true);
     scheduler.resume();
     expect(scheduler.isPaused).toBe(false);
+  });
+});
+
+describe('damage coalescing', () => {
+  const setup = () => {
+    const raf = createFakeRaf();
+    const render = vi.fn();
+    const scheduler = createRenderScheduler({
+      cancelFrame: raf.cancelFrame,
+      render,
+      requestFrame: raf.requestFrame,
+    });
+    return { raf, render, scheduler };
+  };
+
+  const flagsOf = (render: ReturnType<typeof vi.fn>) => render.mock.calls[0]![0] as RenderFlags;
+
+  const damage = (layerId: string, x: number): LayerDamage => ({
+    layerId,
+    rect: { height: 10, width: 10, x, y: 0 },
+  });
+
+  it('carries damage through when every invalidation names its region', () => {
+    const { raf, render, scheduler } = setup();
+    scheduler.invalidate({ damage: damage('a', 0), layers: ['a'] });
+    scheduler.invalidate({ damage: damage('a', 40), layers: ['a'] });
+    raf.flush();
+    expect(flagsOf(render).damage).toEqual([damage('a', 0), damage('a', 40)]);
+  });
+
+  it('keeps overlay-only invalidations from widening the frame', () => {
+    // The overlay is a separate canvas redrawn whole; it says nothing about
+    // which composited pixels changed.
+    const { raf, render, scheduler } = setup();
+    scheduler.invalidate({ damage: damage('a', 0), layers: ['a'] });
+    scheduler.invalidate({ overlay: true });
+    raf.flush();
+    expect(flagsOf(render).damage).toEqual([damage('a', 0)]);
+  });
+
+  it.each([
+    ['a bare layer invalidation', { layers: ['a'] }],
+    ['a viewport change', { view: true } as const],
+    ['a forced full repaint', { all: true } as const],
+  ])('widens to a full repaint after %s', (_label, payload) => {
+    const { raf, render, scheduler } = setup();
+    scheduler.invalidate({ damage: damage('a', 0), layers: ['a'] });
+    scheduler.invalidate(payload);
+    raf.flush();
+    expect(flagsOf(render).damage).toBeNull();
+  });
+
+  it('stays widened once something in the frame could not name its damage', () => {
+    const { raf, render, scheduler } = setup();
+    scheduler.invalidate({ view: true });
+    scheduler.invalidate({ damage: damage('a', 0), layers: ['a'] });
+    raf.flush();
+    expect(flagsOf(render).damage).toBeNull();
+  });
+
+  it('ignores damage that does not name the single invalidated layer', () => {
+    // Damage describes one layer's region; anything else in the same payload
+    // changed without a region, so the frame cannot be narrowed.
+    const { raf, render, scheduler } = setup();
+    scheduler.invalidate({ damage: damage('a', 0), layers: ['a', 'b'] });
+    raf.flush();
+    expect(flagsOf(render).damage).toBeNull();
+  });
+
+  it('ignores damage naming a different layer than the one invalidated', () => {
+    const { raf, render, scheduler } = setup();
+    scheduler.invalidate({ damage: damage('b', 0), layers: ['a'] });
+    raf.flush();
+    expect(flagsOf(render).damage).toBeNull();
+  });
+
+  it('starts each frame with a fresh damage set', () => {
+    const { raf, render, scheduler } = setup();
+    scheduler.invalidate({ all: true });
+    raf.flush();
+    expect(flagsOf(render).damage).toBeNull();
+
+    render.mockClear();
+    scheduler.invalidate({ damage: damage('a', 0), layers: ['a'] });
+    raf.flush();
+    expect(flagsOf(render).damage).toEqual([damage('a', 0)]);
   });
 });

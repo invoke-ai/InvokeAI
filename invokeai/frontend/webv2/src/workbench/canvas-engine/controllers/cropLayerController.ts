@@ -5,10 +5,10 @@ import type {
   CanvasLayerSourceContract,
 } from '@workbench/canvas-engine/contracts';
 import type { History } from '@workbench/canvas-engine/history/history';
+import type { CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
 import type { PreparedLayerCacheReplacement } from '@workbench/canvas-engine/render/layerCache';
 import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
-import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 
 import { renderableSourceOf } from '@workbench/canvas-engine/document/sources';
 import { intersect, isEmpty, roundOut } from '@workbench/canvas-engine/math/rect';

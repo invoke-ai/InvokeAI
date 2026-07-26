@@ -14,15 +14,24 @@
  * pixels"). The eraser is refused entirely on a transparency-locked layer (it
  * would alter alpha), handled by the tool before a session is created.
  *
- * ## Per-frame restore/recapture
+ * ## Per-frame restore/recomposite
  *
  * The cache is the live preview, so it must show `before ∪ stroke@opacity` each
  * frame. To recomposite without compounding opacity, every frame first restores
- * the previously-painted region from the captured "before" pixels, then
- * recaptures the pristine "before" for the (monotonically growing) dirty region,
- * then composites the whole accumulated stroke once. This keeps `beforeImageData`
- * exactly equal to the pre-stroke pixels over the final dirty rect — which is
- * what commit hands to history — and makes cancel a single `putImageData`.
+ * the painted region from the captured "before" pixels, then composites the
+ * whole accumulated stroke once. This keeps `beforeImageData` exactly equal to
+ * the pre-stroke pixels over the final dirty rect — which is what commit hands
+ * to history — and makes cancel a single `putImageData`.
+ *
+ * The "before" snapshot is EXTENDED rather than recaptured (see
+ * {@link extendBefore}). Re-reading the whole region every frame was by far the
+ * most expensive thing this module did — a full-region `getImageData` costs
+ * roughly ten times the rest of the frame put together, and it grows with the
+ * area painted so far, which is exactly why covering a large area with a big
+ * brush degraded the longer you painted. Since the stroke is never composited
+ * outside the accumulated rect, the pixels the region gains are still pristine
+ * and can simply be read as strips and stitched onto the snapshot we already
+ * hold, leaving per-frame readback proportional to new area rather than total.
  *
  * Everything flows through the {@link RasterSurface} `ctx` seam, so this runs
  * unchanged on the node test stub. Zero React, zero dispatch on the move path.
@@ -31,10 +40,10 @@
 import type { CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
-import type { PlacedSurface, PointerInput, Rect } from '@workbench/canvas-engine/types';
+import type { PlacedSurface, PointerInput, Rect, Vec2 } from '@workbench/canvas-engine/types';
 
 import { strokeToPath, type StrokeSamplePoint } from '@workbench/canvas-engine/freehand';
-import { intersect, isEmpty, roundOut, union } from '@workbench/canvas-engine/math/rect';
+import { expand, intersect, isEmpty, roundOut, union } from '@workbench/canvas-engine/math/rect';
 
 import type { StrokeCommittedEvent, ToolContext } from './tool';
 
@@ -109,13 +118,175 @@ const toSample = (input: PointerInput): StrokeSamplePoint => ({
  */
 const GROWTH_CHUNK = 64;
 
-/** Rounds a rect OUTWARD to the {@link GROWTH_CHUNK} grid (integer, chunk-aligned). */
-const padToChunk = (r: Rect): Rect => {
-  const x = Math.floor(r.x / GROWTH_CHUNK) * GROWTH_CHUNK;
-  const y = Math.floor(r.y / GROWTH_CHUNK) * GROWTH_CHUNK;
-  const right = Math.ceil((r.x + r.width) / GROWTH_CHUNK) * GROWTH_CHUNK;
-  const bottom = Math.ceil((r.y + r.height) / GROWTH_CHUNK) * GROWTH_CHUNK;
+/**
+ * Upper bound on the growth chunk. Reallocating the cache surface costs roughly
+ * the same as a full-region readback — it is dominated by re-allocating the
+ * backing canvas, not by preserving the pixels — so a wide brush wants a coarse
+ * grid to cross fewer boundaries.
+ */
+const MAX_GROWTH_CHUNK = 512;
+
+/**
+ * Fraction of the brush diameter used as the growth chunk, above the
+ * {@link GROWTH_CHUNK} floor.
+ *
+ * Scaling with the brush keeps the padding a constant FRACTION of the stroke
+ * rather than a constant number of pixels. A fixed 64px grid means a 1200px
+ * brush reallocates every 64px of travel, and each reallocation costs about as
+ * much as a whole frame; scaled, it reallocates ~5× less often for the same
+ * relative overhead. Small brushes keep the fine grid, so their history patches
+ * (sized from this padded rect) stay small.
+ */
+const GROWTH_CHUNK_RATIO = 0.25;
+
+/** The growth-grid pitch for a stroke of diameter `size`. */
+const growthChunk = (size: number): number =>
+  Math.min(
+    MAX_GROWTH_CHUNK,
+    Math.max(GROWTH_CHUNK, Math.round((size * GROWTH_CHUNK_RATIO) / GROWTH_CHUNK) * GROWTH_CHUNK)
+  );
+
+/** Rounds a rect OUTWARD to the growth grid for `chunk` (integer, chunk-aligned). */
+const padToChunk = (r: Rect, chunk: number): Rect => {
+  const x = Math.floor(r.x / chunk) * chunk;
+  const y = Math.floor(r.y / chunk) * chunk;
+  const right = Math.ceil((r.x + r.width) / chunk) * chunk;
+  const bottom = Math.ceil((r.y + r.height) / chunk) * chunk;
   return { height: bottom - y, width: right - x, x, y };
+};
+
+/** The 2D context flavour a {@link RasterSurface} exposes. */
+type SurfaceContext = RasterSurface['ctx'];
+
+/**
+ * Extra slack (document units) around the changed geometry, covering the
+ * antialiased edge and the outward rounding of the bounds themselves.
+ */
+const CHANGE_MARGIN = 2;
+
+/**
+ * Bounds of the vertices where two outline rings disagree, or `null` when they
+ * are identical.
+ *
+ * This decides how little of the cache a frame has to rewrite, and it is
+ * answered from the geometry itself rather than inferred from the input.
+ * Bounding it by "a brush radius around the newest samples" is the intuitive
+ * approach and it is wrong: the ring is
+ * `left ++ endCap ++ reverse(right) ++ startCap`, so extending the stroke
+ * appends to `left`, rewrites `endCap`, and — because the right side is
+ * REVERSED — shifts the index of every vertex after it. Comparing the rings
+ * directly costs one linear scan and assumes nothing about how far a new sample
+ * can reach.
+ *
+ * The scan takes the longest common prefix and the longest common suffix; what
+ * lies between is everything that moved, appeared or vanished. One vertex of
+ * slack is added on each side, because a vertex is the control point of the
+ * quadratic spanning its two neighbouring edge midpoints, so its influence on
+ * the rendered curve reaches one vertex either way.
+ */
+const changedVertexBounds = (previous: readonly Vec2[], current: readonly Vec2[]): Rect | null => {
+  const shortest = Math.min(previous.length, current.length);
+  let head = 0;
+  while (head < shortest && previous[head]!.x === current[head]!.x && previous[head]!.y === current[head]!.y) {
+    head++;
+  }
+  let tail = 0;
+  while (
+    tail < shortest - head &&
+    previous[previous.length - 1 - tail]!.x === current[current.length - 1 - tail]!.x &&
+    previous[previous.length - 1 - tail]!.y === current[current.length - 1 - tail]!.y
+  ) {
+    tail++;
+  }
+  const from = Math.max(0, head - 1);
+  let minX = Infinity,
+    minY = Infinity,
+    maxX = -Infinity,
+    maxY = -Infinity;
+  const cover = (ring: readonly Vec2[]): void => {
+    for (let i = from; i < ring.length && i <= ring.length - tail; i++) {
+      const p = ring[i]!;
+      minX = Math.min(minX, p.x);
+      minY = Math.min(minY, p.y);
+      maxX = Math.max(maxX, p.x);
+      maxY = Math.max(maxY, p.y);
+    }
+  };
+  cover(previous);
+  cover(current);
+  if (minX > maxX) {
+    return null;
+  }
+  return { height: maxY - minY, width: maxX - minX, x: minX, y: minY };
+};
+
+/** Whether two rects are identical. */
+const sameRect = (a: Rect, b: Rect): boolean =>
+  a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
+
+/**
+ * Grows the pristine "before" snapshot from `previous` to cover `region`,
+ * reading ONLY the newly-added area from the surface.
+ *
+ * The stroke has never been composited outside `previous` — every frame
+ * composites within the accumulated rect — so the surface still holds pristine
+ * pixels there and they can be read directly. Carrying the existing snapshot
+ * forward by copy, instead of re-reading the whole region, is what keeps the
+ * per-frame cost proportional to new area rather than total painted area.
+ */
+const extendBefore = (
+  surfaceCtx: SurfaceContext,
+  existing: ImageData | null,
+  previous: Rect | null,
+  region: Rect,
+  originX: number,
+  originY: number
+): ImageData => {
+  if (!existing || !previous || isEmpty(previous)) {
+    return surfaceCtx.getImageData(region.x - originX, region.y - originY, region.width, region.height);
+  }
+  const grown = surfaceCtx.createImageData(region.width, region.height);
+
+  /** Blits `source` (covering `rect`) into `grown` at its place in `region`. */
+  const blit = (source: ImageData, rect: Rect): void => {
+    const offsetX = rect.x - region.x;
+    const offsetY = rect.y - region.y;
+    const rowBytes = rect.width * 4;
+    for (let row = 0; row < rect.height; row++) {
+      const from = row * rowBytes;
+      grown.data.set(source.data.subarray(from, from + rowBytes), ((row + offsetY) * region.width + offsetX) * 4);
+    }
+  };
+
+  // Carry the pixels we already hold forward untouched...
+  blit(existing, previous);
+  // ...and read only the frame the growth exposed. The stroke has never been
+  // composited out here, so the surface still holds pristine pixels.
+  for (const strip of surroundingStrips(previous, region)) {
+    blit(surfaceCtx.getImageData(strip.x - originX, strip.y - originY, strip.width, strip.height), strip);
+  }
+  return grown;
+};
+
+/**
+ * Decomposes `outer` minus `inner` into up to four disjoint rects (top, bottom,
+ * left, right), assuming `inner` is contained in `outer`.
+ */
+const surroundingStrips = (inner: Rect, outer: Rect): Rect[] => {
+  const innerBottom = inner.y + inner.height;
+  const outerBottom = outer.y + outer.height;
+  const candidates: Rect[] = [
+    { height: inner.y - outer.y, width: outer.width, x: outer.x, y: outer.y },
+    { height: outerBottom - innerBottom, width: outer.width, x: outer.x, y: innerBottom },
+    { height: inner.height, width: inner.x - outer.x, x: outer.x, y: inner.y },
+    {
+      height: inner.height,
+      width: outer.x + outer.width - (inner.x + inner.width),
+      x: inner.x + inner.width,
+      y: inner.y,
+    },
+  ];
+  return candidates.filter((r) => !isEmpty(r));
 };
 
 /** Creates a paint session that grows the target layer's content-sized cache. */
@@ -132,6 +303,8 @@ export const createStrokeSession = (config: StrokeSessionConfig): StrokeSession 
   // (which only shifts the surface origin, not the layer-local geometry).
   let beforeImageData: ImageData | null = null;
   let accumRect: Rect | null = null;
+  let previousPolygon: Vec2[] | null = null;
+  const chunk = growthChunk(size);
 
   /** Ensures the scratch surface is at least `w`×`h`. */
   const ensureStroke = (w: number, h: number): RasterSurface => {
@@ -147,7 +320,7 @@ export const createStrokeSession = (config: StrokeSessionConfig): StrokeSession 
     if (points.length === 0) {
       return;
     }
-    const { bounds, path } = strokeToPath(points, { last, size, thinning }, ctx.createPath2D);
+    const { bounds, path, polygon } = strokeToPath(points, { last, size, thinning }, ctx.createPath2D);
     let dirty: Rect | null = roundOut(bounds);
     // Selection clip: only the region inside the selection can ever change, so
     // bound the dirty/growth region to the mask extent (and skip empty results).
@@ -169,7 +342,7 @@ export const createStrokeSession = (config: StrokeSessionConfig): StrokeSession 
     // and the reported dirty/before/after all use this same padded region so every
     // consumer stays coherent. When a selection clips the stroke, clamp the padded
     // region back to the mask so growth still never escapes the selection.
-    let region = padToChunk(accumRect ? roundOut(union(accumRect, dirty)) : dirty);
+    let region = padToChunk(accumRect ? roundOut(union(accumRect, dirty)) : dirty, chunk);
     if (clipMask) {
       const clamped = intersect(region, clipMask.rect);
       if (clamped) {
@@ -201,59 +374,124 @@ export const createStrokeSession = (config: StrokeSessionConfig): StrokeSession 
     const ox = entry.rect.x;
     const oy = entry.rect.y;
 
-    // 1. Restore the region painted last frame back to pristine "before" pixels,
-    //    so recompositing the (larger) stroke doesn't compound its opacity.
-    if (accumRect && beforeImageData) {
-      targetCtx.putImageData(beforeImageData, accumRect.x - ox, accumRect.y - oy);
+    // 1. Extend the pristine "before" snapshot over whatever the region just
+    //    gained, reading only the newly-exposed frame rather than re-reading
+    //    everything painted so far.
+    const previousRect = accumRect;
+    if (!beforeImageData || !previousRect || !sameRect(previousRect, region)) {
+      beforeImageData = extendBefore(targetCtx, beforeImageData, previousRect, region, ox, oy);
     }
-    // 2. Recapture the pristine "before" for the grown region (in surface coords).
-    beforeImageData = targetCtx.getImageData(region.x - ox, region.y - oy, region.width, region.height);
     accumRect = region;
 
-    // 3. Render the whole accumulated stroke into the scratch surface at full
-    //    alpha — one filled polygon, so no self-overlap darkening. The scratch is
-    //    region-local: translate the (layer-local) path by -region.origin.
+    // 2. Work out where the silhouette actually moved since the last frame, and
+    //    confine the rest of the frame to it. Outside this band the cache already
+    //    holds the correct composite and the shape has not changed, so redoing it
+    //    would only cost time — and rewriting the whole accumulated region every
+    //    frame is what made a long stroke get slower the longer it got.
+    const moved = previousPolygon ? changedVertexBounds(previousPolygon, polygon) : null;
+    const touched = previousRect && moved ? intersect(roundOut(expand(moved, CHANGE_MARGIN)), region) : region;
+    // No intersection means the change fell outside the paintable region (a clip
+    // can do that); fall back to the whole region rather than skip the frame.
+    const changed = touched && !isEmpty(touched) ? touched : region;
+    previousPolygon = polygon;
+
+    // 3. Restore that band to pristine "before" pixels, so recompositing the
+    //    stroke over it doesn't compound its opacity. `putImageData`'s dirty-rect
+    //    arguments write only this window out of the full-region snapshot. On the
+    //    opening frame nothing has been composited yet, so there is nothing to undo.
+    if (previousRect) {
+      targetCtx.putImageData(
+        beforeImageData,
+        region.x - ox,
+        region.y - oy,
+        changed.x - region.x,
+        changed.y - region.y,
+        changed.width,
+        changed.height
+      );
+    }
+
+    // 4. Render the accumulated stroke into the scratch surface at full alpha.
+    //    The path is filled in ONE pass, so overlapping parts of a stroke union
+    //    rather than compounding — filling it in pieces across frames would let
+    //    the antialiased edges of successive batches blend into each other and
+    //    leave seams. The scratch is region-local: translate the (layer-local)
+    //    path by -region.origin.
+    //
+    //    Only the changed band is refreshed. The scratch persists between
+    //    frames, and outside that band the silhouette is by definition the same
+    //    one already sitting there — so re-clearing and re-filling the whole
+    //    region was redrawing pixels to their existing values. A region change
+    //    resizes the scratch, which clears it, so that case still refills whole.
+    const scratchCleared = !previousRect || !sameRect(previousRect, region);
+    const refresh = scratchCleared ? region : changed;
     const scratch = ensureStroke(region.width, region.height);
     const strokeCtx = scratch.ctx;
     strokeCtx.setTransform(1, 0, 0, 1, -region.x, -region.y);
-    strokeCtx.clearRect(region.x, region.y, region.width, region.height);
+    strokeCtx.save();
+    strokeCtx.beginPath();
+    strokeCtx.rect(refresh.x, refresh.y, refresh.width, refresh.height);
+    strokeCtx.clip();
+    strokeCtx.clearRect(refresh.x, refresh.y, refresh.width, refresh.height);
     strokeCtx.globalCompositeOperation = 'source-over';
     strokeCtx.globalAlpha = 1;
     strokeCtx.fillStyle = color;
     strokeCtx.fill(path);
+    strokeCtx.restore();
 
-    // 3b. Selection clip: keep only the stroke pixels inside the selection mask.
+    // 4b. Selection clip: keep only the stroke pixels inside the selection mask.
     //     The mask is a placed surface; draw it at (maskOrigin - regionOrigin) in
-    //     the scratch's region-local space.
+    //     the scratch's region-local space. Confined to the same band — masking
+    //     already-masked pixels a second time would multiply their alpha again.
     if (clipMask) {
       strokeCtx.setTransform(1, 0, 0, 1, 0, 0);
+      strokeCtx.save();
+      strokeCtx.beginPath();
+      strokeCtx.rect(refresh.x - region.x, refresh.y - region.y, refresh.width, refresh.height);
+      strokeCtx.clip();
       strokeCtx.globalCompositeOperation = 'destination-in';
       strokeCtx.globalAlpha = 1;
       strokeCtx.drawImage(clipMask.surface.canvas, clipMask.rect.x - region.x, clipMask.rect.y - region.y);
+      strokeCtx.restore();
     }
 
-    // 4. Composite the scratch stroke into the cache over the region at the stroke
-    //    opacity, using the tool's blend (brush over / eraser out). Both are in
-    //    surface coords (region translated by the surface origin).
+    // 5. Composite the scratch stroke into the cache at the stroke opacity, using
+    //    the tool's blend (brush over / eraser out), clipped to the band this
+    //    batch changed. The clip also confines the whole-canvas `drawImage` to
+    //    the region, which the scratch may exceed after a resize.
     targetCtx.save();
     targetCtx.setTransform(1, 0, 0, 1, 0, 0);
     targetCtx.beginPath();
-    targetCtx.rect(region.x - ox, region.y - oy, region.width, region.height);
+    targetCtx.rect(changed.x - ox, changed.y - oy, changed.width, changed.height);
     targetCtx.clip();
     targetCtx.globalAlpha = opacity;
     targetCtx.globalCompositeOperation = composite;
     targetCtx.drawImage(scratch.canvas, region.x - ox, region.y - oy);
     targetCtx.restore();
 
-    // The cache pixels changed THIS frame — bump the version so a version-keyed
-    // dependent (the memoized adjusted-surface cache) recomputes over the live
-    // stroke. Without this the compositor would keep serving the pre-stroke
+    // The cache pixels changed THIS frame — bump the version, WITH the band they
+    // changed in, so a version-keyed dependent (the memoized adjusted-surface
+    // cache) recomputes over the live stroke without rebuilding from the whole
+    // layer. Without the bump the compositor would keep serving the pre-stroke
     // adjusted surface, and the live stroke would be invisible on an adjusted
-    // raster layer until pointer-up (and jump on rect growth). This does NOT
+    // raster layer until pointer-up (and jump on rect growth). The band is in
+    // SURFACE-local coordinates, the space a derived surface is built in. Note
+    // it is the derived surfaces that need this — the stroke's own scratch and
+    // cache writes are already bounded above. This does NOT
     // touch `thumbnailVersion` (only `notifyLayerPainted`/rasterize do), so
     // thumbnails don't churn mid-stroke.
-    layers.publishPixels(layerId);
-    ctx.invalidate({ layers: [layerId] });
+    layers.publishPixels(layerId, {
+      height: changed.height,
+      width: changed.width,
+      x: changed.x - ox,
+      y: changed.y - oy,
+    });
+    // Report the region as damage so the frame repaints only these pixels
+    // instead of re-resampling every doc-sized layer to screen scale — the cost
+    // that grows with zoom. `region` is layer-local, which is exactly what the
+    // compositor wants: it carries it to the screen through the layer's own
+    // matrix, so this stays correct on a moved or scaled layer.
+    ctx.invalidate({ damage: { layerId, rect: changed }, layers: [layerId] });
   };
 
   return {
@@ -270,7 +508,14 @@ export const createStrokeSession = (config: StrokeSessionConfig): StrokeSession 
         // Bump the version so the adjusted-surface memo (which recomputed over the
         // live stroke) re-derives from the RESTORED pixels — otherwise an adjusted
         // raster layer would keep showing the cancelled stroke's adjusted preview.
-        layers.publishPixels(layerId);
+        // The restore spans everything the gesture touched, so this reports the
+        // whole accumulated rect rather than any one frame's band.
+        layers.publishPixels(layerId, {
+          height: accumRect.height,
+          width: accumRect.width,
+          x: accumRect.x - entry.rect.x,
+          y: accumRect.y - entry.rect.y,
+        });
         ctx.invalidate({ layers: [layerId] });
       }
     },

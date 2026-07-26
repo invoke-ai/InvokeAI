@@ -1,10 +1,10 @@
 import type { CanvasDocumentContractV2, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { History } from '@workbench/canvas-engine/history/history';
+import type { CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
 import type { LayerCacheStore, PreparedLayerCacheReplacement } from '@workbench/canvas-engine/render/layerCache';
 import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { SelectionState } from '@workbench/canvas-engine/selection/selectionState';
 import type { Rect, Vec2 } from '@workbench/canvas-engine/types';
-import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 
 import { isEmpty, roundOut, transformBounds } from '@workbench/canvas-engine/math/rect';
 import { liftSelectedPixels } from '@workbench/canvas-engine/selection/floatingSelection';

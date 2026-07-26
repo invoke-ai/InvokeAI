@@ -652,7 +652,15 @@ describe('createCanvasEngine', () => {
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
-    vi.stubGlobal('Path2D', class FakePath2D {});
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
     const layer = {
       ...rasterLayer('a'),
       source: { bitmap: { height: 20, imageName: 'paint-pixels', width: 20 }, type: 'paint' as const },
@@ -1688,7 +1696,15 @@ describe('createCanvasEngine', () => {
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
-    vi.stubGlobal('Path2D', class FakePath2D {});
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
     const document = paintDoc();
     const layer = document.layers[0];
     if (!layer || layer.type !== 'raster') {
@@ -2061,7 +2077,15 @@ describe('createCanvasEngine', () => {
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
-    vi.stubGlobal('Path2D', class FakePath2D {});
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
     const paint = {
       ...rasterLayer('paint'),
       source: { bitmap: { height: 10, imageName: 'paint', width: 10 }, type: 'paint' as const },
@@ -2670,7 +2694,15 @@ const createControlPaintHarness = (
   const raf = createControllableRaf();
   vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
   vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
-  vi.stubGlobal('Path2D', class FakePath2D {});
+  vi.stubGlobal(
+    'Path2D',
+    class FakePath2D {
+      closePath() {}
+      lineTo() {}
+      moveTo() {}
+      quadraticCurveTo() {}
+    }
+  );
 
   const { source, ...layerOverrides } = overrides;
   const layer: CanvasControlLayerContract = {
@@ -3410,7 +3442,15 @@ describe('engine-owned history: stroke → undo → redo', () => {
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
     // The engine builds real `Path2D`s for stroke outlines; node lacks it.
-    vi.stubGlobal('Path2D', class FakePath2D {});
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
 
     const { store } = createReactiveStore(paintDoc());
     const base = createTestStubRasterBackend();
@@ -3499,7 +3539,15 @@ describe('engine-owned history: stroke → undo → redo', () => {
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
-    vi.stubGlobal('Path2D', class FakePath2D {});
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
 
     const { store } = createReactiveStore(paintDoc());
     const base = createTestStubRasterBackend();
@@ -3574,7 +3622,15 @@ describe('engine-owned history: stroke → undo → redo', () => {
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
-    vi.stubGlobal('Path2D', class FakePath2D {});
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
 
     const { setDocument, store } = createReactiveStore(paintDoc());
     const bitmapStore = createSpyBitmapStore();
@@ -3608,7 +3664,15 @@ describe('engine-owned history: stroke → undo → redo', () => {
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
-    vi.stubGlobal('Path2D', class FakePath2D {});
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
 
     const { setDocument, store } = createReactiveStore(paintDoc());
     const bitmapStore = createSpyBitmapStore();
@@ -3703,7 +3767,15 @@ describe('engine-owned history: undo/redo guarded during an active gesture', () 
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
-    vi.stubGlobal('Path2D', class FakePath2D {});
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
 
     const { store } = createReactiveStore(paintDoc());
     const base = createTestStubRasterBackend();
@@ -3742,15 +3814,16 @@ describe('engine-owned history: undo/redo guarded during an active gesture', () 
     // (The live session itself may draw, so snapshot the put count after it opens.)
     overlay.fire('pointerdown', pointerAt(50, 50));
     overlay.fire('pointermove', pointerAt(60, 60));
-    const putsMidGesture = putImageDataCalls(surfaces).length;
+    const putsMidGesture = putImageDataCalls(surfaces);
 
-    // Mid-gesture undo/redo must be no-ops: no history pop and no putImageData.
+    // Mid-gesture undo/redo must be no-ops: no history pop, and not a single
+    // additional putImageData. Comparing the whole log — rather than just its
+    // length, or scanning it for the first stroke's snapshot — keeps this honest
+    // whether or not the live session reuses one "before" snapshot across frames.
     engine.history.undo();
     engine.history.redo();
     expect(engine.stores.canUndo.get()).toBe(true);
-    expect(putImageDataCalls(surfaces).length).toBe(putsMidGesture);
-    // In particular, the first stroke's before pixels were never injected.
-    expect(putImageDataCalls(surfaces).some((call) => call.image === strokes[0]!.beforeImageData)).toBe(false);
+    expect(putImageDataCalls(surfaces)).toEqual(putsMidGesture);
 
     // End the gesture; now undo works and writes the newest stroke's before pixels.
     overlay.fire('pointerup', pointerAt(60, 60, { buttons: 0 }));
@@ -5195,7 +5268,15 @@ describe('boolean raster operations', () => {
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
-    vi.stubGlobal('Path2D', class FakePath2D {});
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
     const emptyPaint = (id: string): CanvasRasterLayerContractV2 => ({
       blendMode: 'normal',
       id,
@@ -7297,7 +7378,15 @@ describe('engine-owned history: composed auto-create + stroke entry', () => {
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
-    vi.stubGlobal('Path2D', class FakePath2D {});
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
 
     const { store } = createReactiveStore(imageSelectedDoc());
     const dispatch = store.dispatch as Mock;
@@ -8139,7 +8228,15 @@ describe('commitRasterFilterResult', () => {
     const createRealBitmapStoreHarness = async (
       uploadImage: (blob: Blob) => Promise<{ height: number; imageName: string; width: number }>
     ) => {
-      vi.stubGlobal('Path2D', class FakePath2D {});
+      vi.stubGlobal(
+        'Path2D',
+        class FakePath2D {
+          closePath() {}
+          lineTo() {}
+          moveTo() {}
+          quadraticCurveTo() {}
+        }
+      );
       const source: CanvasRasterLayerContractV2 = {
         ...filterLayer('source'),
         source: {
@@ -9761,7 +9858,15 @@ describe('commitGeneratedImageResult', () => {
   });
 
   it('returns stale when unpersisted paint pixels change while the generated image resolves', async () => {
-    vi.stubGlobal('Path2D', class FakePath2D {});
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
     const source: CanvasRasterLayerContractV2 = {
       ...workflowRaster(),
       source: {
@@ -10182,7 +10287,15 @@ describe('replaceSelectionFromImage', () => {
     imageResolver?: (imageName: string, signal?: AbortSignal) => Promise<Blob>;
     seedSelection?: boolean;
   } = {}) => {
-    vi.stubGlobal('Path2D', class FakePath2D {});
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
     const layer = sourceLayer();
     const document = sourceDocument(layer);
     const reactive = createReactiveStore(document);
@@ -10443,7 +10556,15 @@ describe('replaceSelectionFromImage', () => {
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
-    vi.stubGlobal('Path2D', class FakePath2D {});
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
     const decoded = createDeferred<Blob>();
     const document = paintDoc();
     const { projectId, store } = createReducerBackedStore(document);
@@ -12261,7 +12382,15 @@ describe('guarded filter previews', () => {
   });
 
   it('clears an already-published guarded preview when live paint advances the cache version', async () => {
-    vi.stubGlobal('Path2D', class FakePath2D {});
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
     const paint: CanvasRasterLayerContractV2 = {
       ...guardableLayer('L'),
       source: { bitmap: { height: 10, imageName: 'paint-source', width: 10 }, type: 'paint' },
@@ -12313,7 +12442,15 @@ describe('document mirror wiring: prop vs source change (paint-pixel survival)',
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
-    vi.stubGlobal('Path2D', class FakePath2D {});
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
 
     const { setDocument, store } = createReactiveStore(paintDoc());
     const base = createTestStubRasterBackend();
@@ -12361,7 +12498,15 @@ describe('document mirror wiring: prop vs source change (paint-pixel survival)',
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
-    vi.stubGlobal('Path2D', class FakePath2D {});
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
     const { projectId, store } = createReducerBackedStore(paintDoc());
     const engine = createCanvasEngine({
       backend: createTestStubRasterBackend(),
@@ -12387,7 +12532,15 @@ describe('document mirror wiring: prop vs source change (paint-pixel survival)',
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
-    vi.stubGlobal('Path2D', class FakePath2D {});
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
     const reducer = createReducerBackedStore(paintDoc());
     let throwAfterBitmapCommit = false;
     const unsubscribeThrower = reducer.store.subscribe(() => {
@@ -12705,7 +12858,15 @@ describe('hasExportableLayerContent', () => {
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
-    vi.stubGlobal('Path2D', class FakePath2D {});
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
 
     const { setDocument, store } = createReactiveStore({
       ...makeDoc(),
@@ -12907,7 +13068,15 @@ describe('gesture guard: nudge / commitStructural mid-stroke', () => {
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
-    vi.stubGlobal('Path2D', class FakePath2D {});
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
 
     const { store } = createReactiveStore(paintDoc());
     const dispatch = store.dispatch as Mock;
@@ -12970,7 +13139,15 @@ describe('gesture guard: nudge / commitStructural mid-stroke', () => {
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
-    vi.stubGlobal('Path2D', class FakePath2D {});
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
 
     const { store } = createReactiveStore(twoPaintDoc());
     const dispatch = store.dispatch as Mock;
@@ -13019,7 +13196,15 @@ describe('brush cursor ring: live size updates', () => {
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
-    vi.stubGlobal('Path2D', class FakePath2D {});
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
 
     const { store } = createReactiveStore(paintDoc());
     const engine = createCanvasEngine({
@@ -13056,7 +13241,15 @@ describe('brush cursor ring: live size updates', () => {
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
-    vi.stubGlobal('Path2D', class FakePath2D {});
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
 
     const { store } = createReactiveStore(paintDoc());
     const engine = createCanvasEngine({
@@ -14003,7 +14196,15 @@ const lockedPaintDoc = (): CanvasDocumentContractV2 => ({
 
 describe('engine selection: select all / deselect / invert + hasSelection store', () => {
   it('selectAll sets hasSelection; deselect clears it', () => {
-    vi.stubGlobal('Path2D', class FakePath2D {});
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
     const { store } = createFakeStore(paintDoc());
     const engine = createCanvasEngine({
       backend: createTestStubRasterBackend(),
@@ -14021,7 +14222,15 @@ describe('engine selection: select all / deselect / invert + hasSelection store'
   });
 
   it('invertSelection of an empty selection selects everything', () => {
-    vi.stubGlobal('Path2D', class FakePath2D {});
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
     const { store } = createFakeStore(paintDoc());
     const engine = createCanvasEngine({
       backend: createTestStubRasterBackend(),
@@ -14038,7 +14247,15 @@ describe('engine selection: select all / deselect / invert + hasSelection store'
 
 describe('engine selection: fill / erase', () => {
   const makeEngine = (doc: CanvasDocumentContractV2) => {
-    vi.stubGlobal('Path2D', class FakePath2D {});
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
     const { store } = createFakeStore(doc);
     const bitmapStore = createSpyBitmapStore();
     const engine = createCanvasEngine({
@@ -14567,7 +14784,15 @@ describe('engine selection: marching ants animation + overlay-only', () => {
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
-    vi.stubGlobal('Path2D', class FakePath2D {});
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
 
     const { store } = createReactiveStore(paintDoc());
     const engine = createCanvasEngine({
@@ -14604,7 +14829,15 @@ describe('engine selection: marching ants animation + overlay-only', () => {
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
-    vi.stubGlobal('Path2D', class FakePath2D {});
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
 
     const { store } = createReactiveStore(paintDoc());
     const engine = createCanvasEngine({
@@ -14646,7 +14879,15 @@ describe('engine selection: lasso commit through the pipeline', () => {
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
-    vi.stubGlobal('Path2D', class FakePath2D {});
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
 
     const { store } = createReactiveStore(paintDoc());
     const dispatch = store.dispatch as Mock;
@@ -14679,7 +14920,15 @@ describe('engine selection: lasso commit through the pipeline', () => {
 
 describe('engine selection: document replace clears the selection', () => {
   it('a wholesale document swap deselects', () => {
-    vi.stubGlobal('Path2D', class FakePath2D {});
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
     const { setDocument, store } = createReactiveStore(paintDoc());
     const engine = createCanvasEngine({
       backend: createTestStubRasterBackend(),
@@ -14909,7 +15158,15 @@ describe('text edit session', () => {
   });
 
   it('drops the session on a wholesale document replace', () => {
-    vi.stubGlobal('Path2D', class FakePath2D {});
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
     const { engine, setDocument } = makeEngine(textDoc());
     engine.tools.setTool('text');
     engine.layers.openTextEdit('txt1');
@@ -15091,7 +15348,15 @@ describe('Select Object canvas engine integration', () => {
   });
 
   const createOpaqueSamBackend = () => {
-    vi.stubGlobal('Path2D', class FakePath2D {});
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
     const base = createTestStubRasterBackend();
     const surfaces: StubRasterSurface[] = [];
     const backend: StubRasterBackend = {

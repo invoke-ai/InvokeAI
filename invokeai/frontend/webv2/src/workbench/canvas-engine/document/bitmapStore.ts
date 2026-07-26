@@ -48,8 +48,8 @@
 
 import type { CanvasImageRef, CanvasLayerSourceContract } from '@workbench/canvas-engine/contracts';
 import type { CanvasImageUploadResult } from '@workbench/canvas-engine/document/imageUpload';
+import type { CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
-import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 
 /** Default idle window before a dirty layer is flushed. */
 export const DEFAULT_DEBOUNCE_MS = 1500;

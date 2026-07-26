@@ -116,4 +116,22 @@ export interface RenderFlags {
   overlay: boolean;
   /** Force a full repaint, ignoring the other flags. */
   all: boolean;
+  /**
+   * The regions that changed, when every contributing invalidation could name
+   * one — letting the composite repaint just those pixels instead of the whole
+   * viewport. `null` means "repaint everything", and is the default: an
+   * invalidation that does not carry damage widens the frame back to full.
+   */
+  damage: LayerDamage[] | null;
+}
+
+/**
+ * A changed region, in the LAYER-LOCAL space of `layerId` — the same space a
+ * layer's cache rect lives in, so a caller that already knows its dirty rect
+ * (the stroke session does) can report it without knowing the layer's transform.
+ * The compositor maps it to the screen through that layer's effective matrix.
+ */
+export interface LayerDamage {
+  layerId: string;
+  rect: Rect;
 }

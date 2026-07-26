@@ -11,7 +11,7 @@
  * time (never at import) and are always overridden in tests.
  */
 
-import type { RenderFlags } from '@workbench/canvas-engine/types';
+import type { LayerDamage, RenderFlags } from '@workbench/canvas-engine/types';
 
 /** The partial invalidation payload accepted by {@link RenderScheduler.invalidate}. */
 export interface InvalidatePayload {
@@ -23,6 +23,15 @@ export interface InvalidatePayload {
   overlay?: true;
   /** Force a full repaint next frame. */
   all?: true;
+  /**
+   * The layer-local region this invalidation changed — purely an optimisation,
+   * letting the frame repaint only those pixels.
+   *
+   * It is honoured ONLY when it names the single layer in `layers`; anything
+   * else (a bare `layers`, a `view`, an `all`) widens the frame back to a full
+   * repaint. Callers therefore opt in, and omitting it is always safe.
+   */
+  damage?: LayerDamage;
 }
 
 /** Dependencies for {@link createRenderScheduler}; the rAF pair is injectable for tests. */
@@ -51,6 +60,7 @@ export interface RenderScheduler {
 
 const createEmptyFlags = (): RenderFlags => ({
   all: false,
+  damage: [],
   layers: new Set<string>(),
   overlay: false,
   view: false,
@@ -111,18 +121,37 @@ export const createRenderScheduler = (deps: RenderSchedulerDeps): RenderSchedule
     if (disposed) {
       return;
     }
+    // Damage merging is deliberately pessimistic: a frame may repaint only part
+    // of the viewport just when EVERY invalidation in it named the region it
+    // changed. A repaint-everything flag, or a layer invalidation without a
+    // region, drops the frame back to full — so a caller that forgets to report
+    // damage costs performance, never correctness.
     if (payload.all) {
       pending.all = true;
+      pending.damage = null;
     }
     if (payload.view) {
+      // The whole viewport moves under a pan/zoom; no layer-local rect survives it.
       pending.view = true;
+      pending.damage = null;
     }
     if (payload.overlay) {
+      // The overlay is its own canvas, redrawn whole every frame — it neither
+      // needs nor invalidates composite damage.
       pending.overlay = true;
     }
     if (payload.layers) {
       for (const id of payload.layers) {
         pending.layers.add(id);
+      }
+      const damage =
+        payload.damage && payload.layers.length === 1 && payload.layers[0] === payload.damage.layerId
+          ? payload.damage
+          : null;
+      if (!damage) {
+        pending.damage = null;
+      } else if (pending.damage) {
+        pending.damage.push(damage);
       }
     }
     schedule();

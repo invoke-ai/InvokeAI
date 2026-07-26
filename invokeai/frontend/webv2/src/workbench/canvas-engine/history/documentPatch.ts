@@ -15,7 +15,7 @@
  * Zero React, zero DOM, zero import-time side effects.
  */
 
-import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
+import type { CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
 
 import type { HistoryEntry } from './history';
 

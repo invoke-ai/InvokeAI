@@ -2,10 +2,10 @@ import type { CanvasEditIntent, WorkbenchActionOrigin } from '@workbench/autoRou
 import type { LayerExportGuard } from '@workbench/canvas-engine/capabilities';
 import type { CanvasDocumentContractV2 } from '@workbench/canvas-engine/contracts';
 import type { History } from '@workbench/canvas-engine/history/history';
+import type { CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
 import type { PreparedLayerCacheReplacement } from '@workbench/canvas-engine/render/layerCache';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
-import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 
 /**
  * A claim on the current document-edit epoch. Captured before an async

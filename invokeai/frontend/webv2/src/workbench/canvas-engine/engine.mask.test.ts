@@ -244,7 +244,15 @@ const setupEngine = (doc: CanvasDocumentContractV2) => {
   const raf = createControllableRaf();
   vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
   vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
-  vi.stubGlobal('Path2D', class FakePath2D {});
+  vi.stubGlobal(
+    'Path2D',
+    class FakePath2D {
+      closePath() {}
+      lineTo() {}
+      moveTo() {}
+      quadraticCurveTo() {}
+    }
+  );
 
   const reactive = createReactiveStore(doc);
   const engine = createCanvasEngine({
@@ -383,7 +391,15 @@ describe('mask invert', () => {
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
-    vi.stubGlobal('Path2D', class FakePath2D {});
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
 
     const reactive = createReactiveStore(maskDoc());
     const base = createTestStubRasterBackend();
@@ -446,7 +462,15 @@ describe('mask invert', () => {
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
-    vi.stubGlobal('Path2D', class FakePath2D {});
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
     const doc = maskDoc();
     doc.layers.push({
       blendMode: 'normal',
