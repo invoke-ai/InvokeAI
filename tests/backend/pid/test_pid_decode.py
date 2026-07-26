@@ -29,8 +29,9 @@ def test_default_schedule_matches_four_steps() -> None:
 
 
 def test_out_of_range_step_count_trips_the_safety_net() -> None:
-    """If an invalid count ever bypassed the field cap, the hardening assertion catches the duplicate."""
-    with pytest.raises(AssertionError, match="strictly decreasing"):
+    """If an invalid count ever bypassed the field cap, the guard raises. Uses ValueError (not assert)
+    so it still fires under `python -O`, where assertions are stripped."""
+    with pytest.raises(ValueError, match="strictly decreasing"):
         _get_t_list(_CPU, num_steps=5)
 
 

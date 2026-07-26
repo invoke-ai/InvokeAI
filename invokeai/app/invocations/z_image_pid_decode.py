@@ -143,10 +143,11 @@ class ZImagePiDDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
                     f"Expected PreTrainedTokenizerBase for Gemma tokenizer, got {type(gemma_tokenizer).__name__}."
                 )
 
-            # Encode on the Gemma encoder's actual device: model_on_device() honours the encoder's
-            # cpu_only setting, so on a CUDA host with a CPU-only Gemma the global compute device would
-            # push the tokenizer output to CUDA and mismatch the CPU-resident model.
-            device = next(gemma_encoder.parameters()).device
+            # Encode on the encoder's intended compute device. compute_device honours cpu_only and is
+            # stable under partial loading — the first parameter may be offloaded to CPU while later
+            # modules load on CUDA, so inferring the device from the first parameter could place caption
+            # inputs on the wrong device.
+            device = gemma_text_encoder_info.compute_device
             encode_dtype = TorchDevice.choose_bfloat16_safe_dtype(device)
 
             context.util.signal_progress("Encoding caption with Gemma-2")

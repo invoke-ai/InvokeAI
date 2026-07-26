@@ -37,6 +37,7 @@ from invokeai.app.invocations.flux_vae_encode import FluxVaeEncodeInvocation
 from invokeai.app.invocations.model import Gemma2EncoderField, PiDDecoderField, VAEField
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.flux.modules.autoencoder import AutoEncoder
 from invokeai.backend.flux.util import get_flux_ae_params
 from invokeai.backend.model_manager.taxonomy import BaseModelType
 from invokeai.backend.pid._src.networks.pid_net import PidNet
@@ -71,7 +72,9 @@ class PiDUpscaleInvocation(BaseInvocation, WithMetadata, WithBoard):
 
     image: ImageField = InputField(description="Image to upscale.")
     vae: VAEField = InputField(
-        description="FLUX-compatible VAE (FLUX.1, Z-Image, anything sharing the 16-channel encoder).",
+        description="FLUX AutoEncoder VAE. PiD upscale runs the FLUX backbone and applies FLUX VAE "
+        "scaling, and the encode path only supports InvokeAI's FLUX AutoEncoder — a diffusers "
+        "AutoencoderKL (e.g. Z-Image) is not supported here.",
         input=Input.Connection,
     )
     gemma2_encoder: Gemma2EncoderField = InputField(
@@ -115,10 +118,17 @@ class PiDUpscaleInvocation(BaseInvocation, WithMetadata, WithBoard):
             image_tensor = einops.rearrange(image_tensor, "c h w -> 1 c h w")
 
         vae_info = context.models.load(self.vae.vae)
+        # vae_encode + the FLUX scaling below only support InvokeAI's FLUX AutoEncoder. Reject any other
+        # VAE (e.g. a Z-Image diffusers AutoencoderKL) up front with a clear error rather than failing on a
+        # stripped assert inside vae_encode under `python -O`.
+        if not isinstance(vae_info.model, AutoEncoder):
+            raise ValueError(
+                f"PiD Upscale requires a FLUX AutoEncoder VAE, but got {type(vae_info.model).__name__}. "
+                "A diffusers AutoencoderKL (e.g. Z-Image) is not supported by this node."
+            )
         context.util.signal_progress("Running VAE encode")
         normalised_latent = FluxVaeEncodeInvocation.vae_encode(vae_info=vae_info, image_tensor=image_tensor)
-        # FluxAutoEncoder.encode emits `scale * (raw - shift)`. PiD expects raw,
-        # so undo it. Holds for the Z-Image case as well (same VAE constants).
+        # FluxAutoEncoder.encode emits `scale * (raw - shift)`. PiD expects raw, so undo it.
         ae = get_flux_ae_params()
         raw_latent = normalised_latent / ae.scale_factor + ae.shift_factor
         raw_latent = raw_latent.to("cpu")  # park while we swap to Gemma
@@ -137,10 +147,11 @@ class PiDUpscaleInvocation(BaseInvocation, WithMetadata, WithBoard):
                 raise TypeError(
                     f"Expected PreTrainedTokenizerBase for Gemma tokenizer, got {type(gemma_tokenizer).__name__}."
                 )
-            # Encode on the Gemma encoder's actual device: model_on_device() honours the encoder's
-            # cpu_only setting, so on a CUDA host with a CPU-only Gemma the global compute device would
-            # push the tokenizer output to CUDA and mismatch the CPU-resident model.
-            device = next(gemma_encoder.parameters()).device
+            # Encode on the encoder's intended compute device. compute_device honours cpu_only and is
+            # stable under partial loading — the first parameter may be offloaded to CPU while later
+            # modules load on CUDA, so inferring the device from the first parameter could place caption
+            # inputs on the wrong device.
+            device = gemma_text_encoder_info.compute_device
             encode_dtype = TorchDevice.choose_bfloat16_safe_dtype(device)
             context.util.signal_progress("Encoding caption with Gemma-2")
             caption_embs, caption_mask = encode_caption_for_pid(

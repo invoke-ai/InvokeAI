@@ -215,10 +215,13 @@ def _get_t_list(device: torch.device, *, num_steps: Optional[int] = None) -> Ten
     # The student schedule has only 4 transitions (a 5-point list). Sub-sampling to more
     # than 4 steps rounds distinct linspace indices onto the same point, yielding duplicate
     # timesteps that _student_sample_loop would waste a full network forward on (and which
-    # degrade rather than refine the output). Callers cap num_steps at 4; assert the derived
-    # schedule is strictly decreasing as a safety net against an invalid step count slipping through.
-    if t.numel() >= 2:
-        assert bool((t[1:] < t[:-1]).all()), f"t_list must be strictly decreasing, got {t.tolist()}"
+    # degrade rather than refine the output). Callers cap num_steps at 4; raise (not assert, so the
+    # guard survives `python -O`) if an invalid step count ever produces a non-strictly-decreasing schedule.
+    if t.numel() >= 2 and not bool((t[1:] < t[:-1]).all()):
+        raise ValueError(
+            f"PiD student schedule for num_steps={num_steps} is not strictly decreasing (got {t.tolist()}); "
+            "the schedule has only 4 transitions, so num_steps must be between 1 and 4."
+        )
     return t
 
 
