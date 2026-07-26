@@ -1,3 +1,4 @@
+import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createExternalStoreCore } from '@platform/state/externalStoreCore';
 import { useSyncExternalStore } from 'react';
 
@@ -16,6 +17,14 @@ export const useIsCommandPaletteOpen = (): boolean =>
     .isOpen;
 
 let returnFocusElement: HTMLElement | null = null;
+
+registerAccountOwnedResource({
+  clear: () => {
+    returnFocusElement = null;
+    commandPaletteStore.setSnapshot({ isOpen: false });
+  },
+  name: 'command-palette',
+});
 
 const captureReturnFocusElement = (): void => {
   const activeElement = document.activeElement;

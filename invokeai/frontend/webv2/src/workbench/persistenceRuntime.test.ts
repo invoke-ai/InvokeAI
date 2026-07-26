@@ -380,6 +380,29 @@ describe('Workbench persistence runtime', () => {
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
+  it('disposes immediately when its owning account signal is aborted', async () => {
+    const aggregate = createAggregate();
+    const { persistence } = createPersistence(() => Promise.resolve(null));
+    const clock = new FakeClock();
+    const controller = new AbortController();
+    const runtime = createWorkbenchPersistenceRuntime({
+      aggregate: aggregate.port,
+      clock,
+      persistence,
+      signal: controller.signal,
+    });
+
+    runtime.start();
+    await flushPromises();
+    aggregate.edit('Account A edit');
+
+    controller.abort();
+    clock.runAll();
+
+    expect(runtime.getSnapshot().phase).toBe('disposed');
+    expect(persistence.saveWorkbench).not.toHaveBeenCalled();
+  });
+
   it('hydrates through a fresh instance after a prior one was disposed mid-load (StrictMode remount)', async () => {
     const aggregate = createAggregate();
     const loadedState = createInitialWorkbenchState();

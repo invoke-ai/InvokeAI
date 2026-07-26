@@ -4,6 +4,11 @@ import { convertModelToDiffusers, deleteModel, reidentifyModel } from '@features
 import { removeModelsFromStore, replaceModelInStore } from '@features/models/data/modelsStore';
 import { pruneModelsUiKeys } from '@features/models/ui/uiStore';
 import { useNotify } from '@features/models/ui/useModelsNotify';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
 import { useCallback } from 'react';
 
 /**
@@ -18,12 +23,20 @@ export const useModelActions = () => {
 
   const remove = useCallback(
     async (model: ModelActionTarget) => {
+      const owner = captureAccountScope();
+
       try {
-        await deleteModel(model.key);
+        await deleteModel(model.key, owner.signal);
+
+        assertAccountScopeCurrent(owner);
         removeModelsFromStore([model.key]);
         pruneModelsUiKeys([model.key]);
         notify.success('Model deleted', model.name);
       } catch (error) {
+        if (!isAccountScopeCurrent(owner)) {
+          return;
+        }
+
         notify.error('Delete failed', error instanceof Error ? error.message : String(error));
       }
     },
@@ -32,10 +45,19 @@ export const useModelActions = () => {
 
   const convert = useCallback(
     async (model: ModelActionTarget) => {
+      const owner = captureAccountScope();
+
       try {
-        replaceModelInStore(await convertModelToDiffusers(model.key));
+        const converted = await convertModelToDiffusers(model.key, owner.signal);
+
+        assertAccountScopeCurrent(owner);
+        replaceModelInStore(converted);
         notify.success('Converted to diffusers', model.name);
       } catch (error) {
+        if (!isAccountScopeCurrent(owner)) {
+          return;
+        }
+
         notify.error('Conversion failed', error instanceof Error ? error.message : String(error));
       }
     },
@@ -44,10 +66,19 @@ export const useModelActions = () => {
 
   const reidentify = useCallback(
     async (model: ModelActionTarget) => {
+      const owner = captureAccountScope();
+
       try {
-        replaceModelInStore(await reidentifyModel(model.key));
+        const identified = await reidentifyModel(model.key, owner.signal);
+
+        assertAccountScopeCurrent(owner);
+        replaceModelInStore(identified);
         notify.success('Model re-identified', model.name);
       } catch (error) {
+        if (!isAccountScopeCurrent(owner)) {
+          return;
+        }
+
         notify.error('Re-identify failed', error instanceof Error ? error.message : String(error));
       }
     },

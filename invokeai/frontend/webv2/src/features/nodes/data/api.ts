@@ -22,18 +22,22 @@ export interface UninstallNodePackResponse {
   message: string;
 }
 
-export const listCustomNodePacks = async (): Promise<NodePackCatalog> =>
-  normalizeNodePackCatalog(await requestJson<unknown>(`${CUSTOM_NODES_BASE}/`));
+export const listCustomNodePacks = async (signal?: AbortSignal): Promise<NodePackCatalog> =>
+  normalizeNodePackCatalog(await requestJson<unknown>(`${CUSTOM_NODES_BASE}/`, { signal }));
 
-export const installCustomNodePack = (source: string): Promise<InstallNodePackResponse> =>
+export const installCustomNodePack = (source: string, signal?: AbortSignal): Promise<InstallNodePackResponse> =>
   requestJson<InstallNodePackResponse>(`${CUSTOM_NODES_BASE}/install`, {
     body: JSON.stringify({ source }),
     method: 'POST',
+    signal,
   });
 
-export const uninstallCustomNodePack = (packName: string): Promise<UninstallNodePackResponse> =>
-  requestJson<UninstallNodePackResponse>(`${CUSTOM_NODES_BASE}/${encodeURIComponent(packName)}`, { method: 'DELETE' });
+export const uninstallCustomNodePack = (packName: string, signal?: AbortSignal): Promise<UninstallNodePackResponse> =>
+  requestJson<UninstallNodePackResponse>(`${CUSTOM_NODES_BASE}/${encodeURIComponent(packName)}`, {
+    method: 'DELETE',
+    signal,
+  });
 
-export const reloadCustomNodes = async (): Promise<void> => {
-  await request(`${CUSTOM_NODES_BASE}/reload`, { method: 'POST' });
+export const reloadCustomNodes = async (signal?: AbortSignal): Promise<void> => {
+  await request(`${CUSTOM_NODES_BASE}/reload`, { method: 'POST', signal });
 };

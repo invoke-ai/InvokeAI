@@ -30,6 +30,7 @@ import {
   type ProgressImageTarget,
 } from '@features/queue/data/progressImageStore';
 import { queueItemProgressStore, type QueueItemProgressSink } from '@features/queue/data/progressStore';
+import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
 
 const GALLERY_REFRESH_COALESCE_MS = 400;
@@ -188,6 +189,7 @@ export const createQueueCoordinator = (
     sweepIntervalMs?: number;
   }
 ): QueueCoordinator => {
+  const owner = captureAccountScope();
   const backend = options.backend;
   const activeProgressTarget = options.activeProgressTarget ?? activeProgressTargetStore;
   const progress = options.progress ?? queueItemProgressStore;
@@ -214,19 +216,27 @@ export const createQueueCoordinator = (
   let galleryRefreshTimer: ReturnType<typeof setTimeout> | null = null;
   let sweepTimer: ReturnType<typeof setInterval> | null = null;
   let isSweeping = false;
+  const isActive = (): boolean => !isDisposed && isAccountScopeCurrent(owner);
 
   const scheduleGalleryRefresh = (): void => {
-    if (isDisposed || galleryRefreshTimer !== null) {
+    if (!isActive() || galleryRefreshTimer !== null) {
       return;
     }
 
     galleryRefreshTimer = setTimeout(() => {
       galleryRefreshTimer = null;
-      callbacks.onGalleryRefresh();
+
+      if (isActive()) {
+        callbacks.onGalleryRefresh();
+      }
     }, galleryRefreshCoalesceMs);
   };
 
   const bufferTerminalOutcome = (backendItemId: number, outcome: TerminalOutcome): void => {
+    if (!isActive()) {
+      return;
+    }
+
     recentTerminalOutcomes.delete(backendItemId);
     recentTerminalOutcomes.set(backendItemId, outcome);
 
@@ -242,6 +252,10 @@ export const createQueueCoordinator = (
   };
 
   const publishRunProgress = (localQueueItemId: string): void => {
+    if (!isActive()) {
+      return;
+    }
+
     const state = runProgress.get(localQueueItemId);
 
     if (!state) {
@@ -286,7 +300,11 @@ export const createQueueCoordinator = (
 
     waits.delete(backendItemId);
     const progressTarget = getProgressImageTarget(wait.localQueueItemId, backendItemId);
-    const clearProgressImage = (): void => progressImage.clear(progressTarget);
+    const clearProgressImage = (): void => {
+      if (isActive()) {
+        progressImage.clear(progressTarget);
+      }
+    };
     activeProgressTarget.clear(progressTarget);
     const state = runProgress.get(wait.localQueueItemId);
 
@@ -352,6 +370,10 @@ export const createQueueCoordinator = (
   };
 
   const beginRun = (localQueueItemId: string, backendItemIds: number[], backendBatchId?: string): void => {
+    if (!isActive()) {
+      throw new QueueItemCancelledError(localQueueItemId);
+    }
+
     runs.set(localQueueItemId, {
       backendBatchId,
       backendItemIds,
@@ -370,7 +392,7 @@ export const createQueueCoordinator = (
 
   /** Slow safety net for events lost to disconnects; runs on reconnect and on a long interval. */
   const sweep = async (): Promise<void> => {
-    if (isSweeping || waits.size === 0) {
+    if (!isActive() || isSweeping || waits.size === 0) {
       return;
     }
 
@@ -380,9 +402,13 @@ export const createQueueCoordinator = (
       await Promise.all(
         [...waits.keys()].map(async (backendItemId) => {
           try {
-            settleFromQueueItem(await backend.getItem(backendItemId));
+            const queueItem = await backend.getItem(backendItemId);
+
+            if (isActive()) {
+              settleFromQueueItem(queueItem);
+            }
           } catch (error) {
-            if (error instanceof ApiError && error.status === 404) {
+            if (isActive() && error instanceof ApiError && error.status === 404) {
               settleWait(backendItemId, {
                 error: `Queue item ${backendItemId} is no longer on the backend queue.`,
                 status: 'failed',
@@ -397,6 +423,10 @@ export const createQueueCoordinator = (
   };
 
   const handleStatusChanged = (event: QueueItemStatusChangedEvent): void => {
+    if (!isActive()) {
+      return;
+    }
+
     const sequence = event.status_sequence;
     const previousSequence = latestStatusSequences.get(event.item_id);
     if (sequence !== null && previousSequence !== undefined && sequence < previousSequence) {
@@ -424,6 +454,10 @@ export const createQueueCoordinator = (
   };
 
   const handleItemsCanceled = (event: QueueItemsCanceledEvent): void => {
+    if (!isActive()) {
+      return;
+    }
+
     for (const itemId of event.canceled_item_ids) {
       if (waits.has(itemId)) {
         settleWait(itemId, { status: 'canceled' });
@@ -432,6 +466,10 @@ export const createQueueCoordinator = (
   };
 
   const handleProgress = (event: InvocationProgressEvent): void => {
+    if (!isActive()) {
+      return;
+    }
+
     const wait = waits.get(event.item_id);
 
     if (!wait) {
@@ -465,6 +503,10 @@ export const createQueueCoordinator = (
    * and, on (re)connect, schedules a gallery refresh and missed-event sweep.
    */
   const handleConnectionChange = (status: BackendConnectionStatus): void => {
+    if (!isActive()) {
+      return;
+    }
+
     if (status !== 'connected') {
       activeProgressTarget.clear();
       progressImage.clear();
@@ -481,7 +523,7 @@ export const createQueueCoordinator = (
 
   /** Attach generation listeners to the shared socket hub. */
   const connect = (): void => {
-    if (isDisposed || isAttached) {
+    if (!isActive() || isAttached) {
       return;
     }
 
@@ -492,31 +534,35 @@ export const createQueueCoordinator = (
       backend.on('queue_items_canceled', handleItemsCanceled),
       backend.on('invocation_progress', handleProgress),
       backend.on('invocation_started', (event: InvocationStartedEvent) => {
-        if (!isTrackedEvent(event)) {
+        if (!isActive() || !isTrackedEvent(event)) {
           return;
         }
 
         nodeExecution.started(event);
       }),
       backend.on('invocation_complete', (event: InvocationCompleteEvent) => {
-        if (!isTrackedEvent(event)) {
+        if (!isActive() || !isTrackedEvent(event)) {
           return;
         }
 
         nodeExecution.completed(event);
       }),
       backend.on('invocation_error', (event: InvocationErrorEvent) => {
-        if (!isTrackedEvent(event)) {
+        if (!isActive() || !isTrackedEvent(event)) {
           return;
         }
 
         nodeExecution.failed(event);
       }),
       backend.on('model_load_started', (payload: never) => {
-        modelLoads.started(payload);
+        if (isActive()) {
+          modelLoads.started(payload);
+        }
       }),
       backend.on('model_load_complete', (payload: never) => {
-        modelLoads.completed(payload);
+        if (isActive()) {
+          modelLoads.completed(payload);
+        }
       })
     );
 
@@ -534,6 +580,9 @@ export const createQueueCoordinator = (
     isDisposed = true;
     activeProgressTarget.clear();
     progressImage.clear();
+    progress.clearAll?.();
+    nodeExecution.clearAll();
+    modelLoads.reset();
 
     for (const detach of detachers) {
       detach();
@@ -560,12 +609,16 @@ export const createQueueCoordinator = (
     }
 
     waits.clear();
+    runs.clear();
+    runProgress.clear();
+    recentTerminalOutcomes.clear();
+    latestStatusSequences.clear();
   };
 
   const reconcile = async (items: ReconcileInput[]): Promise<Map<string, ReconcileOutcome>> => {
     const outcomes = new Map<string, ReconcileOutcome>();
 
-    if (items.length === 0) {
+    if (!isActive() || items.length === 0) {
       return outcomes;
     }
 
@@ -588,6 +641,11 @@ export const createQueueCoordinator = (
           )
         ).filter((item) => item !== undefined)
       : await backend.listItems();
+
+    if (!isActive()) {
+      return outcomes;
+    }
+
     const backendItemsById = new Map(backendItems.map((item) => [item.id, item]));
     const backendItemsByLocalId = new Map<string, QueueBackendItem[]>();
 
@@ -656,20 +714,34 @@ export const createQueueCoordinator = (
   const submitGenerate = async (
     localQueueItemId: string,
     request: QueueEnqueueGenerateRequest
-  ): Promise<QueueEnqueueResult> =>
-    adoptEnqueueResult(localQueueItemId, await backend.enqueueGenerate(request), 'generation');
+  ): Promise<QueueEnqueueResult> => {
+    if (!isActive()) {
+      throw new QueueItemCancelledError(localQueueItemId);
+    }
+
+    return adoptEnqueueResult(localQueueItemId, await backend.enqueueGenerate(request), 'generation');
+  };
 
   const submitWorkflow = async (
     localQueueItemId: string,
     request: QueueEnqueueWorkflowRequest
-  ): Promise<QueueEnqueueResult> =>
-    adoptEnqueueResult(localQueueItemId, await backend.enqueueWorkflow(request), 'workflow');
+  ): Promise<QueueEnqueueResult> => {
+    if (!isActive()) {
+      throw new QueueItemCancelledError(localQueueItemId);
+    }
+
+    return adoptEnqueueResult(localQueueItemId, await backend.enqueueWorkflow(request), 'workflow');
+  };
 
   const waitForResults = async (
     localQueueItemId: string,
     queuedAt: string,
     options?: QueueResultImageOptions
   ): Promise<QueueResultImage[]> => {
+    if (!isActive()) {
+      throw new QueueItemCancelledError(localQueueItemId);
+    }
+
     const run = runs.get(localQueueItemId);
 
     if (!run) {
@@ -704,7 +776,9 @@ export const createQueueCoordinator = (
     } finally {
       runs.delete(localQueueItemId);
       runProgress.delete(localQueueItemId);
-      progress.clear(localQueueItemId);
+      if (isActive()) {
+        progress.clear(localQueueItemId);
+      }
     }
   };
 

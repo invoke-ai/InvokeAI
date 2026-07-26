@@ -56,4 +56,22 @@ describe('pending library workflow load runtime', () => {
     expect(clearRequest.mock.calls.map(([requestId]) => requestId)).toEqual([1, 3]);
     stop();
   });
+
+  it('does not clear shared state when an in-flight load settles after the runtime stops', async () => {
+    const pending = deferred();
+    const clearRequest = vi.fn();
+    const stop = startPendingLibraryWorkflowLoadRuntime({
+      clearRequest,
+      getRequest: () => ({ requestId: 1, workflowId: 'user-a-workflow' }),
+      load: () => pending.promise,
+      subscribe: () => () => undefined,
+    });
+
+    stop();
+    pending.resolve();
+    await pending.promise;
+    await Promise.resolve();
+
+    expect(clearRequest).not.toHaveBeenCalled();
+  });
 });

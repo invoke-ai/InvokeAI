@@ -1,3 +1,5 @@
+import type * as accountLifecycleModule from '@platform/state/accountLifecycle';
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as libraryModule from './library';
@@ -19,6 +21,7 @@ const api = vi.hoisted(() => ({
 vi.mock('./api', () => api);
 
 let library: typeof libraryModule;
+let account: typeof accountLifecycleModule;
 
 const summaryDto = (id: string, name: string, updatedAt: string) => ({
   created_at: '2026-06-01 08:00:00.000',
@@ -37,6 +40,7 @@ beforeEach(async () => {
   api.updateProject.mockReset();
 
   library = await import('./library');
+  account = await import('@platform/state/accountLifecycle');
 });
 
 describe('refreshProjectLibrary', () => {
@@ -68,6 +72,27 @@ describe('refreshProjectLibrary', () => {
     expect(error).toBe('offline');
     expect(summaries.map((summary) => summary.id)).toEqual(['kept']);
   });
+
+  it('cannot commit a delayed response into a later account epoch', async () => {
+    account.accountLifecycle.activate('user-a');
+    let resolveUserA: ((value: ReturnType<typeof summaryDto>[]) => void) | undefined;
+    api.listProjects.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveUserA = resolve;
+      })
+    );
+    const userARefresh = library.refreshProjectLibrary();
+
+    account.accountLifecycle.invalidate();
+    account.accountLifecycle.activate('user-b');
+    api.listProjects.mockResolvedValueOnce([summaryDto('b', 'User B', '2026-06-11 10:00:00.000')]);
+    await library.refreshProjectLibrary();
+
+    resolveUserA?.([summaryDto('a', 'User A', '2026-06-12 10:00:00.000')]);
+    await userARefresh;
+
+    expect(library.getProjectLibrary().summaries.map((summary) => summary.name)).toEqual(['User B']);
+  });
 });
 
 describe('upsertProjectSummary', () => {
@@ -78,7 +103,7 @@ describe('upsertProjectSummary', () => {
     ]);
     await library.refreshProjectLibrary();
 
-    library.upsertProjectSummary({ id: 'a', name: 'A renamed', revision: 2 });
+    library.upsertProjectSummary({ id: 'a', name: 'A renamed', revision: 2 }, account.accountLifecycle.capture());
 
     const { summaries } = library.getProjectLibrary();
 
@@ -96,7 +121,7 @@ describe('library mutations', () => {
 
     await library.deleteLibraryProject('doomed');
 
-    expect(api.deleteProject).toHaveBeenCalledWith('doomed');
+    expect(api.deleteProject).toHaveBeenCalledWith('doomed', expect.any(AbortSignal));
     expect(library.getProjectLibrary().summaries).toHaveLength(0);
   });
 
@@ -113,11 +138,15 @@ describe('library mutations', () => {
 
     await library.renameLibraryProject('p1', 'New name');
 
-    expect(api.updateProject).toHaveBeenCalledWith('p1', {
-      data: { id: 'p1', layout: {}, name: 'New name' },
-      expected_revision: 1,
-      name: 'New name',
-    });
+    expect(api.updateProject).toHaveBeenCalledWith(
+      'p1',
+      {
+        data: { id: 'p1', layout: {}, name: 'New name' },
+        expected_revision: 1,
+        name: 'New name',
+      },
+      expect.any(AbortSignal)
+    );
     expect(library.getProjectLibrary().summaries[0]?.name).toBe('New name');
   });
 

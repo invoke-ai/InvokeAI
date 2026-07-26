@@ -1,5 +1,10 @@
 import type { StarterModelResponse } from '@features/models/core/types';
 
+import {
+  captureAccountScope,
+  isAccountScopeCurrent,
+  registerAccountOwnedResource,
+} from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
 
 import { getStarterModels } from './api';
@@ -16,31 +21,52 @@ export interface StartersSnapshot {
   error: string | null;
 }
 
-const store = createExternalStore<StartersSnapshot>({ error: null, response: null, status: 'idle' });
+const EMPTY_STARTERS_SNAPSHOT: StartersSnapshot = { error: null, response: null, status: 'idle' };
+const store = createExternalStore<StartersSnapshot>(EMPTY_STARTERS_SNAPSHOT);
 
 let inflightRefresh: Promise<void> | null = null;
+
+registerAccountOwnedResource({
+  clear: () => {
+    inflightRefresh = null;
+    store.setSnapshot(EMPTY_STARTERS_SNAPSHOT);
+  },
+  name: 'starter-models',
+});
 
 export const refreshStarters = (): Promise<void> => {
   if (inflightRefresh) {
     return inflightRefresh;
   }
 
+  const owner = captureAccountScope();
   store.patchSnapshot({ status: store.getSnapshot().response ? 'loaded' : 'loading' });
 
-  inflightRefresh = getStarterModels()
+  const refresh = getStarterModels(owner.signal)
     .then((response) => {
+      if (!isAccountScopeCurrent(owner)) {
+        return;
+      }
+
       store.patchSnapshot({ error: null, response, status: 'loaded' });
     })
     .catch((error: unknown) => {
+      if (!isAccountScopeCurrent(owner)) {
+        return;
+      }
+
       store.patchSnapshot({
         error: error instanceof Error ? error.message : 'Failed to load starter models.',
         status: store.getSnapshot().response ? 'loaded' : 'error',
       });
     })
     .finally(() => {
-      inflightRefresh = null;
+      if (inflightRefresh === refresh) {
+        inflightRefresh = null;
+      }
     });
 
+  inflightRefresh = refresh;
   return inflightRefresh;
 };
 

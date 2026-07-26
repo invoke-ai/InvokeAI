@@ -5,6 +5,11 @@ import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { Project } from '@workbench/projectContracts';
 
 import { galleryImages } from '@features/gallery';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
 
 import type { CanvasCompositeExportEngine } from './exportCanvasComposite';
 import type { GalleryCanvasImportDestination } from './importGalleryImages';
@@ -46,9 +51,10 @@ export const createFromBbox = async (options: {
   getProject: (projectId: string) => Project | null;
   isActiveProject: (projectId: string) => boolean;
   project: Project;
-  resolveImages?: (imageNames: string[]) => Promise<GalleryImage[]>;
+  resolveImages?: (imageNames: string[], signal?: AbortSignal) => Promise<GalleryImage[]>;
   uploadImage?: typeof uploadCanvasImage;
 }): Promise<CreateFromBboxResult> => {
+  const owner = captureAccountScope();
   const {
     applyCanvasMutation,
     destination,
@@ -60,43 +66,58 @@ export const createFromBbox = async (options: {
     uploadImage = uploadCanvasImage,
   } = options;
 
-  const exported = await exportCanvasComposite(engine, 'bbox');
-  if (exported.status !== 'ok') {
-    return exported;
+  try {
+    const exported = await exportCanvasComposite(engine, 'bbox');
+
+    assertAccountScopeCurrent(owner);
+    if (exported.status !== 'ok') {
+      return exported;
+    }
+
+    const uploaded = await uploadImage(exported.blob, {
+      fileName: 'bbox.png',
+      imageCategory: 'other',
+      isIntermediate: false,
+      signal: owner.signal,
+    });
+
+    assertAccountScopeCurrent(owner);
+    if (destination === 'global-reference') {
+      return { image: uploaded, status: 'uploaded' };
+    }
+
+    const [galleryImage] = await resolveImages([uploaded.imageName], owner.signal);
+
+    assertAccountScopeCurrent(owner);
+    if (!galleryImage) {
+      throw new Error(`Uploaded bbox composite ${uploaded.imageName} could not be resolved to a gallery image`);
+    }
+
+    const imported = await importGalleryImagesToCanvas({
+      applyCanvasMutation,
+      destination,
+      engine,
+      getProject,
+      images: [galleryImage],
+      isActiveProject,
+      project,
+    });
+
+    assertAccountScopeCurrent(owner);
+    if (imported.status === 'imported') {
+      return { destination, layerIds: imported.layerIds, status: 'created' };
+    }
+    if (imported.status === 'empty') {
+      // Unreachable: exactly one image is always passed. Kept for exhaustiveness.
+      return { status: 'blocked' };
+    }
+
+    return imported;
+  } catch (error) {
+    if (!isAccountScopeCurrent(owner)) {
+      return { status: 'stale' };
+    }
+
+    throw error;
   }
-
-  const uploaded = await uploadImage(exported.blob, {
-    fileName: 'bbox.png',
-    imageCategory: 'other',
-    isIntermediate: false,
-  });
-
-  if (destination === 'global-reference') {
-    return { image: uploaded, status: 'uploaded' };
-  }
-
-  const [galleryImage] = await resolveImages([uploaded.imageName]);
-  if (!galleryImage) {
-    throw new Error(`Uploaded bbox composite ${uploaded.imageName} could not be resolved to a gallery image`);
-  }
-
-  const imported = await importGalleryImagesToCanvas({
-    applyCanvasMutation,
-    destination,
-    engine,
-    getProject,
-    images: [galleryImage],
-    isActiveProject,
-    project,
-  });
-
-  if (imported.status === 'imported') {
-    return { destination, layerIds: imported.layerIds, status: 'created' };
-  }
-  if (imported.status === 'empty') {
-    // Unreachable: exactly one image is always passed. Kept for exhaustiveness.
-    return { status: 'blocked' };
-  }
-
-  return imported;
 };

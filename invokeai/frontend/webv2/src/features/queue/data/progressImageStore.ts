@@ -1,6 +1,7 @@
 import type { QueueProgressImage } from '@features/queue/core/progressImage';
 import type { QueueItemProgressTarget } from '@features/queue/core/types';
 
+import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createExternalStore, createKeyedTransientStore } from '@platform/state/externalStore';
 
 /**
@@ -52,6 +53,11 @@ export const progressImageStore = {
     }
   },
 };
+
+registerAccountOwnedResource({
+  clear: () => progressImageStore.clear(),
+  name: 'queue-progress-images',
+});
 
 export type ProgressImageSink = typeof progressImageStore;
 

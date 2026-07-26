@@ -63,7 +63,7 @@ import {
   getLayerContextMenuLayout,
   getLayerContextMenuRenderEntries,
 } from './layerContextMenuLayout';
-import { copyBlobToClipboard } from './layerExportActions';
+import { copyBlobToClipboard, saveLayerToAssets } from './layerExportActions';
 import { reorderWithinGroupByKind } from './layerGroups';
 import { resolveMenuTargetForRender } from './layerMenuState';
 import {
@@ -468,12 +468,14 @@ const LayerMenu = ({
     if (!engine) {
       throw makeStatusError('not-ready');
     }
-    const result = await engine.exports.exportBakedLayerBlob(layer.id, { includeDisabled: true });
-    if (result.status !== 'ok') {
-      throw makeStatusError(result.status);
+
+    const result = await saveLayerToAssets(layer.id, {
+      exportLayer: engine.exports.exportBakedLayerBlob,
+      upload: galleryTransfers.upload,
+    });
+    if (result !== 'saved' && result !== 'stale') {
+      throw makeStatusError(result);
     }
-    const file = new File([result.blob], `layer-${layer.id}.png`, { type: result.blob.type || 'image/png' });
-    await galleryTransfers.upload(file, 'none');
   }, [engine, layer.id, makeStatusError]);
 
   const handleCopyToClipboard = useCallback(async () => {

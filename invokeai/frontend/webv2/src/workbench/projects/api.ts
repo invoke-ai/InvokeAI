@@ -35,22 +35,28 @@ export interface ProjectUpdateRequest {
   expected_revision: number;
 }
 
-export const listProjects = (): Promise<ProjectSummaryDTO[]> => apiFetchJson<ProjectSummaryDTO[]>(`${PROJECTS_BASE}/`);
+export const listProjects = (signal?: AbortSignal): Promise<ProjectSummaryDTO[]> =>
+  apiFetchJson<ProjectSummaryDTO[]>(`${PROJECTS_BASE}/`, { signal });
 
-export const getProject = (projectId: string): Promise<ProjectRecordDTO> =>
-  apiFetchJson<ProjectRecordDTO>(`${PROJECTS_BASE}/${encodeURIComponent(projectId)}`);
+export const getProject = (projectId: string, signal?: AbortSignal): Promise<ProjectRecordDTO> =>
+  apiFetchJson<ProjectRecordDTO>(`${PROJECTS_BASE}/${encodeURIComponent(projectId)}`, { signal });
 
-export const createProject = (request: ProjectCreateRequest): Promise<ProjectRecordDTO> =>
-  apiFetchJson<ProjectRecordDTO>(`${PROJECTS_BASE}/`, { body: JSON.stringify(request), method: 'POST' });
+export const createProject = (request: ProjectCreateRequest, signal?: AbortSignal): Promise<ProjectRecordDTO> =>
+  apiFetchJson<ProjectRecordDTO>(`${PROJECTS_BASE}/`, { body: JSON.stringify(request), method: 'POST', signal });
 
-export const updateProject = (projectId: string, request: ProjectUpdateRequest): Promise<ProjectRecordDTO> =>
+export const updateProject = (
+  projectId: string,
+  request: ProjectUpdateRequest,
+  signal?: AbortSignal
+): Promise<ProjectRecordDTO> =>
   apiFetchJson<ProjectRecordDTO>(`${PROJECTS_BASE}/${encodeURIComponent(projectId)}`, {
     body: JSON.stringify(request),
     method: 'PUT',
+    signal,
   });
 
-export const deleteProject = async (projectId: string): Promise<void> => {
-  await apiFetch(`${PROJECTS_BASE}/${encodeURIComponent(projectId)}`, { method: 'DELETE' });
+export const deleteProject = async (projectId: string, signal?: AbortSignal): Promise<void> => {
+  await apiFetch(`${PROJECTS_BASE}/${encodeURIComponent(projectId)}`, { method: 'DELETE', signal });
 };
 
 /** A save was based on a stale revision — another tab or device saved first. */
@@ -58,17 +64,18 @@ export const isProjectConflictError = (error: unknown): boolean => error instanc
 
 export const isProjectNotFoundError = (error: unknown): boolean => error instanceof ApiError && error.status === 404;
 
-export const getClientStateValue = (key: string): Promise<string | null> =>
-  apiFetchJson<string | null>(`${CLIENT_STATE_BASE}/get_by_key?key=${encodeURIComponent(key)}`);
+export const getClientStateValue = (key: string, signal?: AbortSignal): Promise<string | null> =>
+  apiFetchJson<string | null>(`${CLIENT_STATE_BASE}/get_by_key?key=${encodeURIComponent(key)}`, { signal });
 
 /** The endpoint takes a JSON-encoded string body, hence the stringify of a string. */
-export const setClientStateValue = async (key: string, value: string): Promise<void> => {
+export const setClientStateValue = async (key: string, value: string, signal?: AbortSignal): Promise<void> => {
   await apiFetchJson<string>(`${CLIENT_STATE_BASE}/set_by_key?key=${encodeURIComponent(key)}`, {
     body: JSON.stringify(value),
     method: 'POST',
+    signal,
   });
 };
 
-export const deleteClientStateValue = async (key: string): Promise<void> => {
-  await apiFetch(`${CLIENT_STATE_BASE}/delete_by_key?key=${encodeURIComponent(key)}`, { method: 'POST' });
+export const deleteClientStateValue = async (key: string, signal?: AbortSignal): Promise<void> => {
+  await apiFetch(`${CLIENT_STATE_BASE}/delete_by_key?key=${encodeURIComponent(key)}`, { method: 'POST', signal });
 };

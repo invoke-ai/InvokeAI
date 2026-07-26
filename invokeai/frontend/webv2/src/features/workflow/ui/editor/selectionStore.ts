@@ -1,3 +1,4 @@
+import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
 
 /**
@@ -14,10 +15,19 @@ export interface WorkflowSelectionSnapshot {
   selectionRequest: { nodeIds: string[]; token: number } | null;
 }
 
-export const workflowSelectionStore = createExternalStore<WorkflowSelectionSnapshot>({
+const INITIAL_WORKFLOW_SELECTION_SNAPSHOT: WorkflowSelectionSnapshot = {
   hoveredNodeId: null,
   selectedNodeIds: [],
   selectionRequest: null,
+};
+
+export const workflowSelectionStore = createExternalStore<WorkflowSelectionSnapshot>(
+  INITIAL_WORKFLOW_SELECTION_SNAPSHOT
+);
+
+registerAccountOwnedResource({
+  clear: () => workflowSelectionStore.setSnapshot(INITIAL_WORKFLOW_SELECTION_SNAPSHOT),
+  name: 'workflow-selection',
 });
 
 const areSameIds = (a: string[], b: string[]): boolean => a.length === b.length && a.every((id, i) => id === b[i]);

@@ -12,6 +12,7 @@ import type { WidgetId } from '@workbench/widgetContracts';
 
 import { getDefaultGenerateSettings } from '@features/generation/settings';
 import { createDefaultUpscaleWidgetValues } from '@features/upscale';
+import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -346,14 +347,16 @@ describe('submitResolvedInvocation', () => {
     const submitResolved = vi.spyOn(commands.generation, 'submitResolved');
     const prepareCanvasInvocation = vi.fn();
     const route = routeFor(project, { ...project.invocation, destination: 'gallery', sourceId: 'canvas' });
+    const owner = captureAccountScope();
 
-    submitResolvedInvocation({ commands, models: undefined, prepareCanvasInvocation, project, route });
+    submitResolvedInvocation({ commands, models: undefined, owner, prepareCanvasInvocation, project, route });
 
     expect(submitResolved).not.toHaveBeenCalled();
     expect(prepareCanvasInvocation).toHaveBeenCalledTimes(1);
     // The resolved destination rides through so a Canvas source can target the Gallery.
     expect(prepareCanvasInvocation.mock.calls[0]?.[0]).toMatchObject({
       destination: 'gallery',
+      owner,
       projectId: project.id,
     });
   });
@@ -367,12 +370,34 @@ describe('submitResolvedInvocation', () => {
     const prepareCanvasInvocation = vi.fn();
     const route = routeFor(project, { ...project.invocation, destination: 'gallery', sourceId: 'generate' });
 
-    submitResolvedInvocation({ commands, models: undefined, prepareCanvasInvocation, project, route });
+    submitResolvedInvocation({
+      commands,
+      models: undefined,
+      owner: captureAccountScope(),
+      prepareCanvasInvocation,
+      project,
+      route,
+    });
 
     expect(prepareCanvasInvocation).not.toHaveBeenCalled();
     expect(submitResolved).toHaveBeenCalledTimes(1);
     expect(submitResolved.mock.calls[0]?.[0]).toMatchObject({
       route: expect.objectContaining({ destination: 'gallery', sourceId: 'generate' }),
     });
+  });
+
+  it('quietly ignores a submission owned by an expired account scope', () => {
+    const project = getActiveProject(createGenerateValues(animaModel));
+    const commands = createWorkbenchStore().commands;
+    const submitResolved = vi.spyOn(commands.generation, 'submitResolved');
+    const prepareCanvasInvocation = vi.fn();
+    const route = routeFor(project, { ...project.invocation, sourceId: 'generate' });
+    const owner = captureAccountScope();
+
+    accountLifecycle.invalidate();
+    submitResolvedInvocation({ commands, models: undefined, owner, prepareCanvasInvocation, project, route });
+
+    expect(prepareCanvasInvocation).not.toHaveBeenCalled();
+    expect(submitResolved).not.toHaveBeenCalled();
   });
 });

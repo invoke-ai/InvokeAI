@@ -1,5 +1,11 @@
 import type { NodePackInfo } from '@features/nodes/core/catalog';
 
+import {
+  type AccountScope,
+  captureAccountScope,
+  isAccountScopeCurrent,
+  registerAccountOwnedResource,
+} from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
 import { getApiErrorMessage } from '@platform/transport/http';
 
@@ -12,24 +18,37 @@ export interface CustomNodesSnapshot {
   error: string | null;
 }
 
-const store = createExternalStore<CustomNodesSnapshot>({
+const EMPTY_CUSTOM_NODES_SNAPSHOT: CustomNodesSnapshot = {
   customNodesPath: null,
   error: null,
   nodePacks: [],
   status: 'idle',
-});
+};
+const store = createExternalStore<CustomNodesSnapshot>(EMPTY_CUSTOM_NODES_SNAPSHOT);
 
 let inflightRefresh: Promise<void> | null = null;
 
-export const refreshCustomNodePacks = (): Promise<void> => {
+registerAccountOwnedResource({
+  clear: () => {
+    inflightRefresh = null;
+    store.setSnapshot(EMPTY_CUSTOM_NODES_SNAPSHOT);
+  },
+  name: 'custom-node-packs',
+});
+
+export const refreshCustomNodePacks = (owner: AccountScope = captureAccountScope()): Promise<void> => {
   if (inflightRefresh) {
     return inflightRefresh;
   }
 
   store.patchSnapshot({ status: store.getSnapshot().status === 'loaded' ? 'loaded' : 'loading' });
 
-  inflightRefresh = listCustomNodePacks()
+  const refresh = listCustomNodePacks(owner.signal)
     .then((response) => {
+      if (!isAccountScopeCurrent(owner)) {
+        return;
+      }
+
       store.patchSnapshot({
         customNodesPath: response.customNodesPath,
         error: null,
@@ -38,15 +57,22 @@ export const refreshCustomNodePacks = (): Promise<void> => {
       });
     })
     .catch((error: unknown) => {
+      if (!isAccountScopeCurrent(owner)) {
+        return;
+      }
+
       store.patchSnapshot({
         error: getApiErrorMessage(error, 'Failed to load custom node packs.'),
         status: store.getSnapshot().nodePacks.length > 0 ? 'loaded' : 'error',
       });
     })
     .finally(() => {
-      inflightRefresh = null;
+      if (inflightRefresh === refresh) {
+        inflightRefresh = null;
+      }
     });
 
+  inflightRefresh = refresh;
   return inflightRefresh;
 };
 

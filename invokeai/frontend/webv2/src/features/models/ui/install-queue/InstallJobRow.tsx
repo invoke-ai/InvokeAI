@@ -11,6 +11,11 @@ import {
   resumeModelInstall,
 } from '@features/models/data/api';
 import { isActiveInstallStatus, refreshInstalls, replaceInstallJob } from '@features/models/data/installsStore';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
 import { useConnectionStatusSelector } from '@platform/transport/connectionStore';
 import { IconButton, Tooltip } from '@platform/ui';
 import { PauseIcon, PlayIcon, RotateCcwIcon, TriangleAlertIcon, XIcon } from 'lucide-react';
@@ -42,21 +47,30 @@ export const InstallJobRow = ({
   );
   const showDisconnected = connectionStatus !== 'connected' && isActiveInstallStatus(job.status);
 
-  const runAction = async (action: () => Promise<unknown>, failureTitle: string) => {
+  const runAction = async (action: (signal: AbortSignal) => Promise<unknown>, failureTitle: string) => {
+    const owner = captureAccountScope();
+
     setIsActing(true);
 
     try {
-      const result = await action();
+      const result = await action(owner.signal);
 
+      assertAccountScopeCurrent(owner);
       if (result && typeof result === 'object' && 'id' in (result as ModelInstallJob)) {
         replaceInstallJob(result as ModelInstallJob);
       } else {
-        await refreshInstalls();
+        await refreshInstalls(owner);
       }
     } catch (actionError) {
+      if (!isAccountScopeCurrent(owner)) {
+        return;
+      }
+
       onError(failureTitle, actionError instanceof Error ? actionError.message : String(actionError));
     } finally {
-      setIsActing(false);
+      if (isAccountScopeCurrent(owner)) {
+        setIsActing(false);
+      }
     }
   };
 
@@ -89,7 +103,7 @@ export const InstallJobRow = ({
                 disabled={isActing}
                 size="2xs"
                 variant="ghost"
-                onClick={() => void runAction(() => pauseModelInstall(job.id), t('models.pauseFailed'))}
+                onClick={() => void runAction((signal) => pauseModelInstall(job.id, signal), t('models.pauseFailed'))}
               >
                 <Icon as={PauseIcon} boxSize="3" />
               </IconButton>
@@ -102,7 +116,7 @@ export const InstallJobRow = ({
                 disabled={isActing}
                 size="2xs"
                 variant="ghost"
-                onClick={() => void runAction(() => resumeModelInstall(job.id), t('models.resumeFailed'))}
+                onClick={() => void runAction((signal) => resumeModelInstall(job.id, signal), t('models.resumeFailed'))}
               >
                 <Icon as={PlayIcon} boxSize="3" />
               </IconButton>
@@ -115,7 +129,9 @@ export const InstallJobRow = ({
                 disabled={isActing}
                 size="2xs"
                 variant="ghost"
-                onClick={() => void runAction(() => restartFailedModelInstall(job.id), t('models.retryFailed'))}
+                onClick={() =>
+                  void runAction((signal) => restartFailedModelInstall(job.id, signal), t('models.retryFailed'))
+                }
               >
                 <Icon as={RotateCcwIcon} boxSize="3" />
               </IconButton>
@@ -128,7 +144,7 @@ export const InstallJobRow = ({
                 disabled={isActing}
                 size="2xs"
                 variant="ghost"
-                onClick={() => void runAction(() => cancelModelInstall(job.id), t('models.cancelFailed'))}
+                onClick={() => void runAction((signal) => cancelModelInstall(job.id, signal), t('models.cancelFailed'))}
               >
                 <Icon as={XIcon} boxSize="3" />
               </IconButton>
@@ -176,7 +192,10 @@ export const InstallJobRow = ({
                     size="2xs"
                     variant="ghost"
                     onClick={() =>
-                      void runAction(() => restartModelInstallFile(job.id, partUrl), t('models.restartFileFailed'))
+                      void runAction(
+                        (signal) => restartModelInstallFile(job.id, partUrl, signal),
+                        t('models.restartFileFailed')
+                      )
                     }
                   >
                     <Icon as={RotateCcwIcon} boxSize="3" />

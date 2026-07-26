@@ -1,6 +1,14 @@
+import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
 
 const store = createExternalStore<{ activeLayerIds: ReadonlySet<string> }>({ activeLayerIds: new Set<string>() });
+
+registerAccountOwnedResource({
+  clear: () => {
+    store.setSnapshot({ activeLayerIds: new Set<string>() });
+  },
+  name: 'hotkey-modal-layers',
+});
 
 export const registerHotkeyModalLayer = (id: string): (() => void) => {
   store.patchSnapshot({ activeLayerIds: new Set([...store.getSnapshot().activeLayerIds, id]) });

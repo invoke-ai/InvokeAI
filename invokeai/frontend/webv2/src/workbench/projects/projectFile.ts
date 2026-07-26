@@ -1,5 +1,12 @@
 import type { Project } from '@workbench/projectContracts';
 
+import {
+  type AccountScope,
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
+
 import { createProject as apiCreateProject, getProject as apiGetProject, type ProjectRecordDTO } from './api';
 import { createProjectId } from './ids';
 import { upsertProjectSummary } from './library';
@@ -66,9 +73,13 @@ const downloadProjectFile = (name: string, projectDocument: Record<string, unkno
 };
 
 /** Export a closed project straight from its server record. */
-export const exportLibraryProject = async (projectId: string): Promise<void> => {
-  const record = await apiGetProject(projectId);
+export const exportLibraryProject = async (
+  projectId: string,
+  owner: AccountScope = captureAccountScope()
+): Promise<void> => {
+  const record = await apiGetProject(projectId, owner.signal);
 
+  assertAccountScopeCurrent(owner);
   downloadProjectFile(record.name, record.data);
 };
 
@@ -82,8 +93,13 @@ export const exportOpenProject = (project: Project): void => {
  * id — never the one in the file — so an import can never collide with (and
  * overwrite) an existing project. Throws with a user-readable message.
  */
-export const importProjectFile = async (file: File): Promise<ProjectRecordDTO> => {
+export const importProjectFile = async (
+  file: File,
+  owner: AccountScope = captureAccountScope()
+): Promise<ProjectRecordDTO> => {
   const projectDocument = parseProjectFile(await file.text());
+
+  assertAccountScopeCurrent(owner);
 
   if (!projectDocument) {
     throw new Error('This file is not an Invoke project export.');
@@ -100,21 +116,43 @@ export const importProjectFile = async (file: File): Promise<ProjectRecordDTO> =
     throw new Error('The project file is damaged and cannot be opened.');
   }
 
-  const record = await apiCreateProject({ data: document, name, project_id: id });
+  const record = await apiCreateProject({ data: document, name, project_id: id }, owner.signal);
 
-  upsertProjectSummary({ id: record.project_id, name: record.name, revision: record.revision });
+  assertAccountScopeCurrent(owner);
+  upsertProjectSummary({ id: record.project_id, name: record.name, revision: record.revision }, owner);
 
   return record;
 };
 
 /** Open the browser's file picker for a project file; null when dismissed. */
-export const pickProjectFile = (): Promise<File | null> =>
+export const pickProjectFile = (owner: AccountScope = captureAccountScope()): Promise<File | null> =>
   new Promise((resolve) => {
     const input = document.createElement('input');
+    let isSettled = false;
+
+    const finish = (file: File | null): void => {
+      if (isSettled) {
+        return;
+      }
+
+      isSettled = true;
+      owner.signal.removeEventListener('abort', handleAbort);
+      input.onchange = null;
+      input.oncancel = null;
+      resolve(isAccountScopeCurrent(owner) ? file : null);
+    };
+    const handleAbort = (): void => finish(null);
 
     input.type = 'file';
     input.accept = 'application/json,.json';
-    input.onchange = () => resolve(input.files?.[0] ?? null);
-    input.oncancel = () => resolve(null);
+    input.onchange = () => finish(input.files?.[0] ?? null);
+    input.oncancel = () => finish(null);
+    owner.signal.addEventListener('abort', handleAbort, { once: true });
+
+    if (owner.signal.aborted) {
+      finish(null);
+      return;
+    }
+
     input.click();
   });

@@ -1,3 +1,4 @@
+import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { QueryClient } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -65,5 +66,29 @@ describe('Gallery query read model', () => {
     expect(galleryImagesOptions(ranged).queryKey).not.toEqual(
       galleryImagesOptions({ ...ranged, createdTo: '2026-07-16' }).queryKey
     );
+  });
+
+  it('cannot cache an image response from an expired account epoch', async () => {
+    accountLifecycle.activate('user-a');
+    let resolveImages: ((value: { images: never[]; total: number }) => void) | undefined;
+    backend.listGalleryImages.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveImages = resolve;
+      })
+    );
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const options = galleryImagesOptions({
+      boardId: 'none',
+      galleryView: 'images',
+      searchTerm: '',
+    });
+    const oldRequest = queryClient.fetchQuery(options);
+
+    accountLifecycle.invalidate();
+    accountLifecycle.activate('user-b');
+    resolveImages?.({ images: [], total: 0 });
+
+    await expect(oldRequest).rejects.toThrow('no longer active');
+    expect(queryClient.getQueryData(options.queryKey)).toBeUndefined();
   });
 });

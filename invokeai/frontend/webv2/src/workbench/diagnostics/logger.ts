@@ -1,6 +1,7 @@
 import type { DeveloperLogLevel, DeveloperLogNamespace } from '@workbench/diagnostics/contracts';
 import type { WidgetContributionSource } from '@workbench/widgetContracts';
 
+import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { useSyncExternalStore } from 'react';
 
 const MAX_PROJECT_DIAGNOSTIC_ENTRIES = 500;
@@ -177,6 +178,20 @@ export const clearProjectDiagnostics = (projectId: string): void => {
   entriesByProjectId.delete(projectId);
   notifyProjectDiagnostics(projectId);
 };
+
+export const clearAllProjectDiagnostics = (): void => {
+  const projectIds = [...entriesByProjectId.keys()];
+
+  entriesByProjectId.clear();
+  for (const projectId of projectIds) {
+    notifyProjectDiagnostics(projectId);
+  }
+};
+
+registerAccountOwnedResource({
+  clear: clearAllProjectDiagnostics,
+  name: 'project-diagnostics',
+});
 
 export const subscribeProjectDiagnostics = (projectId: string, listener: DiagnosticListener): (() => void) => {
   const listeners = listenersByProjectId.get(projectId) ?? new Set<DiagnosticListener>();

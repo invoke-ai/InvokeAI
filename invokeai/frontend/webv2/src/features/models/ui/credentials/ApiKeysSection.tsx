@@ -15,9 +15,16 @@ import { clearCivitaiApiKey, getCivitaiApiKey, setCivitaiApiKey } from '@feature
 import { refreshInstalls } from '@features/models/data/installsStore';
 import { refreshStartersIfLoaded } from '@features/models/data/startersStore';
 import { useNotify } from '@features/models/ui/useModelsNotify';
+import { useMountEffect } from '@platform/react/useMountEffect';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+  type AccountScope,
+} from '@platform/state/accountLifecycle';
 import { Button } from '@platform/ui';
 import { BotIcon, HexagonIcon } from 'lucide-react';
-import { useEffect, useState, type ElementType } from 'react';
+import { useState, type ElementType } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SiAlibabacloud, SiBytedance, SiGooglegemini, SiHuggingface } from 'react-icons/si';
 
@@ -66,10 +73,10 @@ const ApiKeyCard = ({
   icon: ElementType;
   isLoading?: boolean;
   /** Absent until a key exists; clears the stored key. */
-  onClear?: () => Promise<void> | void;
+  onClear?: (owner: AccountScope) => Promise<void> | void;
   /** Save/clear failures (network, backend rejection) land here. */
   onError: (message: string) => void;
-  onSave: (key: string) => Promise<void> | void;
+  onSave: (key: string, owner: AccountScope) => Promise<void> | void;
   /** Hint at the expected shape, e.g. "hf_…" or "sk-…". */
   placeholder: string;
   status: KeyStatusBadge | null;
@@ -79,19 +86,29 @@ const ApiKeyCard = ({
   const [draft, setDraft] = useState('');
   const [isBusy, setIsBusy] = useState(false);
 
-  const runAction = async (action: () => Promise<void> | void): Promise<boolean> => {
+  const runAction = async (
+    action: (owner: AccountScope) => Promise<void> | void,
+    owner: AccountScope = captureAccountScope()
+  ): Promise<boolean> => {
     setIsBusy(true);
 
     try {
-      await action();
+      await action(owner);
+      assertAccountScopeCurrent(owner);
 
       return true;
     } catch (error) {
+      if (!isAccountScopeCurrent(owner)) {
+        return false;
+      }
+
       onError(error instanceof Error ? error.message : t('common.somethingWentWrong'));
 
       return false;
     } finally {
-      setIsBusy(false);
+      if (isAccountScopeCurrent(owner)) {
+        setIsBusy(false);
+      }
     }
   };
 
@@ -102,8 +119,10 @@ const ApiKeyCard = ({
       return;
     }
 
+    const owner = captureAccountScope();
+
     // Keep the draft on failure so the key can be corrected and retried.
-    if (await runAction(() => onSave(key))) {
+    if ((await runAction((actionOwner) => onSave(key, actionOwner), owner)) && isAccountScopeCurrent(owner)) {
       setDraft('');
     }
   };
@@ -186,25 +205,26 @@ const HuggingFaceKeyCard = ({ onError }: { onError: (title: string, message: str
   const [status, setStatus] = useState<HFTokenStatus | null>(null);
   const statusBadge = status ? { label: t(`models.keyStatus.${status}`), palette: HF_STATUS_PALETTES[status] } : null;
 
-  useEffect(() => {
-    let isStale = false;
+  useMountEffect(() => {
+    const owner = captureAccountScope();
+    let isMounted = true;
 
-    getHFTokenStatus()
+    getHFTokenStatus(owner.signal)
       .then((tokenStatus) => {
-        if (!isStale) {
+        if (isMounted && isAccountScopeCurrent(owner)) {
           setStatus(tokenStatus);
         }
       })
       .catch(() => {
-        if (!isStale) {
+        if (isMounted && isAccountScopeCurrent(owner)) {
           setStatus('unknown');
         }
       });
 
     return () => {
-      isStale = true;
+      isMounted = false;
     };
-  }, [t]);
+  });
 
   return (
     <ApiKeyCard
@@ -217,14 +237,18 @@ const HuggingFaceKeyCard = ({ onError }: { onError: (title: string, message: str
       onError={(message) => onError(t('models.huggingFaceToken'), message)}
       onClear={
         status === 'valid' || status === 'invalid'
-          ? async () => {
-              setStatus(await resetHFToken());
+          ? async (owner) => {
+              const nextStatus = await resetHFToken(owner.signal);
+
+              assertAccountScopeCurrent(owner);
+              setStatus(nextStatus);
             }
           : undefined
       }
-      onSave={async (key) => {
-        const nextStatus = await setHFToken(key);
+      onSave={async (key, owner) => {
+        const nextStatus = await setHFToken(key, owner.signal);
 
+        assertAccountScopeCurrent(owner);
         setStatus(nextStatus);
 
         if (nextStatus === 'invalid') {
@@ -279,26 +303,27 @@ const ExternalProviderKeyCards = ({ onError }: { onError: (title: string, messag
   const [configs, setConfigs] = useState<ExternalProviderConfig[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let isStale = false;
+  useMountEffect(() => {
+    const owner = captureAccountScope();
+    let isMounted = true;
 
-    getExternalProviderConfigs()
+    getExternalProviderConfigs(owner.signal)
       .then((providerConfigs) => {
-        if (!isStale) {
+        if (isMounted && isAccountScopeCurrent(owner)) {
           setConfigs(providerConfigs);
         }
       })
       .catch((error: unknown) => {
-        if (!isStale) {
+        if (isMounted && isAccountScopeCurrent(owner)) {
           setConfigs([]);
           setLoadError(error instanceof Error ? error.message : t('models.failedToLoadExternalProviders'));
         }
       });
 
     return () => {
-      isStale = true;
+      isMounted = false;
     };
-  }, [t]);
+  });
 
   const replaceConfig = (next: ExternalProviderConfig) => {
     setConfigs((current) => (current ?? []).map((config) => (config.provider_id === next.provider_id ? next : config)));
@@ -367,33 +392,36 @@ const ExternalProviderKeyCard = ({
   const [overrideBaseUrl, setOverrideBaseUrl] = useState(config.base_url !== null);
   const [isBusy, setIsBusy] = useState(false);
 
-  useEffect(() => {
-    setApiKeyDraft('');
-    setBaseUrlDraft(config.base_url ?? '');
-    setOverrideBaseUrl(config.base_url !== null);
-  }, [config.base_url, config.provider_id]);
-
   const hasApiKeyDraft = apiKeyDraft.trim().length > 0;
   const hasBaseUrlChange = overrideBaseUrl ? baseUrlDraft.trim() !== (config.base_url ?? '') : config.base_url !== null;
 
   const runAction = async (
-    action: () => Promise<ExternalProviderConfig>,
-    onSuccess?: (next: ExternalProviderConfig) => void
+    action: (owner: AccountScope) => Promise<ExternalProviderConfig>,
+    onSuccess?: (next: ExternalProviderConfig, owner: AccountScope) => void
   ): Promise<void> => {
+    const owner = captureAccountScope();
+
     setIsBusy(true);
 
     try {
-      const nextConfig = await action();
+      const nextConfig = await action(owner);
 
+      assertAccountScopeCurrent(owner);
       onUpdated(nextConfig);
       setApiKeyDraft('');
       setBaseUrlDraft(nextConfig.base_url ?? '');
       setOverrideBaseUrl(nextConfig.base_url !== null);
-      onSuccess?.(nextConfig);
+      onSuccess?.(nextConfig, owner);
     } catch (error) {
+      if (!isAccountScopeCurrent(owner)) {
+        return;
+      }
+
       onError(error instanceof Error ? error.message : t('common.somethingWentWrong'));
     } finally {
-      setIsBusy(false);
+      if (isAccountScopeCurrent(owner)) {
+        setIsBusy(false);
+      }
     }
   };
 
@@ -419,13 +447,13 @@ const ExternalProviderKeyCard = ({
     const apiKeyWasSet = nextConfig.api_key !== undefined;
 
     await runAction(
-      () => setExternalProviderConfig(config.provider_id, nextConfig),
-      (next) => {
+      (owner) => setExternalProviderConfig(config.provider_id, nextConfig, owner.signal),
+      (next, owner) => {
         if (apiKeyWasSet && next.api_key_configured) {
           // The backend queues this provider's external starter models on
           // key-set; pull the new jobs and refresh starters so its rows flip to
           // Installed without an app restart.
-          void refreshInstalls();
+          void refreshInstalls(owner);
           refreshStartersIfLoaded();
         }
       }
@@ -544,7 +572,7 @@ const ExternalProviderKeyCard = ({
             disabled={isBusy}
             size="sm"
             variant="ghost"
-            onClick={() => void runAction(() => resetExternalProviderConfig(config.provider_id))}
+            onClick={() => void runAction((owner) => resetExternalProviderConfig(config.provider_id, owner.signal))}
           >
             {t('common.clear')}
           </Button>

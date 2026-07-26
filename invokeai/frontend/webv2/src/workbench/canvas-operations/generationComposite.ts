@@ -201,14 +201,24 @@ export const composeForGeneration = async (
     byHash: new Map(host.dedupe.byHash),
     byKey: new Map(host.dedupe.byKey),
   };
+  const executorDeps = host.getCompositeExecutorDeps();
   const deps: ExecuteCompositePlanDeps = {
-    ...host.getCompositeExecutorDeps(),
+    ...executorDeps,
     dedupe: operationDedupe,
     getLayerSurface: (layerId) => {
       const detached = rasterSnapshot.layerSurfaces.get(layerId);
       return detached
         ? Promise.resolve(detached)
         : Promise.reject(new Error(`Canvas raster snapshot is missing layer ${layerId}.`));
+    },
+    uploadImage: async (blob) => {
+      // Encoding and hashing yield before upload. Re-check at the transport
+      // boundary so Account A work cannot start with Account B credentials.
+      options.signal.throwIfAborted();
+      const uploaded = await executorDeps.uploadImage(blob);
+      options.signal.throwIfAborted();
+
+      return uploaded;
     },
   };
 

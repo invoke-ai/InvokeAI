@@ -48,19 +48,19 @@ export const queueBackend: QueueBackendPort = {
   pauseProcessor: async () => {
     await pauseQueueProcessor();
   },
-  readCurrent: async (scope) => {
-    const item = await getCurrentQueueItem(scope);
+  readCurrent: async (scope, signal) => {
+    const item = await getCurrentQueueItem(scope, signal);
 
     return item ? mapQueueItemDTO(item) : null;
   },
-  readItemIds: async (order, scope) => mapQueueItemIdsDTO(await getQueueItemIds(order, scope)),
-  readItemsById: async (itemIds) => (await getQueueItemsByIds(itemIds)).map(mapQueueItemDTO),
-  readNext: async (scope) => {
-    const item = await getNextQueueItem(scope);
+  readItemIds: async (order, scope, signal) => mapQueueItemIdsDTO(await getQueueItemIds(order, scope, signal)),
+  readItemsById: async (itemIds, signal) => (await getQueueItemsByIds(itemIds, signal)).map(mapQueueItemDTO),
+  readNext: async (scope, signal) => {
+    const item = await getNextQueueItem(scope, signal);
 
     return item ? mapQueueItemDTO(item) : null;
   },
-  readStatus: async (scope) => mapQueueStatusDTO(await getQueueStatus(scope)),
+  readStatus: async (scope, signal) => mapQueueStatusDTO(await getQueueStatus(scope, signal)),
   retryItems: retryItemsById,
   resumeProcessor: async () => {
     await resumeQueueProcessor();

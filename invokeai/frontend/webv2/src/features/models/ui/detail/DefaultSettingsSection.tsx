@@ -6,6 +6,11 @@ import { createListCollection, Grid, HStack, Icon, NumberInput, Stack, Switch, T
 import { loraDefaultSettingsSchema, mainDefaultSettingsSchema } from '@features/models/core/schemas';
 import { updateModel } from '@features/models/data/api';
 import { replaceModelInStore } from '@features/models/data/modelsStore';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
 import { Button, Combobox, FieldLabel, Panel, Select } from '@platform/ui';
 import { MoveHorizontalIcon } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
@@ -326,6 +331,7 @@ export const DefaultSettingsSection = ({
   };
 
   const handleSave = async () => {
+    const owner = captureAccountScope();
     const validationError = validateDefaults(model, settings, t);
 
     if (validationError) {
@@ -336,12 +342,21 @@ export const DefaultSettingsSection = ({
     setIsSaving(true);
 
     try {
-      replaceModelInStore(await updateModel(model.key, { default_settings: settings }));
+      const updated = await updateModel(model.key, { default_settings: settings }, owner.signal);
+
+      assertAccountScopeCurrent(owner);
+      replaceModelInStore(updated);
       onSaved();
     } catch (saveError) {
+      if (!isAccountScopeCurrent(owner)) {
+        return;
+      }
+
       onError(saveError instanceof Error ? saveError.message : t('models.failedToSaveDefaults'));
     } finally {
-      setIsSaving(false);
+      if (isAccountScopeCurrent(owner)) {
+        setIsSaving(false);
+      }
     }
   };
 

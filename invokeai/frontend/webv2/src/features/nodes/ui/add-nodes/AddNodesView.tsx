@@ -3,6 +3,11 @@ import { installCustomNodePack } from '@features/nodes/data/api';
 import { addCustomNodeInstallLogEntry } from '@features/nodes/data/installLogStore';
 import { refreshCustomNodePacks, useCustomNodesSelector } from '@features/nodes/data/nodesStore';
 import { updateNodesUi, useNodesUiSelector, type AddNodesTab } from '@features/nodes/ui/nodesUiStore';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, Field, Scrollable, Tabs, toaster } from '@platform/ui';
 import { FolderOpenIcon, GitBranchIcon } from 'lucide-react';
@@ -55,16 +60,20 @@ const InstallFromGitForm = () => {
       return;
     }
 
+    const owner = captureAccountScope();
+
     setIsInstalling(true);
     addCustomNodeInstallLogEntry({ name: trimmedSource, status: 'installing' });
 
     try {
-      const result = await installCustomNodePack(trimmedSource);
+      const result = await installCustomNodePack(trimmedSource, owner.signal);
 
+      assertAccountScopeCurrent(owner);
       if (result.success) {
         addCustomNodeInstallLogEntry({ message: result.message, name: result.name, status: 'completed' });
         setSource('');
-        await refreshCustomNodePacks();
+        await refreshCustomNodePacks(owner);
+        assertAccountScopeCurrent(owner);
 
         if (result.requires_dependencies) {
           toaster.create({
@@ -80,13 +89,19 @@ const InstallFromGitForm = () => {
         addCustomNodeInstallLogEntry({ message: result.message, name: result.name, status: 'error' });
       }
     } catch (error) {
+      if (!isAccountScopeCurrent(owner)) {
+        return;
+      }
+
       addCustomNodeInstallLogEntry({
         message: getApiErrorMessage(error, t('nodes.installFailed')),
         name: trimmedSource,
         status: 'error',
       });
     } finally {
-      setIsInstalling(false);
+      if (isAccountScopeCurrent(owner)) {
+        setIsInstalling(false);
+      }
     }
   }, [t, trimmedSource]);
   const handleSourceChange = useCallback(

@@ -4,9 +4,14 @@ import type { ModelConfig } from '@features/models/core/types';
 import { Box, Flex, Icon, Image, Stack, Text } from '@chakra-ui/react';
 import { deleteModelImage, getModelImageUrl, updateModelImage } from '@features/models/data/api';
 import { markCoverImageChanged, useModelsSelector } from '@features/models/data/modelsStore';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
 import { DropZone, IconButton, Tooltip } from '@platform/ui';
 import { ImageIcon, UploadIcon, XIcon } from 'lucide-react';
-import { useEffect, useRef, useState, type DragEvent } from 'react';
+import { useRef, useState, type DragEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const ACCEPTED_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
@@ -18,15 +23,17 @@ const dragContainsFiles = (event: DragEvent): boolean => Array.from(event.dataTr
  * or drop an image file onto it to upload. The remove button sits in the top
  * corner and is hover/focus-revealed (and inert while hidden).
  */
-export const ModelImageUpload = ({
-  model,
-  onError,
-  onUpdated,
-}: {
+interface ModelImageUploadProps {
   model: Pick<ModelConfig, 'cover_image' | 'key' | 'name'>;
   onError: (message: string) => void;
   onUpdated: () => void;
-}) => {
+}
+
+export const ModelImageUpload = (props: ModelImageUploadProps) => (
+  <ModelImageUploadForModel key={`${props.model.key}:${props.model.cover_image ?? ''}`} {...props} />
+);
+
+const ModelImageUploadForModel = ({ model, onError, onUpdated }: ModelImageUploadProps) => {
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const dragDepthRef = useRef(0);
@@ -34,13 +41,6 @@ export const ModelImageUpload = ({
   const [hasImage, setHasImage] = useState(Boolean(model.cover_image));
   const [isBusy, setIsBusy] = useState(false);
   const [isDropActive, setIsDropActive] = useState(false);
-
-  useEffect(() => {
-    dragDepthRef.current = 0;
-    setHasImage(Boolean(model.cover_image));
-    setIsBusy(false);
-    setIsDropActive(false);
-  }, [model.cover_image, model.key]);
 
   const handleFile = async (file: File | undefined) => {
     if (!file) {
@@ -52,35 +52,55 @@ export const ModelImageUpload = ({
       return;
     }
 
-    setIsBusy(true);
+    const owner = captureAccountScope();
     const modelKey = model.key;
 
+    setIsBusy(true);
+
     try {
-      await updateModelImage(modelKey, file);
+      await updateModelImage(modelKey, file, owner.signal);
+
+      assertAccountScopeCurrent(owner);
       setHasImage(true);
       // Bumps the cache-bust version so this tile and list thumbnails reload.
       markCoverImageChanged(modelKey, true);
       onUpdated();
     } catch (error) {
+      if (!isAccountScopeCurrent(owner)) {
+        return;
+      }
+
       onError(error instanceof Error ? error.message : t('models.failedToUploadModelImage'));
     } finally {
-      setIsBusy(false);
+      if (isAccountScopeCurrent(owner)) {
+        setIsBusy(false);
+      }
     }
   };
 
   const handleDelete = async () => {
-    setIsBusy(true);
+    const owner = captureAccountScope();
     const modelKey = model.key;
 
+    setIsBusy(true);
+
     try {
-      await deleteModelImage(modelKey);
+      await deleteModelImage(modelKey, owner.signal);
+
+      assertAccountScopeCurrent(owner);
       setHasImage(false);
       markCoverImageChanged(modelKey, false);
       onUpdated();
     } catch (error) {
+      if (!isAccountScopeCurrent(owner)) {
+        return;
+      }
+
       onError(error instanceof Error ? error.message : t('models.failedToRemoveModelImage'));
     } finally {
-      setIsBusy(false);
+      if (isAccountScopeCurrent(owner)) {
+        setIsBusy(false);
+      }
     }
   };
 

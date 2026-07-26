@@ -30,12 +30,13 @@ export const startPendingLibraryWorkflowLoadRuntime = (deps: PendingLibraryWorkf
       .load(request.workflowId)
       .catch(() => undefined)
       .finally(() => {
+        if (!isRunning) {
+          return;
+        }
+
         deps.clearRequest(request.requestId);
         inFlight = false;
-
-        if (isRunning) {
-          consume();
-        }
+        consume();
       });
   };
 

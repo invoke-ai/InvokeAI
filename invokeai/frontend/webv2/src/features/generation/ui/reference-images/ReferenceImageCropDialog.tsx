@@ -13,6 +13,12 @@ import {
 } from '@features/generation/core/referenceImage';
 import { getReferenceImageUrls } from '@features/generation/data/referenceImageUrls';
 import { useGenerationUi } from '@features/generation/ui/GenerationUiContext';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+  type AccountScope,
+} from '@platform/state/accountLifecycle';
 import { Button } from '@platform/ui';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -99,8 +105,10 @@ const isDragMode = (value: unknown): value is DragMode =>
 
 export const exportCroppedReferenceImage = async (
   image: GenerateReferenceImageAsset,
-  cropBox: ReferenceImageCropBoxPct
+  cropBox: ReferenceImageCropBoxPct,
+  owner: AccountScope = captureAccountScope()
 ): Promise<File> => {
+  assertAccountScopeCurrent(owner);
   const original = image.original.image;
   const img = new Image();
   img.crossOrigin = 'anonymous';
@@ -111,6 +119,7 @@ export const exportCroppedReferenceImage = async (
     img.src = getReferenceImageUrls({ original: image.original }).imageUrl;
   });
 
+  assertAccountScopeCurrent(owner);
   const sourceWidth = img.naturalWidth || original.width;
   const sourceHeight = img.naturalHeight || original.height;
   const sx = Math.round((cropBox.x / 100) * sourceWidth);
@@ -130,20 +139,29 @@ export const exportCroppedReferenceImage = async (
     );
   });
 
+  assertAccountScopeCurrent(owner);
   return new File([blob], `${original.image_name.replace(/\.[^.]+$/, '')}-crop.png`, { type: 'image/png' });
 };
 
 export const applyReferenceImageCropSelection = async (
   image: GenerateReferenceImageAsset,
-  cropBox: ReferenceImageCropBoxPct
+  cropBox: ReferenceImageCropBoxPct,
+  owner: AccountScope = captureAccountScope()
 ): Promise<GenerateReferenceImageAsset> => {
+  assertAccountScopeCurrent(owner);
+
   if (isFullReferenceImageCropBox(cropBox)) {
     return resolveReferenceImageCrop(image, cropBox, null);
   }
 
-  const file = await exportCroppedReferenceImage(image, cropBox);
-  const croppedImage = await galleryTransfers.upload(file, 'none', { isIntermediate: true });
+  const file = await exportCroppedReferenceImage(image, cropBox, owner);
+  assertAccountScopeCurrent(owner);
+  const croppedImage = await galleryTransfers.upload(file, 'none', {
+    isIntermediate: true,
+    signal: owner.signal,
+  });
 
+  assertAccountScopeCurrent(owner);
   return resolveReferenceImageCrop(image, cropBox, generatedImageToReferenceImage(croppedImage).original.image);
 };
 
@@ -240,26 +258,42 @@ export const ReferenceImageCropDialog = ({
   const resetCrop = useCallback(() => setCropBox(FULL_REFERENCE_IMAGE_CROP_BOX), []);
 
   const applyCrop = useCallback(async () => {
-    if (isFullReferenceImageCropBox(cropBox)) {
-      onApply(await applyReferenceImageCropSelection(image, cropBox));
-      close();
-      return;
+    const owner = captureAccountScope();
+    const isFullCrop = isFullReferenceImageCropBox(cropBox);
+
+    if (!isFullCrop) {
+      setIsApplying(true);
     }
 
     try {
-      setIsApplying(true);
-      const croppedImage = await applyReferenceImageCropSelection(image, cropBox);
-      gallery.touchImages();
+      const croppedImage = await applyReferenceImageCropSelection(image, cropBox, owner);
+
+      assertAccountScopeCurrent(owner);
+      if (!isFullCrop) {
+        gallery.touchImages();
+      }
+
+      assertAccountScopeCurrent(owner);
       onApply(croppedImage);
-      onClose();
+      if (isFullCrop) {
+        close();
+      } else {
+        onClose();
+      }
     } catch (error) {
+      if (!isAccountScopeCurrent(owner)) {
+        return;
+      }
+
       notifications.reportError({
         area: 'reference-images',
         message: error instanceof Error ? error.message : String(error),
         namespace: 'generation',
       });
     } finally {
-      setIsApplying(false);
+      if (!isFullCrop && isAccountScopeCurrent(owner)) {
+        setIsApplying(false);
+      }
     }
   }, [close, cropBox, gallery, image, notifications, onApply, onClose]);
 

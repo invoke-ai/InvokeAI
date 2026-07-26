@@ -1,4 +1,5 @@
 import { mergeQueueProgressImage, type QueueProgressImage } from '@features/queue/core/progressImage';
+import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createKeyedTransientStore } from '@platform/state/externalStore';
 
 /**
@@ -36,6 +37,11 @@ export const itemProgressStore = {
     progressByItemId.clear();
   },
 };
+
+registerAccountOwnedResource({
+  clear: itemProgressStore.clearAll,
+  name: 'queue-backend-item-progress',
+});
 
 export const useItemProgress = (itemId: number | null | undefined): ItemProgress | null =>
   progressByItemId.useValue(itemId ?? -1) ?? null;

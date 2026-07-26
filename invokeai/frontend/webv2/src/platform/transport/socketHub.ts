@@ -53,6 +53,11 @@ export const createSocketHub = (options: { createSocket?: () => BackendSocket } 
   const createSocket = options.createSocket ?? createDefaultSocket;
 
   let socket: BackendSocket | null = null;
+  let socketLifecycleHandlers: {
+    connect: (payload: never) => void;
+    connectError: (payload: never) => void;
+    disconnect: (payload: never) => void;
+  } | null = null;
   let status: BackendConnectionStatus = 'connecting';
   let lastError: string | undefined;
 
@@ -80,16 +85,25 @@ export const createSocketHub = (options: { createSocket?: () => BackendSocket } 
     socket = nextSocket;
     publishStatus('connecting');
 
-    nextSocket.on('connect', () => {
+    const onConnect = () => {
       publishStatus('connected');
       nextSocket.emit('subscribe_queue', { queue_id: 'default' });
-    });
-    nextSocket.on('connect_error', (error: { message: string }) => {
+    };
+    const onConnectError = (error: { message: string }) => {
       publishStatus('disconnected', error.message);
-    });
-    nextSocket.on('disconnect', (reason: string) => {
+    };
+    const onDisconnect = (reason: string) => {
       publishStatus('disconnected', reason);
-    });
+    };
+
+    socketLifecycleHandlers = {
+      connect: onConnect,
+      connectError: onConnectError as (payload: never) => void,
+      disconnect: onDisconnect as (payload: never) => void,
+    };
+    nextSocket.on('connect', onConnect);
+    nextSocket.on('connect_error', socketLifecycleHandlers.connectError);
+    nextSocket.on('disconnect', socketLifecycleHandlers.disconnect);
 
     // Re-bind consumer listeners so they survive a socket recreation.
     for (const [event, handlers] of eventHandlers) {
@@ -102,8 +116,28 @@ export const createSocketHub = (options: { createSocket?: () => BackendSocket } 
   };
 
   const disconnect = (): void => {
-    socket?.disconnect();
+    const oldSocket = socket;
+    const oldLifecycleHandlers = socketLifecycleHandlers;
+
     socket = null;
+    socketLifecycleHandlers = null;
+
+    if (oldSocket) {
+      if (oldLifecycleHandlers) {
+        oldSocket.off('connect', oldLifecycleHandlers.connect);
+        oldSocket.off('connect_error', oldLifecycleHandlers.connectError);
+        oldSocket.off('disconnect', oldLifecycleHandlers.disconnect);
+      }
+
+      for (const [event, handlers] of eventHandlers) {
+        for (const handler of handlers) {
+          oldSocket.off(event, handler);
+        }
+      }
+
+      oldSocket.disconnect();
+    }
+
     publishStatus('connecting');
   };
 

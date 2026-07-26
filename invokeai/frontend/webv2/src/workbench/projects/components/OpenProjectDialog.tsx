@@ -1,6 +1,11 @@
 import { Dialog, Icon, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
 import { flushGenerateDrafts } from '@features/generation/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
 import { areArraysEqual } from '@platform/state/selectors';
 import { Button, CloseButton, Row, Scrollable } from '@platform/ui';
 import { formatRelativeTime } from '@workbench/launchpad/formatRelativeTime';
@@ -48,35 +53,54 @@ export const OpenProjectDialog = ({ isOpen, onClose }: { isOpen: boolean; onClos
 
   const openProject = useCallback(
     async (summary: ProjectSummary) => {
+      const owner = captureAccountScope();
+
       setBusyProjectId(summary.id);
 
-      const project = await persistence.hydrateProjectFromServer(summary.id);
+      try {
+        const project = await persistence.hydrateProjectFromServer(summary.id);
 
-      setBusyProjectId(null);
+        assertAccountScopeCurrent(owner);
+        if (!project) {
+          notify.error(t('projects.couldNotOpen'), t('projects.couldNotOpenDescription', { name: summary.name }));
+          void refreshProjectLibrary();
 
-      if (!project) {
-        notify.error(t('projects.couldNotOpen'), t('projects.couldNotOpenDescription', { name: summary.name }));
-        void refreshProjectLibrary();
+          return;
+        }
 
-        return;
+        flushGenerateDrafts();
+        projects.open(project);
+        onClose();
+      } catch (error) {
+        if (!isAccountScopeCurrent(owner)) {
+          return;
+        }
+
+        notify.error(
+          t('projects.couldNotOpen'),
+          error instanceof Error ? error.message : t('projects.couldNotOpenDescription', { name: summary.name })
+        );
+      } finally {
+        if (isAccountScopeCurrent(owner)) {
+          setBusyProjectId(null);
+        }
       }
-
-      flushGenerateDrafts();
-      projects.open(project);
-      onClose();
     },
     [notify, onClose, persistence, projects, t]
   );
 
   const handleImport = useCallback(async () => {
-    const file = await pickProjectFile();
+    const owner = captureAccountScope();
+    const file = await pickProjectFile(owner);
 
-    if (!file) {
+    if (!file || !isAccountScopeCurrent(owner)) {
       return;
     }
 
     try {
-      const record = await importProjectFile(file);
+      const record = await importProjectFile(file, owner);
+
+      assertAccountScopeCurrent(owner);
       const project = persistence.adoptProjectRecord(record);
 
       if (project) {
@@ -85,6 +109,10 @@ export const OpenProjectDialog = ({ isOpen, onClose }: { isOpen: boolean; onClos
         onClose();
       }
     } catch (error) {
+      if (!isAccountScopeCurrent(owner)) {
+        return;
+      }
+
       notify.error(t('projects.importFailed'), error instanceof Error ? error.message : undefined);
     }
   }, [notify, onClose, persistence, projects, t]);

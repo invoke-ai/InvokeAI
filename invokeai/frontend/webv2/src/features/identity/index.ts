@@ -1,14 +1,21 @@
 export * from './capabilities';
 export {
+  AuthSessionUnavailableError,
   completeAdminSetup,
+  configureIdentityAccountLifecycle,
   ensureAuthSession,
+  ensureReadyAuthSession,
   getAuthSession,
   getUserStorageScope,
+  isLoginAttemptSupersededError,
+  LoginAttemptSupersededError,
   loginWithCredentials,
   logoutSession,
   subscribeAuthSession,
   useAuthSession,
   type AuthSession,
+  type ReadyAuthSession,
+  type IdentityAccountLifecycle,
 } from './session';
 export type { IdentityTokenAdapter } from './core/tokenStorage';
 export * from './transportAdapter';
@@ -25,7 +32,7 @@ export {
   type UserUpdateRequest,
 } from './data/api';
 export { AccountMenu } from './ui/AccountMenu';
+export { AuthUnavailableScreen } from './ui/AuthUnavailableScreen';
 export { LoginScreen } from './ui/LoginScreen';
-export { SessionExpiryGuard } from './ui/SessionExpiryGuard';
 export { SetupScreen } from './ui/SetupScreen';
 export { UsersPage } from './ui/UsersPage';

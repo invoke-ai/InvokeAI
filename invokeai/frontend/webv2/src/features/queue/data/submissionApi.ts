@@ -6,6 +6,7 @@ import type {
   QueueResultImageOptions,
 } from '@features/queue/core/types';
 
+import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
 import { absolutizeApiUrl, ApiError, apiFetchJson } from '@platform/transport/http';
 
 import type { QueueImageDTO, QueueServerItemDTO } from './serverTypes';
@@ -140,10 +141,11 @@ const getResultImageNames = (queueItem: QueueServerItemDTO, options?: QueueResul
 const getResultImage = async (
   imageName: string,
   queuedAt: string,
-  sourceQueueItemId: string
+  sourceQueueItemId: string,
+  signal: AbortSignal
 ): Promise<QueueResultImage | null> => {
   try {
-    const image = await apiFetchJson<QueueImageDTO>(`/api/v1/images/i/${encodeURIComponent(imageName)}`);
+    const image = await apiFetchJson<QueueImageDTO>(`/api/v1/images/i/${encodeURIComponent(imageName)}`, { signal });
 
     return {
       height: image.height,
@@ -169,10 +171,16 @@ export const getResultImages = async (
   queuedAt: string,
   options?: QueueResultImageOptions
 ): Promise<QueueResultImage[]> => {
-  const item = await getQueueItem(itemId);
+  const owner = captureAccountScope();
+  const item = await getQueueItem(itemId, owner.signal);
+
+  assertAccountScopeCurrent(owner);
   const images = await Promise.all(
-    getResultImageNames(item, options).map((imageName) => getResultImage(imageName, queuedAt, sourceQueueItemId))
+    getResultImageNames(item, options).map((imageName) =>
+      getResultImage(imageName, queuedAt, sourceQueueItemId, owner.signal)
+    )
   );
 
+  assertAccountScopeCurrent(owner);
   return images.filter((image): image is QueueResultImage => image !== null);
 };

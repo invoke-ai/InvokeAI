@@ -17,6 +17,7 @@ import {
   type QueueNodeExecutionPort,
   type ReconcileInput,
 } from '@features/queue/runtime/coordinator';
+import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { getApiErrorMessage } from '@platform/transport/http';
 
 export interface QueueResultDestinationPort {
@@ -175,6 +176,7 @@ export const createQueueRuntime = ({
   modelLoads: QueueModelLoadPort;
   nodeExecution: QueueNodeExecutionPort;
 }): QueueRuntime => {
+  const owner = captureAccountScope();
   const commands = history.commands;
   const startedQueueItemIds = new Set<string>();
   const cancelledQueueItemIds = new Set<string>();
@@ -182,9 +184,10 @@ export const createQueueRuntime = ({
   let reconcileState: 'idle' | 'running' | 'done' = 'idle';
   let isDisposed = false;
   let isStarted = false;
+  const isActive = (): boolean => !isDisposed && isAccountScopeCurrent(owner);
 
   const addImagesToDestination = async (queueItem: QueueItem, imageNames: string[]): Promise<void> => {
-    if (queueItem.snapshot.destination !== 'gallery') {
+    if (!isActive() || queueItem.snapshot.destination !== 'gallery') {
       return;
     }
 
@@ -223,9 +226,14 @@ export const createQueueRuntime = ({
         queueItem.snapshot.submittedAt,
         getQueueItemResultImageOptions(queueItem)
       );
+
+      if (!isActive()) {
+        return;
+      }
+
       const images = await deliverVisibleImages(queueItem, allImages);
 
-      if (isDisposed) {
+      if (!isActive()) {
         return;
       }
 
@@ -234,7 +242,7 @@ export const createQueueRuntime = ({
         commands.refreshBackendData();
       }
     } catch (error) {
-      if (isDisposed) {
+      if (!isActive()) {
         return;
       }
 
@@ -264,9 +272,14 @@ export const createQueueRuntime = ({
         queueItem.snapshot.submittedAt,
         getQueueItemResultImageOptions(queueItem)
       );
+
+      if (!isActive()) {
+        return;
+      }
+
       const visibleImages = await deliverVisibleImages(queueItem, images);
 
-      if (isDisposed) {
+      if (!isActive()) {
         return;
       }
 
@@ -280,7 +293,7 @@ export const createQueueRuntime = ({
         commands.refreshBackendData();
       }
     } catch (error) {
-      if (!isDisposed) {
+      if (isActive()) {
         commands.recordError({
           area: 'queue-results',
           message: toErrorMessage(error),
@@ -294,6 +307,10 @@ export const createQueueRuntime = ({
   const coordinator = createQueueCoordinator(
     {
       onBackendItemCancelled: (localQueueItemId, backendItemId) => {
+        if (!isActive()) {
+          return;
+        }
+
         const target = getRouteTarget(history, localQueueItemId);
 
         if (!target?.queueItem || target.queueItem.cancelledBackendItemIds?.includes(backendItemId)) {
@@ -307,6 +324,10 @@ export const createQueueRuntime = ({
         });
       },
       onBackendItemComplete: (localQueueItemId, backendItemId) => {
+        if (!isActive()) {
+          return;
+        }
+
         const target = getRouteTarget(history, localQueueItemId);
 
         if (!target?.queueItem || target.queueItem.completedBackendItemIds?.includes(backendItemId)) {
@@ -315,7 +336,11 @@ export const createQueueRuntime = ({
 
         return routeBackendItemResults(target.project.id, target.queueItem, backendItemId);
       },
-      onGalleryRefresh: commands.refreshBackendData,
+      onGalleryRefresh: () => {
+        if (isActive()) {
+          commands.refreshBackendData();
+        }
+      },
     },
     { backend, modelLoads, nodeExecution }
   );
@@ -340,7 +365,7 @@ export const createQueueRuntime = ({
 
     request
       .then(({ batchId, itemIds }) => {
-        if (isDisposed) {
+        if (!isActive()) {
           return;
         }
 
@@ -355,7 +380,7 @@ export const createQueueRuntime = ({
         return routeRunResults(coordinator, project.id, queueItem);
       })
       .catch((error: unknown) => {
-        if (!isDisposed) {
+        if (isActive()) {
           commands.setStatus({
             error: toErrorMessage(error),
             projectId: project.id,
@@ -367,7 +392,7 @@ export const createQueueRuntime = ({
   };
 
   const processQueueItems = (): void => {
-    if (isDisposed || reconcileState !== 'done') {
+    if (!isActive() || reconcileState !== 'done') {
       return;
     }
 
@@ -387,7 +412,7 @@ export const createQueueRuntime = ({
           coordinator
             .cancelRun({ backendBatchId: queueItem.backendBatchId, backendItemIds: queueItem.backendItemIds })
             .catch((error: unknown) => {
-              if (!isDisposed) {
+              if (isActive()) {
                 commands.recordError({
                   area: 'queue-cancel',
                   message: toErrorMessage(error),
@@ -402,7 +427,7 @@ export const createQueueRuntime = ({
 
   const reconcile = (): void => {
     if (
-      isDisposed ||
+      !isActive() ||
       reconcileState !== 'idle' ||
       !history.getSnapshot().isHydrated ||
       history.getSnapshot().connectionStatus !== 'connected'
@@ -433,7 +458,7 @@ export const createQueueRuntime = ({
     coordinator
       .reconcile(inputs)
       .then((outcomes) => {
-        if (isDisposed) {
+        if (!isActive()) {
           return;
         }
 
@@ -469,7 +494,7 @@ export const createQueueRuntime = ({
         }
       })
       .catch((error: unknown) => {
-        if (isDisposed) {
+        if (!isActive()) {
           return;
         }
 
@@ -493,7 +518,7 @@ export const createQueueRuntime = ({
         }
       })
       .finally(() => {
-        if (!isDisposed) {
+        if (isActive()) {
           reconcileState = 'done';
           processQueueItems();
         }
@@ -506,7 +531,7 @@ export const createQueueRuntime = ({
   };
 
   const start = (): void => {
-    if (isStarted || isDisposed) {
+    if (isStarted || !isActive()) {
       return;
     }
 
@@ -516,6 +541,10 @@ export const createQueueRuntime = ({
     detachers.push(
       history.subscribe(synchronize),
       backend.onConnectionChange((status, error) => {
+        if (!isActive()) {
+          return;
+        }
+
         commands.setConnectionStatus({ error, status });
         synchronize();
       })
@@ -530,6 +559,8 @@ export const createQueueRuntime = ({
       detach();
     }
 
+    startedQueueItemIds.clear();
+    cancelledQueueItemIds.clear();
     coordinator.dispose();
   };
 

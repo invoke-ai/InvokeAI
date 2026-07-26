@@ -29,22 +29,37 @@ describe('custom node data adapter', () => {
       customNodesPath: '/nodes',
       nodePacks: [{ name: 'pack', nodeCount: 2, nodeTypes: ['one', 'two'], path: '/nodes/pack' }],
     });
-    expect(adapter.requestJson).toHaveBeenCalledWith('/api/v2/custom_nodes/');
+    expect(adapter.requestJson).toHaveBeenCalledWith('/api/v2/custom_nodes/', { signal: undefined });
   });
 
   it('encodes pack identifiers and sends install intent in the body', async () => {
     adapter.requestJson.mockResolvedValue({ success: true });
     const { installCustomNodePack, uninstallCustomNodePack } = await import('./api');
+    const controller = new AbortController();
 
-    await installCustomNodePack('https://example.test/nodes.git');
-    await uninstallCustomNodePack('pack/with spaces');
+    await installCustomNodePack('https://example.test/nodes.git', controller.signal);
+    await uninstallCustomNodePack('pack/with spaces', controller.signal);
 
     expect(adapter.requestJson).toHaveBeenNthCalledWith(1, '/api/v2/custom_nodes/install', {
       body: JSON.stringify({ source: 'https://example.test/nodes.git' }),
       method: 'POST',
+      signal: controller.signal,
     });
     expect(adapter.requestJson).toHaveBeenNthCalledWith(2, '/api/v2/custom_nodes/pack%2Fwith%20spaces', {
       method: 'DELETE',
+      signal: controller.signal,
+    });
+  });
+
+  it('forwards account cancellation to node reloads', async () => {
+    const { reloadCustomNodes } = await import('./api');
+    const controller = new AbortController();
+
+    await reloadCustomNodes(controller.signal);
+
+    expect(adapter.request).toHaveBeenCalledWith('/api/v2/custom_nodes/reload', {
+      method: 'POST',
+      signal: controller.signal,
     });
   });
 });

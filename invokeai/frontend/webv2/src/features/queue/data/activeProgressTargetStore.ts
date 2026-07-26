@@ -1,5 +1,6 @@
 import type { QueueItemProgressTarget } from '@features/queue/core/types';
 
+import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
 
 export interface ActiveProgressTargetSink {
@@ -26,6 +27,11 @@ export const activeProgressTargetStore: ActiveProgressTargetSink = {
     }
   },
 };
+
+registerAccountOwnedResource({
+  clear: () => activeProgressTargetStore.clear(),
+  name: 'queue-active-progress-target',
+});
 
 export const useActiveProgressTarget = (): QueueItemProgressTarget | null =>
   store.useSelector((snapshot) => snapshot.target);

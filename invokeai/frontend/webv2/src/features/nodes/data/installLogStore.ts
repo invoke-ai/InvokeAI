@@ -1,3 +1,4 @@
+import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
 
 export interface CustomNodeInstallLogEntry {
@@ -32,5 +33,13 @@ export const addCustomNodeInstallLogEntry = (
 export const clearCustomNodeInstallLog = (): void => {
   store.patchSnapshot({ log: [] });
 };
+
+registerAccountOwnedResource({
+  clear: () => {
+    nextId = 1;
+    clearCustomNodeInstallLog();
+  },
+  name: 'custom-node-install-log',
+});
 
 export const useCustomNodeInstallLog = (): CustomNodeInstallLogEntry[] => store.useSelector((snapshot) => snapshot.log);

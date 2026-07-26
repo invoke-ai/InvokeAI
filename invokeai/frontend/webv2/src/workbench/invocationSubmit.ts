@@ -14,8 +14,11 @@
  */
 
 import type { ModelConfig } from '@features/models';
+import type { AccountScope } from '@platform/state/accountLifecycle';
 import type { ResolvedInvocationRoute } from '@workbench/invocationContracts';
 import type { Project } from '@workbench/projectContracts';
+
+import { isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 
 import type { PrepareCanvasInvocationArgs } from './widgets/canvas/invoke/prepareCanvasInvocation';
 import type { WorkbenchCommands } from './workbenchStore';
@@ -31,6 +34,8 @@ export interface SubmitResolvedInvocationDeps {
   project: Project;
   /** Loaded models (or `undefined` while loading), forwarded verbatim to both paths. */
   models: readonly ModelConfig[] | undefined;
+  /** Identity lifetime that initiated this submission. */
+  owner: AccountScope;
   commands: Pick<WorkbenchCommands, 'generation' | 'notifications'>;
   /**
    * The async canvas-invoke entry point, injected for testability. The real
@@ -46,10 +51,15 @@ export const submitResolvedInvocation = ({
   commands,
   formatControlLayerError,
   models,
+  owner,
   prepareCanvasInvocation,
   project,
   route,
 }: SubmitResolvedInvocationDeps): void => {
+  if (!isAccountScopeCurrent(owner)) {
+    return;
+  }
+
   if (route.sourceId === 'canvas') {
     // The canvas graph is composited + compiled asynchronously outside the
     // reducer; fire-and-track (the orchestrator records any failure notice and
@@ -63,6 +73,7 @@ export const submitResolvedInvocation = ({
       formatControlLayerError,
       generateValues: getProjectWidgetValues(project, 'generate'),
       models,
+      owner,
       projectId: project.id,
       projectSettings: project.settings,
       strength: readCanvasDenoisingStrength(getProjectWidgetValues(project, 'canvas')),

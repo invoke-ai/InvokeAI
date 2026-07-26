@@ -1,6 +1,7 @@
 import type { ProjectGraphState, WorkflowEdge, WorkflowNode, XYPosition } from '@features/workflow/contracts';
 
 import { createWorkflowId } from '@features/workflow/utility';
+import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
 
 /**
@@ -20,6 +21,15 @@ interface WorkflowClipboardSnapshot {
 const clipboardStore = createExternalStore<WorkflowClipboardSnapshot>({ edges: [], nodes: [] });
 
 const PASTE_OFFSET = 32;
+
+export const clearWorkflowClipboard = (): void => {
+  clipboardStore.setSnapshot({ edges: [], nodes: [] });
+};
+
+registerAccountOwnedResource({
+  clear: clearWorkflowClipboard,
+  name: 'workflow-clipboard',
+});
 
 export const copyNodesToClipboard = (document: ProjectGraphState, nodeIds: string[]): number => {
   const copiedIds = new Set(nodeIds);

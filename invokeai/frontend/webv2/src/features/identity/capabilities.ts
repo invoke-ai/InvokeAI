@@ -7,6 +7,14 @@ export interface Capabilities {
 }
 
 export const getCapabilities = (session: AuthSession): Capabilities => {
+  if (session.phase !== 'ready') {
+    return {
+      canManageModels: false,
+      canManageNodes: false,
+      canManageUsers: false,
+    };
+  }
+
   const isSingleUser = !session.multiuserEnabled;
   const isAdmin = isSingleUser || session.user?.is_admin === true;
 

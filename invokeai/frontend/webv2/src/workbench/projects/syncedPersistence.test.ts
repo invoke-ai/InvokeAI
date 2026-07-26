@@ -1,3 +1,4 @@
+import type * as accountLifecycleModule from '@platform/state/accountLifecycle';
 import type { Project, WorkbenchState } from '@workbench/projectContracts';
 
 import { createWorkbenchPersistenceRuntime, type PersistenceClock } from '@workbench/persistenceRuntime';
@@ -131,6 +132,17 @@ vi.mock('./api', () => api);
 
 const storage = new Map<string, string>();
 
+const deferred = <T>() => {
+  let resolve!: (value: T) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+
+  return { promise, reject, resolve };
+};
+
 vi.stubGlobal('window', {
   localStorage: {
     getItem: (key: string): string | null => storage.get(key) ?? null,
@@ -147,8 +159,10 @@ const SESSION_KEY = 'webv2:workbench-account';
 
 let persistence: typeof persistenceModule;
 let library: typeof libraryModule;
+let account: typeof accountLifecycleModule;
 let service: persistenceModule.SyncedWorkbenchPersistence;
 const defaultUpdateProject = api.updateProject.getMockImplementation()!;
+const defaultSetClientStateValue = api.setClientStateValue.getMockImplementation()!;
 
 const seedSessionBlob = (blob: Record<string, unknown>): void => {
   api.__clientState.set(SESSION_KEY, JSON.stringify(blob));
@@ -179,9 +193,13 @@ beforeEach(async () => {
   api.listProjects.mockClear();
   api.updateProject.mockReset();
   api.updateProject.mockImplementation(defaultUpdateProject);
+  api.setClientStateValue.mockReset();
+  api.setClientStateValue.mockImplementation(defaultSetClientStateValue);
 
+  account = await import('@platform/state/accountLifecycle');
+  account.accountLifecycle.activate('single-user', '');
   persistence = await import('./syncedPersistence');
-  service = persistence.createSyncedWorkbenchPersistence();
+  service = persistence.createSyncedWorkbenchPersistence(account.captureAccountScope());
   library = await import('./library');
 });
 
@@ -298,6 +316,49 @@ describe('loadWorkbench session hydration', () => {
 });
 
 describe('saveWorkbench', () => {
+  it('cancels an account-A save queued behind the mutation microtask before it can touch account B', async () => {
+    const ownerA = account.accountLifecycle.activate('user-a', ':user:a');
+    const accountAService = persistence.createSyncedWorkbenchPersistence(ownerA);
+    const stateA = createInitialWorkbenchState();
+
+    stateA.projects[0]!.name = 'Account A queued edit';
+    const queuedSave = accountAService.saveWorkbench(stateA);
+
+    account.accountLifecycle.activate('user-b', ':user:b');
+
+    await expect(queuedSave).rejects.toHaveProperty('name', 'AccountScopeExpiredError');
+    expect(storage.has('invokeai:v7:webv2:workbench:user:a')).toBe(false);
+    expect(storage.has('invokeai:v7:webv2:workbench:user:b')).toBe(false);
+    expect(api.setClientStateValue).not.toHaveBeenCalled();
+    expect(api.createProject).not.toHaveBeenCalled();
+    expect(api.updateProject).not.toHaveBeenCalled();
+  });
+
+  it('stops an in-flight account-A save before the next backend request after account B activates', async () => {
+    const ownerA = account.accountLifecycle.activate('user-a', ':user:a');
+    const accountAService = persistence.createSyncedWorkbenchPersistence(ownerA);
+    const stateA = createInitialWorkbenchState();
+    const sessionWrite = deferred<void>();
+
+    stateA.projects[0]!.name = 'Account A in-flight edit';
+    api.setClientStateValue.mockImplementationOnce(() => sessionWrite.promise);
+
+    const inFlightSave = accountAService.saveWorkbench(stateA);
+
+    await vi.waitFor(() => expect(api.setClientStateValue).toHaveBeenCalledOnce());
+    expect(storage.has('invokeai:v7:webv2:workbench:user:a')).toBe(true);
+
+    account.accountLifecycle.activate('user-b', ':user:b');
+    sessionWrite.resolve();
+
+    await expect(inFlightSave).rejects.toHaveProperty('name', 'AccountScopeExpiredError');
+    expect(storage.has('invokeai:v7:webv2:workbench:user:b')).toBe(false);
+    // The already-started client-state request belonged to A. Its late
+    // completion must not advance the chain to a project create under B.
+    expect(api.createProject).not.toHaveBeenCalled();
+    expect(api.updateProject).not.toHaveBeenCalled();
+  });
+
   it('serializes concurrent saves against the latest acknowledged project revision', async () => {
     const project = seedServerProject('Original');
     const account = createInitialWorkbenchState().account;

@@ -1,3 +1,9 @@
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  registerAccountOwnedResource,
+} from '@platform/state/accountLifecycle';
+
 import { getLibraryWorkflow, listLibraryWorkflows, type ListWorkflowsParams, type WorkflowLibraryPage } from './api';
 
 /**
@@ -18,23 +24,37 @@ export const getCachedWorkflowPage = (params: ListWorkflowsParams): WorkflowLibr
 
 /** Fetches a page and stores it; callers show `getCachedWorkflowPage` while this resolves. */
 export const listLibraryWorkflowsCached = async (params: ListWorkflowsParams): Promise<WorkflowLibraryPage> => {
-  const result = await listLibraryWorkflows(params);
+  const owner = captureAccountScope();
+  const signal = params.signal ? AbortSignal.any([params.signal, owner.signal]) : owner.signal;
+  const result = await listLibraryWorkflows({ ...params, signal });
 
+  assertAccountScopeCurrent(owner);
+  signal.throwIfAborted();
   pageCache.set(getPageKey(params), result);
 
   return result;
 };
 
 /** Workflow payloads are immutable per save; cache hits skip the fetch entirely. */
-export const getLibraryWorkflowCached = async (workflowId: string): Promise<Record<string, unknown>> => {
+export const getLibraryWorkflowCached = async (
+  workflowId: string,
+  externalSignal?: AbortSignal
+): Promise<Record<string, unknown>> => {
+  const owner = captureAccountScope();
+  const signal = externalSignal ? AbortSignal.any([externalSignal, owner.signal]) : owner.signal;
+
+  signal.throwIfAborted();
   const cached = workflowCache.get(workflowId);
 
   if (cached) {
+    assertAccountScopeCurrent(owner);
     return cached;
   }
 
-  const result = await getLibraryWorkflow(workflowId);
+  const result = await getLibraryWorkflow(workflowId, signal);
 
+  assertAccountScopeCurrent(owner);
+  signal.throwIfAborted();
   workflowCache.set(workflowId, result);
 
   return result;
@@ -44,3 +64,8 @@ export const invalidateWorkflowLibraryCache = (): void => {
   pageCache.clear();
   workflowCache.clear();
 };
+
+registerAccountOwnedResource({
+  clear: invalidateWorkflowLibraryCache,
+  name: 'workflow-library',
+});

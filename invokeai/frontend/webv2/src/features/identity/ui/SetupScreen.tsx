@@ -1,6 +1,6 @@
 import { chakra, Input, Stack } from '@chakra-ui/react';
 import { createSetupSchema, PASSWORD_RULES_HINT, type SetupFormValues } from '@features/identity/core/schemas';
-import { completeAdminSetup, useAuthSession } from '@features/identity/session';
+import { completeAdminSetup, isLoginAttemptSupersededError, useAuthSession } from '@features/identity/session';
 import { useZodForm } from '@platform/react/useZodForm';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, Field } from '@platform/ui';
@@ -30,6 +30,10 @@ export const SetupScreen = () => {
         try {
           await completeAdminSetup(values.email, values.displayName.trim() || null, values.password);
         } catch (error) {
+          if (isLoginAttemptSupersededError(error)) {
+            return;
+          }
+
           throw new Error(getApiErrorMessage(error, t('auth.couldNotCreateAdmin')));
         }
 

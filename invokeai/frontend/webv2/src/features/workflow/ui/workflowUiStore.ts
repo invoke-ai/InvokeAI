@@ -1,5 +1,6 @@
 import type { FieldType, XYPosition } from '@features/workflow/contracts';
 
+import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
 
 export type AddNodeConnectionFilter =
@@ -42,7 +43,7 @@ export interface LibraryWorkflowLoadRequest {
 
 let nextLibraryWorkflowLoadRequestId = 0;
 
-export const workflowUiStore = createExternalStore<WorkflowUiSnapshot>({
+const INITIAL_WORKFLOW_UI_SNAPSHOT: WorkflowUiSnapshot = {
   addNodeConnection: null,
   addNodePosition: null,
   importRequestCount: 0,
@@ -50,6 +51,15 @@ export const workflowUiStore = createExternalStore<WorkflowUiSnapshot>({
   isLibraryOpen: false,
   isNewWorkflowConfirmOpen: false,
   pendingLibraryWorkflowLoad: null,
+};
+
+export const workflowUiStore = createExternalStore<WorkflowUiSnapshot>(INITIAL_WORKFLOW_UI_SNAPSHOT);
+
+registerAccountOwnedResource({
+  clear: () => {
+    workflowUiStore.setSnapshot(INITIAL_WORKFLOW_UI_SNAPSHOT);
+  },
+  name: 'workflow-ui',
 });
 
 export const setWorkflowLibraryOpen = (isOpen: boolean): void => {

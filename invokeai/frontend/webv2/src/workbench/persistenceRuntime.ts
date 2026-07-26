@@ -53,12 +53,15 @@ export const createWorkbenchPersistenceRuntime = ({
   loadOptions,
   persistence,
   saveDelayMs = 500,
+  signal,
 }: {
   aggregate: PersistenceAggregatePort;
   clock?: PersistenceClock;
   loadOptions?: WorkbenchLoadOptions;
   persistence: WorkbenchPersistencePort;
   saveDelayMs?: number;
+  /** Cancels this runtime when the account lifetime that owns it expires. */
+  signal?: AbortSignal;
 }): WorkbenchPersistenceRuntime => {
   let snapshot: PersistenceRuntimeSnapshot = { error: null, phase: 'idle' };
   const listeners = new Set<() => void>();
@@ -247,26 +250,34 @@ export const createWorkbenchPersistenceRuntime = ({
     }
   };
 
+  const dispose = (): void => {
+    if (disposed) {
+      return;
+    }
+    disposed = true;
+    generation += 1;
+    queuedSaveRequireCurrentRevision = null;
+    clearScheduledSave();
+    unsubscribeAggregate?.();
+    unsubscribeAggregate = null;
+    signal?.removeEventListener('abort', dispose);
+    snapshot = { error: null, phase: 'disposed' };
+    listeners.clear();
+  };
+
   return {
-    dispose() {
-      if (disposed) {
-        return;
-      }
-      disposed = true;
-      generation += 1;
-      queuedSaveRequireCurrentRevision = null;
-      clearScheduledSave();
-      unsubscribeAggregate?.();
-      unsubscribeAggregate = null;
-      snapshot = { error: null, phase: 'disposed' };
-      listeners.clear();
-    },
+    dispose,
     getSnapshot: () => snapshot,
     start() {
       if (started || disposed) {
         return;
       }
+      if (signal?.aborted) {
+        dispose();
+        return;
+      }
       started = true;
+      signal?.addEventListener('abort', dispose, { once: true });
       unsubscribeAggregate = aggregate.subscribe(onAggregateChange);
       void load();
     },

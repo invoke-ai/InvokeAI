@@ -1,5 +1,6 @@
 import type { SettingsSectionId } from '@workbench/widgetContracts';
 
+import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
 
 /**
@@ -14,9 +15,18 @@ interface SettingsDialogSnapshot {
   sectionId: SettingsSectionId;
 }
 
-export const settingsDialogStore = createExternalStore<SettingsDialogSnapshot>({
+const INITIAL_SETTINGS_DIALOG_SNAPSHOT: SettingsDialogSnapshot = {
   isOpen: false,
   sectionId: 'appearance',
+};
+
+export const settingsDialogStore = createExternalStore<SettingsDialogSnapshot>(INITIAL_SETTINGS_DIALOG_SNAPSHOT);
+
+registerAccountOwnedResource({
+  clear: () => {
+    settingsDialogStore.setSnapshot(INITIAL_SETTINGS_DIALOG_SNAPSHOT);
+  },
+  name: 'settings-dialog',
 });
 
 /** Open the workbench settings dialog, optionally at a specific section. */

@@ -6,9 +6,10 @@ import type { Rect } from '@workbench/canvas-engine/types';
 import type { Project } from '@workbench/projectContracts';
 
 import { getDefaultGenerateSettings } from '@features/generation/settings';
+import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { getProjectWidgetInstance } from '@workbench/widgetState';
 import { createInitialWorkbenchState } from '@workbench/workbenchState';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { uploadCanvasImage } from './backend/canvasImages';
 
@@ -24,6 +25,15 @@ const model: MainModelConfig = {
 
 const defaultRect: Rect = { height: 456, width: 123, x: -4, y: 8 };
 const defaultBlob = new Blob(['pixels'], { type: 'image/png' });
+
+const deferred = <T>() => {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+
+  return { promise, resolve };
+};
 
 const createProject = (boardId = 'board-1', generateOverrides: Partial<GenerateWidgetValues> = {}): Project => {
   const project = createInitialWorkbenchState().projects[0]!;
@@ -98,6 +108,14 @@ const createHarness = (
 };
 
 describe('saveCanvasToGallery', () => {
+  beforeEach(() => {
+    accountLifecycle.activate('save-canvas-test');
+  });
+
+  afterEach(() => {
+    accountLifecycle.invalidate();
+  });
+
   it('flushes before exporting canvas content and uploads with gallery metadata', async () => {
     const harness = createHarness();
 
@@ -125,6 +143,7 @@ describe('saveCanvasToGallery', () => {
         seed: 123,
         width: 123,
       },
+      signal: expect.any(AbortSignal),
     });
   });
 
@@ -250,5 +269,25 @@ describe('saveCanvasToGallery', () => {
         uploadImage: harness.uploadImage,
       })
     ).rejects.toThrow('upload failed');
+  });
+
+  it('does not upload account A canvas pixels after account B becomes active', async () => {
+    const harness = createHarness();
+    const exportResult = deferred<RasterCompositeExportResult>();
+
+    harness.exportRasterComposite.mockReturnValueOnce(exportResult.promise);
+    const save = saveCanvasToGallery({
+      engine: harness.engine,
+      project: createProject(),
+      region: 'canvas',
+      uploadImage: harness.uploadImage,
+    });
+
+    await vi.waitFor(() => expect(harness.exportRasterComposite).toHaveBeenCalledOnce());
+    accountLifecycle.activate('save-canvas-test-b');
+    exportResult.resolve({ blob: defaultBlob, rect: defaultRect, status: 'ok' });
+
+    await expect(save).resolves.toEqual({ status: 'stale' });
+    expect(harness.uploadImage).not.toHaveBeenCalled();
   });
 });

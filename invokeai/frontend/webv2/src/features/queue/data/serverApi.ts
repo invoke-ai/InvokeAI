@@ -5,6 +5,7 @@ import type {
   QueueServerItemDTO,
 } from '@features/queue/data/serverTypes';
 
+import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
 import { apiFetchJson } from '@platform/transport/http';
 
 const QUEUE_ID = 'default';
@@ -24,38 +25,52 @@ const buildQueryString = (params: Record<string, string | undefined>): string =>
   return queryString ? `?${queryString}` : '';
 };
 
-export const getQueueStatus = (scope: QueueQueryScope = {}): Promise<QueueAndProcessorStatusDTO> =>
+export const getQueueStatus = (
+  scope: QueueQueryScope = {},
+  signal?: AbortSignal
+): Promise<QueueAndProcessorStatusDTO> =>
   apiFetchJson<QueueAndProcessorStatusDTO>(
-    buildQueueUrl(`status${buildQueryString({ origin_prefix: scope.originPrefix })}`)
+    buildQueueUrl(`status${buildQueryString({ origin_prefix: scope.originPrefix })}`),
+    { signal }
   );
 
-export const getCurrentQueueItem = (scope: QueueQueryScope = {}): Promise<QueueServerItemDTO | null> =>
+export const getCurrentQueueItem = (
+  scope: QueueQueryScope = {},
+  signal?: AbortSignal
+): Promise<QueueServerItemDTO | null> =>
   apiFetchJson<QueueServerItemDTO | null>(
-    buildQueueUrl(`current${buildQueryString({ origin_prefix: scope.originPrefix })}`)
+    buildQueueUrl(`current${buildQueryString({ origin_prefix: scope.originPrefix })}`),
+    { signal }
   );
 
-export const getNextQueueItem = (scope: QueueQueryScope = {}): Promise<QueueServerItemDTO | null> =>
+export const getNextQueueItem = (
+  scope: QueueQueryScope = {},
+  signal?: AbortSignal
+): Promise<QueueServerItemDTO | null> =>
   apiFetchJson<QueueServerItemDTO | null>(
-    buildQueueUrl(`next${buildQueryString({ origin_prefix: scope.originPrefix })}`)
+    buildQueueUrl(`next${buildQueryString({ origin_prefix: scope.originPrefix })}`),
+    { signal }
   );
 
-export const getQueueItem = (itemId: number): Promise<QueueServerItemDTO> =>
-  apiFetchJson<QueueServerItemDTO>(buildQueueUrl(`i/${itemId}`));
+export const getQueueItem = (itemId: number, signal?: AbortSignal): Promise<QueueServerItemDTO> =>
+  apiFetchJson<QueueServerItemDTO>(buildQueueUrl(`i/${itemId}`), { signal });
 
-export const listAllQueueItems = (): Promise<QueueServerItemDTO[]> =>
-  apiFetchJson<QueueServerItemDTO[]>(buildQueueUrl('list_all'));
+export const listAllQueueItems = (signal?: AbortSignal): Promise<QueueServerItemDTO[]> =>
+  apiFetchJson<QueueServerItemDTO[]>(buildQueueUrl('list_all'), { signal });
 
 export const getQueueItemIds = (
   orderDir: 'asc' | 'desc' = 'desc',
-  scope: QueueQueryScope = {}
+  scope: QueueQueryScope = {},
+  signal?: AbortSignal
 ): Promise<QueueItemIdsResultDTO> =>
   apiFetchJson<QueueItemIdsResultDTO>(
     buildQueueUrl(
       `item_ids${buildQueryString({ order_dir: orderDir.toUpperCase(), origin_prefix: scope.originPrefix })}`
-    )
+    ),
+    { signal }
   );
 
-export const getQueueItemsByIds = (itemIds: number[]): Promise<QueueServerItemDTO[]> => {
+export const getQueueItemsByIds = (itemIds: number[], signal?: AbortSignal): Promise<QueueServerItemDTO[]> => {
   if (itemIds.length === 0) {
     return Promise.resolve([]);
   }
@@ -63,53 +78,71 @@ export const getQueueItemsByIds = (itemIds: number[]): Promise<QueueServerItemDT
   return apiFetchJson<QueueServerItemDTO[]>(buildQueueUrl('items_by_ids'), {
     body: JSON.stringify({ item_ids: itemIds }),
     method: 'POST',
+    signal,
   });
 };
 
-export const clearQueue = (): Promise<unknown> => apiFetchJson(buildQueueUrl('clear'), { method: 'PUT' });
+export const clearQueue = (signal?: AbortSignal): Promise<unknown> =>
+  apiFetchJson(buildQueueUrl('clear'), { method: 'PUT', signal });
 
-export const pruneQueue = (): Promise<unknown> => apiFetchJson(buildQueueUrl('prune'), { method: 'PUT' });
+export const pruneQueue = (signal?: AbortSignal): Promise<unknown> =>
+  apiFetchJson(buildQueueUrl('prune'), { method: 'PUT', signal });
 
-export const deleteQueueItem = (itemId: number): Promise<unknown> =>
-  apiFetchJson(buildQueueUrl(`i/${itemId}`), { method: 'DELETE' });
+export const deleteQueueItem = (itemId: number, signal?: AbortSignal): Promise<unknown> =>
+  apiFetchJson(buildQueueUrl(`i/${itemId}`), { method: 'DELETE', signal });
 
-export const deleteQueueItems = async (itemIds: number[]): Promise<void> => {
-  await Promise.all(itemIds.map(deleteQueueItem));
+export const deleteQueueItems = async (itemIds: number[], signal?: AbortSignal): Promise<void> => {
+  await Promise.all(itemIds.map((itemId) => deleteQueueItem(itemId, signal)));
 };
 
-export const cancelQueueItems = async (itemIds: number[]): Promise<void> => {
-  await Promise.all(itemIds.map(cancelQueueItem));
+export const cancelQueueItems = async (itemIds: number[], signal?: AbortSignal): Promise<void> => {
+  await Promise.all(itemIds.map((itemId) => cancelQueueItem(itemId, signal)));
 };
 
 export const clearFailedQueueItems = async (scope: QueueQueryScope = {}): Promise<void> => {
-  const idsResult = await getQueueItemIds('desc', scope);
-  const items = await getQueueItemsByIds(idsResult.item_ids);
+  const owner = captureAccountScope();
+  const idsResult = await getQueueItemIds('desc', scope, owner.signal);
+
+  assertAccountScopeCurrent(owner);
+  const items = await getQueueItemsByIds(idsResult.item_ids, owner.signal);
+
+  assertAccountScopeCurrent(owner);
   const failedItemIds = items.filter((item) => item.status === 'failed').map((item) => item.item_id);
 
-  await deleteQueueItems(failedItemIds);
+  await deleteQueueItems(failedItemIds, owner.signal);
+  assertAccountScopeCurrent(owner);
 };
 
 export const clearScopedQueue = async (scope: QueueQueryScope = {}): Promise<void> => {
+  const owner = captureAccountScope();
+
   if (!scope.originPrefix) {
-    await clearQueue();
+    await clearQueue(owner.signal);
+    assertAccountScopeCurrent(owner);
     return;
   }
 
-  const idsResult = await getQueueItemIds('desc', scope);
-  await deleteQueueItems(idsResult.item_ids);
+  const idsResult = await getQueueItemIds('desc', scope, owner.signal);
+
+  assertAccountScopeCurrent(owner);
+  await deleteQueueItems(idsResult.item_ids, owner.signal);
+  assertAccountScopeCurrent(owner);
 };
 
-export const cancelAllExceptCurrent = (): Promise<unknown> =>
-  apiFetchJson(buildQueueUrl('cancel_all_except_current'), { method: 'PUT' });
+export const cancelAllExceptCurrent = (signal?: AbortSignal): Promise<unknown> =>
+  apiFetchJson(buildQueueUrl('cancel_all_except_current'), { method: 'PUT', signal });
 
-export const cancelQueueItem = (itemId: number): Promise<unknown> =>
-  apiFetchJson(buildQueueUrl(`i/${itemId}/cancel`), { method: 'PUT' });
+export const cancelQueueItem = (itemId: number, signal?: AbortSignal): Promise<unknown> =>
+  apiFetchJson(buildQueueUrl(`i/${itemId}/cancel`), { method: 'PUT', signal });
 
 export const cancelCurrentQueueItem = async (): Promise<void> => {
-  const current = await getCurrentQueueItem();
+  const owner = captureAccountScope();
+  const current = await getCurrentQueueItem({}, owner.signal);
 
+  assertAccountScopeCurrent(owner);
   if (current) {
-    await cancelQueueItem(current.item_id);
+    await cancelQueueItem(current.item_id, owner.signal);
+    assertAccountScopeCurrent(owner);
   }
 };
 
@@ -117,8 +150,13 @@ export const cancelScopedQueueItems = async (
   scope: QueueQueryScope = {},
   currentItemId?: number | null
 ): Promise<void> => {
-  const idsResult = await getQueueItemIds('desc', scope);
-  const items = await getQueueItemsByIds(idsResult.item_ids);
+  const owner = captureAccountScope();
+  const idsResult = await getQueueItemIds('desc', scope, owner.signal);
+
+  assertAccountScopeCurrent(owner);
+  const items = await getQueueItemsByIds(idsResult.item_ids, owner.signal);
+
+  assertAccountScopeCurrent(owner);
   const cancellableItemIds = items
     .filter(
       (item) =>
@@ -128,7 +166,8 @@ export const cancelScopedQueueItems = async (
     )
     .map((item) => item.item_id);
 
-  await cancelQueueItems(cancellableItemIds);
+  await cancelQueueItems(cancellableItemIds, owner.signal);
+  assertAccountScopeCurrent(owner);
 };
 
 export const cancelByBatchIds = (batchIds: string[]): Promise<unknown> =>

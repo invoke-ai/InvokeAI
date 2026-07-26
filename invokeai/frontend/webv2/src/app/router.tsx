@@ -1,18 +1,31 @@
-import { ensureAuthSession, getCapabilities, LoginScreen, SetupScreen, type Capabilities } from '@features/identity';
+import {
+  AuthSessionUnavailableError,
+  AuthUnavailableScreen,
+  ensureReadyAuthSession,
+  getCapabilities,
+  LoginScreen,
+  SetupScreen,
+  useAuthSession,
+  type Capabilities,
+} from '@features/identity';
 import {
   createHashHistory,
   createRootRoute,
   createRoute,
   createRouter,
+  ErrorComponent,
+  type ErrorComponentProps,
   lazyRouteComponent,
   Navigate,
   Outlet,
   redirect,
+  useRouter,
 } from '@tanstack/react-router';
 import { WorkbenchSplashScreen } from '@workbench/components/WorkbenchSplashScreen';
 import { Launchpad } from '@workbench/launchpad/Launchpad';
 import { peekOpenProjectIds, type WorkbenchSearch } from '@workbench/projects/session';
 import { loadWorkbenchSettings } from '@workbench/settings/store';
+import { Fragment } from 'react';
 
 import { SocketHubRuntime } from './SocketHubRuntime';
 
@@ -34,23 +47,48 @@ import { SocketHubRuntime } from './SocketHubRuntime';
  * (`./`), so the app cannot rely on server-side fallback for deep paths.
  */
 
-const rootRoute = createRootRoute({ component: Outlet });
+const RouterError = ({ error }: ErrorComponentProps) => {
+  'use no memo';
+  // Cold-path boundary: Compiler's memo cache costs more than this render.
+  // The browser retry test and production build budget guard its behavior.
+  const router = useRouter();
+
+  return error instanceof AuthSessionUnavailableError ? (
+    <AuthUnavailableScreen onRetry={router.invalidate} />
+  ) : (
+    <ErrorComponent error={error} />
+  );
+};
+
+const rootRoute = createRootRoute({ component: Outlet, errorComponent: RouterError });
 
 /**
  * Wraps every authenticated route with the shared backend socket transport.
  * Feature runtimes attach their own listeners only where needed, keeping the
  * light Launchpad bundle free of editor/model-manager code.
  */
-const AuthenticatedLayout = () => (
-  <>
-    <SocketHubRuntime />
-    <Outlet />
-  </>
-);
+const AuthenticatedLayout = () => {
+  const session = useAuthSession();
+
+  if (session.phase !== 'ready') {
+    return null;
+  }
+
+  if (session.multiuserEnabled && session.user === null) {
+    return <Navigate replace to="/login" />;
+  }
+
+  return (
+    <Fragment key={session.accountEpoch}>
+      <SocketHubRuntime />
+      <Outlet />
+    </Fragment>
+  );
+};
 
 const authenticatedRoute = createRoute({
   beforeLoad: async () => {
-    const session = await ensureAuthSession();
+    const session = await ensureReadyAuthSession();
 
     if (session.multiuserEnabled) {
       if (session.setupRequired) {
@@ -70,7 +108,7 @@ const authenticatedRoute = createRoute({
 });
 
 const requireLaunchpadCapability = async (capability: keyof Capabilities): Promise<void> => {
-  const session = await ensureAuthSession();
+  const session = await ensureReadyAuthSession();
 
   if (!getCapabilities(session)[capability]) {
     throw redirect({ to: '/projects' });
@@ -147,7 +185,7 @@ const workbenchRoute = createRoute({
 
 const loginRoute = createRoute({
   beforeLoad: async () => {
-    const session = await ensureAuthSession();
+    const session = await ensureReadyAuthSession();
 
     if (session.multiuserEnabled && session.setupRequired) {
       throw redirect({ to: '/setup' });
@@ -164,7 +202,7 @@ const loginRoute = createRoute({
 
 const setupRoute = createRoute({
   beforeLoad: async () => {
-    const session = await ensureAuthSession();
+    const session = await ensureReadyAuthSession();
 
     if (!session.multiuserEnabled || !session.setupRequired) {
       throw redirect({ to: '/' });

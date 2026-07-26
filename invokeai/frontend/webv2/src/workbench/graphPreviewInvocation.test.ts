@@ -6,6 +6,7 @@ import type {
 } from '@features/generation/contracts';
 
 import { getDefaultGenerateSettings } from '@features/generation/settings';
+import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { createInitialWorkbenchState, workbenchReducer } from '@workbench/workbenchState.testing';
 import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { describe, expect, it, vi } from 'vitest';
@@ -69,6 +70,7 @@ describe('resolveAndSubmitGraphPreviewInvocation', () => {
     const submitted = resolveAndSubmitGraphPreviewInvocation({
       commands,
       models: undefined,
+      owner: captureAccountScope(),
       prepareCanvasInvocation,
       project,
       sourceId: 'canvas',
@@ -89,6 +91,7 @@ describe('resolveAndSubmitGraphPreviewInvocation', () => {
     const submitted = resolveAndSubmitGraphPreviewInvocation({
       commands,
       models: undefined,
+      owner: captureAccountScope(),
       prepareCanvasInvocation,
       project,
       sourceId: 'generate',
@@ -111,6 +114,7 @@ describe('resolveAndSubmitGraphPreviewInvocation', () => {
     const submitted = resolveAndSubmitGraphPreviewInvocation({
       commands,
       models: undefined,
+      owner: captureAccountScope(),
       prepareCanvasInvocation,
       project,
       sourceId: undefined,
@@ -130,6 +134,7 @@ describe('resolveAndSubmitGraphPreviewInvocation', () => {
     const submitted = resolveAndSubmitGraphPreviewInvocation({
       commands,
       models: undefined,
+      owner: captureAccountScope(),
       prepareCanvasInvocation,
       project,
       sourceId: 'generate',

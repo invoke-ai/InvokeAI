@@ -1,6 +1,5 @@
 import type { WorkbenchSearch } from '@workbench/projects/session';
 
-import { SessionExpiryGuard } from '@features/identity';
 import { useSearch } from '@tanstack/react-router';
 import { WorkbenchHotkeyRuntime } from '@workbench/hotkeys/WorkbenchHotkeyRuntime';
 import { WorkbenchCommandPalette } from '@workbench/palette/WorkbenchCommandPalette';
@@ -37,7 +36,6 @@ export const WorkbenchApp = () => {
     <WorkbenchProvider loadOptions={loadOptions}>
       <WorkbenchWidgetRegistryProvider getWidgetById={getWidgetById} getWidgetsForRegion={getWidgetsForRegion}>
         <WorkbenchUiPorts>
-          <SessionExpiryGuard />
           <WorkbenchHotkeyRuntime />
           <WorkbenchCommandPalette />
           <QueueRuntimeAdapter />

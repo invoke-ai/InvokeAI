@@ -5,6 +5,12 @@ import { createListCollection, HStack, Input, Switch, Text } from '@chakra-ui/re
 import { galleryDestinations, type GalleryBoard, type GeneratedImageContract } from '@features/gallery';
 import { SCHEDULER_OPTIONS } from '@features/generation/settings';
 import { useWorkflowProjectSelector } from '@features/workflow/ui/WorkflowUiContext';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  registerAccountOwnedResource,
+  type AccountScope,
+} from '@platform/state/accountLifecycle';
 import { Button, Combobox, ResizableTextarea, Select } from '@platform/ui';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ChangeEvent } from 'react';
 
@@ -273,20 +279,37 @@ const SchedulerInput = ({ id, invalid, onChange, template, value }: WorkflowFiel
   />
 );
 
-let boardOptionsRequest: Promise<GalleryBoard[]> | null = null;
+let boardOptionsRequest: { owner: AccountScope; promise: Promise<GalleryBoard[]> } | null = null;
+
+registerAccountOwnedResource({
+  clear: () => {
+    boardOptionsRequest = null;
+  },
+  name: 'workflow-board-options',
+});
 
 const getBoardOptions = (): Promise<GalleryBoard[]> => {
-  if (!boardOptionsRequest) {
-    boardOptionsRequest = galleryDestinations
-      .list()
-      .then((loadedBoards) => loadedBoards.filter((board) => board.kind === 'board'))
+  const owner = captureAccountScope();
+
+  if (boardOptionsRequest?.owner !== owner) {
+    const promise = galleryDestinations
+      .list({ signal: owner.signal })
+      .then((loadedBoards) => {
+        assertAccountScopeCurrent(owner);
+
+        return loadedBoards.filter((board) => board.kind === 'board');
+      })
       .catch((error: unknown) => {
-        boardOptionsRequest = null;
+        if (boardOptionsRequest?.promise === promise) {
+          boardOptionsRequest = null;
+        }
         throw error;
       });
+
+    boardOptionsRequest = { owner, promise };
   }
 
-  return boardOptionsRequest;
+  return boardOptionsRequest.promise;
 };
 
 const BoardInput = ({ id, invalid, onChange, template, value }: WorkflowFieldInputProps) => {

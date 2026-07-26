@@ -29,10 +29,9 @@ export const AccountMenu = () => {
     void navigate({ to: '/users' });
   }, [navigate]);
 
-  const signOut = useCallback(async () => {
-    await logoutSession();
-    await navigate({ to: '/login' });
-  }, [navigate]);
+  const signOut = useCallback(() => {
+    void logoutSession();
+  }, []);
 
   const openProfile = useCallback(() => setIsProfileOpen(true), []);
   const closeProfile = useCallback(() => setIsProfileOpen(false), []);

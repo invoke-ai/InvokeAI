@@ -1,3 +1,4 @@
+import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createQueueRealtimeRuntime } from './realtimeRuntime';
@@ -55,8 +56,10 @@ describe('queue realtime runtime', () => {
     vi.advanceTimersByTime(50);
 
     expect(invalidate).toHaveBeenCalledTimes(1);
+    progress.clearAll.mockClear();
     runtime.dispose();
     expect(detachers.every((detach) => detach.mock.calls.length === 1)).toBe(true);
+    expect(progress.clearAll).toHaveBeenCalledOnce();
   });
 
   it('updates transient progress without invalidating the queue list', () => {
@@ -91,6 +94,25 @@ describe('queue realtime runtime', () => {
 
     expect(progress.clear).not.toHaveBeenCalledWith(42);
     expect(progress.clear).toHaveBeenCalledWith(43);
+    runtime.dispose();
+  });
+
+  it('ignores timers and socket callbacks after its account scope expires', () => {
+    const runtime = createQueueRealtimeRuntime({ backend, invalidate, progress, refreshModelCache });
+
+    runtime.start();
+    progress.set.mockClear();
+    accountLifecycle.invalidate();
+
+    handlers.get('invocation_progress')?.({
+      item_id: 42,
+      message: 'Old account',
+      percentage: 0.5,
+    } as never);
+    vi.advanceTimersByTime(50);
+
+    expect(progress.set).not.toHaveBeenCalled();
+    expect(invalidate).not.toHaveBeenCalled();
     runtime.dispose();
   });
 });

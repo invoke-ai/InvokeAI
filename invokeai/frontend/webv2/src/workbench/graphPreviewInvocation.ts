@@ -1,4 +1,7 @@
 import type { ModelConfig } from '@features/models';
+import type { AccountScope } from '@platform/state/accountLifecycle';
+
+import { isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 
 import type { InvocationSourceId } from './invocationContracts';
 import type { Project } from './projectContracts';
@@ -11,6 +14,7 @@ import { submitResolvedInvocation } from './invocationSubmit';
 export interface GraphPreviewInvokeDeps {
   commands: Pick<WorkbenchCommands, 'generation' | 'notifications'>;
   models: readonly ModelConfig[] | undefined;
+  owner: AccountScope;
   prepareCanvasInvocation: typeof prepareCanvasInvocation;
   project: Project;
   sourceId: InvocationSourceId | undefined;
@@ -20,11 +24,12 @@ export interface GraphPreviewInvokeDeps {
 export const resolveAndSubmitGraphPreviewInvocation = ({
   commands,
   models,
+  owner,
   prepareCanvasInvocation: prepareCanvas,
   project,
   sourceId,
 }: GraphPreviewInvokeDeps): boolean => {
-  if (!sourceId) {
+  if (!sourceId || !isAccountScopeCurrent(owner)) {
     return false;
   }
 
@@ -39,6 +44,6 @@ export const resolveAndSubmitGraphPreviewInvocation = ({
     return false;
   }
 
-  submitResolvedInvocation({ commands, models, prepareCanvasInvocation: prepareCanvas, project, route });
+  submitResolvedInvocation({ commands, models, owner, prepareCanvasInvocation: prepareCanvas, project, route });
   return true;
 };

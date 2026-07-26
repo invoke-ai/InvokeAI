@@ -20,6 +20,15 @@ vi.mock('./api', () => api);
 let projectFile: typeof projectFileModule;
 let persistence: typeof persistenceModule;
 
+const deferred = <T>() => {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+
+  return { promise, resolve };
+};
+
 beforeEach(async () => {
   vi.resetModules();
   api.createProject.mockReset();
@@ -88,5 +97,24 @@ describe('importProjectFile', () => {
   it('rejects non-project files before touching the server', async () => {
     await expect(projectFile.importProjectFile(fileFor({ some: 'json' }))).rejects.toThrow('not an Invoke project');
     expect(api.createProject).not.toHaveBeenCalled();
+  });
+
+  it('does not upload an account A file after local parsing completes under account B', async () => {
+    const account = await import('@platform/state/accountLifecycle');
+    const project = { ...createDraftProject([]), name: 'Account A project' };
+    const document = persistence.serializeProjectDocument(project);
+    const contents = deferred<string>();
+    const file = fileFor('');
+
+    vi.spyOn(file, 'text').mockReturnValue(contents.promise);
+    account.accountLifecycle.activate('project-import-a');
+    const imported = projectFile.importProjectFile(file);
+
+    account.accountLifecycle.activate('project-import-b');
+    contents.resolve(JSON.stringify(projectFile.buildProjectFile(document)));
+
+    await expect(imported).rejects.toThrow('no longer active');
+    expect(api.createProject).not.toHaveBeenCalled();
+    account.accountLifecycle.invalidate();
   });
 });

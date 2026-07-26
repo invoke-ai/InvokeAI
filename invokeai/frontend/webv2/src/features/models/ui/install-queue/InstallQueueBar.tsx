@@ -15,9 +15,15 @@ import {
 } from '@features/models/data/installsStore';
 import { setQueueExpanded, useModelsUiSelector } from '@features/models/ui/uiStore';
 import { useNotify } from '@features/models/ui/useModelsNotify';
+import { useMountEffect } from '@platform/react/useMountEffect';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
 import { Button, IconButton, Tooltip } from '@platform/ui';
 import { ChevronUpIcon, ListOrderedIcon, PauseIcon, PlayIcon, RefreshCcwIcon, Trash2Icon, XIcon } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { InstallQueueList } from './InstallQueueList';
@@ -35,9 +41,9 @@ export const InstallQueueBar = () => {
   const status = useInstallsSelector((snapshot) => snapshot.status);
   const queueExpanded = useModelsUiSelector((snapshot) => snapshot.queueExpanded);
 
-  useEffect(() => {
+  useMountEffect(() => {
     ensureInstallsLoaded();
-  }, []);
+  });
 
   const activeJobs = useMemo(() => jobs.filter((job) => isActiveInstallStatus(job.status)), [jobs]);
   const pausedJobs = useMemo(() => jobs.filter((job) => job.status === 'paused'), [jobs]);
@@ -54,42 +60,65 @@ export const InstallQueueBar = () => {
     async (action: 'pause' | 'resume' | 'cancel', targets: ModelInstallJob[]) => {
       const call =
         action === 'pause' ? pauseModelInstall : action === 'resume' ? resumeModelInstall : cancelModelInstall;
+      const owner = captureAccountScope();
 
       setBusyAction(action);
 
       try {
-        await Promise.all(targets.map((job) => call(job.id)));
-        await refreshInstalls();
+        await Promise.all(targets.map((job) => call(job.id, owner.signal)));
+        assertAccountScopeCurrent(owner);
+        await refreshInstalls(owner);
+        assertAccountScopeCurrent(owner);
       } catch (bulkError) {
+        if (!isAccountScopeCurrent(owner)) {
+          return;
+        }
+
         notify.error(t('models.queueActionFailed'), bulkError instanceof Error ? bulkError.message : String(bulkError));
-        void refreshInstalls();
+        void refreshInstalls(owner);
       } finally {
-        setBusyAction(null);
+        if (isAccountScopeCurrent(owner)) {
+          setBusyAction(null);
+        }
       }
     },
     [notify, t]
   );
 
   const handlePrune = useCallback(async () => {
+    const owner = captureAccountScope();
+
     setBusyAction('prune');
 
     try {
-      await pruneCompletedModelInstalls();
-      await refreshInstalls();
+      await pruneCompletedModelInstalls(owner.signal);
+      assertAccountScopeCurrent(owner);
+      await refreshInstalls(owner);
+      assertAccountScopeCurrent(owner);
     } catch (pruneError) {
+      if (!isAccountScopeCurrent(owner)) {
+        return;
+      }
+
       notify.error(t('models.pruneFailed'), pruneError instanceof Error ? pruneError.message : String(pruneError));
     } finally {
-      setBusyAction(null);
+      if (isAccountScopeCurrent(owner)) {
+        setBusyAction(null);
+      }
     }
   }, [notify, t]);
 
   const handleRefresh = useCallback(async () => {
+    const owner = captureAccountScope();
+
     setBusyAction('refresh');
 
     try {
-      await refreshInstalls();
+      await refreshInstalls(owner);
     } finally {
-      setBusyAction(null);
+      if (isAccountScopeCurrent(owner)) {
+        setBusyAction(null);
+      }
     }
   }, []);
   const handleOpenChange = useCallback((event: { open: boolean }) => setQueueExpanded(event.open), []);

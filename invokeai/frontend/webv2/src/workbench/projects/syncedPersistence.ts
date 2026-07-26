@@ -1,9 +1,13 @@
 import type { HydratedWorkbenchSnapshot } from '@workbench/persistenceContracts';
 import type { Project, WorkbenchState } from '@workbench/projectContracts';
 
-import { getUserStorageScope } from '@features/identity';
+import { assertAccountScopeCurrent, captureAccountScope, type AccountScope } from '@platform/state/accountLifecycle';
 import { timeWorkbenchPerf } from '@workbench/performanceMarks';
-import { localStorageWorkbenchPersistence, stripTransientWorkbenchState } from '@workbench/persistence';
+import {
+  createLocalStorageWorkbenchPersistence,
+  stripTransientWorkbenchState,
+  type WorkbenchPersistenceService,
+} from '@workbench/persistence';
 import { createDraftProject, createInitialWorkbenchState, normalizeWorkbenchProject } from '@workbench/workbenchState';
 
 import {
@@ -78,19 +82,28 @@ interface SyncedPersistenceState {
   /** Ids deleted in this runtime lifetime, guarding against racing saves. */
   deletedProjectIds: Set<string>;
   hasPending: boolean;
+  localPersistence: WorkbenchPersistenceService;
   lastPushedAccount: string | null;
+  /** Immutable owner captured when this synchronization lifetime was constructed. */
+  owner: AccountScope;
   projectDocumentJsonCache: WeakMap<Project, { document: Record<string, unknown>; json: string }>;
   /** Server-known projects, keyed by project id. */
   syncEntries: Map<string, SyncEntry>;
 }
 
-const createSyncedPersistenceState = (): SyncedPersistenceState => ({
+const createSyncedPersistenceState = (owner: AccountScope): SyncedPersistenceState => ({
   deletedProjectIds: new Set(),
   hasPending: false,
+  localPersistence: createLocalStorageWorkbenchPersistence(owner.storageSuffix),
   lastPushedAccount: null,
+  owner,
   projectDocumentJsonCache: new WeakMap(),
   syncEntries: new Map(),
 });
+
+const assertOwner = (syncState: SyncedPersistenceState): void => {
+  assertAccountScopeCurrent(syncState.owner);
+};
 
 /**
  * Undo/redo stacks are session-only (each entry is a full project snapshot,
@@ -193,7 +206,8 @@ export const deserializeProjectDocument = (data: Record<string, unknown>): Proje
   } as unknown as Project);
 };
 
-const getSyncMapStorageKey = (): string => `${SYNC_MAP_BASE_KEY}${getUserStorageScope()}`;
+const getSyncMapStorageKey = (syncState: SyncedPersistenceState): string =>
+  `${SYNC_MAP_BASE_KEY}${syncState.owner.storageSuffix}`;
 
 /**
  * The revision map survives reloads so that, while offline, we can still tell
@@ -202,6 +216,8 @@ const getSyncMapStorageKey = (): string => `${SYNC_MAP_BASE_KEY}${getUserStorage
  * (push it)".
  */
 const persistSyncMap = (syncState: SyncedPersistenceState): void => {
+  assertOwner(syncState);
+
   try {
     const revisions: Record<string, number> = {};
 
@@ -209,15 +225,17 @@ const persistSyncMap = (syncState: SyncedPersistenceState): void => {
       revisions[projectId] = entry.revision;
     }
 
-    window.localStorage.setItem(getSyncMapStorageKey(), JSON.stringify({ revisions }));
+    window.localStorage.setItem(getSyncMapStorageKey(syncState), JSON.stringify({ revisions }));
   } catch {
     // Cache only; sync still works for this session.
   }
 };
 
-const loadPersistedRevisions = (): Record<string, number> => {
+const loadPersistedRevisions = (syncState: SyncedPersistenceState): Record<string, number> => {
+  assertOwner(syncState);
+
   try {
-    const raw = window.localStorage.getItem(getSyncMapStorageKey());
+    const raw = window.localStorage.getItem(getSyncMapStorageKey(syncState));
     const parsed = raw ? (JSON.parse(raw) as { revisions?: Record<string, number> }) : null;
 
     return parsed?.revisions ?? {};
@@ -234,21 +252,29 @@ const createSnapshot = (state: WorkbenchState): HydratedWorkbenchSnapshot => ({
 
 /** Import a never-synced project to the server; returns false when it could not reach it. */
 const pushNewProject = async (syncState: SyncedPersistenceState, project: Project): Promise<boolean> => {
+  assertOwner(syncState);
   const document = serializeProjectDocument(project);
 
   try {
-    const created = await apiCreateProject({ data: document, name: project.name, project_id: project.id });
+    const created = await apiCreateProject(
+      { data: document, name: project.name, project_id: project.id },
+      syncState.owner.signal
+    );
 
+    assertOwner(syncState);
     syncState.syncEntries.set(project.id, { pushedDoc: JSON.stringify(document), revision: created.revision });
 
     return true;
   } catch (error) {
+    assertOwner(syncState);
+
     if (isProjectConflictError(error)) {
       // The id already exists server-side (e.g. a previous import raced a
       // reload). Adopt the server revision; the regular save path will PUT.
       try {
-        const existing = await apiGetProject(project.id);
+        const existing = await apiGetProject(project.id, syncState.owner.signal);
 
+        assertOwner(syncState);
         syncState.syncEntries.set(project.id, {
           pushedDoc: JSON.stringify(existing.data),
           revision: existing.revision,
@@ -256,6 +282,8 @@ const pushNewProject = async (syncState: SyncedPersistenceState, project: Projec
 
         return true;
       } catch {
+        assertOwner(syncState);
+
         return false;
       }
     }
@@ -317,8 +345,12 @@ const recoverConflictingProject = async (
   documentJson: string,
   basePushedDoc: string | null
 ): Promise<ConflictOutcome> => {
+  assertOwner(syncState);
+
   try {
-    const server = await apiGetProject(project.id);
+    const server = await apiGetProject(project.id, syncState.owner.signal);
+
+    assertOwner(syncState);
     const serverDocJson = JSON.stringify(server.data);
 
     syncState.syncEntries.set(project.id, { pushedDoc: serverDocJson, revision: server.revision });
@@ -344,8 +376,12 @@ const recoverConflictingProject = async (
       return { kind: 'failed' };
     }
 
-    const created = await apiCreateProject({ data: recoveredDocument, name: recoveredName, project_id: recoveredId });
+    const created = await apiCreateProject(
+      { data: recoveredDocument, name: recoveredName, project_id: recoveredId },
+      syncState.owner.signal
+    );
 
+    assertOwner(syncState);
     syncState.syncEntries.set(recoveredId, {
       pushedDoc: JSON.stringify(recoveredDocument),
       revision: created.revision,
@@ -353,6 +389,8 @@ const recoverConflictingProject = async (
 
     return { kind: 'forked', resolution: { projectId: project.id, recoveredProject, serverProject } };
   } catch {
+    assertOwner(syncState);
+
     return { kind: 'failed' };
   }
 };
@@ -362,6 +400,7 @@ const pushProject = async (
   project: Project,
   conflicts: ProjectConflictResolution[]
 ): Promise<string> => {
+  assertOwner(syncState);
   const { document, json: documentJson } = getSerializedProjectDocument(syncState, project);
   const entry = syncState.syncEntries.get(project.id);
 
@@ -371,35 +410,51 @@ const pushProject = async (
 
   if (!entry) {
     if (!(await pushNewProject(syncState, project))) {
+      assertOwner(syncState);
       syncState.hasPending = true;
     }
 
+    assertOwner(syncState);
     return documentJson;
   }
 
   try {
-    const updated = await apiUpdateProject(project.id, {
-      data: document,
-      expected_revision: entry.revision,
-      name: project.name,
-    });
+    const updated = await apiUpdateProject(
+      project.id,
+      {
+        data: document,
+        expected_revision: entry.revision,
+        name: project.name,
+      },
+      syncState.owner.signal
+    );
 
+    assertOwner(syncState);
     syncState.syncEntries.set(project.id, { pushedDoc: documentJson, revision: updated.revision });
   } catch (error) {
+    assertOwner(syncState);
+
     if (isProjectConflictError(error)) {
       const outcome = await recoverConflictingProject(syncState, project, document, documentJson, entry.pushedDoc);
 
+      assertOwner(syncState);
       if (outcome.kind === 'retry') {
         try {
           const baseRevision = syncState.syncEntries.get(project.id)?.revision ?? entry.revision;
-          const retried = await apiUpdateProject(project.id, {
-            data: document,
-            expected_revision: baseRevision,
-            name: project.name,
-          });
+          const retried = await apiUpdateProject(
+            project.id,
+            {
+              data: document,
+              expected_revision: baseRevision,
+              name: project.name,
+            },
+            syncState.owner.signal
+          );
 
+          assertOwner(syncState);
           syncState.syncEntries.set(project.id, { pushedDoc: documentJson, revision: retried.revision });
         } catch {
+          assertOwner(syncState);
           // A genuinely concurrent writer; the next save re-evaluates.
           syncState.hasPending = true;
         }
@@ -414,6 +469,7 @@ const pushProject = async (
       syncState.syncEntries.delete(project.id);
 
       if (!(await pushNewProject(syncState, project))) {
+        assertOwner(syncState);
         syncState.hasPending = true;
       }
     } else {
@@ -421,10 +477,12 @@ const pushProject = async (
     }
   }
 
+  assertOwner(syncState);
   return documentJson;
 };
 
 const pushSessionState = async (syncState: SyncedPersistenceState, state: WorkbenchState): Promise<void> => {
+  assertOwner(syncState);
   const blob = serializeSessionBlob(state);
 
   if (blob === syncState.lastPushedAccount) {
@@ -432,9 +490,12 @@ const pushSessionState = async (syncState: SyncedPersistenceState, state: Workbe
   }
 
   try {
-    await setClientStateValue(SESSION_STATE_KEY, blob);
+    await setClientStateValue(SESSION_STATE_KEY, blob, syncState.owner.signal);
+
+    assertOwner(syncState);
     syncState.lastPushedAccount = blob;
   } catch {
+    assertOwner(syncState);
     syncState.hasPending = true;
   }
 };
@@ -444,25 +505,34 @@ const loadFromBackend = async (
   local: HydratedWorkbenchSnapshot | null,
   options?: WorkbenchLoadOptions
 ): Promise<HydratedWorkbenchSnapshot> => {
-  const [summaries, sessionBlob] = await Promise.all([listProjects(), fetchSessionBlob()]);
-  const persistedRevisions = loadPersistedRevisions();
+  assertOwner(syncState);
+  const [summaries, sessionBlob] = await Promise.all([
+    listProjects(syncState.owner.signal),
+    fetchSessionBlob(syncState.owner.signal),
+  ]);
 
-  seedProjectLibrary(summaries);
+  assertOwner(syncState);
+  const persistedRevisions = loadPersistedRevisions(syncState);
+
+  seedProjectLibrary(summaries, syncState.owner);
 
   // First contact: a backend with no projects adopts the browser's existing
   // workbench (one-time import of the pre-backend localStorage data).
   if (summaries.length === 0 && local && local.state.projects.length > 0) {
     for (const project of local.state.projects) {
       if (!(await pushNewProject(syncState, project))) {
+        assertOwner(syncState);
         syncState.hasPending = true;
       }
 
+      assertOwner(syncState);
       const entry = syncState.syncEntries.get(project.id);
 
-      upsertProjectSummary({ id: project.id, name: project.name, revision: entry?.revision ?? null });
+      upsertProjectSummary({ id: project.id, name: project.name, revision: entry?.revision ?? null }, syncState.owner);
     }
 
     await pushSessionState(syncState, local.state);
+    assertOwner(syncState);
     persistSyncMap(syncState);
 
     return local;
@@ -485,7 +555,17 @@ const loadFromBackend = async (
   // Only the open set is hydrated into full documents; everything else stays
   // a summary in the library. A project deleted between list and get is
   // simply dropped from the session.
-  const records = await Promise.all(openIds.map((id) => apiGetProject(id).catch(() => null)));
+  const records = await Promise.all(
+    openIds.map((id) =>
+      apiGetProject(id, syncState.owner.signal).catch(() => {
+        assertOwner(syncState);
+
+        return null;
+      })
+    )
+  );
+
+  assertOwner(syncState);
   const serverProjects: Project[] = [];
 
   for (const record of records) {
@@ -572,7 +652,8 @@ const loadFromBackend = async (
   const snapshot = createSnapshot(state);
 
   // Refresh the offline cache with what the server gave us.
-  await localStorageWorkbenchPersistence.saveWorkbench(state);
+  await syncState.localPersistence.saveWorkbench(state);
+  assertOwner(syncState);
 
   return snapshot;
 };
@@ -597,39 +678,55 @@ export interface SyncedWorkbenchPersistence {
  * Independent of any mounted Workbench lifetime; callers are expected to
  * reload afterwards.
  */
-export const clearAllWorkbenchData = async (): Promise<void> => {
-  try {
-    const summaries = await listProjects();
+export const clearAllWorkbenchData = async (owner: AccountScope = captureAccountScope()): Promise<void> => {
+  const syncState = createSyncedPersistenceState(owner);
 
-    await Promise.all(summaries.map((summary) => apiDeleteProject(summary.project_id)));
-    await deleteClientStateValue(SESSION_STATE_KEY);
+  assertOwner(syncState);
+
+  try {
+    const summaries = await listProjects(syncState.owner.signal);
+
+    assertOwner(syncState);
+    await Promise.all(summaries.map((summary) => apiDeleteProject(summary.project_id, syncState.owner.signal)));
+    assertOwner(syncState);
+    await deleteClientStateValue(SESSION_STATE_KEY, syncState.owner.signal);
+    assertOwner(syncState);
   } catch {
+    assertOwner(syncState);
     // Backend unreachable; at least reset this browser.
   }
 
-  seedProjectLibrary([]);
+  seedProjectLibrary([], owner);
 
   try {
-    window.localStorage.removeItem(getSyncMapStorageKey());
+    window.localStorage.removeItem(getSyncMapStorageKey(syncState));
   } catch {
     // Nothing to clear if storage is unavailable.
   }
 
-  await localStorageWorkbenchPersistence.clearWorkbench();
+  await syncState.localPersistence.clearWorkbench();
+  assertOwner(syncState);
 };
 
 /** Construct one synchronization lifetime per mounted Workbench. */
-export const createSyncedWorkbenchPersistence = (): SyncedWorkbenchPersistence => {
-  const syncState = createSyncedPersistenceState();
+export const createSyncedWorkbenchPersistence = (
+  owner: AccountScope = captureAccountScope()
+): SyncedWorkbenchPersistence => {
+  const syncState = createSyncedPersistenceState(owner);
   let loadPromise: Promise<HydratedWorkbenchSnapshot | null> | null = null;
   // Every mutation below shares syncEntries and its optimistic revisions.
   // Serialize them so this browser cannot race itself and manufacture a 409.
   let mutationTail: Promise<void> = Promise.resolve();
 
   const enqueueMutation = <Result>(operation: () => Promise<Result>): Promise<Result> => {
+    const run = (): Promise<Result> => {
+      assertOwner(syncState);
+
+      return operation();
+    };
     const result = mutationTail.then(
-      () => operation(),
-      () => operation()
+      () => run(),
+      () => run()
     );
 
     mutationTail = result.then(
@@ -641,6 +738,7 @@ export const createSyncedWorkbenchPersistence = (): SyncedWorkbenchPersistence =
   };
 
   const adoptProjectRecord = (record: ProjectRecordDTO): Project | null => {
+    assertOwner(syncState);
     const project = deserializeProjectDocument(record.data);
 
     if (!project) {
@@ -661,8 +759,9 @@ export const createSyncedWorkbenchPersistence = (): SyncedWorkbenchPersistence =
     /** Clear everywhere: server projects + session blob, local cache, sync map, and this lifetime's sync state. */
     clearWorkbench(): Promise<void> {
       return enqueueMutation(async () => {
-        await clearAllWorkbenchData();
+        await clearAllWorkbenchData(syncState.owner);
 
+        assertOwner(syncState);
         syncState.syncEntries.clear();
         syncState.deletedProjectIds.clear();
         syncState.lastPushedAccount = null;
@@ -674,16 +773,25 @@ export const createSyncedWorkbenchPersistence = (): SyncedWorkbenchPersistence =
         const conflicts: ProjectConflictResolution[] = [];
 
         await pushProject(syncState, project, conflicts);
+        assertOwner(syncState);
         persistSyncMap(syncState);
       });
     },
     hasPendingChanges(): boolean {
+      assertOwner(syncState);
       return syncState.hasPending;
     },
     async hydrateProjectFromServer(projectId): Promise<Project | null> {
+      assertOwner(syncState);
+
       try {
-        return adoptProjectRecord(await apiGetProject(projectId));
+        const record = await apiGetProject(projectId, syncState.owner.signal);
+
+        assertOwner(syncState);
+        return adoptProjectRecord(record);
       } catch {
+        assertOwner(syncState);
+
         return null;
       }
     },
@@ -701,22 +809,26 @@ export const createSyncedWorkbenchPersistence = (): SyncedWorkbenchPersistence =
       }
 
       loadPromise = (async () => {
+        assertOwner(syncState);
         let local: HydratedWorkbenchSnapshot | null = null;
 
         try {
-          local = await localStorageWorkbenchPersistence.loadWorkbench();
+          local = await syncState.localPersistence.loadWorkbench();
+          assertOwner(syncState);
         } catch {
+          assertOwner(syncState);
           local = null;
         }
 
         try {
           return await loadFromBackend(syncState, local, options);
         } catch {
+          assertOwner(syncState);
           // Backend unreachable: run from the cache; saves queue up locally and
           // replay on reconnect.
           syncState.hasPending = true;
 
-          const persistedRevisions = loadPersistedRevisions();
+          const persistedRevisions = loadPersistedRevisions(syncState);
 
           for (const [projectId, revision] of Object.entries(persistedRevisions)) {
             syncState.syncEntries.set(projectId, { pushedDoc: null, revision });
@@ -749,6 +861,7 @@ export const createSyncedWorkbenchPersistence = (): SyncedWorkbenchPersistence =
      * and removal happens only through the library's explicit delete.
      */
     markProjectDeleted(projectId): void {
+      assertOwner(syncState);
       syncState.deletedProjectIds.add(projectId);
       syncState.syncEntries.delete(projectId);
       persistSyncMap(syncState);
@@ -757,19 +870,23 @@ export const createSyncedWorkbenchPersistence = (): SyncedWorkbenchPersistence =
       return enqueueMutation(async () => {
         const emptied: WorkbenchState = { ...state, activeProjectId: '', projects: [] };
 
-        await localStorageWorkbenchPersistence.saveWorkbench(emptied);
+        await syncState.localPersistence.saveWorkbench(emptied);
+        assertOwner(syncState);
 
         try {
           const blob = serializeSessionBlob(emptied);
 
-          await setClientStateValue(SESSION_STATE_KEY, blob);
+          await setClientStateValue(SESSION_STATE_KEY, blob, syncState.owner.signal);
+          assertOwner(syncState);
           syncState.lastPushedAccount = blob;
         } catch {
+          assertOwner(syncState);
           syncState.hasPending = true;
         }
       });
     },
     releaseProjectSync(projectId): void {
+      assertOwner(syncState);
       syncState.syncEntries.delete(projectId);
       persistSyncMap(syncState);
     },
@@ -777,18 +894,23 @@ export const createSyncedWorkbenchPersistence = (): SyncedWorkbenchPersistence =
       return enqueueMutation(async () => {
         const snapshot = createSnapshot(state);
 
-        await localStorageWorkbenchPersistence.saveWorkbench(state);
+        await syncState.localPersistence.saveWorkbench(state);
 
+        assertOwner(syncState);
         syncState.hasPending = false;
 
         const conflicts: ProjectConflictResolution[] = [];
         const projectSyncInfos: Record<string, ProjectSyncInfo> = {};
 
         await pushSessionState(syncState, state);
+        assertOwner(syncState);
 
         for (const project of state.projects) {
+          assertOwner(syncState);
           const lastAckedDoc = syncState.syncEntries.get(project.id)?.pushedDoc ?? null;
           const documentJson = await pushProject(syncState, project, conflicts);
+
+          assertOwner(syncState);
           const entry = syncState.syncEntries.get(project.id);
 
           projectSyncInfos[project.id] = {
@@ -799,7 +921,7 @@ export const createSyncedWorkbenchPersistence = (): SyncedWorkbenchPersistence =
           // The server acknowledged new content for this project — keep the
           // library summary current without a refetch.
           if (entry && entry.pushedDoc === documentJson && lastAckedDoc !== documentJson) {
-            upsertProjectSummary({ id: project.id, name: project.name, revision: entry.revision });
+            upsertProjectSummary({ id: project.id, name: project.name, revision: entry.revision }, syncState.owner);
           }
         }
 
@@ -810,6 +932,7 @@ export const createSyncedWorkbenchPersistence = (): SyncedWorkbenchPersistence =
       });
     },
     unmarkProjectDeleted(projectId): void {
+      assertOwner(syncState);
       syncState.deletedProjectIds.delete(projectId);
     },
   };

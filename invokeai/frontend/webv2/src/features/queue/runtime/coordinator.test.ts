@@ -12,6 +12,7 @@ import {
   buildUtilityQueueItemOrigin,
   type QueueItemStatusChangedEvent,
 } from '@features/queue/data/events';
+import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
 import { createSocketHub, type BackendSocket } from '@platform/transport/socketHub';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -25,6 +26,15 @@ import {
   type QueueModelLoadPort,
   type QueueNodeExecutionPort,
 } from './coordinator';
+
+const deferred = <T>(): { promise: Promise<T>; resolve: (value: T) => void } => {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((settle) => {
+    resolve = settle;
+  });
+
+  return { promise, resolve };
+};
 
 class FakeSocket implements BackendSocket {
   readonly emitted: { event: string; payload: unknown }[] = [];
@@ -162,6 +172,9 @@ const createHarness = (options: { galleryRefreshCoalesceMs?: number } = {}): Har
   const progress: QueueItemProgressSink = {
     clear: (queueItemId) => {
       progressEntries.delete(queueItemId);
+    },
+    clearAll: () => {
+      progressEntries.clear();
     },
     set: (queueItemId, value) => {
       progressEntries.set(queueItemId, value);
@@ -567,6 +580,28 @@ describe('queueCoordinator', () => {
     expect(harness.progressImage.clear).toHaveBeenCalledWith({ itemIndex: 1, queueItemId: 'local-1' });
   });
 
+  it('does not let an old routing finalizer clear replacement-account progress', async () => {
+    const routing = deferred<void>();
+
+    harness.callbacks.onBackendItemComplete = vi.fn(() => routing.promise);
+    harness.coordinator.connect();
+    await harness.coordinator.submitGenerate('local-1', generateRequest);
+    const resultsPromise = harness.coordinator.waitForResults('local-1', '2026-06-10T00:00:00Z');
+
+    harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: 1 }));
+    await resultsPromise;
+    harness.coordinator.dispose();
+    const clearsAfterDispose = harness.progressImage.clear.mock.calls.length;
+
+    accountLifecycle.invalidate();
+    accountLifecycle.activate('replacement-account');
+    routing.resolve();
+    await routing.promise;
+    await Promise.resolve();
+
+    expect(harness.progressImage.clear).toHaveBeenCalledTimes(clearsAfterDispose);
+  });
+
   it('notifies when one backend item in a batch completes', async () => {
     harness.callbacks.onBackendItemComplete = vi.fn();
     harness.api.enqueueGenerate.mockResolvedValue({
@@ -896,10 +931,26 @@ describe('queueCoordinator', () => {
     harness.coordinator.connect();
 
     await harness.coordinator.submitGenerate('local-1', generateRequest);
+    expect(harness.progressEntries.size).toBe(1);
+
     harness.coordinator.dispose();
 
     harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: 1 }));
 
     expect(harness.nodeExecution.settleRunning).not.toHaveBeenCalled();
+    expect(harness.progressEntries.size).toBe(0);
+  });
+
+  it('does not adopt an enqueue response that completes after its account scope expires', async () => {
+    const acceptance = deferred<{ batchId: string; enqueued: number; itemIds: number[]; requested: number }>();
+
+    harness.api.enqueueGenerate.mockReturnValue(acceptance.promise);
+    const submission = harness.coordinator.submitGenerate('local-1', generateRequest);
+
+    accountLifecycle.invalidate();
+    acceptance.resolve({ batchId: 'old-account-batch', enqueued: 1, itemIds: [42], requested: 1 });
+
+    await expect(submission).rejects.toBeInstanceOf(QueueItemCancelledError);
+    expect(harness.progressEntries.size).toBe(0);
   });
 });

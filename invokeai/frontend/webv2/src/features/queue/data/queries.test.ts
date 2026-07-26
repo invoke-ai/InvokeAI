@@ -1,5 +1,6 @@
 import type { QueueBackendPort } from '@features/queue/core/types';
 
+import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { QueryClient } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -57,7 +58,7 @@ describe('queue queries', () => {
     expect(first).toBe(second);
     expect(cached).toBe(first);
     expect(backend.readStatus).toHaveBeenCalledTimes(1);
-    expect(backend.readItemsById).toHaveBeenCalledWith([2, 1]);
+    expect(backend.readItemsById).toHaveBeenCalledWith([2, 1], expect.any(AbortSignal));
   });
 
   it('keeps project-scoped queue reads in distinct cache entries', async () => {
@@ -81,5 +82,40 @@ describe('queue queries', () => {
     await invalidateQueueReadModels(client);
 
     expect(client.getQueryState(key)?.isInvalidated).toBe(true);
+  });
+
+  it('does not continue or publish a read after its account epoch expires', async () => {
+    accountLifecycle.activate('user-a');
+    const backend = createBackend();
+    const onRead = vi.fn();
+    let resolveStatus: ((value: Awaited<ReturnType<QueueBackendPort['readStatus']>>) => void) | undefined;
+
+    vi.mocked(backend.readStatus).mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveStatus = resolve;
+      })
+    );
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const oldRead = client.fetchQuery(queueReadModelOptions(backend, {}, onRead));
+
+    accountLifecycle.invalidate();
+    accountLifecycle.activate('user-b');
+    resolveStatus?.({
+      processor: { isProcessing: false, isStarted: true },
+      queue: {
+        canceled: 0,
+        completed: 0,
+        failed: 0,
+        inProgress: 0,
+        pending: 0,
+        queueId: 'default',
+        total: 0,
+        waiting: 0,
+      },
+    });
+
+    await expect(oldRead).rejects.toThrow('no longer active');
+    expect(backend.readItemsById).not.toHaveBeenCalled();
+    expect(onRead).not.toHaveBeenCalled();
   });
 });

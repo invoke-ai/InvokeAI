@@ -1,6 +1,7 @@
 import type { GalleryImage } from '@features/gallery';
 import type { ImageActions } from '@workbench/image-actions';
 
+import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
 
 /**
@@ -44,5 +45,10 @@ export const previewHeaderStore = {
     store.patchSnapshot(context);
   },
 };
+
+registerAccountOwnedResource({
+  clear: previewHeaderStore.clear,
+  name: 'preview-header',
+});
 
 export const usePreviewHeaderContext = (): PreviewHeaderContext => store.useSelector((snapshot) => snapshot);

@@ -1,3 +1,4 @@
+import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
 
 export interface ModelLoadInfo {
@@ -40,6 +41,11 @@ export const modelLoadActivitySink: ModelLoadActivitySink = {
     store.patchSnapshot({ activeLoads: [] });
   },
 };
+
+registerAccountOwnedResource({
+  clear: modelLoadActivitySink.reset,
+  name: 'model-load-activity',
+});
 
 export const useModelLoads = (): ModelLoadInfo[] => store.useSelector((snapshot) => snapshot.activeLoads);
 

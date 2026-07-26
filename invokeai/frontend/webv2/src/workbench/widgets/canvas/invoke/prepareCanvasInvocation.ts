@@ -57,6 +57,12 @@ import {
   resolveGenerateSeed,
 } from '@features/generation/graph';
 import { normalizeGenerateWidgetValues, syncGenerateWidgetValuesWithModels } from '@features/generation/settings';
+import {
+  captureAccountScope,
+  isAccountScopeCurrent,
+  registerAccountOwnedResource,
+  type AccountScope,
+} from '@platform/state/accountLifecycle';
 import { getCanvasEngine, getCanvasOperations } from '@workbench/canvas-operations/api';
 import {
   DEFAULT_CANVAS_COMPOSITING,
@@ -98,6 +104,8 @@ export interface RunCanvasInvocationDeps {
   flushPendingUploads: () => Promise<void>;
   /** Project ids with a prepare currently in flight (module/registry-scoped). */
   inFlight: Set<string>;
+  /** Account-qualified concurrency key; defaults to `projectId` for isolated orchestrator callers. */
+  inFlightKey?: string;
   /** The generate widget's raw persisted values (model/prompt/steps, shared with Generate). */
   generateValues: Record<string, unknown>;
   /** Loaded models, for the same value/model sync the generate path performs. */
@@ -308,13 +316,14 @@ const createRegionalGuidanceCollector = (
  */
 export const runCanvasInvocation = async (deps: RunCanvasInvocationDeps): Promise<void> => {
   const { commands, inFlight, projectId } = deps;
+  const inFlightKey = deps.inFlightKey ?? projectId;
 
   // Concurrency guard: ignore a re-invoke while a prior prepare for this project
   // is still settling (the hotkey can be mashed). Cleared in `finally`.
-  if (inFlight.has(projectId)) {
+  if (inFlight.has(inFlightKey)) {
     return;
   }
-  inFlight.add(projectId);
+  inFlight.add(inFlightKey);
 
   try {
     const values = normalizeGenerateWidgetValues(deps.generateValues);
@@ -348,6 +357,7 @@ export const runCanvasInvocation = async (deps: RunCanvasInvocationDeps): Promis
       shouldCompositeRegionalMask: regions.shouldComposite,
       signal: deps.signal,
     });
+    deps.signal.throwIfAborted();
     if (composed.status !== 'ok') {
       recordNotice(
         commands.notifications,
@@ -395,6 +405,10 @@ export const runCanvasInvocation = async (deps: RunCanvasInvocationDeps): Promis
     });
     composed.dedupeCommit.commit();
   } catch (error) {
+    if (deps.signal.aborted) {
+      return;
+    }
+
     const message =
       error instanceof ControlLayerValidationError && deps.formatControlLayerError
         ? deps.formatControlLayerError(error.code, error.layerName)
@@ -403,12 +417,19 @@ export const runCanvasInvocation = async (deps: RunCanvasInvocationDeps): Promis
           : String(error);
     recordNotice(commands.notifications, 'error', message);
   } finally {
-    inFlight.delete(projectId);
+    inFlight.delete(inFlightKey);
   }
 };
 
 // Project ids with a prepare in flight (survives across the async orchestrator).
 const inFlightProjects = new Set<string>();
+
+registerAccountOwnedResource({
+  clear: () => {
+    inFlightProjects.clear();
+  },
+  name: 'canvas-invocation-guards',
+});
 
 /** Arguments for the thin command-layer {@link prepareCanvasInvocation}. */
 export interface PrepareCanvasInvocationArgs {
@@ -417,6 +438,8 @@ export interface PrepareCanvasInvocationArgs {
   destination: ResultDestination;
   generateValues: Record<string, unknown>;
   models?: readonly ModelConfig[];
+  /** Caller-captured identity lifetime; direct synchronous callers may omit it. */
+  owner?: AccountScope;
   projectSettings: Pick<ProjectSettings, 'useCpuNoise'>;
   strength: number;
   signal?: AbortSignal;
@@ -435,12 +458,18 @@ export interface PrepareCanvasInvocationArgs {
  * Fire-and-track: the caller does not await it (the Invoke command stays sync).
  */
 export const prepareCanvasInvocation = async (args: PrepareCanvasInvocationArgs): Promise<void> => {
+  const owner = args.owner ?? captureAccountScope();
+  if (!isAccountScopeCurrent(owner)) {
+    return;
+  }
+
   const engine = getCanvasEngine(args.projectId);
   if (!engine) {
     recordNotice(args.commands.notifications, 'error', 'Open the canvas before invoking it.');
     return;
   }
   const operations = getCanvasOperations(engine);
+  const signal = args.signal ? AbortSignal.any([args.signal, owner.signal]) : owner.signal;
 
   await runCanvasInvocation({
     compositing: args.compositing ?? DEFAULT_CANVAS_COMPOSITING,
@@ -451,10 +480,11 @@ export const prepareCanvasInvocation = async (args: PrepareCanvasInvocationArgs)
     formatControlLayerError: args.formatControlLayerError,
     generateValues: args.generateValues,
     inFlight: inFlightProjects,
+    inFlightKey: `${owner.epoch}:${args.projectId}`,
     models: args.models,
     projectId: args.projectId,
     projectSettings: args.projectSettings,
-    signal: args.signal ?? new AbortController().signal,
+    signal,
     strength: args.strength,
   });
 };

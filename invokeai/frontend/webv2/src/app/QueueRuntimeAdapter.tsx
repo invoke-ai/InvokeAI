@@ -3,6 +3,7 @@ import { nodeExecutionStore } from '@features/nodes';
 import { createProductionQueueRuntime } from '@features/queue';
 import { ensureInvocationTemplatesLoaded } from '@features/workflow/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
+import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
 import { useWorkbenchCommands, useWorkbenchQueries, useWorkbenchSubscription } from '@workbench/WorkbenchContext';
 
 /** App-owned production composition of Queue, Workbench, Gallery, Workflow, Nodes, and Models adapters. */
@@ -12,12 +13,16 @@ export const QueueRuntimeAdapter = () => {
   const subscribe = useWorkbenchSubscription();
 
   useMountEffect(() => {
+    const owner = captureAccountScope();
     const runtime = createProductionQueueRuntime({
       destinations: {
         addImagesToGalleryBoard: async (boardId, imageNames) => {
+          assertAccountScopeCurrent(owner);
           const { galleryOrganization } = await import('@features/gallery');
 
-          await galleryOrganization.addToBoard(boardId, imageNames);
+          assertAccountScopeCurrent(owner);
+          await galleryOrganization.addToBoard(boardId, imageNames, owner.signal);
+          assertAccountScopeCurrent(owner);
         },
       },
       ensureTemplatesLoaded: ensureInvocationTemplatesLoaded,

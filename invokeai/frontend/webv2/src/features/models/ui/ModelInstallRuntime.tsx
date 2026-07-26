@@ -4,17 +4,19 @@ import {
   refreshInstalls,
 } from '@features/models/data/installsStore';
 import { refreshModels } from '@features/models/data/modelsStore';
+import { useMountEffect } from '@platform/react/useMountEffect';
+import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { getConnectionStatus, subscribeConnection } from '@platform/transport/connectionStore';
 import { socketHub } from '@platform/transport/socketHub';
-import { useEffect } from 'react';
 
 import { useInstallOutcomeToasts } from './useInstallOutcomeToasts';
 
 /** Admin model-manager runtime: install socket events, reconnect refresh, and outcome toasts. */
 export const ModelInstallRuntime = () => {
-  useEffect(() => {
+  useMountEffect(() => {
+    const owner = captureAccountScope();
     const detachers = MODEL_INSTALL_SOCKET_EVENTS.map((event) =>
-      socketHub.on(event, (payload) => handleModelInstallSocketEvent(event, payload))
+      socketHub.on(event, (payload) => handleModelInstallSocketEvent(event, payload, owner))
     );
 
     return () => {
@@ -22,11 +24,12 @@ export const ModelInstallRuntime = () => {
         detach();
       }
     };
-  }, []);
+  });
 
-  useEffect(() => {
+  useMountEffect(() => {
+    const owner = captureAccountScope();
     const refreshOnConnect = () => {
-      if (getConnectionStatus().status === 'connected') {
+      if (isAccountScopeCurrent(owner) && getConnectionStatus().status === 'connected') {
         void refreshModels();
         void refreshInstalls();
       }
@@ -35,7 +38,7 @@ export const ModelInstallRuntime = () => {
     refreshOnConnect();
 
     return subscribeConnection(refreshOnConnect);
-  }, []);
+  });
 
   useInstallOutcomeToasts();
 

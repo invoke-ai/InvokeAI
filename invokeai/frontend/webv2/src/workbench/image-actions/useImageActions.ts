@@ -11,6 +11,11 @@ import { getMaxReferenceImages, isVaeModelConfig, isSupportedGenerateModel } fro
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
+import {
   getCanvasImportNotice,
   getCanvasEngine,
   importGalleryImagesToCanvas,
@@ -136,31 +141,55 @@ export const useImageActions = ({
 
     return {
       copyImage: async (image) => {
-        try {
-          const response = await fetch(image.imageUrl);
-          const blob = await toPngBlob(await response.blob());
+        const owner = captureAccountScope();
 
+        try {
+          const response = await fetch(image.imageUrl, { signal: owner.signal });
+          const sourceBlob = await response.blob();
+
+          assertAccountScopeCurrent(owner);
+          const blob = await toPngBlob(sourceBlob);
+
+          assertAccountScopeCurrent(owner);
           await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+          assertAccountScopeCurrent(owner);
           recordSuccess('Copied image to clipboard');
         } catch (error: unknown) {
+          if (!isAccountScopeCurrent(owner)) {
+            return;
+          }
+
           recordError(error);
         }
       },
       deleteImages: async (imageNames) => {
+        const owner = captureAccountScope();
+
         try {
-          await galleryOrganization.deleteImages(imageNames);
+          await galleryOrganization.deleteImages(imageNames, owner.signal);
+
+          assertAccountScopeCurrent(owner);
           gallery.removeImages(imageNames, projectId);
           onImagesDeleted?.(imageNames);
           recordSuccess(imageNames.length === 1 ? 'Deleted image' : `Deleted ${imageNames.length} images`);
           refreshGallery();
         } catch (error: unknown) {
+          if (!isAccountScopeCurrent(owner)) {
+            return;
+          }
+
           recordError(error);
         }
       },
       downloadImage: async (image) => {
+        const owner = captureAccountScope();
+
         try {
-          const response = await fetch(image.imageUrl);
-          const objectUrl = URL.createObjectURL(await response.blob());
+          const response = await fetch(image.imageUrl, { signal: owner.signal });
+          const blob = await response.blob();
+
+          assertAccountScopeCurrent(owner);
+          const objectUrl = URL.createObjectURL(blob);
           const anchor = document.createElement('a');
 
           anchor.href = objectUrl;
@@ -168,10 +197,16 @@ export const useImageActions = ({
           anchor.click();
           URL.revokeObjectURL(objectUrl);
         } catch (error: unknown) {
+          if (!isAccountScopeCurrent(owner)) {
+            return;
+          }
+
           recordError(error);
         }
       },
       downloadImages: async (imageNames) => {
+        const owner = captureAccountScope();
+
         try {
           notifications.add({
             kind: 'info',
@@ -179,22 +214,30 @@ export const useImageActions = ({
             title: 'Preparing download',
           });
 
-          const { blob, fileName } = await galleryTransfers.downloadArchive({ imageNames });
+          const { blob, fileName } = await galleryTransfers.downloadArchive({ imageNames, signal: owner.signal });
 
+          assertAccountScopeCurrent(owner);
           saveBlobToDisk(blob, fileName);
           recordSuccess('Download ready');
         } catch (error: unknown) {
+          if (!isAccountScopeCurrent(owner)) {
+            return;
+          }
+
           recordError(error);
         }
       },
       getImageRecallCapabilities: async (image) => {
+        const owner = captureAccountScope();
+
         if (!currentGenerateValues) {
           return EMPTY_IMAGE_RECALL_CAPABILITIES;
         }
 
         try {
-          const metadata = await galleryImages.metadata(image.imageName);
+          const metadata = await galleryImages.metadata(image.imageName, owner.signal);
 
+          assertAccountScopeCurrent(owner);
           return getImageRecallCapabilities({
             currentValues: currentGenerateValues,
             image,
@@ -204,6 +247,10 @@ export const useImageActions = ({
             vaeModels,
           });
         } catch {
+          if (!isAccountScopeCurrent(owner)) {
+            return EMPTY_IMAGE_RECALL_CAPABILITIES;
+          }
+
           return {
             ...EMPTY_IMAGE_RECALL_CAPABILITIES,
             dimensions:
@@ -212,13 +259,16 @@ export const useImageActions = ({
         }
       },
       moveImagesToBoard: async (imageNames, boardId) => {
+        const owner = captureAccountScope();
+
         try {
           if (boardId === 'none') {
-            await galleryOrganization.removeFromBoard(imageNames);
+            await galleryOrganization.removeFromBoard(imageNames, owner.signal);
           } else {
-            await galleryOrganization.addToBoard(boardId, imageNames);
+            await galleryOrganization.addToBoard(boardId, imageNames, owner.signal);
           }
 
+          assertAccountScopeCurrent(owner);
           recordSuccess(
             imageNames.length === 1
               ? `Moved image to ${getBoardName(boardId)}`
@@ -226,6 +276,10 @@ export const useImageActions = ({
           );
           refreshGallery();
         } catch (error: unknown) {
+          if (!isAccountScopeCurrent(owner)) {
+            return;
+          }
+
           recordError(error);
         }
       },
@@ -234,6 +288,7 @@ export const useImageActions = ({
         openWorkbenchWidget('preview', { preferredRegions: ['center'], requireCenterView: true });
       },
       recallImageData: async (image, kind) => {
+        const owner = captureAccountScope();
         const didRecall = await executeImageRecall({
           commands,
           generateValues,
@@ -244,7 +299,7 @@ export const useImageActions = ({
           projectId,
         });
 
-        if (didRecall && (!projectId || queries.isActiveProject(projectId))) {
+        if (isAccountScopeCurrent(owner) && didRecall && (!projectId || queries.isActiveProject(projectId))) {
           openWorkbenchWidget('generate', { preferredRegions: ['left'] });
         }
       },
@@ -252,6 +307,8 @@ export const useImageActions = ({
         gallery.setCompareImage(image, projectId);
       },
       sendToCanvas: async (images, destination) => {
+        const owner = captureAccountScope();
+
         try {
           const targetProjectId = projectId ?? queries.getSnapshot().activeProject.id;
           const project = queries.getProject(targetProjectId);
@@ -271,6 +328,8 @@ export const useImageActions = ({
             isActiveProject: queries.isActiveProject,
             project,
           });
+
+          assertAccountScopeCurrent(owner);
           const notice = getCanvasImportNotice(result);
           notifications.add({ kind: notice.kind, title: t(notice.titleKey, notice.options ?? {}) });
 
@@ -278,6 +337,10 @@ export const useImageActions = ({
             openWorkbenchWidget('canvas', { preferredRegions: ['center'], requireCenterView: true });
           }
         } catch (error: unknown) {
+          if (!isAccountScopeCurrent(owner)) {
+            return;
+          }
+
           recordCanvasImportError({
             error,
             localizedMessage: t('widgets.canvas.import.failed'),
@@ -287,12 +350,20 @@ export const useImageActions = ({
         }
       },
       setImagesStarred: async (imageNames, starred) => {
+        const owner = captureAccountScope();
+
         onStarredChange?.(imageNames, starred);
 
         try {
-          await galleryOrganization.setStarred(imageNames, starred);
+          await galleryOrganization.setStarred(imageNames, starred, owner.signal);
+
+          assertAccountScopeCurrent(owner);
           refreshGalleryImages();
         } catch (error: unknown) {
+          if (!isAccountScopeCurrent(owner)) {
+            return;
+          }
+
           onStarredChange?.(imageNames, !starred);
           recordError(error);
         }

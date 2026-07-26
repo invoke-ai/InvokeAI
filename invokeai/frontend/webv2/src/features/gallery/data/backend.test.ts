@@ -1,24 +1,68 @@
+import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   apiFetchJson: vi.fn(),
+  apiFetchRaw: vi.fn(),
+  sleep: vi.fn(),
 }));
 
 vi.mock('@platform/transport/http', () => ({
   absolutizeApiUrl: (url: string) => `https://api.test${url}`,
   apiFetch: vi.fn(),
   apiFetchJson: mocks.apiFetchJson,
-  apiFetchRaw: vi.fn(),
-  sleep: vi.fn(),
+  apiFetchRaw: mocks.apiFetchRaw,
+  sleep: mocks.sleep,
 }));
 
 import {
+  downloadGalleryArchive,
   getGalleryImageByName,
   imageMakeCanvasAssetChanges,
   imageMakeDurableChanges,
   imageSaveToGalleryChanges,
   listGalleryImages,
 } from './backend';
+
+describe('downloadGalleryArchive', () => {
+  beforeEach(() => {
+    accountLifecycle.activate('user-a');
+    mocks.apiFetchJson.mockReset();
+    mocks.apiFetchRaw.mockReset();
+    mocks.sleep.mockReset();
+  });
+
+  it('aborts polling before another account can request the prior account archive', async () => {
+    let resumeSleep: (() => void) | undefined;
+    mocks.apiFetchJson.mockResolvedValue({ bulk_download_item_name: 'user-a.zip' });
+    mocks.apiFetchRaw.mockResolvedValue(new Response(null, { status: 404 }));
+    mocks.sleep.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          resumeSleep = resolve;
+        })
+    );
+
+    const download = downloadGalleryArchive({ imageNames: ['user-a.png'] });
+
+    await vi.waitFor(() => {
+      expect(mocks.sleep).toHaveBeenCalledOnce();
+    });
+    const postSignal = (mocks.apiFetchJson.mock.calls[0]?.[1] as RequestInit | undefined)?.signal;
+    const pollSignal = (mocks.apiFetchRaw.mock.calls[0]?.[1] as RequestInit | undefined)?.signal;
+    const sleepSignal = mocks.sleep.mock.calls[0]?.[1] as AbortSignal;
+
+    accountLifecycle.invalidate();
+    accountLifecycle.activate('user-b');
+    resumeSleep?.();
+
+    await expect(download).rejects.toThrow('no longer active');
+    expect(postSignal?.aborted).toBe(true);
+    expect(pollSignal?.aborted).toBe(true);
+    expect(sleepSignal.aborted).toBe(true);
+    expect(mocks.apiFetchRaw).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe('getGalleryImageByName', () => {
   beforeEach(() => {

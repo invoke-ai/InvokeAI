@@ -1,3 +1,10 @@
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+  registerAccountOwnedResource,
+  type AccountScope,
+} from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
 import { createSingleFlight } from '@platform/state/singleFlight';
 import { normalizeServerTimestamp } from '@platform/time/serverTimestamp';
@@ -40,7 +47,15 @@ export interface ProjectLibrarySnapshot {
   error?: string;
 }
 
-const store = createExternalStore<ProjectLibrarySnapshot>({ status: 'idle', summaries: [] });
+const EMPTY_PROJECT_LIBRARY: ProjectLibrarySnapshot = { status: 'idle', summaries: [] };
+const store = createExternalStore<ProjectLibrarySnapshot>(EMPTY_PROJECT_LIBRARY);
+
+registerAccountOwnedResource({
+  clear: () => {
+    store.setSnapshot(EMPTY_PROJECT_LIBRARY);
+  },
+  name: 'project-library',
+});
 
 const toSummary = (dto: ProjectSummaryDTO): ProjectSummary => ({
   createdAt: normalizeServerTimestamp(dto.created_at),
@@ -61,7 +76,11 @@ export const useProjectLibrarySelector = store.useSelector;
 export const getProjectLibrary = (): ProjectLibrarySnapshot => store.getSnapshot();
 
 /** Adopt summaries already fetched elsewhere (the workbench boot pass). */
-export const seedProjectLibrary = (dtos: ProjectSummaryDTO[]): void => {
+export const seedProjectLibrary = (dtos: ProjectSummaryDTO[], owner: AccountScope): void => {
+  if (!isAccountScopeCurrent(owner)) {
+    return;
+  }
+
   store.setSnapshot({ status: 'ready', summaries: sortSummaries(dtos.map(toSummary)) });
 };
 
@@ -69,25 +88,40 @@ const refreshFlight = createSingleFlight<void>();
 
 /** Re-list from the server; concurrent calls share one request. */
 export const refreshProjectLibrary = (): Promise<void> =>
-  refreshFlight.run('project-library', () =>
-    listProjects()
-      .then((dtos) => {
-        seedProjectLibrary(dtos);
-      })
-      .catch((error: unknown) => {
-        store.patchSnapshot({
-          error: error instanceof Error ? error.message : 'Failed to load projects.',
-          status: 'error',
-        });
-      })
-  );
+  (() => {
+    const owner = captureAccountScope();
+
+    return refreshFlight.run(`project-library:${owner.epoch}`, () =>
+      listProjects(owner.signal)
+        .then((dtos) => {
+          seedProjectLibrary(dtos, owner);
+        })
+        .catch((error: unknown) => {
+          if (!isAccountScopeCurrent(owner)) {
+            return;
+          }
+
+          store.patchSnapshot({
+            error: error instanceof Error ? error.message : 'Failed to load projects.',
+            status: 'error',
+          });
+        })
+    );
+  })();
 
 /**
  * Reflect a save the editor just pushed, so the library stays current without
  * a refetch. `updatedAt` is stamped locally; the next refresh replaces it
  * with the server's value.
  */
-export const upsertProjectSummary = (entry: { id: string; name: string; revision: number | null }): void => {
+export const upsertProjectSummary = (
+  entry: { id: string; name: string; revision: number | null },
+  owner: AccountScope
+): void => {
+  if (!isAccountScopeCurrent(owner)) {
+    return;
+  }
+
   const { summaries } = store.getSnapshot();
   const existing = summaries.find((summary) => summary.id === entry.id);
   const updatedAt = new Date().toISOString();
@@ -107,7 +141,10 @@ export const upsertProjectSummary = (entry: { id: string; name: string; revision
 
 /** Permanently remove a project from the server. The only deletion path. */
 export const deleteLibraryProject = async (projectId: string): Promise<void> => {
-  await apiDeleteProject(projectId);
+  const owner = captureAccountScope();
+
+  await apiDeleteProject(projectId, owner.signal);
+  assertAccountScopeCurrent(owner);
   store.patchSnapshot({ summaries: store.getSnapshot().summaries.filter((summary) => summary.id !== projectId) });
 };
 
@@ -117,29 +154,44 @@ export const deleteLibraryProject = async (projectId: string): Promise<void> => 
  * revision chain stay consistent.
  */
 export const renameLibraryProject = async (projectId: string, name: string): Promise<void> => {
-  const record = await apiGetProject(projectId);
-  const updated = await apiUpdateProject(projectId, {
-    data: { ...record.data, name },
-    expected_revision: record.revision,
-    name,
-  });
+  const owner = captureAccountScope();
+  const record = await apiGetProject(projectId, owner.signal);
 
-  upsertProjectSummary({ id: updated.project_id, name: updated.name, revision: updated.revision });
+  assertAccountScopeCurrent(owner);
+  const updated = await apiUpdateProject(
+    projectId,
+    {
+      data: { ...record.data, name },
+      expected_revision: record.revision,
+      name,
+    },
+    owner.signal
+  );
+
+  assertAccountScopeCurrent(owner);
+  upsertProjectSummary({ id: updated.project_id, name: updated.name, revision: updated.revision }, owner);
 };
 
 /** Copy a project under a fresh id; returns the new summary. */
 export const duplicateLibraryProject = async (projectId: string): Promise<ProjectSummary> => {
-  const record = await apiGetProject(projectId);
+  const owner = captureAccountScope();
+  const record = await apiGetProject(projectId, owner.signal);
+
+  assertAccountScopeCurrent(owner);
   const newId = createProjectId();
   const name = `${record.name} copy`;
-  const created = await apiCreateProject({
-    data: { ...record.data, id: newId, name },
-    name,
-    project_id: newId,
-  });
+  const created = await apiCreateProject(
+    {
+      data: { ...record.data, id: newId, name },
+      name,
+      project_id: newId,
+    },
+    owner.signal
+  );
+  assertAccountScopeCurrent(owner);
   const summary = toSummary(created);
 
-  upsertProjectSummary({ id: summary.id, name: summary.name, revision: summary.revision });
+  upsertProjectSummary({ id: summary.id, name: summary.name, revision: summary.revision }, owner);
 
   return summary;
 };

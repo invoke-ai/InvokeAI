@@ -4,6 +4,11 @@ import type { Project } from '@workbench/projectContracts';
 import { isGalleryVirtualBoard } from '@features/gallery';
 import { toModelIdentifier } from '@features/generation/graph';
 import { isSupportedGenerateModel, normalizeGenerateWidgetValues } from '@features/generation/settings';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 
 import type { CanvasCompositeExportEngine, CanvasCompositeRegion } from './exportCanvasComposite';
@@ -48,21 +53,34 @@ export const saveCanvasToGallery = async (options: {
   project: Project;
   uploadImage?: typeof uploadCanvasImage;
 }): Promise<SaveCanvasToGalleryResult> => {
+  const owner = captureAccountScope();
   const { engine, project, region, uploadImage = uploadCanvasImage } = options;
   const boardId = getCanvasSaveBoardId(project);
 
-  const exported = await exportCanvasComposite(engine, region);
-  if (exported.status !== 'ok') {
-    return exported;
+  try {
+    const exported = await exportCanvasComposite(engine, region);
+
+    assertAccountScopeCurrent(owner);
+    if (exported.status !== 'ok') {
+      return exported;
+    }
+
+    const uploaded = await uploadImage(exported.blob, {
+      boardId,
+      fileName: region === 'canvas' ? 'canvas.png' : 'bbox.png',
+      imageCategory: 'general',
+      isIntermediate: false,
+      metadata: buildCanvasSaveMetadata(project, exported.rect),
+      signal: owner.signal,
+    });
+
+    assertAccountScopeCurrent(owner);
+    return { imageName: uploaded.imageName, status: 'saved' };
+  } catch (error) {
+    if (!isAccountScopeCurrent(owner)) {
+      return { status: 'stale' };
+    }
+
+    throw error;
   }
-
-  const uploaded = await uploadImage(exported.blob, {
-    boardId,
-    fileName: region === 'canvas' ? 'canvas.png' : 'bbox.png',
-    imageCategory: 'general',
-    isIntermediate: false,
-    metadata: buildCanvasSaveMetadata(project, exported.rect),
-  });
-
-  return { imageName: uploaded.imageName, status: 'saved' };
 };

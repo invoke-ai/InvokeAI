@@ -1,3 +1,4 @@
+import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -73,6 +74,17 @@ describe('diagnostics logger', () => {
 
     expect(getProjectDiagnostics('project-a')).toEqual([]);
     expect(getProjectDiagnostics('project-b')).toHaveLength(1);
+  });
+
+  it('clears every project synchronously when its account lifetime expires', () => {
+    accountLifecycle.activate('user-a');
+    createProjectLogger('system', { area: 'runtime', kind: 'workbench', projectId: 'project-a' }).error('A failed');
+    createProjectLogger('system', { area: 'runtime', kind: 'workbench', projectId: 'project-b' }).warn('B warned');
+
+    accountLifecycle.invalidate();
+
+    expect(getProjectDiagnostics('project-a')).toEqual([]);
+    expect(getProjectDiagnostics('project-b')).toEqual([]);
   });
 
   it('filters entries by project logging settings', () => {

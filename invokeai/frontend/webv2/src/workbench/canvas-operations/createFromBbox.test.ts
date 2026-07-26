@@ -5,9 +5,10 @@ import type { RasterCompositeExportResult } from '@workbench/canvas-engine/expor
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { Project, WorkbenchState } from '@workbench/projectContracts';
 
+import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { createEmptyPaintLayer } from '@workbench/widgets/layers/layerOps';
 import { createInitialWorkbenchState } from '@workbench/workbenchState';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { uploadCanvasImage } from './backend/canvasImages';
 
@@ -16,6 +17,15 @@ import { createFromBbox, type CreateFromBboxDestination } from './createFromBbox
 const bbox = { height: 512, width: 768, x: 31, y: 47 };
 const uploadedName = 'bbox-upload.png';
 const defaultBlob = new Blob(['pixels'], { type: 'image/png' });
+
+const deferred = <T>() => {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+
+  return { promise, resolve };
+};
 
 const galleryImage: GalleryImage = {
   boardId: 'none',
@@ -139,6 +149,14 @@ const getCommittedLayers = (harness: ReturnType<typeof createHarness>): readonly
 };
 
 describe('createFromBbox', () => {
+  beforeEach(() => {
+    accountLifecycle.activate('create-from-bbox-test');
+  });
+
+  afterEach(() => {
+    accountLifecycle.invalidate();
+  });
+
   it('creates a raster layer at the bbox origin from the uploaded composite', async () => {
     const harness = createHarness();
 
@@ -150,7 +168,9 @@ describe('createFromBbox', () => {
       fileName: 'bbox.png',
       imageCategory: 'other',
       isIntermediate: false,
+      signal: expect.any(AbortSignal),
     });
+    expect(harness.resolveImages).toHaveBeenCalledWith([uploadedName], expect.any(AbortSignal));
 
     const layers = getCommittedLayers(harness);
     expect(layers).toHaveLength(1);
@@ -239,6 +259,23 @@ describe('createFromBbox', () => {
 
     await expect(harness.run('raster')).rejects.toThrow('could not be resolved');
 
+    expect(harness.commitStructural).not.toHaveBeenCalled();
+  });
+
+  it('does not upload account A bbox pixels after account B becomes active', async () => {
+    const harness = createHarness();
+    const exportResult = deferred<RasterCompositeExportResult>();
+
+    harness.exportRasterComposite.mockReturnValueOnce(exportResult.promise);
+    const create = harness.run('raster');
+
+    await vi.waitFor(() => expect(harness.exportRasterComposite).toHaveBeenCalledOnce());
+    accountLifecycle.activate('create-from-bbox-test-b');
+    exportResult.resolve({ blob: defaultBlob, rect: bbox, status: 'ok' });
+
+    await expect(create).resolves.toEqual({ status: 'stale' });
+    expect(harness.uploadImage).not.toHaveBeenCalled();
+    expect(harness.resolveImages).not.toHaveBeenCalled();
     expect(harness.commitStructural).not.toHaveBeenCalled();
   });
 });

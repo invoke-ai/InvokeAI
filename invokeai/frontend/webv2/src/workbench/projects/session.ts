@@ -67,10 +67,12 @@ export const serializeSessionBlob = (state: WorkbenchState): string =>
     openProjectIds: state.projects.map((project) => project.id),
   } satisfies WorkbenchSessionBlob);
 
-export const fetchSessionBlob = async (): Promise<WorkbenchSessionBlob | null> => {
+export const fetchSessionBlob = async (signal?: AbortSignal): Promise<WorkbenchSessionBlob | null> => {
   try {
-    return parseSessionBlob(await getClientStateValue(SESSION_STATE_KEY));
+    return parseSessionBlob(await getClientStateValue(SESSION_STATE_KEY, signal));
   } catch {
+    signal?.throwIfAborted();
+
     return null;
   }
 };
