@@ -17,7 +17,11 @@ from unittest.mock import MagicMock
 import pytest
 
 from invokeai.backend.model_manager.configs.identification_utils import NotAMatchError
-from invokeai.backend.model_manager.configs.qwen3_encoder import Qwen3Encoder_Qwen3Encoder_Config
+from invokeai.backend.model_manager.configs.qwen3_encoder import (
+    Qwen3Encoder_GGUF_Config,
+    Qwen3Encoder_Qwen3Encoder_Config,
+    _has_gemma2_keys,
+)
 
 _OVERRIDE_FIELDS: dict[str, object] = {
     "hash": "blake3:fakehash",
@@ -79,3 +83,25 @@ def test_nested_text_encoder_with_root_tokenizer_still_matches() -> None:
 
         config = Qwen3Encoder_Qwen3Encoder_Config.from_model_on_disk(mod, dict(_OVERRIDE_FIELDS))
         assert config.type.value == "qwen3_encoder"
+
+
+def test_has_gemma2_keys_detects_post_norms() -> None:
+    """Gemma-2/3 GGUFs are identified by their post-attention / post-feedforward norms."""
+    assert _has_gemma2_keys({"token_embd.weight": 0, "blk.0.post_attention_norm.weight": 0}) is True
+    assert _has_gemma2_keys({"blk.5.post_ffw_norm.weight": 0}) is True
+    # A Qwen3-style state dict (attn q/k norms, no post-norms) is not mistaken for Gemma.
+    assert _has_gemma2_keys({"token_embd.weight": 0, "blk.0.attn_q_norm.weight": 0}) is False
+
+
+def test_gguf_config_rejects_gemma_state_dict() -> None:
+    """A Gemma-2 GGUF satisfies the generic Qwen3 key heuristic but must be rejected by the Qwen3 GGUF
+    config so it is not re-identified as a Qwen3 encoder (it should classify as Gemma2Encoder)."""
+    mod = MagicMock()
+    mod.load_state_dict.return_value = {
+        "token_embd.weight": 0,
+        "blk.0.attn_norm.weight": 0,
+        "blk.0.post_attention_norm.weight": 0,
+        "blk.0.post_ffw_norm.weight": 0,
+    }
+    with pytest.raises(NotAMatchError, match="Gemma-2"):
+        Qwen3Encoder_GGUF_Config._validate_looks_like_qwen3_model(mod)
