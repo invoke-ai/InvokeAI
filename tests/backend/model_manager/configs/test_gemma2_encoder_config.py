@@ -77,6 +77,10 @@ def test_gemma_2_2b_gguf_matches(monkeypatch: pytest.MonkeyPatch) -> None:
         config = Gemma2Encoder_GGUF_Config.from_model_on_disk(mod, dict(_OVERRIDE_FIELDS))
         assert config.type.value == "gemma2_encoder"
         assert config.format.value == "gguf_quantized"
+        # The Gemma encoder has no `variant` field. Re-identifying a model previously mis-detected as a
+        # Qwen3 GGUF (which has a variant) to this config must therefore drop the stale variant — the
+        # serialized record carries no variant key, so replace_model overwrites it away.
+        assert "variant" not in config.model_dump()
 
 
 @pytest.mark.parametrize("hidden_size", [3584, 4608])
