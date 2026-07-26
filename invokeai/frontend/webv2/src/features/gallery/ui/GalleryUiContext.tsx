@@ -16,7 +16,6 @@ export interface GalleryImageActionsOptions {
   boards: GalleryBoard[];
   generateValues: Record<string, unknown>;
   onImagesDeleted(imageNames: string[]): void;
-  onStarredChange(imageNames: string[], starred: boolean): void;
   projectId: string;
 }
 
@@ -34,6 +33,7 @@ export interface GalleryImageContextMenuProps {
 }
 
 export interface GalleryCommandsPort {
+  reconcileDeletedBoard(boardId: string, includeImages: boolean): void;
   selectBoard(boardId: string): void;
   selectImage(image: GalleryImage): void;
   setCompareImage(image: GalleryImage | null): void;
@@ -44,7 +44,6 @@ export interface GalleryCommandsPort {
   setSearchTerm(searchTerm: string): void;
   setView(view: GalleryView): void;
   toggleImageSelection(image: GalleryImage): void;
-  touch(): void;
   updateSettings(settings: Partial<GallerySettings>): void;
 }
 

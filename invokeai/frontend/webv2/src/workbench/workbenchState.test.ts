@@ -10,6 +10,7 @@ import type {
 import type { GraphContract } from '@workbench/graphContracts';
 import type { Project, WorkbenchState } from '@workbench/projectContracts';
 
+import { GALLERY_RECENT_IMAGE_LIMIT } from '@features/gallery/contracts';
 import { MAX_PROMPT_HISTORY } from '@features/generation/settings';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -1843,6 +1844,106 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(values.imageBoards).toBeUndefined();
   });
 
+  it('retains only the newest 60 images after 1,000 routed Gallery results', () => {
+    let state = primeGenerate();
+
+    state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
+    state = submitGenerate(state);
+
+    const project = getActiveProject(state);
+    const queueItem = project.queue.items[0];
+
+    for (let index = 0; index < 1_000; index += 1) {
+      state = workbenchReducer(state, {
+        images: [createImage(`gallery-image-${index}.png`, queueItem.id)],
+        projectId: project.id,
+        queueItemId: queueItem.id,
+        type: 'routeQueueItemResults',
+      });
+    }
+
+    const galleryValues = getProjectWidgetValues(getActiveProject(state), 'gallery');
+    const recentImageNames = (galleryValues.recentImages as GeneratedImageContract[]).map((image) => image.imageName);
+
+    expect(GALLERY_RECENT_IMAGE_LIMIT).toBe(60);
+    expect(recentImageNames).toEqual(
+      Array.from({ length: GALLERY_RECENT_IMAGE_LIMIT }, (_, index) => `gallery-image-${999 - index}.png`)
+    );
+    expect(galleryValues.selectedImageName).toBe('gallery-image-999.png');
+    expect(galleryValues.selectedImageNames).toEqual(['gallery-image-999.png']);
+  });
+
+  it('omits transient recent images from immutable queue snapshots', () => {
+    let state = primeGenerate();
+    const recentImages = Array.from({ length: GALLERY_RECENT_IMAGE_LIMIT }, (_, index) =>
+      createImage(`recent-${index}.png`, 'previous-queue-item')
+    );
+
+    state = workbenchReducer(state, {
+      type: 'patchWidgetValues',
+      values: { recentImages },
+      widgetId: 'gallery',
+    });
+    state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
+    state = submitGenerate(state);
+
+    const snapshot = getActiveProject(state).queue.items[0]!.snapshot;
+    const galleryInstance = Object.values(snapshot.widgetInstances).find((instance) => instance.typeId === 'gallery');
+
+    expect(snapshot.widgetStates.gallery?.values.recentImages).toBeUndefined();
+    expect(galleryInstance?.state.values.recentImages).toBeUndefined();
+  });
+
+  it('validates, deduplicates, and truncates persisted recent images during hydration', () => {
+    const initial = createInitialWorkbenchState();
+    const legacyImages = Array.from({ length: 1_000 }, (_, index) =>
+      createImage(`persisted-image-${999 - index}.png`, 'legacy-queue-item')
+    );
+    const selectedImage = legacyImages.at(-1)!;
+    const legacyRecentImages: unknown[] = [
+      legacyImages[0],
+      null,
+      legacyImages[0],
+      { imageName: 42 },
+      ...legacyImages.slice(1),
+    ];
+    const persisted: WorkbenchState = {
+      ...initial,
+      projects: initial.projects.map((project) => {
+        const galleryInstance = project.widgetInstances.gallery!;
+
+        return {
+          ...project,
+          widgetInstances: {
+            ...project.widgetInstances,
+            gallery: {
+              ...galleryInstance,
+              state: {
+                ...galleryInstance.state,
+                values: {
+                  ...galleryInstance.state.values,
+                  recentImages: legacyRecentImages,
+                  selectedImage,
+                  selectedImageName: selectedImage.imageName,
+                },
+              },
+            },
+          },
+        };
+      }),
+    };
+
+    const hydrated = workbenchReducer(initial, { state: persisted, type: 'hydrateWorkbench' });
+    const galleryValues = getProjectWidgetValues(getActiveProject(hydrated), 'gallery');
+    const recentImageNames = (galleryValues.recentImages as GeneratedImageContract[]).map((image) => image.imageName);
+
+    expect(recentImageNames).toEqual(
+      Array.from({ length: GALLERY_RECENT_IMAGE_LIMIT }, (_, index) => `persisted-image-${999 - index}.png`)
+    );
+    expect(galleryValues.selectedImage).toEqual(selectedImage);
+    expect(galleryValues.selectedImageName).toBe(selectedImage.imageName);
+  });
+
   it('routes partial Gallery destination results without completing the local queue item', () => {
     let state = primeGenerate(undefined, { batchCount: 2 });
 
@@ -2122,58 +2223,35 @@ describe('workbench backend connection recovery', () => {
     expect(state.backendConnection.lastConnectedAt).toBeDefined();
   });
 
-  it('refreshes every project gallery when backend data may have changed', () => {
-    const initial = createInitialWorkbenchState();
-    const previousTokens = initial.projects.map(
-      (project) => getProjectWidgetValues(project, 'gallery').galleryRefreshToken
-    );
-    const previousImageTokens = initial.projects.map(
-      (project) => getProjectWidgetValues(project, 'gallery').galleryImagesRefreshToken
-    );
-    const state = workbenchReducer(initial, { type: 'refreshBackendData' });
+  it('reconciles moved and starred metadata across every project recent-image overlay', () => {
+    let state = createInitialWorkbenchState();
+    const image = createImage('patched.png', 'backend-gallery');
 
-    expect(state.projects).toHaveLength(initial.projects.length);
+    state = workbenchReducer(state, { type: 'createProject' });
+    for (const project of state.projects) {
+      state = workbenchReducer(state, {
+        projectId: project.id,
+        type: 'patchWidgetValues',
+        values: { compareImage: image, recentImages: [image], selectedImage: image },
+        widgetId: 'gallery',
+      });
+    }
+    state = workbenchReducer(state, {
+      changes: { boardId: 'board-2', starred: true },
+      imageNames: [image.imageName],
+      type: 'patchGalleryImages',
+    });
 
-    for (const [index, project] of state.projects.entries()) {
-      const galleryValues = getProjectWidgetValues(project, 'gallery');
+    for (const project of state.projects) {
+      const values = getProjectWidgetValues(project, 'gallery');
 
-      expect(galleryValues.galleryRefreshToken).toBeDefined();
-      expect(galleryValues.galleryRefreshToken).not.toBe(previousTokens[index]);
-      expect(galleryValues.galleryImagesRefreshToken).toBeDefined();
-      expect(galleryValues.galleryImagesRefreshToken).not.toBe(previousImageTokens[index]);
+      expect(values.recentImages).toEqual([{ ...image, boardId: 'board-2', starred: true }]);
+      expect(values.selectedImage).toEqual({ ...image, boardId: 'board-2', starred: true });
+      expect(values.compareImage).toEqual({ ...image, boardId: 'board-2', starred: true });
     }
   });
 
-  it('can refresh gallery images without invalidating board data', () => {
-    const initial = createInitialWorkbenchState();
-    const state = workbenchReducer(initial, { type: 'touchGalleryImagesRefresh' });
-    const previousValues = getProjectWidgetValues(getActiveProject(initial), 'gallery');
-    const values = getProjectWidgetValues(getActiveProject(state), 'gallery');
-
-    expect(values.galleryRefreshToken).toBe(previousValues.galleryRefreshToken);
-    expect(values.galleryImagesRefreshToken).toBeDefined();
-    expect(values.galleryImagesRefreshToken).not.toBe(previousValues.galleryImagesRefreshToken);
-  });
-
-  it('can refresh gallery images in a non-active project without touching the active project', () => {
-    let state = createInitialWorkbenchState();
-    const firstProjectId = state.activeProjectId;
-
-    state = workbenchReducer(state, { type: 'createProject' });
-    const secondProjectId = state.activeProjectId;
-    const firstPreviousValues = getProjectWidgetValues(getProject(state, firstProjectId), 'gallery');
-    const secondPreviousValues = getProjectWidgetValues(getProject(state, secondProjectId), 'gallery');
-
-    state = workbenchReducer(state, { projectId: firstProjectId, type: 'touchGalleryImagesRefresh' });
-
-    const firstValues = getProjectWidgetValues(getProject(state, firstProjectId), 'gallery');
-    const secondValues = getProjectWidgetValues(getProject(state, secondProjectId), 'gallery');
-
-    expect(firstValues.galleryImagesRefreshToken).not.toBe(firstPreviousValues.galleryImagesRefreshToken);
-    expect(secondValues.galleryImagesRefreshToken).toBe(secondPreviousValues.galleryImagesRefreshToken);
-  });
-
-  it('can remove gallery images from a non-active project without touching the active project', () => {
+  it('removes deleted backend images and upscale references from every project', () => {
     let state = createInitialWorkbenchState();
     const firstProjectId = state.activeProjectId;
     const image = createImage('shared.png', 'backend-gallery');
@@ -2203,16 +2281,13 @@ describe('workbench backend connection recovery', () => {
 
     state = workbenchReducer(state, {
       imageNames: [image.imageName],
-      projectId: firstProjectId,
       type: 'removeGalleryImages',
     });
 
     expect(getProjectWidgetValues(getProject(state, firstProjectId), 'gallery').recentImages).toEqual([]);
-    expect(getProjectWidgetValues(getProject(state, secondProjectId), 'gallery').recentImages).toEqual([image]);
+    expect(getProjectWidgetValues(getProject(state, secondProjectId), 'gallery').recentImages).toEqual([]);
     expect(getProjectWidgetValues(getProject(state, firstProjectId), 'upscale').inputImage).toBeNull();
-    expect(getProjectWidgetValues(getProject(state, secondProjectId), 'upscale').inputImage).toMatchObject({
-      image_name: image.imageName,
-    });
+    expect(getProjectWidgetValues(getProject(state, secondProjectId), 'upscale').inputImage).toBeNull();
   });
 
   it('does not hydrate stale persisted backend connection state', () => {

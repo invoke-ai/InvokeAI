@@ -2,8 +2,10 @@ import type { GenerationUiAdapter } from '@features/generation/react';
 import type { ReactNode } from 'react';
 
 import { getSelectedGalleryImageFromValues } from '@features/gallery/contracts';
+import { invalidateGallery } from '@features/gallery/queries';
 import { GenerationUiProvider } from '@features/generation/react';
 import { ensureModelsLoaded, getModelBaseColorPalette, getModelBaseLabel, useModelsSelector } from '@features/models';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   getWorkbenchPreferences,
   patchWorkbenchPreferences,
@@ -39,15 +41,16 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
   const modelsCatalog = useModelsSelector((snapshot) => snapshot.models);
   const modelsError = useModelsSelector((snapshot) => snapshot.error);
   const modelsStatus = useModelsSelector((snapshot) => snapshot.status);
-  const { gallery, generation, notifications } = useWorkbenchCommands();
+  const { generation, notifications } = useWorkbenchCommands();
+  const queryClient = useQueryClient();
   const notify = useNotify();
 
   const galleryGroup = useMemo<GenerationUiAdapter['gallery']>(
     () => ({
       selectedImage: selectedGalleryImage,
-      touchImages: () => gallery.touchImages(),
+      touchImages: () => void invalidateGallery(queryClient),
     }),
-    [gallery, selectedGalleryImage]
+    [queryClient, selectedGalleryImage]
   );
   const modelsGroup = useMemo<GenerationUiAdapter['models']>(
     () => ({

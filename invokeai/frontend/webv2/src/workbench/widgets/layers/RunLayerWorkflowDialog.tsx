@@ -5,6 +5,7 @@ import type { FormEvent } from 'react';
 
 import { chakra, createListCollection, Dialog, Portal, Stack, Text } from '@chakra-ui/react';
 import { galleryDurability, galleryImages } from '@features/gallery';
+import { invalidateGalleryImages } from '@features/gallery/queries';
 import { runUtilityGraph } from '@features/queue/utility';
 import {
   buildLayerWorkflowGraph,
@@ -18,8 +19,10 @@ import {
   type WorkflowImageBinding,
 } from '@features/workflow/graph';
 import { useInvocationTemplatesSnapshot, type InvocationTemplatesSnapshot } from '@features/workflow/react';
+import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { socketHub } from '@platform/transport/socketHub';
 import { Button, CloseButton, Field, Select } from '@platform/ui';
+import { useQueryClient } from '@tanstack/react-query';
 import { getCanvasOperations } from '@workbench/canvas-operations/api';
 import { useNotify } from '@workbench/useNotify';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
@@ -190,7 +193,8 @@ export const RunLayerWorkflowDialog = ({
 }: RunLayerWorkflowDialogProps) => {
   const { t } = useTranslation();
   const notify = useNotify();
-  const { canvas, gallery } = useWorkbenchCommands();
+  const { canvas } = useWorkbenchCommands();
+  const queryClient = useQueryClient();
   const projectId = useActiveProjectSelector((project) => project.id);
   const [session] = useState(createLayerActionSession);
   const [selectionState, setSelectionState] = useState<SelectionState>(() => ({
@@ -323,17 +327,17 @@ export const RunLayerWorkflowDialog = ({
       engine,
       layerId,
       notify,
-      gallery,
       projectId,
+      queryClient,
       selection,
       session,
       t,
     }),
-    [availability, canvas, close, engine, gallery, layerId, notify, projectId, selection, session, t]
+    [availability, canvas, close, engine, layerId, notify, projectId, queryClient, selection, session, t]
   );
 
   const run = useCallback(async (): Promise<void> => {
-    const { availability, canvas, close, engine, gallery, layerId, notify, projectId, selection, session, t } =
+    const { availability, canvas, close, engine, layerId, notify, projectId, queryClient, selection, session, t } =
       runContext;
     const { input, output } = selection;
 
@@ -347,6 +351,7 @@ export const RunLayerWorkflowDialog = ({
       return;
     }
 
+    const owner = captureAccountScope();
     const destination = selection.destination;
     setError(null);
     setIsRunning(true);
@@ -366,7 +371,11 @@ export const RunLayerWorkflowDialog = ({
           makeDurable: galleryDurability.makeCanvasAsset,
           runGraph: (options) => runUtilityGraph({ ...options, hub: socketHub }),
           saveToGallery: galleryDurability.save,
-          touchGallery: (targetProjectId) => gallery.touchImages(targetProjectId),
+          touchGallery: () => {
+            if (isAccountScopeCurrent(owner)) {
+              void invalidateGalleryImages(queryClient, owner);
+            }
+          },
           uploadIntermediate: (blob, signal) => {
             if (signal?.aborted) {
               throw new DOMException('Layer workflow aborted', 'AbortError');

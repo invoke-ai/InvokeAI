@@ -69,7 +69,7 @@ type GridCell =
 
 export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => {
   const { t } = useTranslation();
-  const { actions, gallery, imageActions, runtime } = useGalleryWidget();
+  const { actions, gallery, imageActions, isWindowTruncated, runtime } = useGalleryWidget();
   const { account, antialiasProgressImages, ImageContextMenu, widgets } = useGalleryUi();
   const [contextMenuTarget, setContextMenuTarget] = useState<GalleryImageContextMenuTarget | null>(null);
   const [isDropActive, setIsDropActive] = useState(false);
@@ -477,6 +477,13 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
               {paginationMode === 'infinite' && gallery.isLoading && gallery.images.length > 0 && (
                 <Flex align="center" justify="center" py="2">
                   <Spinner color="fg.subtle" size="xs" />
+                </Flex>
+              )}
+              {paginationMode === 'infinite' && !gallery.isLoading && isWindowTruncated && (
+                <Flex align="center" justify="center" py="3">
+                  <Text color="fg.subtle" fontSize="xs" textAlign="center">
+                    {t('widgets.gallery.windowLimit', { count: gallery.images.length })}
+                  </Text>
                 </Flex>
               )}
             </ScrollArea.Content>

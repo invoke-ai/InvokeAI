@@ -1,5 +1,6 @@
 import { ButtonGroup, HStack, Pagination } from '@chakra-ui/react';
 import { getGallerySettings } from '@features/gallery/core/settings';
+import { GALLERY_PAGE_SIZE } from '@features/gallery/data/queries';
 import { IconButton } from '@platform/ui';
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 import { useCallback } from 'react';
@@ -7,7 +8,6 @@ import { useTranslation } from 'react-i18next';
 
 import { getGalleryPage, getGalleryTotalImages } from './galleryStateView';
 import { useGalleryUi } from './GalleryUiContext';
-import { GALLERY_PAGE_SIZE } from './useGalleryData';
 
 const PAGINATION_ITEM_VARIANT = { _selected: 'outline', base: 'ghost' } as const;
 

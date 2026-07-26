@@ -79,14 +79,32 @@ const createCommands = (dispatch: WorkbenchDispatch, getState: () => WorkbenchSt
       appendStagingCandidate: command('appendCanvasStagingCandidate'),
     },
     gallery: {
-      removeImages: command('removeGalleryImages', (imageNames: string[], projectId?: string) => ({
-        imageNames,
-        projectId,
+      patchImages: command(
+        'patchGalleryImages',
+        (imageNames: string[], changes: ActionPayload<'patchGalleryImages'>['changes']) => ({
+          changes,
+          imageNames,
+        })
+      ),
+      removeImages: command('removeGalleryImages', (imageNames: string[]) => ({ imageNames })),
+      reconcileDeletedBoard: command('reconcileDeletedGalleryBoard', (boardId: string, includeImages: boolean) => ({
+        boardId,
+        includeImages,
       })),
       selectBoard: command('selectGalleryBoard', (boardId: string, projectId?: string) => ({ boardId, projectId })),
       selectImage: command(
         'selectGalleryImage',
-        (image: ActionPayload<'selectGalleryImage'>['image'], projectId?: string) => ({ image, projectId })
+        (
+          image: ActionPayload<'selectGalleryImage'>['image'],
+          projectId?: string,
+          selectionPage?: number,
+          preserveNavigationQuery?: boolean
+        ) => ({
+          image,
+          preserveNavigationQuery,
+          projectId,
+          selectionPage,
+        })
       ),
       setCompareImage: command(
         'setGalleryCompareImage',
@@ -127,8 +145,6 @@ const createCommands = (dispatch: WorkbenchDispatch, getState: () => WorkbenchSt
           projectId,
         })
       ),
-      touch: command('touchGalleryRefresh', (projectId?: string) => ({ projectId })),
-      touchImages: command('touchGalleryImagesRefresh', (projectId?: string) => ({ projectId })),
       updateSettings: command(
         'updateGallerySettings',
         (settings: ActionPayload<'updateGallerySettings'>['settings'], projectId?: string) => ({
@@ -279,7 +295,6 @@ const createCommands = (dispatch: WorkbenchDispatch, getState: () => WorkbenchSt
       clearCompleted: command('clearCompletedQueueItems'),
       markBackendCancelled: command('markQueueItemBackendCancelled'),
       markBackendSubmitted: command('markQueueItemBackendSubmitted'),
-      refreshBackendData: command('refreshBackendData'),
       routePartialResults: command('routeQueueItemPartialResults'),
       routeResults: command('routeQueueItemResults'),
       setConnectionStatus: command('setBackendConnectionStatus'),

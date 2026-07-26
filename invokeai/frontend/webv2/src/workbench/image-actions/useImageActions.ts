@@ -7,6 +7,7 @@ import {
   type GalleryBoard,
   type GalleryImage,
 } from '@features/gallery';
+import { invalidateGallery, invalidateGalleryImages, patchGalleryImageCaches } from '@features/gallery/queries';
 import { getMaxReferenceImages, isVaeModelConfig, isSupportedGenerateModel } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
 import { useMountEffect } from '@platform/react/useMountEffect';
@@ -15,6 +16,7 @@ import {
   captureAccountScope,
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   getCanvasImportNotice,
   getCanvasEngine,
@@ -39,8 +41,8 @@ import {
 
 /**
  * Image operations shared by every surface that shows backend images (gallery
- * grid, preview, image context menus). Each mutation notifies the gallery via
- * a refresh action so any mounted gallery widget refetches affected backend data.
+ * grid, preview, image context menus). Mutations patch the shared Gallery cache
+ * when possible and explicitly invalidate the affected server state.
  */
 export interface ImageActions {
   /** Whether the generate widget's current model can accept another reference image. */
@@ -91,7 +93,6 @@ export const useImageActions = ({
   boards,
   generateValues,
   onImagesDeleted,
-  onStarredChange,
   projectId,
 }: {
   boards: GalleryBoard[];
@@ -99,13 +100,12 @@ export const useImageActions = ({
   projectId?: string;
   /** Called after a successful deletion so the host can select a neighboring image. */
   onImagesDeleted?: (imageNames: string[]) => void;
-  /** Optional optimistic hook, called before the request and re-called inverted on failure. */
-  onStarredChange?: (imageNames: string[], starred: boolean) => void;
 }): ImageActions => {
   const openWorkbenchWidget = useOpenWorkbenchWidget();
   const commands = useWorkbenchCommands();
   const { gallery, generation, notifications } = commands;
   const queries = useWorkbenchQueries();
+  const queryClient = useQueryClient();
   const { t } = useTranslation();
   const models = useModelsSelector((snapshot) => snapshot.models);
   const supportedModels = useMemo(() => models.filter(isSupportedGenerateModel), [models]);
@@ -127,8 +127,6 @@ export const useImageActions = ({
         projectId,
       });
     const recordSuccess = (title: string, message?: string) => notifications.add({ kind: 'success', message, title });
-    const refreshGallery = () => gallery.touch(projectId);
-    const refreshGalleryImages = () => gallery.touchImages(projectId);
     const getBoardName = (boardId: string) => boards.find((board) => board.id === boardId)?.name ?? 'Uncategorized';
     const getLatestGenerateValues = () => {
       const snapshot = queries.getSnapshot();
@@ -169,10 +167,11 @@ export const useImageActions = ({
           await galleryOrganization.deleteImages(imageNames, owner.signal);
 
           assertAccountScopeCurrent(owner);
-          gallery.removeImages(imageNames, projectId);
+          patchGalleryImageCaches(queryClient, { imageNames, kind: 'delete' });
+          gallery.removeImages(imageNames);
           onImagesDeleted?.(imageNames);
           recordSuccess(imageNames.length === 1 ? 'Deleted image' : `Deleted ${imageNames.length} images`);
-          refreshGallery();
+          void invalidateGallery(queryClient);
         } catch (error: unknown) {
           if (!isAccountScopeCurrent(owner)) {
             return;
@@ -269,12 +268,14 @@ export const useImageActions = ({
           }
 
           assertAccountScopeCurrent(owner);
+          patchGalleryImageCaches(queryClient, { boardId, imageNames, kind: 'move' });
+          gallery.patchImages(imageNames, { boardId });
           recordSuccess(
             imageNames.length === 1
               ? `Moved image to ${getBoardName(boardId)}`
               : `Moved ${imageNames.length} images to ${getBoardName(boardId)}`
           );
-          refreshGallery();
+          void invalidateGallery(queryClient);
         } catch (error: unknown) {
           if (!isAccountScopeCurrent(owner)) {
             return;
@@ -351,20 +352,22 @@ export const useImageActions = ({
       },
       setImagesStarred: async (imageNames, starred) => {
         const owner = captureAccountScope();
-
-        onStarredChange?.(imageNames, starred);
+        const rollback = patchGalleryImageCaches(queryClient, { imageNames, kind: 'star', starred });
 
         try {
           await galleryOrganization.setStarred(imageNames, starred, owner.signal);
 
           assertAccountScopeCurrent(owner);
-          refreshGalleryImages();
+          gallery.patchImages(imageNames, { starred });
+          void invalidateGalleryImages(queryClient);
         } catch (error: unknown) {
+          rollback();
+
           if (!isAccountScopeCurrent(owner)) {
             return;
           }
 
-          onStarredChange?.(imageNames, !starred);
+          void invalidateGalleryImages(queryClient);
           recordError(error);
         }
       },
@@ -393,9 +396,9 @@ export const useImageActions = ({
     models,
     notifications,
     onImagesDeleted,
-    onStarredChange,
     openWorkbenchWidget,
     projectId,
+    queryClient,
     queries,
     supportedModels,
     t,
