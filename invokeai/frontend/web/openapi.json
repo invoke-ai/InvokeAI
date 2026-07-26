@@ -33066,8 +33066,12 @@
             "anyOf": [
               {
                 "items": {
+                  "maximum": 1000,
+                  "minimum": 0,
                   "type": "integer"
                 },
+                "maxItems": 4,
+                "minItems": 4,
                 "type": "array"
               },
               {

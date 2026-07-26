@@ -63,18 +63,22 @@ export const AdvancedSettingsAccordion = memo(() => {
 
   const selectBadges = useMemo(
     () =>
-      createMemoizedSelector([selectParamsSlice, selectIsFLUX, selectIsFlux2], (params, isFLUX, isFlux2) => {
-        const badges: (string | number)[] = [];
-        // FLUX.2 has VAE built into main model - no badge needed
-        if (isFLUX && !isFlux2) {
-          if (vaeConfig) {
-            let vaeBadge = vaeConfig.name;
-            if (params.vaePrecision === 'fp16') {
-              vaeBadge += ` ${params.vaePrecision}`;
+      createMemoizedSelector(
+        [selectParamsSlice, selectIsFLUX, selectIsFlux2, selectIsIdeogram4],
+        (params, isFLUX, isFlux2, isIdeogram4) => {
+          const badges: (string | number)[] = [];
+          // FLUX.2 has VAE built into main model - no badge needed
+          if (isFLUX && !isFlux2) {
+            if (vaeConfig) {
+              let vaeBadge = vaeConfig.name;
+              if (params.vaePrecision === 'fp16') {
+                vaeBadge += ` ${params.vaePrecision}`;
+              }
+              badges.push(vaeBadge);
             }
-            badges.push(vaeBadge);
-          }
-        } else if (!isFlux2) {
+            // Ideogram 4 hides the VAE / clip skip / CFG rescale / seamless controls (they don't apply),
+            // so it must not advertise stale badges for them either.
+          } else if (!isFlux2 && !isIdeogram4) {
           if (vaeConfig) {
             let vaeBadge = vaeConfig.name;
             if (params.vaePrecision === 'fp16') {

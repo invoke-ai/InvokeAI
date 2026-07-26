@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Annotated, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -10,12 +10,20 @@ from invokeai.backend.ideogram4.caption import build_ideogram4_caption
 
 _IDEOGRAM4_COORD_MAX = 1000
 
+# Exactly four normalized coordinates [y_min, x_min, y_max, x_max], each in 0..1000. Modeled as a
+# constrained type so the generated OpenAPI schema advertises minItems/maxItems and per-item
+# minimum/maximum — clients get the contract from the schema, not only from runtime validation.
+Ideogram4Bbox = Annotated[
+    list[Annotated[int, Field(ge=0, le=_IDEOGRAM4_COORD_MAX)]],
+    Field(min_length=4, max_length=4),
+]
+
 
 class Ideogram4Region(BaseModel):
     """A single region of an Ideogram 4 structured caption (description + optional bounding box)."""
 
     prompt: str = Field(description="The region's description (becomes the element's `desc`).")
-    bbox: Optional[list[int]] = Field(
+    bbox: Optional[Ideogram4Bbox] = Field(
         default=None,
         description="Normalized bounding box [y_min, x_min, y_max, x_max] (0–1000), or null for a region "
         "with no drawn content.",
@@ -24,18 +32,20 @@ class Ideogram4Region(BaseModel):
     @field_validator("bbox")
     @classmethod
     def _validate_bbox(cls, v: Optional[list[int]]) -> Optional[list[int]]:
-        """Enforce the model contract: exactly four coordinates, each normalized to 0..1000.
+        """Enforce the ordering the constrained type can't express: y_min <= y_max and x_min <= x_max.
 
-        The caption builder forwards the bbox verbatim into the structured JSON, so an ill-formed box
-        (wrong length or out-of-range) would emit a malformed prompt the model may misapply. Reject it
-        here instead of serializing it.
+        Length (exactly 4) and range (0..1000) are enforced by the Ideogram4Bbox type. The caption
+        builder forwards the bbox verbatim into the structured JSON, so an inverted box would emit a
+        malformed prompt the model may misapply — reject it here.
         """
         if v is None:
             return v
-        if len(v) != 4:
-            raise ValueError(f"bbox must have exactly 4 values [y_min, x_min, y_max, x_max], got {len(v)}: {v}")
-        if any(c < 0 or c > _IDEOGRAM4_COORD_MAX for c in v):
-            raise ValueError(f"bbox coordinates must each be in the range 0..{_IDEOGRAM4_COORD_MAX}, got {v}")
+        y_min, x_min, y_max, x_max = v
+        if y_min > y_max or x_min > x_max:
+            raise ValueError(
+                f"bbox must satisfy y_min <= y_max and x_min <= x_max, got [y_min={y_min}, x_min={x_min}, "
+                f"y_max={y_max}, x_max={x_max}]"
+            )
         return v
 
 

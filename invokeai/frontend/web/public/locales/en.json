@@ -2924,6 +2924,7 @@
             "rgReferenceImagesNotSupported": "regional Reference Images not supported for selected base model",
             "rgAutoNegativeNotSupported": "Auto-Negative not supported for selected base model",
             "rgNoRegion": "no region drawn",
+            "ideogram4Txt2ImgOnly": "Ideogram 4 is text-to-image only; raster layers and inpaint masks are not supported",
             "fluxFillIncompatibleWithControlLoRA": "Control LoRA is not compatible with FLUX Fill",
             "controlAdapterDuplicateAnimaLLLiteModel": "each Anima control model can only be used by one Control Layer",
             "bboxHidden": "Bounding box is hidden (shift+o to toggle)"

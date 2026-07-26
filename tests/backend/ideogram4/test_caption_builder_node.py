@@ -28,6 +28,8 @@ def test_none_bbox_is_accepted():
         [0, 0, 1000, 1000, 7],  # too long
         [-1, 0, 1000, 1000],  # negative
         [0, 0, 1000, 1001],  # above 1000
+        [900, 900, 100, 100],  # inverted (y_min > y_max and x_min > x_max)
+        [0, 900, 1000, 100],  # inverted x only (x_min > x_max)
     ],
 )
 def test_malformed_bbox_is_rejected(bbox: list[int]):
