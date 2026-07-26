@@ -7,6 +7,7 @@ storage before rejection. The middleware bounds ingress before the parser runs.
 
 import asyncio
 import tempfile
+import time
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -381,6 +382,56 @@ def test_production_upload_authentication(
         headers.append((b"authorization", f"Bearer {create_access_token(token_data)}".encode()))
 
     assert _identify_video_upload_user({"headers": headers}) == expected  # type: ignore[arg-type]
+
+
+def test_upload_authentication_does_not_block_the_event_loop(monkeypatch: pytest.MonkeyPatch) -> None:
+    set_jwt_secret("test-secret-key-for-unit-tests-only-do-not-use-in-production")
+    token = create_access_token(TokenData(user_id="user", email="user@example.com", is_admin=False))
+
+    def slow_get(_user_id: str) -> SimpleNamespace:
+        time.sleep(0.1)
+        return SimpleNamespace(is_active=True)
+
+    invoker = SimpleNamespace(
+        services=SimpleNamespace(
+            configuration=SimpleNamespace(multiuser=True),
+            users=SimpleNamespace(get=slow_get),
+        )
+    )
+    monkeypatch.setattr(api_app.ApiDependencies, "invoker", invoker, raising=False)
+
+    async def inner_app(scope, receive, send):
+        await Response(status_code=200)(scope, receive, send)
+
+    middleware = VideoUploadLimitASGIMiddleware(
+        inner_app,
+        max_body_bytes=MAX_BODY,
+        max_concurrent=MAX_CONCURRENT,
+        identify_user=_identify_video_upload_user,
+    )
+    scope = {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/v1/videos/upload",
+        "root_path": "",
+        "headers": [(b"authorization", f"Bearer {token}".encode()), (b"content-length", b"0")],
+    }
+
+    async def receive() -> dict[str, Any]:
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    async def send(_message: dict[str, Any]) -> None:
+        pass
+
+    async def run() -> float:
+        started = time.monotonic()
+        upload = asyncio.create_task(middleware(scope, receive, send))  # type: ignore[arg-type]
+        await asyncio.sleep(0.01)
+        heartbeat_elapsed = time.monotonic() - started
+        await upload
+        return heartbeat_elapsed
+
+    assert asyncio.run(run()) < 0.05
 
 
 def test_upload_video_closes_tmp_handle_when_stream_copy_fails():

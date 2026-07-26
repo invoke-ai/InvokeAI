@@ -5,6 +5,7 @@ import pytest
 import torch
 
 from invokeai.app.invocations.wan_latents_to_video import (
+    WanLatentsToVideoInvocation,
     _iter_decoded_frames,
     _validate_video_latent_batch,
     _write_video_frames,
@@ -59,3 +60,23 @@ def test_single_video_latent_batch_is_accepted(shape: tuple[int, ...]) -> None:
 def test_multiple_video_latent_batches_are_rejected(shape: tuple[int, ...]) -> None:
     with pytest.raises(ValueError, match="batch size 1"):
         _validate_video_latent_batch(torch.zeros(shape))
+
+
+@pytest.mark.parametrize(
+    "shape",
+    [(1, 16, 0, 4, 4), (1, 16, 2, 0, 4), (1, 16, 2, 4, 0)],
+    ids=["temporal", "height", "width"],
+)
+def test_empty_video_latent_dimensions_are_rejected_before_vae_load(shape: tuple[int, ...]) -> None:
+    context = MagicMock()
+    context.tensors.load.return_value = torch.zeros(shape)
+    invocation = WanLatentsToVideoInvocation.model_construct(
+        latents=MagicMock(latents_name="latents"),
+        vae=MagicMock(vae=MagicMock()),
+        fps=16,
+    )
+
+    with pytest.raises(ValueError, match="non-empty"):
+        invocation.invoke(context)
+
+    context.models.load.assert_not_called()

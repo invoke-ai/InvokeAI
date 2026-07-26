@@ -1,5 +1,6 @@
 """Tests for multiuser boards functionality."""
 
+import inspect
 from contextlib import nullcontext
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -9,6 +10,7 @@ from fastapi import status
 from fastapi.testclient import TestClient
 
 from invokeai.app.api.dependencies import ApiDependencies
+from invokeai.app.api.routers.boards import delete_board
 from invokeai.app.api_app import app
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.users.users_common import UserCreateRequest
@@ -889,3 +891,7 @@ def test_delete_board_without_include_images_lists_uncategorized_videos(
     assert body["deleted_board_videos"] == ["v1.mp4"]
     # delete_videos_on_board MUST NOT be invoked when include_images is false.
     mock_invoker.services.videos.delete_videos_on_board.assert_not_called()
+
+
+def test_delete_board_is_offloaded_by_fastapi() -> None:
+    assert not inspect.iscoroutinefunction(delete_board)

@@ -20,11 +20,12 @@ import pytest
 import torch
 import torch.nn as nn
 
-from invokeai.app.invocations.fields import WanConditioningField, WanRefImageConditioningField
-from invokeai.app.invocations.model import WanTransformerField
+from invokeai.app.invocations.fields import ImageField, LatentsField, WanConditioningField, WanRefImageConditioningField
+from invokeai.app.invocations.model import ModelIdentifierField, VAEField, WanTransformerField
 from invokeai.app.invocations.wan_denoise import WanDenoiseInvocation
+from invokeai.app.invocations.wan_ref_image_encoder import WanRefImageEncoderInvocation
 from invokeai.app.invocations.wan_video_denoise import WanVideoDenoiseInvocation
-from invokeai.backend.model_manager.taxonomy import WanVariantType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, WanVariantType
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     ConditioningFieldData,
     WanConditioningInfo,
@@ -974,6 +975,83 @@ def _make_video_invocation(
         guidance_scale=guidance_scale,
         seed=42,
     )
+
+
+@pytest.mark.parametrize("invocation_type", ["image", "video", "reference"])
+@pytest.mark.parametrize(
+    ("width", "height"),
+    [(0, 64), (-16, 64), (64, 0), (64, -16)],
+    ids=["zero-width", "negative-width", "zero-height", "negative-height"],
+)
+def test_spatial_dimensions_must_be_positive(invocation_type: str, width: int, height: int) -> None:
+    with pytest.raises(ValueError):
+        if invocation_type == "image":
+            _make_invocation(
+                _wan_transformer_field(),
+                WanConditioningField(conditioning_name="pos"),
+                None,
+                width=width,
+                height=height,
+                steps=1,
+                guidance_scale=1.0,
+            )
+        elif invocation_type == "video":
+            _make_video_invocation(width=width, height=height)
+        else:
+            vae_id = ModelIdentifierField(
+                key="wan-vae",
+                hash="h",
+                name="wan-vae",
+                base=BaseModelType.Wan,
+                type=ModelType.VAE,
+            )
+            WanRefImageEncoderInvocation(
+                id="test",
+                image=ImageField(image_name="image.png"),
+                vae=VAEField(vae=vae_id),
+                width=width,
+                height=height,
+            )
+
+
+@pytest.mark.parametrize(
+    ("shape", "error"),
+    [
+        ((16, 8, 8), "4D"),
+        ((2, 16, 8, 8), "batch size 1"),
+        ((1, 16, 2, 8, 8), "single-frame"),
+        ((1, 48, 8, 8), "16 channels"),
+        ((1, 16, 4, 8), "8x8"),
+    ],
+    ids=["rank", "batch", "temporal", "channels", "spatial"],
+)
+def test_initial_latents_must_match_image_denoise_contract(
+    shape: tuple[int, ...], error: str, fake_model_root: Path
+) -> None:
+    ctx = _build_context(
+        _ZeroTransformer(),
+        variant=WanVariantType.T2V_A14B,
+        model_root=fake_model_root,
+        pos_cond=_make_conditioning(),
+        neg_cond=None,
+    )
+    ctx.tensors.load.return_value = torch.zeros(*shape)
+    invocation = _make_invocation(
+        _wan_transformer_field(),
+        WanConditioningField(conditioning_name="pos"),
+        None,
+        width=64,
+        height=64,
+        steps=1,
+        guidance_scale=1.0,
+    )
+    invocation.latents = LatentsField(latents_name="init")
+    invocation.add_noise = False
+    invocation.denoising_start = 0.1
+    invocation.denoising_end = 0.2
+
+    with pytest.raises(ValueError, match=error):
+        invocation._run_diffusion(ctx)
 
 
 class TestWanVideoDenoiseMultiFrame:

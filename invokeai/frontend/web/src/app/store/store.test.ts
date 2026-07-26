@@ -1,6 +1,10 @@
-import { logout, sessionExpiredLogout } from 'features/auth/store/authSlice';
+import { Buffer } from 'node:buffer';
+
+import { externalTokenAdopted, logout, sessionExpiredLogout, setCredentials } from 'features/auth/store/authSlice';
 import { isModalOpenChanged, videosToChangeSelected } from 'features/changeBoardModal/store/slice';
-import { cancelDeletion, deleteVideosWithDialog } from 'features/deleteVideoModal/store/state';
+import { positivePromptChanged } from 'features/controlLayers/store/paramsSlice';
+import { deleteVideosWithDialog } from 'features/deleteVideoModal/store/state';
+import { autoAddBoardIdChanged, boardIdSelected, selectionChanged } from 'features/gallery/store/gallerySlice';
 import { appInfoApi } from 'services/api/endpoints/appInfo';
 import type { S } from 'services/api/types';
 import { describe, expect, it } from 'vitest';
@@ -11,6 +15,17 @@ const runtimeConfig = {
   set_fields: ['models_dir'],
   config: { models_dir: '/operator-only/models' },
 } as S['InvokeAIAppConfigWithSetFields'];
+
+const user = {
+  user_id: 'user',
+  email: 'user@example.com',
+  display_name: null,
+  is_admin: false,
+  is_active: true,
+};
+
+const tokenFor = (userId: string) =>
+  `header.${Buffer.from(JSON.stringify({ user_id: userId })).toString('base64url')}.signature`;
 
 describe('auth cache isolation', () => {
   it.each([
@@ -25,6 +40,51 @@ describe('auth cache isolation', () => {
     store.dispatch(logOut());
 
     expect(appInfoApi.endpoints.getRuntimeConfig.select()(store.getState()).data).toBeUndefined();
+  });
+
+  it('clears API data when another tab changes users', async () => {
+    const store = createStore();
+
+    store.dispatch(setCredentials({ token: tokenFor(user.user_id), user }));
+    await store.dispatch(appInfoApi.util.upsertQueryData('getRuntimeConfig', undefined, runtimeConfig));
+    store.dispatch(externalTokenAdopted(tokenFor('other-user')));
+
+    expect(appInfoApi.endpoints.getRuntimeConfig.select()(store.getState()).data).toBeUndefined();
+  });
+
+  it('retains API data when another tab refreshes the same user token', async () => {
+    const store = createStore();
+
+    store.dispatch(setCredentials({ token: tokenFor(user.user_id), user }));
+    await store.dispatch(appInfoApi.util.upsertQueryData('getRuntimeConfig', undefined, runtimeConfig));
+    store.dispatch(externalTokenAdopted(tokenFor(user.user_id)));
+
+    expect(appInfoApi.endpoints.getRuntimeConfig.select()(store.getState()).data).toEqual(runtimeConfig);
+  });
+
+  it('clears gallery ownership state on a cross-tab account switch', () => {
+    const store = createStore();
+    store.dispatch(boardIdSelected({ boardId: 'previous-user-private-board' }));
+    store.dispatch(autoAddBoardIdChanged('previous-user-private-board'));
+    store.dispatch(selectionChanged(['previous-user-video.mp4']));
+
+    store.dispatch(externalTokenAdopted(tokenFor('other-user')));
+
+    expect(store.getState().gallery).toMatchObject({
+      selectedBoardId: 'none',
+      autoAddBoardId: 'none',
+      selection: [],
+    });
+  });
+
+  it('clears private workspace state on a cross-tab account switch', () => {
+    const store = createStore();
+    store.dispatch(setCredentials({ token: tokenFor(user.user_id), user }));
+    store.dispatch(positivePromptChanged('previous user private prompt'));
+
+    store.dispatch(externalTokenAdopted(tokenFor('other-user')));
+
+    expect(store.getState().params.positivePrompt).toBe('');
   });
 
   it.each([
@@ -49,24 +109,10 @@ describe('auth cache isolation', () => {
     ['session expiry', sessionExpiredLogout],
   ])('settles a pending video deletion dialog on %s', async (_label, logOut) => {
     const store = createStore();
-    let settled = false;
-    const pending = deleteVideosWithDialog(['previous-user-video.mp4'], store).then(
-      () => {
-        settled = true;
-      },
-      () => {
-        settled = true;
-      }
-    );
+    const pending = deleteVideosWithDialog(['previous-user-video.mp4'], store);
 
     store.dispatch(logOut());
-    await Promise.resolve();
-    const settledOnLogout = settled;
 
-    // Keep this proof test isolated even while the production behavior is broken.
-    cancelDeletion();
-    await pending;
-
-    expect(settledOnLogout).toBe(true);
+    await expect(pending).rejects.toBe('User canceled');
   });
 });

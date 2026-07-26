@@ -29,6 +29,14 @@ describe('gallery comparison state', () => {
     expect(state.imageToCompare).toBeNull();
   });
 
+  it('keeps comparison when the active item in a mixed selection is an image', () => {
+    let state = reducer(undefined, imageToCompareChanged('comparison.png'));
+
+    state = reducer(state, selectionChanged(['selected.mp4', 'selected.png']));
+
+    expect(state.imageToCompare).toBe('comparison.png');
+  });
+
   it('rejects a video as the comparison item', () => {
     const state = reducer(undefined, imageToCompareChanged('comparison.mp4'));
 

@@ -1,12 +1,19 @@
 """Tests for Wan loader helpers (native -> diffusers key conversion)."""
 
+from contextlib import nullcontext
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
+
 import gguf
+import pytest
 import torch
 
 from invokeai.backend.model_manager.load.model_loaders.wan import (
+    WanGGUFCheckpointModel,
     _convert_wan_native_to_diffusers,
     _unwrap_unquantized_to_compute_dtype,
 )
+from invokeai.backend.model_manager.taxonomy import WanVariantType
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 
 
@@ -173,3 +180,35 @@ class TestUnwrapUnquantized:
         sd = {"plain": plain}
         out = _unwrap_unquantized_to_compute_dtype(sd)
         assert out["plain"] is plain
+
+
+def test_gguf_loader_rejects_missing_model_parameter() -> None:
+    state_dict = {
+        "patch_embedding.weight": torch.zeros(128, 16, 1, 2, 2),
+        "blocks.0.ffn.net.0.proj.weight": torch.zeros(256, 128),
+        "proj_out.weight": torch.zeros(64, 128),
+    }
+    model = MagicMock()
+    model.load_state_dict.return_value = SimpleNamespace(
+        missing_keys=["blocks.0.attn1.to_q.weight"],
+        unexpected_keys=[],
+    )
+    config = SimpleNamespace(path="/models/wan.gguf", variant=WanVariantType.T2V_A14B)
+    loader = object.__new__(WanGGUFCheckpointModel)
+
+    with (
+        patch("invokeai.backend.model_manager.load.model_loaders.wan.gguf_sd_loader", return_value=state_dict),
+        patch(
+            "invokeai.backend.model_manager.load.model_loaders.wan._unwrap_unquantized_to_compute_dtype",
+            side_effect=lambda value: value,
+        ),
+        patch("invokeai.backend.model_manager.load.model_loaders.wan.TorchDevice.choose_torch_device"),
+        patch(
+            "invokeai.backend.model_manager.load.model_loaders.wan.TorchDevice.choose_bfloat16_safe_dtype",
+            return_value=torch.bfloat16,
+        ),
+        patch("accelerate.init_empty_weights", return_value=nullcontext()),
+        patch("diffusers.WanTransformer3DModel", return_value=model),
+        pytest.raises(RuntimeError, match="missing"),
+    ):
+        loader._load_from_singlefile(config)

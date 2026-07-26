@@ -279,6 +279,36 @@ class TestStreamedDecoderIsBounded:
         assert len(errors) == 1
         assert isinstance(errors[0], TimeoutError)
 
+    def test_probe_timeout_includes_waiting_for_decoder_capacity(self, tmp_path: Path) -> None:
+        target = tmp_path / "never-opened.mp4"
+        errors: list[BaseException] = []
+        finished = Event()
+        acquired = 0
+        for _ in range(video_thumbnails.MAX_CONCURRENT_VIDEO_DECODERS):
+            assert video_thumbnails._VIDEO_DECODER_SLOTS.acquire(timeout=1)
+            acquired += 1
+
+        def probe() -> None:
+            try:
+                probe_video(target, timeout=0.1)
+            except BaseException as error:
+                errors.append(error)
+            finally:
+                finished.set()
+
+        thread = threading.Thread(target=probe)
+        thread.start()
+        try:
+            finished_within_timeout = finished.wait(timeout=0.3)
+        finally:
+            for _ in range(acquired):
+                video_thumbnails._VIDEO_DECODER_SLOTS.release()
+            thread.join(timeout=2)
+
+        assert finished_within_timeout, "probe timeout did not include the wait for decoder capacity"
+        assert len(errors) == 1
+        assert isinstance(errors[0], FileNotFoundError)
+
     def test_midstream_worker_failure_includes_stderr(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         target = tmp_path / "failed.mp4"
         target.write_bytes(b"unused")

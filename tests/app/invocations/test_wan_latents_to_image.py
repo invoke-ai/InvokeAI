@@ -49,6 +49,20 @@ def test_error_points_at_the_video_decode_node() -> None:
         _make_invocation().invoke(ctx)
 
 
+@pytest.mark.parametrize(
+    "shape",
+    [(2, 16, 8, 8), (2, 16, 1, 8, 8)],
+    ids=["4d", "5d-single-frame"],
+)
+def test_multi_image_batch_rejected_before_vae_load(shape: tuple[int, ...]) -> None:
+    ctx = _make_context(torch.zeros(*shape))
+
+    with pytest.raises(ValueError, match="batch size 1"):
+        _make_invocation().invoke(ctx)
+
+    ctx.models.load.assert_not_called()
+
+
 @pytest.mark.parametrize("shape", [(16, 8, 8), (1, 1, 16, 1, 8, 8)], ids=["3d", "6d"])
 def test_invalid_rank_rejected_before_vae_load(shape: tuple[int, ...]) -> None:
     ctx = _make_context(torch.zeros(*shape))

@@ -36,5 +36,12 @@ describe('protected media consumers', () => {
 
     expect(source).toContain('openMediaInNewTab');
     expect(source).not.toContain('href={video.video_url}');
+    expect(source).not.toContain('href={videoUrl}');
+  });
+
+  it('opens the video metadata link only for primary or middle clicks', () => {
+    const source = readConsumer('../../gallery/components/ImageMetadataViewer/VideoMetadataViewer.tsx');
+
+    expect(source).toContain('event.button === 1');
   });
 });

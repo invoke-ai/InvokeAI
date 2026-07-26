@@ -1,9 +1,10 @@
+import { Buffer } from 'node:buffer';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { authSliceConfig, currentUserUpdated, setCredentials, tokenRefreshed } from './authSlice';
+import { authSliceConfig, currentUserUpdated, externalTokenAdopted, setCredentials, tokenRefreshed } from './authSlice';
 
 const user = {
   user_id: 'user',
@@ -13,12 +14,33 @@ const user = {
   is_active: true,
 };
 
+const tokenFor = (userId: string) =>
+  `header.${Buffer.from(JSON.stringify({ user_id: userId })).toString('base64url')}.signature`;
+
 describe('refreshed token consumers', () => {
   it('updates the Redux token used by socket reconnects', () => {
     let state = authSliceConfig.slice.reducer(undefined, setCredentials({ token: 'old', user }));
     state = authSliceConfig.slice.reducer(state, tokenRefreshed('new'));
 
     expect(state.token).toBe('new');
+  });
+
+  it('clears the previous user when adopting a token from another tab', () => {
+    let state = authSliceConfig.slice.reducer(undefined, setCredentials({ token: tokenFor(user.user_id), user }));
+    state = authSliceConfig.slice.reducer(state, externalTokenAdopted(tokenFor('other-user')));
+
+    expect(state.token).toBe(tokenFor('other-user'));
+    expect(state.user).toBeNull();
+    expect(state.isAuthenticated).toBe(true);
+  });
+
+  it('preserves the current user when another tab refreshes the same account token', () => {
+    let state = authSliceConfig.slice.reducer(undefined, setCredentials({ token: tokenFor(user.user_id), user }));
+    state = authSliceConfig.slice.reducer(state, externalTokenAdopted(tokenFor(user.user_id)));
+
+    expect(state.token).toBe(tokenFor(user.user_id));
+    expect(state.user).toEqual(user);
+    expect(state.isAuthenticated).toBe(true);
   });
 
   it('updates profile data without replacing the refreshed token', () => {
@@ -61,6 +83,6 @@ describe('refreshed token consumers', () => {
     );
 
     expect(protectedRouteSource).toContain("localStorage.getItem('auth_token')");
-    expect(protectedRouteSource).toContain('dispatch(tokenRefreshed(');
+    expect(protectedRouteSource).toContain('dispatch(externalTokenAdopted(');
   });
 });

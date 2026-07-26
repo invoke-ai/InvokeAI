@@ -42,6 +42,7 @@ def _invoke(
     *,
     use_component_vae: bool = False,
     vae_latent_channels: int | None = None,
+    vae_config: SimpleNamespace | None = None,
     t5_config: SimpleNamespace | None = None,
 ):
     main = _model("main")
@@ -56,7 +57,12 @@ def _invoke(
     if not use_component_vae:
         if vae_latent_channels is None:
             vae_latent_channels = 48 if getattr(main_config, "variant", None) == WanVariantType.TI2V_5B else 16
-        configs["vae"] = SimpleNamespace(name="vae", latent_channels=vae_latent_channels)
+        configs["vae"] = vae_config or SimpleNamespace(
+            name="vae",
+            latent_channels=vae_latent_channels,
+            base=BaseModelType.Wan,
+            type=ModelType.VAE,
+        )
     configs["t5"] = t5_config or SimpleNamespace(
         name="t5",
         base=BaseModelType.Any,
@@ -273,6 +279,19 @@ def test_loader_rejects_forged_non_wan_t5_identifier() -> None:
         )
 
 
+def test_loader_rejects_forged_non_wan_vae_identifier() -> None:
+    with pytest.raises(ValueError, match="Wan VAE"):
+        _invoke(
+            _config("main", WanVariantType.T2V_A14B, "high"),
+            vae_config=SimpleNamespace(
+                name="not-vae",
+                latent_channels=16,
+                base=BaseModelType.StableDiffusionXL,
+                type=ModelType.Main,
+            ),
+        )
+
+
 def test_loader_rejects_forged_non_wan_component_source_identifier() -> None:
     with pytest.raises(ValueError, match="Wan.*Component Source|Component Source.*Wan"):
         _invoke(
@@ -284,4 +303,19 @@ def test_loader_rejects_forged_non_wan_component_source_identifier() -> None:
                 type=ModelType.Main,
             ),
             use_component_vae=True,
+        )
+
+
+def test_loader_rejects_forged_component_source_even_with_standalone_components() -> None:
+    with pytest.raises(ValueError, match="Wan.*Component Source|Component Source.*Wan"):
+        _invoke(
+            _config("main", WanVariantType.T2V_A14B, "high"),
+            component_config=SimpleNamespace(
+                name="not-wan",
+                format=ModelFormat.Diffusers,
+                variant=WanVariantType.T2V_A14B,
+                boundary_ratio=0.5,
+                base=BaseModelType.StableDiffusionXL,
+                type=ModelType.Main,
+            ),
         )
