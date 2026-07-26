@@ -103,7 +103,9 @@ const slice = createSlice({
       state.ideogram4SamplerPreset = action.payload;
     },
     setIdeogram4Steps: (state, action: PayloadAction<number | null>) => {
-      state.ideogram4Steps = action.payload;
+      // Normalize through the schema so a stale/out-of-range value (e.g. 1, below the backend's min of 2)
+      // becomes null (= use preset) rather than being dispatched straight into the graph.
+      state.ideogram4Steps = zParamsState.shape.ideogram4Steps.parse(action.payload);
     },
     setIdeogram4GuidanceScale: (state, action: PayloadAction<number | null>) => {
       state.ideogram4GuidanceScale = action.payload;

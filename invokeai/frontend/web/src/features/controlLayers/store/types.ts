@@ -823,7 +823,10 @@ export const zParamsState = z.object({
   // Defaults make these resilient to rehydration of persisted state saved before the fields existed.
   ideogram4SamplerPreset: zParameterIdeogram4SamplerPreset.default('V4_QUALITY_48'),
   // Optional advanced overrides of the Ideogram 4 sampler preset (null = use the preset's value).
-  ideogram4Steps: z.number().int().min(1).max(100).nullable().default(null),
+  // Backend requires steps >= 2 (a polish and a main step). `.catch(null)` normalizes a stale/invalid
+  // persisted or recalled value (e.g. 1 from an older build) to null (= use preset) instead of letting an
+  // out-of-range value reach the graph or breaking the whole persisted params slice on rehydrate.
+  ideogram4Steps: z.number().int().min(2).max(100).nullable().catch(null).default(null),
   ideogram4GuidanceScale: z.number().min(1).max(20).nullable().default(null),
   ideogram4Mu: z.number().min(-4).max(4).nullable().default(null),
   // Hex colors (#RRGGBB) injected into the JSON caption's style_description.color_palette.

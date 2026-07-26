@@ -939,7 +939,8 @@ const Ideogram4Steps: SingleMetadataHandler<number | null> = {
     if (raw === null || raw === 'auto') {
       return Promise.resolve(null);
     }
-    return Promise.resolve(z.number().int().min(1).max(100).parse(raw));
+    // Backend requires steps >= 2; refuse a stale/out-of-range recalled value instead of recalling it.
+    return Promise.resolve(z.number().int().min(2).max(100).parse(raw));
   },
   recall: (value, store) => {
     if (selectBase(store.getState()) !== 'ideogram-4') {

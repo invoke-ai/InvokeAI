@@ -1,12 +1,14 @@
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
 from invokeai.app.invocations.fields import InputField, UIComponent
 from invokeai.app.invocations.primitives import StringOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.ideogram4.caption import build_ideogram4_caption
+
+_IDEOGRAM4_COORD_MAX = 1000
 
 
 class Ideogram4Region(BaseModel):
@@ -18,6 +20,23 @@ class Ideogram4Region(BaseModel):
         description="Normalized bounding box [y_min, x_min, y_max, x_max] (0–1000), or null for a region "
         "with no drawn content.",
     )
+
+    @field_validator("bbox")
+    @classmethod
+    def _validate_bbox(cls, v: Optional[list[int]]) -> Optional[list[int]]:
+        """Enforce the model contract: exactly four coordinates, each normalized to 0..1000.
+
+        The caption builder forwards the bbox verbatim into the structured JSON, so an ill-formed box
+        (wrong length or out-of-range) would emit a malformed prompt the model may misapply. Reject it
+        here instead of serializing it.
+        """
+        if v is None:
+            return v
+        if len(v) != 4:
+            raise ValueError(f"bbox must have exactly 4 values [y_min, x_min, y_max, x_max], got {len(v)}: {v}")
+        if any(c < 0 or c > _IDEOGRAM4_COORD_MAX for c in v):
+            raise ValueError(f"bbox coordinates must each be in the range 0..{_IDEOGRAM4_COORD_MAX}, got {v}")
+        return v
 
 
 @invocation(
