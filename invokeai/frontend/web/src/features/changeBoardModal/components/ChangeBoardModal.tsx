@@ -8,8 +8,10 @@ import {
   changeBoardReset,
   isModalOpenChanged,
   selectChangeBoardModalSlice,
+  videosToChangeSelected,
 } from 'features/changeBoardModal/store/slice';
 import { selectSelectedBoardId } from 'features/gallery/store/gallerySelectors';
+import { toast } from 'features/toast/toast';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
@@ -78,7 +80,7 @@ const ChangeBoardModal = () => {
     dispatch(isModalOpenChanged(false));
   }, [dispatch]);
 
-  const handleChangeBoard = useCallback(() => {
+  const handleChangeBoard = useCallback(async () => {
     if (!selectedBoardId || (imagesToChange.length === 0 && videosToChange.length === 0)) {
       return;
     }
@@ -94,19 +96,37 @@ const ChangeBoardModal = () => {
       }
     }
 
+    const videoMutations: { videoName: string; promise: Promise<unknown> }[] = [];
     if (videosToChange.length) {
       // The video board endpoints take one video at a time; the context menu acts on a single
       // selection, so this is normally a one-iteration loop.
       for (const video_name of videosToChange) {
         if (selectedBoardId === 'none') {
-          removeVideoFromBoard({ video_name });
+          videoMutations.push({ videoName: video_name, promise: removeVideoFromBoard({ video_name }).unwrap() });
         } else {
-          addVideoToBoard({ board_id: selectedBoardId, video_name });
+          videoMutations.push({
+            videoName: video_name,
+            promise: addVideoToBoard({ board_id: selectedBoardId, video_name }).unwrap(),
+          });
         }
       }
     }
 
-    dispatch(changeBoardReset());
+    const results = await Promise.allSettled(videoMutations.map(({ promise }) => promise));
+    const failed = results.filter((result) => result.status === 'rejected');
+    if (failed.length === 0) {
+      dispatch(changeBoardReset());
+      return;
+    }
+    const failedVideoNames = results.flatMap((result, index) =>
+      result.status === 'rejected' && videoMutations[index] ? [videoMutations[index].videoName] : []
+    );
+    dispatch(videosToChangeSelected(failedVideoNames));
+    toast({
+      id: 'VIDEOS_FAILED_TO_MOVE',
+      title: t('toast.videosFailedToMove', { count: failed.length }),
+      status: 'warning',
+    });
   }, [
     addImagesToBoard,
     addVideoToBoard,
@@ -115,6 +135,7 @@ const ChangeBoardModal = () => {
     removeImagesFromBoard,
     removeVideoFromBoard,
     selectedBoardId,
+    t,
     videosToChange,
   ]);
 

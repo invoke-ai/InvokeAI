@@ -1,6 +1,7 @@
 """Polymorphic gallery types: images and videos appearing in a single time-sorted stream."""
 
 import datetime
+from dataclasses import dataclass
 from enum import Enum
 from typing import Optional, Union
 
@@ -53,3 +54,12 @@ class GalleryItemNamesResult(BaseModel):
     items: list[GalleryItemRef] = Field(description="Ordered list of (kind, name) references.")
     starred_count: int = Field(description="Number of starred items (when starred_first=True).")
     total_count: int = Field(description="Total number of items matching the query.")
+
+
+@dataclass(frozen=True)
+class BoardMediaSummary:
+    cover_image_name: Optional[str] = None
+    cover_video_name: Optional[str] = None
+    image_count: int = 0
+    video_count: int = 0
+    asset_count: int = 0

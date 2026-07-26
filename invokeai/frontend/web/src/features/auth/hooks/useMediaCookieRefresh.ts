@@ -17,7 +17,35 @@ const pendingRefreshes = new Set<PendingRefresh>();
 // expected to re-mint the cookie. Media consumers use this to treat a 401-style load
 // error as transient rather than surfacing an error to the user.
 let selfHealPending = false;
+const selfHealWaiters = new Set<() => void>();
+const setSelfHealPending = (pending: boolean) => {
+  selfHealPending = pending;
+  if (!pending) {
+    for (const resolve of selfHealWaiters) {
+      resolve();
+    }
+    selfHealWaiters.clear();
+  }
+};
 export const isMediaCookieSelfHealPending = () => selfHealPending;
+export const waitForMediaCookieSelfHeal = (): Promise<void> => {
+  if (!selfHealPending) {
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    selfHealWaiters.add(resolve);
+  });
+};
+
+export const openMediaInNewTab = (url: string) => {
+  const tab = window.open('about:blank', '_blank');
+  if (tab) {
+    tab.opener = null;
+  }
+  void waitForMediaCookieSelfHeal().then(() => {
+    tab?.location.replace(url);
+  });
+};
 
 export const abortAndWaitForPendingRefreshes = async (pending: Set<PendingRefresh>) => {
   for (const refresh of pending) {
@@ -75,7 +103,7 @@ export const useMediaCookieRefresh = () => {
             return;
           }
           hasSucceeded.current = true;
-          selfHealPending = false;
+          setSelfHealPending(false);
           notifyMediaCookieRefreshed();
         })
         .catch((error: unknown) => {
@@ -92,12 +120,12 @@ export const useMediaCookieRefresh = () => {
           }
           const status = (error as { status?: unknown } | null)?.status;
           if (status === 401) {
-            selfHealPending = false;
+            setSelfHealPending(false);
             return;
           }
           const delay = RETRY_DELAYS_MS[attemptIndex];
           if (delay === undefined) {
-            selfHealPending = false;
+            setSelfHealPending(false);
             return;
           }
           nextAttemptIndex = attemptIndex + 1;
@@ -127,12 +155,12 @@ export const useMediaCookieRefresh = () => {
     };
 
     pauseRefreshHandler = pause;
-    selfHealPending = true;
+    setSelfHealPending(true);
     attempt(0);
 
     return () => {
       canceled = true;
-      selfHealPending = false;
+      setSelfHealPending(false);
       if (pauseRefreshHandler === pause) {
         pauseRefreshHandler = null;
       }

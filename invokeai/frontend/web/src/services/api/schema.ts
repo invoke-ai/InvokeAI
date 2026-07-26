@@ -4752,14 +4752,6 @@ export type components = {
              */
             image_names: string[];
         };
-        /** Body_delete_videos_from_list */
-        Body_delete_videos_from_list: {
-            /**
-             * Video Names
-             * @description The list of names of videos to delete
-             */
-            video_names: string[];
-        };
         /** Body_do_hf_login */
         Body_do_hf_login: {
             /**
@@ -4908,14 +4900,6 @@ export type components = {
              */
             image_names: string[];
         };
-        /** Body_star_videos_in_list */
-        Body_star_videos_in_list: {
-            /**
-             * Video Names
-             * @description The list of names of videos to star
-             */
-            video_names: string[];
-        };
         /** Body_unstar_images_in_list */
         Body_unstar_images_in_list: {
             /**
@@ -4923,14 +4907,6 @@ export type components = {
              * @description The list of names of images to unstar
              */
             image_names: string[];
-        };
-        /** Body_unstar_videos_in_list */
-        Body_unstar_videos_in_list: {
-            /**
-             * Video Names
-             * @description The list of names of videos to unstar
-             */
-            video_names: string[];
         };
         /** Body_update_model_image */
         Body_update_model_image: {
@@ -30378,6 +30354,11 @@ export type components = {
              * @description The names of the videos that were starred
              */
             starred_videos: string[];
+            /**
+             * Failed Videos
+             * @description The names of videos that were not starred
+             */
+            failed_videos: string[];
         };
         /** StarterModel */
         StarterModel: {
@@ -32730,6 +32711,11 @@ export type components = {
              * @description The names of the videos that were unstarred
              */
             unstarred_videos: string[];
+            /**
+             * Failed Videos
+             * @description The names of videos that were not unstarred
+             */
+            failed_videos: string[];
         };
         /**
          * UpdateAppGenerationSettingsRequest
@@ -34196,6 +34182,14 @@ export type components = {
              * @constant
              */
             type: "video";
+        };
+        /** VideoNamesBatch */
+        VideoNamesBatch: {
+            /**
+             * Video Names
+             * @description The list of video names to process
+             */
+            video_names: string[];
         };
         /**
          * VideoNamesResult
@@ -40029,7 +40023,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Body_delete_videos_from_list"];
+                "application/json": components["schemas"]["VideoNamesBatch"];
             };
         };
         responses: {
@@ -40402,7 +40396,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Body_star_videos_in_list"];
+                "application/json": components["schemas"]["VideoNamesBatch"];
             };
         };
         responses: {
@@ -40435,7 +40429,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Body_unstar_videos_in_list"];
+                "application/json": components["schemas"]["VideoNamesBatch"];
             };
         };
         responses: {

@@ -6061,7 +6061,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Body_delete_videos_from_list"
+                "$ref": "#/components/schemas/VideoNamesBatch"
               }
             }
           },
@@ -6806,7 +6806,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Body_star_videos_in_list"
+                "$ref": "#/components/schemas/VideoNamesBatch"
               }
             }
           },
@@ -6850,7 +6850,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Body_unstar_videos_in_list"
+                "$ref": "#/components/schemas/VideoNamesBatch"
               }
             }
           },
@@ -15138,21 +15138,6 @@
         "required": ["image_names"],
         "title": "Body_delete_images_from_list"
       },
-      "Body_delete_videos_from_list": {
-        "properties": {
-          "video_names": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Video Names",
-            "description": "The list of names of videos to delete"
-          }
-        },
-        "type": "object",
-        "required": ["video_names"],
-        "title": "Body_delete_videos_from_list"
-      },
       "Body_do_hf_login": {
         "properties": {
           "token": {
@@ -15400,21 +15385,6 @@
         "required": ["image_names"],
         "title": "Body_star_images_in_list"
       },
-      "Body_star_videos_in_list": {
-        "properties": {
-          "video_names": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Video Names",
-            "description": "The list of names of videos to star"
-          }
-        },
-        "type": "object",
-        "required": ["video_names"],
-        "title": "Body_star_videos_in_list"
-      },
       "Body_unstar_images_in_list": {
         "properties": {
           "image_names": {
@@ -15429,21 +15399,6 @@
         "type": "object",
         "required": ["image_names"],
         "title": "Body_unstar_images_in_list"
-      },
-      "Body_unstar_videos_in_list": {
-        "properties": {
-          "video_names": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Video Names",
-            "description": "The list of names of videos to unstar"
-          }
-        },
-        "type": "object",
-        "required": ["video_names"],
-        "title": "Body_unstar_videos_in_list"
       },
       "Body_update_model_image": {
         "properties": {
@@ -71019,10 +70974,18 @@
             "type": "array",
             "title": "Starred Videos",
             "description": "The names of the videos that were starred"
+          },
+          "failed_videos": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Failed Videos",
+            "description": "The names of videos that were not starred"
           }
         },
         "type": "object",
-        "required": ["affected_boards", "starred_videos"],
+        "required": ["affected_boards", "starred_videos", "failed_videos"],
         "title": "StarredVideosResult"
       },
       "StarterModel": {
@@ -75349,10 +75312,18 @@
             "type": "array",
             "title": "Unstarred Videos",
             "description": "The names of the videos that were unstarred"
+          },
+          "failed_videos": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Failed Videos",
+            "description": "The names of videos that were not unstarred"
           }
         },
         "type": "object",
-        "required": ["affected_boards", "unstarred_videos"],
+        "required": ["affected_boards", "unstarred_videos", "failed_videos"],
         "title": "UnstarredVideosResult"
       },
       "UpdateAppGenerationSettingsRequest": {
@@ -77904,6 +77875,23 @@
         "output": {
           "$ref": "#/components/schemas/VideoOutput"
         }
+      },
+      "VideoNamesBatch": {
+        "properties": {
+          "video_names": {
+            "items": {
+              "type": "string",
+              "maxLength": 255
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Video Names",
+            "description": "The list of video names to process"
+          }
+        },
+        "type": "object",
+        "required": ["video_names"],
+        "title": "VideoNamesBatch"
       },
       "VideoNamesResult": {
         "properties": {

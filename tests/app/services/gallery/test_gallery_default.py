@@ -17,6 +17,9 @@ Covers JPPhoto's code-review findings (PR #9163):
 
 import pytest
 
+from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
+from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
+from invokeai.app.services.board_video_records.board_video_records_sqlite import SqliteBoardVideoRecordStorage
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.gallery.gallery_common import GalleryItemKind
 from invokeai.app.services.gallery.gallery_default import SqliteGalleryService
@@ -36,6 +39,9 @@ def services():
         "gallery": SqliteGalleryService(db=db),
         "images": SqliteImageRecordStorage(db=db),
         "videos": SqliteVideoRecordStorage(db=db),
+        "boards": SqliteBoardRecordStorage(db=db),
+        "board_images": SqliteBoardImageRecordStorage(db=db),
+        "board_videos": SqliteBoardVideoRecordStorage(db=db),
     }
 
 
@@ -207,6 +213,43 @@ class TestListItemNamesByCreatedDate:
         result = services["gallery"].list_item_names(user_id="alice", is_admin=False, created_date="2026-01-07")
 
         assert [(item.kind, item.name) for item in result.items] == [(GalleryItemKind.VIDEO, "alice-day.mp4")]
+
+
+class TestGetBoardMediaSummaries:
+    def test_returns_counts_and_deterministic_covers_in_one_result(self, services) -> None:
+        populated = services["boards"].save("Populated", "alice")
+        empty = services["boards"].save("Empty", "alice")
+        _save_image(services["images"], "cover.png", user_id="alice")
+        _save_video(services["videos"], "cover.mp4", user_id="alice")
+        _save_video(services["videos"], "intermediate.mp4", user_id="alice")
+        services["board_images"].add_image_to_board(populated.board_id, "cover.png")
+        services["board_videos"].add_video_to_board(populated.board_id, "cover.mp4")
+        services["board_videos"].add_video_to_board(populated.board_id, "intermediate.mp4")
+        with services["images"]._db.transaction() as cursor:
+            cursor.execute(
+                "UPDATE images SET starred = 1, created_at = ? WHERE image_name = ?",
+                ("2026-01-05 12:00:00", "cover.png"),
+            )
+            cursor.execute(
+                "UPDATE videos SET starred = 1, created_at = ? WHERE video_name = ?",
+                ("2026-01-05 12:00:00", "cover.mp4"),
+            )
+            cursor.execute(
+                "UPDATE videos SET is_intermediate = 1 WHERE video_name = ?",
+                ("intermediate.mp4",),
+            )
+
+        summaries = services["gallery"].get_board_media_summaries([populated.board_id, empty.board_id])
+
+        assert summaries[populated.board_id].image_count == 1
+        assert summaries[populated.board_id].video_count == 1
+        assert summaries[populated.board_id].asset_count == 0
+        assert summaries[populated.board_id].cover_image_name is None
+        assert summaries[populated.board_id].cover_video_name == "cover.mp4"
+        assert summaries[empty.board_id].image_count == 0
+        assert summaries[empty.board_id].video_count == 0
+        assert summaries[empty.board_id].cover_image_name is None
+        assert summaries[empty.board_id].cover_video_name is None
 
 
 class TestOrderingTieBreakers:

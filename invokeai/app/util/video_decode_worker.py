@@ -13,7 +13,7 @@ JSON object is written to stdout and the exit code is 0; on any failure the exit
 non-zero with a message on stderr.
 
 Commands:
-    probe <video_path>                     -> {"width", "height", "duration", "fps"}
+    probe <video_path>                     -> {"width", "height", "duration", "fps", "codec"}
     frame <video_path> <index> <out_path>  -> {"ok": true}; the frame is written to out_path as PNG
     count <video_path>                     -> {"count": <int or null>}
     stream <video_path>                    -> consecutive numpy arrays on stdout
@@ -81,7 +81,7 @@ def _assert_decodable_dims(video_path: Path) -> None:
     record bound and PIL checks run only after the decoder has allocated the frame.
     """
     try:
-        width, height, _duration, _fps = _probe(video_path)
+        width, height, _duration, _fps = _probe(video_path)[:4]
     except Exception as error:
         raise ValueError(f"Unable to validate video dimensions for {video_path}") from error
     if width <= 0 or height <= 0:
@@ -126,8 +126,8 @@ def _extract_frame(video_path: Path, frame_index: int) -> Optional[Image.Image]:
         return None
 
 
-def _probe(video_path: Path) -> tuple[int, int, float, Optional[float]]:
-    """Returns (width, height, duration_seconds, fps_or_none) for a video file.
+def _probe(video_path: Path) -> tuple[int, int, float, Optional[float], Optional[str]]:
+    """Returns (width, height, duration_seconds, fps_or_none, codec_or_none) for a video file.
 
     Tries imageio's FFMPEG plugin first; falls back to cv2.VideoCapture. Raises if
     neither backend can read the file.
@@ -142,7 +142,9 @@ def _probe(video_path: Path) -> tuple[int, int, float, Optional[float]]:
             raise ValueError("imageio probe missing 'size'")
         width, height = int(size[0]), int(size[1])
         fps: Optional[float] = float(fps_raw) if fps_raw and fps_raw > 0 else None
-        return width, height, duration, fps
+        codec_raw = meta.get("codec")
+        codec = str(codec_raw).lower() if codec_raw else None
+        return width, height, duration, fps, codec
     except Exception:
         pass
 
@@ -159,9 +161,11 @@ def _probe(video_path: Path) -> tuple[int, int, float, Optional[float]]:
         fps_raw = capture.get(cv2.CAP_PROP_FPS)
         fps_v2: Optional[float] = float(fps_raw) if fps_raw and fps_raw > 0 else None
         duration = (frame_count / fps_v2) if (fps_v2 and frame_count > 0) else 0.0
+        fourcc = int(capture.get(cv2.CAP_PROP_FOURCC))
+        codec = "".join(chr((fourcc >> (8 * index)) & 0xFF) for index in range(4)).strip().lower() or None
     finally:
         capture.release()
-    return width, height, duration, fps_v2
+    return width, height, duration, fps_v2, codec
 
 
 def _count(video_path: Path) -> Optional[int]:
@@ -259,8 +263,8 @@ def main(argv: list[str]) -> int:
             _assert_decodable_dims(Path(argv[2]))
             _stream(Path(argv[2]))
         elif command == "probe":
-            width, height, duration, fps = _probe(Path(argv[2]))
-            print(json.dumps({"width": width, "height": height, "duration": duration, "fps": fps}))
+            width, height, duration, fps, codec = _probe(Path(argv[2]))
+            print(json.dumps({"width": width, "height": height, "duration": duration, "fps": fps, "codec": codec}))
         elif command == "frame":
             _assert_decodable_dims(Path(argv[2]))
             image = _extract_frame(Path(argv[2]), int(argv[3]))

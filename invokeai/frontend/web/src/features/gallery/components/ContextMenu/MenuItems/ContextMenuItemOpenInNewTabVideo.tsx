@@ -1,4 +1,5 @@
 import { MenuItem } from '@invoke-ai/ui-library';
+import { openMediaInNewTab } from 'features/auth/hooks/useMediaCookieRefresh';
 import { useVideoDTOContext } from 'features/gallery/contexts/VideoDTOContext';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -8,7 +9,7 @@ export const ContextMenuItemOpenInNewTabVideo = memo(() => {
   const { t } = useTranslation();
   const videoDTO = useVideoDTOContext();
   const onClick = useCallback(() => {
-    window.open(videoDTO.video_url, '_blank', 'noopener,noreferrer');
+    openMediaInNewTab(videoDTO.video_url);
   }, [videoDTO.video_url]);
 
   return (

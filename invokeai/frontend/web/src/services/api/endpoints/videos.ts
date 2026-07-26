@@ -1,5 +1,7 @@
 import { skipToken } from '@reduxjs/toolkit/query';
 import { getStore } from 'app/store/nanostores/store';
+import { toast } from 'features/toast/toast';
+import i18n from 'i18next';
 import type { paths } from 'services/api/schema';
 import type {
   GetVideoNamesArgs,
@@ -199,6 +201,20 @@ export const videosApi = api.injectEndpoints({
         method: 'POST',
         body,
       }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          const { data: result } = await queryFulfilled;
+          if (result.failed_videos.length > 0) {
+            toast({
+              id: 'VIDEOS_FAILED_TO_UPDATE',
+              title: i18n.t('toast.videosFailedToUpdate', { count: result.failed_videos.length }),
+              status: 'warning',
+            });
+          }
+        } catch {
+          // Global API error handling reports request-level failures.
+        }
+      },
       invalidatesTags: (result) => {
         if (!result) {
           return [];
@@ -223,6 +239,20 @@ export const videosApi = api.injectEndpoints({
         method: 'POST',
         body,
       }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          const { data: result } = await queryFulfilled;
+          if (result.failed_videos.length > 0) {
+            toast({
+              id: 'VIDEOS_FAILED_TO_UPDATE',
+              title: i18n.t('toast.videosFailedToUpdate', { count: result.failed_videos.length }),
+              status: 'warning',
+            });
+          }
+        } catch {
+          // Global API error handling reports request-level failures.
+        }
+      },
       invalidatesTags: (result) => {
         if (!result) {
           return [];

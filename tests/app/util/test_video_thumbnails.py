@@ -15,6 +15,7 @@ synthetic MP4 so the subprocess plumbing is actually validated end to end.
 import io
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 from threading import Event
@@ -30,6 +31,94 @@ from invokeai.app.util.video_thumbnails import decoder_frame_count, extract_vide
 
 FRAMES = 12
 FPS = 8.0
+
+
+def test_decoder_worker_concurrency_is_globally_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
+    active = 0
+    maximum_active = 0
+    lock = threading.Lock()
+    release = threading.Event()
+
+    class FakeProcess:
+        returncode = 0
+
+        def communicate(self, timeout: float | None = None):
+            del timeout
+            nonlocal active, maximum_active
+            with lock:
+                active += 1
+                maximum_active = max(maximum_active, active)
+            release.wait(timeout=1)
+            with lock:
+                active -= 1
+            return ("{}", "")
+
+    class FakeMonitor:
+        def join(self, timeout: float | None = None) -> None:
+            del timeout
+
+    monkeypatch.setattr(video_thumbnails, "_spawn_worker", lambda *_args, **_kwargs: FakeProcess())
+    monkeypatch.setattr(
+        video_thumbnails,
+        "_start_worker_memory_monitor",
+        lambda _proc: (threading.Event(), threading.Event(), FakeMonitor()),
+    )
+
+    threads = [
+        threading.Thread(target=video_thumbnails._run_worker, args=(["probe", f"{index}.mp4"], 1)) for index in range(4)
+    ]
+    for thread in threads:
+        thread.start()
+    time.sleep(0.1)
+    release.set()
+    for thread in threads:
+        thread.join(timeout=2)
+
+    assert all(not thread.is_alive() for thread in threads)
+    assert maximum_active <= 2
+
+
+def test_streamed_decoders_leave_capacity_for_short_workers(monkeypatch: pytest.MonkeyPatch) -> None:
+    active_streams = 0
+    stream_lock = threading.Lock()
+    stream_started = threading.Event()
+    release = threading.Event()
+    one_shot_started = threading.Event()
+
+    def stream(*_args, **_kwargs):
+        nonlocal active_streams
+        with stream_lock:
+            active_streams += 1
+            stream_started.set()
+        release.wait(timeout=1)
+        return
+        yield  # pragma: no cover
+
+    def one_shot(*_args, **_kwargs):
+        one_shot_started.set()
+        return {}
+
+    monkeypatch.setattr(video_thumbnails, "_iter_video_frames_unbounded", stream)
+    monkeypatch.setattr(video_thumbnails, "_run_worker_unbounded", one_shot)
+
+    stream_threads = [
+        threading.Thread(target=lambda path=Path(f"{index}.mp4"): list(video_thumbnails.iter_video_frames(path)))
+        for index in range(2)
+    ]
+    for thread in stream_threads:
+        thread.start()
+    assert stream_started.wait(timeout=1)
+    time.sleep(0.1)
+
+    worker_thread = threading.Thread(target=video_thumbnails._run_worker, args=(["probe", "short.mp4"], 1))
+    worker_thread.start()
+    try:
+        assert one_shot_started.wait(timeout=0.2)
+    finally:
+        release.set()
+        for thread in stream_threads:
+            thread.join(timeout=2)
+        worker_thread.join(timeout=2)
 
 
 @pytest.fixture

@@ -56,6 +56,9 @@ WORKER_MEMORY_POLL_SECONDS = 0.25
 # upload path persists them, and the worker refuses to decode frames from them.
 # Keep in sync with MAX_FRAME_PIXELS in video_decode_worker.py.
 MAX_VIDEO_FRAME_PIXELS = 64 * 1024 * 1024
+MAX_CONCURRENT_VIDEO_DECODERS = 2
+_VIDEO_DECODER_SLOTS = threading.BoundedSemaphore(MAX_CONCURRENT_VIDEO_DECODERS)
+_VIDEO_STREAM_SLOTS = threading.BoundedSemaphore(1)
 
 _WORKER_PATH = Path(__file__).parent / "video_decode_worker.py"
 
@@ -163,7 +166,7 @@ def _start_worker_memory_monitor(
     return stopped, exceeded, thread
 
 
-def _run_worker(args: list[str], timeout: float, raise_on_timeout: bool = False) -> Optional[dict[str, Any]]:
+def _run_worker_unbounded(args: list[str], timeout: float, raise_on_timeout: bool = False) -> Optional[dict[str, Any]]:
     """Runs the decode worker; returns its parsed JSON output, or None on failure or timeout.
 
     With ``raise_on_timeout``, a timeout raises VideoDecodeTimeoutError instead of
@@ -204,7 +207,12 @@ def _run_worker(args: list[str], timeout: float, raise_on_timeout: bool = False)
     return result if isinstance(result, dict) else None
 
 
-def iter_video_frames(
+def _run_worker(args: list[str], timeout: float, raise_on_timeout: bool = False) -> Optional[dict[str, Any]]:
+    with _VIDEO_DECODER_SLOTS:
+        return _run_worker_unbounded(args, timeout, raise_on_timeout)
+
+
+def _iter_video_frames_unbounded(
     video_path: Path,
     timeout: float = VIDEO_DECODE_TIMEOUT_SECONDS,
     is_canceled: Optional[Callable[[], bool]] = None,
@@ -315,6 +323,16 @@ def iter_video_frames(
         proc.stderr.close()
 
 
+def iter_video_frames(
+    video_path: Path,
+    timeout: float = VIDEO_DECODE_TIMEOUT_SECONDS,
+    is_canceled: Optional[Callable[[], bool]] = None,
+) -> Iterator[np.ndarray]:
+    with _VIDEO_STREAM_SLOTS:
+        with _VIDEO_DECODER_SLOTS:
+            yield from _iter_video_frames_unbounded(video_path, timeout, is_canceled)
+
+
 def extract_video_frame(
     video_path: Path,
     frame_index: int = 0,
@@ -343,10 +361,10 @@ def extract_video_frame(
         Path(tmp_name).unlink(missing_ok=True)
 
 
-def probe_video(
+def probe_video_with_codec(
     video_path: Path, timeout: float = VIDEO_DECODE_TIMEOUT_SECONDS
-) -> tuple[int, int, float, Optional[float]]:
-    """Returns (width, height, duration_seconds, fps_or_none) for a video file.
+) -> tuple[int, int, float, Optional[float], Optional[str]]:
+    """Returns (width, height, duration_seconds, fps_or_none, codec_or_none) for a video file.
 
     Raises FileNotFoundError if the file cannot be read — including when the decode
     times out, since a file we cannot probe within the bound is treated as unreadable —
@@ -365,6 +383,8 @@ def probe_video(
         duration = float(result["duration"])
         fps_raw = result.get("fps")
         fps: Optional[float] = float(fps_raw) if fps_raw else None
+        codec_raw = result.get("codec")
+        codec = str(codec_raw).lower() if codec_raw else None
     except (KeyError, TypeError, ValueError, OverflowError) as e:
         raise FileNotFoundError(f"Unable to open video at {video_path}") from e
     if width <= 0 or height <= 0 or width * height > MAX_VIDEO_FRAME_PIXELS:
@@ -373,6 +393,14 @@ def probe_video(
         raise FileNotFoundError(f"Video at {video_path} reports an invalid duration {duration}")
     if fps is not None and (not math.isfinite(fps) or fps <= 0):
         fps = None
+    return width, height, duration, fps, codec
+
+
+def probe_video(
+    video_path: Path, timeout: float = VIDEO_DECODE_TIMEOUT_SECONDS
+) -> tuple[int, int, float, Optional[float]]:
+    """Returns validated video metadata without the codec."""
+    width, height, duration, fps, _codec = probe_video_with_codec(video_path, timeout)
     return width, height, duration, fps
 
 

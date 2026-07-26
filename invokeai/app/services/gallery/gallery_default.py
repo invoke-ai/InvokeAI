@@ -3,6 +3,7 @@ from typing import Optional, Union, cast
 
 from invokeai.app.services.gallery.gallery_base import GalleryServiceABC
 from invokeai.app.services.gallery.gallery_common import (
+    BoardMediaSummary,
     GalleryItem,
     GalleryItemKind,
     GalleryItemNamesResult,
@@ -249,6 +250,71 @@ class SqliteGalleryService(GalleryServiceABC):
                 )
             )
         return boards
+
+    def get_board_media_summaries(self, board_ids: list[str]) -> dict[str, BoardMediaSummary]:
+        summaries = {board_id: BoardMediaSummary() for board_id in board_ids}
+        if not board_ids:
+            return summaries
+
+        placeholders = ",".join("?" for _ in board_ids)
+        query = f"""--sql
+        SELECT
+            board_id,
+            SUM(CASE WHEN kind = 'image' AND category = 'general' THEN 1 ELSE 0 END) AS image_count,
+            SUM(CASE WHEN kind = 'image' AND category != 'general' THEN 1 ELSE 0 END) AS asset_count,
+            SUM(CASE WHEN kind = 'video' THEN 1 ELSE 0 END) AS video_count,
+            MAX(CASE WHEN rank = 1 AND kind = 'image' THEN name END) AS cover_image_name,
+            MAX(CASE WHEN rank = 1 AND kind = 'video' THEN name END) AS cover_video_name
+        FROM (
+            SELECT
+                board_id,
+                kind,
+                name,
+                category,
+                ROW_NUMBER() OVER (
+                    PARTITION BY board_id
+                    ORDER BY starred DESC, created_at DESC, kind DESC, name DESC
+                ) AS rank
+            FROM (
+                SELECT
+                    board_images.board_id AS board_id,
+                    'image' AS kind,
+                    images.image_name AS name,
+                    images.image_category AS category,
+                    images.starred AS starred,
+                    images.created_at AS created_at
+                FROM board_images
+                INNER JOIN images ON board_images.image_name = images.image_name
+                WHERE images.is_intermediate = FALSE
+                  AND board_images.board_id IN ({placeholders})
+                UNION ALL
+                SELECT
+                    board_videos.board_id AS board_id,
+                    'video' AS kind,
+                    videos.video_name AS name,
+                    videos.video_category AS category,
+                    videos.starred AS starred,
+                    videos.created_at AS created_at
+                FROM board_videos
+                INNER JOIN videos ON board_videos.video_name = videos.video_name
+                WHERE videos.is_intermediate = FALSE
+                  AND board_videos.board_id IN ({placeholders})
+            )
+        )
+        GROUP BY board_id;
+        """
+        with self._db.transaction() as cursor:
+            cursor.execute(query, [*board_ids, *board_ids])
+            rows = cast(list[sqlite3.Row], cursor.fetchall())
+        for row in rows:
+            summaries[row["board_id"]] = BoardMediaSummary(
+                cover_image_name=row["cover_image_name"],
+                cover_video_name=row["cover_video_name"],
+                image_count=row["image_count"],
+                video_count=row["video_count"],
+                asset_count=row["asset_count"],
+            )
+        return summaries
 
     @staticmethod
     def _build_order_clause(starred_first: bool, order_dir: SQLiteDirection) -> str:

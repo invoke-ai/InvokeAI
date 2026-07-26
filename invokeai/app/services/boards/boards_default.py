@@ -32,9 +32,9 @@ class BoardService(BoardServiceABC):
         if cover_image is None:
             return None, cover_video.video_name
 
-        # Both candidates exist — compare on (starred, created_at).
-        image_key = (cover_image.starred, cover_image.created_at)
-        video_key = (cover_video.starred, cover_video.created_at)
+        # Match the gallery's deterministic (starred, created_at, kind, name) ordering.
+        image_key = (cover_image.starred, cover_image.created_at, "image", cover_image.image_name)
+        video_key = (cover_video.starred, cover_video.created_at, "video", cover_video.video_name)
         if video_key > image_key:
             return None, cover_video.video_name
         return cover_image.image_name, None
@@ -100,10 +100,12 @@ class BoardService(BoardServiceABC):
         board_records = self.__invoker.services.board_records.get_many(
             user_id, is_admin, order_by, direction, offset, limit, include_archived
         )
+        summaries = self.__invoker.services.gallery.get_board_media_summaries(
+            [record.board_id for record in board_records.items]
+        )
         board_dtos = []
         for r in board_records.items:
-            cover_image_name, cover_video_name = self._resolve_cover(r.board_id)
-            image_count, video_count, asset_count = self._get_counts(r.board_id)
+            summary = summaries[r.board_id]
 
             # For admin users, include owner username
             owner_username = None
@@ -115,12 +117,12 @@ class BoardService(BoardServiceABC):
             board_dtos.append(
                 board_record_to_dto(
                     r,
-                    cover_image_name,
-                    image_count,
-                    asset_count,
+                    summary.cover_image_name,
+                    summary.image_count,
+                    summary.asset_count,
                     owner_username,
-                    cover_video_name=cover_video_name,
-                    video_count=video_count,
+                    cover_video_name=summary.cover_video_name,
+                    video_count=summary.video_count,
                 )
             )
 
@@ -137,10 +139,12 @@ class BoardService(BoardServiceABC):
         board_records = self.__invoker.services.board_records.get_all(
             user_id, is_admin, order_by, direction, include_archived
         )
+        summaries = self.__invoker.services.gallery.get_board_media_summaries(
+            [record.board_id for record in board_records]
+        )
         board_dtos = []
         for r in board_records:
-            cover_image_name, cover_video_name = self._resolve_cover(r.board_id)
-            image_count, video_count, asset_count = self._get_counts(r.board_id)
+            summary = summaries[r.board_id]
 
             # For admin users, include owner username
             owner_username = None
@@ -152,12 +156,12 @@ class BoardService(BoardServiceABC):
             board_dtos.append(
                 board_record_to_dto(
                     r,
-                    cover_image_name,
-                    image_count,
-                    asset_count,
+                    summary.cover_image_name,
+                    summary.image_count,
+                    summary.asset_count,
                     owner_username,
-                    cover_video_name=cover_video_name,
-                    video_count=video_count,
+                    cover_video_name=summary.cover_video_name,
+                    video_count=summary.video_count,
                 )
             )
 

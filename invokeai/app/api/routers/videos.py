@@ -2,16 +2,16 @@ import os
 import re
 import tempfile
 import traceback
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
-from typing import BinaryIO, Optional
+from typing import Annotated, BinaryIO, Optional
 
 from fastapi import Body, HTTPException, Query, Request, Response, UploadFile
 from fastapi import Path as PathParam
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import StreamingResponse
 from fastapi.routing import APIRouter
 from PIL import Image as PILImage
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, StringConstraints, ValidationError
 from starlette.concurrency import run_in_threadpool
 
 from invokeai.app.api.auth_dependencies import CurrentMediaUserOrDefault, CurrentUserOrDefault
@@ -31,7 +31,7 @@ from invokeai.app.services.videos.videos_common import (
     VideoDTO,
     VideoUrlsDTO,
 )
-from invokeai.app.util.video_thumbnails import VideoDecodeTimeoutError, extract_video_frame, probe_video
+from invokeai.app.util.video_thumbnails import VideoDecodeTimeoutError, extract_video_frame, probe_video_with_codec
 
 videos_router = APIRouter(prefix="/v1/videos", tags=["videos"])
 
@@ -59,10 +59,19 @@ MAX_UPLOAD_SIZE = 1024 * 1024 * 1024  # 1 GB
 MAX_UPLOAD_REQUEST_SIZE = MAX_UPLOAD_SIZE + 10 * 1024 * 1024
 # Global bound on concurrent video uploads — each in-flight upload can hold up to two
 # copies of the file in temp storage (the multipart spool + the route's own tmp file).
-MAX_CONCURRENT_VIDEO_UPLOADS = 4
+MAX_CONCURRENT_VIDEO_UPLOADS = 2
 # Per-user bound (multiuser mode only): keeps one tenant's slow uploads from holding
 # every global slot and starving the other users into 429s.
-MAX_CONCURRENT_VIDEO_UPLOADS_PER_USER = 2
+MAX_CONCURRENT_VIDEO_UPLOADS_PER_USER = 1
+MAX_VIDEO_BATCH_SIZE = 1000
+VideoName = Annotated[str, StringConstraints(max_length=255)]
+
+
+class VideoNamesBatch(BaseModel):
+    video_names: list[VideoName] = Field(
+        max_length=MAX_VIDEO_BATCH_SIZE,
+        description="The list of video names to process",
+    )
 
 
 def _get_video_cache_control() -> str:
@@ -199,7 +208,10 @@ def _probe_decodable_video(path: Path) -> tuple[tuple[int, int, float, Optional[
     succeeded — so it yields (metadata, None) and the upload proceeds, with save-time
     thumbnail extraction as the backstop.
     """
-    metadata = probe_video(path)
+    width, height, duration, fps, codec = probe_video_with_codec(path)
+    if codec is None or codec.lower() not in {"h264", "avc", "avc1", "libx264"}:
+        raise ValueError("Video must use a browser-compatible H.264/AVC codec")
+    metadata = (width, height, duration, fps)
     try:
         first_frame = extract_video_frame(path, frame_index=0, raise_on_timeout=True)
     except VideoDecodeTimeoutError:
@@ -367,7 +379,7 @@ async def delete_video(
 @videos_router.post("/delete", operation_id="delete_videos_from_list", response_model=DeleteVideosResult)
 async def delete_videos_from_list(
     current_user: CurrentUserOrDefault,
-    video_names: list[str] = Body(description="The list of names of videos to delete", embed=True),
+    batch: VideoNamesBatch,
 ) -> DeleteVideosResult:
     # Skip — but do not re-raise — auth failures so a foreign name mid-batch doesn't
     # discard the response payload for items the caller had already legitimately deleted.
@@ -384,7 +396,7 @@ async def delete_videos_from_list(
     # Dedup while preserving order: a name repeated in the request would otherwise be
     # processed twice, and the second pass's not-found error would land the same name
     # in both deleted_videos and failed_videos.
-    for video_name in dict.fromkeys(video_names):
+    for video_name in dict.fromkeys(batch.video_names):
         try:
             _assert_video_owner(video_name, current_user)
             video_dto = ApiDependencies.invoker.services.videos.get_dto(video_name)
@@ -668,14 +680,20 @@ async def get_video_thumbnail(
         path = ApiDependencies.invoker.services.videos.get_path(video_name, thumbnail=True)
     except Exception:
         raise HTTPException(status_code=404)
-    # FileResponse stats the file lazily *after* the route returns, which means a missing
-    # thumbnail surfaces as a server-side error rather than the documented 404. Check up
-    # front so callers get the right status. Video saves are allowed without a thumbnail
-    # (see video_files_disk.save), so this is a reachable path.
-    if not Path(path).is_file():
+    try:
+        thumbnail_file = open(path, "rb")
+    except OSError:
         raise HTTPException(status_code=404)
-    return FileResponse(
-        path,
+
+    async def iter_thumbnail() -> AsyncIterator[bytes]:
+        try:
+            while chunk := thumbnail_file.read(RANGE_CHUNK_SIZE):
+                yield chunk
+        finally:
+            thumbnail_file.close()
+
+    return StreamingResponse(
+        iter_thumbnail(),
         media_type="image/webp",
         headers={"Cache-Control": _get_video_cache_control()},
     )
@@ -771,15 +789,16 @@ async def get_video_names(
 @videos_router.post("/star", operation_id="star_videos_in_list", response_model=StarredVideosResult)
 async def star_videos_in_list(
     current_user: CurrentUserOrDefault,
-    video_names: list[str] = Body(description="The list of names of videos to star", embed=True),
+    batch: VideoNamesBatch,
 ) -> StarredVideosResult:
     # Skip — but do not re-raise — auth failures so a foreign name mid-batch doesn't
     # discard the response payload for items that were already starred. Mirrors
     # delete_videos_from_list: re-raising turned partial successes into an error-shaped
     # response, so the client never invalidated caches for the videos that did change.
     starred_videos: set[str] = set()
+    failed_videos: set[str] = set()
     affected_boards: set[str] = set()
-    for video_name in video_names:
+    for video_name in dict.fromkeys(batch.video_names):
         try:
             _assert_video_owner(video_name, current_user)
             updated = ApiDependencies.invoker.services.videos.update(
@@ -790,19 +809,24 @@ async def star_videos_in_list(
         except HTTPException:
             continue
         except Exception:
-            pass
-    return StarredVideosResult(starred_videos=list(starred_videos), affected_boards=list(affected_boards))
+            failed_videos.add(video_name)
+    return StarredVideosResult(
+        starred_videos=list(starred_videos),
+        failed_videos=list(failed_videos),
+        affected_boards=list(affected_boards),
+    )
 
 
 @videos_router.post("/unstar", operation_id="unstar_videos_in_list", response_model=UnstarredVideosResult)
 async def unstar_videos_in_list(
     current_user: CurrentUserOrDefault,
-    video_names: list[str] = Body(description="The list of names of videos to unstar", embed=True),
+    batch: VideoNamesBatch,
 ) -> UnstarredVideosResult:
     # See star_videos_in_list: skip foreign names instead of re-raising mid-batch.
     unstarred_videos: set[str] = set()
+    failed_videos: set[str] = set()
     affected_boards: set[str] = set()
-    for video_name in video_names:
+    for video_name in dict.fromkeys(batch.video_names):
         try:
             _assert_video_owner(video_name, current_user)
             updated = ApiDependencies.invoker.services.videos.update(
@@ -813,8 +837,12 @@ async def unstar_videos_in_list(
         except HTTPException:
             continue
         except Exception:
-            pass
-    return UnstarredVideosResult(unstarred_videos=list(unstarred_videos), affected_boards=list(affected_boards))
+            failed_videos.add(video_name)
+    return UnstarredVideosResult(
+        unstarred_videos=list(unstarred_videos),
+        failed_videos=list(failed_videos),
+        affected_boards=list(affected_boards),
+    )
 
 
 class VideoBoardArg(BaseModel):

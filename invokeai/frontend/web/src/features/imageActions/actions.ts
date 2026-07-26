@@ -39,8 +39,10 @@ import { fieldImageValueChanged, fieldVideoValueChanged } from 'features/nodes/s
 import type { FieldIdentifier } from 'features/nodes/types/field';
 import { upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
 import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
+import { toast } from 'features/toast/toast';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { WORKSPACE_PANEL_ID } from 'features/ui/layouts/shared';
+import i18n from 'i18next';
 import { imageDTOToFile, imagesApi, uploadImage } from 'services/api/endpoints/images';
 import { videosApi } from 'services/api/endpoints/videos';
 import type { ImageDTO, VideoDTO } from 'services/api/types';
@@ -339,16 +341,38 @@ export const removeImagesFromBoard = (arg: { image_names: string[]; dispatch: Ap
 // callers loop per video. Backend permissions: add requires _assert_board_write_access
 // (admin/owner/public dest) AND _assert_video_direct_owner; remove requires
 // _assert_video_direct_owner plus write access on the *source* board.
+type VideoBoardMutation = { videoName: string; request: { unwrap: () => Promise<unknown> } };
+
+const settleVideoBoardMutations = async (mutations: VideoBoardMutation[], dispatch: AppDispatch) => {
+  const results = await Promise.allSettled(mutations.map(({ request }) => request.unwrap()));
+  const failed = results.filter((result) => result.status === 'rejected');
+  if (failed.length === 0) {
+    dispatch(selectionChanged([]));
+    return;
+  }
+  const failedVideoNames = results.flatMap((result, index) =>
+    result.status === 'rejected' && mutations[index] ? [mutations[index].videoName] : []
+  );
+  dispatch(selectionChanged(failedVideoNames));
+  toast({
+    id: 'VIDEOS_FAILED_TO_MOVE',
+    title: i18n.t('toast.videosFailedToMove', { count: failed.length }),
+    status: 'warning',
+  });
+};
+
 export const addVideoToBoard = (arg: { video_name: string; boardId: BoardId; dispatch: AppDispatch }) => {
   const { video_name, boardId, dispatch } = arg;
-  dispatch(videosApi.endpoints.addVideoToBoard.initiate({ video_name, board_id: boardId }, { track: false }));
-  dispatch(selectionChanged([]));
+  const mutation = dispatch(
+    videosApi.endpoints.addVideoToBoard.initiate({ video_name, board_id: boardId }, { track: false })
+  );
+  void settleVideoBoardMutations([{ videoName: video_name, request: mutation }], dispatch);
 };
 
 export const removeVideoFromBoard = (arg: { video_name: string; dispatch: AppDispatch }) => {
   const { video_name, dispatch } = arg;
-  dispatch(videosApi.endpoints.removeVideoFromBoard.initiate({ video_name }, { track: false }));
-  dispatch(selectionChanged([]));
+  const mutation = dispatch(videosApi.endpoints.removeVideoFromBoard.initiate({ video_name }, { track: false }));
+  void settleVideoBoardMutations([{ videoName: video_name, request: mutation }], dispatch);
 };
 
 // Bulk helpers. No batch endpoint exists for the video router yet, so we fan out per-video over
@@ -357,16 +381,20 @@ export const removeVideoFromBoard = (arg: { video_name: string; dispatch: AppDis
 // keep their wiring symmetrical with the image-side helpers.
 export const addVideosToBoard = (arg: { video_names: string[]; boardId: BoardId; dispatch: AppDispatch }) => {
   const { video_names, boardId, dispatch } = arg;
-  for (const video_name of video_names) {
-    dispatch(videosApi.endpoints.addVideoToBoard.initiate({ video_name, board_id: boardId }, { track: false }));
-  }
-  dispatch(selectionChanged([]));
+  const mutations = video_names.map((videoName) => ({
+    videoName,
+    request: dispatch(
+      videosApi.endpoints.addVideoToBoard.initiate({ video_name: videoName, board_id: boardId }, { track: false })
+    ),
+  }));
+  void settleVideoBoardMutations(mutations, dispatch);
 };
 
 export const removeVideosFromBoard = (arg: { video_names: string[]; dispatch: AppDispatch }) => {
   const { video_names, dispatch } = arg;
-  for (const video_name of video_names) {
-    dispatch(videosApi.endpoints.removeVideoFromBoard.initiate({ video_name }, { track: false }));
-  }
-  dispatch(selectionChanged([]));
+  const mutations = video_names.map((videoName) => ({
+    videoName,
+    request: dispatch(videosApi.endpoints.removeVideoFromBoard.initiate({ video_name: videoName }, { track: false })),
+  }));
+  void settleVideoBoardMutations(mutations, dispatch);
 };

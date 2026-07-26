@@ -48,10 +48,12 @@ class DeleteVideosResult(VideoResultWithAffectedBoards):
 
 class StarredVideosResult(VideoResultWithAffectedBoards):
     starred_videos: list[str] = Field(description="The names of the videos that were starred")
+    failed_videos: list[str] = Field(description="The names of videos that were not starred")
 
 
 class UnstarredVideosResult(VideoResultWithAffectedBoards):
     unstarred_videos: list[str] = Field(description="The names of the videos that were unstarred")
+    failed_videos: list[str] = Field(description="The names of videos that were not unstarred")
 
 
 class AddVideosToBoardResult(VideoResultWithAffectedBoards):

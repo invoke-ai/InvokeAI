@@ -5,7 +5,7 @@ import { useStore } from '@nanostores/react';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { useClipboard } from 'common/hooks/useClipboard';
 import { useDownloadItem } from 'common/hooks/useDownloadImage';
-import { isMediaCookieSelfHealPending } from 'features/auth/hooks/useMediaCookieRefresh';
+import { isMediaCookieSelfHealPending, openMediaInNewTab } from 'features/auth/hooks/useMediaCookieRefresh';
 import { useMediaUrl } from 'features/auth/store/mediaCookieRefresh';
 import { useDeleteVideoModalApi } from 'features/deleteVideoModal/store/state';
 import { multipleVideoDndSource, singleVideoDndSource } from 'features/dnd/dnd';
@@ -189,7 +189,7 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
     if (!videoDTO) {
       return;
     }
-    window.open(videoDTO.video_url, '_blank', 'noopener,noreferrer');
+    openMediaInNewTab(videoDTO.video_url);
   }, [videoDTO]);
 
   // Cross-browser clipboard support for raw `video/*` MIME types doesn't really exist — Chrome

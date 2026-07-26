@@ -19,7 +19,7 @@ import { selectCachedGalleryItemNames } from 'features/gallery/store/selectCache
 import { isVideoName } from 'features/gallery/store/types';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { VIEWER_PANEL_ID } from 'features/ui/layouts/shared';
-import type { MouseEvent, MouseEventHandler } from 'react';
+import type { KeyboardEventHandler, MouseEvent, MouseEventHandler } from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { VideoDTO } from 'services/api/types';
 
@@ -106,6 +106,12 @@ export const GalleryVideoItem = memo(({ videoDTO }: Props) => {
   const onDoubleClick = useCallback<MouseEventHandler<HTMLDivElement>>(() => {
     navigationApi.focusPanelInActiveTab(VIEWER_PANEL_ID);
   }, []);
+  const onKeyDown = useCallback<KeyboardEventHandler<HTMLDivElement>>((event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      ref.current?.click();
+    }
+  }, []);
 
   // Reuse the image item's size-badge component — its only inputs are width/height.
   const sizeBadgeImageStandIn = useMemo(
@@ -161,9 +167,12 @@ export const GalleryVideoItem = memo(({ videoDTO }: Props) => {
       sx={galleryItemContainerSX}
       data-item-id={videoDTO.video_name}
       role="button"
+      tabIndex={0}
+      aria-label={videoDTO.video_name}
       onMouseOver={onMouseOver}
       onMouseOut={onMouseOut}
       onClick={onClick}
+      onKeyDown={onKeyDown}
       onDoubleClick={onDoubleClick}
       data-selected={isSelected}
     >

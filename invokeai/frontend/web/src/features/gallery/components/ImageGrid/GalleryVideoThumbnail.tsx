@@ -1,7 +1,9 @@
 import { Box, Image } from '@invoke-ai/ui-library';
+import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { getMediaUrl, useMediaCookieRefreshVersion } from 'features/auth/store/mediaCookieRefresh';
 import type { SyntheticEvent } from 'react';
 import { memo, useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 type Props = {
   thumbnailUrl: string;
@@ -26,13 +28,19 @@ export const getVideoThumbnailKey = (thumbnailUrl: string, mediaCookieVersion: n
   `${mediaCookieVersion}:${thumbnailUrl}`;
 
 export const GalleryVideoThumbnail = memo(({ thumbnailUrl, videoUrl }: Props) => {
+  const { t } = useTranslation();
   const mediaCookieVersion = useMediaCookieRefreshVersion();
   const refreshedThumbnailUrl = getMediaUrl(thumbnailUrl, mediaCookieVersion);
   const refreshedVideoUrl = getMediaUrl(videoUrl, mediaCookieVersion);
   const [failedThumbnail, setFailedThumbnail] = useState<FailedThumbnail | null>(null);
+  const [failedVideo, setFailedVideo] = useState<FailedThumbnail | null>(null);
   const onError = useCallback(
     () => setFailedThumbnail({ url: thumbnailUrl, mediaCookieVersion }),
     [mediaCookieVersion, thumbnailUrl]
+  );
+  const onVideoError = useCallback(
+    () => setFailedVideo({ url: videoUrl, mediaCookieVersion }),
+    [mediaCookieVersion, videoUrl]
   );
 
   // With preload="metadata" some browsers populate dimensions/duration but don't decode
@@ -50,6 +58,9 @@ export const GalleryVideoThumbnail = memo(({ thumbnailUrl, videoUrl }: Props) =>
   }, []);
 
   if (getVideoThumbnailMode(thumbnailUrl, failedThumbnail, mediaCookieVersion) === 'video') {
+    if (failedVideo?.url === videoUrl && failedVideo.mediaCookieVersion === mediaCookieVersion) {
+      return <IAINoContentFallback label={t('toast.videoPlaybackFailed')} />;
+    }
     return (
       <Box
         as="video"
@@ -63,6 +74,7 @@ export const GalleryVideoThumbnail = memo(({ thumbnailUrl, videoUrl }: Props) =>
         maxH="full"
         borderRadius="base"
         onLoadedMetadata={onLoadedMetadata}
+        onError={onVideoError}
       />
     );
   }

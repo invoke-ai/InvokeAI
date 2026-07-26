@@ -11,6 +11,7 @@ same fixture pattern as test_boards_multiuser. The storage-level user_id
 filter is covered separately in tests/app/services/video_records.
 """
 
+import asyncio
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -18,9 +19,17 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi import status
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 from invokeai.app.api.dependencies import ApiDependencies
-from invokeai.app.api.routers.videos import _is_mp4_file
+from invokeai.app.api.routers import videos as videos_router_module
+from invokeai.app.api.routers.videos import (
+    VideoNamesBatch,
+    _is_mp4_file,
+    get_video_thumbnail,
+    star_videos_in_list,
+    unstar_videos_in_list,
+)
 from invokeai.app.api_app import app
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.users.users_common import UserCreateRequest
@@ -244,6 +253,19 @@ def test_delete_videos_from_list_dedupes_repeated_names(client: TestClient, mock
     assert sorted(delete_calls) == ["dup.mp4", "other.mp4"]
 
 
+def test_video_batch_rejects_too_many_or_overlong_names() -> None:
+    with pytest.raises(ValidationError):
+        VideoNamesBatch(video_names=[f"{index}.mp4" for index in range(1001)])
+    with pytest.raises(ValidationError):
+        VideoNamesBatch(video_names=[f"{'x' * 252}.mp4"])
+
+
+def test_video_batch_accepts_maximum_bounded_batch() -> None:
+    video_names = [f"{index}.mp4" for index in range(1000)]
+
+    assert VideoNamesBatch(video_names=video_names).video_names == video_names
+
+
 def test_delete_videos_from_list_skips_foreign_items_and_returns_owned(
     client: TestClient, mock_invoker: Invoker, user1_token: str
 ):
@@ -355,6 +377,42 @@ def test_unstar_videos_from_list_skips_foreign_items_and_returns_owned(
     assert update_calls == {"mine_a.mp4", "mine_b.mp4"}
 
 
+@pytest.mark.parametrize(
+    ("path", "result_key"),
+    [("star", "starred_videos"), ("unstar", "unstarred_videos")],
+)
+def test_video_star_endpoints_dedupe_names_and_report_partial_failures(
+    enable_multiuser_for_videos: Any,
+    mock_invoker: Invoker,
+    path: str,
+    result_key: str,
+):
+    del enable_multiuser_for_videos
+    updated = MagicMock()
+    updated.board_id = None
+
+    def update(video_name: str, **_kwargs: Any):
+        if video_name == "fails.mp4":
+            raise RuntimeError("database unavailable")
+        return updated
+
+    mock_invoker.services.videos.update.side_effect = update
+    route = star_videos_in_list if path == "star" else unstar_videos_in_list
+    response = asyncio.run(
+        route(
+            current_user=MagicMock(is_admin=True),
+            batch=VideoNamesBatch(video_names=["ok.mp4", "ok.mp4", "fails.mp4"]),
+        )
+    )
+
+    assert getattr(response, result_key) == ["ok.mp4"]
+    assert response.failed_videos == ["fails.mp4"]
+    assert [call.args[0] for call in mock_invoker.services.videos.update.call_args_list] == [
+        "ok.mp4",
+        "fails.mp4",
+    ]
+
+
 # ---------------------------------------------------------------------------
 # POST /videos/upload must reject malformed MP4 payloads with 415 (residual
 # verification flagged in JPPhoto's PR #9163 review)
@@ -396,7 +454,7 @@ def test_upload_video_malformed_mp4_returns_415_and_cleans_up_tmp(
     with (
         patch("invokeai.app.api.routers.videos.tempfile.NamedTemporaryFile", side_effect=spying_named_tmp),
         patch(
-            "invokeai.app.api.routers.videos.probe_video",
+            "invokeai.app.api.routers.videos.probe_video_with_codec",
             side_effect=RuntimeError("not a decodable mp4"),
         ),
     ):
@@ -601,6 +659,54 @@ def test_get_video_thumbnail_missing_file_returns_404(
     )
     assert response.status_code == status.HTTP_404_NOT_FOUND
     mock_invoker.services.videos.get_path.assert_called_once_with("some_video.mp4", thumbnail=True)
+
+
+def test_get_video_thumbnail_stream_survives_delete_after_route_returns(
+    enable_multiuser_for_videos: Any,
+    mock_invoker: Invoker,
+    tmp_path: Path,
+):
+    del enable_multiuser_for_videos
+    thumbnail_path = tmp_path / "thumbnail.webp"
+    thumbnail_path.write_bytes(b"thumbnail-data")
+    mock_invoker.services.videos.get_path.return_value = str(thumbnail_path)
+    current_user = MagicMock(is_admin=True)
+
+    async def consume_after_delete() -> bytes:
+        response = await get_video_thumbnail(current_user=current_user, video_name="video.mp4")
+        thumbnail_path.unlink()
+        chunks = [chunk async for chunk in response.body_iterator]  # type: ignore[attr-defined]
+        return b"".join(chunks)
+
+    assert asyncio.run(consume_after_delete()) == b"thumbnail-data"
+
+
+@pytest.mark.parametrize(
+    ("codec", "is_supported"),
+    [("h264", True), ("avc1", True), ("hevc", False), ("h265", False), (None, False)],
+)
+def test_uploaded_video_codec_must_be_browser_compatible(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    codec: str | None,
+    is_supported: bool,
+):
+    path = tmp_path / "video.mp4"
+    path.write_bytes(b"video")
+    monkeypatch.setattr(
+        videos_router_module,
+        "probe_video_with_codec",
+        lambda _path: (64, 64, 1.0, 8.0, codec),
+        raising=False,
+    )
+    monkeypatch.setattr(videos_router_module, "extract_video_frame", lambda *_args, **_kwargs: MagicMock())
+
+    if is_supported:
+        metadata, _frame = videos_router_module._probe_decodable_video(path)
+        assert metadata == (64, 64, 1.0, 8.0)
+    else:
+        with pytest.raises(ValueError, match="browser-compatible"):
+            videos_router_module._probe_decodable_video(path)
 
 
 # ---------------------------------------------------------------------------

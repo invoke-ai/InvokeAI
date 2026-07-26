@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from invokeai.app.services.gallery.gallery_common import GalleryItem, GalleryItemNamesResult
+from invokeai.app.services.gallery.gallery_common import BoardMediaSummary, GalleryItem, GalleryItemNamesResult
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
@@ -57,4 +57,9 @@ class GalleryServiceABC(ABC):
         is_admin: bool = False,
     ) -> list[VirtualSubBoardDTO]:
         """Returns date-based virtual sub-boards covering both images and videos."""
+        pass
+
+    @abstractmethod
+    def get_board_media_summaries(self, board_ids: list[str]) -> dict[str, BoardMediaSummary]:
+        """Returns covers and media counts for each requested board."""
         pass
