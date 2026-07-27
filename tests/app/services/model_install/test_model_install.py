@@ -630,13 +630,12 @@ def test_concurrent_import_and_restore_register_single_job(
 
         # Start the service so restoration processes the marker for the same
         # source. With the fix, restore sees the source reserved in
-        # _pending_sources and skips it; without the fix, restore registers a
-        # duplicate job now.
+        # _pending_sources, defers the marker, and its deferred recheck waits
+        # for the reservation to resolve - so restore cannot complete until the
+        # import is released. Without the fix, restore registers a duplicate
+        # job now.
         start_thread.start()
-        if restore_observed_marker.wait(timeout=2):
-            # Let restore finish its pass before releasing the import so the
-            # interleaving is deterministic.
-            installer._restore_completed_event.wait(timeout=5)
+        assert restore_observed_marker.wait(timeout=10)
 
         release_import.set()
         import_thread.join(timeout=10)
@@ -827,6 +826,96 @@ def test_restore_skips_marker_of_job_completing_mid_scan(
         assert tmpdir.exists()
     finally:
         release_restore.set()
+        installer.stop()
+
+
+@pytest.mark.timeout(timeout=20, method="thread")
+def test_restore_recovers_marker_after_pending_import_fails(
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_record_store,
+    mm2_download_queue,
+    mm2_session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A _pending_sources reservation is not an owner: the reserving import may
+    fail before registering a job. If restore treated the reservation as a
+    permanent owner, a failed import would leave its marker neither restored nor
+    owned until the next restart. Restore must defer the marker and, once the
+    reservation resolves without registering a job, restore it."""
+    installer = ModelInstallService(
+        app_config=mm2_app_config,
+        record_store=mm2_record_store,
+        download_queue=mm2_download_queue,
+        event_bus=TestEventService(),
+        session=mm2_session,
+    )
+    source = URLModelSource(url=Url("https://www.test.foo/download/test_embedding.safetensors"))
+
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}orphan"
+    _write_test_install_marker(tmpdir, str(source))
+
+    import_reserved = threading.Event()
+    release_import = threading.Event()
+
+    def _failing_import_from_url(src, config=None):
+        import_reserved.set()
+        assert release_import.wait(timeout=10)
+        raise RuntimeError("simulated import failure before job registration")
+
+    monkeypatch.setattr(installer, "_import_from_url", _failing_import_from_url)
+
+    marker_scanned = threading.Event()
+    real_guess_source = installer._guess_source
+
+    def _observing_guess_source(source_str: str):
+        result = real_guess_source(source_str)
+        marker_scanned.set()
+        return result
+
+    monkeypatch.setattr(installer, "_guess_source", _observing_guess_source)
+
+    resumed: list[ModelInstallJob] = []
+    monkeypatch.setattr(installer, "_resume_remote_download", lambda job: resumed.append(job))
+
+    import_errors: list[Exception] = []
+
+    def _run_import() -> None:
+        try:
+            installer.import_model(source)
+        except Exception as e:  # noqa: BLE001 - the simulated failure is the point
+            import_errors.append(e)
+
+    import_thread = threading.Thread(target=_run_import)
+    start_thread = threading.Thread(target=installer.start)
+    try:
+        # The import passes _wait_for_restore_complete() (the event starts out
+        # set), reserves the source in _pending_sources, then pauses inside its
+        # helper - before any job is registered.
+        import_thread.start()
+        assert import_reserved.wait(timeout=10)
+
+        # Restoration scans the marker while the reservation is pending. Its
+        # main pass must defer the marker rather than restore or discard it.
+        start_thread.start()
+        assert marker_scanned.wait(timeout=10)
+
+        # Fail the import before it registers a job. The reservation is
+        # discarded, so the marker has no owner; restore's deferred recheck
+        # must now restore it.
+        release_import.set()
+        import_thread.join(timeout=10)
+        assert import_errors, "the paused import was expected to fail"
+
+        start_thread.join(timeout=10)
+        installer._wait_for_restore_complete()
+
+        jobs_for_source = [job for job in installer._install_jobs if str(job.source) == str(source)]
+        assert len(jobs_for_source) == 1, "restore did not recover the marker of the failed import"
+        assert jobs_for_source[0]._install_tmpdir == tmpdir
+        assert resumed == jobs_for_source
+        assert tmpdir.exists()
+    finally:
+        release_import.set()
         installer.stop()
 
 

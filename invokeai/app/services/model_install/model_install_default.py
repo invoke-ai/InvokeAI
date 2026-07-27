@@ -211,18 +211,21 @@ class ModelInstallService(ModelInstallServiceBase):
     def _restore_incomplete_installs(self) -> None:
         path = self._app_config.models_path
         seen_sources: set[str] = set()
-        # Snapshot the sources that have an owner at the moment restoration
-        # begins. A job's terminal transition, marker deletion and tmpdir
-        # cleanup are not synchronized with the per-marker check below, so an
-        # owner that completes mid-scan could otherwise look inactive while its
-        # marker is still on disk, and we would enqueue a duplicate job for a
-        # directory the owner is about to clean up. A source owned when the
-        # scan starts stays owned for the whole scan; its leftover markers, if
-        # any, are cleaned up on a later startup when the source is idle.
+        # Snapshot the sources that have an owning job at the moment
+        # restoration begins. A job's terminal transition, marker deletion and
+        # tmpdir cleanup are not synchronized with the per-marker check below,
+        # so an owner that completes mid-scan could otherwise look inactive
+        # while its marker is still on disk, and we would enqueue a duplicate
+        # job for a directory the owner is about to clean up. A source owned
+        # when the scan starts stays owned for the whole scan; its leftover
+        # markers, if any, are cleaned up on a later startup when the source is
+        # idle. A _pending_sources reservation is deliberately NOT an owner:
+        # it may still fail without registering a job, so markers for pending
+        # sources are deferred and rechecked after the scan instead.
         with self._lock:
             owned_sources = {str(j.source) for j in self._install_jobs if not j.in_terminal_state}
             owned_sources |= {str(j.source) for j in self._download_cache.values() if not j.in_terminal_state}
-            owned_sources |= set(self._pending_sources)
+        deferred: list[tuple[str, ModelInstallJob, Path]] = []
         for tmpdir in path.glob(f"{TMPDIR_PREFIX}*"):
             marker = self._read_install_marker(tmpdir)
             if not marker:
@@ -271,12 +274,49 @@ class ModelInstallService(ModelInstallServiceBase):
             with self._lock:
                 already_active = (
                     source_str in owned_sources
-                    or source_str in self._pending_sources
                     or any(str(j.source) == source_str for j in self._install_jobs if not j.in_terminal_state)
                     or any(
                         str(j.source) == source_str for j in self._download_cache.values() if not j.in_terminal_state
                     )
                 )
+                if already_active:
+                    self._logger.debug(f"Skipping restore for {source_str} - already being tracked")
+                    continue
+                if source_str in self._pending_sources:
+                    # An in-flight import_model call has reserved this source
+                    # but has not registered a job yet - and it may still fail
+                    # without registering one, in which case the marker would
+                    # be left with no owner. Defer the marker and recheck it
+                    # after the scan, once the reservation has resolved.
+                    self._logger.debug(f"Deferring restore for {source_str} - a pending import has reserved it")
+                    deferred.append((source_str, job, tmpdir))
+                    continue
+                if source_str in seen_sources:
+                    duplicate_tmpdir = True
+                else:
+                    seen_sources.add(source_str)
+                    self._install_jobs.append(job)
+            if duplicate_tmpdir:
+                self._logger.info(f"Removing duplicate temporary directory {tmpdir}")
+                self._safe_rmtree(tmpdir, self._logger)
+                continue
+
+            self._launch_restored_job(job)
+
+        # Second pass: markers deferred above because an import_model call had
+        # reserved their source. Wait for each reservation to resolve; if the
+        # import registered a job it owns the source and the marker is left for
+        # a later idle startup, and if it failed the marker has no owner and is
+        # restored here. The recheck runs under the lock, so it is atomic with
+        # respect to new reservations and registrations.
+        for source_str, job, tmpdir in deferred:
+            duplicate_tmpdir = False
+            with self._install_cond:
+                while source_str in self._pending_sources:
+                    self._install_cond.wait()
+                already_active = any(
+                    str(j.source) == source_str for j in self._install_jobs if not j.in_terminal_state
+                ) or any(str(j.source) == source_str for j in self._download_cache.values() if not j.in_terminal_state)
                 if already_active:
                     self._logger.debug(f"Skipping restore for {source_str} - already being tracked")
                     continue
@@ -290,19 +330,23 @@ class ModelInstallService(ModelInstallServiceBase):
                 self._safe_rmtree(tmpdir, self._logger)
                 continue
 
-            if job.paused:
-                continue
+            self._launch_restored_job(job)
 
-            if job.status in [InstallStatus.DOWNLOADS_DONE, InstallStatus.RUNNING]:
-                job.status = InstallStatus.DOWNLOADS_DONE
-                self._put_in_queue(job)
-            else:
-                try:
-                    self._resume_remote_download(job)
-                except Exception as e:
-                    self._set_error(job, e)
-                    if job._install_tmpdir is not None:
-                        self._safe_rmtree(job._install_tmpdir, self._logger)
+    def _launch_restored_job(self, job: ModelInstallJob) -> None:
+        """Kick off a job that _restore_incomplete_installs has just registered."""
+        if job.paused:
+            return
+
+        if job.status in [InstallStatus.DOWNLOADS_DONE, InstallStatus.RUNNING]:
+            job.status = InstallStatus.DOWNLOADS_DONE
+            self._put_in_queue(job)
+        else:
+            try:
+                self._resume_remote_download(job)
+            except Exception as e:
+                self._set_error(job, e)
+                if job._install_tmpdir is not None:
+                    self._safe_rmtree(job._install_tmpdir, self._logger)
 
     def _restore_incomplete_installs_async(self) -> None:
         self._restore_completed_event.clear()
