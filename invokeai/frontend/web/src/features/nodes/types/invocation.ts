@@ -37,6 +37,7 @@ export const zInvocationNodeData = z
     // Parsed per-input in the transform below so that the input-instance schema can be chosen based
     // on the node type (extras are only accepted for nodes that declare `extra='allow'`).
     inputs: z.record(z.string(), z.unknown()),
+    dynamicInputTemplates: z.record(z.string(), zFieldInputTemplate).default({}),
     isOpen: z.boolean(),
     isIntermediate: z.boolean(),
     useCache: z.boolean(),
@@ -188,4 +189,29 @@ const isGeneratorNode = (node: InvocationNode) => isGeneratorNodeType(node.data.
 
 export const isExecutableNode = (node: InvocationNode) => {
   return !isBatchNode(node) && !isGeneratorNode(node);
+};
+
+export const getInvocationNodeInputTemplate = (
+  nodeData: Pick<InvocationNodeData, 'inputs'> & Partial<Pick<InvocationNodeData, 'dynamicInputTemplates'>>,
+  template: InvocationTemplate,
+  fieldName: string
+) => {
+  return nodeData.dynamicInputTemplates?.[fieldName] ?? template.inputs[fieldName];
+};
+
+export const getInvocationNodeTemplateWithDynamicInputs = (
+  nodeData: Pick<InvocationNodeData, 'inputs'> & Partial<Pick<InvocationNodeData, 'dynamicInputTemplates'>>,
+  template: InvocationTemplate
+): InvocationTemplate => {
+  if (!nodeData.dynamicInputTemplates || Object.keys(nodeData.dynamicInputTemplates).length === 0) {
+    return template;
+  }
+
+  return {
+    ...template,
+    inputs: {
+      ...template.inputs,
+      ...nodeData.dynamicInputTemplates,
+    },
+  };
 };

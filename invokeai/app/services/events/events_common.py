@@ -308,12 +308,43 @@ class QueueItemsRetriedEvent(QueueEventBase):
     __event_name__ = "queue_items_retried"
 
     retried_item_ids: list[int] = Field(description="The IDs of the queue items that were retried")
+    user_ids: list[str] = Field(description="The IDs of the users who own the retried root queue items")
+    retried_item_ids_by_user: dict[str, list[int]] = Field(
+        description="The retried root queue item IDs keyed by owner user ID."
+    )
 
     @classmethod
-    def build(cls, retry_result: RetryItemsResult) -> "QueueItemsRetriedEvent":
+    def build(
+        cls, retry_result: RetryItemsResult, user_ids: list[str], retried_item_ids_by_user: dict[str, list[int]]
+    ) -> "QueueItemsRetriedEvent":
         return cls(
             queue_id=retry_result.queue_id,
             retried_item_ids=retry_result.retried_item_ids,
+            user_ids=user_ids,
+            retried_item_ids_by_user=retried_item_ids_by_user,
+        )
+
+
+@payload_schema.register
+class QueueItemsCanceledEvent(QueueEventBase):
+    """Event model for queue_items_canceled. Emitted when queue items are canceled or deleted in
+    bulk (e.g. cancel/delete-all-except-current) without per-item status change events."""
+
+    __event_name__ = "queue_items_canceled"
+
+    canceled_item_ids: list[int] = Field(description="The IDs of the queue items that were canceled or deleted")
+    user_ids: list[str] = Field(description="The IDs of the users who own the canceled queue items")
+    canceled_item_ids_by_user: dict[str, list[int]] = Field(
+        description="The canceled queue item IDs keyed by owner user ID."
+    )
+
+    @classmethod
+    def build(cls, queue_id: str, canceled_item_ids_by_user: dict[str, list[int]]) -> "QueueItemsCanceledEvent":
+        return cls(
+            queue_id=queue_id,
+            canceled_item_ids=[item_id for item_ids in canceled_item_ids_by_user.values() for item_id in item_ids],
+            user_ids=list(canceled_item_ids_by_user.keys()),
+            canceled_item_ids_by_user=canceled_item_ids_by_user,
         )
 
 
@@ -323,9 +354,77 @@ class QueueClearedEvent(QueueEventBase):
 
     __event_name__ = "queue_cleared"
 
+    user_id: str | None = Field(
+        default=None,
+        description="The ID of the user whose queue items were cleared, or None if all users' items were cleared",
+    )
+
     @classmethod
-    def build(cls, queue_id: str) -> "QueueClearedEvent":
-        return cls(queue_id=queue_id)
+    def build(cls, queue_id: str, user_id: str | None = None) -> "QueueClearedEvent":
+        return cls(queue_id=queue_id, user_id=user_id)
+
+
+class WorkflowEventBase(EventBase):
+    """Base class for workflow library CRUD events."""
+
+    workflow_id: str = Field(description="The ID of the workflow")
+    user_id: str = Field(description="The owner of the workflow")
+
+
+@payload_schema.register
+class WorkflowCreatedEvent(WorkflowEventBase):
+    """Event model for workflow_created"""
+
+    __event_name__ = "workflow_created"
+
+    is_public: bool = Field(description="Whether the workflow is shared with all users")
+
+    @classmethod
+    def build(cls, workflow_id: str, user_id: str, is_public: bool) -> "WorkflowCreatedEvent":
+        return cls(workflow_id=workflow_id, user_id=user_id, is_public=is_public)
+
+
+@payload_schema.register
+class WorkflowUpdatedEvent(WorkflowEventBase):
+    """Event model for workflow_updated"""
+
+    __event_name__ = "workflow_updated"
+
+    old_is_public: bool = Field(description="Whether the workflow was shared before the update")
+    new_is_public: bool = Field(description="Whether the workflow is shared after the update")
+
+    @classmethod
+    def build(cls, workflow_id: str, user_id: str, old_is_public: bool, new_is_public: bool) -> "WorkflowUpdatedEvent":
+        return cls(
+            workflow_id=workflow_id,
+            user_id=user_id,
+            old_is_public=old_is_public,
+            new_is_public=new_is_public,
+        )
+
+
+@payload_schema.register
+class WorkflowDeletedEvent(WorkflowEventBase):
+    """Event model for workflow_deleted"""
+
+    __event_name__ = "workflow_deleted"
+
+    is_public: bool = Field(description="Whether the workflow was shared when it was deleted")
+
+    @classmethod
+    def build(cls, workflow_id: str, user_id: str, is_public: bool) -> "WorkflowDeletedEvent":
+        return cls(workflow_id=workflow_id, user_id=user_id, is_public=is_public)
+
+
+@payload_schema.register
+class WorkflowAccessRevokedEvent(WorkflowEventBase):
+    """Event model for workflow_access_revoked."""
+
+    __event_name__ = "workflow_access_revoked"
+
+    @classmethod
+    def build(cls, workflow_id: str, user_id: str) -> "WorkflowAccessRevokedEvent":
+        return cls(workflow_id=workflow_id, user_id=user_id)
 
 
 class DownloadEventBase(EventBase):
@@ -434,10 +533,13 @@ class ModelLoadStartedEvent(ModelEventBase):
 
     config: AnyModelConfig = Field(description="The model's config")
     submodel_type: Optional[SubModelType] = Field(default=None, description="The submodel type, if any")
+    user_id: str = Field(default="system", description="The ID of the user whose action triggered the load")
 
     @classmethod
-    def build(cls, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> "ModelLoadStartedEvent":
-        return cls(config=config, submodel_type=submodel_type)
+    def build(
+        cls, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None, user_id: str = "system"
+    ) -> "ModelLoadStartedEvent":
+        return cls(config=config, submodel_type=submodel_type, user_id=user_id)
 
 
 @payload_schema.register
@@ -448,10 +550,13 @@ class ModelLoadCompleteEvent(ModelEventBase):
 
     config: AnyModelConfig = Field(description="The model's config")
     submodel_type: Optional[SubModelType] = Field(default=None, description="The submodel type, if any")
+    user_id: str = Field(default="system", description="The ID of the user whose action triggered the load")
 
     @classmethod
-    def build(cls, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> "ModelLoadCompleteEvent":
-        return cls(config=config, submodel_type=submodel_type)
+    def build(
+        cls, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None, user_id: str = "system"
+    ) -> "ModelLoadCompleteEvent":
+        return cls(config=config, submodel_type=submodel_type, user_id=user_id)
 
 
 @payload_schema.register

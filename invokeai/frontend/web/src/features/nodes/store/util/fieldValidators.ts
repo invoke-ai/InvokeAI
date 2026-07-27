@@ -37,7 +37,12 @@ import {
   isStringFieldCollectionInputInstance,
   isStringFieldCollectionInputTemplate,
 } from 'features/nodes/types/field';
-import { type InvocationNode, type InvocationTemplate, isInvocationNode } from 'features/nodes/types/invocation';
+import {
+  getInvocationNodeInputTemplate,
+  type InvocationNode,
+  type InvocationTemplate,
+  isInvocationNode,
+} from 'features/nodes/types/invocation';
 import { t } from 'i18next';
 import { map } from 'nanostores';
 import { useEffect } from 'react';
@@ -273,7 +278,7 @@ export const getInvocationNodeErrors = (
   }
 
   for (const [fieldName, field] of Object.entries(node.data.inputs)) {
-    const fieldTemplate = nodeTemplate.inputs[fieldName];
+    const fieldTemplate = getInvocationNodeInputTemplate(node.data, nodeTemplate, fieldName);
 
     if (!fieldTemplate) {
       // Backend nodes with `extra='allow'` accept inputs that aren't declared in the OpenAPI
@@ -313,7 +318,7 @@ const syncNodeErrors = (nodesState: NodesState, templates: Templates) => {
     }
 
     for (const [fieldName, field] of Object.entries(node.data.inputs)) {
-      const fieldTemplate = nodeTemplate.inputs[fieldName];
+      const fieldTemplate = getInvocationNodeInputTemplate(node.data, nodeTemplate, fieldName);
 
       if (!fieldTemplate) {
         if (nodeAcceptsExtraInputs(node.data.type)) {

@@ -49,6 +49,7 @@ class UIType(str, Enum, metaclass=MetaEnum):
     # region Misc Field Types
     Scheduler = "SchedulerField"
     Any = "AnyField"
+    SavedWorkflow = "SavedWorkflowField"
     # endregion
 
     # region Internal Field Types
@@ -341,6 +342,12 @@ class ZImageConditioningField(BaseModel):
         description="The mask associated with this conditioning tensor for regional prompting. "
         "Excluded regions should be set to False, included regions should be set to True.",
     )
+
+
+class Ideogram4ConditioningField(BaseModel):
+    """An Ideogram 4 conditioning tensor primitive value"""
+
+    conditioning_name: str = Field(description="The name of conditioning tensor")
 
 
 class QwenImageConditioningField(BaseModel):

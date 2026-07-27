@@ -5,7 +5,7 @@ import type { HotkeysState } from './hotkeysTypes';
 
 describe('Hotkeys Slice', () => {
   const getInitialState = (): HotkeysState => ({
-    _version: 1,
+    _version: 2,
     customHotkeys: {},
   });
 
@@ -17,7 +17,7 @@ describe('Hotkeys Slice', () => {
       const action = hotkeyChanged({ id: 'app.invoke', hotkeys: ['ctrl+shift+enter'] });
       const result = reducer(state, action);
       expect(result).toEqual({
-        _version: 1,
+        _version: 2,
         customHotkeys: {
           'app.invoke': ['ctrl+shift+enter'],
         },
@@ -26,7 +26,7 @@ describe('Hotkeys Slice', () => {
 
     it('should update an existing custom hotkey', () => {
       const state: HotkeysState = {
-        _version: 1,
+        _version: 2,
         customHotkeys: {
           'app.invoke': ['ctrl+enter'],
         },
@@ -34,7 +34,7 @@ describe('Hotkeys Slice', () => {
       const action = hotkeyChanged({ id: 'app.invoke', hotkeys: ['ctrl+shift+enter'] });
       const result = reducer(state, action);
       expect(result).toEqual({
-        _version: 1,
+        _version: 2,
         customHotkeys: {
           'app.invoke': ['ctrl+shift+enter'],
         },
@@ -45,7 +45,7 @@ describe('Hotkeys Slice', () => {
   describe('hotkeyReset', () => {
     it('should remove a custom hotkey', () => {
       const state: HotkeysState = {
-        _version: 1,
+        _version: 2,
         customHotkeys: {
           'app.invoke': ['ctrl+shift+enter'],
           'app.cancelQueueItem': ['shift+x'],
@@ -62,7 +62,7 @@ describe('Hotkeys Slice', () => {
   describe('allHotkeysReset', () => {
     it('should clear all custom hotkeys', () => {
       const state: HotkeysState = {
-        _version: 1,
+        _version: 2,
         customHotkeys: {
           'app.invoke': ['ctrl+shift+enter'],
           'app.cancelQueueItem': ['shift+x'],
@@ -71,8 +71,33 @@ describe('Hotkeys Slice', () => {
       const action = allHotkeysReset();
       const result = reducer(state, action);
       expect(result).toEqual({
-        _version: 1,
+        _version: 2,
         customHotkeys: {},
+      });
+    });
+  });
+
+  describe('migration', () => {
+    it('should migrate v1 persisted hotkeys without remapping punctuation glyphs to physical keys', () => {
+      const migrate = hotkeysSliceConfig.persistConfig?.migrate;
+      if (!migrate) {
+        throw new Error('Expected hotkeys slice to be persisted');
+      }
+
+      const result = migrate({
+        _version: 1,
+        customHotkeys: {
+          'canvas.decrementToolWidth': ['Shift+[', ' '],
+          'canvas.incrementToolWidth': [']'],
+        },
+      });
+
+      expect(result).toEqual({
+        _version: 2,
+        customHotkeys: {
+          'canvas.decrementToolWidth': ['shift+[', 'space'],
+          'canvas.incrementToolWidth': [']'],
+        },
       });
     });
   });
