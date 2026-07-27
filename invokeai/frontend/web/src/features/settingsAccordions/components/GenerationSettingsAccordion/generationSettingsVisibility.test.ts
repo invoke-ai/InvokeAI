@@ -21,10 +21,7 @@ describe('shouldShowStandardScheduler', () => {
     'anima',
     'krea-2',
     'ideogram-4',
-  ] as const)(
-    'hides the standard scheduler for %s',
-    (base) => {
-      expect(shouldShowStandardScheduler(base)).toBe(false);
-    }
-  );
+  ] as const)('hides the standard scheduler for %s', (base) => {
+    expect(shouldShowStandardScheduler(base)).toBe(false);
+  });
 });
