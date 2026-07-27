@@ -7,7 +7,7 @@
 # - Only do root-level installs, as base container does not include the non-root ubuntu user and
 #   sets it up using the common-utils feature after.
 
-FROM mcr.microsoft.com/devcontainers/base:ubuntu-24.04
+FROM mcr.microsoft.com/devcontainers/base:ubuntu26.04
 
 RUN rm -f /etc/apt/apt.conf.d/docker-clean; echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -17,7 +17,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         git git-lfs \
         imagemagick- \
         libopencv-dev \
-        libstdc++-10-dev \
+        libstdc++-15-dev \
         openssh-client &&\
     # Link amdgpu.ids for ROCm builds
     # contributed by https://github.com/Rubonnek
@@ -27,7 +27,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     ln -sf --relative /usr/lib/$(uname -p)-linux-gnu/pkgconfig/{opencv4,opencv}.pc
 
 # Install `uv` for Python package management
-COPY --from=ghcr.io/astral-sh/uv:0.11.14 /uv /uvx /usr/local/bin/
+COPY --from=ghcr.io/astral-sh/uv:0.11.32 /uv /uvx /usr/local/bin/
 
 ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH
 
@@ -40,5 +40,5 @@ RUN addgroup --system pnpm &&\
     chmod g+s "${PNPM_HOME}" &&\
     # Use the pnpm install script, but inhibit it from changing any rc-files
     # because we set those values in the ENV above.
-    curl -fsSL https://get.pnpm.io/install.sh | PNPM_VERSION=10.33.4 SHELL=/bin/sh ENV=/dev/null newgrp pnpm &&\
+    curl -fsSL https://get.pnpm.io/install.sh | PNPM_VERSION=10.34.4 SHELL=/bin/sh ENV=/dev/null sh &&\
     pnpm env use --global 22
