@@ -186,3 +186,22 @@ def test_obj_serializer_fwd_cache_calls_delete_callback(fwd_cache: ObjectSeriali
     obj_1_name = fwd_cache.save(obj_1)
     fwd_cache.delete(obj_1_name)
     assert called_name == obj_1_name
+
+
+def test_obj_serializer_fwd_cache_removes_deleted_ids_from_eviction_queue(
+    tmp_path: Path,
+):
+    fwd_cache = ObjectSerializerForwardCache(
+        ObjectSerializerDisk[MockDataclass](tmp_path, safe_globals=[MockDataclass]), max_cache_size=2
+    )
+
+    obj_1_name = fwd_cache.save(MockDataclass(foo="bar"))
+    obj_2_name = fwd_cache.save(MockDataclass(foo="baz"))
+    fwd_cache.delete(obj_1_name)
+
+    obj_3_name = fwd_cache.save(MockDataclass(foo="qux"))
+
+    assert obj_1_name not in fwd_cache._cache
+    assert obj_2_name in fwd_cache._cache
+    assert obj_3_name in fwd_cache._cache
+    assert fwd_cache._cache_ids.qsize() == 2

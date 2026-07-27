@@ -1,4 +1,4 @@
-from queue import Queue
+from queue import Empty, Queue
 from typing import TYPE_CHECKING, Optional, TypeVar
 
 from invokeai.app.services.object_serializer.object_serializer_base import ObjectSerializerBase
@@ -52,7 +52,21 @@ class ObjectSerializerForwardCache(ObjectSerializerBase[T]):
         self._underlying_storage.delete(name)
         if name in self._cache:
             del self._cache[name]
+            self._remove_cache_id(name)
         self._on_deleted(name)
+
+    def _remove_cache_id(self, name: str) -> None:
+        remaining_ids: list[str] = []
+        while True:
+            try:
+                cache_id = self._cache_ids.get_nowait()
+            except Empty:
+                break
+            if cache_id != name:
+                remaining_ids.append(cache_id)
+
+        for cache_id in remaining_ids:
+            self._cache_ids.put(cache_id)
 
     def _get_cache(self, name: str) -> Optional[T]:
         return None if name not in self._cache else self._cache[name]
