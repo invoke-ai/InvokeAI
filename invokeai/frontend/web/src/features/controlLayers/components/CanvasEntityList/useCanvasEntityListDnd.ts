@@ -4,7 +4,7 @@ import { attachClosestEdge, extractClosestEdge } from '@atlaskit/pragmatic-drag-
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { singleCanvasEntityDndSource } from 'features/dnd/dnd';
 import { type DndListTargetState, idle } from 'features/dnd/types';
-import { firefoxDndFix } from 'features/dnd/util';
+import { dndInputFix } from 'features/dnd/util';
 import type { RefObject } from 'react';
 import { useEffect, useState } from 'react';
 
@@ -21,7 +21,7 @@ export const useCanvasEntityListDnd = (
       return;
     }
     return combine(
-      firefoxDndFix(element),
+      dndInputFix(element),
       draggable({
         element,
         getInitialData() {
