@@ -20,6 +20,21 @@ const wrapCanvasSurface = (canvas: HTMLCanvasElement): RasterSurface => {
       canvas.width = width;
       canvas.height = height;
     },
+    // This wraps the canvas ELEMENT that is mounted in the document, so it
+    // cannot use the swap-the-backing-store trick the offscreen surfaces use —
+    // the element has to stay the one the page is displaying. It copies through
+    // a temporary instead. Nothing calls this on the display surface (only layer
+    // caches grow), so the slower shape costs nothing; it is here to honour the
+    // contract rather than to be used.
+    resizePreserving(width: number, height: number, dx: number, dy: number) {
+      const previous = document.createElement('canvas');
+      previous.width = canvas.width;
+      previous.height = canvas.height;
+      previous.getContext('2d')?.drawImage(canvas, 0, 0);
+      canvas.width = width;
+      canvas.height = height;
+      ctx.drawImage(previous, dx, dy);
+    },
     get width() {
       return canvas.width;
     },

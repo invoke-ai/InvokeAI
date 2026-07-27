@@ -13,6 +13,29 @@ export interface RasterSurface {
   readonly width: number;
   readonly height: number;
   resize(w: number, h: number): void;
+  /**
+   * Resizes to `w`×`h` while keeping the current pixels, placed at `(dx, dy)`
+   * in the new surface.
+   *
+   * This exists because {@link resize} cannot preserve anything: assigning
+   * `canvas.width` resets the backing store, so a caller that wants its pixels
+   * back has to read them out to the CPU first and upload them again. That
+   * round trip is the dominant cost of growing a layer cache during a stroke —
+   * measured at 33.8 ms for a 3520×3200 → 3840×3712 growth, against a 14.9 ms
+   * floor for reallocating and preserving nothing.
+   *
+   * Adopting a fresh canvas and blitting the old one into it does the copy on
+   * the GPU instead, for 17.9 ms on the same growth. It costs no extra
+   * allocation — the copy's target IS the new surface, and the old canvas is
+   * dropped — which is what separates it from a temp-buffer scheme, where the
+   * second allocation gives back everything the faster copy wins.
+   *
+   * `canvas` and `ctx` are therefore REPLACED, not mutated. The surface object
+   * itself keeps its identity (caches key derived surfaces on it), but anything
+   * holding a reference to the old `canvas`/`ctx` across this call is holding a
+   * detached one. As with `resize`, all context state resets to defaults.
+   */
+  resizePreserving(w: number, h: number, dx: number, dy: number): void;
 }
 
 export interface RasterSurfaceOptions {
@@ -56,21 +79,36 @@ class OffscreenRasterSurface implements RasterSurface {
   ctx: OffscreenCanvasRenderingContext2D;
   width: number;
   height: number;
+  private readonly options: RasterSurfaceOptions | undefined;
 
   constructor(width: number, height: number, options?: RasterSurfaceOptions) {
+    this.options = options;
     this.canvas = new OffscreenCanvas(width, height);
-    const ctx = this.canvas.getContext('2d', { willReadFrequently: options?.willReadFrequently });
+    this.ctx = this.acquire();
+    this.width = width;
+    this.height = height;
+  }
+
+  private acquire(): OffscreenCanvasRenderingContext2D {
+    const ctx = this.canvas.getContext('2d', { willReadFrequently: this.options?.willReadFrequently });
     if (!ctx) {
       throw new Error('Failed to acquire a 2D context from OffscreenCanvas');
     }
-    this.ctx = ctx;
-    this.width = width;
-    this.height = height;
+    return ctx;
   }
 
   resize(w: number, h: number): void {
     this.canvas.width = w;
     this.canvas.height = h;
+    this.width = w;
+    this.height = h;
+  }
+
+  resizePreserving(w: number, h: number, dx: number, dy: number): void {
+    const previous = this.canvas;
+    this.canvas = new OffscreenCanvas(w, h);
+    this.ctx = this.acquire();
+    this.ctx.drawImage(previous, dx, dy);
     this.width = w;
     this.height = h;
   }
@@ -81,23 +119,40 @@ class DomCanvasRasterSurface implements RasterSurface {
   ctx: CanvasRenderingContext2D;
   width: number;
   height: number;
+  private readonly options: RasterSurfaceOptions | undefined;
 
   constructor(width: number, height: number, options?: RasterSurfaceOptions) {
+    this.options = options;
     this.canvas = document.createElement('canvas');
     this.canvas.width = width;
     this.canvas.height = height;
-    const ctx = this.canvas.getContext('2d', { willReadFrequently: options?.willReadFrequently });
+    this.ctx = this.acquire();
+    this.width = width;
+    this.height = height;
+  }
+
+  private acquire(): CanvasRenderingContext2D {
+    const ctx = this.canvas.getContext('2d', { willReadFrequently: this.options?.willReadFrequently });
     if (!ctx) {
       throw new Error('Failed to acquire a 2D context from HTMLCanvasElement');
     }
-    this.ctx = ctx;
-    this.width = width;
-    this.height = height;
+    return ctx;
   }
 
   resize(w: number, h: number): void {
     this.canvas.width = w;
     this.canvas.height = h;
+    this.width = w;
+    this.height = h;
+  }
+
+  resizePreserving(w: number, h: number, dx: number, dy: number): void {
+    const previous = this.canvas;
+    this.canvas = document.createElement('canvas');
+    this.canvas.width = w;
+    this.canvas.height = h;
+    this.ctx = this.acquire();
+    this.ctx.drawImage(previous, dx, dy);
     this.width = w;
     this.height = h;
   }

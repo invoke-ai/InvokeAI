@@ -164,6 +164,18 @@ class StubRasterSurfaceImpl implements StubRasterSurface {
     this.width = w;
     this.height = h;
   }
+
+  /**
+   * The stub holds no pixels, so this only records the resize and the offset the
+   * real surface would have blitted the old canvas to. Unlike the real surface
+   * the `ctx` is NOT replaced — keeping one call log per surface is what lets
+   * tests assert on a surface's whole history across a growth.
+   */
+  resizePreserving(w: number, h: number, dx: number, dy: number): void {
+    this.callLog.push({ args: [w, h, dx, dy], op: 'resizePreserving' });
+    this.width = w;
+    this.height = h;
+  }
 }
 
 /**

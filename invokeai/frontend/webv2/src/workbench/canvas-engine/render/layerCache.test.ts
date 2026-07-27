@@ -263,17 +263,15 @@ describe('growToRect (paint caches grow with strokes)', () => {
     expect(grown.surface.width).toBe(40);
     expect(grown.surface.height).toBe(40);
 
-    // The old pixels were snapshotted before the (clearing) resize and blitted
-    // back at their layer-local position within the grown surface: old origin
-    // (10,10) minus new origin (-10,-10) = surface (20,20).
+    // The growth preserves the old pixels at their layer-local position within
+    // the grown surface: old origin (10,10) minus new origin (-10,-10) =
+    // surface (20,20). It must NOT go through a CPU round trip to do it — the
+    // whole point of `resizePreserving` is that the copy stays on the GPU, and
+    // a `getImageData` here would mean that regressed.
     const log = (grown.surface as StubRasterSurface).callLog;
-    const snapshot = log.find((e) => e.op === 'getImageData');
-    expect(snapshot?.args).toEqual([0, 0, 20, 20]);
-    const resizeIndex = log.findIndex((e) => e.op === 'resize');
-    const putIndex = log.findIndex((e) => e.op === 'putImageData');
-    expect(resizeIndex).toBeGreaterThan(-1);
-    expect(putIndex).toBeGreaterThan(resizeIndex);
-    expect(log[putIndex]?.args.slice(1)).toEqual([20, 20]);
+    expect(log.filter((e) => e.op === 'resizePreserving').map((e) => e.args)).toEqual([[40, 40, 20, 20]]);
+    expect(log.map((e) => e.op)).not.toContain('getImageData');
+    expect(log.map((e) => e.op)).not.toContain('putImageData');
   });
 
   it('is a no-op (no resize, no blit) when the current extent already covers the request', () => {
