@@ -161,6 +161,8 @@ export interface GenerateSettings {
   dynamicPromptsCombinatorial: boolean;
   /** Upper bound on expanded prompts (the sample size when not combinatorial). */
   dynamicPromptsMaxPrompts: number;
+  /** Seeds the random sampler so the preview matches what generates. */
+  dynamicPromptsSampleSeed: number;
   dynamicPromptsSeedBehaviour: DynamicPromptsSeedBehaviour;
   width: number;
   height: number;

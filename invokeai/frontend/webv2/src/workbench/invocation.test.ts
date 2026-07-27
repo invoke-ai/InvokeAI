@@ -12,8 +12,14 @@ import type { WidgetId } from '@workbench/widgetContracts';
 
 import { getDefaultGenerateSettings } from '@features/generation/settings';
 import { createDefaultUpscaleWidgetValues } from '@features/upscale';
+import { queryClient } from '@platform/query/client';
 import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+// Dynamic prompt expansion is the only transport `submitResolvedInvocation` touches.
+const parseDynamicPromptsMock = vi.hoisted(() => vi.fn());
+
+vi.mock('@features/generation/data/promptUtilities', () => ({ parseDynamicPrompts: parseDynamicPromptsMock }));
 
 import {
   areInvocationRouteInputsEqual,
@@ -339,6 +345,12 @@ describe('submitResolvedInvocation', () => {
   const routeFor = (project: Parameters<typeof resolveInvocationRoute>[0], route: InvocationRoute) =>
     resolveInvocationRoute(project, 'global', route);
 
+  beforeEach(() => {
+    queryClient.clear();
+    parseDynamicPromptsMock.mockReset();
+    parseDynamicPromptsMock.mockResolvedValue({ prompts: ['a red cat', 'a green cat'] });
+  });
+
   it('routes a canvas source through prepareCanvasInvocation and does not dispatch a resolved snapshot', () => {
     const project = getActiveProject(
       createGenerateValues(animaModel, { qwen3EncoderModel: qwen3Encoder, vae: animaVae })
@@ -384,6 +396,76 @@ describe('submitResolvedInvocation', () => {
     expect(submitResolved.mock.calls[0]?.[0]).toMatchObject({
       route: expect.objectContaining({ destination: 'gallery', sourceId: 'generate' }),
     });
+  });
+
+  it('expands a dynamic prompt before dispatching, and only then', async () => {
+    const project = getActiveProject(
+      createGenerateValues(animaModel, {
+        positivePrompt: 'a {red|green} cat',
+        qwen3EncoderModel: qwen3Encoder,
+        vae: animaVae,
+      })
+    );
+    const commands = createWorkbenchStore().commands;
+    const submitResolved = vi.spyOn(commands.generation, 'submitResolved');
+    const route = routeFor(project, { ...project.invocation, destination: 'gallery', sourceId: 'generate' });
+
+    submitResolvedInvocation({
+      commands,
+      models: undefined,
+      owner: captureAccountScope(),
+      prepareCanvasInvocation: vi.fn(),
+      project,
+      route,
+    });
+
+    // The expansion is a round trip, so dispatch cannot have happened yet.
+    expect(submitResolved).not.toHaveBeenCalled();
+
+    await vi.waitFor(() => expect(submitResolved).toHaveBeenCalledTimes(1));
+    expect(submitResolved.mock.calls[0]?.[0]).toMatchObject({
+      positivePrompts: ['a red cat', 'a green cat'],
+    });
+  });
+
+  it('dispatches synchronously when the prompt has no dynamic syntax', () => {
+    const project = getActiveProject(createGenerateValues(animaModel, { positivePrompt: 'a plain cat' }));
+    const commands = createWorkbenchStore().commands;
+    const submitResolved = vi.spyOn(commands.generation, 'submitResolved');
+    const route = routeFor(project, { ...project.invocation, destination: 'gallery', sourceId: 'generate' });
+
+    submitResolvedInvocation({
+      commands,
+      models: undefined,
+      owner: captureAccountScope(),
+      prepareCanvasInvocation: vi.fn(),
+      project,
+      route,
+    });
+
+    expect(submitResolved).toHaveBeenCalledTimes(1);
+    expect(submitResolved.mock.calls[0]?.[0]).toMatchObject({ positivePrompts: undefined });
+  });
+
+  it('falls back to the literal prompt when expansion fails', async () => {
+    parseDynamicPromptsMock.mockRejectedValueOnce(new Error('offline'));
+
+    const project = getActiveProject(createGenerateValues(animaModel, { positivePrompt: 'a {red|green} cat' }));
+    const commands = createWorkbenchStore().commands;
+    const submitResolved = vi.spyOn(commands.generation, 'submitResolved');
+    const route = routeFor(project, { ...project.invocation, destination: 'gallery', sourceId: 'generate' });
+
+    submitResolvedInvocation({
+      commands,
+      models: undefined,
+      owner: captureAccountScope(),
+      prepareCanvasInvocation: vi.fn(),
+      project,
+      route,
+    });
+
+    await vi.waitFor(() => expect(submitResolved).toHaveBeenCalledTimes(1));
+    expect(submitResolved.mock.calls[0]?.[0]).toMatchObject({ positivePrompts: undefined });
   });
 
   it('quietly ignores a submission owned by an expired account scope', () => {

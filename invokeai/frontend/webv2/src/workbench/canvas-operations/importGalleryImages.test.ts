@@ -75,6 +75,7 @@ const setModel = (project: Project, base: GenerateWidgetValues['model']['base'])
     colorCompensation: false,
     dynamicPromptsCombinatorial: true,
     dynamicPromptsMaxPrompts: 100,
+    dynamicPromptsSampleSeed: 0,
     dynamicPromptsSeedBehaviour: 'per-iteration',
     componentSourceModel: null,
     height: 1024,

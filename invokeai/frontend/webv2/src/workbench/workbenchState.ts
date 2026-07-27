@@ -74,6 +74,7 @@ import {
   getGenerationModelAvailabilityReasons,
   getPromptDraftFromValues,
   getPromptHistoryItemFromGenerateSettings,
+  hasDynamicPromptSyntax,
   migrateProjectPromptDraft,
   normalizeGenerateSettings,
   normalizeGenerateWidgetValues,
@@ -214,6 +215,8 @@ type WorkbenchReducerAction =
   | {
       type: 'submitResolvedInvocationSnapshot';
       backendSupportsCancellation: boolean;
+      /** Expanded positive prompts, resolved by the caller before dispatch. */
+      positivePrompts?: string[];
       route: InvocationRoute;
       models?: readonly ModelConfig[];
     }
@@ -280,6 +283,8 @@ type WorkbenchReducerAction =
       destination: ResultDestination;
       generate: QueueGenerateSnapshot;
       graph: GraphContract;
+      /** Expanded positive prompts, resolved by the caller before dispatch. */
+      positivePrompts?: string[];
       projectId: string;
     }
   | { type: 'cancelQueueItem'; queueItemId: string; projectId?: string }
@@ -2006,7 +2011,12 @@ const routeQueueItemResults = (project: Project, queueItemId: string, images: Ge
 const enqueueCompiledSnapshot = (
   project: Project,
   route: InvocationRoute,
-  compiled: { generate?: QueueGenerateSnapshot; graph: GraphContract; widgetStates: WidgetStateMap },
+  compiled: {
+    generate?: QueueGenerateSnapshot;
+    graph: GraphContract;
+    positivePrompts?: string[];
+    widgetStates: WidgetStateMap;
+  },
   backendSupportsCancellation: boolean,
   canvasSnapshot?: CanvasStateContractV2
 ): Project => {
@@ -2024,14 +2034,29 @@ const enqueueCompiledSnapshot = (
   const upscaleSettings =
     route.sourceId === 'upscale' ? normalizeUpscaleWidgetValues(widgetStates.upscale.values) : null;
   const backendGraph = graph.backendGraph;
+  const canvasGenerateSettings = route.sourceId === 'canvas' ? normalizeGenerateSettings(generate?.values) : null;
   const sourceGenerateSettings =
     route.sourceId === 'canvas'
-      ? normalizeGenerateSettings(generate?.values)
+      ? canvasGenerateSettings
       : route.sourceId === 'generate'
         ? generateSettings
         : route.sourceId === 'upscale'
           ? upscaleSettings
           : null;
+  // Dynamic prompting is a Generate setting, so only the routes compiled from
+  // GenerateSettings honour it; Upscale keeps its prompt literal. The caller has
+  // already expanded, so the queue item records the exact prompts it will submit.
+  const expandedPositivePrompts =
+    route.sourceId !== 'upscale' &&
+    compiled.positivePrompts &&
+    compiled.positivePrompts.length > 1 &&
+    sourceGenerateSettings &&
+    hasDynamicPromptSyntax(sourceGenerateSettings.positivePrompt)
+      ? compiled.positivePrompts
+      : undefined;
+  const expandedSeedBehaviour = expandedPositivePrompts
+    ? (canvasGenerateSettings ?? generateSettings)?.dynamicPromptsSeedBehaviour
+    : undefined;
   const backendSubmission: QueueCompiledSubmission = !backendGraph
     ? { error: `${route.sourceId} queue item is missing a compiled backend graph.`, kind: 'invalid' }
     : route.sourceId === 'workflow'
@@ -2049,7 +2074,9 @@ const enqueueCompiledSnapshot = (
             negativePromptNodeId: generate?.negativePromptNodeId ?? 'negative_prompt',
             positivePrompt: sourceGenerateSettings.positivePrompt,
             positivePromptNodeId: generate?.positivePromptNodeId ?? 'positive_prompt',
+            ...(expandedPositivePrompts ? { positivePrompts: expandedPositivePrompts } : {}),
             seed: sourceGenerateSettings.seed,
+            ...(expandedSeedBehaviour ? { seedBehaviour: expandedSeedBehaviour } : {}),
             seedNodeId: generate?.seedNodeId ?? 'seed',
             shouldRandomizeSeed: sourceGenerateSettings.shouldRandomizeSeed,
           }
@@ -2075,7 +2102,12 @@ const enqueueCompiledSnapshot = (
       ...(generate ? { generate: cloneQueueGenerateSnapshot(generate) } : {}),
       graph,
       presentation: {
-        batchCount: backendSubmission.kind === 'invalid' ? 1 : backendSubmission.batchCount,
+        // Placeholder sizing only: superseded by the backend's real item ids as
+        // soon as the batch is accepted.
+        batchCount:
+          backendSubmission.kind === 'invalid'
+            ? 1
+            : backendSubmission.batchCount * (expandedPositivePrompts?.length ?? 1),
         height: presentationDimensions.height,
         ...(sourceGenerateSettings?.positivePrompt ? { positivePrompt: sourceGenerateSettings.positivePrompt } : {}),
         width: presentationDimensions.width,
@@ -2132,7 +2164,8 @@ const submitInvocationSnapshot = (
   project: Project,
   backendSupportsCancellation: boolean,
   route = resolveInvocationRoute(project),
-  models?: readonly ModelConfig[]
+  models?: readonly ModelConfig[],
+  positivePrompts?: string[]
 ): Project => {
   if (!isInvocationRouteValid(route)) {
     return project;
@@ -2144,7 +2177,7 @@ const submitInvocationSnapshot = (
     return project;
   }
 
-  return enqueueCompiledSnapshot(project, route, compiledSnapshot, backendSupportsCancellation);
+  return enqueueCompiledSnapshot(project, route, { ...compiledSnapshot, positivePrompts }, backendSupportsCancellation);
 };
 
 export const createInitialWorkbenchState = (): WorkbenchState => {
@@ -2704,7 +2737,8 @@ export const __workbenchReducerInternal = (
           project,
           action.backendSupportsCancellation,
           resolveInvocationRoute(project, 'global', action.route, action.models),
-          action.models
+          action.models,
+          action.positivePrompts
         )
       );
     }
@@ -3204,6 +3238,7 @@ export const __workbenchReducerInternal = (
           {
             generate: action.generate,
             graph: action.graph,
+            positivePrompts: action.positivePrompts,
             widgetStates: getWidgetStatesSnapshot(project.widgetInstances),
           },
           action.backendSupportsCancellation,

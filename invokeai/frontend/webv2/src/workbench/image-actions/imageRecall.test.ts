@@ -43,6 +43,7 @@ const createValues = (overrides: Partial<GenerateWidgetValues> = {}): GenerateWi
   colorCompensation: false,
   dynamicPromptsCombinatorial: true,
   dynamicPromptsMaxPrompts: 100,
+  dynamicPromptsSampleSeed: 0,
   dynamicPromptsSeedBehaviour: 'per-iteration',
   componentSourceModel: null,
   height: 1024,

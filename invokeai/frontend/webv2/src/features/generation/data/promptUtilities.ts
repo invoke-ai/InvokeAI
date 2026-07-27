@@ -34,3 +34,30 @@ export const imageToPrompt = (request: ImageToPromptRequest): Promise<ImageToPro
     body: JSON.stringify(request),
     method: 'POST',
   });
+
+export interface ParseDynamicPromptsRequest {
+  prompt: string;
+  max_prompts?: number;
+  combinatorial?: boolean;
+  /** Only read by the random generator; ignored when combinatorial. */
+  seed?: number | null;
+}
+
+export interface ParseDynamicPromptsResponse {
+  prompts: string[];
+  /**
+   * A soft failure. The route still returns usable prompts alongside a parse
+   * message or a "No values found for wildcard(s)" notice.
+   */
+  error?: string | null;
+}
+
+export const parseDynamicPrompts = (
+  request: ParseDynamicPromptsRequest,
+  signal?: AbortSignal
+): Promise<ParseDynamicPromptsResponse> =>
+  apiFetchJson('/api/v1/utilities/dynamicprompts', {
+    body: JSON.stringify(request),
+    method: 'POST',
+    signal,
+  });

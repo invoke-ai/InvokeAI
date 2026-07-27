@@ -111,6 +111,58 @@ describe('enqueueGenerate', () => {
 
     expect(getSubmittedBody().batch.origin).toBe('webv2:p:project-1:q:local-1');
   });
+
+  describe('expanded prompts', () => {
+    it('submits several prompts as their own batch dimension', async () => {
+      const { enqueueGenerate } = await import('./submissionApi');
+
+      await enqueueGenerate(
+        createRequest({
+          batchCount: 2,
+          positivePrompt: 'a {red|green} cat',
+          positivePrompts: ['a red cat', 'a green cat'],
+          seedBehaviour: 'per-iteration',
+          shouldRandomizeSeed: true,
+        })
+      );
+
+      const body = getSubmittedBody();
+
+      expect(body.batch.data).toEqual([
+        [{ field_name: 'value', items: [10, 11], node_path: 'seed' }],
+        [
+          { field_name: 'value', items: ['a red cat', 'a green cat'], node_path: 'positive_prompt' },
+          { field_name: 'value', items: ['low quality', 'low quality'], node_path: 'negative_prompt' },
+        ],
+      ]);
+      expect(body.batch.runs).toBe(1);
+    });
+
+    it('gives every image its own seed under per-image behaviour', async () => {
+      const { enqueueGenerate } = await import('./submissionApi');
+
+      await enqueueGenerate(
+        createRequest({
+          batchCount: 2,
+          positivePrompts: ['a red cat', 'a green cat'],
+          seedBehaviour: 'per-image',
+        })
+      );
+
+      const body = getSubmittedBody();
+
+      expect(body.batch.data[0][0]).toEqual({ field_name: 'value', items: [10, 11, 12, 13], node_path: 'seed' });
+      expect(body.batch.runs).toBe(1);
+    });
+
+    it('falls back to the literal prompt when the expanded list is empty', async () => {
+      const { enqueueGenerate } = await import('./submissionApi');
+
+      await enqueueGenerate(createRequest({ positivePrompts: [] }));
+
+      expect(getSubmittedBody().batch.data[0][1].items).toEqual(['a fjord at dawn']);
+    });
+  });
 });
 
 describe('enqueueWorkflow', () => {

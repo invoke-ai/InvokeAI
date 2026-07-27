@@ -51,7 +51,7 @@ export {
 export { isVaeCompatibleWithGenerateModel } from './core/componentCompatibility';
 export { MIN_BATCH_COUNT, sanitizeBatchCount } from './core/batch';
 export {
-  buildGeneratePromptBatchPlan,
+  createDynamicPromptsSampleSeed,
   DYNAMIC_PROMPTS_DEFAULT_MAX_PROMPTS,
   DYNAMIC_PROMPTS_MAX_PROMPTS,
   DYNAMIC_PROMPTS_MIN_PROMPTS,
@@ -60,9 +60,9 @@ export {
   isDynamicPromptsSeedBehaviour,
   sanitizeDynamicPromptsConfig,
   sanitizeMaxPrompts,
+  sanitizeSampleSeed,
   type DynamicPromptsConfig,
   type DynamicPromptsSeedBehaviour,
-  type GeneratePromptBatchPlan,
 } from './core/dynamicPrompts';
 export {
   addPromptHistoryItem,

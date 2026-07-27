@@ -550,6 +550,7 @@ export const getDefaultGenerateSettings = (model?: GenerateModelConfig): Generat
     colorCompensation: false,
     dynamicPromptsCombinatorial: true,
     dynamicPromptsMaxPrompts: DYNAMIC_PROMPTS_DEFAULT_MAX_PROMPTS,
+    dynamicPromptsSampleSeed: 0,
     dynamicPromptsSeedBehaviour: 'per-iteration',
     clipEmbedModel: null,
     clipGEmbedModel: null,

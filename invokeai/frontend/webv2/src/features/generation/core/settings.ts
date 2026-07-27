@@ -16,7 +16,7 @@ import type {
 
 import { sanitizeBatchCount } from './batch';
 import { isVaeCompatibleWithGenerateModel } from './componentCompatibility';
-import { isDynamicPromptsSeedBehaviour, sanitizeMaxPrompts } from './dynamicPrompts';
+import { isDynamicPromptsSeedBehaviour, sanitizeMaxPrompts, sanitizeSampleSeed } from './dynamicPrompts';
 import { cloneCroppableImage, isCanonicalCroppableImage, normalizeCroppableImage } from './referenceImage';
 
 /** Preset ratios, with the preset to switch to when dimensions are swapped. */
@@ -559,6 +559,7 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
     dynamicPromptsCombinatorial:
       typeof values.dynamicPromptsCombinatorial === 'boolean' ? values.dynamicPromptsCombinatorial : true,
     dynamicPromptsMaxPrompts: sanitizeMaxPrompts(values.dynamicPromptsMaxPrompts),
+    dynamicPromptsSampleSeed: sanitizeSampleSeed(values.dynamicPromptsSampleSeed),
     dynamicPromptsSeedBehaviour: isDynamicPromptsSeedBehaviour(values.dynamicPromptsSeedBehaviour)
       ? values.dynamicPromptsSeedBehaviour
       : 'per-iteration',

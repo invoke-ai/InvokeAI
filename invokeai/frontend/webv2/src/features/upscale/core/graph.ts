@@ -61,6 +61,7 @@ const addUpscaleMetadata = (
       // Upscale prompts are not batch-expanded; these only satisfy the shape.
       dynamicPromptsCombinatorial: true,
       dynamicPromptsMaxPrompts: DYNAMIC_PROMPTS_DEFAULT_MAX_PROMPTS,
+      dynamicPromptsSampleSeed: 0,
       dynamicPromptsSeedBehaviour: 'per-iteration',
       height: dimensions.height,
       modelKey: settings.model.key,
