@@ -585,6 +585,11 @@
         "summary": "List Model Records",
         "description": "Get a list of models.",
         "operationId": "list_model_records",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "base_models",
@@ -712,7 +717,7 @@
       "get": {
         "tags": ["model_manager"],
         "summary": "List Missing Models",
-        "description": "Get models whose files are missing from disk.\n\nThese are models that have database entries but their corresponding\nweight files have been deleted externally (not via Model Manager).",
+        "description": "Get models whose files are missing from disk.\n\nThese are models that have database entries but their corresponding\nweight files have been deleted externally (not via Model Manager).\n\nAvailable to any authenticated user, not just admins: the frontend's model hooks subtract this\nset from the model list so unusable models are kept out of the generation dropdowns.",
         "operationId": "list_missing_models",
         "responses": {
           "200": {
@@ -725,7 +730,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v2/models/get_by_attrs": {
@@ -734,6 +744,11 @@
         "summary": "Get Model Records By Attrs",
         "description": "Gets a model by its attributes. The main use of this route is to provide backwards compatibility with the old\nmodel manager, which identified models by a combination of name, base and type.",
         "operationId": "get_model_records_by_attrs",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "name",
@@ -964,6 +979,9 @@
                       "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
                     },
                     {
@@ -1078,6 +1096,11 @@
         "summary": "Get Model Records By Hash",
         "description": "Gets a model by its hash. This is useful for recalling models that were deleted and reinstalled,\nas the hash remains stable across reinstallations while the key (UUID) changes.",
         "operationId": "get_model_records_by_hash",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "hash",
@@ -1288,6 +1311,9 @@
                       "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
                     },
                     {
@@ -1402,6 +1428,11 @@
         "summary": "Get Model Record",
         "description": "Get a model record",
         "operationId": "get_model_record",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "key",
@@ -1610,6 +1641,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
@@ -1984,6 +2018,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
@@ -2384,6 +2421,9 @@
                       "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
                     },
                     {
@@ -2521,6 +2561,11 @@
         "tags": ["model_manager"],
         "summary": "Scan For Models",
         "operationId": "scan_for_models",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "scan_path",
@@ -2570,6 +2615,11 @@
         "tags": ["model_manager"],
         "summary": "Get Hugging Face Models",
         "operationId": "get_hugging_face_models",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "hugging_face_repo",
@@ -3602,6 +3652,9 @@
                       "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
                     },
                     {
@@ -3753,7 +3806,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v2/models/stats": {
@@ -3781,7 +3839,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v2/models/empty_model_cache": {
@@ -3823,7 +3886,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       },
       "post": {
         "tags": ["model_manager"],
@@ -4394,6 +4462,11 @@
         "summary": "Create Image Upload Entry",
         "description": "Uploads an image from a URL, not implemented",
         "operationId": "create_image_upload_entry",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -6516,7 +6589,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/app/patchmatch_status": {
@@ -6536,7 +6614,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/app/runtime_config": {
@@ -6555,7 +6638,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       },
       "patch": {
         "tags": ["app"],
@@ -6621,7 +6709,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/app/external_providers/config": {
@@ -6644,7 +6737,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/app/external_providers/config/{provider_id}": {
@@ -6767,7 +6865,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       },
       "post": {
         "tags": ["app"],
@@ -6806,7 +6909,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/app/invocation_cache": {
@@ -6824,7 +6932,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/app/invocation_cache/enable": {
@@ -6842,7 +6955,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/app/invocation_cache/disable": {
@@ -6860,7 +6978,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/app/invocation_cache/status": {
@@ -6880,7 +7003,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/queue/{queue_id}/enqueue_batch": {
@@ -11898,6 +12026,9 @@
           },
           {
             "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
+          },
+          {
+            "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
           },
           {
             "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
@@ -55999,6 +56130,9 @@
                 "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
               },
               {
+                "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
               },
               {
@@ -56574,6 +56708,9 @@
                     "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
                   },
                   {
@@ -57034,6 +57171,9 @@
                 "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
               },
               {
+                "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
               },
               {
@@ -57348,6 +57488,9 @@
               },
               {
                 "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
+              },
+              {
+                "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
               },
               {
                 "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
@@ -58113,6 +58256,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
                 },
                 {
                   "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
@@ -69310,6 +69456,155 @@
         ],
         "title": "T5Encoder_BnBLLMint8_Config",
         "description": "Configuration for T5 Encoder models quantized by bitsandbytes' LLM.int8."
+      },
+      "T5Encoder_GGUF_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "any",
+            "title": "Base",
+            "default": "any"
+          },
+          "type": {
+            "type": "string",
+            "const": "t5_encoder",
+            "title": "Type",
+            "default": "t5_encoder"
+          },
+          "format": {
+            "type": "string",
+            "const": "gguf_quantized",
+            "title": "Format",
+            "default": "gguf_quantized"
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "config_path",
+          "base",
+          "type",
+          "format",
+          "cpu_only"
+        ],
+        "title": "T5Encoder_GGUF_Config",
+        "description": "Configuration for GGUF-quantized T5 text encoder models in a single .gguf file.\n\nThese are conversions like city96/t5-v1_1-xxl-encoder-gguf, which use llama.cpp's T5 encoder\ntensor naming (``enc.blk.N.*``, ``token_embd.weight``, ``enc.output_norm.weight``)."
       },
       "T5Encoder_T5Encoder_Config": {
         "properties": {

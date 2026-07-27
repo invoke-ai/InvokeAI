@@ -16,7 +16,6 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import Qwen3EncoderField
 from invokeai.app.invocations.primitives import ZImageConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.model_manager.load.model_cache.utils import get_effective_device
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.lora_conversions.z_image_lora_constants import Z_IMAGE_LORA_QWEN3_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
@@ -80,10 +79,11 @@ class ZImageTextEncoderInvocation(BaseInvocation):
             (cached_weights, text_encoder) = exit_stack.enter_context(text_encoder_info.model_on_device())
             (_, tokenizer) = exit_stack.enter_context(tokenizer_info.model_on_device())
 
-            # Use the device that the text encoder is effectively executing on, and repair any required tensors left on
-            # the CPU by a previous interrupted run.
+            # Repair any required tensors left on the CPU by a previous interrupted run, then run on the encoder's
+            # intended compute device. Do NOT infer the device from current parameter residency: partial loading may
+            # have temporarily offloaded all weights to RAM, which would wrongly run the whole encode on the CPU.
             repaired_tensors = text_encoder_info.repair_required_tensors_on_device()
-            device = get_effective_device(text_encoder)
+            device = text_encoder_info.compute_device
             if repaired_tensors > 0:
                 context.logger.warning(
                     f"Recovered {repaired_tensors} required Qwen3 tensor(s) onto {device} after a partial device mismatch."

@@ -89,6 +89,17 @@ class LoadedModelWithoutConfig:
         """Return the model without locking it."""
         return self._cache_record.cached_model.model
 
+    @property
+    def compute_device(self) -> torch.device:
+        """Return the model's intended compute device.
+
+        This is the device the model is meant to execute on (typically CUDA/MPS, or CPU when the model is configured
+        cpu_only or the whole install is CPU-only). Unlike inferring the device from current parameter residency (e.g.
+        `get_effective_device`), this is stable even when partial loading has temporarily offloaded all of the model's
+        weights to RAM, so it is the correct device to place inputs on before running the model.
+        """
+        return self._cache_record.cached_model.compute_device
+
     def repair_required_tensors_on_device(self) -> int:
         """Repair required tensors that should be resident on the cached model's execution device."""
         cached_model = self._cache_record.cached_model
