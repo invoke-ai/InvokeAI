@@ -19,9 +19,6 @@ export const useCanvasSelectBboxToolHotkey = () => {
 
   const onKeyUp = useCallback(
     (event: KeyboardEvent) => {
-      if (event.repeat) {
-        return;
-      }
       canvasManager.tool.onBboxToolHotkeyUp(event);
     },
     [canvasManager]

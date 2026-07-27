@@ -290,7 +290,6 @@ export class CanvasBboxToolModule extends CanvasModuleBase {
     }
 
     if (this.konva.transformer.isTransforming()) {
-      this.$aspectRatioBuffer.set(this.konva.proxyRect.width() / this.konva.proxyRect.height());
       this.konva.transformer.stopTransform();
     }
   };

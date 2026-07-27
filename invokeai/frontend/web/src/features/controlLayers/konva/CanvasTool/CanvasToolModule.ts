@@ -1,16 +1,3 @@
-import {
-  type BboxToolHotkeyPressedState,
-  beginBboxToolHotkeyPress,
-  type CanvasToolHotkeyState,
-  clearTemporaryToolHotkeysInState,
-  endBboxToolHotkeyPress,
-  getActiveToolFromState,
-  pressAltInState,
-  pressSpaceInState,
-  releaseAltInState,
-  releaseSpaceInState,
-  setBaseToolInState,
-} from 'features/controlLayers/hooks/bboxToolHotkey';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { AnyObjectState } from 'features/controlLayers/konva/CanvasObject/types';
@@ -25,7 +12,18 @@ import { CanvasShapeToolModule } from 'features/controlLayers/konva/CanvasTool/C
 import { CanvasTextToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasTextToolModule';
 import { CanvasViewToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasViewToolModule';
 import {
+  type BboxToolHotkeyPressedState,
+  beginBboxToolHotkeyPress,
+  type CanvasToolHotkeyState,
+  clearTemporaryToolHotkeysInState,
+  endBboxToolHotkeyPress,
+  getActiveToolFromState,
   getToolToCancelOnEscape,
+  pressAltInState,
+  pressSpaceInState,
+  releaseAltInState,
+  releaseSpaceInState,
+  setBaseToolInState,
   shouldPreserveSuspendableShapesSession,
   shouldQuickSwitchToColorPickerOnAlt,
   shouldTranslateShapeDragOnSpace,
@@ -182,8 +180,6 @@ export class CanvasToolModule extends CanvasModuleBase {
         const shouldPreserveLassoPointerState =
           this.$baseTool.get() === 'lasso' &&
           this.tools.lasso.hasActiveSession() &&
-          previousTool !== 'colorPicker' &&
-          tool !== 'colorPicker' &&
           (previousTool === 'lasso' || previousTool === 'view') &&
           (tool === 'lasso' || tool === 'view');
         const shouldPreserveShapesPointerState =
@@ -228,27 +224,12 @@ export class CanvasToolModule extends CanvasModuleBase {
   applyToolHotkeyState = (state: CanvasToolHotkeyState) => {
     const previousActiveTool = this.$tool.get();
 
-    if (this.$baseTool.get() !== state.baseTool) {
-      this.$baseTool.set(state.baseTool);
-    }
-
-    if (this.$isSpacePressed.get() !== state.isSpacePressed) {
-      this.$isSpacePressed.set(state.isSpacePressed);
-      this.manager.stateApi.$spaceKey.set(state.isSpacePressed);
-    }
-
-    if (this.$isAltPressed.get() !== state.isAltPressed) {
-      this.$isAltPressed.set(state.isAltPressed);
-    }
-
-    const currentBboxToolHotkeyState = this.$bboxToolHotkeyPressedState.get();
-    const nextBboxToolHotkeyState = state.bboxToolHotkeyPressedState;
-    const bboxToolHotkeyStateChanged =
-      currentBboxToolHotkeyState?.bindingId !== nextBboxToolHotkeyState?.bindingId ||
-      currentBboxToolHotkeyState?.pressedAt !== nextBboxToolHotkeyState?.pressedAt;
-
-    if (bboxToolHotkeyStateChanged) {
-      this.$bboxToolHotkeyPressedState.set(nextBboxToolHotkeyState);
+    this.$baseTool.set(state.baseTool);
+    this.$isSpacePressed.set(state.isSpacePressed);
+    this.manager.stateApi.$spaceKey.set(state.isSpacePressed);
+    this.$isAltPressed.set(state.isAltPressed);
+    if (this.$bboxToolHotkeyPressedState.get() !== state.bboxToolHotkeyPressedState) {
+      this.$bboxToolHotkeyPressedState.set(state.bboxToolHotkeyPressedState);
     }
 
     const nextActiveTool = getActiveToolFromState(state);
@@ -262,14 +243,7 @@ export class CanvasToolModule extends CanvasModuleBase {
   };
 
   pressSpaceKey = () => {
-    const currentTool = this.$tool.get();
     this.applyToolHotkeyState(pressSpaceInState(this.getToolHotkeyState()));
-    if (currentTool === 'lasso' && this.tools.lasso.hasActiveSession() && this.$isPrimaryPointerDown.get()) {
-      // Start panning immediately if user is already drawing with freehand lasso.
-      this.manager.stage.startDragging();
-    } else {
-      this.$cursorPos.set(null);
-    }
   };
 
   releaseSpaceKey = () => {
