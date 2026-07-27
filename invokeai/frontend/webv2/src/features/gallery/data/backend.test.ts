@@ -256,3 +256,42 @@ describe('imageMakeCanvasAssetChanges', () => {
     expect(imageMakeCanvasAssetChanges().is_intermediate).toBe(false);
   });
 });
+
+describe('gallery category queries', () => {
+  beforeEach(() => {
+    mocks.apiFetchJson.mockReset();
+    mocks.apiFetchJson.mockResolvedValue({ items: [], limit: 20, offset: 0, total: 0 });
+  });
+
+  const categoriesFor = async (galleryView: 'images' | 'assets'): Promise<string[]> => {
+    await listGalleryImages({ boardId: 'board-1', galleryView, searchTerm: '' });
+    const url = mocks.apiFetchJson.mock.calls[0]?.[0] as string;
+
+    return new URLSearchParams(url.split('?')[1]).getAll('categories');
+  };
+
+  it('never asks the assets view for the canvas-owned category', async () => {
+    // The regression this guards: canvas paint bitmaps, composites and adopted
+    // filter results all upload as `other`. While `other` was an assets
+    // category, every brush stroke and every generation put an image in the
+    // user's Assets tab.
+    expect(await categoriesFor('assets')).not.toContain('other');
+  });
+
+  it('lists only user-facing categories in the assets view', async () => {
+    expect(await categoriesFor('assets')).toEqual(['control', 'mask', 'user']);
+  });
+
+  it('lists only general in the images view', async () => {
+    expect(await categoriesFor('images')).toEqual(['general']);
+  });
+
+  it('leaves the canvas category out of both views', async () => {
+    const assets = await categoriesFor('assets');
+
+    mocks.apiFetchJson.mockClear();
+    const images = await categoriesFor('images');
+
+    expect([...assets, ...images]).not.toContain('other');
+  });
+});

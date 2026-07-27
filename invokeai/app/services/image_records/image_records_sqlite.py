@@ -6,6 +6,8 @@ from typing import Optional, Union, cast
 from invokeai.app.invocations.fields import MetadataField, MetadataFieldValidator
 from invokeai.app.services.image_records.image_records_base import ImageRecordStorageBase
 from invokeai.app.services.image_records.image_records_common import (
+    ASSETS_CATEGORIES,
+    IMAGE_CATEGORIES,
     IMAGE_DTO_COLS,
     ImageCategory,
     ImageNamesResult,
@@ -569,11 +571,17 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 """
                 query_params.append(user_id)
 
+            # Derived from the category constants rather than `!= 'general'`, so a
+            # category belonging to neither view (OTHER, owned by canvas layers) is
+            # counted by neither. These are enum values, never user input.
+            image_categories_sql = ",".join(f"'{c.value}'" for c in IMAGE_CATEGORIES)
+            assets_categories_sql = ",".join(f"'{c.value}'" for c in ASSETS_CATEGORIES)
+
             query = f"""--sql
             SELECT
                 DATE(images.created_at) as date,
-                SUM(CASE WHEN images.image_category = 'general' THEN 1 ELSE 0 END) as image_count,
-                SUM(CASE WHEN images.image_category != 'general' THEN 1 ELSE 0 END) as asset_count,
+                SUM(CASE WHEN images.image_category IN ({image_categories_sql}) THEN 1 ELSE 0 END) as image_count,
+                SUM(CASE WHEN images.image_category IN ({assets_categories_sql}) THEN 1 ELSE 0 END) as asset_count,
                 (
                     SELECT i2.image_name FROM images i2
                     WHERE DATE(i2.created_at) = DATE(images.created_at)

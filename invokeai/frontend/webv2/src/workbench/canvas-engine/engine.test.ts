@@ -48,6 +48,7 @@ import type { StrokeCommittedEvent } from './tools/tool';
 
 import { createBitmapStore } from './document/bitmapStore';
 import { mergeDownMatrix } from './document/mergeDown';
+import { createCanvasEngine as createCoreCanvasEngine } from './engine';
 
 interface EngineStore {
   dispatch(action: EngineTestAction): void;
@@ -1036,6 +1037,32 @@ describe('createCanvasEngine', () => {
     await expect(engine.lifecycle.beginCooldown()).resolves.toBe('cooled');
 
     expect(bitmapStore.flushPendingUploads).toHaveBeenCalledTimes(2);
+    engine.lifecycle.dispose();
+  });
+
+  it('uploads per-generation composites through the intermediate seam, not the durable one', async () => {
+    // Both consumers once shared a single un-parameterised `uploadImage`, so
+    // every invocation's base/mask composite was stored as a permanent image.
+    // Nothing in the document ever points at a composite, so it must be
+    // reclaimable; only pixels a layer references may be durable.
+    const doc = makeDoc();
+    const { store } = createFakeStore(doc);
+    const uploadImage = vi.fn(() => Promise.resolve({ height: 1, imageName: 'durable', width: 1 }));
+    const uploadIntermediateImage = vi.fn(() => Promise.resolve({ height: 1, imageName: 'transient', width: 1 }));
+    const { engine } = createCoreCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      mutationPort: createTestMutationPort(store, 'p1'),
+      projectId: 'p1',
+      reportError: () => undefined,
+      uploadImage,
+      uploadIntermediateImage,
+    });
+
+    await engine.exports.getCompositeExecutorDeps().uploadImage(new Blob());
+
+    expect(uploadIntermediateImage).toHaveBeenCalledOnce();
+    expect(uploadImage).not.toHaveBeenCalled();
     engine.lifecycle.dispose();
   });
 
