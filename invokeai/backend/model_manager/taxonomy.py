@@ -181,13 +181,13 @@ class Qwen3VariantType(str, Enum):
 
 
 class PiDDecoderVariantType(str, Enum):
-    """PiD (Pixel Diffusion Decoder) variants distributed by NVIDIA.
+    """PiD (Pixel Diffusion Decoder) resolution presets distributed by NVIDIA.
 
-    Each backbone (FLUX.1, FLUX.2, SD3) ships in two resolution presets that
-    differ only in target output resolution; the underlying network is the
-    same. NVIDIA's checkpoint filenames encode this as e.g.
-    `PiD_res2k_sr4x_official_flux_distill_4step` vs
-    `PiD_res2kto4k_sr4x_official_flux_distill_4step`.
+    Supported backbones are FLUX.1, FLUX.2, SD3, SDXL and Qwen-Image. Not every backbone ships both
+    presets: FLUX.1 / FLUX.2 / SD3 have both the 2K and the 2K-to-4K preset, while SDXL and Qwen-Image
+    ship only the 2K-to-4K preset. The presets differ only in target output resolution; the underlying
+    (legacy) network is the same. NVIDIA's checkpoint filenames encode this as e.g.
+    `PiD_res2k_sr4x_official_flux_distill_4step` vs `PiD_res2kto4k_sr4x_official_flux_distill_4step`.
     """
 
     Res2k_Sr4x = "res2k_sr4x"

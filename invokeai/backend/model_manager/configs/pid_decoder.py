@@ -69,6 +69,23 @@ def _latent_channels_from_state_dict(state_dict: dict[str | int, Any]) -> int | 
     return None
 
 
+# The `lq_proj.latent_proj.0` Conv's out-channel count is PidNet's `lq_hidden_dim`. `build_pid_net`
+# constructs the legacy 512-dim network; NVIDIA's v1.5 checkpoints use 1024 (plus PiT injection, scalar
+# gates, etc.) and cannot be loaded into it. We read dim-0 to reject an incompatible checkpoint at
+# identification time instead of failing with a size-mismatch deep inside the decode.
+_SUPPORTED_LQ_HIDDEN_DIM = 512
+
+
+def _lq_hidden_dim_from_state_dict(state_dict: dict[str | int, Any]) -> int | None:
+    """Read PidNet's `lq_hidden_dim` (the `lq_proj.latent_proj.0` Conv out-channels), or None if absent."""
+    for k, v in state_dict.items():
+        if isinstance(k, str) and k.endswith(_LATENT_PROJ_KEY_SUFFIX):
+            shape = getattr(v, "shape", None)
+            if shape is not None and len(shape) == 4:
+                return int(shape[0])
+    return None
+
+
 def _name_for_matching(mod: ModelOnDisk) -> str:
     """Searchable name for backbone/variant heuristics.
 
@@ -132,6 +149,16 @@ class PiDDecoder_Checkpoint_Config_Base(Checkpoint_Config_Base):
         state_dict = mod.load_state_dict()
         if not _looks_like_pid_decoder(state_dict):
             raise NotAMatchError("state dict does not look like a PiD decoder (no 'lq_proj.*' keys)")
+
+        # Reject checkpoints whose network shape InvokeAI's build_pid_net cannot construct (e.g. NVIDIA's
+        # v1.5 decoders use lq_hidden_dim=1024) at identification time, instead of accepting them and
+        # failing with a size-mismatch deep inside the decode.
+        lq_hidden_dim = _lq_hidden_dim_from_state_dict(state_dict)
+        if lq_hidden_dim is not None and lq_hidden_dim != _SUPPORTED_LQ_HIDDEN_DIM:
+            raise NotAMatchError(
+                f"PiD decoder has lq_proj hidden dim {lq_hidden_dim}, but InvokeAI only supports the legacy "
+                f"{_SUPPORTED_LQ_HIDDEN_DIM}-dim architecture (NVIDIA's v1.5 checkpoints are not yet supported)."
+            )
 
         # Whether the caller explicitly pinned a base (e.g. a starter-model install passes base=sd-3).
         # In the ambiguous 16-channel FLUX.1/SD3 case this override is trusted when the filename is silent.

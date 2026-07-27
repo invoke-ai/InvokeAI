@@ -21,7 +21,7 @@ class PiDDecoderOutput(BaseInvocationOutput):
 
 @invocation(
     "pid_decoder_loader",
-    title="PiD Decoder - FLUX / FLUX.2 / SD3",
+    title="PiD Decoder - FLUX / FLUX.2 / SD3 / SDXL / Qwen-Image",
     tags=["model", "pid", "decoder"],
     category="model",
     version="1.0.0",
