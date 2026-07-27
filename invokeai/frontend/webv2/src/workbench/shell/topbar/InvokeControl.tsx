@@ -1,8 +1,8 @@
 import type { InvocationRoute, InvocationSourceId, ResultDestination } from '@workbench/invocationContracts';
 
 import { Flex, Group, HStack, Icon, Menu, Portal, Separator, Stack, Text, VStack } from '@chakra-ui/react';
-import { flushGenerateDrafts } from '@features/generation/react';
-import { sanitizeBatchCount } from '@features/generation/settings';
+import { flushGenerateDrafts, useDynamicPrompts, type DynamicPromptsExpansion } from '@features/generation/react';
+import { sanitizeBatchCount, sanitizeDynamicPromptsConfig } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
 import { useInvocationTemplatesSelector } from '@features/workflow/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
@@ -39,6 +39,14 @@ const MENU_POSITIONING = { placement: 'bottom-end' } as const;
 const TOOLTIP_CONTENT_PROPS = { p: '0' };
 const DISABLED_PROPS = { opacity: 0.4 };
 
+/** Reads the persisted dynamic prompt fields off untyped widget values. */
+const readDynamicPromptsConfig = (values: Record<string, unknown>) => ({
+  combinatorial: values.dynamicPromptsCombinatorial,
+  maxPrompts: values.dynamicPromptsMaxPrompts,
+  sampleSeed: values.dynamicPromptsSampleSeed,
+  seedBehaviour: values.dynamicPromptsSeedBehaviour,
+});
+
 const getBatchCount = (values: Record<string, unknown>): number => {
   const batchCount = values.batchCount;
 
@@ -53,23 +61,30 @@ const compactBlockingReason = (reason: string): string => {
   return reason.replace(/^The /, '').replace(/project graph/i, 'workflow');
 };
 
+const plural = (count: number, noun: string): string => `${count} ${noun}${count === 1 ? '' : 's'}`;
+
 const InvokeTooltipContent = ({
   blockingReasons,
   sourceValues,
   invocation,
   isValid,
+  promptExpansion,
 }: {
   blockingReasons: string[];
   sourceValues: Record<string, unknown>;
   invocation: InvocationRoute;
   isValid: boolean;
+  promptExpansion: DynamicPromptsExpansion;
 }) => {
   const batchCount = getBatchCount(sourceValues);
   const destination = getDestinationLabel(invocation.destination);
+  const promptCount = promptExpansion.count;
   const summary =
     invocation.sourceId === 'generate' || invocation.sourceId === 'upscale'
-      ? `1 prompt × ${batchCount} iteration${batchCount === 1 ? '' : 's'} → ${batchCount} generation${batchCount === 1 ? '' : 's'}`
-      : `Workflow × ${batchCount} run${batchCount === 1 ? '' : 's'} → ${batchCount} generation${batchCount === 1 ? '' : 's'}`;
+      ? promptExpansion.isLoading
+        ? 'Expanding prompts…'
+        : `${plural(promptCount, 'prompt')} × ${plural(batchCount, 'iteration')} → ${plural(promptCount * batchCount, 'generation')}`
+      : `Workflow × ${plural(batchCount, 'run')} → ${plural(batchCount, 'generation')}`;
 
   return (
     <Stack gap="1.5" minW="14rem" p="2">
@@ -127,9 +142,21 @@ export const InvokeControl = () => {
   const isLocked = invocation.sourceLocked || invocation.destinationLocked;
   const isConnected = backendConnectionStatus === 'connected';
 
+  // Observing the shared expansion cache here keeps the count honest and costs
+  // nothing extra: the Generate preview and the submit path use the same key.
+  const promptExpansion = useDynamicPrompts(
+    typeof routeInput.generateValues.positivePrompt === 'string' ? routeInput.generateValues.positivePrompt : '',
+    invocation.sourceId === 'generate' || invocation.sourceId === 'canvas'
+      ? sanitizeDynamicPromptsConfig(readDynamicPromptsConfig(routeInput.generateValues))
+      : null
+  );
   const blockingReasons = useMemo(
-    () => [...(isConnected ? [] : ['The backend is disconnected.']), ...resolvedRoute.validationReasons],
-    [isConnected, resolvedRoute.validationReasons]
+    () => [
+      ...(isConnected ? [] : ['The backend is disconnected.']),
+      ...(promptExpansion.isError ? ['The prompt could not be expanded.'] : []),
+      ...resolvedRoute.validationReasons,
+    ],
+    [isConnected, promptExpansion.isError, resolvedRoute.validationReasons]
   );
   const isValid = isInvocationRouteValid(resolvedRoute) && isConnected;
   const routeLabel = isValid ? formatRoute(resolvedRoute) : (blockingReasons[0] ?? formatRoute(resolvedRoute));
@@ -187,12 +214,14 @@ export const InvokeControl = () => {
         }
         invocation={invocation}
         isValid={isValid}
+        promptExpansion={promptExpansion}
       />
     ),
     [
       blockingReasons,
       invocation,
       isValid,
+      promptExpansion,
       routeInput.generateValues,
       routeInput.invocation.sourceId,
       routeInput.upscaleValues,

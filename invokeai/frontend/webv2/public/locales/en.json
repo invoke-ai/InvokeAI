@@ -944,7 +944,26 @@
         "coherenceMinDenoise": "Coherence min denoise",
         "maskBlur": "Mask blur"
       },
-      "resetAllToModelDefaults": "Reset all to model defaults"
+      "resetAllToModelDefaults": "Reset all to model defaults",
+      "dynamicPrompts": {
+        "title": "Dynamic Prompts",
+        "showPrompts": "Show dynamic prompts",
+        "noDynamicSyntax": "Wrap alternatives in braces to generate one image per combination, e.g. a {red|green} ball",
+        "summary": "{{prompts}} × {{iterations}} → {{generations}}",
+        "expanding": "Expanding…",
+        "allCombinations": "All combinations",
+        "randomSample": "Random sample",
+        "shuffle": "Shuffle the sample",
+        "maxPrompts": "Max prompts",
+        "numberOfPrompts": "Number of prompts",
+        "seedBehaviour": "Seed",
+        "seedPerIteration": "Per iteration",
+        "seedPerImage": "Per image",
+        "promptsPreview": "Prompts preview",
+        "usePrompt": "Use this prompt",
+        "andMore": "and {{count}} more",
+        "problemGeneratingPrompts": "Could not expand this prompt"
+      }
     },
     "upscale": {
       "addLora": "LoRAs",

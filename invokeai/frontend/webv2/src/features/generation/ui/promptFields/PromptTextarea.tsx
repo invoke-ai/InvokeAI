@@ -46,6 +46,12 @@ const PROMPT_TEXTAREA_HIGHLIGHTED_CSS = {
 };
 
 interface PromptTextareaProps extends Omit<ResizableTextareaProps, 'underlay'> {
+  /**
+   * Annotate `{a|b}` syntax. Only surfaces whose prompt is batch-expanded set
+   * this — elsewhere the braces are literal text and colouring them would
+   * promise an expansion that never happens.
+   */
+  highlightDynamicPrompts?: boolean;
   showSyntaxHighlighting: boolean;
   value: string;
 }
@@ -83,6 +89,7 @@ const PromptHighlightSpan = ({ segment }: { segment: PromptHighlightSegment }) =
 export const PromptTextarea = ({
   fontFamily = 'mono',
   fontSize,
+  highlightDynamicPrompts = false,
   lineHeight,
   onScroll,
   showSyntaxHighlighting,
@@ -98,8 +105,8 @@ export const PromptTextarea = ({
   const effectiveLineHeight = lineHeight ?? PROMPT_TEXTAREA_LINE_HEIGHT;
 
   const segments = useMemo(
-    () => (shouldHighlight ? buildPromptHighlightSegments(value) : []),
-    [shouldHighlight, value]
+    () => (shouldHighlight ? buildPromptHighlightSegments(value, { dynamicPrompts: highlightDynamicPrompts }) : []),
+    [highlightDynamicPrompts, shouldHighlight, value]
   );
 
   useLayoutEffect(() => {

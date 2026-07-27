@@ -8,6 +8,8 @@ import { Field } from '@platform/ui';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import type { DynamicPromptsFieldConfig } from './DynamicPromptsButton';
+
 import { PositivePromptActions, PromptTriggerPopover } from './PositivePromptActions';
 import { PROMPT_ATTENTION_TARGET_PROPS } from './promptAttentionHotkeys';
 import { insertPromptText, type PromptTextRange, registerPositivePromptElement } from './promptFocus';
@@ -17,6 +19,9 @@ import { PromptTextarea } from './PromptTextarea';
 const PROMPT_INPUT_DEBOUNCE_MS = 250;
 
 interface PositivePromptFieldProps {
+  batchCount?: number;
+  /** Absent on surfaces whose prompt is not batch-expanded (Upscale). */
+  dynamicPrompts?: DynamicPromptsFieldConfig | null;
   heightPx: number;
   loras: GenerateLora[];
   projectId: string;
@@ -34,6 +39,8 @@ type PromptTriggerPickerState = {
 };
 
 export const PositivePromptField = ({
+  batchCount = 1,
+  dynamicPrompts = null,
   heightPx,
   loras,
   onChange,
@@ -133,6 +140,8 @@ export const PositivePromptField = ({
   const labelEnd = useMemo(
     () => (
       <PositivePromptActions
+        batchCount={batchCount}
+        dynamicPrompts={dynamicPrompts}
         isPromptTriggerPickerOpen={triggerPickerState !== null}
         loras={loras}
         positivePrompt={draftValue}
@@ -144,8 +153,10 @@ export const PositivePromptField = ({
       />
     ),
     [
+      batchCount,
       commitPromptChangeImmediately,
       draftValue,
+      dynamicPrompts,
       handleOpenPromptTriggerPicker,
       handleUsePrompt,
       loras,
@@ -175,6 +186,7 @@ export const PositivePromptField = ({
         resizeHandleAriaLabel={t('widgets.generate.resizePositivePrompt')}
         size="xs"
         fontFamily="mono"
+        highlightDynamicPrompts={dynamicPrompts !== null}
         showSyntaxHighlighting={showSyntaxHighlighting}
         textareaRef={handleTextareaRef}
         value={draftValue}

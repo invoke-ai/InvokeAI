@@ -7,6 +7,10 @@ import { HStack, Icon, Image, Input, Popover, Portal, Separator, Stack, Text } f
 import { filterPromptHistory } from '@features/generation/core/promptHistory';
 import { expandPrompt, imageToPrompt } from '@features/generation/data/promptUtilities';
 import { GenerationModelSelect as ModelSelect, useGenerationUi } from '@features/generation/ui/GenerationUiContext';
+import {
+  DynamicPromptsButton,
+  type DynamicPromptsFieldConfig,
+} from '@features/generation/ui/promptFields/DynamicPromptsButton';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, IconButton, Scrollable, Tooltip } from '@platform/ui';
@@ -19,6 +23,9 @@ const TEXT_LLM_MODEL_TYPES = ['text_llm'];
 const LLAVA_MODEL_TYPES = ['llava_onevision'];
 
 interface PositivePromptActionsProps {
+  batchCount: number;
+  /** Absent on surfaces whose prompt is not batch-expanded (Upscale). */
+  dynamicPrompts: DynamicPromptsFieldConfig | null;
   loras: GenerateLora[];
   isPromptTriggerPickerOpen: boolean;
   onUsePrompt: (prompt: PromptHistoryItem) => void;
@@ -30,6 +37,8 @@ interface PositivePromptActionsProps {
 }
 
 export const PositivePromptActions = ({
+  batchCount,
+  dynamicPrompts,
   isPromptTriggerPickerOpen,
   onOpenPromptTriggerPicker,
   onPositivePromptChangeImmediate,
@@ -39,6 +48,14 @@ export const PositivePromptActions = ({
 }: PositivePromptActionsProps) => {
   return (
     <HStack gap="0.5">
+      {dynamicPrompts ? (
+        <DynamicPromptsButton
+          batchCount={batchCount}
+          config={dynamicPrompts}
+          positivePrompt={positivePrompt}
+          onUsePrompt={onPositivePromptChangeImmediate}
+        />
+      ) : null}
       <AddPromptTriggerButton
         isOpen={isPromptTriggerPickerOpen}
         onOpenPromptTriggerPicker={onOpenPromptTriggerPicker}
