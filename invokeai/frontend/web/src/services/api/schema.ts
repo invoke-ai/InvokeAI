@@ -25619,7 +25619,7 @@ export type components = {
             decoder: components["schemas"]["ModelIdentifierField"];
         };
         /**
-         * PiD Decoder - FLUX / FLUX.2 / SD3
+         * PiD Decoder - FLUX / FLUX.2 / SD3 / SDXL / Qwen-Image
          * @description Loads a PiD decoder checkpoint, outputting a PiDDecoderField for use
          *     by the per-backbone PiD decode nodes.
          */
@@ -25670,13 +25670,13 @@ export type components = {
         };
         /**
          * PiDDecoderVariantType
-         * @description PiD (Pixel Diffusion Decoder) variants distributed by NVIDIA.
+         * @description PiD (Pixel Diffusion Decoder) resolution presets distributed by NVIDIA.
          *
-         *     Each backbone (FLUX.1, FLUX.2, SD3) ships in two resolution presets that
-         *     differ only in target output resolution; the underlying network is the
-         *     same. NVIDIA's checkpoint filenames encode this as e.g.
-         *     `PiD_res2k_sr4x_official_flux_distill_4step` vs
-         *     `PiD_res2kto4k_sr4x_official_flux_distill_4step`.
+         *     Supported backbones are FLUX.1, FLUX.2, SD3, SDXL and Qwen-Image. Not every backbone ships both
+         *     presets: FLUX.1 / FLUX.2 / SD3 have both the 2K and the 2K-to-4K preset, while SDXL and Qwen-Image
+         *     ship only the 2K-to-4K preset. The presets differ only in target output resolution; the underlying
+         *     (legacy) network is the same. NVIDIA's checkpoint filenames encode this as e.g.
+         *     `PiD_res2k_sr4x_official_flux_distill_4step` vs `PiD_res2kto4k_sr4x_official_flux_distill_4step`.
          * @enum {string}
          */
         PiDDecoderVariantType: "res2k_sr4x" | "res2kto4k_sr4x";
