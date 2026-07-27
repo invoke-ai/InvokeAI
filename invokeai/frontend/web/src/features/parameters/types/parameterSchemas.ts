@@ -9,6 +9,7 @@ import {
   zFluxDypePresetField,
   zFluxDypeScaleField,
   zFluxSchedulerField,
+  zIdeogram4SamplerPresetField,
   zModelIdentifierField,
   zSchedulerField,
   zZImageSchedulerField,
@@ -91,6 +92,12 @@ export type ParameterErnieImageScheduler = z.infer<typeof zParameterErnieImageSc
 // #region Anima Scheduler
 export const [zParameterAnimaScheduler, isParameterAnimaScheduler] = buildParameter(zAnimaSchedulerField);
 export type ParameterAnimaScheduler = z.infer<typeof zParameterAnimaScheduler>;
+// #endregion
+
+// #region Ideogram 4 Sampler Preset
+export const [zParameterIdeogram4SamplerPreset, isParameterIdeogram4SamplerPreset] =
+  buildParameter(zIdeogram4SamplerPresetField);
+export type ParameterIdeogram4SamplerPreset = z.infer<typeof zParameterIdeogram4SamplerPreset>;
 // #endregion
 
 // #region Flux DyPE Preset

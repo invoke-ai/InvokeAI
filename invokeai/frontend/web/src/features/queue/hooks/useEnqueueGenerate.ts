@@ -16,6 +16,7 @@ import { buildCogView4Graph } from 'features/nodes/util/graph/generation/buildCo
 import { buildErnieImageGraph } from 'features/nodes/util/graph/generation/buildErnieImageGraph';
 import { buildExternalGraph } from 'features/nodes/util/graph/generation/buildExternalGraph';
 import { buildFLUXGraph } from 'features/nodes/util/graph/generation/buildFLUXGraph';
+import { buildIdeogram4Graph } from 'features/nodes/util/graph/generation/buildIdeogram4Graph';
 import { buildQwenImageGraph } from 'features/nodes/util/graph/generation/buildQwenImageGraph';
 import { buildSD1Graph } from 'features/nodes/util/graph/generation/buildSD1Graph';
 import { buildSD3Graph } from 'features/nodes/util/graph/generation/buildSD3Graph';
@@ -65,6 +66,8 @@ const enqueueGenerate = async (store: AppStore, prepend: boolean) => {
         return await buildZImageGraph(graphBuilderArg);
       case 'ernie-image':
         return await buildErnieImageGraph(graphBuilderArg);
+      case 'ideogram-4':
+        return await buildIdeogram4Graph(graphBuilderArg);
       case 'external':
         return await buildExternalGraph(graphBuilderArg);
       case 'anima':

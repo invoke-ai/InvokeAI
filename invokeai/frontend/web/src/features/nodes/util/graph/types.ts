@@ -18,6 +18,7 @@ export type ImageOutputNodes =
   | 'qwen_image_l2i'
   | 'z_image_l2i'
   | 'ernie_image_vae_decode'
+  | 'ideogram4_l2i'
   | 'anima_l2i';
 
 export type LatentToImageNodes =

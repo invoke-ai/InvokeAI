@@ -12,6 +12,7 @@ import {
   selectIsExternal,
   selectIsFLUX,
   selectIsFlux2,
+  selectIsIdeogram4,
   selectIsQwenImage,
   selectIsSD3,
   selectIsZImage,
@@ -28,6 +29,7 @@ import ParamFluxDypePreset from 'features/parameters/components/Core/ParamFluxDy
 import ParamFluxDypeScale from 'features/parameters/components/Core/ParamFluxDypeScale';
 import ParamFluxScheduler from 'features/parameters/components/Core/ParamFluxScheduler';
 import ParamGuidance from 'features/parameters/components/Core/ParamGuidance';
+import ParamIdeogram4SamplerPreset from 'features/parameters/components/Core/ParamIdeogram4SamplerPreset';
 import ParamQwenImageShift from 'features/parameters/components/Core/ParamQwenImageShift';
 import ParamScheduler from 'features/parameters/components/Core/ParamScheduler';
 import ParamSteps from 'features/parameters/components/Core/ParamSteps';
@@ -55,6 +57,7 @@ export const GenerationSettingsAccordion = memo(() => {
   const isCogView4 = useAppSelector(selectIsCogView4);
   const isZImage = useAppSelector(selectIsZImage);
   const isErnieImage = useAppSelector(selectIsErnieImage);
+  const isIdeogram4 = useAppSelector(selectIsIdeogram4);
   const isExternal = useAppSelector(selectIsExternal);
   const isQwenImage = useAppSelector(selectIsQwenImage);
   const isAnima = useAppSelector(selectIsAnima);
@@ -106,19 +109,21 @@ export const GenerationSettingsAccordion = memo(() => {
                   !isSD3 &&
                   !isCogView4 &&
                   !isZImage &&
+                  !isIdeogram4 &&
                   !isQwenImage &&
                   !isErnieImage &&
                   !isAnima && <ParamScheduler />}
                 {!isExternal && (isFLUX || isFlux2) && <ParamFluxScheduler />}
                 {!isExternal && isZImage && <ParamZImageScheduler />}
                 {!isExternal && isErnieImage && <ParamErnieImageScheduler />}
+                {!isExternal && isIdeogram4 && <ParamIdeogram4SamplerPreset />}
                 {!isExternal && isAnima && <ParamAnimaScheduler />}
                 {modelSupportsSteps && <ParamSteps />}
                 {isExternal && modelSupportsGuidance && <ParamGuidance />}
                 {!isExternal && isFLUX && modelConfig && !isFluxFillMainModelModelConfig(modelConfig) && (
                   <ParamGuidance />
                 )}
-                {!isExternal && !isFLUX && !isFlux2 && <ParamCFGScale />}
+                {!isExternal && !isFLUX && !isFlux2 && !isIdeogram4 && <ParamCFGScale />}
                 {!isExternal && isZImage && <ParamZImageShift />}
                 {!isExternal && isQwenImage && <ParamQwenImageShift />}
                 {!isExternal && isFLUX && <ParamFluxDypePreset />}

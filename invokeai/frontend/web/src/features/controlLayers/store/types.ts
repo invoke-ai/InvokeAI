@@ -16,6 +16,7 @@ import {
   zParameterFluxDypeScale,
   zParameterFluxScheduler,
   zParameterGuidance,
+  zParameterIdeogram4SamplerPreset,
   zParameterImageDimension,
   zParameterMaskBlurMethod,
   zParameterModel,
@@ -227,6 +228,8 @@ const zCanvasBrushLineWithPressureState = z.object({
    */
   points: zPointsWithPressure,
   color: zRgbaColor,
+  pressureAffectsWidth: z.boolean().default(true),
+  pressureAffectsOpacity: z.boolean().default(false),
   clip: zRect.nullable(),
   globalCompositeOperation: z.string().optional(),
 });
@@ -252,16 +255,20 @@ const zCanvasEraserLineWithPressureState = z.object({
    * Points with pressure are in the format [x1, y1, pressure1, x2, y2, pressure2, ...]
    */
   points: zPointsWithPressure,
+  pressureAffectsWidth: z.boolean().default(true),
   clip: zRect.nullable(),
 });
 export type CanvasEraserLineWithPressureState = z.infer<typeof zCanvasEraserLineWithPressureState>;
+
+const zCanvasShapeCompositeOperation = z.enum(['source-over', 'source-atop', 'destination-out']);
 
 const zCanvasRectState = z.object({
   id: zId,
   type: z.literal('rect'),
   rect: zRect,
   color: zRgbaColor,
-  compositeOperation: z.enum(['source-over', 'destination-out']).default('source-over'),
+  compositeOperation: zCanvasShapeCompositeOperation.default('source-over'),
+  clip: zRect.nullable().default(null),
 });
 export type CanvasRectState = z.infer<typeof zCanvasRectState>;
 
@@ -284,7 +291,8 @@ const zCanvasOvalState = z.object({
   type: z.literal('oval'),
   rect: zRect,
   color: zRgbaColor,
-  compositeOperation: z.enum(['source-over', 'destination-out']).default('source-over'),
+  compositeOperation: zCanvasShapeCompositeOperation.default('source-over'),
+  clip: zRect.nullable().default(null),
 });
 export type CanvasOvalState = z.infer<typeof zCanvasOvalState>;
 
@@ -293,7 +301,7 @@ const zCanvasPolygonState = z.object({
   type: z.literal('polygon'),
   points: zPoints,
   color: zRgbaColor,
-  compositeOperation: z.enum(['source-over', 'destination-out']).default('source-over'),
+  compositeOperation: zCanvasShapeCompositeOperation.default('source-over'),
   previewPoint: zCoordinate.optional(),
 });
 export type CanvasPolygonState = z.infer<typeof zCanvasPolygonState>;
@@ -316,6 +324,7 @@ const zCanvasLinearGradientState = z.object({
   bboxRect: zRect,
   fgColor: zRgbaColor,
   bgColor: zRgbaColor,
+  globalCompositeOperation: z.string().optional(),
 });
 const zCanvasRadialGradientState = z.object({
   id: zId,
@@ -330,6 +339,7 @@ const zCanvasRadialGradientState = z.object({
   bboxRect: zRect,
   fgColor: zRgbaColor,
   bgColor: zRgbaColor,
+  globalCompositeOperation: z.string().optional(),
 });
 const zCanvasGradientState = z.discriminatedUnion('gradientType', [
   zCanvasLinearGradientState,
@@ -816,6 +826,17 @@ export const zParamsState = z.object({
   zImageShift: z.number().min(0).max(3).nullable(),
   ernieImageScheduler: zParameterErnieImageScheduler,
   ernieImageUsePromptEnhancer: z.boolean(),
+  // Defaults make these resilient to rehydration of persisted state saved before the fields existed.
+  ideogram4SamplerPreset: zParameterIdeogram4SamplerPreset.default('V4_QUALITY_48'),
+  // Optional advanced overrides of the Ideogram 4 sampler preset (null = use the preset's value).
+  // Backend requires steps >= 2 (a polish and a main step). `.catch(null)` normalizes a stale/invalid
+  // persisted or recalled value (e.g. 1 from an older build) to null (= use preset) instead of letting an
+  // out-of-range value reach the graph or breaking the whole persisted params slice on rehydrate.
+  ideogram4Steps: z.number().int().min(2).max(100).nullable().catch(null).default(null),
+  ideogram4GuidanceScale: z.number().min(1).max(20).nullable().default(null),
+  ideogram4Mu: z.number().min(-4).max(4).nullable().default(null),
+  // Hex colors (#RRGGBB) injected into the JSON caption's style_description.color_palette.
+  ideogram4ColorPalette: z.array(z.string()).default([]),
   upscaleScheduler: zParameterScheduler,
   upscaleCfgScale: zParameterCFGScale,
   seed: zParameterSeed,
@@ -908,6 +929,11 @@ export const getInitialParamsState = (): ParamsState => ({
   zImageShift: null,
   ernieImageScheduler: 'euler',
   ernieImageUsePromptEnhancer: true,
+  ideogram4SamplerPreset: 'V4_QUALITY_48',
+  ideogram4Steps: null,
+  ideogram4GuidanceScale: null,
+  ideogram4Mu: null,
+  ideogram4ColorPalette: [],
   upscaleScheduler: 'kdpm_2',
   upscaleCfgScale: 2,
   seed: 0,
