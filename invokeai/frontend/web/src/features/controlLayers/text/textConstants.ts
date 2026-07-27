@@ -1,6 +1,7 @@
 import { atom } from 'nanostores';
 import { z } from 'zod';
 
+// Custom font IDs are server-generated paths, so this cannot be restricted to the built-in font ID enum.
 export const zTextFontId = z.string().min(1);
 export type TextFontId = string;
 

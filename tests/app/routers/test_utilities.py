@@ -1,5 +1,12 @@
-"""Router-level tests for /api/v1/utilities."""
+"""Router-level tests for /api/v1/utilities.
 
+Covers:
+- Auth gating (CurrentUserOrDefault on all utility routes).
+- image-to-prompt: image read-access checks must fire before model loading so non-owners cannot probe stored images.
+- image-to-prompt: a missing image surfaces as 404, not 500.
+"""
+
+import shutil
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
@@ -7,6 +14,7 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi import status
 from fastapi.testclient import TestClient
+from fontTools.ttLib import TTFont
 
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.invoker import Invoker
@@ -106,6 +114,7 @@ def test_dynamicprompts_random_generator_ignores_unknown_wildcard(client: TestCl
 def test_image_to_prompt_forbidden_for_non_owner(
     client: TestClient, user1_token: str, user2_token: str, mock_invoker: Invoker
 ):
+    """A second user must not be able to read a private image via image-to-prompt."""
     user1 = mock_invoker.services.users.get_by_email("user1@test.com")
     assert user1 is not None
     _save_image(mock_invoker, "private-img.png", user1.user_id)
@@ -117,6 +126,7 @@ def test_image_to_prompt_forbidden_for_non_owner(
     )
 
     assert response.status_code == status.HTTP_403_FORBIDDEN
+    # The model must not be loaded: ownership checks must run before inference.
     mock_invoker.services.model_manager.store.get_model.assert_not_called()
 
 
@@ -175,6 +185,59 @@ def test_get_user_font_file_requires_auth(enable_multiuser: Any, font_root: Path
     response = client.get("/api/v1/utilities/fonts/MyFont.ttf")
 
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+def test_user_fonts_support_real_font_files_and_configured_directory(
+    admin_token: str, client: TestClient, font_root: Path, mock_invoker: Invoker
+) -> None:
+    assert mock_invoker.services.configuration.root_path == font_root
+    mock_invoker.services.configuration.fonts_dir = Path("custom-fonts")
+    fonts_dir = mock_invoker.services.configuration.fonts_path
+    fonts_dir.mkdir(parents=True, exist_ok=True)
+    source_font = Path(__file__).parents[3] / "invokeai" / "assets" / "fonts" / "inter" / "Inter-Regular.ttf"
+    shutil.copyfile(source_font, fonts_dir / "Inter-Regular.ttf")
+
+    response = client.get("/api/v1/utilities/fonts", headers={"Authorization": f"Bearer {admin_token}"})
+
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+    assert len(data["fonts"]) == 1
+    assert data["fonts"][0]["family"] == "Inter"
+    assert data["fonts"][0]["url"] == "api/v1/utilities/fonts/Inter-Regular.ttf"
+
+    font_response = client.get(
+        "/api/v1/utilities/fonts/Inter-Regular.ttf",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+
+    assert font_response.status_code == status.HTTP_200_OK
+    assert font_response.headers["content-type"] == "font/ttf"
+    assert font_response.headers["cache-control"] == "private, max-age=31536000, immutable"
+    assert font_response.headers["content-disposition"].startswith('inline; filename="Inter-Regular.ttf"')
+    assert font_response.content == source_font.read_bytes()
+
+
+def test_list_user_fonts_reads_real_woff2_file(
+    admin_token: str, client: TestClient, mock_invoker: Invoker, tmp_path: Path
+) -> None:
+    mock_invoker.services.configuration.fonts_dir = tmp_path / "fonts"
+    fonts_dir = mock_invoker.services.configuration.fonts_path
+    fonts_dir.mkdir(parents=True, exist_ok=True)
+    source_font = Path(__file__).parents[3] / "invokeai" / "assets" / "fonts" / "inter" / "Inter-Regular.ttf"
+    font = TTFont(source_font)
+    try:
+        font.flavor = "woff2"
+        font.save(fonts_dir / "Inter-Regular.woff2")
+    finally:
+        font.close()
+
+    response = client.get("/api/v1/utilities/fonts", headers={"Authorization": f"Bearer {admin_token}"})
+
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+    assert len(data["fonts"]) == 1
+    assert data["fonts"][0]["family"] == "Inter"
+    assert data["fonts"][0]["faces"][0]["path"] == "Inter-Regular.woff2"
 
 
 def test_list_user_fonts_allows_authenticated_access(

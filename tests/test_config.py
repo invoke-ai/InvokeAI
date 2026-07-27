@@ -303,7 +303,7 @@ def test_ensure_fonts_dir_logs_warning_on_oserror(
     monkeypatch.setattr(Path, "mkdir", mock_mkdir)
 
     with caplog.at_level("WARNING"):
-        ensure_fonts_dir(tmp_path)
+        ensure_fonts_dir(fonts_path)
 
     assert "Unable to initialize fonts directory" in caplog.text
 

@@ -9,12 +9,12 @@ from urllib.parse import quote
 import torch
 from dynamicprompts.generators import CombinatorialPromptGenerator, RandomPromptGenerator
 from fastapi import Body, HTTPException
+from fastapi.responses import FileResponse
 from fastapi.routing import APIRouter
 from fontTools.ttLib import TTFont
 from PIL import ImageFont
 from pydantic import BaseModel, Field
 from pyparsing import ParseException
-from starlette.responses import FileResponse
 from transformers import AutoProcessor, AutoTokenizer, LlavaOnevisionForConditionalGeneration, LlavaOnevisionProcessor
 
 from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
@@ -33,6 +33,13 @@ logger = logging.getLogger(__name__)
 
 utilities_router = APIRouter(prefix="/v1/utilities", tags=["utilities"])
 SUPPORTED_FONT_EXTENSIONS = {".ttf", ".otf", ".woff", ".woff2"}
+FONT_MEDIA_TYPES = {
+    ".ttf": "font/ttf",
+    ".otf": "font/otf",
+    ".woff": "font/woff",
+    ".woff2": "font/woff2",
+}
+FONT_CACHE_CONTROL = "private, max-age=31536000, immutable"
 
 # The underlying model loader is not thread-safe, so we serialize load_model calls.
 _model_load_lock = threading.Lock()
@@ -106,8 +113,7 @@ async def parse_dynamicprompts(
 
 
 def _get_fonts_dir() -> Path:
-    root = ApiDependencies.invoker.services.configuration.root_path
-    return root / "fonts"
+    return ApiDependencies.invoker.services.configuration.fonts_path
 
 
 def _path_has_symlink_component(path: Path, boundary: Path) -> bool:
@@ -119,7 +125,7 @@ def _path_has_symlink_component(path: Path, boundary: Path) -> bool:
         return True
 
     while True:
-        if current.exists() and current.is_symlink():
+        if current.is_symlink():
             return True
         if current == boundary:
             return False
@@ -271,7 +277,7 @@ def _resolve_font_request_path(font_path: str) -> Path:
     operation_id="list_user_fonts",
     responses={200: {"model": UserFontsResponse}},
 )
-async def list_user_fonts(_current_user: CurrentUserOrDefault) -> UserFontsResponse:
+def list_user_fonts(_current_user: CurrentUserOrDefault) -> UserFontsResponse:
     fonts_dir = _get_fonts_dir()
     if not fonts_dir.exists() or not fonts_dir.is_dir() or fonts_dir.is_symlink():
         return UserFontsResponse(fonts=[])
@@ -310,7 +316,7 @@ async def list_user_fonts(_current_user: CurrentUserOrDefault) -> UserFontsRespo
         faces = [
             UserFontFace(
                 path=relative,
-                url=f"/api/v1/utilities/fonts/{quote(relative)}",
+                url=f"api/v1/utilities/fonts/{quote(relative)}",
                 weight=weight,
                 style=style,
             )
@@ -325,7 +331,7 @@ async def list_user_fonts(_current_user: CurrentUserOrDefault) -> UserFontsRespo
                 family=selected_family,
                 label=selected_family,
                 path=selected_relative,
-                url=f"/api/v1/utilities/fonts/{quote(selected_relative)}",
+                url=f"api/v1/utilities/fonts/{quote(selected_relative)}",
                 faces=faces,
             )
         )
@@ -337,7 +343,7 @@ async def list_user_fonts(_current_user: CurrentUserOrDefault) -> UserFontsRespo
     "/fonts/{font_path:path}",
     operation_id="get_user_font_file",
 )
-async def get_user_font_file(font_path: str, _current_user: CurrentUserOrDefault) -> FileResponse:
+def get_user_font_file(font_path: str, _current_user: CurrentUserOrDefault) -> FileResponse:
     requested = _resolve_font_request_path(font_path)
     if not requested.exists() or not requested.is_file():
         raise HTTPException(status_code=404, detail="Font file not found")
@@ -345,7 +351,13 @@ async def get_user_font_file(font_path: str, _current_user: CurrentUserOrDefault
     if requested.suffix.lower() not in SUPPORTED_FONT_EXTENSIONS:
         raise HTTPException(status_code=400, detail="Unsupported font format")
 
-    return FileResponse(path=requested)
+    return FileResponse(
+        path=requested,
+        media_type=FONT_MEDIA_TYPES[requested.suffix.lower()],
+        filename=requested.name,
+        content_disposition_type="inline",
+        headers={"Cache-Control": FONT_CACHE_CONTROL},
+    )
 
 
 # --- Expand Prompt ---
@@ -453,6 +465,7 @@ def _run_image_to_prompt(image_name: str, model_key: str, instruction: str, user
     with _model_load_lock:
         loaded_model = model_manager.load.load_model(model_config, user_id=user_id)
 
+    # Load the image from InvokeAI's image store.
     image = ApiDependencies.invoker.services.images.get_pil_image(image_name)
     image = image.convert("RGB")
 

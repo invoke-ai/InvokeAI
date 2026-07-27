@@ -179,6 +179,7 @@ class InvokeAIAppConfig(BaseSettings):
     legacy_conf_dir:               Path = Field(default=Path("configs"), description="Path to directory of legacy checkpoint config files.")
     db_dir:                        Path = Field(default=Path("databases"),  description="Path to InvokeAI databases directory.")
     outputs_dir:                   Path = Field(default=Path("outputs"),    description="Path to directory for outputs.")
+    fonts_dir:                     Path = Field(default=Path("fonts"),      description="Path to directory for custom fonts.")
     image_subfolder_strategy: IMAGE_SUBFOLDER_STRATEGY = Field(default="flat", description="Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.")
     custom_nodes_dir:              Path = Field(default=Path("nodes"),      description="Path to directory for custom nodes.")
     style_presets_dir:      Path = Field(default=Path("style_presets"),      description="Path to directory for style presets.")
@@ -380,6 +381,11 @@ class InvokeAIAppConfig(BaseSettings):
     def outputs_path(self) -> Optional[Path]:
         """Path to the outputs directory, resolved to an absolute path.."""
         return self._resolve(self.outputs_dir)
+
+    @property
+    def fonts_path(self) -> Path:
+        """Path to the custom fonts directory, resolved to an absolute path."""
+        return self._resolve(self.fonts_dir)
 
     @property
     def db_path(self) -> Path:
@@ -635,8 +641,7 @@ def load_external_api_keys(api_keys_file_path: Path) -> dict[str, str]:
     return parsed_api_keys
 
 
-def ensure_fonts_dir(root_path: Path) -> None:
-    fonts_path = root_path / "fonts"
+def ensure_fonts_dir(fonts_path: Path) -> None:
     fonts_readme_path = fonts_path / "README.txt"
 
     try:
@@ -730,7 +735,7 @@ def get_config() -> InvokeAIAppConfig:
         default_config = DefaultInvokeAIAppConfig()
         default_config.write_file(config.config_file_path, as_example=False)
 
-    ensure_fonts_dir(config.root_path)
+    ensure_fonts_dir(config.fonts_path)
 
     api_keys_from_file = load_external_api_keys(config.api_keys_file_path)
     if api_keys_from_file:

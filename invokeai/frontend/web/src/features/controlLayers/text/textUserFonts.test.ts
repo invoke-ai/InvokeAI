@@ -7,13 +7,14 @@ import {
   clearUserFontRegistryForTests,
   getUserFontFaceKey,
   isUserFontReady,
+  loadedUserFontFaces,
   syncUserFontFaces,
 } from './textUserFonts';
 
 describe('textUserFonts', () => {
   const face = {
     path: 'fonts/MyFont-Regular.ttf',
-    url: '/api/v1/utilities/fonts/fonts/MyFont-Regular.ttf',
+    url: 'api/v1/utilities/fonts/fonts/MyFont-Regular.ttf',
     weight: 400,
     style: 'normal' as const,
   };
@@ -23,7 +24,7 @@ describe('textUserFonts', () => {
     family: 'My Font',
     label: 'My Font',
     path: 'fonts/MyFont-Regular.ttf',
-    url: '/api/v1/utilities/fonts/fonts/MyFont-Regular.ttf',
+    url: 'api/v1/utilities/fonts/fonts/MyFont-Regular.ttf',
     faces: [face],
   };
 
@@ -62,6 +63,7 @@ describe('textUserFonts', () => {
     await syncUserFontFaces({
       fonts: [font],
       token: 'test-token',
+      baseUrl: 'https://invoke.example.com/subpath',
       loadedFontFaces,
       fontFaceSet: {
         add: (face) => addedFaces.push(face),
@@ -76,7 +78,7 @@ describe('textUserFonts', () => {
 
     const faceKey = getUserFontFaceKey(font, face);
 
-    expect(fetchFn).toHaveBeenCalledWith(face.url, {
+    expect(fetchFn).toHaveBeenCalledWith(`https://invoke.example.com/subpath/${face.url}`, {
       headers: { Authorization: 'Bearer test-token' },
     });
     expect(fontFaceCtor).toHaveBeenCalledWith('My Font', expect.any(ArrayBuffer), {
@@ -87,6 +89,40 @@ describe('textUserFonts', () => {
     expect(deletedFaces).toEqual([staleFace]);
     expect(loadedFontFaces.get(faceKey)).toBe(loadedFace);
     expect(loadedFontFaces.has('stale|400|normal|/stale.ttf')).toBe(false);
+  });
+
+  it('reuses the module-level font face registry across sync cycles', async () => {
+    const loadedFace = { family: 'My Font' } as FontFace;
+    const addedFaces: FontFace[] = [];
+    const fetchFn = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)),
+      })
+    );
+    const fontFaceCtor = vi.fn(function () {
+      return {
+        load: () => Promise.resolve(loadedFace),
+      };
+    });
+    const args = {
+      fonts: [font],
+      token: null,
+      baseUrl: 'https://invoke.example.com',
+      loadedFontFaces: loadedUserFontFaces,
+      fontFaceSet: {
+        add: (loadedFace: FontFace) => addedFaces.push(loadedFace),
+        delete: () => true,
+      },
+      fontFaceCtor,
+      fetchFn,
+    };
+
+    await syncUserFontFaces(args);
+    await syncUserFontFaces(args);
+
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    expect(addedFaces).toEqual([loadedFace]);
   });
 
   it('tracks custom font readiness until all faces load', async () => {
@@ -108,6 +144,7 @@ describe('textUserFonts', () => {
     const syncPromise = syncUserFontFaces({
       fonts: [font],
       token: null,
+      baseUrl: 'https://invoke.example.com',
       loadedFontFaces,
       fontFaceSet: {
         add: () => undefined,
@@ -161,6 +198,7 @@ describe('textUserFonts', () => {
     await syncUserFontFaces({
       fonts: [font],
       token: null,
+      baseUrl: 'https://invoke.example.com',
       loadedFontFaces,
       fontFaceSet: {
         add: () => undefined,
@@ -175,6 +213,7 @@ describe('textUserFonts', () => {
     await syncUserFontFaces({
       fonts: [font],
       token: null,
+      baseUrl: 'https://invoke.example.com',
       loadedFontFaces,
       fontFaceSet: {
         add: () => undefined,

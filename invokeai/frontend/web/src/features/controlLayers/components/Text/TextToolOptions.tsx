@@ -49,6 +49,7 @@ import {
 import {
   $userFontReadyStates,
   buildCustomTextFontStacks,
+  loadedUserFontFaces,
   primeUserFontReadiness,
   syncUserFontFaces,
 } from 'features/controlLayers/text/textUserFonts';
@@ -65,6 +66,7 @@ import {
   PiTextStrikethroughBold,
   PiTextUnderlineBold,
 } from 'react-icons/pi';
+import { getBaseUrl } from 'services/api';
 import { useListUserFontsQuery } from 'services/api/endpoints/utilities';
 
 const formatSliderValue = (value: number) => String(value);
@@ -93,7 +95,6 @@ const FontSelect = () => {
   const fontId = useAppSelector(selectTextFontId);
   const authToken = useAppSelector(selectAuthToken);
   const { data: userFonts } = useListUserFontsQuery();
-  const loadedUserFontFacesRef = useRef<Map<string, FontFace>>(new Map());
   const autoRetryAttemptsRef = useRef(0);
   const userFontReadyStates = useStore($userFontReadyStates);
   const [fontSyncVersion, setFontSyncVersion] = useState(0);
@@ -128,14 +129,15 @@ const FontSelect = () => {
       return;
     }
 
-    primeUserFontReadiness(userFonts ?? [], loadedUserFontFacesRef.current);
+    primeUserFontReadiness(userFonts ?? [], loadedUserFontFaces);
     let isCancelled = false;
 
     void (async () => {
       await syncUserFontFaces({
         fonts: userFonts ?? [],
         token: authToken,
-        loadedFontFaces: loadedUserFontFacesRef.current,
+        baseUrl: getBaseUrl(),
+        loadedFontFaces: loadedUserFontFaces,
         fontFaceSet: document.fonts,
         fontFaceCtor: FontFace,
         fetchFn: fetch,

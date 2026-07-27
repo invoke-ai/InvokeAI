@@ -28,6 +28,7 @@ type FontFaceSetLike<TLoadedFontFace> = {
 };
 
 export const $userFontReadyStates = atom<Record<TextFontId, UserFontReadyState>>({});
+export const loadedUserFontFaces = new Map<string, FontFace>();
 const userFontReadyPromises = new Map<TextFontId, Promise<void>>();
 const userFontReadyResolvers = new Map<TextFontId, () => void>();
 const USER_FONT_READY_TIMEOUT_MS = 2000;
@@ -131,17 +132,23 @@ export const awaitUserFontReady = async (fontId: TextFontId): Promise<void> => {
   if (state === 'ready' || state === 'error') {
     return;
   }
-  await Promise.race([
-    ensureUserFontReadyPromise(fontId),
-    new Promise<void>((resolve) => {
-      setTimeout(resolve, USER_FONT_READY_TIMEOUT_MS);
-    }),
-  ]);
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      ensureUserFontReadyPromise(fontId),
+      new Promise<void>((resolve) => {
+        timeoutId = setTimeout(resolve, USER_FONT_READY_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timeoutId);
+  }
 };
 
 export const clearUserFontRegistryForTests = (): void => {
   $userFontReadyStates.set({});
   userFontReadyPromises.clear();
+  loadedUserFontFaces.clear();
   userFontReadyResolvers.clear();
 };
 
@@ -149,6 +156,7 @@ type SyncUserFontFacesArgs<TLoadedFontFace> = {
   fonts: Array<UserFont>;
   token: string | null;
   loadedFontFaces: Map<string, TLoadedFontFace>;
+  baseUrl: string;
   fontFaceSet: FontFaceSetLike<TLoadedFontFace>;
   fontFaceCtor: FontFaceConstructorLike<TLoadedFontFace>;
   fetchFn: FetchLike;
@@ -158,6 +166,7 @@ export async function syncUserFontFaces<TLoadedFontFace>({
   fonts,
   token,
   loadedFontFaces,
+  baseUrl,
   fontFaceSet,
   fontFaceCtor,
   fetchFn,
@@ -192,7 +201,8 @@ export async function syncUserFontFaces<TLoadedFontFace>({
           }
 
           try {
-            const response = await fetchFn(face.url, {
+            const fontUrl = `${baseUrl.replace(/\/$/, '')}/${face.url.replace(/^\//, '')}`;
+            const response = await fetchFn(fontUrl, {
               headers: token ? { Authorization: `Bearer ${token}` } : undefined,
             });
             if (!response.ok) {
