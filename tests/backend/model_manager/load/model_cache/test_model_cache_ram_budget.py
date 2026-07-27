@@ -209,6 +209,10 @@ def test_eviction_coordinates_across_device_caches(mock_logger):
     try:
         cache_a.put("shared", DummyModule())
         cache_b.put("shared", DummyModule())  # both devices hold "shared" (refcount 2, counted once)
+        # Production loaders retrieve every model immediately after put() (load_default.py); the
+        # get() clears the post-admission grace, leaving the entries as evictable idle residents.
+        cache_a.get("shared")
+        cache_b.get("shared")
         assert budget.total_in_use() == S
 
         cache_a.put("new", DummyModule())  # triggers make_room; "shared" is a's only droppable entry
@@ -241,6 +245,10 @@ def test_contended_peer_reconciles_budget_after_its_operation_completes(mock_log
     try:
         cache_a.put("shared", DummyModule())
         cache_b.put("shared", DummyModule())
+        # Mirror production: the loader's get() right after put() clears the post-admission
+        # grace, leaving b's entry an evictable idle resident.
+        cache_a.get("shared")
+        cache_b.get("shared")
         assert budget.total_in_use() == S
 
         # Simulate b being mid-operation on another thread: its lock is contended when a's
@@ -297,6 +305,10 @@ def test_reconcile_request_after_peer_finished_operation_is_not_lost(mock_logger
     try:
         cache_a.put("shared", DummyModule())
         cache_b.put("shared", DummyModule())
+        # Mirror production: the loader's get() right after put() clears the post-admission
+        # grace, leaving b's entry an evictable idle resident.
+        cache_a.get("shared")
+        cache_b.get("shared")
         assert budget.total_in_use() == S
 
         holding = threading.Event()
@@ -363,3 +375,261 @@ def test_peer_eviction_skips_locked_entries(mock_logger):
     finally:
         cache_a.shutdown()
         cache_b.shutdown()
+
+
+def test_manual_release_in_cached_model_keys_honors_pending_reconcile(mock_logger):
+    """cached_model_keys() manages the cache lock manually; its release must process a pending
+    budget-reconcile request just like the synchronized-decorator hook does. Otherwise a request
+    arriving while it holds the lock is stranded: the requester's inline attempt fails on the
+    contended lock, the manual release runs no hook, and an idle cache leaves the budget exceeded
+    indefinitely (JPPhoto review, 2026-07-27)."""
+    import threading
+
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=int(S * 1.4), shared_store=store)
+    cache_a = _make_cache(store, budget, mock_logger)
+    cache_b = _make_cache(store, budget, mock_logger)
+    try:
+        cache_a.put("shared", DummyModule())
+        cache_b.put("shared", DummyModule())
+        cache_a.get("shared")
+        cache_b.get("shared")
+
+        inside = threading.Event()
+        proceed = threading.Event()
+
+        class PausingDict(dict):
+            """Pauses cached_model_keys inside its lock, on its first key iteration."""
+
+            paused = False
+
+            def __iter__(self):
+                if not PausingDict.paused:
+                    PausingDict.paused = True
+                    inside.set()
+                    assert proceed.wait(timeout=10)
+                return super().__iter__()
+
+        cache_b._cached_models = PausingDict(cache_b._cached_models)
+
+        holder = threading.Thread(target=cache_b.cached_model_keys)
+        holder.start()
+        assert inside.wait(timeout=10)
+
+        # While b's lock is held inside cached_model_keys: a's admission overshoots the budget
+        # and records a reconcile request on b (the request's inline attempt fails on the
+        # contended lock).
+        cache_a.put("new", DummyModule())
+        assert budget.total_in_use() == 2 * S  # transiently exceeded
+        assert "shared" in cache_b._cached_models
+
+        proceed.set()
+        holder.join(timeout=10)
+        assert not holder.is_alive()
+
+        # cached_model_keys' release processed the pending request — no other access needed.
+        assert "shared" not in cache_b._cached_models
+        assert store.refcount("shared") == 0
+        assert budget.total_in_use() == S
+        assert budget.total_in_use() <= budget.max_bytes
+    finally:
+        cache_a.shutdown()
+        cache_b.shutdown()
+
+
+def test_manual_release_in_evict_unlocked_for_peer_honors_pending_reconcile(mock_logger):
+    """evict_unlocked_for_peer() also manages the cache lock manually; a reconcile request that
+    arrives while it holds the lock must be processed when it releases, since the requester's
+    inline attempt failed on the contended lock (JPPhoto review, 2026-07-27)."""
+    import threading
+
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=int(S * 1.4), shared_store=store)
+    cache_a = _make_cache(store, budget, mock_logger)
+    cache_b = _make_cache(store, budget, mock_logger)
+    try:
+        cache_a.put("shared", DummyModule())
+        cache_b.put("shared", DummyModule())
+        cache_a.get("shared")
+        cache_b.get("shared")
+
+        inside = threading.Event()
+        proceed = threading.Event()
+        paused = [False]
+
+        def satisfied_after_pause() -> bool:
+            # The first check runs inside b's lock: rendezvous there, then report "satisfied"
+            # so this peer-eviction pass evicts nothing itself.
+            if not paused[0]:
+                paused[0] = True
+                inside.set()
+                assert proceed.wait(timeout=10)
+            return True
+
+        holder = threading.Thread(target=lambda: cache_b.evict_unlocked_for_peer(is_satisfied=satisfied_after_pause))
+        holder.start()
+        assert inside.wait(timeout=10)
+
+        cache_a.put("new", DummyModule())
+        assert budget.total_in_use() == 2 * S  # transiently exceeded
+        assert "shared" in cache_b._cached_models
+
+        proceed.set()
+        holder.join(timeout=10)
+        assert not holder.is_alive()
+
+        assert "shared" not in cache_b._cached_models
+        assert store.refcount("shared") == 0
+        assert budget.total_in_use() == S
+        assert budget.total_in_use() <= budget.max_bytes
+    finally:
+        cache_a.shutdown()
+        cache_b.shutdown()
+
+
+def test_reconcile_clear_does_not_wipe_concurrent_request(mock_logger):
+    """The satisfied-path clear() in _reconcile_budget_if_pending races a concurrent requester:
+    a peer counts its admission (driving the budget negative) and sets the flag just before the
+    clear lands, then its own inline attempt observes the just-wiped flag and returns. The
+    reconciler must detect the wiped request — the budget is negative again after its clear —
+    restore the flag, and keep reconciling (JPPhoto review, 2026-07-27)."""
+    import threading
+
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=int(S * 1.4), shared_store=store)
+    cache_b = _make_cache(store, budget, mock_logger)
+    try:
+        cache_b.put("evictable", DummyModule())
+        cache_b.get("evictable")
+        assert budget.total_in_use() == S  # under the 1.4*S cap
+
+        fired = [False]
+
+        class RacingEvent(threading.Event):
+            """On the first clear(): a peer admission lands and sets the flag — which this
+            clear then wipes. That is exactly the interleaving under test."""
+
+            def clear(self) -> None:
+                if not fired[0]:
+                    fired[0] = True
+                    budget.add_non_shared(S)  # the peer's admission, counted pre-set...
+                    self.set()  # ...and its request flag, set post-admission
+                super().clear()
+
+        cache_b._budget_reconcile_pending = RacingEvent()
+        cache_b._budget_reconcile_pending.set()  # a previously recorded, now-satisfied request
+
+        # A lock release runs the reconcile hook: it sees the budget satisfied and clears the
+        # flag — colliding with the racing request. (The requester's inline attempt is emulated
+        # by the no-op it becomes once it observes the wiped flag.)
+        cache_b._reconcile_budget_if_pending()
+
+        assert "evictable" not in cache_b._cached_models
+        assert budget.total_in_use() == S
+        assert budget.total_in_use() <= budget.max_bytes
+    finally:
+        cache_b.shutdown()
+
+
+def test_reconcile_post_eviction_clear_does_not_wipe_concurrent_request(mock_logger):
+    """The same set-versus-clear race, entered through the eviction path: the reconciler
+    satisfies the budget by evicting and then retires the flag, colliding with a concurrent
+    admission's freshly set request (JPPhoto review, 2026-07-27)."""
+    import threading
+
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=int(S * 2.5), shared_store=store)
+    cache_b = _make_cache(store, budget, mock_logger)
+    try:
+        cache_b.put("evictable_1", DummyModule())
+        cache_b.get("evictable_1")
+        cache_b.put("evictable_2", DummyModule())
+        cache_b.get("evictable_2")
+        assert budget.total_in_use() == 2 * S
+
+        fired = [False]
+
+        class RacingEvent(threading.Event):
+            def clear(self) -> None:
+                if not fired[0]:
+                    fired[0] = True
+                    budget.add_non_shared(S)
+                    self.set()
+                super().clear()
+
+        cache_b._budget_reconcile_pending = RacingEvent()
+
+        # A peer admission overshoots (2*S resident + S non-shared > 2.5*S cap) and requests a
+        # reconcile. Evicting evictable_1 satisfies the budget; the post-eviction clear then
+        # collides with a second concurrent admission's request (the RacingEvent).
+        budget.add_non_shared(S)
+        cache_b.request_budget_reconcile()
+
+        assert "evictable_1" not in cache_b._cached_models
+        assert "evictable_2" not in cache_b._cached_models
+        assert budget.total_in_use() <= budget.max_bytes
+    finally:
+        cache_b.shutdown()
+
+
+def test_admitting_cache_reconciles_its_own_overshoot_after_unlock(mock_logger):
+    """When the overshoot is held by the ADMITTING cache's own locked entry and its peers have
+    nothing to evict, the admitting cache itself must carry the pending request: the unlock that
+    eventually frees the entry reconciles the budget. With peer-only requests, the unlock hook
+    runs with the flag unset and the budget stays exceeded indefinitely (JPPhoto review,
+    2026-07-27)."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=int(S * 1.4), shared_store=store)
+    cache_a = _make_cache(store, budget, mock_logger)
+    cache_b = _make_cache(store, budget, mock_logger)  # stays empty: peers have nothing to evict
+    try:
+        cache_a.put("locked_model", DummyModule())
+        record = cache_a.get("locked_model")
+        cache_a.lock(record, None)  # in use on this device (CPU execution -> no VRAM move)
+
+        cache_a.put("new", DummyModule())
+        # The locked entry cannot be evicted and b holds nothing: transiently exceeded.
+        assert budget.total_in_use() == 2 * S
+
+        cache_a.unlock(record)
+        # unlock()'s release hook processes this cache's own pending request — no peer action,
+        # no further model load.
+        assert "locked_model" not in cache_a._cached_models
+        assert "new" in cache_a._cached_models
+        assert budget.total_in_use() == S
+        assert budget.total_in_use() <= budget.max_bytes
+    finally:
+        cache_a.shutdown()
+        cache_b.shutdown()
+
+
+def test_pending_reconcile_cannot_evict_just_admitted_model_before_first_use(mock_logger):
+    """A reconcile request pending while put() runs (a peer's request that found this cache
+    busy) is processed by put()'s own release hook — before the loader can call get(). The hook
+    must never evict the model that was just admitted: the loader retrieves it via get()
+    immediately after put() returns (load_default.py), and evicting it first would break the
+    in-flight load with an IndexError. The post-admission grace (CacheRecord.awaiting_first_use)
+    shields it until its first retrieval."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=int(S * 1.4), shared_store=store)
+    cache_a = _make_cache(store, budget, mock_logger)
+    try:
+        cache_a.put("locked_model", DummyModule())
+        record = cache_a.get("locked_model")
+        cache_a.lock(record, None)
+
+        # A peer's reconcile request arrived while this cache was busy: the flag is pending
+        # when put() runs.
+        cache_a._budget_reconcile_pending.set()
+
+        # Overshoots the budget with "new" as the only unlocked entry. put()'s release hook
+        # processes the pending request before put() returns — it must skip the just-admitted
+        # model.
+        cache_a.put("new", DummyModule())
+        assert "new" in cache_a._cached_models
+        new_record = cache_a.get("new")  # the loader's immediate retrieval must succeed
+        assert new_record.key == "new"
+        # The in-use model was never touched.
+        assert "locked_model" in cache_a._cached_models
+    finally:
+        cache_a.shutdown()

@@ -514,7 +514,9 @@ class ModelCache:
                 cache_key=key,
             )
 
-        cache_record = CacheRecord(key=key, cached_model=wrapped_model)
+        # awaiting_first_use protects the new entry from the asynchronous eviction paths (budget
+        # reconcile, peer-requested eviction) until the loader retrieves it — see CacheRecord.
+        cache_record = CacheRecord(key=key, cached_model=wrapped_model, awaiting_first_use=True)
         self._cached_models[key] = cache_record
         self._cache_stack.append(key)
         # Account this model's RAM in the global budget. Shared weights are tracked once by the
@@ -536,6 +538,13 @@ class ModelCache:
             # the true (exceeded) state.
             for peer in self._ram_budget.peer_caches(exclude=self):
                 peer.request_budget_reconcile()
+            # If the overshoot is held by THIS cache's own locked entries, the peers may have
+            # nothing to evict. That case is handled by unlock(): any unlock that leaves the
+            # shared budget exceeded records a reconcile request on its own cache, so the entry
+            # that eventually becomes evictable triggers the reconcile itself. (A request on
+            # self here would be worse than useless: _make_room_internal already evicted
+            # everything unlocked, so the only entry a self-reconcile could ever claim is the
+            # model just admitted — evicting it out from under its own loader.)
 
     def cached_model_keys(self) -> set[str]:
         """Return the base model keys of every model currently resident in this cache.
@@ -559,6 +568,13 @@ class ModelCache:
             return {k for k in base_keys if len(k) >= 16 and "/" not in k and "\\" not in k}
         finally:
             self._lock.release()
+            # This manual release must honor a pending budget reconcile just like the
+            # synchronized-decorator hook: a peer whose request found the lock held by this
+            # method relies on the release to process the flag (see request_budget_reconcile).
+            # Non-blocking to preserve this method's no-stall guarantee — if the lock is
+            # already contended again, that holder's own release hook processes the flag.
+            if not self._lock._is_owned():
+                self._reconcile_budget_if_pending(blocking=False)
 
     @synchronized
     def _get_cache_snapshot(self) -> dict[str, CacheEntrySnapshot]:
@@ -596,6 +612,9 @@ class ModelCache:
             raise IndexError(f"The model with key {key} is not in the cache.")
 
         cache_entry = self._cached_models[key]
+        # First retrieval: the loader now owns a reference, so the entry no longer needs the
+        # post-admission grace that shields it from the asynchronous eviction paths.
+        cache_entry.awaiting_first_use = False
 
         # more stats
         if self.stats:
@@ -629,6 +648,7 @@ class ModelCache:
             )
         # cache_entry = self._cached_models[key]
         cache_entry.lock()
+        cache_entry.awaiting_first_use = False
 
         self._logger.debug(
             f"Locking model {cache_entry.key} (Type: {cache_entry.cached_model.model.__class__.__name__})"
@@ -705,6 +725,15 @@ class ModelCache:
             gc.collect()
             TorchDevice.empty_cache()
             self._logger.debug(f"Evicted stale cache entry {cache_entry.key} after unlock.")
+
+        # If the shared budget is exceeded, this unlock may have just made the offending entry
+        # evictable. This is the only reconcile trigger for an overshoot held by this cache's
+        # OWN locked entries: put() requests reconciles from its peers only (see put()), so
+        # when the admitting cache itself holds the locked RAM, no pending request exists
+        # anywhere until the lock releases. Recording it here lets this unlock's own release
+        # hook perform the eviction.
+        if self._ram_budget is not None and self._ram_budget.available() < 0:
+            self._budget_reconcile_pending.set()
 
     def _load_locked_model(self, cache_entry: CacheRecord, working_mem_bytes: Optional[int] = None) -> None:
         """Helper function for self.lock(). Loads a locked model into VRAM."""
@@ -1185,7 +1214,8 @@ class ModelCache:
         Returns the number of entries evicted, or None if the lock was contended and nothing could
         be attempted. Either way, if the shared budget is still exceeded once the caller admits its
         model, the caller records a deferred reconcile request on every peer (see
-        request_budget_reconcile), so a skip never leaves the budget exceeded indefinitely.
+        request_budget_reconcile) — and every unlock that leaves the budget exceeded records one on
+        its own cache — so a skip never leaves the budget exceeded indefinitely.
         """
         if not self._lock.acquire(blocking=False):
             return None
@@ -1194,7 +1224,7 @@ class ModelCache:
             pos = 0
             while pos < len(self._cache_stack) and not is_satisfied():
                 cache_entry = self._cached_models[self._cache_stack[pos]]
-                if cache_entry.is_locked:
+                if cache_entry.is_locked or cache_entry.awaiting_first_use:
                     pos += 1
                     continue
                 self._logger.debug(
@@ -1206,6 +1236,14 @@ class ModelCache:
             return models_cleared
         finally:
             self._lock.release()
+            # This manual release must honor a pending budget reconcile just like the
+            # synchronized-decorator hook — a requester whose inline attempt found the lock
+            # held by this method depends on it (see request_budget_reconcile). Non-blocking:
+            # the peer calling this method holds its own cache lock, and blocking on this
+            # cache's lock while holding another cache's lock is the one shape that could
+            # deadlock; on contention the new holder's release hook processes the flag.
+            if not self._lock._is_owned():
+                self._reconcile_budget_if_pending(blocking=False)
 
     def request_budget_reconcile(self) -> None:
         """Ask this cache to shed unlocked entries until the shared budget is satisfied.
@@ -1230,41 +1268,54 @@ class ModelCache:
         shared budget is exceeded.
 
         Called (blocking) from the synchronized-decorator hook after each lock release, and
-        (non-blocking) inline from request_budget_reconcile. The pending flag stays set until the
+        (non-blocking) inline from request_budget_reconcile and from the manual lock releases in
+        cached_model_keys / evict_unlocked_for_peer. The pending flag stays set until the
         budget is actually satisfied: if the remaining overshoot is held by locked (in-use)
         entries, the unlock that eventually frees them is itself a synchronized method, whose hook
         re-runs this reconcile.
         """
         if self._ram_budget is None or not self._budget_reconcile_pending.is_set():
             return
-        if self._ram_budget.available() >= 0:
-            self._budget_reconcile_pending.clear()
-            return
-        if not self._lock.acquire(blocking=blocking):
-            # Contended (non-blocking caller only): the holder releases through the synchronized
-            # hook, which re-runs this reconcile with the flag still set.
-            return
-        models_cleared = 0
-        try:
-            pos = 0
-            while pos < len(self._cache_stack) and self._ram_budget.available() < 0:
-                cache_entry = self._cached_models[self._cache_stack[pos]]
-                if cache_entry.is_locked:
-                    pos += 1
-                    continue
-                self._logger.debug(
-                    f"Dropping {cache_entry.key} from RAM cache to reconcile the shared RAM budget "
-                    f"({(cache_entry.cached_model.total_bytes() / MB):.2f}MB)."
-                )
-                self._delete_cache_entry(cache_entry)
-                models_cleared += 1
-        finally:
-            self._lock.release()
-        if self._ram_budget.available() >= 0:
-            self._budget_reconcile_pending.clear()
-        if models_cleared > 0:
-            gc.collect()
-            TorchDevice.empty_cache()
+        while True:
+            if self._ram_budget.available() >= 0:
+                # Budget satisfied: retire the request. Clearing races a concurrent admission —
+                # a peer counts its new model (driving the budget negative) BEFORE setting the
+                # flag, so if the budget is negative again after the clear, the clear may have
+                # wiped a request whose own inline attempt already saw the flag unset and
+                # returned. Restore the flag and keep reconciling in that case.
+                self._budget_reconcile_pending.clear()
+                if self._ram_budget.available() >= 0:
+                    return
+                self._budget_reconcile_pending.set()
+            if not self._lock.acquire(blocking=blocking):
+                # Contended (non-blocking caller only): the holder releases through a reconcile
+                # hook, which re-runs this reconcile with the flag still set.
+                return
+            models_cleared = 0
+            try:
+                pos = 0
+                while pos < len(self._cache_stack) and self._ram_budget.available() < 0:
+                    cache_entry = self._cached_models[self._cache_stack[pos]]
+                    if cache_entry.is_locked or cache_entry.awaiting_first_use:
+                        pos += 1
+                        continue
+                    self._logger.debug(
+                        f"Dropping {cache_entry.key} from RAM cache to reconcile the shared RAM budget "
+                        f"({(cache_entry.cached_model.total_bytes() / MB):.2f}MB)."
+                    )
+                    self._delete_cache_entry(cache_entry)
+                    models_cleared += 1
+            finally:
+                self._lock.release()
+            if models_cleared > 0:
+                gc.collect()
+                TorchDevice.empty_cache()
+            if self._ram_budget.available() < 0:
+                # Everything evictable here is gone; the remainder is held by locked (in-use)
+                # or just-admitted entries. Leave the flag set — the eventual unlock()'s hook
+                # (or the loader's next cache operation) retries.
+                return
+            # Satisfied: loop back to retire the flag via the guarded clear above.
 
     def _delete_cache_entry(self, cache_entry: CacheRecord) -> None:
         """Delete cache_entry from the cache if it exists. No exception is thrown if it doesn't exist."""
