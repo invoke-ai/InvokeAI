@@ -24,23 +24,28 @@ class Krea2SeedVarianceInvocation(BaseInvocation):
     Distilled few-step models (like Krea-2-Turbo) suffer from low seed variance — different seeds give
     near-identical images. This adds seeded uniform noise to a random subset of the text-embedding
     values, trading some prompt adherence for variety (the same idea as the Z-Image-Turbo
-    `SeedVarianceEnhancer`). Optional pass between the text encoder and denoise; the defaults are
-    aggressive and may need tuning for Krea-2.
+    `SeedVarianceEnhancer`). Optional pass between the text encoder and denoise.
+
+    The noise magnitude is auto-calibrated relative to the embedding's standard deviation, so a given
+    `strength` behaves consistently regardless of the embedding scale — in particular it stays sane
+    whether or not the upstream Conditioning Rebalance node has scaled the embeddings up.
     """
 
     conditioning: Krea2ConditioningField = InputField(
         description=FieldDescriptions.cond, input=Input.Connection, title="Conditioning"
     )
     strength: float = InputField(
-        default=20.0,
+        default=0.1,
+        ge=0.0,
+        le=2.0,
         allow_inf_nan=False,
-        description="Magnitude of the uniform noise added to the embeddings (noise in [-strength, +strength]).",
+        description="Noise strength as a multiplier of the embedding std (0=off, 0.1=subtle, 0.5=strong).",
     )
     randomize_percent: float = InputField(
         default=50.0,
-        ge=1.0,
+        ge=0.0,
         le=100.0,
-        description="Percentage of embedding values that get perturbed (Bernoulli mask).",
+        description="Percentage of embedding values that get perturbed (Bernoulli mask); 0 disables.",
     )
     variance_seed: int = InputField(default=0, description="Seed for the variance noise (vary this to get variety).")
 
@@ -52,9 +57,20 @@ class Krea2SeedVarianceInvocation(BaseInvocation):
         assert isinstance(conditioning, Krea2ConditioningInfo)
 
         embeds = conditioning.prompt_embeds  # (B, seq, 12, hidden)
+
+        # No-op when the effect is disabled, so the node can stay wired in the graph without altering output.
+        if self.strength == 0.0 or self.randomize_percent == 0.0:
+            return Krea2ConditioningOutput.build(self.conditioning.conditioning_name)
+
+        # Auto-calibrate the noise magnitude to the embedding scale (same approach as the Z-Image enhancer).
+        # This keeps the perceptual effect of `strength` stable across prompts and, crucially, whether or not
+        # the upstream rebalance has multiplied the embeddings up.
+        embed_std = torch.std(embeds.to(torch.float32)).item()
+        actual_strength = self.strength * embed_std
+
         generator = torch.Generator(device=embeds.device).manual_seed(self.variance_seed)
         noise = torch.rand(embeds.shape, generator=generator, dtype=torch.float32, device=embeds.device) * 2.0 - 1.0
-        noise = noise * self.strength
+        noise = noise * actual_strength
         mask = torch.bernoulli(
             torch.full(embeds.shape, self.randomize_percent / 100.0, dtype=torch.float32, device=embeds.device),
             generator=generator,

@@ -18111,8 +18111,11 @@ export type components = {
          *     Distilled few-step models (like Krea-2-Turbo) suffer from low seed variance — different seeds give
          *     near-identical images. This adds seeded uniform noise to a random subset of the text-embedding
          *     values, trading some prompt adherence for variety (the same idea as the Z-Image-Turbo
-         *     `SeedVarianceEnhancer`). Optional pass between the text encoder and denoise; the defaults are
-         *     aggressive and may need tuning for Krea-2.
+         *     `SeedVarianceEnhancer`). Optional pass between the text encoder and denoise.
+         *
+         *     The noise magnitude is auto-calibrated relative to the embedding's standard deviation, so a given
+         *     `strength` behaves consistently regardless of the embedding scale — in particular it stays sane
+         *     whether or not the upstream Conditioning Rebalance node has scaled the embeddings up.
          */
         Krea2SeedVarianceInvocation: {
             /**
@@ -18140,13 +18143,13 @@ export type components = {
             conditioning?: components["schemas"]["Krea2ConditioningField"] | null;
             /**
              * Strength
-             * @description Magnitude of the uniform noise added to the embeddings (noise in [-strength, +strength]).
-             * @default 20
+             * @description Noise strength as a multiplier of the embedding std (0=off, 0.1=subtle, 0.5=strong).
+             * @default 0.1
              */
             strength?: number;
             /**
              * Randomize Percent
-             * @description Percentage of embedding values that get perturbed (Bernoulli mask).
+             * @description Percentage of embedding values that get perturbed (Bernoulli mask); 0 disables.
              * @default 50
              */
             randomize_percent?: number;

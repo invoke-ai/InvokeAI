@@ -2138,14 +2138,14 @@
         "krea2SeedVarianceStrength": {
             "heading": "Variance Strength",
             "paragraphs": [
-                "Magnitude of the uniform noise added to the embeddings.",
-                "Higher values give more variety but can drift further from the prompt. Default is 20."
+                "Noise strength as a multiplier of the embedding's standard deviation, so it behaves consistently regardless of the embedding scale (including whether Conditioning Rebalance is on).",
+                "0 is off, 0.1 is subtle, 0.5 is strong. Higher values give more variety but drift further from the prompt."
             ]
         },
         "krea2SeedVarianceRandomizePercent": {
             "heading": "Randomize Percent",
             "paragraphs": [
-                "Percentage of embedding values that receive noise (1-100%).",
+                "Percentage of embedding values that receive noise (0-100%); 0 disables.",
                 "Lower values create more selective perturbations, while 100% affects all values."
             ]
         },

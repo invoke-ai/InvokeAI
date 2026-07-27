@@ -10,15 +10,15 @@ import { useTranslation } from 'react-i18next';
 
 const CONSTRAINTS = {
   initial: 50,
-  sliderMin: 1,
+  sliderMin: 0,
   sliderMax: 100,
-  numberInputMin: 1,
+  numberInputMin: 0,
   numberInputMax: 100,
   fineStep: 1,
-  coarseStep: 5,
+  coarseStep: 10,
 };
 
-const MARKS = [1, 25, 50, 75, 100];
+const MARKS = [0, 25, 50, 75, 100];
 
 const ParamKrea2SeedVarianceRandomizePercent = () => {
   const randomizePercent = useAppSelector(selectKrea2SeedVarianceRandomizePercent);
