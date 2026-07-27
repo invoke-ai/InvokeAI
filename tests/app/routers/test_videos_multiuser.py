@@ -401,11 +401,9 @@ def test_video_star_endpoints_dedupe_names_and_report_partial_failures(
 
     mock_invoker.services.videos.update.side_effect = update
     route = star_videos_in_list if path == "star" else unstar_videos_in_list
-    response = asyncio.run(
-        route(
-            current_user=MagicMock(is_admin=True),
-            batch=VideoNamesBatch(video_names=["ok.mp4", "ok.mp4", "fails.mp4"]),
-        )
+    response = route(
+        current_user=MagicMock(is_admin=True),
+        batch=VideoNamesBatch(video_names=["ok.mp4", "ok.mp4", "fails.mp4"]),
     )
 
     assert getattr(response, result_key) == ["ok.mp4"]
