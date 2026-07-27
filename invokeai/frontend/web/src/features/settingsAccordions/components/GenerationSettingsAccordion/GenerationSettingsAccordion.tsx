@@ -12,6 +12,7 @@ import {
   selectIsFLUX,
   selectIsFlux2,
   selectIsFlux2Dev,
+  selectIsIdeogram4,
   selectIsQwenImage,
   selectIsSD3,
   selectIsZImage,
@@ -27,6 +28,7 @@ import ParamFluxDypePreset from 'features/parameters/components/Core/ParamFluxDy
 import ParamFluxDypeScale from 'features/parameters/components/Core/ParamFluxDypeScale';
 import ParamFluxScheduler from 'features/parameters/components/Core/ParamFluxScheduler';
 import ParamGuidance from 'features/parameters/components/Core/ParamGuidance';
+import ParamIdeogram4SamplerPreset from 'features/parameters/components/Core/ParamIdeogram4SamplerPreset';
 import ParamQwenImageShift from 'features/parameters/components/Core/ParamQwenImageShift';
 import ParamScheduler from 'features/parameters/components/Core/ParamScheduler';
 import ParamSteps from 'features/parameters/components/Core/ParamSteps';
@@ -54,6 +56,7 @@ export const GenerationSettingsAccordion = memo(() => {
   const isSD3 = useAppSelector(selectIsSD3);
   const isCogView4 = useAppSelector(selectIsCogView4);
   const isZImage = useAppSelector(selectIsZImage);
+  const isIdeogram4 = useAppSelector(selectIsIdeogram4);
   const isExternal = useAppSelector(selectIsExternal);
   const isQwenImage = useAppSelector(selectIsQwenImage);
   const isAnima = useAppSelector(selectIsAnima);
@@ -105,10 +108,12 @@ export const GenerationSettingsAccordion = memo(() => {
                   !isSD3 &&
                   !isCogView4 &&
                   !isZImage &&
+                  !isIdeogram4 &&
                   !isQwenImage &&
                   !isAnima && <ParamScheduler />}
                 {!isExternal && (isFLUX || isFlux2) && <ParamFluxScheduler />}
                 {!isExternal && isZImage && <ParamZImageScheduler />}
+                {!isExternal && isIdeogram4 && <ParamIdeogram4SamplerPreset />}
                 {!isExternal && isAnima && <ParamAnimaScheduler />}
                 {modelSupportsSteps && <ParamSteps />}
                 {isExternal && modelSupportsGuidance && <ParamGuidance />}
@@ -116,7 +121,7 @@ export const GenerationSettingsAccordion = memo(() => {
                   <ParamGuidance />
                 )}
                 {!isExternal && isFlux2Dev && <ParamGuidance />}
-                {!isExternal && !isFLUX && !isFlux2 && <ParamCFGScale />}
+                {!isExternal && !isFLUX && !isFlux2 && !isIdeogram4 && <ParamCFGScale />}
                 {!isExternal && isZImage && <ParamZImageShift />}
                 {!isExternal && isQwenImage && <ParamQwenImageShift />}
                 {!isExternal && isFLUX && <ParamFluxDypePreset />}

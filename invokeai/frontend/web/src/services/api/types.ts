@@ -497,8 +497,17 @@ export const isFlux2DevDiffusersMainModelConfig = (config: AnyModelConfig): conf
   return isFlux2DevMainModelConfig(config) && config.format === 'diffusers';
 };
 
+const isIdeogram4MainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return config.type === 'main' && config.base === 'ideogram-4';
+};
+
 export const isNonCommercialMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
-  return isFluxDevMainModelConfig(config) || isFlux2Klein9BMainModelConfig(config) || isFlux2DevMainModelConfig(config);
+  return (
+    isFluxDevMainModelConfig(config) ||
+    isFlux2Klein9BMainModelConfig(config) ||
+    isFlux2DevMainModelConfig(config) ||
+    isIdeogram4MainModelConfig(config)
+  );
 };
 
 export const isFluxFillMainModelModelConfig = (config: AnyModelConfig): config is MainModelConfig => {

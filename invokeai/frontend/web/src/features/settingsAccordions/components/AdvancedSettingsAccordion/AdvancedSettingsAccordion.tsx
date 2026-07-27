@@ -9,6 +9,7 @@ import {
   selectIsFLUX,
   selectIsFlux2,
   selectIsFlux2Dev,
+  selectIsIdeogram4,
   selectIsQwenImage,
   selectIsSD3,
   selectIsZImage,
@@ -27,6 +28,10 @@ import ParamQwenImageComponentSourceSelect from 'features/parameters/components/
 import ParamQwenImageQuantization from 'features/parameters/components/Advanced/ParamQwenImageQuantization';
 import ParamT5EncoderModelSelect from 'features/parameters/components/Advanced/ParamT5EncoderModelSelect';
 import ParamZImageQwen3VaeModelSelect from 'features/parameters/components/Advanced/ParamZImageQwen3VaeModelSelect';
+import ParamIdeogram4ColorPalette from 'features/parameters/components/Core/ParamIdeogram4ColorPalette';
+import ParamIdeogram4GuidanceScale from 'features/parameters/components/Core/ParamIdeogram4GuidanceScale';
+import ParamIdeogram4Mu from 'features/parameters/components/Core/ParamIdeogram4Mu';
+import ParamIdeogram4Steps from 'features/parameters/components/Core/ParamIdeogram4Steps';
 import ParamSeamlessXAxis from 'features/parameters/components/Seamless/ParamSeamlessXAxis';
 import ParamSeamlessYAxis from 'features/parameters/components/Seamless/ParamSeamlessYAxis';
 import ParamColorCompensation from 'features/parameters/components/VAEModel/ParamColorCompensation';
@@ -54,46 +59,52 @@ export const AdvancedSettingsAccordion = memo(() => {
   const isFlux2Dev = useAppSelector(selectIsFlux2Dev);
   const isSD3 = useAppSelector(selectIsSD3);
   const isZImage = useAppSelector(selectIsZImage);
+  const isIdeogram4 = useAppSelector(selectIsIdeogram4);
   const isExternal = useAppSelector(selectIsExternal);
   const isQwenImage = useAppSelector(selectIsQwenImage);
   const isAnima = useAppSelector(selectIsAnima);
 
   const selectBadges = useMemo(
     () =>
-      createMemoizedSelector([selectParamsSlice, selectIsFLUX, selectIsFlux2], (params, isFLUX, isFlux2) => {
-        const badges: (string | number)[] = [];
-        // FLUX.2 has VAE built into main model - no badge needed
-        if (isFLUX && !isFlux2) {
-          if (vaeConfig) {
-            let vaeBadge = vaeConfig.name;
-            if (params.vaePrecision === 'fp16') {
-              vaeBadge += ` ${params.vaePrecision}`;
+      createMemoizedSelector(
+        [selectParamsSlice, selectIsFLUX, selectIsFlux2, selectIsIdeogram4],
+        (params, isFLUX, isFlux2, isIdeogram4) => {
+          const badges: (string | number)[] = [];
+          // FLUX.2 has VAE built into main model - no badge needed
+          if (isFLUX && !isFlux2) {
+            if (vaeConfig) {
+              let vaeBadge = vaeConfig.name;
+              if (params.vaePrecision === 'fp16') {
+                vaeBadge += ` ${params.vaePrecision}`;
+              }
+              badges.push(vaeBadge);
             }
-            badges.push(vaeBadge);
-          }
-        } else if (!isFlux2) {
-          if (vaeConfig) {
-            let vaeBadge = vaeConfig.name;
-            if (params.vaePrecision === 'fp16') {
-              vaeBadge += ` ${params.vaePrecision}`;
+            // Ideogram 4 hides the VAE / clip skip / CFG rescale / seamless controls (they don't apply),
+            // so it must not advertise stale badges for them either.
+          } else if (!isFlux2 && !isIdeogram4) {
+            if (vaeConfig) {
+              let vaeBadge = vaeConfig.name;
+              if (params.vaePrecision === 'fp16') {
+                vaeBadge += ` ${params.vaePrecision}`;
+              }
+              badges.push(vaeBadge);
+            } else if (params.vaePrecision === 'fp16') {
+              badges.push(`VAE ${params.vaePrecision}`);
             }
-            badges.push(vaeBadge);
-          } else if (params.vaePrecision === 'fp16') {
-            badges.push(`VAE ${params.vaePrecision}`);
+            if (params.clipSkip) {
+              badges.push(`Skip ${params.clipSkip}`);
+            }
+            if (params.cfgRescaleMultiplier) {
+              badges.push(`Rescale ${params.cfgRescaleMultiplier}`);
+            }
+            if (params.seamlessXAxis || params.seamlessYAxis) {
+              badges.push('seamless');
+            }
           }
-          if (params.clipSkip) {
-            badges.push(`Skip ${params.clipSkip}`);
-          }
-          if (params.cfgRescaleMultiplier) {
-            badges.push(`Rescale ${params.cfgRescaleMultiplier}`);
-          }
-          if (params.seamlessXAxis || params.seamlessYAxis) {
-            badges.push('seamless');
-          }
-        }
 
-        return badges;
-      }),
+          return badges;
+        }
+      ),
     [vaeConfig]
   );
   const badges = useAppSelector(selectBadges);
@@ -110,13 +121,13 @@ export const AdvancedSettingsAccordion = memo(() => {
   return (
     <StandaloneAccordion label={t('accordions.advanced.title')} badges={badges} isOpen={isOpen} onToggle={onToggle}>
       <Flex gap={4} alignItems="center" p={4} flexDir="column" data-testid="advanced-settings-accordion">
-        {!isZImage && !isAnima && !isFlux2 && !isQwenImage && (
+        {!isZImage && !isAnima && !isFlux2 && !isQwenImage && !isIdeogram4 && (
           <Flex gap={4} w="full">
             {isFLUX ? <ParamFLUXVAEModelSelect /> : <ParamVAEModelSelect />}
             {!isFLUX && !isSD3 && <ParamVAEPrecision />}
           </Flex>
         )}
-        {!isFLUX && !isFlux2 && !isSD3 && !isZImage && !isQwenImage && !isAnima && (
+        {!isFLUX && !isFlux2 && !isSD3 && !isZImage && !isQwenImage && !isAnima && !isIdeogram4 && (
           <>
             <FormControlGroup formLabelProps={formLabelProps}>
               <ParamClipSkip />
@@ -173,6 +184,16 @@ export const AdvancedSettingsAccordion = memo(() => {
           <FormControlGroup>
             <ParamAnimaModelSelect />
           </FormControlGroup>
+        )}
+        {isIdeogram4 && (
+          <>
+            <FormControlGroup formLabelProps={formLabelProps}>
+              <ParamIdeogram4Steps />
+              <ParamIdeogram4GuidanceScale />
+              <ParamIdeogram4Mu />
+            </FormControlGroup>
+            <ParamIdeogram4ColorPalette />
+          </>
         )}
       </Flex>
     </StandaloneAccordion>
