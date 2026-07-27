@@ -58,7 +58,6 @@ for (const locale of ['de', 'es', 'hi']) {
     file: `${locale}/start-here/installation/index.html`,
     includes: [
       `<html lang="${locale}"`,
-      'lang="en" dir="ltr"',
       `hreflang="${locale}" href="${siteUrl(`/${locale}/start-here/installation/`)}`,
       `href="${withBase(`/${locale}/start-here/system-requirements/`)}`,
       'href="https://crowdin.com/project/invoke"',
@@ -68,6 +67,14 @@ for (const locale of ['de', 'es', 'hi']) {
       `href="${withBase(`/${locale}/${locale}/`)}`,
       `href="${withBase('/start-here/system-requirements/')}"`,
     ],
+  });
+
+  // Fallback rendering is asserted against a page outside crowdin.yml's scope, so it stays
+  // untranslated for good. Asserting it on a translatable page would turn the first Crowdin
+  // import into a red build.
+  expectations.push({
+    file: `${locale}/contributing/translations/index.html`,
+    includes: [`<html lang="${locale}"`, 'lang="en" dir="ltr"'],
   });
 }
 
