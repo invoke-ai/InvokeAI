@@ -5,7 +5,7 @@ import { HStack, Icon, Menu, Portal, Stack, Text } from '@chakra-ui/react';
 import { Button, ConfirmDialog, IconButton, MenuContent, RenameDialog } from '@platform/ui';
 import { layoutPresets } from '@workbench/layoutPresets';
 import { areLayoutPresetSnapshotsEqual, createLayoutPresetSnapshot } from '@workbench/layoutPresetSnapshots';
-import { preloadWidget } from '@workbench/widgetRegistry';
+import { loadWidget, preloadWidget } from '@workbench/widgetRegistry';
 import { useActiveProjectSelector, useWorkbenchCommands, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { CheckIcon, ChevronDownIcon, EllipsisVerticalIcon, PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
@@ -34,6 +34,30 @@ const preloadLayoutPreset = (preset: LayoutPreset): void => {
     }
   }
 };
+
+/**
+ * Resolves once every widget the preset will show is loaded.
+ *
+ * Applying a preset used to dispatch immediately after kicking off a preload,
+ * so the widgets it revealed rendered against a pending promise and suspended.
+ * That is what cost the switch its time — not the download, which is already
+ * finished by then, but React withholding the resolved tree for 300ms
+ * (`FALLBACK_THROTTLE_MS`) once a fallback has been shown. Waiting here instead
+ * keeps the previous layout on screen for the few ms the modules actually need
+ * and lets the new one commit immediately.
+ *
+ * `allSettled`, not `all`: a widget that fails to load must still be placed, so
+ * its own failure boundary can report it.
+ */
+const loadLayoutPreset = (preset: LayoutPreset): Promise<unknown> =>
+  Promise.allSettled(
+    Object.values(preset.snapshot.widgetRegions).flatMap((region) => {
+      const typeId = preset.snapshot.widgetInstances[region.activeInstanceId]?.typeId;
+      const pending = typeId ? loadWidget(typeId) : null;
+
+      return pending ? [pending] : [];
+    })
+  );
 
 /** Global layout preset registry surfaced as a menu. */
 export const LayoutPresetMenu = () => {
@@ -73,8 +97,9 @@ export const LayoutPresetMenu = () => {
   );
   const applyPreset = useCallback(
     (preset: LayoutPreset) => {
-      preloadLayoutPreset(preset);
-      layout.applyPreset(preset.id);
+      void loadLayoutPreset(preset).then(() => {
+        layout.applyPreset(preset.id);
+      });
     },
     [layout]
   );

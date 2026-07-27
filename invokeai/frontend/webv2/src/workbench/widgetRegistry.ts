@@ -156,6 +156,23 @@ export const preloadWidget = (widgetId: WidgetTypeId): void => {
   }
 };
 
+/**
+ * Like {@link preloadWidget}, but resolves when the implementation is in hand.
+ *
+ * Callers that are about to make a widget appear use this to get the module
+ * BEFORE committing the state change, so the render never suspends. Suspending
+ * is not free even when the chunk is already downloaded: showing a fallback
+ * makes React withhold the resolved content for `FALLBACK_THROTTLE_MS` (300ms)
+ * to avoid a flash, which measured as the entire cost of a layout switch.
+ *
+ * Returns `null` for an unknown or disabled widget, so callers can skip it.
+ */
+export const loadWidget = (widgetId: WidgetTypeId): Promise<unknown> | null => {
+  const widget = getWidgetById(widgetId);
+
+  return widget?.status === 'enabled' ? widget.implementation.load() : null;
+};
+
 export const widgetRegistrationFailures = registeredWidgets.flatMap((widget) =>
   widget.failure ? [widget.failure] : []
 );
