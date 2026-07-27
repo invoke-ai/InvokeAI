@@ -1,4 +1,4 @@
-import { Box, Flex, type SystemStyleObject } from '@chakra-ui/react';
+import { Box, Flex, VisuallyHidden, type SystemStyleObject } from '@chakra-ui/react';
 import { useCapabilities, UsersPage } from '@features/identity';
 import { ModelsPage } from '@features/models';
 import { NodesPage } from '@features/nodes';
@@ -122,6 +122,7 @@ const LaunchpadSections = ({ sections }: { sections: LaunchpadSection[] }) => {
   const navigate = useNavigate();
   const requestedSectionId = getRequestedSectionId(location.pathname);
   const activeSectionId = getActiveSectionId(sections, requestedSectionId);
+  const activeSectionLabel = sections.find((section) => section.id === activeSectionId)?.label ?? activeSectionId;
   const handleValueChange = useCallback(
     (details: { value: string }) => {
       if (isSectionId(details.value)) {
@@ -142,7 +143,10 @@ const LaunchpadSections = ({ sections }: { sections: LaunchpadSection[] }) => {
       onValueChange={handleValueChange}
     >
       <LaunchpadNav items={sections} />
-      <Box flex="1" minH="0" minW="0" position="relative">
+      <Box aria-labelledby="launchpad-page-heading" as="main" flex="1" minH="0" minW="0" position="relative">
+        <VisuallyHidden as="h1" id="launchpad-page-heading">
+          {activeSectionLabel}
+        </VisuallyHidden>
         {sections.map((section) => (
           <Tabs.Content key={section.id} h="full" m="0" minH="0" p="0" value={section.id}>
             {section.render()}

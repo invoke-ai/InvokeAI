@@ -236,7 +236,7 @@ export const createCanvasEngine = (options: CanvasEngineOptions): CanvasEngine =
       if (signal?.aborted) {
         throw new DOMException('Canvas upload aborted', 'AbortError');
       }
-      const uploaded = await canvasApplicationPort.uploadImage(blob, { isIntermediate: true });
+      const uploaded = await canvasApplicationPort.uploadImage(blob, { isIntermediate: true, signal });
       if (signal?.aborted) {
         throw new DOMException('Canvas upload aborted', 'AbortError');
       }

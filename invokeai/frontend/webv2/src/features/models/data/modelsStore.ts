@@ -1,5 +1,11 @@
 import type { ModelConfig } from '@features/models/core/types';
 
+import {
+  type AccountScope,
+  captureAccountScope,
+  isAccountScopeCurrent,
+  registerAccountOwnedResource,
+} from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
 
 import { getModelsDir, listMissingModels, listModels } from './api';
@@ -27,33 +33,46 @@ export interface ModelsSnapshot {
 
 const EMPTY_MISSING_KEYS: ReadonlySet<string> = new Set<string>();
 
-const store = createExternalStore<ModelsSnapshot>({
+const EMPTY_MODELS_SNAPSHOT: ModelsSnapshot = {
   coverImageVersions: {},
   error: null,
   missingModelKeys: EMPTY_MISSING_KEYS,
   models: [],
   modelsDir: null,
   status: 'idle',
-});
+};
+const store = createExternalStore<ModelsSnapshot>(EMPTY_MODELS_SNAPSHOT);
 
 let inflightRefresh: Promise<void> | null = null;
 
+registerAccountOwnedResource({
+  clear: () => {
+    inflightRefresh = null;
+    store.setSnapshot(EMPTY_MODELS_SNAPSHOT);
+  },
+  name: 'models-library',
+});
+
 /** Re-fetch the library; concurrent calls share one request. */
-export const refreshModels = (): Promise<void> => {
+export const refreshModels = (owner: AccountScope = captureAccountScope()): Promise<void> => {
   if (inflightRefresh) {
     return inflightRefresh;
   }
 
   store.patchSnapshot({ status: store.getSnapshot().status === 'loaded' ? 'loaded' : 'loading' });
 
-  inflightRefresh = Promise.all([
-    listModels(),
+  const refresh = Promise.all([
+    listModels(owner.signal),
     // Missing-file detection is best-effort; never fail the whole library.
-    listMissingModels().catch(() => [] as ModelConfig[]),
+    listMissingModels(owner.signal).catch(() => [] as ModelConfig[]),
     // Static server config: fetched once, best-effort.
-    store.getSnapshot().modelsDir ?? getModelsDir().catch(() => null),
+    store.getSnapshot().modelsDir ?? getModelsDir(owner.signal).catch(() => null),
   ])
     .then(([models, missingModels, modelsDir]) => {
+      if (!isAccountScopeCurrent(owner)) {
+        return;
+      }
+
       store.patchSnapshot({
         error: null,
         missingModelKeys:
@@ -64,15 +83,22 @@ export const refreshModels = (): Promise<void> => {
       });
     })
     .catch((error: unknown) => {
+      if (!isAccountScopeCurrent(owner)) {
+        return;
+      }
+
       store.patchSnapshot({
         error: error instanceof Error ? error.message : 'Failed to load models.',
         status: store.getSnapshot().models.length > 0 ? 'loaded' : 'error',
       });
     })
     .finally(() => {
-      inflightRefresh = null;
+      if (inflightRefresh === refresh) {
+        inflightRefresh = null;
+      }
     });
 
+  inflightRefresh = refresh;
   return inflightRefresh;
 };
 

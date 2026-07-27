@@ -9,6 +9,11 @@ import { nodeExecutionStore } from '@features/nodes';
 import { hasPendingWorkflowQueueItem } from '@features/queue';
 import { WorkflowGraphPreviewProvider, WorkflowUiProvider } from '@features/workflow/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
 import { createProjectedExternalStore } from '@platform/state/projectedExternalStore';
 import { shallowEqual } from '@platform/state/selectors';
 import { resolveAndSubmitGraphPreviewInvocation } from '@workbench/graphPreviewInvocation';
@@ -71,15 +76,27 @@ const WorkflowGraphPreviewAdapterProvider = ({ children }: { children: ReactNode
         };
       },
       invoke: async (sourceId) => {
+        const owner = captureAccountScope();
         flushGenerateDrafts();
-        const { prepareCanvasInvocation } = await import('@workbench/widgets/canvas/invoke/prepareCanvasInvocation');
-        return resolveAndSubmitGraphPreviewInvocation({
-          commands,
-          models: availabilityModels,
-          prepareCanvasInvocation,
-          project: queries.getSnapshot().activeProject,
-          sourceId,
-        });
+        try {
+          const { prepareCanvasInvocation } = await import('@workbench/widgets/canvas/invoke/prepareCanvasInvocation');
+
+          assertAccountScopeCurrent(owner);
+          return resolveAndSubmitGraphPreviewInvocation({
+            commands,
+            models: availabilityModels,
+            owner,
+            prepareCanvasInvocation,
+            project: queries.getSnapshot().activeProject,
+            sourceId,
+          });
+        } catch (error) {
+          if (!isAccountScopeCurrent(owner)) {
+            return false;
+          }
+
+          throw error;
+        }
       },
     }),
     [availabilityModels, commands, queries, routeInput]

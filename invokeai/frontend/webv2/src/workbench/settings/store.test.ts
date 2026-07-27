@@ -1,3 +1,5 @@
+import type * as accountLifecycleModule from '@platform/state/accountLifecycle';
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as storeModule from './store';
@@ -50,6 +52,7 @@ const SETTINGS_KEY = 'webv2:workbench-settings';
 const SESSION_KEY = 'webv2:workbench-account';
 
 let store: typeof storeModule;
+let account: typeof accountLifecycleModule;
 
 const seedBackendPreferences = (preferences: Record<string, unknown>): void => {
   api.__clientState.set(SETTINGS_KEY, JSON.stringify(preferences));
@@ -61,13 +64,25 @@ const readBackendPreferences = (): Record<string, unknown> =>
 beforeEach(async () => {
   vi.resetModules();
   api.__clientState.clear();
-  api.deleteClientStateValue.mockClear();
-  api.getClientStateValue.mockClear();
-  api.setClientStateValue.mockClear();
+  api.deleteClientStateValue.mockReset();
+  api.deleteClientStateValue.mockImplementation((key: string) => {
+    api.__clientState.delete(key);
+
+    return Promise.resolve();
+  });
+  api.getClientStateValue.mockReset();
+  api.getClientStateValue.mockImplementation((key: string) => Promise.resolve(api.__clientState.get(key) ?? null));
+  api.setClientStateValue.mockReset();
+  api.setClientStateValue.mockImplementation((key: string, value: string) => {
+    api.__clientState.set(key, value);
+
+    return Promise.resolve();
+  });
   auth.scope = '';
   storage.clear();
 
   store = await import('./store');
+  account = await import('@platform/state/accountLifecycle');
 });
 
 describe('loadWorkbenchSettings', () => {
@@ -147,6 +162,28 @@ describe('loadWorkbenchSettings', () => {
 
     expect(preferences.themeId).toBe('classic');
   });
+
+  it('does not share a same-user single-flight or publish a prior epoch response', async () => {
+    account.accountLifecycle.activate('user-a', ':user:a');
+    let resolveOld: ((value: string | null) => void) | undefined;
+    api.getClientStateValue
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveOld = resolve;
+          })
+      )
+      .mockResolvedValueOnce(JSON.stringify({ themeId: 'light' }));
+    const oldLoad = store.loadWorkbenchSettings();
+
+    account.accountLifecycle.invalidate();
+    account.accountLifecycle.activate('user-a', ':user:a');
+    await expect(store.loadWorkbenchSettings()).resolves.toMatchObject({ themeId: 'light' });
+
+    resolveOld?.(JSON.stringify({ themeId: 'forest' }));
+    await expect(oldLoad).rejects.toThrow('no longer active');
+    expect(store.getWorkbenchPreferences().themeId).toBe('light');
+  });
 });
 
 describe('patchWorkbenchPreferences', () => {
@@ -198,6 +235,57 @@ describe('patchWorkbenchPreferences', () => {
     expect(preferences.themeId).toBe('light');
     expect(readBackendPreferences().themeId).toBe('light');
   });
+
+  it('serializes writes so an older completion cannot overwrite a newer preference snapshot', async () => {
+    await store.loadWorkbenchSettings();
+    api.setClientStateValue.mockClear();
+    let resolveFirstWrite: (() => void) | undefined;
+    api.setClientStateValue.mockImplementationOnce(
+      (key: string, value: string) =>
+        new Promise<void>((resolve) => {
+          resolveFirstWrite = () => {
+            api.__clientState.set(key, value);
+            resolve();
+          };
+        })
+    );
+
+    const first = store.patchWorkbenchPreferences({ themeId: 'forest' });
+    const second = store.patchWorkbenchPreferences({ themeId: 'light' });
+
+    await vi.waitFor(() => {
+      expect(api.setClientStateValue).toHaveBeenCalledTimes(1);
+    });
+    resolveFirstWrite?.();
+    await Promise.all([first, second]);
+
+    expect(readBackendPreferences().themeId).toBe('light');
+    expect(store.getWorkbenchPreferences().themeId).toBe('light');
+  });
+
+  it('settles without publishing an error when its account expires during a write', async () => {
+    account.accountLifecycle.activate('user-a', ':user:a');
+    await store.loadWorkbenchSettings();
+    api.setClientStateValue.mockClear();
+    let resolveWrite: (() => void) | undefined;
+    api.setClientStateValue.mockImplementationOnce(
+      (key: string, value: string) =>
+        new Promise<void>((resolve) => {
+          resolveWrite = () => {
+            api.__clientState.set(key, value);
+            resolve();
+          };
+        })
+    );
+
+    const write = store.patchWorkbenchPreferences({ themeId: 'forest' });
+    account.accountLifecycle.invalidate();
+    account.accountLifecycle.activate('user-b', ':user:b');
+    resolveWrite?.();
+
+    await expect(write).resolves.toBeUndefined();
+    expect(store.getWorkbenchPreferences().themeId).toBe('classic');
+  });
 });
 
 describe('clearWorkbenchSettings', () => {
@@ -209,6 +297,36 @@ describe('clearWorkbenchSettings', () => {
 
     expect(store.getWorkbenchPreferences().themeId).toBe('classic');
     expect(api.__clientState.has(SETTINGS_KEY)).toBe(false);
+  });
+
+  it('orders reset after an in-flight patch so the older write cannot restore backend or local settings', async () => {
+    await store.loadWorkbenchSettings();
+    api.setClientStateValue.mockClear();
+    api.deleteClientStateValue.mockClear();
+    let resolvePatch: (() => void) | undefined;
+    api.setClientStateValue.mockImplementationOnce(
+      (key: string, value: string) =>
+        new Promise<void>((resolve) => {
+          resolvePatch = () => {
+            api.__clientState.set(key, value);
+            resolve();
+          };
+        })
+    );
+
+    const patch = store.patchWorkbenchPreferences({ themeId: 'forest' });
+    const clear = store.clearWorkbenchSettings();
+
+    await vi.waitFor(() => {
+      expect(api.setClientStateValue).toHaveBeenCalledTimes(1);
+    });
+    expect(api.deleteClientStateValue).not.toHaveBeenCalled();
+    resolvePatch?.();
+    await Promise.all([patch, clear]);
+
+    expect(api.__clientState.has(SETTINGS_KEY)).toBe(false);
+    expect(storage.has('invokeai:v7:webv2:settings')).toBe(false);
+    expect(store.getWorkbenchPreferences().themeId).toBe('classic');
   });
 });
 

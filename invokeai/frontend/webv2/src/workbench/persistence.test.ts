@@ -1,13 +1,16 @@
+import type { WorkbenchState } from '@workbench/projectContracts';
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  createLocalStorageWorkbenchPersistence,
   hydratePersistedWorkbenchSnapshot,
-  localStorageWorkbenchPersistence,
   serializeWorkbenchPersistenceSnapshot,
 } from './persistence';
 import { createInitialWorkbenchState, workbenchReducer } from './workbenchState.testing';
 
 const storage = new Map<string, string>();
+const localStorageWorkbenchPersistence = createLocalStorageWorkbenchPersistence('');
 
 vi.stubGlobal('window', {
   localStorage: {
@@ -159,5 +162,33 @@ describe('workbench persistence migration', () => {
     await localStorageWorkbenchPersistence.saveWorkbench(largeState);
 
     expect(storage.has('invokeai:v7:webv2:workbench')).toBe(true);
+  });
+
+  it('keeps each constructed persistence adapter bound to its immutable account bucket', async () => {
+    const accountA = createLocalStorageWorkbenchPersistence(':user:a');
+    const accountB = createLocalStorageWorkbenchPersistence(':user:b');
+    const stateA = createInitialWorkbenchState();
+    const stateB = createInitialWorkbenchState();
+
+    stateA.projects[0]!.name = 'Account A';
+    stateB.projects[0]!.name = 'Account B';
+
+    await accountA.saveWorkbench(stateA);
+    await accountB.saveWorkbench(stateB);
+
+    // This late A write still targets A even though B's adapter was constructed
+    // and used in between.
+    stateA.projects[0]!.name = 'Account A late save';
+    await accountA.saveWorkbench(stateA);
+
+    const persistedA = JSON.parse(storage.get('invokeai:v7:webv2:workbench:user:a') ?? 'null') as {
+      state: WorkbenchState;
+    };
+    const persistedB = JSON.parse(storage.get('invokeai:v7:webv2:workbench:user:b') ?? 'null') as {
+      state: WorkbenchState;
+    };
+
+    expect(persistedA.state.projects[0]?.name).toBe('Account A late save');
+    expect(persistedB.state.projects[0]?.name).toBe('Account B');
   });
 });

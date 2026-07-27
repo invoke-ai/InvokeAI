@@ -1,3 +1,4 @@
+import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
 
 /**
@@ -19,10 +20,18 @@ export interface ProjectSyncSnapshot {
   lastSyncedAt: string | null;
 }
 
-const store = createExternalStore<ProjectSyncSnapshot>({
+const EMPTY_PROJECT_SYNC: ProjectSyncSnapshot = {
   hasPendingChanges: false,
   lastSyncedAt: null,
   projects: {},
+};
+const store = createExternalStore<ProjectSyncSnapshot>(EMPTY_PROJECT_SYNC);
+
+registerAccountOwnedResource({
+  clear: () => {
+    store.setSnapshot(EMPTY_PROJECT_SYNC);
+  },
+  name: 'project-sync',
 });
 
 export const useProjectSync = (): ProjectSyncSnapshot => store.useSnapshot();

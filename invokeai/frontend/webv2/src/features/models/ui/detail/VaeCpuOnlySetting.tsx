@@ -3,6 +3,11 @@ import type { ModelConfig } from '@features/models/core/types';
 import { Stack, Switch, Text } from '@chakra-ui/react';
 import { updateModel } from '@features/models/data/api';
 import { patchModelInStore, replaceModelInStore } from '@features/models/data/modelsStore';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -30,6 +35,7 @@ export const VaeCpuOnlySetting = ({
         return;
       }
 
+      const owner = captureAccountScope();
       const previousCpuOnly = model.cpu_only;
       const cpuOnly = details.checked ? true : null;
 
@@ -37,13 +43,22 @@ export const VaeCpuOnlySetting = ({
       patchModelInStore(model.key, { cpu_only: cpuOnly });
 
       try {
-        replaceModelInStore(await updateModel(model.key, { cpu_only: cpuOnly }));
+        const updated = await updateModel(model.key, { cpu_only: cpuOnly }, owner.signal);
+
+        assertAccountScopeCurrent(owner);
+        replaceModelInStore(updated);
         onSaved();
       } catch (error) {
+        if (!isAccountScopeCurrent(owner)) {
+          return;
+        }
+
         patchModelInStore(model.key, { cpu_only: previousCpuOnly });
         onError(getApiErrorMessage(error, t('models.failedToSaveVaeCpuSetting')));
       } finally {
-        setIsPending(false);
+        if (isAccountScopeCurrent(owner)) {
+          setIsPending(false);
+        }
       }
     },
     [isPending, model.cpu_only, model.key, onError, onSaved, t]

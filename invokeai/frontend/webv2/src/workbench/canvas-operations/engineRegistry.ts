@@ -16,6 +16,7 @@
 
 import type { CanvasEngine as PublicCanvasEngine } from '@workbench/canvas-engine/api';
 
+import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import {
   createCanvasEngine,
   type CanvasEngine,
@@ -36,6 +37,8 @@ export interface RegistryTimers {
 
 /** The registry handle. */
 export interface EngineRegistry {
+  /** Immediately disposes every engine, including active and cooling leases. */
+  disposeAll(): void;
   /** Returns the engine for `projectId`, creating it if needed, and adds a reference. */
   getOrCreateEngine(projectId: string, deps: EngineDeps): CanvasEngine;
   /** Returns the engine for `projectId` without changing its reference count. */
@@ -94,6 +97,26 @@ export const createEngineRegistry = (
   };
 
   return {
+    disposeAll: () => {
+      const ownedEntries = [...entries.values()];
+      let firstError: unknown;
+
+      entries.clear();
+      for (const entry of ownedEntries) {
+        cancelDisposal(entry);
+        try {
+          entry.engine.lifecycle.dispose();
+        } catch (error) {
+          firstError ??= error;
+        }
+      }
+
+      if (firstError !== undefined) {
+        throw new Error(firstError instanceof Error ? firstError.message : 'A canvas engine failed to dispose.', {
+          cause: firstError,
+        });
+      }
+    },
     getEngine: (projectId) => entries.get(projectId)?.engine,
     getOrCreateEngine: (projectId, deps) => {
       const existing = entries.get(projectId);
@@ -128,6 +151,11 @@ export const createEngineRegistry = (
 
 /** The process-wide default registry shared by all widget surfaces. */
 const defaultRegistry = createEngineRegistry();
+
+registerAccountOwnedResource({
+  clear: defaultRegistry.disposeAll,
+  name: 'canvas-engine-registry',
+});
 
 export const getOrCreateEngine = defaultRegistry.getOrCreateEngine;
 export const releaseEngine = defaultRegistry.releaseEngine;

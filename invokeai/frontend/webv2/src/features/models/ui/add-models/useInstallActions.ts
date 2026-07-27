@@ -2,6 +2,11 @@ import { installModel, type InstallModelRequest } from '@features/models/data/ap
 import { getAccessTokenForSource } from '@features/models/data/apiKeys';
 import { addInstallJob } from '@features/models/data/installsStore';
 import { useNotify } from '@features/models/ui/useModelsNotify';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
 import { useCallback, useState } from 'react';
 
 /**
@@ -17,14 +22,20 @@ export const useInstallActions = () => {
 
   const install = useCallback(
     async (request: InstallModelRequest, options?: { silent?: boolean }): Promise<boolean> => {
+      const owner = captureAccountScope();
+
       setPendingSources((current) => new Set(current).add(request.source));
 
       try {
-        const job = await installModel({
-          ...request,
-          accessToken: request.accessToken ?? getAccessTokenForSource(request.source),
-        });
+        const job = await installModel(
+          {
+            ...request,
+            accessToken: request.accessToken ?? getAccessTokenForSource(request.source),
+          },
+          owner.signal
+        );
 
+        assertAccountScopeCurrent(owner);
         addInstallJob(job);
 
         if (!options?.silent) {
@@ -33,17 +44,23 @@ export const useInstallActions = () => {
 
         return true;
       } catch (error) {
+        if (!isAccountScopeCurrent(owner)) {
+          return false;
+        }
+
         notify.error('Model install failed to start', error instanceof Error ? error.message : String(error));
 
         return false;
       } finally {
-        setPendingSources((current) => {
-          const next = new Set(current);
+        if (isAccountScopeCurrent(owner)) {
+          setPendingSources((current) => {
+            const next = new Set(current);
 
-          next.delete(request.source);
+            next.delete(request.source);
 
-          return next;
-        });
+            return next;
+          });
+        }
       }
     },
     [notify]

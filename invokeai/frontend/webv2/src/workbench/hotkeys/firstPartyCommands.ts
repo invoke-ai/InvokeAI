@@ -1,5 +1,6 @@
 import type { ImageRecallKind } from '@workbench/image-actions/imageRecall';
 
+import { invalidateGallery } from '@features/gallery/queries';
 import {
   adjustFocusedPromptAttention,
   flushGenerateDrafts,
@@ -10,7 +11,13 @@ import { ensureModelsLoaded, getModelsSnapshot } from '@features/models';
 import { queueCommands } from '@features/queue';
 import { useInvocationTemplatesSelector } from '@features/workflow/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
 import { getConnectionStatus } from '@platform/transport/connectionStore';
+import { useQueryClient } from '@tanstack/react-query';
 import { isInvocationRouteValid, resolveInvocationRoute } from '@workbench/invocation';
 import { submitResolvedInvocation } from '@workbench/invocationSubmit';
 import { toggleCommandPalette } from '@workbench/palette/paletteStore';
@@ -64,6 +71,7 @@ export const useRegisterFirstPartyCommands = () => {
   const commands = useWorkbenchCommands();
   const { commands: commandApi } = useWorkbenchExtensions();
   const queries = useWorkbenchQueries();
+  const queryClient = useQueryClient();
   const { layout, notifications, queue, widgets } = commands;
   useInvocationTemplatesSelector((snapshot) => snapshot.status);
 
@@ -72,65 +80,90 @@ export const useRegisterFirstPartyCommands = () => {
   });
 
   const submitInvocation = useEffectEvent(async () => {
+    const owner = captureAccountScope();
     flushGenerateDrafts();
 
-    const { prepareCanvasInvocation } = await import('@workbench/widgets/canvas/invoke/prepareCanvasInvocation');
+    try {
+      const { prepareCanvasInvocation } = await import('@workbench/widgets/canvas/invoke/prepareCanvasInvocation');
 
-    const activeProject = queries.getSnapshot().activeProject;
-    const resolvedRoute = resolveInvocationRoute(
-      activeProject,
-      'global',
-      activeProject.invocation,
-      getAvailableModels()
-    );
-    const { status } = getConnectionStatus();
+      assertAccountScopeCurrent(owner);
+      const activeProject = queries.getSnapshot().activeProject;
+      const resolvedRoute = resolveInvocationRoute(
+        activeProject,
+        'global',
+        activeProject.invocation,
+        getAvailableModels()
+      );
+      const { status } = getConnectionStatus();
 
-    if (!isInvocationRouteValid(resolvedRoute) || status !== 'connected') {
-      return;
+      if (!isInvocationRouteValid(resolvedRoute) || status !== 'connected') {
+        return;
+      }
+
+      submitResolvedInvocation({
+        commands,
+        models: getAvailableModels(),
+        owner,
+        prepareCanvasInvocation,
+        project: activeProject,
+        route: resolvedRoute,
+      });
+    } catch (error) {
+      if (!isAccountScopeCurrent(owner)) {
+        return;
+      }
+
+      throw error;
     }
-
-    submitResolvedInvocation({
-      commands,
-      models: getAvailableModels(),
-      prepareCanvasInvocation,
-      project: activeProject,
-      route: resolvedRoute,
-    });
   });
 
   const recallSelectedImage = useEffectEvent(async (kind: ImageRecallKind) => {
-    const [{ executeImageRecall }, { getSelectedGalleryImage }] = await Promise.all([
-      import('@workbench/image-actions/executeImageRecall'),
-      import('@workbench/image-actions/selectedImage'),
-    ]);
-    const activeProject = queries.getSnapshot().activeProject;
-    const image = getSelectedGalleryImage(activeProject);
+    const owner = captureAccountScope();
 
-    if (!image) {
-      notifications.add({
-        kind: 'info',
-        message: 'Select an image in Gallery or Preview first.',
-        title: 'No image selected',
+    try {
+      const [{ executeImageRecall }, { getSelectedGalleryImage }] = await Promise.all([
+        import('@workbench/image-actions/executeImageRecall'),
+        import('@workbench/image-actions/selectedImage'),
+      ]);
+
+      assertAccountScopeCurrent(owner);
+      const activeProject = queries.getSnapshot().activeProject;
+      const image = getSelectedGalleryImage(activeProject);
+
+      if (!image) {
+        notifications.add({
+          kind: 'info',
+          message: 'Select an image in Gallery or Preview first.',
+          title: 'No image selected',
+        });
+        return;
+      }
+
+      const didRecall = await executeImageRecall({
+        commands,
+        generateValues: getProjectWidgetValues(activeProject, 'generate'),
+        image,
+        kind,
+        models: getAvailableModels() ?? [],
+        owner,
+        projectId: activeProject.id,
       });
-      return;
-    }
 
-    const didRecall = await executeImageRecall({
-      commands,
-      generateValues: getProjectWidgetValues(activeProject, 'generate'),
-      image,
-      kind,
-      models: getAvailableModels() ?? [],
-      projectId: activeProject.id,
-    });
+      assertAccountScopeCurrent(owner);
+      if (didRecall && queries.isActiveProject(activeProject.id)) {
+        openWidgetPlacement({
+          getWidgetsForRegion,
+          options: { preferredRegions: ['left'] },
+          typeId: 'generate',
+          widgets,
+        });
+      }
+    } catch (error) {
+      if (!isAccountScopeCurrent(owner)) {
+        return;
+      }
 
-    if (didRecall && queries.isActiveProject(activeProject.id)) {
-      openWidgetPlacement({
-        getWidgetsForRegion,
-        options: { preferredRegions: ['left'] },
-        typeId: 'generate',
-        widgets,
-      });
+      throw error;
     }
   });
 
@@ -147,7 +180,15 @@ export const useRegisterFirstPartyCommands = () => {
       commandApi.register({ handler: submitInvocation, id: 'app.invoke', title: 'Invoke' }),
       commandApi.register({ handler: submitInvocation, id: 'app.invokeFront', title: 'Invoke front' }),
       commandApi.register({
-        handler: () => void queueCommands.cancelCurrentItem().finally(queue.refreshBackendData),
+        handler: () => {
+          const owner = captureAccountScope();
+
+          void queueCommands.cancelCurrentItem().finally(() => {
+            if (isAccountScopeCurrent(owner)) {
+              return invalidateGallery(queryClient, owner);
+            }
+          });
+        },
         id: 'app.cancelQueueItem',
         title: 'Cancel current queue item',
       }),
@@ -316,5 +357,5 @@ export const useRegisterFirstPartyCommands = () => {
     return () => {
       disposers.forEach((dispose) => dispose());
     };
-  }, [commandApi, commands, layout, notifications, queries, queue, widgets]);
+  }, [commandApi, commands, layout, notifications, queries, queryClient, queue, widgets]);
 };

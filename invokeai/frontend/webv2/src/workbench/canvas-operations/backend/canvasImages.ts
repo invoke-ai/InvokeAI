@@ -15,6 +15,7 @@
 
 import type { CanvasImageUploadResult } from '@workbench/canvas-engine/document/imageUpload';
 
+import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
 import { buildApiUrl, getHttpAuthToken } from '@platform/transport/http';
 
 export type { CanvasImageUploadResult } from '@workbench/canvas-engine/document/imageUpload';
@@ -66,7 +67,9 @@ export const uploadCanvasImage = async (
   blob: Blob,
   options: UploadCanvasImageOptions = {}
 ): Promise<CanvasImageUploadResult> => {
+  const owner = captureAccountScope();
   const fetchImpl = options.fetch ?? globalThis.fetch;
+  const signal = options.signal ? AbortSignal.any([options.signal, owner.signal]) : owner.signal;
 
   const query = new URLSearchParams({
     image_category: options.imageCategory ?? 'other',
@@ -99,7 +102,7 @@ export const uploadCanvasImage = async (
       body,
       headers,
       method: 'POST',
-      signal: options.signal,
+      signal,
     });
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
@@ -111,8 +114,11 @@ export const uploadCanvasImage = async (
     );
   }
 
+  assertAccountScopeCurrent(owner);
   if (!response.ok) {
     const text = await response.text().catch(() => '');
+
+    assertAccountScopeCurrent(owner);
     throw new CanvasImageUploadError(
       text || `Canvas image upload failed: ${response.status} ${response.statusText}`,
       response.status
@@ -120,5 +126,7 @@ export const uploadCanvasImage = async (
   }
 
   const dto = (await response.json()) as UploadImageResponseDTO;
+
+  assertAccountScopeCurrent(owner);
   return { height: dto.height, imageName: dto.image_name, width: dto.width };
 };

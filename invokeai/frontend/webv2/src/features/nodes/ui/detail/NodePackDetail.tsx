@@ -45,7 +45,7 @@ export const NodePackDetail = ({ onUninstalled, pack }: { onUninstalled: () => v
               {pack.name}
             </Text>
           </HStack>
-          <Text color="fg.subtle" fontFamily="mono" fontSize="2xs" overflowWrap="anywhere">
+          <Text color="fg.muted" fontFamily="mono" fontSize="2xs" overflowWrap="anywhere">
             {pack.path}
           </Text>
           <HStack gap="1.5" wrap="wrap">
@@ -58,7 +58,7 @@ export const NodePackDetail = ({ onUninstalled, pack }: { onUninstalled: () => v
       </HStack>
 
       <Stack gap="2">
-        <Text color="fg.subtle" fontSize="2xs" fontWeight="600" textTransform="uppercase">
+        <Text color="fg.muted" fontSize="2xs" fontWeight="600" textTransform="uppercase">
           {t('nodes.nodesInPack')}
         </Text>
         {isLoadingTemplates ? (

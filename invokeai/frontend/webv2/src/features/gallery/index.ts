@@ -53,8 +53,8 @@ export const galleryOrganization = {
   addToBoard: addImagesToGalleryBoard,
   deleteImages: deleteGalleryImages,
   removeFromBoard: removeImagesFromGalleryBoard,
-  setStarred: (imageNames: string[], starred: boolean): Promise<void> =>
-    starred ? starGalleryImages(imageNames) : unstarGalleryImages(imageNames),
+  setStarred: (imageNames: string[], starred: boolean, signal?: AbortSignal): Promise<void> =>
+    starred ? starGalleryImages(imageNames, signal) : unstarGalleryImages(imageNames, signal),
 } as const;
 
 /** Destination choices for callers such as Workflow fields. */

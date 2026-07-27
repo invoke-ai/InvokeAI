@@ -4,6 +4,7 @@ import type {
   NodeInvocationStartedEvent,
 } from '@features/nodes/core/executionContracts';
 
+import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createKeyedTransientStore } from '@platform/state/externalStore';
 
 import { browserNodesDataPort } from './transport';
@@ -114,6 +115,11 @@ export interface NodeExecutionSink {
   started(event: NodeInvocationStartedEvent): void;
   subscribe(nodeId: string, listener: () => void): () => void;
 }
+
+registerAccountOwnedResource({
+  clear: nodeExecutionStore.clearAll,
+  name: 'node-execution',
+});
 
 export const useNodeExecutionState = (nodeId: string): NodeExecutionState | null =>
   stateByNodeId.useValue(nodeId) ?? null;

@@ -144,7 +144,7 @@ export const ResizableTextarea = ({
         variant="hover"
         zIndex={underlay ? 1 : undefined}
       >
-        <ScrollArea.Viewport asChild>
+        <ScrollArea.Viewport asChild role="textbox">
           <Textarea ref={textareaRef} resize="none" {...textareaProps} />
         </ScrollArea.Viewport>
         {/* zag skips scrollbar re-measurement entirely without a content element;

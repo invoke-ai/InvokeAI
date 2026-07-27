@@ -6,6 +6,11 @@ import { sanitizeBatchCount } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
 import { useInvocationTemplatesSelector } from '@features/workflow/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
 import { Button, IconButton, Tooltip } from '@platform/ui';
 import {
   formatRoute,
@@ -133,32 +138,45 @@ export const InvokeControl = () => {
   });
 
   const onInvoke = useCallback(async () => {
+    const owner = captureAccountScope();
     flushGenerateDrafts();
-    const { prepareCanvasInvocation } = await import('@workbench/widgets/canvas/invoke/prepareCanvasInvocation');
-    const snapshot = queries.getSnapshot();
-    const postFlushRoute = resolveInvocationRoute(
-      snapshot.activeProject,
-      'global',
-      snapshot.activeProject.invocation,
-      availabilityModels
-    );
 
-    if (!isInvocationRouteValid(postFlushRoute) || snapshot.backendConnection.status !== 'connected') {
-      return;
+    try {
+      const { prepareCanvasInvocation } = await import('@workbench/widgets/canvas/invoke/prepareCanvasInvocation');
+
+      assertAccountScopeCurrent(owner);
+      const snapshot = queries.getSnapshot();
+      const postFlushRoute = resolveInvocationRoute(
+        snapshot.activeProject,
+        'global',
+        snapshot.activeProject.invocation,
+        availabilityModels
+      );
+
+      if (!isInvocationRouteValid(postFlushRoute) || snapshot.backendConnection.status !== 'connected') {
+        return;
+      }
+
+      submitResolvedInvocation({
+        commands,
+        formatControlLayerError: (code, layerName) =>
+          t('widgets.layers.control.invalidLayer', {
+            name: layerName,
+            reason: t(`widgets.layers.control.validation.${code}`),
+          }),
+        models: availabilityModels,
+        owner,
+        prepareCanvasInvocation,
+        project: snapshot.activeProject,
+        route: postFlushRoute,
+      });
+    } catch (error) {
+      if (!isAccountScopeCurrent(owner)) {
+        return;
+      }
+
+      throw error;
     }
-
-    submitResolvedInvocation({
-      commands,
-      formatControlLayerError: (code, layerName) =>
-        t('widgets.layers.control.invalidLayer', {
-          name: layerName,
-          reason: t(`widgets.layers.control.validation.${code}`),
-        }),
-      models: availabilityModels,
-      prepareCanvasInvocation,
-      project: snapshot.activeProject,
-      route: postFlushRoute,
-    });
   }, [availabilityModels, commands, queries, t]);
   const tooltipContent = useMemo(
     () => (

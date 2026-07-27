@@ -80,7 +80,7 @@ const InstallLogRow = ({ entry }: { entry: CustomNodeInstallLogEntry }) => {
         </Badge>
       </Table.Cell>
       <Table.Cell borderColor="border.subtle" pe="3">
-        <Text color="fg.subtle" fontSize="2xs" lineClamp={2} overflowWrap="anywhere">
+        <Text color="fg.muted" fontSize="2xs" lineClamp={2} overflowWrap="anywhere">
           {entry.message ?? ''}
         </Text>
       </Table.Cell>

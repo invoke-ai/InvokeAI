@@ -1,5 +1,11 @@
 import type { ModelInstallJob, ModelInstallStatus } from '@features/models/core/types';
 
+import {
+  type AccountScope,
+  captureAccountScope,
+  isAccountScopeCurrent,
+  registerAccountOwnedResource,
+} from '@platform/state/accountLifecycle';
 import { createExternalStore, createKeyedTransientStore } from '@platform/state/externalStore';
 
 import { listModelInstalls } from './api';
@@ -39,8 +45,11 @@ export interface InstallOutcome {
 const REFRESH_COALESCE_MS = 250;
 const OUTCOME_LIMIT = 16;
 
-const store = createExternalStore<InstallsSnapshot>({ error: null, jobs: [], status: 'idle' });
-const outcomesStore = createExternalStore<{ outcomes: InstallOutcome[] }>({ outcomes: [] });
+const EMPTY_INSTALLS_SNAPSHOT: InstallsSnapshot = { error: null, jobs: [], status: 'idle' };
+const EMPTY_INSTALL_OUTCOMES: { outcomes: InstallOutcome[] } = { outcomes: [] };
+
+const store = createExternalStore<InstallsSnapshot>(EMPTY_INSTALLS_SNAPSHOT);
+const outcomesStore = createExternalStore<{ outcomes: InstallOutcome[] }>(EMPTY_INSTALL_OUTCOMES);
 let nextOutcomeId = 1;
 
 const progressByJobId = createKeyedTransientStore<number, InstallDownloadProgress>();
@@ -48,15 +57,35 @@ const progressByJobId = createKeyedTransientStore<number, InstallDownloadProgres
 let inflightRefresh: Promise<void> | null = null;
 let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
-export const refreshInstalls = (): Promise<void> => {
+registerAccountOwnedResource({
+  clear: () => {
+    if (refreshTimer !== null) {
+      clearTimeout(refreshTimer);
+      refreshTimer = null;
+    }
+
+    inflightRefresh = null;
+    nextOutcomeId = 1;
+    progressByJobId.clear();
+    outcomesStore.setSnapshot(EMPTY_INSTALL_OUTCOMES);
+    store.setSnapshot(EMPTY_INSTALLS_SNAPSHOT);
+  },
+  name: 'model-installs',
+});
+
+export const refreshInstalls = (owner: AccountScope = captureAccountScope()): Promise<void> => {
   if (inflightRefresh) {
     return inflightRefresh;
   }
 
   store.patchSnapshot({ status: store.getSnapshot().status === 'loaded' ? 'loaded' : 'loading' });
 
-  inflightRefresh = listModelInstalls()
+  const refresh = listModelInstalls(owner.signal)
     .then((jobs) => {
+      if (!isAccountScopeCurrent(owner)) {
+        return;
+      }
+
       const activeJobIds = new Set(jobs.map((job) => job.id));
 
       for (const [jobId] of progressByJobId.entries()) {
@@ -68,15 +97,22 @@ export const refreshInstalls = (): Promise<void> => {
       store.patchSnapshot({ error: null, jobs, status: 'loaded' });
     })
     .catch((error: unknown) => {
+      if (!isAccountScopeCurrent(owner)) {
+        return;
+      }
+
       store.patchSnapshot({
         error: error instanceof Error ? error.message : 'Failed to load install queue.',
         status: store.getSnapshot().jobs.length > 0 ? 'loaded' : 'error',
       });
     })
     .finally(() => {
-      inflightRefresh = null;
+      if (inflightRefresh === refresh) {
+        inflightRefresh = null;
+      }
     });
 
+  inflightRefresh = refresh;
   return inflightRefresh;
 };
 
@@ -162,7 +198,15 @@ export const MODEL_INSTALL_SOCKET_EVENTS = [
 export type ModelInstallSocketEvent = (typeof MODEL_INSTALL_SOCKET_EVENTS)[number];
 
 /** Socket sink — wired into the backend socket by the queue coordinator. */
-export const handleModelInstallSocketEvent = (event: ModelInstallSocketEvent, payload: unknown): void => {
+export const handleModelInstallSocketEvent = (
+  event: ModelInstallSocketEvent,
+  payload: unknown,
+  owner: AccountScope = captureAccountScope()
+): void => {
+  if (!isAccountScopeCurrent(owner)) {
+    return;
+  }
+
   const data = payload as ModelInstallSocketPayload;
 
   if (typeof data?.id !== 'number') {

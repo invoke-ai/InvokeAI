@@ -3,6 +3,11 @@ import { Icon } from '@chakra-ui/react';
 import { reloadCustomNodes } from '@features/nodes/data/api';
 import { refreshCustomNodePacks } from '@features/nodes/data/nodesStore';
 import { useNotify } from '@features/nodes/ui/useNodesNotify';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button } from '@platform/ui';
 import { RefreshCwIcon } from 'lucide-react';
@@ -15,16 +20,26 @@ export const ReloadNodesButton = () => {
   const [isReloading, setIsReloading] = useState(false);
 
   const handleReload = async () => {
+    const owner = captureAccountScope();
+
     setIsReloading(true);
 
     try {
-      await reloadCustomNodes();
-      await refreshCustomNodePacks();
+      await reloadCustomNodes(owner.signal);
+      assertAccountScopeCurrent(owner);
+      await refreshCustomNodePacks(owner);
+      assertAccountScopeCurrent(owner);
       notify.success(t('nodes.customNodesReloaded'));
     } catch (error) {
+      if (!isAccountScopeCurrent(owner)) {
+        return;
+      }
+
       notify.error(t('nodes.reloadFailed'), getApiErrorMessage(error, t('nodes.couldNotReloadCustomNodes')));
     } finally {
-      setIsReloading(false);
+      if (isAccountScopeCurrent(owner)) {
+        setIsReloading(false);
+      }
     }
   };
 

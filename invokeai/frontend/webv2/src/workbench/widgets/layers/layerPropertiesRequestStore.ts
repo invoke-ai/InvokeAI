@@ -1,5 +1,6 @@
 import type { CanvasLayerContract } from '@workbench/canvas-engine/api';
 
+import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
 
 export type LayerPropertiesSection = 'filter' | 'adjustments';
@@ -15,6 +16,13 @@ export const layerPropertiesRequestStore = createExternalStore<{ request: LayerP
 });
 
 let nextToken = 1;
+
+registerAccountOwnedResource({
+  clear: () => {
+    layerPropertiesRequestStore.setSnapshot({ request: null });
+  },
+  name: 'layer-properties-requests',
+});
 
 export const requestLayerProperties = (layerId: string, section: LayerPropertiesSection): void => {
   layerPropertiesRequestStore.setSnapshot({ request: { layerId, section, token: nextToken++ } });

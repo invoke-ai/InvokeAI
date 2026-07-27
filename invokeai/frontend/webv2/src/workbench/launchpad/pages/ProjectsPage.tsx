@@ -2,6 +2,13 @@ import type { SystemStyleObject } from '@chakra-ui/react';
 
 import { Flex, Heading, HStack, Stack, Text } from '@chakra-ui/react';
 import { useAuthSession } from '@features/identity';
+import { LAUNCHPAD_READY_MARK, markSemanticReady } from '@platform/performance/semanticReady';
+import { useMountEffect } from '@platform/react/useMountEffect';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
 import { Button, Scrollable, toaster } from '@platform/ui';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { KnownBrowserIssuesAlert } from '@workbench/launchpad/KnownBrowserIssuesAlert';
@@ -9,7 +16,7 @@ import { ProjectsGrid } from '@workbench/launchpad/ProjectsGrid';
 import { refreshProjectLibrary } from '@workbench/projects/library';
 import { importProjectFile, pickProjectFile } from '@workbench/projects/projectFile';
 import { FileUpIcon, PlusIcon } from 'lucide-react';
-import { useCallback, useEffect } from 'react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /**
@@ -31,9 +38,15 @@ export const ProjectsPage = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
 
-  useEffect(() => {
-    void refreshProjectLibrary();
-  }, []);
+  useMountEffect(() => {
+    const owner = captureAccountScope();
+
+    void refreshProjectLibrary().then(() => {
+      if (isAccountScopeCurrent(owner)) {
+        markSemanticReady(LAUNCHPAD_READY_MARK);
+      }
+    });
+  });
 
   const displayName = session.user?.display_name?.trim();
   const greeting = displayName
@@ -41,17 +54,24 @@ export const ProjectsPage = () => {
     : t('launchpad.projectsGreeting');
 
   const handleImport = useCallback(async () => {
-    const file = await pickProjectFile();
+    const owner = captureAccountScope();
+    const file = await pickProjectFile(owner);
 
-    if (!file) {
+    if (!file || !isAccountScopeCurrent(owner)) {
       return;
     }
 
     try {
-      const record = await importProjectFile(file);
+      const record = await importProjectFile(file, owner);
 
+      assertAccountScopeCurrent(owner);
       await navigate({ search: { project: record.project_id }, to: '/app' });
+      assertAccountScopeCurrent(owner);
     } catch (error) {
+      if (!isAccountScopeCurrent(owner)) {
+        return;
+      }
+
       toaster.create({
         description: error instanceof Error ? error.message : undefined,
         title: t('projects.importFailed'),

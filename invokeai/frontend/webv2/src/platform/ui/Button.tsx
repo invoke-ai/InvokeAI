@@ -7,8 +7,20 @@ import {
 } from '@chakra-ui/react';
 
 type ButtonProps = ComponentProps<typeof ChakraButton>;
-type IconButtonProps = ComponentProps<typeof ChakraIconButton>;
 type CloseButtonProps = ComponentProps<typeof ChakraCloseButton>;
+type ChakraIconButtonProps = ComponentProps<typeof ChakraIconButton>;
+
+type IconButtonAccessibleName =
+  | {
+      'aria-label': string;
+      'aria-labelledby'?: never;
+    }
+  | {
+      'aria-label'?: never;
+      'aria-labelledby': string;
+    };
+
+export type IconButtonProps = Omit<ChakraIconButtonProps, 'aria-label' | 'aria-labelledby'> & IconButtonAccessibleName;
 
 /**
  * Workbench buttons. Solid buttons default to the blue `accent` palette; every

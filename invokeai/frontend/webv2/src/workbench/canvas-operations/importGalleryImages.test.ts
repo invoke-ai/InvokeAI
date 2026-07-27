@@ -6,6 +6,7 @@ import type { uploadCanvasImage } from '@workbench/canvas-operations/backend/can
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { Project, WorkbenchState } from '@workbench/projectContracts';
 
+import { accountLifecycle } from '@platform/state/accountLifecycle';
 import {
   createControlLayer,
   createEmptyPaintLayer,
@@ -563,6 +564,43 @@ describe('importGalleryImagesToCanvas', () => {
     expect(independent.status).toBe('imported');
     release();
     await firstImport;
+  });
+
+  it('does not upload an old account image after local preprocessing crosses an account switch', async () => {
+    accountLifecycle.activate('user-a');
+    const { project, state } = withProject();
+    let resolveFetch: ((response: Response) => void) | undefined;
+    const fetchImage = vi.fn<typeof fetch>(
+      () =>
+        new Promise((resolve) => {
+          resolveFetch = resolve;
+        })
+    );
+    const uploadImage = vi.fn<typeof uploadCanvasImage>(() =>
+      Promise.resolve({ height: 512, imageName: 'must-not-upload', width: 512 })
+    );
+    const applyCanvasMutation = vi.fn();
+
+    const oldImport = importGalleryImagesToCanvas({
+      destination: 'control-resized',
+      applyCanvasMutation,
+      engine: null,
+      fetchImage,
+      ...queriesFor(() => state),
+      images: [image('user-a.png')],
+      project,
+      uploadImage,
+    });
+    const signal = (fetchImage.mock.calls[0]?.[1] as RequestInit | undefined)?.signal;
+
+    accountLifecycle.invalidate();
+    accountLifecycle.activate('user-b');
+    resolveFetch?.(new Response(new Blob(['user-a-pixels']), { status: 200 }));
+
+    await expect(oldImport).rejects.toBeInstanceOf(AggregateError);
+    expect(signal?.aborted).toBe(true);
+    expect(uploadImage).not.toHaveBeenCalled();
+    expect(applyCanvasMutation).not.toHaveBeenCalled();
   });
 
   it('bounds resized work at four, preserves successful order, and reports partial failures once', async () => {

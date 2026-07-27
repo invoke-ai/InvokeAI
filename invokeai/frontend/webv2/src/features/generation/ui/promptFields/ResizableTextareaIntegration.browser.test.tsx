@@ -106,6 +106,7 @@ describe('ResizableTextarea', () => {
     const { textarea } = await renderTextarea(140);
 
     expect(textarea.dataset.part).toBe('viewport');
+    expect(textarea.getAttribute('role')).toBe('textbox');
     expect(getComputedStyle(textarea).scrollbarWidth).toBe('none');
 
     await act(() => {

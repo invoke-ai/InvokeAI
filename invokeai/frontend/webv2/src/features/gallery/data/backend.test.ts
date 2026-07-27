@@ -1,24 +1,69 @@
+import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   apiFetchJson: vi.fn(),
+  apiFetchRaw: vi.fn(),
+  sleep: vi.fn(),
 }));
 
 vi.mock('@platform/transport/http', () => ({
   absolutizeApiUrl: (url: string) => `https://api.test${url}`,
   apiFetch: vi.fn(),
   apiFetchJson: mocks.apiFetchJson,
-  apiFetchRaw: vi.fn(),
-  sleep: vi.fn(),
+  apiFetchRaw: mocks.apiFetchRaw,
+  sleep: mocks.sleep,
 }));
 
 import {
+  downloadGalleryArchive,
   getGalleryImageByName,
+  getGalleryImagesByNames,
   imageMakeCanvasAssetChanges,
   imageMakeDurableChanges,
   imageSaveToGalleryChanges,
   listGalleryImages,
 } from './backend';
+
+describe('downloadGalleryArchive', () => {
+  beforeEach(() => {
+    accountLifecycle.activate('user-a');
+    mocks.apiFetchJson.mockReset();
+    mocks.apiFetchRaw.mockReset();
+    mocks.sleep.mockReset();
+  });
+
+  it('aborts polling before another account can request the prior account archive', async () => {
+    let resumeSleep: (() => void) | undefined;
+    mocks.apiFetchJson.mockResolvedValue({ bulk_download_item_name: 'user-a.zip' });
+    mocks.apiFetchRaw.mockResolvedValue(new Response(null, { status: 404 }));
+    mocks.sleep.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          resumeSleep = resolve;
+        })
+    );
+
+    const download = downloadGalleryArchive({ imageNames: ['user-a.png'] });
+
+    await vi.waitFor(() => {
+      expect(mocks.sleep).toHaveBeenCalledOnce();
+    });
+    const postSignal = (mocks.apiFetchJson.mock.calls[0]?.[1] as RequestInit | undefined)?.signal;
+    const pollSignal = (mocks.apiFetchRaw.mock.calls[0]?.[1] as RequestInit | undefined)?.signal;
+    const sleepSignal = mocks.sleep.mock.calls[0]?.[1] as AbortSignal;
+
+    accountLifecycle.invalidate();
+    accountLifecycle.activate('user-b');
+    resumeSleep?.();
+
+    await expect(download).rejects.toThrow('no longer active');
+    expect(postSignal?.aborted).toBe(true);
+    expect(pollSignal?.aborted).toBe(true);
+    expect(sleepSignal.aborted).toBe(true);
+    expect(mocks.apiFetchRaw).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe('getGalleryImageByName', () => {
   beforeEach(() => {
@@ -73,6 +118,31 @@ describe('getGalleryImageByName', () => {
     controller.abort();
 
     await expect(result).rejects.toBe(error);
+  });
+});
+
+describe('getGalleryImagesByNames', () => {
+  beforeEach(() => {
+    mocks.apiFetchJson.mockReset();
+  });
+
+  it('restores the requested order when the bulk endpoint responds out of order', async () => {
+    const dto = (imageName: string) => ({
+      board_id: 'none',
+      created_at: '2026-07-09T12:00:00.000Z',
+      height: 512,
+      image_category: 'general',
+      image_name: imageName,
+      image_url: `/images/${imageName}`,
+      is_intermediate: false,
+      thumbnail_url: `/thumbnails/${imageName}`,
+      width: 512,
+    });
+    mocks.apiFetchJson.mockResolvedValue([dto('third.png'), dto('first.png'), dto('second.png')]);
+
+    const images = await getGalleryImagesByNames(['first.png', 'second.png', 'third.png']);
+
+    expect(images.map((image) => image.imageName)).toEqual(['first.png', 'second.png', 'third.png']);
   });
 });
 

@@ -8,7 +8,7 @@ import { socketHub } from '@platform/transport/socketHub';
  *
  * It intentionally does NOT disconnect on unmount — that keeps it StrictMode
  * safe and lets the socket persist across Launchpad↔editor navigation. The
- * socket is torn down explicitly on logout/expiry (see `features/identity/session.ts`).
+ * App-composed account lifecycle tears it down before an identity epoch changes.
  */
 export const SocketHubRuntime = () => {
   useMountEffect(() => {

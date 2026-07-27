@@ -26,14 +26,18 @@ export const DetailPane = () => {
 
   return (
     <Flex direction="column" flex="1" minH="0" minW="0">
-      <Flex align="flex-end" borderBottomWidth={1} flexShrink={0} minH={HEADER_MIN_HEIGHT} px="2">
-        <Tabs.Root
-          size="sm"
-          mb="-1px"
-          value={activeTab}
-          onValueChange={(event) => updateModelsUi({ activeTab: event.value as ModelManagerTab })}
-        >
-          <Tabs.List h="full">
+      <Tabs.Root
+        display="flex"
+        flex="1"
+        flexDirection="column"
+        minH="0"
+        minW="0"
+        size="sm"
+        value={activeTab}
+        onValueChange={(event) => updateModelsUi({ activeTab: event.value as ModelManagerTab })}
+      >
+        <Flex align="flex-end" borderBottomWidth={1} flexShrink={0} minH={HEADER_MIN_HEIGHT} px="2">
+          <Tabs.List h="full" mb="-1px">
             <Tabs.Trigger fontSize="xs" value="details">
               <Icon as={BoxIcon} boxSize="3" />
               <Text maxW="14rem" truncate>
@@ -49,18 +53,24 @@ export const DetailPane = () => {
               {t('models.apiKeys')}
             </Tabs.Trigger>
           </Tabs.List>
-        </Tabs.Root>
-      </Flex>
+        </Flex>
 
-      <Box flex="1" minH="0">
-        {activeTab === 'details' ? <DetailTab modelKey={activeModelKey} /> : null}
-        {activeTab === 'add' ? <AddModelsView /> : null}
-        {activeTab === 'keys' ? (
-          <Scrollable h="full" label={t('models.apiKeys')} minH="0" p="3">
-            <ApiKeysSection />
-          </Scrollable>
-        ) : null}
-      </Box>
+        <Box flex="1" minH="0">
+          <Tabs.Content h="full" m="0" p="0" value="details">
+            {activeTab === 'details' ? <DetailTab modelKey={activeModelKey} /> : null}
+          </Tabs.Content>
+          <Tabs.Content h="full" m="0" p="0" value="add">
+            {activeTab === 'add' ? <AddModelsView /> : null}
+          </Tabs.Content>
+          <Tabs.Content h="full" m="0" p="0" value="keys">
+            {activeTab === 'keys' ? (
+              <Scrollable h="full" label={t('models.apiKeys')} minH="0" p="3">
+                <ApiKeysSection />
+              </Scrollable>
+            ) : null}
+          </Tabs.Content>
+        </Box>
+      </Tabs.Root>
 
       <InstallQueueBar />
     </Flex>

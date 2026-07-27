@@ -116,7 +116,7 @@ const ProfileForm = ({ onClose, user }: { onClose: () => void; user: UserDTO }) 
         try {
           const updated = await updateCurrentUser(changes);
 
-          setSessionUser(updated);
+          setSessionUser(updated, session.accountEpoch);
         } catch (error) {
           throw new Error(getApiErrorMessage(error, t('auth.couldNotUpdateAccount')));
         }
@@ -124,7 +124,7 @@ const ProfileForm = ({ onClose, user }: { onClose: () => void; user: UserDTO }) 
         notify.success(t('auth.accountUpdated'));
         onClose();
       }),
-    [form, notify, onClose, t, user.display_name]
+    [form, notify, onClose, session.accountEpoch, t, user.display_name]
   );
   const handleDisplayNameChange = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => form.setValue('displayName', event.target.value),

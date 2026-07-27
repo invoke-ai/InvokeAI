@@ -11,6 +11,13 @@ import {
   isVaeModelConfig,
   normalizeGenerateWidgetValues,
 } from '@features/generation/settings';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+  registerAccountOwnedResource,
+  type AccountScope,
+} from '@platform/state/accountLifecycle';
 
 import {
   buildImageRecallSettings,
@@ -19,24 +26,39 @@ import {
   type ImageRecallKind,
 } from './imageRecall';
 
-const imageMetadataRequests = new Map<string, Promise<unknown>>();
+const imageMetadataRequests = new Map<string, { owner: AccountScope; promise: Promise<unknown> }>();
+
+registerAccountOwnedResource({
+  clear: () => {
+    imageMetadataRequests.clear();
+  },
+  name: 'image-recall-metadata',
+});
 
 const toErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
-const loadImageMetadata = (imageName: string): Promise<unknown> => {
+const loadImageMetadata = (imageName: string, owner: AccountScope): Promise<unknown> => {
   const cachedRequest = imageMetadataRequests.get(imageName);
 
-  if (cachedRequest) {
-    return cachedRequest;
+  if (cachedRequest?.owner === owner) {
+    return cachedRequest.promise;
   }
 
-  const request = galleryImages.metadata(imageName).catch((error: unknown) => {
-    imageMetadataRequests.delete(imageName);
-    throw error;
-  });
+  const request = galleryImages
+    .metadata(imageName, owner.signal)
+    .then((metadata) => {
+      assertAccountScopeCurrent(owner);
 
-  imageMetadataRequests.set(imageName, request);
+      return metadata;
+    })
+    .catch((error: unknown) => {
+      if (imageMetadataRequests.get(imageName)?.promise === request) {
+        imageMetadataRequests.delete(imageName);
+      }
+      throw error;
+    });
 
+  imageMetadataRequests.set(imageName, { owner, promise: request });
   return request;
 };
 
@@ -73,6 +95,7 @@ export const executeImageRecall = async ({
   image,
   kind,
   models,
+  owner: callerOwner,
   projectId,
 }: {
   commands: Pick<WorkbenchCommands, 'generation' | 'notifications'>;
@@ -81,8 +104,15 @@ export const executeImageRecall = async ({
   image: GalleryImage;
   kind: ImageRecallKind;
   models: ModelConfig[];
+  /** Caller-captured identity lifetime; direct synchronous callers may omit it. */
+  owner?: AccountScope;
   projectId?: string;
 }): Promise<boolean> => {
+  const owner = callerOwner ?? captureAccountScope();
+  if (!isAccountScopeCurrent(owner)) {
+    return false;
+  }
+
   const supportedModels = models.filter(isSupportedGenerateModel);
   const vaeModels = models.filter(isVaeModelConfig).map((model) => model as VaeModelConfig);
   const currentGenerateValues = getCurrentGenerateValues({
@@ -100,7 +130,9 @@ export const executeImageRecall = async ({
       return false;
     }
 
-    const metadata = kind === 'dimensions' ? null : await loadImageMetadata(image.imageName);
+    const metadata = kind === 'dimensions' ? null : await loadImageMetadata(image.imageName, owner);
+
+    assertAccountScopeCurrent(owner);
     const result = buildImageRecallSettings({
       currentValues: currentGenerateValues,
       image,
@@ -125,10 +157,12 @@ export const executeImageRecall = async ({
         referenceImage.config.image ? [getEffectiveReferenceImage(referenceImage.config.image).image_name] : []
       );
       const availableNames = new Set(
-        (await galleryImages.resolveMany([...new Set(effectiveNames)])).map(
+        (await galleryImages.resolveMany([...new Set(effectiveNames)], owner.signal)).map(
           (availableImage) => availableImage.imageName
         )
       );
+
+      assertAccountScopeCurrent(owner);
       result.values.referenceImages = result.values.referenceImages.filter((referenceImage) => {
         const referenceAsset = referenceImage.config.image;
         return referenceAsset && availableNames.has(getEffectiveReferenceImage(referenceAsset).image_name);
@@ -156,6 +190,10 @@ export const executeImageRecall = async ({
     });
     return true;
   } catch (error: unknown) {
+    if (!isAccountScopeCurrent(owner)) {
+      return false;
+    }
+
     commands.notifications.reportError({
       area: 'image-recall',
       message: toErrorMessage(error),

@@ -9,6 +9,7 @@ import type {
 } from '@features/gallery/core/types';
 
 import { isTimestampInRange } from '@platform/search/dateTokens';
+import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
 import { absolutizeApiUrl, apiFetch, apiFetchJson, apiFetchRaw, sleep } from '@platform/transport/http';
 
 import { getGalleryImageThumbnailUrl } from './imageUrls';
@@ -182,8 +183,8 @@ interface VirtualDateBoardDTO {
   cover_image_name?: string | null;
 }
 
-export const listGalleryDateBoards = async (): Promise<GalleryBoard[]> => {
-  const body = await apiFetchJson<VirtualDateBoardDTO[]>('/api/v1/virtual_boards/by_date');
+export const listGalleryDateBoards = async (signal?: AbortSignal): Promise<GalleryBoard[]> => {
+  const body = await apiFetchJson<VirtualDateBoardDTO[]>('/api/v1/virtual_boards/by_date', { signal });
 
   return body.map((board) => ({
     archived: false,
@@ -197,7 +198,7 @@ export const listGalleryDateBoards = async (): Promise<GalleryBoard[]> => {
   }));
 };
 
-export const getGalleryImagesByNames = async (imageNames: string[]): Promise<GalleryImage[]> => {
+export const getGalleryImagesByNames = async (imageNames: string[], signal?: AbortSignal): Promise<GalleryImage[]> => {
   if (imageNames.length === 0) {
     return [];
   }
@@ -205,9 +206,16 @@ export const getGalleryImagesByNames = async (imageNames: string[]): Promise<Gal
   const body = await apiFetchJson<BackendImageDTO[]>('/api/v1/images/images_by_names', {
     body: JSON.stringify({ image_names: imageNames }),
     method: 'POST',
+    signal,
   });
 
-  return body.map(mapImage);
+  const imagesByName = new Map(body.map((image) => [image.image_name, mapImage(image)]));
+
+  return imageNames.flatMap((imageName) => {
+    const image = imagesByName.get(imageName);
+
+    return image ? [image] : [];
+  });
 };
 
 export const getGalleryImageByName = async (imageName: string, signal?: AbortSignal): Promise<GalleryImage> => {
@@ -216,17 +224,21 @@ export const getGalleryImageByName = async (imageName: string, signal?: AbortSig
   return mapImage(body);
 };
 
+export interface GalleryDateBoardImageNames {
+  imageNames: string[];
+  total: number;
+}
+
 /**
- * Date virtual boards have no offset-paginated DTO endpoint; list the ordered
- * names for the date, slice the requested window, then bulk-hydrate DTOs.
+ * Date virtual boards have no offset-paginated DTO endpoint. The query module
+ * caches this ordered name list once per semantic filter, then each infinite
+ * page hydrates only its own fixed-size slice.
  */
-const listGalleryDateBoardImages = async ({
+export const listGalleryDateBoardImageNames = async ({
   boardId,
   createdFrom,
   createdTo,
   galleryView,
-  limit,
-  offset,
   orderDir,
   searchTerm,
   signal,
@@ -236,20 +248,18 @@ const listGalleryDateBoardImages = async ({
   createdFrom?: string;
   createdTo?: string;
   galleryView: GalleryView;
-  limit: number;
-  offset: number;
   orderDir: GalleryOrderDir;
   searchTerm: string;
   signal?: AbortSignal;
   starredFirst: boolean;
-}): Promise<GalleryImagesPage> => {
+}): Promise<GalleryDateBoardImageNames> => {
   // The board already pins a single day; a date filter either contains that
   // day (and constrains nothing further) or excludes the whole board.
   if (
     (createdFrom !== undefined || createdTo !== undefined) &&
     !isTimestampInRange(getDateFromBoardId(boardId), { from: createdFrom, to: createdTo })
   ) {
-    return { images: [], total: 0 };
+    return { imageNames: [], total: 0 };
   }
 
   const query = toSearchParams({
@@ -262,10 +272,27 @@ const listGalleryDateBoardImages = async ({
     `/api/v1/virtual_boards/by_date/${encodeURIComponent(getDateFromBoardId(boardId))}/image_names?${query}`,
     { signal }
   );
-  const images = await getGalleryImagesByNames(body.image_names.slice(offset, offset + limit));
 
-  return { images, total: normalizeTotal(body.total_count, body.image_names.length) };
+  return {
+    imageNames: body.image_names,
+    total: normalizeTotal(body.total_count, body.image_names.length),
+  };
 };
+
+export const hydrateGalleryDateBoardImagePage = async ({
+  imageNames,
+  limit,
+  offset,
+  signal,
+  total,
+}: GalleryDateBoardImageNames & {
+  limit: number;
+  offset: number;
+  signal?: AbortSignal;
+}): Promise<GalleryImagesPage> => ({
+  images: await getGalleryImagesByNames(imageNames.slice(offset, offset + limit), signal),
+  total,
+});
 
 export const listGalleryImages = async ({
   boardId,
@@ -291,18 +318,18 @@ export const listGalleryImages = async ({
   starredFirst?: boolean;
 }): Promise<GalleryImagesPage> => {
   if (isDateBoardId(boardId)) {
-    return listGalleryDateBoardImages({
+    const names = await listGalleryDateBoardImageNames({
       boardId,
       createdFrom,
       createdTo,
       galleryView,
-      limit,
-      offset,
       orderDir,
       searchTerm,
       signal,
       starredFirst,
     });
+
+    return hydrateGalleryDateBoardImagePage({ ...names, limit, offset, signal });
   }
 
   const query = toSearchParams({
@@ -410,38 +437,51 @@ export const saveImageToGallery = async (imageName: string): Promise<GalleryImag
   return mapImage(body);
 };
 
-export const getGalleryImageMetadata = async (imageName: string): Promise<GalleryImageMetadata | null> => {
-  const body = await apiFetchJson<unknown>(`/api/v1/images/i/${encodeURIComponent(imageName)}/metadata`);
+export const getGalleryImageMetadata = async (
+  imageName: string,
+  signal?: AbortSignal
+): Promise<GalleryImageMetadata | null> => {
+  const body = await apiFetchJson<unknown>(`/api/v1/images/i/${encodeURIComponent(imageName)}/metadata`, { signal });
 
   return body && typeof body === 'object' && !Array.isArray(body) ? (body as GalleryImageMetadata) : null;
 };
 
-export const createGalleryBoard = async (boardName: string): Promise<GalleryBoard> => {
+export const createGalleryBoard = async (boardName: string, signal?: AbortSignal): Promise<GalleryBoard> => {
   const query = toSearchParams({ board_name: boardName });
-  const body = await apiFetchJson<BackendBoardDTO>(`/api/v1/boards/?${query}`, { method: 'POST' });
+  const body = await apiFetchJson<BackendBoardDTO>(`/api/v1/boards/?${query}`, { method: 'POST', signal });
 
   return mapBoard(body);
 };
 
 export const updateGalleryBoard = async (
   boardId: string,
-  changes: { name?: string; archived?: boolean }
+  changes: { name?: string; archived?: boolean },
+  signal?: AbortSignal
 ): Promise<GalleryBoard> => {
   const body = await apiFetchJson<BackendBoardDTO>(`/api/v1/boards/${encodeURIComponent(boardId)}`, {
     body: JSON.stringify({ archived: changes.archived, board_name: changes.name }),
     method: 'PATCH',
+    signal,
   });
 
   return mapBoard(body);
 };
 
-export const deleteGalleryBoard = async (boardId: string, includeImages: boolean): Promise<void> => {
+export const deleteGalleryBoard = async (
+  boardId: string,
+  includeImages: boolean,
+  signal?: AbortSignal
+): Promise<void> => {
   const query = toSearchParams({ include_images: includeImages });
 
-  await apiFetch(`/api/v1/boards/${encodeURIComponent(boardId)}?${query}`, { method: 'DELETE' });
+  await apiFetch(`/api/v1/boards/${encodeURIComponent(boardId)}?${query}`, { method: 'DELETE', signal });
 };
 
-export const addImagesToGalleryBoard = async (boardId: string, imageNames: string[]): Promise<void> => {
+export const addImagesToGalleryBoard = async (
+  boardId: string,
+  imageNames: string[],
+  signal?: AbortSignal
+): Promise<void> => {
   if (
     boardId === 'none' ||
     boardId === 'generated' ||
@@ -455,10 +495,11 @@ export const addImagesToGalleryBoard = async (boardId: string, imageNames: strin
   await apiFetchJson('/api/v1/board_images/batch', {
     body: JSON.stringify({ board_id: boardId, image_names: imageNames }),
     method: 'POST',
+    signal,
   });
 };
 
-export const removeImagesFromGalleryBoard = async (imageNames: string[]): Promise<void> => {
+export const removeImagesFromGalleryBoard = async (imageNames: string[], signal?: AbortSignal): Promise<void> => {
   if (imageNames.length === 0) {
     return;
   }
@@ -466,10 +507,11 @@ export const removeImagesFromGalleryBoard = async (imageNames: string[]): Promis
   await apiFetchJson('/api/v1/board_images/batch/delete', {
     body: JSON.stringify({ image_names: imageNames }),
     method: 'POST',
+    signal,
   });
 };
 
-const setGalleryImagesStarred = async (imageNames: string[], starred: boolean): Promise<void> => {
+const setGalleryImagesStarred = async (imageNames: string[], starred: boolean, signal?: AbortSignal): Promise<void> => {
   if (imageNames.length === 0) {
     return;
   }
@@ -477,14 +519,17 @@ const setGalleryImagesStarred = async (imageNames: string[], starred: boolean): 
   await apiFetchJson(`/api/v1/images/${starred ? 'star' : 'unstar'}`, {
     body: JSON.stringify({ image_names: imageNames }),
     method: 'POST',
+    signal,
   });
 };
 
-export const starGalleryImages = (imageNames: string[]): Promise<void> => setGalleryImagesStarred(imageNames, true);
+export const starGalleryImages = (imageNames: string[], signal?: AbortSignal): Promise<void> =>
+  setGalleryImagesStarred(imageNames, true, signal);
 
-export const unstarGalleryImages = (imageNames: string[]): Promise<void> => setGalleryImagesStarred(imageNames, false);
+export const unstarGalleryImages = (imageNames: string[], signal?: AbortSignal): Promise<void> =>
+  setGalleryImagesStarred(imageNames, false, signal);
 
-export const deleteGalleryImages = async (imageNames: string[]): Promise<void> => {
+export const deleteGalleryImages = async (imageNames: string[], signal?: AbortSignal): Promise<void> => {
   if (imageNames.length === 0) {
     return;
   }
@@ -492,6 +537,7 @@ export const deleteGalleryImages = async (imageNames: string[]): Promise<void> =
   await apiFetchJson('/api/v1/images/delete', {
     body: JSON.stringify({ image_names: imageNames }),
     method: 'POST',
+    signal,
   });
 };
 
@@ -506,18 +552,25 @@ const BULK_DOWNLOAD_TIMEOUT_MS = 5 * 60 * 1000;
 export const downloadGalleryArchive = async ({
   boardId,
   imageNames,
+  signal,
 }: {
   boardId?: string;
   imageNames?: string[];
+  signal?: AbortSignal;
 }): Promise<{ blob: Blob; fileName: string }> => {
+  const owner = captureAccountScope();
+  const requestSignal = signal ? AbortSignal.any([signal, owner.signal]) : owner.signal;
   const { bulk_download_item_name: fileName } = await apiFetchJson<{ bulk_download_item_name?: string | null }>(
     '/api/v1/images/download',
     {
       body: JSON.stringify({ board_id: boardId, image_names: imageNames }),
       method: 'POST',
+      signal: requestSignal,
     }
   );
 
+  assertAccountScopeCurrent(owner);
+  requestSignal.throwIfAborted();
   if (!fileName) {
     throw new Error('The bulk download failed to start.');
   }
@@ -525,17 +578,27 @@ export const downloadGalleryArchive = async ({
   const startedAt = Date.now();
 
   while (Date.now() - startedAt < BULK_DOWNLOAD_TIMEOUT_MS) {
-    const response = await apiFetchRaw(`/api/v1/images/download/${encodeURIComponent(fileName)}`);
+    const response = await apiFetchRaw(`/api/v1/images/download/${encodeURIComponent(fileName)}`, {
+      signal: requestSignal,
+    });
 
+    assertAccountScopeCurrent(owner);
+    requestSignal.throwIfAborted();
     if (response.ok) {
-      return { blob: await response.blob(), fileName };
+      const blob = await response.blob();
+
+      assertAccountScopeCurrent(owner);
+      requestSignal.throwIfAborted();
+      return { blob, fileName };
     }
 
     if (response.status !== 404) {
       throw new Error(`${response.status} ${response.statusText}`);
     }
 
-    await sleep(BULK_DOWNLOAD_POLL_INTERVAL_MS);
+    await sleep(BULK_DOWNLOAD_POLL_INTERVAL_MS, requestSignal);
+    assertAccountScopeCurrent(owner);
+    requestSignal.throwIfAborted();
   }
 
   throw new Error('Timed out preparing the download archive.');
@@ -544,7 +607,7 @@ export const downloadGalleryArchive = async ({
 export const uploadGalleryImage = async (
   file: File,
   boardId: string,
-  options: { isIntermediate?: boolean } = {}
+  options: { isIntermediate?: boolean; signal?: AbortSignal } = {}
 ): Promise<GalleryImage> => {
   const query = toSearchParams({
     board_id: boardId === 'none' || isDateBoardId(boardId) ? undefined : boardId,
@@ -557,6 +620,7 @@ export const uploadGalleryImage = async (
   const uploadedImage = await apiFetchJson<BackendImageDTO>(`/api/v1/images/upload?${query}`, {
     body,
     method: 'POST',
+    signal: options.signal,
   });
 
   return mapImage(uploadedImage);

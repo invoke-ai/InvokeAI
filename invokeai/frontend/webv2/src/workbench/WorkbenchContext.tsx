@@ -4,6 +4,7 @@ import type { ProjectSettings } from '@workbench/settings/contracts';
 import type { WidgetInstanceId, WidgetTypeId } from '@workbench/widgetContracts';
 
 import { useMountEffect } from '@platform/react/useMountEffect';
+import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { shallowEqual as selectorShallowEqual, useExternalStoreSelector } from '@platform/state/selectors';
 import { createContext, use, useEffect, useSyncExternalStore, useState, type ReactNode } from 'react';
 
@@ -48,7 +49,8 @@ export const WorkbenchProvider = ({
   loadOptions?: WorkbenchLoadOptions;
 }) => {
   const [store] = useState(() => createWorkbenchStore());
-  const [persistence] = useState(createSyncedWorkbenchPersistence);
+  const [owner] = useState(captureAccountScope);
+  const [persistence] = useState(() => createSyncedWorkbenchPersistence(owner));
   const [extensions] = useState(createExtensionRegistry);
   const hasHydrated = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot).hasHydrated;
 
@@ -72,6 +74,7 @@ export const WorkbenchProvider = ({
       },
       loadOptions,
       persistence,
+      signal: owner.signal,
     });
     persistenceRuntime.start();
     return () => persistenceRuntime.dispose();

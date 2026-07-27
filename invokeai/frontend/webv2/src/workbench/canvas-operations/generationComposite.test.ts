@@ -245,6 +245,36 @@ describe('composeForGeneration', () => {
     );
   });
 
+  it('does not start an upload when its account lifetime expires during encoding', async () => {
+    const harness = makeHost(makeDoc([rasterLayer('base')]));
+    const executorDeps = harness.host.getCompositeExecutorDeps();
+    const controller = new AbortController();
+    let resolveEncode: ((blob: Blob) => void) | undefined;
+
+    harness.host.getCompositeExecutorDeps = () => ({
+      ...executorDeps,
+      backend: {
+        ...executorDeps.backend,
+        encodeSurface: () =>
+          new Promise((resolve) => {
+            resolveEncode = resolve;
+          }),
+      },
+    });
+
+    const result = compose(harness.host, { signal: controller.signal });
+    await vi.waitFor(() => {
+      expect(resolveEncode).toBeDefined();
+    });
+
+    controller.abort();
+    resolveEncode?.(new Blob(['encoded']));
+
+    await expect(result).rejects.toMatchObject({ name: 'AbortError' });
+    expect(harness.uploadImage).not.toHaveBeenCalled();
+    expect(harness.release).toHaveBeenCalledOnce();
+  });
+
   it('resolves txt2img from the bounds pre-pass: no base upload, detectMode never consulted, controls and regionals still composited', async () => {
     // No raster layers → no content bounds → txt2img without executing the base
     // plan; control + regional composites are mode-independent and still run.

@@ -3,6 +3,11 @@ import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCo
 import { useWorkflowNotifications } from '@features/workflow/ui/WorkflowUiContext';
 import { parseWorkflowJson } from '@features/workflow/utility';
 import { useMountEffect } from '@platform/react/useMountEffect';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { useTranslation } from 'react-i18next';
 
@@ -18,10 +23,15 @@ export const PendingLibraryWorkflowLoader = () => {
   const { t } = useTranslation();
   const { replace } = useProjectGraphCommands();
   const notify = useWorkflowNotifications();
-  useMountEffect(() =>
-    startWorkflowUiPendingLoadRuntime(async (workflowId) => {
+  useMountEffect(() => {
+    const owner = captureAccountScope();
+
+    return startWorkflowUiPendingLoadRuntime(async (workflowId) => {
       try {
-        const raw = await getLibraryWorkflow(workflowId);
+        assertAccountScopeCurrent(owner);
+        const raw = await getLibraryWorkflow(workflowId, owner.signal);
+
+        assertAccountScopeCurrent(owner);
         const { document, warnings } = parseWorkflowJson(raw);
         const name = typeof raw.name === 'string' && raw.name.length > 0 ? raw.name : 'workflow';
 
@@ -31,17 +41,21 @@ export const PendingLibraryWorkflowLoader = () => {
           notify.info(t('commandPalette.workflowLoad.warning'), warning);
         }
 
-        void touchLibraryWorkflowOpenedAt(workflowId).catch(() => {
+        void touchLibraryWorkflowOpenedAt(workflowId, owner.signal).catch(() => {
           // Recency bookkeeping only; loading already succeeded.
         });
       } catch (error) {
+        if (!isAccountScopeCurrent(owner)) {
+          return;
+        }
+
         notify.error(
           t('commandPalette.workflowLoad.failed'),
           getApiErrorMessage(error, t('commandPalette.workflowLoad.couldNotLoad'))
         );
       }
-    })
-  );
+    });
+  });
 
   return null;
 };

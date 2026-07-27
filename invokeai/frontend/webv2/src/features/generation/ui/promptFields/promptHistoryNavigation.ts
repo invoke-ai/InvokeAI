@@ -2,6 +2,7 @@ import type { GenerationModelCatalogItem as ModelConfig, PromptHistoryItem } fro
 
 import { getPromptHistoryRecallPatch } from '@features/generation/core/baseGenerationPolicies';
 import { normalizeGenerateSettings } from '@features/generation/core/settings';
+import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 
 import { isPositivePromptFocused } from './promptFocus';
 
@@ -115,3 +116,8 @@ export const createPromptHistoryNavigation = (): PromptHistoryNavigation => {
 
 /** One navigation cursor per window: the hotkey commands and both prompt fields must share it. */
 export const promptHistoryNavigation: PromptHistoryNavigation = createPromptHistoryNavigation();
+
+registerAccountOwnedResource({
+  clear: promptHistoryNavigation.reset,
+  name: 'prompt-history-navigation',
+});

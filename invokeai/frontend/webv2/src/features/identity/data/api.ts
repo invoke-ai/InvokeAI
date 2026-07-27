@@ -66,8 +66,8 @@ export interface UserUpdateRequest {
 
 export const getAuthStatus = (): Promise<AuthStatus> => apiFetchJson<AuthStatus>(`${AUTH_BASE}/status`);
 
-export const login = (request: LoginRequest): Promise<LoginResult> =>
-  apiFetchJson<LoginResult>(`${AUTH_BASE}/login`, { body: JSON.stringify(request), method: 'POST' });
+export const login = (request: LoginRequest, signal?: AbortSignal): Promise<LoginResult> =>
+  apiFetchJson<LoginResult>(`${AUTH_BASE}/login`, { body: JSON.stringify(request), method: 'POST', signal });
 
 export const logout = (): Promise<{ success: boolean }> =>
   apiFetchJson<{ success: boolean }>(`${AUTH_BASE}/logout`, { method: 'POST' });

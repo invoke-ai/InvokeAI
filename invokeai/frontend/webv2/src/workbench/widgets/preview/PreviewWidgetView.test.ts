@@ -1,16 +1,7 @@
+import { GALLERY_MAX_ROWS } from '@features/gallery/queries';
 import { describe, expect, it } from 'vitest';
 
-import { getMatchingProgressImage, getPreviewBoardsRequestKey, mergePreviewBoardImages } from './PreviewWidgetView';
-
-describe('getPreviewBoardsRequestKey', () => {
-  it('requests boards for local generated images, not only backend gallery images', () => {
-    expect(getPreviewBoardsRequestKey({ hasSelectedImage: true, refreshToken: 'refresh-1' })).toBe('refresh-1');
-  });
-
-  it('does not request boards without a selected image', () => {
-    expect(getPreviewBoardsRequestKey({ hasSelectedImage: false, refreshToken: 'refresh-1' })).toBeNull();
-  });
-});
+import { getMatchingProgressImage, mergePreviewBoardImages } from './PreviewWidgetView';
 
 describe('getMatchingProgressImage', () => {
   const placeholder = {
@@ -74,5 +65,19 @@ describe('mergePreviewBoardImages', () => {
       optimistic,
       existing,
     ]);
+  });
+
+  it('never renders more than the bounded Gallery window after merging optimistic images', () => {
+    const backend = Array.from({ length: GALLERY_MAX_ROWS }, (_, index) =>
+      image(`backend-${index}`, new Date(index * 1_000).toISOString())
+    );
+    const optimistic = Array.from({ length: 60 }, (_, index) =>
+      image(`optimistic-${index}`, new Date((GALLERY_MAX_ROWS + index) * 1_000).toISOString())
+    );
+
+    const merged = mergePreviewBoardImages(backend, optimistic, 'DESC', false);
+
+    expect(merged).toHaveLength(GALLERY_MAX_ROWS);
+    expect(merged[0]?.imageName).toBe('optimistic-59');
   });
 });

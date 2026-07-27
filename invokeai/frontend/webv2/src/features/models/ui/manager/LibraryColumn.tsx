@@ -14,6 +14,11 @@ import {
   useModelsUiSelector,
 } from '@features/models/ui/uiStore';
 import { useNotify } from '@features/models/ui/useModelsNotify';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
 import { Button, IconButton, ConfirmDialog } from '@platform/ui';
 import { Trash2Icon, XIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
@@ -46,11 +51,13 @@ export const LibraryColumn = () => {
   const handleToggleSelected = useCallback((modelKey: string) => toggleModelSelection(modelKey), []);
 
   const handleBulkDelete = async () => {
+    const owner = captureAccountScope();
     const keys = [...selectedKeys];
 
     try {
-      const result = await bulkDeleteModels(keys);
+      const result = await bulkDeleteModels(keys, owner.signal);
 
+      assertAccountScopeCurrent(owner);
       removeModelsFromStore(result.deleted);
       pruneModelsUiKeys(result.deleted);
       updateModelsUi({ selectedKeys: new Set(result.failed.map((failure) => failure.key)) });
@@ -68,8 +75,12 @@ export const LibraryColumn = () => {
         notify.success(t('models.deleted'), t('models.deletedDescription', { count: result.deleted.length }));
       }
     } catch (error) {
+      if (!isAccountScopeCurrent(owner)) {
+        return;
+      }
+
       notify.error(t('models.bulkDeleteFailed'), error instanceof Error ? error.message : String(error));
-      void refreshModels();
+      void refreshModels(owner);
     }
   };
 
@@ -79,7 +90,7 @@ export const LibraryColumn = () => {
         <Text fontSize="sm" fontWeight="700">
           {t('models.title')}
         </Text>
-        <Text color="fg.subtle" fontSize="xs">
+        <Text color="fg.muted" fontSize="xs">
           {models.length}
         </Text>
         <Box ms="auto">

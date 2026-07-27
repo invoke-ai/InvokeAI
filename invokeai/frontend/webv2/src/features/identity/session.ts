@@ -1,6 +1,5 @@
 import { createExternalStore } from '@platform/state/externalStore';
 import { ApiError } from '@platform/transport/http';
-import { socketHub } from '@platform/transport/socketHub';
 
 import { shouldExpireUnauthorizedSession } from './core/sessionPolicy';
 import { browserIdentityTokenAdapter } from './core/tokenStorage';
@@ -8,13 +7,16 @@ import { getAuthStatus, getCurrentUser, login, logout, setupAdmin, type AuthStat
 
 /**
  * Session-lived auth state shared by the router guards and shell chrome. When
- * multi-user is disabled on the backend the snapshot stays at its defaults
- * (`multiuserEnabled: false`, `user: null`) and the entire auth surface — login
- * screen, user menu, expiry handling — stays dormant.
+ * multi-user is disabled on the backend, the resolved snapshot keeps the
+ * entire auth surface — login screen, user menu, expiry handling — dormant.
+ * Until that mode is known, `phase` keeps the otherwise conservative boolean
+ * defaults from being interpreted as a single-user grant.
  */
 export interface AuthSession {
-  /** 'unknown' until the first `/auth/status` round-trip resolves. */
-  phase: 'unknown' | 'ready';
+  /** Remount key for every authenticated lifetime, including same-user logins. */
+  accountEpoch: number;
+  /** Auth mode is never inferred when `/auth/status` cannot be resolved. */
+  phase: 'unknown' | 'unavailable' | 'ready';
   multiuserEnabled: boolean;
   setupRequired: boolean;
   strictPasswordChecking: boolean;
@@ -24,6 +26,7 @@ export interface AuthSession {
 }
 
 const store = createExternalStore<AuthSession>({
+  accountEpoch: 0,
   multiuserEnabled: false,
   phase: 'unknown',
   sessionExpired: false,
@@ -31,6 +34,26 @@ const store = createExternalStore<AuthSession>({
   strictPasswordChecking: false,
   user: null,
 });
+
+export interface IdentityAccountLifecycle {
+  activate(accountId: string, storageSuffix?: string): { readonly epoch: number };
+  invalidate(): { readonly epoch: number };
+}
+
+let accountLifecycle: IdentityAccountLifecycle | null = null;
+
+/** Selected once by the App composition root before session resolution. */
+export const configureIdentityAccountLifecycle = (lifecycle: IdentityAccountLifecycle): void => {
+  accountLifecycle = lifecycle;
+};
+
+const getAccountLifecycle = (): IdentityAccountLifecycle => {
+  if (!accountLifecycle) {
+    throw new Error('Identity account lifecycle has not been configured by the App composition root.');
+  }
+
+  return accountLifecycle;
+};
 
 export const useAuthSession = (): AuthSession => store.useSnapshot();
 
@@ -45,16 +68,24 @@ export const getAuthSession = (): AuthSession => store.getSnapshot();
 export const subscribeAuthSession = (listener: () => void): (() => void) => store.subscribe(listener);
 
 /**
- * Sticky across sign-out: a debounced autosave can still fire during the
- * logout transition, and it must land in the bucket of the user whose data
- * was loaded — never the shared single-user bucket.
+ * Compatibility scope for synchronous settings/storage callers. Long-lived
+ * async work must capture `AccountScope.storageSuffix` from the App-composed
+ * lifecycle instead of consulting this mutable value after an await.
  */
 let activeUserScope = '';
 
 const setActiveUserScope = (user: UserDTO | null): void => {
-  if (user !== null) {
-    activeUserScope = `:user:${user.user_id}`;
+  activeUserScope = user === null ? '' : `:user:${user.user_id}`;
+};
+
+const activateResolvedAccount = (multiuserEnabled: boolean, user: UserDTO | null): number => {
+  if (!multiuserEnabled) {
+    return getAccountLifecycle().activate('single-user').epoch;
   }
+
+  return user
+    ? getAccountLifecycle().activate(user.user_id, `:user:${user.user_id}`).epoch
+    : getAccountLifecycle().invalidate().epoch;
 };
 
 /**
@@ -62,22 +93,101 @@ const setActiveUserScope = (user: UserDTO | null): void => {
  * preferences, personal API keys — see the spec's State Ownership section).
  * Empty in single-user mode, so existing keys keep working unchanged.
  */
-export const getUserStorageScope = (): string => (store.getSnapshot().multiuserEnabled ? activeUserScope : '');
+export const getUserStorageScope = (): string => {
+  const session = store.getSnapshot();
 
-const fetchAuthStatus = async (): Promise<AuthStatus> => {
-  try {
-    return await getAuthStatus();
-  } catch {
-    // Backend unreachable: let the shell mount in single-user shape. The
-    // connection banner reports the outage, and a 401 once the backend returns
-    // in multi-user mode routes through the session-expiry path to login.
-    return { admin_email: null, multiuser_enabled: false, setup_required: false, strict_password_checking: false };
+  if (session.phase !== 'ready') {
+    throw new AuthSessionUnavailableError();
   }
+
+  if (!session.multiuserEnabled) {
+    return '';
+  }
+
+  if (session.user === null || activeUserScope === '') {
+    throw new Error('Account-owned storage is unavailable without an authenticated user.');
+  }
+
+  return activeUserScope;
+};
+
+export class AuthSessionUnavailableError extends Error {
+  constructor() {
+    super('The backend authentication mode is currently unavailable.');
+    this.name = 'AuthSessionUnavailableError';
+  }
+}
+
+export class LoginAttemptSupersededError extends Error {
+  constructor() {
+    super('This sign-in attempt was superseded by a newer identity transition.');
+    this.name = 'LoginAttemptSupersededError';
+  }
+}
+
+export const isLoginAttemptSupersededError = (error: unknown): error is LoginAttemptSupersededError =>
+  error instanceof LoginAttemptSupersededError;
+
+interface LoginAttempt {
+  readonly controller: AbortController;
+}
+
+let activeLoginAttempt: LoginAttempt | null = null;
+
+const beginLoginAttempt = (): LoginAttempt => {
+  activeLoginAttempt?.controller.abort();
+
+  const attempt: LoginAttempt = { controller: new AbortController() };
+  activeLoginAttempt = attempt;
+
+  return attempt;
+};
+
+const cancelLoginAttempt = (): boolean => {
+  if (activeLoginAttempt === null) {
+    return false;
+  }
+
+  const attempt = activeLoginAttempt;
+  activeLoginAttempt = null;
+  attempt.controller.abort();
+
+  return true;
+};
+
+const isCurrentLoginAttempt = (attempt: LoginAttempt): boolean =>
+  activeLoginAttempt === attempt && !attempt.controller.signal.aborted;
+
+const publishUnavailableSession = (): AuthSession => {
+  cancelLoginAttempt();
+  setActiveUserScope(null);
+  const accountEpoch = getAccountLifecycle().invalidate().epoch;
+  store.patchSnapshot({
+    accountEpoch,
+    multiuserEnabled: false,
+    phase: 'unavailable',
+    setupRequired: false,
+    strictPasswordChecking: false,
+    user: null,
+  });
+
+  return store.getSnapshot();
 };
 
 const resolveSession = async (): Promise<AuthSession> => {
-  const status = await fetchAuthStatus();
+  let status: AuthStatus;
+
+  try {
+    status = await getAuthStatus();
+  } catch {
+    // A network failure says nothing about the backend's auth mode. Publishing
+    // an unavailable state keeps every authenticated route and storage owner
+    // unmounted while allowing a later route retry to resolve the session.
+    return publishUnavailableSession();
+  }
+
   let user: UserDTO | null = null;
+  let sessionExpired = false;
 
   if (status.multiuser_enabled && !status.setup_required && browserIdentityTokenAdapter.get()) {
     try {
@@ -85,15 +195,27 @@ const resolveSession = async (): Promise<AuthSession> => {
     } catch (error) {
       if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
         browserIdentityTokenAdapter.clear();
+        sessionExpired = true;
+      } else {
+        // The auth mode is known, but the principal is not. Treat this like a
+        // status outage instead of incorrectly presenting the user as signed
+        // out and making unscoped storage reachable.
+        return publishUnavailableSession();
       }
-      // Any other failure leaves `user` null; the route guard lands on login.
     }
+  } else if (status.multiuser_enabled && !status.setup_required) {
+    // Preserve an expiry raised while auth status was unavailable so recovery
+    // can explain why the remembered session returned to the login screen.
+    sessionExpired = store.getSnapshot().sessionExpired;
   }
 
   setActiveUserScope(user);
+  const accountEpoch = activateResolvedAccount(status.multiuser_enabled, user);
   store.patchSnapshot({
+    accountEpoch,
     multiuserEnabled: status.multiuser_enabled,
     phase: 'ready',
+    sessionExpired,
     setupRequired: status.setup_required,
     strictPasswordChecking: status.strict_password_checking,
     user,
@@ -104,7 +226,7 @@ const resolveSession = async (): Promise<AuthSession> => {
 
 let pendingResolve: Promise<AuthSession> | null = null;
 
-/** Resolve the session exactly once per app load; later calls reuse the snapshot. */
+/** Resolve once while pending; an unavailable snapshot is retryable. */
 export const ensureAuthSession = (): Promise<AuthSession> => {
   const current = store.getSnapshot();
 
@@ -119,29 +241,77 @@ export const ensureAuthSession = (): Promise<AuthSession> => {
   return pendingResolve;
 };
 
-export const loginWithCredentials = async (email: string, password: string, rememberMe: boolean): Promise<void> => {
-  // A stale token must not ride along on the login request itself.
-  browserIdentityTokenAdapter.clear();
+export type ReadyAuthSession = AuthSession & { phase: 'ready' };
 
-  const result = await login({ email, password, remember_me: rememberMe });
+/**
+ * Route-facing resolver. Unknown auth mode is an availability error, never an
+ * implicit single-user grant. Retrying the route retries session resolution.
+ */
+export const ensureReadyAuthSession = async (): Promise<ReadyAuthSession> => {
+  const session = await ensureAuthSession();
 
-  browserIdentityTokenAdapter.set(result.token);
-  setActiveUserScope(result.user);
-  store.patchSnapshot({ sessionExpired: false, user: result.user });
-};
-
-export const logoutSession = async (): Promise<void> => {
-  try {
-    await logout();
-  } catch {
-    // Tokens are stateless on the backend; local sign-out always wins.
+  if (session.phase !== 'ready') {
+    throw new AuthSessionUnavailableError();
   }
 
+  return session as ReadyAuthSession;
+};
+
+export const loginWithCredentials = async (email: string, password: string, rememberMe: boolean): Promise<void> => {
+  const session = store.getSnapshot();
+
+  if (session.phase !== 'ready' || !session.multiuserEnabled) {
+    throw new AuthSessionUnavailableError();
+  }
+
+  const attempt = beginLoginAttempt();
+
+  // Invalidate the old epoch before touching its token. This also protects a
+  // same-user reauthentication from completions started by the prior login.
+  const invalidatedEpoch = getAccountLifecycle().invalidate().epoch;
   browserIdentityTokenAdapter.clear();
-  // Tear down the shared socket so it does not linger authenticated as the
-  // previous user; the next authenticated mount reconnects with a fresh token.
-  socketHub.disconnect();
-  store.patchSnapshot({ sessionExpired: false, user: null });
+  setActiveUserScope(null);
+  store.patchSnapshot({ accountEpoch: invalidatedEpoch, sessionExpired: false, user: null });
+
+  try {
+    const result = await login({ email, password, remember_me: rememberMe }, attempt.controller.signal);
+
+    if (!isCurrentLoginAttempt(attempt)) {
+      throw new LoginAttemptSupersededError();
+    }
+
+    browserIdentityTokenAdapter.set(result.token);
+    setActiveUserScope(result.user);
+    const accountEpoch = getAccountLifecycle().activate(result.user.user_id, `:user:${result.user.user_id}`).epoch;
+    store.patchSnapshot({ accountEpoch, sessionExpired: false, user: result.user });
+  } catch (error) {
+    if (!isCurrentLoginAttempt(attempt)) {
+      throw new LoginAttemptSupersededError();
+    }
+
+    throw error;
+  } finally {
+    if (activeLoginAttempt === attempt) {
+      activeLoginAttempt = null;
+    }
+  }
+};
+
+export const logoutSession = (): Promise<void> => {
+  cancelLoginAttempt();
+
+  // apiFetch captures the current token synchronously. Let the best-effort
+  // request finish in the old account while local sign-out proceeds at once.
+  void logout().catch(() => {
+    // Tokens are stateless on the backend; local sign-out always wins.
+  });
+
+  const accountEpoch = getAccountLifecycle().invalidate().epoch;
+  browserIdentityTokenAdapter.clear();
+  setActiveUserScope(null);
+  store.patchSnapshot({ accountEpoch, sessionExpired: false, user: null });
+
+  return Promise.resolve();
 };
 
 /** Create the initial admin account, then sign straight in with it. */
@@ -155,22 +325,29 @@ export const completeAdminSetup = async (
   await loginWithCredentials(email, password, false);
 };
 
-/** Reflect a profile edit (display name, password) into the session snapshot. */
-export const setSessionUser = (user: UserDTO): void => {
-  store.patchSnapshot({ user });
-};
-
-// A 401 on any authenticated request means the stored token expired or was
-// revoked. Only react while an authenticated multi-user session is live, so
-// failed login attempts and single-user mode never trip it.
-export const handleUnauthorizedResponse = (): void => {
+/** Reflect a profile edit only into the authenticated lifetime that started it. */
+export const setSessionUser = (user: UserDTO, expectedAccountEpoch: number): void => {
   const session = store.getSnapshot();
 
-  if (!shouldExpireUnauthorizedSession(session)) {
+  if (session.accountEpoch !== expectedAccountEpoch || session.user?.user_id !== user.user_id) {
     return;
   }
 
+  store.patchSnapshot({ user });
+};
+
+// A 401 for the current stored credential invalidates its account lifetime.
+// Login requests carry no stored token, and known single-user mode stays inert.
+export const handleUnauthorizedResponse = (): void => {
+  const canceledLogin = cancelLoginAttempt();
+  const session = store.getSnapshot();
+
+  if (!canceledLogin && !shouldExpireUnauthorizedSession(session)) {
+    return;
+  }
+
+  const accountEpoch = getAccountLifecycle().invalidate().epoch;
   browserIdentityTokenAdapter.clear();
-  socketHub.disconnect();
-  store.patchSnapshot({ sessionExpired: true, user: null });
+  setActiveUserScope(null);
+  store.patchSnapshot({ accountEpoch, sessionExpired: true, user: null });
 };

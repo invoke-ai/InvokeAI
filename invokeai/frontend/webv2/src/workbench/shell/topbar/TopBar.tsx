@@ -4,8 +4,8 @@ import { InvokeMark } from '@platform/ui/InvokeMark';
 import { Link } from '@tanstack/react-router';
 import { PaletteButton } from '@workbench/palette/PaletteButton';
 import { ProjectTabs } from '@workbench/projects/components';
-
-import { SettingsButton } from '@/workbench/settings';
+import { SettingsButton } from '@workbench/settings/SettingsButton';
+import { useTranslation } from 'react-i18next';
 
 import { BatchCountField } from './BatchCountField';
 import { InvokeControl } from './InvokeControl';
@@ -27,6 +27,7 @@ const HOME_LINK_STYLE = {
 /** Workbench top bar: brand, global Invoke command cluster, project tabs, layout + account controls. */
 export const TopBar = () => {
   const { canManageModels, canManageNodes } = useCapabilities();
+  const { t } = useTranslation();
 
   return (
     <Flex
@@ -42,7 +43,7 @@ export const TopBar = () => {
       pe="1.5"
       w="full"
     >
-      <Link to="/" style={HOME_LINK_STYLE}>
+      <Link aria-label={t('commandPalette.launchpad.goToProjects')} to="/" style={HOME_LINK_STYLE}>
         <InvokeMark size={20} />
       </Link>
       <Separator orientation="vertical" h={5} ms="-2" />

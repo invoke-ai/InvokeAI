@@ -135,6 +135,7 @@ describe('socketHub', () => {
 
     expect(sockets).toHaveLength(2);
 
+    sockets[0]!.fire('queue_item_status_changed', { item_id: 0 });
     sockets[1]!.fire('queue_item_status_changed', { item_id: 1 });
 
     expect(handler).toHaveBeenCalledTimes(1);

@@ -1,6 +1,7 @@
 import type { FoundModel } from '@features/models/core/types';
 
 import { DEFAULT_LIBRARY_FILTERS, type ModelLibraryFilters } from '@features/models/core/library';
+import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
 
 /**
@@ -41,15 +42,22 @@ export interface ModelsUiSnapshot {
   libraryScrollOffsets: Record<string, number>;
 }
 
-const store = createExternalStore<ModelsUiSnapshot>({
+const createInitialModelsUiSnapshot = (): ModelsUiSnapshot => ({
   activeModelKey: null,
   activeTab: 'add',
-  filters: DEFAULT_LIBRARY_FILTERS,
+  filters: { ...DEFAULT_LIBRARY_FILTERS },
   hfLookup: null,
   libraryScrollOffsets: {},
   queueExpanded: false,
   scan: null,
   selectedKeys: new Set(),
+});
+
+const store = createExternalStore<ModelsUiSnapshot>(createInitialModelsUiSnapshot());
+
+registerAccountOwnedResource({
+  clear: () => store.setSnapshot(createInitialModelsUiSnapshot()),
+  name: 'models-ui',
 });
 
 export const updateModelsUi = (next: Partial<ModelsUiSnapshot>): void => {

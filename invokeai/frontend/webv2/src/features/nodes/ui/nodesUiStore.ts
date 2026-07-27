@@ -1,3 +1,4 @@
+import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
 
 /**
@@ -18,12 +19,19 @@ export interface NodesUiSnapshot {
   searchTerm: string;
 }
 
-const store = createExternalStore<NodesUiSnapshot>({
+const INITIAL_NODES_UI_SNAPSHOT: NodesUiSnapshot = {
   activeTab: 'details',
   activePackName: null,
   activityExpanded: false,
   addTab: 'git',
   searchTerm: '',
+};
+
+const store = createExternalStore<NodesUiSnapshot>(INITIAL_NODES_UI_SNAPSHOT);
+
+registerAccountOwnedResource({
+  clear: () => store.setSnapshot(INITIAL_NODES_UI_SNAPSHOT),
+  name: 'nodes-ui',
 });
 
 export const updateNodesUi = (next: Partial<NodesUiSnapshot>): void => store.patchSnapshot(next);

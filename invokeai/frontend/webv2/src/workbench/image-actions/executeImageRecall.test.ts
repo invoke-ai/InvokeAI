@@ -2,6 +2,7 @@ import type { GalleryImage } from '@features/gallery';
 import type { ModelConfig } from '@features/models';
 import type { WorkbenchCommands } from '@workbench/workbenchStore';
 
+import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const galleryApi = vi.hoisted(() => ({
@@ -54,6 +55,7 @@ const createCommands = () => {
 
 describe('executeImageRecall', () => {
   beforeEach(() => {
+    accountLifecycle.activate('test-account');
     galleryApi.galleryImages.metadata.mockReset();
     galleryApi.galleryImages.resolveMany.mockReset();
   });
@@ -74,7 +76,7 @@ describe('executeImageRecall', () => {
       })
     ).resolves.toBe(true);
 
-    expect(galleryApi.galleryImages.metadata).toHaveBeenCalledWith('selected.png');
+    expect(galleryApi.galleryImages.metadata).toHaveBeenCalledWith('selected.png', expect.any(AbortSignal));
     expect(setSettings).toHaveBeenCalledWith(
       expect.objectContaining({ positivePrompt: 'recalled prompt' }),
       'project-1'
@@ -139,7 +141,10 @@ describe('executeImageRecall', () => {
       })
     ).resolves.toBe(true);
 
-    expect(galleryApi.galleryImages.resolveMany).toHaveBeenCalledWith(['valid-crop.png', 'deleted-crop.png']);
+    expect(galleryApi.galleryImages.resolveMany).toHaveBeenCalledWith(
+      ['valid-crop.png', 'deleted-crop.png'],
+      expect.any(AbortSignal)
+    );
     expect(setSettings).toHaveBeenCalledWith(
       expect.objectContaining({
         positivePrompt: 'keep other fields',
@@ -147,5 +152,73 @@ describe('executeImageRecall', () => {
       }),
       'project-1'
     );
+  });
+
+  it('does not reuse or commit image metadata from an expired account epoch', async () => {
+    const oldCommands = createCommands();
+    let resolveOldMetadata: ((value: unknown) => void) | undefined;
+
+    galleryApi.galleryImages.metadata.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveOldMetadata = resolve;
+      })
+    );
+    const oldRecall = executeImageRecall({
+      commands: oldCommands.commands,
+      generateValues: { modelKey: model.key },
+      image,
+      kind: 'remix',
+      models: [model],
+      projectId: 'project-a',
+    });
+
+    accountLifecycle.invalidate();
+    accountLifecycle.activate('user-b');
+
+    const newCommands = createCommands();
+    galleryApi.galleryImages.metadata.mockResolvedValueOnce({ positive_prompt: 'user b' });
+    await expect(
+      executeImageRecall({
+        commands: newCommands.commands,
+        generateValues: { modelKey: model.key },
+        image,
+        kind: 'remix',
+        models: [model],
+        projectId: 'project-b',
+      })
+    ).resolves.toBe(true);
+
+    resolveOldMetadata?.({ positive_prompt: 'user a' });
+    await expect(oldRecall).resolves.toBe(false);
+
+    expect(oldCommands.setSettings).not.toHaveBeenCalled();
+    expect(newCommands.setSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ positivePrompt: 'user b' }),
+      'project-b'
+    );
+    expect(galleryApi.galleryImages.metadata).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not recapture the current account when a caller-owned scope has already expired', async () => {
+    const oldCommands = createCommands();
+    const owner = accountLifecycle.capture();
+
+    accountLifecycle.activate('new-account');
+
+    await expect(
+      executeImageRecall({
+        commands: oldCommands.commands,
+        generateValues: { modelKey: model.key },
+        image,
+        kind: 'remix',
+        models: [model],
+        owner,
+        projectId: 'project-a',
+      })
+    ).resolves.toBe(false);
+
+    expect(galleryApi.galleryImages.metadata).not.toHaveBeenCalled();
+    expect(oldCommands.setSettings).not.toHaveBeenCalled();
+    expect(oldCommands.add).not.toHaveBeenCalled();
   });
 });

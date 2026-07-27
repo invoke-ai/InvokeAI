@@ -3,6 +3,11 @@ import { installCustomNodePack } from '@features/nodes/data/api';
 import { addCustomNodeInstallLogEntry } from '@features/nodes/data/installLogStore';
 import { refreshCustomNodePacks, useCustomNodesSelector } from '@features/nodes/data/nodesStore';
 import { updateNodesUi, useNodesUiSelector, type AddNodesTab } from '@features/nodes/ui/nodesUiStore';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, Field, Scrollable, Tabs, toaster } from '@platform/ui';
 import { FolderOpenIcon, GitBranchIcon } from 'lucide-react';
@@ -24,8 +29,8 @@ export const AddNodesView = () => {
   );
 
   return (
-    <Stack gap="3" h="full" minH="0">
-      <Tabs.Root size="sm" value={addTab} onValueChange={handleValueChange}>
+    <Tabs.Root asChild lazyMount size="sm" unmountOnExit value={addTab} onValueChange={handleValueChange}>
+      <Stack gap="3" h="full" minH="0">
         <Tabs.List>
           <Tabs.Trigger fontSize="xs" value="git">
             <Icon as={GitBranchIcon} boxSize="3" />
@@ -36,11 +41,20 @@ export const AddNodesView = () => {
             {t('nodes.scanFolder')}
           </Tabs.Trigger>
         </Tabs.List>
-      </Tabs.Root>
-      <Scrollable flex="1" label={t('nodes.addCustomNodes')} minH="0" pr="1">
-        {addTab === 'git' ? <InstallFromGitForm /> : <ScanFolderInfo customNodesPath={customNodesPath} />}
-      </Scrollable>
-    </Stack>
+        <Box flex="1" minH="0">
+          <Tabs.Content h="full" p="0" value="git">
+            <Scrollable h="full" label={t('nodes.gitUrl')} minH="0" pr="1">
+              <InstallFromGitForm />
+            </Scrollable>
+          </Tabs.Content>
+          <Tabs.Content h="full" p="0" value="scan">
+            <Scrollable h="full" label={t('nodes.scanFolder')} minH="0" pr="1">
+              <ScanFolderInfo customNodesPath={customNodesPath} />
+            </Scrollable>
+          </Tabs.Content>
+        </Box>
+      </Stack>
+    </Tabs.Root>
   );
 };
 
@@ -55,16 +69,20 @@ const InstallFromGitForm = () => {
       return;
     }
 
+    const owner = captureAccountScope();
+
     setIsInstalling(true);
     addCustomNodeInstallLogEntry({ name: trimmedSource, status: 'installing' });
 
     try {
-      const result = await installCustomNodePack(trimmedSource);
+      const result = await installCustomNodePack(trimmedSource, owner.signal);
 
+      assertAccountScopeCurrent(owner);
       if (result.success) {
         addCustomNodeInstallLogEntry({ message: result.message, name: result.name, status: 'completed' });
         setSource('');
-        await refreshCustomNodePacks();
+        await refreshCustomNodePacks(owner);
+        assertAccountScopeCurrent(owner);
 
         if (result.requires_dependencies) {
           toaster.create({
@@ -80,13 +98,19 @@ const InstallFromGitForm = () => {
         addCustomNodeInstallLogEntry({ message: result.message, name: result.name, status: 'error' });
       }
     } catch (error) {
+      if (!isAccountScopeCurrent(owner)) {
+        return;
+      }
+
       addCustomNodeInstallLogEntry({
         message: getApiErrorMessage(error, t('nodes.installFailed')),
         name: trimmedSource,
         status: 'error',
       });
     } finally {
-      setIsInstalling(false);
+      if (isAccountScopeCurrent(owner)) {
+        setIsInstalling(false);
+      }
     }
   }, [t, trimmedSource]);
   const handleSourceChange = useCallback(
@@ -138,7 +162,7 @@ const ScanFolderInfo = ({ customNodesPath }: { customNodesPath: string | null })
       </Text>
       {customNodesPath ? (
         <Box bg="bg.subtle" borderColor="border.subtle" borderWidth="1px" p="3" rounded="md">
-          <Text color="fg.subtle" fontSize="2xs" fontWeight="600" textTransform="uppercase">
+          <Text color="fg.muted" fontSize="2xs" fontWeight="600" textTransform="uppercase">
             {t('nodes.nodesDirectory')}
           </Text>
           <Text fontFamily="mono" fontSize="xs" mt="1" overflowWrap="anywhere">

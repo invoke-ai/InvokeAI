@@ -57,6 +57,11 @@ import {
   UPSCALE_TILE_SIZE_MIN,
 } from '@features/upscale/core/settings';
 import { useMountEffect } from '@platform/react/useMountEffect';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
 import { Button, Combobox, DropZone, Field, IconButton, Select, Slider, Tooltip } from '@platform/ui';
 import { toaster } from '@platform/ui/toaster';
 import { DicesIcon, ImagePlusIcon, Trash2Icon, UploadIcon, XIcon } from 'lucide-react';
@@ -382,14 +387,20 @@ const UpscaleImageField = ({
         return;
       }
 
+      const owner = captureAccountScope();
       setIsLoading(true);
 
       try {
-        const image = await galleryTransfers.upload(file, 'none');
+        const image = await galleryTransfers.upload(file, 'none', { signal: owner.signal });
 
+        assertAccountScopeCurrent(owner);
         onChange({ height: image.height, image_name: image.imageName, width: image.width });
         touchGalleryImages();
       } catch (error) {
+        if (!isAccountScopeCurrent(owner)) {
+          return;
+        }
+
         const message = error instanceof Error ? error.message : String(error);
         setErrorMessage(message);
         reportError(message);

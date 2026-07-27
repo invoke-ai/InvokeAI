@@ -10,8 +10,10 @@ import { useQueueCounts } from './queueDataStore';
  */
 const QueueStatCard = ({ value, label, danger }: { value: number; label: string; danger?: boolean }) => (
   <Stat.Root size="sm" colorScheme={danger ? 'red' : undefined} gap="0">
-    <Stat.ValueText>{value}</Stat.ValueText>
-    <Stat.Label fontSize="xs">{label}</Stat.Label>
+    <Stat.Label fontSize="xs" order="2">
+      {label}
+    </Stat.Label>
+    <Stat.ValueText order="1">{value}</Stat.ValueText>
   </Stat.Root>
 );
 

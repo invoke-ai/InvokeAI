@@ -1,19 +1,10 @@
 import type { HydratedWorkbenchSnapshot, PersistedWorkbenchSnapshotV1 } from '@workbench/persistenceContracts';
 import type { WorkbenchState } from '@workbench/projectContracts';
 
-import { getUserStorageScope } from '@features/identity';
-
 import { timeWorkbenchPerf } from './performanceMarks';
 
 const BASE_STORAGE_KEY = 'invokeai:v7:webv2:workbench';
 const WORKBENCH_SCHEMA_VERSION = 1;
-
-/**
- * Projects and the editor session are account-owned on multi-user backends, so
- * each signed-in user gets their own storage bucket on this browser.
- * Single-user mode keeps the unscoped key, so existing data is untouched.
- */
-const getStorageKey = (): string => `${BASE_STORAGE_KEY}${getUserStorageScope()}`;
 
 export interface WorkbenchPersistenceService {
   loadWorkbench(): Promise<HydratedWorkbenchSnapshot | null>;
@@ -82,55 +73,64 @@ export const serializeWorkbenchPersistenceSnapshot = (
   version: WORKBENCH_SCHEMA_VERSION,
 });
 
-export const localStorageWorkbenchPersistence: WorkbenchPersistenceService = {
-  clearWorkbench() {
-    if (!isBrowser()) {
+/**
+ * Construct one account-owned browser cache. The suffix is captured once,
+ * rather than read from mutable auth state when a debounced save eventually
+ * executes, so work started by account A can never land in account B's bucket.
+ */
+export const createLocalStorageWorkbenchPersistence = (storageSuffix: string): WorkbenchPersistenceService => {
+  const storageKey = `${BASE_STORAGE_KEY}${storageSuffix}`;
+
+  return {
+    clearWorkbench() {
+      if (!isBrowser()) {
+        return Promise.resolve();
+      }
+
+      window.localStorage.removeItem(storageKey);
+
       return Promise.resolve();
-    }
+    },
+    loadWorkbench() {
+      if (!isBrowser()) {
+        return Promise.resolve(null);
+      }
 
-    window.localStorage.removeItem(getStorageKey());
+      const value = window.localStorage.getItem(storageKey);
 
-    return Promise.resolve();
-  },
-  loadWorkbench() {
-    if (!isBrowser()) {
-      return Promise.resolve(null);
-    }
+      if (!value) {
+        return Promise.resolve(null);
+      }
 
-    const value = window.localStorage.getItem(getStorageKey());
+      try {
+        return Promise.resolve(hydratePersistedWorkbenchSnapshot(JSON.parse(value)));
+      } catch {
+        window.localStorage.removeItem(storageKey);
 
-    if (!value) {
-      return Promise.resolve(null);
-    }
+        return Promise.resolve(null);
+      }
+    },
+    saveWorkbench(state) {
+      const snapshot = createSnapshot(state);
 
-    try {
-      return Promise.resolve(hydratePersistedWorkbenchSnapshot(JSON.parse(value)));
-    } catch {
-      window.localStorage.removeItem(getStorageKey());
+      if (!isBrowser()) {
+        return Promise.resolve(snapshot);
+      }
 
-      return Promise.resolve(null);
-    }
-  },
-  saveWorkbench(state) {
-    const snapshot = createSnapshot(state);
+      try {
+        window.localStorage.setItem(
+          storageKey,
+          timeWorkbenchPerf(
+            'workbench:persistence-localstorage-stringify',
+            { area: 'persistence', kind: 'workbench', projectId: state.activeProjectId },
+            () => JSON.stringify(serializeWorkbenchPersistenceSnapshot(snapshot))
+          )
+        );
+      } catch {
+        // The backend remains the source of truth; localStorage is only an offline cache.
+      }
 
-    if (!isBrowser()) {
       return Promise.resolve(snapshot);
-    }
-
-    try {
-      window.localStorage.setItem(
-        getStorageKey(),
-        timeWorkbenchPerf(
-          'workbench:persistence-localstorage-stringify',
-          { area: 'persistence', kind: 'workbench', projectId: state.activeProjectId },
-          () => JSON.stringify(serializeWorkbenchPersistenceSnapshot(snapshot))
-        )
-      );
-    } catch {
-      // The backend remains the source of truth; localStorage is only an offline cache.
-    }
-
-    return Promise.resolve(snapshot);
-  },
+    },
+  };
 };

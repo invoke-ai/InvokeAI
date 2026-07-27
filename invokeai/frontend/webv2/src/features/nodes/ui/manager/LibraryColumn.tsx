@@ -31,7 +31,7 @@ export const LibraryColumn = () => {
         <Text fontSize="sm" fontWeight="700">
           {t('nodes.nodePacks')}
         </Text>
-        <Text color="fg.subtle" fontSize="xs">
+        <Text color="fg.muted" fontSize="xs">
           {nodePacks.length}
         </Text>
         <Box ms="auto">

@@ -5,9 +5,11 @@ import { configureHttpAuth } from '@platform/transport/http';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
+import { configureAppAccountLifecycle } from './accountLifecycle';
 import { App } from './App';
 
-// HTTP auth must be configured before any React-owned transport consumer mounts.
+// Identity and HTTP ownership must be configured before any route starts work.
+configureAppAccountLifecycle();
 configureHttpAuth(identityTransportAuthAdapter);
 
 const rootElement = document.getElementById('root');

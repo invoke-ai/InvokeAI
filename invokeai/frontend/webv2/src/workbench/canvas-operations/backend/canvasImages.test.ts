@@ -15,16 +15,22 @@ const jsonResponse = (body: unknown, init: { ok?: boolean; status?: number; stat
 describe('uploadCanvasImage', () => {
   it('forwards an abort signal to fetch', async () => {
     const controller = new AbortController();
-    const fetchImpl = vi.fn(() =>
+    const fetchMock = vi.fn((_input: RequestInfo | URL, _init?: RequestInit) =>
       Promise.resolve(jsonResponse({ height: 1, image_name: 'uploaded.png', width: 1 }))
-    ) as unknown as typeof fetch;
+    );
+    const fetchImpl = fetchMock as unknown as typeof fetch;
 
     await uploadCanvasImage(new Blob(['pixels'], { type: 'image/png' }), {
       fetch: fetchImpl,
       signal: controller.signal,
     });
 
-    expect(fetchImpl).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ signal: controller.signal }));
+    const signal = (fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.signal;
+
+    expect(signal).toBeInstanceOf(AbortSignal);
+    expect(signal?.aborted).toBe(false);
+    controller.abort();
+    expect(signal?.aborted).toBe(true);
   });
 
   it('POSTs a multipart file to the upload endpoint with the persistence params', async () => {

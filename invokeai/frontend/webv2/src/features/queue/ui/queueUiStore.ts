@@ -1,3 +1,4 @@
+import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
 
 export interface QueueItemRevealRequest {
@@ -19,6 +20,16 @@ export const clearPendingQueueItemReveal = (requestId: number): void => {
     queueRevealStore.setSnapshot({ pendingReveal: null });
   }
 };
+
+const resetQueueUi = (): void => {
+  nextRevealRequestId = 0;
+  queueRevealStore.setSnapshot({ pendingReveal: null });
+};
+
+registerAccountOwnedResource({
+  clear: resetQueueUi,
+  name: 'queue-ui',
+});
 
 export const getPendingQueueItemReveal = (): QueueItemRevealRequest | null =>
   queueRevealStore.getSnapshot().pendingReveal;

@@ -18,6 +18,12 @@ import { documentToPreviewGraph, GraphPreviewFlow } from '@features/workflow/ui/
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import { useWorkflowNotifications, useWorkflowProjectSelector } from '@features/workflow/ui/WorkflowUiContext';
 import { parseWorkflowJson, serializeWorkflowJson } from '@features/workflow/utility';
+import {
+  type AccountScope,
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, CloseButton, ConfirmDialog, JsonPreview, Scrollable } from '@platform/ui';
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
@@ -123,8 +129,8 @@ export const WorkflowLibraryDialog = ({
   const isWorkflowLoadPending = workflowLoad !== null;
 
   const refresh = useCallback(
-    (nextPage: number) => {
-      const params = { category, page: nextPage, query: searchTerm };
+    (nextPage: number, owner: AccountScope = captureAccountScope()) => {
+      const params = { category, page: nextPage, query: searchTerm, signal: owner.signal };
       const cached = getCachedWorkflowPage(params);
       const token = (refreshTokenRef.current += 1);
 
@@ -139,7 +145,7 @@ export const WorkflowLibraryDialog = ({
 
       listLibraryWorkflowsCached(params)
         .then((result) => {
-          if (token !== refreshTokenRef.current) {
+          if (!isAccountScopeCurrent(owner) || token !== refreshTokenRef.current) {
             return;
           }
 
@@ -155,14 +161,14 @@ export const WorkflowLibraryDialog = ({
           }
         })
         .catch((error: unknown) => {
-          if (cached) {
+          if (!isAccountScopeCurrent(owner) || cached) {
             return; // Stale-but-rendered beats an error toast on revalidation.
           }
 
           notify.error('Workflow library unavailable', getApiErrorMessage(error, 'Failed to list workflows.'));
         })
         .finally(() => {
-          if (token === refreshTokenRef.current) {
+          if (isAccountScopeCurrent(owner) && token === refreshTokenRef.current) {
             setIsLoading(false);
           }
         });
@@ -179,8 +185,10 @@ export const WorkflowLibraryDialog = ({
     }
   }, [isOpen, refresh]);
 
-  const fetchParsedWorkflow = async (item: WorkflowLibraryListItem) => {
-    const raw = await getLibraryWorkflowCached(item.workflow_id);
+  const fetchParsedWorkflow = async (item: WorkflowLibraryListItem, owner: AccountScope) => {
+    const raw = await getLibraryWorkflowCached(item.workflow_id, owner.signal);
+
+    assertAccountScopeCurrent(owner);
     const { document, warnings } = parseWorkflowJson(raw);
 
     return { document, raw, warnings };
@@ -190,6 +198,8 @@ export const WorkflowLibraryDialog = ({
     item: WorkflowLibraryListItem,
     loaded?: { document: ProjectGraphState; warnings: string[] }
   ) => {
+    const owner = captureAccountScope();
+
     if (workflowLoadInFlightRef.current) {
       return;
     }
@@ -200,9 +210,10 @@ export const WorkflowLibraryDialog = ({
 
       if (!parsed) {
         setWorkflowLoad({ id: item.workflow_id, phase: 'fetching' });
-        parsed = await fetchParsedWorkflow(item);
+        parsed = await fetchParsedWorkflow(item, owner);
       }
 
+      assertAccountScopeCurrent(owner);
       setWorkflowLoad({ id: item.workflow_id, phase: 'applying' });
       // Synchronous graph replacement can be expensive for large workflows.
       // Give React a full frame to commit and paint the busy overlay first.
@@ -210,60 +221,87 @@ export const WorkflowLibraryDialog = ({
         requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
       });
 
+      assertAccountScopeCurrent(owner);
       replace(parsed.document, `Loaded "${item.name}" from library`);
 
       for (const warning of parsed.warnings) {
         notify.info('Workflow load warning', warning);
       }
 
-      void touchLibraryWorkflowOpenedAt(item.workflow_id).catch(() => {
+      void touchLibraryWorkflowOpenedAt(item.workflow_id, owner.signal).catch(() => {
         // Recency bookkeeping only; loading already succeeded.
       });
       onOpenChange(false);
     } catch (error) {
+      if (!isAccountScopeCurrent(owner)) {
+        return;
+      }
+
       notify.error('Failed to load workflow', getApiErrorMessage(error, `Could not load "${item.name}".`));
     } finally {
-      workflowLoadInFlightRef.current = false;
-      setWorkflowLoad(null);
+      if (isAccountScopeCurrent(owner)) {
+        workflowLoadInFlightRef.current = false;
+        setWorkflowLoad(null);
+      }
     }
   };
 
   const previewWorkflow = async (item: WorkflowLibraryListItem) => {
+    const owner = captureAccountScope();
+
     setPreviewingWorkflowId(item.workflow_id);
 
     try {
-      const { document, raw, warnings } = await fetchParsedWorkflow(item);
+      const { document, raw, warnings } = await fetchParsedWorkflow(item, owner);
 
+      assertAccountScopeCurrent(owner);
       setPreview({ document, item, raw, warnings });
     } catch (error) {
+      if (!isAccountScopeCurrent(owner)) {
+        return;
+      }
+
       notify.error('Failed to preview workflow', getApiErrorMessage(error, `Could not preview "${item.name}".`));
     } finally {
-      setPreviewingWorkflowId(null);
+      if (isAccountScopeCurrent(owner)) {
+        setPreviewingWorkflowId(null);
+      }
     }
   };
 
   const saveToLibrary = async (asNew: boolean) => {
+    const owner = captureAccountScope();
+
     setIsSaving(true);
 
     try {
       const serialized = serializeWorkflowJson(projectGraph);
 
       if (!asNew && projectGraph.libraryWorkflowId) {
-        await updateLibraryWorkflow(projectGraph.libraryWorkflowId, serialized);
+        await updateLibraryWorkflow(projectGraph.libraryWorkflowId, serialized, owner.signal);
+
+        assertAccountScopeCurrent(owner);
         notify.success('Workflow saved', `Updated "${projectGraph.name || 'Untitled Workflow'}" in the library.`);
       } else {
-        const workflowId = await createLibraryWorkflow(serialized);
+        const workflowId = await createLibraryWorkflow(serialized, owner.signal);
 
+        assertAccountScopeCurrent(owner);
         bindLibraryWorkflow(workflowId);
         notify.success('Workflow saved', `Saved "${projectGraph.name || 'Untitled Workflow'}" to the library.`);
       }
 
       invalidateWorkflowLibraryCache();
-      refresh(page);
+      refresh(page, owner);
     } catch (error) {
+      if (!isAccountScopeCurrent(owner)) {
+        return;
+      }
+
       notify.error('Failed to save workflow', getApiErrorMessage(error, 'The workflow could not be saved.'));
     } finally {
-      setIsSaving(false);
+      if (isAccountScopeCurrent(owner)) {
+        setIsSaving(false);
+      }
     }
   };
 
@@ -508,11 +546,20 @@ export const WorkflowLibraryDialog = ({
             return;
           }
 
+          const owner = captureAccountScope();
+          const workflowId = pendingDelete.workflow_id;
+
           try {
-            await deleteLibraryWorkflow(pendingDelete.workflow_id);
+            await deleteLibraryWorkflow(workflowId, owner.signal);
+
+            assertAccountScopeCurrent(owner);
             invalidateWorkflowLibraryCache();
-            refresh(page);
+            refresh(page, owner);
           } catch (error) {
+            if (!isAccountScopeCurrent(owner)) {
+              return;
+            }
+
             notify.error('Failed to delete workflow', getApiErrorMessage(error, 'The workflow could not be deleted.'));
           }
         }}

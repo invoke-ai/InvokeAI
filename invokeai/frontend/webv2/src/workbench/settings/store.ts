@@ -3,6 +3,13 @@ import type { ProjectSettings, WorkbenchPreferences } from '@workbench/settings/
 
 import { getUserStorageScope } from '@features/identity';
 import { normalizeWorkbenchLanguage } from '@platform/i18n/languages';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+  registerAccountOwnedResource,
+  type AccountScope,
+} from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
 import { createSingleFlight } from '@platform/state/singleFlight';
 import { DEFAULT_THEME_ID, isWorkbenchThemeId } from '@theme/themes';
@@ -72,20 +79,40 @@ interface WorkbenchSettingsSnapshot {
   error?: string;
 }
 
-const store = createExternalStore<WorkbenchSettingsSnapshot>({
+const INITIAL_SETTINGS_SNAPSHOT: WorkbenchSettingsSnapshot = {
   hydratedStorageKey: null,
   preferences: DEFAULT_PREFERENCES,
   scope: 'global',
   status: 'idle',
+};
+const store = createExternalStore<WorkbenchSettingsSnapshot>(INITIAL_SETTINGS_SNAPSHOT);
+
+interface SettingsMutationQueue {
+  latestRevision: number;
+  owner: AccountScope;
+  tail: Promise<void>;
+}
+
+let settingsMutationQueue: SettingsMutationQueue | null = null;
+
+registerAccountOwnedResource({
+  clear: () => {
+    settingsMutationQueue = null;
+    store.setSnapshot(INITIAL_SETTINGS_SNAPSHOT);
+  },
+  name: 'workbench-settings',
 });
 
 const isBrowser = (): boolean => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
 
-const getSettingsStorageKey = (): string => `${SETTINGS_BASE_STORAGE_KEY}${getUserStorageScope()}`;
+const getSettingsStorageKey = (storageSuffix = getUserStorageScope()): string =>
+  `${SETTINGS_BASE_STORAGE_KEY}${storageSuffix}`;
 
-const getLegacyWorkbenchStorageKey = (): string => `${LEGACY_WORKBENCH_BASE_STORAGE_KEY}${getUserStorageScope()}`;
+const getLegacyWorkbenchStorageKey = (storageSuffix = getUserStorageScope()): string =>
+  `${LEGACY_WORKBENCH_BASE_STORAGE_KEY}${storageSuffix}`;
 
-const getSettingsScope = (): WorkbenchSettingsSnapshot['scope'] => (getUserStorageScope() ? 'user' : 'global');
+const getSettingsScope = (storageSuffix = getUserStorageScope()): WorkbenchSettingsSnapshot['scope'] =>
+  storageSuffix ? 'user' : 'global';
 
 const isDeveloperLogLevel = (value: unknown): value is DeveloperLogLevel =>
   typeof value === 'string' && DEVELOPER_LOG_LEVELS.includes(value as DeveloperLogLevel);
@@ -250,13 +277,13 @@ interface StoredSettings {
   pendingPush?: boolean;
 }
 
-const readLocalSettings = (): StoredSettings | null => {
+const readLocalSettings = (storageKey: string): StoredSettings | null => {
   if (!isBrowser()) {
     return null;
   }
 
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(getSettingsStorageKey()) ?? 'null') as
+    const parsed = JSON.parse(window.localStorage.getItem(storageKey) ?? 'null') as
       | (Partial<StoredSettings> & Partial<WorkbenchPreferences>)
       | null;
 
@@ -278,31 +305,31 @@ const readLocalSettings = (): StoredSettings | null => {
   }
 };
 
-const writeLocalSettings = (preferences: WorkbenchPreferences, pendingPush?: boolean): void => {
+const writeLocalSettings = (storageKey: string, preferences: WorkbenchPreferences, pendingPush?: boolean): void => {
   if (!isBrowser()) {
     return;
   }
 
   const payload: StoredSettings = pendingPush ? { pendingPush, preferences } : { preferences };
 
-  window.localStorage.setItem(getSettingsStorageKey(), JSON.stringify(payload));
+  window.localStorage.setItem(storageKey, JSON.stringify(payload));
 };
 
-const removeLocalSettings = (): void => {
+const removeLocalSettings = (storageKey: string): void => {
   if (!isBrowser()) {
     return;
   }
 
-  window.localStorage.removeItem(getSettingsStorageKey());
+  window.localStorage.removeItem(storageKey);
 };
 
-const readLegacyLocalPreferences = (): WorkbenchPreferences | null => {
+const readLegacyLocalPreferences = (storageSuffix: string): WorkbenchPreferences | null => {
   if (!isBrowser()) {
     return null;
   }
 
   try {
-    const raw = window.localStorage.getItem(getLegacyWorkbenchStorageKey());
+    const raw = window.localStorage.getItem(getLegacyWorkbenchStorageKey(storageSuffix));
     const parsed = raw ? (JSON.parse(raw) as { state?: { account?: { preferences?: unknown } } }) : null;
 
     return parsed?.state?.account?.preferences
@@ -313,31 +340,64 @@ const readLegacyLocalPreferences = (): WorkbenchPreferences | null => {
   }
 };
 
-const loadLegacySessionPreferences = async (): Promise<WorkbenchPreferences | null> => {
-  const blob = await fetchSessionBlob();
+const loadLegacySessionPreferences = async (owner: AccountScope): Promise<WorkbenchPreferences | null> => {
+  const blob = await fetchSessionBlob(owner.signal);
 
+  assertAccountScopeCurrent(owner);
   return blob?.account.preferences ? normalizeWorkbenchPreferences(blob.account.preferences) : null;
 };
 
 const replaceSnapshot = (
   preferences: WorkbenchPreferences,
   status: WorkbenchSettingsSnapshot['status'],
-  hydratedStorageKey: string | null = store.getSnapshot().hydratedStorageKey
+  hydratedStorageKey: string | null = store.getSnapshot().hydratedStorageKey,
+  storageSuffix = getUserStorageScope()
 ): void => {
-  store.setSnapshot({ hydratedStorageKey, preferences, scope: getSettingsScope(), status });
+  store.setSnapshot({ hydratedStorageKey, preferences, scope: getSettingsScope(storageSuffix), status });
 };
 
-const pushPreferences = (preferences: WorkbenchPreferences): Promise<void> =>
-  setClientStateValue(SETTINGS_CLIENT_STATE_KEY, JSON.stringify(preferences));
+const pushPreferences = (preferences: WorkbenchPreferences, signal: AbortSignal): Promise<void> =>
+  setClientStateValue(SETTINGS_CLIENT_STATE_KEY, JSON.stringify(preferences), signal);
 
-const resolveSettings = async (local: StoredSettings | null): Promise<WorkbenchPreferences> => {
+const getSettingsMutationQueue = (owner: AccountScope): SettingsMutationQueue => {
+  if (settingsMutationQueue?.owner === owner) {
+    return settingsMutationQueue;
+  }
+
+  settingsMutationQueue = { latestRevision: 0, owner, tail: Promise.resolve() };
+
+  return settingsMutationQueue;
+};
+
+const enqueueSettingsMutation = (
+  owner: AccountScope,
+  operation: (queue: SettingsMutationQueue, revision: number) => Promise<void>
+): Promise<void> => {
+  const queue = getSettingsMutationQueue(owner);
+  const revision = (queue.latestRevision += 1);
+  const run = (): Promise<void> => operation(queue, revision);
+  const result = queue.tail.then(run, run);
+
+  queue.tail = result.catch(() => undefined);
+
+  return result;
+};
+
+const resolveSettings = async (
+  local: StoredSettings | null,
+  owner: AccountScope,
+  storageSuffix: string
+): Promise<WorkbenchPreferences> => {
   if (local?.pendingPush) {
-    await pushPreferences(local.preferences);
+    await pushPreferences(local.preferences, owner.signal);
+    assertAccountScopeCurrent(owner);
 
     return local.preferences;
   }
 
-  const backendPreferences = parsePreferences(await getClientStateValue(SETTINGS_CLIENT_STATE_KEY));
+  const backendPreferences = parsePreferences(await getClientStateValue(SETTINGS_CLIENT_STATE_KEY, owner.signal));
+
+  assertAccountScopeCurrent(owner);
 
   if (backendPreferences) {
     return backendPreferences;
@@ -346,12 +406,13 @@ const resolveSettings = async (local: StoredSettings | null): Promise<WorkbenchP
   // First contact for this account: adopt whatever the legacy locations
   // hold and write the new backend key once.
   const preferences =
-    (await loadLegacySessionPreferences()) ??
+    (await loadLegacySessionPreferences(owner)) ??
     local?.preferences ??
-    readLegacyLocalPreferences() ??
+    readLegacyLocalPreferences(storageSuffix) ??
     normalizeWorkbenchPreferences();
 
-  await pushPreferences(preferences);
+  await pushPreferences(preferences, owner.signal);
+  assertAccountScopeCurrent(owner);
 
   return preferences;
 };
@@ -364,33 +425,40 @@ const settingsLoad = createSingleFlight<WorkbenchPreferences>();
  * and the next load retries the backend.
  */
 export const loadWorkbenchSettings = (): Promise<WorkbenchPreferences> => {
-  const storageKey = getSettingsStorageKey();
+  const owner = captureAccountScope();
+  const storageSuffix = owner.accountId === null ? getUserStorageScope() : owner.storageSuffix;
+  const storageKey = getSettingsStorageKey(storageSuffix);
 
   if (store.getSnapshot().hydratedStorageKey === storageKey) {
     return Promise.resolve(getWorkbenchPreferences());
   }
 
-  return settingsLoad.run(storageKey, async () => {
-    store.patchSnapshot({ scope: getSettingsScope(), status: 'loading' });
-    const local = readLocalSettings();
+  return settingsLoad.run(`${storageKey}:${owner.epoch}`, async () => {
+    store.patchSnapshot({ scope: getSettingsScope(storageSuffix), status: 'loading' });
+    const local = readLocalSettings(storageKey);
 
     try {
-      const preferences = await resolveSettings(local);
+      const preferences = await resolveSettings(local, owner, storageSuffix);
 
-      writeLocalSettings(preferences);
-      replaceSnapshot(preferences, 'ready', storageKey);
+      assertAccountScopeCurrent(owner);
+      writeLocalSettings(storageKey, preferences);
+      replaceSnapshot(preferences, 'ready', storageKey, storageSuffix);
 
       return preferences;
     } catch (error) {
-      const fallback = local?.preferences ?? readLegacyLocalPreferences();
+      if (!isAccountScopeCurrent(owner)) {
+        throw error;
+      }
+
+      const fallback = local?.preferences ?? readLegacyLocalPreferences(storageSuffix);
       const preferences = fallback ?? normalizeWorkbenchPreferences();
 
-      writeLocalSettings(preferences, local?.pendingPush);
+      writeLocalSettings(storageKey, preferences, local?.pendingPush);
       store.setSnapshot({
         error: error instanceof Error ? error.message : 'Failed to load settings from the backend.',
         hydratedStorageKey: null,
         preferences,
-        scope: getSettingsScope(),
+        scope: getSettingsScope(storageSuffix),
         status: fallback ? 'ready' : 'error',
       });
 
@@ -431,29 +499,58 @@ export const useWorkbenchReduceMotion = (): boolean =>
   store.useSelector((snapshot) => snapshot.preferences.reduceMotion);
 
 export const patchWorkbenchPreferences = async (preferences: Partial<WorkbenchPreferences>): Promise<void> => {
+  const owner = captureAccountScope();
+  const storageSuffix = owner.accountId === null ? getUserStorageScope() : owner.storageSuffix;
+  const storageKey = getSettingsStorageKey(storageSuffix);
   const next = normalizeWorkbenchPreferences({ ...store.getSnapshot().preferences, ...preferences });
 
-  replaceSnapshot(next, 'ready');
-  writeLocalSettings(next, true);
+  replaceSnapshot(next, 'ready', store.getSnapshot().hydratedStorageKey, storageSuffix);
+  writeLocalSettings(storageKey, next, true);
 
-  try {
-    await pushPreferences(next);
-    writeLocalSettings(next);
-  } catch (error) {
-    store.patchSnapshot({
-      error: error instanceof Error ? error.message : 'Failed to save settings.',
-      status: 'error',
-    });
-  }
+  await enqueueSettingsMutation(owner, async (queue, revision) => {
+    if (!isAccountScopeCurrent(owner)) {
+      return;
+    }
+
+    try {
+      await pushPreferences(next, owner.signal);
+
+      if (!isAccountScopeCurrent(owner)) {
+        return;
+      }
+      if (queue.latestRevision === revision) {
+        writeLocalSettings(storageKey, next);
+      }
+    } catch (error) {
+      if (!isAccountScopeCurrent(owner) || queue.latestRevision !== revision) {
+        return;
+      }
+
+      store.patchSnapshot({
+        error: error instanceof Error ? error.message : 'Failed to save settings.',
+        status: 'error',
+      });
+    }
+  });
 };
 
 export const clearWorkbenchSettings = async (): Promise<void> => {
-  removeLocalSettings();
-  replaceSnapshot(normalizeWorkbenchPreferences(), 'ready', getSettingsStorageKey());
+  const owner = captureAccountScope();
+  const storageSuffix = owner.accountId === null ? getUserStorageScope() : owner.storageSuffix;
+  const storageKey = getSettingsStorageKey(storageSuffix);
 
-  try {
-    await deleteClientStateValue(SETTINGS_CLIENT_STATE_KEY);
-  } catch {
-    // Backend persistence is best-effort; the local reset should still complete.
-  }
+  removeLocalSettings(storageKey);
+  replaceSnapshot(normalizeWorkbenchPreferences(), 'ready', storageKey, storageSuffix);
+
+  await enqueueSettingsMutation(owner, async () => {
+    if (!isAccountScopeCurrent(owner)) {
+      return;
+    }
+
+    try {
+      await deleteClientStateValue(SETTINGS_CLIENT_STATE_KEY, owner.signal);
+    } catch {
+      // Backend persistence is best-effort; the local reset should still complete.
+    }
+  });
 };

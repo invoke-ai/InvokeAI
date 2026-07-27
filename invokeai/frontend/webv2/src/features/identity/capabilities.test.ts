@@ -5,6 +5,7 @@ import type { AuthSession } from './session';
 import { getCapabilities } from './capabilities';
 
 const session = (overrides: Partial<AuthSession>): AuthSession => ({
+  accountEpoch: 0,
   multiuserEnabled: true,
   phase: 'ready',
   sessionExpired: false,
@@ -15,6 +16,14 @@ const session = (overrides: Partial<AuthSession>): AuthSession => ({
 });
 
 describe('Identity route capabilities', () => {
+  it.each(['unknown', 'unavailable'] as const)('grants nothing while auth mode is %s', (phase) => {
+    expect(getCapabilities(session({ multiuserEnabled: false, phase }))).toEqual({
+      canManageModels: false,
+      canManageNodes: false,
+      canManageUsers: false,
+    });
+  });
+
   it('allows all local management in single-user mode', () => {
     expect(getCapabilities(session({ multiuserEnabled: false }))).toEqual({
       canManageModels: true,

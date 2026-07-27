@@ -4,6 +4,7 @@ import type {
   CanvasRegionalGuidanceLayerContract,
 } from '@workbench/canvas-engine/contracts';
 
+import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { createBitmapStore } from '@workbench/canvas-engine/document/bitmapStore';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
 import {
@@ -22,7 +23,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { EngineDeps, RegistryTimers } from './engineRegistry';
 
-import { createEngineRegistry } from './engineRegistry';
+import { createEngineRegistry, getCanvasEngine, getOrCreateEngine } from './engineRegistry';
 
 const createDeferred = <T>() => {
   let resolve!: (value: T) => void;
@@ -139,6 +140,17 @@ const createFakeTimers = (): { timers: RegistryTimers; flush: () => void; pendin
 };
 
 describe('createEngineRegistry', () => {
+  it('disposes the process registry synchronously when its account expires', () => {
+    accountLifecycle.activate('user-a');
+    const engine = getOrCreateEngine('shared-project-id', createFakeDeps());
+    const dispose = vi.spyOn(engine.lifecycle, 'dispose');
+
+    accountLifecycle.invalidate();
+
+    expect(getCanvasEngine('shared-project-id')).toBeUndefined();
+    expect(dispose).toHaveBeenCalledOnce();
+  });
+
   it('returns the same instance per project id and distinct instances across ids', () => {
     const registry = createEngineRegistry();
     const deps = createFakeDeps();
@@ -221,6 +233,44 @@ describe('createEngineRegistry', () => {
     expect(disposeSpy).not.toHaveBeenCalled();
 
     engine.lifecycle.dispose();
+  });
+
+  it('synchronously disposes every active and cooling engine', () => {
+    const fakeTimers = createFakeTimers();
+    const registry = createEngineRegistry({ timers: fakeTimers.timers });
+    const active = registry.getOrCreateEngine('active', createFakeDeps());
+    const cooling = registry.getOrCreateEngine('cooling', createFakeDeps());
+    const activeDispose = vi.spyOn(active.lifecycle, 'dispose');
+    const coolingDispose = vi.spyOn(cooling.lifecycle, 'dispose');
+
+    registry.releaseEngine('cooling');
+    expect(fakeTimers.pending()).toBe(1);
+
+    registry.disposeAll();
+
+    expect(registry.getEngine('active')).toBeUndefined();
+    expect(registry.getEngine('cooling')).toBeUndefined();
+    expect(fakeTimers.pending()).toBe(0);
+    expect(activeDispose).toHaveBeenCalledOnce();
+    expect(coolingDispose).toHaveBeenCalledOnce();
+  });
+
+  it('continues disposing account-owned engines after one disposal fails', () => {
+    const registry = createEngineRegistry();
+    const first = registry.getOrCreateEngine('first', createFakeDeps());
+    const second = registry.getOrCreateEngine('second', createFakeDeps());
+    const failure = new Error('first engine cleanup failed');
+    const firstDispose = vi.spyOn(first.lifecycle, 'dispose').mockImplementationOnce(() => {
+      throw failure;
+    });
+    const secondDispose = vi.spyOn(second.lifecycle, 'dispose');
+
+    expect(() => registry.disposeAll()).toThrow(failure);
+
+    expect(firstDispose).toHaveBeenCalledOnce();
+    expect(secondDispose).toHaveBeenCalledOnce();
+    expect(registry.getEngine('first')).toBeUndefined();
+    expect(registry.getEngine('second')).toBeUndefined();
   });
 
   it('continues control and regional composites from a detached snapshot after a project switch', async () => {

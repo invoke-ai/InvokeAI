@@ -65,33 +65,47 @@ interface WorkflowRecordDTO {
 }
 
 /** Returns the stored workflow JSON, with the record id stamped in. */
-export const getLibraryWorkflow = async (workflowId: string): Promise<Record<string, unknown>> => {
-  const record = await apiFetchJson<WorkflowRecordDTO>(`/api/v1/workflows/i/${encodeURIComponent(workflowId)}`);
+export const getLibraryWorkflow = async (
+  workflowId: string,
+  signal?: AbortSignal
+): Promise<Record<string, unknown>> => {
+  const record = await apiFetchJson<WorkflowRecordDTO>(`/api/v1/workflows/i/${encodeURIComponent(workflowId)}`, {
+    signal,
+  });
 
   return { ...record.workflow, id: record.workflow_id };
 };
 
-export const createLibraryWorkflow = async (workflow: Record<string, unknown>): Promise<string> => {
+export const createLibraryWorkflow = async (
+  workflow: Record<string, unknown>,
+  signal?: AbortSignal
+): Promise<string> => {
   const { id: _id, ...workflowWithoutId } = workflow;
   const record = await apiFetchJson<WorkflowRecordDTO>('/api/v1/workflows/', {
     body: JSON.stringify({ workflow: workflowWithoutId }),
     method: 'POST',
+    signal,
   });
 
   return record.workflow_id;
 };
 
-export const updateLibraryWorkflow = async (workflowId: string, workflow: Record<string, unknown>): Promise<void> => {
+export const updateLibraryWorkflow = async (
+  workflowId: string,
+  workflow: Record<string, unknown>,
+  signal?: AbortSignal
+): Promise<void> => {
   await apiFetchJson(`/api/v1/workflows/i/${encodeURIComponent(workflowId)}`, {
     body: JSON.stringify({ workflow: { ...workflow, id: workflowId } }),
     method: 'PATCH',
+    signal,
   });
 };
 
-export const deleteLibraryWorkflow = async (workflowId: string): Promise<void> => {
-  await apiFetch(`/api/v1/workflows/i/${encodeURIComponent(workflowId)}`, { method: 'DELETE' });
+export const deleteLibraryWorkflow = async (workflowId: string, signal?: AbortSignal): Promise<void> => {
+  await apiFetch(`/api/v1/workflows/i/${encodeURIComponent(workflowId)}`, { method: 'DELETE', signal });
 };
 
-export const touchLibraryWorkflowOpenedAt = async (workflowId: string): Promise<void> => {
-  await apiFetch(`/api/v1/workflows/i/${encodeURIComponent(workflowId)}/opened_at`, { method: 'PUT' });
+export const touchLibraryWorkflowOpenedAt = async (workflowId: string, signal?: AbortSignal): Promise<void> => {
+  await apiFetch(`/api/v1/workflows/i/${encodeURIComponent(workflowId)}/opened_at`, { method: 'PUT', signal });
 };

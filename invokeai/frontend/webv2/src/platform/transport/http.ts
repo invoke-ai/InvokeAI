@@ -9,11 +9,17 @@ import { getDeploymentBasePath, getDeploymentBaseUrl } from './deploymentBase';
 
 const API_BASE_URL = (import.meta.env.VITE_INVOKEAI_API_BASE_URL ?? '').trim().replace(/\/$/, '');
 export interface HttpAuthAdapter {
+  /** Opaque identity-lifetime token; object identity must rotate on reauthentication. */
+  getIdentity(): unknown;
   getToken(): string | null;
-  onUnauthorized(): void;
+  onUnauthorized(rejectedToken: string, rejectedIdentity: unknown): void;
 }
 
-let authAdapter: HttpAuthAdapter = { getToken: () => null, onUnauthorized: () => undefined };
+let authAdapter: HttpAuthAdapter = {
+  getIdentity: () => null,
+  getToken: () => null,
+  onUnauthorized: () => undefined,
+};
 
 /** Selected once by the App composition root; Platform owns no Auth policy. */
 export const configureHttpAuth = (adapter: HttpAuthAdapter): void => {
@@ -70,6 +76,19 @@ export class ApiError extends Error {
   }
 }
 
+export class HttpRequestIdentityExpiredError extends Error {
+  constructor() {
+    super('The identity lifetime that started this HTTP request is no longer active.');
+    this.name = 'HttpRequestIdentityExpiredError';
+  }
+}
+
+const assertHttpIdentityCurrent = (identity: unknown): void => {
+  if (authAdapter.getIdentity() !== identity) {
+    throw new HttpRequestIdentityExpiredError();
+  }
+};
+
 const humanizeFieldName = (value: string): string => value.replaceAll('_', ' ');
 
 const getLastString = (values: unknown[]): string | null => {
@@ -122,9 +141,7 @@ export const assertOk = async (response: Response): Promise<Response> => {
   throw new ApiError(text || `${response.status} ${response.statusText}`, response.status);
 };
 
-/** Authenticated fetch that leaves status handling to the caller. */
-export const apiFetchRaw = (path: string, init?: RequestInit): Promise<Response> => {
-  const token = getHttpAuthToken();
+const fetchWithAuthToken = (path: string, init: RequestInit | undefined, token: string | null): Promise<Response> => {
   const headers = new Headers(init?.headers);
 
   if (token && !headers.has('Authorization')) {
@@ -134,15 +151,47 @@ export const apiFetchRaw = (path: string, init?: RequestInit): Promise<Response>
   return fetch(buildApiUrl(path), { ...init, headers });
 };
 
-export const apiFetch = async (path: string, init?: RequestInit): Promise<Response> => {
-  const hadToken = getHttpAuthToken() !== null;
-  const response = await apiFetchRaw(path, init);
+/** Authenticated fetch that leaves status handling to the caller. */
+export const apiFetchRaw = async (path: string, init?: RequestInit): Promise<Response> => {
+  const requestToken = getHttpAuthToken();
+  const requestIdentity = authAdapter.getIdentity();
+  const response = await fetchWithAuthToken(path, init, requestToken);
 
-  if (response.status === 401 && hadToken) {
-    authAdapter.onUnauthorized();
+  assertHttpIdentityCurrent(requestIdentity);
+
+  return response;
+};
+
+export const apiFetch = async (path: string, init?: RequestInit): Promise<Response> => {
+  // Capture one principal for the complete request. A late User A response
+  // must neither use User B's header nor expire User B's newer session.
+  const requestToken = getHttpAuthToken();
+  const requestIdentity = authAdapter.getIdentity();
+  const response = await fetchWithAuthToken(path, init, requestToken);
+  let expiredCurrentIdentity = false;
+
+  assertHttpIdentityCurrent(requestIdentity);
+
+  if (response.status === 401 && requestToken !== null && authAdapter.getToken() === requestToken) {
+    expiredCurrentIdentity = true;
+    authAdapter.onUnauthorized(requestToken, requestIdentity);
   }
 
-  return assertOk(response);
+  try {
+    const asserted = await assertOk(response);
+
+    assertHttpIdentityCurrent(requestIdentity);
+
+    return asserted;
+  } catch (error) {
+    // A current-session 401 intentionally rotates identity inside
+    // `onUnauthorized`; callers should still receive the backend ApiError.
+    if (!expiredCurrentIdentity) {
+      assertHttpIdentityCurrent(requestIdentity);
+    }
+
+    throw error;
+  }
 };
 
 /**
@@ -177,6 +226,7 @@ export const getApiErrorMessage = (error: unknown, fallback: string): string => 
 };
 
 export const apiFetchJson = async <T>(path: string, init?: RequestInit): Promise<T> => {
+  const requestIdentity = authAdapter.getIdentity();
   const headers = new Headers(init?.headers);
 
   if (init?.body !== undefined && !(init.body instanceof FormData) && !headers.has('Content-Type')) {
@@ -184,11 +234,28 @@ export const apiFetchJson = async <T>(path: string, init?: RequestInit): Promise
   }
 
   const response = await apiFetch(path, { ...init, headers });
+  const body = (await response.json()) as T;
 
-  return (await response.json()) as T;
+  assertHttpIdentityCurrent(requestIdentity);
+
+  return body;
 };
 
-export const sleep = (ms: number): Promise<void> =>
-  new Promise((resolve) => {
-    window.setTimeout(resolve, ms);
+export const sleep = (ms: number, signal?: AbortSignal): Promise<void> =>
+  new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(signal.reason);
+      return;
+    }
+
+    const onAbort = (): void => {
+      window.clearTimeout(timeoutId);
+      reject(signal?.reason);
+    };
+    const timeoutId = window.setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+
+    signal?.addEventListener('abort', onAbort, { once: true });
   });

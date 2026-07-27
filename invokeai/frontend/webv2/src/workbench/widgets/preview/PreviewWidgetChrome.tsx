@@ -27,10 +27,10 @@ export const PreviewWidgetLabel = (_props: WidgetLabelProps) => {
       <Text flexShrink={0} fontSize="xs" fontWeight="700">
         {boardName}
       </Text>
-      <Text color="fg.subtle" flexShrink={0} fontSize="xs">
+      <Text color="fg.muted" flexShrink={0} fontSize="xs">
         /
       </Text>
-      <Text color="fg.subtle" fontSize="xs" truncate>
+      <Text color="fg.muted" fontSize="xs" truncate>
         {imageName}
       </Text>
     </HStack>

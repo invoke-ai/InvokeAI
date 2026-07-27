@@ -1,6 +1,17 @@
 import type { Viewport } from '@xyflow/react';
 
+import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
+
 const viewports = new Map<string, Viewport>();
+
+export const clearWorkflowViewports = (): void => {
+  viewports.clear();
+};
+
+registerAccountOwnedResource({
+  clear: clearWorkflowViewports,
+  name: 'workflow-viewports',
+});
 
 export const getWorkflowViewportKey = (projectId: string, instanceId: string): string => `${projectId}:${instanceId}`;
 

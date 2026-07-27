@@ -35,7 +35,7 @@ export const NodeActivityBar = () => {
       <Collapsible.Content>
         <Flex direction="column" h="min(22rem, 45dvh)" minH="0" overflow="hidden">
           <HStack borderBottomWidth={1} gap="2" justify="space-between" px="3" py="1.5">
-            <Text color="fg.subtle" fontSize="2xs" fontWeight="700" textTransform="uppercase">
+            <Text color="fg.muted" fontSize="2xs" fontWeight="700" textTransform="uppercase">
               {t('nodes.installActivity')}
             </Text>
             <Button disabled={log.length === 0} size="2xs" variant="ghost" onClick={clearCustomNodeInstallLog}>

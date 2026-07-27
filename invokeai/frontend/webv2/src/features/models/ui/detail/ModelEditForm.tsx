@@ -8,6 +8,11 @@ import { getModelTypeLabel, MODEL_CATEGORIES } from '@features/models/core/taxon
 import { updateModel } from '@features/models/data/api';
 import { replaceModelInStore } from '@features/models/data/modelsStore';
 import { useZodForm } from '@platform/react/useZodForm';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
 import { Button, Field, Select } from '@platform/ui';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -80,18 +85,33 @@ export const ModelEditForm = ({
 
   const handleSave = () =>
     form.handleSubmit(async (values) => {
-      const updated = await updateModel(model.key, {
-        base: values.base,
-        description: values.description || null,
-        name: values.name,
-        prediction_type: values.predictionType === '' ? null : (values.predictionType as PredictionType),
-        source_url: values.sourceUrl === '' ? null : values.sourceUrl,
-        type: values.type,
-        variant: values.variant === '' ? null : values.variant,
-      });
+      const owner = captureAccountScope();
 
-      replaceModelInStore(updated);
-      onSaved();
+      try {
+        const updated = await updateModel(
+          model.key,
+          {
+            base: values.base,
+            description: values.description || null,
+            name: values.name,
+            prediction_type: values.predictionType === '' ? null : (values.predictionType as PredictionType),
+            source_url: values.sourceUrl === '' ? null : values.sourceUrl,
+            type: values.type,
+            variant: values.variant === '' ? null : values.variant,
+          },
+          owner.signal
+        );
+
+        assertAccountScopeCurrent(owner);
+        replaceModelInStore(updated);
+        onSaved();
+      } catch (error) {
+        if (!isAccountScopeCurrent(owner)) {
+          return;
+        }
+
+        throw error;
+      }
     });
 
   return (

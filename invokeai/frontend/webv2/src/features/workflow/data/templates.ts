@@ -7,6 +7,11 @@ import type {
   InvocationTemplatesSnapshot,
 } from '@features/workflow/core/types';
 
+import {
+  captureAccountScope,
+  isAccountScopeCurrent,
+  registerAccountOwnedResource,
+} from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
 import { apiFetchJson, getApiErrorMessage } from '@platform/transport/http';
 
@@ -19,7 +24,15 @@ export type { InvocationTemplatesSnapshot } from '@features/workflow/core/types'
  * than in project state.
  */
 
-const store = createExternalStore<InvocationTemplatesSnapshot>({ error: null, status: 'idle', templates: {} });
+const EMPTY_INVOCATION_TEMPLATES: InvocationTemplatesSnapshot = { error: null, status: 'idle', templates: {} };
+const store = createExternalStore<InvocationTemplatesSnapshot>(EMPTY_INVOCATION_TEMPLATES);
+
+registerAccountOwnedResource({
+  clear: () => {
+    store.setSnapshot(EMPTY_INVOCATION_TEMPLATES);
+  },
+  name: 'invocation-templates',
+});
 
 type JsonObject = Record<string, unknown>;
 
@@ -352,14 +365,24 @@ export const parseOpenApiToTemplates = (openApiDocument: unknown): InvocationTem
 };
 
 export const refreshInvocationTemplates = async (): Promise<void> => {
+  const owner = captureAccountScope();
+
   store.patchSnapshot({ error: null, status: 'loading' });
 
   try {
     // FastAPI serves the schema at the app root (proxied in dev), not under /api.
-    const openApiDocument = await apiFetchJson<unknown>('/openapi.json');
+    const openApiDocument = await apiFetchJson<unknown>('/openapi.json', { signal: owner.signal });
+
+    if (!isAccountScopeCurrent(owner)) {
+      return;
+    }
 
     store.setSnapshot({ error: null, status: 'loaded', templates: parseOpenApiToTemplates(openApiDocument) });
   } catch (error) {
+    if (!isAccountScopeCurrent(owner)) {
+      return;
+    }
+
     store.patchSnapshot({
       error: getApiErrorMessage(error, 'Failed to load node definitions from the backend.'),
       status: 'error',

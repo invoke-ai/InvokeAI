@@ -3,6 +3,12 @@ import { HStack, Icon, Input, Tag, Text, Wrap } from '@chakra-ui/react';
 import { triggerPhraseSchema } from '@features/models/core/schemas';
 import { updateModel } from '@features/models/data/api';
 import { replaceModelInStore } from '@features/models/data/modelsStore';
+import {
+  type AccountScope,
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
 import { Button, Field } from '@platform/ui';
 import { PlusIcon } from 'lucide-react';
 import { memo, useState } from 'react';
@@ -40,7 +46,7 @@ export const TriggerPhrasesEditor = ({
   const error = isEditorCurrent ? editor.error : null;
   const isSaving = isEditorCurrent ? editor.isSaving : false;
 
-  const persist = async (nextPhrases: string[]): Promise<boolean> => {
+  const persist = async (nextPhrases: string[], owner: AccountScope = captureAccountScope()): Promise<boolean> => {
     setEditor((current) => ({
       draft: current.modelKey === modelKey ? current.draft : '',
       error: current.modelKey === modelKey ? current.error : null,
@@ -49,15 +55,23 @@ export const TriggerPhrasesEditor = ({
     }));
 
     try {
-      replaceModelInStore(await updateModel(modelKey, { trigger_phrases: nextPhrases }));
+      const updated = await updateModel(modelKey, { trigger_phrases: nextPhrases }, owner.signal);
 
+      assertAccountScopeCurrent(owner);
+      replaceModelInStore(updated);
       return true;
     } catch (persistError) {
+      if (!isAccountScopeCurrent(owner)) {
+        return false;
+      }
+
       onError(persistError instanceof Error ? persistError.message : t('models.failedToUpdateTriggerPhrases'));
 
       return false;
     } finally {
-      setEditor((current) => (current.modelKey === modelKey ? { ...current, isSaving: false } : current));
+      if (isAccountScopeCurrent(owner)) {
+        setEditor((current) => (current.modelKey === modelKey ? { ...current, isSaving: false } : current));
+      }
     }
   };
 
@@ -82,7 +96,9 @@ export const TriggerPhrasesEditor = ({
     setEditor({ draft, error: null, isSaving, modelKey });
 
     // Clear the draft only once it is saved, so a failure never eats the text.
-    if (await persist([...phrases, parsed.data])) {
+    const owner = captureAccountScope();
+
+    if ((await persist([...phrases, parsed.data], owner)) && isAccountScopeCurrent(owner)) {
       setEditor((current) => (current.modelKey === modelKey ? { ...current, draft: '' } : current));
     }
   };

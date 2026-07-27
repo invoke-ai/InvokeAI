@@ -1,5 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const deferred = <T>(): { promise: Promise<T>; resolve: (value: T) => void } => {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((settle) => {
+    resolve = settle;
+  });
+
+  return { promise, resolve };
+};
+
 const dependencies = vi.hoisted(() => ({
   listModelInstalls: vi.fn(),
   refreshModels: vi.fn(),
@@ -60,5 +69,54 @@ describe('model install event interpretation', () => {
 
     await vi.advanceTimersByTimeAsync(250);
     expect(dependencies.listModelInstalls).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops a stale refresh without releasing the replacement account refresh', async () => {
+    const first = deferred<Array<{ id: number; source: string; status: 'waiting' }>>();
+    const second = deferred<Array<{ id: number; source: string; status: 'waiting' }>>();
+
+    dependencies.listModelInstalls.mockReset().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+
+    const store = await import('./installsStore');
+    const { accountLifecycle } = await import('@platform/state/accountLifecycle');
+    const staleRefresh = store.refreshInstalls();
+
+    accountLifecycle.invalidate();
+
+    expect(store.getInstallsSnapshot()).toEqual({ error: null, jobs: [], status: 'idle' });
+
+    const currentRefresh = store.refreshInstalls();
+
+    first.resolve([{ id: 1, source: 'old/account', status: 'waiting' }]);
+    await staleRefresh;
+
+    expect(store.getInstallsSnapshot()).toEqual({ error: null, jobs: [], status: 'loading' });
+    expect(store.refreshInstalls()).toBe(currentRefresh);
+    expect(dependencies.listModelInstalls).toHaveBeenCalledTimes(2);
+
+    second.resolve([{ id: 2, source: 'new/account', status: 'waiting' }]);
+    await currentRefresh;
+
+    expect(store.getInstallsSnapshot()).toEqual({
+      error: null,
+      jobs: [{ id: 2, source: 'new/account', status: 'waiting' }],
+      status: 'loaded',
+    });
+  });
+
+  it('ignores socket events owned by an expired account scope', async () => {
+    const store = await import('./installsStore');
+    const { accountLifecycle } = await import('@platform/state/accountLifecycle');
+    const owner = accountLifecycle.capture();
+
+    accountLifecycle.invalidate();
+    store.handleModelInstallSocketEvent(
+      'model_install_download_progress',
+      { bytes: 25, id: 7, total_bytes: 100 },
+      owner
+    );
+
+    expect(store.getInstallProgress(7)).toBeNull();
+    expect(store.getInstallsSnapshot()).toEqual({ error: null, jobs: [], status: 'idle' });
   });
 });

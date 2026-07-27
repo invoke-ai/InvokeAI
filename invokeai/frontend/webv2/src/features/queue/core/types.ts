@@ -236,11 +236,11 @@ export interface QueueBackendPort extends QueueFeatureCommands {
     options?: QueueResultImageOptions
   ): Promise<QueueResultImage[]>;
   listItems(): Promise<QueueBackendItem[]>;
-  readCurrent(scope?: QueueQueryScope): Promise<QueueItemReadModel | null>;
-  readItemIds(order: 'asc' | 'desc', scope?: QueueQueryScope): Promise<QueueItemIdsReadModel>;
-  readItemsById(itemIds: number[]): Promise<QueueItemReadModel[]>;
-  readNext(scope?: QueueQueryScope): Promise<QueueItemReadModel | null>;
-  readStatus(scope?: QueueQueryScope): Promise<QueueStatusReadModel>;
+  readCurrent(scope?: QueueQueryScope, signal?: AbortSignal): Promise<QueueItemReadModel | null>;
+  readItemIds(order: 'asc' | 'desc', scope?: QueueQueryScope, signal?: AbortSignal): Promise<QueueItemIdsReadModel>;
+  readItemsById(itemIds: number[], signal?: AbortSignal): Promise<QueueItemReadModel[]>;
+  readNext(scope?: QueueQueryScope, signal?: AbortSignal): Promise<QueueItemReadModel | null>;
+  readStatus(scope?: QueueQueryScope, signal?: AbortSignal): Promise<QueueStatusReadModel>;
   retryItems(itemIds: number[]): Promise<unknown>;
   emit(event: string, payload: unknown): void;
   on(event: string, handler: (payload: never) => void): () => void;

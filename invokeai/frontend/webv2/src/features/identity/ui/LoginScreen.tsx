@@ -1,6 +1,6 @@
 import { chakra, Checkbox, Input } from '@chakra-ui/react';
 import { loginSchema } from '@features/identity/core/schemas';
-import { loginWithCredentials, useAuthSession } from '@features/identity/session';
+import { isLoginAttemptSupersededError, loginWithCredentials, useAuthSession } from '@features/identity/session';
 import { useZodForm } from '@platform/react/useZodForm';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, Field } from '@platform/ui';
@@ -24,6 +24,13 @@ export const LoginScreen = () => {
         try {
           await loginWithCredentials(values.email, values.password, values.rememberMe);
         } catch (error) {
+          // A second submit, logout, or expiry owns the newer identity
+          // transition. The stale submit should neither navigate nor flash an
+          // error over the winning transition.
+          if (isLoginAttemptSupersededError(error)) {
+            return;
+          }
+
           throw new Error(getApiErrorMessage(error, t('auth.signInFailed')));
         }
 

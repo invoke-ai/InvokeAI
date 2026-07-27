@@ -6,9 +6,15 @@ import { formatBytes } from '@features/models/core/taxonomy';
 import { deleteOrphanedModels, emptyModelCache, getOrphanedModels } from '@features/models/data/api';
 import { refreshModels } from '@features/models/data/modelsStore';
 import { useNotify } from '@features/models/ui/useModelsNotify';
+import { useMountEffect } from '@platform/react/useMountEffect';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
 import { Button, CloseButton, IconButton, MenuContent, Panel } from '@platform/ui';
 import { BrushCleaningIcon, FolderSearchIcon, MoreHorizontalIcon, RefreshCcwIcon } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /**
@@ -21,12 +27,26 @@ export const MaintenanceMenu = () => {
   const [isSyncDialogOpen, setIsSyncDialogOpen] = useState(false);
 
   const handleEmptyCache = async () => {
+    const owner = captureAccountScope();
+
     try {
-      await emptyModelCache();
+      await emptyModelCache(owner.signal);
+
+      assertAccountScopeCurrent(owner);
       notify.success(t('models.cacheEmptied'));
     } catch (error) {
+      if (!isAccountScopeCurrent(owner)) {
+        return;
+      }
+
       notify.error(t('models.failedToEmptyCache'), error instanceof Error ? error.message : String(error));
     }
+  };
+
+  const handleRefresh = () => {
+    const owner = captureAccountScope();
+
+    void refreshModels(owner);
   };
 
   return (
@@ -40,7 +60,7 @@ export const MaintenanceMenu = () => {
         <Portal>
           <Menu.Positioner>
             <MenuContent minW="14rem">
-              <Menu.Item value="refresh" onClick={() => void refreshModels()}>
+              <Menu.Item value="refresh" onClick={handleRefresh}>
                 <Icon as={RefreshCcwIcon} boxSize="3.5" />
                 <Menu.ItemText fontSize="xs">{t('models.refreshList')}</Menu.ItemText>
               </Menu.Item>
@@ -70,25 +90,26 @@ const OrphanedModelsDialog = ({ onClose }: { onClose: () => void }) => {
   const [selectedPaths, setSelectedPaths] = useState<ReadonlySet<string>>(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
 
-  useEffect(() => {
-    let isStale = false;
+  useMountEffect(() => {
+    const owner = captureAccountScope();
+    let isMounted = true;
 
-    getOrphanedModels()
+    getOrphanedModels(owner.signal)
       .then((result) => {
-        if (!isStale) {
+        if (isMounted && isAccountScopeCurrent(owner)) {
           setOrphans(result);
         }
       })
       .catch((error: unknown) => {
-        if (!isStale) {
+        if (isMounted && isAccountScopeCurrent(owner)) {
           setLoadError(error instanceof Error ? error.message : t('models.failedToScanOrphaned'));
         }
       });
 
     return () => {
-      isStale = true;
+      isMounted = false;
     };
-  }, [t]);
+  });
 
   const togglePath = (path: string) => {
     setSelectedPaths((current) => {
@@ -105,10 +126,14 @@ const OrphanedModelsDialog = ({ onClose }: { onClose: () => void }) => {
   };
 
   const handleDelete = async () => {
+    const owner = captureAccountScope();
+
     setIsDeleting(true);
 
     try {
-      const result = await deleteOrphanedModels([...selectedPaths]);
+      const result = await deleteOrphanedModels([...selectedPaths], owner.signal);
+
+      assertAccountScopeCurrent(owner);
       const errorCount = Object.keys(result.errors).length;
 
       if (errorCount > 0) {
@@ -127,12 +152,18 @@ const OrphanedModelsDialog = ({ onClose }: { onClose: () => void }) => {
         );
       }
 
-      void refreshModels();
+      void refreshModels(owner);
       onClose();
     } catch (error) {
+      if (!isAccountScopeCurrent(owner)) {
+        return;
+      }
+
       notify.error(t('models.orphanedCleanupFailed'), error instanceof Error ? error.message : String(error));
     } finally {
-      setIsDeleting(false);
+      if (isAccountScopeCurrent(owner)) {
+        setIsDeleting(false);
+      }
     }
   };
 

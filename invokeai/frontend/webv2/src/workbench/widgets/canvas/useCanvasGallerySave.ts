@@ -1,5 +1,12 @@
 import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
 
+import { invalidateGallery } from '@features/gallery/queries';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
+import { useQueryClient } from '@tanstack/react-query';
 import { saveCanvasToGallery, type CanvasGallerySaveRegion } from '@workbench/canvas-operations/api';
 import { useNotify } from '@workbench/useNotify';
 import { useWorkbenchCommands, useWorkbenchQueries } from '@workbench/WorkbenchContext';
@@ -16,7 +23,8 @@ export const useCanvasGallerySave = (
   const { t } = useTranslation();
   const notify = useNotify();
   const queries = useWorkbenchQueries();
-  const { gallery, notifications } = useWorkbenchCommands();
+  const { notifications } = useWorkbenchCommands();
+  const queryClient = useQueryClient();
   const isSavingRef = useRef(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -27,6 +35,7 @@ export const useCanvasGallerySave = (
       }
 
       const project = queries.getSnapshot().activeProject;
+      const owner = captureAccountScope();
 
       await withMatchingCanvasProject(engine, project.id, async (matchedEngine) => {
         isSavingRef.current = true;
@@ -35,8 +44,9 @@ export const useCanvasGallerySave = (
         try {
           const result = await saveCanvasToGallery({ engine: matchedEngine, project, region });
 
+          assertAccountScopeCurrent(owner);
           if (result.status === 'saved') {
-            gallery.touchImages(project.id);
+            void invalidateGallery(queryClient, owner);
             notify.success(
               t('widgets.canvas.contextMenu.saved'),
               t('widgets.canvas.contextMenu.savedDescription', { name: result.imageName })
@@ -49,6 +59,10 @@ export const useCanvasGallerySave = (
             notify.info(t('widgets.canvas.contextMenu.notReady'));
           }
         } catch (error: unknown) {
+          if (!isAccountScopeCurrent(owner)) {
+            return;
+          }
+
           notifications.reportError(
             getCanvasGallerySaveErrorAction(error, project.id, t('widgets.canvas.contextMenu.saveError'))
           );
@@ -58,7 +72,7 @@ export const useCanvasGallerySave = (
         }
       });
     },
-    [engine, gallery, notifications, notify, queries, t]
+    [engine, notifications, notify, queries, queryClient, t]
   );
 
   return { isSaving, save };

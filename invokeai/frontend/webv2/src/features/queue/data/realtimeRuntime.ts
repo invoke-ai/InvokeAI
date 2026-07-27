@@ -6,6 +6,7 @@ import type {
 } from '@features/queue/data/events';
 
 import { isTerminalBackendStatus } from '@features/queue/data/events';
+import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 
 export interface QueueItemProgressPort {
   clear(itemId: number): void;
@@ -43,23 +44,28 @@ export const createQueueRealtimeRuntime = ({
   progress: QueueItemProgressPort;
   refreshModelCache: () => void | Promise<void>;
 }): QueueRealtimeRuntime => {
+  const owner = captureAccountScope();
   const detachers: Array<() => void> = [];
   let invalidationTimer: ReturnType<typeof setTimeout> | null = null;
   let isStarted = false;
+  const isActive = (): boolean => isStarted && isAccountScopeCurrent(owner);
 
   const scheduleInvalidation = (): void => {
-    if (invalidationTimer !== null) {
+    if (!isActive() || invalidationTimer !== null) {
       return;
     }
 
     invalidationTimer = setTimeout(() => {
       invalidationTimer = null;
-      void invalidate();
+
+      if (isActive()) {
+        void invalidate();
+      }
     }, coalesceMs);
   };
 
   const start = (): void => {
-    if (isStarted) {
+    if (isStarted || !isAccountScopeCurrent(owner)) {
       return;
     }
 
@@ -69,6 +75,10 @@ export const createQueueRealtimeRuntime = ({
 
     detachers.push(
       backend.on('queue_item_status_changed', (payload: never) => {
+        if (!isActive()) {
+          return;
+        }
+
         const event = payload as unknown as QueueItemStatusChangedEvent;
 
         if (isTerminalBackendStatus(event.status) && event.status !== 'completed') {
@@ -82,11 +92,19 @@ export const createQueueRealtimeRuntime = ({
       backend.on('queue_items_retried', scheduleInvalidation),
       backend.on('queue_items_canceled', scheduleInvalidation),
       backend.on('invocation_started', (payload: never) => {
+        if (!isActive()) {
+          return;
+        }
+
         const event = payload as unknown as InvocationStartedEvent;
 
         progress.set(event.item_id, { message: '', percentage: null });
       }),
       backend.on('invocation_progress', (payload: never) => {
+        if (!isActive()) {
+          return;
+        }
+
         const event = payload as unknown as InvocationProgressEvent;
 
         progress.set(event.item_id, {
@@ -98,9 +116,15 @@ export const createQueueRealtimeRuntime = ({
         });
       }),
       backend.on('model_load_complete', () => {
-        void refreshModelCache();
+        if (isActive()) {
+          void refreshModelCache();
+        }
       }),
       backend.onConnectionChange((status) => {
+        if (!isActive()) {
+          return;
+        }
+
         if (status === 'connected') {
           progress.clearAll();
           scheduleInvalidation();
@@ -111,6 +135,8 @@ export const createQueueRealtimeRuntime = ({
   };
 
   const dispose = (): void => {
+    isStarted = false;
+
     for (const detach of detachers.splice(0)) {
       detach();
     }
@@ -120,7 +146,7 @@ export const createQueueRealtimeRuntime = ({
       invalidationTimer = null;
     }
 
-    isStarted = false;
+    progress.clearAll();
   };
 
   return { dispose, start };

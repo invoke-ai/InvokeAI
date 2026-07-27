@@ -35,6 +35,8 @@ export interface GalleryWidgetContextValue {
   gallery: GalleryStateView;
   actions: GalleryActions;
   imageActions: GalleryImageActions;
+  /** The infinite window is full and the board holds images it cannot reach. */
+  isWindowTruncated: boolean;
   projectName: string;
   runtime: GalleryWidgetRuntime;
 }

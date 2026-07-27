@@ -1,5 +1,6 @@
 import type { QueueEnqueueGenerateRequest, QueueEnqueueWorkflowRequest } from '@features/queue/core/types';
 
+import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -142,6 +143,7 @@ describe('enqueueWorkflow', () => {
 
 describe('getResultImages', () => {
   beforeEach(() => {
+    accountLifecycle.activate('test-account');
     mocks.apiFetchJson.mockReset();
   });
 
@@ -220,5 +222,32 @@ describe('getResultImages', () => {
     const images = await getResultImages(1, 'source-1', '2026-06-15T00:00:00.000Z');
 
     expect(images.map((image) => image.imageName)).toEqual(['external-a.png', 'external-b.png']);
+  });
+
+  it('does not issue image requests from queue data resolved after an account switch', async () => {
+    accountLifecycle.activate('user-a');
+    let resolveItem: ((item: unknown) => void) | undefined;
+    mocks.apiFetchJson.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveItem = resolve;
+        })
+    );
+    const { getResultImages } = await import('./submissionApi');
+
+    const oldResult = getResultImages(1, 'source-a', '2026-06-15T00:00:00.000Z');
+    const signal = (mocks.apiFetchJson.mock.calls[0]?.[1] as RequestInit | undefined)?.signal;
+
+    accountLifecycle.invalidate();
+    accountLifecycle.activate('user-b');
+    resolveItem?.({
+      item_id: 1,
+      session: { results: { output: { image: { image_name: 'user-a.png' } } } },
+      status: 'completed',
+    });
+
+    await expect(oldResult).rejects.toThrow('no longer active');
+    expect(signal?.aborted).toBe(true);
+    expect(mocks.apiFetchJson).toHaveBeenCalledTimes(1);
   });
 });

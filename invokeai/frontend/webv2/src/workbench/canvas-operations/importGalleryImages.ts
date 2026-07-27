@@ -11,6 +11,11 @@ import {
   normalizeGenerateWidgetValues,
 } from '@features/generation/settings';
 import { getModelsSnapshot } from '@features/models';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  registerAccountOwnedResource,
+} from '@platform/state/accountLifecycle';
 import { resolveDefaultControlModelForBase } from '@workbench/widgets/layers/controlModelOptions';
 import {
   createControlLayer,
@@ -53,6 +58,13 @@ interface BuildLayerContext {
 type LayerImage = CanvasImageRef | GalleryImage;
 
 const activeImports = new Set<string>();
+
+registerAccountOwnedResource({
+  clear: () => {
+    activeImports.clear();
+  },
+  name: 'canvas-gallery-imports',
+});
 
 const imageRef = (image: LayerImage): CanvasImageRef => ({
   height: image.height,
@@ -180,24 +192,32 @@ const resizeImages = async (
   images: readonly GalleryImage[],
   project: Project,
   fetchImage: typeof fetch,
-  uploadImage: typeof uploadCanvasImage
+  uploadImage: typeof uploadCanvasImage,
+  signal: AbortSignal
 ): Promise<{ images: LayerImage[]; failedImageNames: string[] }> => {
   const generateValues = normalizeGenerateWidgetValues(getProjectWidgetValues(project, 'generate'));
   const dimensions = getGenerationDimensions(generateValues?.model);
   const results = await mapWithConcurrency(images, 4, async (image): Promise<ResizeResult> => {
     try {
-      const response = await fetchImage(image.imageUrl);
+      const response = await fetchImage(image.imageUrl, { signal });
+
+      signal.throwIfAborted();
       if (!response.ok) {
         throw new Error(`Failed to fetch ${image.imageName}: ${response.status} ${response.statusText}`);
       }
       const blob = await response.blob();
+
+      signal.throwIfAborted();
       const resizeTo = calculateNewSize(image.width / image.height, dimensions.optimal ** 2, dimensions.grid);
       const uploaded = await uploadImage(blob, {
         fileName: image.imageName,
         imageCategory: 'other',
         isIntermediate: false,
         resizeTo,
+        signal,
       });
+
+      signal.throwIfAborted();
       return { image: uploaded, status: 'fulfilled' };
     } catch (reason) {
       return { imageName: image.imageName, reason, status: 'rejected' };
@@ -236,6 +256,7 @@ export const importGalleryImagesToCanvas = async (options: {
   models?: readonly ModelConfig[];
   uploadImage?: typeof uploadCanvasImage;
 }): Promise<ImportGalleryImagesResult> => {
+  const owner = captureAccountScope();
   const {
     applyCanvasMutation,
     destination,
@@ -251,10 +272,12 @@ export const importGalleryImagesToCanvas = async (options: {
   if (images.length === 0) {
     return { status: 'empty' };
   }
-  if (activeImports.has(project.id)) {
+  const importKey = `${owner.epoch}:${project.id}`;
+
+  if (activeImports.has(importKey)) {
     return { status: 'blocked' };
   }
-  activeImports.add(project.id);
+  activeImports.add(importKey);
 
   try {
     const capturedDocument = project.canvas.document;
@@ -266,7 +289,9 @@ export const importGalleryImagesToCanvas = async (options: {
     let layerImages: readonly LayerImage[] = images;
     let failedImageNames: string[] = [];
     if (destination === 'control-resized') {
-      const resized = await resizeImages(images, project, fetchImage, uploadImage);
+      const resized = await resizeImages(images, project, fetchImage, uploadImage, owner.signal);
+
+      assertAccountScopeCurrent(owner);
       layerImages = resized.images;
       failedImageNames = resized.failedImageNames;
     }
@@ -287,6 +312,8 @@ export const importGalleryImagesToCanvas = async (options: {
     };
 
     const latestProject = getProject(project.id);
+
+    assertAccountScopeCurrent(owner);
     if (!latestProject) {
       return { status: 'stale-project' };
     }
@@ -303,6 +330,6 @@ export const importGalleryImagesToCanvas = async (options: {
     }
     return { failedImageNames, layerIds: layers.map((layer) => layer.id), status: 'imported' };
   } finally {
-    activeImports.delete(project.id);
+    activeImports.delete(importKey);
   }
 };

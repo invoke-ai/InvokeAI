@@ -524,6 +524,21 @@ describe('runCanvasInvocation', () => {
     expect(harness.submittedGraphs()).toHaveLength(0);
   });
 
+  it('quietly stops when its account signal expires during composition', async () => {
+    const harness = makeHarness();
+    const controller = new AbortController();
+    harness.deps.signal = controller.signal;
+    harness.deps.composeForGeneration = () => {
+      controller.abort(new DOMException('account changed', 'AbortError'));
+      return Promise.reject(controller.signal.reason);
+    };
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.submittedGraphs()).toHaveLength(0);
+    expect(harness.notices()).toHaveLength(0);
+  });
+
   it('uses the frozen canvas and detached pixels after edits at composite, upload, and queue-dispatch boundaries', async () => {
     let liveDocument = makeDoc([rasterLayer('frozen-layer')], 96);
     liveDocument.bbox = { height: 64, width: 64, x: 7, y: 11 };

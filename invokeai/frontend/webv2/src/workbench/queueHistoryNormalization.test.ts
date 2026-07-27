@@ -93,6 +93,46 @@ describe('normalizeWorkbenchQueueHistory', () => {
     expect(normalizeWorkbenchQueueHistory(queue, createContext())).toBe(queue);
   });
 
+  it('strips transient recent images from both current queue snapshot representations', () => {
+    const context = createContext();
+    const galleryInstance = context.widgetInstances.gallery!;
+    const recentImages = [{ imageName: 'transient.png' }];
+    const current = {
+      ...createLegacyItem('workflow'),
+      snapshot: {
+        ...createLegacyItem('workflow').snapshot,
+        backendSubmission: { batchCount: 1, graph: backendGraph, kind: 'workflow' },
+        filterIntermediateResults: true,
+        galleryBoardId: null,
+        presentation: { batchCount: 1, height: 512, width: 512 },
+        widgetInstances: {
+          ...context.widgetInstances,
+          gallery: {
+            ...galleryInstance,
+            state: {
+              ...galleryInstance.state,
+              values: { ...galleryInstance.state.values, recentImages },
+            },
+          },
+        },
+        widgetStates: {
+          gallery: state('gallery', { recentImages, selectedBoardId: 'none' }),
+        },
+      },
+    };
+
+    const queue = { items: [current] };
+    const normalized = normalizeWorkbenchQueueHistory(queue, context);
+    const snapshot = normalized.items[0]!.snapshot;
+    const normalizedGalleryInstance = Object.values(snapshot.widgetInstances).find(
+      (instance) => instance.typeId === 'gallery'
+    );
+
+    expect(normalized).not.toBe(queue);
+    expect(snapshot.widgetStates.gallery?.values.recentImages).toBeUndefined();
+    expect(normalizedGalleryInstance?.state.values.recentImages).toBeUndefined();
+  });
+
   it.each(['pending', 'completed'] as const)('upgrades legacy Generate items with %s status', (status) => {
     const values = createGenerateValues();
     const item = createLegacyItem('generate', {

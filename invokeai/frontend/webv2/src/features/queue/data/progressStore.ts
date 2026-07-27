@@ -1,5 +1,6 @@
 import type { QueueItemProgress } from '@features/queue/core/types';
 
+import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createKeyedTransientStore } from '@platform/state/externalStore';
 
 /**
@@ -30,6 +31,11 @@ export const queueItemProgressStore: QueueItemProgressSink = {
     progressByQueueItemId.set(queueItemId, progress);
   },
 };
+
+registerAccountOwnedResource({
+  clear: () => queueItemProgressStore.clearAll?.(),
+  name: 'queue-local-item-progress',
+});
 
 export const useQueueItemProgress = (queueItemId: string): QueueItemProgress | null =>
   progressByQueueItemId.useValue(queueItemId) ?? null;

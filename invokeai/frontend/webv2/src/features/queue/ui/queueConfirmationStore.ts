@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 
+import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
 
 export interface QueueConfirmation {
@@ -18,6 +19,11 @@ export const requestQueueConfirmation = (confirmation: QueueConfirmation): void 
 export const clearQueueConfirmation = (): void => {
   queueConfirmationStore.setSnapshot({ confirmation: null });
 };
+
+registerAccountOwnedResource({
+  clear: clearQueueConfirmation,
+  name: 'queue-confirmation',
+});
 
 export const getQueueConfirmation = (): QueueConfirmation | null => queueConfirmationStore.getSnapshot().confirmation;
 
