@@ -1,6 +1,7 @@
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasToolModule';
+import { getShouldUsePressureForEraser } from 'features/controlLayers/konva/pressure';
 import {
   alignCoordForTool,
   getLastPointOfLastLine,
@@ -183,13 +184,17 @@ export class CanvasEraserToolModule extends CanvasModuleBase {
     const normalizedPoint = offsetCoord(cursorPos.relative, selectedEntity.state.position);
     const alignedPoint = alignCoordForTool(normalizedPoint, settings.brushWidth);
 
-    if (e.evt.pointerType === 'pen' && settings.pressureSensitivity) {
-      // If the pen is down and pressure sensitivity is enabled, add the point with pressure
+    const shouldUsePressure =
+      e.evt.pointerType === 'pen' && getShouldUsePressureForEraser(settings.pressureAffectsWidth);
+
+    if (shouldUsePressure) {
+      // If the pen is down and pressure input is enabled, add the point with pressure
       await selectedEntity.bufferRenderer.setBuffer({
         id: getPrefixedId('eraser_line_with_pressure'),
         type: 'eraser_line_with_pressure',
         points: [alignedPoint.x, alignedPoint.y, e.evt.pressure],
         strokeWidth: settings.eraserWidth,
+        pressureAffectsWidth: settings.pressureAffectsWidth,
         clip: this.parent.getClip(selectedEntity.state),
       });
     } else {
@@ -233,7 +238,10 @@ export class CanvasEraserToolModule extends CanvasModuleBase {
 
     const normalizedPoint = offsetCoord(cursorPos.relative, selectedEntity.state.position);
 
-    if (e.evt.pointerType === 'pen' && settings.pressureSensitivity) {
+    const shouldUsePressure =
+      e.evt.pointerType === 'pen' && getShouldUsePressureForEraser(settings.pressureAffectsWidth);
+
+    if (shouldUsePressure) {
       // We need to get the last point of the last line to create a straight line if shift is held
       const lastLinePoint = getLastPointOfLastLineWithPressure(
         selectedEntity.state.objects,
@@ -263,6 +271,7 @@ export class CanvasEraserToolModule extends CanvasModuleBase {
         type: 'eraser_line_with_pressure',
         points,
         strokeWidth: settings.eraserWidth,
+        pressureAffectsWidth: settings.pressureAffectsWidth,
         clip: this.parent.getClip(selectedEntity.state),
       });
     } else {
@@ -372,8 +381,8 @@ export class CanvasEraserToolModule extends CanvasModuleBase {
 
     bufferState.points.push(alignedPoint.x, alignedPoint.y);
 
-    // Add pressure if the pen is down and pressure sensitivity is enabled
-    if (bufferState.type === 'eraser_line_with_pressure' && settings.pressureSensitivity) {
+    // Preserve pressure data for the full stroke even if the settings change mid-draw.
+    if (bufferState.type === 'eraser_line_with_pressure') {
       bufferState.points.push(e.evt.pressure);
     }
 
