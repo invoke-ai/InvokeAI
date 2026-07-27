@@ -10,6 +10,7 @@ const BASES_WITHOUT_STANDARD_SCHEDULER = new Set<BaseModelType>([
   'qwen-image',
   'anima',
   'krea-2',
+  'ideogram-4',
 ]);
 
 export const shouldShowStandardScheduler = (base: BaseModelType | null | undefined): boolean =>

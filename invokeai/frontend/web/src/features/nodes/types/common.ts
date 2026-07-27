@@ -75,6 +75,10 @@ export const zZImageSchedulerField = z.enum(['euler', 'heun', 'lcm']);
 // Anima scheduler options (same flow-matching schedulers, defined separately to avoid coupling)
 export const zAnimaSchedulerField = z.enum(['euler', 'heun', 'dpmpp_2m', 'dpmpp_2m_sde', 'er_sde', 'lcm']);
 
+// Ideogram 4 sampler presets. Each bundles step count, the per-step guidance schedule (with a polish
+// tail), and the logit-normal schedule mean/std. V4_QUALITY_48 is the reference default.
+export const zIdeogram4SamplerPresetField = z.enum(['V4_QUALITY_48', 'V4_DEFAULT_20', 'V4_TURBO_12']);
+
 // Flux DyPE (Dynamic Position Extrapolation) preset options for high-resolution generation
 export const zFluxDypePresetField = z.enum(['off', 'manual', 'auto', 'area', '4k']);
 
@@ -99,6 +103,7 @@ export const zBaseModelType = z.enum([
   'qwen-image',
   'z-image',
   'krea-2',
+  'ideogram-4',
   'external',
   'anima',
   'unknown',
@@ -115,6 +120,7 @@ export const zMainModelBase = z.enum([
   'qwen-image',
   'z-image',
   'krea-2',
+  'ideogram-4',
   'anima',
 ]);
 type MainModelBase = z.infer<typeof zMainModelBase>;

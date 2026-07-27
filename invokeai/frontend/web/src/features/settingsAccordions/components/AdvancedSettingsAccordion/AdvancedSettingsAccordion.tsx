@@ -8,6 +8,7 @@ import {
   selectIsExternal,
   selectIsFLUX,
   selectIsFlux2,
+  selectIsIdeogram4,
   selectIsKrea2,
   selectIsQwenImage,
   selectIsSD3,
@@ -27,6 +28,10 @@ import ParamQwenImageComponentSourceSelect from 'features/parameters/components/
 import ParamQwenImageQuantization from 'features/parameters/components/Advanced/ParamQwenImageQuantization';
 import ParamT5EncoderModelSelect from 'features/parameters/components/Advanced/ParamT5EncoderModelSelect';
 import ParamZImageQwen3VaeModelSelect from 'features/parameters/components/Advanced/ParamZImageQwen3VaeModelSelect';
+import ParamIdeogram4ColorPalette from 'features/parameters/components/Core/ParamIdeogram4ColorPalette';
+import ParamIdeogram4GuidanceScale from 'features/parameters/components/Core/ParamIdeogram4GuidanceScale';
+import ParamIdeogram4Mu from 'features/parameters/components/Core/ParamIdeogram4Mu';
+import ParamIdeogram4Steps from 'features/parameters/components/Core/ParamIdeogram4Steps';
 import ParamSeamlessXAxis from 'features/parameters/components/Seamless/ParamSeamlessXAxis';
 import ParamSeamlessYAxis from 'features/parameters/components/Seamless/ParamSeamlessYAxis';
 import ParamColorCompensation from 'features/parameters/components/VAEModel/ParamColorCompensation';
@@ -53,6 +58,7 @@ export const AdvancedSettingsAccordion = memo(() => {
   const isFlux2 = useAppSelector(selectIsFlux2);
   const isSD3 = useAppSelector(selectIsSD3);
   const isZImage = useAppSelector(selectIsZImage);
+  const isIdeogram4 = useAppSelector(selectIsIdeogram4);
   const isExternal = useAppSelector(selectIsExternal);
   const isQwenImage = useAppSelector(selectIsQwenImage);
   const isAnima = useAppSelector(selectIsAnima);
@@ -61,8 +67,8 @@ export const AdvancedSettingsAccordion = memo(() => {
   const selectBadges = useMemo(
     () =>
       createMemoizedSelector(
-        [selectParamsSlice, selectIsFLUX, selectIsFlux2, selectIsKrea2],
-        (params, isFLUX, isFlux2, isKrea2) => {
+        [selectParamsSlice, selectIsFLUX, selectIsFlux2, selectIsKrea2, selectIsIdeogram4],
+        (params, isFLUX, isFlux2, isKrea2, isIdeogram4) => {
           const badges: (string | number)[] = [];
           // FLUX.2 has VAE built into main model - no badge needed
           if (isFLUX && !isFlux2) {
@@ -73,7 +79,9 @@ export const AdvancedSettingsAccordion = memo(() => {
               }
               badges.push(vaeBadge);
             }
-          } else if (!isFlux2 && !isKrea2) {
+            // Ideogram 4 and Krea-2 hide the VAE / clip skip / CFG rescale / seamless controls (they don't
+            // apply), so they must not advertise stale badges for them either.
+          } else if (!isFlux2 && !isKrea2 && !isIdeogram4) {
             if (vaeConfig) {
               let vaeBadge = vaeConfig.name;
               if (params.vaePrecision === 'fp16') {
@@ -113,13 +121,13 @@ export const AdvancedSettingsAccordion = memo(() => {
   return (
     <StandaloneAccordion label={t('accordions.advanced.title')} badges={badges} isOpen={isOpen} onToggle={onToggle}>
       <Flex gap={4} alignItems="center" p={4} flexDir="column" data-testid="advanced-settings-accordion">
-        {!isZImage && !isAnima && !isFlux2 && !isQwenImage && !isKrea2 && (
+        {!isZImage && !isAnima && !isFlux2 && !isQwenImage && !isKrea2 && !isIdeogram4 && (
           <Flex gap={4} w="full">
             {isFLUX ? <ParamFLUXVAEModelSelect /> : <ParamVAEModelSelect />}
             {!isFLUX && !isSD3 && <ParamVAEPrecision />}
           </Flex>
         )}
-        {!isFLUX && !isFlux2 && !isSD3 && !isZImage && !isQwenImage && !isAnima && !isKrea2 && (
+        {!isFLUX && !isFlux2 && !isSD3 && !isZImage && !isQwenImage && !isAnima && !isKrea2 && !isIdeogram4 && (
           <>
             <FormControlGroup formLabelProps={formLabelProps}>
               <ParamClipSkip />
@@ -176,6 +184,16 @@ export const AdvancedSettingsAccordion = memo(() => {
           <FormControlGroup>
             <ParamKrea2ModelSelects />
           </FormControlGroup>
+        )}
+        {isIdeogram4 && (
+          <>
+            <FormControlGroup formLabelProps={formLabelProps}>
+              <ParamIdeogram4Steps />
+              <ParamIdeogram4GuidanceScale />
+              <ParamIdeogram4Mu />
+            </FormControlGroup>
+            <ParamIdeogram4ColorPalette />
+          </>
         )}
       </Flex>
     </StandaloneAccordion>
