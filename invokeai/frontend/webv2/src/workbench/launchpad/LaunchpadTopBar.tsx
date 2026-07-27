@@ -7,7 +7,7 @@ import { Button } from '@platform/ui';
 import { InvokeMark } from '@platform/ui/InvokeMark';
 import { Link, useSearch } from '@tanstack/react-router';
 import { PaletteButton } from '@workbench/palette/PaletteButton';
-import { SettingsButton } from '@workbench/settings/SettingsDialog';
+import { SettingsButton } from '@workbench/settings/SettingsButton';
 import { ArrowLeftIcon } from 'lucide-react';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';

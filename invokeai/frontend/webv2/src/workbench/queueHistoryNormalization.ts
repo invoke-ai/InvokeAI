@@ -25,6 +25,58 @@ export interface QueueHistoryNormalizationContext {
 
 const isRecord = (value: unknown): value is UnknownRecord => value !== null && typeof value === 'object';
 
+const stripGalleryRecentImagesFromState = (value: unknown): unknown => {
+  if (!isRecord(value) || !isRecord(value.values) || !Object.hasOwn(value.values, 'recentImages')) {
+    return value;
+  }
+
+  const values = { ...value.values };
+
+  delete values.recentImages;
+  return { ...value, values };
+};
+
+const stripGalleryRecentImagesFromWidgetStates = (value: unknown): unknown => {
+  if (!isRecord(value)) {
+    return value;
+  }
+
+  const gallery = stripGalleryRecentImagesFromState(value.gallery);
+
+  return gallery === value.gallery ? value : { ...value, gallery };
+};
+
+const stripGalleryRecentImagesFromWidgetInstances = (value: unknown): unknown => {
+  if (!isRecord(value)) {
+    return value;
+  }
+
+  let didChange = false;
+  const instances = Object.fromEntries(
+    Object.entries(value).map(([instanceId, instance]) => {
+      if (!isRecord(instance) || instance.typeId !== 'gallery') {
+        return [instanceId, instance];
+      }
+
+      const state = stripGalleryRecentImagesFromState(instance.state);
+
+      didChange ||= state !== instance.state;
+      return [instanceId, state === instance.state ? instance : { ...instance, state }];
+    })
+  );
+
+  return didChange ? instances : value;
+};
+
+const stripGalleryRecentImagesFromSnapshot = (snapshot: UnknownRecord): UnknownRecord => {
+  const widgetStates = stripGalleryRecentImagesFromWidgetStates(snapshot.widgetStates);
+  const widgetInstances = stripGalleryRecentImagesFromWidgetInstances(snapshot.widgetInstances);
+
+  return widgetStates === snapshot.widgetStates && widgetInstances === snapshot.widgetInstances
+    ? snapshot
+    : { ...snapshot, widgetInstances, widgetStates };
+};
+
 const normalizeSourceId = (value: unknown): QueueSourceId | null => {
   if (value === 'project-graph') {
     return 'workflow';
@@ -188,7 +240,7 @@ const normalizeLegacyQueueItem = (
   const item = isRecord(value) ? value : {};
   const snapshot = isRecord(item.snapshot) ? item.snapshot : {};
   const sourceId = normalizeSourceId(snapshot.sourceId);
-  const widgetStates = getWidgetStates(snapshot);
+  const widgetStates = stripGalleryRecentImagesFromWidgetStates(getWidgetStates(snapshot)) as WidgetStateMap;
   const { presentationSource, submission } = getBackendSubmission(sourceId, snapshot, widgetStates);
   const upscaleValues =
     sourceId === 'upscale' ? normalizeUpscaleWidgetValues(getWidgetValues(widgetStates, 'upscale')) : null;
@@ -240,9 +292,9 @@ const normalizeLegacyQueueItem = (
           : {}),
       sourceId: safeSourceId,
       submittedAt: typeof snapshot.submittedAt === 'string' ? snapshot.submittedAt : new Date(0).toISOString(),
-      widgetInstances: isRecord(snapshot.widgetInstances)
-        ? (snapshot.widgetInstances as Record<WidgetInstanceId, WidgetInstanceContract>)
-        : context.widgetInstances,
+      widgetInstances: stripGalleryRecentImagesFromWidgetInstances(
+        isRecord(snapshot.widgetInstances) ? snapshot.widgetInstances : context.widgetInstances
+      ) as Record<WidgetInstanceId, WidgetInstanceContract>,
       widgetStates,
     },
     status:
@@ -269,7 +321,14 @@ export const normalizeWorkbenchQueueHistory = (
   const items = value.items.map((item, index) => {
     const snapshot = isRecord(item) && isRecord(item.snapshot) ? item.snapshot : null;
     if (snapshot && isCurrentSnapshot(snapshot)) {
-      return item as unknown as WorkbenchQueueItem;
+      const strippedSnapshot = stripGalleryRecentImagesFromSnapshot(snapshot);
+
+      if (strippedSnapshot === snapshot) {
+        return item as unknown as WorkbenchQueueItem;
+      }
+
+      didChange = true;
+      return { ...item, snapshot: strippedSnapshot } as unknown as WorkbenchQueueItem;
     }
     didChange = true;
     return normalizeLegacyQueueItem(item, index, context);

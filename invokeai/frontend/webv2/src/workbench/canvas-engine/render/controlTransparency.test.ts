@@ -112,6 +112,7 @@ const createFakeBackend = (sourcePixels: Uint8ClampedArray): RasterBackend & { r
       height,
       putImageDataCalls,
       resize: () => {},
+      resizePreserving: () => {},
       width,
     };
     created.push(surface);

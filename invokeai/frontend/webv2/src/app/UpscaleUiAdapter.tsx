@@ -1,8 +1,10 @@
 import type { UpscaleUiAdapter } from '@features/upscale';
 import type { ReactNode } from 'react';
 
+import { invalidateGallery } from '@features/gallery/queries';
 import { areProjectPromptDraftsEqual, getPromptDraftFromValues } from '@features/generation/settings';
 import { UpscaleUiProvider } from '@features/upscale';
+import { useQueryClient } from '@tanstack/react-query';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { useMemo } from 'react';
@@ -30,6 +32,7 @@ export const UpscaleUiAdapterProvider = ({ children }: { children: ReactNode }) 
       left.showPromptSyntaxHighlighting === right.showPromptSyntaxHighlighting
   );
   const commands = useWorkbenchCommands();
+  const queryClient = useQueryClient();
   const adapter = useMemo<UpscaleUiAdapter>(
     () => ({
       ...project,
@@ -37,9 +40,9 @@ export const UpscaleUiAdapterProvider = ({ children }: { children: ReactNode }) 
       patchValues: (values, origin) => commands.widgets.patchValues('upscale', values, project.projectId, origin),
       reportError: (message) =>
         commands.notifications.reportError({ area: 'upscale', message, namespace: 'generation' }),
-      touchGalleryImages: () => commands.gallery.touchImages(),
+      touchGalleryImages: () => void invalidateGallery(queryClient),
     }),
-    [commands, project]
+    [commands, project, queryClient]
   );
 
   return <UpscaleUiProvider adapter={adapter}>{children}</UpscaleUiProvider>;

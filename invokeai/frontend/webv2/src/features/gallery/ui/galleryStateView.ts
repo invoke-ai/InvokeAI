@@ -8,6 +8,7 @@ import type {
 import type { QueueItem } from '@features/queue/contracts';
 
 import { normalizeGalleryImage } from '@features/gallery/core/image';
+import { getBoundedRecentImages } from '@features/gallery/core/recentImages';
 import { getGallerySettings, type GallerySettings } from '@features/gallery/core/settings';
 import { getQueueItemSnapshotBatchCount, getQueueItemSnapshotDimensions } from '@features/queue/contracts';
 
@@ -211,18 +212,60 @@ export const getGalleryPage = (values: Record<string, unknown>): number =>
     ? Math.max(0, Math.floor(values.galleryPage))
     : 0;
 
+export const getGallerySelectedImagePage = (values: Record<string, unknown>): number =>
+  typeof values.selectedImagePage === 'number' && Number.isFinite(values.selectedImagePage)
+    ? Math.max(0, Math.floor(values.selectedImagePage))
+    : getGalleryPage(values);
+
+export interface GallerySelectedImageQuery {
+  boardId: string;
+  galleryView: GalleryView;
+  imageOrderDir: GalleryOrderDir;
+  page: number;
+  paginationMode: 'infinite' | 'paginated';
+  searchTerm: string;
+  starredFirst: boolean;
+}
+
+export const getGallerySelectedImageQuery = (values: Record<string, unknown>): GallerySelectedImageQuery => {
+  const query =
+    values.selectedImageQuery && typeof values.selectedImageQuery === 'object'
+      ? (values.selectedImageQuery as Partial<GallerySelectedImageQuery>)
+      : null;
+  const settings = getGallerySettings(values);
+
+  return {
+    boardId:
+      query && typeof query.boardId === 'string'
+        ? query.boardId
+        : typeof values.selectedBoardId === 'string'
+          ? values.selectedBoardId
+          : 'none',
+    galleryView:
+      query?.galleryView === 'assets' || query?.galleryView === 'images'
+        ? query.galleryView
+        : values.galleryView === 'assets'
+          ? 'assets'
+          : 'images',
+    imageOrderDir:
+      query?.imageOrderDir === 'ASC' || query?.imageOrderDir === 'DESC' ? query.imageOrderDir : settings.imageOrderDir,
+    page:
+      query && typeof query.page === 'number' && Number.isFinite(query.page)
+        ? Math.max(0, Math.floor(query.page))
+        : getGallerySelectedImagePage(values),
+    paginationMode:
+      query?.paginationMode === 'infinite' || query?.paginationMode === 'paginated'
+        ? query.paginationMode
+        : settings.paginationMode,
+    searchTerm: query && typeof query.searchTerm === 'string' ? query.searchTerm : String(values.searchTerm ?? ''),
+    starredFirst: typeof query?.starredFirst === 'boolean' ? query.starredFirst : settings.starredFirst,
+  };
+};
+
 export const getGalleryTotalImages = (values: Record<string, unknown>): number | null =>
   typeof values.galleryTotalImages === 'number' && Number.isFinite(values.galleryTotalImages)
     ? Math.max(0, values.galleryTotalImages)
     : null;
-
-export const getGalleryRefreshToken = (values: Record<string, unknown>): string =>
-  typeof values.galleryRefreshToken === 'string' ? values.galleryRefreshToken : '';
-
-export const getGalleryImagesRefreshToken = (values: Record<string, unknown>): string =>
-  typeof values.galleryImagesRefreshToken === 'string'
-    ? values.galleryImagesRefreshToken
-    : getGalleryRefreshToken(values);
 
 export const getGalleryProjectBoardId = (values: Record<string, unknown>): string | null =>
   typeof values.projectBoardId === 'string' ? values.projectBoardId : null;
@@ -239,14 +282,6 @@ export const getGalleryCompareImage = (values: Record<string, unknown>): Generat
   }
 
   return null;
-};
-
-export const getGalleryRecentImagesKey = (values: Record<string, unknown>): string => {
-  if (!Array.isArray(values.recentImages)) {
-    return '';
-  }
-
-  return (values.recentImages as GeneratedImageContract[]).map((image) => image.imageName).join('\0');
 };
 
 export const getGalleryQueuePlaceholders = (
@@ -293,11 +328,7 @@ export const getGalleryStateView = (
   liveFollowEnabled = false,
   liveTarget: GalleryLiveTarget | null = null
 ): GalleryStateView => {
-  const localImages = Array.isArray(values.recentImages)
-    ? (values.recentImages as Array<GeneratedImageContract & Partial<GalleryImage>>).map((image) =>
-        normalizeGalleryImage(image)
-      )
-    : [];
+  const localImages = getBoundedRecentImages(values.recentImages).map((image) => normalizeGalleryImage(image));
   const images = backendImages ?? (isLoading ? [] : localImages);
   const selectedImageName = typeof values.selectedImageName === 'string' ? values.selectedImageName : null;
   const visibleSelectedImageName = images.some((image) => image.imageName === selectedImageName)

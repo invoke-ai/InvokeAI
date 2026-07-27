@@ -10,7 +10,7 @@ import {
 import { createProject as apiCreateProject, getProject as apiGetProject, type ProjectRecordDTO } from './api';
 import { createProjectId } from './ids';
 import { upsertProjectSummary } from './library';
-import { deserializeProjectDocument, serializeProjectDocument } from './syncedPersistence';
+import { serializeProjectDocument } from './projectDocument';
 
 /**
  * The portable project file: a versioned envelope around the same document
@@ -111,6 +111,12 @@ export const importProjectFile = async (
       ? projectDocument.name.trim()
       : 'Imported project';
   const document = { ...projectDocument, id, name };
+  // Full validation rehydrates the document through the Workbench reducer, so
+  // it is loaded here rather than imported: the Launchpad should not carry the
+  // editor's aggregate state just to offer an Import button.
+  const { deserializeProjectDocument } = await import('./syncedPersistence');
+
+  assertAccountScopeCurrent(owner);
 
   if (!deserializeProjectDocument(document)) {
     throw new Error('The project file is damaged and cannot be opened.');

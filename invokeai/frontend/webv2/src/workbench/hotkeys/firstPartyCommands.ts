@@ -1,5 +1,6 @@
 import type { ImageRecallKind } from '@workbench/image-actions/imageRecall';
 
+import { invalidateGallery } from '@features/gallery/queries';
 import {
   adjustFocusedPromptAttention,
   flushGenerateDrafts,
@@ -16,6 +17,7 @@ import {
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
 import { getConnectionStatus } from '@platform/transport/connectionStore';
+import { useQueryClient } from '@tanstack/react-query';
 import { isInvocationRouteValid, resolveInvocationRoute } from '@workbench/invocation';
 import { submitResolvedInvocation } from '@workbench/invocationSubmit';
 import { toggleCommandPalette } from '@workbench/palette/paletteStore';
@@ -69,6 +71,7 @@ export const useRegisterFirstPartyCommands = () => {
   const commands = useWorkbenchCommands();
   const { commands: commandApi } = useWorkbenchExtensions();
   const queries = useWorkbenchQueries();
+  const queryClient = useQueryClient();
   const { layout, notifications, queue, widgets } = commands;
   useInvocationTemplatesSelector((snapshot) => snapshot.status);
 
@@ -177,7 +180,15 @@ export const useRegisterFirstPartyCommands = () => {
       commandApi.register({ handler: submitInvocation, id: 'app.invoke', title: 'Invoke' }),
       commandApi.register({ handler: submitInvocation, id: 'app.invokeFront', title: 'Invoke front' }),
       commandApi.register({
-        handler: () => void queueCommands.cancelCurrentItem().finally(queue.refreshBackendData),
+        handler: () => {
+          const owner = captureAccountScope();
+
+          void queueCommands.cancelCurrentItem().finally(() => {
+            if (isAccountScopeCurrent(owner)) {
+              return invalidateGallery(queryClient, owner);
+            }
+          });
+        },
         id: 'app.cancelQueueItem',
         title: 'Cancel current queue item',
       }),
@@ -346,5 +357,5 @@ export const useRegisterFirstPartyCommands = () => {
     return () => {
       disposers.forEach((dispose) => dispose());
     };
-  }, [commandApi, commands, layout, notifications, queries, queue, widgets]);
+  }, [commandApi, commands, layout, notifications, queries, queryClient, queue, widgets]);
 };

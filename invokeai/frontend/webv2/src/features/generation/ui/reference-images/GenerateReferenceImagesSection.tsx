@@ -23,6 +23,11 @@ import { generatedImageToReferenceImage, getEffectiveReferenceImage } from '@fea
 import { clampDimension, deriveAspectRatioId } from '@features/generation/core/settings';
 import { useGenerationUi } from '@features/generation/ui/GenerationUiContext';
 import { GenerateCollapsibleSection } from '@features/generation/ui/shared/GenerateCollapsibleSection';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
 import { Button, DropZone } from '@platform/ui';
 import { UploadIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef } from 'react';
@@ -138,14 +143,23 @@ export const GenerateReferenceImagesSection = ({
         return;
       }
 
+      const owner = captureAccountScope();
+
       try {
         const uploaded = await Promise.all(
-          files.slice(0, maxReferenceImages - referenceImageCount).map((file) => galleryTransfers.upload(file, 'none'))
+          files
+            .slice(0, maxReferenceImages - referenceImageCount)
+            .map((file) => galleryTransfers.upload(file, 'none', { signal: owner.signal }))
         );
 
+        assertAccountScopeCurrent(owner);
         appendReferenceImages(uploaded.map(generatedImageToReferenceImage));
         gallery.touchImages();
       } catch (error) {
+        if (!isAccountScopeCurrent(owner)) {
+          return;
+        }
+
         notifications.reportError({
           area: 'reference-images',
           message: error instanceof Error ? error.message : String(error),

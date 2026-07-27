@@ -36,7 +36,7 @@ const createFixedPixelBackend = (pixel: MutablePixel): RasterBackend => ({
       save: () => {},
       setTransform: () => {},
     } as unknown as OffscreenCanvasRenderingContext2D;
-    return { canvas, ctx, height, resize: () => {}, width };
+    return { canvas, ctx, height, resize: () => {}, resizePreserving: () => {}, width };
   },
   encodeSurface: () => Promise.resolve(new Blob()),
 });

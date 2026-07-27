@@ -1,106 +1,223 @@
 import type { GallerySettings } from '@features/gallery/core/settings';
-import type { GalleryBoard, GalleryImage, GalleryView } from '@features/gallery/core/types';
+import type { GalleryBoard, GalleryImage, GalleryView, GeneratedImageContract } from '@features/gallery/core/types';
 
-import { galleryBoardsOptions, galleryImagesOptions } from '@features/gallery/data/queries';
+import { normalizeGalleryImage } from '@features/gallery/core/image';
+import { GALLERY_RECENT_IMAGE_LIMIT } from '@features/gallery/core/recentImages';
+import { ALL_READABLE_BOARDS_ID, isDateBoardId } from '@features/gallery/data/backend';
+import {
+  flattenGalleryImagesData,
+  GALLERY_MAX_ROWS,
+  GALLERY_PAGE_SIZE,
+  galleryBoardsOptions,
+  galleryImagesInfiniteOptions,
+  type GalleryImagesFilter,
+} from '@features/gallery/data/queries';
 import { parseDateTokens } from '@platform/search/dateTokens';
-import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useMemo, useState } from 'react';
-
-export const GALLERY_PAGE_SIZE = 60;
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { useCallback, useMemo } from 'react';
 
 export interface GalleryData {
   boards: GalleryBoard[];
   hasMore: boolean;
   images: GalleryImage[] | null;
   isLoadingImages: boolean;
+  /**
+   * True when the infinite window is full *and* the board holds more images
+   * than it can reach. `hasMore` is false in that case exactly as it is at the
+   * true end of a board, so the two must be distinguishable: stopping at the
+   * end is complete, stopping at the cap is not, and only one of them owes the
+   * user an explanation.
+   */
+  isWindowTruncated: boolean;
   loadMore: () => void;
-  patchImages: (getImages: (images: GalleryImage[]) => GalleryImage[]) => void;
   total: number | null;
 }
 
-const useGalleryBoards = ({ refreshToken, settings }: { refreshToken: string; settings: GallerySettings }) => {
+const useGalleryBoards = ({ settings }: { settings: GallerySettings }) => {
   const query = useQuery(
     galleryBoardsOptions({
       includeArchived: settings.showArchivedBoards,
       includeDateBoards: settings.showDateBoards,
       orderBy: settings.boardOrderBy,
       orderDir: settings.boardOrderDir,
-      revision: refreshToken,
     })
   );
 
   return { boards: query.data ?? [] };
 };
 
+const isRecentImageVisible = (image: GalleryImage, filter: GalleryImagesFilter): boolean => {
+  if (
+    filter.searchTerm !== '' ||
+    filter.createdFrom !== undefined ||
+    filter.createdTo !== undefined ||
+    isDateBoardId(filter.boardId)
+  ) {
+    return false;
+  }
+
+  const hasMatchingBoard = filter.boardId === ALL_READABLE_BOARDS_ID || filter.boardId === image.boardId;
+  const hasMatchingCategory =
+    filter.galleryView === 'images' ? image.imageCategory === 'general' : image.imageCategory !== 'general';
+
+  return hasMatchingBoard && hasMatchingCategory;
+};
+
+const compareGalleryImages = (
+  a: GalleryImage,
+  b: GalleryImage,
+  { orderDir = 'DESC', starredFirst = false }: GalleryImagesFilter
+): number => {
+  if (starredFirst && a.starred !== b.starred) {
+    return a.starred ? -1 : 1;
+  }
+
+  const chronologicalOrder = a.queuedAt.localeCompare(b.queuedAt);
+
+  return orderDir === 'ASC' ? chronologicalOrder : -chronologicalOrder;
+};
+
+export const mergeGalleryImageWindow = ({
+  backendImages,
+  filter,
+  maxRows,
+  recentImages,
+}: {
+  backendImages: readonly GalleryImage[];
+  filter: GalleryImagesFilter;
+  maxRows: number;
+  recentImages: readonly GeneratedImageContract[];
+}): GalleryImage[] => {
+  const backendImageNames = new Set(backendImages.map((image) => image.imageName));
+  const missingRecentImages = recentImages
+    .slice(0, GALLERY_RECENT_IMAGE_LIMIT)
+    .map((image) => normalizeGalleryImage(image))
+    .filter((image) => !backendImageNames.has(image.imageName) && isRecentImageVisible(image, filter));
+
+  if (missingRecentImages.length === 0) {
+    return backendImages.length <= maxRows ? (backendImages as GalleryImage[]) : backendImages.slice(0, maxRows);
+  }
+
+  return [...missingRecentImages, ...backendImages]
+    .sort((a, b) => compareGalleryImages(a, b, filter))
+    .slice(0, maxRows);
+};
+
+/**
+ * Distinguishes "this board has no more images" from "this board has more
+ * images than the infinite window can reach".
+ *
+ * Both leave `hasNextPage` false, but only the second one is incomplete, and a
+ * gallery that silently stops scrolling with a thousand images on the server
+ * reads as a bug. Paginated mode is never truncated: every page is reachable
+ * by asking for it.
+ */
+export const isGalleryWindowTruncated = ({
+  hasNextPage,
+  isPaginated,
+  loadedRowCount,
+  maxRows,
+  total,
+}: {
+  hasNextPage: boolean;
+  isPaginated: boolean;
+  loadedRowCount: number;
+  maxRows: number;
+  total: number | null;
+}): boolean => !isPaginated && !hasNextPage && total !== null && loadedRowCount >= maxRows && total > loadedRowCount;
+
 export const useGalleryData = ({
   galleryView,
-  imageRefreshToken,
   page,
-  recentImagesKey,
-  refreshToken,
+  recentImages,
   searchTerm,
   selectedBoardId,
   settings,
 }: {
   galleryView: GalleryView;
-  imageRefreshToken: string;
   page: number;
-  recentImagesKey: string;
-  refreshToken: string;
+  recentImages: readonly GeneratedImageContract[];
   searchTerm: string;
   selectedBoardId: string;
   settings: GallerySettings;
 }): GalleryData => {
-  const queryClient = useQueryClient();
-  const { boards } = useGalleryBoards({ refreshToken, settings });
+  const { boards } = useGalleryBoards({ settings });
   const boardId =
     boards.length === 0 || boards.some((board) => board.id === selectedBoardId) ? selectedBoardId : 'none';
-  const baseKey = [galleryView, boardId, searchTerm.trim(), settings.imageOrderDir, String(settings.starredFirst)].join(
-    '\0'
-  );
-  const [infiniteWindow, setInfiniteWindow] = useState({ baseKey, pageCount: 1 });
   const isPaginated = settings.paginationMode === 'paginated';
-  const pageCount = infiniteWindow.baseKey === baseKey ? infiniteWindow.pageCount : 1;
-  const offset = isPaginated ? page * GALLERY_PAGE_SIZE : 0;
-  const limit = isPaginated ? GALLERY_PAGE_SIZE : pageCount * GALLERY_PAGE_SIZE;
-  // The raw search term stays the source of truth; date tokens are derived
-  // here so both the text filter and the range reach the query together.
   const dateParse = useMemo(() => parseDateTokens(searchTerm), [searchTerm]);
-  const options = galleryImagesOptions({
-    boardId,
-    createdFrom: dateParse.range?.from,
-    createdTo: dateParse.range?.to,
-    galleryView,
-    limit,
-    offset,
-    orderDir: settings.imageOrderDir,
-    revision: `${imageRefreshToken}:${recentImagesKey}`,
-    searchTerm: dateParse.text,
-    starredFirst: settings.starredFirst,
+  const filter = useMemo<GalleryImagesFilter>(
+    () => ({
+      boardId,
+      createdFrom: dateParse.range?.from,
+      createdTo: dateParse.range?.to,
+      galleryView,
+      orderDir: settings.imageOrderDir,
+      searchTerm: dateParse.text,
+      starredFirst: settings.starredFirst,
+    }),
+    [
+      boardId,
+      dateParse.range?.from,
+      dateParse.range?.to,
+      dateParse.text,
+      galleryView,
+      settings.imageOrderDir,
+      settings.starredFirst,
+    ]
+  );
+  const {
+    data: queryData,
+    fetchNextPage,
+    hasNextPage,
+    isFetching,
+    isFetchingNextPage,
+  } = useInfiniteQuery(
+    galleryImagesInfiniteOptions(
+      filter,
+      isPaginated ? { kind: 'anchor', offset: page * GALLERY_PAGE_SIZE } : { kind: 'infinite' }
+    )
+  );
+  const backendImages = useMemo(() => {
+    if (!isPaginated) {
+      return flattenGalleryImagesData(queryData);
+    }
+
+    const pageOffset = page * GALLERY_PAGE_SIZE;
+    const pageIndex = queryData?.pageParams.indexOf(pageOffset) ?? -1;
+
+    return pageIndex === -1 ? [] : (queryData?.pages[pageIndex]?.images ?? []).slice(0, GALLERY_PAGE_SIZE);
+  }, [isPaginated, page, queryData]);
+  const shouldOverlayRecentImages = !isPaginated;
+  const maxRows = isPaginated ? GALLERY_PAGE_SIZE : GALLERY_MAX_ROWS;
+  const images = useMemo(
+    () =>
+      queryData || (shouldOverlayRecentImages && recentImages.length > 0)
+        ? mergeGalleryImageWindow({
+            backendImages,
+            filter,
+            maxRows,
+            recentImages: shouldOverlayRecentImages ? recentImages : [],
+          })
+        : null,
+    [backendImages, filter, maxRows, queryData, recentImages, shouldOverlayRecentImages]
+  );
+  const total = queryData?.pages[0]?.total ?? null;
+  const hasMore = !isPaginated && Boolean(hasNextPage);
+  const isWindowTruncated = isGalleryWindowTruncated({
+    hasNextPage: Boolean(hasNextPage),
+    isPaginated,
+    loadedRowCount: backendImages.length,
+    maxRows,
+    total,
   });
-  const query = useQuery({ ...options, placeholderData: keepPreviousData });
-  const images = query.data?.images ?? null;
-  const total = query.data?.total ?? null;
-  const hasMore = !isPaginated && total !== null && images !== null && images.length < total;
   const loadMore = useCallback(() => {
-    if (!hasMore || query.isFetching) {
+    if (!hasMore || isFetchingNextPage) {
       return;
     }
 
-    setInfiniteWindow((current) => ({
-      baseKey,
-      pageCount: current.baseKey === baseKey ? current.pageCount + 1 : 2,
-    }));
-  }, [baseKey, hasMore, query.isFetching]);
+    void fetchNextPage();
+  }, [fetchNextPage, hasMore, isFetchingNextPage]);
 
-  const patchImages = useCallback(
-    (getImages: (images: GalleryImage[]) => GalleryImage[]) => {
-      queryClient.setQueryData(options.queryKey, (current) =>
-        current ? { ...current, images: getImages(current.images) } : current
-      );
-    },
-    [options.queryKey, queryClient]
-  );
-
-  return { boards, hasMore, images, isLoadingImages: query.isFetching, loadMore, patchImages, total };
+  return { boards, hasMore, images, isLoadingImages: isFetching, isWindowTruncated, loadMore, total };
 };

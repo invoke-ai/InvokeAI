@@ -14,10 +14,17 @@ import type { ChangeEvent, CSSProperties, FocusEvent } from 'react';
 import { Box, createListCollection, HStack, IconButton, Input, Stack, Switch, Text } from '@chakra-ui/react';
 import { useDndMonitor, useDroppable } from '@dnd-kit/core';
 import { galleryImages, galleryTransfers } from '@features/gallery';
+import { invalidateGallery } from '@features/gallery/queries';
 import { isGalleryImageDragData } from '@features/gallery/utility';
 import { FluxReduxControls, PROMPT_ATTENTION_TARGET_PROPS, PromptTextarea } from '@features/generation/components';
 import { useModelsSelector } from '@features/models';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
 import { Button, ColorPicker, DropZone, Field, Select, Slider } from '@platform/ui';
+import { useQueryClient } from '@tanstack/react-query';
 import { useCanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { ImageIcon, PlusIcon, XIcon } from 'lucide-react';
@@ -88,7 +95,8 @@ interface RegionalGuidanceSettingsProps {
 export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSettingsProps) => {
   const { t } = useTranslation();
   const dispatch = useCanvasProjectMutationDispatch();
-  const { gallery, notifications } = useWorkbenchCommands();
+  const { notifications } = useWorkbenchCommands();
+  const queryClient = useQueryClient();
   const models = useModelsSelector((snapshot) => snapshot.models);
   const base = useSelectedModelBase();
   const showSyntaxHighlighting = useActiveProjectSelector((project) => project.settings.showPromptSyntaxHighlighting);
@@ -264,11 +272,19 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
 
   const uploadReferenceImageAsset = useCallback(
     async (refId: string, file: File) => {
+      const owner = captureAccountScope();
+
       try {
-        const uploaded = await galleryTransfers.upload(file, 'none');
+        const uploaded = await galleryTransfers.upload(file, 'none', { signal: owner.signal });
+
+        assertAccountScopeCurrent(owner);
         setReferenceImageAsset(refId, uploaded);
-        gallery.touchImages();
+        void invalidateGallery(queryClient, owner);
       } catch (error) {
+        if (!isAccountScopeCurrent(owner)) {
+          return;
+        }
+
         notifications.reportError({
           area: 'regional-guidance',
           message: error instanceof Error ? error.message : String(error),
@@ -276,7 +292,7 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
         });
       }
     },
-    [gallery, notifications, setReferenceImageAsset]
+    [notifications, queryClient, setReferenceImageAsset]
   );
 
   // A single monitor routes gallery-image drops to the region's ref slot the drop

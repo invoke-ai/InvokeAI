@@ -1,4 +1,6 @@
+import { getBoundedRecentImages } from '@features/gallery/core/recentImages';
 import { getGallerySettings } from '@features/gallery/core/settings';
+import { GALLERY_PAGE_SIZE } from '@features/gallery/data/queries';
 import { StatusWidgetChip } from '@platform/ui';
 import { ImageIcon } from 'lucide-react';
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef } from 'react';
@@ -9,9 +11,6 @@ import { GalleryPanelContent } from './GalleryPanelContent';
 import {
   getGalleryPage,
   getGalleryProjectBoardId,
-  getGalleryImagesRefreshToken,
-  getGalleryRecentImagesKey,
-  getGalleryRefreshToken,
   getGallerySearchTerm,
   getGallerySelectedBoardId,
   getGalleryStateView,
@@ -26,7 +25,7 @@ import {
 } from './GalleryUiContext';
 import { GalleryWidgetContext, type GalleryActions, type GalleryWidgetContextValue } from './GalleryWidgetContext';
 import { useGalleryActions } from './useGalleryActions';
-import { GALLERY_PAGE_SIZE, useGalleryData } from './useGalleryData';
+import { useGalleryData } from './useGalleryData';
 
 export const shouldPublishGalleryTotal = ({
   knownTotalImages,
@@ -53,24 +52,20 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
   } = useGalleryUi();
   const galleryView = getGalleryView(galleryValues);
   const searchTerm = getGallerySearchTerm(galleryValues);
-  const recentImagesKey = getGalleryRecentImagesKey(galleryValues);
-  const refreshToken = getGalleryRefreshToken(galleryValues);
-  const imageRefreshToken = getGalleryImagesRefreshToken(galleryValues);
+  const recentImages = useMemo(() => getBoundedRecentImages(galleryValues.recentImages), [galleryValues.recentImages]);
   const page = getGalleryPage(galleryValues);
   const knownTotalImages = getGalleryTotalImages(galleryValues);
   const settings = getGallerySettings(galleryValues);
   const data = useGalleryData({
     galleryView,
-    imageRefreshToken,
     page,
-    recentImagesKey,
-    refreshToken,
+    recentImages,
     searchTerm,
     selectedBoardId: getGallerySelectedBoardId(galleryValues, []),
     settings,
   });
 
-  const { loadMore, patchImages, total } = data;
+  const { loadMore, total } = data;
   const selectedBoardId = getGallerySelectedBoardId(galleryValues, data.boards);
   const gallery = getGalleryStateView(
     galleryValues,
@@ -80,15 +75,6 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
     queueItems,
     liveFollowEnabled,
     liveProgressTarget
-  );
-
-  const onStarredChange = useCallback(
-    (imageNames: string[], starred: boolean) => {
-      patchImages((images) =>
-        images.map((image) => (imageNames.includes(image.imageName) ? { ...image, starred } : image))
-      );
-    },
-    [patchImages]
   );
 
   const lastPublishedTotalRef = useRef<number | null>(null);
@@ -184,11 +170,11 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
       generateValues={generateValues}
       projectId={projectId}
       onImagesDeleted={onImagesDeleted}
-      onStarredChange={onStarredChange}
     >
       <GalleryWidgetContent
         actions={actions}
         gallery={gallery}
+        isWindowTruncated={data.isWindowTruncated}
         layout={isWidePlacement ? 'wide' : 'stacked'}
         projectName={projectName}
         runtime={runtime}
@@ -200,20 +186,22 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
 const GalleryWidgetContent = ({
   actions,
   gallery,
+  isWindowTruncated,
   layout,
   projectName,
   runtime,
 }: {
   actions: GalleryActions;
   gallery: GalleryStateView;
+  isWindowTruncated: boolean;
   layout: 'stacked' | 'wide';
   projectName: string;
   runtime: GalleryWidgetRuntime;
 }) => {
   const imageActions = useGalleryImageActions();
   const contextValue = useMemo<GalleryWidgetContextValue>(
-    () => ({ actions, gallery, imageActions, projectName, runtime }),
-    [actions, gallery, imageActions, projectName, runtime]
+    () => ({ actions, gallery, imageActions, isWindowTruncated, projectName, runtime }),
+    [actions, gallery, imageActions, isWindowTruncated, projectName, runtime]
   );
 
   return (

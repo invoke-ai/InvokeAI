@@ -22,7 +22,7 @@ import {
   useSlotRecipe,
 } from '@chakra-ui/react';
 import { WORKBENCH_LANGUAGE_OPTIONS } from '@platform/i18n/languages';
-import { Button, CloseButton, IconButton, ConfirmDialog, Select, Tabs, Tooltip } from '@platform/ui';
+import { Button, CloseButton, ConfirmDialog, Select, Tabs } from '@platform/ui';
 import { themeCardRecipe } from '@theme/recipes';
 import { previewSwatches, THEMES, type ThemeDefinition } from '@theme/system';
 import { registerHotkeyModalLayer } from '@workbench/hotkeys';
@@ -53,12 +53,7 @@ import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from
 import { useTranslation } from 'react-i18next';
 
 import { HotkeysSettingsSection } from './HotkeysSettingsSection';
-import {
-  closeWorkbenchSettings,
-  openWorkbenchSettings,
-  setWorkbenchSettingsSection,
-  settingsDialogStore,
-} from './settingsDialogStore';
+import { setWorkbenchSettingsSection, settingsDialogStore } from './settingsDialogStore';
 import {
   clearWorkbenchSettings,
   DEVELOPER_LOG_LEVELS,
@@ -89,27 +84,6 @@ const SWITCH_CHECKED_STYLES = { bg: 'accent.solid' };
 const FIELD_ALIGN_ITEMS = { base: 'stretch', md: 'center' };
 const FIELD_FLEX_DIRECTION = { base: 'column', md: 'row' };
 const SELECT_MAX_WIDTH = { base: 'full', md: '56' };
-
-/**
- * The top bar's settings entry point. It also hosts the dialog itself, driven
- * by `settingsDialogStore` so any surface can deep-link into a section via
- * `openWorkbenchSettings('workflow')`.
- */
-export const SettingsButton = () => {
-  const isOpen = settingsDialogStore.useSelector((snapshot) => snapshot.isOpen);
-  const handleOpen = useCallback(() => openWorkbenchSettings(), []);
-
-  return (
-    <>
-      <Tooltip content="Settings">
-        <IconButton aria-label="Settings" size="sm" variant="ghost" onClick={handleOpen}>
-          <SettingsIcon />
-        </IconButton>
-      </Tooltip>
-      <SettingsDialog isOpen={isOpen} onClose={closeWorkbenchSettings} />
-    </>
-  );
-};
 
 export const SettingsDialog = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
   useEffect(() => {
@@ -897,3 +871,6 @@ const DEVELOPER_LOG_LEVEL_OPTIONS = DEVELOPER_LOG_LEVELS.map((value) => ({
   label: formatSettingLabel(value),
   value,
 }));
+
+/** Default export so the top bar can host this body behind `React.lazy`. */
+export default SettingsDialog;

@@ -209,7 +209,13 @@ export const getGalleryImagesByNames = async (imageNames: string[], signal?: Abo
     signal,
   });
 
-  return body.map(mapImage);
+  const imagesByName = new Map(body.map((image) => [image.image_name, mapImage(image)]));
+
+  return imageNames.flatMap((imageName) => {
+    const image = imagesByName.get(imageName);
+
+    return image ? [image] : [];
+  });
 };
 
 export const getGalleryImageByName = async (imageName: string, signal?: AbortSignal): Promise<GalleryImage> => {
@@ -218,17 +224,21 @@ export const getGalleryImageByName = async (imageName: string, signal?: AbortSig
   return mapImage(body);
 };
 
+export interface GalleryDateBoardImageNames {
+  imageNames: string[];
+  total: number;
+}
+
 /**
- * Date virtual boards have no offset-paginated DTO endpoint; list the ordered
- * names for the date, slice the requested window, then bulk-hydrate DTOs.
+ * Date virtual boards have no offset-paginated DTO endpoint. The query module
+ * caches this ordered name list once per semantic filter, then each infinite
+ * page hydrates only its own fixed-size slice.
  */
-const listGalleryDateBoardImages = async ({
+export const listGalleryDateBoardImageNames = async ({
   boardId,
   createdFrom,
   createdTo,
   galleryView,
-  limit,
-  offset,
   orderDir,
   searchTerm,
   signal,
@@ -238,20 +248,18 @@ const listGalleryDateBoardImages = async ({
   createdFrom?: string;
   createdTo?: string;
   galleryView: GalleryView;
-  limit: number;
-  offset: number;
   orderDir: GalleryOrderDir;
   searchTerm: string;
   signal?: AbortSignal;
   starredFirst: boolean;
-}): Promise<GalleryImagesPage> => {
+}): Promise<GalleryDateBoardImageNames> => {
   // The board already pins a single day; a date filter either contains that
   // day (and constrains nothing further) or excludes the whole board.
   if (
     (createdFrom !== undefined || createdTo !== undefined) &&
     !isTimestampInRange(getDateFromBoardId(boardId), { from: createdFrom, to: createdTo })
   ) {
-    return { images: [], total: 0 };
+    return { imageNames: [], total: 0 };
   }
 
   const query = toSearchParams({
@@ -264,10 +272,27 @@ const listGalleryDateBoardImages = async ({
     `/api/v1/virtual_boards/by_date/${encodeURIComponent(getDateFromBoardId(boardId))}/image_names?${query}`,
     { signal }
   );
-  const images = await getGalleryImagesByNames(body.image_names.slice(offset, offset + limit), signal);
 
-  return { images, total: normalizeTotal(body.total_count, body.image_names.length) };
+  return {
+    imageNames: body.image_names,
+    total: normalizeTotal(body.total_count, body.image_names.length),
+  };
 };
+
+export const hydrateGalleryDateBoardImagePage = async ({
+  imageNames,
+  limit,
+  offset,
+  signal,
+  total,
+}: GalleryDateBoardImageNames & {
+  limit: number;
+  offset: number;
+  signal?: AbortSignal;
+}): Promise<GalleryImagesPage> => ({
+  images: await getGalleryImagesByNames(imageNames.slice(offset, offset + limit), signal),
+  total,
+});
 
 export const listGalleryImages = async ({
   boardId,
@@ -293,18 +318,18 @@ export const listGalleryImages = async ({
   starredFirst?: boolean;
 }): Promise<GalleryImagesPage> => {
   if (isDateBoardId(boardId)) {
-    return listGalleryDateBoardImages({
+    const names = await listGalleryDateBoardImageNames({
       boardId,
       createdFrom,
       createdTo,
       galleryView,
-      limit,
-      offset,
       orderDir,
       searchTerm,
       signal,
       starredFirst,
     });
+
+    return hydrateGalleryDateBoardImagePage({ ...names, limit, offset, signal });
   }
 
   const query = toSearchParams({

@@ -7,7 +7,6 @@ import {
   getBoardCounts,
   getGalleryCurrentItem,
   getGalleryGenerationSequence,
-  getGalleryImagesRefreshToken,
   getGalleryQueuePlaceholders,
   getGallerySelectedBoardId,
   getGalleryStateView,
@@ -112,13 +111,6 @@ describe('gallery state view', () => {
       starredFirst: false,
       thumbnailFit: 'square',
     });
-  });
-
-  it('falls back to the full gallery refresh token when image refresh token is absent', () => {
-    expect(getGalleryImagesRefreshToken({ galleryRefreshToken: 'full-refresh' })).toBe('full-refresh');
-    expect(
-      getGalleryImagesRefreshToken({ galleryImagesRefreshToken: 'image-refresh', galleryRefreshToken: 'full-refresh' })
-    ).toBe('image-refresh');
   });
 
   it('derives the multi-selection from persisted values with a single-selection fallback', () => {
