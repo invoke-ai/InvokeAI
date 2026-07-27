@@ -36,6 +36,15 @@ def _ambiguous_text_encoder_only_lora() -> MagicMock:
     return mod
 
 
+def _diffusion_model_transformer_only_lora() -> MagicMock:
+    mod = MagicMock()
+    mod.load_state_dict.return_value = {
+        "diffusion_model.transformer_blocks.0.attn.to_q.lora_A.weight": object(),
+        "diffusion_model.transformer_blocks.0.attn.to_q.lora_B.weight": object(),
+    }
+    return mod
+
+
 @patch("invokeai.backend.model_manager.configs.lora.raise_if_not_file")
 def test_explicit_krea2_override_accepts_ambiguous_transformer_only_lora(_raise_if_not_file) -> None:
     config = LoRA_LyCORIS_Krea2_Config.from_model_on_disk(
@@ -75,3 +84,25 @@ def test_explicit_krea2_override_accepts_text_encoder_only_lora(_raise_if_not_fi
 def test_automatic_probe_rejects_ambiguous_text_encoder_only_lora(_raise_if_not_file) -> None:
     with pytest.raises(NotAMatchError):
         LoRA_LyCORIS_Krea2_Config.from_model_on_disk(_ambiguous_text_encoder_only_lora(), {**_REQUIRED_FIELDS})
+
+
+@patch("invokeai.backend.model_manager.configs.lora.raise_if_not_file")
+def test_explicit_krea2_override_accepts_diffusion_model_transformer_only_lora(_raise_if_not_file) -> None:
+    # The converter supports the `diffusion_model.` transformer layout (lora_model_from_krea2_state_dict), so a
+    # transformer-only LoRA using it must install under an explicit Krea-2 override (regression: review 4791964047).
+    config = LoRA_LyCORIS_Krea2_Config.from_model_on_disk(
+        _diffusion_model_transformer_only_lora(), {**_REQUIRED_FIELDS, "base": BaseModelType.Krea2}
+    )
+
+    assert config.base is BaseModelType.Krea2
+
+
+@patch("invokeai.backend.model_manager.configs.lora.raise_if_not_file")
+def test_explicit_krea2_override_rejects_incomplete_diffusion_model_lora_pair(_raise_if_not_file) -> None:
+    mod = MagicMock()
+    mod.load_state_dict.return_value = {
+        "diffusion_model.transformer_blocks.0.attn.to_q.lora_A.weight": object(),
+    }
+
+    with pytest.raises(NotAMatchError):
+        LoRA_LyCORIS_Krea2_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS, "base": BaseModelType.Krea2})

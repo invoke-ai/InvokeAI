@@ -293,7 +293,7 @@ describe('ImageMetadataHandlers — Krea-2 recall gating', () => {
   describe('conditioning-enhancer gating', () => {
     const enhancerCases = [
       { handler: 'Krea2SeedVarianceEnabled', field: 'krea2_seed_variance_enabled', value: true },
-      { handler: 'Krea2SeedVarianceStrength', field: 'krea2_seed_variance_strength', value: 20 },
+      { handler: 'Krea2SeedVarianceStrength', field: 'krea2_seed_variance_strength', value: 0.5 },
       { handler: 'Krea2SeedVarianceRandomizePercent', field: 'krea2_seed_variance_randomize_percent', value: 50 },
       { handler: 'Krea2RebalanceEnabled', field: 'krea2_rebalance_enabled', value: true },
       { handler: 'Krea2RebalanceMultiplier', field: 'krea2_rebalance_multiplier', value: 4 },
@@ -339,5 +339,47 @@ describe('ImageMetadataHandlers — Krea-2 recall gating', () => {
         ).rejects.toThrow();
       }
     );
+  });
+
+  // The numeric enhancer scalars must parse exactly the ranges the slider / param-state / invocation accept,
+  // so recalling an image never dispatches a value the backend rejects (regression for review 4791964047:
+  // strength is a 0..2 std-multiplier, randomize-percent allows 0 as the disabled value).
+  describe('conditioning-enhancer numeric ranges', () => {
+    const parseStrength = (value: unknown, store: AppStore) =>
+      (
+        ImageMetadataHandlers.Krea2SeedVarianceStrength as unknown as {
+          parse: (m: Record<string, unknown>, s: AppStore) => Promise<unknown>;
+        }
+      ).parse({ model: { base: 'krea-2' }, krea2_seed_variance_strength: value }, store);
+
+    const parsePercent = (value: unknown, store: AppStore) =>
+      (
+        ImageMetadataHandlers.Krea2SeedVarianceRandomizePercent as unknown as {
+          parse: (m: Record<string, unknown>, s: AppStore) => Promise<unknown>;
+        }
+      ).parse({ model: { base: 'krea-2' }, krea2_seed_variance_randomize_percent: value }, store);
+
+    it.each([0, 0.1, 2])('strength accepts %s (0..2 std-multiplier)', async (value) => {
+      currentBase = 'krea-2';
+      expect(await parseStrength(value, makeStore())).toBe(value);
+    });
+
+    it.each([-0.1, 2.1, 20])('strength rejects out-of-range %s (e.g. the stale absolute value 20)', async (value) => {
+      currentBase = 'krea-2';
+      const store = makeStore();
+      // `.parse()` throws synchronously, so wrap it to observe the rejection (as the gating tests do).
+      await expect(Promise.resolve().then(() => parseStrength(value, store))).rejects.toThrow();
+    });
+
+    it.each([0, 1, 50, 100])('randomize percent accepts %s (0 = disabled)', async (value) => {
+      currentBase = 'krea-2';
+      expect(await parsePercent(value, makeStore())).toBe(value);
+    });
+
+    it.each([-1, 101])('randomize percent rejects out-of-range %s', async (value) => {
+      currentBase = 'krea-2';
+      const store = makeStore();
+      await expect(Promise.resolve().then(() => parsePercent(value, store))).rejects.toThrow();
+    });
   });
 });

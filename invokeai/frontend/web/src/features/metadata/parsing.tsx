@@ -1447,7 +1447,8 @@ const Krea2SeedVarianceStrength: SingleMetadataHandler<number> = {
     );
     assertMetadataModelBase(metadata, 'krea-2', 'Krea2SeedVarianceStrength');
     const raw = getProperty(metadata, 'krea2_seed_variance_strength');
-    return Promise.resolve(z.number().min(0).max(100).parse(raw));
+    // Strength is a multiplier of the embedding std, capped at 2 (matches the invocation + param state).
+    return Promise.resolve(z.number().min(0).max(2).parse(raw));
   },
   recall: (value, store) => {
     store.dispatch(setKrea2SeedVarianceStrength(value));
@@ -1469,7 +1470,8 @@ const Krea2SeedVarianceRandomizePercent: SingleMetadataHandler<number> = {
     );
     assertMetadataModelBase(metadata, 'krea-2', 'Krea2SeedVarianceRandomizePercent');
     const raw = getProperty(metadata, 'krea2_seed_variance_randomize_percent');
-    return Promise.resolve(z.number().min(1).max(100).parse(raw));
+    // 0 is the valid "disabled" value (matches the slider, param state, and invocation); reject negatives.
+    return Promise.resolve(z.number().min(0).max(100).parse(raw));
   },
   recall: (value, store) => {
     store.dispatch(setKrea2SeedVarianceRandomizePercent(value));
