@@ -227,6 +227,8 @@ const zCanvasBrushLineWithPressureState = z.object({
    */
   points: zPointsWithPressure,
   color: zRgbaColor,
+  pressureAffectsWidth: z.boolean().default(true),
+  pressureAffectsOpacity: z.boolean().default(false),
   clip: zRect.nullable(),
   globalCompositeOperation: z.string().optional(),
 });
@@ -252,6 +254,7 @@ const zCanvasEraserLineWithPressureState = z.object({
    * Points with pressure are in the format [x1, y1, pressure1, x2, y2, pressure2, ...]
    */
   points: zPointsWithPressure,
+  pressureAffectsWidth: z.boolean().default(true),
   clip: zRect.nullable(),
 });
 export type CanvasEraserLineWithPressureState = z.infer<typeof zCanvasEraserLineWithPressureState>;
