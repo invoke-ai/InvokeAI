@@ -115,7 +115,9 @@ class FluxTextEncoderInvocation(BaseInvocation):
                 )
             )
 
-            t5_encoder = HFEncoder(t5_text_encoder, t5_tokenizer, False, self.t5_max_seq_len)
+            t5_encoder = HFEncoder(
+                t5_text_encoder, t5_tokenizer, False, self.t5_max_seq_len, device=t5_encoder_info.compute_device
+            )
 
             if context.config.get().log_tokenization:
                 self._log_t5_tokenization(context, t5_tokenizer)
@@ -158,7 +160,9 @@ class FluxTextEncoderInvocation(BaseInvocation):
                 # There are currently no supported CLIP quantized models. Add support here if needed.
                 raise ValueError(f"Unsupported model format: {clip_text_encoder_config.format}")
 
-            clip_encoder = HFEncoder(clip_text_encoder, clip_tokenizer, True, 77)
+            clip_encoder = HFEncoder(
+                clip_text_encoder, clip_tokenizer, True, 77, device=clip_text_encoder_info.compute_device
+            )
 
             if context.config.get().log_tokenization:
                 self._log_clip_tokenization(context, clip_tokenizer)

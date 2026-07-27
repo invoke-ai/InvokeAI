@@ -180,7 +180,8 @@ class DownloadQueueService(DownloadQueueServiceBase):
         on_cancelled: Optional[DownloadEventHandler] = None,
         on_error: Optional[DownloadExceptionHandler] = None,
     ) -> MultiFileDownloadJob:
-        mfdj = MultiFileDownloadJob(dest=dest, id=self._next_id())
+        dest_root = dest.resolve()
+        mfdj = MultiFileDownloadJob(dest=dest_root, id=self._next_id())
         mfdj.set_callbacks(
             on_start=on_start,
             on_progress=on_progress,
@@ -191,8 +192,9 @@ class DownloadQueueService(DownloadQueueServiceBase):
 
         for part in parts:
             url = part.url
-            path = dest / part.path
-            assert path.is_relative_to(dest), "only relative download paths accepted"
+            path = (dest_root / part.path).resolve()
+            if not path.is_relative_to(dest_root):
+                raise ValueError("only relative download paths accepted")
             job = DownloadJob(
                 source=url,
                 dest=path,

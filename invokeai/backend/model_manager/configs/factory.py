@@ -74,6 +74,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Diffusers_CogView4_Config,
     Main_Diffusers_Flux2_Config,
     Main_Diffusers_FLUX_Config,
+    Main_Diffusers_Ideogram4_Config,
     Main_Diffusers_QwenImage_Config,
     Main_Diffusers_SD1_Config,
     Main_Diffusers_SD2_Config,
@@ -102,7 +103,11 @@ from invokeai.backend.model_manager.configs.t2i_adapter import (
     T2IAdapter_Diffusers_SD1_Config,
     T2IAdapter_Diffusers_SDXL_Config,
 )
-from invokeai.backend.model_manager.configs.t5_encoder import T5Encoder_BnBLLMint8_Config, T5Encoder_T5Encoder_Config
+from invokeai.backend.model_manager.configs.t5_encoder import (
+    T5Encoder_BnBLLMint8_Config,
+    T5Encoder_GGUF_Config,
+    T5Encoder_T5Encoder_Config,
+)
 from invokeai.backend.model_manager.configs.text_llm import TextLLM_Diffusers_Config
 from invokeai.backend.model_manager.configs.textual_inversion import (
     TI_File_SD1_Config,
@@ -176,6 +181,7 @@ AnyModelConfig = Annotated[
         Annotated[Main_Diffusers_CogView4_Config, Main_Diffusers_CogView4_Config.get_tag()],
         Annotated[Main_Diffusers_QwenImage_Config, Main_Diffusers_QwenImage_Config.get_tag()],
         Annotated[Main_Diffusers_ZImage_Config, Main_Diffusers_ZImage_Config.get_tag()],
+        Annotated[Main_Diffusers_Ideogram4_Config, Main_Diffusers_Ideogram4_Config.get_tag()],
         # Main (Pipeline) - checkpoint format
         # IMPORTANT: FLUX.2 must be checked BEFORE FLUX.1 because FLUX.2 has specific validation
         # that will reject FLUX.1 models, but FLUX.1 validation may incorrectly match FLUX.2 models
@@ -248,6 +254,7 @@ AnyModelConfig = Annotated[
         # T5 Encoder - all formats
         Annotated[T5Encoder_T5Encoder_Config, T5Encoder_T5Encoder_Config.get_tag()],
         Annotated[T5Encoder_BnBLLMint8_Config, T5Encoder_BnBLLMint8_Config.get_tag()],
+        Annotated[T5Encoder_GGUF_Config, T5Encoder_GGUF_Config.get_tag()],
         # Qwen3 Encoder
         Annotated[Qwen3Encoder_Qwen3Encoder_Config, Qwen3Encoder_Qwen3Encoder_Config.get_tag()],
         Annotated[Qwen3Encoder_Checkpoint_Config, Qwen3Encoder_Checkpoint_Config.get_tag()],
