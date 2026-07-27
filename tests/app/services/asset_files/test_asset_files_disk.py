@@ -1,5 +1,6 @@
 import platform
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -62,3 +63,27 @@ def test_delete_removes_file(disk_storage: DiskAssetFileStorage):
     disk_storage.delete("splat.ply")
     with pytest.raises(AssetFileNotFoundException):
         disk_storage.get_path("splat.ply")
+
+
+def test_start_sweeps_orphaned_assets(tmp_path: Path):
+    """Assets are session-transient with no DB records, so server startup wipes anything left over
+    from a previous run — this is the storage's only GC."""
+    (tmp_path / "orphan-1.ply").write_bytes(b"a")
+    (tmp_path / "orphan-2.ply").write_bytes(b"b")
+    subdir = tmp_path / "unrelated-dir"
+    subdir.mkdir()
+
+    storage = DiskAssetFileStorage(tmp_path)
+    storage.start(MagicMock())
+
+    assert list(tmp_path.glob("*.ply")) == []
+    assert subdir.exists()  # only files are swept
+
+
+def test_construction_does_not_sweep(tmp_path: Path):
+    """Only start() (server boot) sweeps — bare construction must leave existing files alone."""
+    (tmp_path / "existing.ply").write_bytes(b"a")
+
+    DiskAssetFileStorage(tmp_path)
+
+    assert (tmp_path / "existing.ply").exists()

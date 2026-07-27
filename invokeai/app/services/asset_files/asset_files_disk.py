@@ -18,6 +18,7 @@ class DiskAssetFileStorage(AssetFilesServiceBase):
 
     def start(self, invoker: Invoker) -> None:
         self._invoker = invoker
+        self._sweep()
 
     def save(self, asset_name: str, data: bytes) -> None:
         try:
@@ -56,6 +57,24 @@ class DiskAssetFileStorage(AssetFilesServiceBase):
         if not path.is_relative_to(self._asset_files_folder.resolve()):
             raise ValueError(f"Invalid asset name: {asset_name}")
         return path
+
+    def _sweep(self) -> None:
+        """Deletes all stored asset files. Assets are session-transient — they have no DB records and
+        are referenced only by a live canvas overlay — so anything on disk at server startup is an
+        orphan from a previous run. Mirrors ObjectSerializerDisk's boot-time cleanup of dangling
+        tensor tempdirs."""
+        deleted = 0
+        for path in self._asset_files_folder.glob("*"):
+            if not path.is_file():
+                continue
+            try:
+                path.unlink()
+                deleted += 1
+            except OSError:
+                # A locked or otherwise undeletable file should not block startup.
+                pass
+        if deleted:
+            self._invoker.services.logger.info(f"Deleted {deleted} orphaned 3D asset file(s)")
 
     def _validate_storage_folder(self) -> None:
         """Creates the storage folder if it does not exist."""
