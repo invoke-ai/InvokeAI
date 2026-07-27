@@ -787,9 +787,7 @@
       "src/features/models/ui/ModelManagerView.tsx",
       "src/features/nodes/ui/NodeManagerView.tsx"
     ],
-    "editorForbiddenInitialChunkNames": [
-      "ag-psd"
-    ],
+    "editorForbiddenInitialChunkNames": ["ag-psd"],
     "inactiveWidgetGateOwner": "deepen-widget-registry-loading"
   }
 }
