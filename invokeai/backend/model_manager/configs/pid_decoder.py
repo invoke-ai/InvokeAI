@@ -1,9 +1,11 @@
 """Model configs for PiD (Pixel Diffusion Decoder) checkpoints.
 
 PiD decoders are released by NVIDIA at https://huggingface.co/nvidia/PiD and
-ship per supported backbone (FLUX.1, FLUX.2, SD3) in two resolution presets
-(`res2k_sr4x_*` and `res2kto4k_sr4x_*`). See `LICENSE-PiD.txt` at the repo
-root — code is Apache-2.0, weights are NSCLv1 (non-commercial / research).
+ship per supported backbone (FLUX.1, FLUX.2, SD3, SDXL, Qwen-Image). Most
+backbones offer two resolution presets (`res2k_sr4x_*` and `res2kto4k_sr4x_*`),
+while SDXL and Qwen-Image ship only the `res2kto4k_sr4x_*` preset. See
+`LICENSE-PiD.txt` at the repo root — code is Apache-2.0, weights are NSCLv1
+(non-commercial / research).
 """
 
 import re
@@ -193,7 +195,7 @@ class PiDDecoder_Checkpoint_Config_Base(Checkpoint_Config_Base):
             if candidate_bases is None:
                 raise NotAMatchError(
                     f"PiD checkpoint has {channels} latent channels; no supported backbone uses this "
-                    "(supported: 16 for FLUX.1/SD3, 128 for FLUX.2)"
+                    "(supported: 4 for SDXL, 16 for FLUX.1/SD3/Qwen-Image, 128 for FLUX.2)"
                 )
             if expected_base not in candidate_bases:
                 raise NotAMatchError(f"latent channels={channels} do not match backbone {expected_base}")
@@ -215,7 +217,8 @@ class PiDDecoder_Checkpoint_Config_Base(Checkpoint_Config_Base):
         inferred_base = _backbone_from_filename(_name_for_matching(mod))
         if inferred_base is None:
             raise NotAMatchError(
-                "cannot determine PiD decoder backbone from weights or filename (expected one of: flux, flux2, sd3)"
+                "cannot determine PiD decoder backbone from weights or filename "
+                "(expected one of: flux, flux2, sd3, sdxl, qwen-image)"
             )
         if inferred_base is not expected_base:
             raise NotAMatchError(f"backbone is {inferred_base}, not {expected_base}")

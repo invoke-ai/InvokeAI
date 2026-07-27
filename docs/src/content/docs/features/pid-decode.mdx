@@ -43,6 +43,10 @@ PiD needs two extra models, both available in **Model Manager → Starter Models
 
 Each PiD decoder is roughly 5 GB and the shared Gemma-2 encoder is roughly 5 GB.
 
+<Aside type="note">
+The Starter Models install NVIDIA's **legacy** PiD checkpoints (the ones now under `checkpoints_deprecated/` on Hugging Face). NVIDIA's newer **v1.5** decoders use a different network and are not yet supported — installing one is rejected during model identification rather than failing at decode time.
+</Aside>
+
 ## Enabling PiD
 
 Open the **Generation** settings for a supported model and expand the advanced options. You'll find a **PiD** control with three modes:
