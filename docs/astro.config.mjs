@@ -99,6 +99,10 @@ export default defineConfig({
         starlightLinksValidator({
           errorOnRelativeLinks: false,
           errorOnLocalLinks: false,
+          // Only part of the docs tree is translated, and pages within it land one Crowdin batch
+          // at a time, so a localized page linking to a page that only exists as Starlight
+          // fallback content is the normal case rather than a broken link.
+          errorOnFallbackPages: false,
           // The validator only knows content collection routes, not the custom Astro pages in
           // src/pages/. Derived from the shared exemption list so a new custom page only has to
           // be registered in one place, and base-aware because links are emitted with the base.
