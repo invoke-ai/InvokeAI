@@ -36,7 +36,7 @@ const VideoMetadataViewer = ({ video }: Props) => {
       overflow="hidden"
     >
       <ExternalLink
-        href="#"
+        as="button"
         label={video.video_name}
         onClick={(event) => {
           event.preventDefault();

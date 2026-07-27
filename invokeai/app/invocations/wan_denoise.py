@@ -78,6 +78,30 @@ def _validate_spatial_dimensions(variant: WanVariantType, width: int, height: in
         )
 
 
+def _validate_ref_condition_shape(
+    condition: torch.Tensor,
+    *,
+    channels: int,
+    frames: int,
+    height: int,
+    width: int,
+) -> None:
+    if condition.ndim != 5:
+        raise ValueError(f"Wan reference condition must be a 5D tensor; got shape {tuple(condition.shape)}.")
+    if condition.shape[0] != 1:
+        raise ValueError(f"Wan reference condition requires batch size 1; got {condition.shape[0]}.")
+    if condition.shape[1] != channels:
+        raise ValueError(f"Wan reference condition requires {channels} channels; got {condition.shape[1]}.")
+    if condition.shape[2] != frames:
+        expected = "a single latent frame" if frames == 1 else f"{frames} latent frames"
+        raise ValueError(f"Wan reference condition requires {expected}; got {condition.shape[2]}.")
+    if condition.shape[3:] != (height, width):
+        raise ValueError(
+            f"Wan reference condition requires {width}x{height} latent spatial dimensions; "
+            f"got {condition.shape[4]}x{condition.shape[3]}."
+        )
+
+
 def _scheduler_path_for_transformer(context: InvocationContext, transformer_field: WanTransformerField) -> Path | None:
     """Return the on-disk ``scheduler/`` directory for the main model, or None."""
     config = context.models.get_config(transformer_field.transformer)
@@ -420,6 +444,13 @@ class WanDenoiseInvocation(BaseInvocation):
                 )
             ref_condition = context.tensors.load(self.ref_image.condition_tensor_name).to(
                 device=device, dtype=inference_dtype
+            )
+            _validate_ref_condition_shape(
+                ref_condition,
+                channels=20,
+                frames=1,
+                height=self.height // spatial_scale,
+                width=self.width // spatial_scale,
             )
 
         # Schedule timesteps. set_timesteps populates scheduler.timesteps and

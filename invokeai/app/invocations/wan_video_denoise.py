@@ -31,6 +31,7 @@ from invokeai.app.invocations.wan_denoise import (
     WanDenoiseInvocation,
     _ExpertSwapper,
     _resolve_variant,
+    _validate_ref_condition_shape,
     _validate_spatial_dimensions,
 )
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -223,6 +224,13 @@ class WanVideoDenoiseInvocation(BaseInvocation):
             ref_condition = context.tensors.load(self.ref_image.condition_tensor_name).to(
                 device=device, dtype=inference_dtype
             )
+            _validate_ref_condition_shape(
+                ref_condition,
+                channels=48 if variant == WanVariantType.TI2V_5B else 20,
+                frames=1 if variant == WanVariantType.TI2V_5B else num_latent_frames_for(self.num_frames),
+                height=self.height // spatial_scale,
+                width=self.width // spatial_scale,
+            )
 
         scheduler.set_timesteps(num_inference_steps=self.steps, device=device)
         timesteps = scheduler.timesteps
@@ -249,23 +257,6 @@ class WanVideoDenoiseInvocation(BaseInvocation):
 
         if total_steps <= 0:
             return latents
-
-        # Sanity-check ref-condition shape per variant. A14B expects matched T_lat;
-        # TI2V-5B expects a single latent frame regardless of output length.
-        if ref_condition is not None:
-            if variant == WanVariantType.TI2V_5B:
-                if ref_condition.shape[1] != 48 or ref_condition.shape[2] != 1:
-                    raise ValueError(
-                        f"TI2V-5B reference condition must be shape [1, 48, 1, H_lat, W_lat] "
-                        f"(got channels={ref_condition.shape[1]}, frames={ref_condition.shape[2]}). "
-                        "Re-run the Reference Image - Wan 2.2 node with a TI2V-5B VAE."
-                    )
-            elif ref_condition.shape[2] != t_lat:
-                raise ValueError(
-                    f"Reference-image condition has {ref_condition.shape[2]} latent frames but the "
-                    f"denoise loop expected {t_lat}. Ensure the ref-image encoder was called with "
-                    f"the same num_frames ({self.num_frames})."
-                )
 
         # Build the TI2V-5B first-frame mask once: 0 at frame 0 (locked to the
         # condition), 1 elsewhere (free to denoise). Broadcasts across channel dim.
