@@ -17154,6 +17154,13 @@ export type components = {
              */
             outputs_dir?: string;
             /**
+             * Fonts Dir
+             * Format: path
+             * @description Path to directory for custom fonts.
+             * @default fonts
+             */
+            fonts_dir?: string;
+            /**
              * Image Subfolder Strategy
              * @description Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.
              * @default flat

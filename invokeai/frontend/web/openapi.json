@@ -42843,6 +42843,13 @@
             "description": "Path to directory for outputs.",
             "default": "outputs"
           },
+          "fonts_dir": {
+            "type": "string",
+            "format": "path",
+            "title": "Fonts Dir",
+            "description": "Path to directory for custom fonts.",
+            "default": "fonts"
+          },
           "image_subfolder_strategy": {
             "type": "string",
             "enum": ["flat", "date", "type", "hash"],
