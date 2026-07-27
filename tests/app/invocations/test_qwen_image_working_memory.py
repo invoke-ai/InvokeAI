@@ -66,6 +66,9 @@ class TestQwenImageWorkingMemory:
         # Create mock vae_info with a model_on_device context manager yielding (None, vae)
         mock_vae_info = MagicMock()
         mock_vae_info.model = mock_vae
+        # Decode places latents on the VAE's intended compute device (see #9373); this must be a
+        # real torch.device so `latents.to(device=...)` works instead of raising TypeError.
+        mock_vae_info.compute_device = torch.device("cpu")
 
         mock_cm = MagicMock()
         mock_cm.__enter__ = MagicMock(return_value=(None, mock_vae))

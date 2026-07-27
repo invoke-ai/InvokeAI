@@ -17,7 +17,6 @@ from invokeai.app.invocations.model import VAEField
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.krea2.vae_compat import as_qwen_image_vae
-from invokeai.backend.model_manager.load.model_cache.utils import get_effective_device
 from invokeai.backend.stable_diffusion.extensions.seamless import SeamlessExt
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_qwen_image
@@ -54,11 +53,14 @@ class QwenImageLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard)
         with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
             context.util.signal_progress("Running VAE")
             # A native-layout qwen_image_vae single file is classified with the Anima base and loaded
-            # as AutoencoderKLWan; reinterpret it as AutoencoderKLQwenImage (identical weights).
+            # as AutoencoderKLWan; reinterpret it as AutoencoderKLQwenImage (identical weights). This is
+            # cache-preserving (returns the same module), keeping partial-loading hooks intact.
             vae = as_qwen_image_vae(vae)
             with SeamlessExt.static_patch_model(vae, self.vae.seamless_axes):
-                # Use the VAE's actual device (may be CPU if the model is configured cpu_only).
-                latents = latents.to(device=get_effective_device(vae), dtype=vae.dtype)
+                # Use the VAE's intended compute device (CUDA/MPS, or CPU if configured cpu_only). Do NOT infer it
+                # from current param residency: partial loading may have temporarily offloaded all weights to RAM,
+                # which would wrongly place the latents (and thus the whole decode) on the CPU (see #9373).
+                latents = latents.to(device=vae_info.compute_device, dtype=vae.dtype)
 
                 vae.disable_tiling()
 
