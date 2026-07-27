@@ -160,10 +160,14 @@ def test_create_image_upload_entry_requires_auth_before_the_501_stub(
 # - auth bootstrap: reachable pre-login by construction
 # - binary <img src>/thumbnail routes: browsers cannot attach a Bearer header to <img> requests; closing
 #   these needs a signed-URL or cookie scheme (tracked separately, see PR #9367)
+# - 3D assets: session-transient splat binaries with no DB records or ownership, protected by
+#   server-generated UUID names returned only to the generating user's own graph run — deliberate
+#   parity with the image binary routes (see TestAssetReadAuth in test_multiuser_authorization.py)
 # - version: intentionally public
 # - docs/redoc: API documentation
 PUBLIC_ROUTES = {
     ("GET", "/api/v1/app/version"),
+    ("GET", "/api/v1/assets/i/{asset_name}"),
     ("POST", "/api/v1/auth/login"),
     ("POST", "/api/v1/auth/setup"),
     ("GET", "/api/v1/auth/status"),
