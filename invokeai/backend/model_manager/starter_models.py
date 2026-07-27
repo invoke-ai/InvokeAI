@@ -101,6 +101,24 @@ t5_8b_quantized_encoder = StarterModel(
     format=ModelFormat.BnbQuantizedLlmInt8b,
 )
 
+t5_gguf_q3_k_s_encoder = StarterModel(
+    name="t5_gguf_q3_k_s_encoder",
+    base=BaseModelType.Any,
+    source="https://huggingface.co/city96/t5-v1_1-xxl-encoder-gguf/resolve/main/t5-v1_1-xxl-encoder-Q3_K_S.gguf",
+    description="T5-XXL text encoder, GGUF Q3_K_S quantized (used in FLUX pipelines). Smallest size for low VRAM, lower quality. ~2.1GB",
+    type=ModelType.T5Encoder,
+    format=ModelFormat.GGUFQuantized,
+)
+
+t5_gguf_q6_k_encoder = StarterModel(
+    name="t5_gguf_q6_k_encoder",
+    base=BaseModelType.Any,
+    source="https://huggingface.co/city96/t5-v1_1-xxl-encoder-gguf/resolve/main/t5-v1_1-xxl-encoder-Q6_K.gguf",
+    description="T5-XXL text encoder, GGUF Q6_K quantized (used in FLUX pipelines). Near-lossless quality. ~3.9GB",
+    type=ModelType.T5Encoder,
+    format=ModelFormat.GGUFQuantized,
+)
+
 clip_l_encoder = StarterModel(
     name="clip-vit-large-patch14",
     base=BaseModelType.Any,
@@ -1572,6 +1590,84 @@ anima_base = StarterModel(
     format=ModelFormat.Checkpoint,
     dependencies=[anima_qwen3_encoder, anima_vae],
 )
+
+anima_lllite_inpainting = StarterModel(
+    name="Anima LLLite Inpainting",
+    base=BaseModelType.Anima,
+    source="https://huggingface.co/kohya-ss/Anima-LLLite/resolve/main/anima-lllite-inpainting-v2.safetensors",
+    description="ControlNet-LLLite inpainting adapter for Anima by kohya-ss. Conditions the model on the masked image content during inpainting/outpainting. ~66MB",
+    type=ModelType.ControlNet,
+    format=ModelFormat.Checkpoint,
+)
+
+anima_lllite_sketch = StarterModel(
+    name="Anima LLLite Sketch",
+    base=BaseModelType.Anima,
+    source="https://huggingface.co/kohya-ss/Anima-LLLite/resolve/main/anima-lllite-any-test-like-v2.safetensors",
+    description="ControlNet-LLLite control adapter for Anima by kohya-ss. Trained on mixed scribble/HED/lineart/grayscale conditioning images. ~16MB",
+    type=ModelType.ControlNet,
+    format=ModelFormat.Checkpoint,
+)
+
+anima_lllite_depth_preview3 = StarterModel(
+    name="Anima LLLite Depth (Preview3)",
+    base=BaseModelType.Anima,
+    source="https://huggingface.co/kohya-ss/Anima-LLLite/resolve/main/anima-lllite-depth-1.safetensors",
+    description="ControlNet-LLLite depth adapter for Anima by kohya-ss. Trained on the Preview3 build; reduced quality on Anima Base 1.0. ~8MB",
+    type=ModelType.ControlNet,
+    format=ModelFormat.Checkpoint,
+)
+
+anima_lllite_scribble_preview3 = StarterModel(
+    name="Anima LLLite Scribble (Preview3)",
+    base=BaseModelType.Anima,
+    source="https://huggingface.co/kohya-ss/Anima-LLLite/resolve/main/anima-lllite-scribble-1.safetensors",
+    description="ControlNet-LLLite scribble adapter for Anima by kohya-ss. Trained on the Preview3 build; reduced quality on Anima Base 1.0. ~8MB",
+    type=ModelType.ControlNet,
+    format=ModelFormat.Checkpoint,
+)
+
+anima_lllite_lineart_preview3 = StarterModel(
+    name="Anima LLLite Lineart (Preview3)",
+    base=BaseModelType.Anima,
+    source="https://huggingface.co/kohya-ss/Anima-LLLite/resolve/main/anima-lllite-lineart-1.safetensors",
+    description="ControlNet-LLLite lineart adapter for Anima by kohya-ss. Trained on the Preview3 build; reduced quality on Anima Base 1.0. ~8MB",
+    type=ModelType.ControlNet,
+    format=ModelFormat.Checkpoint,
+)
+
+anima_lllite_pose_preview3 = StarterModel(
+    name="Anima LLLite Pose (Preview3)",
+    base=BaseModelType.Anima,
+    source="https://huggingface.co/kohya-ss/Anima-LLLite/resolve/main/anima-lllite-pose-1.safetensors",
+    description="ControlNet-LLLite pose adapter for Anima by kohya-ss. Trained on the Preview3 build; notably weak on Anima Base 1.0. ~23MB",
+    type=ModelType.ControlNet,
+    format=ModelFormat.Checkpoint,
+)
+# endregion
+
+# region Ideogram 4
+# Self-contained diffusers pipelines (both transformers + Qwen3-VL text encoder + VAE in one folder), so
+# no separate dependencies. Gated, non-commercial license: the license must be accepted on the
+# HuggingFace model page and a HuggingFace token configured before the download will succeed — same as
+# FLUX.1 dev.
+ideogram_4_nf4 = StarterModel(
+    name="Ideogram 4 (nf4)",
+    base=BaseModelType.Ideogram4,
+    source="ideogram-ai/ideogram-4-nf4",
+    description="Ideogram 4 text-to-image in nf4-quantized Diffusers format (CUDA only). Structured JSON "
+    "prompting with regional layout control. Non-commercial license — accept it on HuggingFace first. ~16GB",
+    type=ModelType.Main,
+)
+
+ideogram_4_fp8 = StarterModel(
+    name="Ideogram 4 (fp8)",
+    base=BaseModelType.Ideogram4,
+    source="ideogram-ai/ideogram-4-fp8",
+    description="Ideogram 4 text-to-image in fp8-quantized Diffusers format (runs on any device, higher "
+    "memory use). Non-commercial license — accept it on HuggingFace first. ~26GB",
+    type=ModelType.Main,
+)
 # endregion
 
 # List of starter models, displayed on the frontend.
@@ -1584,6 +1680,8 @@ STARTER_MODELS: list[StarterModel] = [
     flux_dev,
     sd35_medium,
     sd35_large,
+    ideogram_4_nf4,
+    ideogram_4_fp8,
     cyberrealistic_sd1,
     rev_animated_sd1,
     dreamshaper_8_sd1,
@@ -1642,6 +1740,8 @@ STARTER_MODELS: list[StarterModel] = [
     swinir,
     t5_base_encoder,
     t5_8b_quantized_encoder,
+    t5_gguf_q3_k_s_encoder,
+    t5_gguf_q6_k_encoder,
     clip_l_encoder,
     siglip,
     flux_redux,
@@ -1710,6 +1810,12 @@ STARTER_MODELS: list[StarterModel] = [
     anima_base,
     anima_qwen3_encoder,
     anima_vae,
+    anima_lllite_inpainting,
+    anima_lllite_sketch,
+    anima_lllite_depth_preview3,
+    anima_lllite_scribble_preview3,
+    anima_lllite_lineart_preview3,
+    anima_lllite_pose_preview3,
 ]
 
 sd1_bundle: list[StarterModel] = [
@@ -1797,6 +1903,13 @@ anima_bundle: list[StarterModel] = [
     anima_base,
     anima_qwen3_encoder,
     anima_vae,
+    anima_lllite_inpainting,
+    anima_lllite_sketch,
+]
+
+# nf4 is the recommended 24GB CUDA path; the fp8 build is offered separately for non-CUDA / more VRAM.
+ideogram_bundle: list[StarterModel] = [
+    ideogram_4_nf4,
 ]
 
 STARTER_BUNDLES: dict[str, StarterModelBundle] = {
@@ -1807,6 +1920,7 @@ STARTER_BUNDLES: dict[str, StarterModelBundle] = {
     BaseModelType.ZImage: StarterModelBundle(name="Z-Image Turbo", models=zimage_bundle),
     BaseModelType.QwenImage: StarterModelBundle(name="Qwen Image", models=qwen_image_bundle),
     BaseModelType.Anima: StarterModelBundle(name="Anima", models=anima_bundle),
+    BaseModelType.Ideogram4: StarterModelBundle(name="Ideogram 4", models=ideogram_bundle),
 }
 
 assert len(STARTER_MODELS) == len({m.source for m in STARTER_MODELS}), "Duplicate starter models"

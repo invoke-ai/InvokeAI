@@ -1,7 +1,6 @@
 import type { ComboboxOnChange } from '@invoke-ai/ui-library';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
-import { selectCurrentUser } from 'features/auth/store/authSlice';
+import { useIsAdmin } from 'features/auth/hooks/useIsAdmin';
 import { toast } from 'features/toast/toast';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -38,11 +37,11 @@ export const getImageSubfolderStrategyOption = (strategy: string): ImageSubfolde
 
 export const SettingsImageSubfolderStrategySelect = memo(() => {
   const { t } = useTranslation();
-  const currentUser = useAppSelector(selectCurrentUser);
-  const { data: runtimeConfig } = useGetRuntimeConfigQuery();
+  const isAdmin = useIsAdmin();
+  // runtime_config is an admin-only route; don't fire it for non-admins just to render a disabled control.
+  const { data: runtimeConfig } = useGetRuntimeConfigQuery(undefined, { skip: !isAdmin });
   const [updateRuntimeConfig, { isLoading }] = useUpdateRuntimeConfigMutation();
   const imageSubfolderStrategy: string = runtimeConfig?.config.image_subfolder_strategy ?? 'flat';
-  const canEditRuntimeConfig = runtimeConfig ? !runtimeConfig.config.multiuser || currentUser?.is_admin : false;
 
   const options = useMemo(() => {
     const localizedOptions: ImageSubfolderStrategySelectOption[] = imageSubfolderStrategyOptions.map((option) => ({
@@ -84,15 +83,14 @@ export const SettingsImageSubfolderStrategySelect = memo(() => {
     [imageSubfolderStrategy, t, updateRuntimeConfig]
   );
 
+  if (!isAdmin) {
+    return null;
+  }
+
   return (
     <FormControl>
       <FormLabel>{t('settings.imageSubfolderStrategy')}</FormLabel>
-      <Combobox
-        value={value}
-        options={options}
-        onChange={onChange}
-        isDisabled={!runtimeConfig || !canEditRuntimeConfig || isLoading}
-      />
+      <Combobox value={value} options={options} onChange={onChange} isDisabled={!runtimeConfig || isLoading} />
     </FormControl>
   );
 });

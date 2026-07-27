@@ -21,6 +21,7 @@ import { useGetWorkflowQuery } from 'services/api/endpoints/workflows';
 import {
   getSavedWorkflowDynamicEdgeIdsToRemove,
   getSavedWorkflowDynamicFields,
+  getSelectedSavedWorkflow,
   shouldSyncSavedWorkflowDynamicFields,
 } from './callSavedWorkflowFormUtils';
 
@@ -60,8 +61,15 @@ const CallSavedWorkflowNode = ({ nodeId, isOpen }: Props) => {
     skip: !workflowIdField.value,
   });
 
-  const shouldSyncDynamicFields = shouldSyncSavedWorkflowDynamicFields({ workflowId: workflowIdField.value, workflow });
-  const dynamicFields = useMemo(() => getSavedWorkflowDynamicFields(workflow, templates), [templates, workflow]);
+  const selectedWorkflow = getSelectedSavedWorkflow(workflowIdField.value, workflow);
+  const shouldSyncDynamicFields = shouldSyncSavedWorkflowDynamicFields({
+    workflowId: workflowIdField.value,
+    workflow: selectedWorkflow,
+  });
+  const dynamicFields = useMemo(
+    () => getSavedWorkflowDynamicFields(selectedWorkflow, templates),
+    [templates, selectedWorkflow]
+  );
   const edgeIdsToRemove = useMemo(
     () =>
       getSavedWorkflowDynamicEdgeIdsToRemove({

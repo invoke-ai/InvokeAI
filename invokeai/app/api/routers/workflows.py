@@ -1,4 +1,5 @@
 import io
+import math
 import traceback
 from typing import Optional
 
@@ -177,6 +178,11 @@ async def list_workflows(
     query: Optional[str] = Query(default=None, description="The text to query by (matches name and description)"),
     has_been_opened: Optional[bool] = Query(default=None, description="Whether to include/exclude recent workflows"),
     is_public: Optional[bool] = Query(default=None, description="Filter by public/shared status"),
+    is_callable: Optional[bool] = Query(
+        default=None,
+        alias="callable",
+        description="Filter by whether workflows are callable by call_saved_workflow",
+    ),
 ) -> PaginatedResults[WorkflowRecordListItemWithThumbnailDTO]:
     """Gets a page of workflows"""
     config = ApiDependencies.invoker.services.configuration
@@ -194,7 +200,7 @@ async def list_workflows(
         order_by=order_by,
         direction=direction,
         page=page,
-        per_page=per_page,
+        per_page=None if is_callable is not None else per_page,
         query=query,
         categories=categories,
         tags=tags,
@@ -217,6 +223,8 @@ async def list_workflows(
             maximum_children=ApiDependencies.invoker.services.configuration.max_queue_size,
             resolve_generator_items=False,
         )
+        if is_callable is not None and compatibility.is_callable != is_callable:
+            continue
         workflows_with_thumbnails.append(
             WorkflowRecordListItemWithThumbnailDTO(
                 thumbnail_url=ApiDependencies.invoker.services.workflow_thumbnails.get_url(workflow.workflow_id),
@@ -224,6 +232,25 @@ async def list_workflows(
                 **workflow.model_dump(),
             )
         )
+
+    if is_callable is not None:
+        total = len(workflows_with_thumbnails)
+        if per_page:
+            start = page * per_page
+            end = start + per_page
+            page_items = workflows_with_thumbnails[start:end]
+            pages = math.ceil(total / per_page)
+        else:
+            page_items = workflows_with_thumbnails
+            pages = 1
+        return PaginatedResults[WorkflowRecordListItemWithThumbnailDTO](
+            items=page_items,
+            total=total,
+            page=page,
+            pages=pages,
+            per_page=per_page if per_page else total,
+        )
+
     return PaginatedResults[WorkflowRecordListItemWithThumbnailDTO](
         items=workflows_with_thumbnails,
         total=max(len(workflows_with_thumbnails), workflows.total - skipped_missing_workflows),

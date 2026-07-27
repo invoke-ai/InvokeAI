@@ -6,7 +6,7 @@
     },
     "linux": {
       "cpu": "https://download.pytorch.org/whl/cpu",
-      "rocm": "https://download.pytorch.org/whl/rocm6.3",
+      "rocm": "https://download.pytorch.org/whl/rocm7.1",
       "cuda": "https://download.pytorch.org/whl/cu128"
     },
     "darwin": {}

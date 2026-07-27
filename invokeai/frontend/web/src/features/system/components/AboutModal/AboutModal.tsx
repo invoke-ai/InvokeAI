@@ -15,7 +15,7 @@ import {
   Text,
   useDisclosure,
 } from '@invoke-ai/ui-library';
-import { deepClone } from 'common/util/deepClone';
+import { useIsAdmin } from 'features/auth/hooks/useIsAdmin';
 import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataViewer';
 import { discordLink, githubLink } from 'features/system/store/constants';
 import InvokeLogoYellow from 'public/assets/images/invoke-tag-lrg.svg';
@@ -32,26 +32,22 @@ type AboutModalProps = {
 const AboutModal = ({ children }: AboutModalProps) => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { t } = useTranslation();
-  const { data: runtimeConfig } = useGetRuntimeConfigQuery();
+  const isAdmin = useIsAdmin();
+  // The runtime config is administrator-only, so non-admins get a debug blob without the config section.
+  const { data: runtimeConfig } = useGetRuntimeConfigQuery(undefined, { skip: !isAdmin });
   const { data: dependencies } = useGetAppDepsQuery();
   const { data: appVersion } = useGetAppVersionQuery();
 
-  const localData = useMemo(() => {
-    const clonedRuntimeConfig = deepClone(runtimeConfig);
-
-    if (clonedRuntimeConfig && clonedRuntimeConfig.config.remote_api_tokens) {
-      clonedRuntimeConfig.config.remote_api_tokens.forEach((remote_api_token) => {
-        remote_api_token.token = 'REDACTED';
-      });
-    }
-
-    return {
+  const localData = useMemo(
+    () => ({
       version: appVersion?.version,
       dependencies,
-      config: clonedRuntimeConfig?.config,
-      set_config_fields: clonedRuntimeConfig?.set_fields,
-    };
-  }, [appVersion, dependencies, runtimeConfig]);
+      // Credentials in the config are already masked by the server; no client-side redaction needed.
+      config: runtimeConfig?.config,
+      set_config_fields: runtimeConfig?.set_fields,
+    }),
+    [appVersion, dependencies, runtimeConfig]
+  );
 
   return (
     <>

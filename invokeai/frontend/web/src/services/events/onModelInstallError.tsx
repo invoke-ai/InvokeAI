@@ -1,6 +1,8 @@
 import { Button, ExternalLink, Spinner, Text } from '@invoke-ai/ui-library';
 import { logger } from 'app/logging/logger';
 import type { AppDispatch, AppGetState } from 'app/store/store';
+import { getIsAdmin } from 'features/auth/hooks/useIsAdmin';
+import { selectCurrentUser } from 'features/auth/store/authSlice';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { discordLink, githubIssuesLink } from 'features/system/store/constants';
 import { toast, toastApi } from 'features/toast/toast';
@@ -9,6 +11,7 @@ import { t } from 'i18next';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api } from 'services/api';
+import { authApi } from 'services/api/endpoints/auth';
 import { modelsApi, useGetHFTokenStatusQuery } from 'services/api/endpoints/models';
 import type { S } from 'services/api/types';
 import { assert } from 'tsafe';
@@ -39,6 +42,12 @@ const getHFTokenStatus = async (dispatch: AppDispatch): Promise<S['HFTokenStatus
   }
 };
 
+const getIsAdminFromState = (getState: AppGetState): boolean => {
+  const setupStatus = authApi.endpoints.getSetupStatus.select()(getState()).data;
+  const user = selectCurrentUser(getState());
+  return getIsAdmin(setupStatus, user);
+};
+
 /**
  * Handles model install error events by logging the error, displaying appropriate toast notifications.
  */
@@ -50,20 +59,25 @@ export const buildOnModelInstallError = (getState: AppGetState, dispatch: AppDis
 
     if (data.error === 'Unauthorized') {
       if (data.source.type === 'hf') {
-        const hfTokenStatus = await getHFTokenStatus(dispatch);
-        if (hfTokenStatus === null) {
-          // This means there was a problem getting the token status, should never happen...
-          log.error('Error getting HF token status');
-        } else {
-          const title = getHFTokenStatusToastTitle(hfTokenStatus);
-          toast({
-            id: UNAUTHORIZED_TOAST_ID,
-            title,
-            description: <HFUnauthorizedToastDescription />,
-            status: 'error',
-            isClosable: true,
-            duration: null,
-          });
+        // Admin-only: model_install_error is broadcast to every connected client, but /hf_login is an
+        // admin-only route and the toast concerns the server-wide HF token that only an admin can fix.
+        // Without this guard every non-admin session fires a doomed request and logs a spurious 403.
+        if (getIsAdminFromState(getState)) {
+          const hfTokenStatus = await getHFTokenStatus(dispatch);
+          if (hfTokenStatus === null) {
+            // This means there was a problem getting the token status, should never happen...
+            log.error('Error getting HF token status');
+          } else {
+            const title = getHFTokenStatusToastTitle(hfTokenStatus);
+            toast({
+              id: UNAUTHORIZED_TOAST_ID,
+              title,
+              description: <HFUnauthorizedToastDescription />,
+              status: 'error',
+              isClosable: true,
+              duration: null,
+            });
+          }
         }
       } else if (data.source.type === 'url') {
         toast({

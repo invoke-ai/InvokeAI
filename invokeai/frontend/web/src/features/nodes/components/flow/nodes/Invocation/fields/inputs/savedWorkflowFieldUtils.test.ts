@@ -161,17 +161,19 @@ describe('savedWorkflowFieldUtils', () => {
   it('queries owned/default workflows and shared public workflows separately', () => {
     expect(getSavedWorkflowPickerOwnedQueryArg('landscape')).toMatchObject({
       page: 0,
-      per_page: 50,
+      per_page: undefined,
       query: 'landscape',
       categories: ['user', 'default'],
       is_public: undefined,
+      callable: true,
     });
     expect(getSavedWorkflowPickerSharedQueryArg('landscape')).toMatchObject({
       page: 0,
-      per_page: 50,
+      per_page: undefined,
       query: 'landscape',
       categories: ['user'],
       is_public: true,
+      callable: true,
     });
   });
 

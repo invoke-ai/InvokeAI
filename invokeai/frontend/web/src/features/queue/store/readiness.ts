@@ -761,6 +761,52 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     }
   }
 
+  if (model?.base === 'ideogram-4') {
+    // Ideogram 4 requires bbox dimensions that are multiples of 16 (enforced by ideogram4_denoise).
+    const { bbox } = canvas;
+    const gridSize = getGridSize('ideogram-4');
+
+    if (bbox.scaleMethod === 'none') {
+      if (bbox.rect.width % gridSize !== 0) {
+        reasons.push({
+          content: i18n.t('parameters.invoke.modelIncompatibleBboxWidth', {
+            model: 'Ideogram 4',
+            width: bbox.rect.width,
+            multiple: gridSize,
+          }),
+        });
+      }
+      if (bbox.rect.height % gridSize !== 0) {
+        reasons.push({
+          content: i18n.t('parameters.invoke.modelIncompatibleBboxHeight', {
+            model: 'Ideogram 4',
+            height: bbox.rect.height,
+            multiple: gridSize,
+          }),
+        });
+      }
+    } else {
+      if (bbox.scaledSize.width % gridSize !== 0) {
+        reasons.push({
+          content: i18n.t('parameters.invoke.modelIncompatibleScaledBboxWidth', {
+            model: 'Ideogram 4',
+            width: bbox.scaledSize.width,
+            multiple: gridSize,
+          }),
+        });
+      }
+      if (bbox.scaledSize.height % gridSize !== 0) {
+        reasons.push({
+          content: i18n.t('parameters.invoke.modelIncompatibleScaledBboxHeight', {
+            model: 'Ideogram 4',
+            height: bbox.scaledSize.height,
+            multiple: gridSize,
+          }),
+        });
+      }
+    }
+  }
+
   if (model?.base === 'qwen-image' && model.format === 'gguf_quantized') {
     // GGUF needs sources for VAE + encoder. Each can come from either a standalone
     // model or the Component Source (Diffusers).
@@ -819,7 +865,7 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     const layerNumber = i + 1;
     const layerType = i18n.t(LAYER_TYPE_TO_TKEY['control_layer']);
     const prefix = `${layerLiteral} #${layerNumber} (${layerType})`;
-    const problems = getControlLayerWarnings(controlLayer, model);
+    const problems = getControlLayerWarnings(controlLayer, model, enabledControlLayers);
 
     if (problems.length) {
       const content = upperFirst(problems.map((p) => i18n.t(p)).join(', '));
