@@ -3,7 +3,7 @@ from pathlib import Path
 import torch
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
-from invokeai.app.invocations.fields import ImageField, InputField, WithBoard, WithMetadata
+from invokeai.app.invocations.fields import ImageField, InputField
 from invokeai.app.invocations.primitives import Asset3DOutput
 from invokeai.app.services.session_processor.session_processor_common import CanceledException
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -30,7 +30,10 @@ TRIPOSPLAT_MAX_GAUSSIANS = 262144
     version="1.0.0",
     classification=Classification.Prototype,
 )
-class ImageTo3DInvocation(BaseInvocation, WithMetadata, WithBoard):
+# Deliberately no WithMetadata/WithBoard: the .ply output is an intermediate asset (raster -> 3D ->
+# raster), not a gallery image — advertising board/metadata sockets the handler ignores would mislead
+# workflow users.
+class ImageTo3DInvocation(BaseInvocation):
     """Generates a 3D Gaussian splat (.ply) from a single image using TripoSplat."""
 
     image: ImageField = InputField(description="The image to convert to a 3D Gaussian splat.")

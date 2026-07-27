@@ -15076,16 +15076,6 @@ export type components = {
          */
         ImageTo3DInvocation: {
             /**
-             * @description The board to save the image to
-             * @default null
-             */
-            board?: components["schemas"]["BoardField"] | null;
-            /**
-             * @description Optional metadata to be saved with the image
-             * @default null
-             */
-            metadata?: components["schemas"]["MetadataField"] | null;
-            /**
              * Id
              * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
              */
