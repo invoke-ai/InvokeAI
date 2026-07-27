@@ -15,8 +15,14 @@ export type OrderDir = z.infer<typeof zOrderDir>;
 const zBoardRecordOrderBy = z.enum(['created_at', 'board_name']);
 export type BoardRecordOrderBy = z.infer<typeof zBoardRecordOrderBy>;
 
+// Mirrors the backend's IMAGE_CATEGORIES / ASSETS_CATEGORIES
+// (image_records_common.py). 'other' is in neither: it is the private category
+// for images a canvas layer owns, which are layer pixels rather than gallery
+// content. The list endpoint filters by whatever categories the client sends,
+// so leaving 'other' here would list those images in the assets view while the
+// board counts — which come from the backend constant — excluded them.
 export const IMAGE_CATEGORIES: ImageCategory[] = ['general'];
-export const ASSETS_CATEGORIES: ImageCategory[] = ['control', 'mask', 'user', 'other'];
+export const ASSETS_CATEGORIES: ImageCategory[] = ['control', 'mask', 'user'];
 
 export const zGalleryState = z.object({
   selection: z.array(z.string()),

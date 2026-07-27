@@ -15,7 +15,10 @@ import type { CanvasOperationCapability, CanvasOperationImplementation } from '.
 
 import { attachCanvasOperations } from './operationAccess';
 
-export interface CanvasEngineOptions extends Omit<CoreCanvasEngineOptions, 'uploadImage' | 'getMainModelBase'> {
+export interface CanvasEngineOptions extends Omit<
+  CoreCanvasEngineOptions,
+  'uploadImage' | 'uploadIntermediateImage' | 'getMainModelBase'
+> {
   getMainModelBase?: () => string | null;
   selectObjectDeps?: {
     uploadIntermediate(blob: Blob, signal?: AbortSignal): Promise<{ height: number; imageName: string; width: number }>;
@@ -46,6 +49,7 @@ export const createCanvasEngine = (options: CanvasEngineOptions): CanvasEngine =
     ...coreOptions,
     getMainModelBase: options.getMainModelBase,
     uploadImage: (blob) => canvasApplicationPort.uploadImage(blob),
+    uploadIntermediateImage: (blob) => canvasApplicationPort.uploadImage(blob, { isIntermediate: true }),
   });
   const { applicationHost: host } = composition;
   const core = composition.engine;

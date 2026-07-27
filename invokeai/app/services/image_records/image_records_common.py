@@ -63,8 +63,16 @@ ASSETS_CATEGORIES: list[ImageCategory] = [
     ImageCategory.CONTROL,
     ImageCategory.MASK,
     ImageCategory.USER,
-    ImageCategory.OTHER,
 ]
+"""The categories the gallery's assets view lists.
+
+OTHER is deliberately absent: it is the private category for images a canvas
+layer owns (paint bitmaps, composites, adopted filter results). Those are layer
+pixels, not gallery content, so they belong to neither view. Because OTHER is in
+neither IMAGE_CATEGORIES nor ASSETS_CATEGORIES, such an image can stay durable —
+safe from intermediate garbage collection, which would strand the layer pointing
+at it — without ever surfacing in the gallery or in a board's counts.
+"""
 
 
 class InvalidImageCategoryException(ValueError):

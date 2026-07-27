@@ -58,8 +58,14 @@ interface ListImagesResponse {
   total: number;
 }
 
+/**
+ * Mirrors the backend's `IMAGE_CATEGORIES` / `ASSETS_CATEGORIES`
+ * (`image_records_common.py`). `'other'` is in neither: it is the private
+ * category for images a canvas layer owns, which are layer pixels rather than
+ * gallery content and so belong to neither view.
+ */
 const imageCategories = ['general'];
-const assetCategories = ['control', 'mask', 'user', 'other'];
+const assetCategories = ['control', 'mask', 'user'];
 
 const toSearchParams = (entries: Record<string, boolean | number | string | string[] | undefined>): string => {
   const params = new URLSearchParams();
@@ -390,8 +396,9 @@ export const imageMakeDurableChanges = (): { is_intermediate: false } => ({
  * A node's output is `general` by default, which is exactly what the gallery's
  * Images view lists — so promoting a control-layer filter result with
  * {@link imageMakeDurableChanges} alone published every ControlNet preprocess
- * into the user's gallery. These are layer pixels, not gallery images: they
- * belong with the rest of the canvas's assets.
+ * into the user's gallery. These are layer pixels, not gallery images, and
+ * `'other'` belongs to neither {@link imageCategories} nor
+ * {@link assetCategories}, so they surface in neither view.
  */
 export const imageMakeCanvasAssetChanges = (): { is_intermediate: false; image_category: 'other' } => ({
   image_category: 'other',

@@ -239,8 +239,18 @@ export interface CanvasEngineErrorReport {
 export interface CanvasEngineOptions {
   projectId: string;
   mutationPort: CanvasProjectMutationPort;
-  /** Persists encoded engine-owned bitmaps. Application networking stays outside the core. */
+  /**
+   * Persists encoded engine-owned bitmaps DURABLY. A layer's document points at
+   * the resulting image name, so the upload must not be garbage-collectable.
+   * Application networking stays outside the core.
+   */
   uploadImage(blob: Blob): Promise<{ height: number; imageName: string; width: number }>;
+  /**
+   * Uploads a TRANSIENT image — one no layer will reference, such as a
+   * per-generation composite. Marked intermediate so it is reclaimable instead
+   * of accumulating one durable image per invocation forever.
+   */
+  uploadIntermediateImage(blob: Blob): Promise<{ height: number; imageName: string; width: number }>;
   /** Supplies the currently selected model base for core-created control layer contracts. */
   getMainModelBase?: () => string | null;
   /** Supplies the default control model key for core-created control layer contracts. */
@@ -2275,7 +2285,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       syncMemoryBaselines();
       return rasterController.memory.reserveOperation(bytes, { purpose: 'invocation-composite' });
     },
-    uploadImage: (blob) => opts.uploadImage(blob),
+    // Generation inputs, not layer pixels: nothing in the document will point at
+    // these, so they upload as intermediates rather than durable images.
+    uploadImage: (blob) => opts.uploadIntermediateImage(blob),
   });
   const exportRasterComposite = (request: RasterCompositeExportRequest) =>
     exportRasterCompositeWithDeps(request, {
