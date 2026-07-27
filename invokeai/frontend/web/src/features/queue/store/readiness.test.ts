@@ -270,3 +270,117 @@ describe('FLUX.2 Klein readiness checks – canvas tab', () => {
     expect(hasFlux2Qwen3Reason(reasons)).toBe(true);
   });
 });
+
+const ideogram4Model = {
+  key: 'ideogram-4',
+  hash: 'h',
+  name: 'Ideogram 4',
+  base: 'ideogram-4',
+  type: 'main',
+  format: 'diffusers',
+} as unknown as MainModelConfig;
+
+const buildIdeogram4CanvasArg = (canvasOverrides: {
+  bbox?: { width: number; height: number };
+  rasterLayers?: unknown[];
+  inpaintMasks?: unknown[];
+  regionalGuidance?: unknown[];
+}) => ({
+  ...buildCanvasTabArg({ model: ideogram4Model }),
+  canvas: {
+    bbox: {
+      scaleMethod: 'none',
+      rect: canvasOverrides.bbox ?? { width: 1024, height: 1024 },
+      scaledSize: canvasOverrides.bbox ?? { width: 1024, height: 1024 },
+    },
+    controlLayers: { entities: [] },
+    regionalGuidance: { entities: canvasOverrides.regionalGuidance ?? [] },
+    rasterLayers: { entities: canvasOverrides.rasterLayers ?? [] },
+    inpaintMasks: { entities: canvasOverrides.inpaintMasks ?? [] },
+  },
+});
+
+const hasReasonWith = (reasons: { content: string }[], key: string) => reasons.some((r) => r.content.includes(key));
+
+describe('Ideogram 4 readiness checks - canvas tab', () => {
+  it('blocks a bbox whose width is not a multiple of 16', () => {
+    const reasons = getReasonsWhyCannotEnqueueCanvasTab(
+      buildIdeogram4CanvasArg({ bbox: { width: 1025, height: 1024 } }) as never
+    );
+    expect(hasReasonWith(reasons, 'modelIncompatibleBboxWidth')).toBe(true);
+  });
+
+  it('allows a bbox that is a multiple of 16', () => {
+    const reasons = getReasonsWhyCannotEnqueueCanvasTab(
+      buildIdeogram4CanvasArg({ bbox: { width: 1024, height: 1024 } }) as never
+    );
+    expect(hasReasonWith(reasons, 'modelIncompatibleBbox')).toBe(false);
+  });
+
+  it('blocks an enabled raster layer with content (Ideogram 4 is txt2img only)', () => {
+    const reasons = getReasonsWhyCannotEnqueueCanvasTab(
+      buildIdeogram4CanvasArg({
+        rasterLayers: [{ id: 'r1', isEnabled: true, type: 'raster_layer', objects: [{}] }],
+      }) as never
+    );
+    expect(hasReasonWith(reasons, 'ideogram4Txt2ImgOnly')).toBe(true);
+  });
+
+  it('blocks an enabled inpaint mask with content', () => {
+    const reasons = getReasonsWhyCannotEnqueueCanvasTab(
+      buildIdeogram4CanvasArg({
+        inpaintMasks: [{ id: 'm1', isEnabled: true, type: 'inpaint_mask', objects: [{}] }],
+      }) as never
+    );
+    expect(hasReasonWith(reasons, 'ideogram4Txt2ImgOnly')).toBe(true);
+  });
+
+  it('does not block an empty (fully transparent) enabled raster layer', () => {
+    const reasons = getReasonsWhyCannotEnqueueCanvasTab(
+      buildIdeogram4CanvasArg({
+        rasterLayers: [{ id: 'r1', isEnabled: true, type: 'raster_layer', objects: [] }],
+      }) as never
+    );
+    expect(hasReasonWith(reasons, 'ideogram4Txt2ImgOnly')).toBe(false);
+  });
+
+  it('warns a regional guidance layer whose only input is a negative prompt', () => {
+    const reasons = getReasonsWhyCannotEnqueueCanvasTab(
+      buildIdeogram4CanvasArg({
+        regionalGuidance: [
+          {
+            id: 'rg1',
+            isEnabled: true,
+            type: 'regional_guidance',
+            objects: [{}],
+            positivePrompt: null,
+            negativePrompt: 'no cats',
+            autoNegative: false,
+            referenceImages: [],
+          },
+        ],
+      }) as never
+    );
+    expect(hasReasonWith(reasons, 'rgNegativePromptNotSupported')).toBe(true);
+  });
+
+  it('warns a regional guidance layer whose only input is a reference image', () => {
+    const reasons = getReasonsWhyCannotEnqueueCanvasTab(
+      buildIdeogram4CanvasArg({
+        regionalGuidance: [
+          {
+            id: 'rg1',
+            isEnabled: true,
+            type: 'regional_guidance',
+            objects: [{}],
+            positivePrompt: null,
+            negativePrompt: null,
+            autoNegative: false,
+            referenceImages: [{ id: 'ri1', config: { model: null, image: null } }],
+          },
+        ],
+      }) as never
+    );
+    expect(hasReasonWith(reasons, 'rgReferenceImagesNotSupported')).toBe(true);
+  });
+});
