@@ -4,8 +4,7 @@ import { RGB_COLOR_SWATCHES } from 'common/components/ColorPicker/swatches';
 import { rgbColorToString } from 'common/util/colorCodeTransformers';
 import type { CSSProperties } from 'react';
 import { memo, useCallback } from 'react';
-import { RgbColorPicker as ColorfulRgbColorPicker } from 'react-colorful';
-import type { RgbColor } from 'react-colorful/dist/types';
+import { type RgbColor, RgbColorPicker as ColorfulRgbColorPicker } from 'react-colorful';
 import { useTranslation } from 'react-i18next';
 
 type Props = {

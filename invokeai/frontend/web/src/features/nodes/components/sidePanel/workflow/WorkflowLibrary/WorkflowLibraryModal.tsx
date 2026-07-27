@@ -16,6 +16,7 @@ import { memo, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetCountsByCategoryQuery } from 'services/api/endpoints/workflows';
 
+import { getSyncedWorkflowLibraryView } from './WorkflowLibraryModal.utils';
 import { WorkflowLibrarySideNav } from './WorkflowLibrarySideNav';
 import { WorkflowLibraryTopNav } from './WorkflowLibraryTopNav';
 import { WorkflowList } from './WorkflowList';
@@ -76,7 +77,7 @@ const queryOptions = {
 } satisfies Parameters<typeof useGetCountsByCategoryQuery>[1];
 
 /**
- * On first app load, if the user's selected view has no workflows, switches to the next available view.
+ * Once workflow counts load, if the user's selected view has no workflows, switches to the next available view.
  */
 const useSyncInitialWorkflowLibraryCategories = () => {
   const dispatch = useAppDispatch();
@@ -92,34 +93,25 @@ const useSyncInitialWorkflowLibraryCategories = () => {
     queryOptions
   );
 
+  const didLoadWorkflowCounts = !isLoadingRecentWorkflowsCount && !isLoadingYourWorkflowsCount;
+  const syncedView = getSyncedWorkflowLibraryView({ view, recentWorkflowsCount, yourWorkflowsCount });
+  const isViewSynced = syncedView === view;
+
   useEffect(() => {
-    if (didSync || isLoadingRecentWorkflowsCount || isLoadingYourWorkflowsCount) {
+    if (didSync || !didLoadWorkflowCounts) {
       return;
     }
-    // If the user's selected view has no workflows, switch to the next available view
-    if (recentWorkflowsCount === 0 && view === 'recent') {
-      if (yourWorkflowsCount > 0) {
-        dispatch(workflowLibraryViewChanged('yours'));
-      } else {
-        dispatch(workflowLibraryViewChanged('defaults'));
-      }
-    } else if (yourWorkflowsCount === 0 && view === 'yours') {
-      if (recentWorkflowsCount > 0) {
-        dispatch(workflowLibraryViewChanged('recent'));
-      } else {
-        dispatch(workflowLibraryViewChanged('defaults'));
-      }
-    }
-    setDidSync(true);
-  }, [
-    didSync,
-    dispatch,
-    isLoadingRecentWorkflowsCount,
-    isLoadingYourWorkflowsCount,
-    recentWorkflowsCount,
-    view,
-    yourWorkflowsCount,
-  ]);
 
-  return didSync;
+    const timer = setTimeout(() => {
+      // If the user's selected view has no workflows, switch to the next available view
+      if (!isViewSynced) {
+        dispatch(workflowLibraryViewChanged(syncedView));
+      }
+      setDidSync(true);
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, [didLoadWorkflowCounts, didSync, dispatch, isViewSynced, syncedView]);
+
+  return didLoadWorkflowCounts && (didSync || isViewSynced);
 };

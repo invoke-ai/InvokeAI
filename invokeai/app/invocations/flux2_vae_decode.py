@@ -51,7 +51,10 @@ class Flux2VaeDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
         """
         with vae_info.model_on_device() as (_, vae):
             vae_dtype = next(iter(vae.parameters())).dtype
-            device = TorchDevice.choose_torch_device()
+            # Use the VAE's intended compute device (CUDA/MPS, or CPU if configured cpu_only). Do NOT infer it from
+            # current param residency: partial loading may have temporarily offloaded all weights to RAM, which would
+            # wrongly place the latents (and thus the whole decode) on the CPU (see #9373).
+            device = vae_info.compute_device
             latents = latents.to(device=device, dtype=vae_dtype)
 
             # Decode using diffusers API

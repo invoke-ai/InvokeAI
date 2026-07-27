@@ -33,7 +33,7 @@ const buildSelectWarnings = (entityIdentifier: CanvasEntityIdentifier, t: TFunct
     const entityType = entity.type;
 
     if (entityType === 'control_layer') {
-      warnings = getControlLayerWarnings(entity, model);
+      warnings = getControlLayerWarnings(entity, model, canvas.controlLayers.entities);
     } else if (entityType === 'regional_guidance') {
       warnings = getRegionalGuidanceWarnings(entity, model);
     } else if (entityType === 'inpaint_mask') {

@@ -88,7 +88,7 @@ const scrollIntoView = (
   return;
 };
 
-const useScrollableStagingArea = (rootRef: RefObject<HTMLDivElement>) => {
+const useScrollableStagingArea = (rootRef: RefObject<HTMLDivElement | null>) => {
   const [scroller, scrollerRef] = useState<HTMLElement | null>(null);
   const [initialize, osInstance] = useOverlayScrollbars({
     defer: true,

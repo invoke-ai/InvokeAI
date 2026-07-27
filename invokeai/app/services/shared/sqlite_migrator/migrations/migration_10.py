@@ -27,6 +27,8 @@ def build_migration_10() -> Migration:
     - Renames the `error` column to `error_traceback`.
     """
     migration_10 = Migration(
+        id="migration_10",
+        depends_on="migration_9",
         from_version=9,
         to_version=10,
         callback=Migration10Callback(),

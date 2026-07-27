@@ -71,6 +71,31 @@ Content-Type: application/json
 
 All parameters are optional — only send the fields you want to update.
 
+#### Query parameters
+
+The POST endpoint accepts two optional boolean query parameters that control
+how reference images are merged into the frontend state:
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `strict` | `false` | When `true`, parameters **not** included in the request body are reset to their defaults (cleared on the frontend). When `false`, only the parameters you send are updated and everything else is left as-is. |
+| `append` | `false` | When `true`, recalled reference images (`ip_adapters` and `reference_images`) are **appended** to the frontend's existing reference-image list instead of replacing it. When `false` (or omitted), the recalled reference images **replace** the existing list. |
+
+`strict` and `append` are mutually exclusive — `strict` clears omitted
+parameters while `append` preserves and extends the existing list, so the two
+cannot be combined. Sending `?strict=true&append=true` returns
+**400 Bad Request**:
+
+```json
+{
+  "detail": "The 'strict' and 'append' query parameters are mutually exclusive"
+}
+```
+
+`append` only affects the reference-image collections (`ip_adapters` and
+`reference_images`). All other parameters (prompts, model, LoRAs, control
+layers, etc.) are updated the same way regardless of the flag.
+
 ### GET — Retrieve Recall Parameters
 
 ```http
@@ -294,6 +319,26 @@ curl -X POST http://localhost:9090/api/v1/recall/default \
   }'
 ```
 
+### Appending reference images (append mode)
+
+By default, recalled reference images **replace** whatever the frontend
+already has. Pass `?append=true` to **add** the recalled `ip_adapters` and
+`reference_images` to the existing list instead:
+
+```bash
+# Add a reference image without clearing the ones already on the frontend
+curl -X POST 'http://localhost:9090/api/v1/recall/default?append=true' \
+  -H "Content-Type: application/json" \
+  -d '{
+    "reference_images": [
+      {"image_name": "extra_reference.png"}
+    ]
+  }'
+```
+
+Combining `append=true` with `strict=true` is invalid and returns
+**400 Bad Request** (see [Query parameters](#query-parameters)).
+
 ### Model-free reference images (FLUX.2 Klein / FLUX Kontext / Qwen Image Edit)
 
 ```bash
@@ -426,13 +471,18 @@ room. Connected frontend clients automatically:
 1. Apply standard parameters (prompts, steps, dimensions, etc.).
 2. Load and add LoRAs to the LoRA list.
 3. Apply control-layer configurations.
-4. Apply IP Adapter / FLUX Redux configurations with their images.
-5. Append model-free reference images, using the config flavor that
-   matches the currently-selected main model.
+4. Merge the recalled reference images — IP Adapter / FLUX Redux entries and
+   model-free reference images both feed the same reference-image list, using
+   the config flavor that matches the currently-selected main model. By
+   default this **replaces** the existing list; with `append=true` it is
+   **added** to whatever is already there (see
+   [Query parameters](#query-parameters)).
 
 ## Error Handling
 
-- **400 Bad Request** — invalid parameters or parameter values.
+- **400 Bad Request** — invalid parameters or parameter values, or the
+  mutually exclusive `strict=true&append=true` combination (see
+  [Query parameters](#query-parameters)).
 - **500 Internal Server Error** — server-side storage or retrieval failure.
 
 Errors include detailed messages. Missing images and unresolved model
@@ -460,8 +510,7 @@ messages under the `events` namespace.
 
 ```
 INFO: Applied 5 recall parameters to store
-INFO: Applied 1 IP adapter(s), replacing existing list
-INFO: Applied 1 model-free reference image(s)
+INFO: Applied 2 reference image(s) (IP adapters + model-free), replacing existing list
 DEBUG: Built IP adapter ref image state: ip-adapter-xyz... (weight: 0.7)
 DEBUG: IP adapter image: outputs/images/depth_map.png (1024x768)
 ```

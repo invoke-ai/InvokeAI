@@ -1,8 +1,8 @@
 import { useAppStore } from 'app/store/storeHooks';
 import { useDeleteImageModalApi } from 'features/deleteImageModal/store/state';
 import { selectSelection } from 'features/gallery/store/gallerySelectors';
+import { useCancelCurrentQueueItem } from 'features/queue/hooks/useCancelCurrentQueueItem';
 import { useClearQueue } from 'features/queue/hooks/useClearQueue';
-import { useDeleteCurrentQueueItem } from 'features/queue/hooks/useDeleteCurrentQueueItem';
 import { useInvoke } from 'features/queue/hooks/useInvoke';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
@@ -37,17 +37,19 @@ export const useGlobalHotkeys = () => {
     dependencies: [queue],
   });
 
-  const deleteCurrentQueueItem = useDeleteCurrentQueueItem();
+  const cancelCurrentQueueItem = useCancelCurrentQueueItem();
 
   useRegisteredHotkeys({
     id: 'cancelQueueItem',
     category: 'app',
-    callback: deleteCurrentQueueItem.trigger,
+    callback: () => {
+      cancelCurrentQueueItem.trigger();
+    },
     options: {
-      enabled: !deleteCurrentQueueItem.isDisabled && !deleteCurrentQueueItem.isLoading,
+      enabled: !cancelCurrentQueueItem.isDisabled && !cancelCurrentQueueItem.isLoading,
       preventDefault: true,
     },
-    dependencies: [deleteCurrentQueueItem],
+    dependencies: [cancelCurrentQueueItem],
   });
 
   const clearQueue = useClearQueue();

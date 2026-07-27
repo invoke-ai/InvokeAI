@@ -315,7 +315,7 @@ def test_flux2_add_noise_false_ignores_connected_noise():
         num_steps=4,
         denoising_start=0.25,
         denoising_end=0.25,
-        positive_text_conditioning=MagicMock(conditioning_name="positive"),
+        positive_text_conditioning=MagicMock(conditioning_name="positive", mask=None),
         transformer=MagicMock(transformer="transformer"),
         vae=MagicMock(vae="vae"),
         seed=123,
@@ -447,7 +447,7 @@ def test_flux2_partial_denoise_short_circuit_uses_first_clipped_timestep():
         num_steps=4,
         denoising_start=0.25,
         denoising_end=0.25,
-        positive_text_conditioning=MagicMock(conditioning_name="positive"),
+        positive_text_conditioning=MagicMock(conditioning_name="positive", mask=None),
         transformer=MagicMock(transformer="transformer"),
         vae=MagicMock(vae="vae"),
         seed=0,
@@ -502,6 +502,7 @@ def test_flux2_lcm_scheduler_setup_passes_mu():
             img_ids: torch.Tensor,
             txt_ids: torch.Tensor,
             guidance: torch.Tensor,
+            joint_attention_kwargs: dict | None = None,
             return_dict: bool = False,
         ):
             return (torch.zeros_like(hidden_states),)

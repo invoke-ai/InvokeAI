@@ -25,7 +25,7 @@ const shouldHandleMiddleClick = <T extends HTMLElement>(
 };
 
 export const useMiddleClickOpenInNewTab = <T extends HTMLElement = HTMLElement>(
-  ref: RefObject<T>,
+  ref: RefObject<T | null>,
   imageUrl: string,
   { requireDirectTarget = false }: Options = {}
 ) => {

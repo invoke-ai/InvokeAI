@@ -20,7 +20,7 @@ type Options = {
  * @param options.initialWidth An optional initial width in pixels
  * @param options.initialHeight An optional initial height in pixels
  */
-export const usePersistedTextAreaSize = (id: string, ref: RefObject<HTMLTextAreaElement>, options: Options) => {
+export const usePersistedTextAreaSize = (id: string, ref: RefObject<HTMLTextAreaElement | null>, options: Options) => {
   const { dispatch, getState } = useAppStore();
 
   const onResize = useCallback(

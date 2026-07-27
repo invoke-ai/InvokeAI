@@ -42,6 +42,7 @@ import type {
   IntegerFieldCollectionValue,
   IntegerFieldValue,
   IntegerGeneratorFieldValue,
+  LoRAFieldCollectionValue,
   ModelIdentifierFieldValue,
   SchedulerFieldValue,
   StatefulFieldValue,
@@ -64,6 +65,7 @@ import {
   zIntegerFieldCollectionValue,
   zIntegerFieldValue,
   zIntegerGeneratorFieldValue,
+  zLoRAFieldCollectionValue,
   zModelIdentifierFieldValue,
   zSchedulerFieldValue,
   zStatefulFieldValue,
@@ -92,6 +94,7 @@ import {
   isNodeFieldElement,
   isTextElement,
 } from 'features/nodes/types/workflow';
+import { buildFieldInputInstance } from 'features/nodes/util/schema/buildFieldInputInstance';
 import { atom, computed } from 'nanostores';
 import type { MouseEvent } from 'react';
 import type { UndoableOptions } from 'redux-undo';
@@ -99,6 +102,8 @@ import { assert } from 'tsafe';
 import type { z } from 'zod';
 
 import type { PendingConnection, Templates } from './types';
+
+const CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX = 'saved_workflow_input::';
 
 export const getInitialWorkflow = (): Omit<NodesState, 'mode' | 'formFieldInitialValues' | '_version'> => {
   return {
@@ -175,6 +180,67 @@ const fieldValueReducer = <T extends FieldValue>(
     return;
   }
   field.value = result.data;
+};
+
+const clearCallSavedWorkflowDynamicFields = (state: NodesState, nodeId: string) => {
+  const node = state.nodes.find((n) => n.id === nodeId);
+  if (!isInvocationNode(node) || node.data.type !== 'call_saved_workflow') {
+    return;
+  }
+
+  const removedFieldNames = new Set<string>();
+  for (const fieldName of Object.keys(node.data.inputs)) {
+    if (fieldName.startsWith(CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX)) {
+      removedFieldNames.add(fieldName);
+      delete node.data.inputs[fieldName];
+      delete node.data.dynamicInputTemplates[fieldName];
+    }
+  }
+
+  state.edges = state.edges.filter((edge) => {
+    return (
+      edge.type !== 'default' ||
+      edge.target !== nodeId ||
+      !edge.targetHandle?.startsWith(CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX)
+    );
+  });
+
+  removeCallSavedWorkflowDynamicFieldsFromForm(state, nodeId, removedFieldNames);
+};
+
+const clearCallSavedWorkflowDynamicFieldsIfWorkflowIdIsEmpty = (
+  state: NodesState,
+  { nodeId, fieldName, value }: FieldValueAction<StatefulFieldValue>['payload']
+) => {
+  if (fieldName === 'workflow_id' && value === '') {
+    clearCallSavedWorkflowDynamicFields(state, nodeId);
+  }
+};
+
+const removeCallSavedWorkflowDynamicFieldsFromForm = (
+  state: NodesState,
+  nodeId: string,
+  fieldNames: ReadonlySet<string>
+) => {
+  if (fieldNames.size === 0) {
+    return;
+  }
+
+  const formElementIdsToRemove = Object.values(state.form.elements).flatMap((element) => {
+    if (!isNodeFieldElement(element)) {
+      return [];
+    }
+    const { fieldIdentifier } = element.data;
+    if (fieldIdentifier.nodeId === nodeId && fieldNames.has(fieldIdentifier.fieldName)) {
+      return [element.id];
+    }
+    return [];
+  });
+
+  for (const id of formElementIdsToRemove) {
+    removeElement({ form: state.form, id });
+    delete state.formFieldInitialValues[id];
+  }
 };
 
 const slice = createSlice({
@@ -484,9 +550,11 @@ const slice = createSlice({
     },
     fieldValueReset: (state, action: FieldValueAction<StatefulFieldValue>) => {
       fieldValueReducer(state, action, zStatefulFieldValue);
+      clearCallSavedWorkflowDynamicFieldsIfWorkflowIdIsEmpty(state, action.payload);
     },
     fieldStringValueChanged: (state, action: FieldValueAction<StringFieldValue>) => {
       fieldValueReducer(state, action, zStringFieldValue);
+      clearCallSavedWorkflowDynamicFieldsIfWorkflowIdIsEmpty(state, action.payload);
     },
     fieldStringCollectionValueChanged: (state, action: FieldValueAction<StringFieldCollectionValue>) => {
       fieldValueReducer(state, action, zStringFieldCollectionValue);
@@ -517,6 +585,9 @@ const slice = createSlice({
     },
     fieldImageCollectionValueChanged: (state, action: FieldValueAction<ImageFieldCollectionValue>) => {
       fieldValueReducer(state, action, zImageFieldCollectionValue);
+    },
+    fieldLoRACollectionValueChanged: (state, action: FieldValueAction<LoRAFieldCollectionValue>) => {
+      fieldValueReducer(state, action, zLoRAFieldCollectionValue);
     },
     fieldColorValueChanged: (state, action: FieldValueAction<ColorFieldValue>) => {
       fieldValueReducer(state, action, zColorFieldValue);
@@ -549,6 +620,72 @@ const slice = createSlice({
         return;
       }
       field.description = val || '';
+    },
+    callSavedWorkflowDynamicFieldsChanged: (
+      state,
+      action: PayloadAction<{
+        nodeId: string;
+        fields: Array<{
+          fieldName: string;
+          fieldTemplate: Parameters<typeof buildFieldInputInstance>[1];
+          label: string;
+          description: string;
+          initialValue: StatefulFieldValue;
+        }>;
+        edgeIdsToRemove: string[];
+      }>
+    ) => {
+      const { nodeId, fields, edgeIdsToRemove } = action.payload;
+      const node = state.nodes.find((n) => n.id === nodeId);
+      if (!isInvocationNode(node) || node.data.type !== 'call_saved_workflow') {
+        return;
+      }
+
+      const nextFieldNames = new Set(fields.map((field) => field.fieldName));
+      const removedFieldNames = new Set<string>();
+
+      for (const fieldName of Object.keys(node.data.inputs)) {
+        if (fieldName.startsWith(CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX) && !nextFieldNames.has(fieldName)) {
+          removedFieldNames.add(fieldName);
+          delete node.data.inputs[fieldName];
+          delete node.data.dynamicInputTemplates[fieldName];
+        }
+      }
+      removeCallSavedWorkflowDynamicFieldsFromForm(state, nodeId, removedFieldNames);
+
+      for (const { fieldName, fieldTemplate, label, description, initialValue } of fields) {
+        const existingTemplate = node.data.dynamicInputTemplates[fieldName];
+        node.data.dynamicInputTemplates[fieldName] = fieldTemplate;
+        const existing = node.data.inputs[fieldName];
+        if (existing) {
+          if (
+            existingTemplate?.type.name !== fieldTemplate.type.name ||
+            existingTemplate?.type.cardinality !== fieldTemplate.type.cardinality ||
+            existingTemplate?.type.batch !== fieldTemplate.type.batch
+          ) {
+            const instance = buildFieldInputInstance(fieldName, fieldTemplate);
+            instance.label = label;
+            instance.description = description;
+            instance.value = initialValue;
+            node.data.inputs[fieldName] = instance;
+            continue;
+          }
+          existing.label = label;
+          existing.description = description;
+          continue;
+        }
+
+        const instance = buildFieldInputInstance(fieldName, fieldTemplate);
+        instance.label = label;
+        instance.description = description;
+        instance.value = initialValue;
+        node.data.inputs[fieldName] = instance;
+      }
+
+      if (edgeIdsToRemove.length > 0) {
+        const edgeIdsToRemoveSet = new Set(edgeIdsToRemove);
+        state.edges = state.edges.filter((edge) => !edgeIdsToRemoveSet.has(edge.id));
+      }
     },
     notesNodeValueChanged: (state, action: PayloadAction<{ nodeId: string; value: string }>) => {
       const { nodeId, value } = action.payload;
@@ -667,6 +804,7 @@ export const {
   fieldImageValueChanged,
   fieldImageCollectionValueChanged,
   fieldLabelChanged,
+  fieldLoRACollectionValueChanged,
   fieldModelIdentifierValueChanged,
   fieldIntegerValueChanged,
   fieldFloatValueChanged,
@@ -680,6 +818,7 @@ export const {
   fieldStringGeneratorValueChanged,
   fieldImageGeneratorValueChanged,
   fieldDescriptionChanged,
+  callSavedWorkflowDynamicFieldsChanged,
   nodeEditorReset,
   nodeIsIntermediateChanged,
   nodeIsOpenChanged,
@@ -795,6 +934,7 @@ const isHighFrequencyFieldChangeAction = isAnyOf(
   fieldFloatValueChanged,
   fieldFloatCollectionValueChanged,
   fieldIntegerCollectionValueChanged,
+  fieldLoRACollectionValueChanged,
   fieldStringValueChanged,
   fieldStringCollectionValueChanged,
   fieldFloatGeneratorValueChanged,
@@ -925,3 +1065,5 @@ export const getFormFieldInitialValues = (form: BuilderForm, nodes: NodesState['
 
   return formFieldInitialValues;
 };
+
+export { CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX };

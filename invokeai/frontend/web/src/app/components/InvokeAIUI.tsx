@@ -5,7 +5,8 @@ import { addStorageListeners } from 'app/store/enhancers/reduxRemember/driver';
 import { $store } from 'app/store/nanostores/store';
 import { createStore } from 'app/store/store';
 import Loading from 'common/components/Loading/Loading';
-import React, { lazy, memo, useEffect, useState } from 'react';
+import { getBasePath } from 'common/util/baseUrl';
+import React, { lazy, useEffect, useState } from 'react';
 import { Provider } from 'react-redux';
 import { BrowserRouter } from 'react-router-dom';
 
@@ -21,15 +22,12 @@ configureLogging(true, 'debug', '*');
 const App = lazy(() => import('./App'));
 
 const InvokeAIUI = () => {
-  const [store, setStore] = useState<ReturnType<typeof createStore> | undefined>(undefined);
   const [didRehydrate, setDidRehydrate] = useState(false);
+  const [store] = useState(() =>
+    createStore({ persist: true, persistDebounce: 300, onRehydrated: () => setDidRehydrate(true) })
+  );
 
   useEffect(() => {
-    const onRehydrated = () => {
-      setDidRehydrate(true);
-    };
-    const store = createStore({ persist: true, persistDebounce: 300, onRehydrated });
-    setStore(store);
     $store.set(store);
     if (import.meta.env.MODE === 'development') {
       window.$store = $store;
@@ -37,22 +35,21 @@ const InvokeAIUI = () => {
     const removeStorageListeners = addStorageListeners();
     return () => {
       removeStorageListeners();
-      setStore(undefined);
       $store.set(undefined);
       if (import.meta.env.MODE === 'development') {
         window.$store = undefined;
       }
     };
-  }, []);
+  }, [store]);
 
-  if (!store || !didRehydrate) {
+  if (!didRehydrate) {
     return <Loading />;
   }
 
   return (
     <React.StrictMode>
       <Provider store={store}>
-        <BrowserRouter>
+        <BrowserRouter basename={getBasePath() || undefined}>
           <React.Suspense fallback={<Loading />}>
             <App />
           </React.Suspense>
@@ -62,4 +59,4 @@ const InvokeAIUI = () => {
   );
 };
 
-export default memo(InvokeAIUI);
+export default InvokeAIUI;

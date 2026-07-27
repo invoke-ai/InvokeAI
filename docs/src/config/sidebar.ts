@@ -55,7 +55,7 @@ const sidebar: SidebarConfig = [
     collapsed: true,
   },
   {
-    label: 'Troubleshooting',
+    label: 'Troubleshooting & Help',
     items: [
       {
         autogenerate: { directory: 'troubleshooting' },

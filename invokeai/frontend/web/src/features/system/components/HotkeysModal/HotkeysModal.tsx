@@ -36,7 +36,7 @@ import { HotkeysListWrapper } from './HotkeysListWrapper';
 
 type HotkeysModalProps = {
   /* The button to open the Settings Modal */
-  children: ReactElement;
+  children: ReactElement<{ onClick?: () => void }>;
 };
 
 type TransformedHotkeysCategoryData = {
