@@ -673,6 +673,31 @@ class TestWanDenoiseRefImage:
         with pytest.raises(ValueError, match="must match denoise dimensions"):
             inv._run_diffusion(ctx)
 
+    @pytest.mark.parametrize(
+        ("shape", "error"),
+        [
+            ((1, 20, 1, 8), "5D"),
+            ((2, 20, 1, 8, 8), "batch size 1"),
+            ((1, 19, 1, 8, 8), "20 channels"),
+            ((1, 20, 2, 8, 8), "single latent frame"),
+            ((1, 20, 1, 4, 8), "8x8"),
+        ],
+        ids=["rank", "batch", "channels", "temporal", "spatial"],
+    )
+    def test_ref_condition_tensor_must_match_image_denoise_contract(
+        self, shape: tuple[int, ...], error: str, fake_model_root: Path
+    ) -> None:
+        transformer = _ZeroTransformer()
+        condition = torch.zeros(*shape)
+        ctx = self._build_ctx_with_condition(transformer, WanVariantType.I2V_A14B, fake_model_root, condition)
+        ref_field = WanRefImageConditioningField(condition_tensor_name="condition", width=64, height=64)
+        inv = self._make_inv_with_ref(ref_field)
+
+        with pytest.raises(ValueError, match=error):
+            inv._run_diffusion(ctx)
+
+        assert transformer.calls == []
+
 
 class TestWanDenoiseInpaint:
     """Phase 8: ``denoise_mask`` (inpaint) wiring via ``RectifiedFlowInpaintExtension``.
@@ -1203,6 +1228,54 @@ class TestWanVideoDenoiseMultiFrame:
 
         with pytest.raises(ValueError, match="latent frames"):
             inv._run_diffusion(ctx)
+
+    @pytest.mark.parametrize(
+        ("variant", "shape", "field_num_frames", "error"),
+        [
+            (WanVariantType.I2V_A14B, (1, 20, 5, 8), 17, "5D"),
+            (WanVariantType.I2V_A14B, (2, 20, 5, 8, 8), 17, "batch size 1"),
+            (WanVariantType.I2V_A14B, (1, 19, 5, 8, 8), 17, "20 channels"),
+            (WanVariantType.I2V_A14B, (1, 20, 5, 4, 8), 17, "8x8"),
+            (WanVariantType.TI2V_5B, (1, 48, 1, 4), 1, "5D"),
+            (WanVariantType.TI2V_5B, (2, 48, 1, 4, 4), 1, "batch size 1"),
+            (WanVariantType.TI2V_5B, (1, 48, 1, 2, 4), 1, "4x4"),
+        ],
+        ids=[
+            "a14b-rank",
+            "a14b-batch",
+            "a14b-channels",
+            "a14b-spatial",
+            "ti2v-rank",
+            "ti2v-batch",
+            "ti2v-spatial",
+        ],
+    )
+    def test_ref_condition_tensor_must_match_video_denoise_contract(
+        self,
+        variant: WanVariantType,
+        shape: tuple[int, ...],
+        field_num_frames: int,
+        error: str,
+        fake_model_root: Path,
+    ) -> None:
+        transformer = _ZeroTransformer()
+        ctx = _build_context(
+            transformer,
+            variant=variant,
+            model_root=fake_model_root,
+            pos_cond=_make_conditioning(),
+            neg_cond=None,
+        )
+        ctx.tensors.load.return_value = torch.zeros(*shape)
+        ref = WanRefImageConditioningField(
+            condition_tensor_name="condition", width=64, height=64, num_frames=field_num_frames
+        )
+        inv = _make_video_invocation(ref_field=ref, num_frames=17, steps=3)
+
+        with pytest.raises(ValueError, match=error):
+            inv._run_diffusion(ctx)
+
+        assert transformer.calls == []
 
     def test_ti2v_expand_timesteps_blend(self, fake_model_root) -> None:
         """TI2V-5B I2V: frame 0 is locked to the condition via the first-frame mask.

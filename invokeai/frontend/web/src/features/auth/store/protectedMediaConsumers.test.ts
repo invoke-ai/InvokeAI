@@ -44,4 +44,10 @@ describe('protected media consumers', () => {
 
     expect(source).toContain('event.button === 1');
   });
+
+  it('does not give the protected video link a misleading hash target', () => {
+    const source = readConsumer('../../gallery/components/ImageMetadataViewer/VideoMetadataViewer.tsx');
+
+    expect(source).not.toContain('href="#"');
+  });
 });
