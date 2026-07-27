@@ -342,6 +342,11 @@ article.card {
 
 /* Splash Page-specific styles */
 
+/* Make the default body font a bit smaller on the splash/home page. */
+[data-has-hero] .sl-markdown-content {
+  font-size: 0.9rem;
+}
+
 @keyframes splash-animate {
   0% { background-position: 0% 0%; }
   50% { background-position: 0% 100%; }

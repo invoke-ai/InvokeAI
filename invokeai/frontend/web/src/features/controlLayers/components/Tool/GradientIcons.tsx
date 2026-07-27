@@ -1,6 +1,8 @@
 import { Box } from '@invoke-ai/ui-library';
 import { memo, useId } from 'react';
 
+import { TOOL_OPTION_ICON_SIZE } from './toolOptionIconSize';
+
 export const GradientToolIcon = memo(() => {
   const id = useId();
   const gradientId = `${id}-gradient-tool-horizontal`;
@@ -32,7 +34,7 @@ export const GradientLinearIcon = memo(() => {
   const id = useId();
   const gradientId = `${id}-gradient-linear-diagonal`;
   return (
-    <Box as="svg" viewBox="0 0 20 20" aria-hidden focusable={false} display="block">
+    <Box as="svg" viewBox="0 0 20 20" boxSize={TOOL_OPTION_ICON_SIZE} aria-hidden focusable={false} display="block">
       <defs>
         <linearGradient id={gradientId} x1="0" y1="1" x2="1" y2="0">
           <stop offset="0%" stopColor="currentColor" stopOpacity="0.0" />
@@ -59,7 +61,7 @@ export const GradientRadialIcon = memo(() => {
   const id = useId();
   const gradientId = `${id}-gradient-radial`;
   return (
-    <Box as="svg" viewBox="0 0 20 20" aria-hidden focusable={false} display="block">
+    <Box as="svg" viewBox="0 0 20 20" boxSize={TOOL_OPTION_ICON_SIZE} aria-hidden focusable={false} display="block">
       <defs>
         <radialGradient id={gradientId} cx="0.5" cy="0.5" r="0.5">
           <stop offset="0%" stopColor="currentColor" stopOpacity="0.0" />

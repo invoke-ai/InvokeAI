@@ -15,7 +15,7 @@ import { addSeamless } from 'features/nodes/util/graph/generation/addSeamless';
 import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
-import { selectCanvasOutputFields, selectPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
+import { selectCanvasOutputFields } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg, GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { Invocation } from 'services/api/types';
@@ -56,8 +56,6 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
   } = params;
 
   const fp32 = vaePrecision === 'fp32';
-  const prompts = selectPresetModifiedPrompts(state);
-
   const g = new Graph(getPrefixedId('sd1_graph'));
   const seed = g.addNode({
     id: getPrefixedId('seed'),
@@ -65,6 +63,10 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
   });
   const positivePrompt = g.addNode({
     id: getPrefixedId('positive_prompt'),
+    type: 'string',
+  });
+  const negativePrompt = g.addNode({
+    id: getPrefixedId('negative_prompt'),
     type: 'string',
   });
   const modelLoader = g.addNode({
@@ -88,7 +90,6 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
   const negCond = g.addNode({
     type: 'compel',
     id: getPrefixedId('neg_cond'),
-    prompt: prompts.negative,
   });
   const negCondCollect = g.addNode({
     type: 'collect',
@@ -137,6 +138,7 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
   g.addEdge(posCond, 'conditioning', posCondCollect, 'item');
   g.addEdge(posCondCollect, 'collection', denoise, 'positive_conditioning');
 
+  g.addEdge(negativePrompt, 'value', negCond, 'prompt');
   g.addEdge(negCond, 'conditioning', negCondCollect, 'item');
   g.addEdge(negCondCollect, 'collection', denoise, 'negative_conditioning');
 
@@ -152,7 +154,6 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
     hidiffusion_window_attn: hiDiffusionWindowAttnEnabled,
     hidiffusion_t1_ratio: hiDiffusionT1Ratio,
     hidiffusion_t2_ratio: hiDiffusionT2Ratio,
-    negative_prompt: prompts.negative,
     model: Graph.getModelMetadataField(model),
     steps,
     rand_device: shouldUseCpuNoise ? 'cpu' : 'cuda',
@@ -162,6 +163,7 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
   });
   g.addEdgeToMetadata(seed, 'value', 'seed');
   g.addEdgeToMetadata(positivePrompt, 'value', 'positive_prompt');
+  g.addEdgeToMetadata(negativePrompt, 'value', 'negative_prompt');
 
   const seamless = addSeamless(state, g, denoise, modelLoader, vaeLoader);
 
@@ -340,5 +342,6 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
     g,
     seed,
     positivePrompt,
+    negativePrompt,
   };
 };

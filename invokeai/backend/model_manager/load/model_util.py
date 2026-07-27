@@ -10,7 +10,7 @@ import onnxruntime as ort
 import torch
 from diffusers.pipelines.pipeline_utils import DiffusionPipeline
 from diffusers.schedulers.scheduling_utils import SchedulerMixin
-from transformers import CLIPTokenizer, PreTrainedTokenizerBase, T5Tokenizer, T5TokenizerFast
+from transformers import CLIPTokenizer, PreTrainedTokenizerBase, T5Tokenizer
 
 from invokeai.backend.image_util.depth_anything.depth_anything_pipeline import DepthAnythingPipeline
 from invokeai.backend.image_util.grounding_dino.grounding_dino_pipeline import GroundingDinoPipeline
@@ -64,10 +64,7 @@ def calc_model_size_by_data(logger: logging.Logger, model: AnyModel) -> int:
             return 0
     elif isinstance(
         model,
-        (
-            T5TokenizerFast,
-            T5Tokenizer,
-        ),
+        T5Tokenizer,
     ):
         # HACK(ryand): len(model) just returns the vocabulary size, so this is blatantly wrong. It should be small
         # relative to the text encoder that it's used with, so shouldn't matter too much, but we should fix this at some

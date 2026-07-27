@@ -530,7 +530,7 @@ const FlowSurface = memo((props: FlowSurfaceProps) => {
 
 FlowSurface.displayName = 'FlowSurface';
 
-const HotkeyIsolator = memo(({ flowWrapper }: { flowWrapper: RefObject<HTMLDivElement> }) => {
+const HotkeyIsolator = memo(({ flowWrapper }: { flowWrapper: RefObject<HTMLDivElement | null> }) => {
   const mayUndo = useAppSelector(selectMayUndo);
   const mayRedo = useAppSelector(selectMayRedo);
 

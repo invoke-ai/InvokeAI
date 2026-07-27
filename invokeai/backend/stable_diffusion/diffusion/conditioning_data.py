@@ -89,6 +89,21 @@ class ZImageConditioningInfo:
 
 
 @dataclass
+class Ideogram4ConditioningInfo:
+    """Ideogram 4 text conditioning from the Qwen3-VL encoder.
+
+    prompt_embeds is the concatenation of hidden states from 13 Qwen3-VL layers.
+    Shape: (seq_len, 53248) where 53248 = 4096 * 13.
+    """
+
+    prompt_embeds: torch.Tensor
+
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        self.prompt_embeds = self.prompt_embeds.to(device=device, dtype=dtype)
+        return self
+
+
+@dataclass
 class QwenImageConditioningInfo:
     """Qwen Image Edit conditioning information from Qwen2.5-VL encoder."""
 
@@ -142,6 +157,7 @@ class ConditioningFieldData:
         | List[SD3ConditioningInfo]
         | List[CogView4ConditioningInfo]
         | List[ZImageConditioningInfo]
+        | List[Ideogram4ConditioningInfo]
         | List[QwenImageConditioningInfo]
         | List[AnimaConditioningInfo]
     )

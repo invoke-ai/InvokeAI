@@ -88,7 +88,7 @@ class TestSampleToLowresEstimatedImage:
         assert image.size == (2, 2)
 
         # All pixels should be identical (uniform zero input)
-        pixels = list(image.get_flattened_data())
+        pixels = [image.getpixel((x, y)) for y in range(image.height) for x in range(image.width)]
         assert all(p == pixels[0] for p in pixels)
 
         # With zero input, result = bias, scaled: ((bias + 1) / 2) * 255

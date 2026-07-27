@@ -29,6 +29,10 @@ from invokeai.app.invocations.baseinvocation import (
     invocation,
     invocation_output,
 )
+from invokeai.app.invocations.call_saved_workflow import (
+    CallSavedWorkflowInvocation,
+    is_call_saved_workflow_dynamic_input,
+)
 from invokeai.app.invocations.fields import Input, InputField, OutputField, UIType
 from invokeai.app.invocations.logic import IfInvocation
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -66,6 +70,56 @@ class Edge(BaseModel):
 
 
 PreparedExecState = Literal["pending", "ready", "executed", "skipped"]
+WorkflowCallStatus = Literal["waiting_for_child", "running_child", "completed", "failed"]
+
+
+class WorkflowCallFrame(BaseModel):
+    """Represents one workflow-call frame in a nested call chain."""
+
+    prepared_call_node_id: str = Field(description="The prepared exec node id for the call site.")
+    source_call_node_id: str = Field(description="The source graph node id for the call site.")
+    workflow_id: str = Field(description="The saved workflow being called.")
+    depth: int = Field(description="The 1-based depth of this call frame.", ge=1)
+
+
+class WorkflowCallExecution(BaseModel):
+    """Tracks one parent/child workflow-call relationship and its lifecycle."""
+
+    id: str = Field(description="The workflow-call execution id.", default_factory=uuid_string)
+    parent_session_id: str = Field(description="The parent graph execution state id.")
+    child_session_id: Optional[str] = Field(default=None, description="The child graph execution state id, if any.")
+    prepared_call_node_id: str = Field(description="The prepared exec node id for the parent call site.")
+    source_call_node_id: str = Field(description="The source graph node id for the parent call site.")
+    workflow_id: str = Field(description="The saved workflow being called.")
+    depth: int = Field(description="The 1-based depth of this call frame.", ge=1)
+    status: WorkflowCallStatus = Field(description="The current workflow-call lifecycle state.")
+    error_message: Optional[str] = Field(default=None, description="Failure reason, if the call failed.")
+    child_session_ids: list[str] = Field(default_factory=list, description="All child graph execution state ids.")
+    child_item_ids: list[int] = Field(default_factory=list, description="Child queue item ids in enqueue order.")
+    expected_child_count: int = Field(default=1, ge=1, description="The number of child executions for this call.")
+    completed_child_item_ids: list[int] = Field(
+        default_factory=list,
+        description="The child queue item ids whose workflow_return outputs have been aggregated.",
+    )
+    aggregated_values: dict[str, list[Any]] = Field(
+        default_factory=dict,
+        description="The aggregated workflow_return values accumulated from child executions.",
+    )
+    child_outputs: dict[int, dict[str, Any]] = Field(
+        default_factory=dict,
+        description="Workflow return values keyed by child queue item id.",
+    )
+
+
+class WorkflowCallParentRef(BaseModel):
+    """Reference from a child execution state back to its parent workflow-call relationship."""
+
+    workflow_call_id: str = Field(description="The workflow-call execution id.")
+    parent_session_id: str = Field(description="The parent graph execution state id.")
+    prepared_call_node_id: str = Field(description="The prepared exec node id for the parent call site.")
+    source_call_node_id: str = Field(description="The source graph node id for the parent call site.")
+    workflow_id: str = Field(description="The saved workflow being called.")
+    depth: int = Field(description="The 1-based depth of this call frame.", ge=1)
 
 
 @dataclass
@@ -343,7 +397,7 @@ class _ExecutionMaterializer:
 
     def _attach_execution_edges(self, exec_node_id: str, new_edges: list[Edge]) -> None:
         for edge in new_edges:
-            self._state.execution_graph.add_edge(
+            self._state.execution_graph._add_execution_edge(
                 Edge(
                     source=edge.source,
                     destination=EdgeConnection(node_id=exec_node_id, field=edge.destination.field),
@@ -357,17 +411,153 @@ class _ExecutionMaterializer:
         self._state._try_resolve_if_node(exec_node_id)
         self._state._enqueue_if_ready(exec_node_id)
 
-    def _get_collect_iteration_mappings(self, parent_node_ids: list[str]) -> list[tuple[str, str]]:
-        all_iteration_mappings: list[tuple[str, str]] = []
-        for source_node_id in parent_node_ids:
-            prepared_nodes = self._get_prepared_nodes_for_source(source_node_id)
-            all_iteration_mappings.extend((source_node_id, prepared_id) for prepared_id in prepared_nodes)
-        return all_iteration_mappings
+    def _get_collect_iteration_group_key(self, edge: Edge) -> tuple[int, ...]:
+        path = self._state._get_iteration_path(edge.source.node_id)
+        if edge.destination.field == ITEM_FIELD:
+            return path[:-1]
+        return path
+
+    def _get_ordered_prepared_nodes_for_source(self, source_node_id: str) -> list[str]:
+        return sorted(
+            self._get_prepared_nodes_for_source(source_node_id),
+            key=lambda exec_node_id: (self._state._get_iteration_path(exec_node_id), exec_node_id),
+        )
+
+    def _get_collect_candidate_group_keys(self, edge: Edge) -> set[tuple[int, ...]]:
+        source_node_id = edge.source.node_id
+        iterator_node_ids = self.get_node_iterators(source_node_id)
+        if isinstance(self._state.graph.get_node(source_node_id), IterateInvocation):
+            iterator_node_ids.append(source_node_id)
+
+        group_depth = len(iterator_node_ids)
+        if edge.destination.field == ITEM_FIELD:
+            group_depth = max(group_depth - 1, 0)
+        if group_depth == 0:
+            return {()}
+
+        return {
+            iteration_path[:group_depth]
+            for iterator_node_id in iterator_node_ids
+            for prepared_id in self._get_ordered_prepared_nodes_for_source(iterator_node_id)
+            if len(iteration_path := self._state._get_iteration_path(prepared_id)) >= group_depth
+        }
+
+    def _get_collect_iteration_mapping_groups(
+        self, input_edges: list[Edge]
+    ) -> list[tuple[tuple[int, ...], list[tuple[str, str]]]]:
+        prepared_inputs: list[tuple[Edge, str, str, tuple[int, ...]]] = []
+        group_keys: set[tuple[int, ...]] = set()
+        for edge in input_edges:
+            group_keys.update(self._get_collect_candidate_group_keys(edge))
+            prepared_nodes = self._get_ordered_prepared_nodes_for_source(edge.source.node_id)
+            for prepared_id in prepared_nodes:
+                prepared_edge = Edge(
+                    source=EdgeConnection(node_id=prepared_id, field=edge.source.field),
+                    destination=edge.destination,
+                )
+                group_key = self._get_collect_iteration_group_key(prepared_edge)
+                group_keys.add(group_key)
+                prepared_inputs.append(
+                    (prepared_edge, edge.source.node_id, prepared_id, self._state._get_iteration_path(prepared_id))
+                )
+
+        if not group_keys:
+            group_keys.add(())
+
+        final_group_keys = sorted(
+            group_key
+            for group_key in group_keys
+            if not any(
+                group_key != other_group_key and other_group_key[: len(group_key)] == group_key
+                for other_group_key in group_keys
+            )
+        )
+
+        return [
+            (
+                group_key,
+                [
+                    (source_node_id, prepared_id)
+                    for prepared_edge, source_node_id, prepared_id, iteration_path in prepared_inputs
+                    if (
+                        prepared_edge.destination.field == ITEM_FIELD
+                        and (
+                            group_key[: len(iteration_path)] == iteration_path
+                            or iteration_path[: len(group_key)] == group_key
+                        )
+                    )
+                    or (
+                        prepared_edge.destination.field != ITEM_FIELD
+                        and group_key[: len(iteration_path)] == iteration_path
+                    )
+                ],
+            )
+            for group_key in final_group_keys
+        ]
+
+    def _get_parent_iteration_mappings_without_iterators(
+        self, parent_node_ids: list[str]
+    ) -> list[list[tuple[str, str]]]:
+        parent_prepared_nodes = {
+            node_id: self._get_ordered_prepared_nodes_for_source(node_id) for node_id in parent_node_ids
+        }
+        all_iteration_paths = {
+            self._state._get_iteration_path(prepared_id)
+            for prepared_nodes in parent_prepared_nodes.values()
+            for prepared_id in prepared_nodes
+            if self._state._get_iteration_path(prepared_id) != ()
+        }
+        iteration_paths = sorted(
+            iteration_path
+            for iteration_path in all_iteration_paths
+            if not any(
+                iteration_path != other_path and other_path[: len(iteration_path)] == iteration_path
+                for other_path in all_iteration_paths
+            )
+        )
+        if not iteration_paths:
+            iteration_paths = [()]
+
+        mappings: list[list[tuple[str, str]]] = []
+        for iteration_path in iteration_paths:
+            mapping: list[tuple[str, str]] = []
+            for node_id, prepared_nodes in parent_prepared_nodes.items():
+                matching_prepared_node = next(
+                    iter(
+                        sorted(
+                            (
+                                prepared_id
+                                for prepared_id in prepared_nodes
+                                if iteration_path[: len(self._state._get_iteration_path(prepared_id))]
+                                == self._state._get_iteration_path(prepared_id)
+                            ),
+                            key=lambda prepared_id: (
+                                -len(self._state._get_iteration_path(prepared_id)),
+                                prepared_id,
+                            ),
+                        )
+                    ),
+                    None,
+                )
+                if matching_prepared_node is None:
+                    break
+                mapping.append((node_id, matching_prepared_node))
+            if len(mapping) == len(parent_node_ids):
+                mappings.append(mapping)
+        return mappings
+
+    def _mark_source_node_empty(self, source_node_id: str) -> None:
+        self._state.source_prepared_mapping[source_node_id] = set()
+        self._state.executed.add(source_node_id)
+        self._state.executed_history.append(source_node_id)
 
     def _get_parent_iteration_mappings(self, next_node_id: str, graph: nx.DiGraph) -> list[list[tuple[str, str]]]:
         parent_node_ids = [source_id for source_id, _ in graph.in_edges(next_node_id)]
         iterator_graph = self.iterator_graph(graph)
         iterator_nodes = self.get_node_iterators(next_node_id, iterator_graph)
+        if not iterator_nodes:
+            return self._get_parent_iteration_mappings_without_iterators(parent_node_ids)
+
         iterator_nodes_prepared = [list(self._state.source_prepared_mapping[node_id]) for node_id in iterator_nodes]
         iterator_node_prepared_combinations = list(itertools.product(*iterator_nodes_prepared))
 
@@ -385,7 +575,12 @@ class _ExecutionMaterializer:
             if all(prepared_id is not None for _, prepared_id in mapping)
         ]
 
-    def create_execution_node(self, node_id: str, iteration_node_map: list[tuple[str, str]]) -> list[str]:
+    def create_execution_node(
+        self,
+        node_id: str,
+        iteration_node_map: list[tuple[str, str]],
+        iteration_path: Optional[tuple[int, ...]] = None,
+    ) -> list[str]:
         """Prepares an iteration node and connects all edges, returning the new node id"""
 
         node = self._state.graph.get_node(node_id)
@@ -397,6 +592,11 @@ class _ExecutionMaterializer:
         new_nodes: list[str] = []
         for iteration_index in iteration_indexes:
             new_node = self._create_execution_node_copy(node, node_id, iteration_index)
+            if iteration_path is not None:
+                prepared_iteration_path = iteration_path
+                if isinstance(node, IterateInvocation):
+                    prepared_iteration_path += (iteration_index,)
+                self._state._prepared_registry().set_iteration_path(new_node.id, prepared_iteration_path)
             self._attach_execution_edges(new_node.id, new_edges)
             self._initialize_execution_node(new_node.id)
             new_nodes.append(new_node.id)
@@ -524,19 +724,30 @@ class _ExecutionMaterializer:
         new_node_ids: list[str] = []
 
         if isinstance(next_node, CollectInvocation):
-            next_node_parents = [source_id for source_id, _ in g.in_edges(next_node_id)]
-            create_results = self.create_execution_node(
-                next_node_id, self._get_collect_iteration_mappings(next_node_parents)
+            iteration_mapping_groups = self._get_collect_iteration_mapping_groups(
+                self._state.graph._get_input_edges(next_node_id)
             )
-            if create_results is not None:
+            for iteration_path, iteration_mappings in iteration_mapping_groups:
+                create_results = self.create_execution_node(next_node_id, iteration_mappings, iteration_path)
                 new_node_ids.extend(create_results)
         else:
+            parent_iterator_nodes = self.get_node_iterators(next_node_id)
             for iteration_mappings in self._get_parent_iteration_mappings(next_node_id, g):
-                create_results = self.create_execution_node(next_node_id, iteration_mappings)
-                if create_results is not None:
-                    new_node_ids.extend(create_results)
+                iteration_path = None
+                if not parent_iterator_nodes:
+                    iteration_path = max(
+                        (self._state._get_iteration_path(prepared_id) for _, prepared_id in iteration_mappings),
+                        key=lambda path: (len(path), path),
+                        default=(),
+                    )
+                create_results = self.create_execution_node(next_node_id, iteration_mappings, iteration_path)
+                new_node_ids.extend(create_results)
 
-        return next(iter(new_node_ids), None)
+        if not new_node_ids:
+            self._mark_source_node_empty(next_node_id)
+            return next_node_id
+
+        return new_node_ids[0]
 
 
 class _ExecutionScheduler:
@@ -771,6 +982,10 @@ class _ExecutionRuntime:
     ) -> None:
         for edge in input_edges:
             if allowed_fields is not None and edge.destination.field not in allowed_fields:
+                continue
+            if isinstance(node, CallSavedWorkflowInvocation) and is_call_saved_workflow_dynamic_input(
+                edge.destination.field
+            ):
                 continue
             setattr(node, edge.destination.field, self._get_copied_result_value(edge))
 
@@ -1159,7 +1374,13 @@ class Graph(BaseModel):
         :raises InvalidEdgeError: the provided edge is invalid.
         """
 
-        self._validate_edge(edge)
+        self._add_edge(edge, allow_inputless_source_collector=False)
+
+    def _add_execution_edge(self, edge: Edge) -> None:
+        self._add_edge(edge, allow_inputless_source_collector=True)
+
+    def _add_edge(self, edge: Edge, allow_inputless_source_collector: bool) -> None:
+        self._validate_edge(edge, allow_inputless_source_collector)
         if edge not in self.edges:
             self.edges.append(edge)
         else:
@@ -1201,6 +1422,10 @@ class Graph(BaseModel):
                 )
 
             if edge.destination.field not in type(destination_node).model_fields:
+                if isinstance(destination_node, CallSavedWorkflowInvocation) and is_call_saved_workflow_dynamic_input(
+                    edge.destination.field
+                ):
+                    continue
                 raise NodeFieldNotFoundError(
                     f"Edge destination field {edge.destination.field} does not exist in node {edge.destination.node_id}"
                 )
@@ -1212,10 +1437,15 @@ class Graph(BaseModel):
 
     def _validate_edge_type_compatibility(self) -> None:
         for edge in self.edges:
+            destination_node = self.get_node(edge.destination.node_id)
+            if isinstance(destination_node, CallSavedWorkflowInvocation) and is_call_saved_workflow_dynamic_input(
+                edge.destination.field
+            ):
+                continue
             if not are_connections_compatible(
                 self.get_node(edge.source.node_id),
                 edge.source.field,
-                self.get_node(edge.destination.node_id),
+                destination_node,
                 edge.destination.field,
             ):
                 raise InvalidEdgeError(f"Edge source and target types do not match ({edge})")
@@ -1305,6 +1535,10 @@ class Graph(BaseModel):
     def _validate_edge_field_compatibility(
         self, edge: Edge, source_node: BaseInvocation, destination_node: BaseInvocation
     ) -> None:
+        if isinstance(destination_node, CallSavedWorkflowInvocation) and is_call_saved_workflow_dynamic_input(
+            edge.destination.field
+        ):
+            return
         if not are_connections_compatible(source_node, edge.source.field, destination_node, edge.destination.field):
             raise InvalidEdgeError(f"Field types are incompatible ({edge})")
 
@@ -1322,7 +1556,11 @@ class Graph(BaseModel):
                 raise InvalidEdgeError(f"Iterator output type does not match iterator input type ({edge}): {err}")
 
     def _validate_collector_edge_rules(
-        self, edge: Edge, source_node: BaseInvocation, destination_node: BaseInvocation
+        self,
+        edge: Edge,
+        source_node: BaseInvocation,
+        destination_node: BaseInvocation,
+        allow_inputless_source_collector: bool,
     ) -> None:
         if isinstance(destination_node, CollectInvocation) and edge.destination.field in (ITEM_FIELD, COLLECTION_FIELD):
             err = self._is_collector_connection_valid(
@@ -1337,18 +1575,22 @@ class Graph(BaseModel):
             and not self._is_destination_field_list_of_Any(edge)
             and not self._is_destination_field_Any(edge)
         ):
+            if allow_inputless_source_collector and not any(
+                edge.destination.node_id == source_node.id for edge in self.edges
+            ):
+                return
             err = self._is_collector_connection_valid(edge.source.node_id, new_output=edge.destination)
             if err is not None:
                 raise InvalidEdgeError(f"Collector input type does not match collector output type ({edge}): {err}")
 
-    def _validate_edge(self, edge: Edge):
+    def _validate_edge(self, edge: Edge, allow_inputless_source_collector: bool = False):
         """Validates that a new edge doesn't create a cycle in the graph"""
         source_node, destination_node = self._get_edge_nodes(edge)
         self._validate_edge_destination_uniqueness(edge, destination_node)
         self._validate_edge_would_not_create_cycle(edge)
         self._validate_edge_field_compatibility(edge, source_node, destination_node)
         self._validate_iterator_edge_rules(edge, source_node, destination_node)
-        self._validate_collector_edge_rules(edge, source_node, destination_node)
+        self._validate_collector_edge_rules(edge, source_node, destination_node, allow_inputless_source_collector)
 
     def has_node(self, node_id: str) -> bool:
         """Determines whether or not a node exists in the graph."""
@@ -1736,6 +1978,36 @@ class GraphExecutionState(BaseModel):
     # Errors raised when executing nodes
     errors: dict[str, str] = Field(description="Errors raised when executing nodes", default_factory=dict)
 
+    workflow_call_stack: list[WorkflowCallFrame] = Field(
+        description="The nested workflow call stack inherited by this execution state.",
+        default_factory=list,
+    )
+    workflow_call_history: list[WorkflowCallExecution] = Field(
+        description="Completed or failed workflow-call relationships observed by this execution state.",
+        default_factory=list,
+    )
+    workflow_call_parent: Optional[WorkflowCallParentRef] = Field(
+        default=None,
+        description="Parent workflow-call relationship metadata when this execution state is a child workflow session.",
+    )
+    waiting_workflow_call: Optional[WorkflowCallFrame] = Field(
+        default=None,
+        description="The child workflow call this execution state is currently waiting on, if any.",
+    )
+    waiting_workflow_call_execution: Optional[WorkflowCallExecution] = Field(
+        default=None,
+        description="The active workflow-call relationship metadata for the current waiting child workflow, if any.",
+    )
+    waiting_workflow_call_child_session: Optional["GraphExecutionState"] = Field(
+        default=None,
+        description="The child workflow execution state spawned by the current waiting workflow call, if any.",
+    )
+    max_workflow_call_depth: int = Field(
+        default=4,
+        ge=1,
+        description="The maximum permitted workflow call depth for nested workflow execution.",
+    )
+
     # Map of prepared/executed nodes to their original nodes
     prepared_source_mapping: dict[str, str] = Field(
         description="The map of prepared nodes to original graph nodes",
@@ -1918,6 +2190,8 @@ class GraphExecutionState(BaseModel):
                 "executed_history",
                 "results",
                 "errors",
+                "workflow_call_stack",
+                "workflow_call_history",
                 "prepared_source_mapping",
                 "source_prepared_mapping",
             ]
@@ -1935,6 +2209,9 @@ class GraphExecutionState(BaseModel):
 
         # TODO: enable multiple nodes to execute simultaneously by tracking currently executing nodes
         #       possibly with a timeout?
+
+        if self.is_waiting_on_workflow_call():
+            return None
 
         # If there are no prepared nodes, prepare some nodes
         next_node = self._get_next_node()
@@ -1961,12 +2238,158 @@ class GraphExecutionState(BaseModel):
 
     def is_complete(self) -> bool:
         """Returns true if the graph is complete"""
+        if self.is_waiting_on_workflow_call():
+            return False
         node_ids = set(self.graph.nx_graph_flat().nodes)
         return self.has_error() or all((k in self.executed for k in node_ids))
 
     def has_error(self) -> bool:
         """Returns true if the graph has any errors"""
         return len(self.errors) > 0
+
+    def get_workflow_call_depth(self) -> int:
+        return len(self.workflow_call_stack)
+
+    def is_waiting_on_workflow_call(self) -> bool:
+        return self.waiting_workflow_call is not None
+
+    def build_workflow_call_frame(self, exec_node_id: str, workflow_id: str) -> WorkflowCallFrame:
+        if exec_node_id not in self.execution_graph.nodes:
+            raise NodeNotFoundError(f"Node {exec_node_id} not found in execution graph")
+        if exec_node_id not in self.prepared_source_mapping:
+            raise ValueError(f"Node {exec_node_id} is not a prepared execution node")
+
+        next_depth = self.get_workflow_call_depth() + 1
+        if next_depth > self.max_workflow_call_depth:
+            raise ValueError(
+                f"Maximum workflow call depth exceeded ({self.max_workflow_call_depth}) for workflow '{workflow_id}'"
+            )
+
+        return WorkflowCallFrame(
+            prepared_call_node_id=exec_node_id,
+            source_call_node_id=self.prepared_source_mapping[exec_node_id],
+            workflow_id=workflow_id,
+            depth=next_depth,
+        )
+
+    def begin_waiting_on_workflow_call(self, frame: WorkflowCallFrame) -> None:
+        if self.waiting_workflow_call is not None:
+            raise ValueError("Execution state is already waiting on a workflow call")
+        self.waiting_workflow_call = frame
+        self.waiting_workflow_call_execution = WorkflowCallExecution(
+            parent_session_id=self.id,
+            prepared_call_node_id=frame.prepared_call_node_id,
+            source_call_node_id=frame.source_call_node_id,
+            workflow_id=frame.workflow_id,
+            depth=frame.depth,
+            status="waiting_for_child",
+        )
+
+    def attach_waiting_workflow_call_child_session(self, child_session: "GraphExecutionState") -> None:
+        if self.waiting_workflow_call is None:
+            raise ValueError("Execution state must be waiting on a workflow call before attaching a child session")
+        if self.waiting_workflow_call_execution is None:
+            raise ValueError("Execution state is waiting on a workflow call but has no workflow call execution")
+        self.waiting_workflow_call_child_session = child_session
+        self.waiting_workflow_call_execution.child_session_id = child_session.id
+        self.waiting_workflow_call_execution.child_session_ids = [child_session.id]
+        self.waiting_workflow_call_execution.expected_child_count = 1
+        self.waiting_workflow_call_execution.status = "running_child"
+        child_session.workflow_call_parent = WorkflowCallParentRef(
+            workflow_call_id=self.waiting_workflow_call_execution.id,
+            parent_session_id=self.waiting_workflow_call_execution.parent_session_id,
+            prepared_call_node_id=self.waiting_workflow_call_execution.prepared_call_node_id,
+            source_call_node_id=self.waiting_workflow_call_execution.source_call_node_id,
+            workflow_id=self.waiting_workflow_call_execution.workflow_id,
+            depth=self.waiting_workflow_call_execution.depth,
+        )
+
+    def attach_waiting_workflow_call_child_sessions(self, child_sessions: list["GraphExecutionState"]) -> None:
+        if not child_sessions:
+            raise ValueError("Workflow call must attach at least one child session")
+        if self.waiting_workflow_call_execution is None:
+            raise ValueError("Execution state is waiting on a workflow call but has no workflow call execution")
+        self.waiting_workflow_call_child_session = child_sessions[0] if len(child_sessions) == 1 else None
+        self.waiting_workflow_call_execution.child_session_id = child_sessions[0].id
+        self.waiting_workflow_call_execution.child_session_ids = [child_session.id for child_session in child_sessions]
+        self.waiting_workflow_call_execution.expected_child_count = len(child_sessions)
+        self.waiting_workflow_call_execution.status = "running_child"
+        for child_session in child_sessions:
+            child_session.workflow_call_parent = WorkflowCallParentRef(
+                workflow_call_id=self.waiting_workflow_call_execution.id,
+                parent_session_id=self.waiting_workflow_call_execution.parent_session_id,
+                prepared_call_node_id=self.waiting_workflow_call_execution.prepared_call_node_id,
+                source_call_node_id=self.waiting_workflow_call_execution.source_call_node_id,
+                workflow_id=self.waiting_workflow_call_execution.workflow_id,
+                depth=self.waiting_workflow_call_execution.depth,
+            )
+
+    def set_waiting_workflow_call_child_item_ids(self, child_item_ids: list[int]) -> None:
+        if self.waiting_workflow_call_execution is None:
+            raise ValueError("Execution state is not waiting on a workflow call.")
+        if len(child_item_ids) != self.waiting_workflow_call_execution.expected_child_count:
+            raise ValueError("Workflow call child item count does not match expected child count.")
+        if len(set(child_item_ids)) != len(child_item_ids):
+            raise ValueError("Workflow call child item ids must be unique.")
+        self.waiting_workflow_call_execution.child_item_ids = list(child_item_ids)
+
+    def record_waiting_workflow_call_child_completion(
+        self, child_item_id: int, output_values: dict[str, Any]
+    ) -> tuple[bool, dict[str, Any]]:
+        if self.waiting_workflow_call_execution is None:
+            raise ValueError("Execution state is not waiting on a workflow call.")
+        execution = self.waiting_workflow_call_execution
+        if execution.child_item_ids and child_item_id not in execution.child_item_ids:
+            raise ValueError(f"Child queue item {child_item_id} does not belong to the active workflow call.")
+        if child_item_id not in execution.completed_child_item_ids:
+            if (
+                execution.expected_child_count > 1
+                and execution.child_outputs
+                and set(output_values.keys()) != set(next(iter(execution.child_outputs.values())).keys())
+            ):
+                raise ValueError("Batched child workflows returned different workflow return keys.")
+            execution.completed_child_item_ids.append(child_item_id)
+            execution.child_outputs[child_item_id] = dict(output_values)
+
+            ordered_item_ids = execution.child_item_ids or execution.completed_child_item_ids
+            execution.aggregated_values = {
+                key: [
+                    execution.child_outputs[item_id][key]
+                    for item_id in ordered_item_ids
+                    if item_id in execution.child_outputs
+                ]
+                for key in output_values
+            }
+        is_complete = len(execution.completed_child_item_ids) >= execution.expected_child_count
+        if execution.expected_child_count == 1:
+            return (
+                is_complete,
+                {key: values[0] for key, values in execution.aggregated_values.items()},
+            )
+        return (
+            is_complete,
+            {key: list(values) for key, values in execution.aggregated_values.items()},
+        )
+
+    def end_waiting_on_workflow_call(
+        self,
+        status: Literal["completed", "failed"] = "completed",
+        error_message: Optional[str] = None,
+    ) -> None:
+        if self.waiting_workflow_call_execution is not None:
+            self.waiting_workflow_call_execution.status = status
+            self.waiting_workflow_call_execution.error_message = error_message
+            self.workflow_call_history.append(self.waiting_workflow_call_execution.model_copy(deep=True))
+        self.waiting_workflow_call = None
+        self.waiting_workflow_call_execution = None
+        self.waiting_workflow_call_child_session = None
+
+    def create_child_workflow_execution_state(self, graph: Graph, frame: WorkflowCallFrame) -> "GraphExecutionState":
+        return GraphExecutionState(
+            graph=graph,
+            workflow_call_stack=[*self.workflow_call_stack, frame],
+            max_workflow_call_depth=self.max_workflow_call_depth,
+        )
 
     def _create_execution_node(self, node_id: str, iteration_node_map: list[tuple[str, str]]) -> list[str]:
         return self._materializer().create_execution_node(node_id, iteration_node_map)

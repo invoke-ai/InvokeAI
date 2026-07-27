@@ -75,7 +75,10 @@ class ZImageLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
                 )
 
             vae_dtype = next(iter(vae.parameters())).dtype
-            latents = latents.to(device=TorchDevice.choose_torch_device(), dtype=vae_dtype)
+            # Use the VAE's intended compute device (CUDA/MPS, or CPU if configured cpu_only). Do NOT infer it from
+            # current param residency: partial loading may have temporarily offloaded all weights to RAM, which would
+            # wrongly place the latents (and thus the whole decode) on the CPU (see #9373).
+            latents = latents.to(device=vae_info.compute_device, dtype=vae_dtype)
 
             # Disable tiling for AutoencoderKL
             if isinstance(vae, AutoencoderKL):

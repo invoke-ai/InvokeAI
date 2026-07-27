@@ -1,11 +1,5 @@
 type CompletedInvocationKeysByItemId = Map<number, Set<string>>;
 
-type FinishedQueueItemIds = {
-  has: (itemId: number) => boolean;
-};
-
-type FinishedQueueItemInvocationEventName = 'invocation_error' | 'invocation_progress' | 'invocation_started';
-
 export const hasCompletedInvocationKey = (
   completedInvocationKeysByItemId: CompletedInvocationKeysByItemId,
   itemId: number,
@@ -30,16 +24,4 @@ export const clearCompletedInvocationKeysForQueueItem = (
   itemId: number
 ) => {
   completedInvocationKeysByItemId.delete(itemId);
-};
-
-export const shouldIgnoreFinishedQueueItemInvocationEvent = (
-  eventName: FinishedQueueItemInvocationEventName,
-  finishedQueueItemIds: FinishedQueueItemIds,
-  itemId: number
-) => {
-  if (eventName === 'invocation_error') {
-    return false;
-  }
-
-  return finishedQueueItemIds.has(itemId);
 };

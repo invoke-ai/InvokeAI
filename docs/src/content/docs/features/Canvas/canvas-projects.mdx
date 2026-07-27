@@ -1,22 +1,24 @@
 ---
-title: Canvas Projects (.invk files)
+title: Canvas Projects
 sidebar:
-  order: 4
+  badge: New
+  order: 7
 ---
 
 import { Steps } from '@astrojs/starlight/components';
 
 Canvas Projects let you save the entire state of a canvas — including all layers, masks, reference images, generation parameters, and LoRAs — into a single `.invk` file that you can reopen later or share with someone else.
 
-`.invk` files are ZIP archives. They embed the actual image bytes for every layer and reference image, so a project is fully self-contained: opening it on another machine or after wiping the gallery still restores everything.
+`.invk` files are ZIP archives. When saved images can be fetched successfully from the server, they embed the actual image bytes for every layer and reference image, so a project is self-contained: opening it on another machine or after wiping the gallery can restore those images.
 
 ## Saving a project
 
 <Steps>
 1. Open the canvas and arrange your layers, masks, reference images, and parameters the way you want them.
-2. From the menu, choose **File → Save Canvas Project**.
-3. Optionally rename the project (the default is **Canvas Project**).
-4. Save the `.invk` file to disk.
+2. Open the archive menu in the canvas toolbar, or open the canvas context menu and choose **Project**.
+3. Choose **Save Canvas Project**.
+4. Optionally rename the project (the default is **Canvas Project**).
+5. Save the `.invk` file to disk.
 </Steps>
 
 What gets saved:
@@ -30,8 +32,9 @@ What gets saved:
 ## Loading a project
 
 <Steps>
-1. From the menu, choose **File → Load Canvas Project**.
-2. Pick the `.invk` file.
+1. Open the archive menu in the canvas toolbar, or open the canvas context menu and choose **Project**.
+2. Choose **Load Canvas Project**.
+3. Pick the `.invk` file.
 </Steps>
 
 When a project is loaded, the canvas is replaced with the project's state. LoRAs are reset first, then re-applied from the project, so opening a project never leaves stale LoRAs from your previous session attached.
@@ -40,7 +43,7 @@ When a project is loaded, the canvas is replaced with the project's state. LoRAs
 
 Loading a project does **not** blindly re-upload every embedded image. Invoke compares each embedded image against what is already in your gallery and only uploads the images that are missing. Re-opening the same project a second time, or opening it shortly after saving it, is therefore very fast — most or all images will already be on the server.
 
-This also means a project shared with another user will upload all its images the first time it is opened on that user's machine, then become nearly free to re-open after that.
+This also means a project shared with another user will upload its missing embedded images the first time it is opened on that user's machine, then become nearly free to re-open after that.
 
 To keep the gallery responsive during large imports, image fetches and uploads are limited to a small number of concurrent requests.
 
@@ -54,4 +57,4 @@ A `.invk` file is a canvas state snapshot. It does **not** contain:
 
 ## Sharing projects
 
-`.invk` files are safe to share directly. The recipient drops the file via **File → Load Canvas Project** on their own canvas. They'll need any referenced models / LoRAs installed locally; if a referenced model is missing, the parameter slot will be empty and they can pick a substitute before generating.
+`.invk` files are safe to share directly. The recipient loads the file from the canvas toolbar archive menu or canvas context menu. They'll need any referenced models / LoRAs installed locally; if a referenced model is missing, the parameter slot will be empty and they can pick a substitute before generating.

@@ -15,8 +15,11 @@ def load_state_dict_into_t5(model: T5EncoderModel, state_dict: dict):
     missing_keys, unexpected_keys = model.load_state_dict(state_dict, strict=False, assign=True)
     assert len(unexpected_keys) == 0
     assert set(missing_keys) == {"encoder.embed_tokens.weight"}
-    # Assert that the layers we expect to be shared are actually shared.
-    assert model.encoder.embed_tokens.weight is model.shared.weight
+    # Re-tie shared weights. In transformers 5.x, weight tying is implemented at the
+    # parameter level (via _tie_weights / tie_weights) rather than as a Python object
+    # alias.  load_state_dict(assign=True) replaces parameters in-place, which severs
+    # the parameter-level tie.  Calling tie_weights() re-establishes it.
+    model.tie_weights()
 
 
 def main():

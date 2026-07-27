@@ -3,11 +3,11 @@ import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-d
 import { attachClosestEdge, extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
 import { singleRefImageDndSource } from 'features/dnd/dnd';
 import { type DndListTargetState, idle } from 'features/dnd/types';
-import { firefoxDndFix } from 'features/dnd/util';
+import { dndInputFix } from 'features/dnd/util';
 import type { RefObject } from 'react';
 import { useEffect, useState } from 'react';
 
-export const useRefImageDnd = (ref: RefObject<HTMLElement>, id: string) => {
+export const useRefImageDnd = (ref: RefObject<HTMLElement | null>, id: string) => {
   const [dndListState, setDndListState] = useState<DndListTargetState>(idle);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -17,7 +17,7 @@ export const useRefImageDnd = (ref: RefObject<HTMLElement>, id: string) => {
       return;
     }
     return combine(
-      firefoxDndFix(element),
+      dndInputFix(element),
       draggable({
         element,
         getInitialData() {

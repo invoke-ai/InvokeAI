@@ -31,6 +31,66 @@ class DummyModuleWithTwoLayers(torch.nn.Module):
         return self.linear_layer_2(self.linear_layer_1(x))
 
 
+class DummyModuleWithNestedLayer(torch.nn.Module):
+    """A model with both a top-level layer (dotless key) and a nested submodule (dotted key)."""
+
+    def __init__(self, in_features: int, out_features: int, device: str, dtype: torch.dtype):
+        super().__init__()
+        self.top_layer = torch.nn.Linear(in_features, in_features, device=device, dtype=dtype)
+        self.block = DummyModuleWithOneLayer(in_features, out_features, device=device, dtype=dtype)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.block(self.top_layer(x))
+
+
+@torch.no_grad()
+def test_apply_smart_model_patches_mixed_dotted_and_dotless_keys():
+    """Regression test: a patch whose first layer key is a dotless top-level module (e.g. a Flux2 diffusers
+    LoRA whose first converted layer is `context_embedder`) followed by dotted nested keys must not be
+    misclassified as a flattened patch. Inspecting only the first key would set layer_keys_are_flattened=True
+    and trip `assert "." not in layer_key` in _get_submodule on the subsequent dotted keys.
+    """
+    dtype = torch.float16
+    in_features = 4
+    out_features = 8
+    lora_rank = 2
+    model = DummyModuleWithNestedLayer(in_features, out_features, device="cpu", dtype=dtype)
+    apply_custom_layers_to_model(model)
+
+    # Insertion order matters: the dotless top-level key comes first, the dotted nested key second.
+    lora_layers = {
+        "top_layer": LoRALayer.from_state_dict_values(
+            values={
+                "lora_down.weight": torch.ones((lora_rank, in_features), device="cpu", dtype=dtype),
+                "lora_up.weight": torch.ones((in_features, lora_rank), device="cpu", dtype=dtype),
+            },
+        ),
+        "block.linear_layer_1": LoRALayer.from_state_dict_values(
+            values={
+                "lora_down.weight": torch.ones((lora_rank, in_features), device="cpu", dtype=dtype),
+                "lora_up.weight": torch.ones((out_features, lora_rank), device="cpu", dtype=dtype),
+            },
+        ),
+    }
+    lora = ModelPatchRaw(lora_layers)
+    assert next(iter(lora.layers.keys())) == "top_layer"  # the dotless key is first
+
+    input = torch.randn(1, in_features, device="cpu", dtype=dtype)
+    output_before_patch = model(input)
+
+    # This previously raised AssertionError on the "block.linear_layer_1" key.
+    with LayerPatcher.apply_smart_model_patches(
+        model=model, patches=[(lora, 0.5)], prefix="", dtype=dtype, force_direct_patching=True
+    ):
+        output_during_patch = model(input)
+
+    output_after_patch = model(input)
+
+    # Both layers were actually patched (output changed), and unpatching restored the original output.
+    assert not torch.allclose(output_before_patch, output_during_patch)
+    assert torch.allclose(output_before_patch, output_after_patch)
+
+
 @pytest.mark.parametrize(
     "device",
     [
@@ -311,3 +371,47 @@ def test_apply_smart_model_patches_force_sidecar_and_direct_patching():
             force_sidecar_patching=True,
         ):
             pass
+
+
+@torch.no_grad()
+def test_apply_smart_model_patches_fp8_weights_force_sidecar():
+    """Regression test: a module whose weights are stored in float8 (e.g. from fp8_storage layerwise
+    casting) must be sidecar-patched, even when direct patching is explicitly requested. Direct patching
+    does an in-place add on the model weight, which has no CUDA add kernel for float8 and raises
+    'ufunc_add_CUDA not implemented for Float8_e4m3fn'.
+    """
+    linear_in_features = 4
+    linear_out_features = 8
+    lora_rank = 2
+    # Build the model, then cast its weights to fp8 to mimic fp8_storage layerwise casting.
+    model = DummyModuleWithOneLayer(linear_in_features, linear_out_features, device="cpu", dtype=torch.bfloat16)
+    model.linear_layer_1.weight.data = model.linear_layer_1.weight.data.to(torch.float8_e4m3fn)
+    model.linear_layer_1.bias.data = model.linear_layer_1.bias.data.to(torch.float8_e4m3fn)
+    apply_custom_layers_to_model(model)
+
+    assert LayerPatcher._is_any_part_of_layer_fp8(model.linear_layer_1)
+
+    lora_layers = {
+        "linear_layer_1": LoRALayer.from_state_dict_values(
+            values={
+                "lora_down.weight": torch.ones((lora_rank, linear_in_features), device="cpu", dtype=torch.bfloat16),
+                "lora_up.weight": torch.ones((linear_out_features, lora_rank), device="cpu", dtype=torch.bfloat16),
+            },
+        )
+    }
+    lora = ModelPatchRaw(lora_layers)
+
+    # force_direct_patching=True would crash on fp8 weights if it were honored; the fp8 guard must
+    # override it and route to sidecar patching instead.
+    with LayerPatcher.apply_smart_model_patches(
+        model=model,
+        patches=[(lora, 0.5)],
+        prefix="",
+        dtype=torch.bfloat16,
+        force_direct_patching=True,
+    ):
+        # A sidecar patch was added to the module rather than the weight being modified in place.
+        assert model.linear_layer_1.get_num_patches() == 1
+
+    # After exiting the context, the sidecar patch is cleared.
+    assert model.linear_layer_1.get_num_patches() == 0

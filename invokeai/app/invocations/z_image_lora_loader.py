@@ -106,13 +106,17 @@ class ZImageLoRALoaderInvocation(BaseInvocation):
     title="Apply LoRA Collection - Z-Image",
     tags=["lora", "model", "z-image"],
     category="model",
-    version="1.0.0",
+    version="1.0.1",
 )
 class ZImageLoRACollectionLoader(BaseInvocation):
     """Applies a collection of LoRAs to a Z-Image transformer."""
 
     loras: Optional[LoRAField | list[LoRAField]] = InputField(
-        default=None, description="LoRA models and weights. May be a single LoRA or collection.", title="LoRAs"
+        default=None,
+        description="LoRA models and weights. May be a single LoRA or collection.",
+        title="LoRAs",
+        ui_model_base=[BaseModelType.ZImage],
+        ui_model_type=ModelType.LoRA,
     )
 
     transformer: Optional[TransformerField] = InputField(

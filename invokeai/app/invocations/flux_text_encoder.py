@@ -1,8 +1,8 @@
 from contextlib import ExitStack
-from typing import Iterator, Literal, Optional, Tuple, Union
+from typing import Iterator, Literal, Optional, Tuple
 
 import torch
-from transformers import CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokenizer, T5TokenizerFast
+from transformers import CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokenizer
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
 from invokeai.app.invocations.fields import (
@@ -86,7 +86,7 @@ class FluxTextEncoderInvocation(BaseInvocation):
             ExitStack() as exit_stack,
         ):
             assert isinstance(t5_text_encoder, T5EncoderModel)
-            assert isinstance(t5_tokenizer, (T5Tokenizer, T5TokenizerFast))
+            assert isinstance(t5_tokenizer, T5Tokenizer)
 
             # Determine if the model is quantized.
             # If the model is quantized, then we need to apply the LoRA weights as sidecar layers. This results in
@@ -115,7 +115,9 @@ class FluxTextEncoderInvocation(BaseInvocation):
                 )
             )
 
-            t5_encoder = HFEncoder(t5_text_encoder, t5_tokenizer, False, self.t5_max_seq_len)
+            t5_encoder = HFEncoder(
+                t5_text_encoder, t5_tokenizer, False, self.t5_max_seq_len, device=t5_encoder_info.compute_device
+            )
 
             if context.config.get().log_tokenization:
                 self._log_t5_tokenization(context, t5_tokenizer)
@@ -158,7 +160,9 @@ class FluxTextEncoderInvocation(BaseInvocation):
                 # There are currently no supported CLIP quantized models. Add support here if needed.
                 raise ValueError(f"Unsupported model format: {clip_text_encoder_config.format}")
 
-            clip_encoder = HFEncoder(clip_text_encoder, clip_tokenizer, True, 77)
+            clip_encoder = HFEncoder(
+                clip_text_encoder, clip_tokenizer, True, 77, device=clip_text_encoder_info.compute_device
+            )
 
             if context.config.get().log_tokenization:
                 self._log_clip_tokenization(context, clip_tokenizer)
@@ -186,7 +190,7 @@ class FluxTextEncoderInvocation(BaseInvocation):
     def _log_t5_tokenization(
         self,
         context: InvocationContext,
-        tokenizer: Union[T5Tokenizer, T5TokenizerFast],
+        tokenizer: T5Tokenizer,
     ) -> None:
         """Logs the tokenization of a prompt for a T5-based model like FLUX."""
 

@@ -1,0 +1,34 @@
+---
+title: Image Storage Maintenance
+description: Move existing images into the current image subfolder strategy with crash recovery.
+---
+
+InvokeAI can move existing images into the folder layout selected by [`image_subfolder_strategy`](/configuration/invokeai-yaml/#image-subfolder-strategy). This is useful after changing the image subfolder strategy from `flat` to `date`, `type`, or `hash`, or when reorganizing an older image library.
+
+This operation changes where image files and thumbnails are stored on disk. It does not change image names, boards, generation metadata, or gallery records.
+
+## Access
+
+Image storage maintenance is available from the in-application Settings panel.
+
+Administrators can start image moves, force recovery, and inspect the current move status. If multi-user mode is disabled, the single local user has the same access. Non-admin users in multi-user mode cannot run or inspect image move status.
+
+## Maintenance Mode
+
+Image moves run as a maintenance operation. Before a move starts, InvokeAI checks that no queue work is active. While the move is running, InvokeAI prevents image reads, uploads, deletes, generation jobs, and gallery mutations from racing with the filesystem move.
+
+The UI shows the move or recovery state until the job is complete or requires manual attention. Gallery images and thumbnails may be unavailable while maintenance is active.
+
+## Crash Recovery
+
+The move process is crash-recoverable. InvokeAI records each move job in its database before moving files, moves full-size images and thumbnails on disk, and updates `images.image_subfolder` only after the filesystem move succeeds.
+
+If InvokeAI stops during a move, recovery resumes incomplete jobs. If recovery finds an ambiguous filesystem state, such as both the old and new full-size image files existing or neither file existing, it halts the job for manual repair instead of blindly updating the database.
+
+Recovery finalizes jobs that were already recorded before the stop. Images that had not yet been planned into a move job are not moved by recovery itself. The Settings panel reports how many images still need moving; run **Start Move** again to continue.
+
+Missing intermediate image files are treated as already cleaned up and do not halt the move. Missing non-intermediate image files still require operator attention.
+
+For the `date` strategy, existing images are moved according to their original image creation timestamp stored in the database, not according to the time the maintenance job is run.
+
+Empty source directories left behind by successful moves are removed when safe.

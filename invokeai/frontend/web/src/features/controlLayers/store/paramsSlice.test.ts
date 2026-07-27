@@ -9,12 +9,15 @@ import { describe, expect, it } from 'vitest';
 
 import {
   paramsSliceConfig,
+  positivePromptAddedToHistory,
+  promptRemovedFromHistory,
   selectModelSupportsDimensions,
   selectModelSupportsGuidance,
   selectModelSupportsNegativePrompt,
   selectModelSupportsRefImages,
   selectModelSupportsSeed,
   selectModelSupportsSteps,
+  setIdeogram4Steps,
 } from './paramsSlice';
 import { getInitialParamsState } from './types';
 
@@ -174,5 +177,79 @@ describe('paramsSliceConfig persisted state migration', () => {
     expect(result.shouldRandomizeSeed).toBe(false);
     expect(result.dimensions.width).toBe(768);
     expect(result.dimensions.height).toBe(768);
+  });
+
+  it('migrates old positive prompt history entries to prompt pairs', () => {
+    expect(migrate).toBeDefined();
+
+    const initial = getInitialParamsState();
+    const v3State: Record<string, unknown> = {
+      ...initial,
+      positivePromptHistory: ['a fluffy cat'],
+    };
+
+    const result = migrate?.(v3State) as ReturnType<typeof getInitialParamsState>;
+
+    expect(result.positivePromptHistory).toEqual([{ positivePrompt: 'a fluffy cat', negativePrompt: null }]);
+  });
+});
+
+describe('paramsSlice prompt history', () => {
+  it('stores positive and negative prompts in the same history item', () => {
+    const initial = getInitialParamsState();
+    const state = paramsSliceConfig.slice.reducer(
+      initial,
+      positivePromptAddedToHistory({ positivePrompt: ' a fluffy cat ', negativePrompt: ' blurry ' })
+    );
+
+    expect(state.positivePromptHistory).toEqual([{ positivePrompt: 'a fluffy cat', negativePrompt: 'blurry' }]);
+  });
+
+  it('deduplicates and removes prompt history by positive and negative prompt pair', () => {
+    const initial = getInitialParamsState();
+    const withFirstPrompt = paramsSliceConfig.slice.reducer(
+      initial,
+      positivePromptAddedToHistory({ positivePrompt: 'a cat', negativePrompt: 'blurry' })
+    );
+    const withSecondPrompt = paramsSliceConfig.slice.reducer(
+      withFirstPrompt,
+      positivePromptAddedToHistory({ positivePrompt: 'a cat', negativePrompt: 'low quality' })
+    );
+    const removed = paramsSliceConfig.slice.reducer(
+      withSecondPrompt,
+      promptRemovedFromHistory({ positivePrompt: 'a cat', negativePrompt: 'blurry' })
+    );
+
+    expect(withSecondPrompt.positivePromptHistory).toEqual([
+      { positivePrompt: 'a cat', negativePrompt: 'low quality' },
+      { positivePrompt: 'a cat', negativePrompt: 'blurry' },
+    ]);
+    expect(removed.positivePromptHistory).toEqual([{ positivePrompt: 'a cat', negativePrompt: 'low quality' }]);
+  });
+});
+
+describe('paramsSlice ideogram4Steps normalization (backend requires >= 2)', () => {
+  it('keeps a valid override step count', () => {
+    const state = paramsSliceConfig.slice.reducer(getInitialParamsState(), setIdeogram4Steps(20));
+    expect(state.ideogram4Steps).toBe(20);
+  });
+
+  it('accepts null (use the preset)', () => {
+    const state = paramsSliceConfig.slice.reducer(getInitialParamsState(), setIdeogram4Steps(null));
+    expect(state.ideogram4Steps).toBeNull();
+  });
+
+  it('normalizes a stale out-of-range value (1, below the backend min of 2) to null', () => {
+    const state = paramsSliceConfig.slice.reducer(getInitialParamsState(), setIdeogram4Steps(1));
+    expect(state.ideogram4Steps).toBeNull();
+  });
+
+  it('normalizes a stale rehydrated ideogram4Steps of 1 to null instead of failing the whole slice', () => {
+    const migrate = paramsSliceConfig.persistConfig?.migrate;
+    expect(migrate).toBeDefined();
+    const rehydrated = migrate?.({ ...getInitialParamsState(), ideogram4Steps: 1 }) as ReturnType<
+      typeof getInitialParamsState
+    >;
+    expect(rehydrated.ideogram4Steps).toBeNull();
   });
 });

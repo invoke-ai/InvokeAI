@@ -17,6 +17,7 @@ export type ImageOutputNodes =
   | 'cogview4_l2i'
   | 'qwen_image_l2i'
   | 'z_image_l2i'
+  | 'ideogram4_l2i'
   | 'anima_l2i';
 
 export type LatentToImageNodes =
@@ -72,6 +73,7 @@ export type GraphBuilderReturn = {
   g: Graph;
   seed?: Invocation<'integer'>;
   positivePrompt: Invocation<'string'>;
+  negativePrompt?: Invocation<'string'>;
 };
 
 export class UnsupportedGenerationModeError extends Error {

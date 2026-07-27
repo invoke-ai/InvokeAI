@@ -86,8 +86,13 @@ class LayerPatcher:
         # submodules. If the layer keys do not contain a dot, then they are flattened, meaning that all '.' have been
         # replaced with '_'. Non-flattened keys are preferred, because they allow submodules to be accessed directly
         # without searching, but some legacy code still uses flattened keys.
-        first_key = next(iter(patch.layers.keys()))
-        layer_keys_are_flattened = "." not in first_key
+        #
+        # We inspect *all* keys rather than just the first one: a flattened key never contains a dot, so the patch is
+        # only flattened if no key contains a dot. Checking only the first key misclassifies non-flattened patches whose
+        # first layer happens to target a top-level module with a single-token name (e.g. a Flux2 diffusers LoRA whose
+        # first converted layer is `lora_transformer-context_embedder`), causing a spurious assertion failure on
+        # subsequent dotted keys.
+        layer_keys_are_flattened = not any("." in key for key in patch.layers.keys())
 
         prefix_len = len(prefix)
 
@@ -121,10 +126,18 @@ class LayerPatcher:
             use_sidecar_patching = False
             if force_direct_patching and force_sidecar_patching:
                 raise ValueError("Cannot force both direct and sidecar patching.")
-            elif force_direct_patching:
-                use_sidecar_patching = False
             elif force_sidecar_patching:
                 use_sidecar_patching = True
+            elif LayerPatcher._is_any_part_of_layer_fp8(module):
+                # FP8 weights (e.g. a model loaded with fp8_storage layerwise casting) cannot be
+                # directly patched: _apply_model_layer_patch does an in-place add on the model weight,
+                # and CUDA has no add kernel for float8 ("ufunc_add_CUDA not implemented for
+                # Float8_e4m3fn"). Sidecar patching dequantizes to the compute dtype before any math,
+                # so it works regardless of the storage dtype. This takes precedence over
+                # force_direct_patching, since direct patching is simply not possible on fp8 weights.
+                use_sidecar_patching = True
+            elif force_direct_patching:
+                use_sidecar_patching = False
             elif module.get_num_patches() > 0:
                 use_sidecar_patching = True
             elif LayerPatcher._is_any_part_of_layer_on_cpu(module):
@@ -151,6 +164,14 @@ class LayerPatcher:
     @staticmethod
     def _is_any_part_of_layer_on_cpu(layer: torch.nn.Module) -> bool:
         return any(p.device.type == "cpu" for p in layer.parameters())
+
+    # FP8 storage dtypes. Direct patching does in-place arithmetic on the model weights, which has no
+    # CUDA kernel for these dtypes, so a layer with fp8 weights must be patched via the sidecar wrapper.
+    _FP8_DTYPES = (torch.float8_e4m3fn, torch.float8_e5m2)
+
+    @staticmethod
+    def _is_any_part_of_layer_fp8(layer: torch.nn.Module) -> bool:
+        return any(p.dtype in LayerPatcher._FP8_DTYPES for p in layer.parameters())
 
     @staticmethod
     @torch.no_grad()

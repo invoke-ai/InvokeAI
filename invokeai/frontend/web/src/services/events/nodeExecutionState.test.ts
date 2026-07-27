@@ -4,6 +4,9 @@ import type { S } from 'services/api/types';
 import { describe, expect, it } from 'vitest';
 
 import {
+  getCompletedInvocationIdsFromCompletedSession,
+  getNodeExecutionStatesFromCompletedSession,
+  getResetNodeExecutionStatesOnQueueItemStarted,
   getUpdatedNodeExecutionStateOnInvocationComplete,
   getUpdatedNodeExecutionStateOnInvocationError,
   getUpdatedNodeExecutionStateOnInvocationProgress,
@@ -107,6 +110,49 @@ const buildInvocationErrorEvent = (overrides: Partial<S['InvocationErrorEvent']>
     error_traceback: 'traceback',
     ...overrides,
   }) as S['InvocationErrorEvent'];
+
+describe(getResetNodeExecutionStatesOnQueueItemStarted.name, () => {
+  it('resets node execution states when a queue item starts for the first time', () => {
+    const updated = getResetNodeExecutionStatesOnQueueItemStarted(
+      {
+        'node-1': buildNodeExecutionState({
+          status: zNodeStatus.enum.COMPLETED,
+          progress: 1,
+          outputs: [{ type: 'integer_output', value: 3 } as unknown as S['InvocationCompleteEvent']['result']],
+        }),
+      },
+      1,
+      new Map()
+    );
+
+    expect(updated?.['node-1']).toEqual({
+      nodeId: 'node-1',
+      status: zNodeStatus.enum.PENDING,
+      progress: null,
+      progressImage: null,
+      outputs: [],
+      error: null,
+    });
+  });
+
+  it('does not reset node execution states when a workflow-call parent queue item resumes', () => {
+    const workflowReturnOutput = {
+      type: 'workflow_return_output',
+      values: { result: [3] },
+    } as unknown as S['InvocationCompleteEvent']['result'];
+    const existing = {
+      'call-node': buildNodeExecutionState({
+        nodeId: 'call-node',
+        status: zNodeStatus.enum.COMPLETED,
+        outputs: [workflowReturnOutput],
+      }),
+    };
+
+    const updated = getResetNodeExecutionStatesOnQueueItemStarted(existing, 1, new Map([[1, new Set(['call-node'])]]));
+
+    expect(updated).toBeUndefined();
+  });
+});
 
 describe(getUpdatedNodeExecutionStateOnInvocationStarted.name, () => {
   it('creates an execution state when started arrives before initialization', () => {
@@ -276,5 +322,58 @@ describe(getUpdatedNodeExecutionStateOnInvocationError.name, () => {
       error_message: event.error_message,
       error_traceback: event.error_traceback,
     });
+  });
+});
+
+describe(getNodeExecutionStatesFromCompletedSession.name, () => {
+  it('builds completed node execution states from a completed session', () => {
+    const result = { type: 'integer_output', value: 42 } as unknown as S['GraphExecutionState']['results'][string];
+    const states = getNodeExecutionStatesFromCompletedSession({
+      source_prepared_mapping: {
+        'node-1': ['prepared-node-1'],
+      },
+      results: {
+        'prepared-node-1': result,
+      },
+    } as unknown as S['GraphExecutionState']);
+
+    expect(states).toEqual([
+      {
+        nodeId: 'node-1',
+        status: zNodeStatus.enum.COMPLETED,
+        progress: null,
+        progressImage: null,
+        outputs: [result],
+        error: null,
+      },
+    ]);
+  });
+
+  it('does not create a completed state for source nodes with no results', () => {
+    const states = getNodeExecutionStatesFromCompletedSession({
+      source_prepared_mapping: {
+        'node-1': ['prepared-node-1'],
+      },
+      results: {},
+    } as unknown as S['GraphExecutionState']);
+
+    expect(states).toEqual([]);
+  });
+});
+
+describe(getCompletedInvocationIdsFromCompletedSession.name, () => {
+  it('returns prepared invocation ids that have persisted results', () => {
+    const result = { type: 'integer_output', value: 42 } as unknown as S['GraphExecutionState']['results'][string];
+    const invocationIds = getCompletedInvocationIdsFromCompletedSession({
+      source_prepared_mapping: {
+        'node-1': ['prepared-node-1'],
+        'node-2': ['prepared-node-2'],
+      },
+      results: {
+        'prepared-node-1': result,
+      },
+    } as unknown as S['GraphExecutionState']);
+
+    expect(invocationIds).toEqual(['prepared-node-1']);
   });
 });

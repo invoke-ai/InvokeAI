@@ -1095,6 +1095,12 @@ class AdaptiveInvokeAIClient:
         return response.json()
 ```
 
+## Programmatic Graph Execution
+
+If you are building an external client against the HTTP API, see the dedicated [Workflow Execution guide](/development/guides/workflow-api/).
+
+In multi-user mode, remember to include your `Authorization: Bearer <token>` header on queue and workflow requests.
+
 ## OpenAPI/Swagger Documentation
 
 InvokeAI provides OpenAPI documentation for all endpoints.

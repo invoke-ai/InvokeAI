@@ -174,6 +174,8 @@ export const AddNodeCmdk = memo(() => {
     dependencies: [open, tab],
   });
 
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+
   const onChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
   }, []);
@@ -184,8 +186,6 @@ export const AddNodeCmdk = memo(() => {
     setExpandedCategories(new Set());
     $pendingConnection.set(null);
   }, [close]);
-
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
   const toggleCategory = useCallback((category: string) => {
     setExpandedCategories((prev) => {

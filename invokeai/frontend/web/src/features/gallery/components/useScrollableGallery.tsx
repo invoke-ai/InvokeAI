@@ -4,7 +4,7 @@ import { type RefObject, useEffect, useState } from 'react';
 /**
  * Handles the initialization of the overlay scrollbars for the gallery, returning the ref to the scroller element.
  */
-export const useScrollableGallery = (rootRef: RefObject<HTMLDivElement>) => {
+export const useScrollableGallery = (rootRef: RefObject<HTMLDivElement | null>) => {
   const [scroller, scrollerRef] = useState<HTMLElement | null>(null);
   const [initialize, osInstance] = useOverlayScrollbars({
     defer: true,

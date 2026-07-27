@@ -44,7 +44,7 @@ export const SaveCanvasProjectDialog = memo(() => {
 
 SaveCanvasProjectDialog.displayName = 'SaveCanvasProjectDialog';
 
-const Content = memo(({ cancelRef }: { cancelRef: RefObject<HTMLButtonElement> }) => {
+const Content = memo(({ cancelRef }: { cancelRef: RefObject<HTMLButtonElement | null> }) => {
   const { t } = useTranslation();
   const { saveCanvasProject } = useCanvasProjectSave();
   const [name, setName] = useState('Canvas Project');

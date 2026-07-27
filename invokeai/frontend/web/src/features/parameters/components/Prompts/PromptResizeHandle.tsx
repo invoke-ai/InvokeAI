@@ -10,7 +10,7 @@ import {
 } from 'react';
 
 type PromptResizeHandleProps = {
-  textareaRef: RefObject<HTMLTextAreaElement>;
+  textareaRef: RefObject<HTMLTextAreaElement | null>;
   minHeight: number;
 };
 

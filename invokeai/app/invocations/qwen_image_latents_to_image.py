@@ -19,6 +19,7 @@ from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.stable_diffusion.extensions.seamless import SeamlessExt
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_qwen_image
 
 
 @invocation(
@@ -41,13 +42,21 @@ class QwenImageLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard)
 
         vae_info = context.models.load(self.vae.vae)
         assert isinstance(vae_info.model, AutoencoderKLQwenImage)
+        estimated_working_memory = estimate_vae_working_memory_qwen_image(
+            operation="decode",
+            image_tensor=latents,
+            vae=vae_info.model,
+        )
         with (
             SeamlessExt.static_patch_model(vae_info.model, self.vae.seamless_axes),
-            vae_info.model_on_device() as (_, vae),
+            vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae),
         ):
             context.util.signal_progress("Running VAE")
             assert isinstance(vae, AutoencoderKLQwenImage)
-            latents = latents.to(device=TorchDevice.choose_torch_device(), dtype=vae.dtype)
+            # Use the VAE's intended compute device (CUDA/MPS, or CPU if configured cpu_only). Do NOT infer it from
+            # current param residency: partial loading may have temporarily offloaded all weights to RAM, which would
+            # wrongly place the latents (and thus the whole decode) on the CPU (see #9373).
+            latents = latents.to(device=vae_info.compute_device, dtype=vae.dtype)
 
             vae.disable_tiling()
 

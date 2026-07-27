@@ -13,7 +13,7 @@ import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHook
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
 import { parseify } from 'common/util/serialize';
-import { firefoxDndFix, triggerPostMoveFlash } from 'features/dnd/util';
+import { dndInputFix, triggerPostMoveFlash } from 'features/dnd/util';
 import type { CenterOrEdge } from 'features/nodes/components/sidePanel/builder/center-or-closest-edge';
 import {
   attachClosestCenterOrEdge,
@@ -383,8 +383,8 @@ export const useBuilderDndMonitor = () => {
  */
 export const useFormElementDnd = (
   elementId: ElementId,
-  draggableRef: RefObject<HTMLElement>,
-  dragHandleRef: RefObject<HTMLElement>
+  draggableRef: RefObject<HTMLElement | null>,
+  dragHandleRef: RefObject<HTMLElement | null>
 ) => {
   const isRootElement = useIsRootElement(elementId);
   const [isDragging, setIsDragging] = useState(false);
@@ -405,7 +405,7 @@ export const useFormElementDnd = (
     }
 
     return combine(
-      firefoxDndFix(draggableElement),
+      dndInputFix(draggableElement),
       draggable({
         element: draggableElement,
         dragHandle: dragHandleElement,
@@ -486,7 +486,7 @@ export const useFormElementDnd = (
   return [activeDropRegion, isDragging] as const;
 };
 
-export const useRootElementDropTarget = (droppableRef: RefObject<HTMLDivElement>) => {
+export const useRootElementDropTarget = (droppableRef: RefObject<HTMLDivElement | null>) => {
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const getElement = useGetElement();
   const getAllowedDropRegions = useGetAllowedDropRegions();
@@ -555,8 +555,8 @@ export const useNodeFieldDnd = (
   nodeId: string,
   fieldName: string,
   fieldTemplate: FieldInputTemplate,
-  draggableRef: RefObject<HTMLElement>,
-  dragHandleRef: RefObject<HTMLElement>
+  draggableRef: RefObject<HTMLElement | null>,
+  dragHandleRef: RefObject<HTMLElement | null>
 ) => {
   const [isDragging, setIsDragging] = useState(false);
 
@@ -567,7 +567,7 @@ export const useNodeFieldDnd = (
       return;
     }
     return combine(
-      firefoxDndFix(draggableElement),
+      dndInputFix(draggableElement),
       draggable({
         element: draggableElement,
         dragHandle: dragHandleElement,

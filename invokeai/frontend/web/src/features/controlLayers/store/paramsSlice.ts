@@ -7,7 +7,13 @@ import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMul
 import { isPlainObject } from 'es-toolkit';
 import { clamp } from 'es-toolkit/compat';
 import { logout } from 'features/auth/store/authSlice';
-import type { AspectRatioID, InfillMethod, ParamsState, RgbaColor } from 'features/controlLayers/store/types';
+import type {
+  AspectRatioID,
+  InfillMethod,
+  ParamsState,
+  PromptHistoryItem,
+  RgbaColor,
+} from 'features/controlLayers/store/types';
 import {
   ASPECT_RATIO_MAP,
   DEFAULT_ASPECT_RATIO_CONFIG,
@@ -21,7 +27,7 @@ import {
   SUPPORTS_OPTIMIZED_DENOISING_BASE_MODELS,
   SUPPORTS_REF_IMAGES_BASE_MODELS,
 } from 'features/modelManagerV2/models';
-import type { BaseModelType } from 'features/nodes/types/common';
+import type { BaseModelType, ModelIdentifierField } from 'features/nodes/types/common';
 import { CLIP_SKIP_MAP } from 'features/parameters/types/constants';
 import type {
   ParameterCanvasCoherenceMode,
@@ -33,6 +39,7 @@ import type {
   ParameterControlLoRAModel,
   ParameterFluxDypePreset,
   ParameterGuidance,
+  ParameterIdeogram4SamplerPreset,
   ParameterModel,
   ParameterNegativePrompt,
   ParameterPositivePrompt,
@@ -91,6 +98,23 @@ const slice = createSlice({
     },
     setZImageShift: (state, action: PayloadAction<number | null>) => {
       state.zImageShift = action.payload;
+    },
+    setIdeogram4SamplerPreset: (state, action: PayloadAction<ParameterIdeogram4SamplerPreset>) => {
+      state.ideogram4SamplerPreset = action.payload;
+    },
+    setIdeogram4Steps: (state, action: PayloadAction<number | null>) => {
+      // Normalize through the schema so a stale/out-of-range value (e.g. 1, below the backend's min of 2)
+      // becomes null (= use preset) rather than being dispatched straight into the graph.
+      state.ideogram4Steps = zParamsState.shape.ideogram4Steps.parse(action.payload);
+    },
+    setIdeogram4GuidanceScale: (state, action: PayloadAction<number | null>) => {
+      state.ideogram4GuidanceScale = action.payload;
+    },
+    setIdeogram4Mu: (state, action: PayloadAction<number | null>) => {
+      state.ideogram4Mu = action.payload;
+    },
+    setIdeogram4ColorPalette: (state, action: PayloadAction<string[]>) => {
+      state.ideogram4ColorPalette = action.payload;
     },
     setZImageSeedVarianceEnabled: (state, action: PayloadAction<boolean>) => {
       state.zImageSeedVarianceEnabled = action.payload;
@@ -246,12 +270,19 @@ const slice = createSlice({
       }
       state.animaQwen3EncoderModel = result.data;
     },
-    animaT5EncoderModelSelected: (state, action: PayloadAction<ParameterT5EncoderModel | null>) => {
-      const result = zParamsState.shape.animaT5EncoderModel.safeParse(action.payload);
+    animaLLLiteModelSelected: (state, action: PayloadAction<ModelIdentifierField | null>) => {
+      const result = zParamsState.shape.animaLLLiteModel.safeParse(action.payload);
       if (!result.success) {
         return;
       }
-      state.animaT5EncoderModel = result.data;
+      state.animaLLLiteModel = result.data;
+    },
+    animaLLLiteWeightChanged: (state, action: PayloadAction<number>) => {
+      const result = zParamsState.shape.animaLLLiteWeight.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.animaLLLiteWeight = result.data;
     },
     setAnimaScheduler: (
       state,
@@ -321,20 +352,33 @@ const slice = createSlice({
     positivePromptChanged: (state, action: PayloadAction<ParameterPositivePrompt>) => {
       state.positivePrompt = action.payload;
     },
-    positivePromptAddedToHistory: (state, action: PayloadAction<ParameterPositivePrompt>) => {
-      const prompt = action.payload.trim();
-      if (prompt.length === 0) {
+    positivePromptAddedToHistory: (state, action: PayloadAction<PromptHistoryItem>) => {
+      const prompt: PromptHistoryItem = {
+        positivePrompt: action.payload.positivePrompt.trim(),
+        negativePrompt: action.payload.negativePrompt?.trim() || null,
+      };
+      if (prompt.positivePrompt.length === 0 && !prompt.negativePrompt) {
         return;
       }
 
-      state.positivePromptHistory = [prompt, ...state.positivePromptHistory.filter((p) => p !== prompt)];
+      state.positivePromptHistory = [
+        prompt,
+        ...state.positivePromptHistory.filter(
+          (p) =>
+            p.positivePrompt !== prompt.positivePrompt || (p.negativePrompt ?? null) !== (prompt.negativePrompt ?? null)
+        ),
+      ];
 
       if (state.positivePromptHistory.length > MAX_POSITIVE_PROMPT_HISTORY) {
         state.positivePromptHistory = state.positivePromptHistory.slice(0, MAX_POSITIVE_PROMPT_HISTORY);
       }
     },
-    promptRemovedFromHistory: (state, action: PayloadAction<string>) => {
-      state.positivePromptHistory = state.positivePromptHistory.filter((p) => p !== action.payload);
+    promptRemovedFromHistory: (state, action: PayloadAction<PromptHistoryItem>) => {
+      state.positivePromptHistory = state.positivePromptHistory.filter(
+        (p) =>
+          p.positivePrompt !== action.payload.positivePrompt ||
+          (p.negativePrompt ?? null) !== (action.payload.negativePrompt ?? null)
+      );
     },
     promptHistoryCleared: (state) => {
       state.positivePromptHistory = [];
@@ -617,7 +661,7 @@ const resetState = (state: ParamsState): ParamsState => {
   newState.zImageQwen3SourceModel = oldState.zImageQwen3SourceModel;
   newState.animaVaeModel = oldState.animaVaeModel;
   newState.animaQwen3EncoderModel = oldState.animaQwen3EncoderModel;
-  newState.animaT5EncoderModel = oldState.animaT5EncoderModel;
+  newState.animaLLLiteModel = oldState.animaLLLiteModel;
   newState.kleinVaeModel = oldState.kleinVaeModel;
   newState.kleinQwen3EncoderModel = oldState.kleinQwen3EncoderModel;
   newState.qwenImageComponentSource = oldState.qwenImageComponentSource;
@@ -649,6 +693,11 @@ export const {
   setFluxDypeExponent,
   setZImageScheduler,
   setZImageShift,
+  setIdeogram4SamplerPreset,
+  setIdeogram4Steps,
+  setIdeogram4GuidanceScale,
+  setIdeogram4Mu,
+  setIdeogram4ColorPalette,
   setZImageSeedVarianceEnabled,
   setZImageSeedVarianceStrength,
   setZImageSeedVarianceRandomizePercent,
@@ -722,7 +771,8 @@ export const {
   paramsRecalled,
   animaVaeModelSelected,
   animaQwen3EncoderModelSelected,
-  animaT5EncoderModelSelected,
+  animaLLLiteModelSelected,
+  animaLLLiteWeightChanged,
   setAnimaScheduler,
 } = slice.actions;
 
@@ -784,6 +834,7 @@ export const selectIsFLUX = createParamsSelector((params) => params.model?.base 
 export const selectIsSD3 = createParamsSelector((params) => params.model?.base === 'sd-3');
 export const selectIsCogView4 = createParamsSelector((params) => params.model?.base === 'cogview4');
 export const selectIsZImage = createParamsSelector((params) => params.model?.base === 'z-image');
+export const selectIsIdeogram4 = createParamsSelector((params) => params.model?.base === 'ideogram-4');
 export const selectIsAnima = createParamsSelector((params) => params.model?.base === 'anima');
 export const selectIsFlux2 = createParamsSelector((params) => params.model?.base === 'flux2');
 export const selectIsExternal = createParamsSelector((params) => params.model?.base === 'external');
@@ -810,8 +861,9 @@ export const selectZImageQwen3EncoderModel = createParamsSelector((params) => pa
 export const selectZImageQwen3SourceModel = createParamsSelector((params) => params.zImageQwen3SourceModel);
 export const selectAnimaVaeModel = createParamsSelector((params) => params.animaVaeModel);
 export const selectAnimaQwen3EncoderModel = createParamsSelector((params) => params.animaQwen3EncoderModel);
-export const selectAnimaT5EncoderModel = createParamsSelector((params) => params.animaT5EncoderModel);
 export const selectAnimaScheduler = createParamsSelector((params) => params.animaScheduler);
+export const selectAnimaLLLiteModel = createParamsSelector((params) => params.animaLLLiteModel);
+export const selectAnimaLLLiteWeight = createParamsSelector((params) => params.animaLLLiteWeight);
 export const selectKleinVaeModel = createParamsSelector((params) => params.kleinVaeModel);
 export const selectKleinQwen3EncoderModel = createParamsSelector((params) => params.kleinQwen3EncoderModel);
 export const selectQwenImageComponentSource = createParamsSelector((params) => params.qwenImageComponentSource);
@@ -914,6 +966,10 @@ export const selectModelSupportsSteps = createSelector(selectModel, (model) => {
   if (model.base === 'external') {
     return false;
   }
+  if (model.base === 'ideogram-4') {
+    // Ideogram 4 bundles step count into its sampler preset, so there is no standalone steps control.
+    return false;
+  }
   return true;
 });
 export const selectModelSupportsDimensions = createSelector(selectModel, selectModelConfig, (model, modelConfig) => {
@@ -938,6 +994,11 @@ export const selectFluxDypeScale = createParamsSelector((params) => params.fluxD
 export const selectFluxDypeExponent = createParamsSelector((params) => params.fluxDypeExponent);
 export const selectZImageScheduler = createParamsSelector((params) => params.zImageScheduler);
 export const selectZImageShift = createParamsSelector((params) => params.zImageShift);
+export const selectIdeogram4SamplerPreset = createParamsSelector((params) => params.ideogram4SamplerPreset);
+export const selectIdeogram4Steps = createParamsSelector((params) => params.ideogram4Steps);
+export const selectIdeogram4GuidanceScale = createParamsSelector((params) => params.ideogram4GuidanceScale);
+export const selectIdeogram4Mu = createParamsSelector((params) => params.ideogram4Mu);
+export const selectIdeogram4ColorPalette = createParamsSelector((params) => params.ideogram4ColorPalette);
 export const selectZImageSeedVarianceEnabled = createParamsSelector((params) => params.zImageSeedVarianceEnabled);
 export const selectZImageSeedVarianceStrength = createParamsSelector((params) => params.zImageSeedVarianceStrength);
 export const selectZImageSeedVarianceRandomizePercent = createParamsSelector(

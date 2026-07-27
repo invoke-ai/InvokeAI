@@ -25,6 +25,7 @@ from invokeai.app.services.external_generation.providers import (
 )
 from invokeai.app.services.external_generation.startup import sync_configured_external_starter_models
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
+from invokeai.app.services.image_moves.image_moves_default import ImageMoveService
 from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
 from invokeai.app.services.images.images_default import ImageService
 from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
@@ -59,6 +60,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     CogView4ConditioningInfo,
     ConditioningFieldData,
     FLUXConditioningInfo,
+    Ideogram4ConditioningInfo,
     QwenImageConditioningInfo,
     SD3ConditioningInfo,
     SDXLConditioningInfo,
@@ -130,6 +132,7 @@ class ApiDependencies:
         events = FastAPIEventService(event_handler_id, loop=loop)
         bulk_download = BulkDownloadService()
         image_records = SqliteImageRecordStorage(db=db)
+        image_moves = ImageMoveService(db=db, image_files=image_files, config=configuration, logger=logger)
         images = ImageService()
         invocation_cache = MemoryInvocationCache(max_cache_size=config.node_cache_size)
         tensors = ObjectSerializerForwardCache(
@@ -150,6 +153,7 @@ class ApiDependencies:
                     SD3ConditioningInfo,
                     CogView4ConditioningInfo,
                     ZImageConditioningInfo,
+                    Ideogram4ConditioningInfo,
                     QwenImageConditioningInfo,
                     AnimaConditioningInfo,
                 ],
@@ -198,6 +202,7 @@ class ApiDependencies:
             configuration=configuration,
             events=events,
             image_files=image_files,
+            image_moves=image_moves,
             image_records=image_records,
             images=images,
             invocation_cache=invocation_cache,

@@ -218,14 +218,18 @@ class ModelLoader(ModelLoaderBase):
             if first_param is not None:
                 compute_dtype = first_param.dtype
 
-        from diffusers.models.modeling_utils import ModelMixin
-
-        if isinstance(model, ModelMixin):
-            model.enable_layerwise_casting(
-                storage_dtype=storage_dtype,
-                compute_dtype=compute_dtype,
-            )
-        elif isinstance(model, torch.nn.Module):
+        # We use our own hook-based path for every nn.Module — including diffusers ModelMixin —
+        # rather than `model.enable_layerwise_casting()`. Diffusers' LayerwiseCastingHook installs
+        # an instance-level `forward` attribute that captures the original `Linear.forward` in a
+        # closure. `ModelCache.put()` later runs `apply_custom_layers_to_model`, which constructs a
+        # new `CustomLinear` sharing the original Linear's `__dict__` — so the diffusers wrapper
+        # carries over and routes calls back to the captured original forward, silently bypassing
+        # `CustomLinear.forward` and its `cast_to_device` autocast. With partial loading (e.g. FLUX.2
+        # Klein 9B) some weights stay on CPU, the diffusers pre_forward only casts dtype, and
+        # `F.linear` then sees input on cuda and weight on cpu. Our `register_forward_pre_hook` /
+        # `register_forward_hook` path fires around `nn.Module._call_impl` without replacing
+        # `forward`, so `CustomLinear.forward` is still reached.
+        if isinstance(model, torch.nn.Module):
             self._apply_fp8_to_nn_module(model, storage_dtype=storage_dtype, compute_dtype=compute_dtype)
         else:
             return model

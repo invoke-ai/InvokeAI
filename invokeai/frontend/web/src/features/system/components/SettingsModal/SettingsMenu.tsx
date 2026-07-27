@@ -14,7 +14,14 @@ import HotkeysModal from 'features/system/components/HotkeysModal/HotkeysModal';
 import { discordLink, githubLink } from 'features/system/store/constants';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiBugBeetleBold, PiGearSixFill, PiInfoBold, PiKeyboardBold, PiToggleRightFill } from 'react-icons/pi';
+import {
+  PiBookOpenBold,
+  PiBugBeetleBold,
+  PiGearSixFill,
+  PiInfoBold,
+  PiKeyboardBold,
+  PiToggleRightFill,
+} from 'react-icons/pi';
 import { RiDiscordFill, RiGithubFill } from 'react-icons/ri';
 
 import SettingsModal from './SettingsModal';
@@ -35,6 +42,9 @@ const SettingsMenu = () => {
       <Portal>
         <MenuList>
           <MenuGroup title={t('common.communityLabel')}>
+            <MenuItem as="a" href="https://invoke.ai/" target="_blank" icon={<PiBookOpenBold />}>
+              {t('common.userGuideLabel')}
+            </MenuItem>
             <MenuItem as="a" href={githubLink} target="_blank" icon={<RiGithubFill />}>
               {t('common.githubLabel')}
             </MenuItem>

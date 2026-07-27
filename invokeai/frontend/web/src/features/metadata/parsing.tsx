@@ -9,7 +9,6 @@ import { bboxHeightChanged, bboxWidthChanged, canvasMetadataRecalled } from 'fea
 import { loraAllDeleted, loraRecalled } from 'features/controlLayers/store/lorasSlice';
 import {
   animaQwen3EncoderModelSelected,
-  animaT5EncoderModelSelected,
   animaVaeModelSelected,
   geminiTemperatureChanged,
   geminiThinkingLevelChanged,
@@ -45,6 +44,11 @@ import {
   setHiDiffusionT1Ratio,
   setHiDiffusionT2Ratio,
   setHiDiffusionWindowAttnEnabled,
+  setIdeogram4ColorPalette,
+  setIdeogram4GuidanceScale,
+  setIdeogram4Mu,
+  setIdeogram4SamplerPreset,
+  setIdeogram4Steps,
   setImg2imgStrength,
   setRefinerCFGScale,
   setRefinerNegativeAestheticScore,
@@ -62,6 +66,7 @@ import {
   setZImageSeedVarianceRandomizePercent,
   setZImageSeedVarianceStrength,
   setZImageShift,
+  t5EncoderModelSelected,
   vaeSelected,
   widthChanged,
   zImageQwen3EncoderModelSelected,
@@ -84,6 +89,7 @@ import type {
   ParameterFluxDypeScale,
   ParameterGuidance,
   ParameterHeight,
+  ParameterIdeogram4SamplerPreset,
   ParameterModel,
   ParameterNegativePrompt,
   ParameterPositivePrompt,
@@ -109,6 +115,7 @@ import {
   zParameterFluxDypePreset,
   zParameterFluxDypeScale,
   zParameterGuidance,
+  zParameterIdeogram4SamplerPreset,
   zParameterImageDimension,
   zParameterNegativePrompt,
   zParameterPositivePrompt,
@@ -246,16 +253,30 @@ export type UnrecallableMetadataHandler<T> = {
   ValueComponent: ComponentType<UnrecallableMetadataValueProps<T>>;
 };
 
+export const parseMetadataHandler = <T,>(
+  metadata: unknown,
+  handler: { parse: (metadata: unknown, store: AppStore) => Promise<T> },
+  store: AppStore
+): Promise<T> => {
+  return Promise.resolve().then(() => handler.parse(metadata, store));
+};
+
 const isSingleMetadataHandler = (
   handler: SingleMetadataHandler<any> | CollectionMetadataHandler<any[]> | UnrecallableMetadataHandler<any>
 ): handler is SingleMetadataHandler<any> => {
   return SingleMetadataKey in handler && handler[SingleMetadataKey] === true;
 };
 
-const isCollectionMetadataHandler = (
+export const isCollectionMetadataHandler = (
   handler: SingleMetadataHandler<any> | CollectionMetadataHandler<any[]> | UnrecallableMetadataHandler<any>
 ): handler is CollectionMetadataHandler<any[]> => {
   return CollectionMetadataKey in handler && handler[CollectionMetadataKey] === true;
+};
+
+export const isUnrecallableMetadataHandler = (
+  handler: SingleMetadataHandler<any> | CollectionMetadataHandler<any[]> | UnrecallableMetadataHandler<any>
+): handler is UnrecallableMetadataHandler<any> => {
+  return UnrecallableMetadataKey in handler && handler[UnrecallableMetadataKey] === true;
 };
 
 //#region Created By
@@ -968,11 +989,178 @@ const ZImageShift: SingleMetadataHandler<number | null> = {
   },
   i18nKey: 'metadata.zImageShift',
   LabelComponent: MetadataLabel,
-  ValueComponent: ({ value }: SingleMetadataValueProps<number | null>) => (
-    <MetadataPrimitiveValue value={value ?? 'Auto'} />
-  ),
+  ValueComponent: ({ value }: SingleMetadataValueProps<number | null>) => {
+    const { t } = useTranslation();
+    return <MetadataPrimitiveValue value={value ?? t('common.auto')} />;
+  },
 };
 //#endregion ZImageShift
+
+//#region Ideogram4SamplerPreset
+const Ideogram4SamplerPreset: SingleMetadataHandler<ParameterIdeogram4SamplerPreset> = {
+  [SingleMetadataKey]: true,
+  type: 'Ideogram4SamplerPreset',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'ideogram4_sampler_preset');
+    const parsed = zParameterIdeogram4SamplerPreset.parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    // Only recall onto an Ideogram 4 model so we don't set this (otherwise hidden) field for other bases.
+    if (selectBase(store.getState()) !== 'ideogram-4') {
+      return;
+    }
+    store.dispatch(setIdeogram4SamplerPreset(value));
+  },
+  i18nKey: 'parameters.samplerPreset',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ParameterIdeogram4SamplerPreset>) => (
+    <MetadataPrimitiveValue value={value} />
+  ),
+};
+//#endregion Ideogram4SamplerPreset
+
+//#region Ideogram4Steps
+// Optional override of the preset step count. The graph writes 'auto' (sentinel) when unset; recall
+// maps that back to null (= use preset). Only recalled onto an Ideogram 4 model.
+const Ideogram4Steps: SingleMetadataHandler<number | null> = {
+  [SingleMetadataKey]: true,
+  type: 'Ideogram4Steps',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'ideogram4_steps');
+    if (raw === undefined) {
+      return Promise.reject();
+    }
+    if (raw === null || raw === 'auto') {
+      return Promise.resolve(null);
+    }
+    // Backend requires steps >= 2; refuse a stale/out-of-range recalled value instead of recalling it.
+    return Promise.resolve(z.number().int().min(2).max(100).parse(raw));
+  },
+  recall: (value, store) => {
+    if (selectBase(store.getState()) !== 'ideogram-4') {
+      return;
+    }
+    store.dispatch(setIdeogram4Steps(value));
+  },
+  i18nKey: 'parameters.steps',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<number | null>) => {
+    const { t } = useTranslation();
+    return <MetadataPrimitiveValue value={value ?? t('common.auto')} />;
+  },
+};
+//#endregion Ideogram4Steps
+
+//#region Ideogram4GuidanceScale
+const Ideogram4GuidanceScale: SingleMetadataHandler<number | null> = {
+  [SingleMetadataKey]: true,
+  type: 'Ideogram4GuidanceScale',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'ideogram4_guidance_scale');
+    if (raw === undefined) {
+      return Promise.reject();
+    }
+    if (raw === null || raw === 'auto') {
+      return Promise.resolve(null);
+    }
+    return Promise.resolve(z.number().min(1).max(20).parse(raw));
+  },
+  recall: (value, store) => {
+    if (selectBase(store.getState()) !== 'ideogram-4') {
+      return;
+    }
+    store.dispatch(setIdeogram4GuidanceScale(value));
+  },
+  i18nKey: 'parameters.guidance',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<number | null>) => {
+    const { t } = useTranslation();
+    return <MetadataPrimitiveValue value={value ?? t('common.auto')} />;
+  },
+};
+//#endregion Ideogram4GuidanceScale
+
+//#region Ideogram4Mu
+const Ideogram4Mu: SingleMetadataHandler<number | null> = {
+  [SingleMetadataKey]: true,
+  type: 'Ideogram4Mu',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'ideogram4_mu');
+    if (raw === undefined) {
+      return Promise.reject();
+    }
+    if (raw === null || raw === 'auto') {
+      return Promise.resolve(null);
+    }
+    return Promise.resolve(z.number().min(-4).max(4).parse(raw));
+  },
+  recall: (value, store) => {
+    if (selectBase(store.getState()) !== 'ideogram-4') {
+      return;
+    }
+    store.dispatch(setIdeogram4Mu(value));
+  },
+  i18nKey: 'parameters.shift',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<number | null>) => {
+    const { t } = useTranslation();
+    return <MetadataPrimitiveValue value={value ?? t('common.auto')} />;
+  },
+};
+//#endregion Ideogram4Mu
+
+//#region Ideogram4ColorPalette
+const Ideogram4ColorPalette: SingleMetadataHandler<string[]> = {
+  [SingleMetadataKey]: true,
+  type: 'Ideogram4ColorPalette',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'ideogram4_color_palette');
+    if (raw === undefined) {
+      return Promise.reject();
+    }
+    return Promise.resolve(z.array(z.string()).parse(raw));
+  },
+  recall: (value, store) => {
+    if (selectBase(store.getState()) !== 'ideogram-4') {
+      return;
+    }
+    store.dispatch(setIdeogram4ColorPalette(value));
+  },
+  i18nKey: 'parameters.colorPalette',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<string[]>) => (
+    <MetadataPrimitiveValue value={value.join(', ')} />
+  ),
+};
+//#endregion Ideogram4ColorPalette
+
+//#region Ideogram4Caption
+// For regional/structured prompts the value actually encoded by the model is this assembled JSON
+// caption, while `positive_prompt` holds the raw overall description (via the graph's decoy node).
+// Recalling it into the positive prompt round-trips: the graph builder detects a leading `{` and passes
+// the JSON through unchanged.
+const Ideogram4Caption: SingleMetadataHandler<string> = {
+  [SingleMetadataKey]: true,
+  type: 'Ideogram4Caption',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'ideogram4_caption');
+    if (raw === undefined) {
+      return Promise.reject();
+    }
+    return Promise.resolve(z.string().parse(raw));
+  },
+  recall: (value, store) => {
+    if (selectBase(store.getState()) !== 'ideogram-4') {
+      return;
+    }
+    store.dispatch(positivePromptChanged(value));
+  },
+  i18nKey: 'parameters.ideogram4Caption',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<string>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion Ideogram4Caption
 
 //#region RefinerModel
 const RefinerModel: SingleMetadataHandler<ParameterSDXLRefinerModel> = {
@@ -1180,6 +1368,27 @@ const Qwen3EncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
 };
 //#endregion Qwen3EncoderModel
 
+//#region T5EncoderModel
+const T5EncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
+  [SingleMetadataKey]: true,
+  type: 'T5EncoderModel',
+  parse: async (metadata, store) => {
+    const raw = getProperty(metadata, 't5_encoder');
+    const parsed = await parseModelIdentifier(raw, store, 't5_encoder');
+    assert(parsed.type === 't5_encoder');
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(t5EncoderModelSelected(value));
+  },
+  i18nKey: 'metadata.t5Encoder',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField>) => (
+    <MetadataPrimitiveValue value={`${value.name} (${value.base.toUpperCase()})`} />
+  ),
+};
+//#endregion T5EncoderModel
+
 //#region ZImageVAEModel
 const ZImageVAEModel: SingleMetadataHandler<ModelIdentifierField> = {
   [SingleMetadataKey]: true,
@@ -1278,29 +1487,6 @@ const AnimaQwen3EncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
   ),
 };
 //#endregion AnimaQwen3EncoderModel
-
-//#region AnimaT5EncoderModel
-const AnimaT5EncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
-  [SingleMetadataKey]: true,
-  type: 'AnimaT5EncoderModel',
-  parse: async (metadata, store) => {
-    const raw = getProperty(metadata, 't5_encoder');
-    const parsed = await parseModelIdentifier(raw, store, 't5_encoder');
-    assert(parsed.type === 't5_encoder');
-    const base = selectBase(store.getState());
-    assert(base === 'anima', 'AnimaT5EncoderModel handler only works with Anima models');
-    return Promise.resolve(parsed);
-  },
-  recall: (value, store) => {
-    store.dispatch(animaT5EncoderModelSelected(value));
-  },
-  i18nKey: 'metadata.t5Encoder',
-  LabelComponent: MetadataLabel,
-  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField>) => (
-    <MetadataPrimitiveValue value={`${value.name} (${value.base.toUpperCase()})`} />
-  ),
-};
-//#endregion AnimaT5EncoderModel
 
 //#region KleinVAEModel
 const KleinVAEModel: SingleMetadataHandler<ModelIdentifierField> = {
@@ -1750,11 +1936,11 @@ export const ImageMetadataHandlers = {
   Scheduler,
   VAEModel,
   Qwen3EncoderModel,
+  T5EncoderModel,
   ZImageVAEModel,
   ZImageQwen3SourceModel,
   AnimaVAEModel,
   AnimaQwen3EncoderModel,
-  AnimaT5EncoderModel,
   KleinVAEModel,
   KleinQwen3EncoderModel,
   ZImageSeedVarianceEnabled,
@@ -1766,6 +1952,12 @@ export const ImageMetadataHandlers = {
   QwenImageQuantization,
   QwenImageShift,
   ZImageShift,
+  Ideogram4SamplerPreset,
+  Ideogram4Steps,
+  Ideogram4GuidanceScale,
+  Ideogram4Mu,
+  Ideogram4ColorPalette,
+  Ideogram4Caption,
   LoRAs,
   CanvasLayers,
   RefImages,
@@ -1820,7 +2012,7 @@ const recallByHandler = async (arg: {
   let didRecall = false;
 
   try {
-    const value = await handler.parse(metadata, store);
+    const value = await parseMetadataHandler(metadata, handler, store);
     handler.recall(value, store);
     didRecall = true;
   } catch {
@@ -1869,7 +2061,7 @@ const recallByHandlers = async (arg: {
 
   for (const handler of sortedHandlers) {
     try {
-      const value = await handler.parse(metadata, store);
+      const value = await parseMetadataHandler(metadata, handler, store);
       handler.recall(value, store);
       recalled.set(handler, value);
     } catch {
@@ -1917,7 +2109,7 @@ const hasMetadataByHandlers = async (arg: {
   const { metadata, handlers, store, require } = arg;
   for (const handler of handlers) {
     try {
-      await handler.parse(metadata, store);
+      await parseMetadataHandler(metadata, handler, store);
       if (require === 'some') {
         return true;
       }
@@ -1927,7 +2119,7 @@ const hasMetadataByHandlers = async (arg: {
       }
     }
   }
-  return true;
+  return require === 'all';
 };
 
 const recallImageDimensions = async (metadata: unknown, store: AppStore) => {
@@ -1977,21 +2169,26 @@ export function useSingleMetadataDatum<T>(metadata: unknown, handler: SingleMeta
     error: null,
   }));
 
-  const parse = useCallback(
-    async (metadata: unknown) => {
-      try {
-        const value = await handler.parse(metadata, store);
-        setData(buildParsedSuccessData(value));
-      } catch (error) {
-        setData(buildParsedErrorData(WrappedError.wrap(error)));
-      }
-    },
-    [handler, store]
-  );
-
   useEffect(() => {
-    parse(metadata);
-  }, [metadata, parse]);
+    let isActive = true;
+
+    void parseMetadataHandler(metadata, handler, store).then(
+      (value) => {
+        if (isActive) {
+          setData(buildParsedSuccessData(value));
+        }
+      },
+      (error) => {
+        if (isActive) {
+          setData(buildParsedErrorData(WrappedError.wrap(error)));
+        }
+      }
+    );
+
+    return () => {
+      isActive = false;
+    };
+  }, [metadata, handler, store]);
 
   const recall = useCallback(
     (value: T) => {
@@ -2007,21 +2204,26 @@ export function useCollectionMetadataDatum<T extends any[]>(metadata: unknown, h
   const store = useAppStore();
   const [data, setData] = useState<Data<T>>(buildUnparsedData);
 
-  const parse = useCallback(
-    async (metadata: unknown) => {
-      try {
-        const value = await handler.parse(metadata, store);
-        setData(buildParsedSuccessData(value));
-      } catch (error) {
-        setData(buildParsedErrorData(WrappedError.wrap(error)));
-      }
-    },
-    [handler, store]
-  );
-
   useEffect(() => {
-    parse(metadata);
-  }, [metadata, parse]);
+    let isActive = true;
+
+    void parseMetadataHandler(metadata, handler, store).then(
+      (value) => {
+        if (isActive) {
+          setData(buildParsedSuccessData(value));
+        }
+      },
+      (error) => {
+        if (isActive) {
+          setData(buildParsedErrorData(WrappedError.wrap(error)));
+        }
+      }
+    );
+
+    return () => {
+      isActive = false;
+    };
+  }, [metadata, handler, store]);
 
   const recallAll = useCallback(
     (values: T) => {
@@ -2044,21 +2246,26 @@ export function useUnrecallableMetadataDatum<T>(metadata: unknown, handler: Unre
   const store = useAppStore();
   const [data, setData] = useState<Data<T>>(buildUnparsedData);
 
-  const parse = useCallback(
-    async (metadata: unknown) => {
-      try {
-        const value = await handler.parse(metadata, store);
-        setData(buildParsedSuccessData(value));
-      } catch (error) {
-        setData(buildParsedErrorData(WrappedError.wrap(error)));
-      }
-    },
-    [handler, store]
-  );
-
   useEffect(() => {
-    parse(metadata);
-  }, [metadata, parse]);
+    let isActive = true;
+
+    void parseMetadataHandler(metadata, handler, store).then(
+      (value) => {
+        if (isActive) {
+          setData(buildParsedSuccessData(value));
+        }
+      },
+      (error) => {
+        if (isActive) {
+          setData(buildParsedErrorData(WrappedError.wrap(error)));
+        }
+      }
+    );
+
+    return () => {
+      isActive = false;
+    };
+  }, [metadata, handler, store]);
 
   return { data };
 }

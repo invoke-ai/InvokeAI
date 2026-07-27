@@ -6,13 +6,18 @@ import { extractMessageFromAssertionError } from 'common/util/extractMessageFrom
 import { withResult, withResultAsync } from 'common/util/result';
 import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { positivePromptAddedToHistory, selectPositivePrompt } from 'features/controlLayers/store/paramsSlice';
+import {
+  positivePromptAddedToHistory,
+  selectNegativePrompt,
+  selectPositivePrompt,
+} from 'features/controlLayers/store/paramsSlice';
 import type { BaseModelType } from 'features/nodes/types/common';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildAnimaGraph } from 'features/nodes/util/graph/generation/buildAnimaGraph';
 import { buildCogView4Graph } from 'features/nodes/util/graph/generation/buildCogView4Graph';
 import { buildExternalGraph } from 'features/nodes/util/graph/generation/buildExternalGraph';
 import { buildFLUXGraph } from 'features/nodes/util/graph/generation/buildFLUXGraph';
+import { buildIdeogram4Graph } from 'features/nodes/util/graph/generation/buildIdeogram4Graph';
 import { buildQwenImageGraph } from 'features/nodes/util/graph/generation/buildQwenImageGraph';
 import { buildSD1Graph } from 'features/nodes/util/graph/generation/buildSD1Graph';
 import { buildSD3Graph } from 'features/nodes/util/graph/generation/buildSD3Graph';
@@ -65,6 +70,8 @@ const enqueueCanvas = async (store: AppStore, canvasManager: CanvasManager, prep
         return await buildQwenImageGraph(graphBuilderArg);
       case 'z-image':
         return await buildZImageGraph(graphBuilderArg);
+      case 'ideogram-4':
+        return await buildIdeogram4Graph(graphBuilderArg);
       case 'external':
         return await buildExternalGraph(graphBuilderArg);
       case 'anima':
@@ -95,7 +102,7 @@ const enqueueCanvas = async (store: AppStore, canvasManager: CanvasManager, prep
     return;
   }
 
-  const { g, seed, positivePrompt } = buildGraphResult.value;
+  const { g, seed, positivePrompt, negativePrompt } = buildGraphResult.value;
 
   const prepareBatchResult = withResult(() =>
     prepareLinearUIBatch({
@@ -105,6 +112,7 @@ const enqueueCanvas = async (store: AppStore, canvasManager: CanvasManager, prep
       prepend,
       seedNode: seed,
       positivePromptNode: positivePrompt,
+      negativePromptNode: negativePrompt,
       origin: 'canvas',
       destination,
     })
@@ -127,7 +135,12 @@ const enqueueCanvas = async (store: AppStore, canvasManager: CanvasManager, prep
   const enqueueResult = await req.unwrap();
 
   // Push to prompt history on successful enqueue
-  dispatch(positivePromptAddedToHistory(selectPositivePrompt(state)));
+  dispatch(
+    positivePromptAddedToHistory({
+      positivePrompt: selectPositivePrompt(state),
+      negativePrompt: selectNegativePrompt(state),
+    })
+  );
 
   return { batchConfig, enqueueResult };
 };

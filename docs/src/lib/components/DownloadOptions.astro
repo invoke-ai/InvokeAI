@@ -1,5 +1,5 @@
 ---
-import { LinkCard, Icon, LinkButton } from '@astrojs/starlight/components';
+import { CardGrid, LinkCard, Icon, LinkButton } from '@astrojs/starlight/components';
 import { type StarlightIcon } from '@astrojs/starlight/types';
 import { withBase } from '../base-path';
 
@@ -49,6 +49,24 @@ const manualDownloadOptions = {
     href: withBase('/configuration/docker/', import.meta.env.BASE_URL),
   },
 };
+
+const hostedOptions = {
+  aibadgr: {
+     headline: 'Run on AI Badgr',
+     description: 'Run on the AI Badgr hosted GPU service',
+     href: 'https://aibadgr.com/gpu/launch?template=invokeai',
+   },
+  runpod: {
+     headline: 'Run on RunPod',
+     description: 'Run on the RunPod hosted GPU service',
+     href: 'https://www.runpod.io/blog/invoke-ai-stable-diffusion-runpod-nfz18',
+   },
+  railway: {
+     headline: 'Run on Railway',
+     description: 'Run on the Railway hosted GPU service',
+     href: 'https://railway.com/deploy/invokeai',
+   },
+};
 ---
 
 <div class="download-options">
@@ -92,6 +110,20 @@ const manualDownloadOptions = {
       ))
     }
   </div>
+
+  <!-- Hosted Options -->
+  <div class="download-options__hosted">
+    <h3>Hosted Options</h3>
+    <p>For users who want to run Invoke on a hosted GPU service instead of their own hardware.</p>
+
+    <CardGrid>
+      {
+        Object.entries(hostedOptions).map(([key, { headline, href, description }]) => (
+          <LinkCard title={headline} {href} {description} />
+        ))
+      }
+    </CardGrid>
+  </div>
 </div>
 
 <style is:global>
@@ -131,6 +163,23 @@ const manualDownloadOptions = {
       height: 1px;
       background: var(--sl-color-hairline);
       z-index: 0;
+    }
+  }
+
+  .download-options__hosted {
+    margin: 0;
+    border-radius: var(--radius);
+    background: var(--sl-color-black);
+    border: 1px solid var(--sl-color-gray-5);
+    padding: 1.5rem;
+
+    h3 {
+      margin-top: 0;
+    }
+
+    > p {
+      margin-top: 0.5rem;
+      color: var(--sl-color-gray-2);
     }
   }
 
