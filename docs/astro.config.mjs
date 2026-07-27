@@ -8,6 +8,7 @@ import starlightLlmsText from 'starlight-llms-txt';
 import starlightChangelogs from 'starlight-changelogs';
 import { rehypePrefixBaseToRootLinks } from './plugins/rehype-prefix-base-to-root-links.mjs';
 import { remarkLocalizeContent } from './plugins/remark-localize-content.mjs';
+import { LOCALE_EXEMPT_PATHS } from './src/lib/link-localization.mjs';
 import starlightContextualMenu from 'starlight-contextual-menu';
 
 // Configs
@@ -98,8 +99,10 @@ export default defineConfig({
         starlightLinksValidator({
           errorOnRelativeLinks: false,
           errorOnLocalLinks: false,
-          // The validator only knows content collection routes, not custom Astro pages.
-          exclude: ['/download/'],
+          // The validator only knows content collection routes, not the custom Astro pages in
+          // src/pages/. Derived from the shared exemption list so a new custom page only has to
+          // be registered in one place, and base-aware because links are emitted with the base.
+          exclude: LOCALE_EXEMPT_PATHS.flatMap((path) => [`${base}${path}`, `${base}${path}/`]),
         }),
         starlightLlmsText(),
         starlightChangelogs(),

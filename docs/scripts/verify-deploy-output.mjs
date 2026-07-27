@@ -13,8 +13,14 @@ const expectations = [
       `href="${withBase('/_astro/')}`,
       `src="${withBase('/_astro/')}`,
       `href="${withBase('/start-here/installation/')}`,
+      // The "Get Invoke" button is a root-relative href on an MDX component rather than a plain
+      // markdown link, which is an easy way to lose the base prefix.
+      `href="${withBase('/download/')}"`,
     ],
-    excludes: deployTarget === 'custom' ? ['href="/InvokeAI/', 'src="/InvokeAI/'] : ['href="/_astro/', 'src="/_astro/'],
+    excludes:
+      deployTarget === 'custom'
+        ? ['href="/InvokeAI/', 'src="/InvokeAI/']
+        : ['href="/_astro/', 'src="/_astro/', 'href="/download/"'],
   },
   {
     file: 'contributing/index.html',
