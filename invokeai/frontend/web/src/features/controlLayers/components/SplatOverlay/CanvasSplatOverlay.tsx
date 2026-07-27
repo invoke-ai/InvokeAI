@@ -14,8 +14,10 @@ import {
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { rasterLayerAdded } from 'features/controlLayers/store/canvasSlice';
 import { imageDTOToImageObject } from 'features/controlLayers/store/util';
+import { toast } from 'features/toast/toast';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import { lazy, memo, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { uploadImage } from 'services/api/endpoints/images';
 
 const log = logger('canvas');
@@ -39,20 +41,21 @@ const CORNERS: { corner: RectCorner; cursor: string }[] = [
 
 type RotateMode = 'orbit' | 'object';
 
+// i18n keys, translated at render.
 const CONTROL_HINTS: Record<RotateMode, string[]> = {
   orbit: [
-    'Drag to orbit view',
-    'Right-drag to pan (moves the rotation point)',
-    'Scroll to zoom',
-    'Edges to move',
-    'Corners to resize',
+    'controlLayers.convertTo3D.hintDragOrbit',
+    'controlLayers.convertTo3D.hintRightDragPan',
+    'controlLayers.convertTo3D.hintScrollZoom',
+    'controlLayers.convertTo3D.hintEdgesMove',
+    'controlLayers.convertTo3D.hintCornersResize',
   ],
   object: [
-    'Drag to rotate object',
-    'Right-drag to pan (moves the rotation point)',
-    'Scroll to zoom',
-    'Edges to move',
-    'Corners to resize',
+    'controlLayers.convertTo3D.hintDragRotate',
+    'controlLayers.convertTo3D.hintRightDragPan',
+    'controlLayers.convertTo3D.hintScrollZoom',
+    'controlLayers.convertTo3D.hintEdgesMove',
+    'controlLayers.convertTo3D.hintCornersResize',
   ],
 };
 
@@ -72,6 +75,7 @@ type DragState = {
  * the current framing to a new raster layer at the current rect.
  */
 export const CanvasSplatOverlay = memo(() => {
+  const { t } = useTranslation();
   const canvasManager = useCanvasManager();
   const state = useStore($splatOverlay);
   const stageAttrs = useStore(canvasManager.stage.$stageAttrs);
@@ -187,10 +191,11 @@ export const CanvasSplatOverlay = memo(() => {
         clearSplatOverlay();
       } catch (error) {
         log.error({ error: String(error) }, 'Failed to commit 3D layer to canvas');
+        toast({ status: 'error', title: t('controlLayers.convertTo3D.commitError') });
         setIsCommitting(false);
       }
     })();
-  }, [dispatch]);
+  }, [dispatch, t]);
 
   // This component stays mounted across open/close (it just renders null when closed), so per-session UI
   // state would persist between sessions. Reset it whenever we're not in an active "ready" session — i.e.
@@ -346,23 +351,23 @@ export const CanvasSplatOverlay = memo(() => {
           <Flex gap={2} alignItems="center" px={1}>
             <Spinner size="sm" />
             <Text fontSize="sm" whiteSpace="nowrap">
-              Generating 3D…
+              {t('controlLayers.convertTo3D.generating')}
             </Text>
           </Flex>
         ) : (
           <>
             <ButtonGroup isAttached size="sm" flexShrink={0}>
               <Button colorScheme={rotateMode === 'orbit' ? 'invokeBlue' : 'base'} onClick={onOrbitMode}>
-                Orbit view
+                {t('controlLayers.convertTo3D.orbitView')}
               </Button>
               <Button colorScheme={rotateMode === 'object' ? 'invokeBlue' : 'base'} onClick={onObjectMode}>
-                Rotate object
+                {t('controlLayers.convertTo3D.rotateObject')}
               </Button>
             </ButtonGroup>
             <Flex px={1} columnGap={1.5} flexWrap="wrap" justifyContent="center">
               {CONTROL_HINTS[rotateMode].map((hint, i) => (
                 <Text key={hint} fontSize="xs" color="base.300" whiteSpace="nowrap">
-                  {hint}
+                  {t(hint)}
                   {i < CONTROL_HINTS[rotateMode].length - 1 ? ' ·' : ''}
                 </Text>
               ))}
@@ -371,7 +376,7 @@ export const CanvasSplatOverlay = memo(() => {
         )}
         <Flex gap={2} flexShrink={0}>
           <Button size="sm" onClick={clearSplatOverlay} isDisabled={isCommitting}>
-            Cancel
+            {t('controlLayers.convertTo3D.cancel')}
           </Button>
           <Button
             size="sm"
@@ -380,7 +385,7 @@ export const CanvasSplatOverlay = memo(() => {
             isLoading={isCommitting}
             isDisabled={state.status !== 'ready'}
           >
-            Commit to layer
+            {t('controlLayers.convertTo3D.commitToLayer')}
           </Button>
         </Flex>
       </Flex>

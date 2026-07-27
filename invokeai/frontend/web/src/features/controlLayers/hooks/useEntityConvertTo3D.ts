@@ -1,9 +1,9 @@
 import { NUMPY_RAND_MAX, NUMPY_RAND_MIN } from 'app/constants';
-import { logger } from 'app/logging/logger';
 import randomInt from 'common/util/randomInt';
 import { withResultAsync } from 'common/util/result';
 import {
   $splatOverlay,
+  applyConvertTo3DResult,
   clearSplatGenerationAbort,
   clearSplatOverlay,
   setSplatGenerationAbort,
@@ -18,8 +18,6 @@ import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types'
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { useCallback, useMemo } from 'react';
 import { buildV1Url } from 'services/api';
-
-const log = logger('canvas');
 
 /**
  * Trigger for the "Convert to 3D" raster-layer action: rasterizes the layer, runs the `image_to_3d`
@@ -90,24 +88,7 @@ export const useEntityConvertTo3D = (entityIdentifier: CanvasEntityIdentifier | 
         });
 
         clearSplatGenerationAbort(controller);
-
-        // Every write below is gated on the overlay still showing *this* session — the user may have
-        // cancelled (state null) or started another conversion (different sessionId) while we generated.
-        const current = $splatOverlay.get();
-        const isCurrentSession = current?.status === 'loading' && current.sessionId === sessionId;
-
-        if (result.isErr()) {
-          log.error({ error: String(result.error) }, 'Failed to convert image to 3D');
-          if (isCurrentSession) {
-            clearSplatOverlay();
-          }
-          return;
-        }
-
-        if (isCurrentSession) {
-          // Use the overlay's *current* rect, not the one captured at start — the frame is movable while loading.
-          $splatOverlay.set({ status: 'ready', sessionId, assetUrl: result.value, rect: current.rect });
-        }
+        applyConvertTo3DResult(result, sessionId);
       })();
     },
     [isDisabled, entityIdentifier, canvasManager]

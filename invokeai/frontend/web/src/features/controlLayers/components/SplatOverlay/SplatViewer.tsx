@@ -1,6 +1,9 @@
 import { Box } from '@invoke-ai/ui-library';
 import { logger } from 'app/logging/logger';
 import { SplatScene } from 'features/controlLayers/components/SplatOverlay/splatScene';
+import { clearSplatOverlay } from 'features/controlLayers/components/SplatOverlay/state';
+import { toast } from 'features/toast/toast';
+import { t } from 'i18next';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 
 const log = logger('canvas');
@@ -28,12 +31,21 @@ const SplatViewer = ({ assetUrl, stageScale, onSceneReady }: Props) => {
       return;
     }
     const scene = new SplatScene(container);
+    let unmounted = false;
     setScene(scene);
     onSceneReady(scene);
     scene.loadFromUrl(assetUrl).catch((error: unknown) => {
       log.error({ error: String(error) }, 'Failed to load splat');
+      // A rejection after unmount means the session was already cancelled/replaced — stay silent.
+      // Otherwise the frame would just sit blank, so tell the user and close the dead session.
+      if (unmounted) {
+        return;
+      }
+      toast({ status: 'error', title: t('controlLayers.convertTo3D.loadError') });
+      clearSplatOverlay();
     });
     return () => {
+      unmounted = true;
       onSceneReady(null);
       setScene(null);
       scene.dispose();

@@ -3,9 +3,11 @@ import { SubMenuButtonContent, useSubMenu } from 'common/hooks/useSubMenu';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { useEntityConvertTo3D } from 'features/controlLayers/hooks/useEntityConvertTo3D';
 import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PiCubeFill } from 'react-icons/pi';
 
 export const CanvasEntityMenuItemsConvertTo3D = memo(() => {
+  const { t } = useTranslation();
   const subMenu = useSubMenu();
   const entityIdentifier = useEntityIdentifierContext();
   const { isDisabled, start } = useEntityConvertTo3D(entityIdentifier);
@@ -16,14 +18,14 @@ export const CanvasEntityMenuItemsConvertTo3D = memo(() => {
     <MenuItem {...subMenu.parentMenuItemProps} icon={<PiCubeFill />} isDisabled={isDisabled}>
       <Menu {...subMenu.menuProps}>
         <MenuButton {...subMenu.menuButtonProps}>
-          <SubMenuButtonContent label="Convert to 3D" />
+          <SubMenuButtonContent label={t('controlLayers.convertTo3D.convertTo3D')} />
         </MenuButton>
         <MenuList {...subMenu.menuListProps}>
           <MenuItem onClick={convertIsolated} icon={<PiCubeFill />} isDisabled={isDisabled}>
-            Isolate subject
+            {t('controlLayers.convertTo3D.isolateSubject')}
           </MenuItem>
           <MenuItem onClick={convertFullImage} icon={<PiCubeFill />} isDisabled={isDisabled}>
-            Keep background
+            {t('controlLayers.convertTo3D.keepBackground')}
           </MenuItem>
         </MenuList>
       </Menu>
