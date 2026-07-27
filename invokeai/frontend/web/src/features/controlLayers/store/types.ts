@@ -15,6 +15,7 @@ import {
   zParameterFluxDypeScale,
   zParameterFluxScheduler,
   zParameterGuidance,
+  zParameterIdeogram4SamplerPreset,
   zParameterImageDimension,
   zParameterMaskBlurMethod,
   zParameterModel,
@@ -240,6 +241,8 @@ const zCanvasBrushLineWithPressureState = z.object({
    */
   points: zPointsWithPressure,
   color: zRgbaColor,
+  pressureAffectsWidth: z.boolean().default(true),
+  pressureAffectsOpacity: z.boolean().default(false),
   clip: zRect.nullable(),
   globalCompositeOperation: z.string().optional(),
 });
@@ -265,6 +268,7 @@ const zCanvasEraserLineWithPressureState = z.object({
    * Points with pressure are in the format [x1, y1, pressure1, x2, y2, pressure2, ...]
    */
   points: zPointsWithPressure,
+  pressureAffectsWidth: z.boolean().default(true),
   clip: zRect.nullable(),
 });
 export type CanvasEraserLineWithPressureState = z.infer<typeof zCanvasEraserLineWithPressureState>;
@@ -861,6 +865,17 @@ export const zParamsState = z.object({
   fluxDypeExponent: zParameterFluxDypeExponent,
   zImageScheduler: zParameterZImageScheduler,
   zImageShift: z.number().min(0).max(3).nullable(),
+  // Defaults make these resilient to rehydration of persisted state saved before the fields existed.
+  ideogram4SamplerPreset: zParameterIdeogram4SamplerPreset.default('V4_QUALITY_48'),
+  // Optional advanced overrides of the Ideogram 4 sampler preset (null = use the preset's value).
+  // Backend requires steps >= 2 (a polish and a main step). `.catch(null)` normalizes a stale/invalid
+  // persisted or recalled value (e.g. 1 from an older build) to null (= use preset) instead of letting an
+  // out-of-range value reach the graph or breaking the whole persisted params slice on rehydrate.
+  ideogram4Steps: z.number().int().min(2).max(100).nullable().catch(null).default(null),
+  ideogram4GuidanceScale: z.number().min(1).max(20).nullable().default(null),
+  ideogram4Mu: z.number().min(-4).max(4).nullable().default(null),
+  // Hex colors (#RRGGBB) injected into the JSON caption's style_description.color_palette.
+  ideogram4ColorPalette: z.array(z.string()).default([]),
   upscaleScheduler: zParameterScheduler,
   upscaleCfgScale: zParameterCFGScale,
   seed: zParameterSeed,
@@ -951,6 +966,11 @@ export const getInitialParamsState = (): ParamsState => ({
   fluxDypeExponent: 2.0,
   zImageScheduler: 'euler',
   zImageShift: null,
+  ideogram4SamplerPreset: 'V4_QUALITY_48',
+  ideogram4Steps: null,
+  ideogram4GuidanceScale: null,
+  ideogram4Mu: null,
+  ideogram4ColorPalette: [],
   upscaleScheduler: 'kdpm_2',
   upscaleCfgScale: 2,
   seed: 0,

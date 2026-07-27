@@ -20,6 +20,7 @@ const WARNINGS = {
   RG_REFERENCE_IMAGES_NOT_SUPPORTED: 'controlLayers.warnings.rgReferenceImagesNotSupported',
   RG_AUTO_NEGATIVE_NOT_SUPPORTED: 'controlLayers.warnings.rgAutoNegativeNotSupported',
   RG_NO_REGION: 'controlLayers.warnings.rgNoRegion',
+  IDEOGRAM4_TXT2IMG_ONLY: 'controlLayers.warnings.ideogram4Txt2ImgOnly',
   IP_ADAPTER_NO_MODEL_SELECTED: 'controlLayers.warnings.ipAdapterNoModelSelected',
   IP_ADAPTER_INCOMPATIBLE_BASE_MODEL: 'controlLayers.warnings.ipAdapterIncompatibleBaseModel',
   IP_ADAPTER_NO_IMAGE_SELECTED: 'controlLayers.warnings.ipAdapterNoImageSelected',
@@ -98,6 +99,21 @@ export const getRegionalGuidanceWarnings = (
       }
       if (entity.autoNegative) {
         warnings.push(WARNINGS.RG_AUTO_NEGATIVE_NOT_SUPPORTED);
+      }
+    }
+
+    if (model.base === 'ideogram-4') {
+      // Ideogram 4 regions contribute only a positive prompt + bbox to the structured caption
+      // (see collectIdeogram4PromptInputs). Negative prompts, auto-negative and reference images are
+      // silently dropped, so warn they are unsupported rather than letting the layer look effective.
+      if (entity.negativePrompt !== null) {
+        warnings.push(WARNINGS.RG_NEGATIVE_PROMPT_NOT_SUPPORTED);
+      }
+      if (entity.autoNegative) {
+        warnings.push(WARNINGS.RG_AUTO_NEGATIVE_NOT_SUPPORTED);
+      }
+      if (entity.referenceImages.length > 0) {
+        warnings.push(WARNINGS.RG_REFERENCE_IMAGES_NOT_SUPPORTED);
       }
     }
 
@@ -240,23 +256,32 @@ export const getControlLayerWarnings = (
 };
 
 export const getRasterLayerWarnings = (
-  _entity: CanvasRasterLayerState,
-  _model: MainOrExternalModelConfig | null | undefined
+  entity: CanvasRasterLayerState,
+  model: MainOrExternalModelConfig | null | undefined
 ): WarningTKey[] => {
   const warnings: WarningTKey[] = [];
 
-  // There are no warnings at the moment for raster layers.
+  // Ideogram 4 is text-to-image only (buildIdeogram4Graph asserts txt2img). A raster layer with content
+  // makes the compositor pick img2img/outpaint, which the graph builder rejects only at enqueue — warn
+  // here so canvas readiness blocks it up front.
+  if (model?.base === 'ideogram-4' && entity.objects.length > 0) {
+    warnings.push(WARNINGS.IDEOGRAM4_TXT2IMG_ONLY);
+  }
 
   return warnings;
 };
 
 export const getInpaintMaskWarnings = (
-  _entity: CanvasInpaintMaskState,
-  _model: MainOrExternalModelConfig | null | undefined
+  entity: CanvasInpaintMaskState,
+  model: MainOrExternalModelConfig | null | undefined
 ): WarningTKey[] => {
   const warnings: WarningTKey[] = [];
 
-  // There are no warnings at the moment for inpaint masks.
+  // Ideogram 4 is text-to-image only; an inpaint mask with content makes the compositor pick inpaint,
+  // which the Ideogram graph builder cannot handle. Warn so canvas readiness blocks it before enqueue.
+  if (model?.base === 'ideogram-4' && entity.objects.length > 0) {
+    warnings.push(WARNINGS.IDEOGRAM4_TXT2IMG_ONLY);
+  }
 
   return warnings;
 };
