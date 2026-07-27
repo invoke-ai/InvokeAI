@@ -226,11 +226,12 @@ def test_eviction_coordinates_across_device_caches(mock_logger):
 
 
 def test_contended_peer_reconciles_budget_after_its_operation_completes(mock_logger):
-    """A peer whose cache lock is briefly held at the moment of a cross-cache eviction request
-    must not leave the budget exceeded indefinitely: the request is recorded on the skipped peer,
-    and the peer sheds its unlocked entries as soon as its current (lock-holding) operation
-    completes — every public cache operation releases the lock through the reconcile hook
-    (JPPhoto merge blocker, 2026-07-22)."""
+    """A peer whose cache lock is held at the moment of a cross-cache eviction request must not
+    leave the budget exceeded indefinitely: the request is recorded on the busy peer, and the
+    peer sheds its unlocked entries as soon as its current (lock-holding) operation completes —
+    in production every operation releases the lock through the synchronized-decorator reconcile
+    hook, which the holder thread emulates here. No other cache access may be needed to trigger
+    the reconcile (JPPhoto merge blocker, 2026-07-22)."""
     import threading
 
     store = SharedCpuWeightsStore()
@@ -252,6 +253,8 @@ def test_contended_peer_reconciles_budget_after_its_operation_completes(mock_log
             with cache_b._lock:
                 holding.set()
                 assert release.wait(timeout=10)
+            # The synchronized-decorator hook that ends every real cache operation:
+            cache_b._reconcile_budget_if_pending()
 
         holder = threading.Thread(target=hold_lock)
         holder.start()
@@ -263,13 +266,71 @@ def test_contended_peer_reconciles_budget_after_its_operation_completes(mock_log
         assert "shared" in cache_b._cached_models
         assert budget.total_in_use() == 2 * S
 
+        # b's operation completes; its lock-release hook must reconcile without any
+        # further access to cache_b.
         release.set()
         holder.join(timeout=10)
 
-        # b's next lock-releasing operation (in production: the operation that was holding
-        # the lock, which always releases via the synchronized hook) triggers the reconcile.
-        _ = cache_b.stats
+        assert "shared" not in cache_b._cached_models
+        assert store.refcount("shared") == 0
+        assert budget.total_in_use() == S
+        assert budget.total_in_use() <= budget.max_bytes
+    finally:
+        cache_a.shutdown()
+        cache_b.shutdown()
 
+
+def test_reconcile_request_after_peer_finished_operation_is_not_lost(mock_logger):
+    """Lost-wakeup regression: the peer's busy operation can release its lock and run its
+    (no-op — flag not yet set) reconcile hook BEFORE the requester records the reconcile
+    request. If the peer then stays idle, no future lock release exists to honor the request,
+    so request_budget_reconcile must attempt the reconcile inline. The interleaving is forced
+    by delaying the request until the peer's operation has fully finished, and the budget must
+    return under its cap with no subsequent access to the peer cache (JPPhoto merge blocker,
+    2026-07-25)."""
+    import threading
+
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=int(S * 1.4), shared_store=store)
+    cache_a = _make_cache(store, budget, mock_logger)
+    cache_b = _make_cache(store, budget, mock_logger)
+    try:
+        cache_a.put("shared", DummyModule())
+        cache_b.put("shared", DummyModule())
+        assert budget.total_in_use() == S
+
+        holding = threading.Event()
+        release = threading.Event()
+
+        def hold_lock() -> None:
+            # b's "busy operation": holds the lock (so evict_unlocked_for_peer fails), then
+            # releases and runs the synchronized-decorator hook — with the request flag still
+            # unset, a no-op. After this thread finishes, b is idle forever.
+            with cache_b._lock:
+                holding.set()
+                assert release.wait(timeout=10)
+            cache_b._reconcile_budget_if_pending()
+
+        holder = threading.Thread(target=hold_lock)
+        holder.start()
+        assert holding.wait(timeout=10)
+
+        # Delay the reconcile request until b's operation has completely finished (lock
+        # released, hook run, thread dead) — the exact window in which a flag-only request
+        # would be lost.
+        original_request = cache_b.request_budget_reconcile
+
+        def request_after_peer_finished() -> None:
+            release.set()
+            holder.join(timeout=10)
+            assert not holder.is_alive()
+            original_request()
+
+        cache_b.request_budget_reconcile = request_after_peer_finished  # type: ignore[method-assign]
+
+        cache_a.put("new", DummyModule())
+
+        # No subsequent cache access: the request itself must have reconciled the budget.
         assert "shared" not in cache_b._cached_models
         assert store.refcount("shared") == 0
         assert budget.total_in_use() == S

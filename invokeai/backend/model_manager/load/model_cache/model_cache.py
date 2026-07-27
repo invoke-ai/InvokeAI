@@ -526,6 +526,17 @@ class ModelCache:
             f"Added model {key} (Type: {model.__class__.__name__}, Wrap mode: {wrapped_model.__class__.__name__}, Model size: {size / MB:.2f}MB)"
         )
 
+        if self._ram_budget is not None and self._ram_budget.available() < 0:
+            # Admission left the shared budget exceeded: make-room above exhausted this cache's
+            # own evictable entries, and best-effort peer eviction fell short (a peer's lock was
+            # contended, or the remaining RAM is held by locked in-use entries). Record a
+            # reconcile request on every peer so each sheds unlocked entries as soon as it can —
+            # the cap must not stay exceeded merely because a peer was busy at the moment we
+            # asked. This runs after the new model is counted so the peers' budget checks see
+            # the true (exceeded) state.
+            for peer in self._ram_budget.peer_caches(exclude=self):
+                peer.request_budget_reconcile()
+
     def cached_model_keys(self) -> set[str]:
         """Return the base model keys of every model currently resident in this cache.
 
@@ -1117,24 +1128,20 @@ class ModelCache:
             # so ask each peer to drop its unlocked entries. Whatever still can't be freed is held
             # by locked (in-use) entries, which release soon — the same transient overshoot the
             # single-cache path has always allowed.
-            skipped_peers: list["ModelCache"] = []
             for peer in self._ram_budget.peer_caches(exclude=self):
                 if bytes_needed <= self._get_ram_available():
                     break
                 peer_cleared = peer.evict_unlocked_for_peer(
                     is_satisfied=lambda: bytes_needed <= self._get_ram_available()
                 )
-                if peer_cleared is None:
-                    skipped_peers.append(peer)
-                else:
-                    models_cleared += peer_cleared
-            if skipped_peers and bytes_needed > self._get_ram_available():
-                # A busy peer's lock was contended, so its unlocked entries couldn't be
-                # dropped — and nothing re-checks the budget when that lock frees, so the
-                # cap could stay exceeded indefinitely. Ask each skipped peer to reconcile
-                # the shared budget as soon as its current operation completes.
-                for peer in skipped_peers:
-                    peer.request_budget_reconcile()
+                models_cleared += peer_cleared or 0
+            # A peer whose lock was contended (peer_cleared is None) could not be evicted here.
+            # That is handled AFTER admission: put() re-checks the budget once the new model is
+            # actually counted and records a reconcile request on every peer (see
+            # request_budget_reconcile). Requesting here, pre-admission, would race the peers'
+            # reconcile checks against a budget that does not yet include the incoming model —
+            # a peer could see the budget as satisfied, clear the request, and leave the cap
+            # exceeded once the model lands.
 
         if models_cleared > 0:
             # There would likely be some 'garbage' to be collected regardless of whether a model was cleared or not, but
@@ -1176,7 +1183,8 @@ class ModelCache:
         it — blocking here could deadlock two caches making room for each other simultaneously.
 
         Returns the number of entries evicted, or None if the lock was contended and nothing could
-        be attempted — the caller uses that to request a deferred reconcile (see
+        be attempted. Either way, if the shared budget is still exceeded once the caller admits its
+        model, the caller records a deferred reconcile request on every peer (see
         request_budget_reconcile), so a skip never leaves the budget exceeded indefinitely.
         """
         if not self._lock.acquire(blocking=False):
@@ -1200,31 +1208,44 @@ class ModelCache:
             self._lock.release()
 
     def request_budget_reconcile(self) -> None:
-        """Ask this cache to shed unlocked entries once its current operation finishes.
+        """Ask this cache to shed unlocked entries until the shared budget is satisfied.
 
-        Set by a peer whose eviction request found this cache's lock contended (see
-        evict_unlocked_for_peer). Honored by the synchronized-decorator hook right after
-        this cache next releases its lock, so the shared RamBudget cannot remain exceeded
-        merely because this cache was briefly busy at the moment the peer asked.
+        Called by a peer that admitted a model while the global RamBudget was exceeded and could
+        not free enough by evicting from this cache directly (evict_unlocked_for_peer found the
+        lock contended, or everything evictable was already gone). Setting the pending flag alone
+        is not enough: this cache's busy operation may have released its lock — running its
+        reconcile hook while the flag was still unset — just before the flag was set here, and if
+        the cache then stays idle no future lock release would ever honor the request (lost
+        wakeup). The inline attempt below closes that window: either the lock is free now and the
+        reconcile runs immediately, or it is still held and the eventual release hook — which runs
+        strictly after the flag set below — performs it.
         """
         self._budget_reconcile_pending.set()
+        # Non-blocking: the caller holds its own cache lock, and blocking here could deadlock two
+        # caches requesting reconciles from each other.
+        self._reconcile_budget_if_pending(blocking=False)
 
-    def _reconcile_budget_if_pending(self) -> None:
+    def _reconcile_budget_if_pending(self, blocking: bool = True) -> None:
         """Evict this cache's unlocked entries while a requested reconcile is pending and the
         shared budget is exceeded.
 
-        Runs outside any held lock (called from the synchronized-decorator hook after release).
-        The pending flag stays set until the budget is actually satisfied: if the remaining
-        overshoot is held by locked (in-use) entries, the unlock that eventually frees them is
-        itself a synchronized method, whose hook re-runs this reconcile.
+        Called (blocking) from the synchronized-decorator hook after each lock release, and
+        (non-blocking) inline from request_budget_reconcile. The pending flag stays set until the
+        budget is actually satisfied: if the remaining overshoot is held by locked (in-use)
+        entries, the unlock that eventually frees them is itself a synchronized method, whose hook
+        re-runs this reconcile.
         """
         if self._ram_budget is None or not self._budget_reconcile_pending.is_set():
             return
         if self._ram_budget.available() >= 0:
             self._budget_reconcile_pending.clear()
             return
+        if not self._lock.acquire(blocking=blocking):
+            # Contended (non-blocking caller only): the holder releases through the synchronized
+            # hook, which re-runs this reconcile with the flag still set.
+            return
         models_cleared = 0
-        with self._lock:
+        try:
             pos = 0
             while pos < len(self._cache_stack) and self._ram_budget.available() < 0:
                 cache_entry = self._cached_models[self._cache_stack[pos]]
@@ -1237,6 +1258,8 @@ class ModelCache:
                 )
                 self._delete_cache_entry(cache_entry)
                 models_cleared += 1
+        finally:
+            self._lock.release()
         if self._ram_budget.available() >= 0:
             self._budget_reconcile_pending.clear()
         if models_cleared > 0:
