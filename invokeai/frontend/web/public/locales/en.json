@@ -1633,6 +1633,14 @@
     },
     "parameters": {
         "aspect": "Aspect",
+        "samplerPreset": "Sampler Preset",
+        "colorPalette": "Color Palette",
+        "ideogram4Caption": "Structured Caption",
+        "ideogram4SamplerPresets": {
+            "quality": "Quality ({{steps}} steps)",
+            "default": "Default ({{steps}} steps)",
+            "turbo": "Turbo ({{steps}} steps)"
+        },
         "duration": "Duration",
         "lockAspectRatio": "Lock Aspect Ratio",
         "swapDimensions": "Swap Dimensions",
@@ -2450,7 +2458,7 @@
         "fluxDevLicense": {
             "heading": "Non-Commercial License",
             "paragraphs": [
-                "This model is licensed for non-commercial use only. FLUX.1 [dev] models use the FLUX.1 [dev] Non-Commercial License, and FLUX.2 Klein 9B uses the FLUX.2 Non-Commercial License."
+                "This model is licensed for non-commercial use only. FLUX.1 [dev] models use the FLUX.1 [dev] Non-Commercial License, FLUX.2 Klein 9B uses the FLUX.2 Non-Commercial License, and Ideogram 4 uses the Ideogram 4 Non-Commercial License."
             ]
         },
         "optimizedDenoising": {
@@ -2919,6 +2927,7 @@
             "rgReferenceImagesNotSupported": "regional Reference Images not supported for selected base model",
             "rgAutoNegativeNotSupported": "Auto-Negative not supported for selected base model",
             "rgNoRegion": "no region drawn",
+            "ideogram4Txt2ImgOnly": "Ideogram 4 is text-to-image only; raster layers and inpaint masks are not supported",
             "fluxFillIncompatibleWithControlLoRA": "Control LoRA is not compatible with FLUX Fill",
             "controlAdapterDuplicateAnimaLLLiteModel": "each Anima control model can only be used by one Control Layer",
             "bboxHidden": "Bounding box is hidden (shift+o to toggle)"
