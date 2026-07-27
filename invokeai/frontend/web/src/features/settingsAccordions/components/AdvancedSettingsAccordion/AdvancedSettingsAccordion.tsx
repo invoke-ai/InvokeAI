@@ -79,28 +79,29 @@ export const AdvancedSettingsAccordion = memo(() => {
             // Ideogram 4 hides the VAE / clip skip / CFG rescale / seamless controls (they don't apply),
             // so it must not advertise stale badges for them either.
           } else if (!isFlux2 && !isIdeogram4) {
-          if (vaeConfig) {
-            let vaeBadge = vaeConfig.name;
-            if (params.vaePrecision === 'fp16') {
-              vaeBadge += ` ${params.vaePrecision}`;
+            if (vaeConfig) {
+              let vaeBadge = vaeConfig.name;
+              if (params.vaePrecision === 'fp16') {
+                vaeBadge += ` ${params.vaePrecision}`;
+              }
+              badges.push(vaeBadge);
+            } else if (params.vaePrecision === 'fp16') {
+              badges.push(`VAE ${params.vaePrecision}`);
             }
-            badges.push(vaeBadge);
-          } else if (params.vaePrecision === 'fp16') {
-            badges.push(`VAE ${params.vaePrecision}`);
+            if (params.clipSkip) {
+              badges.push(`Skip ${params.clipSkip}`);
+            }
+            if (params.cfgRescaleMultiplier) {
+              badges.push(`Rescale ${params.cfgRescaleMultiplier}`);
+            }
+            if (params.seamlessXAxis || params.seamlessYAxis) {
+              badges.push('seamless');
+            }
           }
-          if (params.clipSkip) {
-            badges.push(`Skip ${params.clipSkip}`);
-          }
-          if (params.cfgRescaleMultiplier) {
-            badges.push(`Rescale ${params.cfgRescaleMultiplier}`);
-          }
-          if (params.seamlessXAxis || params.seamlessYAxis) {
-            badges.push('seamless');
-          }
-        }
 
-        return badges;
-      }),
+          return badges;
+        }
+      ),
     [vaeConfig]
   );
   const badges = useAppSelector(selectBadges);
