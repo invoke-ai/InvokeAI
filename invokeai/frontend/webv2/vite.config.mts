@@ -3,10 +3,13 @@ import react, { reactCompilerPreset } from '@vitejs/plugin-react';
 import { fileURLToPath, URL } from 'node:url';
 import { defineConfig } from 'vite';
 
+import { chunkSourceManifest } from './scripts/chunk-source-manifest.mjs';
+
 // Override with e.g. INVOKEAI_DEV_BACKEND=http://127.0.0.1:9091 when the
 // backend dev server runs on a non-default port.
 const BACKEND_URL = process.env.INVOKEAI_DEV_BACKEND ?? 'http://127.0.0.1:9090';
 const BACKEND_WS_URL = BACKEND_URL.replace(/^http/, 'ws');
+const PROJECT_ROOT = fileURLToPath(new URL('.', import.meta.url));
 
 export default defineConfig({
   base: './',
@@ -21,7 +24,8 @@ export default defineConfig({
           if (
             id.endsWith('/platform/state/selectors.ts') ||
             id.endsWith('/workbench/palette/paletteStore.ts') ||
-            id.endsWith('/platform/search/dateTokens.ts')
+            id.endsWith('/platform/search/dateTokens.ts') ||
+            id.endsWith('/platform/performance/semanticReady.ts')
           ) {
             return 'shared';
           }
@@ -46,6 +50,20 @@ export default defineConfig({
             return 'react-icons';
           }
 
+          // The Workflow editor's graph canvas. XYFlow and the d3 modules it
+          // pulls in are reachable only from the Workflow widget, which is
+          // lazy — but the `vendor` catch-all below made them launchpad-eager.
+          if (id.includes('/node_modules/@xyflow/') || /\/node_modules\/d3-[^/]+\//.test(id)) {
+            return 'workflow-vendor';
+          }
+
+          // Editor-only pointer and drag interaction libraries: perfect-freehand
+          // belongs to Canvas stroke geometry, dnd-kit to widget and tab
+          // reordering. Neither is reachable from the launchpad.
+          if (id.includes('/node_modules/perfect-freehand/') || id.includes('/node_modules/@dnd-kit/')) {
+            return 'editor-interactions';
+          }
+
           if (id.includes('/node_modules/@chakra-ui/') || id.includes('/node_modules/@emotion/')) {
             return 'chakra';
           }
@@ -60,6 +78,7 @@ export default defineConfig({
     babel({
       presets: [reactCompilerPreset()],
     }),
+    chunkSourceManifest({ projectRoot: PROJECT_ROOT }),
   ],
   resolve: {
     alias: {

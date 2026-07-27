@@ -7,7 +7,7 @@ export const SectionHeader = ({ title, count }: { title: string; count?: number 
       {title}
     </Text>
     {count !== undefined ? (
-      <Text color="fg.subtle" fontSize="2xs" fontVariantNumeric="tabular-nums">
+      <Text color="fg.muted" fontSize="2xs" fontVariantNumeric="tabular-nums">
         {count}
       </Text>
     ) : null}

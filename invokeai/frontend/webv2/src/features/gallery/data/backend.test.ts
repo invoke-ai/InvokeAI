@@ -18,6 +18,7 @@ vi.mock('@platform/transport/http', () => ({
 import {
   downloadGalleryArchive,
   getGalleryImageByName,
+  getGalleryImagesByNames,
   imageMakeCanvasAssetChanges,
   imageMakeDurableChanges,
   imageSaveToGalleryChanges,
@@ -117,6 +118,31 @@ describe('getGalleryImageByName', () => {
     controller.abort();
 
     await expect(result).rejects.toBe(error);
+  });
+});
+
+describe('getGalleryImagesByNames', () => {
+  beforeEach(() => {
+    mocks.apiFetchJson.mockReset();
+  });
+
+  it('restores the requested order when the bulk endpoint responds out of order', async () => {
+    const dto = (imageName: string) => ({
+      board_id: 'none',
+      created_at: '2026-07-09T12:00:00.000Z',
+      height: 512,
+      image_category: 'general',
+      image_name: imageName,
+      image_url: `/images/${imageName}`,
+      is_intermediate: false,
+      thumbnail_url: `/thumbnails/${imageName}`,
+      width: 512,
+    });
+    mocks.apiFetchJson.mockResolvedValue([dto('third.png'), dto('first.png'), dto('second.png')]);
+
+    const images = await getGalleryImagesByNames(['first.png', 'second.png', 'third.png']);
+
+    expect(images.map((image) => image.imageName)).toEqual(['first.png', 'second.png', 'third.png']);
   });
 });
 

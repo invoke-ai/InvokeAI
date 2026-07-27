@@ -352,6 +352,7 @@ const HoverCompareFrame = ({
       cursor="pointer"
       overflow="hidden"
       position="relative"
+      role="region"
       rounded="lg"
       tabIndex={0}
       touchAction="none"

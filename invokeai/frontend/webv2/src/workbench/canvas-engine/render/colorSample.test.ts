@@ -61,6 +61,7 @@ const createFixedPixelBackend = (pixel: readonly [number, number, number, number
         drawnCanvases,
         height,
         resize: () => {},
+        resizePreserving: () => {},
         transforms,
         width,
       };

@@ -113,6 +113,7 @@ export const LayoutPresetMenu = () => {
       <Menu.Root positioning={MENU_POSITIONING}>
         <Menu.Trigger asChild>
           <Button
+            aria-label={`Layout preset: ${triggerLabel}`}
             bg="bg.subtle"
             borderWidth="1px"
             borderColor="border.emphasized"

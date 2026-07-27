@@ -42,6 +42,7 @@ type CenterWidgetItem = PlacedWidgetRegionItem<WidgetPlacementInstanceMeta>;
 const CENTER_MENU_POSITIONING = { placement: 'bottom-end' } as const;
 const CENTER_MENU_TRIGGER = { kind: 'center' } as const;
 const CENTER_PREFERRED_REGIONS = ['center'] as const;
+const getCenterViewPanelId = (instanceId: string): string => `center-view-panel-${instanceId}`;
 
 /** Center work area: the view tab strip plus the active registered center view. */
 export const CenterArea = ({ dropState }: { dropState: WidgetRegionDropState }) => {
@@ -176,21 +177,21 @@ export const CenterArea = ({ dropState }: { dropState: WidgetRegionDropState }) 
   });
 
   return (
-    <Flex as="section" bg="bg" direction="column" flex="1" minH="0" minW="0" {...focusRegionProps}>
-      <WidgetStrip
-        align="center"
-        bg="bg.subtle"
-        borderBottomWidth="1px"
-        borderColor="border.subtle"
-        dropState={dropState}
-        h="10"
-        px="1.5"
-        region="center"
-        sortableInstanceIds={centerSortableInstanceIds}
-        strategy={horizontalListSortingStrategy}
-        onContextMenu={openEnableMenu}
-      >
-        <Tabs.Root value={activeCenterViewId} h="full" onValueChange={handleCenterTabChange}>
+    <Tabs.Root asChild lazyMount unmountOnExit value={activeCenterViewId} onValueChange={handleCenterTabChange}>
+      <Flex as="section" bg="bg" direction="column" flex="1" minH="0" minW="0" {...focusRegionProps}>
+        <WidgetStrip
+          align="center"
+          bg="bg.subtle"
+          borderBottomWidth="1px"
+          borderColor="border.subtle"
+          dropState={dropState}
+          h="10"
+          px="1.5"
+          region="center"
+          sortableInstanceIds={centerSortableInstanceIds}
+          strategy={horizontalListSortingStrategy}
+          onContextMenu={openEnableMenu}
+        >
           <Tabs.List>
             {centerViewItems.map((item) => (
               <SortableCenterTab
@@ -202,39 +203,47 @@ export const CenterArea = ({ dropState }: { dropState: WidgetRegionDropState }) 
               />
             ))}
           </Tabs.List>
-        </Tabs.Root>
 
-        {centerToolbarItems.map((item) => (
-          <Flex key={item.id} align="center" h="full">
-            <WidgetRendererById instanceId={item.id} widget={item.widget} presentation="compact" region="center" />
-          </Flex>
-        ))}
+          {centerToolbarItems.map((item) => (
+            <Flex key={item.id} align="center" h="full">
+              <WidgetRendererById instanceId={item.id} widget={item.widget} presentation="compact" region="center" />
+            </Flex>
+          ))}
 
-        <WidgetEnableMenu
-          contextTarget={enableMenuTarget}
-          getItemMeta={getItemMeta}
-          groupLabel="Center Widgets"
-          isItemDisabled={isItemDisabled}
-          items={centerWidgetMenuItems}
-          positioning={CENTER_MENU_POSITIONING}
-          trigger={CENTER_MENU_TRIGGER}
-          triggerLabel="Center widget menu"
-          onContextClose={handleContextClose}
-          onToggle={toggleCenterWidget}
-        />
+          <WidgetEnableMenu
+            contextTarget={enableMenuTarget}
+            getItemMeta={getItemMeta}
+            groupLabel="Center Widgets"
+            isItemDisabled={isItemDisabled}
+            items={centerWidgetMenuItems}
+            positioning={CENTER_MENU_POSITIONING}
+            trigger={CENTER_MENU_TRIGGER}
+            triggerLabel="Center widget menu"
+            onContextClose={handleContextClose}
+            onToggle={toggleCenterWidget}
+          />
 
-        <WidgetInstanceContextMenu
-          isRemoveDisabled={isItemDisabled}
-          target={instanceMenuTarget}
-          onClose={handleInstanceClose}
-          onRemove={toggleCenterWidget}
-        />
-      </WidgetStrip>
+          <WidgetInstanceContextMenu
+            isRemoveDisabled={isItemDisabled}
+            target={instanceMenuTarget}
+            onClose={handleInstanceClose}
+            onRemove={toggleCenterWidget}
+          />
+        </WidgetStrip>
 
-      <Box flex="1" minH="0" position="relative">
-        <CenterViewSlot activeWidgetId={activeCenterViewId} items={centerViewItems} />
-      </Box>
-    </Flex>
+        <Box flex="1" minH="0" position="relative">
+          {activeCenterViewId ? (
+            centerViewItems.map((item) => (
+              <Tabs.Content key={item.id} h="full" id={getCenterViewPanelId(item.id)} p="0" value={item.id}>
+                <CenterViewSlot item={item} />
+              </Tabs.Content>
+            ))
+          ) : (
+            <FallbackCenterView label="Center widget unavailable" />
+          )}
+        </Box>
+      </Flex>
+    </Tabs.Root>
   );
 };
 
@@ -249,7 +258,7 @@ const SortableCenterTab = ({
   progressState: QueueProgressBarState;
   showProgress: boolean;
 }) => {
-  const { dragHandleProps, setNodeRef, style } = useWidgetSortable({
+  const { semanticDragHandleProps, setNodeRef, style } = useWidgetSortable({
     disabled: item.status === 'disabled',
     instanceId: item.id,
     region: 'center',
@@ -261,6 +270,7 @@ const SortableCenterTab = ({
   return (
     <Tabs.Trigger
       ref={setNodeRef}
+      aria-controls={getCenterViewPanelId(item.id)}
       value={item.id}
       disabled={item.status === 'disabled'}
       fontSize="xs"
@@ -268,7 +278,7 @@ const SortableCenterTab = ({
       position="relative"
       px="3"
       style={style}
-      {...dragHandleProps}
+      {...semanticDragHandleProps}
       {...intentPreloadProps}
       onContextMenu={handleContextMenu}
     >
@@ -282,20 +292,12 @@ const SortableCenterTab = ({
   );
 };
 
-const CenterViewSlot = ({
-  activeWidgetId,
-  items,
-}: {
-  activeWidgetId: string | undefined;
-  items: CenterWidgetItem[];
-}) => {
-  const widget = items.find((item) => item.id === activeWidgetId)?.widget;
-  const instance = items.find((item) => item.id === activeWidgetId)?.instance;
-  if (!instance || !widget || widget.status !== 'enabled') {
+const CenterViewSlot = ({ item }: { item: CenterWidgetItem }) => {
+  if (item.widget.status !== 'enabled') {
     return <FallbackCenterView label="Center widget unavailable" />;
   }
 
-  return <WidgetRendererById instanceId={instance.id} widget={widget} region="center" />;
+  return <WidgetRendererById instanceId={item.instance.id} widget={item.widget} region="center" />;
 };
 
 const FallbackCenterView = ({ label }: { label: string }) => (

@@ -13,10 +13,9 @@ const GalleryImageActionsAdapterComponent = ({
   children,
   generateValues,
   onImagesDeleted,
-  onStarredChange,
   projectId,
 }: GalleryImageActionsOptions & { children: ReactNode }) => {
-  const actions = useImageActions({ boards, generateValues, onImagesDeleted, onStarredChange, projectId });
+  const actions = useImageActions({ boards, generateValues, onImagesDeleted, projectId });
 
   return <GalleryImageActionsProvider actions={actions}>{children}</GalleryImageActionsProvider>;
 };

@@ -90,7 +90,7 @@ export const LibraryColumn = () => {
         <Text fontSize="sm" fontWeight="700">
           {t('models.title')}
         </Text>
-        <Text color="fg.subtle" fontSize="xs">
+        <Text color="fg.muted" fontSize="xs">
           {models.length}
         </Text>
         <Box ms="auto">

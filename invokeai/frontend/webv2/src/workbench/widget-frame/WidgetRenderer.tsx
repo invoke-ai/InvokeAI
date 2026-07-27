@@ -8,6 +8,8 @@ import type {
 } from '@workbench/widgetContracts';
 
 import { Box, Flex, Text } from '@chakra-ui/react';
+import { getWidgetReadyMark, markSemanticReady } from '@platform/performance/semanticReady';
+import { useMountEffect } from '@platform/react/useMountEffect';
 import { Scrollable } from '@platform/ui';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
@@ -66,6 +68,9 @@ const LoadedWidgetRenderer = ({ instance, presentation, region, widget }: Widget
   const project = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
   const implementation = use(widget.implementation.load());
   const View = implementation.view;
+  useMountEffect(() => {
+    markSemanticReady(getWidgetReadyMark(region, instance.typeId));
+  });
   const instanceMeta: WidgetInstanceRuntimeMeta = useMemo(
     () => ({
       createdAt: instance.createdAt,

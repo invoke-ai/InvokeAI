@@ -21,8 +21,8 @@ export const QueueHeaderLabel = () => {
       <Text fontSize="xs" fontWeight="700" lineHeight="1.15">
         {t('widgets.labels.queue')}
       </Text>
-      <Text color="fg.subtle" fontSize="2xs" fontVariantNumeric="tabular-nums" lineHeight="1.15" truncate mb="-1.5">
-        <Text as="span" color={isGenerating ? 'accent.solid' : 'fg.subtle'} fontWeight={isGenerating ? '600' : '400'}>
+      <Text color="fg.muted" fontSize="2xs" fontVariantNumeric="tabular-nums" lineHeight="1.15" truncate mb="-1.5">
+        <Text as="span" color={isGenerating ? 'accent.solid' : 'fg.muted'} fontWeight={isGenerating ? '600' : '400'}>
           {t('widgets.queue.generating', { count: activity.inProgress })}
         </Text>{' '}
         · {t('widgets.queue.waiting', { count: activity.pending })}

@@ -9,12 +9,14 @@ const TOOLBAR_TOOLTIP_POSITIONING = { placement: 'right' } as const;
 
 export const Toolbar = ({ children, direction = 'column', ...stackProps }: StackProps) => (
   <Stack
+    aria-orientation={direction === 'column' ? 'vertical' : 'horizontal'}
     bg="bg.subtle"
     borderColor="border.subtle"
     borderWidth="1px"
     direction={direction}
     gap="0.5"
     p="1"
+    role="toolbar"
     rounded="lg"
     shadow="sm"
     {...stackProps}
@@ -33,7 +35,7 @@ export const ToolbarButton = ({
   /** Sticky-tool styling; omit for one-shot action buttons. */
   isActive?: boolean;
   label: string;
-} & Omit<ComponentProps<typeof IconButton>, 'aria-label'>) => (
+} & Omit<ComponentProps<typeof IconButton>, 'aria-label' | 'aria-labelledby'>) => (
   <Tooltip content={label} positioning={TOOLBAR_TOOLTIP_POSITIONING}>
     <IconButton
       aria-label={label}

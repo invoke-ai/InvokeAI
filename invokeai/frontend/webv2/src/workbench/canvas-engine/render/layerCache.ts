@@ -318,21 +318,21 @@ export const createLayerCacheStore = (
       touch(existing);
       return existing;
     }
-    // Snapshot the old pixels BEFORE resizing (resize clears the backing canvas),
-    // then blit them back at their new offset within the grown surface. Skip the
-    // copy when the old extent was empty (nothing to preserve).
-    const surface = existing.surface;
-    let snapshot: ImageData | null = null;
-    if (!curEmpty && cur.width > 0 && cur.height > 0) {
-      snapshot = surface.ctx.getImageData(0, 0, cur.width, cur.height);
-    }
     // The surface origin moves with the grown rect, so every surface-local rect
     // recorded so far is void. Dropping the trail makes derived surfaces rebuild
     // wholesale for one frame rather than refresh the wrong pixels.
     damageTrails.delete(layerId);
-    surface.resize(newRect.width, newRect.height);
-    if (snapshot) {
-      surface.ctx.putImageData(snapshot, cur.x - newRect.x, cur.y - newRect.y);
+    // Grow onto a fresh backing store with the old pixels blitted across, at
+    // their new offset within it. `resize` cannot do this — it clears — so the
+    // pixels would otherwise have to make a CPU round trip, which measured as
+    // roughly the whole cost of the growth again on top of the allocation. This
+    // is the hot path for a stroke: painting outward grows the cache once per
+    // chunk boundary crossed, and each growth stalls the gesture.
+    const surface = existing.surface;
+    if (!curEmpty && cur.width > 0 && cur.height > 0) {
+      surface.resizePreserving(newRect.width, newRect.height, cur.x - newRect.x, cur.y - newRect.y);
+    } else {
+      surface.resize(newRect.width, newRect.height);
     }
     existing.rect = newRect;
     touch(existing);

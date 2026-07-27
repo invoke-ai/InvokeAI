@@ -779,6 +779,7 @@
     "actionsLabel": "{{label}} actions",
     "loadingLabel": "Loading {{label}}",
     "removeWidget": "Remove {{label}}",
+    "panelLabel": "{{region}} widget panel",
     "resizePanel": "Resize {{region}} widget panel",
     "settingsLabel": "{{label}} settings",
     "visibilityLabel": "{{region}} widget visibility",
@@ -1913,8 +1914,8 @@
       "hideArchivedBoards": "Hide archived boards",
       "hideDateBoards": "Hide date boards",
       "imageDensity": "Image density",
-      "imagesAriaLabel": "Gallery images",
       "imageSort": "Image Sort",
+      "imagesAriaLabel": "Gallery images",
       "infinite": "Infinite",
       "loadingBackendGallery": "Loading backend gallery...",
       "loadingBoard": "Loading board...",
@@ -1941,12 +1942,13 @@
       "starImage": "Star {{name}}",
       "thumbnailFitAspect": "Aspect",
       "thumbnailFitSquare": "Square",
-      "uncategorized": "Uncategorized",
       "unarchiveBoard": "Unarchive Board",
+      "uncategorized": "Uncategorized",
       "unknownBoard": "Unknown board",
       "unstarImage": "Unstar {{name}}",
       "uploadImagesToBoard": "Upload images to {{name}}",
-      "uploadsUnavailableForDateBoards": "Uploads are unavailable for date boards"
+      "uploadsUnavailableForDateBoards": "Uploads are unavailable for date boards",
+      "windowLimit": "Showing the first {{count}} images. Narrow the search or switch to Pages to reach the rest."
     },
     "serverStatus": {
       "connected": "Connected to Server",

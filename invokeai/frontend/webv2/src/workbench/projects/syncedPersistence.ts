@@ -23,8 +23,11 @@ import {
   type ProjectRecordDTO,
 } from './api';
 import { seedProjectLibrary, upsertProjectSummary } from './library';
+import { isProjectDocumentShape, normalizeLegacyProjectDocument, serializeProjectDocument } from './projectDocument';
 import { fetchSessionBlob, serializeSessionBlob, SESSION_STATE_KEY } from './session';
 import { reportProjectSync, type ProjectSyncInfo } from './syncStore';
+
+export { serializeProjectDocument } from './projectDocument';
 
 /**
  * Backend-first workbench persistence (spec: Persistence Model).
@@ -105,17 +108,6 @@ const assertOwner = (syncState: SyncedPersistenceState): void => {
   assertAccountScopeCurrent(syncState.owner);
 };
 
-/**
- * Undo/redo stacks are session-only (each entry is a full project snapshot,
- * far too heavy to autosave); everything else in the project document is the
- * project, verbatim.
- */
-export const serializeProjectDocument = (project: Project): Record<string, unknown> => {
-  const { undoRedo: _undoRedo, ...document } = project;
-
-  return document;
-};
-
 const getSerializedProjectDocument = (
   syncState: SyncedPersistenceState,
   project: Project
@@ -139,64 +131,15 @@ const getSerializedProjectDocument = (
   return serialized;
 };
 
-const normalizeInvocationSourceId = (sourceId: unknown): unknown => {
-  if (sourceId === 'project-graph') {
-    return 'workflow';
-  }
-
-  if (sourceId === 'canvas-fill') {
-    return 'canvas';
-  }
-
-  return sourceId;
-};
-
-const normalizeLegacyProjectDocument = (data: Record<string, unknown>): Record<string, unknown> => {
-  const invocation = data.invocation;
-  const queue = data.queue;
-
-  return {
-    ...data,
-    invocation:
-      invocation && typeof invocation === 'object'
-        ? { ...invocation, sourceId: normalizeInvocationSourceId((invocation as { sourceId?: unknown }).sourceId) }
-        : invocation,
-    queue:
-      queue && typeof queue === 'object' && Array.isArray((queue as { items?: unknown }).items)
-        ? {
-            ...queue,
-            items: (queue as { items: unknown[] }).items.map((item) => {
-              if (!item || typeof item !== 'object') {
-                return item;
-              }
-
-              const snapshot = (item as { snapshot?: unknown }).snapshot;
-
-              return {
-                ...item,
-                snapshot:
-                  snapshot && typeof snapshot === 'object'
-                    ? {
-                        ...snapshot,
-                        sourceId: normalizeInvocationSourceId((snapshot as { sourceId?: unknown }).sourceId),
-                      }
-                    : snapshot,
-              };
-            }),
-          }
-        : queue,
-  };
-};
-
+/**
+ * Rehydrate a document into a live project. This is the half of the codec that
+ * needs the aggregate reducer, so it stays here rather than in
+ * `./projectDocument`; Launchpad callers reach it through a dynamic import.
+ */
 export const deserializeProjectDocument = (data: Record<string, unknown>): Project | null => {
   const normalizedData = normalizeLegacyProjectDocument(data);
 
-  if (
-    typeof normalizedData.id !== 'string' ||
-    typeof normalizedData.name !== 'string' ||
-    typeof normalizedData.layout !== 'object' ||
-    normalizedData.layout === null
-  ) {
+  if (!isProjectDocumentShape(normalizedData)) {
     return null;
   }
 

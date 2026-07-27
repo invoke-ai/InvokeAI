@@ -571,8 +571,8 @@ const AddNodeDialogContent = ({
                 </Tooltip>
               </HStack>
               <ScrollArea.Root flex="1" minH="0" size="xs" variant="hover" w="full">
-                <ScrollArea.Viewport ref={setScrollElement} aria-label="Node search results" h="full" w="full">
-                  <ScrollArea.Content id={RESULT_LIST_ID} role="tree" w="full">
+                <ScrollArea.Viewport ref={setScrollElement} h="full" w="full">
+                  <ScrollArea.Content id={RESULT_LIST_ID} aria-label="Node search results" role="tree" w="full">
                     {body}
                   </ScrollArea.Content>
                 </ScrollArea.Viewport>

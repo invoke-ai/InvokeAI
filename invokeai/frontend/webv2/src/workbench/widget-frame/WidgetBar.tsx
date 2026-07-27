@@ -77,6 +77,7 @@ export const WidgetBar = ({
   return (
     <WidgetStrip
       align="center"
+      aria-label={t('widgets.visibilityLabel', { region: side === 'left' ? 'Left' : 'Right' })}
       as="nav"
       bg="bg.subtle"
       borderColor="border.subtle"

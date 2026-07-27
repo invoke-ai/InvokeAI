@@ -1,14 +1,15 @@
 import type { WidgetRegion } from '@workbench/layoutContracts';
 import type { Project } from '@workbench/projectContracts';
 
-import { Flex, Icon, Menu, Portal, ScrollArea, Separator } from '@chakra-ui/react';
+import { Box, Flex, Icon, Menu, Portal, ScrollArea, Separator } from '@chakra-ui/react';
 import { flushGenerateDrafts } from '@features/generation/react';
 import { useModelLoads } from '@features/models';
 import { getProjectQueueIndicatorState, type QueueItem } from '@features/queue/contracts';
 import { useQueueItemProgress } from '@features/queue/react';
-import { CloseButton, IconButton, ConfirmDialog, MenuContent, RenameDialog, Tabs, Tooltip } from '@platform/ui';
+import { IconButton, ConfirmDialog, MenuContent, RenameDialog, Tabs, Tooltip } from '@platform/ui';
 import { QueueCircularProgress } from '@workbench/components/QueueProgressIndicator';
 import { exportOpenProject } from '@workbench/projects/projectFile';
+import { getProjectTabId, PROJECT_CONTENT_PANEL_ID } from '@workbench/projects/projectTabsA11y';
 import { useProjectActions } from '@workbench/projects/useProjectActions';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import {
@@ -27,7 +28,7 @@ import {
   Trash2Icon,
   XIcon,
 } from 'lucide-react';
-import { useCallback, useMemo, useState, type MouseEvent } from 'react';
+import { useCallback, useMemo, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { OpenProjectDialog } from './OpenProjectDialog';
@@ -54,6 +55,7 @@ const selectProjectTabSummaries = (projects: readonly Project[]): ProjectTabSumm
   projects.map(({ id, name, queue }) => ({ id, name, queueItems: queue.items }));
 
 const deleteMenuItemHover = { bg: 'bg.error', color: 'fg.error' } as const;
+const projectTabCloseHover = { bg: 'bg.emphasized' } as const;
 
 // `min-width: 0` lets the strip shrink in flex layout, but does not stop its
 // content from propagating into the tab list's intrinsic (shrink-to-fit)
@@ -68,9 +70,9 @@ const TAB_STRIP_CONTAIN_CSS = { contain: 'inline-size' } as const;
  * it from the session — the project stays saved and reopens through the
  * folder button's Open Project dialog. Closing the last tab lands on Home.
  *
- * Each tab is a container with two real buttons (select + close) rather than
- * the prototype's invalid button-nested-in-button, so keyboard focus and
- * click targets behave correctly. Right-clicking a tab opens a context menu
+ * The tab list owns tabs only; pinned project actions live beside it. The
+ * close glyph is part of the tab's pointer target, while Delete/Backspace is
+ * the equivalent keyboard command. Right-clicking a tab opens a context menu
  * with rename, details, export, close, and delete.
  */
 export const ProjectTabs = () => {
@@ -153,12 +155,12 @@ export const ProjectTabs = () => {
   return (
     <>
       <Tabs.Root minW="0" variant="subtle" value={activeProjectId} h="full" w="full">
-        <Tabs.List flex="1 1 auto" minW="0" w="full" h="full" py="1">
+        <Flex flex="1 1 auto" minW="0" w="full" h="full" py="1">
           {/* Only the tabs scroll; the new/open controls stay pinned in view. */}
           <ScrollArea.Root css={TAB_STRIP_CONTAIN_CSS} flex="1 1 auto" minW="0" h="full" size="xs" variant="hover">
-            <ScrollArea.Viewport aria-label={t('projects.openProjects')} h="full" w="full">
-              <ScrollArea.Content asChild>
-                <Flex align="center" h="full" gap="1">
+            <ScrollArea.Viewport h="full" w="full">
+              <ScrollArea.Content>
+                <Tabs.List aria-label={t('projects.openProjects')} h="full" gap="1">
                   {projectTabSummaries.map((project) => (
                     <ProjectTab
                       key={project.id}
@@ -171,7 +173,7 @@ export const ProjectTabs = () => {
                       onSwitchProject={onSwitchProject}
                     />
                   ))}
-                </Flex>
+                </Tabs.List>
               </ScrollArea.Content>
             </ScrollArea.Viewport>
             <ScrollArea.Scrollbar orientation="horizontal">
@@ -206,7 +208,7 @@ export const ProjectTabs = () => {
               <FolderOpenIcon />
             </IconButton>
           </Tooltip>
-        </Tabs.List>
+        </Flex>
       </Tabs.Root>
 
       <ProjectTabContextMenu
@@ -265,7 +267,6 @@ const ProjectTab = ({
     progress,
     queueItems: project.queueItems,
   });
-  const switchProject = useCallback(() => onSwitchProject(project.id), [onSwitchProject, project.id]);
   const { t } = useTranslation();
   const openContextMenu = useCallback((event: MouseEvent) => onContextMenu(project, event), [onContextMenu, project]);
 
@@ -281,9 +282,24 @@ const ProjectTab = ({
     [isActive]
   );
 
-  const closeProject = useCallback(
+  const handleClick = useCallback(
     (event: MouseEvent) => {
-      event.stopPropagation();
+      if (event.target instanceof Element && event.target.closest('[data-project-close]')) {
+        onCloseProject(project);
+        return;
+      }
+
+      onSwitchProject(project.id);
+    },
+    [onCloseProject, onSwitchProject, project]
+  );
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent) => {
+      if (event.key !== 'Delete' && event.key !== 'Backspace') {
+        return;
+      }
+
+      event.preventDefault();
       onCloseProject(project);
     },
     [onCloseProject, project]
@@ -292,12 +308,16 @@ const ProjectTab = ({
   return (
     <Tabs.Trigger
       ref={scrollIntoViewWhenActive}
+      aria-controls={PROJECT_CONTENT_PANEL_ID}
+      aria-keyshortcuts="Delete Backspace"
+      id={getProjectTabId(project.id)}
       value={project.id}
-      onClick={switchProject}
-      onContextMenu={openContextMenu}
       fontSize="xs"
       flexShrink={0}
       h="full"
+      onClick={handleClick}
+      onContextMenu={openContextMenu}
+      onKeyDown={handleKeyDown}
     >
       {progressState.kind === 'idle' ? (
         <Icon as={isActive ? FolderOpenIcon : FolderIcon} boxSize="4" />
@@ -307,14 +327,19 @@ const ProjectTab = ({
 
       {project.name}
 
-      <CloseButton
-        size="2xs"
-        me="-2"
+      <Box
+        aria-hidden="true"
         as="span"
-        role="button"
-        aria-label={t('projects.closeProjectLabel', { name: project.name })}
-        onClick={closeProject}
-      />
+        data-project-close=""
+        display="inline-flex"
+        me="-2"
+        p="1"
+        rounded="sm"
+        title={t('projects.closeProjectLabel', { name: project.name })}
+        _hover={projectTabCloseHover}
+      >
+        <XIcon size={12} />
+      </Box>
     </Tabs.Trigger>
   );
 };

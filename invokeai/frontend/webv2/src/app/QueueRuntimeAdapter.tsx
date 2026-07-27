@@ -1,15 +1,18 @@
+import { invalidateGallery } from '@features/gallery/queries';
 import { modelLoadActivitySink } from '@features/models';
 import { nodeExecutionStore } from '@features/nodes';
 import { createProductionQueueRuntime } from '@features/queue';
 import { ensureInvocationTemplatesLoaded } from '@features/workflow/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
+import { useQueryClient } from '@tanstack/react-query';
 import { useWorkbenchCommands, useWorkbenchQueries, useWorkbenchSubscription } from '@workbench/WorkbenchContext';
 
 /** App-owned production composition of Queue, Workbench, Gallery, Workflow, Nodes, and Models adapters. */
 export const QueueRuntimeAdapter = () => {
   const { notifications, queue } = useWorkbenchCommands();
   const queries = useWorkbenchQueries();
+  const queryClient = useQueryClient();
   const subscribe = useWorkbenchSubscription();
 
   useMountEffect(() => {
@@ -27,7 +30,11 @@ export const QueueRuntimeAdapter = () => {
       },
       ensureTemplatesLoaded: ensureInvocationTemplatesLoaded,
       history: {
-        commands: { ...queue, recordError: notifications.reportError },
+        commands: {
+          ...queue,
+          recordError: notifications.reportError,
+          refreshBackendData: () => void invalidateGallery(queryClient),
+        },
         getSnapshot: () => {
           const snapshot = queries.getSnapshot();
 

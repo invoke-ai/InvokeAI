@@ -7,11 +7,13 @@ import {
   updateGalleryBoard,
   uploadGalleryImage,
 } from '@features/gallery/data/backend';
+import { invalidateGallery } from '@features/gallery/data/queryCache';
 import {
   assertAccountScopeCurrent,
   captureAccountScope,
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
+import { useQueryClient } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
 import type { GalleryActions } from './GalleryWidgetContext';
@@ -46,12 +48,13 @@ export const useGalleryActions = ({
   selectedBoardId: string;
 }): GalleryActions => {
   const { gallery, notifications } = useGalleryUi();
+  const queryClient = useQueryClient();
 
   return useMemo<GalleryActions>(() => {
     const recordError = (error: unknown) =>
       notifications.reportError({ area: 'gallery-actions', message: toErrorMessage(error), namespace: 'gallery' });
     const recordSuccess = (title: string, message?: string) => notifications.add({ kind: 'success', message, title });
-    const refresh = gallery.touch;
+    const refresh = () => void invalidateGallery(queryClient);
     const getBoardName = (boardId: string) => boards.find((board) => board.id === boardId)?.name ?? 'Uncategorized';
 
     return {
@@ -109,10 +112,7 @@ export const useGalleryActions = ({
             includeImages ? 'Its images were permanently deleted.' : 'Its images were moved to Uncategorized.'
           );
 
-          if (boardId === selectedBoardId) {
-            gallery.selectBoard('none');
-          }
-
+          gallery.reconcileDeletedBoard(boardId, includeImages);
           refresh();
         } catch (error: unknown) {
           if (!isAccountScopeCurrent(owner)) {
@@ -232,5 +232,5 @@ export const useGalleryActions = ({
         }
       },
     };
-  }, [boards, gallery, loadMore, notifications, projectBoardId, projectName, selectedBoardId]);
+  }, [boards, gallery, loadMore, notifications, projectBoardId, projectName, queryClient, selectedBoardId]);
 };

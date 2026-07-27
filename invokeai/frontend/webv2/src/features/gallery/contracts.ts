@@ -10,6 +10,7 @@ export type {
   GeneratedImageContract,
 } from './core/types';
 export { normalizeGalleryImage } from './core/image';
+export { GALLERY_RECENT_IMAGE_LIMIT, getBoundedRecentImages } from './core/recentImages';
 export {
   DEFAULT_GALLERY_SETTINGS,
   getGallerySettings,
@@ -21,13 +22,14 @@ export {
   getGalleryCompareImage,
   getGalleryCurrentItem,
   getGalleryGenerationSequence,
+  getGalleryPage,
+  getGallerySelectedImagePage,
+  getGallerySelectedImageQuery,
   getGalleryPlaceholderInsertionIndex,
-  getGalleryImagesRefreshToken,
-  getGalleryRecentImagesKey,
-  getGalleryRefreshToken,
   type GalleryCurrentItem,
   type GalleryGenerationSequence,
   type GalleryLiveTarget,
   type GalleryQueuePlaceholder,
+  type GallerySelectedImageQuery,
 } from './ui/galleryStateView';
 export { getSelectedGalleryImageFromValues } from './core/selection';

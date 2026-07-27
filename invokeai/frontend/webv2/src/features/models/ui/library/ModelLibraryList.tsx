@@ -206,10 +206,10 @@ export const ModelLibraryList = ({
 
 const GroupHeader = ({ count, label }: { count: number; label: string }) => (
   <HStack bg="bg.inset" gap="1.5" h={`${HEADER_ROW_HEIGHT_PX}px`} pt="2" w="full">
-    <Text color="fg.subtle" fontSize="2xs" fontWeight="700" textTransform="uppercase">
+    <Text color="fg.muted" fontSize="2xs" fontWeight="700" textTransform="uppercase">
       {label}
     </Text>
-    <Text color="fg.subtle" fontSize="2xs">
+    <Text color="fg.muted" fontSize="2xs">
       {count}
     </Text>
   </HStack>
@@ -273,27 +273,12 @@ const ModelRow = memo(function ModelRow({
   onToggleSelected,
 }: ModelRowProps) {
   return (
-    <Row
-      active={isActive ? 'accent' : isSelected ? 'muted' : 'none'}
-      aria-current={isActive || undefined}
-      h={`${MODEL_ROW_HEIGHT_PX - 4}px`}
+    <Box
       mb="1"
-      minW="0"
-      px="2"
-      role="button"
-      rounded="md"
-      tabIndex={0}
-      _focusVisible={{ boxShadow: 'inset 0 0 0 2px {colors.accent.solid}', outline: 'none' }}
-      onClick={() => onActivate(modelKey)}
+      position="relative"
       onContextMenu={(event) => {
         event.preventDefault();
         onContextMenu(modelKey, event.clientX, event.clientY);
-      }}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          onActivate(modelKey);
-        }
       }}
     >
       {onToggleSelected ? (
@@ -301,35 +286,53 @@ const ModelRow = memo(function ModelRow({
           aria-label={`Select ${name}`}
           checked={isSelected}
           colorPalette="accent"
+          insetStart="2"
+          position="absolute"
           size="xs"
+          top="50%"
+          transform="translateY(-50%)"
+          zIndex={1}
           onCheckedChange={() => onToggleSelected(modelKey)}
-          onClick={(event) => event.stopPropagation()}
         >
           <Checkbox.HiddenInput />
           <Checkbox.Control />
         </Checkbox.Root>
       ) : null}
-      {/* Keyed by version so a stale load error clears when the image changes. */}
-      <ModelRowThumbnail
-        key={`${modelKey}:${imageVersion ?? 0}`}
-        coverImage={coverImage}
-        imageVersion={imageVersion}
-        modelKey={modelKey}
-      />
-      <Stack flex="1" gap="0.5" minW="0">
-        <Text fontSize="xs" fontWeight="600" truncate>
-          {name}
-        </Text>
-        <HStack gap="1" minW="0" wrap="wrap">
-          <ModelBaseBadge base={base} />
-          <ModelFormatBadge format={format} />
-          {isMissing ? <MissingFileBadge /> : null}
-        </HStack>
-      </Stack>
-      <Text color={isActive ? 'accent.solid' : 'fg.subtle'} flexShrink={0} fontSize="2xs">
-        {formatBytes(fileSize)}
-      </Text>
-    </Row>
+      <Row
+        active={isActive ? 'accent' : isSelected ? 'muted' : 'none'}
+        aria-current={isActive || undefined}
+        asChild
+        h={`${MODEL_ROW_HEIGHT_PX - 4}px`}
+        minW="0"
+        pe="2"
+        ps={onToggleSelected ? '9' : '2'}
+        rounded="md"
+        _focusVisible={{ boxShadow: 'inset 0 0 0 2px {colors.accent.solid}', outline: 'none' }}
+      >
+        <button type="button" onClick={() => onActivate(modelKey)}>
+          {/* Keyed by version so a stale load error clears when the image changes. */}
+          <ModelRowThumbnail
+            key={`${modelKey}:${imageVersion ?? 0}`}
+            coverImage={coverImage}
+            imageVersion={imageVersion}
+            modelKey={modelKey}
+          />
+          <Stack flex="1" gap="0.5" minW="0">
+            <Text fontSize="xs" fontWeight="600" truncate>
+              {name}
+            </Text>
+            <HStack gap="1" minW="0" wrap="wrap">
+              <ModelBaseBadge base={base} />
+              <ModelFormatBadge format={format} />
+              {isMissing ? <MissingFileBadge /> : null}
+            </HStack>
+          </Stack>
+          <Text color={isActive ? 'accent.contrast' : 'fg.muted'} flexShrink={0} fontSize="2xs">
+            {formatBytes(fileSize)}
+          </Text>
+        </button>
+      </Row>
+    </Box>
   );
 });
 

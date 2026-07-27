@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["typescript", "react", "import", "unicorn", "oxc", "react-perf", "eslint"],
+  "plugins": ["typescript", "react", "import", "unicorn", "oxc", "react-perf", "jsx-a11y", "eslint"],
   "categories": {
     "correctness": "error"
   },
@@ -56,6 +56,13 @@
 
     "react-hooks/exhaustive-deps": "error",
     "react-hooks/rules-of-hooks": "error",
+
+    // Invoke's Chakra/Ark composites deliberately use ARIA listbox, option,
+    // separator, and status semantics on polymorphic primitives. Replacing
+    // those primitives with the rule's suggested native tags would break the
+    // owning composite's keyboard/focus contract; Axe journeys validate the
+    // resulting accessibility tree instead.
+    "jsx-a11y/prefer-tag-over-role": "off",
 
     "react-perf/jsx-no-new-object-as-prop": [
       "error",
@@ -113,6 +120,42 @@
 
     "vitest/require-mock-type-parameters": "off"
   },
+  "overrides": [
+    {
+      // These are focus-managed entry points. Autofocus is intentional and
+      // scoped to an opened dialog, an auth screen, or an inline rename so
+      // keyboard users land on the only immediate task.
+      "files": [
+        "src/features/gallery/ui/GalleryBoardMenu.tsx",
+        "src/features/identity/ui/LoginScreen.tsx",
+        "src/features/identity/ui/SetupScreen.tsx",
+        "src/features/identity/ui/UserFormDialog.tsx",
+        "src/features/workflow/ui/editor/AddNodeDialog.tsx",
+        "src/features/workflow/ui/editor/InvocationFlowNode.tsx",
+        "src/platform/ui/RenameDialog.tsx",
+        "src/workbench/palette/CommandPaletteDialog.tsx",
+        "src/workbench/widgets/layers/LayerListItem.tsx"
+      ],
+      "rules": {
+        "jsx-a11y/no-autofocus": "off"
+      }
+    },
+    {
+      // Oxlint cannot see the focusable DOM produced by Chakra Button/Input/
+      // Menu primitives. Palette options are the other intentional case:
+      // focus stays on their aria-activedescendant combobox by design.
+      "files": [
+        "src/features/models/ui/components/ModelSelect.tsx",
+        "src/features/models/ui/shared/ModelFilterMenu.tsx",
+        "src/features/workflow/ui/editor/AddNodeDialog.tsx",
+        "src/workbench/palette/CommandPaletteDialog.tsx",
+        "src/workbench/palette/CommandPaletteRows.tsx"
+      ],
+      "rules": {
+        "jsx-a11y/interactive-supports-focus": "off"
+      }
+    }
+  ],
   "env": {
     "browser": true,
     "builtin": true,

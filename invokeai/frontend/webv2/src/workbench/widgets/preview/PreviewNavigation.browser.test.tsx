@@ -1,10 +1,11 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop */
+import type { GalleryImage, GalleryImagesPage } from '@features/gallery';
 import type { QueueItem } from '@features/queue/contracts';
 import type { WidgetViewProps } from '@workbench/widgetContracts';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { DndContext } from '@dnd-kit/core';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, type InfiniteData } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import i18next from 'i18next';
 import { act } from 'react';
@@ -74,6 +75,8 @@ const mocks = vi.hoisted(() => {
         preview: { state: { values: {} }, typeId: 'preview' },
       },
     },
+    galleryImagePageOffsets: [] as number[],
+    galleryImagePages: [] as GalleryImagesPage[],
     recentImages,
     useActiveProgressTarget: vi.fn(() => null as unknown),
     useProgressImage: vi.fn(() => null as unknown),
@@ -94,11 +97,41 @@ vi.mock('@features/queue/react', async (importOriginal) => ({
 }));
 
 vi.mock('@features/gallery/queries', () => ({
-  galleryBoardsOptions: () => ({ enabled: false, queryFn: () => [], queryKey: ['test-boards'] }),
-  galleryImagesOptions: (query: { boardId: string }) => ({
-    queryFn: () => new Promise<never>(() => {}),
-    queryKey: ['test-images', query.boardId],
-  }),
+  GALLERY_MAX_ROWS: 600,
+  GALLERY_PAGE_SIZE: 60,
+  flattenGalleryImagesData: (data: InfiniteData<GalleryImagesPage, number> | undefined): GalleryImage[] =>
+    data?.pages.flatMap((page) => page.images) ?? [],
+  galleryBoardsOptions: () => ({ queryFn: () => [], queryKey: ['test-boards'], staleTime: Infinity }),
+  galleryImagesInfiniteOptions: (
+    query: { boardId: string; orderDir?: 'ASC' | 'DESC' },
+    window: { kind: 'anchor' | 'infinite' | 'page'; offset?: number } = { kind: 'infinite' }
+  ) => {
+    const pages = mocks.galleryImagePages.map((page) => {
+      const images = page.images.filter((image) => image.boardId === query.boardId);
+
+      return {
+        ...page,
+        images: query.orderDir === 'ASC' ? images.reverse() : images,
+      };
+    });
+    const initialOffset = window.kind === 'infinite' ? 0 : (window.offset ?? 0);
+    const initialPage = pages[initialOffset / 60] ?? { images: [], total: 0 };
+
+    return {
+      getNextPageParam: (_lastPage: GalleryImagesPage, _allPages: GalleryImagesPage[], lastPageParam: number) =>
+        pages[lastPageParam / 60 + 1] ? lastPageParam + 60 : undefined,
+      getPreviousPageParam: (_firstPage: GalleryImagesPage, _allPages: GalleryImagesPage[], firstPageParam: number) =>
+        firstPageParam >= 60 ? firstPageParam - 60 : undefined,
+      initialData: { pageParams: [initialOffset], pages: [initialPage] },
+      initialPageParam: initialOffset,
+      queryFn: ({ pageParam }: { pageParam: number }) => {
+        mocks.galleryImagePageOffsets.push(pageParam);
+        return Promise.resolve(pages[pageParam / 60] ?? { images: [], total: 0 });
+      },
+      queryKey: ['test-images', query.boardId, query.orderDir, window.kind, initialOffset],
+      staleTime: Infinity,
+    };
+  },
 }));
 
 vi.mock('@workbench/image-actions', () => ({
@@ -195,13 +228,27 @@ beforeEach(() => {
   mocks.project.queue.items = [];
   mocks.project.settings.showProgressImagesInViewer = false;
   delete (mocks.project.widgetInstances.gallery.state.values as Record<string, unknown>).compareImage;
+  delete (mocks.project.widgetInstances.gallery.state.values as Record<string, unknown>).galleryPage;
   delete (mocks.project.widgetInstances.gallery.state.values as Record<string, unknown>).imageOrderDir;
+  delete (mocks.project.widgetInstances.gallery.state.values as Record<string, unknown>).paginationMode;
   mocks.project.widgetInstances.gallery.state.values.recentImages = mocks.recentImages;
   mocks.project.widgetInstances.gallery.state.values.selectedImage = {
     ...mocks.recentImages[0],
     boardId: 'none',
   };
   mocks.project.widgetInstances.gallery.state.values.selectedImageName = 'newest';
+  mocks.galleryImagePageOffsets.length = 0;
+  mocks.galleryImagePages = [
+    {
+      images: mocks.recentImages.map((image) => ({
+        ...image,
+        boardId: 'none',
+        imageCategory: 'general',
+        starred: false,
+      })),
+      total: mocks.recentImages.length,
+    },
+  ];
   mocks.useActiveProgressTarget.mockReturnValue(null);
   mocks.useProgressImage.mockReturnValue(null);
 });
@@ -226,11 +273,95 @@ describe('preview keyboard navigation boundary', () => {
       await pressArrow('ArrowRight');
 
       expect(mocks.commands.gallery.selectImage).toHaveBeenCalledTimes(1);
-      expect(mocks.commands.gallery.selectImage).toHaveBeenCalledWith(expect.objectContaining({ imageName: 'oldest' }));
+      expect(mocks.commands.gallery.selectImage).toHaveBeenCalledWith(
+        expect.objectContaining({ imageName: 'oldest' }),
+        undefined,
+        expect.any(Number),
+        true
+      );
       expect(documentKeydown).not.toHaveBeenCalled();
     } finally {
       document.removeEventListener('keydown', documentKeydown);
     }
+  });
+
+  it('fetches the next infinite page before stepping past the loaded backend boundary', async () => {
+    const newest: GalleryImage = {
+      ...mocks.recentImages[0],
+      boardId: 'none',
+      imageCategory: 'general',
+      starred: false,
+    };
+    const oldest: GalleryImage = {
+      ...mocks.recentImages[1],
+      boardId: 'none',
+      imageCategory: 'general',
+      starred: false,
+    };
+    mocks.project.widgetInstances.gallery.state.values.recentImages = [mocks.recentImages[0]];
+    mocks.galleryImagePages = [
+      { images: [newest], total: 2 },
+      { images: [oldest], total: 2 },
+    ];
+
+    await render();
+    await pressArrow('ArrowRight');
+
+    await vi.waitFor(() => {
+      expect(mocks.commands.gallery.selectImage).toHaveBeenCalledWith(
+        expect.objectContaining({ imageName: 'oldest' }),
+        undefined,
+        expect.any(Number),
+        true
+      );
+    });
+    expect(mocks.galleryImagePageOffsets).toEqual([60]);
+    expect(mocks.commands.gallery.selectImage).toHaveBeenCalledTimes(1);
+  });
+
+  it('anchors Preview navigation to the selected paginated Gallery page', async () => {
+    const pageZero = {
+      ...mocks.recentImages[0],
+      boardId: 'none',
+      imageCategory: 'general' as const,
+      imageName: 'page-zero',
+      starred: false,
+    };
+    const selected = {
+      ...mocks.recentImages[0],
+      boardId: 'none',
+      imageCategory: 'general' as const,
+      imageName: 'page-one-selected',
+      starred: false,
+    };
+    const neighbor = {
+      ...mocks.recentImages[1],
+      boardId: 'none',
+      imageCategory: 'general' as const,
+      imageName: 'page-one-neighbor',
+      starred: false,
+    };
+    const galleryValues = mocks.project.widgetInstances.gallery.state.values as Record<string, unknown>;
+
+    galleryValues.galleryPage = 1;
+    galleryValues.paginationMode = 'paginated';
+    galleryValues.recentImages = [];
+    galleryValues.selectedImage = selected;
+    galleryValues.selectedImageName = selected.imageName;
+    mocks.galleryImagePages = [
+      { images: [pageZero], total: 3 },
+      { images: [selected, neighbor], total: 3 },
+    ];
+
+    await render();
+    await pressArrow('ArrowRight');
+
+    expect(mocks.commands.gallery.selectImage).toHaveBeenCalledWith(
+      expect.objectContaining({ imageName: neighbor.imageName }),
+      undefined,
+      1,
+      true
+    );
   });
 
   it('enables live-follow when stepping onto the active placeholder', async () => {
@@ -276,7 +407,12 @@ describe('preview keyboard navigation boundary', () => {
     await pressArrow('ArrowRight');
 
     expect(mocks.commands.gallery.selectImage).toHaveBeenCalledTimes(1);
-    expect(mocks.commands.gallery.selectImage).toHaveBeenCalledWith(expect.objectContaining({ imageName: 'newest' }));
+    expect(mocks.commands.gallery.selectImage).toHaveBeenCalledWith(
+      expect.objectContaining({ imageName: 'newest' }),
+      undefined,
+      expect.any(Number),
+      true
+    );
   });
 
   it('uses the active placeholder board while following live, even before an image frame arrives', async () => {
@@ -298,7 +434,10 @@ describe('preview keyboard navigation boundary', () => {
     await pressArrow('ArrowRight');
 
     expect(mocks.commands.gallery.selectImage).toHaveBeenCalledWith(
-      expect.objectContaining({ boardId: 'board-live', imageName: 'live-board-image' })
+      expect.objectContaining({ boardId: 'board-live', imageName: 'live-board-image' }),
+      undefined,
+      expect.any(Number),
+      true
     );
   });
 
@@ -308,7 +447,12 @@ describe('preview keyboard navigation boundary', () => {
     await render();
     await pressArrow('ArrowLeft');
 
-    expect(mocks.commands.gallery.selectImage).toHaveBeenCalledWith(expect.objectContaining({ imageName: 'oldest' }));
+    expect(mocks.commands.gallery.selectImage).toHaveBeenCalledWith(
+      expect.objectContaining({ imageName: 'oldest' }),
+      undefined,
+      expect.any(Number),
+      true
+    );
   });
 
   it('does not consume arrow keys in comparison mode', async () => {

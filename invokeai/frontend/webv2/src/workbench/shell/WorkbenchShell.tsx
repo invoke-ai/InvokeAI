@@ -1,4 +1,4 @@
-import { Flex, HStack, Text } from '@chakra-ui/react';
+import { Flex, HStack, Text, VisuallyHidden } from '@chakra-ui/react';
 import {
   DndContext,
   DragOverlay,
@@ -14,6 +14,7 @@ import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { FocusRegionProvider } from '@workbench/focusRegions';
 import { WidgetIcon } from '@workbench/iconResolver';
+import { getProjectTabId, PROJECT_CONTENT_PANEL_ID } from '@workbench/projects/projectTabsA11y';
 import { WidgetBar } from '@workbench/widget-frame';
 import {
   getRegionDropState,
@@ -50,6 +51,8 @@ export const WorkbenchShell = () => {
   const { notifications, widgets } = useWorkbenchCommands();
   const { t } = useTranslation();
   const panels = useActiveProjectSelector((project) => project.layout.panels);
+  const projectId = useActiveProjectSelector((project) => project.id);
+  const projectName = useActiveProjectSelector((project) => project.name);
   const leftRegion = useActiveProjectSelector((project) => project.widgetRegions.left);
   const rightRegion = useActiveProjectSelector((project) => project.widgetRegions.right);
   const placementProject = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
@@ -226,34 +229,46 @@ export const WorkbenchShell = () => {
           <WorkbenchNotificationToaster />
           <TopBar />
 
-          <Flex as="main" flex="1" minH="0" overflow="hidden">
-            <WidgetBar
-              activeId={panels.isLeftOpen && !leftRegion.isCollapsed ? leftRegion.activeInstanceId : null}
-              dropState={leftDropState}
-              menuItems={leftMenuItems}
-              railItems={leftRailItems}
-              region="left"
-              side="left"
-              onSelect={handleSelectLeft}
-              onToggle={handleToggleLeft}
-            />
-            {panels.isLeftOpen && !leftRegion.isCollapsed && canShowLeftPanel ? (
-              <LeftPanel instanceId={leftRegion.activeInstanceId} />
-            ) : null}
-            <CenterArea dropState={centerDropState} />
-            {panels.isRightOpen && !rightRegion.isCollapsed && canShowRightPanel ? (
-              <RightPanel instanceId={rightRegion.activeInstanceId} />
-            ) : null}
-            <WidgetBar
-              activeId={panels.isRightOpen && !rightRegion.isCollapsed ? rightRegion.activeInstanceId : null}
-              dropState={rightDropState}
-              menuItems={rightMenuItems}
-              railItems={rightRailItems}
-              region="right"
-              side="right"
-              onSelect={handleSelectRight}
-              onToggle={handleToggleRight}
-            />
+          <Flex aria-labelledby="workbench-project-heading" as="main" flex="1" minH="0" overflow="hidden">
+            <VisuallyHidden as="h1" id="workbench-project-heading">
+              {projectName}
+            </VisuallyHidden>
+            <Flex
+              aria-labelledby={getProjectTabId(projectId)}
+              flex="1"
+              id={PROJECT_CONTENT_PANEL_ID}
+              minH="0"
+              overflow="hidden"
+              role="tabpanel"
+            >
+              <WidgetBar
+                activeId={panels.isLeftOpen && !leftRegion.isCollapsed ? leftRegion.activeInstanceId : null}
+                dropState={leftDropState}
+                menuItems={leftMenuItems}
+                railItems={leftRailItems}
+                region="left"
+                side="left"
+                onSelect={handleSelectLeft}
+                onToggle={handleToggleLeft}
+              />
+              {panels.isLeftOpen && !leftRegion.isCollapsed && canShowLeftPanel ? (
+                <LeftPanel instanceId={leftRegion.activeInstanceId} />
+              ) : null}
+              <CenterArea dropState={centerDropState} />
+              {panels.isRightOpen && !rightRegion.isCollapsed && canShowRightPanel ? (
+                <RightPanel instanceId={rightRegion.activeInstanceId} />
+              ) : null}
+              <WidgetBar
+                activeId={panels.isRightOpen && !rightRegion.isCollapsed ? rightRegion.activeInstanceId : null}
+                dropState={rightDropState}
+                menuItems={rightMenuItems}
+                railItems={rightRailItems}
+                region="right"
+                side="right"
+                onSelect={handleSelectRight}
+                onToggle={handleToggleRight}
+              />
+            </Flex>
           </Flex>
 
           <BottomPanel />
