@@ -111,6 +111,7 @@ We very much thank the following sponsors:
 ### Backers ($15/mo)
 
 * [apokolypsse](https://github.com/apokolypsse)
+* [Romeotechguy](https://github.com/Romeotechguy)
 
 ### Power Users ($50/mo)
 
