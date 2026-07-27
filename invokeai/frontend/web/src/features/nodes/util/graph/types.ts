@@ -72,6 +72,7 @@ export type GraphBuilderReturn = {
   g: Graph;
   seed?: Invocation<'integer'>;
   positivePrompt: Invocation<'string'>;
+  negativePrompt?: Invocation<'string'>;
 };
 
 export class UnsupportedGenerationModeError extends Error {

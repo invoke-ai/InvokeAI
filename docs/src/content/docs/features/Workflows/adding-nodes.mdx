@@ -88,6 +88,26 @@ You can also drop a connection onto a node without targeting a specific port. In
 - **Remove** an edge by dragging it away from its port and releasing it over empty canvas.
 - **Delete** selected edges with <kbd>Delete</kbd> or <kbd>Backspace</kbd>.
 
+### Connectors
+
+Connectors are small editor-only nodes that exist purely to **reroute edges** for a cleaner-looking graph. They are saved with the workflow but are flattened out of the graph before execution, so the runtime never sees them — you cannot use them to add logic, only to tidy wiring.
+
+Ways to add a connector:
+
+- **Right-click empty canvas → Add Connector**, then drag connections to and from it.
+- **Double-click an existing edge** to insert a connector at that point, splicing it in.
+
+Other behaviors worth knowing:
+
+- **Target-first wiring works.** You can connect a connector's output to a downstream target field *before* hooking up its upstream source. The connector stays unresolved until a compatible source is connected; incompatible upstreams are rejected.
+- **Type compatibility is enforced** through the connector, exactly as for normal edges.
+- **Deleting a connector splices through** any edges that pass through it:
+    - `1 → 1`: the source is reconnected directly to the target.
+    - `1 → N`: the source is reconnected to every compatible downstream target.
+    - `1 → 0`: the connector is removed, no edges created.
+    - If a splice-through would produce an invalid graph, **Delete Connector** is disabled.
+- **Connectors persist** across workflow save / load.
+
 ## Configuring Nodes
 
 Once a node is on the canvas, you can configure it by editing its input fields directly. Each node exposes a set of fields specific to its function — for example, a noise node has a **Seed** field, while a model loader has a **Model** selector.
@@ -133,16 +153,18 @@ Custom names you set on input fields will carry over into the Linear View.
 
 InvokeAI's node system is extensible. Community-created nodes can add new capabilities to your workflows — from specialized image processing to LLM-powered prompt generation.
 
-To install a community node pack:
+The easiest way to install a community node pack is through the **[Custom Node Manager](/features/workflows/custom-node-manager/)**: paste a Git URL in the **Nodes** sidebar tab and the pack is cloned, loaded, and made available without a restart.
+
+If you prefer to install manually:
 
 <Steps>
-1. Find a node pack from the [Community Nodes](../community-nodes) list.
+1. Find a node pack from the [Community Nodes](/features/workflows/community-nodes/) list.
 2. Clone or download the node pack into the `nodes` folder inside your InvokeAI installation directory.
-3. Restart InvokeAI. The new nodes will appear in the node picker.
+3. In the Custom Node Manager, click **Reload** (or restart InvokeAI). The new nodes will appear in the node picker.
 </Steps>
 
 :::note
-The recommended method is `git clone`, which makes it easy to update node packs later with `git pull`.
+`git clone` is preferred over downloading a ZIP — it makes it easy to update node packs later with `git pull`.
 :::
 
-For more details and a full catalog of available community nodes, see the [Community Nodes](../community-nodes) page.
+For more details and a full catalog of available community nodes, see the [Community Nodes](/features/workflows/community-nodes/) page.

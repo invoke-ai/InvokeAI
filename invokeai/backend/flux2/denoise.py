@@ -40,6 +40,9 @@ def denoise(
     # Reference image conditioning (multi-reference image editing)
     img_cond_seq: torch.Tensor | None = None,
     img_cond_seq_ids: torch.Tensor | None = None,
+    # Optional joint_attention_kwargs (e.g. {"attention_mask": ...}) applied to positive forward
+    # passes only. Negative forwards always run unmasked.
+    pos_joint_attention_kwargs: dict[str, Any] | None = None,
 ) -> torch.Tensor:
     """Denoise latents using a FLUX.2 Klein transformer model.
 
@@ -106,7 +109,14 @@ def denoise(
             scheduler.set_timesteps(sigmas=sigmas.tolist(), device=img.device)
         else:
             # Scheduler doesn't support sigmas (e.g., Heun, LCM) - use num_inference_steps
-            scheduler.set_timesteps(num_inference_steps=len(sigmas), device=img.device)
+            #
+            # Important for img2img callers: if the initial latent/noise blend was
+            # computed from a separate pre-scheduler schedule, that preblend may not
+            # match this scheduler's true first step exactly.
+            scheduler_kwargs: dict[str, Any] = {"num_inference_steps": len(sigmas), "device": img.device}
+            if mu is not None and "mu" in set_timesteps_sig.parameters:
+                scheduler_kwargs["mu"] = mu
+            scheduler.set_timesteps(**scheduler_kwargs)
         num_scheduler_steps = len(scheduler.timesteps)
         is_heun = hasattr(scheduler, "state_in_first_order")
         user_step = 0
@@ -129,6 +139,7 @@ def denoise(
                 img_ids=img_ids,
                 txt_ids=txt_ids,
                 guidance=guidance_vec,
+                joint_attention_kwargs=pos_joint_attention_kwargs,
                 return_dict=False,
             )
 
@@ -188,13 +199,17 @@ def denoise(
                             preview_img = inpaint_extension.merge_intermediate_latents_with_init_latents(
                                 preview_img, 0.0
                             )
+                        # Extract only the generated image portion for preview (exclude reference images)
+                        callback_latents = (
+                            preview_img[:, :original_seq_len, :] if img_cond_seq is not None else preview_img
+                        )
                         step_callback(
                             PipelineIntermediateState(
                                 step=user_step,
                                 order=2,
                                 total_steps=total_steps,
                                 timestep=int(t_curr * 1000),
-                                latents=preview_img,
+                                latents=callback_latents,
                             ),
                         )
             else:
@@ -230,6 +245,7 @@ def denoise(
                 img_ids=img_ids,
                 txt_ids=txt_ids,
                 guidance=guidance_vec,
+                joint_attention_kwargs=pos_joint_attention_kwargs,
                 return_dict=False,
             )
 

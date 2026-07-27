@@ -31,15 +31,13 @@ Restart Invoke for the change to take effect.
 
 | Model | Modes | Reference Images | Notes |
 | --- | --- | --- | --- |
-| **Gemini 2.5 Flash Image** | txt2img, img2img, inpaint | Yes | 10 aspect ratios, fixed per-ratio resolutions. |
-| **Gemini 3 Pro Image Preview** | txt2img, img2img, inpaint | Up to 14 (6 object + 5 character) | 1K / 2K / 4K resolution presets. |
-| **Gemini 3.1 Flash Image Preview** | txt2img, img2img, inpaint | Up to 14 (10 object + 4 character) | 512 / 1K / 2K / 4K resolution presets. |
+| **Gemini 2.5 Flash Image** | txt2img | Yes | 10 aspect ratios, fixed per-ratio resolutions. |
+| **Gemini 3 Pro Image Preview** | txt2img | Up to 14 (6 object + 5 character) | 1K / 2K / 4K resolution presets. |
+| **Gemini 3.1 Flash Image Preview** | txt2img | Up to 14 (10 object + 4 character) | 512 / 1K / 2K / 4K resolution presets. |
+
+Reference-image input is used to condition generation but counts as txt2img — neither img2img (denoising strength) nor inpaint (mask) is supported for Gemini.
 
 All Gemini models are single-image-per-request — batch size is fixed at 1. To generate multiple variations, queue multiple invocations.
-
-## Provider-Specific Options
-
-Gemini exposes a **temperature** control in the parameters panel. Lower values make outputs more deterministic, higher values increase variability.
 
 ## Tips
 

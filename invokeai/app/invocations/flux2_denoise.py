@@ -21,12 +21,14 @@ from invokeai.app.invocations.fields import (
     InputField,
     LatentsField,
 )
+from invokeai.app.invocations.latent_noise import validate_noise_tensor_shape
 from invokeai.app.invocations.model import TransformerField, VAEField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional
 from invokeai.backend.flux.schedulers import FLUX_SCHEDULER_LABELS, FLUX_SCHEDULER_MAP, FLUX_SCHEDULER_NAME_VALUES
 from invokeai.backend.flux2.denoise import denoise
+from invokeai.backend.flux2.extensions.regional_prompting_extension import Flux2RegionalPromptingExtension
 from invokeai.backend.flux2.ref_image_extension import Flux2RefImageExtension
 from invokeai.backend.flux2.sampling_utils import (
     compute_empirical_mu,
@@ -36,6 +38,7 @@ from invokeai.backend.flux2.sampling_utils import (
     pack_flux2,
     unpack_flux2,
 )
+from invokeai.backend.flux2.text_conditioning import Flux2TextConditioning
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.lora_conversions.flux_bfl_peft_lora_conversion_utils import (
@@ -53,20 +56,27 @@ from invokeai.backend.util.devices import TorchDevice
     "flux2_denoise",
     title="FLUX2 Denoise",
     tags=["image", "flux", "flux2", "klein", "denoise"],
-    category="image",
-    version="1.5.0",
+    category="latents",
+    version="1.6.0",
     classification=Classification.Prototype,
 )
 class Flux2DenoiseInvocation(BaseInvocation):
     """Run denoising process with a FLUX.2 Klein transformer model.
 
     This node is designed for FLUX.2 Klein models which use Qwen3 as the text encoder.
-    It does not support ControlNet, IP-Adapters, or regional prompting.
+    Regional prompting is supported via per-conditioning masks (single mask is applied
+    to every transformer block via `joint_attention_kwargs`). ControlNet and IP-Adapters
+    are not supported. Regional masking is skipped when reference images are attached.
     """
 
     latents: Optional[LatentsField] = InputField(
         default=None,
         description=FieldDescriptions.latents,
+        input=Input.Connection,
+    )
+    noise: Optional[LatentsField] = InputField(
+        default=None,
+        description=FieldDescriptions.noise,
         input=Input.Connection,
     )
     denoise_mask: Optional[DenoiseMaskField] = InputField(
@@ -92,7 +102,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
         input=Input.Connection,
         title="Transformer",
     )
-    positive_text_conditioning: FluxConditioningField = InputField(
+    positive_text_conditioning: FluxConditioningField | list[FluxConditioningField] = InputField(
         description=FieldDescriptions.positive_cond,
         input=Input.Connection,
     )
@@ -247,36 +257,42 @@ class Flux2DenoiseInvocation(BaseInvocation):
         if init_latents is not None:
             init_latents = init_latents.to(device=device, dtype=inference_dtype)
 
-        # Prepare input noise (FLUX.2 uses 32 channels)
-        noise = get_noise_flux2(
-            num_samples=1,
-            height=self.height,
-            width=self.width,
-            device=device,
-            dtype=inference_dtype,
-            seed=self.seed,
-        )
-        b, _c, latent_h, latent_w = noise.shape
+        # Prepare input noise (FLUX.2 uses 32 channels).
+        # If noise will never be consumed, avoid validating/loading it.
+        should_ignore_noise = init_latents is not None and not self.add_noise and self.denoise_mask is None
+        noise: Optional[torch.Tensor]
+        if should_ignore_noise:
+            noise = None
+            b, _c, latent_h, latent_w = init_latents.shape
+        else:
+            noise = self._prepare_noise_tensor(context, inference_dtype, device)
+            b, _c, latent_h, latent_w = noise.shape
         packed_h = latent_h // 2
         packed_w = latent_w // 2
 
-        # Load the conditioning data
-        pos_cond_data = context.conditioning.load(self.positive_text_conditioning.conditioning_name)
-        assert len(pos_cond_data.conditionings) == 1
-        pos_flux_conditioning = pos_cond_data.conditionings[0]
-        assert isinstance(pos_flux_conditioning, FLUXConditioningInfo)
-        pos_flux_conditioning = pos_flux_conditioning.to(dtype=inference_dtype, device=device)
-
-        # Qwen3 stacked embeddings (stored in t5_embeds field for compatibility)
-        txt = pos_flux_conditioning.t5_embeds
-
-        # Generate text position IDs (4D format for FLUX.2: T, H, W, L)
-        # FLUX.2 uses 4D position coordinates for its rotary position embeddings
-        # IMPORTANT: Position IDs must be int64 (long) dtype
-        # Diffusers uses: T=0, H=0, W=0, L=0..seq_len-1
-        seq_len = txt.shape[1]
-        txt_ids = torch.zeros(1, seq_len, 4, device=device, dtype=torch.long)
-        txt_ids[..., 3] = torch.arange(seq_len, device=device, dtype=torch.long)  # L coordinate varies
+        # Load the positive conditioning(s). Supports a single field or a list of regional
+        # fields (with optional per-conditioning masks). Masks are preprocessed against the
+        # packed latent grid and combined into a single attention mask via the regional
+        # extension.
+        pos_cond_fields = (
+            self.positive_text_conditioning
+            if isinstance(self.positive_text_conditioning, list)
+            else [self.positive_text_conditioning]
+        )
+        pos_text_conditionings = self._load_text_conditioning(
+            context=context,
+            cond_fields=pos_cond_fields,
+            packed_height=packed_h,
+            packed_width=packed_w,
+            dtype=inference_dtype,
+            device=device,
+        )
+        regional_extension = Flux2RegionalPromptingExtension.from_text_conditionings(
+            text_conditionings=pos_text_conditionings,
+            img_seq_len=packed_h * packed_w,
+        )
+        txt = regional_extension.regional_text_conditioning.txt_embeddings
+        txt_ids = regional_extension.regional_text_conditioning.txt_ids
 
         # Load negative conditioning if provided
         neg_txt = None
@@ -314,6 +330,15 @@ class Flux2DenoiseInvocation(BaseInvocation):
         # Prepare input latent image
         if init_latents is not None:
             if self.add_noise:
+                assert noise is not None
+                # Noise the init latents using the first timestep from the clipped
+                # InvokeAI schedule.
+                #
+                # Known limitation: if a scheduler later uses a different first
+                # effective timestep/sigma than this precomputed schedule, the
+                # img2img preblend below may not match that scheduler exactly.
+                # This is an existing pipeline limitation and applies to both
+                # seed-generated noise and externally supplied noise.
                 t_0 = timesteps[0]
                 x = t_0 * noise + (1.0 - t_0) * init_latents
             else:
@@ -321,6 +346,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
         else:
             if self.denoising_start > 1e-5:
                 raise ValueError("denoising_start should be 0 when initial latents are not provided.")
+            assert noise is not None
             x = noise
 
         # If len(timesteps) == 1, then short-circuit
@@ -337,7 +363,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
         # Pack all latent tensors
         init_latents_packed = pack_flux2(init_latents) if init_latents is not None else None
         inpaint_mask_packed = pack_flux2(inpaint_mask) if inpaint_mask is not None else None
-        noise_packed = pack_flux2(noise)
+        noise_packed = pack_flux2(noise) if noise is not None else None
         x = pack_flux2(x)
 
         # BN normalization for img2img/inpainting:
@@ -357,7 +383,8 @@ class Flux2DenoiseInvocation(BaseInvocation):
                 # Also normalize noise for InpaintExtension - it's used to compute
                 # noised_init_latents = noise * t + init_latents * (1-t)
                 # Both operands must be in the same normalized space
-                noise_packed = self._bn_normalize(noise_packed, bn_mean, bn_std)
+                if noise_packed is not None:
+                    noise_packed = self._bn_normalize(noise_packed, bn_mean, bn_std)
             # For img2img/inpainting, x is computed from init_latents and must also be normalized
             # For txt2img, x is pure noise (already N(0,1)) - normalizing it would be incorrect
             # We detect img2img by checking if init_latents was provided
@@ -371,6 +398,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
         inpaint_extension: Optional[RectifiedFlowInpaintExtension] = None
         if inpaint_mask_packed is not None:
             assert init_latents_packed is not None
+            assert noise_packed is not None
             inpaint_extension = RectifiedFlowInpaintExtension(
                 init_latents=init_latents_packed,
                 inpaint_mask=inpaint_mask_packed,
@@ -385,8 +413,13 @@ class Flux2DenoiseInvocation(BaseInvocation):
         is_inpainting = self.denoise_mask is not None or self.denoising_start > 1e-5
 
         # Create scheduler with FLUX.2 Klein configuration
-        # For inpainting/img2img, use manual Euler stepping to preserve the exact timestep schedule
-        # For txt2img, use the scheduler with dynamic shifting for optimal results
+        # For inpainting/img2img, use manual Euler stepping to preserve the exact
+        # clipped timestep schedule used for the initial latent/noise preblend.
+        # For txt2img, use the scheduler with dynamic shifting for optimal results.
+        #
+        # This split is intentional. Reusing a scheduler for img2img here can
+        # change the first effective timestep/sigma and break parity with the
+        # preblend computed above.
         scheduler = None
         if self.scheduler in FLUX_SCHEDULER_MAP and not is_inpainting:
             # Only use scheduler for txt2img - use manual Euler for inpainting to preserve exact timesteps
@@ -467,6 +500,18 @@ class Flux2DenoiseInvocation(BaseInvocation):
                     ref_image_extension.ref_image_ids,
                 )
 
+            # Regional attention mask is shaped against (txt_len + img_seq_len). When
+            # reference images are concatenated to the image stream their tokens are not
+            # represented in the mask, so SDPA would error. Skip masking in that case.
+            pos_joint_attention_kwargs = None
+            if img_cond_seq is None:
+                pos_joint_attention_kwargs = regional_extension.get_joint_attention_kwargs(dtype=inference_dtype)
+            elif regional_extension.restricted_attn_mask is not None:
+                context.logger.warning(
+                    "FLUX.2 regional prompting is not supported together with reference images. "
+                    "Regional masks will be ignored for this generation."
+                )
+
             x = denoise(
                 model=transformer,
                 img=x,
@@ -484,6 +529,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
                 inpaint_extension=inpaint_extension,
                 img_cond_seq=img_cond_seq,
                 img_cond_seq_ids=img_cond_seq_ids,
+                pos_joint_attention_kwargs=pos_joint_attention_kwargs,
             )
 
         # Apply BN denormalization if BN stats are available
@@ -494,6 +540,23 @@ class Flux2DenoiseInvocation(BaseInvocation):
 
         x = unpack_flux2(x.float(), self.height, self.width)
         return x
+
+    def _prepare_noise_tensor(
+        self, context: InvocationContext, inference_dtype: torch.dtype, device: torch.device
+    ) -> torch.Tensor:
+        if self.noise is not None:
+            noise = context.tensors.load(self.noise.latents_name).to(device=device, dtype=inference_dtype)
+            validate_noise_tensor_shape(noise, "FLUX.2", self.width, self.height)
+            return noise
+
+        return get_noise_flux2(
+            num_samples=1,
+            height=self.height,
+            width=self.width,
+            device=device,
+            dtype=inference_dtype,
+            seed=self.seed,
+        )
 
     def _prep_inpaint_mask(self, context: InvocationContext, latents: torch.Tensor) -> Optional[torch.Tensor]:
         """Prepare the inpaint mask."""
@@ -513,6 +576,38 @@ class Flux2DenoiseInvocation(BaseInvocation):
 
         mask = mask.to(device=latents.device, dtype=latents.dtype)
         return mask.expand_as(latents)
+
+    def _load_text_conditioning(
+        self,
+        context: InvocationContext,
+        cond_fields: list[FluxConditioningField],
+        packed_height: int,
+        packed_width: int,
+        dtype: torch.dtype,
+        device: torch.device,
+    ) -> list[Flux2TextConditioning]:
+        """Load FLUX.2 Klein text conditionings, preprocessing per-conditioning regional masks."""
+        out: list[Flux2TextConditioning] = []
+        for field in cond_fields:
+            cond_data = context.conditioning.load(field.conditioning_name)
+            assert len(cond_data.conditionings) == 1
+            info = cond_data.conditionings[0]
+            assert isinstance(info, FLUXConditioningInfo)
+            info = info.to(dtype=dtype, device=device)
+
+            # mask=None marks a global prompt; only preprocess when a mask field is attached
+            mask_processed: torch.Tensor | None = None
+            if field.mask is not None:
+                mask_tensor = context.tensors.load(field.mask.tensor_name).to(device=device)
+                mask_processed = Flux2RegionalPromptingExtension.preprocess_regional_prompt_mask(
+                    mask=mask_tensor,
+                    packed_height=packed_height,
+                    packed_width=packed_width,
+                    dtype=dtype,
+                    device=device,
+                )
+            out.append(Flux2TextConditioning(txt_embeddings=info.t5_embeds, mask=mask_processed))
+        return out
 
     def _lora_iterator(self, context: InvocationContext) -> Iterator[Tuple[ModelPatchRaw, float]]:
         """Iterate over LoRA models to apply.

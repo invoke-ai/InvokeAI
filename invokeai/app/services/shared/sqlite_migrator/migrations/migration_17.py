@@ -27,6 +27,8 @@ def build_migration_17() -> Migration:
             workflow JSON.
     """
     migration_17 = Migration(
+        id="migration_17",
+        depends_on="migration_16",
         from_version=16,
         to_version=17,
         callback=Migration17Callback(),

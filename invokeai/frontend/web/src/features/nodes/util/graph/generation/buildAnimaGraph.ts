@@ -3,7 +3,6 @@ import { getPrefixedId } from 'features/controlLayers/konva/util';
 import {
   selectAnimaQwen3EncoderModel,
   selectAnimaScheduler,
-  selectAnimaT5EncoderModel,
   selectAnimaVaeModel,
   selectMainModelConfig,
   selectParamsSlice,
@@ -11,6 +10,7 @@ import {
 import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import { addAnimaLoRAs } from 'features/nodes/util/graph/generation/addAnimaLoRAs';
+import { addAnimaLLLiteControl } from 'features/nodes/util/graph/generation/addControlAdapters';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
 import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
@@ -41,7 +41,6 @@ export const buildAnimaGraph = async (arg: GraphBuilderArg): Promise<GraphBuilde
   // Get Anima component models
   const animaVaeModel = selectAnimaVaeModel(state);
   const animaQwen3EncoderModel = selectAnimaQwen3EncoderModel(state);
-  const animaT5EncoderModel = selectAnimaT5EncoderModel(state);
   const animaScheduler = selectAnimaScheduler(state);
 
   // Validate required component models
@@ -50,7 +49,6 @@ export const buildAnimaGraph = async (arg: GraphBuilderArg): Promise<GraphBuilde
     'No VAE model selected for Anima. Set a compatible VAE (Wan 2.1 QwenImage or FLUX VAE).'
   );
   assert(animaQwen3EncoderModel !== null, 'No Qwen3 Encoder model selected for Anima. Set a Qwen3 0.6B encoder model.');
-  assert(animaT5EncoderModel !== null, 'No T5 Encoder model selected for Anima. Set a T5-XXL encoder model.');
 
   const params = selectParamsSlice(state);
   const { cfgScale: guidance_scale, steps } = params;
@@ -65,7 +63,6 @@ export const buildAnimaGraph = async (arg: GraphBuilderArg): Promise<GraphBuilde
     model,
     vae_model: animaVaeModel,
     qwen3_encoder_model: animaQwen3EncoderModel,
-    t5_encoder_model: animaT5EncoderModel,
   });
 
   const positivePrompt = g.addNode({
@@ -122,7 +119,6 @@ export const buildAnimaGraph = async (arg: GraphBuilderArg): Promise<GraphBuilde
   // Connect model loader outputs
   g.addEdge(modelLoader, 'transformer', denoise, 'transformer');
   g.addEdge(modelLoader, 'qwen3_encoder', posCond, 'qwen3_encoder');
-  g.addEdge(modelLoader, 't5_encoder', posCond, 't5_encoder');
   g.addEdge(modelLoader, 'vae', l2i, 'vae');
 
   // Connect positive prompt through collector for regional support
@@ -133,7 +129,6 @@ export const buildAnimaGraph = async (arg: GraphBuilderArg): Promise<GraphBuilde
   // Connect negative conditioning if guidance_scale > 1
   if (negCond !== null && negCondCollect !== null) {
     g.addEdge(modelLoader, 'qwen3_encoder', negCond, 'qwen3_encoder');
-    g.addEdge(modelLoader, 't5_encoder', negCond, 't5_encoder');
     g.addEdge(negCond, 'conditioning', negCondCollect, 'item');
     g.addEdge(negCondCollect, 'collection', denoise, 'negative_conditioning');
   }
@@ -153,7 +148,6 @@ export const buildAnimaGraph = async (arg: GraphBuilderArg): Promise<GraphBuilde
     scheduler: animaScheduler,
     vae: animaVaeModel ?? undefined,
     qwen3_encoder: animaQwen3EncoderModel ?? undefined,
-    t5_encoder: animaT5EncoderModel ?? undefined,
   });
   g.addEdgeToMetadata(seed, 'value', 'seed');
   g.addEdgeToMetadata(positivePrompt, 'value', 'positive_prompt');
@@ -181,6 +175,25 @@ export const buildAnimaGraph = async (arg: GraphBuilderArg): Promise<GraphBuilde
 
   // IP Adapters are not supported for Anima, so delete the unused collector
   g.deleteNode(ipAdapterCollect.id);
+
+  // All ControlNet-LLLite adapters (canvas control layers and/or the inpaint adapter) fan into ONE
+  // collect node feeding denoise.control_lllite.
+  const hasAnimaControlLayers =
+    manager !== null &&
+    canvas.controlLayers.entities.some(
+      (entity) =>
+        entity.isEnabled && entity.controlAdapter.type === 'anima_lllite' && entity.controlAdapter.model !== null
+    );
+  const hasInpaintAdapter =
+    (generationMode === 'inpaint' || generationMode === 'outpaint') && params.animaLLLiteModel !== null;
+
+  let controlLLLiteCollect: Invocation<'collect'> | null = null;
+  if (hasAnimaControlLayers || hasInpaintAdapter) {
+    controlLLLiteCollect = g.addNode({
+      type: 'collect',
+      id: getPrefixedId('control_lllite_collect'),
+    });
+  }
 
   let canvasOutput: Invocation<ImageOutputNodes> = l2i;
 
@@ -226,6 +239,7 @@ export const buildAnimaGraph = async (arg: GraphBuilderArg): Promise<GraphBuilde
       vaeSource: modelLoader,
       modelLoader,
       seed,
+      controlLLLiteCollect,
     });
     g.upsertMetadata({ generation_mode: 'anima_inpaint' });
   } else if (generationMode === 'outpaint') {
@@ -245,10 +259,33 @@ export const buildAnimaGraph = async (arg: GraphBuilderArg): Promise<GraphBuilde
       vaeSource: modelLoader,
       modelLoader,
       seed,
+      controlLLLiteCollect,
     });
     g.upsertMetadata({ generation_mode: 'anima_outpaint' });
   } else {
     assert<Equals<typeof generationMode, never>>(false);
+  }
+
+  // Add control layers for all generation modes, then wire the collect node into the denoise node.
+  // The inpaint adapter (if any) was already wired into the collect node by addInpaint/addOutpaint.
+  if (controlLLLiteCollect !== null) {
+    let addedLLLiteAdapters = hasInpaintAdapter ? 1 : 0;
+    if (manager !== null) {
+      const animaControlResult = await addAnimaLLLiteControl({
+        manager,
+        entities: canvas.controlLayers.entities,
+        g,
+        rect: canvas.bbox.rect,
+        collect: controlLLLiteCollect,
+        model,
+      });
+      addedLLLiteAdapters += animaControlResult.addedAnimaLLLiteControls;
+    }
+    if (addedLLLiteAdapters > 0) {
+      g.addEdge(controlLLLiteCollect, 'collection', denoise, 'control_lllite');
+    } else {
+      g.deleteNode(controlLLLiteCollect.id);
+    }
   }
 
   if (state.system.shouldUseNSFWChecker) {

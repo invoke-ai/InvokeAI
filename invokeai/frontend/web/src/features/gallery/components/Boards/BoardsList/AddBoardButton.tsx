@@ -1,25 +1,46 @@
 import { IconButton } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
-import { boardIdSelected, boardSearchTextChanged } from 'features/gallery/store/gallerySlice';
+import type { AppThunkDispatch } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { selectAutoAssignBoardOnClick } from 'features/gallery/store/gallerySelectors';
+import { autoAddBoardIdChanged, boardIdSelected, boardSearchTextChanged } from 'features/gallery/store/gallerySlice';
+import type { BoardId } from 'features/gallery/store/types';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
 import { useCreateBoardMutation } from 'services/api/endpoints/boards';
 
+export const getCreatedBoardActions = (boardId: BoardId, autoAssignBoardOnClick: boolean) => [
+  boardIdSelected({ boardId }),
+  ...(autoAssignBoardOnClick ? [autoAddBoardIdChanged(boardId)] : []),
+  boardSearchTextChanged(''),
+];
+
+type CreateBoard = (args: { board_name: string }) => { unwrap: () => Promise<{ board_id: BoardId }> };
+
+export const createBoardAndDispatchActions = async (
+  createBoard: CreateBoard,
+  dispatch: AppThunkDispatch,
+  boardName: string,
+  autoAssignBoardOnClick: boolean
+) => {
+  try {
+    const board = await createBoard({ board_name: boardName }).unwrap();
+    getCreatedBoardActions(board.board_id, autoAssignBoardOnClick).forEach((action) => dispatch(action));
+  } catch {
+    //no-op
+  }
+};
+
 const AddBoardButton = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+  const autoAssignBoardOnClick = useAppSelector(selectAutoAssignBoardOnClick);
   const [createBoard, { isLoading }] = useCreateBoardMutation();
 
-  const handleCreateBoard = useCallback(async () => {
-    try {
-      const board = await createBoard({ board_name: t('boards.myBoard') }).unwrap();
-      dispatch(boardIdSelected({ boardId: board.board_id }));
-      dispatch(boardSearchTextChanged(''));
-    } catch {
-      //no-op
-    }
-  }, [t, createBoard, dispatch]);
+  const handleCreateBoard = useCallback(
+    () => createBoardAndDispatchActions(createBoard, dispatch, t('boards.myBoard'), autoAssignBoardOnClick),
+    [t, createBoard, dispatch, autoAssignBoardOnClick]
+  );
 
   return (
     <IconButton

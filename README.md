@@ -6,7 +6,10 @@
 
 [![discord badge]][discord link] [![latest release badge]][latest release link] [![github stars badge]][github stars link] [![github forks badge]][github forks link] [![CI checks on main badge]][CI checks on main link] [![latest commit to main badge]][latest commit to main link] [![github open issues badge]][github open issues link] [![github open prs badge]][github open prs link] [![translation status badge]][translation status link]
 
+[![Sponsor Invoke](https://img.shields.io/badge/Sponsor-Invoke-ea4aaa?logo=githubsponsors&logoColor=white)][sponsor link]
+
 </div>
+
 
 Invoke is a leading creative engine built to empower professionals and enthusiasts alike. Generate and create stunning visual media using the latest AI-driven technologies. Invoke offers an industry leading web-based UI, and serves as the foundation for multiple commercial products.
 
@@ -15,12 +18,6 @@ Invoke is a leading creative engine built to empower professionals and enthusias
 - Generate, refine, iterate on images, and build workflows
 
 ![Highlighted Features - Canvas and Workflows](https://github.com/invoke-ai/InvokeAI/assets/31807370/708f7a82-084f-4860-bfbe-e2588c53548d)
-
----
-> ## 📣 Are you a new or returning InvokeAI user?
-> Take our first annual [User's Survey](https://forms.gle/rCE5KuQ7Wfrd1UnS7)
-
----
 
 # Documentation
 
@@ -100,6 +97,25 @@ Get started with contributing by reading our [contribution documentation][contri
 
 We hope you enjoy using Invoke as much as we enjoy creating it, and we hope you will elect to become part of our community.
 
+## Sponsors
+
+Invoke's open-source development is powered by our sponsors. If Invoke is valuable to you or your business, please consider [sponsoring us][sponsor link] — it directly funds maintenance, new features, and community support.
+
+<!-- Sponsor logos can be added below, or automated with a GitHub Action
+     such as `JamesIves/github-sponsors-readme-action` to keep them in sync. -->
+
+[![Sponsor Invoke](https://img.shields.io/badge/Sponsor-Invoke-ea4aaa?logo=githubsponsors&logoColor=white)][sponsor link]
+
+We very much thank the following sponsors:
+
+### Backers ($15/mo)
+
+* [apokolypsse](https://github.com/apokolypsse)
+
+### Power Users ($50/mo)
+
+* [mickr777](https://github.com/mickr777)
+
 ## Thanks
 
 Invoke is a combined effort of [passionate and talented people from across the world][contributors]. We thank them for their time, hard work and effort.
@@ -112,6 +128,7 @@ Original portions of the software are Copyright © 2024 by respective contributo
 [github issues]: https://github.com/invoke-ai/InvokeAI/issues
 [docs home]: https://invoke.ai
 [installation docs]: https://invoke.ai/start-here/installation/
+[sponsor link]: https://github.com/sponsors/invoke-ai
 [#dev-chat]: https://discord.com/channels/1020123559063990373/1049495067846524939
 [contributing docs]: https://invoke.ai/contributing/
 [CI checks on main badge]: https://flat.badgen.net/github/checks/invoke-ai/InvokeAI/main?label=CI%20status%20on%20main&cache=900&icon=github

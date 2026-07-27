@@ -9,7 +9,7 @@ import { memo, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
 
-export const WorkflowSearch = memo(({ searchInputRef }: { searchInputRef: RefObject<HTMLInputElement> }) => {
+export const WorkflowSearch = memo(({ searchInputRef }: { searchInputRef: RefObject<HTMLInputElement | null> }) => {
   const dispatch = useAppDispatch();
   const searchTerm = useAppSelector(selectWorkflowLibrarySearchTerm);
   const { t } = useTranslation();

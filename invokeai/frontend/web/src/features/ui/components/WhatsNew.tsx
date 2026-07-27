@@ -31,21 +31,10 @@ export const WhatsNew = () => {
         <ExternalLink
           fontSize="sm"
           fontWeight="semibold"
-          label={t('whatsNew.takeUserSurvey')}
-          href="https://forms.gle/rCE5KuQ7Wfrd1UnS7"
-        />
-        <ExternalLink
-          fontSize="sm"
-          fontWeight="semibold"
           label={t('whatsNew.readReleaseNotes')}
           href={`https://github.com/invoke-ai/InvokeAI/releases/tag/v${data?.version}`}
         />
-        <ExternalLink
-          fontSize="sm"
-          fontWeight="semibold"
-          label={t('whatsNew.watchRecentReleaseVideos')}
-          href="https://www.youtube.com/@invokeai/videos"
-        />
+        <ExternalLink fontSize="sm" fontWeight="semibold" label={t('whatsNew.readTheDocs')} href="https://invoke.ai/" />
       </Flex>
     </Flex>
   );

@@ -38,6 +38,7 @@ def test_get_external_provider_statuses(monkeypatch: Any, mock_invoker: Invoker,
     }
 
     monkeypatch.setattr("invokeai.app.api.routers.app_info.ApiDependencies", MockApiDependencies(mock_invoker))
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(mock_invoker))
     monkeypatch.setattr(mock_invoker.services.external_generation, "get_provider_statuses", lambda: statuses)
 
     response = client.get("/api/v1/app/external_providers/status")
@@ -59,6 +60,7 @@ def test_external_provider_config_update_and_reset(monkeypatch: Any, mock_invoke
     mock_model_manager.install = mock_install
     mock_invoker.services.model_manager = mock_model_manager
     monkeypatch.setattr("invokeai.app.api.routers.app_info.ApiDependencies", MockApiDependencies(mock_invoker))
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(mock_invoker))
 
     for provider_id in ("gemini", "openai"):
         response = client.delete(f"/api/v1/app/external_providers/config/{provider_id}")
@@ -139,6 +141,7 @@ def test_reset_external_provider_config_removes_provider_models(
     mock_invoker.services.model_manager = mock_model_manager
 
     monkeypatch.setattr("invokeai.app.api.routers.app_info.ApiDependencies", MockApiDependencies(mock_invoker))
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(mock_invoker))
 
     response = client.delete("/api/v1/app/external_providers/config/openai")
 
@@ -169,6 +172,7 @@ def test_set_external_provider_config_clears_provider_models_when_api_key_remove
     mock_invoker.services.model_manager = mock_model_manager
 
     monkeypatch.setattr("invokeai.app.api.routers.app_info.ApiDependencies", MockApiDependencies(mock_invoker))
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(mock_invoker))
 
     response = client.post("/api/v1/app/external_providers/config/openai", json={"api_key": " "})
 
@@ -279,6 +283,49 @@ def test_update_runtime_config_rejects_non_admin_users(
     response = client.patch(
         "/api/v1/app/runtime_config",
         json={"image_subfolder_strategy": "date"},
+        headers={"Authorization": "Bearer non-admin-token"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Admin privileges required"
+
+
+@pytest.mark.parametrize("provider_id", ["alibabacloud", "gemini", "openai", "seedream"])
+def test_set_external_provider_config_rejects_non_admin_users(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient, provider_id: str
+) -> None:
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(mock_invoker))
+    monkeypatch.setattr(mock_invoker.services.configuration, "multiuser", True)
+    monkeypatch.setattr(
+        "invokeai.app.api.auth_dependencies.verify_token",
+        lambda _: TokenData(user_id="user-1", email="user@example.com", is_admin=False),
+    )
+    monkeypatch.setattr(mock_invoker.services.users, "get", Mock(return_value=Mock(is_active=True)))
+
+    response = client.post(
+        f"/api/v1/app/external_providers/config/{provider_id}",
+        json={"api_key": "non-admin-attempt"},
+        headers={"Authorization": "Bearer non-admin-token"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Admin privileges required"
+
+
+@pytest.mark.parametrize("provider_id", ["alibabacloud", "gemini", "openai", "seedream"])
+def test_reset_external_provider_config_rejects_non_admin_users(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient, provider_id: str
+) -> None:
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(mock_invoker))
+    monkeypatch.setattr(mock_invoker.services.configuration, "multiuser", True)
+    monkeypatch.setattr(
+        "invokeai.app.api.auth_dependencies.verify_token",
+        lambda _: TokenData(user_id="user-1", email="user@example.com", is_admin=False),
+    )
+    monkeypatch.setattr(mock_invoker.services.users, "get", Mock(return_value=Mock(is_active=True)))
+
+    response = client.delete(
+        f"/api/v1/app/external_providers/config/{provider_id}",
         headers={"Authorization": "Bearer non-admin-token"},
     )
 

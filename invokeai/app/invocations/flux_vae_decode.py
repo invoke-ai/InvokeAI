@@ -47,7 +47,10 @@ class FluxVaeDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
         with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
             assert isinstance(vae, AutoEncoder)
             vae_dtype = next(iter(vae.parameters())).dtype
-            latents = latents.to(device=TorchDevice.choose_torch_device(), dtype=vae_dtype)
+            # Use the VAE's intended compute device (CUDA/MPS, or CPU if configured cpu_only). Do NOT infer it from
+            # current param residency: partial loading may have temporarily offloaded all weights to RAM, which would
+            # wrongly place the latents (and thus the whole decode) on the CPU (see #9373).
+            latents = latents.to(device=vae_info.compute_device, dtype=vae_dtype)
             img = vae.decode(latents)
 
         img = img.clamp(-1, 1)

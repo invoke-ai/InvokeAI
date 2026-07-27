@@ -137,3 +137,17 @@ class TorchDevice:
             if device.type == "cuda":
                 return torch.float16
             return torch.float32
+
+    @classmethod
+    def choose_anima_inference_dtype(cls, device: Optional[torch.device] = None) -> torch.dtype:
+        """Choose the inference dtype for Anima models, honoring config.precision.
+
+        When precision is 'auto', delegates to choose_bfloat16_safe_dtype (current
+        behavior). When precision is set to a specific value (float16, bfloat16,
+        float32), returns that dtype directly without hardware probing.
+        """
+        device = device or cls.choose_torch_device()
+        config = get_config()
+        if config.precision == "auto":
+            return cls.choose_bfloat16_safe_dtype(device)
+        return NAME_TO_PRECISION[config.precision]

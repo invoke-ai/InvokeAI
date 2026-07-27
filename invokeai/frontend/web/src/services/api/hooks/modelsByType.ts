@@ -11,6 +11,7 @@ import {
 } from 'services/api/endpoints/models';
 import type { AnyModelConfig, AnyModelConfigWithExternal, MainOrExternalModelConfig } from 'services/api/types';
 import {
+  isAnimaInpaintControlNetModelConfig,
   isAnimaQwen3EncoderModelConfig,
   isAnimaVAEModelConfig,
   isCLIPEmbedModelConfigOrSubmodel,
@@ -105,6 +106,7 @@ export const useFlux1VAEModels = () => buildModelsHook(isFlux1VAEModelConfig)();
 export const useFlux2VAEModels = () => buildModelsHook(isFlux2VAEModelConfig)();
 export const useAnimaVAEModels = () => buildModelsHook(isAnimaVAEModelConfig)();
 export const useAnimaQwen3EncoderModels = () => buildModelsHook(isAnimaQwen3EncoderModelConfig)();
+export const useAnimaInpaintControlNetModels = () => buildModelsHook(isAnimaInpaintControlNetModelConfig)();
 export const useZImageDiffusersModels = () => buildModelsHook(isZImageDiffusersMainModelConfig)();
 export const useFlux2DiffusersModels = () => buildModelsHook(isFlux2DiffusersMainModelConfig)();
 export const useQwenImageDiffusersModels = () => buildModelsHook(isQwenImageDiffusersMainModelConfig)();
@@ -153,6 +155,5 @@ export const selectZImageDiffusersModels = buildModelsSelector(isZImageDiffusers
 export const selectFlux2DiffusersModels = buildModelsSelector(isFlux2DiffusersMainModelConfig);
 export const selectFluxVAEModels = buildModelsSelector(isFluxVAEModelConfig);
 export const selectAnimaVAEModels = buildModelsSelector(isAnimaVAEModelConfig);
-export const selectT5EncoderModels = buildModelsSelector(isT5EncoderModelConfigOrSubmodel);
 export const useTextLLMModels = () => buildModelsHook(isTextLLMModelConfig)();
 export const useLlavaModels = () => buildModelsHook(isLLaVAModelConfig)();

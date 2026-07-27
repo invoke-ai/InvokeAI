@@ -12,6 +12,16 @@ from pydantic import BaseModel, Field, model_validator
 from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.extract_metadata_from_image import extract_metadata_from_image
+from invokeai.app.api.routers._access import (
+    assert_board_read_access as _assert_board_read_access,
+)
+from invokeai.app.api.routers._access import (
+    assert_image_owner as _assert_image_owner,
+)
+from invokeai.app.api.routers._access import (
+    assert_image_read_access as _assert_image_read_access,
+)
+from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
 from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
@@ -36,96 +46,6 @@ images_router = APIRouter(prefix="/v1/images", tags=["images"])
 
 # images are immutable; set a high max-age
 IMAGE_MAX_AGE = 31536000
-
-
-def _assert_image_owner(image_name: str, current_user: CurrentUserOrDefault) -> None:
-    """Raise 403 if the current user does not own the image and is not an admin.
-
-    Ownership is satisfied when ANY of these hold:
-    - The user is an admin.
-    - The user is the image's direct owner (image_records.user_id).
-    - The user owns the board the image sits on.
-    - The image sits on a Public board (public boards grant mutation rights).
-    """
-    from invokeai.app.services.board_records.board_records_common import BoardVisibility
-
-    if current_user.is_admin:
-        return
-    owner = ApiDependencies.invoker.services.image_records.get_user_id(image_name)
-    if owner is not None and owner == current_user.user_id:
-        return
-
-    # Check whether the user owns the board the image belongs to,
-    # or the board is Public (public boards grant mutation rights).
-    board_id = ApiDependencies.invoker.services.board_image_records.get_board_for_image(image_name)
-    if board_id is not None:
-        try:
-            board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
-            if board.user_id == current_user.user_id:
-                return
-            if board.board_visibility == BoardVisibility.Public:
-                return
-        except Exception:
-            pass
-
-    raise HTTPException(status_code=403, detail="Not authorized to modify this image")
-
-
-def _assert_image_read_access(image_name: str, current_user: CurrentUserOrDefault) -> None:
-    """Raise 403 if the current user may not view the image.
-
-    Access is granted when ANY of these hold:
-    - The user is an admin.
-    - The user owns the image.
-    - The image sits on a shared or public board.
-    """
-    from invokeai.app.services.board_records.board_records_common import BoardVisibility
-
-    if current_user.is_admin:
-        return
-
-    owner = ApiDependencies.invoker.services.image_records.get_user_id(image_name)
-    if owner is not None and owner == current_user.user_id:
-        return
-
-    # Check whether the image's board makes it visible to other users.
-    board_id = ApiDependencies.invoker.services.board_image_records.get_board_for_image(image_name)
-    if board_id is not None:
-        try:
-            board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
-            if board.board_visibility in (BoardVisibility.Shared, BoardVisibility.Public):
-                return
-        except Exception:
-            pass
-
-    raise HTTPException(status_code=403, detail="Not authorized to access this image")
-
-
-def _assert_board_read_access(board_id: str, current_user: CurrentUserOrDefault) -> None:
-    """Raise 403 if the current user may not read images from this board.
-
-    Access is granted when ANY of these hold:
-    - The user is an admin.
-    - The user owns the board.
-    - The board visibility is Shared or Public.
-    """
-    from invokeai.app.services.board_records.board_records_common import BoardVisibility
-
-    if current_user.is_admin:
-        return
-
-    try:
-        board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
-    except Exception:
-        raise HTTPException(status_code=404, detail="Board not found")
-
-    if board.user_id == current_user.user_id:
-        return
-
-    if board.board_visibility in (BoardVisibility.Shared, BoardVisibility.Public):
-        return
-
-    raise HTTPException(status_code=403, detail="Not authorized to access this board")
 
 
 class ResizeToDimensions(BaseModel):
@@ -188,6 +108,8 @@ async def upload_image(
             and board.board_visibility != BoardVisibility.Public
         ):
             raise HTTPException(status_code=403, detail="Not authorized to upload to this board")
+
+    assert_image_move_maintenance_inactive()
 
     if not file.content_type or not file.content_type.startswith("image"):
         raise HTTPException(status_code=415, detail="Not an image")
@@ -260,6 +182,7 @@ class ImageUploadEntry(BaseModel):
 
 @images_router.post("/", operation_id="create_image_upload_entry")
 async def create_image_upload_entry(
+    _: CurrentUserOrDefault,
     width: int = Body(description="The width of the image"),
     height: int = Body(description="The height of the image"),
     board_id: Optional[str] = Body(default=None, description="The board to add this image to, if any"),
@@ -276,6 +199,7 @@ async def delete_image(
 ) -> DeleteImagesResult:
     """Deletes an image"""
     _assert_image_owner(image_name, current_user)
+    assert_image_move_maintenance_inactive()
 
     deleted_images: set[str] = set()
     affected_boards: set[str] = set()
@@ -303,6 +227,7 @@ async def clear_intermediates(
     """Clears all intermediates. Requires admin."""
     if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Only admins can clear all intermediates")
+    assert_image_move_maintenance_inactive()
 
     try:
         count_deleted = ApiDependencies.invoker.services.images.delete_intermediates()
@@ -336,6 +261,7 @@ async def update_image(
 ) -> ImageDTO:
     """Updates an image"""
     _assert_image_owner(image_name, current_user)
+    assert_image_move_maintenance_inactive()
 
     try:
         return ApiDependencies.invoker.services.images.update(image_name, image_changes)
@@ -392,6 +318,7 @@ async def get_image_workflow(
     image_name: str = Path(description="The name of image whose workflow to get"),
 ) -> WorkflowAndGraphResponse:
     _assert_image_read_access(image_name, current_user)
+    assert_image_move_maintenance_inactive()
 
     try:
         workflow = ApiDependencies.invoker.services.images.get_workflow(image_name)
@@ -432,8 +359,11 @@ async def get_image_full(
 
     This endpoint is intentionally unauthenticated because browsers load images
     via <img src> tags which cannot send Bearer tokens. Image names are UUIDs,
-    providing security through unguessability.
+    providing security through unguessability. Returns 409 while image storage
+    maintenance is active.
     """
+    assert_image_move_maintenance_inactive()
+
     try:
         path = ApiDependencies.invoker.services.images.get_path(image_name)
         with open(path, "rb") as f:
@@ -465,8 +395,11 @@ async def get_image_thumbnail(
 
     This endpoint is intentionally unauthenticated because browsers load images
     via <img src> tags which cannot send Bearer tokens. Image names are UUIDs,
-    providing security through unguessability.
+    providing security through unguessability. Returns 409 while image storage
+    maintenance is active.
     """
+    assert_image_move_maintenance_inactive()
+
     try:
         path = ApiDependencies.invoker.services.images.get_path(image_name, thumbnail=True)
         with open(path, "rb") as f:
@@ -540,6 +473,7 @@ async def list_image_dtos(
         board_id,
         search_term,
         current_user.user_id,
+        current_user.is_admin,
     )
 
     return image_dtos
@@ -550,6 +484,13 @@ async def delete_images_from_list(
     current_user: CurrentUserOrDefault,
     image_names: list[str] = Body(description="The list of names of images to delete", embed=True),
 ) -> DeleteImagesResult:
+    try:
+        assert_image_move_maintenance_inactive()
+    except HTTPException:
+        for image_name in image_names:
+            _assert_image_owner(image_name, current_user)
+        raise
+
     try:
         deleted_images: set[str] = set()
         affected_boards: set[str] = set()
@@ -580,6 +521,7 @@ async def delete_uncategorized_images(
     current_user: CurrentUserOrDefault,
 ) -> DeleteImagesResult:
     """Deletes all uncategorized images owned by the current user (or all if admin)"""
+    assert_image_move_maintenance_inactive()
 
     image_names = ApiDependencies.invoker.services.board_images.get_all_board_image_names_for_board(
         board_id="none", categories=None, is_intermediate=None
@@ -617,6 +559,13 @@ async def star_images_in_list(
     image_names: list[str] = Body(description="The list of names of images to star", embed=True),
 ) -> StarredImagesResult:
     try:
+        assert_image_move_maintenance_inactive()
+    except HTTPException:
+        for image_name in image_names:
+            _assert_image_owner(image_name, current_user)
+        raise
+
+    try:
         starred_images: set[str] = set()
         affected_boards: set[str] = set()
         for image_name in image_names:
@@ -646,6 +595,13 @@ async def unstar_images_in_list(
     current_user: CurrentUserOrDefault,
     image_names: list[str] = Body(description="The list of names of images to unstar", embed=True),
 ) -> UnstarredImagesResult:
+    try:
+        assert_image_move_maintenance_inactive()
+    except HTTPException:
+        for image_name in image_names:
+            _assert_image_owner(image_name, current_user)
+        raise
+
     try:
         unstarred_images: set[str] = set()
         affected_boards: set[str] = set()
@@ -704,6 +660,8 @@ async def download_images_from_list(
     if image_names:
         for name in image_names:
             _assert_image_read_access(name, current_user)
+
+    assert_image_move_maintenance_inactive()
 
     bulk_download_item_id: str = ApiDependencies.invoker.services.bulk_download.generate_item_id(board_id)
 

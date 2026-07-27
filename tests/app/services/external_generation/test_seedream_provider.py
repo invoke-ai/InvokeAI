@@ -4,7 +4,10 @@ import pytest
 from PIL import Image
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
-from invokeai.app.services.external_generation.errors import ExternalProviderRequestError
+from invokeai.app.services.external_generation.errors import (
+    ExternalProviderCapabilityError,
+    ExternalProviderRequestError,
+)
 from invokeai.app.services.external_generation.external_generation_common import (
     ExternalGenerationRequest,
     ExternalReferenceImage,
@@ -276,7 +279,7 @@ def test_seedream_uses_base_url(monkeypatch: pytest.MonkeyPatch) -> None:
     assert captured["url"] == "https://proxy.seedream/api/v3/images/generations"
 
 
-def test_seedream_batch_skips_error_items(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_seedream_batch_surfaces_partial_failures(monkeypatch: pytest.MonkeyPatch) -> None:
     config = InvokeAIAppConfig(external_seedream_api_key="seedream-key")
     provider = SeedreamProvider(config, logging.getLogger("test"))
     model = _build_model("seedream-4-5-251128")
@@ -300,3 +303,52 @@ def test_seedream_batch_skips_error_items(monkeypatch: pytest.MonkeyPatch) -> No
     result = provider.generate(request)
 
     assert len(result.images) == 2
+    assert result.provider_metadata is not None
+    partial_failures = result.provider_metadata.get("partial_failures")
+    assert isinstance(partial_failures, list) and len(partial_failures) == 1
+    assert partial_failures[0] == {"code": "content_filter", "message": "filtered"}
+
+
+def test_seedream_batch_all_items_failed_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    config = InvokeAIAppConfig(external_seedream_api_key="seedream-key")
+    provider = SeedreamProvider(config, logging.getLogger("test"))
+    model = _build_model("seedream-4-5-251128")
+    request = _build_request(model, num_images=2)
+
+    def fake_post(url: str, headers: dict, json: dict, timeout: int) -> DummyResponse:
+        return DummyResponse(
+            ok=True,
+            json_data={
+                "data": [
+                    {"error": {"code": "content_filter", "message": "filtered"}},
+                    {"error": {"code": "content_filter", "message": "filtered"}},
+                ]
+            },
+        )
+
+    monkeypatch.setattr("requests.post", fake_post)
+
+    with pytest.raises(ExternalProviderRequestError, match="filtered"):
+        provider.generate(request)
+
+
+def test_seedream_rejects_combined_reference_and_output_count(monkeypatch: pytest.MonkeyPatch) -> None:
+    config = InvokeAIAppConfig(external_seedream_api_key="seedream-key")
+    provider = SeedreamProvider(config, logging.getLogger("test"))
+    model = _build_model("seedream-4-5-251128")
+    references = [ExternalReferenceImage(image=_make_image("red")) for _ in range(14)]
+    request = _build_request(model, num_images=15, reference_images=references)
+
+    posted = False
+
+    def fake_post(url: str, headers: dict, json: dict, timeout: int) -> DummyResponse:
+        nonlocal posted
+        posted = True
+        return DummyResponse(ok=True, json_data={"data": []})
+
+    monkeypatch.setattr("requests.post", fake_post)
+
+    with pytest.raises(ExternalProviderCapabilityError, match="15 images total"):
+        provider.generate(request)
+
+    assert posted is False

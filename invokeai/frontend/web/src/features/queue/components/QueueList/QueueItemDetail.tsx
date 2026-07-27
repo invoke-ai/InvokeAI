@@ -15,6 +15,8 @@ import { PiArrowCounterClockwiseBold, PiXBold } from 'react-icons/pi';
 import { useGetQueueItemQuery } from 'services/api/endpoints/queue';
 import type { S } from 'services/api/types';
 
+import { getQueueItemActionVisibility } from './getQueueItemActionVisibility';
+
 type Props = {
   queueItem: S['SessionQueueItem'];
 };
@@ -51,6 +53,10 @@ const QueueItemComponent = ({ queueItem: queueItemDTO }: Props) => {
   );
 
   const isFailed = useMemo(() => !!queueItem && ['canceled', 'failed'].includes(queueItem.status), [queueItem]);
+  const { canShowCancelQueueItem, canShowRetryQueueItem } = useMemo(
+    () => getQueueItemActionVisibility(queueItemDTO),
+    [queueItemDTO]
+  );
 
   const onCancelBatch = useCallback(() => {
     cancelBatch.trigger(batch_id);
@@ -82,7 +88,7 @@ const QueueItemComponent = ({ queueItem: queueItemDTO }: Props) => {
         <QueueItemData label={t('queue.batch')} data={batch_id} />
         <QueueItemData label={t('queue.session')} data={session_id} />
         <ButtonGroup size="xs" orientation="vertical">
-          {!isFailed && (
+          {canShowCancelQueueItem && !isFailed && (
             <Button
               onClick={onCancelQueueItem}
               isLoading={cancelQueueItem.isLoading}
@@ -94,7 +100,7 @@ const QueueItemComponent = ({ queueItem: queueItemDTO }: Props) => {
               {t('queue.cancelItem')}
             </Button>
           )}
-          {isFailed && (
+          {canShowRetryQueueItem && isFailed && (
             <Button
               onClick={onRetryQueueItem}
               isLoading={retryQueueItem.isLoading}

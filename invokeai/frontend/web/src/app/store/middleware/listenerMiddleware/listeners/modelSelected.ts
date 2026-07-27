@@ -5,7 +5,6 @@ import { buildSelectIsStaging, selectCanvasSessionId } from 'features/controlLay
 import { loraIsEnabledChanged } from 'features/controlLayers/store/lorasSlice';
 import {
   animaQwen3EncoderModelSelected,
-  animaT5EncoderModelSelected,
   animaVaeModelSelected,
   aspectRatioIdChanged,
   kleinQwen3EncoderModelSelected,
@@ -62,7 +61,6 @@ import {
   selectQwenImageVAEModels,
   selectQwenVLEncoderModels,
   selectRegionalRefImageModels,
-  selectT5EncoderModels,
   selectZImageDiffusersModels,
 } from 'services/api/hooks/modelsByType';
 import type { FLUXKontextModelConfig, FLUXReduxModelConfig, IPAdapterModelConfig } from 'services/api/types';
@@ -129,7 +127,20 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
             const availableZImageDiffusers = selectZImageDiffusersModels(state);
 
             if (availableZImageDiffusers.length > 0) {
-              const diffusersModel = availableZImageDiffusers[0];
+              // Look up the new model's variant to match turbo vs zbase
+              const modelConfigsResult = selectModelConfigsQuery(state);
+              let selectedVariant: string | null = null;
+              if (modelConfigsResult.data) {
+                const newModelConfig = modelConfigsAdapterSelectors.selectById(modelConfigsResult.data, newModel.key);
+                if (newModelConfig && 'variant' in newModelConfig && typeof newModelConfig.variant === 'string') {
+                  selectedVariant = newModelConfig.variant;
+                }
+              }
+
+              const matchingModel = selectedVariant
+                ? availableZImageDiffusers.find((m) => 'variant' in m && m.variant === selectedVariant)
+                : undefined;
+              const diffusersModel = matchingModel ?? availableZImageDiffusers[0];
               if (diffusersModel) {
                 dispatch(
                   zImageQwen3SourceModelSelected({
@@ -176,7 +187,7 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         }
 
         // handle incompatible Anima models - clear if switching away from anima
-        const { animaVaeModel, animaQwen3EncoderModel, animaT5EncoderModel } = state.params;
+        const { animaVaeModel, animaQwen3EncoderModel } = state.params;
         if (newBase !== 'anima') {
           if (animaVaeModel) {
             dispatch(animaVaeModelSelected(null));
@@ -186,18 +197,13 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
             dispatch(animaQwen3EncoderModelSelected(null));
             modelsUpdatedDisabledOrCleared += 1;
           }
-          if (animaT5EncoderModel) {
-            dispatch(animaT5EncoderModelSelected(null));
-            modelsUpdatedDisabledOrCleared += 1;
-          }
         } else {
           // Switching to Anima - set defaults if no valid configuration exists
-          const hasValidConfig = animaVaeModel && animaQwen3EncoderModel && animaT5EncoderModel;
+          const hasValidConfig = animaVaeModel && animaQwen3EncoderModel;
 
           if (!hasValidConfig) {
             const availableQwen3Encoders = selectAnimaQwen3EncoderModels(state);
             const availableAnimaVAEs = selectAnimaVAEModels(state);
-            const availableT5Encoders = selectT5EncoderModels(state);
 
             if (availableQwen3Encoders.length > 0 && availableAnimaVAEs.length > 0) {
               const qwen3Encoder = availableQwen3Encoders[0];
@@ -222,18 +228,6 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
                     name: fluxVAE.name,
                     base: fluxVAE.base,
                     type: fluxVAE.type,
-                  })
-                );
-              }
-              const t5Encoder = availableT5Encoders[0];
-              if (t5Encoder && !animaT5EncoderModel) {
-                dispatch(
-                  animaT5EncoderModelSelected({
-                    key: t5Encoder.key,
-                    hash: t5Encoder.hash,
-                    name: t5Encoder.name,
-                    base: t5Encoder.base,
-                    type: t5Encoder.type,
                   })
                 );
               }
@@ -534,6 +528,35 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
 
           if (diffusersModel) {
             dispatch(qwenImageComponentSourceSelected(zModelIdentifierField.parse(diffusersModel)));
+          }
+        }
+      }
+
+      // Handle Z-Image model changes within the same base (variant may change between turbo/zbase)
+      // Auto-update the Qwen3 source diffusers model to match the new variant
+      if (newBase === 'z-image' && state.params.model?.base === 'z-image' && newModel.key !== state.params.model?.key) {
+        const modelConfigsResult = selectModelConfigsQuery(state);
+        if (modelConfigsResult.data) {
+          const newModelConfig = modelConfigsAdapterSelectors.selectById(modelConfigsResult.data, newModel.key);
+          const newVariant =
+            newModelConfig && 'variant' in newModelConfig && typeof newModelConfig.variant === 'string'
+              ? newModelConfig.variant
+              : null;
+
+          if (newVariant) {
+            const availableZImageDiffusers = selectZImageDiffusersModels(state);
+            const matchingModel = availableZImageDiffusers.find((m) => 'variant' in m && m.variant === newVariant);
+            if (matchingModel) {
+              dispatch(
+                zImageQwen3SourceModelSelected({
+                  key: matchingModel.key,
+                  hash: matchingModel.hash,
+                  name: matchingModel.name,
+                  base: matchingModel.base,
+                  type: matchingModel.type,
+                })
+              );
+            }
           }
         }
       }

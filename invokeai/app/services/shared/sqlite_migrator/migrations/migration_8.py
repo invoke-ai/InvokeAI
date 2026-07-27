@@ -83,6 +83,8 @@ def build_migration_8(app_config: InvokeAIAppConfig) -> Migration:
     - Migrates absolute model & legacy config paths to be relative to the models directory.
     """
     migration_8 = Migration(
+        id="migration_8",
+        depends_on="migration_7",
         from_version=7,
         to_version=8,
         callback=Migration8Callback(app_config),

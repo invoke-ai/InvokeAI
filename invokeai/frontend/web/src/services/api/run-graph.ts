@@ -319,8 +319,8 @@ const _runGraph = async (
       return;
     }
 
-    // Ignore events where the status is pending or in progress - no need to do anything for these
-    if (event.status === 'pending' || event.status === 'in_progress') {
+    // Ignore events where the status is still nonterminal - no need to do anything for these
+    if (event.status === 'pending' || event.status === 'in_progress' || event.status === 'waiting') {
       return;
     }
 
@@ -329,8 +329,8 @@ const _runGraph = async (
       const queueItem = await dependencies.executor.getQueueItem(event.item_id);
       const { status, session, error_type, error_message, error_traceback } = queueItem;
 
-      // We are confident that the queue item is not pending or in progress, at this time.
-      if (status === 'pending' || status === 'in_progress') {
+      // We are confident that the queue item is not in a nonterminal status, at this time.
+      if (status === 'pending' || status === 'in_progress' || status === 'waiting') {
         throw new UnexpectedStatusError(event.item_id, session, status);
       }
 

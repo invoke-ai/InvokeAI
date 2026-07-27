@@ -21,7 +21,9 @@ from invokeai.app.services.external_generation.image_utils import decode_image_b
 class OpenAIProvider(ExternalProvider):
     provider_id = "openai"
 
-    _GPT_IMAGE_MODELS = {"gpt-image-1", "gpt-image-1.5", "gpt-image-1-mini"}
+    _GPT_IMAGE_MODELS = {"gpt-image-1", "gpt-image-1.5", "gpt-image-1-mini", "gpt-image-2"}
+    _DEFAULT_TIMEOUT = 120
+    _MODEL_TIMEOUTS: dict[str, int] = {"gpt-image-2": 300}
 
     def is_configured(self) -> bool:
         return bool(self._app_config.external_openai_api_key)
@@ -33,6 +35,7 @@ class OpenAIProvider(ExternalProvider):
 
         model_id = request.model.provider_model_id
         is_gpt_image = model_id in self._GPT_IMAGE_MODELS
+        timeout = self._MODEL_TIMEOUTS.get(model_id, self._DEFAULT_TIMEOUT)
         size = f"{request.width}x{request.height}"
         base_url = (self._app_config.external_openai_base_url or "https://api.openai.com").rstrip("/")
         headers = {"Authorization": f"Bearer {api_key}"}
@@ -62,7 +65,7 @@ class OpenAIProvider(ExternalProvider):
                 f"{base_url}/v1/images/generations",
                 headers=headers,
                 json=payload,
-                timeout=120,
+                timeout=timeout,
             )
         else:
             images: list[PILImageType] = []
@@ -110,7 +113,7 @@ class OpenAIProvider(ExternalProvider):
                 headers=headers,
                 data=data,
                 files=files,
-                timeout=120,
+                timeout=timeout,
             )
 
         if not response.ok:

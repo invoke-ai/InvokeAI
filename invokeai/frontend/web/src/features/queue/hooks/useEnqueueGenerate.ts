@@ -4,7 +4,11 @@ import type { AppStore } from 'app/store/store';
 import { useAppStore } from 'app/store/storeHooks';
 import { extractMessageFromAssertionError } from 'common/util/extractMessageFromAssertionError';
 import { withResult, withResultAsync } from 'common/util/result';
-import { positivePromptAddedToHistory, selectPositivePrompt } from 'features/controlLayers/store/paramsSlice';
+import {
+  positivePromptAddedToHistory,
+  selectNegativePrompt,
+  selectPositivePrompt,
+} from 'features/controlLayers/store/paramsSlice';
 import type { BaseModelType } from 'features/nodes/types/common';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildAnimaGraph } from 'features/nodes/util/graph/generation/buildAnimaGraph';
@@ -88,7 +92,7 @@ const enqueueGenerate = async (store: AppStore, prepend: boolean) => {
     return;
   }
 
-  const { g, seed, positivePrompt } = buildGraphResult.value;
+  const { g, seed, positivePrompt, negativePrompt } = buildGraphResult.value;
 
   const prepareBatchResult = withResult(() =>
     prepareLinearUIBatch({
@@ -98,6 +102,7 @@ const enqueueGenerate = async (store: AppStore, prepend: boolean) => {
       prepend,
       seedNode: seed,
       positivePromptNode: positivePrompt,
+      negativePromptNode: negativePrompt,
       origin: 'generate',
       destination: 'generate',
     })
@@ -120,7 +125,12 @@ const enqueueGenerate = async (store: AppStore, prepend: boolean) => {
   const enqueueResult = await req.unwrap();
 
   // Push to prompt history on successful enqueue
-  dispatch(positivePromptAddedToHistory(selectPositivePrompt(state)));
+  dispatch(
+    positivePromptAddedToHistory({
+      positivePrompt: selectPositivePrompt(state),
+      negativePrompt: selectNegativePrompt(state),
+    })
+  );
 
   return { batchConfig, enqueueResult };
 };

@@ -4,7 +4,7 @@ import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/C
 import { canvasToBlob, getPrefixedId } from 'features/controlLayers/konva/util';
 import { type CanvasTextSettingsState, selectCanvasTextSlice } from 'features/controlLayers/store/canvasTextSlice';
 import type { Coordinate, RgbaColor } from 'features/controlLayers/store/types';
-import { imageDTOToImageObject } from 'features/controlLayers/store/util';
+import { buildCommittedTextImageState, getCommittedTextImageDimensions } from 'features/controlLayers/text/textCommit';
 import { getFontStackById, TEXT_RASTER_PADDING } from 'features/controlLayers/text/textConstants';
 import {
   buildFontDescriptor,
@@ -418,7 +418,8 @@ export class CanvasTextToolModule extends CanvasModuleBase {
       is_intermediate: true,
       silent: true,
     });
-    const imageState = imageDTOToImageObject(imageDTO);
+    const { width: committedWidth, height: committedHeight } = getCommittedTextImageDimensions(totalWidth, totalHeight);
+    const imageState = buildCommittedTextImageState(imageDTO, totalWidth, totalHeight);
 
     const extraLeftPadding = Math.ceil(textSettings.fontSize * 0.12);
     const fallbackPosition = calculateLayerPosition(
@@ -434,8 +435,8 @@ export class CanvasTextToolModule extends CanvasModuleBase {
       rotation === 0
         ? basePosition
         : {
-            x: basePosition.x + baseSize.width / 2 - totalWidth / 2,
-            y: basePosition.y + baseSize.height / 2 - totalHeight / 2,
+            x: basePosition.x + baseSize.width / 2 - committedWidth / 2,
+            y: basePosition.y + baseSize.height / 2 - committedHeight / 2,
           };
 
     const selectedAdapter = this.manager.stateApi.getSelectedEntityAdapter();

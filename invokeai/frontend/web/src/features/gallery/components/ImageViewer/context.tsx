@@ -1,13 +1,14 @@
 import { useStore } from '@nanostores/react';
 import { logger } from 'app/logging/logger';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { selectAutoSwitch } from 'features/gallery/store/gallerySelectors';
 import type { ProgressImage as ProgressImageType } from 'features/nodes/types/common';
 import { LRUCache } from 'lru-cache';
-import { type Atom, atom, computed } from 'nanostores';
+import { type Atom, atom, computed, type WritableAtom } from 'nanostores';
 import type { PropsWithChildren } from 'react';
-import { createContext, memo, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { S } from 'services/api/types';
+import { getEventScope } from 'services/events/eventScope';
 import { $socket } from 'services/events/stores';
 import { assert } from 'tsafe';
 import type { JsonObject } from 'type-fest';
@@ -16,6 +17,8 @@ type ImageViewerContextValue = {
   $progressEvent: Atom<S['InvocationProgressEvent'] | null>;
   $progressImage: Atom<ProgressImageType | null>;
   $hasProgressImage: Atom<boolean>;
+  $isProgressImageResolving: Atom<boolean>;
+  $isTemporarilyShowingSelectedImage: WritableAtom<boolean>;
   onLoadImage: () => void;
 };
 
@@ -25,10 +28,14 @@ const log = logger('events');
 
 export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
   const socket = useStore($socket);
+  const store = useAppStore();
   const autoSwitch = useAppSelector(selectAutoSwitch);
   const $progressEvent = useState(() => atom<S['InvocationProgressEvent'] | null>(null))[0];
   const $progressImage = useState(() => atom<ProgressImageType | null>(null))[0];
   const $hasProgressImage = useState(() => computed($progressImage, (progressImage) => progressImage !== null))[0];
+  const $isProgressImageResolving = useState(() => atom(false))[0];
+  const $isTemporarilyShowingSelectedImage = useState(() => atom(false))[0];
+  const shouldClearProgressImageOnLoadRef = useRef(false);
   // We can have race conditions where we receive a progress event for a queue item that has already finished. Easiest
   // way to handle this is to keep track of finished queue items in a cache and ignore progress events for those.
   const [finishedQueueItemIds] = useState(() => new LRUCache<number, boolean>({ max: 200 }));
@@ -39,6 +46,11 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
     }
 
     const onInvocationProgress = (data: S['InvocationProgressEvent']) => {
+      // The backend routes progress events to the owner's room only; this check is defense in
+      // depth, mirroring the invocation_progress listener in setEventListeners.
+      if (getEventScope(store.getState, data) !== 'own') {
+        return;
+      }
       if (finishedQueueItemIds.has(data.item_id)) {
         log.trace(
           { data } as JsonObject,
@@ -46,6 +58,8 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
         );
         return;
       }
+      shouldClearProgressImageOnLoadRef.current = false;
+      $isProgressImageResolving.set(false);
       $progressEvent.set(data);
       if (data.image) {
         $progressImage.set(data.image);
@@ -57,7 +71,7 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
     return () => {
       socket.off('invocation_progress', onInvocationProgress);
     };
-  }, [$progressEvent, $progressImage, finishedQueueItemIds, socket]);
+  }, [$isProgressImageResolving, $progressEvent, $progressImage, finishedQueueItemIds, socket, store]);
 
   useEffect(() => {
     if (!socket) {
@@ -65,6 +79,14 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
     }
 
     const onQueueItemStatusChanged = (data: S['QueueItemStatusChangedEvent']) => {
+      // Other users' terminal status changes must not clear this client's live progress
+      // preview. Both the sanitized companion (user_id="redacted", broadcast to every queue
+      // subscriber) and foreign full events (received by admins via the admin room) carry a
+      // real top-level item_id and terminal status, so without this guard they would drive
+      // the terminal branch below and blank the viewer mid-generation.
+      if (getEventScope(store.getState, data) !== 'own') {
+        return;
+      }
       if (finishedQueueItemIds.has(data.item_id)) {
         log.trace(
           { data } as JsonObject,
@@ -92,8 +114,13 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
           // will be stuck on the viewer.
           (data.origin === 'canvas' && data.destination !== 'canvas')
         ) {
+          shouldClearProgressImageOnLoadRef.current = false;
+          $isProgressImageResolving.set(false);
           $progressEvent.set(null);
           $progressImage.set(null);
+        } else {
+          shouldClearProgressImageOnLoadRef.current = true;
+          $isProgressImageResolving.set(true);
         }
       }
     };
@@ -103,16 +130,36 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
     return () => {
       socket.off('queue_item_status_changed', onQueueItemStatusChanged);
     };
-  }, [$progressEvent, $progressImage, autoSwitch, finishedQueueItemIds, socket]);
+  }, [$isProgressImageResolving, $progressEvent, $progressImage, autoSwitch, finishedQueueItemIds, socket, store]);
 
   const onLoadImage = useCallback(() => {
+    if (!shouldClearProgressImageOnLoadRef.current) {
+      return;
+    }
+
+    shouldClearProgressImageOnLoadRef.current = false;
+    $isProgressImageResolving.set(false);
     $progressEvent.set(null);
     $progressImage.set(null);
-  }, [$progressEvent, $progressImage]);
+  }, [$isProgressImageResolving, $progressEvent, $progressImage]);
 
   const value = useMemo(
-    () => ({ $progressEvent, $progressImage, $hasProgressImage, onLoadImage }),
-    [$hasProgressImage, $progressEvent, $progressImage, onLoadImage]
+    () => ({
+      $progressEvent,
+      $progressImage,
+      $hasProgressImage,
+      $isProgressImageResolving,
+      $isTemporarilyShowingSelectedImage,
+      onLoadImage,
+    }),
+    [
+      $hasProgressImage,
+      $isProgressImageResolving,
+      $isTemporarilyShowingSelectedImage,
+      $progressEvent,
+      $progressImage,
+      onLoadImage,
+    ]
   );
 
   return <ImageViewerContext.Provider value={value}>{props.children}</ImageViewerContext.Provider>;

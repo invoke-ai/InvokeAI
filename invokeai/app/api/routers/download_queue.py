@@ -1,6 +1,8 @@
 # Copyright (c) 2023 Lincoln D. Stein
 """FastAPI route for the download queue."""
 
+from pathlib import Path as FsPath
+from pathlib import PurePosixPath, PureWindowsPath
 from typing import List, Optional
 
 from fastapi import Body, Path, Response
@@ -8,6 +10,7 @@ from fastapi.routing import APIRouter
 from pydantic.networks import AnyHttpUrl
 from starlette.exceptions import HTTPException
 
+from invokeai.app.api.auth_dependencies import AdminUserOrDefault, CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.download import (
     DownloadJob,
@@ -17,11 +20,32 @@ from invokeai.app.services.download import (
 download_queue_router = APIRouter(prefix="/v1/download_queue", tags=["download_queue"])
 
 
+def _validate_dest(dest: str) -> str:
+    """Reject absolute paths and parent-traversal segments.
+
+    Accepts a relative POSIX- or Windows-style path. Returns the original string
+    for the caller to wrap in `Path(...)`. Raises 400 on suspicious input so the
+    download service never sees it.
+    """
+    if not dest or not dest.strip():
+        raise HTTPException(status_code=400, detail="Download destination must not be empty.")
+
+    posix = PurePosixPath(dest)
+    windows = PureWindowsPath(dest)
+    if posix.is_absolute() or windows.is_absolute():
+        raise HTTPException(status_code=400, detail="Download destination must be a relative path.")
+
+    if ".." in posix.parts or ".." in windows.parts:
+        raise HTTPException(status_code=400, detail="Download destination must not contain '..' segments.")
+
+    return dest
+
+
 @download_queue_router.get(
     "/",
     operation_id="list_downloads",
 )
-async def list_downloads() -> List[DownloadJob]:
+async def list_downloads(current_user: CurrentUserOrDefault) -> List[DownloadJob]:
     """Get a list of active and inactive jobs."""
     queue = ApiDependencies.invoker.services.download_queue
     return queue.list_jobs()
@@ -35,7 +59,7 @@ async def list_downloads() -> List[DownloadJob]:
         400: {"description": "Bad request"},
     },
 )
-async def prune_downloads() -> Response:
+async def prune_downloads(current_user: AdminUserOrDefault) -> Response:
     """Prune completed and errored jobs."""
     queue = ApiDependencies.invoker.services.download_queue
     queue.prune_jobs()
@@ -47,14 +71,16 @@ async def prune_downloads() -> Response:
     operation_id="download",
 )
 async def download(
+    current_user: CurrentUserOrDefault,
     source: AnyHttpUrl = Body(description="download source"),
     dest: str = Body(description="download destination"),
     priority: int = Body(default=10, description="queue priority"),
     access_token: Optional[str] = Body(default=None, description="token for authorization to download"),
 ) -> DownloadJob:
     """Download the source URL to the file or directory indicted in dest."""
+    validated_dest = _validate_dest(dest)
     queue = ApiDependencies.invoker.services.download_queue
-    return queue.download(source, Path(dest), priority, access_token)
+    return queue.download(source, FsPath(validated_dest), priority, access_token)
 
 
 @download_queue_router.get(
@@ -66,6 +92,7 @@ async def download(
     },
 )
 async def get_download_job(
+    current_user: CurrentUserOrDefault,
     id: int = Path(description="ID of the download job to fetch."),
 ) -> DownloadJob:
     """Get a download job using its ID."""
@@ -85,6 +112,7 @@ async def get_download_job(
     },
 )
 async def cancel_download_job(
+    current_user: CurrentUserOrDefault,
     id: int = Path(description="ID of the download job to cancel."),
 ) -> Response:
     """Cancel a download job using its ID."""
@@ -104,7 +132,7 @@ async def cancel_download_job(
         204: {"description": "Download jobs have been cancelled"},
     },
 )
-async def cancel_all_download_jobs() -> Response:
+async def cancel_all_download_jobs(current_user: AdminUserOrDefault) -> Response:
     """Cancel all download jobs."""
     ApiDependencies.invoker.services.download_queue.cancel_all_jobs()
     return Response(status_code=204)

@@ -27,12 +27,9 @@ export const useRecallCLIPSkip = (imageDTO: ImageDTO) => {
       }
     };
 
-    if (!hasModelCLIPSkip) {
-      setHasCLIPSkip(false);
-      return;
+    if (hasModelCLIPSkip) {
+      parse();
     }
-
-    parse();
   }, [metadata, store, hasModelCLIPSkip]);
 
   const isEnabled = useMemo(() => {
@@ -40,28 +37,18 @@ export const useRecallCLIPSkip = (imageDTO: ImageDTO) => {
       return false;
     }
 
-    if (!ALLOWED_TABS.includes(tab)) {
-      return false;
-    }
-
-    if (!metadata) {
-      return false;
-    }
-
-    if (!hasCLIPSkip) {
+    if (!ALLOWED_TABS.includes(tab) || !hasModelCLIPSkip || !metadata || !hasCLIPSkip) {
       return false;
     }
 
     return true;
-  }, [hasCLIPSkip, isLoading, metadata, tab]);
+  }, [hasCLIPSkip, hasModelCLIPSkip, isLoading, metadata, tab]);
 
   const recall = useCallback(() => {
-    if (!metadata) {
+    if (!metadata || !isEnabled) {
       return;
     }
-    if (!isEnabled) {
-      return;
-    }
+
     MetadataUtils.recallByHandler({ metadata, handler: ImageMetadataHandlers.CLIPSkip, store });
   }, [metadata, isEnabled, store]);
 

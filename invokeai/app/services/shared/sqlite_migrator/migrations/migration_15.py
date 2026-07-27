@@ -26,6 +26,8 @@ def build_migration_15() -> Migration:
         - Adds `destination` column to the session queue table.
     """
     migration_15 = Migration(
+        id="migration_15",
+        depends_on="migration_14",
         from_version=14,
         to_version=15,
         callback=Migration15Callback(),

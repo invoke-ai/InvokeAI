@@ -9,7 +9,7 @@ import { addOutpaint } from 'features/nodes/util/graph/generation/addOutpaint';
 import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
-import { selectCanvasOutputFields, selectPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
+import { selectCanvasOutputFields } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg, GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { Invocation } from 'services/api/types';
@@ -31,8 +31,6 @@ export const buildSD3Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
 
   const { cfgScale: cfg_scale, steps, vae, t5EncoderModel, clipLEmbedModel, clipGEmbedModel } = params;
 
-  const prompts = selectPresetModifiedPrompts(state);
-
   const g = new Graph(getPrefixedId('sd3_graph'));
 
   const modelLoader = g.addNode({
@@ -49,6 +47,10 @@ export const buildSD3Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
     id: getPrefixedId('positive_prompt'),
     type: 'string',
   });
+  const negativePrompt = g.addNode({
+    id: getPrefixedId('negative_prompt'),
+    type: 'string',
+  });
   const posCond = g.addNode({
     type: 'sd3_text_encoder',
     id: getPrefixedId('pos_cond'),
@@ -57,7 +59,6 @@ export const buildSD3Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
   const negCond = g.addNode({
     type: 'sd3_text_encoder',
     id: getPrefixedId('neg_cond'),
-    prompt: prompts.negative,
   });
 
   const seed = g.addNode({
@@ -87,6 +88,7 @@ export const buildSD3Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
   g.addEdge(modelLoader, 'vae', l2i, 'vae');
 
   g.addEdge(positivePrompt, 'value', posCond, 'prompt');
+  g.addEdge(negativePrompt, 'value', negCond, 'prompt');
   g.addEdge(posCond, 'conditioning', denoise, 'positive_conditioning');
   g.addEdge(negCond, 'conditioning', denoise, 'negative_conditioning');
 
@@ -95,13 +97,13 @@ export const buildSD3Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
 
   g.upsertMetadata({
     cfg_scale,
-    negative_prompt: prompts.negative,
     model: Graph.getModelMetadataField(model),
     steps,
     vae: vae ?? undefined,
   });
   g.addEdgeToMetadata(seed, 'value', 'seed');
   g.addEdgeToMetadata(positivePrompt, 'value', 'positive_prompt');
+  g.addEdgeToMetadata(negativePrompt, 'value', 'negative_prompt');
 
   let canvasOutput: Invocation<ImageOutputNodes> = l2i;
 
@@ -188,5 +190,6 @@ export const buildSD3Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
     g,
     seed,
     positivePrompt,
+    negativePrompt,
   };
 };

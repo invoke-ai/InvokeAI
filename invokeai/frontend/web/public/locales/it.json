@@ -849,7 +849,9 @@
         "noOrphanedModels": "La cartella dei modelli è sincronizzata. Nessun file orfano trovato.",
         "orphanedModelsFound": "Modelli orfani trovati",
         "orphanedModelsDescription": "Le seguenti cartelle dei modelli non sono referenziate nel database e possono essere eliminate in sicurezza:",
-        "foundOrphanedModels": "Trovata {{count}} cartella di modello orfana",
+        "foundOrphanedModels_one": "Trovata {{count}} cartella di modello orfana",
+        "foundOrphanedModels_many": "",
+        "foundOrphanedModels_other": "",
         "filesCount": "{{count}} file",
         "deleteSelected": "Elimina {{count}} selezionati",
         "deselectAll": "Deseleziona tutto",
@@ -2567,7 +2569,8 @@
             "eraser": "Cancellino",
             "gradient": "Gradiente",
             "text": "Testo",
-            "lasso": "Lazo"
+            "lasso": "Lazo",
+            "shapes": "Forme"
         },
         "filter": {
             "apply": "Applica",
@@ -3113,8 +3116,15 @@
                 "newLine": "Nuova linea",
                 "cancelText": "Annulla",
                 "dragText": "Trascina il testo",
-                "snapRotation": "Rotazione a scatto"
+                "snapRotation": "Rotazione a scatto",
+                "moveShape": "Sposta la forma",
+                "erase": "Cancella",
+                "nudgeSelection": "Sposta selezione"
             }
+        },
+        "shape": {
+            "rect": "Rett",
+            "oval": "Ovale"
         }
     },
     "ui": {

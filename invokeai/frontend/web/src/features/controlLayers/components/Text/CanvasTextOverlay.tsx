@@ -22,6 +22,8 @@ import {
   useState,
 } from 'react';
 
+import { getCanvasTextEditorEffectiveSize, getInitialCanvasTextEditorSize } from './CanvasTextOverlay.utils';
+
 export const CanvasTextOverlay = memo(() => {
   const canvasManager = useCanvasManager();
   const session = useStore(canvasManager.tool.tools.text.$session);
@@ -47,6 +49,7 @@ export const CanvasTextOverlay = memo(() => {
         transformOrigin="top left"
       >
         <TextEditor
+          key={session.id}
           sessionId={session.id}
           anchor={session.anchor}
           initialText={session.text}
@@ -108,13 +111,47 @@ const TextEditor = ({
   const [isDragging, setIsDragging] = useState(false);
   const [isRotating, setIsRotating] = useState(false);
   const [textValue, setTextValue] = useState(initialText);
-  const [contentMetrics, setContentMetrics] = useState(() =>
-    measureTextContent(buildMeasureConfig(initialText, textSettings))
+  const contentMetrics = useMemo(
+    () => measureTextContent(buildMeasureConfig(textValue, textSettings)),
+    [textValue, textSettings]
   );
-  const [measuredSize, setMeasuredSize] = useState(() => ({
-    width: Math.max(contentMetrics.contentWidth, textSettings.fontSize),
-    height: Math.max(contentMetrics.contentHeight, textSettings.fontSize),
-  }));
+  const textContainerData = useMemo(() => {
+    const padding = TEXT_RASTER_PADDING;
+    const extraRightPadding = Math.ceil(textSettings.fontSize * 0.26);
+    const extraLeftPadding = Math.ceil(textSettings.fontSize * 0.12);
+    let offsetX = -padding - extraLeftPadding;
+    if (textSettings.alignment === 'center') {
+      offsetX = -(contentMetrics.contentWidth / 2) - padding - extraLeftPadding;
+    } else if (textSettings.alignment === 'right') {
+      offsetX = -contentMetrics.contentWidth - padding - extraLeftPadding;
+    }
+    return {
+      x: anchor.x + offsetX,
+      y: anchor.y - padding,
+      padding,
+      extraLeftPadding,
+      extraRightPadding,
+      width: contentMetrics.contentWidth + padding * 2 + extraLeftPadding + extraRightPadding,
+      height: contentMetrics.contentHeight + padding * 2,
+    };
+  }, [
+    anchor.x,
+    anchor.y,
+    contentMetrics.contentHeight,
+    contentMetrics.contentWidth,
+    textSettings.alignment,
+    textSettings.fontSize,
+  ]);
+  const initialMeasuredSize = useMemo(
+    () =>
+      getInitialCanvasTextEditorSize({
+        contentMetrics,
+        textContainerData,
+        minSize: textSettings.fontSize,
+      }),
+    [contentMetrics, textContainerData, textSettings.fontSize]
+  );
+  const [measuredSize, setMeasuredSize] = useState<{ width: number; height: number } | null>(() => initialMeasuredSize);
   const dragStateRef = useRef<{
     pointerId: number;
     startPointer: Coordinate;
@@ -193,7 +230,7 @@ const TextEditor = ({
       node.textContent = initialText;
       const syncedText = (node.innerText ?? '').replace(/\r/g, '');
       setTextValue(syncedText);
-      setContentMetrics(measureTextContent(buildMeasureConfig(syncedText, textSettings)));
+      setMeasuredSize(initialMeasuredSize);
       canvasManager.tool.tools.text.updateSessionText(sessionId, syncedText);
     }
     if (lastFocusedSessionIdRef.current !== sessionId) {
@@ -213,11 +250,7 @@ const TextEditor = ({
         focusRafIdRef.current = null;
       }
     };
-  }, [canvasManager.tool.tools.text, focusEditor, initialText, sessionId, textSettings]);
-
-  useEffect(() => {
-    setContentMetrics(measureTextContent(buildMeasureConfig(textValue, textSettings)));
-  }, [textSettings, textValue]);
+  }, [canvasManager.tool.tools.text, focusEditor, initialMeasuredSize, initialText, sessionId]);
 
   const updateMeasuredSize = useCallback(
     (width: number, height: number) => {
@@ -292,34 +325,6 @@ const TextEditor = ({
   const handleCompositionStart = useCallback(() => setIsComposing(true), []);
   const handleCompositionEnd = useCallback(() => setIsComposing(false), []);
 
-  const textContainerData = useMemo(() => {
-    const padding = TEXT_RASTER_PADDING;
-    const extraRightPadding = Math.ceil(textSettings.fontSize * 0.26);
-    const extraLeftPadding = Math.ceil(textSettings.fontSize * 0.12);
-    let offsetX = -padding - extraLeftPadding;
-    if (textSettings.alignment === 'center') {
-      offsetX = -(contentMetrics.contentWidth / 2) - padding - extraLeftPadding;
-    } else if (textSettings.alignment === 'right') {
-      offsetX = -contentMetrics.contentWidth - padding - extraLeftPadding;
-    }
-    return {
-      x: anchor.x + offsetX,
-      y: anchor.y - padding,
-      padding,
-      extraLeftPadding,
-      extraRightPadding,
-      width: contentMetrics.contentWidth + padding * 2 + extraLeftPadding + extraRightPadding,
-      height: contentMetrics.contentHeight + padding * 2,
-    };
-  }, [
-    anchor.x,
-    anchor.y,
-    contentMetrics.contentHeight,
-    contentMetrics.contentWidth,
-    textSettings.alignment,
-    textSettings.fontSize,
-  ]);
-
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Control' || event.key === 'Meta') {
@@ -339,10 +344,12 @@ const TextEditor = ({
     };
   }, []);
 
-  const fallbackWidth = Math.max(textContainerData.width, textSettings.fontSize);
-  const fallbackHeight = Math.max(textContainerData.height, textSettings.fontSize);
-  const effectiveWidth = lastMeasuredSizeRef.current ? measuredSize.width : fallbackWidth;
-  const effectiveHeight = lastMeasuredSizeRef.current ? measuredSize.height : fallbackHeight;
+  const { width: effectiveWidth, height: effectiveHeight } = getCanvasTextEditorEffectiveSize({
+    measuredSize,
+    contentMetrics,
+    textContainerData,
+    minSize: textSettings.fontSize,
+  });
 
   useEffect(() => {
     const node = containerRef.current;

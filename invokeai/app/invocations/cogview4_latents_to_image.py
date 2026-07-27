@@ -54,7 +54,10 @@ class CogView4LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         ):
             context.util.signal_progress("Running VAE")
             assert isinstance(vae, (AutoencoderKL))
-            latents = latents.to(TorchDevice.choose_torch_device())
+            # Use the VAE's intended compute device (CUDA/MPS, or CPU if configured cpu_only). Do NOT infer it from
+            # current param residency: partial loading may have temporarily offloaded all weights to RAM, which would
+            # wrongly place the latents (and thus the whole decode) on the CPU (see #9373).
+            latents = latents.to(vae_info.compute_device)
 
             vae.disable_tiling()
 

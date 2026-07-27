@@ -8,7 +8,10 @@ import { firefoxDndFix } from 'features/dnd/util';
 import type { RefObject } from 'react';
 import { useEffect, useState } from 'react';
 
-export const useCanvasEntityListDnd = (ref: RefObject<HTMLElement>, entityIdentifier: CanvasEntityIdentifier) => {
+export const useCanvasEntityListDnd = (
+  ref: RefObject<HTMLElement | null>,
+  entityIdentifier: CanvasEntityIdentifier
+) => {
   const [dndListState, setDndListState] = useState<DndListTargetState>(idle);
   const [isDragging, setIsDragging] = useState(false);
 

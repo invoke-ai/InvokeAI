@@ -7,6 +7,7 @@ from typing import Optional
 import accelerate
 
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base
+from invokeai.backend.model_manager.configs.controlnet import ControlNet_Checkpoint_Anima_Config
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.configs.main import Main_Checkpoint_Anima_Config
 from invokeai.backend.model_manager.load.load_default import ModelLoader
@@ -22,6 +23,35 @@ from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 
 logger = InvokeAILogger.get_logger(__name__)
+
+
+def _strip_anima_bundle_prefix(sd: dict) -> dict:
+    """Strip the transformer-key prefix from an Anima single-file checkpoint.
+
+    Handles both packaging formats:
+      - Official format: keys prefixed with `net.` (e.g. `net.blocks.0...`)
+      - ComfyUI bundled format: transformer keys prefixed with `model.diffusion_model.`
+        alongside `first_stage_model.*` (VAE) and `cond_stage_model.*` (text encoder).
+
+    Only keys under the detected prefix are kept; unrelated keys from bundled
+    checkpoints (VAE, text encoder) are dropped. If no known prefix is present, the
+    state dict is returned unchanged.
+    """
+    prefix_to_strip = None
+    for prefix in ["model.diffusion_model.", "net."]:
+        if any(k.startswith(prefix) for k in sd.keys() if isinstance(k, str)):
+            prefix_to_strip = prefix
+            break
+
+    if prefix_to_strip is None:
+        return sd
+
+    stripped_sd: dict = {}
+    for key, value in sd.items():
+        if isinstance(key, str) and key.startswith(prefix_to_strip):
+            stripped_sd[key[len(prefix_to_strip) :]] = value
+        # Skip non-transformer keys from bundled checkpoints (VAE, text encoder)
+    return stripped_sd
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Anima, type=ModelType.Main, format=ModelFormat.Checkpoint)
@@ -67,23 +97,8 @@ class AnimaCheckpointModel(ModelLoader):
         # Load the state dict from safetensors
         sd = load_file(model_path)
 
-        # Handle different checkpoint packaging formats:
-        # - Official format: keys prefixed with `net.` (e.g. `net.blocks.0...`)
-        # - ComfyUI bundled format: transformer keys prefixed with `model.diffusion_model.`
-        #   alongside `first_stage_model.*` (VAE) and `cond_stage_model.*` (text encoder)
-        prefix_to_strip = None
-        for prefix in ["model.diffusion_model.", "net."]:
-            if any(k.startswith(prefix) for k in sd.keys() if isinstance(k, str)):
-                prefix_to_strip = prefix
-                break
-
-        if prefix_to_strip:
-            stripped_sd = {}
-            for key, value in sd.items():
-                if isinstance(key, str) and key.startswith(prefix_to_strip):
-                    stripped_sd[key[len(prefix_to_strip) :]] = value
-                # Skip non-transformer keys from bundled checkpoints (VAE, text encoder)
-            sd = stripped_sd
+        # Strip the transformer-key prefix (`net.` or bundled `model.diffusion_model.`).
+        sd = _strip_anima_bundle_prefix(sd)
 
         # Create an empty AnimaTransformer with Anima's default architecture parameters
         with accelerate.init_empty_weights():
@@ -118,7 +133,7 @@ class AnimaCheckpointModel(ModelLoader):
 
         # Determine safe dtype
         target_device = TorchDevice.choose_torch_device()
-        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+        model_dtype = TorchDevice.choose_anima_inference_dtype(target_device)
 
         # Handle memory management
         new_sd_size = sum(ten.nelement() * model_dtype.itemsize for ten in sd.values())
@@ -129,8 +144,17 @@ class AnimaCheckpointModel(ModelLoader):
             if sd[k].is_floating_point():
                 sd[k] = sd[k].to(model_dtype)
 
-        # Filter out rotary embedding inv_freq buffers that are regenerated at runtime
-        keys_to_remove = [k for k in sd.keys() if k.endswith(".inv_freq")]
+        # Filter out tensors that are regenerated at runtime and therefore not part of the
+        # in-memory module state. Some community-trained checkpoints (e.g. animaCatTower_v10)
+        # serialize derived pos_embedder buffers/cached tensors that the official model
+        # registers as non-persistent (or recomputes locally).
+        runtime_only_suffixes = (
+            ".inv_freq",
+            "pos_embedder.dim_spatial_range",
+            "pos_embedder.dim_temporal_range",
+            "pos_embedder.seq",
+        )
+        keys_to_remove = [k for k in sd.keys() if k.endswith(runtime_only_suffixes)]
         for k in keys_to_remove:
             del sd[k]
 
@@ -146,4 +170,43 @@ class AnimaCheckpointModel(ModelLoader):
                 f"Checkpoint is missing {len(load_result.missing_keys)} keys "
                 f"(expected for inv_freq buffers). First 5: {load_result.missing_keys[:5]}"
             )
+        return model
+
+
+@ModelLoaderRegistry.register(base=BaseModelType.Anima, type=ModelType.ControlNet, format=ModelFormat.Checkpoint)
+class AnimaControlNetLLLiteModel(ModelLoader):
+    """Class to load Anima ControlNet-LLLite adapter models from safetensors checkpoints.
+
+    LLLite adapters are standalone files holding a shared conditioning trunk
+    (lllite_conditioning1) plus tiny per-Linear modules (lllite_dit_blocks_*).
+    Hyperparameters are stored in the safetensors metadata (`lllite.*` keys) with
+    state-dict-shape fallbacks.
+    """
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        from safetensors import safe_open
+        from safetensors.torch import load_file
+
+        from invokeai.backend.anima.control_net_lllite import AnimaControlNetLLLite
+
+        if not isinstance(config, ControlNet_Checkpoint_Anima_Config):
+            raise ValueError("Only ControlNet_Checkpoint_Anima_Config models are supported here.")
+
+        # ControlNet type models don't use submodel_type - load the adapter directly
+        model_path = Path(config.path)
+
+        sd = load_file(model_path)
+        with safe_open(model_path, framework="pt", device="cpu") as f:
+            metadata = f.metadata()
+
+        model = AnimaControlNetLLLite.from_state_dict(sd, metadata)
+
+        target_device = TorchDevice.choose_torch_device()
+        model_dtype = TorchDevice.choose_anima_inference_dtype(target_device)
+        model.to(dtype=model_dtype)
+
         return model

@@ -9,6 +9,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   paramsSliceConfig,
+  positivePromptAddedToHistory,
+  promptRemovedFromHistory,
   selectModelSupportsDimensions,
   selectModelSupportsGuidance,
   selectModelSupportsNegativePrompt,
@@ -164,5 +166,53 @@ describe('paramsSliceConfig persisted state migration', () => {
     expect(result.shouldRandomizeSeed).toBe(false);
     expect(result.dimensions.width).toBe(768);
     expect(result.dimensions.height).toBe(768);
+  });
+
+  it('migrates old positive prompt history entries to prompt pairs', () => {
+    expect(migrate).toBeDefined();
+
+    const initial = getInitialParamsState();
+    const v3State: Record<string, unknown> = {
+      ...initial,
+      positivePromptHistory: ['a fluffy cat'],
+    };
+
+    const result = migrate?.(v3State) as ReturnType<typeof getInitialParamsState>;
+
+    expect(result.positivePromptHistory).toEqual([{ positivePrompt: 'a fluffy cat', negativePrompt: null }]);
+  });
+});
+
+describe('paramsSlice prompt history', () => {
+  it('stores positive and negative prompts in the same history item', () => {
+    const initial = getInitialParamsState();
+    const state = paramsSliceConfig.slice.reducer(
+      initial,
+      positivePromptAddedToHistory({ positivePrompt: ' a fluffy cat ', negativePrompt: ' blurry ' })
+    );
+
+    expect(state.positivePromptHistory).toEqual([{ positivePrompt: 'a fluffy cat', negativePrompt: 'blurry' }]);
+  });
+
+  it('deduplicates and removes prompt history by positive and negative prompt pair', () => {
+    const initial = getInitialParamsState();
+    const withFirstPrompt = paramsSliceConfig.slice.reducer(
+      initial,
+      positivePromptAddedToHistory({ positivePrompt: 'a cat', negativePrompt: 'blurry' })
+    );
+    const withSecondPrompt = paramsSliceConfig.slice.reducer(
+      withFirstPrompt,
+      positivePromptAddedToHistory({ positivePrompt: 'a cat', negativePrompt: 'low quality' })
+    );
+    const removed = paramsSliceConfig.slice.reducer(
+      withSecondPrompt,
+      promptRemovedFromHistory({ positivePrompt: 'a cat', negativePrompt: 'blurry' })
+    );
+
+    expect(withSecondPrompt.positivePromptHistory).toEqual([
+      { positivePrompt: 'a cat', negativePrompt: 'low quality' },
+      { positivePrompt: 'a cat', negativePrompt: 'blurry' },
+    ]);
+    expect(removed.positivePromptHistory).toEqual([{ positivePrompt: 'a cat', negativePrompt: 'low quality' }]);
   });
 });

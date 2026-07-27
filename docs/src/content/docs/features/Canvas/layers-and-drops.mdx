@@ -1,0 +1,35 @@
+---
+title: Layer Tips
+sidebar:
+  order: 6
+---
+
+A couple of layer-related behaviors that aren't obvious from the canvas UI alone.
+
+## Drag & drop targets
+
+Dragging an image onto the canvas reveals **five** drop zones, arranged as two zones on top and three on the bottom:
+
+| Top row | |
+| :--- | :--- |
+| **New Raster Layer** | Create a regular raster layer from the dropped image. |
+| **New Control Layer** | Create a control layer from the dropped image. |
+
+| Bottom row | |
+| :--- | :--- |
+| **New Regional Reference** | Use the image as a regional reference. |
+| **New Inpaint Mask** | Create a new inpaint mask layer using the image as the mask source. |
+| **New Resized Control Layer** | Create a control layer resized to the current canvas dimensions. |
+
+You can drop from the gallery, from disk, or from any panel that shows a draggable image.
+
+## Lock transparency on raster layers
+
+Each raster layer has a **Lock Transparency** toggle (drop icon) in its layer header. When enabled, brush strokes only affect existing non-transparent pixels — painting over transparent areas does nothing. This behaves like Photoshop's "Lock Transparent Pixels".
+
+Typical uses:
+
+- **Recolor an existing shape** without bleeding paint into the empty space around it.
+- **Refine details on a subject** that was painted on an otherwise transparent layer, with no risk of growing its silhouette.
+
+Toggle it off to resume normal painting. The lock is per-layer, so different layers can be locked or unlocked independently. Pressure-sensitive pen input and undo/redo both respect the lock.

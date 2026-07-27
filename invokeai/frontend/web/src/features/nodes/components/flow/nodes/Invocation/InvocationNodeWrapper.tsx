@@ -3,6 +3,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import type { Node, NodeProps } from '@xyflow/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import NodeWrapper from 'features/nodes/components/flow/nodes/common/NodeWrapper';
+import CallSavedWorkflowNode from 'features/nodes/components/flow/nodes/Invocation/CallSavedWorkflowNode';
 import InvocationNode from 'features/nodes/components/flow/nodes/Invocation/InvocationNode';
 import { $templates } from 'features/nodes/store/nodesSlice';
 import { selectNodes } from 'features/nodes/store/selectors';
@@ -40,7 +41,11 @@ const InvocationNodeWrapper = (props: NodeProps<Node<InvocationNodeData>>) => {
   return (
     <InvocationNodeContextProvider nodeId={nodeId}>
       <NodeWrapper nodeId={nodeId} selected={selected}>
-        <InvocationNode nodeId={nodeId} isOpen={isOpen} />
+        {type === 'call_saved_workflow' ? (
+          <CallSavedWorkflowNode nodeId={nodeId} isOpen={isOpen} />
+        ) : (
+          <InvocationNode nodeId={nodeId} isOpen={isOpen} />
+        )}
       </NodeWrapper>
     </InvocationNodeContextProvider>
   );

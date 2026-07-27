@@ -3,13 +3,13 @@ description: Installs frontend dependencies with pnpm, with caching
 runs:
   using: 'composite'
   steps:
-    - name: setup node 20
-      uses: actions/setup-node@v4
+    - name: setup node 22
+      uses: actions/setup-node@v6
       with:
-        node-version: '20'
+        node-version: '22'
 
     - name: setup pnpm
-      uses: pnpm/action-setup@v4
+      uses: pnpm/action-setup@v6
       with:
         version: 10
         run_install: false
@@ -20,7 +20,7 @@ runs:
         echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
 
     - name: setup cache
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: ${{ env.STORE_PATH }}
         key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}

@@ -1,5 +1,6 @@
 import { Grid, GridItem } from '@invoke-ai/ui-library';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
+import { useIsEntityTypeEnabled } from 'features/controlLayers/hooks/useIsEntityTypeEnabled';
 import { newCanvasEntityFromImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { memo } from 'react';
@@ -21,6 +22,10 @@ const addResizedControlLayerFromImageDndTargetData = newCanvasEntityFromImageDnd
 export const CanvasDropArea = memo(() => {
   const { t } = useTranslation();
   const isBusy = useCanvasIsBusy();
+  const isRasterLayerEnabled = useIsEntityTypeEnabled('raster_layer');
+  const isControlLayerEnabled = useIsEntityTypeEnabled('control_layer');
+  const isRegionalGuidanceEnabled = useIsEntityTypeEnabled('regional_guidance');
+  const isInpaintMaskEnabled = useIsEntityTypeEnabled('inpaint_mask');
 
   return (
     <>
@@ -39,7 +44,7 @@ export const CanvasDropArea = memo(() => {
             dndTarget={newCanvasEntityFromImageDndTarget}
             dndTargetData={addRasterLayerFromImageDndTargetData}
             label={t('controlLayers.canvasContextMenu.newRasterLayer')}
-            isDisabled={isBusy}
+            isDisabled={isBusy || !isRasterLayerEnabled}
           />
         </GridItem>
         <GridItem position="relative" colSpan={3}>
@@ -47,7 +52,7 @@ export const CanvasDropArea = memo(() => {
             dndTarget={newCanvasEntityFromImageDndTarget}
             dndTargetData={addControlLayerFromImageDndTargetData}
             label={t('controlLayers.canvasContextMenu.newControlLayer')}
-            isDisabled={isBusy}
+            isDisabled={isBusy || !isControlLayerEnabled}
           />
         </GridItem>
         <GridItem position="relative" colSpan={2}>
@@ -55,7 +60,7 @@ export const CanvasDropArea = memo(() => {
             dndTarget={newCanvasEntityFromImageDndTarget}
             dndTargetData={addRegionalGuidanceReferenceImageFromImageDndTargetData}
             label={t('controlLayers.canvasContextMenu.newRegionalReferenceImage')}
-            isDisabled={isBusy}
+            isDisabled={isBusy || !isRegionalGuidanceEnabled}
           />
         </GridItem>
         <GridItem position="relative" colSpan={2}>
@@ -63,7 +68,7 @@ export const CanvasDropArea = memo(() => {
             dndTarget={newCanvasEntityFromImageDndTarget}
             dndTargetData={addInpaintMaskFromImageDndTargetData}
             label={t('controlLayers.canvasContextMenu.newInpaintMask')}
-            isDisabled={isBusy}
+            isDisabled={isBusy || !isInpaintMaskEnabled}
           />
         </GridItem>
         <GridItem position="relative" colSpan={2}>
@@ -71,7 +76,7 @@ export const CanvasDropArea = memo(() => {
             dndTarget={newCanvasEntityFromImageDndTarget}
             dndTargetData={addResizedControlLayerFromImageDndTargetData}
             label={t('controlLayers.canvasContextMenu.newResizedControlLayer')}
-            isDisabled={isBusy}
+            isDisabled={isBusy || !isControlLayerEnabled}
           />
         </GridItem>
       </Grid>

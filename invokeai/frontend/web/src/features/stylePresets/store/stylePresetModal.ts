@@ -18,7 +18,7 @@ type StylePresetModalState = {
   prefilledFormData: PrefilledFormData | null;
 };
 
-export type PrefilledFormData = {
+type PrefilledFormData = {
   name: string;
   positivePrompt: string;
   negativePrompt: string;

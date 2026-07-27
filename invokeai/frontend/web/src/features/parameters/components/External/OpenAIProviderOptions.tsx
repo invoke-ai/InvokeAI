@@ -43,10 +43,10 @@ export const OpenAIProviderOptions = memo(() => {
       <FormControl>
         <FormLabel>{t('parameters.quality', 'Quality')}</FormLabel>
         <Select size="sm" value={quality} onChange={onQualityChange} icon={<PiCaretDownBold />} iconSize="0.75rem">
-          <option value="auto">Auto</option>
-          <option value="high">High</option>
-          <option value="medium">Medium</option>
-          <option value="low">Low</option>
+          <option value="auto">{t('parameters.qualityOptions.auto', 'Auto')}</option>
+          <option value="high">{t('parameters.qualityOptions.high', 'High')}</option>
+          <option value="medium">{t('parameters.qualityOptions.medium', 'Medium')}</option>
+          <option value="low">{t('parameters.qualityOptions.low', 'Low')}</option>
         </Select>
       </FormControl>
       <FormControl>
@@ -58,9 +58,9 @@ export const OpenAIProviderOptions = memo(() => {
           icon={<PiCaretDownBold />}
           iconSize="0.75rem"
         >
-          <option value="auto">Auto</option>
-          <option value="transparent">Transparent</option>
-          <option value="opaque">Opaque</option>
+          <option value="auto">{t('parameters.backgroundOptions.auto', 'Auto')}</option>
+          <option value="transparent">{t('parameters.backgroundOptions.transparent', 'Transparent')}</option>
+          <option value="opaque">{t('parameters.backgroundOptions.opaque', 'Opaque')}</option>
         </Select>
       </FormControl>
       <FormControl>
@@ -72,9 +72,9 @@ export const OpenAIProviderOptions = memo(() => {
           icon={<PiCaretDownBold />}
           iconSize="0.75rem"
         >
-          <option value="">Default</option>
-          <option value="low">Low</option>
-          <option value="high">High</option>
+          <option value="">{t('parameters.inputFidelityOptions.default', 'Default')}</option>
+          <option value="low">{t('parameters.inputFidelityOptions.low', 'Low')}</option>
+          <option value="high">{t('parameters.inputFidelityOptions.high', 'High')}</option>
         </Select>
       </FormControl>
     </>

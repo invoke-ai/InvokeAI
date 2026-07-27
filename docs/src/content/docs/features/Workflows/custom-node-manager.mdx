@@ -1,0 +1,76 @@
+---
+title: Custom Node Manager
+sidebar:
+  order: 5
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+The Custom Node Manager installs, updates, and removes community node packs directly from the InvokeAI UI — no manual file copying, no restart required.
+
+## Opening the Custom Node Manager
+
+Click the **Nodes** tab (circuit icon) in the left sidebar, between **Models** and **Queue**.
+
+The page is split into two panels:
+
+- **Left:** the list of installed node packs, with each pack's node count, type badges, and on-disk path.
+- **Right:** the install UI, with tabs for **Git Repository URL** and **Scan Folder**, plus an install log at the bottom.
+
+## Installing a node pack
+
+<Steps>
+1. On the right panel, choose the **Git Repository URL** tab.
+2. Paste the Git URL of the pack, e.g. `https://github.com/user/my-node-pack.git`.
+3. Click **Install**.
+</Steps>
+
+What happens during install:
+
+- The repo is cloned into your `nodes` directory.
+- The nodes are loaded into the running InvokeAI process immediately — **no restart needed**.
+- Any workflow `.json` files found in the repo are imported into your workflow library and tagged with `node-pack:<pack-name>` so you can filter for them.
+- The install log at the bottom of the panel shows the result for each step.
+
+:::caution[Security]
+Custom nodes execute arbitrary Python on your machine. **Only install node packs from authors you trust.** A malicious pack could harm your system or exfiltrate data.
+:::
+
+### Python dependencies
+
+The Custom Node Manager **does not** automatically run `pip install` for a pack's `requirements.txt` or `pyproject.toml`. Auto-installing into the running InvokeAI environment risks pulling in incompatible package versions and breaking the application.
+
+If a pack ships extra dependencies, you'll see a warning toast after installation. Install them yourself — typically `pip install -r requirements.txt` from inside an activated InvokeAI environment, but check the pack's README first. After installing, click **Reload** so the new dependencies take effect.
+
+## Managing installed packs
+
+Each entry in the left panel has actions for managing the pack:
+
+- **Reload** — re-scans the `nodes` directory. Use this after manually adding a pack via `git clone`, or after installing extra Python dependencies.
+- **Uninstall** — removes the pack from disk, unregisters its nodes from the running process, and removes any workflows that were imported from the pack. No restart needed.
+
+## Scan Folder tab
+
+The **Scan Folder** tab shows the path of your `nodes` directory. Anything placed there manually (for example, by `git clone`-ing a pack directly) is detected automatically at startup. Use **Reload** to pick up packs added at runtime.
+
+## Troubleshooting
+
+### Install fails
+
+- Confirm the Git URL is correct and reachable.
+- The repo must contain an `__init__.py` at its root.
+- Read the install log — it surfaces the underlying error.
+
+### Nodes don't appear after install
+
+- Click **Reload**.
+- Check that the pack's `__init__.py` imports the node classes.
+- Check the server console for import errors.
+
+### Workflows show errors after uninstalling
+
+User-created workflows that reference nodes from an uninstalled pack will show errors for the missing node types. Either reinstall the pack or remove the affected nodes from the workflow.
+
+## Authoring a node pack
+
+If you want to publish your own pack so it can be installed by URL, see the [Creating a Node Pack](/development/guides/creating-nodes/) developer guide for the required repository layout, `__init__.py` requirements, and conventions for shipping workflows alongside your nodes.

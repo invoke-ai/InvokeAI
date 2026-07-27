@@ -76,7 +76,7 @@ WorkflowBuilderContent.displayName = 'WorkflowBuilderContent';
 
 const useAddFormElementDnd = (
   type: Exclude<FormElement['type'], 'node-field'>,
-  draggableRef: RefObject<HTMLElement>
+  draggableRef: RefObject<HTMLElement | null>
 ) => {
   const [isDragging, setIsDragging] = useState(false);
 

@@ -101,6 +101,24 @@ t5_8b_quantized_encoder = StarterModel(
     format=ModelFormat.BnbQuantizedLlmInt8b,
 )
 
+t5_gguf_q3_k_s_encoder = StarterModel(
+    name="t5_gguf_q3_k_s_encoder",
+    base=BaseModelType.Any,
+    source="https://huggingface.co/city96/t5-v1_1-xxl-encoder-gguf/resolve/main/t5-v1_1-xxl-encoder-Q3_K_S.gguf",
+    description="T5-XXL text encoder, GGUF Q3_K_S quantized (used in FLUX pipelines). Smallest size for low VRAM, lower quality. ~2.1GB",
+    type=ModelType.T5Encoder,
+    format=ModelFormat.GGUFQuantized,
+)
+
+t5_gguf_q6_k_encoder = StarterModel(
+    name="t5_gguf_q6_k_encoder",
+    base=BaseModelType.Any,
+    source="https://huggingface.co/city96/t5-v1_1-xxl-encoder-gguf/resolve/main/t5-v1_1-xxl-encoder-Q6_K.gguf",
+    description="T5-XXL text encoder, GGUF Q6_K quantized (used in FLUX pipelines). Near-lossless quality. ~3.9GB",
+    type=ModelType.T5Encoder,
+    format=ModelFormat.GGUFQuantized,
+)
+
 clip_l_encoder = StarterModel(
     name="clip-vit-large-patch14",
     base=BaseModelType.Any,
@@ -1335,6 +1353,7 @@ alibabacloud_qwen_image_edit_max = StarterModel(
         supports_negative_prompt=False,
         supports_reference_images=True,
         supports_seed=True,
+        max_reference_images=3,
         max_images_per_request=4,
         allowed_aspect_ratios=QWEN_IMAGE_2_ALLOWED_ASPECT_RATIOS,
         aspect_ratio_sizes={
@@ -1358,6 +1377,23 @@ OPENAI_GPT_IMAGE_PANEL_SCHEMA = ExternalModelPanelSchema(
     prompts=[{"name": "reference_images"}], image=[{"name": "dimensions"}]
 )
 
+openai_gpt_image_2 = StarterModel(
+    name="GPT Image 2",
+    base=BaseModelType.External,
+    source="external://openai/gpt-image-2",
+    description="OpenAI GPT-Image-2 image generation model. State-of-the-art image generation and editing with flexible sizing and high-fidelity image inputs. Does not support transparent backgrounds or configurable input fidelity. Requires a configured OpenAI API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img", "img2img"],
+        supports_reference_images=True,
+        max_images_per_request=10,
+        allowed_aspect_ratios=OPENAI_GPT_IMAGE_ASPECT_RATIOS,
+        aspect_ratio_sizes=OPENAI_GPT_IMAGE_ASPECT_RATIO_SIZES,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=OPENAI_GPT_IMAGE_PANEL_SCHEMA,
+)
 openai_gpt_image_1_5 = StarterModel(
     name="GPT Image 1.5",
     base=BaseModelType.External,
@@ -1552,7 +1588,61 @@ anima_base = StarterModel(
     description="Anima Base 1.0 - 2B parameter anime-focused text-to-image model built on Cosmos Predict2 DiT. ~4.5GB",
     type=ModelType.Main,
     format=ModelFormat.Checkpoint,
-    dependencies=[anima_qwen3_encoder, anima_vae, t5_base_encoder],
+    dependencies=[anima_qwen3_encoder, anima_vae],
+)
+
+anima_lllite_inpainting = StarterModel(
+    name="Anima LLLite Inpainting",
+    base=BaseModelType.Anima,
+    source="https://huggingface.co/kohya-ss/Anima-LLLite/resolve/main/anima-lllite-inpainting-v2.safetensors",
+    description="ControlNet-LLLite inpainting adapter for Anima by kohya-ss. Conditions the model on the masked image content during inpainting/outpainting. ~66MB",
+    type=ModelType.ControlNet,
+    format=ModelFormat.Checkpoint,
+)
+
+anima_lllite_sketch = StarterModel(
+    name="Anima LLLite Sketch",
+    base=BaseModelType.Anima,
+    source="https://huggingface.co/kohya-ss/Anima-LLLite/resolve/main/anima-lllite-any-test-like-v2.safetensors",
+    description="ControlNet-LLLite control adapter for Anima by kohya-ss. Trained on mixed scribble/HED/lineart/grayscale conditioning images. ~16MB",
+    type=ModelType.ControlNet,
+    format=ModelFormat.Checkpoint,
+)
+
+anima_lllite_depth_preview3 = StarterModel(
+    name="Anima LLLite Depth (Preview3)",
+    base=BaseModelType.Anima,
+    source="https://huggingface.co/kohya-ss/Anima-LLLite/resolve/main/anima-lllite-depth-1.safetensors",
+    description="ControlNet-LLLite depth adapter for Anima by kohya-ss. Trained on the Preview3 build; reduced quality on Anima Base 1.0. ~8MB",
+    type=ModelType.ControlNet,
+    format=ModelFormat.Checkpoint,
+)
+
+anima_lllite_scribble_preview3 = StarterModel(
+    name="Anima LLLite Scribble (Preview3)",
+    base=BaseModelType.Anima,
+    source="https://huggingface.co/kohya-ss/Anima-LLLite/resolve/main/anima-lllite-scribble-1.safetensors",
+    description="ControlNet-LLLite scribble adapter for Anima by kohya-ss. Trained on the Preview3 build; reduced quality on Anima Base 1.0. ~8MB",
+    type=ModelType.ControlNet,
+    format=ModelFormat.Checkpoint,
+)
+
+anima_lllite_lineart_preview3 = StarterModel(
+    name="Anima LLLite Lineart (Preview3)",
+    base=BaseModelType.Anima,
+    source="https://huggingface.co/kohya-ss/Anima-LLLite/resolve/main/anima-lllite-lineart-1.safetensors",
+    description="ControlNet-LLLite lineart adapter for Anima by kohya-ss. Trained on the Preview3 build; reduced quality on Anima Base 1.0. ~8MB",
+    type=ModelType.ControlNet,
+    format=ModelFormat.Checkpoint,
+)
+
+anima_lllite_pose_preview3 = StarterModel(
+    name="Anima LLLite Pose (Preview3)",
+    base=BaseModelType.Anima,
+    source="https://huggingface.co/kohya-ss/Anima-LLLite/resolve/main/anima-lllite-pose-1.safetensors",
+    description="ControlNet-LLLite pose adapter for Anima by kohya-ss. Trained on the Preview3 build; notably weak on Anima Base 1.0. ~23MB",
+    type=ModelType.ControlNet,
+    format=ModelFormat.Checkpoint,
 )
 # endregion
 
@@ -1624,6 +1714,8 @@ STARTER_MODELS: list[StarterModel] = [
     swinir,
     t5_base_encoder,
     t5_8b_quantized_encoder,
+    t5_gguf_q3_k_s_encoder,
+    t5_gguf_q6_k_encoder,
     clip_l_encoder,
     siglip,
     flux_redux,
@@ -1675,6 +1767,7 @@ STARTER_MODELS: list[StarterModel] = [
     gemini_flash_image,
     gemini_pro_image_preview,
     gemini_3_1_flash_image_preview,
+    openai_gpt_image_2,
     openai_gpt_image_1_5,
     openai_gpt_image_1,
     openai_gpt_image_1_mini,
@@ -1691,6 +1784,12 @@ STARTER_MODELS: list[StarterModel] = [
     anima_base,
     anima_qwen3_encoder,
     anima_vae,
+    anima_lllite_inpainting,
+    anima_lllite_sketch,
+    anima_lllite_depth_preview3,
+    anima_lllite_scribble_preview3,
+    anima_lllite_lineart_preview3,
+    anima_lllite_pose_preview3,
 ]
 
 sd1_bundle: list[StarterModel] = [
@@ -1778,7 +1877,8 @@ anima_bundle: list[StarterModel] = [
     anima_base,
     anima_qwen3_encoder,
     anima_vae,
-    t5_base_encoder,
+    anima_lllite_inpainting,
+    anima_lllite_sketch,
 ]
 
 STARTER_BUNDLES: dict[str, StarterModelBundle] = {

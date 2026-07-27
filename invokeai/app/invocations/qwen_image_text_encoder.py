@@ -14,7 +14,6 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import QwenVLEncoderField
 from invokeai.app.invocations.primitives import QwenImageConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.model_manager.load.model_cache.utils import get_effective_device
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     ConditioningFieldData,
     QwenImageConditioningInfo,
@@ -264,7 +263,9 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
         text_encoder_info = context.models.load(self.qwen_vl_encoder.text_encoder)
         ctx = text_encoder_info.model_on_device()
         _, text_encoder = ctx.__enter__()
-        device = get_effective_device(text_encoder)
+        # Use the encoder's intended compute device, not its current parameter residency: partial loading may have
+        # temporarily offloaded all weights to RAM, which would wrongly run the whole encode on the CPU.
+        device = text_encoder_info.compute_device
         assert isinstance(text_encoder, Qwen2_5_VLForConditionalGeneration)
         return text_encoder, device, lambda: ctx.__exit__(None, None, None)
 
