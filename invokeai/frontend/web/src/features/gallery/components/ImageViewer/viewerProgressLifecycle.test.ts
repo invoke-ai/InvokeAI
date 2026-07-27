@@ -1,0 +1,208 @@
+import type { ProgressImage as ProgressImageType } from 'features/nodes/types/common';
+import { atom, map } from 'nanostores';
+import type { S } from 'services/api/types';
+import { beforeEach, describe, expect, it } from 'vitest';
+
+import type { ViewerProgressDataMap, ViewerProgressStores } from './viewerProgressLifecycle';
+import { createViewerProgressLifecycle } from './viewerProgressLifecycle';
+
+const buildProgressImage = (itemId: number): ProgressImageType =>
+  ({
+    dataURL: `data:image/png;base64,item-${itemId}`,
+    width: 512,
+    height: 512,
+  }) as ProgressImageType;
+
+const buildProgressEvent = (overrides: Partial<S['InvocationProgressEvent']> = {}): S['InvocationProgressEvent'] =>
+  ({
+    queue_id: 'default',
+    item_id: 1,
+    batch_id: 'batch-1',
+    origin: null,
+    destination: null,
+    user_id: 'user-1',
+    session_id: 'session-1',
+    invocation_source_id: 'node-1',
+    invocation: { id: 'node-1', type: 'test_node' },
+    message: 'denoising',
+    percentage: 0.5,
+    image: null,
+    ...overrides,
+  }) as S['InvocationProgressEvent'];
+
+const buildTerminalEvent = (
+  overrides: Partial<S['QueueItemStatusChangedEvent']> = {}
+): S['QueueItemStatusChangedEvent'] =>
+  ({
+    queue_id: 'default',
+    item_id: 1,
+    batch_id: 'batch-1',
+    origin: null,
+    destination: null,
+    user_id: 'user-1',
+    status: 'completed',
+    ...overrides,
+  }) as S['QueueItemStatusChangedEvent'];
+
+const buildQueueClearedEvent = (userId: string | null): S['QueueClearedEvent'] =>
+  ({ queue_id: 'default', user_id: userId }) as S['QueueClearedEvent'];
+
+describe('viewerProgressLifecycle', () => {
+  let stores: ViewerProgressStores;
+  let lifecycle: ReturnType<typeof createViewerProgressLifecycle>;
+
+  beforeEach(() => {
+    stores = {
+      $progressEvent: atom<S['InvocationProgressEvent'] | null>(null),
+      $progressImage: atom<ProgressImageType | null>(null),
+      $progressData: map<ViewerProgressDataMap>({}),
+      $isProgressImageResolving: atom(false),
+      finishedQueueItemIds: new Map<number, boolean>(),
+    };
+    lifecycle = createViewerProgressLifecycle(stores);
+  });
+
+  const startTwoSessions = () => {
+    // B posts a preview first, then A — A owns the shared single-image preview.
+    const eventB = buildProgressEvent({ item_id: 2, session_id: 'session-2', image: buildProgressImage(2) });
+    const eventA = buildProgressEvent({ item_id: 1, session_id: 'session-1', image: buildProgressImage(1) });
+    lifecycle.recordProgress(eventB);
+    lifecycle.recordProgress(eventA);
+    return { eventA, eventB };
+  };
+
+  describe('recordProgress', () => {
+    it('tracks per-session data and hands the shared preview to the latest reporter', () => {
+      const { eventA } = startTwoSessions();
+      expect(stores.$progressEvent.get()).toBe(eventA);
+      expect(stores.$progressImage.get()).toBe(eventA.image);
+      expect(stores.$progressData.get()[1]?.itemId).toBe(1);
+      expect(stores.$progressData.get()[2]?.itemId).toBe(2);
+    });
+
+    it('ignores events for finished items so trailing progress cannot repopulate the preview', () => {
+      stores.finishedQueueItemIds.set(1, true);
+      const handled = lifecycle.recordProgress(buildProgressEvent({ item_id: 1, image: buildProgressImage(1) }));
+      expect(handled).toBe(false);
+      expect(stores.$progressEvent.get()).toBeNull();
+      expect(stores.$progressData.get()[1]).toBeUndefined();
+    });
+  });
+
+  describe('onTerminal', () => {
+    it.each(['completed', 'canceled', 'failed'] as const)(
+      'hands the shared preview to the remaining session when its owner reaches %s',
+      (status) => {
+        const { eventB } = startTwoSessions();
+        lifecycle.onTerminal(buildTerminalEvent({ item_id: 1, status }), true);
+        // B immediately becomes the single visible progress image and indicator.
+        expect(stores.$progressEvent.get()).toBe(eventB);
+        expect(stores.$progressImage.get()).toBe(eventB.image);
+        expect(stores.$progressData.get()[1]).toBeUndefined();
+        expect(stores.$progressData.get()[2]?.itemId).toBe(2);
+        // No resolve illusion may be pending — it would swap B's live preview for A's final image.
+        expect(stores.$isProgressImageResolving.get()).toBe(false);
+        lifecycle.onFinalImageLoaded();
+        expect(stores.$progressEvent.get()).toBe(eventB);
+        expect(stores.$progressImage.get()).toBe(eventB.image);
+      }
+    );
+
+    it('hands the shared preview to the remaining session even when auto-switch is off', () => {
+      const { eventB } = startTwoSessions();
+      lifecycle.onTerminal(buildTerminalEvent({ item_id: 1, status: 'canceled' }), false);
+      expect(stores.$progressEvent.get()).toBe(eventB);
+      expect(stores.$progressImage.get()).toBe(eventB.image);
+    });
+
+    it('promotes the most recently updated remaining session when several remain', () => {
+      startTwoSessions();
+      const eventC = buildProgressEvent({ item_id: 3, session_id: 'session-3', image: buildProgressImage(3) });
+      lifecycle.recordProgress(eventC);
+      lifecycle.onTerminal(buildTerminalEvent({ item_id: 3, status: 'canceled' }), true);
+      // C owned the preview; A reported more recently than B, so A takes over.
+      expect(stores.$progressEvent.get()?.item_id).toBe(1);
+    });
+
+    it('leaves the shared preview alone when a non-owner terminates', () => {
+      const { eventA } = startTwoSessions();
+      lifecycle.onTerminal(buildTerminalEvent({ item_id: 2, status: 'canceled' }), true);
+      expect(stores.$progressEvent.get()).toBe(eventA);
+      expect(stores.$progressImage.get()).toBe(eventA.image);
+      expect(stores.$progressData.get()[2]).toBeUndefined();
+    });
+
+    it('clears immediately when the last session is canceled', () => {
+      const eventA = buildProgressEvent({ item_id: 1, image: buildProgressImage(1) });
+      lifecycle.recordProgress(eventA);
+      lifecycle.onTerminal(buildTerminalEvent({ item_id: 1, status: 'canceled' }), true);
+      expect(stores.$progressEvent.get()).toBeNull();
+      expect(stores.$progressImage.get()).toBeNull();
+      expect(stores.$isProgressImageResolving.get()).toBe(false);
+    });
+
+    it('runs the resolve illusion when the last session completes with auto-switch on', () => {
+      const eventA = buildProgressEvent({ item_id: 1, image: buildProgressImage(1) });
+      lifecycle.recordProgress(eventA);
+      lifecycle.onTerminal(buildTerminalEvent({ item_id: 1, status: 'completed' }), true);
+      // The preview is retained until the final image loads, "resolving" into it.
+      expect(stores.$progressEvent.get()).toBe(eventA);
+      expect(stores.$isProgressImageResolving.get()).toBe(true);
+      lifecycle.onFinalImageLoaded();
+      expect(stores.$progressEvent.get()).toBeNull();
+      expect(stores.$progressImage.get()).toBeNull();
+      expect(stores.$isProgressImageResolving.get()).toBe(false);
+    });
+
+    it('ignores repeat terminal events for an already-finished item', () => {
+      const { eventA } = startTwoSessions();
+      lifecycle.onTerminal(buildTerminalEvent({ item_id: 2, status: 'canceled' }), true);
+      expect(lifecycle.onTerminal(buildTerminalEvent({ item_id: 2, status: 'canceled' }), true)).toBe(false);
+      expect(stores.$progressEvent.get()).toBe(eventA);
+    });
+  });
+
+  describe('onQueueCleared', () => {
+    it.each([
+      ['an unscoped (admin or single-user) clear', null, 'user-1'],
+      ["the current user's scoped clear", 'user-1', 'user-1'],
+    ])('drops all previews and blocks trailing progress on %s', (_desc, clearedUserId, currentUserId) => {
+      startTwoSessions();
+      const applied = lifecycle.onQueueCleared(buildQueueClearedEvent(clearedUserId), currentUserId);
+      expect(applied).toBe(true);
+      expect(stores.$progressEvent.get()).toBeNull();
+      expect(stores.$progressImage.get()).toBeNull();
+      expect(stores.$progressData.get()).toEqual({});
+      // A worker claimed between the clear's cancellation pass and deletion is stopped only by
+      // this event — its trailing progress must not repopulate the preview.
+      expect(lifecycle.recordProgress(buildProgressEvent({ item_id: 1, image: buildProgressImage(1) }))).toBe(false);
+      expect(lifecycle.recordProgress(buildProgressEvent({ item_id: 2, image: buildProgressImage(2) }))).toBe(false);
+    });
+
+    it.each([
+      ["another user's scoped clear", 'user-2'],
+      ['the sanitized broadcast of a foreign scoped clear', 'redacted'],
+    ])('leaves previews alone on %s', (_desc, clearedUserId) => {
+      const { eventA } = startTwoSessions();
+      const applied = lifecycle.onQueueCleared(buildQueueClearedEvent(clearedUserId), 'user-1');
+      expect(applied).toBe(false);
+      expect(stores.$progressEvent.get()).toBe(eventA);
+      expect(stores.$progressData.get()[1]?.itemId).toBe(1);
+      expect(stores.$progressData.get()[2]?.itemId).toBe(2);
+    });
+  });
+
+  describe('reset', () => {
+    it('drops all preview state without marking items finished', () => {
+      startTwoSessions();
+      stores.$isProgressImageResolving.set(true);
+      lifecycle.reset();
+      expect(stores.$progressEvent.get()).toBeNull();
+      expect(stores.$progressImage.get()).toBeNull();
+      expect(stores.$progressData.get()).toEqual({});
+      expect(stores.$isProgressImageResolving.get()).toBe(false);
+      // A new connection's events for a re-used id are not blocked — reset is not a cancel.
+      expect(lifecycle.recordProgress(buildProgressEvent({ item_id: 1, image: buildProgressImage(1) }))).toBe(true);
+    });
+  });
+});
