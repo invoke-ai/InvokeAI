@@ -8,6 +8,11 @@ from invokeai.app.services.asset_files.asset_files_common import (
 )
 from invokeai.app.services.invoker import Invoker
 
+# Gaussian-splat interchange formats written by the image_to_3d node. The startup sweep deletes ONLY
+# these, so any future asset type stored via this service must make its own lifecycle decision rather
+# than silently inheriting the splats' session-transient one.
+SWEPT_SUFFIXES = {".ply", ".splat", ".spz"}
+
 
 class DiskAssetFileStorage(AssetFilesServiceBase):
     """Stores 3D asset files (Gaussian-splat .ply / .splat) on disk."""
@@ -59,13 +64,13 @@ class DiskAssetFileStorage(AssetFilesServiceBase):
         return path
 
     def _sweep(self) -> None:
-        """Deletes all stored asset files. Assets are session-transient — they have no DB records and
+        """Deletes stored splat files. Splats are session-transient — they have no DB records and
         are referenced only by a live canvas overlay — so anything on disk at server startup is an
         orphan from a previous run. Mirrors ObjectSerializerDisk's boot-time cleanup of dangling
         tensor tempdirs."""
         deleted = 0
         for path in self._asset_files_folder.glob("*"):
-            if not path.is_file():
+            if not path.is_file() or path.suffix.lower() not in SWEPT_SUFFIXES:
                 continue
             try:
                 path.unlink()

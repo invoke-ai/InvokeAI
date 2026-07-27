@@ -65,11 +65,12 @@ def test_delete_removes_file(disk_storage: DiskAssetFileStorage):
         disk_storage.get_path("splat.ply")
 
 
-def test_start_sweeps_orphaned_assets(tmp_path: Path):
-    """Assets are session-transient with no DB records, so server startup wipes anything left over
+def test_start_sweeps_orphaned_splats(tmp_path: Path):
+    """Splats are session-transient with no DB records, so server startup wipes anything left over
     from a previous run — this is the storage's only GC."""
     (tmp_path / "orphan-1.ply").write_bytes(b"a")
-    (tmp_path / "orphan-2.ply").write_bytes(b"b")
+    (tmp_path / "orphan-2.splat").write_bytes(b"b")
+    (tmp_path / "orphan-3.spz").write_bytes(b"c")
     subdir = tmp_path / "unrelated-dir"
     subdir.mkdir()
 
@@ -77,7 +78,22 @@ def test_start_sweeps_orphaned_assets(tmp_path: Path):
     storage.start(MagicMock())
 
     assert list(tmp_path.glob("*.ply")) == []
+    assert list(tmp_path.glob("*.splat")) == []
+    assert list(tmp_path.glob("*.spz")) == []
     assert subdir.exists()  # only files are swept
+
+
+def test_sweep_only_deletes_splat_formats(tmp_path: Path):
+    """The sweep must not delete non-splat files: a future asset type stored via this service has to
+    opt into the transient lifecycle explicitly, not inherit it."""
+    (tmp_path / "splat.ply").write_bytes(b"a")
+    (tmp_path / "future-mesh.glb").write_bytes(b"b")
+
+    storage = DiskAssetFileStorage(tmp_path)
+    storage.start(MagicMock())
+
+    assert not (tmp_path / "splat.ply").exists()
+    assert (tmp_path / "future-mesh.glb").exists()
 
 
 def test_construction_does_not_sweep(tmp_path: Path):
