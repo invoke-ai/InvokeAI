@@ -84,18 +84,23 @@ def test_dynamicprompts_unknown_wildcard_returns_error_without_hanging(client: T
     assert body["prompts"] == ["{__random__8chan|fenster|stuff}"]
 
 
-def test_dynamicprompts_bare_unknown_wildcard_still_generates(client: TestClient, user1_token: str):
-    """A wildcard used as plain literal text (not a variant value) does not hang and must not error."""
+def test_dynamicprompts_bare_unknown_wildcard_returns_error(client: TestClient, user1_token: str):
+    """A wildcard outside a variant does not hang, but it does not generate usefully either.
+
+    The combinatorial generator emits `max_prompts` copies of one prompt and drops every other
+    variant's values, so a caller that generated anyway would queue N identical results. This case
+    was previously allowed through with `error: None`; it must report the unresolvable name instead.
+    """
     r = client.post(
         "/api/v1/utilities/dynamicprompts",
-        json={"prompt": "a photo, __my_style__"},
+        json={"prompt": "a {red|green} photo, __my_style__"},
         headers={"Authorization": f"Bearer {user1_token}"},
     )
     assert r.status_code == status.HTTP_200_OK
     body = r.json()
-    assert body["error"] is None
-    assert body["prompts"]  # non-empty
-    assert all(p == "a photo, __my_style__" for p in body["prompts"])
+    assert body["error"] is not None
+    assert "my_style" in body["error"]
+    assert body["prompts"] == ["a {red|green} photo, __my_style__"]
 
 
 def test_dynamicprompts_random_generator_ignores_unknown_wildcard(client: TestClient, user1_token: str):
