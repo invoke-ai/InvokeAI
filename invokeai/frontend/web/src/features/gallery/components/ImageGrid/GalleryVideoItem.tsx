@@ -7,7 +7,7 @@ import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { useMiddleClickOpenInNewTab } from 'common/hooks/useMiddleClickOpenInNewTab';
 import { uniq } from 'es-toolkit';
 import { multipleVideoDndSource, singleVideoDndSource } from 'features/dnd/dnd';
-import { firefoxDndFix } from 'features/dnd/util';
+import { dndInputFix } from 'features/dnd/util';
 import { useVideoContextMenu } from 'features/gallery/components/ContextMenu/VideoContextMenu';
 import {
   selectAlwaysShouldImageSizeBadge,
@@ -135,7 +135,7 @@ export const GalleryVideoItem = memo(({ videoDTO }: Props) => {
       return;
     }
     return combine(
-      firefoxDndFix(element),
+      dndInputFix(element),
       draggable({
         element,
         getInitialData: () => {

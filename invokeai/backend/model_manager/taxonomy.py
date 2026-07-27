@@ -52,6 +52,8 @@ class BaseModelType(str, Enum):
     """Indicates the model is associated with CogView 4 model architecture."""
     ZImage = "z-image"
     """Indicates the model is associated with Z-Image model architecture, including Z-Image-Turbo."""
+    Ideogram4 = "ideogram-4"
+    """Indicates the model is associated with the Ideogram 4 text-to-image model architecture."""
     External = "external"
     """Indicates the model is hosted by an external provider."""
     QwenImage = "qwen-image"

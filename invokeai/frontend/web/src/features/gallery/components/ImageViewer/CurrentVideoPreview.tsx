@@ -9,7 +9,7 @@ import { isMediaCookieSelfHealPending, openMediaInNewTab } from 'features/auth/h
 import { useMediaUrl } from 'features/auth/store/mediaCookieRefresh';
 import { useDeleteVideoModalApi } from 'features/deleteVideoModal/store/state';
 import { multipleVideoDndSource, singleVideoDndSource } from 'features/dnd/dnd';
-import { firefoxDndFix } from 'features/dnd/util';
+import { dndInputFix } from 'features/dnd/util';
 import VideoMetadataViewer from 'features/gallery/components/ImageMetadataViewer/VideoMetadataViewer';
 import NextPrevItemButtons from 'features/gallery/components/NextPrevItemButtons';
 import { useNextPrevItemNavigation } from 'features/gallery/components/useNextPrevItemNavigation';
@@ -93,7 +93,7 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
       return;
     }
     return combine(
-      firefoxDndFix(element),
+      dndInputFix(element),
       draggable({
         element,
         getInitialData: () => {
