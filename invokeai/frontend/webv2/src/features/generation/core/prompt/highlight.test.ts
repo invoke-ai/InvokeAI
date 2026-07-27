@@ -53,4 +53,35 @@ describe('prompt highlight segments', () => {
 
     expect(kindForText(prompt, '-')).toBe('punctuation');
   });
+
+  describe('dynamic prompt syntax', () => {
+    const dynamicKindForText = (prompt: string, text: string): PromptHighlightKind | undefined =>
+      buildPromptHighlightSegments(prompt, { dynamicPrompts: true }).find((segment) => segment.text === text)?.kind;
+
+    it('is off by default, so surfaces that never expand see plain text', () => {
+      const prompt = 'a {red|green} ball';
+
+      expect(kindForText(prompt, '{')).toBe('text');
+      expect(kindForText(prompt, '|')).toBe('punctuation');
+    });
+
+    it('marks variant braces, separators and weights when enabled', () => {
+      expect(dynamicKindForText('a {red|green} ball', '{')).toBe('variantBrace');
+      expect(dynamicKindForText('a {red|green} ball', '|')).toBe('variantSeparator');
+      expect(dynamicKindForText('a {red|green} ball', '}')).toBe('variantBrace');
+      expect(dynamicKindForText('{2::red|green}', '2::')).toBe('variantWeight');
+      expect(dynamicKindForText('{1-2$$red|green}', '1-2$$')).toBe('variantRange');
+      expect(dynamicKindForText('a __color__ ball', '__color__')).toBe('wildcard');
+      expect(dynamicKindForText(`\${colour} ball`, `\${colour}`)).toBe('promptVariable');
+    });
+
+    it('marks an unbalanced brace as an error, like an unbalanced parenthesis', () => {
+      expect(dynamicKindForText('a {red green', '{')).toBe('error');
+      expect(dynamicKindForText('a red} green', '}')).toBe('error');
+    });
+
+    it('leaves attention syntax inside a variant intact', () => {
+      expect(dynamicKindForText('{red+|green}', '+')).toBe('attention');
+    });
+  });
 });

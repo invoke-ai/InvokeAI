@@ -24,8 +24,14 @@ const HIGHLIGHT_STYLE_BY_KIND: Record<
   group: { color: 'fg.subtle' },
   promptFunctionArg: { bg: 'accent.subtle/20', color: 'fg' },
   promptFunctionMethod: { color: 'accent.fg' },
+  promptVariable: { color: 'accent.fg' },
   punctuation: { color: 'fg.subtle' },
   text: { color: 'fg' },
+  variantBrace: { color: 'accent.fg' },
+  variantRange: { color: 'fg.success' },
+  variantSeparator: { color: 'fg.muted' },
+  variantWeight: { color: 'fg.success' },
+  wildcard: { color: 'fg.subtle' },
 };
 
 const PROMPT_TEXTAREA_FORCED_COLORS_CSS = { '@media (forced-colors: active)': { display: 'none' } };

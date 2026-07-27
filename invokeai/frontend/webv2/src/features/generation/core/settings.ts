@@ -16,6 +16,7 @@ import type {
 
 import { sanitizeBatchCount } from './batch';
 import { isVaeCompatibleWithGenerateModel } from './componentCompatibility';
+import { isDynamicPromptsSeedBehaviour, sanitizeMaxPrompts } from './dynamicPrompts';
 import { cloneCroppableImage, isCanonicalCroppableImage, normalizeCroppableImage } from './referenceImage';
 
 /** Preset ratios, with the preset to switch to when dimensions are swapped. */
@@ -555,6 +556,12 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
     cfgScale: values.cfgScale as number,
     clipSkip: hasFiniteNumber(values, 'clipSkip') ? (values.clipSkip as number) : 0,
     colorCompensation: typeof values.colorCompensation === 'boolean' ? values.colorCompensation : false,
+    dynamicPromptsCombinatorial:
+      typeof values.dynamicPromptsCombinatorial === 'boolean' ? values.dynamicPromptsCombinatorial : true,
+    dynamicPromptsMaxPrompts: sanitizeMaxPrompts(values.dynamicPromptsMaxPrompts),
+    dynamicPromptsSeedBehaviour: isDynamicPromptsSeedBehaviour(values.dynamicPromptsSeedBehaviour)
+      ? values.dynamicPromptsSeedBehaviour
+      : 'per-iteration',
     height,
     loras: Array.isArray(values.loras) ? values.loras.filter(isGenerateLora) : [],
     modelKey: values.modelKey as string,

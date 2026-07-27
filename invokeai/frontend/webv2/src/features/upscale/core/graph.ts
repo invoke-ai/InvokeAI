@@ -13,7 +13,7 @@ import {
   toGraphContract,
   toModelIdentifier,
 } from '@features/generation/graph';
-import { coerceSchedulerForGraph } from '@features/generation/settings';
+import { coerceSchedulerForGraph, DYNAMIC_PROMPTS_DEFAULT_MAX_PROMPTS } from '@features/generation/settings';
 
 import type { CompiledUpscaleGraph, UpscaleWidgetValues } from './types';
 
@@ -58,6 +58,10 @@ const addUpscaleMetadata = (
       cfgRescaleMultiplier: 0,
       colorCompensation: false,
       componentSourceModel: null,
+      // Upscale prompts are not batch-expanded; these only satisfy the shape.
+      dynamicPromptsCombinatorial: true,
+      dynamicPromptsMaxPrompts: DYNAMIC_PROMPTS_DEFAULT_MAX_PROMPTS,
+      dynamicPromptsSeedBehaviour: 'per-iteration',
       height: dimensions.height,
       modelKey: settings.model.key,
       negativePromptHeightPx: 56,

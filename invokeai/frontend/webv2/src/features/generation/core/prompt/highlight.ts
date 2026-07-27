@@ -1,6 +1,7 @@
 import type { PromptAstNode, PromptRange, PromptToken } from './ast';
 
 import { parsePromptTokens, tokenizePrompt } from './ast';
+import { scanDynamicPromptSyntax } from './dynamicPromptSyntax';
 
 export type PromptHighlightKind =
   | 'text'
@@ -12,7 +13,23 @@ export type PromptHighlightKind =
   | 'promptFunctionMethod'
   | 'promptFunctionArg'
   | 'punctuation'
+  | 'variantBrace'
+  | 'variantSeparator'
+  | 'variantWeight'
+  | 'variantRange'
+  | 'wildcard'
+  | 'promptVariable'
   | 'error';
+
+export interface PromptHighlightOptions {
+  /**
+   * Annotate dynamic prompting syntax. Only surfaces whose prompt is actually
+   * batch-expanded enable this — a `{a|b}` in a regional guidance or negative
+   * prompt is literal text, and colouring it would promise an expansion that
+   * never happens.
+   */
+  dynamicPrompts?: boolean;
+}
 
 export interface PromptHighlightSegment {
   kind: PromptHighlightKind;
@@ -28,6 +45,12 @@ interface HighlightAnnotation {
 
 const ANNOTATION_PRIORITY = {
   error: 100,
+  wildcard: 45,
+  promptVariable: 45,
+  variantRange: 42,
+  variantWeight: 42,
+  variantBrace: 41,
+  variantSeparator: 41,
   embedding: 40,
   promptFunctionMethod: 35,
   promptFunctionArg: 5,
@@ -42,8 +65,14 @@ const BASE_PRIORITY: Record<PromptHighlightKind, number> = {
   group: 20,
   promptFunctionArg: 5,
   promptFunctionMethod: 35,
+  promptVariable: 45,
   punctuation: 10,
   text: 0,
+  variantBrace: 41,
+  variantRange: 42,
+  variantSeparator: 41,
+  variantWeight: 42,
+  wildcard: 45,
 };
 
 const isNumericAttention = (value: unknown): boolean => typeof value === 'number' || !Number.isNaN(Number(value));
@@ -167,14 +196,28 @@ const appendSegment = (segments: PromptHighlightSegment[], segment: PromptHighli
   segments.push(segment);
 };
 
-export const buildPromptHighlightSegments = (prompt: string): PromptHighlightSegment[] => {
+const collectDynamicPromptAnnotations = (prompt: string): HighlightAnnotation[] =>
+  scanDynamicPromptSyntax(prompt).map(({ kind, range }) => ({
+    kind,
+    priority: ANNOTATION_PRIORITY[kind],
+    range,
+  }));
+
+export const buildPromptHighlightSegments = (
+  prompt: string,
+  options: PromptHighlightOptions = {}
+): PromptHighlightSegment[] => {
   if (!prompt) {
     return [];
   }
 
   try {
     const tokens = tokenizePrompt(prompt);
-    const annotations = [...collectAnnotations(prompt, parsePromptTokens(tokens)), ...collectParenthesisErrors(tokens)];
+    const annotations = [
+      ...collectAnnotations(prompt, parsePromptTokens(tokens)),
+      ...collectParenthesisErrors(tokens),
+      ...(options.dynamicPrompts ? collectDynamicPromptAnnotations(prompt) : []),
+    ];
     const segments: PromptHighlightSegment[] = [];
 
     for (const token of tokens) {

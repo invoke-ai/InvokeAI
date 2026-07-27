@@ -1,4 +1,5 @@
 import type { BackendGraphContract, GraphContract } from '@features/generation/core/contracts';
+import type { DynamicPromptsSeedBehaviour } from '@features/generation/core/dynamicPrompts';
 
 export type ModelIdentifierConfig = {
   key: string;
@@ -156,6 +157,11 @@ export interface GenerateSettings {
   negativePromptEnabled: boolean;
   negativePrompt: string;
   negativePromptHeightPx: number;
+  /** Expand `{a|b}` into every combination; otherwise draw a random sample. */
+  dynamicPromptsCombinatorial: boolean;
+  /** Upper bound on expanded prompts (the sample size when not combinatorial). */
+  dynamicPromptsMaxPrompts: number;
+  dynamicPromptsSeedBehaviour: DynamicPromptsSeedBehaviour;
   width: number;
   height: number;
   aspectRatioId: AspectRatioId;

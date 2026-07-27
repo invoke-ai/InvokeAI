@@ -27,6 +27,7 @@ import {
   isVaeForBases,
   type GenerateComponentFilter,
 } from './componentCompatibility';
+import { DYNAMIC_PROMPTS_DEFAULT_MAX_PROMPTS } from './dynamicPrompts';
 import {
   clampDimension,
   DEFAULT_REFERENCE_IMAGE_LIMIT,
@@ -547,6 +548,9 @@ export const getDefaultGenerateSettings = (model?: GenerateModelConfig): Generat
     cfgScale: defaults.cfgScale,
     clipSkip: 0,
     colorCompensation: false,
+    dynamicPromptsCombinatorial: true,
+    dynamicPromptsMaxPrompts: DYNAMIC_PROMPTS_DEFAULT_MAX_PROMPTS,
+    dynamicPromptsSeedBehaviour: 'per-iteration',
     clipEmbedModel: null,
     clipGEmbedModel: null,
     clipLEmbedModel: null,
