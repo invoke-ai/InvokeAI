@@ -320,28 +320,56 @@ const runSample = async (browser, fixture, sample) => {
       const beforePaths = new Set(beforeActivation.map((resource) => resource.path));
       const interactionMark = `invokeai:interaction:${fixture.id}:${fixture.stateProfile}:layout-switch`;
 
+      // Open the menu BEFORE starting the clock, and let the page stamp the
+      // interaction mark itself when the selection actually lands.
+      //
+      // Marking from the driver ahead of `presetTrigger.click()` folded two costs
+      // that are not the app's into the measurement: opening the menu, and
+      // Playwright's actionability wait before it will click a menu item. The
+      // second is not small — dispatching the same click in-page instead cut the
+      // gap from 272.9ms to 25.8ms, so roughly 40% of the recorded layout switch
+      // was the driver deciding the item was safe to click. A real click is still
+      // used here; only the waiting is excluded, by moving the start of the
+      // interval to the pointer event itself.
+      await presetTrigger.click();
+      const presetItem = page.getByRole('menuitem', { exact: true, name: fixture.layoutPreset });
+      await presetItem.waitFor({ timeout: 10_000 });
       await page.evaluate(
         ({ interactionMarkName, readyMark }) => {
           performance.clearMarks(interactionMarkName);
           performance.clearMarks(readyMark);
-          performance.mark(interactionMarkName);
+          // Capture-phase and document-level, so this cannot miss the way matching
+          // on a menu item's text could. The next pointerdown is the selection.
+          document.addEventListener(
+            'pointerdown',
+            () => {
+              performance.mark(interactionMarkName);
+            },
+            { capture: true, once: true }
+          );
         },
         { interactionMarkName: interactionMark, readyMark: fixture.readyMark }
       );
-      await presetTrigger.click();
-      await page.getByRole('menuitem', { exact: true, name: fixture.layoutPreset }).click();
+      await presetItem.click();
       await page
         .getByRole('button', { exact: true, name: `Layout preset: ${fixture.layoutPreset}` })
         .waitFor({ timeout: 10_000 });
       await waitForSemanticMark(page, fixture.readyMark);
       layoutSwitchMs = await page.evaluate(
         ({ interactionMarkName, readyMark }) => {
-          const start = performance.getEntriesByName(interactionMarkName, 'mark').at(-1)?.startTime ?? 0;
-          const end = performance.getEntriesByName(readyMark, 'mark').at(-1)?.startTime ?? 0;
-          return Math.max(0, end - start);
+          const start = performance.getEntriesByName(interactionMarkName, 'mark').at(-1);
+          const end = performance.getEntriesByName(readyMark, 'mark').at(-1);
+
+          // A missing start mark used to read as 0 and silently turn the whole
+          // interval into "time since navigation", which looks like a plausible
+          // number rather than a broken one.
+          return start && end ? Math.max(0, end.startTime - start.startTime) : null;
         },
         { interactionMarkName: interactionMark, readyMark: fixture.readyMark }
       );
+      if (layoutSwitchMs === null) {
+        throw new Error(`${fixture.id}/${fixture.stateProfile} did not record a layout-switch interaction.`);
+      }
       const afterActivation = await resourceCollector.settle();
       activatedResourcePaths = new Set(
         afterActivation.filter((resource) => !beforePaths.has(resource.path)).map((resource) => resource.path)
