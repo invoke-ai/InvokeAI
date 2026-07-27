@@ -1,6 +1,8 @@
 import { existsSync } from 'node:fs';
 import { dirname, relative, resolve, sep } from 'node:path';
 
+import { localizeRootPath } from '../src/lib/link-localization.mjs';
+
 const relativeImportPattern = /(from\s+|import\s*)(['"])(\.\.?\/[^'"]+)\2/g;
 
 export function remarkLocalizeContent(options = {}) {
@@ -15,7 +17,7 @@ export function remarkLocalizeContent(options = {}) {
 
     walk(tree, (node) => {
       if (node.type === 'link' && typeof node.url === 'string') {
-        node.url = localizeRootLink(node.url, context.locale);
+        node.url = localizeRootPath(node.url, context.locale);
       }
 
       if (node.type === 'image' && typeof node.url === 'string') {
@@ -31,7 +33,7 @@ export function remarkLocalizeContent(options = {}) {
 
       if (node.type === 'mdxJsxAttribute' && typeof node.value === 'string') {
         if (node.name === 'href' || node.name === 'link') {
-          node.value = localizeRootLink(node.value, context.locale);
+          node.value = localizeRootPath(node.value, context.locale);
         } else if (node.name === 'src') {
           node.value = pointToSourceAsset(node.value, context);
         }
@@ -66,23 +68,6 @@ function getLocalizedFileContext(filePath, locales) {
     localizedDirectory: dirname(normalizedPath),
     sourceDirectory: dirname(resolve(docsRoot, ...sourceSegments)),
   };
-}
-
-function localizeRootLink(url, locale) {
-  if (!url.startsWith('/') || url.startsWith('//')) {
-    return url;
-  }
-
-  if (
-    url === `/${locale}` ||
-    url.startsWith(`/${locale}/`) ||
-    url === '/download' ||
-    url.startsWith('/download/')
-  ) {
-    return url;
-  }
-
-  return `/${locale}${url}`;
 }
 
 function pointToSourceAsset(url, context) {
@@ -122,6 +107,5 @@ function walk(node, visitor) {
 
 export const testing = {
   getLocalizedFileContext,
-  localizeRootLink,
   pointToSourceAsset,
 };
