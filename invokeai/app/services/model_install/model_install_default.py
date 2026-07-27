@@ -82,6 +82,12 @@ TMPDIR_PREFIX = "tmpinstall_"
 # Marker file used to resume or pause remote model installs across restarts.
 INSTALL_MARKER_FILENAME = ".invokeai_install.json"
 INSTALL_MARKER_VERSION = 1
+# How long startup restoration waits for an in-flight import_model reservation
+# to resolve before leaving that source's markers for a later startup. Bounds
+# the time _restore_incomplete_installs can block (and with it every
+# import_model call waiting on the startup barrier) behind an import whose
+# helpers hang, e.g. on a metadata request that never returns.
+DEFERRED_RESTORE_TIMEOUT = 30.0
 
 
 class ModelInstallService(ModelInstallServiceBase):
@@ -225,7 +231,7 @@ class ModelInstallService(ModelInstallServiceBase):
         with self._lock:
             owned_sources = {str(j.source) for j in self._install_jobs if not j.in_terminal_state}
             owned_sources |= {str(j.source) for j in self._download_cache.values() if not j.in_terminal_state}
-        deferred: list[tuple[str, ModelInstallJob, Path]] = []
+        deferred: list[tuple[str, ModelInstallJob, Path, set[int]]] = []
         for tmpdir in path.glob(f"{TMPDIR_PREFIX}*"):
             marker = self._read_install_marker(tmpdir)
             if not marker:
@@ -287,9 +293,14 @@ class ModelInstallService(ModelInstallServiceBase):
                     # but has not registered a job yet - and it may still fail
                     # without registering one, in which case the marker would
                     # be left with no owner. Defer the marker and recheck it
-                    # after the scan, once the reservation has resolved.
+                    # after the scan, once the reservation has resolved. Record
+                    # the IDs of the source's jobs known now (all terminal, or
+                    # already_active would have hit) so the recheck can tell a
+                    # job the reservation registered - even one that has already
+                    # reached a terminal state by then - from these older ones.
                     self._logger.debug(f"Deferring restore for {source_str} - a pending import has reserved it")
-                    deferred.append((source_str, job, tmpdir))
+                    known_job_ids = {j.id for j in self._install_jobs if str(j.source) == source_str}
+                    deferred.append((source_str, job, tmpdir, known_job_ids))
                     continue
                 if source_str in seen_sources:
                     duplicate_tmpdir = True
@@ -305,19 +316,34 @@ class ModelInstallService(ModelInstallServiceBase):
 
         # Second pass: markers deferred above because an import_model call had
         # reserved their source. Wait for each reservation to resolve; if the
-        # import registered a job it owns the source and the marker is left for
-        # a later idle startup, and if it failed the marker has no owner and is
-        # restored here. The recheck runs under the lock, so it is atomic with
-        # respect to new reservations and registrations.
-        for source_str, job, tmpdir in deferred:
+        # import registered a job - even one that has already reached a
+        # terminal state - it owned the source and the marker is left for a
+        # later idle startup, and only a reservation that dissolved without
+        # registering anything leaves the marker unowned and restored here.
+        # The recheck runs under the lock, so it is atomic with respect to new
+        # reservations and registrations. The wait is bounded: an import whose
+        # helpers hang must not hold up restoration (and with it the startup
+        # barrier every import_model call waits on) forever, so on timeout the
+        # marker is left on disk for a later startup instead.
+        for source_str, job, tmpdir, known_job_ids in deferred:
             duplicate_tmpdir = False
+            deadline = time.monotonic() + DEFERRED_RESTORE_TIMEOUT
             with self._install_cond:
                 while source_str in self._pending_sources:
-                    self._install_cond.wait()
-                already_active = any(
-                    str(j.source) == source_str for j in self._install_jobs if not j.in_terminal_state
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        break
+                    self._install_cond.wait(timeout=remaining)
+                if source_str in self._pending_sources:
+                    self._logger.warning(
+                        f"An import of {source_str} has been pending for over {DEFERRED_RESTORE_TIMEOUT}s; "
+                        f"leaving {tmpdir} to be restored on a later startup"
+                    )
+                    continue
+                already_registered = any(
+                    str(j.source) == source_str and j.id not in known_job_ids for j in self._install_jobs
                 ) or any(str(j.source) == source_str for j in self._download_cache.values() if not j.in_terminal_state)
-                if already_active:
+                if already_registered:
                     self._logger.debug(f"Skipping restore for {source_str} - already being tracked")
                     continue
                 if source_str in seen_sources:

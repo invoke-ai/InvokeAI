@@ -30,6 +30,7 @@ from invokeai.app.services.model_install import (
     HFModelSource,
     ModelInstallService,
     ModelInstallServiceBase,
+    model_install_default,
 )
 from invokeai.app.services.model_install.model_install_common import (
     InstallStatus,
@@ -916,6 +917,168 @@ def test_restore_recovers_marker_after_pending_import_fails(
         assert tmpdir.exists()
     finally:
         release_import.set()
+        installer.stop()
+
+
+@pytest.mark.timeout(timeout=20, method="thread")
+def test_deferred_restore_skips_marker_of_import_that_completed(
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_record_store,
+    mm2_download_queue,
+    mm2_session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A pending import whose job reaches a terminal state before restore's deferred
+    recheck still resolved by REGISTERING a job, so it owned the source. The recheck
+    must not mistake the terminal job for a failed reservation and register a
+    duplicate job for the deferred marker."""
+    installer = ModelInstallService(
+        app_config=mm2_app_config,
+        record_store=mm2_record_store,
+        download_queue=mm2_download_queue,
+        event_bus=TestEventService(),
+        session=mm2_session,
+    )
+    source = URLModelSource(url=Url("https://www.test.foo/download/test_embedding.safetensors"))
+
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}stale"
+    _write_test_install_marker(tmpdir, str(source))
+
+    import_reserved = threading.Event()
+    release_import = threading.Event()
+
+    def _instantly_completing_import(src, config=None):
+        # Stand-in for an import whose download and install finish before
+        # restore's deferred recheck runs: the job it registers is already
+        # terminal, and nothing for the source remains in _download_cache.
+        import_reserved.set()
+        assert release_import.wait(timeout=10)
+        job = ModelInstallJob(
+            id=installer._next_id(),
+            source=src,
+            config_in=config or ModelRecordChanges(),
+            local_path=mm2_app_config.models_path,
+        )
+        job.status = InstallStatus.COMPLETED
+        return job
+
+    monkeypatch.setattr(installer, "_import_from_url", _instantly_completing_import)
+
+    marker_scanned = threading.Event()
+    real_guess_source = installer._guess_source
+
+    def _observing_guess_source(source_str: str):
+        result = real_guess_source(source_str)
+        marker_scanned.set()
+        return result
+
+    monkeypatch.setattr(installer, "_guess_source", _observing_guess_source)
+
+    resumed: list[ModelInstallJob] = []
+    monkeypatch.setattr(installer, "_resume_remote_download", lambda job: resumed.append(job))
+
+    import_jobs: list[ModelInstallJob] = []
+    import_thread = threading.Thread(target=lambda: import_jobs.append(installer.import_model(source)))
+    start_thread = threading.Thread(target=installer.start)
+    try:
+        import_thread.start()
+        assert import_reserved.wait(timeout=10)
+
+        # Restoration scans the marker while the reservation is pending and
+        # defers it.
+        start_thread.start()
+        assert marker_scanned.wait(timeout=10)
+
+        # The import registers an already-terminal job and clears the
+        # reservation. The deferred recheck runs only after that, and must
+        # recognize the newly registered job as the reservation's outcome.
+        release_import.set()
+        import_thread.join(timeout=10)
+        assert import_jobs and import_jobs[0].status == InstallStatus.COMPLETED
+
+        start_thread.join(timeout=10)
+        installer._wait_for_restore_complete()
+
+        jobs_for_source = [job for job in installer._install_jobs if str(job.source) == str(source)]
+        assert jobs_for_source == import_jobs, "restore registered a duplicate job for a completed import"
+        assert resumed == []
+        assert tmpdir.exists()
+    finally:
+        release_import.set()
+        installer.stop()
+
+
+@pytest.mark.timeout(timeout=20, method="thread")
+def test_restore_completes_when_pending_import_hangs(
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_record_store,
+    mm2_download_queue,
+    mm2_session,
+    embedding_file: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An import whose helpers hang (e.g. a metadata request that never returns)
+    must not hold up restoration forever: every import_model call waits on the
+    startup barrier restore sets, so an unbounded deferred wait would wedge all
+    installs for all sources. Restore must time out, leave the hung source's
+    marker for a later startup, and let unrelated imports proceed."""
+    installer = ModelInstallService(
+        app_config=mm2_app_config,
+        record_store=mm2_record_store,
+        download_queue=mm2_download_queue,
+        event_bus=TestEventService(),
+        session=mm2_session,
+    )
+    monkeypatch.setattr(model_install_default, "DEFERRED_RESTORE_TIMEOUT", 0.25, raising=False)
+    source = URLModelSource(url=Url("https://www.test.foo/download/test_embedding.safetensors"))
+
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}hung"
+    _write_test_install_marker(tmpdir, str(source))
+
+    import_reserved = threading.Event()
+    release_import = threading.Event()
+
+    def _hanging_import_from_url(src, config=None):
+        import_reserved.set()
+        # Simulates a metadata fetch with no timeout: blocks until the test
+        # tears down, far beyond the deferred-restore timeout.
+        assert release_import.wait(timeout=15)
+        raise RuntimeError("simulated hung import aborted by test teardown")
+
+    monkeypatch.setattr(installer, "_import_from_url", _hanging_import_from_url)
+
+    resumed: list[ModelInstallJob] = []
+    monkeypatch.setattr(installer, "_resume_remote_download", lambda job: resumed.append(job))
+
+    def _run_import() -> None:
+        try:
+            installer.import_model(source)
+        except Exception:  # noqa: BLE001 - the simulated hang ends in a teardown error
+            pass
+
+    import_thread = threading.Thread(target=_run_import)
+    try:
+        import_thread.start()
+        assert import_reserved.wait(timeout=10)
+
+        # Restore defers the marker behind the hung reservation. It must give
+        # up after the (shortened) timeout instead of blocking forever.
+        installer.start()
+        assert installer._restore_completed_event.wait(timeout=10), "restore never completed while an import was hung"
+
+        # The hung source's marker is left alone for a later startup.
+        jobs_for_source = [job for job in installer._install_jobs if str(job.source) == str(source)]
+        assert jobs_for_source == []
+        assert resumed == []
+        assert tmpdir.exists()
+
+        # The startup barrier lifted, so an unrelated import proceeds normally.
+        unrelated_job = installer.import_model(LocalModelSource(path=embedding_file))
+        installer.wait_for_installs(timeout=10)
+        assert unrelated_job.complete
+    finally:
+        release_import.set()
+        import_thread.join(timeout=10)
         installer.stop()
 
 
