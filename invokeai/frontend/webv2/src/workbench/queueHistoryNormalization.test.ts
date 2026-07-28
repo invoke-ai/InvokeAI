@@ -171,6 +171,24 @@ describe('normalizeWorkbenchQueueHistory', () => {
     });
   });
 
+  // The queue row is written at submit time from the merged prompt. Rehydrating
+  // from the raw settings made that row change under the user on reload, from
+  // `a cat, cinematic` back to the `a cat` they typed.
+  it('rehydrates a templated item with the prompt that generated', () => {
+    const values = createGenerateValues({
+      positivePrompt: 'a cat',
+      promptTemplate: { id: 't1', name: 'Cinematic', negativePrompt: '', positivePrompt: '{prompt}, cinematic' },
+    });
+    const item = createLegacyItem('generate', {
+      widgetStates: { generate: state('generate', values) },
+    });
+
+    const normalized = normalizeWorkbenchQueueHistory({ items: [item] }, createContext()).items[0]!;
+
+    expect(normalized.snapshot.presentation).toMatchObject({ positivePrompt: 'a cat, cinematic' });
+    expect(normalized.snapshot.backendSubmission).toMatchObject({ positivePrompt: 'a cat, cinematic' });
+  });
+
   it('upgrades Canvas items both before and after the captured generate payload was added', () => {
     const widgetValues = createGenerateValues({ positivePrompt: 'widget prompt', seed: 10 });
     const capturedValues = createGenerateValues({ positivePrompt: 'captured prompt', seed: 99 });

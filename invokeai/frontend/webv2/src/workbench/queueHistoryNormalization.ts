@@ -221,7 +221,10 @@ const getBackendSubmission = (
   const effectivePrompts = getEffectivePrompts(sourceSettings);
 
   return {
-    presentationSource: sourceId === 'upscale' ? null : sourceSettings,
+    // The merged source computed above, not the raw settings: the row is written
+    // at submit time from the merged prompt, so returning the authored text here
+    // made a rehydrated item's prompt change under the user on reload.
+    presentationSource: sourceId === 'upscale' ? null : presentationSource,
     submission: {
       batchCount: sourceSettings.batchCount,
       graph: backendGraph,
