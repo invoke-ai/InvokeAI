@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from invokeai.app.services.object_serializer.object_serializer_base import ObjectSerializerBase
 from invokeai.app.services.style_preset_images.style_preset_images_base import StylePresetImageFileStorageBase
 from invokeai.app.services.style_preset_records.style_preset_records_base import StylePresetRecordsStorageBase
+from invokeai.app.services.wildcard_records.wildcard_records_base import WildcardRecordsStorageBase
 
 if TYPE_CHECKING:
     from logging import Logger
@@ -77,6 +78,7 @@ class InvocationServices:
         tensors: "ObjectSerializerBase[torch.Tensor]",
         conditioning: "ObjectSerializerBase[ConditioningFieldData]",
         style_preset_records: "StylePresetRecordsStorageBase",
+        wildcard_records: "WildcardRecordsStorageBase",
         style_preset_image_files: "StylePresetImageFileStorageBase",
         workflow_thumbnails: "WorkflowThumbnailServiceBase",
         client_state_persistence: "ClientStatePersistenceABC",
@@ -112,6 +114,7 @@ class InvocationServices:
         self.tensors = tensors
         self.conditioning = conditioning
         self.style_preset_records = style_preset_records
+        self.wildcard_records = wildcard_records
         self.style_preset_image_files = style_preset_image_files
         self.workflow_thumbnails = workflow_thumbnails
         self.client_state_persistence = client_state_persistence

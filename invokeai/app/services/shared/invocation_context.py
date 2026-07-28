@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Optional, Union
 
+from dynamicprompts.wildcards import WildcardManager
 from PIL.Image import Image
 from pydantic.networks import AnyHttpUrl
 from torch import Tensor
@@ -18,6 +19,7 @@ from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
 from invokeai.app.services.session_processor.session_processor_common import ProgressImage
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.wildcard_records.wildcard_records_common import build_wildcard_manager
 from invokeai.app.util.step_callback import diffusion_step_callback
 from invokeai.backend.model_manager.configs.base import Config_Base
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
@@ -721,6 +723,16 @@ class UtilInterface(InvocationContextInterface):
         )
 
 
+class WildcardsInterface(InvocationContextInterface):
+    def get_manager(self) -> WildcardManager:
+        """Builds the wildcard manager that resolves `__name__` for the queue item's owner.
+
+        Wildcards are per-user records, so an invocation resolves them against whoever queued it.
+        """
+        wildcards = self._services.wildcard_records.get_many(user_id=self._data.queue_item.user_id)
+        return build_wildcard_manager(wildcards)
+
+
 class InvocationContext:
     """Provides access to various services and data for the current invocation.
 
@@ -733,6 +745,7 @@ class InvocationContext:
         config (ConfigInterface): The app config.
         util (UtilInterface): Utility methods, including a method to check if an invocation was canceled and step callbacks.
         boards (BoardsInterface): Methods to interact with boards.
+        wildcards (WildcardsInterface): Access to the queueing user's wildcards.
     """
 
     def __init__(
@@ -745,6 +758,7 @@ class InvocationContext:
         config: ConfigInterface,
         util: UtilInterface,
         boards: BoardsInterface,
+        wildcards: WildcardsInterface,
         data: InvocationContextData,
         services: InvocationServices,
     ) -> None:
@@ -763,6 +777,9 @@ class InvocationContext:
         self.util = util
         """Utility methods, including a method to check if an invocation was canceled and step callbacks."""
         self.boards = boards
+        """Methods to interact with boards."""
+        self.wildcards = wildcards
+        """Access to the queueing user's wildcards."""
         """Methods to interact with boards."""
         self._data = data
         """An internal API providing access to data about the current queue item and invocation. You probably shouldn't use this. It may change without warning."""
@@ -793,6 +810,7 @@ def build_invocation_context(
     models = ModelsInterface(services=services, data=data, util=util)
     images = ImagesInterface(services=services, data=data, util=util)
     boards = BoardsInterface(services=services, data=data)
+    wildcards = WildcardsInterface(services=services, data=data)
 
     ctx = InvocationContext(
         images=images,
@@ -805,6 +823,7 @@ def build_invocation_context(
         conditioning=conditioning,
         services=services,
         boards=boards,
+        wildcards=wildcards,
     )
 
     return ctx

@@ -39,6 +39,7 @@ def _services(**overrides):
         "client_state_persistence": object(),
         "project_records": object(),
         "users": object(),
+        "wildcard_records": object(),
         "image_moves": None,
     }
     services.update(overrides)

@@ -25,6 +25,7 @@ from invokeai.app.services.invocation_stats.invocation_stats_default import Invo
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.project_records.project_records_sqlite import ProjectRecordsSqlite
 from invokeai.app.services.users.users_default import UserService
+from invokeai.app.services.wildcard_records.wildcard_records_sqlite import SqliteWildcardRecordsStorage
 from invokeai.app.services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.backend.model_manager.model_manager_fixtures import *  # noqa: F403
@@ -72,6 +73,7 @@ def mock_services() -> InvocationServices:
         client_state_persistence=ClientStatePersistenceSqlite(db=db),
         project_records=ProjectRecordsSqlite(db=db),
         users=UserService(db),
+        wildcard_records=SqliteWildcardRecordsStorage(db=db),
     )
 
 

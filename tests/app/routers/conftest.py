@@ -53,6 +53,7 @@ _PATCHED_API_DEPENDENCIES_MODULES = (
     "invokeai.app.api.routers.style_presets",
     "invokeai.app.api.routers.model_relationships",
     "invokeai.app.api.routers.utilities",
+    "invokeai.app.api.routers.wildcards",
     "invokeai.app.api.routers.virtual_boards",
     "invokeai.app.api.routers.images",
     "invokeai.app.api.routers.workflows",
