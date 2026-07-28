@@ -5,6 +5,7 @@ models per-instance, and that eviction is made against the global deduplicated t
 case where a cache cannot free RAM because another device still holds the model. Runs on CPU.
 """
 
+import gc
 import logging
 import threading
 import time
@@ -12,6 +13,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from invokeai.backend.model_manager.load.load_base import LoadedModelWithoutConfig
 from invokeai.backend.model_manager.load.model_cache import model_cache as model_cache_module
 from invokeai.backend.model_manager.load.model_cache.cache_stats import CacheStats
 from invokeai.backend.model_manager.load.model_cache.model_cache import (
@@ -732,6 +734,35 @@ def test_next_admission_sweeps_stale_grace_from_prior_load(mock_logger):
 
         assert "orphan" not in cache_b._cached_models
     finally:
+        cache_b.shutdown()
+
+
+def test_abandoned_loaded_model_releases_first_use_grace(mock_logger):
+    """A LoadedModel dropped before its first lock must release the admission grace immediately.
+    Otherwise an idle cache can shield the abandoned record from a peer's budget reconcile
+    indefinitely."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=int(S * 1.4), shared_store=store)
+    cache_a = _make_cache(store, budget, mock_logger)
+    cache_b = _make_cache(store, budget, mock_logger)
+    try:
+        cache_a.put("abandoned", DummyModule())
+        loaded_model = LoadedModelWithoutConfig(cache_record=cache_a.get("abandoned"), cache=cache_a)
+
+        # The live wrapper keeps the record protected while a peer admission exceeds the budget.
+        cache_b.put("peer", DummyModule())
+        assert "abandoned" in cache_a._cached_models
+        assert budget.total_in_use() == 2 * S
+
+        # Dropping the never-locked wrapper is the only subsequent cache-A lifecycle event.
+        del loaded_model
+        gc.collect()
+
+        assert "abandoned" not in cache_a._cached_models
+        assert budget.total_in_use() == S
+        assert budget.total_in_use() <= budget.max_bytes
+    finally:
+        cache_a.shutdown()
         cache_b.shutdown()
 
 

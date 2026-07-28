@@ -604,6 +604,12 @@ class ModelCache:
                 ).start()
 
     @synchronized
+    def release_first_use_grace(self, cache_entry: CacheRecord) -> None:
+        """Make an abandoned, never-locked record available for budget eviction."""
+        if self._cached_models.get(cache_entry.key) is cache_entry and not cache_entry.is_locked:
+            cache_entry.awaiting_first_use = False
+
+    @synchronized
     def _get_cache_snapshot(self) -> dict[str, CacheEntrySnapshot]:
         overview: dict[str, CacheEntrySnapshot] = {}
         for cache_key, cache_entry in self._cached_models.items():

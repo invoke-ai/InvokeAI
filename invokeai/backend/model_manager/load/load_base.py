@@ -8,6 +8,7 @@ from contextlib import contextmanager
 from logging import Logger
 from pathlib import Path
 from typing import Any, Dict, Generator, Optional, Tuple
+from weakref import finalize
 
 import torch
 
@@ -55,6 +56,14 @@ class LoadedModelWithoutConfig:
     def __init__(self, cache_record: CacheRecord, cache: ModelCache):
         self._cache_record = cache_record
         self._cache = cache
+        release_first_use_grace = getattr(cache, "release_first_use_grace", None)
+        self._first_use_finalizer = (
+            finalize(self, release_first_use_grace, cache_record)
+            if cache_record.awaiting_first_use and release_first_use_grace is not None
+            else None
+        )
+        if self._first_use_finalizer is not None:
+            self._first_use_finalizer.atexit = False
 
     def __enter__(self) -> AnyModel:
         # Hold the MODEL_LOAD_LOCK read lock across the VRAM load (lock() runs
@@ -63,6 +72,8 @@ class LoadedModelWithoutConfig:
         # Acquired before the cache's own lock to keep a consistent lock order (see MODEL_LOAD_LOCK).
         with MODEL_LOAD_LOCK.read_lock():
             self._cache.lock(self._cache_record, None)
+        if self._first_use_finalizer is not None:
+            self._first_use_finalizer.detach()
         try:
             self.repair_required_tensors_on_device()
             return self.model
@@ -85,6 +96,8 @@ class LoadedModelWithoutConfig:
         # See __enter__ for why the VRAM load is wrapped in the read lock.
         with MODEL_LOAD_LOCK.read_lock():
             self._cache.lock(self._cache_record, working_mem_bytes)
+        if self._first_use_finalizer is not None:
+            self._first_use_finalizer.detach()
         try:
             self.repair_required_tensors_on_device()
             yield (self._cache_record.cached_model.get_cpu_state_dict(), self._cache_record.cached_model.model)
