@@ -174,19 +174,30 @@ describe('paramsSliceConfig persisted state migration', () => {
 
     const initial = getInitialParamsState();
     const kleinVae = { key: 'klein-vae', hash: 'h', name: 'Klein VAE', base: 'flux2', type: 'vae' };
-    // Pre-PR v3 state: separate Klein / dev VAE slots, no shared flux2VaeModel.
+    // Pre-PR v3 state: separate Klein / dev VAE slots, no shared flux2VaeModel and none of the
+    // other v4-only keys. Deleting both is what makes this a field-accurate v3 blob — without it
+    // the fixture carries flux2DevMistralEncoderModel from getInitialParamsState() and masks the
+    // migration's missing seed (which makes zParamsState.parse() throw on real upgrades).
     const v3State: Record<string, unknown> = {
       ...initial,
       _version: 3,
+      positivePrompt: 'a fluffy cat',
+      seed: 42,
       kleinVaeModel: kleinVae,
       flux2DevVaeModel: null,
     };
     delete v3State.flux2VaeModel;
+    delete v3State.flux2DevMistralEncoderModel;
 
     const result = migrate?.(v3State) as ReturnType<typeof getInitialParamsState> & Record<string, unknown>;
 
     expect(result._version).toBe(4);
     expect((result.flux2VaeModel as { key: string } | null)?.key).toBe('klein-vae');
+    // The new standalone dev Mistral encoder slot must be seeded, not left undefined.
+    expect(result.flux2DevMistralEncoderModel).toBeNull();
+    // Unrelated params must survive the migration (they'd be wiped if parse() threw).
+    expect(result.positivePrompt).toBe('a fluffy cat');
+    expect(result.seed).toBe(42);
     // The old slots must be gone.
     expect(result.kleinVaeModel).toBeUndefined();
     expect(result.flux2DevVaeModel).toBeUndefined();

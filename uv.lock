@@ -1295,7 +1295,7 @@ requires-dist = [
     { name = "imageio", extras = ["ffmpeg"], specifier = ">=2.37" },
     { name = "jurigged", marker = "extra == 'dev'" },
     { name = "mediapipe", specifier = "==0.10.14" },
-    { name = "mistral-common" },
+    { name = "mistral-common", specifier = ">=1.5.4,<2" },
     { name = "mypy", marker = "extra == 'test'" },
     { name = "numpy", specifier = "<2.0.0" },
     { name = "onnx", specifier = "==1.16.1" },

@@ -202,24 +202,56 @@ describe('ImageMetadataHandlers — Klein recall gating', () => {
     });
   });
 
-  describe('Guidance (legacy FLUX.2 gating)', () => {
-    // Prior to the Klein guidance cleanup, FLUX.2 images wrote a `guidance`
-    // field into metadata. The guidance scalar is inert for all current Klein
-    // variants, so legacy values must not be recalled into the shared guidance
-    // state — otherwise they leak back into FLUX.1 when the user switches
-    // models.
-    it('rejects parsing when the image was generated with a FLUX.2 model', async () => {
+  describe('Guidance (FLUX.2 variant gating)', () => {
+    // guidance_embeds is inert for FLUX.2 Klein, so a legacy Klein `guidance`
+    // value must not be recalled into the shared guidance state — otherwise it
+    // leaks back into FLUX.1 when the user switches models. FLUX.2 [dev] genuinely
+    // consumes guidance, so it must parse and recall. The handler resolves the
+    // image's own model to read its variant.
+    it('rejects parsing when the image was generated with a FLUX.2 Klein model', async () => {
+      modelRegistry['k'] = fakeMainModel('klein_9b');
       const store = makeStore();
 
       await expect(
-        Promise.resolve().then(() =>
-          ImageMetadataHandlers.Guidance.parse(
-            {
-              model: { key: 'k', hash: 'h', name: 'Klein 9B Base', base: 'flux2', type: 'main' },
-              guidance: 3.5,
-            },
-            store
-          )
+        ImageMetadataHandlers.Guidance.parse(
+          {
+            model: { key: 'k', hash: 'h', name: 'Klein 9B Base', base: 'flux2', type: 'main' },
+            guidance: 3.5,
+          },
+          store
+        )
+      ).rejects.toThrow();
+    });
+
+    it('parses successfully when the image was generated with a FLUX.2 [dev] model', async () => {
+      modelRegistry['k'] = fakeMainModel('dev');
+      const store = makeStore();
+
+      const parsed = await ImageMetadataHandlers.Guidance.parse(
+        {
+          model: { key: 'k', hash: 'h', name: 'FLUX.2 dev', base: 'flux2', type: 'main' },
+          guidance: 3.5,
+        },
+        store
+      );
+
+      expect(parsed).toBe(3.5);
+    });
+
+    it('rejects when the FLUX.2 model can no longer be resolved', async () => {
+      // Uninstalled/unresolvable model: we cannot confirm it was [dev], so fall
+      // back to the safe Klein behavior and skip rather than leak a stale value.
+      modelRegistry = {};
+      nextResolved = fakeModel('vae', 'flux2'); // no variant field
+      const store = makeStore();
+
+      await expect(
+        ImageMetadataHandlers.Guidance.parse(
+          {
+            model: { key: 'gone', hash: 'h', name: 'Uninstalled', base: 'flux2', type: 'main' },
+            guidance: 3.5,
+          },
+          store
         )
       ).rejects.toThrow();
     });

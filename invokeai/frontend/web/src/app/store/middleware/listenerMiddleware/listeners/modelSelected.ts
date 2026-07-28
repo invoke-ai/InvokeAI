@@ -7,6 +7,7 @@ import {
   animaQwen3EncoderModelSelected,
   animaVaeModelSelected,
   aspectRatioIdChanged,
+  flux2DevMistralEncoderModelSelected,
   flux2VaeModelSelected,
   kleinQwen3EncoderModelSelected,
   modelChanged,
@@ -244,7 +245,7 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         }
 
         // handle incompatible FLUX.2 models - clear if switching away from flux2
-        const { flux2VaeModel, kleinQwen3EncoderModel } = state.params;
+        const { flux2VaeModel, kleinQwen3EncoderModel, flux2DevMistralEncoderModel } = state.params;
         if (newBase !== 'flux2') {
           if (flux2VaeModel) {
             dispatch(flux2VaeModelSelected(null));
@@ -252,6 +253,10 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
           }
           if (kleinQwen3EncoderModel) {
             dispatch(kleinQwen3EncoderModelSelected(null));
+            modelsUpdatedDisabledOrCleared += 1;
+          }
+          if (flux2DevMistralEncoderModel) {
+            dispatch(flux2DevMistralEncoderModelSelected(null));
             modelsUpdatedDisabledOrCleared += 1;
           }
         }
@@ -592,12 +597,13 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         }
       }
 
-      // Handle FLUX.2 Klein model changes within the same base (different variants need different encoders)
-      // Clear the Qwen3 encoder only when switching between different Klein variants
-      // (e.g., klein_4b needs qwen3_4b, klein_9b needs qwen3_8b)
+      // Handle FLUX.2 model changes within the same base (different variants need different encoders).
+      // Clear the standalone encoder slots only when switching between different variants:
+      //  - Klein Qwen3 encoder (klein_4b needs qwen3_4b, klein_9b needs qwen3_8b)
+      //  - [dev] Mistral encoder (only valid for the `dev` variant; stale on any Klein variant)
       if (newBase === 'flux2' && state.params.model?.base === 'flux2' && newModel.key !== state.params.model?.key) {
-        const { kleinQwen3EncoderModel } = state.params;
-        if (kleinQwen3EncoderModel) {
+        const { kleinQwen3EncoderModel, flux2DevMistralEncoderModel } = state.params;
+        if (kleinQwen3EncoderModel || flux2DevMistralEncoderModel) {
           // Get model configs to compare variants
           const modelConfigsResult = selectModelConfigsQuery(state);
           if (modelConfigsResult.data) {
@@ -612,13 +618,18 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
             const newVariant = newModelConfig && 'variant' in newModelConfig ? newModelConfig.variant : null;
 
             if (oldVariant !== newVariant) {
-              dispatch(kleinQwen3EncoderModelSelected(null));
-              toast({
-                id: 'KLEIN_ENCODER_CLEARED',
-                title: t('toast.kleinEncoderCleared'),
-                description: t('toast.kleinEncoderClearedDescription'),
-                status: 'info',
-              });
+              if (kleinQwen3EncoderModel) {
+                dispatch(kleinQwen3EncoderModelSelected(null));
+                toast({
+                  id: 'KLEIN_ENCODER_CLEARED',
+                  title: t('toast.kleinEncoderCleared'),
+                  description: t('toast.kleinEncoderClearedDescription'),
+                  status: 'info',
+                });
+              }
+              if (flux2DevMistralEncoderModel) {
+                dispatch(flux2DevMistralEncoderModelSelected(null));
+              }
             }
           }
         }
