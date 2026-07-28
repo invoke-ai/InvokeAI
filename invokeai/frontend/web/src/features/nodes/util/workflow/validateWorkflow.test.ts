@@ -1,11 +1,18 @@
 import { get } from 'es-toolkit/compat';
 import { addElement } from 'features/nodes/components/sidePanel/builder/form-manipulation';
 import { CONNECTOR_INPUT_HANDLE, CONNECTOR_OUTPUT_HANDLE } from 'features/nodes/store/util/connectorTopology';
-import { img_resize, main_model_loader, workflow_return } from 'features/nodes/store/util/testUtils';
+import {
+  add,
+  call_saved_workflow,
+  img_resize,
+  main_model_loader,
+  workflow_return,
+} from 'features/nodes/store/util/testUtils';
 import type { InvocationTemplate } from 'features/nodes/types/invocation';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import { buildNodeFieldElement, getDefaultForm, isNodeFieldElement } from 'features/nodes/types/workflow';
 import { buildInvocationNode } from 'features/nodes/util/node/buildInvocationNode';
+import { buildFieldInputInstance } from 'features/nodes/util/schema/buildFieldInputInstance';
 import { validateWorkflow } from 'features/nodes/util/workflow/validateWorkflow';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -483,5 +490,198 @@ describe('validateWorkflow', () => {
       throw new Error('Expected a node field form element');
     }
     expect(updatedElement.data.fieldIdentifier.fieldName).toBe('images');
+  });
+
+  it('should refresh call_saved_workflow dynamic inputs while loading a stale serialized workflow', async () => {
+    const workflow = getWorkflow();
+    const callNode = buildInvocationNode({ x: 0, y: 0 }, call_saved_workflow);
+    const workflowIdInput = callNode.data.inputs.workflow_id;
+    if (!workflowIdInput) {
+      throw new Error('Expected workflow_id input');
+    }
+    workflowIdInput.value = 'saved-workflow-1';
+    const addInputA = add.inputs.a;
+    if (!addInputA) {
+      throw new Error('Expected add.a input template');
+    }
+    const oldFieldName = 'saved_workflow_input::child-add::a';
+    const oldFieldTemplate = structuredClone(addInputA);
+    oldFieldTemplate.name = oldFieldName;
+    oldFieldTemplate.title = 'A';
+    oldFieldTemplate.input = 'any';
+    oldFieldTemplate.ui_hidden = false;
+    callNode.data.dynamicInputTemplates[oldFieldName] = oldFieldTemplate;
+    callNode.data.inputs[oldFieldName] = buildFieldInputInstance(oldFieldName, oldFieldTemplate);
+    callNode.data.inputs[oldFieldName]!.value = 99;
+    workflow.nodes = [callNode];
+
+    const validationResult = await validateWorkflow({
+      workflow,
+      templates: { add, call_saved_workflow },
+      checkImageAccess: resolveTrue,
+      checkBoardAccess: resolveTrue,
+      checkModelAccess: resolveTrue,
+      getWorkflow: (workflowId) => {
+        expect(workflowId).toBe('saved-workflow-1');
+        return Promise.resolve({
+          workflow_id: 'saved-workflow-1',
+          name: 'Saved workflow',
+          created_at: '2026-04-08T00:00:00Z',
+          updated_at: '2026-04-08T00:00:00Z',
+          opened_at: null,
+          user_id: 'user-1',
+          is_public: false,
+          thumbnail_url: null,
+          workflow: {
+            id: 'saved-workflow-1',
+            name: 'Saved workflow',
+            author: '',
+            description: '',
+            version: '',
+            contact: '',
+            tags: '',
+            notes: '',
+            exposedFields: [
+              { nodeId: 'child-add', fieldName: 'a' },
+              { nodeId: 'child-add', fieldName: 'b' },
+            ],
+            meta: { version: '4.0.0', category: 'user' },
+            form: getDefaultForm(),
+            nodes: [
+              {
+                id: 'child-add',
+                type: 'invocation',
+                data: {
+                  id: 'child-add',
+                  type: 'add',
+                  version: '1.0.1',
+                  label: '',
+                  notes: '',
+                  dynamicInputTemplates: {},
+                  isOpen: true,
+                  isIntermediate: true,
+                  useCache: true,
+                  nodePack: 'invokeai',
+                  inputs: {
+                    a: { name: 'a', label: 'A', description: '', value: 1 },
+                    b: { name: 'b', label: 'B', description: '', value: 2 },
+                  },
+                },
+                position: { x: 0, y: 0 },
+              },
+            ],
+            edges: [],
+          },
+        });
+      },
+    });
+
+    const refreshedCallNode = validationResult.workflow.nodes[0];
+    if (!refreshedCallNode || refreshedCallNode.type !== 'invocation') {
+      throw new Error('Expected invocation node');
+    }
+    expect(refreshedCallNode.data.inputs['saved_workflow_input::child-add::a']?.value).toBe(99);
+    expect(refreshedCallNode.data.inputs['saved_workflow_input::child-add::b']?.value).toBe(2);
+    expect(refreshedCallNode.data.dynamicInputTemplates['saved_workflow_input::child-add::b']).toBeDefined();
+  });
+
+  // Regression for PR #9162: `core_metadata` accepts undeclared extras (pydantic `extra='allow'`).
+  // These must round-trip without producing "missing field template" load warnings.
+  const core_metadata: InvocationTemplate = {
+    title: 'Core Metadata',
+    type: 'core_metadata',
+    version: '2.1.0',
+    tags: ['metadata'],
+    description: 'Collects core generation metadata into a MetadataField',
+    outputType: 'metadata_output',
+    // Empty inputs: every input on the node below is an undeclared extra, which is exactly what
+    // core_metadata accepts. This keeps the template minimal while exercising the extra path.
+    inputs: {},
+    outputs: {},
+    useCache: true,
+    nodePack: 'invokeai',
+    classification: 'internal',
+    category: 'metadata',
+  };
+
+  const getCoreMetadataWorkflow = (): WorkflowV3 => ({
+    name: '',
+    author: '',
+    description: '',
+    version: '',
+    contact: '',
+    tags: '',
+    notes: '',
+    exposedFields: [],
+    form: getDefaultForm(),
+    meta: { version: '4.0.0', category: 'user' },
+    nodes: [
+      {
+        id: 'core_metadata-1',
+        type: 'invocation',
+        data: {
+          id: 'core_metadata-1',
+          type: 'core_metadata',
+          version: '2.1.0',
+          label: '',
+          notes: '',
+          isOpen: true,
+          isIntermediate: true,
+          useCache: true,
+          nodePack: 'invokeai',
+          dynamicInputTemplates: {},
+          inputs: {
+            generation_mode: { name: 'generation_mode', label: '', description: '', value: 'z_image_txt2img' },
+            // Undeclared extra - not in the template. Must be preserved without a warning.
+            z_image_seed_variance_enabled: {
+              name: 'z_image_seed_variance_enabled',
+              label: '',
+              description: '',
+              value: false,
+            },
+          },
+        },
+        position: { x: 0, y: 0 },
+      },
+    ],
+    edges: [],
+  });
+
+  it('should not warn about undeclared extras on core_metadata and should preserve them', async () => {
+    const validationResult = await validateWorkflow({
+      workflow: getCoreMetadataWorkflow(),
+      templates: { core_metadata },
+      checkImageAccess: resolveTrue,
+      checkBoardAccess: resolveTrue,
+      checkModelAccess: resolveTrue,
+    });
+
+    expect(validationResult.warnings).toEqual([]);
+    expect(get(validationResult, 'workflow.nodes[0].data.inputs.z_image_seed_variance_enabled.value')).toBe(false);
+  });
+
+  it('should still warn about undeclared inputs on nodes that do NOT accept extras', async () => {
+    const workflow = getWorkflow();
+    // main_model_loader does not accept extras - an undeclared input must produce a warning.
+    const node = workflow.nodes[0];
+    if (!node || node.type !== 'invocation') {
+      throw new Error('expected an invocation node');
+    }
+    node.data.inputs.bogus_extra = {
+      name: 'bogus_extra',
+      label: '',
+      description: '',
+      value: 'should-warn',
+    };
+
+    const validationResult = await validateWorkflow({
+      workflow,
+      templates: { img_resize, main_model_loader },
+      checkImageAccess: resolveTrue,
+      checkBoardAccess: resolveTrue,
+      checkModelAccess: resolveTrue,
+    });
+
+    expect(validationResult.warnings.length).toBe(1);
   });
 });

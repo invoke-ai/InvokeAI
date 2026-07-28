@@ -64,7 +64,7 @@ to point to the location where you wish to store your InvokeAI models, configura
 | --- | --- | --- |
 | `INVOKEAI_ROOT` | `~/invokeai` | **Required** - the location of your InvokeAI root directory. It will be created if it does not exist. |
 | `HUGGING_FACE_HUB_TOKEN` |  | InvokeAI will work without it, but some of the integrations with HuggingFace (like downloading from models from private repositories) may not work |
-| `GPU_DRIVER` | `cuda` | Optionally change this to `rocm` to build the image for AMD GPUs. NOTE: Use the `build.sh` script to build the image for this to take effect. |
+| `GPU_DRIVER` | `cuda` | Optionally change this to `rocm` to build the image for AMD GPUs, or `cpu` for CPU-only builds (required on ARM64 / `aarch64` hosts such as the Raspberry Pi 5). NOTE: Use the `build.sh` script to build the image for this to take effect. |
 
 #### Build the Image
 

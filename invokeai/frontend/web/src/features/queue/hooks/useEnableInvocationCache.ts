@@ -1,4 +1,6 @@
 import { useStore } from '@nanostores/react';
+import { useIsAdmin } from 'features/auth/hooks/useIsAdmin';
+import { getIsEnableInvocationCacheDisabled } from 'features/queue/hooks/invocationCacheControls';
 import { toast } from 'features/toast/toast';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,6 +11,7 @@ export const useEnableInvocationCache = () => {
   const { t } = useTranslation();
   const { data: cacheStatus } = useGetInvocationCacheStatusQuery();
   const isConnected = useStore($isConnected);
+  const isAdmin = useIsAdmin();
   const [_trigger, { isLoading }] = useEnableInvocationCacheMutation({
     fixedCacheKey: 'enableInvocationCache',
   });
@@ -33,6 +36,6 @@ export const useEnableInvocationCache = () => {
   return {
     trigger,
     isLoading,
-    isDisabled: cacheStatus?.enabled || !isConnected || cacheStatus?.max_size === 0,
+    isDisabled: getIsEnableInvocationCacheDisabled(isAdmin, isConnected, cacheStatus),
   };
 };

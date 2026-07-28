@@ -13,7 +13,7 @@ import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHook
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
 import { parseify } from 'common/util/serialize';
-import { firefoxDndFix, triggerPostMoveFlash } from 'features/dnd/util';
+import { dndInputFix, triggerPostMoveFlash } from 'features/dnd/util';
 import type { CenterOrEdge } from 'features/nodes/components/sidePanel/builder/center-or-closest-edge';
 import {
   attachClosestCenterOrEdge,
@@ -405,7 +405,7 @@ export const useFormElementDnd = (
     }
 
     return combine(
-      firefoxDndFix(draggableElement),
+      dndInputFix(draggableElement),
       draggable({
         element: draggableElement,
         dragHandle: dragHandleElement,
@@ -567,7 +567,7 @@ export const useNodeFieldDnd = (
       return;
     }
     return combine(
-      firefoxDndFix(draggableElement),
+      dndInputFix(draggableElement),
       draggable({
         element: draggableElement,
         dragHandle: dragHandleElement,
