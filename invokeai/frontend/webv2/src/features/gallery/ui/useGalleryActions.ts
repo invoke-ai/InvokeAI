@@ -8,6 +8,7 @@ import {
   uploadGalleryImage,
 } from '@features/gallery/data/backend';
 import { invalidateGallery } from '@features/gallery/data/queryCache';
+import { downloadBlob } from '@platform/browser/downloadBlob';
 import {
   assertAccountScopeCurrent,
   captureAccountScope,
@@ -25,13 +26,7 @@ const ACCEPTED_UPLOAD_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp'])
 const toErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
 const saveBlobToDisk = (blob: Blob, fileName: string): void => {
-  const objectUrl = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-
-  anchor.href = objectUrl;
-  anchor.download = fileName;
-  anchor.click();
-  URL.revokeObjectURL(objectUrl);
+  downloadBlob(blob, fileName);
 };
 
 export const useGalleryActions = ({

@@ -37,6 +37,7 @@ import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Mat2d, Rect } from '@workbench/canvas-engine/types';
 import type { BlendMode, Layer as AgPsdLayer, Psd } from 'ag-psd';
 
+import { downloadBlob } from '@platform/browser/downloadBlob';
 import { fromTRS } from '@workbench/canvas-engine/math/mat2d';
 import { isEmpty, roundOut, transformBounds, union } from '@workbench/canvas-engine/math/rect';
 import { applyAdjustments } from '@workbench/canvas-engine/render/adjustments';
@@ -259,12 +260,7 @@ const defaultWritePsd = async (psd: Psd): Promise<ArrayBuffer> => {
 /** Triggers a browser download of the PSD bytes (Blob + anchor click). */
 const defaultDownload = (data: ArrayBuffer, fileName: string): void => {
   const blob = new Blob([data], { type: 'image/vnd.adobe.photoshop' });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = fileName;
-  anchor.click();
-  URL.revokeObjectURL(url);
+  downloadBlob(blob, fileName);
 };
 
 /** Injected dependencies for {@link executePsdExport}. */

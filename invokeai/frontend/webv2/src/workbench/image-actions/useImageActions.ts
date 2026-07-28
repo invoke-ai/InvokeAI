@@ -11,6 +11,7 @@ import { invalidateGallery, invalidateGalleryImages, patchGalleryImageCaches } f
 import { setPendingPromptTemplateDraft } from '@features/generation/react';
 import { getMaxReferenceImages, isVaeModelConfig, isSupportedGenerateModel } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
+import { downloadBlob } from '@platform/browser/downloadBlob';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import {
   assertAccountScopeCurrent,
@@ -66,13 +67,7 @@ export interface ImageActions {
 }
 
 export const saveBlobToDisk = (blob: Blob, fileName: string): void => {
-  const objectUrl = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-
-  anchor.href = objectUrl;
-  anchor.download = fileName;
-  anchor.click();
-  URL.revokeObjectURL(objectUrl);
+  downloadBlob(blob, fileName);
 };
 
 const toErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
@@ -192,13 +187,7 @@ export const useImageActions = ({
           const blob = await response.blob();
 
           assertAccountScopeCurrent(owner);
-          const objectUrl = URL.createObjectURL(blob);
-          const anchor = document.createElement('a');
-
-          anchor.href = objectUrl;
-          anchor.download = image.imageName;
-          anchor.click();
-          URL.revokeObjectURL(objectUrl);
+          downloadBlob(blob, image.imageName);
         } catch (error: unknown) {
           if (!isAccountScopeCurrent(owner)) {
             return;

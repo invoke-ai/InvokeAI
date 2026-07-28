@@ -15,6 +15,7 @@ import {
   wildcardsFromNestedRecord,
   wildcardsToNestedRecord,
 } from '@features/generation/core/wildcardTransfer';
+import { downloadText } from '@platform/browser/downloadBlob';
 
 export type WildcardExportFormat = 'json' | 'yaml';
 
@@ -155,12 +156,5 @@ export const downloadWildcards = async (
 ): Promise<void> => {
   const nested = wildcardsToNestedRecord(wildcards);
   const text = format === 'json' ? `${JSON.stringify(nested, null, 2)}\n` : (await import('yaml')).stringify(nested);
-  const blob = new Blob([text], { type: format === 'json' ? 'application/json' : 'text/yaml' });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-
-  anchor.href = url;
-  anchor.download = `wildcards.${format}`;
-  anchor.click();
-  URL.revokeObjectURL(url);
+  downloadText(text, `wildcards.${format}`, format === 'json' ? 'application/json' : 'text/yaml');
 };

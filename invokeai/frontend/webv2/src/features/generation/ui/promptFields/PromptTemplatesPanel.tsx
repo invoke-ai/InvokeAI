@@ -8,6 +8,7 @@ import { PROMPT_TEMPLATE_PLACEHOLDER } from '@features/generation/core/promptTem
 import { toPromptTemplateSnapshot } from '@features/generation/data/promptTemplates';
 import { useGenerationUi } from '@features/generation/ui/GenerationUiContext';
 import { PANEL_HEADER_CONTROL_HEIGHT, PromptPanelHeader } from '@features/generation/ui/promptFields/PromptPanelHeader';
+import { downloadBlob } from '@platform/browser/downloadBlob';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, IconButton } from '@platform/ui/Button';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
@@ -205,14 +206,7 @@ const PromptTemplateTransferActions = ({ catalog }: { catalog: PromptTemplateCat
     setIsBusy(true);
 
     try {
-      const blob = await catalog.exportCsv();
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-
-      link.download = 'prompt_templates.csv';
-      link.href = url;
-      link.click();
-      URL.revokeObjectURL(url);
+      downloadBlob(await catalog.exportCsv(), 'prompt_templates.csv');
     } catch (caught) {
       reportError('export-prompt-templates', caught, t('widgets.generate.promptTemplates.couldNotExport'));
     } finally {
