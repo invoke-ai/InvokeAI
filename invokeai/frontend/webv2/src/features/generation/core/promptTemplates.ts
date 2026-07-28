@@ -163,5 +163,17 @@ export const syncPromptTemplateWithCatalog = (
 
   const current = catalog.find((template) => template.id === promptTemplate.id);
 
-  return current && !areSnapshotsEqual(current, promptTemplate) ? current : promptTemplate;
+  if (!current || areSnapshotsEqual(current, promptTemplate)) {
+    return promptTemplate;
+  }
+
+  // Copied down to the four fields rather than adopted whole: the catalog holds
+  // records, which carry a couple of extra keys that have no business being
+  // persisted into project state. See `toPromptTemplateSnapshot`.
+  return {
+    id: current.id,
+    name: current.name,
+    negativePrompt: current.negativePrompt,
+    positivePrompt: current.positivePrompt,
+  };
 };

@@ -38,6 +38,24 @@ export interface PromptTemplateRecord extends PromptTemplateSnapshot {
   imageUrl: string | null;
 }
 
+/**
+ * The four fields a record shares with a snapshot, and no more.
+ *
+ * A record is assignable to a snapshot, so applying one type-checks and keeps
+ * `isDefault` and `imageUrl` along for the ride. Both then land in persisted
+ * project state and in every queue item's widget snapshot — an absolute,
+ * host-specific image URL among them, stale the moment the server moves. It
+ * also puts five keys on an object `isCanonicalPromptTemplateSnapshot` requires
+ * to have exactly four, so the identity short-circuits built around it in
+ * `normalizeGenerateSettings` and `isGenerateSettings` never fired.
+ */
+export const toPromptTemplateSnapshot = ({
+  id,
+  name,
+  negativePrompt,
+  positivePrompt,
+}: PromptTemplateSnapshot): PromptTemplateSnapshot => ({ id, name, negativePrompt, positivePrompt });
+
 export interface PromptTemplateDraft {
   name: string;
   negativePrompt: string;

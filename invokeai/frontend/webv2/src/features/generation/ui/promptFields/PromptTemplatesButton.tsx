@@ -3,6 +3,7 @@ import type { PromptTemplateRecord } from '@features/generation/data/promptTempl
 import type { PendingPromptTemplateDraft } from '@features/generation/ui/promptTemplateDraftStore';
 
 import { Popover, Portal, Text } from '@chakra-ui/react';
+import { toPromptTemplateSnapshot } from '@features/generation/data/promptTemplates';
 import { PromptTemplateEditor } from '@features/generation/ui/promptFields/PromptTemplateEditor';
 import { PromptTemplatesPanel } from '@features/generation/ui/promptFields/PromptTemplatesPanel';
 import { useOnPendingPromptTemplateDraft } from '@features/generation/ui/promptTemplateDraftStore';
@@ -75,7 +76,7 @@ export const PromptTemplatesButton = ({
   const handleSaved = useCallback(
     (saved: PromptTemplateRecord) => {
       if (activeTemplate?.id === saved.id) {
-        onApply(saved);
+        onApply(toPromptTemplateSnapshot(saved));
       }
 
       setEditorTarget(null);

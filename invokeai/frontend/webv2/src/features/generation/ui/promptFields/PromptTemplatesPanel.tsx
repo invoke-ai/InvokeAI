@@ -5,6 +5,7 @@ import type { ChangeEvent } from 'react';
 
 import { Box, HStack, Image, Input, Separator, Stack, Text } from '@chakra-ui/react';
 import { PROMPT_TEMPLATE_PLACEHOLDER } from '@features/generation/core/promptTemplates';
+import { toPromptTemplateSnapshot } from '@features/generation/data/promptTemplates';
 import { useGenerationUi } from '@features/generation/ui/GenerationUiContext';
 import { PANEL_HEADER_CONTROL_HEIGHT, PromptPanelHeader } from '@features/generation/ui/promptFields/PromptPanelHeader';
 import { getApiErrorMessage } from '@platform/transport/http';
@@ -320,7 +321,7 @@ const TemplateRow = ({
   onEdit?: (template: PromptTemplateRecord) => void;
 }) => {
   const { t } = useTranslation();
-  const handleApply = useCallback(() => onApply(template), [onApply, template]);
+  const handleApply = useCallback(() => onApply(toPromptTemplateSnapshot(template)), [onApply, template]);
   const handleEdit = useCallback(() => onEdit?.(template), [onEdit, template]);
   const handleDelete = useCallback(() => onDelete?.(template), [onDelete, template]);
   // The prompt with its placeholder is the whole content of a template, so the

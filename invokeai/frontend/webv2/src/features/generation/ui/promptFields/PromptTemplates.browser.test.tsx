@@ -173,7 +173,14 @@ describe('the prompt templates panel', () => {
       await userEvent.click(buttonWithText('Cinematic'));
     });
 
-    expect(onApply).toHaveBeenCalledWith(userTemplate);
+    // The four snapshot fields only. `isDefault` and the absolute `imageUrl`
+    // belong to the catalog, not to persisted project state.
+    expect(onApply).toHaveBeenCalledWith({
+      id: userTemplate.id,
+      name: userTemplate.name,
+      negativePrompt: userTemplate.negativePrompt,
+      positivePrompt: userTemplate.positivePrompt,
+    });
   });
 
   it('clears the applied template', async () => {

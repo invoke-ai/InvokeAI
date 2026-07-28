@@ -185,7 +185,25 @@ describe('syncPromptTemplateWithCatalog', () => {
     const stored = template({ positivePrompt: '{prompt}, cinematic' });
     const edited = template({ name: 'Cinematic v2', positivePrompt: '{prompt}, cinematic, 35mm' });
 
-    expect(syncPromptTemplateWithCatalog(stored, [edited])).toBe(edited);
+    expect(syncPromptTemplateWithCatalog(stored, [edited])).toEqual(edited);
+  });
+
+  // The catalog holds records, which carry `isDefault` and a host-specific
+  // `imageUrl`. Adopting one wholesale persisted both into project state and
+  // into every queue item, and put five keys on something the canonical check
+  // requires to have four.
+  it('takes only the snapshot fields from the catalog entry', () => {
+    const stored = template({ positivePrompt: '{prompt}, cinematic' });
+    const record = {
+      ...template({ positivePrompt: '{prompt}, cinematic, 35mm' }),
+      imageUrl: 'http://some-host:9090/api/v1/style_presets/t1/image',
+      isDefault: false,
+    };
+
+    expect(syncPromptTemplateWithCatalog(stored, [record])).toEqual({
+      ...stored,
+      positivePrompt: '{prompt}, cinematic, 35mm',
+    });
   });
 
   // The callers diff with `Object.is`, so an equal-but-new object each pass
