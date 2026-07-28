@@ -1006,6 +1006,7 @@
         "importedCount_one": "Imported {{count}} wildcard",
         "importedCount_other": "Imported {{count}} wildcards",
         "couldNotImport": "Could not import these wildcards",
+        "couldNotImportAfter": "Stopped after importing {{done}} of {{total}} wildcards",
         "couldNotExport": "Could not export your wildcards",
         "couldNotReadFile": "Could not read {{name}}"
       },

@@ -46,26 +46,36 @@ export const WildcardImportDialog = ({
 }) => {
   const { t } = useTranslation();
   const [resolutions, setResolutions] = useState<Record<string, WildcardImportResolution>>({});
+  // The set-all row is a control in its own right, so it has to hold what it was
+  // last set to. Rendered without a value it read as nothing selected however
+  // often it was used, which invited a second click — and that reapplied the
+  // choice over every per-row override made in between.
+  const [allResolution, setAllResolution] = useState<WildcardImportResolution | null>(null);
 
   const conflicts = useMemo(
     () => entries.filter((entry) => entry.rejection === null && entry.conflictId !== null),
     [entries]
   );
-  const freshCount = entries.filter((entry) => entry.rejection === null && entry.conflictId === null).length;
+  const freshCount = useMemo(
+    () => entries.filter((entry) => entry.rejection === null && entry.conflictId === null).length,
+    [entries]
+  );
   const rejected = useMemo(
     () => entries.flatMap((entry) => (entry.rejection ? [{ name: entry.name, rejection: entry.rejection }] : [])),
     [entries]
   );
 
-  const setResolution = useCallback(
-    (name: string, resolution: WildcardImportResolution) =>
-      setResolutions((current) => ({ ...current, [name]: resolution })),
-    []
-  );
+  const setResolution = useCallback((name: string, resolution: WildcardImportResolution) => {
+    // A single row disagreeing means the set-all row no longer describes them.
+    setAllResolution(null);
+    setResolutions((current) => ({ ...current, [name]: resolution }));
+  }, []);
 
   const setAllResolutions = useCallback(
-    (resolution: WildcardImportResolution) =>
-      setResolutions(Object.fromEntries(conflicts.map((entry) => [entry.name, resolution]))),
+    (resolution: WildcardImportResolution) => {
+      setAllResolution(resolution);
+      setResolutions(Object.fromEntries(conflicts.map((entry) => [entry.name, resolution])));
+    },
     [conflicts]
   );
 
@@ -87,7 +97,7 @@ export const WildcardImportDialog = ({
               {t('widgets.generate.dynamicPrompts.importAlreadyExist')}
             </Text>
             {/* One decision for a folder of forty; the rows below still win. */}
-            {conflicts.length > 1 ? <ResolutionControl onChange={setAllResolutions} /> : null}
+            {conflicts.length > 1 ? <ResolutionControl value={allResolution} onChange={setAllResolutions} /> : null}
           </HStack>
           <Scrollable maxH="12rem" label={t('widgets.generate.dynamicPrompts.importAlreadyExist')}>
             <Stack gap="1" pr="1">
@@ -110,16 +120,23 @@ export const WildcardImportDialog = ({
           <Text fontSize="xs" fontWeight="600">
             {t('widgets.generate.dynamicPrompts.importCannotImport')}
           </Text>
-          {rejected.map((entry) => (
-            <HStack justify="space-between" key={entry.name}>
-              <Text fontFamily="mono" fontSize="2xs" truncate>
-                {entry.name || t('widgets.generate.dynamicPrompts.importUnnamed')}
-              </Text>
-              <Text color="fg.subtle" fontSize="2xs" flexShrink="0">
-                {t(REJECTION_KEY[entry.rejection])}
-              </Text>
-            </HStack>
-          ))}
+          {/* Bounded like the conflicts above it. Pointed at a folder where most
+              files are unusable, this list grew past the viewport and pushed the
+              dialog's own buttons out of reach. */}
+          <Scrollable maxH="8rem" label={t('widgets.generate.dynamicPrompts.importCannotImport')}>
+            <Stack gap="1" pr="1">
+              {rejected.map((entry, index) => (
+                <HStack justify="space-between" key={`${entry.name}-${index}`}>
+                  <Text fontFamily="mono" fontSize="2xs" truncate>
+                    {entry.name || t('widgets.generate.dynamicPrompts.importUnnamed')}
+                  </Text>
+                  <Text color="fg.subtle" fontSize="2xs" flexShrink="0">
+                    {t(REJECTION_KEY[entry.rejection])}
+                  </Text>
+                </HStack>
+              ))}
+            </Stack>
+          </Scrollable>
         </Stack>
       ) : null}
     </Stack>
@@ -143,7 +160,7 @@ const ResolutionControl = ({
   value,
 }: {
   onChange: (resolution: WildcardImportResolution) => void;
-  value?: WildcardImportResolution;
+  value?: WildcardImportResolution | null;
 }) => {
   const { t } = useTranslation();
   const handleValueChange = useCallback(

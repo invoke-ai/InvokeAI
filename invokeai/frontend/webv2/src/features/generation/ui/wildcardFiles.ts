@@ -39,24 +39,60 @@ export class WildcardFileError extends Error {
 }
 
 /**
+ * Bounds on what a selection may contain, so a mistaken pick fails by saying so.
+ *
+ * Without the count, `parsed.push(...entries)` on a large collection overflowed
+ * the argument stack and surfaced as `RangeError` — caught as a parse failure
+ * and reported as "could not read", about a file that had parsed perfectly. The
+ * threshold is engine-dependent, so it tripped in Safari well before Chrome.
+ */
+const MAX_IMPORT_FILE_BYTES = 32 * 1024 * 1024;
+const MAX_IMPORT_WILDCARDS = 20_000;
+
+/**
  * Every wildcard the picked files describe, in the order the files were given.
  *
  * A folder of `.txt` files, a single `.yaml` collection, and a `.json` export of
  * this app all land in the same list — mixing them in one selection is fine, and
  * duplicate names across files are sorted out later by `planWildcardImport`.
  */
+/** `a.txt` and a bare `wildcards` yes, `README.md` and `preview.png` no. */
+const isTextWildcardFile = (path: string): boolean => {
+  const name = path.slice(path.lastIndexOf('/') + 1);
+  const dot = name.lastIndexOf('.');
+
+  return dot <= 0 || name.slice(dot).toLowerCase() === '.txt';
+};
+
 export const readWildcardFiles = async (files: readonly File[]): Promise<ParsedWildcard[]> => {
   const parsed: ParsedWildcard[] = [];
 
+  const collect = (wildcards: readonly ParsedWildcard[], fileName: string): void => {
+    // Appended one at a time rather than spread: a spread of a large collection
+    // is a call with that many arguments, which overflows the stack.
+    for (const wildcard of wildcards) {
+      parsed.push(wildcard);
+    }
+
+    if (parsed.length > MAX_IMPORT_WILDCARDS) {
+      throw new WildcardFileError(fileName);
+    }
+  };
+
   for (const file of files) {
     const path = getFilePath(file);
+
+    if (file.size > MAX_IMPORT_FILE_BYTES) {
+      throw new WildcardFileError(file.name);
+    }
+
     const contents = await file.text();
 
     if (hasExtension(path, '.yaml', '.yml')) {
       const { parse } = await import('yaml');
 
       try {
-        parsed.push(...wildcardsFromNestedRecord(parse(contents)));
+        collect(wildcardsFromNestedRecord(parse(contents)), file.name);
       } catch {
         throw new WildcardFileError(file.name);
       }
@@ -65,16 +101,22 @@ export const readWildcardFiles = async (files: readonly File[]): Promise<ParsedW
 
     if (hasExtension(path, '.json')) {
       try {
-        parsed.push(...wildcardsFromNestedRecord(JSON.parse(contents)));
+        collect(wildcardsFromNestedRecord(JSON.parse(contents)), file.name);
       } catch {
         throw new WildcardFileError(file.name);
       }
       continue;
     }
 
-    // Anything else is read a line at a time. A wildcard file has no header to
-    // check, and refusing an extensionless one would only be pedantry.
-    parsed.push(parseWildcardTextFile(path, contents));
+    // Text is read a line at a time, and an extensionless file is fair game — a
+    // wildcard file has no header to check. Anything else is not: `accept` is
+    // only a hint on a file input, and a README picked up alongside a wildcard
+    // folder used to import as a wildcard named `README`.
+    if (!isTextWildcardFile(path)) {
+      throw new WildcardFileError(file.name);
+    }
+
+    collect([parseWildcardTextFile(path, contents)], file.name);
   }
 
   return parsed;

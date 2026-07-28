@@ -66,7 +66,16 @@ export const WildcardTransferActions = ({ catalog }: { catalog: WildcardCatalog 
 
         notifications.info(t('widgets.generate.dynamicPrompts.importedCount', { count: done }));
       } catch (caught) {
-        reportError('import-wildcards', caught, t('widgets.generate.dynamicPrompts.couldNotImport'));
+        // Writes go one at a time, so a failure part-way leaves real wildcards
+        // behind. Saying only that the import failed sent people back for a
+        // second run that then clashed with everything the first one had made.
+        reportError(
+          'import-wildcards',
+          caught,
+          done > 0
+            ? t('widgets.generate.dynamicPrompts.couldNotImportAfter', { done, total: actions.length })
+            : t('widgets.generate.dynamicPrompts.couldNotImport')
+        );
       } finally {
         setIsBusy(false);
         setPendingEntries(null);

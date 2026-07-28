@@ -107,6 +107,27 @@ describe('wildcard import dialog', () => {
     expect(onConfirm).toHaveBeenCalledWith({ colours: 'keepBoth', moods: 'keepBoth' });
   });
 
+  // Regression: rendered controlled with no value, the apply-to-all row snapped
+  // back to nothing selected after every use, so it read as not having worked.
+  it('shows what the apply-to-all row was set to', async () => {
+    await renderDialog();
+    const [all] = segmentGroups();
+
+    await clickOption(all!, 'importKeepBoth');
+
+    expect(all!.querySelector('[data-part="item"][data-state="checked"]')?.textContent).toContain('importKeepBoth');
+  });
+
+  it('stops describing every clash once one of them disagrees', async () => {
+    await renderDialog();
+    const [all, colours] = segmentGroups();
+
+    await clickOption(all!, 'importReplace');
+    await clickOption(colours!, 'importSkip');
+
+    expect(all!.querySelector('[data-part="item"][data-state="checked"]')).toBeNull();
+  });
+
   it('lets a row override the decision made for all of them', async () => {
     const onConfirm = await renderDialog();
     const [all, colours] = segmentGroups();
