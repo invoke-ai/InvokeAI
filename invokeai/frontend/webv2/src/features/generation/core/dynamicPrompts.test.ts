@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { hasDynamicPromptSyntax, sanitizeDynamicPromptsConfig, sanitizeMaxPrompts } from './dynamicPrompts';
+import {
+  findWildcardReferences,
+  hasDynamicPromptSyntax,
+  sanitizeDynamicPromptsConfig,
+  sanitizeMaxPrompts,
+} from './dynamicPrompts';
 
 describe('hasDynamicPromptSyntax', () => {
   it('detects a variant anywhere in the prompt', () => {
@@ -9,10 +14,30 @@ describe('hasDynamicPromptSyntax', () => {
     expect(hasDynamicPromptSyntax('multi\nline {a|b}')).toBe(true);
   });
 
-  it('ignores prompts with no braces, including bare wildcards', () => {
+  it('detects a wildcard reference', () => {
+    expect(hasDynamicPromptSyntax('a __colors__ ball')).toBe(true);
+    expect(hasDynamicPromptSyntax('a __animals/dogs__ ball')).toBe(true);
+  });
+
+  it('ignores prompts with neither a variant nor a wildcard', () => {
     expect(hasDynamicPromptSyntax('a red ball')).toBe(false);
-    expect(hasDynamicPromptSyntax('a __color__ ball')).toBe(false);
     expect(hasDynamicPromptSyntax('unclosed { brace')).toBe(false);
+    // Not a reference: a name may not start or end with an underscore, so this
+    // cannot round-trip through the `__` delimiters.
+    expect(hasDynamicPromptSyntax('snake__case word')).toBe(false);
+  });
+});
+
+describe('findWildcardReferences', () => {
+  it('collects each referenced name once, in order', () => {
+    expect(findWildcardReferences('a __colors__ __animals/dogs__ and __colors__ again')).toEqual([
+      'colors',
+      'animals/dogs',
+    ]);
+  });
+
+  it('returns nothing for a prompt with no references', () => {
+    expect(findWildcardReferences('a {red|green} ball')).toEqual([]);
   });
 });
 

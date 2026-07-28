@@ -39,22 +39,22 @@
         "fontRawBytes": 23664,
         "imageRawBytes": 0,
         "largestAssetRawBytes": 737748,
-        "otherRawBytes": 89272,
+        "otherRawBytes": 89849,
         "requestCount": 19,
         "scriptRawBytes": 1453501,
         "scriptRequestCount": 15,
-        "totalRawBytes": 1568596
+        "totalRawBytes": 1569173
       },
       "resourceLimits": {
         "cssRawBytes": 2181,
         "fontRawBytes": 23901,
         "imageRawBytes": 0,
         "largestAssetRawBytes": 745126,
-        "otherRawBytes": 90165,
+        "otherRawBytes": 90742,
         "requestCount": 19,
         "scriptRawBytes": 1468037,
         "scriptRequestCount": 15,
-        "totalRawBytes": 1584282
+        "totalRawBytes": 1584859
       },
       "routeReadyMedianMs": 227.19999999925494,
       "scriptSourceOwnerSet": "launchpad-static",
@@ -97,22 +97,22 @@
         "fontRawBytes": 23664,
         "imageRawBytes": 0,
         "largestAssetRawBytes": 737748,
-        "otherRawBytes": 89272,
+        "otherRawBytes": 89849,
         "requestCount": 19,
         "scriptRawBytes": 1453501,
         "scriptRequestCount": 15,
-        "totalRawBytes": 1568596
+        "totalRawBytes": 1569173
       },
       "resourceLimits": {
         "cssRawBytes": 2181,
         "fontRawBytes": 23901,
         "imageRawBytes": 0,
         "largestAssetRawBytes": 745126,
-        "otherRawBytes": 90165,
+        "otherRawBytes": 90742,
         "requestCount": 19,
         "scriptRawBytes": 1468037,
         "scriptRequestCount": 15,
-        "totalRawBytes": 1584282
+        "totalRawBytes": 1584859
       },
       "routeReadyMedianMs": 278.8999999985099,
       "scriptSourceOwnerSet": "launchpad-static",
@@ -155,22 +155,22 @@
         "fontRawBytes": 23664,
         "imageRawBytes": 156376,
         "largestAssetRawBytes": 737748,
-        "otherRawBytes": 89272,
+        "otherRawBytes": 89849,
         "requestCount": 95,
         "scriptRawBytes": 2920198,
         "scriptRequestCount": 89,
-        "totalRawBytes": 3207082
+        "totalRawBytes": 3207659
       },
       "resourceLimits": {
         "cssRawBytes": 17748,
         "fontRawBytes": 23901,
         "imageRawBytes": 157940,
         "largestAssetRawBytes": 745126,
-        "otherRawBytes": 90165,
+        "otherRawBytes": 90742,
         "requestCount": 95,
         "scriptRawBytes": 2949400,
         "scriptRequestCount": 89,
-        "totalRawBytes": 3239153
+        "totalRawBytes": 3239730
       },
       "routeReadyMedianMs": 614.6999999992549,
       "scriptSourceOwnerSet": "editor-minimal-static",
@@ -213,22 +213,22 @@
         "fontRawBytes": 23664,
         "imageRawBytes": 156376,
         "largestAssetRawBytes": 737748,
-        "otherRawBytes": 89272,
+        "otherRawBytes": 89849,
         "requestCount": 95,
         "scriptRawBytes": 2920198,
         "scriptRequestCount": 89,
-        "totalRawBytes": 3207082
+        "totalRawBytes": 3207659
       },
       "resourceLimits": {
         "cssRawBytes": 17748,
         "fontRawBytes": 23901,
         "imageRawBytes": 157940,
         "largestAssetRawBytes": 745126,
-        "otherRawBytes": 90165,
+        "otherRawBytes": 90742,
         "requestCount": 95,
         "scriptRawBytes": 2949400,
         "scriptRequestCount": 89,
-        "totalRawBytes": 3239153
+        "totalRawBytes": 3239730
       },
       "routeReadyMedianMs": 663.1999999992549,
       "scriptSourceOwnerSet": "editor-minimal-static",
@@ -271,22 +271,22 @@
         "fontRawBytes": 23664,
         "imageRawBytes": 156376,
         "largestAssetRawBytes": 737748,
-        "otherRawBytes": 89272,
+        "otherRawBytes": 89849,
         "requestCount": 99,
         "scriptRawBytes": 3196397,
         "scriptRequestCount": 93,
-        "totalRawBytes": 3483281
+        "totalRawBytes": 3483858
       },
       "resourceLimits": {
         "cssRawBytes": 17748,
         "fontRawBytes": 23901,
         "imageRawBytes": 157940,
         "largestAssetRawBytes": 745126,
-        "otherRawBytes": 90165,
+        "otherRawBytes": 90742,
         "requestCount": 99,
         "scriptRawBytes": 3228361,
         "scriptRequestCount": 93,
-        "totalRawBytes": 3518114
+        "totalRawBytes": 3518691
       },
       "routeReadyMedianMs": 767.3000000007451,
       "scriptSourceOwnerSet": "editor-canvas-static",
@@ -329,22 +329,22 @@
         "fontRawBytes": 23664,
         "imageRawBytes": 156376,
         "largestAssetRawBytes": 737748,
-        "otherRawBytes": 89272,
+        "otherRawBytes": 89849,
         "requestCount": 99,
         "scriptRawBytes": 3196397,
         "scriptRequestCount": 93,
-        "totalRawBytes": 3483281
+        "totalRawBytes": 3483858
       },
       "resourceLimits": {
         "cssRawBytes": 17748,
         "fontRawBytes": 23901,
         "imageRawBytes": 157940,
         "largestAssetRawBytes": 745126,
-        "otherRawBytes": 90165,
+        "otherRawBytes": 90742,
         "requestCount": 99,
         "scriptRawBytes": 3228361,
         "scriptRequestCount": 93,
-        "totalRawBytes": 3518114
+        "totalRawBytes": 3518691
       },
       "routeReadyMedianMs": 1164.4000000003725,
       "scriptSourceOwnerSet": "editor-canvas-static",
@@ -387,22 +387,22 @@
         "fontRawBytes": 23664,
         "imageRawBytes": 156376,
         "largestAssetRawBytes": 737748,
-        "otherRawBytes": 89272,
+        "otherRawBytes": 89849,
         "requestCount": 95,
         "scriptRawBytes": 2920198,
         "scriptRequestCount": 89,
-        "totalRawBytes": 3207082
+        "totalRawBytes": 3207659
       },
       "resourceLimits": {
         "cssRawBytes": 17748,
         "fontRawBytes": 23901,
         "imageRawBytes": 157940,
         "largestAssetRawBytes": 745126,
-        "otherRawBytes": 90165,
+        "otherRawBytes": 90742,
         "requestCount": 95,
         "scriptRawBytes": 2949400,
         "scriptRequestCount": 89,
-        "totalRawBytes": 3239153
+        "totalRawBytes": 3239730
       },
       "routeReadyMedianMs": 750.6999999992549,
       "scriptSourceOwnerSet": "editor-minimal-static",
@@ -445,22 +445,22 @@
         "fontRawBytes": 23664,
         "imageRawBytes": 156376,
         "largestAssetRawBytes": 737748,
-        "otherRawBytes": 89272,
+        "otherRawBytes": 89849,
         "requestCount": 95,
         "scriptRawBytes": 2920198,
         "scriptRequestCount": 89,
-        "totalRawBytes": 3207082
+        "totalRawBytes": 3207659
       },
       "resourceLimits": {
         "cssRawBytes": 17748,
         "fontRawBytes": 23901,
         "imageRawBytes": 157940,
         "largestAssetRawBytes": 745126,
-        "otherRawBytes": 90165,
+        "otherRawBytes": 90742,
         "requestCount": 95,
         "scriptRawBytes": 2949400,
         "scriptRequestCount": 89,
-        "totalRawBytes": 3239153
+        "totalRawBytes": 3239730
       },
       "routeReadyMedianMs": 977.9000000003725,
       "scriptSourceOwnerSet": "editor-minimal-static",
@@ -503,22 +503,22 @@
         "fontRawBytes": 23664,
         "imageRawBytes": 156376,
         "largestAssetRawBytes": 737748,
-        "otherRawBytes": 89272,
+        "otherRawBytes": 89849,
         "requestCount": 95,
         "scriptRawBytes": 2920198,
         "scriptRequestCount": 89,
-        "totalRawBytes": 3207082
+        "totalRawBytes": 3207659
       },
       "resourceLimits": {
         "cssRawBytes": 17748,
         "fontRawBytes": 23901,
         "imageRawBytes": 157940,
         "largestAssetRawBytes": 745126,
-        "otherRawBytes": 90165,
+        "otherRawBytes": 90742,
         "requestCount": 95,
         "scriptRawBytes": 2949400,
         "scriptRequestCount": 89,
-        "totalRawBytes": 3239153
+        "totalRawBytes": 3239730
       },
       "routeReadyMedianMs": 708.5,
       "scriptSourceOwnerSet": "editor-minimal-static",
@@ -561,22 +561,22 @@
         "fontRawBytes": 23664,
         "imageRawBytes": 156376,
         "largestAssetRawBytes": 737748,
-        "otherRawBytes": 89272,
+        "otherRawBytes": 89849,
         "requestCount": 95,
         "scriptRawBytes": 2920198,
         "scriptRequestCount": 89,
-        "totalRawBytes": 3207082
+        "totalRawBytes": 3207659
       },
       "resourceLimits": {
         "cssRawBytes": 17748,
         "fontRawBytes": 23901,
         "imageRawBytes": 157940,
         "largestAssetRawBytes": 745126,
-        "otherRawBytes": 90165,
+        "otherRawBytes": 90742,
         "requestCount": 95,
         "scriptRawBytes": 2949400,
         "scriptRequestCount": 89,
-        "totalRawBytes": 3239153
+        "totalRawBytes": 3239730
       },
       "routeReadyMedianMs": 857,
       "scriptSourceOwnerSet": "editor-minimal-static",
@@ -1004,6 +1004,7 @@
       "source:src/features/generation/data/dynamicPromptsQueries.ts",
       "source:src/features/generation/data/promptUtilities.ts",
       "source:src/features/generation/data/referenceImageUrls.ts",
+      "source:src/features/generation/data/wildcards.ts",
       "source:src/features/generation/graph.ts",
       "source:src/features/generation/prompts.ts",
       "source:src/features/generation/react.ts",
@@ -1028,6 +1029,7 @@
       "source:src/features/generation/ui/promptFields/PositivePromptActions.tsx",
       "source:src/features/generation/ui/promptFields/PositivePromptField.tsx",
       "source:src/features/generation/ui/promptFields/PromptTextarea.tsx",
+      "source:src/features/generation/ui/promptFields/WildcardsPanel.tsx",
       "source:src/features/generation/ui/promptFields/index.ts",
       "source:src/features/generation/ui/promptFields/promptAttentionHotkeys.ts",
       "source:src/features/generation/ui/promptFields/promptFocus.ts",
@@ -1044,6 +1046,7 @@
       "source:src/features/generation/ui/shared/modelDefaultSettings.ts",
       "source:src/features/generation/ui/useDebouncedDraftValue.ts",
       "source:src/features/generation/ui/useDynamicPrompts.ts",
+      "source:src/features/generation/ui/useWildcards.ts",
       "source:src/features/generation/widget.ts",
       "source:src/features/identity/capabilities.ts",
       "source:src/features/identity/core/schemas.ts",
@@ -1782,6 +1785,7 @@
       "source:src/features/generation/data/dynamicPromptsQueries.ts",
       "source:src/features/generation/data/promptUtilities.ts",
       "source:src/features/generation/data/referenceImageUrls.ts",
+      "source:src/features/generation/data/wildcards.ts",
       "source:src/features/generation/graph.ts",
       "source:src/features/generation/prompts.ts",
       "source:src/features/generation/react.ts",
@@ -1806,6 +1810,7 @@
       "source:src/features/generation/ui/promptFields/PositivePromptActions.tsx",
       "source:src/features/generation/ui/promptFields/PositivePromptField.tsx",
       "source:src/features/generation/ui/promptFields/PromptTextarea.tsx",
+      "source:src/features/generation/ui/promptFields/WildcardsPanel.tsx",
       "source:src/features/generation/ui/promptFields/index.ts",
       "source:src/features/generation/ui/promptFields/promptAttentionHotkeys.ts",
       "source:src/features/generation/ui/promptFields/promptFocus.ts",
@@ -1822,6 +1827,7 @@
       "source:src/features/generation/ui/shared/modelDefaultSettings.ts",
       "source:src/features/generation/ui/useDebouncedDraftValue.ts",
       "source:src/features/generation/ui/useDynamicPrompts.ts",
+      "source:src/features/generation/ui/useWildcards.ts",
       "source:src/features/generation/widget.ts",
       "source:src/features/identity/capabilities.ts",
       "source:src/features/identity/core/schemas.ts",

@@ -75,6 +75,19 @@ describe('prompt highlight segments', () => {
       expect(dynamicKindForText(`\${colour} ball`, `\${colour}`)).toBe('promptVariable');
     });
 
+    it('marks an unknown wildcard as an error and a known one as recognised syntax', () => {
+      const known = new Set(['colors']);
+      const kindWithCatalog = (prompt: string, text: string) =>
+        buildPromptHighlightSegments(prompt, { dynamicPrompts: true, knownWildcards: known }).find(
+          (segment) => segment.text === text
+        )?.kind;
+
+      expect(kindWithCatalog('a __colors__ ball', '__colors__')).toBe('wildcard');
+      expect(kindWithCatalog('a __nope__ ball', '__nope__')).toBe('error');
+      // Without a catalog nothing is known to be missing, so neither is an error.
+      expect(dynamicKindForText('a __nope__ ball', '__nope__')).toBe('wildcard');
+    });
+
     it('marks an unbalanced brace as an error, like an unbalanced parenthesis', () => {
       expect(dynamicKindForText('a {red green', '{')).toBe('error');
       expect(dynamicKindForText('a red} green', '}')).toBe('error');

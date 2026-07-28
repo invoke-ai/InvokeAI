@@ -29,6 +29,8 @@ export interface PromptHighlightOptions {
    * never happens.
    */
   dynamicPrompts?: boolean;
+  /** Resolvable wildcard names; omitted leaves every `__name__` neutral. */
+  knownWildcards?: ReadonlySet<string>;
 }
 
 export interface PromptHighlightSegment {
@@ -196,8 +198,8 @@ const appendSegment = (segments: PromptHighlightSegment[], segment: PromptHighli
   segments.push(segment);
 };
 
-const collectDynamicPromptAnnotations = (prompt: string): HighlightAnnotation[] =>
-  scanDynamicPromptSyntax(prompt).map(({ kind, range }) => ({
+const collectDynamicPromptAnnotations = (prompt: string, knownWildcards?: ReadonlySet<string>): HighlightAnnotation[] =>
+  scanDynamicPromptSyntax(prompt, knownWildcards).map(({ kind, range }) => ({
     kind,
     priority: ANNOTATION_PRIORITY[kind],
     range,
@@ -216,7 +218,7 @@ export const buildPromptHighlightSegments = (
     const annotations = [
       ...collectAnnotations(prompt, parsePromptTokens(tokens)),
       ...collectParenthesisErrors(tokens),
-      ...(options.dynamicPrompts ? collectDynamicPromptAnnotations(prompt) : []),
+      ...(options.dynamicPrompts ? collectDynamicPromptAnnotations(prompt, options.knownWildcards) : []),
     ];
     const segments: PromptHighlightSegment[] = [];
 

@@ -4,6 +4,7 @@ import type { ChangeEvent, KeyboardEvent } from 'react';
 
 import { useRegisterGenerateDraftFlusher } from '@features/generation/ui/generateDraftRegistry';
 import { useDebouncedDraftValue } from '@features/generation/ui/useDebouncedDraftValue';
+import { useWildcards } from '@features/generation/ui/useWildcards';
 import { Field } from '@platform/ui';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -54,6 +55,7 @@ export const PositivePromptField = ({
   const { t } = useTranslation();
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [triggerPickerState, setTriggerPickerState] = useState<PromptTriggerPickerState | null>(null);
+  const { knownNames: knownWildcards } = useWildcards();
   const { commitDraftValue, draftValue, flushDraftValue, replaceDraftValue, setDraftValue } = useDebouncedDraftValue({
     delayMs: PROMPT_INPUT_DEBOUNCE_MS,
     onCommit: onChange,
@@ -90,15 +92,26 @@ export const PositivePromptField = ({
 
   const handlePromptKeyDown = useCallback(
     (event: KeyboardEvent<HTMLTextAreaElement>) => {
-      if (event.key !== '<' || event.altKey || event.ctrlKey || event.metaKey) {
+      if (event.altKey || event.ctrlKey || event.metaKey) {
+        return;
+      }
+
+      // `<` opens the picker outright; `__` does too, on the second underscore,
+      // since that is the point where the user has committed to a wildcard.
+      const opensPicker =
+        event.key === '<' ||
+        (event.key === '_' && event.currentTarget.value.slice(0, event.currentTarget.selectionStart).endsWith('_'));
+
+      if (!opensPicker) {
         return;
       }
 
       event.preventDefault();
-      openPromptTriggerPicker(event.currentTarget, {
-        end: event.currentTarget.selectionEnd,
-        start: event.currentTarget.selectionStart,
-      });
+      // The `__` case replaces the underscore already typed, so the inserted
+      // `__name__` does not end up with three leading underscores.
+      const start = event.key === '_' ? event.currentTarget.selectionStart - 1 : event.currentTarget.selectionStart;
+
+      openPromptTriggerPicker(event.currentTarget, { end: event.currentTarget.selectionEnd, start });
     },
     [openPromptTriggerPicker]
   );
@@ -137,12 +150,20 @@ export const PositivePromptField = ({
     [openPromptTriggerPicker]
   );
 
+  const insertTextAtCaret = useCallback(
+    (text: string) => {
+      insertPromptText({ onChange: commitPromptChange, textarea: textareaRef.current, text, value: draftValue });
+    },
+    [commitPromptChange, draftValue]
+  );
+
   const labelEnd = useMemo(
     () => (
       <PositivePromptActions
         batchCount={batchCount}
         dynamicPrompts={dynamicPrompts}
         isPromptTriggerPickerOpen={triggerPickerState !== null}
+        onInsertText={insertTextAtCaret}
         loras={loras}
         positivePrompt={draftValue}
         projectId={projectId}
@@ -159,6 +180,7 @@ export const PositivePromptField = ({
       dynamicPrompts,
       handleOpenPromptTriggerPicker,
       handleUsePrompt,
+      insertTextAtCaret,
       loras,
       projectId,
       selectedModel,
@@ -187,6 +209,7 @@ export const PositivePromptField = ({
         size="xs"
         fontFamily="mono"
         highlightDynamicPrompts={dynamicPrompts !== null}
+        knownWildcards={knownWildcards}
         showSyntaxHighlighting={showSyntaxHighlighting}
         textareaRef={handleTextareaRef}
         value={draftValue}

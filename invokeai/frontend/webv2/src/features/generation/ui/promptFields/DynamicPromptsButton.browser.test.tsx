@@ -14,6 +14,15 @@ const parseDynamicPrompts = vi.hoisted(() => vi.fn());
 
 vi.mock('@features/generation/data/promptUtilities', () => ({ parseDynamicPrompts }));
 
+// The wildcards tab fetches the catalog on mount; the preview assertions do not need it.
+vi.mock('@features/generation/data/wildcards', () => ({
+  createWildcard: vi.fn(),
+  deleteWildcard: vi.fn(),
+  invalidateWildcardDependents: vi.fn(),
+  updateWildcard: vi.fn(),
+  wildcardsQueryOptions: () => ({ queryFn: () => Promise.resolve([]), queryKey: ['generation', 'wildcards'] }),
+}));
+
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -45,7 +54,13 @@ const render = async (prompt: string, onUsePrompt = vi.fn()) => {
             showSyntaxHighlighting
             value={prompt}
           />
-          <DynamicPromptsButton batchCount={2} config={config} positivePrompt={prompt} onUsePrompt={onUsePrompt} />
+          <DynamicPromptsButton
+            batchCount={2}
+            config={config}
+            positivePrompt={prompt}
+            onInsertText={vi.fn()}
+            onUsePrompt={onUsePrompt}
+          />
         </ChakraProvider>
       </QueryClientProvider>
     );

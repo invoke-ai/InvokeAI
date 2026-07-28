@@ -52,6 +52,8 @@ interface PromptTextareaProps extends Omit<ResizableTextareaProps, 'underlay'> {
    * promise an expansion that never happens.
    */
   highlightDynamicPrompts?: boolean;
+  /** Resolvable wildcard names; an unknown `__name__` is underlined as an error. */
+  knownWildcards?: ReadonlySet<string>;
   showSyntaxHighlighting: boolean;
   value: string;
 }
@@ -90,6 +92,7 @@ export const PromptTextarea = ({
   fontFamily = 'mono',
   fontSize,
   highlightDynamicPrompts = false,
+  knownWildcards,
   lineHeight,
   onScroll,
   showSyntaxHighlighting,
@@ -105,8 +108,11 @@ export const PromptTextarea = ({
   const effectiveLineHeight = lineHeight ?? PROMPT_TEXTAREA_LINE_HEIGHT;
 
   const segments = useMemo(
-    () => (shouldHighlight ? buildPromptHighlightSegments(value, { dynamicPrompts: highlightDynamicPrompts }) : []),
-    [highlightDynamicPrompts, shouldHighlight, value]
+    () =>
+      shouldHighlight
+        ? buildPromptHighlightSegments(value, { dynamicPrompts: highlightDynamicPrompts, knownWildcards })
+        : [],
+    [highlightDynamicPrompts, knownWildcards, shouldHighlight, value]
   );
 
   useLayoutEffect(() => {

@@ -32,14 +32,31 @@ export interface DynamicPromptsConfig {
   seedBehaviour: DynamicPromptsSeedBehaviour;
 }
 
+/** `__name__`, the reference form for a wildcard. Mirrors the backend's name rule. */
+export const WILDCARD_REFERENCE_RE =
+  /__([A-Za-z0-9](?:[A-Za-z0-9_-]*[A-Za-z0-9])?(?:\/[A-Za-z0-9](?:[A-Za-z0-9_-]*[A-Za-z0-9])?)*)__/;
+
 /**
  * Whether a prompt is worth sending to the expansion route at all. A prompt with
- * no `{…}` is its own single expansion, so the round trip is skipped entirely.
- *
- * Deliberately does not look for `__wildcard__`: this deployment runs an
- * unconfigured `WildcardManager`, so wildcards never resolve.
+ * neither a `{…}` variant nor a `__wildcard__` reference is its own single
+ * expansion, so the round trip is skipped entirely.
  */
-export const hasDynamicPromptSyntax = (prompt: string): boolean => /\{[\s\S]*\}/.test(prompt);
+export const hasDynamicPromptSyntax = (prompt: string): boolean =>
+  /\{[\s\S]*\}/.test(prompt) || WILDCARD_REFERENCE_RE.test(prompt);
+
+/** The wildcard names a prompt references, in order of first appearance. */
+export const findWildcardReferences = (prompt: string): string[] => {
+  const pattern = new RegExp(WILDCARD_REFERENCE_RE, 'g');
+  const names: string[] = [];
+
+  for (let match = pattern.exec(prompt); match; match = pattern.exec(prompt)) {
+    if (!names.includes(match[1])) {
+      names.push(match[1]);
+    }
+  }
+
+  return names;
+};
 
 export const isDynamicPromptsSeedBehaviour = (value: unknown): value is DynamicPromptsSeedBehaviour =>
   value === 'per-iteration' || value === 'per-image';

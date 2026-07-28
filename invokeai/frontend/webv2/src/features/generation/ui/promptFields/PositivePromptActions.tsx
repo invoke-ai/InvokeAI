@@ -11,6 +11,7 @@ import {
   DynamicPromptsButton,
   type DynamicPromptsFieldConfig,
 } from '@features/generation/ui/promptFields/DynamicPromptsButton';
+import { useWildcards } from '@features/generation/ui/useWildcards';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, IconButton, Scrollable, Tooltip } from '@platform/ui';
@@ -34,12 +35,14 @@ interface PositivePromptActionsProps {
   projectId: string;
   onOpenPromptTriggerPicker: (anchorElement: HTMLElement) => void;
   onPositivePromptChangeImmediate: (prompt: string) => void;
+  onInsertText: (text: string) => void;
 }
 
 export const PositivePromptActions = ({
   batchCount,
   dynamicPrompts,
   isPromptTriggerPickerOpen,
+  onInsertText,
   onOpenPromptTriggerPicker,
   onPositivePromptChangeImmediate,
   onUsePrompt,
@@ -53,6 +56,7 @@ export const PositivePromptActions = ({
           batchCount={batchCount}
           config={dynamicPrompts}
           positivePrompt={positivePrompt}
+          onInsertText={onInsertText}
           onUsePrompt={onPositivePromptChangeImmediate}
         />
       ) : null}
@@ -95,14 +99,24 @@ const getPromptTriggerOptions = ({
   mainModelLabel,
   models,
   selectedModel,
+  wildcards,
+  wildcardsLabel,
 }: {
   compatibleEmbeddingsLabel: string;
   loras: GenerateLora[];
   mainModelLabel: string;
   models: readonly ModelConfig[];
   selectedModel: GenerateModelConfig | undefined;
+  wildcards: readonly { name: string; values: string[] }[];
+  wildcardsLabel: string;
 }): PromptTriggerOption[] => {
   const options: PromptTriggerOption[] = [];
+
+  // A wildcard inserts as `__name__`, which is just another trigger the picker
+  // can splice in, so it rides in the same list as embeddings and LoRA phrases.
+  for (const wildcard of wildcards) {
+    options.push({ group: wildcardsLabel, label: wildcard.name, value: `__${wildcard.name}__` });
+  }
 
   for (const phrase of getTriggerPhrases(selectedModel)) {
     options.push({ group: selectedModel?.name ?? mainModelLabel, label: phrase, value: phrase });
@@ -183,6 +197,7 @@ export const PromptTriggerPopover = ({
 }) => {
   const { t } = useTranslation();
   const { catalog: models, ensureLoaded: ensureModelsLoaded } = useGenerationUi().models;
+  const { wildcards } = useWildcards();
   const [searchTerm, setSearchTerm] = useState('');
 
   const options = useMemo(
@@ -193,8 +208,10 @@ export const PromptTriggerPopover = ({
         mainModelLabel: t('widgets.generate.mainModel'),
         models,
         selectedModel,
+        wildcards,
+        wildcardsLabel: t('widgets.generate.dynamicPrompts.wildcards'),
       }),
-    [loras, models, selectedModel, t]
+    [loras, models, selectedModel, t, wildcards]
   );
 
   const filteredOptions = useMemo(

@@ -69,7 +69,14 @@ const covers = (outer: PromptRange, inner: PromptRange): boolean =>
  * reported as `error` so the textarea can underline them the same way it already
  * underlines unbalanced attention parentheses.
  */
-export const scanDynamicPromptSyntax = (prompt: string): DynamicPromptSyntaxAnnotation[] => {
+export const scanDynamicPromptSyntax = (
+  prompt: string,
+  /**
+   * Wildcard names the backend can resolve. Omitted means "unknown", so callers
+   * without a catalog get the neutral wildcard colour rather than a false error.
+   */
+  knownWildcards?: ReadonlySet<string>
+): DynamicPromptSyntaxAnnotation[] => {
   const annotations: DynamicPromptSyntaxAnnotation[] = [];
   const variableRanges: PromptRange[] = [];
   // Open braces awaiting a `}`, paired with the annotation to rewrite if none arrives.
@@ -153,7 +160,11 @@ export const scanDynamicPromptSyntax = (prompt: string): DynamicPromptSyntaxAnno
     const wildcardRange = { end: match.index + match[0].length, start: match.index };
 
     if (!variableRanges.some((variableRange) => covers(variableRange, wildcardRange))) {
-      annotations.push({ kind: 'wildcard', range: wildcardRange });
+      // An unresolvable wildcard makes the whole prompt fail to expand, so it earns the same
+      // treatment as an unbalanced brace rather than looking like ordinary recognised syntax.
+      const isUnknown = knownWildcards !== undefined && !knownWildcards.has(match[1]);
+
+      annotations.push({ kind: isUnknown ? 'error' : 'wildcard', range: wildcardRange });
     }
   }
 

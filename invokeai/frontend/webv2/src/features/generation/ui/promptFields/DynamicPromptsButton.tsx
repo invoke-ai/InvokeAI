@@ -18,7 +18,9 @@ import {
   isDynamicPromptsSeedBehaviour,
   sanitizeMaxPrompts,
 } from '@features/generation/core/dynamicPrompts';
+import { WildcardsPanel } from '@features/generation/ui/promptFields/WildcardsPanel';
 import { useDynamicPrompts } from '@features/generation/ui/useDynamicPrompts';
+import { useWildcards } from '@features/generation/ui/useWildcards';
 import { Button, IconButton } from '@platform/ui/Button';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { Select } from '@platform/ui/Select';
@@ -41,18 +43,22 @@ interface DynamicPromptsButtonProps {
   batchCount: number;
   positivePrompt: string;
   onUsePrompt: (prompt: string) => void;
+  onInsertText: (text: string) => void;
 }
 
 export const DynamicPromptsButton = ({
   batchCount,
   config,
+  onInsertText,
   onUsePrompt,
   positivePrompt,
 }: DynamicPromptsButtonProps) => {
   const { t } = useTranslation();
   const triggerId = useId();
   const [isOpen, setIsOpen] = useState(false);
+  const [tab, setTab] = useState<'preview' | 'wildcards'>('preview');
   const expansion = useDynamicPrompts(positivePrompt, config);
+  const catalog = useWildcards();
   const popoverIds = useMemo(() => ({ trigger: triggerId }), [triggerId]);
   const handleOpenChange = useCallback((event: { open: boolean }) => setIsOpen(event.open), []);
   const handleUsePrompt = useCallback(
@@ -61,6 +67,24 @@ export const DynamicPromptsButton = ({
       setIsOpen(false);
     },
     [onUsePrompt]
+  );
+  const handleInsert = useCallback(
+    (text: string) => {
+      onInsertText(text);
+      setIsOpen(false);
+    },
+    [onInsertText]
+  );
+  const handleTabChange = useCallback(
+    (event: { value: string | null }) => setTab(event.value === 'wildcards' ? 'wildcards' : 'preview'),
+    []
+  );
+  const tabItems = useMemo(
+    () => [
+      { label: t('widgets.generate.dynamicPrompts.preview'), value: 'preview' },
+      { label: t('widgets.generate.dynamicPrompts.wildcards'), value: 'wildcards' },
+    ],
+    [t]
   );
 
   const tooltip = expansion.isDynamic
@@ -103,12 +127,22 @@ export const DynamicPromptsButton = ({
         <Popover.Positioner>
           <Popover.Content bg="bg.muted" borderColor="border.emphasized" borderWidth="1px" w="26rem">
             <Popover.Body p="2.5">
-              <DynamicPromptsPanel
-                batchCount={batchCount}
-                config={config}
-                expansion={expansion}
-                onUsePrompt={handleUsePrompt}
-              />
+              <Stack gap="2.5">
+                <SegmentGroup.Root size="xs" value={tab} onValueChange={handleTabChange}>
+                  <SegmentGroup.Indicator />
+                  <SegmentGroup.Items items={tabItems} />
+                </SegmentGroup.Root>
+                {tab === 'preview' ? (
+                  <DynamicPromptsPanel
+                    batchCount={batchCount}
+                    config={config}
+                    expansion={expansion}
+                    onUsePrompt={handleUsePrompt}
+                  />
+                ) : (
+                  <WildcardsPanel catalog={catalog} onInsert={handleInsert} />
+                )}
+              </Stack>
             </Popover.Body>
           </Popover.Content>
         </Popover.Positioner>

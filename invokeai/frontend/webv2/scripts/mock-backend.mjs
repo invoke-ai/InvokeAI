@@ -448,6 +448,10 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         return json(200, []);
       }
 
+      if (method === 'GET' && (path === '/api/v1/wildcards' || path === '/api/v1/wildcards/')) {
+        return json(200, []);
+      }
+
       // Dynamic prompt expansion. Enough of the `{a|b}` grammar for journeys to
       // exercise the preview and the batch dimension; the real generator lives
       // in the backend.
