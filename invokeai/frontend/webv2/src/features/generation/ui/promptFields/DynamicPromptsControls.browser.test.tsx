@@ -74,6 +74,13 @@ const openPopover = async () => {
   await act(async () => {
     await userEvent.click([...host!.querySelectorAll('button')].at(-1)!);
   });
+  // The popover opens with a scale transform, and getBoundingClientRect includes
+  // transforms — measuring before it settles reports every box ~5% short.
+  await act(async () => {
+    await new Promise((resolve) => {
+      window.setTimeout(resolve, 300);
+    });
+  });
 };
 
 /**
@@ -105,18 +112,20 @@ describe('dynamic prompts popover controls', () => {
   it('switches seed behaviour without tearing down the widget', async () => {
     // Regression: a Chakra Select here threw `r.options is not iterable` from
     // syncSelectElement as the popover opened, taking the Generate widget down
-    // with it. A two-option choice is a segmented control now.
+    // with it. The seed choice is a switch now, which has no hidden native
+    // select to sync.
     const onChange = vi.fn();
 
     await render(onChange);
     await openPopover();
 
-    for (const expected of ['per-image', 'per-iteration'] as const) {
-      const target = segmentLabel(expected);
+    const seedSwitch = document.querySelector<HTMLElement>('[data-scope="switch"][data-part="root"]')!;
 
-      expect(target, `${expected} should be rendered`).toBeTruthy();
+    expect(seedSwitch, 'seed switch should be rendered').toBeTruthy();
+
+    for (const expected of ['per-image', 'per-iteration'] as const) {
       await act(async () => {
-        await userEvent.click(target!);
+        await userEvent.click(seedSwitch);
       });
       expect(onChange).toHaveBeenCalledWith({ seedBehaviour: expected });
     }
@@ -125,29 +134,58 @@ describe('dynamic prompts popover controls', () => {
     expect(segmentLabel('preview'), 'popover should still be mounted').toBeTruthy();
   });
 
-  it('never lets the shuffle button drive the mode row height', async () => {
-    // The button used to be ~8px taller than the segmented control beside it, so
-    // switching to Random visibly nudged the row. It is now always rendered (just
-    // hidden) and never taller than the control, so the row is governed by the
-    // segmented control in both modes.
-    await render();
+  it('sends a click on the seed label to the switch, not the number input', async () => {
+    // Regression: Chakra derives the switch's label `for` from its own id
+    // counter, which collided with the number input beside it, so clicking the
+    // label focused Max prompts instead of toggling the switch.
+    const onChange = vi.fn();
+
+    await render(onChange);
     await openPopover();
 
-    const segments = () => segmentLabel('all')!.closest('[data-scope="segment-group"][data-part="root"]')!;
-    const row = () => segments().parentElement!;
-    const heights = () => [row().getBoundingClientRect().height, segments().getBoundingClientRect().height];
+    const label = document.querySelector<HTMLElement>('[data-scope="switch"][data-part="label"]')!;
+    const switchRoot = document.querySelector('[data-scope="switch"][data-part="root"]')!;
+    const hiddenInput = switchRoot.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+    const numberInput = document.querySelector<HTMLInputElement>('[data-scope="number-input"][data-part="input"]')!;
 
-    const [combinatorialRow, combinatorialSegments] = heights();
-
-    expect(combinatorialRow).toBe(combinatorialSegments);
+    // Whether the generated ids actually collide depends on how many other
+    // controls rendered first, so this asserts the condition that caused it —
+    // two controls sharing an id — rather than relying on the ordering that
+    // happened to trip it in the app.
+    expect(hiddenInput.id).toBeTruthy();
+    expect(hiddenInput.id).not.toBe(numberInput.id);
 
     await act(async () => {
-      await userEvent.click(segmentLabel('random')!);
+      await userEvent.click(label);
     });
 
-    const [randomRow, randomSegments] = heights();
+    expect(onChange).toHaveBeenCalledWith({ seedBehaviour: 'per-image' });
+    expect(document.activeElement).not.toBe(numberInput);
+  });
 
-    expect(randomRow).toBe(randomSegments);
+  it('keeps the settings row the same height in either mode', async () => {
+    // The shuffle button only applies to a random sample, so it is always
+    // rendered and merely hidden; switching modes must not reflow the row.
+    const onChange = vi.fn();
+
+    await render(onChange);
+    await openPopover();
+
+    const row = () =>
+      document.querySelector('[data-scope="menu"][data-part="trigger"]')!.closest('div')!.parentElement!;
+    const combinatorialHeight = row().getBoundingClientRect().height;
+
+    await act(async () => {
+      await userEvent.click(document.querySelector<HTMLElement>('[data-scope="menu"][data-part="trigger"]')!);
+    });
+    await act(async () => {
+      await userEvent.click(
+        [...document.querySelectorAll('[data-scope="menu"][data-part="item"]')].at(-1) as HTMLElement
+      );
+    });
+
+    expect(onChange).toHaveBeenCalledWith({ combinatorial: false });
+    expect(row().getBoundingClientRect().height).toBe(combinatorialHeight);
   });
 
   it('keeps the tabs to their content width rather than stretching them', async () => {

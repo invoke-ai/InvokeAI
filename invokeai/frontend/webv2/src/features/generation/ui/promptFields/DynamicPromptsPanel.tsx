@@ -1,7 +1,7 @@
 import type { DynamicPromptsConfig } from '@features/generation/core/dynamicPrompts';
 import type { DynamicPromptsExpansion } from '@features/generation/ui/useDynamicPrompts';
 
-import { HStack, NumberInput, SegmentGroup, Stack, Text } from '@chakra-ui/react';
+import { HStack, Menu, NumberInput, Portal, Stack, Switch, Text } from '@chakra-ui/react';
 import {
   createDynamicPromptsSampleSeed,
   DYNAMIC_PROMPTS_MAX_PROMPTS,
@@ -10,15 +10,18 @@ import {
 } from '@features/generation/core/dynamicPrompts';
 import { HighlightedPrompt } from '@features/generation/ui/promptFields/PromptHighlight';
 import { Button, IconButton } from '@platform/ui/Button';
+import { MenuContent } from '@platform/ui/Menu';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { Tooltip } from '@platform/ui/Tooltip';
-import { ShuffleIcon } from 'lucide-react';
-import { useCallback, useMemo } from 'react';
+import { CheckIcon, ChevronDownIcon, ShuffleIcon } from 'lucide-react';
+import { useCallback, useId, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /** Rendering every row of a 10,000-prompt expansion would cost more than it tells the user. */
 const MAX_PREVIEW_ROWS = 200;
 const TABULAR_NUMS = { fontVariantNumeric: 'tabular-nums' } as const;
+const MENU_POSITIONING = { placement: 'bottom-start' } as const;
+const SWITCH_CHECKED = { bg: 'accent.solid' } as const;
 
 export interface DynamicPromptsFieldConfig extends DynamicPromptsConfig {
   onChange: (patch: Partial<DynamicPromptsConfig>) => void;
@@ -39,11 +42,16 @@ export const DynamicPromptsPanel = ({
 }) => {
   const { t } = useTranslation();
   const { onChange } = config;
+  // Chakra derives the switch's label/input ids from its own counter, which can
+  // collide with the number input beside it and send label clicks to the wrong
+  // control. Explicit ids keep them apart.
+  const seedSwitchId = useId();
+  const seedSwitchIds = useMemo(() => ({ hiddenInput: seedSwitchId, label: `${seedSwitchId}-label` }), [seedSwitchId]);
   const visiblePrompts = expansion.prompts.slice(0, MAX_PREVIEW_ROWS);
   const hiddenPromptCount = expansion.prompts.length - visiblePrompts.length;
 
   const handleModeChange = useCallback(
-    (event: { value: string | null }) => onChange({ combinatorial: event.value !== 'random' }),
+    (event: { value: string }) => onChange({ combinatorial: event.value !== 'random' }),
     [onChange]
   );
   const handleMaxPromptsChange = useCallback(
@@ -55,8 +63,7 @@ export const DynamicPromptsPanel = ({
     [onChange]
   );
   const handleSeedBehaviourChange = useCallback(
-    (event: { value: string | null }) =>
-      onChange({ seedBehaviour: event.value === 'per-image' ? 'per-image' : 'per-iteration' }),
+    (event: { checked: boolean }) => onChange({ seedBehaviour: event.checked ? 'per-image' : 'per-iteration' }),
     [onChange]
   );
   const handleShuffle = useCallback(() => onChange({ sampleSeed: createDynamicPromptsSampleSeed() }), [onChange]);
@@ -68,13 +75,9 @@ export const DynamicPromptsPanel = ({
     ],
     [t]
   );
-  const seedItems = useMemo(
-    () => [
-      { label: t('widgets.generate.dynamicPrompts.seedPerIteration'), value: 'per-iteration' },
-      { label: t('widgets.generate.dynamicPrompts.seedPerImage'), value: 'per-image' },
-    ],
-    [t]
-  );
+  const mode = config.combinatorial ? 'all' : 'random';
+  const modeValue = useMemo(() => [mode], [mode]);
+  const modeLabel = modeItems.find((item) => item.value === mode)?.label ?? '';
   const maxPromptsLabel = config.combinatorial
     ? t('widgets.generate.dynamicPrompts.maxPrompts')
     : t('widgets.generate.dynamicPrompts.numberOfPrompts');
@@ -96,35 +99,42 @@ export const DynamicPromptsPanel = ({
         </Text>
       </HStack>
 
-      {/* Shuffle only means anything for a random sample, but it is always
-          rendered — merely hidden — so switching modes cannot change the row's
-          shape. `visibility: hidden` also takes it out of the tab order. */}
-      <HStack gap="2">
-        <SegmentGroup.Root
-          flex="1"
-          size="xs"
-          value={config.combinatorial ? 'all' : 'random'}
-          onValueChange={handleModeChange}
-        >
-          <SegmentGroup.Indicator />
-          <SegmentGroup.Items items={modeItems} />
-        </SegmentGroup.Root>
-        <Tooltip content={t('widgets.generate.dynamicPrompts.shuffle')}>
-          <IconButton
-            aria-label={t('widgets.generate.dynamicPrompts.shuffle')}
-            size="2xs"
-            variant="ghost"
-            visibility={config.combinatorial ? 'hidden' : 'visible'}
-            onClick={handleShuffle}
-          >
-            <ShuffleIcon />
-          </IconButton>
-        </Tooltip>
-      </HStack>
-
       <HStack align="end" gap="2">
         <Stack flex="1" gap="1" minW="0">
-          <Text color="fg.subtle" fontSize="2xs">
+          <Text color="fg.subtle" fontSize="2xs" truncate>
+            {t('widgets.generate.dynamicPrompts.mode')}
+          </Text>
+          {/* A menu rather than a Select: Chakra's Select renders a hidden native
+              select whose sync throws inside this popover. */}
+          <Menu.Root positioning={MENU_POSITIONING}>
+            <Menu.Trigger asChild>
+              <Button justifyContent="space-between" minW="0" size="xs" variant="outline" w="full">
+                <Text as="span" truncate>
+                  {modeLabel}
+                </Text>
+                <ChevronDownIcon />
+              </Button>
+            </Menu.Trigger>
+            <Portal>
+              <Menu.Positioner>
+                <MenuContent minW="10rem" py="1">
+                  <Menu.RadioItemGroup value={modeValue[0]} onValueChange={handleModeChange}>
+                    {modeItems.map((item) => (
+                      <Menu.RadioItem key={item.value} value={item.value}>
+                        <Menu.ItemText>{item.label}</Menu.ItemText>
+                        <Menu.ItemIndicator>
+                          <CheckIcon />
+                        </Menu.ItemIndicator>
+                      </Menu.RadioItem>
+                    ))}
+                  </Menu.RadioItemGroup>
+                </MenuContent>
+              </Menu.Positioner>
+            </Portal>
+          </Menu.Root>
+        </Stack>
+        <Stack gap="1" w="6.5rem">
+          <Text color="fg.subtle" fontSize="2xs" truncate>
             {maxPromptsLabel}
           </Text>
           <NumberInput.Root
@@ -139,23 +149,34 @@ export const DynamicPromptsPanel = ({
             <NumberInput.Input aria-label={maxPromptsLabel} paddingStart="2" />
           </NumberInput.Root>
         </Stack>
-        <Stack flex="1" gap="1" minW="0">
-          <Text color="fg.subtle" fontSize="2xs">
-            {t('widgets.generate.dynamicPrompts.seedBehaviour')}
-          </Text>
-          {/* A two-option choice reads better as a segmented control than a dropdown:
-              one click instead of two, and it matches the mode control above. */}
-          <SegmentGroup.Root
-            aria-label={t('widgets.generate.dynamicPrompts.seedBehaviour')}
+        {/* Always rendered, merely hidden, so switching modes cannot reflow the row. */}
+        <Tooltip content={t('widgets.generate.dynamicPrompts.shuffle')}>
+          <IconButton
+            aria-label={t('widgets.generate.dynamicPrompts.shuffle')}
             size="xs"
-            value={config.seedBehaviour}
-            onValueChange={handleSeedBehaviourChange}
+            variant="ghost"
+            visibility={config.combinatorial ? 'hidden' : 'visible'}
+            onClick={handleShuffle}
           >
-            <SegmentGroup.Indicator />
-            <SegmentGroup.Items items={seedItems} />
-          </SegmentGroup.Root>
-        </Stack>
+            <ShuffleIcon />
+          </IconButton>
+        </Tooltip>
       </HStack>
+
+      <Switch.Root
+        checked={config.seedBehaviour === 'per-image'}
+        ids={seedSwitchIds}
+        size="sm"
+        onCheckedChange={handleSeedBehaviourChange}
+      >
+        <Switch.HiddenInput />
+        <Switch.Control _checked={SWITCH_CHECKED}>
+          <Switch.Thumb />
+        </Switch.Control>
+        <Switch.Label color="fg.muted" fontSize="2xs">
+          {t('widgets.generate.dynamicPrompts.newSeedPerImage')}
+        </Switch.Label>
+      </Switch.Root>
 
       {expansion.isError ? (
         <Text color="fg.error" fontSize="2xs">
