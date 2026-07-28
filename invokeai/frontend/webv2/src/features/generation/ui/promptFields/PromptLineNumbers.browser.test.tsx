@@ -49,6 +49,20 @@ afterEach(async () => {
 });
 
 describe('prompt line numbers', () => {
+  it('indents the text clear of the gutter so numbers never overlap it', async () => {
+    // Regression: the gutter offset was a calc() over a Chakra spacing var whose
+    // generated name does not resolve for fractional tokens, so the declaration
+    // was dropped and the numbers rendered on top of the first characters.
+    await render('toyota+\nhonda\nacura--');
+
+    const textarea = host!.querySelector('textarea')!;
+    const gutter = host!.querySelector('[data-line-number]')!.parentElement!.parentElement!;
+    const textStart = textarea.getBoundingClientRect().left + parseFloat(getComputedStyle(textarea).paddingInlineStart);
+
+    expect(parseFloat(getComputedStyle(textarea).paddingInlineStart)).toBeGreaterThan(0);
+    expect(gutter.getBoundingClientRect().right).toBeLessThanOrEqual(textStart);
+  });
+
   it('numbers every logical line', async () => {
     await render('red\ngreen\nblue');
 

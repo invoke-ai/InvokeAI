@@ -37,6 +37,9 @@ export const PromptLineNumbers = ({ metrics, value }: { metrics: PromptLineNumbe
   const [lineHeights, setLineHeights] = useState<number[]>([]);
   const lines = useMemo(() => value.split('\n'), [value]);
   const gutterWidth = `${getLineNumberGutterCh(lines.length)}ch`;
+  // The numbers occupy the same lane the text is indented by, so they end just
+  // short of where the first character starts.
+  const gutterLaneWidth = `calc(${metrics.paddingInline} + ${gutterWidth})`;
 
   useLayoutEffect(() => {
     const mirror = mirrorRef.current;
@@ -93,15 +96,19 @@ export const PromptLineNumbers = ({ metrics, value }: { metrics: PromptLineNumbe
         </Box>
       </Box>
 
+      {/* The font metrics have to be on this box too: `ch` in its width resolves
+          against its own font size, not the numbers' inside it. */}
       <Box
         aria-hidden="true"
         bottom="0"
+        fontFamily={metrics.fontFamily}
+        fontSize={metrics.fontSize}
         left="0"
         overflow="hidden"
         pointerEvents="none"
         position="absolute"
         top="0"
-        w={gutterWidth}
+        w={gutterLaneWidth}
         zIndex={2}
       >
         <Box

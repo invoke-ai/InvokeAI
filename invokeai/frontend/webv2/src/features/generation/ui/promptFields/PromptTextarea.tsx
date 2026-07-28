@@ -7,8 +7,12 @@ import { getLineNumberGutterCh, PromptLineNumbers } from '@features/generation/u
 import { ResizableTextarea } from '@platform/ui';
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 const PROMPT_TEXTAREA_LINE_HEIGHT = '1.6';
-const PROMPT_TEXTAREA_PX = '2.5';
-const PROMPT_TEXTAREA_PY = '2';
+// Literal lengths rather than spacing tokens: the gutter offset is a `calc()`,
+// and Chakra's generated var name for a fractional token does not resolve inside
+// one, which silently invalidates the whole declaration. These are the `2.5` and
+// `2` spacing tokens.
+const PROMPT_TEXTAREA_PX = '0.625rem';
+const PROMPT_TEXTAREA_PY = '0.5rem';
 
 const PROMPT_TEXTAREA_FORCED_COLORS_CSS = { '@media (forced-colors: active)': { display: 'none' } };
 const PROMPT_TEXTAREA_HIGHLIGHTED_CSS = {
@@ -70,9 +74,7 @@ export const PromptTextarea = ({
   const effectiveLineHeight = lineHeight ?? PROMPT_TEXTAREA_LINE_HEIGHT;
   // The gutter widens with the line count, and the text has to start clear of it.
   const gutterCh = showLineNumbers ? getLineNumberGutterCh(value.split('\n').length) : 0;
-  const paddingInlineStart = showLineNumbers
-    ? `calc(var(--chakra-spacing-${PROMPT_TEXTAREA_PX}) + ${gutterCh}ch)`
-    : undefined;
+  const paddingInlineStart = showLineNumbers ? `calc(${PROMPT_TEXTAREA_PX} + ${gutterCh}ch)` : undefined;
 
   const highlightOptions = useMemo(
     () => ({ dynamicPrompts: highlightDynamicPrompts, knownWildcards }),
@@ -126,8 +128,8 @@ export const PromptTextarea = ({
       fontFamily,
       fontSize: effectiveFontSize,
       lineHeight: effectiveLineHeight,
-      paddingBlock: `var(--chakra-spacing-${PROMPT_TEXTAREA_PY})`,
-      paddingInline: `var(--chakra-spacing-${PROMPT_TEXTAREA_PX})`,
+      paddingBlock: PROMPT_TEXTAREA_PY,
+      paddingInline: PROMPT_TEXTAREA_PX,
       scrollTop: scroll.top,
     }),
     [effectiveFontSize, effectiveLineHeight, fontFamily, scroll.top, textareaClientWidth]
