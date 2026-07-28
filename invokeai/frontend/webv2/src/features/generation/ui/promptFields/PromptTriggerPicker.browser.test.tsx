@@ -40,7 +40,7 @@ let root: Root | null = null;
 /** Tall on purpose: the old picker anchored to the whole box, which is the bug. */
 const TEXTAREA_HEIGHT_PX = 320;
 
-const render = async () => {
+const render = async (isTemplateViewMode = false) => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -51,6 +51,7 @@ const render = async () => {
         <ChakraProvider value={system}>
           <PositivePromptField
             heightPx={TEXTAREA_HEIGHT_PX}
+            isTemplateViewMode={isTemplateViewMode}
             loras={[]}
             projectId="project-1"
             selectedModel={undefined}
@@ -227,5 +228,18 @@ describe('the caret autocomplete', () => {
     await type('a photo of __colors__');
 
     expect(listbox()).toBeNull();
+  });
+
+  // Regression: the template view-mode toggle can be on with no template
+  // applied, which leaves the prompt fully editable. Gating on the toggle alone
+  // killed the autocomplete outright while the user was still typing.
+  it('still opens when view mode is on but no template is applied', async () => {
+    await act(() => root?.unmount());
+    host?.remove();
+    await render(true);
+    await type('a photo of __');
+
+    expect(textarea().readOnly).toBe(false);
+    expect(optionLabels()).toEqual(['colors', 'moods']);
   });
 });

@@ -86,8 +86,14 @@ export const NegativePromptField = ({
     setTriggerPickerState({ anchorRect: { height: rect.height, width: rect.width, x: rect.x, y: rect.y } });
   }, []);
 
+  // Same textarea, read-only, as on the positive side — swapping in a different
+  // component would reset the resizer's mounted height. The `&&` matters: view
+  // mode with no template leaves the prompt editable, so gating on the toggle
+  // alone would kill the autocomplete while the user is still typing.
+  const isViewingMerged = isTemplateViewMode && templateNegativePrompt !== null;
+
   const autocomplete = usePromptTriggerAutocomplete({
-    isDisabled: isTemplateViewMode,
+    isDisabled: isViewingMerged,
     keys: NEGATIVE_PROMPT_TRIGGER_KEYS,
     loras,
     onChange: commitPromptChange,
@@ -187,9 +193,6 @@ export const NegativePromptField = ({
     [triggerPickerState]
   );
 
-  // Same textarea, read-only, as on the positive side — swapping in a different
-  // component would reset the resizer's mounted height.
-  const isViewingMerged = isTemplateViewMode && templateNegativePrompt !== null;
   const templateChunks = useMemo(
     () => (isViewingMerged ? getPromptTemplateChunks(draftValue, templateNegativePrompt) : null),
     [draftValue, isViewingMerged, templateNegativePrompt]

@@ -108,8 +108,18 @@ export const PositivePromptField = ({
     setTriggerPickerState({ anchorRect: { height: rect.height, width: rect.width, x: rect.x, y: rect.y } });
   }, []);
 
+  // View mode keeps the same textarea rather than swapping in a preview
+  // component: `ResizableTextarea` reads its height once on mount, and the
+  // element is also what `focusPositivePrompt` and the attention hotkeys target,
+  // so unmounting it would reset the height and break both.
+  //
+  // Note the `&&`: view mode with no template applied leaves the prompt fully
+  // editable, so gating anything on the toggle alone silently disables it while
+  // the user is still typing.
+  const isViewingMerged = isTemplateViewMode && promptTemplate !== null;
+
   const autocomplete = usePromptTriggerAutocomplete({
-    isDisabled: isTemplateViewMode,
+    isDisabled: isViewingMerged,
     keys: POSITIVE_PROMPT_TRIGGER_KEYS,
     loras,
     onChange: commitPromptChange,
@@ -243,11 +253,6 @@ export const PositivePromptField = ({
   /** Clicking moves the caret, which may land in — or out of — a trigger. */
   const handlePromptClick = useCallback(() => autocomplete.refresh(textareaRef.current), [autocomplete]);
 
-  // View mode keeps the same textarea rather than swapping in a preview
-  // component: `ResizableTextarea` reads its height once on mount, and the
-  // element is also what `focusPositivePrompt` and the attention hotkeys target,
-  // so unmounting it would reset the height and break both.
-  const isViewingMerged = isTemplateViewMode && promptTemplate !== null;
   const templateChunks = useMemo(
     () => (isViewingMerged ? getPromptTemplateChunks(draftValue, promptTemplate.positivePrompt) : null),
     [draftValue, isViewingMerged, promptTemplate]
