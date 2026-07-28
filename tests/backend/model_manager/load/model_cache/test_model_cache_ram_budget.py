@@ -768,6 +768,125 @@ def test_abandoned_loaded_model_releases_first_use_grace(mock_logger):
         cache_b.shutdown()
 
 
+def test_deferred_worker_start_failure_leaves_admission_unchanged_and_can_retry(mock_logger, monkeypatch):
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=int(S * 1.4), shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    real_thread_start = threading.Thread.start
+    failed_once = False
+
+    def fail_first_worker_start(thread: threading.Thread) -> None:
+        nonlocal failed_once
+        if thread is cache._deferred_work_thread and not failed_once:
+            failed_once = True
+            raise RuntimeError("forced thread start failure")
+        real_thread_start(thread)
+
+    monkeypatch.setattr(threading.Thread, "start", fail_first_worker_start)
+    try:
+        with pytest.raises(RuntimeError, match="forced thread start failure"):
+            cache.put("model", DummyModule())
+
+        assert cache._cached_models == {}
+        assert store.refcount("model") == 0
+        assert budget.total_in_use() == 0
+
+        cache.put("model", DummyModule())
+        assert "model" in cache._cached_models
+        assert cache._deferred_work_thread.is_alive()
+    finally:
+        cache.shutdown()
+
+
+def test_shutdown_stops_deferred_worker(mock_logger):
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=int(S * 1.4), shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    cache.put("model", DummyModule())
+
+    cache.shutdown()
+    cache._deferred_work_thread.join(timeout=10)
+
+    assert not cache._deferred_work_thread.is_alive()
+
+
+@pytest.mark.parametrize("finalizer_order", ["before_cache_release", "after_cache_release"])
+def test_grace_release_thread_start_failure_does_not_starve_reconcile(mock_logger, monkeypatch, finalizer_order):
+    """A failed grace-release thread start must not lose the finalizer's one-shot release.
+
+    Exercise both relevant orders: the finalizer runs while another cache operation owns the
+    lock, or after that operation has released the lock and checked for pending reconciliation.
+    Neither order gets another cache operation to rescue a lost wakeup.
+    """
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=int(S * 1.4), shared_store=store)
+    cache_a = _make_cache(store, budget, mock_logger)
+    cache_b = _make_cache(store, budget, mock_logger)
+    holding = threading.Event()
+    release = threading.Event()
+    finalized = threading.Event()
+
+    def hold_cache_lock() -> None:
+        with cache_a._lock:
+            holding.set()
+            assert release.wait(timeout=10)
+        cache_a._reconcile_budget_if_pending()
+
+    def finalize_wrapper() -> None:
+        nonlocal loaded_model
+        loaded_model = None
+        gc.collect()
+        finalized.set()
+
+    holder = threading.Thread(target=hold_cache_lock)
+    finalizer = threading.Thread(target=finalize_wrapper)
+    try:
+        cache_a.put("abandoned", DummyModule())
+        loaded_model = LoadedModelWithoutConfig(cache_record=cache_a.get("abandoned"), cache=cache_a)
+        cache_b.put("peer", DummyModule())
+        assert cache_a._budget_reconcile_pending.is_set()
+        assert budget.total_in_use() == 2 * S
+
+        holder.start()
+        assert holding.wait(timeout=10)
+
+        real_thread_start = threading.Thread.start
+
+        def fail_deferred_thread_start(thread: threading.Thread) -> None:
+            if thread is finalizer:
+                real_thread_start(thread)
+                return
+            raise RuntimeError("forced thread start failure")
+
+        monkeypatch.setattr(threading.Thread, "start", fail_deferred_thread_start)
+
+        if finalizer_order == "before_cache_release":
+            finalizer.start()
+            assert finalized.wait(timeout=10), "grace finalizer deadlocked while cache lock was held"
+            finalizer.join(timeout=10)
+            release.set()
+            holder.join(timeout=10)
+        else:
+            release.set()
+            holder.join(timeout=10)
+            finalizer.start()
+            assert finalized.wait(timeout=10), "grace finalizer deadlocked after cache lock was released"
+            finalizer.join(timeout=10)
+
+        assert not holder.is_alive()
+        assert not finalizer.is_alive()
+        assert _wait_until(lambda: "abandoned" not in cache_a._cached_models, timeout=2)
+        assert budget.total_in_use() == S
+        assert budget.total_in_use() <= budget.max_bytes
+    finally:
+        release.set()
+        holder.join(timeout=10)
+        if finalizer.ident is not None:
+            finalizer.join(timeout=10)
+        cache_a.shutdown()
+        cache_b.shutdown()
+
+
 class _ReentryReportingLock:
     """Stand-in for a non-reentrant `threading.Lock` that reports same-thread re-acquisition
     instead of deadlocking on it, so a lock-order violation fails the test rather than hanging it.
@@ -917,4 +1036,78 @@ def test_cached_model_keys_returns_without_waiting_for_reconcile_work(mock_logge
         assert budget.total_in_use() <= budget.max_bytes
     finally:
         release_gc.set()
+        cache_b.shutdown()
+
+
+@pytest.mark.parametrize("request_order", ["before_lookup", "while_lookup_holds_lock"])
+def test_cached_model_keys_thread_start_failure_does_not_starve_reconcile(mock_logger, monkeypatch, request_order):
+    """A failed deferred-reconcile thread start must preserve cached_model_keys()' nonblocking
+    contract without leaving an idle cache permanently over budget.
+
+    Exercise a request already pending at lookup entry and one racing with the lookup while its
+    manually managed lock is held.
+    """
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=int(S * 1.4), shared_store=store)
+    cache_b = _make_cache(store, budget, mock_logger)
+    inside = threading.Event()
+    proceed = threading.Event()
+    results: list[set[str]] = []
+    errors: list[BaseException] = []
+
+    class PausingDict(dict):
+        paused = False
+
+        def __iter__(self):
+            if not PausingDict.paused:
+                PausingDict.paused = True
+                inside.set()
+                assert proceed.wait(timeout=10)
+            return super().__iter__()
+
+    def lookup() -> None:
+        try:
+            results.append(cache_b.cached_model_keys())
+        except BaseException as error:
+            errors.append(error)
+
+    real_thread_start = threading.Thread.start
+
+    def fail_deferred_thread_start(thread: threading.Thread) -> None:
+        if thread is lookup_thread:
+            real_thread_start(thread)
+            return
+        raise RuntimeError("forced thread start failure")
+
+    lookup_thread = threading.Thread(target=lookup)
+    try:
+        cache_b.put("victim", DummyModule())
+        _use_and_release(cache_b, "victim")
+        budget.add_non_shared(S)
+        monkeypatch.setattr(threading.Thread, "start", fail_deferred_thread_start)
+
+        if request_order == "before_lookup":
+            cache_b._budget_reconcile_pending.set()
+            lookup_thread.start()
+            lookup_thread.join(timeout=10)
+            assert not lookup_thread.is_alive(), "cached_model_keys deadlocked with a pending reconcile"
+        else:
+            cache_b._cached_models = PausingDict(cache_b._cached_models)
+            lookup_thread.start()
+            assert inside.wait(timeout=10)
+            cache_b.request_budget_reconcile()
+            proceed.set()
+            lookup_thread.join(timeout=10)
+            assert not lookup_thread.is_alive()
+
+        recovered = _wait_until(
+            lambda: "victim" not in cache_b._cached_models and not cache_b._budget_reconcile_pending.is_set(),
+            timeout=2,
+        )
+        assert (errors, results, recovered) == ([], [set()], True)
+        assert budget.total_in_use() <= budget.max_bytes
+    finally:
+        proceed.set()
+        if lookup_thread.ident is not None:
+            lookup_thread.join(timeout=10)
         cache_b.shutdown()

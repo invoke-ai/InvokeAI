@@ -1,5 +1,6 @@
 import gc
 import logging
+import queue
 import threading
 import time
 from contextlib import contextmanager
@@ -50,6 +51,9 @@ MB = 2**20
 RAM_CACHE_SYSTEM_FRACTION = 0.5
 RAM_CACHE_BASELINE_BYTES = 2 * GB
 MIN_RAM_CACHE_BYTES = 4 * GB
+
+_DEFERRED_RECONCILE = object()
+_DEFERRED_STOP = object()
 
 
 class _ModelLoadReadWriteLock:
@@ -306,9 +310,6 @@ class ModelCache:
         # lock. See request_budget_reconcile / _reconcile_budget_if_pending.
         self._budget_reconcile_pending = threading.Event()
 
-        if ram_budget is not None:
-            ram_budget.register_cache(self)
-
         self._on_cache_hit_callbacks: set[CacheHitCallback] = set()
         self._on_cache_miss_callbacks: set[CacheMissCallback] = set()
         self._on_cache_models_cleared_callbacks: set[CacheModelsClearedCallback] = set()
@@ -318,6 +319,15 @@ class ModelCache:
         self._last_activity_time: Optional[float] = None
         self._timeout_timer: Optional[threading.Timer] = None
         self._shutdown_event = threading.Event()
+        self._deferred_work_queue: queue.SimpleQueue[object] = queue.SimpleQueue()
+        self._deferred_work_thread = threading.Thread(
+            target=self._run_deferred_work,
+            name="model-cache-deferred-work",
+            daemon=True,
+        )
+
+        if ram_budget is not None:
+            ram_budget.register_cache(self)
 
     def on_cache_hit(self, cb: CacheHitCallback) -> Callable[[], None]:
         self._on_cache_hit_callbacks.add(cb)
@@ -457,7 +467,10 @@ class ModelCache:
     @synchronized
     def shutdown(self) -> None:
         """Shutdown the model cache, cancelling any pending timers."""
+        if self._shutdown_event.is_set():
+            return
         self._shutdown_event.set()
+        self._deferred_work_queue.put(_DEFERRED_STOP)
         if self._timeout_timer is not None:
             self._timeout_timer.cancel()
             self._timeout_timer = None
@@ -484,6 +497,11 @@ class ModelCache:
                 f"Attempted to add model {key} ({model.__class__.__name__}), but it already exists in the cache. No action necessary."
             )
             return
+
+        # Start before mutating cache state. Every deferred task concerns an admitted record, so
+        # this makes later dispatch queue-only while avoiding a thread for an unused cache.
+        if self._deferred_work_thread.ident is None:
+            self._deferred_work_thread.start()
 
         # Any entry still carrying the post-admission grace belongs to an earlier load: cold loads
         # are serialized under MODEL_LOAD_LOCK's write lock and each load's only graced put() is
@@ -594,14 +612,10 @@ class ModelCache:
             # method relies on the release to process the flag (see request_budget_reconcile).
             # But reconciliation evicts models and runs gc.collect(), which can pause for
             # seconds — running it inline would break this method's no-stall contract. Hand the
-            # work to a short-lived background thread instead: the thread may wait on the cache
-            # lock and do the slow work; this caller returns immediately.
+            # work to the cache's background worker instead: it may wait on the cache lock and do
+            # the slow work; this caller returns immediately.
             if self._ram_budget is not None and self._budget_reconcile_pending.is_set() and not self._lock._is_owned():
-                threading.Thread(
-                    target=self._reconcile_budget_if_pending,
-                    name="model-cache-budget-reconcile",
-                    daemon=True,
-                ).start()
+                self._deferred_work_queue.put(_DEFERRED_RECONCILE)
 
     def release_first_use_grace(self, cache_entry: CacheRecord) -> None:
         """Make an abandoned, never-locked record available for budget eviction.
@@ -620,39 +634,32 @@ class ModelCache:
         against itself, wedging the whole process. The same hook would also run evictions,
         gc.collect() and empty_cache() inline in whatever unrelated thread dropped the reference.
 
-        The work is therefore handed to a short-lived background thread, exactly as
-        cached_model_keys() does with its own reconcile: the thread may wait on the cache lock and
-        do the slow work, while this call returns without ever waiting on a cache, store or budget
-        lock. (Thread.start() does wait for the child to bootstrap, so "immediately" here means
-        "without lock waits", not "without any delay".)
+        The work is therefore handed to the cache's background worker, exactly as
+        cached_model_keys() does with its own reconcile. SimpleQueue.put() is reentrant and never
+        waits on the cache, store or budget locks, so it is safe from a finalizer.
         """
         # Unsynchronized read: the flag is monotonic (put() is the only writer that sets it, and
         # only on a brand-new record), so a False reading is always final and there is nothing to
-        # release. Losing a race here at worst spawns a thread that no-ops under the lock.
+        # release. Losing a race here at worst queues work that no-ops under the lock.
         if not cache_entry.awaiting_first_use or self._shutdown_event.is_set():
             return
-        try:
-            threading.Thread(
-                target=self._release_first_use_grace,
-                args=(cache_entry,),
-                name="model-cache-release-grace",
-                daemon=True,
-            ).start()
-        except RuntimeError:
-            # Thread creation failed (thread or process limits). A finalize callback gets no
-            # retry — weakref retires it before invoking it — and an exception here would be
-            # swallowed by sys.unraisablehook, silently losing the release. Fall back to clearing
-            # the flag inline under a NON-blocking acquire: that touches no store or budget lock,
-            # so it cannot deadlock the collecting thread. Deliberately no reconcile afterwards
-            # (that is the slow, lock-taking work this method exists to avoid); a pending request
-            # stays set for the next ordinary cache operation, and put()'s sweep remains the
-            # backstop if the lock is contended here.
-            if self._lock.acquire(blocking=False):
-                try:
-                    if self._cached_models.get(cache_entry.key) is cache_entry and not cache_entry.is_locked:
-                        cache_entry.awaiting_first_use = False
-                finally:
-                    self._lock.release()
+        self._deferred_work_queue.put(cache_entry)
+
+    def _run_deferred_work(self) -> None:
+        while True:
+            work = self._deferred_work_queue.get()
+            if work is _DEFERRED_STOP:
+                return
+            if self._shutdown_event.is_set():
+                continue
+            try:
+                if work is _DEFERRED_RECONCILE:
+                    self._reconcile_budget_if_pending()
+                else:
+                    assert isinstance(work, CacheRecord)
+                    self._release_first_use_grace(work)
+            except Exception:
+                self._logger.exception("Error processing deferred model-cache work")
 
     @synchronized
     def _release_first_use_grace(self, cache_entry: CacheRecord) -> None:
