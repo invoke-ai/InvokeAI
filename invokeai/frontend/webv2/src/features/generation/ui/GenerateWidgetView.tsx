@@ -1,17 +1,25 @@
 import type { GenerationModelCatalogItem as ModelConfig } from '@features/generation/contracts';
-import type { GenerateModelConfig, GenerateSettings, LoraModelConfig } from '@features/generation/core/types';
+import type { PromptTemplateSnapshot } from '@features/generation/core/promptTemplates';
+import type {
+  GenerateModelConfig,
+  GenerateSettings,
+  GenerateWidgetValues,
+  LoraModelConfig,
+} from '@features/generation/core/types';
 
 import {
   getAutoFlux2ComponentSourceModel,
   getDefaultGenerateSettings,
   isSupportedGenerateModel,
 } from '@features/generation/core/baseGenerationPolicies';
+import { syncPromptTemplateWithCatalog } from '@features/generation/core/promptTemplates';
 import {
   isLoraModelConfig,
   normalizeGenerateSettings,
   normalizeGenerateWidgetValues,
   syncGenerateWidgetValuesWithModels,
 } from '@features/generation/core/settings';
+import { usePromptTemplates } from '@features/generation/ui/usePromptTemplates';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { useCallback, useEffect, useMemo } from 'react';
 
@@ -33,6 +41,20 @@ const getSettingsWithAutoComponentSource = (
   return { ...nextSettings, componentSourceModel };
 };
 
+/**
+ * Returns the same object when the stored template still matches the catalog, so
+ * the identity short-circuit below keeps holding and an unchanged catalog cannot
+ * drive a commit loop.
+ */
+const getValuesWithSyncedPromptTemplate = (
+  values: GenerateWidgetValues,
+  promptTemplates: readonly PromptTemplateSnapshot[]
+): GenerateWidgetValues => {
+  const promptTemplate = syncPromptTemplateWithCatalog(values.promptTemplate, promptTemplates);
+
+  return promptTemplate === values.promptTemplate ? values : { ...values, promptTemplate };
+};
+
 export const GenerateWidgetView = () => {
   const ui = useGenerationUi();
   const projectId = ui.project.activeProjectId;
@@ -40,6 +62,10 @@ export const GenerateWidgetView = () => {
   const error = ui.models.error;
   const models = ui.models.catalog;
   const status = ui.models.status;
+  // The active template is stored as a snapshot, so an edit made in another tab
+  // or by another client only lands by re-reading it from the catalog here —
+  // the same treatment model snapshots get in `syncGenerateWidgetValuesWithModels`.
+  const { templates: promptTemplates } = usePromptTemplates();
 
   useMountEffect(() => {
     ui.models.ensureLoaded();
@@ -62,8 +88,11 @@ export const GenerateWidgetView = () => {
     }
 
     const storedWidgetValues = normalizeGenerateWidgetValues(storedValues);
-    const syncedWidgetValues = storedWidgetValues
+    const modelSyncedValues = storedWidgetValues
       ? syncGenerateWidgetValuesWithModels(storedWidgetValues, models)
+      : null;
+    const syncedWidgetValues = modelSyncedValues
+      ? getValuesWithSyncedPromptTemplate(modelSyncedValues, promptTemplates)
       : null;
     const baseSettings = syncedWidgetValues ?? (selectedModel ? settings : getDefaultGenerateSettings(model));
     const nextSettings = getSettingsWithAutoComponentSource(baseSettings, model, models);
@@ -78,7 +107,7 @@ export const GenerateWidgetView = () => {
     }
 
     ui.settings.patchGenerateSettings(getGenerateFormCommitPatch({ ...nextSettings, model }), projectId, 'system');
-  }, [models, projectId, selectedModel, settings, storedValues, supportedModels, ui]);
+  }, [models, projectId, promptTemplates, selectedModel, settings, storedValues, supportedModels, ui]);
 
   const commitSettings = useCallback(
     (nextSettings: GenerateSettings) => {
