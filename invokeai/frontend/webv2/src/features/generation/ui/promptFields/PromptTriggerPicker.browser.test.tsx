@@ -8,31 +8,37 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
-// The actions row and the picker's own contents need Generation's UI port; neither
-// is what these tests are about. The stub records the two ways out of the picker so
-// they can be invoked directly — a real click would have to compete with the
-// textarea for the same coordinates.
-const picker = vi.hoisted(() => ({ current: null as { onClose: () => void; onSelect: (t: string) => void } | null }));
-
+// The actions row needs Generation's UI port and is not what these tests are
+// about; the caret autocomplete underneath it is entirely real.
 vi.mock('@features/generation/ui/promptFields/PositivePromptActions', () => ({
   PositivePromptActions: () => null,
-  PromptTriggerPopover: (props: { onClose: () => void; onSelect: (trigger: string) => void }) => {
-    picker.current = props;
-    return null;
-  },
+  PromptTriggerPopover: () => null,
 }));
+
+vi.mock('@features/generation/ui/GenerationUiContext', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useGenerationUi: () => ({ models: { catalog: [], ensureLoaded: vi.fn() } }),
+}));
+
+const WILDCARDS = [
+  { id: 'w1', name: 'colors', values: ['red'] },
+  { id: 'w2', name: 'moods', values: ['calm'] },
+];
 
 vi.mock('@features/generation/data/wildcards', () => ({
   createWildcard: vi.fn(),
   deleteWildcard: vi.fn(),
   invalidateWildcardDependents: vi.fn(),
   updateWildcard: vi.fn(),
-  wildcardsQueryOptions: () => ({ queryFn: () => Promise.resolve([]), queryKey: ['generation', 'wildcards'] }),
+  wildcardsQueryOptions: () => ({ queryFn: () => Promise.resolve(WILDCARDS), queryKey: ['generation', 'wildcards'] }),
 }));
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+/** Tall on purpose: the old picker anchored to the whole box, which is the bug. */
+const TEXTAREA_HEIGHT_PX = 320;
 
 const render = async () => {
   host = document.createElement('div');
@@ -44,7 +50,7 @@ const render = async () => {
       <QueryClientProvider client={new QueryClient()}>
         <ChakraProvider value={system}>
           <PositivePromptField
-            heightPx={120}
+            heightPx={TEXTAREA_HEIGHT_PX}
             loras={[]}
             projectId="project-1"
             selectedModel={undefined}
@@ -58,25 +64,18 @@ const render = async () => {
       </QueryClientProvider>
     );
   });
-};
 
-const textarea = () => host!.querySelector('textarea')!;
-const isPickerOpen = () => picker.current !== null;
-
-/** Runs one of the picker's exits, then lets insertPromptText's caret frame settle. */
-const leavePicker = async (exit: (handlers: NonNullable<typeof picker.current>) => void) => {
-  const handlers = picker.current!;
-
-  await act(() => exit(handlers));
+  // The option list is fed by the wildcard query, which resolves a tick later.
   await act(async () => {
     await new Promise((resolve) => {
-      requestAnimationFrame(() => requestAnimationFrame(resolve));
+      setTimeout(resolve, 0);
     });
   });
 };
 
-const dismissPicker = () => leavePicker((handlers) => handlers.onClose());
-const pickColors = () => leavePicker((handlers) => handlers.onSelect('__colors__'));
+const textarea = () => host!.querySelector('textarea')!;
+const listbox = () => document.querySelector('[role="listbox"]');
+const optionLabels = () => [...(listbox()?.querySelectorAll('[role="option"]') ?? [])].map((o) => o.textContent);
 
 const type = async (text: string) => {
   await act(async () => {
@@ -87,8 +86,18 @@ const type = async (text: string) => {
   });
 };
 
+const press = async (key: string) => {
+  await act(async () => {
+    await userEvent.keyboard(key);
+  });
+  await act(async () => {
+    await new Promise((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(resolve));
+    });
+  });
+};
+
 beforeEach(async () => {
-  picker.current = null;
   await render();
 });
 
@@ -99,50 +108,124 @@ afterEach(async () => {
   root = null;
 });
 
-describe('the prompt trigger picker and the keystroke that opens it', () => {
+describe('the caret autocomplete', () => {
   // Regression: the picker opened on any second underscore and swallowed the
   // keystroke, so an ordinary word containing `__` could not be typed at all.
   it('leaves an underscore inside a word alone', async () => {
     await type('a close_up shot');
 
     expect(textarea().value).toBe('a close_up shot');
-    expect(isPickerOpen()).toBe(false);
+    expect(listbox()).toBeNull();
   });
 
-  it('types a double underscore mid-word without opening the picker', async () => {
+  it('types a double underscore mid-word without opening', async () => {
     await type('snake__case');
 
     expect(textarea().value).toBe('snake__case');
-    expect(isPickerOpen()).toBe(false);
+    expect(listbox()).toBeNull();
   });
 
   it('opens on `__` where a wildcard reference could begin', async () => {
     await type('a photo of __');
 
-    expect(isPickerOpen()).toBe(true);
+    expect(optionLabels()).toEqual(['colors', 'moods']);
   });
 
-  // Regression: dismissing left the prompt one underscore short of what was typed.
-  it('gives the underscores back when the picker is dismissed', async () => {
+  // The whole point: nothing is swallowed, so there is nothing to give back.
+  it('leaves the typed characters in the prompt while it is open', async () => {
     await type('a photo of __');
-    await dismissPicker();
 
     expect(textarea().value).toBe('a photo of __');
   });
 
-  it('gives `<` back when the picker is dismissed', async () => {
-    await type('a photo of <');
-    expect(isPickerOpen()).toBe(true);
+  it('narrows as the name is typed, where the user is already looking', async () => {
+    await type('a photo of __mo');
 
-    await dismissPicker();
-
-    expect(textarea().value).toBe('a photo of <');
+    expect(optionLabels()).toEqual(['moods']);
   });
 
-  it('replaces the typed underscores with the picked reference', async () => {
+  it('closes when nothing matches, rather than showing an empty list', async () => {
+    await type('a photo of __zzz');
+
+    expect(listbox()).toBeNull();
+    expect(textarea().value).toBe('a photo of __zzz');
+  });
+
+  it('opens beside the caret, not at the bottom of a tall box', async () => {
     await type('a photo of __');
-    await pickColors();
+
+    const box = textarea().getBoundingClientRect();
+    const list = listbox()!.getBoundingClientRect();
+
+    expect(box.height).toBeGreaterThan(200);
+    // On the first line of the prompt, so the list belongs at the top of the box.
+    expect(list.top - box.top).toBeLessThan(80);
+  });
+
+  // The complaint this whole thing exists to answer: the list used to open at
+  // the bottom-left of the box no matter where you were typing.
+  it('follows the caret down the box', async () => {
+    await type('one\ntwo\nthree\nfour\nfive\nsix __');
+
+    const box = textarea().getBoundingClientRect();
+    const list = listbox()!.getBoundingClientRect();
+
+    expect(list.top - box.top).toBeGreaterThan(60);
+  });
+
+  it('inserts the highlighted option on Enter', async () => {
+    await type('a photo of __');
+    await press('{Enter}');
 
     expect(textarea().value).toBe('a photo of __colors__');
+    expect(listbox()).toBeNull();
+  });
+
+  it('moves the highlight with the arrow keys', async () => {
+    await type('a photo of __');
+    await press('{ArrowDown}');
+    await press('{Enter}');
+
+    expect(textarea().value).toBe('a photo of __moods__');
+  });
+
+  it('wraps the highlight around the ends of the list', async () => {
+    await type('a photo of __');
+    await press('{ArrowUp}');
+    await press('{Enter}');
+
+    expect(textarea().value).toBe('a photo of __moods__');
+  });
+
+  it('replaces what was typed, not just the trigger', async () => {
+    await type('a photo of __mo');
+    await press('{Enter}');
+
+    expect(textarea().value).toBe('a photo of __moods__');
+  });
+
+  it('closes on Escape and leaves the prompt exactly as typed', async () => {
+    await type('a photo of __');
+    await press('{Escape}');
+
+    expect(listbox()).toBeNull();
+    expect(textarea().value).toBe('a photo of __');
+  });
+
+  it('tells assistive tech the textarea is a combobox over the list', async () => {
+    await type('a photo of __');
+
+    const activeId = textarea().getAttribute('aria-activedescendant');
+
+    expect(textarea().getAttribute('role')).toBe('combobox');
+    expect(textarea().getAttribute('aria-expanded')).toBe('true');
+    expect(textarea().getAttribute('aria-controls')).toBe(listbox()!.id);
+    expect(document.getElementById(activeId!)?.getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('closes once the reference is finished', async () => {
+    await type('a photo of __colors__');
+
+    expect(listbox()).toBeNull();
   });
 });

@@ -15,15 +15,10 @@ import type { DynamicPromptsFieldConfig } from './DynamicPromptsPanel';
 
 import { PositivePromptActions, PromptTriggerPopover } from './PositivePromptActions';
 import { PROMPT_ATTENTION_TARGET_PROPS } from './promptAttentionHotkeys';
-import {
-  getPromptTriggerRange,
-  insertPromptText,
-  type PromptTextRange,
-  type PromptTriggerKey,
-  registerPositivePromptElement,
-} from './promptFocus';
+import { insertPromptText, registerPositivePromptElement } from './promptFocus';
 import { promptHistoryNavigation } from './promptHistoryNavigation';
 import { PromptTextarea } from './PromptTextarea';
+import { usePromptTriggerAutocomplete } from './usePromptTriggerAutocomplete';
 
 const PROMPT_INPUT_DEBOUNCE_MS = 250;
 
@@ -54,12 +49,8 @@ interface PositivePromptFieldProps {
   onUsePrompt: (prompt: PromptHistoryItem) => void;
 }
 
-type PromptTriggerPickerState = {
-  anchorRect: { height: number; width: number; x: number; y: number };
-  /** The keystroke the picker consumed, restored if it is dismissed unpicked. */
-  pendingKey?: PromptTriggerKey;
-  range?: PromptTextRange;
-};
+/** The `+` button's browsable list, anchored to the button that opened it. */
+type PromptTriggerPickerState = { anchorRect: { height: number; width: number; x: number; y: number } };
 
 /** The positive prompt is the only field whose `__name__` references resolve. */
 const POSITIVE_PROMPT_TRIGGER_KEYS = ['<', '_'] as const;
@@ -111,18 +102,19 @@ export const PositivePromptField = ({
     [commitDraftValue]
   );
 
-  const openPromptTriggerPicker = useCallback(
-    (anchorElement: HTMLElement, range?: PromptTextRange, pendingKey?: PromptTriggerKey) => {
-      const rect = anchorElement.getBoundingClientRect();
+  const openPromptTriggerPicker = useCallback((anchorElement: HTMLElement) => {
+    const rect = anchorElement.getBoundingClientRect();
 
-      setTriggerPickerState({
-        anchorRect: { height: rect.height, width: rect.width, x: rect.x, y: rect.y },
-        pendingKey,
-        range,
-      });
-    },
-    []
-  );
+    setTriggerPickerState({ anchorRect: { height: rect.height, width: rect.width, x: rect.x, y: rect.y } });
+  }, []);
+
+  const autocomplete = usePromptTriggerAutocomplete({
+    isDisabled: isTemplateViewMode,
+    keys: POSITIVE_PROMPT_TRIGGER_KEYS,
+    loras,
+    onChange: commitPromptChange,
+    selectedModel,
+  });
 
   const handlePromptKeyDown = useCallback(
     (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -130,55 +122,26 @@ export const PositivePromptField = ({
         return;
       }
 
-      const trigger = getPromptTriggerRange(
-        event.currentTarget.value,
-        event.currentTarget.selectionStart,
-        event.currentTarget.selectionEnd,
-        event.key,
-        POSITIVE_PROMPT_TRIGGER_KEYS
-      );
-
-      if (!trigger) {
-        return;
-      }
-
-      // The keystroke is held rather than typed, so the picked trigger reads as
-      // one edit. `dismissPromptTriggerPicker` puts it back if nothing is picked.
-      event.preventDefault();
-      openPromptTriggerPicker(event.currentTarget, trigger.range, trigger.key);
+      // The autocomplete gets first refusal: while its list is open the arrow
+      // keys belong to it rather than to prompt history.
+      autocomplete.handleKeyDown(event);
     },
-    [openPromptTriggerPicker]
+    [autocomplete]
   );
 
   const closePromptTriggerPicker = useCallback(() => setTriggerPickerState(null), []);
-
-  /** Escape or click-away: the swallowed keystroke was the user's, so give it back. */
-  const dismissPromptTriggerPicker = useCallback(() => {
-    if (triggerPickerState?.pendingKey) {
-      insertPromptText({
-        onChange: commitPromptChange,
-        range: triggerPickerState.range,
-        textarea: textareaRef.current,
-        text: triggerPickerState.pendingKey === '_' ? '__' : triggerPickerState.pendingKey,
-        value: draftValue,
-      });
-    }
-
-    setTriggerPickerState(null);
-  }, [commitPromptChange, draftValue, triggerPickerState]);
 
   const selectPromptTrigger = useCallback(
     (trigger: string) => {
       insertPromptText({
         onChange: commitPromptChange,
-        range: triggerPickerState?.range,
         textarea: textareaRef.current,
         text: trigger,
         value: draftValue,
       });
       closePromptTriggerPicker();
     },
-    [closePromptTriggerPicker, commitPromptChange, draftValue, triggerPickerState?.range]
+    [closePromptTriggerPicker, commitPromptChange, draftValue]
   );
 
   const handleUsePrompt = useCallback(
@@ -270,9 +233,15 @@ export const PositivePromptField = ({
   );
 
   const handlePromptChange = useCallback(
-    (event: ChangeEvent<HTMLTextAreaElement>) => commitPromptChange(event.currentTarget.value),
-    [commitPromptChange]
+    (event: ChangeEvent<HTMLTextAreaElement>) => {
+      commitPromptChange(event.currentTarget.value);
+      autocomplete.refresh(event.currentTarget);
+    },
+    [autocomplete, commitPromptChange]
   );
+
+  /** Clicking moves the caret, which may land in — or out of — a trigger. */
+  const handlePromptClick = useCallback(() => autocomplete.refresh(textareaRef.current), [autocomplete]);
 
   // View mode keeps the same textarea rather than swapping in a preview
   // component: `ResizableTextarea` reads its height once on mount, and the
@@ -296,6 +265,7 @@ export const PositivePromptField = ({
     <Field label={t('common.prompt')} labelEnd={labelEnd}>
       <PromptTextarea
         {...PROMPT_ATTENTION_TARGET_PROPS}
+        {...autocomplete.comboboxProps}
         aria-label={t('widgets.generate.positivePrompt')}
         defaultHeightPx={heightPx}
         minHeightPx={96}
@@ -310,18 +280,20 @@ export const PositivePromptField = ({
         textareaRef={handleTextareaRef}
         title={isViewingMerged ? t('widgets.generate.promptTemplates.editAuthored') : undefined}
         value={isViewingMerged ? effectivePositivePrompt : draftValue}
+        onBlur={autocomplete.close}
         onChange={handlePromptChange}
-        onClick={isViewingMerged ? exitViewMode : undefined}
+        onClick={isViewingMerged ? exitViewMode : handlePromptClick}
         onKeyDown={handlePromptKeyDown}
         onResizeEnd={onResizeEnd}
       />
+      {autocomplete.element}
       {triggerPickerState ? (
         <PromptTriggerPopover
           loras={loras}
           open
           positioning={triggerPickerPositioning}
           selectedModel={selectedModel}
-          onClose={dismissPromptTriggerPicker}
+          onClose={closePromptTriggerPicker}
           onSelect={selectPromptTrigger}
         />
       ) : null}

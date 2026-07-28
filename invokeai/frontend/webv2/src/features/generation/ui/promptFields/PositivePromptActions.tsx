@@ -11,7 +11,12 @@ import { expandPrompt, imageToPrompt } from '@features/generation/data/promptUti
 import { GenerationModelSelect as ModelSelect, useGenerationUi } from '@features/generation/ui/GenerationUiContext';
 import { DynamicPromptsButton } from '@features/generation/ui/promptFields/DynamicPromptsButton';
 import { PromptTemplatesButton } from '@features/generation/ui/promptFields/PromptTemplatesButton';
-import { useWildcards } from '@features/generation/ui/useWildcards';
+import {
+  filterPromptTriggerOptions,
+  groupPromptTriggerOptions,
+  usePromptTriggerOptions,
+  type PromptTriggerOption,
+} from '@features/generation/ui/promptFields/promptTriggerOptions';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, IconButton, Scrollable, Tooltip } from '@platform/ui';
@@ -124,85 +129,6 @@ export const PositivePromptActions = ({
   );
 };
 
-type PromptTriggerOption = {
-  group: string;
-  label: string;
-  value: string;
-};
-
-const getTriggerPhrases = (model: unknown): string[] => {
-  if (!model || typeof model !== 'object') {
-    return [];
-  }
-
-  const triggerPhrases = (model as { trigger_phrases?: unknown }).trigger_phrases;
-
-  return Array.isArray(triggerPhrases)
-    ? triggerPhrases.filter((phrase): phrase is string => typeof phrase === 'string' && phrase.trim().length > 0)
-    : [];
-};
-
-const getPromptTriggerOptions = ({
-  compatibleEmbeddingsLabel,
-  loras,
-  mainModelLabel,
-  models,
-  selectedModel,
-  wildcards,
-  wildcardsLabel,
-}: {
-  compatibleEmbeddingsLabel: string;
-  loras: GenerateLora[];
-  mainModelLabel: string;
-  models: readonly ModelConfig[];
-  selectedModel: GenerateModelConfig | undefined;
-  wildcards: readonly { name: string; values: string[] }[];
-  wildcardsLabel: string;
-}): PromptTriggerOption[] => {
-  const options: PromptTriggerOption[] = [];
-
-  // A wildcard inserts as `__name__`, which is just another trigger the picker
-  // can splice in, so it rides in the same list as embeddings and LoRA phrases.
-  for (const wildcard of wildcards) {
-    options.push({ group: wildcardsLabel, label: wildcard.name, value: `__${wildcard.name}__` });
-  }
-
-  for (const phrase of getTriggerPhrases(selectedModel)) {
-    options.push({ group: selectedModel?.name ?? mainModelLabel, label: phrase, value: phrase });
-  }
-
-  for (const lora of loras) {
-    if (!lora.isEnabled) {
-      continue;
-    }
-
-    for (const phrase of getTriggerPhrases(lora.model)) {
-      options.push({ group: lora.model.name, label: phrase, value: phrase });
-    }
-  }
-
-  if (selectedModel) {
-    for (const model of models) {
-      if (model.type === 'embedding' && model.base === selectedModel.base) {
-        options.push({ group: compatibleEmbeddingsLabel, label: model.name, value: `<${model.name}>` });
-      }
-    }
-  }
-
-  const seen = new Set<string>();
-
-  return options.filter((option) => {
-    const key = `${option.group}:${option.value}`;
-
-    if (seen.has(key)) {
-      return false;
-    }
-
-    seen.add(key);
-    return true;
-  });
-};
-
 /**
  * Swaps the prompt box between the authored text and the merged result. Quiet
  * states only — the icon changes, nothing tints or animates.
@@ -271,49 +197,11 @@ export const PromptTriggerPopover = ({
   onSelect: (trigger: string) => void;
 }) => {
   const { t } = useTranslation();
-  const { catalog: models, ensureLoaded: ensureModelsLoaded } = useGenerationUi().models;
-  const { wildcards } = useWildcards();
+  const { ensureLoaded: ensureModelsLoaded } = useGenerationUi().models;
   const [searchTerm, setSearchTerm] = useState('');
-
-  const options = useMemo(
-    () =>
-      getPromptTriggerOptions({
-        compatibleEmbeddingsLabel: t('widgets.generate.compatibleEmbeddings'),
-        loras,
-        mainModelLabel: t('widgets.generate.mainModel'),
-        models,
-        selectedModel,
-        wildcards,
-        wildcardsLabel: t('widgets.generate.dynamicPrompts.wildcards'),
-      }),
-    [loras, models, selectedModel, t, wildcards]
-  );
-
-  const filteredOptions = useMemo(
-    () =>
-      options.filter((option) => {
-        const query = searchTerm.trim().toLowerCase();
-
-        return !query || option.label.toLowerCase().includes(query) || option.group.toLowerCase().includes(query);
-      }),
-    [options, searchTerm]
-  );
-
-  const groupedOptions = useMemo(
-    () =>
-      filteredOptions.reduce<Array<{ group: string; options: PromptTriggerOption[] }>>((groups, option) => {
-        const existingGroup = groups.find((group) => group.group === option.group);
-
-        if (existingGroup) {
-          existingGroup.options.push(option);
-        } else {
-          groups.push({ group: option.group, options: [option] });
-        }
-
-        return groups;
-      }, []),
-    [filteredOptions]
-  );
+  const options = usePromptTriggerOptions(loras, selectedModel);
+  const filteredOptions = useMemo(() => filterPromptTriggerOptions(options, searchTerm), [options, searchTerm]);
+  const groupedOptions = useMemo(() => groupPromptTriggerOptions(filteredOptions), [filteredOptions]);
 
   const popoverPositioning = useMemo(() => ({ ...positioning, placement: 'bottom-start' as const }), [positioning]);
 
