@@ -124,6 +124,12 @@ export const PromptTemplatesButton = ({
             <Popover.Body p="2.5">
               {editorTarget ? (
                 <PromptTemplateEditor
+                  // The editor seeds its draft on mount. Every other way in goes
+                  // through the panel first, which unmounts it — but the gallery
+                  // handover swaps the target in place, so without this a draft
+                  // opened over an existing template kept that template's text
+                  // and saved a duplicate of it.
+                  key={editorTarget.record?.id ?? 'new'}
                   catalog={catalog}
                   prefill={editorTarget.prefill}
                   showSyntaxHighlighting={showSyntaxHighlighting}

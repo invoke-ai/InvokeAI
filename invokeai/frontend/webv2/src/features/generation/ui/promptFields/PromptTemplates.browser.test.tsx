@@ -2,6 +2,7 @@ import type { PromptTemplateRecord } from '@features/generation/data/promptTempl
 import type { PromptTemplateCatalog } from '@features/generation/ui/usePromptTemplates';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { fetchPromptTemplateImage } from '@features/generation/data/promptTemplates';
 import { PromptTemplateEditor } from '@features/generation/ui/promptFields/PromptTemplateEditor';
 import { PromptTemplatesPanel } from '@features/generation/ui/promptFields/PromptTemplatesPanel';
 import { system } from '@theme/system';
@@ -23,8 +24,8 @@ vi.mock('@features/generation/ui/GenerationUiContext', async (importOriginal) =>
 }));
 
 // The editor loads an existing preview image back so saving does not drop it.
-// No template under test has one, so the fetch never fires; stubbed anyway so a
-// regression shows up as a failed assertion rather than a network error.
+// Stubbed so a template with an image is driven from the test rather than the
+// network, and so a regression shows up as a failed assertion.
 vi.mock('@features/generation/data/promptTemplates', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   fetchPromptTemplateImage: vi.fn().mockResolvedValue(null),
@@ -98,6 +99,15 @@ await i18n.use(initReactI18next).init({ fallbackLng: 'en', lng: 'en', resources:
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+const templateWithImage: PromptTemplateRecord = {
+  id: 'user-1',
+  imageUrl: 'http://host/image.png',
+  isDefault: false,
+  name: 'Cinematic',
+  negativePrompt: '',
+  positivePrompt: '{prompt}, cinematic',
+};
 
 const userTemplate: PromptTemplateRecord = {
   id: 'user-1',
@@ -295,6 +305,46 @@ describe('the prompt template editor', () => {
       negativePrompt: '',
       positivePrompt: '{prompt}, watercolour',
     });
+  });
+
+  // Regression: the existing image is fetched on mount so that saving does not
+  // drop it, and `image: null` was read as "still loading". Removing it before
+  // that landed therefore looked identical to not having loaded yet, and the
+  // arriving blob put the image the user had just taken off straight back.
+  it('does not resurrect an image removed while it was still loading', async () => {
+    const catalog = createCatalog();
+    let resolveImage: (image: Blob) => void = () => {};
+
+    vi.mocked(fetchPromptTemplateImage).mockReturnValueOnce(
+      new Promise<Blob | null>((resolve) => {
+        resolveImage = resolve;
+      })
+    );
+
+    await render(
+      <PromptTemplateEditor
+        catalog={catalog}
+        showSyntaxHighlighting
+        template={templateWithImage}
+        onCancel={vi.fn()}
+        onSaved={vi.fn()}
+      />
+    );
+
+    await act(async () => {
+      await userEvent.click(host!.querySelector<HTMLButtonElement>('button[aria-label="Remove image"]')!);
+    });
+
+    await act(async () => {
+      resolveImage(new Blob(['old'], { type: 'image/png' }));
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      await userEvent.click(buttonWithText('Save'));
+    });
+
+    expect(catalog.update).toHaveBeenCalledWith('user-1', expect.objectContaining({ image: null }));
   });
 
   it('keeps Save out of reach until the template is named', async () => {

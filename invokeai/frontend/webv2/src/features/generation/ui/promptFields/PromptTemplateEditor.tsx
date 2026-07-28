@@ -17,7 +17,7 @@ import { DropZone } from '@platform/ui/DropZone';
 import { Field } from '@platform/ui/Field';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { CheckIcon, ImageUpIcon, XIcon } from 'lucide-react';
-import { useCallback, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 interface PromptTemplateEditorProps {
@@ -37,6 +37,13 @@ interface EditorDraft {
   positivePrompt: string;
   image: Blob | null;
   imagePreviewUrl: string | null;
+  /**
+   * Whether the existing image has been dealt with — fetched, replaced, or
+   * removed. Stated outright because `image: null` is both "not loaded yet" and
+   * "the user took it off", and reading it as the former let a removal be undone
+   * by a fetch that landed afterwards.
+   */
+  isExistingImageSettled: boolean;
 }
 
 const MAX_NAME_LENGTH = 128;
@@ -56,12 +63,41 @@ export const PromptTemplateEditor = ({
   const [draft, setDraft] = useState<EditorDraft>({
     image: null,
     imagePreviewUrl: template?.imageUrl ?? null,
+    isExistingImageSettled: !template?.imageUrl,
     name: template?.name ?? '',
     negativePrompt: template?.negativePrompt ?? prefill?.negativePrompt ?? '',
     positivePrompt: template?.positivePrompt ?? prefill?.positivePrompt ?? '',
   });
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const objectUrlRef = useRef<string | null>(null);
+
+  /**
+   * Swaps in a preview URL for a picked file, releasing the previous one.
+   *
+   * A blob URL pins the whole file for the document's lifetime, so re-picking
+   * ten images held on to all ten. The remote `template.imageUrl` shares this
+   * field but is not ours to revoke, which is why only what we created is
+   * tracked here.
+   */
+  const takeObjectUrl = useCallback((file: Blob | null): string | null => {
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+    }
+
+    objectUrlRef.current = file ? URL.createObjectURL(file) : null;
+
+    return objectUrlRef.current;
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+      }
+    },
+    []
+  );
 
   // The backend replaces the whole record, so saving without resending the
   // existing image would drop it. Load it up front and treat it as part of the
@@ -75,7 +111,9 @@ export const PromptTemplateEditor = ({
 
     void fetchPromptTemplateImage(imageUrl).then((image) => {
       if (image) {
-        setDraft((current) => (current.image ? current : { ...current, image }));
+        setDraft((current) =>
+          current.isExistingImageSettled ? current : { ...current, image, isExistingImageSettled: true }
+        );
       }
     });
   });
@@ -130,18 +168,26 @@ export const PromptTemplateEditor = ({
     []
   );
 
-  const handleImageChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.currentTarget.files?.[0];
+  const handleImageChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.currentTarget.files?.[0];
 
-    if (file) {
-      setDraft((current) => ({ ...current, image: file, imagePreviewUrl: URL.createObjectURL(file) }));
-    }
+      if (file) {
+        const imagePreviewUrl = takeObjectUrl(file);
 
-    // Reset so re-picking the same file still fires a change.
-    event.currentTarget.value = '';
-  }, []);
+        setDraft((current) => ({ ...current, image: file, imagePreviewUrl, isExistingImageSettled: true }));
+      }
 
-  const clearImage = useCallback(() => setDraft((current) => ({ ...current, image: null, imagePreviewUrl: null })), []);
+      // Reset so re-picking the same file still fires a change.
+      event.currentTarget.value = '';
+    },
+    [takeObjectUrl]
+  );
+
+  const clearImage = useCallback(() => {
+    takeObjectUrl(null);
+    setDraft((current) => ({ ...current, image: null, imagePreviewUrl: null, isExistingImageSettled: true }));
+  }, [takeObjectUrl]);
 
   const reportSaveError = useCallback(
     (caught: unknown) =>
