@@ -16,7 +16,7 @@ from invokeai.app.invocations.model import CLIPField, T5EncoderField
 from invokeai.app.invocations.primitives import SD3ConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.taxonomy import ModelFormat
-from invokeai.backend.patches.layer_patcher import LayerPatcher
+from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_CLIP_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData, SD3ConditioningInfo
@@ -200,11 +200,10 @@ class Sd3TextEncoderInvocation(BaseInvocation):
 
             return prompt_embeds, pooled_prompt_embeds
 
-    def _clip_lora_iterator(
-        self, context: InvocationContext, clip_model: CLIPField
-    ) -> Iterator[Tuple[ModelPatchRaw, float]]:
+    def _clip_lora_iterator(self, context: InvocationContext, clip_model: CLIPField) -> Iterator[PatchSpec]:
         for lora in clip_model.loras:
             lora_info = context.models.load(lora.lora)
             assert isinstance(lora_info.model, ModelPatchRaw)
-            yield (lora_info.model, lora.weight)
-            del lora_info
+            # lora_info rides along so LayerPatcher pins the cache record for the
+            # patched region: this model is never lock()ed. See PatchSpec.
+            yield (lora_info.model, lora.weight, lora_info)

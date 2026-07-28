@@ -1,6 +1,6 @@
 import re
 from contextlib import contextmanager
-from typing import Dict, Iterable, Optional, Tuple
+from typing import Dict, Iterable, Optional, Tuple, Union
 
 import torch
 
@@ -13,6 +13,22 @@ from invokeai.backend.util import InvokeAILogger
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.original_weights_storage import OriginalWeightsStorage
 
+# A patch and its weight, optionally followed by the cache handle that must outlive it.
+#
+# Patch models are used WITHOUT ever locking their cache record: an iterator calls
+# context.models.load(), reads `.model`, yields the ModelPatchRaw and lets the LoadedModel wrapper
+# go. That wrapper is the cache's only signal that the record is in use — dropping it lets
+# ModelCache treat the record as abandoned and evict it (see ModelCache.release_first_use_grace),
+# while the patch itself stays applied for the whole denoise. Because ModelPatchRaw is not an
+# nn.Module, that eviction takes the remove_non_shared path and un-accounts RAM that is still
+# resident, so the shared budget under-counts and over-admits.
+#
+# Producers therefore pass the wrapper along as a third element. apply_smart_model_patches
+# materializes the iterable and holds it for the entire patched region, so the record stays live
+# until the patches are removed. Two-element specs remain valid for callers whose patches are not
+# cache-backed (tests, and anything that owns the model's lifetime itself).
+PatchSpec = Union[Tuple[ModelPatchRaw, float], Tuple[ModelPatchRaw, float, object]]
+
 
 class LayerPatcher:
     @staticmethod
@@ -20,7 +36,7 @@ class LayerPatcher:
     @contextmanager
     def apply_smart_model_patches(
         model: torch.nn.Module,
-        patches: Iterable[Tuple[ModelPatchRaw, float]],
+        patches: Iterable[PatchSpec],
         prefix: str,
         dtype: torch.dtype,
         cached_weights: Optional[Dict[str, torch.Tensor]] = None,
@@ -46,6 +62,8 @@ class LayerPatcher:
             # iterator here lets every LoRA load take (and release) the write lock first, then we
             # take the read lock once for patch application only. This is also compatible with
             # callers that hand us a fresh iterator per call (see wan_denoise.LoRAIteratorFactory).
+            # Materializing also pins each spec's cache handle (see PatchSpec) for the whole
+            # patched region: `patches` stays referenced until this contextmanager exits.
             patches = list(patches)
             # Patching can register new parameters (FLUX Control LoRA shape expansion routes
             # through nn.Module.register_parameter via setattr). Model construction on another
@@ -55,7 +73,8 @@ class LayerPatcher:
             # patching on different devices may overlap; only construction is exclusive. The lock
             # is released before the yield — patched inference must not block model loads.
             with MODEL_LOAD_LOCK.read_lock():
-                for patch, patch_weight in patches:
+                for spec in patches:
+                    patch, patch_weight = spec[0], spec[1]
                     LayerPatcher.apply_smart_model_patch(
                         model=model,
                         prefix=prefix,

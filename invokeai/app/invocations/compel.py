@@ -20,7 +20,7 @@ from invokeai.app.invocations.primitives import ConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.ti_utils import generate_ti_list
 from invokeai.backend.model_patcher import ModelPatcher
-from invokeai.backend.patches.layer_patcher import LayerPatcher
+from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     BasicConditioningInfo,
@@ -64,12 +64,13 @@ class CompelInvocation(BaseInvocation):
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ConditioningOutput:
-        def _lora_loader() -> Iterator[Tuple[ModelPatchRaw, float]]:
+        def _lora_loader() -> Iterator[PatchSpec]:
             for lora in self.clip.loras:
                 lora_info = context.models.load(lora.lora)
                 assert isinstance(lora_info.model, ModelPatchRaw)
-                yield (lora_info.model, lora.weight)
-                del lora_info
+                # lora_info rides along so LayerPatcher pins the cache record for the
+                # patched region: this model is never lock()ed. See PatchSpec.
+                yield (lora_info.model, lora.weight, lora_info)
             return
 
         # loras = [(context.models.get(**lora.dict(exclude={"weight"})).context.model, lora.weight) for lora in self.clip.loras]
@@ -169,13 +170,14 @@ class SDXLPromptInvocationBase:
                 c_pooled = None
             return c, c_pooled
 
-        def _lora_loader() -> Iterator[Tuple[ModelPatchRaw, float]]:
+        def _lora_loader() -> Iterator[PatchSpec]:
             for lora in clip_field.loras:
                 lora_info = context.models.load(lora.lora)
                 lora_model = lora_info.model
                 assert isinstance(lora_model, ModelPatchRaw)
-                yield (lora_model, lora.weight)
-                del lora_info
+                # lora_info rides along so LayerPatcher pins the cache record for the
+                # patched region: this model is never lock()ed. See PatchSpec.
+                yield (lora_model, lora.weight, lora_info)
             return
 
         # loras = [(context.models.get(**lora.dict(exclude={"weight"})).context.model, lora.weight) for lora in self.clip.loras]

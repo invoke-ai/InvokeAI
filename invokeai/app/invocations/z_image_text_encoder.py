@@ -1,5 +1,5 @@
 from contextlib import ExitStack
-from typing import Iterator, Optional, Tuple
+from typing import Iterator, Optional
 
 import torch
 from transformers import PreTrainedModel, PreTrainedTokenizerBase
@@ -16,7 +16,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import Qwen3EncoderField
 from invokeai.app.invocations.primitives import ZImageConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.patches.layer_patcher import LayerPatcher
+from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.z_image_lora_constants import Z_IMAGE_LORA_QWEN3_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
@@ -197,7 +197,7 @@ class ZImageTextEncoderInvocation(BaseInvocation):
             )
         return prompt_embeds
 
-    def _lora_iterator(self, context: InvocationContext) -> Iterator[Tuple[ModelPatchRaw, float]]:
+    def _lora_iterator(self, context: InvocationContext) -> Iterator[PatchSpec]:
         """Iterate over LoRA models to apply to the Qwen3 text encoder."""
         for lora in self.qwen3_encoder.loras:
             lora_info = context.models.load(lora.lora)
@@ -206,5 +206,6 @@ class ZImageTextEncoderInvocation(BaseInvocation):
                     f"Expected ModelPatchRaw for LoRA '{lora.lora.key}', got {type(lora_info.model).__name__}. "
                     "The LoRA model may be corrupted or incompatible."
                 )
-            yield (lora_info.model, lora.weight)
-            del lora_info
+            # lora_info rides along so LayerPatcher pins the cache record for the
+            # patched region: this model is never lock()ed. See PatchSpec.
+            yield (lora_info.model, lora.weight, lora_info)

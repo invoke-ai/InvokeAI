@@ -8,6 +8,9 @@ corrupt the weights seen by the other GPU (and taint the cached "clean" copy eve
 These run on CPU and force direct patching, which is the path that touches CPU-resident weights.
 """
 
+import gc
+import weakref
+
 import torch
 
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
@@ -104,3 +107,68 @@ def test_two_models_sharing_canonical_are_isolated_under_direct_patch():
         assert torch.allclose(model_b(x), out_b_before)
 
     assert torch.allclose(model_b(x), out_b_before)
+
+
+@torch.no_grad()
+def test_patch_spec_cache_handle_is_held_for_the_patched_region():
+    """A patch's cache handle must stay referenced for as long as the patch is applied.
+
+    LoRA patches are used without ever locking their cache record, so the LoadedModel wrapper is
+    the cache's only signal that the record is in use (see ModelCache.release_first_use_grace).
+    The producers therefore yield it as a third PatchSpec element, and apply_smart_model_patches
+    materializes the iterable so it is pinned. If that pinning regresses, the wrapper dies while
+    the patch is still applied and a peer's budget reconcile can evict a live record.
+    """
+    in_features, out_features, rank = 4, 8, 2
+    model = DummyModuleWithOneLayer(in_features, out_features, device="cpu", dtype=torch.float32)
+    apply_custom_layers_to_model(model)
+    (patch, weight), *_ = _make_loras(1, in_features, out_features, rank)
+
+    class _Handle:
+        """Stands in for the LoadedModel wrapper; its death is what would release the grace."""
+
+    handle = _Handle()
+    handle_ref = weakref.ref(handle)
+
+    def _iterator(held):
+        # Mirrors the production iterators: the handle is a generator local that leaves only
+        # through the yielded spec, so once the generator is exhausted the spec is the sole
+        # strong reference to it.
+        yield (patch, weight, held)
+
+    it = _iterator(handle)
+    del handle
+
+    with LayerPatcher.apply_smart_model_patches(
+        model=model,
+        patches=it,
+        prefix="",
+        dtype=torch.float32,
+        force_direct_patching=True,
+    ):
+        del it
+        gc.collect()
+        assert handle_ref() is not None, "the patch's cache handle was released while its patch was still applied"
+
+    # Once the patched region exits, nothing should pin it any more.
+    gc.collect()
+    assert handle_ref() is None
+
+
+@torch.no_grad()
+def test_two_element_patch_specs_are_still_accepted():
+    """Callers whose patches are not cache-backed (tests, owned models) keep the 2-tuple form."""
+    in_features, out_features, rank = 4, 8, 2
+    model = DummyModuleWithOneLayer(in_features, out_features, device="cpu", dtype=torch.float32)
+    apply_custom_layers_to_model(model)
+    before = model.linear_layer_1.weight.detach().clone()
+
+    with LayerPatcher.apply_smart_model_patches(
+        model=model,
+        patches=_make_loras(1, in_features, out_features, rank),
+        prefix="",
+        dtype=torch.float32,
+        force_direct_patching=True,
+    ):
+        assert not torch.allclose(model.linear_layer_1.weight, before)
+    assert torch.allclose(model.linear_layer_1.weight, before)
