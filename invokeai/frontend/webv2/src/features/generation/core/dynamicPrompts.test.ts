@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   getWildcardNameError,
   hasDynamicPromptSyntax,
+  matchesKnownWildcard,
   sanitizeDynamicPromptsConfig,
   sanitizeMaxPrompts,
 } from './dynamicPrompts';
@@ -96,5 +97,50 @@ describe('getWildcardNameError', () => {
   it('reports a name the user already owns', () => {
     expect(getWildcardNameError('colors', new Set(['colors']))).toBe('taken');
     expect(getWildcardNameError('shades', new Set(['colors']))).toBeNull();
+  });
+});
+
+describe('matchesKnownWildcard', () => {
+  const CATALOG = new Set(['colours', 'colours/warm', 'animals/dogs', 'moods']);
+
+  it('looks a plain path up directly', () => {
+    expect(matchesKnownWildcard('colours', CATALOG)).toBe(true);
+    expect(matchesKnownWildcard('nope', CATALOG)).toBe(false);
+  });
+
+  it('resolves globs, including across the `/` separator', () => {
+    expect(matchesKnownWildcard('colo*', CATALOG)).toBe(true);
+    expect(matchesKnownWildcard('*s', CATALOG)).toBe(true);
+    expect(matchesKnownWildcard('animals/*', CATALOG)).toBe(true);
+    // `*` is an unanchored run of anything, `/` included — as on the backend.
+    expect(matchesKnownWildcard('*/dogs', CATALOG)).toBe(true);
+    expect(matchesKnownWildcard('*', CATALOG)).toBe(true);
+    expect(matchesKnownWildcard('nope/*', CATALOG)).toBe(false);
+    expect(matchesKnownWildcard('colours/*', new Set(['colours']))).toBe(false);
+  });
+
+  it('anchors both ends, so the two cannot share characters', () => {
+    // `ab*ba` needs four characters; matching `ab` and `ba` onto the same `b`
+    // is what a naive prefix/suffix check gets wrong.
+    expect(matchesKnownWildcard('ab*ba', new Set(['aba']))).toBe(false);
+    expect(matchesKnownWildcard('ab*ba', new Set(['abba']))).toBe(true);
+  });
+
+  it('takes the interior runs in order', () => {
+    expect(matchesKnownWildcard('a*b*c', new Set(['axbxc']))).toBe(true);
+    expect(matchesKnownWildcard('a*b*c', new Set(['axcxb']))).toBe(false);
+    // Adjacent stars collapse: `**` means what `*` means.
+    expect(matchesKnownWildcard('a**c', new Set(['abc']))).toBe(true);
+  });
+
+  // Regression: translating the path to `^a.*.*.*…$` backtracks exponentially,
+  // and the path is whatever the user has typed so far. Twelve stars against one
+  // name used to take about a minute.
+  it('does not backtrack on a path full of stars', () => {
+    const names = new Set(Array.from({ length: 50 }, (_, index) => `colours/warm-autumn-palette-${index}`));
+    const started = performance.now();
+
+    expect(matchesKnownWildcard(`${'*'.repeat(24)}q`, names)).toBe(false);
+    expect(performance.now() - started).toBeLessThan(100);
   });
 });

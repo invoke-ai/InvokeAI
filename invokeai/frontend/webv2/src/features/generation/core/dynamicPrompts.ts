@@ -64,7 +64,55 @@ export const WILDCARD_REFERENCE_RE = new RegExp(`__[~@]?(${WILDCARD_PATH_SOURCE}
 /** The same rule anchored, for validating a name the user is typing. */
 export const WILDCARD_NAME_RE = new RegExp(`^${WILDCARD_NAME_SOURCE}$`);
 
-const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/**
+ * Whether `name` matches a glob, given the literal runs between its `*`s.
+ *
+ * Deliberately not a regex. Translating `a*b*c` to `^a.*b.*c$` reads well but
+ * makes adjacent stars into `.*.*`, which backtracks exponentially: a dozen of
+ * them against one catalog name took a minute to fail. The path comes straight
+ * out of whatever the user is typing, so that is a frozen tab, not a slow test.
+ *
+ * The greedy scan below is the standard `*`-only matcher and is linear in
+ * practice: anchor the first run to the start and the last to the end, then take
+ * each middle run at its earliest remaining occurrence. Earliest is always safe
+ * when the only wildcard is "any run of anything" — consuming less can never
+ * turn a match into a miss.
+ */
+const matchesGlobLiterals = (literals: readonly string[], name: string): boolean => {
+  const first = literals[0] ?? '';
+  const last = literals[literals.length - 1] ?? '';
+
+  if (literals.length === 1) {
+    return name === first;
+  }
+
+  // Checked before the middle runs so the two anchors cannot overlap and count
+  // the same characters twice: `ab*ba` needs four characters, not three.
+  if (name.length < first.length + last.length || !name.startsWith(first) || !name.endsWith(last)) {
+    return false;
+  }
+
+  const end = name.length - last.length;
+  let index = first.length;
+
+  for (let position = 1; position < literals.length - 1; position++) {
+    const literal = literals[position];
+
+    if (literal === undefined || literal.length === 0) {
+      continue;
+    }
+
+    const found = name.indexOf(literal, index);
+
+    if (found < 0 || found + literal.length > end) {
+      return false;
+    }
+
+    index = found + literal.length;
+  }
+
+  return true;
+};
 
 /**
  * Whether a referenced path resolves against the catalog.
@@ -83,10 +131,10 @@ export const matchesKnownWildcard = (path: string, knownNames: ReadonlySet<strin
     return knownNames.has(path);
   }
 
-  const pattern = new RegExp(`^${path.split('*').map(escapeRegExp).join('.*')}$`);
+  const literals = path.split('*');
 
   for (const name of knownNames) {
-    if (pattern.test(name)) {
+    if (matchesGlobLiterals(literals, name)) {
       return true;
     }
   }
