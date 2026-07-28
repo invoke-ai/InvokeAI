@@ -4,6 +4,7 @@ import type { PromptTemplateCatalog } from '@features/generation/ui/usePromptTem
 import type { ChangeEvent } from 'react';
 
 import { Box, HStack, Image, Input, Separator, Stack, Text } from '@chakra-ui/react';
+import { searchCatalog } from '@features/generation/core/catalogSearch';
 import { PROMPT_TEMPLATE_PLACEHOLDER } from '@features/generation/core/promptTemplates';
 import { toPromptTemplateSnapshot } from '@features/generation/data/promptTemplates';
 import { useGenerationUi } from '@features/generation/ui/GenerationUiContext';
@@ -33,12 +34,11 @@ interface PromptTemplatesPanelProps {
   onCreate: () => void;
 }
 
-/** Matches on name and on prompt text — a template is mostly its prompt. */
-const matchesSearch = (template: PromptTemplateRecord, query: string): boolean =>
-  !query ||
-  template.name.toLowerCase().includes(query) ||
-  template.positivePrompt.toLowerCase().includes(query) ||
-  template.negativePrompt.toLowerCase().includes(query);
+/** A template's prose is its two prompts; `searchCatalog` handles the name. */
+const getTemplateProse = (template: PromptTemplateRecord): readonly string[] => [
+  template.positivePrompt,
+  template.negativePrompt,
+];
 
 export const PromptTemplatesPanel = ({
   activeTemplate,
@@ -53,15 +53,14 @@ export const PromptTemplatesPanel = ({
   const canManagePromptTemplates = capabilities.canManagePromptTemplates;
   const [searchTerm, setSearchTerm] = useState('');
   const [pendingDelete, setPendingDelete] = useState<PromptTemplateRecord | null>(null);
-  const query = searchTerm.trim().toLowerCase();
 
   const userTemplates = useMemo(
-    () => catalog.userTemplates.filter((template) => matchesSearch(template, query)),
-    [catalog.userTemplates, query]
+    () => searchCatalog(catalog.userTemplates, searchTerm, getTemplateProse),
+    [catalog.userTemplates, searchTerm]
   );
   const defaultTemplates = useMemo(
-    () => catalog.defaultTemplates.filter((template) => matchesSearch(template, query)),
-    [catalog.defaultTemplates, query]
+    () => searchCatalog(catalog.defaultTemplates, searchTerm, getTemplateProse),
+    [catalog.defaultTemplates, searchTerm]
   );
   const hasResults = userTemplates.length > 0 || defaultTemplates.length > 0;
 
@@ -124,7 +123,7 @@ export const PromptTemplatesPanel = ({
           <PanelMessage>{t('widgets.generate.promptTemplates.loading')}</PanelMessage>
         ) : !hasResults ? (
           <PanelMessage>
-            {query
+            {searchTerm.trim()
               ? t('widgets.generate.promptTemplates.noMatches')
               : t('widgets.generate.promptTemplates.noTemplatesYet')}
           </PanelMessage>

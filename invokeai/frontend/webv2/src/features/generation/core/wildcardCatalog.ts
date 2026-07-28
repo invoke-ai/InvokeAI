@@ -10,15 +10,12 @@
  * and grouping never reshuffles it.
  */
 
-import fuzzysort from 'fuzzysort';
+import { searchCatalog } from './catalogSearch';
 
 export interface WildcardListEntry {
   name: string;
   values: readonly string[];
 }
-
-/** Matches below this fuzzysort score (0–1) are noise, not results. */
-const NAME_MATCH_THRESHOLD = 0.2;
 
 export interface WildcardGroup<T> {
   /** `null` for names with no `/` — those render without a header. */
@@ -28,41 +25,14 @@ export interface WildcardGroup<T> {
 
 /**
  * Name matches first, ranked fuzzily, then wildcards whose *values* contain the
- * query.
- *
- * The split is deliberate. Names are short slugs, where fuzzy matching earns its
- * keep (`adg` finds `animals/dogs`); values are free text, where a fuzzy match
- * would fire on almost anything, so they take a plain substring test. Searching
- * values at all matters because a wildcard is mostly its values — you remember
- * that "cyberpunk" is in one of these lists long before you remember which.
- *
- * Values are scanned in full rather than sampled: stopping early would silently
- * hide a match in a long list, which is worse than the scan being slow. `.some`
- * exits on the first hit.
+ * query — `searchCatalog`'s rule, which the template and history lists follow
+ * too. Values are this record's prose: you remember that "cyberpunk" is in one
+ * of these lists long before you remember which.
  */
-export const filterWildcards = <T extends WildcardListEntry>(wildcards: readonly T[], query: string): T[] => {
-  const trimmed = query.trim();
+const getWildcardProse = (wildcard: WildcardListEntry): readonly string[] => wildcard.values;
 
-  if (trimmed.length === 0) {
-    return [...wildcards];
-  }
-
-  const nameMatches = fuzzysort.go(trimmed, wildcards, {
-    key: (wildcard: T) => wildcard.name,
-    threshold: NAME_MATCH_THRESHOLD,
-  });
-  const matched = new Set<T>(nameMatches.map((result) => result.obj));
-  const results = nameMatches.map((result) => result.obj);
-  const needle = trimmed.toLowerCase();
-
-  for (const wildcard of wildcards) {
-    if (!matched.has(wildcard) && wildcard.values.some((value) => value.toLowerCase().includes(needle))) {
-      results.push(wildcard);
-    }
-  }
-
-  return results;
-};
+export const filterWildcards = <T extends WildcardListEntry>(wildcards: readonly T[], query: string): T[] =>
+  searchCatalog(wildcards, query, getWildcardProse);
 
 /**
  * Splits on the *first* `/` only. `characters/fantasy/elves` groups under

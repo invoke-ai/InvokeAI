@@ -280,6 +280,28 @@ describe('the prompt templates panel', () => {
     expect(host!.textContent).toContain('Photography');
     expect(host!.textContent).not.toContain('Cinematic');
   });
+
+  // The same fuzzy name rule the wildcards panel beside it has always used —
+  // these two sit in one popover and used to disagree about what typing means.
+  it('matches a name fuzzily', async () => {
+    await render(
+      <PromptTemplatesPanel
+        activeTemplate={null}
+        catalog={createCatalog()}
+        onApply={vi.fn()}
+        onCreate={vi.fn()}
+        onDetach={vi.fn()}
+        onEdit={vi.fn()}
+      />
+    );
+
+    await act(async () => {
+      await userEvent.fill(host!.querySelector('input')!, 'cnmt');
+    });
+
+    expect(host!.textContent).toContain('Cinematic');
+    expect(host!.textContent).not.toContain('Photography');
+  });
 });
 
 describe('the prompt template editor', () => {

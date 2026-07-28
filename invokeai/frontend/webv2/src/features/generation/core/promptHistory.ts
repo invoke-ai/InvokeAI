@@ -2,6 +2,8 @@ import type { PromptHistoryItem } from '@features/generation/core/contracts';
 
 import type { GenerateSettings } from './types';
 
+import { searchProse } from './catalogSearch';
+
 export const MAX_PROMPT_HISTORY = 100;
 
 export const normalizePromptHistoryItem = (item: PromptHistoryItem): PromptHistoryItem | null => {
@@ -36,18 +38,14 @@ export const removePromptHistoryItem = (
   item: PromptHistoryItem
 ): PromptHistoryItem[] => history.filter((entry) => !isSamePromptHistoryItem(entry, item));
 
-export const filterPromptHistory = (history: readonly PromptHistoryItem[], searchTerm: string): PromptHistoryItem[] => {
-  const query = searchTerm.trim().toLowerCase();
+/** A history entry has no name — it is its two prompts. */
+const getPromptHistoryProse = (item: PromptHistoryItem): readonly string[] => [
+  item.positivePrompt,
+  item.negativePrompt ?? '',
+];
 
-  if (!query) {
-    return [...history];
-  }
-
-  return history.filter(
-    (item) =>
-      item.positivePrompt.toLowerCase().includes(query) || (item.negativePrompt ?? '').toLowerCase().includes(query)
-  );
-};
+export const filterPromptHistory = (history: readonly PromptHistoryItem[], searchTerm: string): PromptHistoryItem[] =>
+  searchProse(history, searchTerm, getPromptHistoryProse);
 
 export const getPromptHistoryItemFromGenerateSettings = (settings: GenerateSettings): PromptHistoryItem => ({
   negativePrompt: settings.negativePromptEnabled ? settings.negativePrompt : null,
