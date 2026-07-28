@@ -8,7 +8,7 @@ import { useRegisterGenerateDraftFlusher } from '@features/generation/ui/generat
 import { useDebouncedDraftValue } from '@features/generation/ui/useDebouncedDraftValue';
 import { useWildcards } from '@features/generation/ui/useWildcards';
 import { Field } from '@platform/ui';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { DynamicPromptsFieldConfig } from './DynamicPromptsPanel';
@@ -19,6 +19,7 @@ import { insertPromptText, registerPositivePromptElement } from './promptFocus';
 import { promptHistoryNavigation } from './promptHistoryNavigation';
 import { PromptTextarea } from './PromptTextarea';
 import { usePromptTriggerAutocomplete } from './usePromptTriggerAutocomplete';
+import { usePromptTriggerPicker } from './usePromptTriggerPicker';
 
 const PROMPT_INPUT_DEBOUNCE_MS = 250;
 
@@ -49,9 +50,6 @@ interface PositivePromptFieldProps {
   onUsePrompt: (prompt: PromptHistoryItem) => void;
 }
 
-/** The `+` button's browsable list, anchored to the button that opened it. */
-type PromptTriggerPickerState = { anchorRect: { height: number; width: number; x: number; y: number } };
-
 /** The positive prompt is the only field whose `__name__` references resolve. */
 const POSITIVE_PROMPT_TRIGGER_KEYS = ['<', '_'] as const;
 
@@ -75,7 +73,6 @@ export const PositivePromptField = ({
 }: PositivePromptFieldProps) => {
   const { t } = useTranslation();
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const [triggerPickerState, setTriggerPickerState] = useState<PromptTriggerPickerState | null>(null);
   const { knownNames: knownWildcards } = useWildcards();
   const { commitDraftValue, draftValue, flushDraftValue, replaceDraftValue, setDraftValue } = useDebouncedDraftValue({
     delayMs: PROMPT_INPUT_DEBOUNCE_MS,
@@ -102,12 +99,6 @@ export const PositivePromptField = ({
     [commitDraftValue]
   );
 
-  const openPromptTriggerPicker = useCallback((anchorElement: HTMLElement) => {
-    const rect = anchorElement.getBoundingClientRect();
-
-    setTriggerPickerState({ anchorRect: { height: rect.height, width: rect.width, x: rect.x, y: rect.y } });
-  }, []);
-
   // View mode keeps the same textarea rather than swapping in a preview
   // component: `ResizableTextarea` reads its height once on mount, and the
   // element is also what `focusPositivePrompt` and the attention hotkeys target,
@@ -126,6 +117,19 @@ export const PositivePromptField = ({
     selectedModel,
   });
 
+  const insertTrigger = useCallback(
+    (trigger: string) => {
+      insertPromptText({
+        onChange: commitPromptChange,
+        textarea: textareaRef.current,
+        text: trigger,
+        value: draftValue,
+      });
+    },
+    [commitPromptChange, draftValue]
+  );
+  const triggerPicker = usePromptTriggerPicker({ insert: insertTrigger });
+
   const handlePromptKeyDown = useCallback(
     (event: KeyboardEvent<HTMLTextAreaElement>) => {
       if (event.altKey || event.ctrlKey || event.metaKey) {
@@ -137,21 +141,6 @@ export const PositivePromptField = ({
       autocomplete.handleKeyDown(event);
     },
     [autocomplete]
-  );
-
-  const closePromptTriggerPicker = useCallback(() => setTriggerPickerState(null), []);
-
-  const selectPromptTrigger = useCallback(
-    (trigger: string) => {
-      insertPromptText({
-        onChange: commitPromptChange,
-        textarea: textareaRef.current,
-        text: trigger,
-        value: draftValue,
-      });
-      closePromptTriggerPicker();
-    },
-    [closePromptTriggerPicker, commitPromptChange, draftValue]
   );
 
   const handleUsePrompt = useCallback(
@@ -166,11 +155,6 @@ export const PositivePromptField = ({
     textareaRef.current = element;
     registerPositivePromptElement(element);
   }, []);
-
-  const handleOpenPromptTriggerPicker = useCallback(
-    (anchorElement: HTMLElement) => openPromptTriggerPicker(anchorElement),
-    [openPromptTriggerPicker]
-  );
 
   const insertTextAtCaret = useCallback(
     (text: string) => {
@@ -201,7 +185,7 @@ export const PositivePromptField = ({
       <PositivePromptActions
         batchCount={batchCount}
         dynamicPrompts={dynamicPrompts}
-        isPromptTriggerPickerOpen={triggerPickerState !== null}
+        isPromptTriggerPickerOpen={triggerPicker.isOpen}
         showSyntaxHighlighting={showSyntaxHighlighting}
         onInsertText={insertTextAtCaret}
         loras={loras}
@@ -215,7 +199,7 @@ export const PositivePromptField = ({
         onFlattenPromptTemplate={flattenPromptTemplate}
         projectId={projectId}
         selectedModel={selectedModel}
-        onOpenPromptTriggerPicker={handleOpenPromptTriggerPicker}
+        onOpenPromptTriggerPicker={triggerPicker.open}
         onPositivePromptChangeImmediate={commitPromptChangeImmediately}
         onUsePrompt={handleUsePrompt}
       />
@@ -227,7 +211,6 @@ export const PositivePromptField = ({
       dynamicPrompts,
       effectivePositivePrompt,
       flattenPromptTemplate,
-      handleOpenPromptTriggerPicker,
       handleUsePrompt,
       insertTextAtCaret,
       isTemplateViewMode,
@@ -238,7 +221,7 @@ export const PositivePromptField = ({
       promptTemplate,
       selectedModel,
       showSyntaxHighlighting,
-      triggerPickerState,
+      triggerPicker,
     ]
   );
 
@@ -260,11 +243,6 @@ export const PositivePromptField = ({
 
   /** Clicking the merged text is the way back to editing, as it is in legacy. */
   const exitViewMode = useCallback(() => onTemplateViewModeChange?.(false), [onTemplateViewModeChange]);
-
-  const triggerPickerPositioning = useMemo(
-    () => ({ getAnchorRect: () => triggerPickerState?.anchorRect ?? null }),
-    [triggerPickerState]
-  );
 
   return (
     <Field label={t('common.prompt')} labelEnd={labelEnd}>
@@ -292,14 +270,14 @@ export const PositivePromptField = ({
         onResizeEnd={onResizeEnd}
       />
       {autocomplete.element}
-      {triggerPickerState ? (
+      {triggerPicker.isOpen ? (
         <PromptTriggerPopover
           loras={loras}
           open
-          positioning={triggerPickerPositioning}
+          positioning={triggerPicker.positioning}
           selectedModel={selectedModel}
-          onClose={closePromptTriggerPicker}
-          onSelect={selectPromptTrigger}
+          onClose={triggerPicker.close}
+          onSelect={triggerPicker.select}
         />
       ) : null}
     </Field>

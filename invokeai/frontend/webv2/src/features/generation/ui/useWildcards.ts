@@ -38,39 +38,31 @@ export const useWildcards = (): WildcardCatalog => {
   );
 
   // Each mutation captures the identity that started it, so a sign-out mid-flight
-  // does not invalidate the next account's caches on the way back.
-  const create = useCallback(
-    async (wildcard: { name: string; values: string[] }) => {
+  // does not invalidate the next account's caches on the way back. Stated once,
+  // as `usePromptTemplates` does — three copies of it was three chances for the
+  // next mutation added here to forget a step.
+  const runAndInvalidate = useCallback(
+    async (run: () => Promise<unknown>): Promise<void> => {
       const owner = captureAccountScope();
 
-      await createWildcard(wildcard);
+      await run();
       assertAccountScopeCurrent(owner);
       await invalidateWildcardDependents(queryClient);
     },
     [queryClient]
+  );
+
+  const create = useCallback(
+    (wildcard: { name: string; values: string[] }) => runAndInvalidate(() => createWildcard(wildcard)),
+    [runAndInvalidate]
   );
 
   const update = useCallback(
-    async (id: string, changes: { name?: string; values?: string[] }) => {
-      const owner = captureAccountScope();
-
-      await updateWildcard(id, changes);
-      assertAccountScopeCurrent(owner);
-      await invalidateWildcardDependents(queryClient);
-    },
-    [queryClient]
+    (id: string, changes: { name?: string; values?: string[] }) => runAndInvalidate(() => updateWildcard(id, changes)),
+    [runAndInvalidate]
   );
 
-  const remove = useCallback(
-    async (id: string) => {
-      const owner = captureAccountScope();
-
-      await deleteWildcard(id);
-      assertAccountScopeCurrent(owner);
-      await invalidateWildcardDependents(queryClient);
-    },
-    [queryClient]
-  );
+  const remove = useCallback((id: string) => runAndInvalidate(() => deleteWildcard(id)), [runAndInvalidate]);
 
   return { create, isLoading: query.isPending, knownNames, remove, update, wildcards };
 };

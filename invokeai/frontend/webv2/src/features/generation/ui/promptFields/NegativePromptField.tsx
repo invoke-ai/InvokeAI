@@ -7,7 +7,7 @@ import { getPromptTemplateChunks } from '@features/generation/core/promptTemplat
 import { useRegisterGenerateDraftFlusher } from '@features/generation/ui/generateDraftRegistry';
 import { useDebouncedDraftValue } from '@features/generation/ui/useDebouncedDraftValue';
 import { Field } from '@platform/ui';
-import { useCallback, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useId, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AddPromptTriggerButton, PromptTriggerPopover } from './PositivePromptActions';
@@ -16,6 +16,7 @@ import { insertPromptText } from './promptFocus';
 import { promptHistoryNavigation } from './promptHistoryNavigation';
 import { PromptTextarea } from './PromptTextarea';
 import { usePromptTriggerAutocomplete } from './usePromptTriggerAutocomplete';
+import { usePromptTriggerPicker } from './usePromptTriggerPicker';
 
 const PROMPT_INPUT_DEBOUNCE_MS = 250;
 
@@ -38,9 +39,6 @@ interface NegativePromptFieldProps {
   onResizeEnd: (heightPx: number) => void;
 }
 
-/** The `+` button's browsable list, anchored to the button that opened it. */
-type PromptTriggerPickerState = { anchorRect: { height: number; width: number; x: number; y: number } };
-
 /** No `__name__` here: a negative prompt is never expanded, so it has no wildcards. */
 const NEGATIVE_PROMPT_TRIGGER_KEYS = ['<'] as const;
 
@@ -62,7 +60,6 @@ export const NegativePromptField = ({
 }: NegativePromptFieldProps) => {
   const { t } = useTranslation();
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const [triggerPickerState, setTriggerPickerState] = useState<PromptTriggerPickerState | null>(null);
   const { draftValue, flushDraftValue, setDraftValue } = useDebouncedDraftValue({
     delayMs: PROMPT_INPUT_DEBOUNCE_MS,
     onCommit: onChange,
@@ -79,12 +76,6 @@ export const NegativePromptField = ({
     },
     [setDraftValue]
   );
-
-  const openPromptTriggerPicker = useCallback((anchorElement: HTMLElement) => {
-    const rect = anchorElement.getBoundingClientRect();
-
-    setTriggerPickerState({ anchorRect: { height: rect.height, width: rect.width, x: rect.x, y: rect.y } });
-  }, []);
 
   // Same textarea, read-only, as on the positive side — swapping in a different
   // component would reset the resizer's mounted height.
@@ -106,6 +97,19 @@ export const NegativePromptField = ({
     selectedModel,
   });
 
+  const insertTrigger = useCallback(
+    (trigger: string) => {
+      insertPromptText({
+        onChange: commitPromptChange,
+        textarea: textareaRef.current,
+        text: trigger,
+        value: draftValue,
+      });
+    },
+    [commitPromptChange, draftValue]
+  );
+  const triggerPicker = usePromptTriggerPicker({ insert: insertTrigger });
+
   const handlePromptKeyDown = useCallback(
     (event: KeyboardEvent<HTMLTextAreaElement>) => {
       if (event.altKey || event.ctrlKey || event.metaKey) {
@@ -115,26 +119,6 @@ export const NegativePromptField = ({
       autocomplete.handleKeyDown(event);
     },
     [autocomplete]
-  );
-
-  const closePromptTriggerPicker = useCallback(() => setTriggerPickerState(null), []);
-
-  const selectPromptTrigger = useCallback(
-    (trigger: string) => {
-      insertPromptText({
-        onChange: commitPromptChange,
-        textarea: textareaRef.current,
-        text: trigger,
-        value: draftValue,
-      });
-      closePromptTriggerPicker();
-    },
-    [closePromptTriggerPicker, commitPromptChange, draftValue]
-  );
-
-  const handleOpenPromptTriggerPicker = useCallback(
-    (anchorElement: HTMLElement) => openPromptTriggerPicker(anchorElement),
-    [openPromptTriggerPicker]
   );
 
   const handleEnabledChange = useCallback(
@@ -165,8 +149,8 @@ export const NegativePromptField = ({
       <HStack gap="0.5">
         {isEnabled ? (
           <AddPromptTriggerButton
-            isOpen={triggerPickerState !== null || isTemplateViewMode}
-            onOpenPromptTriggerPicker={handleOpenPromptTriggerPicker}
+            isOpen={triggerPicker.isOpen || isTemplateViewMode}
+            onOpenPromptTriggerPicker={triggerPicker.open}
           />
         ) : null}
         <Switch.Root
@@ -183,20 +167,7 @@ export const NegativePromptField = ({
         </Switch.Root>
       </HStack>
     ),
-    [
-      enableSwitchInputId,
-      handleEnabledChange,
-      handleOpenPromptTriggerPicker,
-      isEnabled,
-      isTemplateViewMode,
-      t,
-      triggerPickerState,
-    ]
-  );
-
-  const triggerPickerPositioning = useMemo(
-    () => ({ getAnchorRect: () => triggerPickerState?.anchorRect ?? null }),
-    [triggerPickerState]
+    [enableSwitchInputId, handleEnabledChange, isEnabled, isTemplateViewMode, t, triggerPicker]
   );
 
   const templateChunks = useMemo(
@@ -231,14 +202,14 @@ export const NegativePromptField = ({
             onResizeEnd={onResizeEnd}
           />
           {autocomplete.element}
-          {triggerPickerState ? (
+          {triggerPicker.isOpen ? (
             <PromptTriggerPopover
               loras={loras}
               open
-              positioning={triggerPickerPositioning}
+              positioning={triggerPicker.positioning}
               selectedModel={selectedModel}
-              onClose={closePromptTriggerPicker}
-              onSelect={selectPromptTrigger}
+              onClose={triggerPicker.close}
+              onSelect={triggerPicker.select}
             />
           ) : null}
         </>
