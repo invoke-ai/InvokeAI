@@ -11,6 +11,7 @@ import {
   selectIsIdeogram4,
   selectIsQwenImage,
   selectIsSD3,
+  selectIsWan,
   selectIsZImage,
   selectParamsSlice,
   selectVAEKey,
@@ -32,6 +33,7 @@ import {
 import ParamQwenImageComponentSourceSelect from 'features/parameters/components/Advanced/ParamQwenImageComponentSourceSelect';
 import ParamQwenImageQuantization from 'features/parameters/components/Advanced/ParamQwenImageQuantization';
 import ParamT5EncoderModelSelect from 'features/parameters/components/Advanced/ParamT5EncoderModelSelect';
+import ParamWanModelSelects from 'features/parameters/components/Advanced/ParamWanModelSelects';
 import ParamZImageQwen3VaeModelSelect from 'features/parameters/components/Advanced/ParamZImageQwen3VaeModelSelect';
 import ParamIdeogram4ColorPalette from 'features/parameters/components/Core/ParamIdeogram4ColorPalette';
 import ParamIdeogram4GuidanceScale from 'features/parameters/components/Core/ParamIdeogram4GuidanceScale';
@@ -67,6 +69,7 @@ export const AdvancedSettingsAccordion = memo(() => {
   const isExternal = useAppSelector(selectIsExternal);
   const isQwenImage = useAppSelector(selectIsQwenImage);
   const isAnima = useAppSelector(selectIsAnima);
+  const isWan = useAppSelector(selectIsWan);
 
   const selectBadges = useMemo(
     () =>
@@ -128,13 +131,13 @@ export const AdvancedSettingsAccordion = memo(() => {
   return (
     <StandaloneAccordion label={t('accordions.advanced.title')} badges={badges} isOpen={isOpen} onToggle={onToggle}>
       <Flex gap={4} alignItems="center" p={4} flexDir="column" data-testid="advanced-settings-accordion">
-        {!isZImage && !isAnima && !isFlux2 && !isQwenImage && !isIdeogram4 && (
+        {!isZImage && !isAnima && !isFlux2 && !isQwenImage && !isWan && !isIdeogram4 && (
           <Flex gap={4} w="full">
             {isFLUX ? <ParamFLUXVAEModelSelect /> : <ParamVAEModelSelect />}
             {!isFLUX && !isSD3 && <ParamVAEPrecision />}
           </Flex>
         )}
-        {!isFLUX && !isFlux2 && !isSD3 && !isZImage && !isQwenImage && !isAnima && !isIdeogram4 && (
+        {!isFLUX && !isFlux2 && !isSD3 && !isZImage && !isQwenImage && !isAnima && !isWan && !isIdeogram4 && (
           <>
             <FormControlGroup formLabelProps={formLabelProps}>
               <ParamClipSkip />
@@ -188,6 +191,11 @@ export const AdvancedSettingsAccordion = memo(() => {
         {isAnima && (
           <FormControlGroup>
             <ParamAnimaModelSelect />
+          </FormControlGroup>
+        )}
+        {isWan && (
+          <FormControlGroup>
+            <ParamWanModelSelects />
           </FormControlGroup>
         )}
         {isIdeogram4 && (
