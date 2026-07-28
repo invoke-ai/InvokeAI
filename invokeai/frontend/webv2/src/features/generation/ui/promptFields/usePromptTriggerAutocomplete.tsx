@@ -31,6 +31,14 @@ import { useCallback, useId, useMemo, useState } from 'react';
 interface AutocompleteState {
   caretRect: CaretRect;
   query: PromptTriggerQuery;
+  /**
+   * The field the query was read from. Held rather than looked up again at
+   * selection time: `document.activeElement` is only the textarea because the
+   * option suppressed its own mousedown, and if that ever stops holding, the
+   * insert reads `undefined` for the current value and commits the option on its
+   * own — silently replacing the whole prompt.
+   */
+  textarea: HTMLTextAreaElement;
 }
 
 export interface PromptTriggerAutocompleteApi {
@@ -90,21 +98,21 @@ export const usePromptTriggerAutocomplete = ({
       // while the name is typed instead of creeping sideways with it.
       const caretRect = query ? getTextareaCaretRect(textarea, query.range.start) : null;
 
-      setState(query && caretRect ? { caretRect, query } : null);
+      setState(query && caretRect ? { caretRect, query, textarea } : null);
       setActiveIndex(0);
     },
     [isDisabled, keys]
   );
 
   const selectOption = useCallback(
-    (option: PromptTriggerOption, textarea: HTMLTextAreaElement | null) => {
+    (option: PromptTriggerOption) => {
       if (state) {
         insertPromptText({
           onChange,
           range: state.query.range,
           text: option.value,
-          textarea,
-          value: textarea?.value ?? '',
+          textarea: state.textarea,
+          value: state.textarea.value,
         });
       }
 
@@ -147,7 +155,7 @@ export const usePromptTriggerAutocomplete = ({
 
         if (option) {
           event.preventDefault();
-          selectOption(option, event.currentTarget);
+          selectOption(option);
           return true;
         }
       }
@@ -155,14 +163,6 @@ export const usePromptTriggerAutocomplete = ({
       return false;
     },
     [activeIndex, isOpen, matches, selectOption]
-  );
-
-  // The option list has no focus of its own, so a click on it arrives as a
-  // mousedown the option itself has already suppressed; this only ever runs with
-  // the textarea's own element.
-  const handleSelect = useCallback(
-    (option: PromptTriggerOption) => selectOption(option, document.activeElement as HTMLTextAreaElement | null),
-    [selectOption]
   );
 
   return {
@@ -182,7 +182,7 @@ export const usePromptTriggerAutocomplete = ({
           listboxId={listboxId}
           optionIdPrefix={optionIdPrefix}
           options={matches}
-          onSelect={handleSelect}
+          onSelect={selectOption}
         />
       ) : null,
     handleKeyDown,

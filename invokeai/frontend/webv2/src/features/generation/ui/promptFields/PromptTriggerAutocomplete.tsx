@@ -1,5 +1,8 @@
 import type { CaretRect } from '@features/generation/ui/promptFields/promptCaret';
-import type { PromptTriggerOption } from '@features/generation/ui/promptFields/promptTriggerOptions';
+import type {
+  PromptTriggerOption,
+  PromptTriggerOptionGroup,
+} from '@features/generation/ui/promptFields/promptTriggerOptions';
 import type { MouseEvent } from 'react';
 
 import { Box, Portal, Stack, Text } from '@chakra-ui/react';
@@ -42,7 +45,24 @@ export const PromptTriggerAutocomplete = ({
   onSelect: (option: PromptTriggerOption) => void;
 }) => {
   const listRef = useRef<HTMLDivElement | null>(null);
-  const groups = useMemo(() => groupPromptTriggerOptions(options), [options]);
+  // Each group carries where it starts in the flat list. The hook selects with
+  // `options[activeIndex]`, so the ids have to be numbered the same way — and
+  // counting them up as the rows render, which is what this replaced, only
+  // agreed with that while grouping happened to be an order-preserving no-op.
+  const groups = useMemo(
+    () =>
+      groupPromptTriggerOptions(options).reduce<(PromptTriggerOptionGroup & { startIndex: number })[]>(
+        (numbered, group) => {
+          const previous = numbered[numbered.length - 1];
+
+          numbered.push({ ...group, startIndex: previous ? previous.startIndex + previous.options.length : 0 });
+
+          return numbered;
+        },
+        []
+      ),
+    [options]
+  );
 
   // Below the caret when there is room, above it when there is not, and never
   // off the right edge of a narrow window.
@@ -62,8 +82,6 @@ export const PromptTriggerAutocomplete = ({
       ?.querySelector(`#${CSS.escape(`${optionIdPrefix}${activeIndex}`)}`)
       ?.scrollIntoView({ block: 'nearest' });
   }, [activeIndex, optionIdPrefix]);
-
-  let renderedIndex = -1;
 
   return (
     <Portal>
@@ -91,14 +109,14 @@ export const PromptTriggerAutocomplete = ({
               <Text color="fg.subtle" fontSize="2xs" fontWeight="700" px="2" textTransform="uppercase" truncate>
                 {group.group}
               </Text>
-              {group.options.map((option) => {
-                renderedIndex++;
+              {group.options.map((option, position) => {
+                const index = group.startIndex + position;
 
                 return (
                   <AutocompleteOption
                     key={`${option.group}-${option.value}`}
-                    id={`${optionIdPrefix}${renderedIndex}`}
-                    isActive={renderedIndex === activeIndex}
+                    id={`${optionIdPrefix}${index}`}
+                    isActive={index === activeIndex}
                     option={option}
                     onSelect={onSelect}
                   />
@@ -124,9 +142,14 @@ const AutocompleteOption = ({
   onSelect: (option: PromptTriggerOption) => void;
 }) => {
   // On mousedown, not click, and with the default prevented: letting the press
-  // blur the textarea would close the list out from under the pointer.
+  // blur the textarea would close the list out from under the pointer. Primary
+  // button only — a right-click is after the context menu, not an insertion.
   const handleMouseDown = useCallback(
     (event: MouseEvent<HTMLDivElement>) => {
+      if (event.button !== 0) {
+        return;
+      }
+
       event.preventDefault();
       onSelect(option);
     },

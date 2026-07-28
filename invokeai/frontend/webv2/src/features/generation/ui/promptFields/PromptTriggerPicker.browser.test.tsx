@@ -228,6 +228,39 @@ describe('the caret autocomplete', () => {
     expect(textarea().value).toBe('a photo of __moods__');
   });
 
+  const mouseDownOnFirstOption = (button: number) => {
+    const option = listbox()!.querySelector('[role="option"]')!;
+
+    return act(() => {
+      option.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button, cancelable: true }));
+    });
+  };
+
+  it('inserts the option the pointer pressed', async () => {
+    await type('a photo of __');
+    await mouseDownOnFirstOption(0);
+
+    expect(textarea().value).toBe('a photo of __colors__');
+  });
+
+  // The press has to insert from the field the query was read from. Reading it
+  // back off the document instead meant a non-textarea gave `undefined` for the
+  // current value, and the insert committed the option over the whole prompt.
+  it('keeps the rest of the prompt when the pointer selects', async () => {
+    await type('a photo of __co');
+    textarea().blur();
+    await mouseDownOnFirstOption(0);
+
+    expect(textarea().value).toBe('a photo of __colors__');
+  });
+
+  it('ignores a right-click on an option', async () => {
+    await type('a photo of __');
+    await mouseDownOnFirstOption(2);
+
+    expect(textarea().value).toBe('a photo of __');
+  });
+
   it('closes on Escape and leaves the prompt exactly as typed', async () => {
     await type('a photo of __');
     await press('{Escape}');
