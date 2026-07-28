@@ -23,6 +23,12 @@ WILDCARD_NAME_RE = re.compile(rf"^{_WILDCARD_NAME_SEGMENT}(?:/{_WILDCARD_NAME_SE
 
 MAX_WILDCARD_NAME_LENGTH = 128
 
+# The values list is the only unbounded per-user write surface here, and it is stored as one JSON
+# blob. These bounds are generous for the intended use (a list you would plausibly type or paste)
+# and are about storage rather than expansion cost, which stays cheap either way.
+MAX_WILDCARD_VALUES = 10_000
+MAX_WILDCARD_VALUE_LENGTH = 2_000
+
 
 def validate_wildcard_name(name: str) -> str:
     """Normalizes and validates a wildcard name, or raises ValueError."""
@@ -42,8 +48,18 @@ def validate_wildcard_name(name: str) -> str:
 
 
 def _clean_values(values: list[str]) -> list[str]:
-    """Drops blank entries and surrounding whitespace; a wildcard of empty strings expands to nothing."""
-    return [stripped for stripped in (value.strip() for value in values) if stripped]
+    """Drops blank entries and surrounding whitespace, or raises ValueError if the list is oversized.
+
+    A wildcard of empty strings expands to nothing, so blanks are dropped rather than rejected.
+    """
+    cleaned = [stripped for stripped in (value.strip() for value in values) if stripped]
+
+    if len(cleaned) > MAX_WILDCARD_VALUES:
+        raise ValueError(f"A wildcard may have at most {MAX_WILDCARD_VALUES} values")
+    if any(len(value) > MAX_WILDCARD_VALUE_LENGTH for value in cleaned):
+        raise ValueError(f"Each wildcard value must be at most {MAX_WILDCARD_VALUE_LENGTH} characters")
+
+    return cleaned
 
 
 class WildcardWithoutId(BaseModel):

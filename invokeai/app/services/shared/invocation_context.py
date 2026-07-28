@@ -780,7 +780,6 @@ class InvocationContext:
         """Methods to interact with boards."""
         self.wildcards = wildcards
         """Access to the queueing user's wildcards."""
-        """Methods to interact with boards."""
         self._data = data
         """An internal API providing access to data about the current queue item and invocation. You probably shouldn't use this. It may change without warning."""
         self._services = services

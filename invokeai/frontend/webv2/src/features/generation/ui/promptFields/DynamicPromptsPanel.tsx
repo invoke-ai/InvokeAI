@@ -84,7 +84,6 @@ export const DynamicPromptsPanel = ({
     [t]
   );
   const mode = config.combinatorial ? 'all' : 'random';
-  const modeValue = useMemo(() => [mode], [mode]);
   const modeLabel = modeItems.find((item) => item.value === mode)?.label ?? '';
   const maxPromptsLabel = config.combinatorial
     ? t('widgets.generate.dynamicPrompts.maxPrompts')
@@ -139,7 +138,7 @@ export const DynamicPromptsPanel = ({
             <Portal>
               <Menu.Positioner>
                 <MenuContent minW="10rem" py="1">
-                  <Menu.RadioItemGroup value={modeValue[0]} onValueChange={handleModeChange}>
+                  <Menu.RadioItemGroup value={mode} onValueChange={handleModeChange}>
                     {modeItems.map((item) => (
                       <Menu.RadioItem key={item.value} value={item.value}>
                         <Menu.ItemText>{item.label}</Menu.ItemText>

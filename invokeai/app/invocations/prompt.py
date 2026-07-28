@@ -16,7 +16,9 @@ from invokeai.app.util.dynamicprompts import expand_dynamic_prompt
     title="Dynamic Prompt",
     tags=["prompt", "collection"],
     category="prompt",
-    version="1.0.1",
+    # 1.1.0: wildcards now resolve against the queueing user's records, and an
+    # unresolvable one fails the invocation instead of silently repeating a prompt.
+    version="1.1.0",
     use_cache=False,
 )
 class DynamicPromptInvocation(BaseInvocation):
