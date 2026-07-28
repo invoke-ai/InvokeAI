@@ -17,7 +17,7 @@ import type { GenerateLora, GenerateModelConfig } from '@features/generation/cor
 import type { CaretRect } from '@features/generation/ui/promptFields/promptCaret';
 import type { PromptTriggerKey, PromptTriggerQuery } from '@features/generation/ui/promptFields/promptFocus';
 import type { PromptTriggerOption } from '@features/generation/ui/promptFields/promptTriggerOptions';
-import type { KeyboardEvent, ReactNode } from 'react';
+import type { CompositionEvent, KeyboardEvent, ReactNode } from 'react';
 
 import { getTextareaCaretRect } from '@features/generation/ui/promptFields/promptCaret';
 import { getActiveTriggerQuery, insertPromptText } from '@features/generation/ui/promptFields/promptFocus';
@@ -26,7 +26,7 @@ import {
   getInlineTriggerOptions,
   usePromptTriggerOptions,
 } from '@features/generation/ui/promptFields/promptTriggerOptions';
-import { useCallback, useId, useMemo, useState } from 'react';
+import { useCallback, useId, useMemo, useRef, useState } from 'react';
 
 interface AutocompleteState {
   caretRect: CaretRect;
@@ -42,13 +42,19 @@ interface AutocompleteState {
 }
 
 export interface PromptTriggerAutocompleteApi {
-  /** Spread onto the textarea so assistive tech sees a combobox. */
+  /**
+   * Spread onto the textarea so assistive tech sees a combobox, and so the list
+   * stays out of the way while an IME is composing.
+   */
   comboboxProps: {
     'aria-activedescendant': string | undefined;
     'aria-autocomplete': 'list';
     'aria-controls': string | undefined;
     'aria-expanded': boolean;
+    'aria-multiline': true;
     role: 'combobox';
+    onCompositionEnd: (event: CompositionEvent<HTMLTextAreaElement>) => void;
+    onCompositionStart: () => void;
   };
   element: ReactNode;
   isOpen: boolean;
@@ -77,6 +83,7 @@ export const usePromptTriggerAutocomplete = ({
   const optionIdPrefix = `${listboxId}-option-`;
   const [state, setState] = useState<AutocompleteState | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  const isComposingRef = useRef(false);
   const options = usePromptTriggerOptions(loras, selectedModel);
 
   const matches = useMemo(
@@ -88,7 +95,10 @@ export const usePromptTriggerAutocomplete = ({
 
   const refresh = useCallback(
     (textarea: HTMLTextAreaElement | null) => {
-      if (!textarea || isDisabled) {
+      // Mid-composition the field holds half-committed romaji, which is not a
+      // wildcard name being typed. Reading it would re-anchor the list on every
+      // keystroke the IME is still working on.
+      if (!textarea || isDisabled || isComposingRef.current) {
         setState(null);
         return;
       }
@@ -123,7 +133,11 @@ export const usePromptTriggerAutocomplete = ({
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLTextAreaElement>): boolean => {
-      if (!isOpen) {
+      // While an IME is composing, the arrows move through its candidate window
+      // and Enter commits the composition. Taking either would leave a Japanese
+      // or Chinese user unable to pick a candidate at all. `keyCode === 229` is
+      // the same signal for the browsers that do not set `isComposing`.
+      if (!isOpen || event.nativeEvent.isComposing || event.keyCode === 229) {
         return false;
       }
 
@@ -165,6 +179,21 @@ export const usePromptTriggerAutocomplete = ({
     [activeIndex, isOpen, matches, selectOption]
   );
 
+  const handleCompositionStart = useCallback(() => {
+    isComposingRef.current = true;
+    setState(null);
+  }, []);
+
+  const handleCompositionEnd = useCallback(
+    (event: CompositionEvent<HTMLTextAreaElement>) => {
+      isComposingRef.current = false;
+      // The composed text is only in the field now, so this is the first point
+      // at which a trigger under the caret is worth reading again.
+      refresh(event.currentTarget);
+    },
+    [refresh]
+  );
+
   return {
     close,
     comboboxProps: {
@@ -172,6 +201,12 @@ export const usePromptTriggerAutocomplete = ({
       'aria-autocomplete': 'list',
       'aria-controls': isOpen ? listboxId : undefined,
       'aria-expanded': isOpen,
+      // `combobox` overrides the textarea's implicit `textbox` role, which is
+      // what carries multiline-ness; without this a tall prompt box announces
+      // as a single-line field.
+      'aria-multiline': true,
+      onCompositionEnd: handleCompositionEnd,
+      onCompositionStart: handleCompositionStart,
       role: 'combobox',
     },
     element:

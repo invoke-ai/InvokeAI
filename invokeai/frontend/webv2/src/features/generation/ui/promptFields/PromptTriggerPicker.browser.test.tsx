@@ -261,6 +261,53 @@ describe('the caret autocomplete', () => {
     expect(textarea().value).toBe('a photo of __');
   });
 
+  // An IME sends every key through `keydown` while composing. Taking ArrowDown
+  // and Enter for the list leaves the candidate window unusable, so a Japanese
+  // or Chinese user cannot commit a word at all.
+  describe('while an IME is composing', () => {
+    const compose = (type: 'compositionend' | 'compositionstart') =>
+      act(() => {
+        textarea().dispatchEvent(new CompositionEvent(type, { bubbles: true, data: 'ねこ' }));
+      });
+
+    const pressWhileComposing = (key: string) =>
+      act(() => {
+        textarea().dispatchEvent(
+          new KeyboardEvent('keydown', { bubbles: true, cancelable: true, isComposing: true, key })
+        );
+      });
+
+    it('leaves Enter to the composition instead of inserting', async () => {
+      await type('a photo of __');
+      await compose('compositionstart');
+      await pressWhileComposing('Enter');
+
+      expect(textarea().value).toBe('a photo of __');
+    });
+
+    it('leaves the arrow keys to the candidate window', async () => {
+      await type('a photo of __');
+      await compose('compositionstart');
+      await pressWhileComposing('ArrowDown');
+      await compose('compositionend');
+      await press('{Enter}');
+
+      // Still the first option: the arrow moved an IME candidate, not this list.
+      expect(textarea().value).toBe('a photo of __colors__');
+    });
+
+    it('reopens against the committed text once composition ends', async () => {
+      await type('a photo of __');
+      await compose('compositionstart');
+
+      expect(listbox()).toBeNull();
+
+      await compose('compositionend');
+
+      expect(optionLabels()).toEqual(['colors', 'moods']);
+    });
+  });
+
   it('closes on Escape and leaves the prompt exactly as typed', async () => {
     await type('a photo of __');
     await press('{Escape}');
