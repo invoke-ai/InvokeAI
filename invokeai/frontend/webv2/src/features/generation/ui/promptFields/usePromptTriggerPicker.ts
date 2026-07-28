@@ -12,7 +12,7 @@
 
 import type { PromptTextRange } from '@features/generation/ui/promptFields/promptFocus';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 interface AnchorRect {
   height: number;
@@ -54,6 +54,25 @@ export const usePromptTriggerPicker = ({
   );
 
   const positioning = useMemo(() => ({ getAnchorRect: () => anchorRect }), [anchorRect]);
+
+  // `getAnchorRect` hands back the rect read when the button was pressed, so the
+  // usual re-measuring the popover would do on its own finds the same answer
+  // every time. Scroll the panel and it stays where the button used to be.
+  useEffect(() => {
+    if (anchorRect === null) {
+      return;
+    }
+
+    const dismiss = () => setAnchorRect(null);
+
+    window.addEventListener('scroll', dismiss, { capture: true, passive: true });
+    window.addEventListener('resize', dismiss, { passive: true });
+
+    return () => {
+      window.removeEventListener('scroll', dismiss, { capture: true });
+      window.removeEventListener('resize', dismiss);
+    };
+  }, [anchorRect]);
 
   return { close, isOpen: anchorRect !== null, open, positioning, select };
 };

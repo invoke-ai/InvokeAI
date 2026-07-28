@@ -67,7 +67,14 @@ export const PromptTriggerAutocomplete = ({
   // Below the caret when there is room, above it when there is not, and never
   // off the right edge of a narrow window.
   const spaceBelow = window.innerHeight - (caretRect.y + caretRect.height);
-  const height = Math.min(MAX_LIST_HEIGHT_PX, Math.max(spaceBelow, caretRect.y) - VIEWPORT_MARGIN_PX - CARET_GAP_PX);
+  // Clamped: in a short viewport with the caret near the top there is room on
+  // neither side, and the subtraction went negative — `maxH="-2px"` is dropped
+  // by the browser, so the list sprang to full height and was then positioned
+  // from that negative number.
+  const height = Math.max(
+    0,
+    Math.min(MAX_LIST_HEIGHT_PX, Math.max(spaceBelow, caretRect.y) - VIEWPORT_MARGIN_PX - CARET_GAP_PX)
+  );
   const opensBelow = spaceBelow >= height + CARET_GAP_PX + VIEWPORT_MARGIN_PX;
   const left = Math.max(
     VIEWPORT_MARGIN_PX,

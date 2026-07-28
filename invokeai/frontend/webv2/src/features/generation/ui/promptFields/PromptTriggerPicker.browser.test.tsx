@@ -332,6 +332,34 @@ describe('the caret autocomplete', () => {
     });
   });
 
+  // The list is placed once from a viewport rect and never re-measured, and the
+  // textarea keeps focus throughout — so without this it stayed welded to where
+  // the caret used to be while the prompt scrolled away underneath it.
+  it('closes when something scrolls under it', async () => {
+    await type('a photo of __');
+
+    expect(listbox()).not.toBeNull();
+
+    await act(() => {
+      // Capture-phase, so an element scroll reaches it even though it does not
+      // bubble.
+      textarea().dispatchEvent(new Event('scroll'));
+    });
+
+    expect(listbox()).toBeNull();
+    expect(textarea().value).toBe('a photo of __');
+  });
+
+  it('closes when the window is resized', async () => {
+    await type('a photo of __');
+
+    await act(() => {
+      window.dispatchEvent(new Event('resize'));
+    });
+
+    expect(listbox()).toBeNull();
+  });
+
   it('closes on Escape and leaves the prompt exactly as typed', async () => {
     await type('a photo of __');
     await press('{Escape}');
