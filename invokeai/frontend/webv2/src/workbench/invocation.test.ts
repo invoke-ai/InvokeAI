@@ -447,25 +447,54 @@ describe('submitResolvedInvocation', () => {
     expect(submitResolved.mock.calls[0]?.[0]).toMatchObject({ positivePrompts: undefined });
   });
 
-  it('falls back to the literal prompt when expansion fails', async () => {
-    parseDynamicPromptsMock.mockRejectedValueOnce(new Error('offline'));
+  // Submitting the authored text on a failed expansion would put the literal
+  // `{a|b}` or `__name__` in front of the model, so neither failure generates.
+  describe('when a prompt cannot be expanded', () => {
+    const submitDynamicPrompt = () => {
+      const project = getActiveProject(createGenerateValues(animaModel, { positivePrompt: 'a {red|green} cat' }));
+      const store = createWorkbenchStore();
+      const submitResolved = vi.spyOn(store.commands.generation, 'submitResolved');
+      const route = routeFor(project, { ...project.invocation, destination: 'gallery', sourceId: 'generate' });
 
-    const project = getActiveProject(createGenerateValues(animaModel, { positivePrompt: 'a {red|green} cat' }));
-    const commands = createWorkbenchStore().commands;
-    const submitResolved = vi.spyOn(commands.generation, 'submitResolved');
-    const route = routeFor(project, { ...project.invocation, destination: 'gallery', sourceId: 'generate' });
+      submitResolvedInvocation({
+        commands: store.commands,
+        models: undefined,
+        owner: captureAccountScope(),
+        prepareCanvasInvocation: vi.fn(),
+        project,
+        route,
+      });
 
-    submitResolvedInvocation({
-      commands,
-      models: undefined,
-      owner: captureAccountScope(),
-      prepareCanvasInvocation: vi.fn(),
-      project,
-      route,
+      return { store, submitResolved };
+    };
+
+    it('does not dispatch when the request fails outright', async () => {
+      parseDynamicPromptsMock.mockRejectedValueOnce(new Error('offline'));
+
+      const { store, submitResolved } = submitDynamicPrompt();
+
+      await vi.waitFor(() => expect(store.getSnapshot().notifications).toHaveLength(1));
+      expect(submitResolved).not.toHaveBeenCalled();
+      expect(store.getSnapshot().notifications[0]).toMatchObject({
+        kind: 'error',
+        title: 'The prompt could not be expanded',
+      });
     });
 
-    await vi.waitFor(() => expect(submitResolved).toHaveBeenCalledTimes(1));
-    expect(submitResolved.mock.calls[0]?.[0]).toMatchObject({ positivePrompts: undefined });
+    it('does not dispatch when the backend reports an unresolvable wildcard', async () => {
+      // The route is deliberately soft: it answers 200 with the literal prompt
+      // alongside the message, so only `error` distinguishes this from success.
+      parseDynamicPromptsMock.mockResolvedValueOnce({
+        error: 'No values found for wildcard(s): nope',
+        prompts: ['a {red|green} cat'],
+      });
+
+      const { store, submitResolved } = submitDynamicPrompt();
+
+      await vi.waitFor(() => expect(store.getSnapshot().notifications).toHaveLength(1));
+      expect(submitResolved).not.toHaveBeenCalled();
+      expect(store.getSnapshot().notifications[0]?.message).toBe('No values found for wildcard(s): nope');
+    });
   });
 
   it('quietly ignores a submission owned by an expired account scope', () => {

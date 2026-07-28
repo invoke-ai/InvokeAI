@@ -14,6 +14,7 @@
  */
 
 import type { GenerateSettings } from '@features/generation/contracts';
+import type { ParseDynamicPromptsResponse } from '@features/generation/prompts';
 import type { ModelConfig } from '@features/models';
 import type { AccountScope } from '@platform/state/accountLifecycle';
 import type { ResolvedInvocationRoute } from '@workbench/invocationContracts';
@@ -30,6 +31,9 @@ import type { WorkbenchCommands } from './workbenchStore';
 import { readCanvasCompositingSettings } from './widgets/canvas/invoke/canvasCompositing';
 import { readCanvasDenoisingStrength } from './widgets/canvas/invoke/canvasStrength';
 import { getProjectWidgetValues } from './widgetState';
+
+/** Plain English, like the shell's other notices — this module has no i18n context. */
+const EXPANSION_FAILED_TITLE = 'The prompt could not be expanded';
 
 export interface SubmitResolvedInvocationDeps {
   /** The resolved route to submit — the caller has already checked it is valid. */
@@ -69,21 +73,22 @@ const getExpandableSettings = (project: Project, route: ResolvedInvocationRoute)
  * Resolving the expansion here rather than inside Queue keeps Queue free of a
  * Generation import, which would close a `gallery -> queue -> generation`
  * dependency cycle. Reading the shared cache means invoking mid-edit still
- * submits the prompts the backend actually produces. A failed expansion falls
- * back to the literal prompt so an Invoke is never silently swallowed.
+ * submits the prompts the backend actually produces.
+ *
+ * `null` means the request itself failed. A response may still carry an `error`
+ * alongside a usable-looking `prompts` — the route is deliberately soft so the
+ * preview can show the message, but the submit path must not act on it.
  */
-const resolveExpandedPrompts = async (settings: GenerateSettings): Promise<string[] | undefined> => {
+const resolveExpandedPrompts = async (settings: GenerateSettings): Promise<ParseDynamicPromptsResponse | null> => {
   try {
-    const { prompts } = await resolveDynamicPrompts(queryClient, {
+    return await resolveDynamicPrompts(queryClient, {
       combinatorial: settings.dynamicPromptsCombinatorial,
       max_prompts: settings.dynamicPromptsMaxPrompts,
       prompt: settings.positivePrompt,
       seed: settings.dynamicPromptsCombinatorial ? null : settings.dynamicPromptsSampleSeed,
     });
-
-    return prompts.length > 0 ? prompts : undefined;
   } catch {
-    return undefined;
+    return null;
   }
 };
 
@@ -105,13 +110,28 @@ export const submitResolvedInvocation = ({
   // Only a prompt with dynamic syntax pays for a round trip; every other Invoke
   // stays on the synchronous path it has always taken.
   if (expandableSettings) {
-    void resolveExpandedPrompts(expandableSettings).then((positivePrompts) => {
-      if (isAccountScopeCurrent(owner)) {
-        dispatchResolvedInvocation(
-          { commands, formatControlLayerError, models, owner, prepareCanvasInvocation, project, route },
-          positivePrompts
-        );
+    void resolveExpandedPrompts(expandableSettings).then((expansion) => {
+      if (!isAccountScopeCurrent(owner)) {
+        return;
       }
+
+      // Submitting the authored text would put the literal `{a|b}` or `__name__`
+      // in front of the model, so a prompt that could not be expanded does not
+      // generate at all. The Invoke button gates on the same state; this covers
+      // the hotkey and graph-preview paths, which never see it.
+      if (expansion === null || expansion.error) {
+        commands.notifications.add({
+          kind: 'error',
+          message: expansion?.error ?? undefined,
+          title: EXPANSION_FAILED_TITLE,
+        });
+        return;
+      }
+
+      dispatchResolvedInvocation(
+        { commands, formatControlLayerError, models, owner, prepareCanvasInvocation, project, route },
+        expansion.prompts.length > 0 ? expansion.prompts : undefined
+      );
     });
     return;
   }

@@ -150,15 +150,21 @@ export const InvokeControl = () => {
       ? sanitizeDynamicPromptsConfig(readDynamicPromptsConfig(routeInput.generateValues))
       : null
   );
+  // A prompt that will not expand cannot be submitted — the alternative is putting
+  // the literal `{a|b}` in front of the model — so this blocks rather than just
+  // annotating. `submitResolvedInvocation` enforces the same rule for the hotkey.
+  const expansionReason = promptExpansion.isError
+    ? 'The prompt could not be expanded.'
+    : (promptExpansion.error ?? null);
   const blockingReasons = useMemo(
     () => [
       ...(isConnected ? [] : ['The backend is disconnected.']),
-      ...(promptExpansion.isError ? ['The prompt could not be expanded.'] : []),
+      ...(expansionReason === null ? [] : [expansionReason]),
       ...resolvedRoute.validationReasons,
     ],
-    [isConnected, promptExpansion.isError, resolvedRoute.validationReasons]
+    [expansionReason, isConnected, resolvedRoute.validationReasons]
   );
-  const isValid = isInvocationRouteValid(resolvedRoute) && isConnected;
+  const isValid = isInvocationRouteValid(resolvedRoute) && isConnected && expansionReason === null;
   const routeLabel = isValid ? formatRoute(resolvedRoute) : (blockingReasons[0] ?? formatRoute(resolvedRoute));
   useMountEffect(() => {
     void ensureModelsLoaded();
