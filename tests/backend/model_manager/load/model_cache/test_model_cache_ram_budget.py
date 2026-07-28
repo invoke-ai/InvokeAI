@@ -6,10 +6,13 @@ case where a cache cannot free RAM because another device still holds the model.
 """
 
 import logging
+import threading
+import time
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+from invokeai.backend.model_manager.load.model_cache import model_cache as model_cache_module
 from invokeai.backend.model_manager.load.model_cache.cache_stats import CacheStats
 from invokeai.backend.model_manager.load.model_cache.model_cache import (
     GB,
@@ -45,6 +48,26 @@ def _make_cache(store, budget, logger, keep_ram_copy=True) -> ModelCache:
         shared_cpu_weights=store,
         ram_budget=budget,
     )
+
+
+def _use_and_release(cache: ModelCache, key: str):
+    """Mirror a production load-use cycle: retrieve, lock for inference (CPU execution, so no
+    VRAM move), unlock. The lock() ends the post-admission grace, leaving the entry an evictable
+    idle resident."""
+    record = cache.get(key)
+    cache.lock(record, None)
+    cache.unlock(record)
+    return record
+
+
+def _wait_until(predicate, timeout: float = 10.0) -> bool:
+    """Poll until predicate() is true — budget reconciles may run on a background thread."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if predicate():
+            return True
+        time.sleep(0.01)
+    return predicate()
 
 
 def test_shared_model_counts_once_in_global_budget(mock_logger):
@@ -209,10 +232,10 @@ def test_eviction_coordinates_across_device_caches(mock_logger):
     try:
         cache_a.put("shared", DummyModule())
         cache_b.put("shared", DummyModule())  # both devices hold "shared" (refcount 2, counted once)
-        # Production loaders retrieve every model immediately after put() (load_default.py); the
-        # get() clears the post-admission grace, leaving the entries as evictable idle residents.
-        cache_a.get("shared")
-        cache_b.get("shared")
+        # Mirror production: each model is retrieved and locked for use, then released — the
+        # lock() clears the post-admission grace, leaving the entries as evictable idle residents.
+        _use_and_release(cache_a, "shared")
+        _use_and_release(cache_b, "shared")
         assert budget.total_in_use() == S
 
         cache_a.put("new", DummyModule())  # triggers make_room; "shared" is a's only droppable entry
@@ -245,10 +268,10 @@ def test_contended_peer_reconciles_budget_after_its_operation_completes(mock_log
     try:
         cache_a.put("shared", DummyModule())
         cache_b.put("shared", DummyModule())
-        # Mirror production: the loader's get() right after put() clears the post-admission
-        # grace, leaving b's entry an evictable idle resident.
-        cache_a.get("shared")
-        cache_b.get("shared")
+        # Mirror production: each model is used and released — the lock() clears the
+        # post-admission grace, leaving b's entry an evictable idle resident.
+        _use_and_release(cache_a, "shared")
+        _use_and_release(cache_b, "shared")
         assert budget.total_in_use() == S
 
         # Simulate b being mid-operation on another thread: its lock is contended when a's
@@ -305,10 +328,10 @@ def test_reconcile_request_after_peer_finished_operation_is_not_lost(mock_logger
     try:
         cache_a.put("shared", DummyModule())
         cache_b.put("shared", DummyModule())
-        # Mirror production: the loader's get() right after put() clears the post-admission
-        # grace, leaving b's entry an evictable idle resident.
-        cache_a.get("shared")
-        cache_b.get("shared")
+        # Mirror production: each model is used and released — the lock() clears the
+        # post-admission grace, leaving b's entry an evictable idle resident.
+        _use_and_release(cache_a, "shared")
+        _use_and_release(cache_b, "shared")
         assert budget.total_in_use() == S
 
         holding = threading.Event()
@@ -382,9 +405,10 @@ def test_manual_release_in_cached_model_keys_honors_pending_reconcile(mock_logge
     budget-reconcile request just like the synchronized-decorator hook does. Otherwise a request
     arriving while it holds the lock is stranded: the requester's inline attempt fails on the
     contended lock, the manual release runs no hook, and an idle cache leaves the budget exceeded
-    indefinitely (JPPhoto review, 2026-07-27)."""
-    import threading
-
+    indefinitely (JPPhoto review, 2026-07-27). The release hands the work to a background
+    reconcile thread (it must not stall this method — see
+    test_cached_model_keys_returns_without_waiting_for_reconcile_work), so the outcome is
+    awaited with a deadline."""
     store = SharedCpuWeightsStore()
     budget = RamBudget(max_bytes=int(S * 1.4), shared_store=store)
     cache_a = _make_cache(store, budget, mock_logger)
@@ -392,8 +416,8 @@ def test_manual_release_in_cached_model_keys_honors_pending_reconcile(mock_logge
     try:
         cache_a.put("shared", DummyModule())
         cache_b.put("shared", DummyModule())
-        cache_a.get("shared")
-        cache_b.get("shared")
+        _use_and_release(cache_a, "shared")
+        _use_and_release(cache_b, "shared")
 
         inside = threading.Event()
         proceed = threading.Event()
@@ -427,8 +451,9 @@ def test_manual_release_in_cached_model_keys_honors_pending_reconcile(mock_logge
         holder.join(timeout=10)
         assert not holder.is_alive()
 
-        # cached_model_keys' release processed the pending request — no other access needed.
-        assert "shared" not in cache_b._cached_models
+        # cached_model_keys' release handed the pending request to a background reconcile
+        # thread — no other cache access needed, only time.
+        assert _wait_until(lambda: "shared" not in cache_b._cached_models)
         assert store.refcount("shared") == 0
         assert budget.total_in_use() == S
         assert budget.total_in_use() <= budget.max_bytes
@@ -441,8 +466,6 @@ def test_manual_release_in_evict_unlocked_for_peer_honors_pending_reconcile(mock
     """evict_unlocked_for_peer() also manages the cache lock manually; a reconcile request that
     arrives while it holds the lock must be processed when it releases, since the requester's
     inline attempt failed on the contended lock (JPPhoto review, 2026-07-27)."""
-    import threading
-
     store = SharedCpuWeightsStore()
     budget = RamBudget(max_bytes=int(S * 1.4), shared_store=store)
     cache_a = _make_cache(store, budget, mock_logger)
@@ -450,8 +473,8 @@ def test_manual_release_in_evict_unlocked_for_peer_honors_pending_reconcile(mock
     try:
         cache_a.put("shared", DummyModule())
         cache_b.put("shared", DummyModule())
-        cache_a.get("shared")
-        cache_b.get("shared")
+        _use_and_release(cache_a, "shared")
+        _use_and_release(cache_b, "shared")
 
         inside = threading.Event()
         proceed = threading.Event()
@@ -493,14 +516,12 @@ def test_reconcile_clear_does_not_wipe_concurrent_request(mock_logger):
     clear lands, then its own inline attempt observes the just-wiped flag and returns. The
     reconciler must detect the wiped request — the budget is negative again after its clear —
     restore the flag, and keep reconciling (JPPhoto review, 2026-07-27)."""
-    import threading
-
     store = SharedCpuWeightsStore()
     budget = RamBudget(max_bytes=int(S * 1.4), shared_store=store)
     cache_b = _make_cache(store, budget, mock_logger)
     try:
         cache_b.put("evictable", DummyModule())
-        cache_b.get("evictable")
+        _use_and_release(cache_b, "evictable")
         assert budget.total_in_use() == S  # under the 1.4*S cap
 
         fired = [False]
@@ -535,16 +556,14 @@ def test_reconcile_post_eviction_clear_does_not_wipe_concurrent_request(mock_log
     """The same set-versus-clear race, entered through the eviction path: the reconciler
     satisfies the budget by evicting and then retires the flag, colliding with a concurrent
     admission's freshly set request (JPPhoto review, 2026-07-27)."""
-    import threading
-
     store = SharedCpuWeightsStore()
     budget = RamBudget(max_bytes=int(S * 2.5), shared_store=store)
     cache_b = _make_cache(store, budget, mock_logger)
     try:
         cache_b.put("evictable_1", DummyModule())
-        cache_b.get("evictable_1")
+        _use_and_release(cache_b, "evictable_1")
         cache_b.put("evictable_2", DummyModule())
-        cache_b.get("evictable_2")
+        _use_and_release(cache_b, "evictable_2")
         assert budget.total_in_use() == 2 * S
 
         fired = [False]
@@ -609,7 +628,7 @@ def test_pending_reconcile_cannot_evict_just_admitted_model_before_first_use(moc
     must never evict the model that was just admitted: the loader retrieves it via get()
     immediately after put() returns (load_default.py), and evicting it first would break the
     in-flight load with an IndexError. The post-admission grace (CacheRecord.awaiting_first_use)
-    shields it until its first retrieval."""
+    shields it until it is locked for use."""
     store = SharedCpuWeightsStore()
     budget = RamBudget(max_bytes=int(S * 1.4), shared_store=store)
     cache_a = _make_cache(store, budget, mock_logger)
@@ -633,3 +652,129 @@ def test_pending_reconcile_cannot_evict_just_admitted_model_before_first_use(moc
         assert "locked_model" in cache_a._cached_models
     finally:
         cache_a.shutdown()
+
+
+def test_pending_reconcile_cannot_evict_model_between_get_and_lock(mock_logger):
+    """The admission grace must survive get(): get() is synchronized, so its own lock-release
+    hook can run a pending reconcile before returning to the caller — if the grace ended inside
+    get(), the hook would evict the very record the call just selected, detaching a live model
+    from the cache and its RAM accounting and forcing a reload on the next request. The record
+    must stay cached from put() through get() and the subsequent lock() (JPPhoto review,
+    2026-07-27)."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=int(S * 1.4), shared_store=store)
+    cache_a = _make_cache(store, budget, mock_logger)
+    try:
+        cache_a.put("locked_model", DummyModule())
+        record = cache_a.get("locked_model")
+        cache_a.lock(record, None)
+
+        # A peer's reconcile request stays pending throughout the load (the locked model keeps
+        # the budget exceeded, so no hook can retire it).
+        cache_a._budget_reconcile_pending.set()
+
+        cache_a.put("new", DummyModule())  # budget exceeded; "new" is the only unlocked entry
+        new_record = cache_a.get("new")
+        # get()'s own release hook ran the pending reconcile — it must not have evicted the
+        # record it just returned.
+        assert "new" in cache_a._cached_models
+        cache_a.lock(new_record, None)
+        assert "new" in cache_a._cached_models  # still cached once locked for inference
+        cache_a.unlock(new_record)
+        # After use the grace is gone: the still-pending request may now evict it normally.
+        assert "new" not in cache_a._cached_models
+    finally:
+        cache_a.shutdown()
+
+
+def test_prefetched_record_without_get_is_evictable_by_reconcile(mock_logger):
+    """StableDiffusionLoader._load_from_singlefile() proactively put()s the pipeline submodels
+    it was not asked for; nothing ever get()s or lock()s them. Such prefetch admissions must not
+    receive the post-admission grace: with it, budget reconciles would skip the records
+    indefinitely and an idle cache could keep the shared budget exceeded forever (JPPhoto
+    review, 2026-07-27)."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=int(S * 1.4), shared_store=store)
+    cache_b = _make_cache(store, budget, mock_logger)
+    try:
+        # A put()-only preload, exactly as the single-file pipeline loader admits the submodels
+        # that were not requested.
+        cache_b.put("prefetched_submodel", DummyModule(), prefetch=True)
+        assert budget.total_in_use() == S
+
+        # A peer's admission overshoots the budget and requests a reconcile here.
+        budget.add_non_shared(S)
+        cache_b.request_budget_reconcile()
+
+        assert "prefetched_submodel" not in cache_b._cached_models
+        assert store.refcount("prefetched_submodel") == 0
+        assert budget.total_in_use() <= budget.max_bytes
+    finally:
+        cache_b.shutdown()
+
+
+def test_next_admission_sweeps_stale_grace_from_prior_load(mock_logger):
+    """A graced record whose loader never came back for it (the load errored between put() and
+    get(), or the LoadedModel was dropped before lock()) must not keep its shield forever: cold
+    loads are serialized, so the next admission on the same cache clears stale grace flags,
+    making the orphan evictable by the still-pending reconcile."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=int(S * 2.5), shared_store=store)
+    cache_b = _make_cache(store, budget, mock_logger)
+    try:
+        cache_b.put("orphan", DummyModule())  # graced; its load died before get()
+        cache_b.put("next", DummyModule())  # the next admission sweeps the stale flag
+        _use_and_release(cache_b, "next")
+
+        # A peer's overshoot: with the orphan's grace swept, the reconcile can evict it.
+        budget.add_non_shared(int(S * 2))
+        cache_b.request_budget_reconcile()
+
+        assert "orphan" not in cache_b._cached_models
+    finally:
+        cache_b.shutdown()
+
+
+def test_cached_model_keys_returns_without_waiting_for_reconcile_work(mock_logger, monkeypatch):
+    """cached_model_keys() feeds the session queue's dequeue-affinity heuristic and must never
+    stall. Its manual-release hook therefore hands a pending budget reconcile to a background
+    thread instead of running it inline: reconciliation evicts models and calls gc.collect(),
+    which can pause for seconds (JPPhoto review, 2026-07-27). gc.collect() is blocked here to
+    prove the lookup does not wait for the reconcile work."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=int(S * 1.4), shared_store=store)
+    cache_b = _make_cache(store, budget, mock_logger)
+    release_gc = threading.Event()
+    try:
+        cache_b.put("victim", DummyModule())
+        _use_and_release(cache_b, "victim")
+
+        # A peer's admission overshoots the budget; its request found this cache busy, so only
+        # the pending flag was left behind.
+        budget.add_non_shared(S)
+        cache_b._budget_reconcile_pending.set()
+
+        real_collect = model_cache_module.gc.collect
+
+        def blocking_collect(*args, **kwargs):
+            assert release_gc.wait(timeout=10)
+            return real_collect(*args, **kwargs)
+
+        monkeypatch.setattr(model_cache_module.gc, "collect", blocking_collect)
+
+        result = []
+        lookup = threading.Thread(target=lambda: result.append(cache_b.cached_model_keys()))
+        lookup.start()
+        lookup.join(timeout=5)
+        # The lookup returned even though the reconcile's gc.collect() is still blocked.
+        assert not lookup.is_alive()
+        assert result
+
+        release_gc.set()
+        # The background thread completes the reconcile on its own.
+        assert _wait_until(lambda: "victim" not in cache_b._cached_models)
+        assert _wait_until(lambda: not cache_b._budget_reconcile_pending.is_set())
+        assert budget.total_in_use() <= budget.max_bytes
+    finally:
+        release_gc.set()
+        cache_b.shutdown()

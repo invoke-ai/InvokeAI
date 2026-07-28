@@ -204,6 +204,10 @@ class ModelLoader(ModelLoaderBase):
                 model=loaded_model,
                 execution_device=execution_device,
             )
+            # Retrieve immediately: the new record carries the cache's post-admission grace until
+            # it is locked, and keeping put() and get() adjacent means no failure in between can
+            # leave a graced record whose loader never comes back for it.
+            cache_record = self._ram_cache.get(key=cache_key, stats_name=stats_name)
 
             # Register the shell only after put() has created the shared entry (via the wrapper's
             # acquire); it is dropped automatically when that entry's last reference is released.
@@ -212,7 +216,7 @@ class ModelLoader(ModelLoaderBase):
                 if shared_store is not None:
                     shared_store.set_shell(cache_key, shell_to_register)
 
-            return self._ram_cache.get(key=cache_key, stats_name=stats_name)
+            return cache_record
 
     def get_size_fs(
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None

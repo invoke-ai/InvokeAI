@@ -464,7 +464,9 @@ class ModelCache:
 
     @synchronized
     @record_activity
-    def put(self, key: str, model: AnyModel, execution_device: Optional[torch.device] = None) -> None:
+    def put(
+        self, key: str, model: AnyModel, execution_device: Optional[torch.device] = None, prefetch: bool = False
+    ) -> None:
         """Add a model to the cache.
 
         Args:
@@ -472,12 +474,27 @@ class ModelCache:
             model: The model to cache
             execution_device: Optional device to use for this specific model. If None, uses the cache's default
                 execution_device. Use torch.device("cpu") to force a model to run on CPU.
+            prefetch: The model is being cached opportunistically (e.g. the unused submodels of a
+                single-file pipeline load) and no loader will retrieve it after this call. It is
+                admitted without the post-admission grace, so budget reconciles may evict it
+                immediately.
         """
         if key in self._cached_models:
             self._logger.debug(
                 f"Attempted to add model {key} ({model.__class__.__name__}), but it already exists in the cache. No action necessary."
             )
             return
+
+        # Any entry still carrying the post-admission grace belongs to an earlier load: cold loads
+        # are serialized under MODEL_LOAD_LOCK's write lock and each load's only graced put() is
+        # its final one, so a flag that survives to the next admission is stale — its loader
+        # either errored out before retrieving the model or dropped the LoadedModel without ever
+        # locking it. Clear such flags so an orphaned record cannot dodge budget reconciles
+        # indefinitely. (An entry retrieved but not yet locked loses its shield here; if a
+        # reconcile then evicts it, lock() falls back to the tolerated issue-7513 path and
+        # proceeds on the detached record.)
+        for stale_entry in self._cached_models.values():
+            stale_entry.awaiting_first_use = False
 
         size = calc_model_size_by_data(self._logger, model)
         self._make_room_internal(size)
@@ -515,8 +532,10 @@ class ModelCache:
             )
 
         # awaiting_first_use protects the new entry from the asynchronous eviction paths (budget
-        # reconcile, peer-requested eviction) until the loader retrieves it — see CacheRecord.
-        cache_record = CacheRecord(key=key, cached_model=wrapped_model, awaiting_first_use=True)
+        # reconcile, peer-requested eviction) until the loader locks it — see CacheRecord. A
+        # prefetch admission gets no grace: nothing will come back for it, so it must stay
+        # ordinarily evictable.
+        cache_record = CacheRecord(key=key, cached_model=wrapped_model, awaiting_first_use=not prefetch)
         self._cached_models[key] = cache_record
         self._cache_stack.append(key)
         # Account this model's RAM in the global budget. Shared weights are tracked once by the
@@ -559,7 +578,9 @@ class ModelCache:
           such short strings would corrupt substring-based affinity scoring.
         - Non-blocking: the cache lock is held across long operations (VRAM transfers, cache
           clears), and this feeds an opportunistic scheduling heuristic — returning an empty set
-          when the lock is contended is better than stalling a worker's dequeue.
+          when the lock is contended is better than stalling a worker's dequeue. For the same
+          reason, a pending budget reconcile observed at release time is handed to a background
+          thread rather than performed inline.
         """
         if not self._lock.acquire(blocking=False):
             return set()
@@ -571,10 +592,16 @@ class ModelCache:
             # This manual release must honor a pending budget reconcile just like the
             # synchronized-decorator hook: a peer whose request found the lock held by this
             # method relies on the release to process the flag (see request_budget_reconcile).
-            # Non-blocking to preserve this method's no-stall guarantee — if the lock is
-            # already contended again, that holder's own release hook processes the flag.
-            if not self._lock._is_owned():
-                self._reconcile_budget_if_pending(blocking=False)
+            # But reconciliation evicts models and runs gc.collect(), which can pause for
+            # seconds — running it inline would break this method's no-stall contract. Hand the
+            # work to a short-lived background thread instead: the thread may wait on the cache
+            # lock and do the slow work; this caller returns immediately.
+            if self._ram_budget is not None and self._budget_reconcile_pending.is_set() and not self._lock._is_owned():
+                threading.Thread(
+                    target=self._reconcile_budget_if_pending,
+                    name="model-cache-budget-reconcile",
+                    daemon=True,
+                ).start()
 
     @synchronized
     def _get_cache_snapshot(self) -> dict[str, CacheEntrySnapshot]:
@@ -612,9 +639,11 @@ class ModelCache:
             raise IndexError(f"The model with key {key} is not in the cache.")
 
         cache_entry = self._cached_models[key]
-        # First retrieval: the loader now owns a reference, so the entry no longer needs the
-        # post-admission grace that shields it from the asynchronous eviction paths.
-        cache_entry.awaiting_first_use = False
+        # Deliberately NOT clearing awaiting_first_use here: this method is synchronized, so its
+        # own lock-release hook may run a pending budget reconcile before returning — ending the
+        # grace now would let that hook evict the very record this call just selected, detaching
+        # a live model from the cache (and from the RAM accounting) before the caller can lock
+        # it. The grace ends at lock(), when the entry becomes pinned anyway.
 
         # more stats
         if self.stats:
@@ -648,6 +677,8 @@ class ModelCache:
             )
         # cache_entry = self._cached_models[key]
         cache_entry.lock()
+        # End of the post-admission grace: from here the entry is pinned by its lock count, and
+        # after the final unlock it is ordinary evictable cache content.
         cache_entry.awaiting_first_use = False
 
         self._logger.debug(
@@ -1267,9 +1298,10 @@ class ModelCache:
         """Evict this cache's unlocked entries while a requested reconcile is pending and the
         shared budget is exceeded.
 
-        Called (blocking) from the synchronized-decorator hook after each lock release, and
-        (non-blocking) inline from request_budget_reconcile and from the manual lock releases in
-        cached_model_keys / evict_unlocked_for_peer. The pending flag stays set until the
+        Called (blocking) from the synchronized-decorator hook after each lock release,
+        (non-blocking) inline from request_budget_reconcile and from the manual lock release in
+        evict_unlocked_for_peer, and (blocking, on a dedicated background thread) from
+        cached_model_keys' release, which must not stall. The pending flag stays set until the
         budget is actually satisfied: if the remaining overshoot is held by locked (in-use)
         entries, the unlock that eventually frees them is itself a synchronized method, whose hook
         re-runs this reconcile.

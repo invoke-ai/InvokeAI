@@ -22,15 +22,20 @@ class CacheRecord:
     # change (e.g. fp8_storage toggled during an in-flight generation) takes effect on the
     # next load instead of silently being ignored.
     is_stale: bool = False
-    # Set by ModelCache.put() and cleared on the entry's first get()/lock(). A freshly admitted
-    # model is about to be used — its loader calls get() as soon as put() returns — so the
-    # asynchronous eviction paths (shared-budget reconcile, peer-requested eviction) must not
-    # treat it as idle: with a peer's reconcile request pending, put()'s own lock-release hook
-    # would otherwise evict the model before the loader can even retrieve it, breaking the
-    # in-flight load. The cache's local make_room path ignores this flag (cold loads are
-    # serialized under MODEL_LOAD_LOCK, so it can never see another loader's entry inside this
-    # window), which also bounds the flag's lifetime if a load errors out between put() and
-    # get().
+    # Post-admission grace: set by ModelCache.put() (unless the admission is a prefetch of a
+    # model nothing will come back for) and cleared on the entry's first lock(). A freshly
+    # admitted model is about to be used — its loader calls get() as soon as put() returns, then
+    # locks it for inference — so the asynchronous eviction paths (shared-budget reconcile,
+    # peer-requested eviction) must not treat it as idle: they would evict the record out from
+    # under the in-flight load, breaking the loader's get() or detaching a live model from the
+    # cache's RAM accounting. The grace deliberately survives get(): get() is synchronized, and
+    # its own lock-release hook may run a pending reconcile before the caller can lock the record
+    # it was just handed. The flag cannot shield a record forever: the cache's local make_room
+    # path ignores it (cold loads are serialized under MODEL_LOAD_LOCK, so make_room can never
+    # see another loader's entry inside the put()->lock() window), and the next admission on the
+    # same cache clears any flag still standing (see the sweep in ModelCache.put()), so a load
+    # that errors out — or a LoadedModel dropped without ever locking — cannot dodge budget
+    # reconciles indefinitely.
     awaiting_first_use: bool = False
 
     def lock(self) -> None:
