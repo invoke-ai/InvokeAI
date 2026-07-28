@@ -4,9 +4,22 @@
  * A textarea gives no geometry for a position within its text, so the standard
  * trick is to lay the same text out again in a hidden element that copies every
  * property affecting how it wraps, and read the offset of a marker placed at the
- * caret. The prompt textarea already renders a mirror for syntax highlighting,
- * but only when highlighting is on — this builds its own so caret anchoring
- * works with the setting off too.
+ * caret.
+ *
+ * `PromptTextarea` already renders a mirror for syntax highlighting, and reusing
+ * it — placing a `Range` in that `<pre>` — would delete everything below. It
+ * does not work, for two reasons worth writing down so the idea is not tried a
+ * third time. It renders only when highlighting is on and the prompt is
+ * non-empty, so it is absent for the first character typed and for anyone with
+ * the setting off. And it is React-rendered from the state the keystroke is
+ * updating: measured during `refresh`, which runs inside the change handler, it
+ * holds the *previous* value. Both confirmed by measurement — with `ab` in the
+ * field, the rendered mirror still read `a`.
+ *
+ * Reusing it would mean rendering it unconditionally and moving the measurement
+ * into a layout effect, costing a second render on every keystroke while the
+ * list is live. This mirror reads `textarea.value`, and is never a keystroke
+ * behind.
  *
  * Measured on demand rather than tracked: it is read while a picker is opening
  * or its query is growing, which is a handful of times per keystroke at most,
