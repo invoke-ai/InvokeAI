@@ -15,9 +15,12 @@ vi.mock('@features/generation/ui/promptFields/PositivePromptActions', () => ({
   PromptTriggerPopover: () => null,
 }));
 
+const MODEL_CATALOG = [{ base: 'sdxl', name: 'easynegative', type: 'embedding' }];
+const SELECTED_MODEL = { base: 'sdxl', name: 'Juggernaut', trigger_phrases: ['jugg'] };
+
 vi.mock('@features/generation/ui/GenerationUiContext', async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  useGenerationUi: () => ({ models: { catalog: [], ensureLoaded: vi.fn() } }),
+  useGenerationUi: () => ({ models: { catalog: MODEL_CATALOG, ensureLoaded: vi.fn() } }),
 }));
 
 const WILDCARDS = [
@@ -54,7 +57,7 @@ const render = async (isTemplateViewMode = false) => {
             isTemplateViewMode={isTemplateViewMode}
             loras={[]}
             projectId="project-1"
-            selectedModel={undefined}
+            selectedModel={SELECTED_MODEL as never}
             showSyntaxHighlighting={false}
             value=""
             onChange={vi.fn()}
@@ -130,6 +133,26 @@ describe('the caret autocomplete', () => {
     await type('a photo of __');
 
     expect(optionLabels()).toEqual(['colors', 'moods']);
+  });
+
+  // Each delimiter offers only what it can actually open. `jugg`, the model's
+  // trigger phrase, belongs to neither and stays with the `+` button.
+  it('offers embeddings for `<` and wildcards for `__`, and phrases for neither', async () => {
+    await type('a photo of <');
+
+    expect(optionLabels()).toEqual(['easynegative']);
+
+    await press('{Escape}');
+    await type('__');
+
+    expect(optionLabels()).toEqual(['colors', 'moods']);
+  });
+
+  it('inserts an embedding with its angle brackets', async () => {
+    await type('a photo of <easy');
+    await press('{Enter}');
+
+    expect(textarea().value).toBe('a photo of <easynegative>');
   });
 
   // The whole point: nothing is swallowed, so there is nothing to give back.

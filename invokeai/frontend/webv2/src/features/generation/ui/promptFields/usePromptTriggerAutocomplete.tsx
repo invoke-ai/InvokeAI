@@ -23,7 +23,7 @@ import { getTextareaCaretRect } from '@features/generation/ui/promptFields/promp
 import { getActiveTriggerQuery, insertPromptText } from '@features/generation/ui/promptFields/promptFocus';
 import { PromptTriggerAutocomplete } from '@features/generation/ui/promptFields/PromptTriggerAutocomplete';
 import {
-  filterPromptTriggerOptions,
+  getInlineTriggerOptions,
   usePromptTriggerOptions,
 } from '@features/generation/ui/promptFields/promptTriggerOptions';
 import { useCallback, useId, useMemo, useState } from 'react';
@@ -72,7 +72,7 @@ export const usePromptTriggerAutocomplete = ({
   const options = usePromptTriggerOptions(loras, selectedModel);
 
   const matches = useMemo(
-    () => (state ? filterPromptTriggerOptions(options, state.query.query) : []),
+    () => (state ? getInlineTriggerOptions(options, state.query.key, state.query.query) : []),
     [options, state]
   );
   const isOpen = state !== null && matches.length > 0;

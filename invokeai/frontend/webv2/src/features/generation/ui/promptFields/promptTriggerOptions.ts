@@ -9,14 +9,23 @@
 
 import type { GenerationModelCatalogItem as ModelConfig } from '@features/generation/contracts';
 import type { GenerateLora, GenerateModelConfig } from '@features/generation/core/types';
+import type { PromptTriggerKey } from '@features/generation/ui/promptFields/promptFocus';
 
 import { useGenerationUi } from '@features/generation/ui/GenerationUiContext';
 import { useWildcards } from '@features/generation/ui/useWildcards';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+/**
+ * What an option inserts. Carried explicitly rather than sniffed back out of
+ * `value`, because the inline autocomplete offers only the kind its delimiter
+ * actually stands for.
+ */
+export type PromptTriggerKind = 'embedding' | 'phrase' | 'wildcard';
+
 export interface PromptTriggerOption {
   group: string;
+  kind: PromptTriggerKind;
   label: string;
   value: string;
 }
@@ -60,11 +69,11 @@ export const getPromptTriggerOptions = ({
   // A wildcard inserts as `__name__`, which is just another trigger the picker
   // can splice in, so it rides in the same list as embeddings and LoRA phrases.
   for (const wildcard of wildcards) {
-    options.push({ group: wildcardsLabel, label: wildcard.name, value: `__${wildcard.name}__` });
+    options.push({ group: wildcardsLabel, kind: 'wildcard', label: wildcard.name, value: `__${wildcard.name}__` });
   }
 
   for (const phrase of getTriggerPhrases(selectedModel)) {
-    options.push({ group: selectedModel?.name ?? mainModelLabel, label: phrase, value: phrase });
+    options.push({ group: selectedModel?.name ?? mainModelLabel, kind: 'phrase', label: phrase, value: phrase });
   }
 
   for (const lora of loras) {
@@ -73,14 +82,19 @@ export const getPromptTriggerOptions = ({
     }
 
     for (const phrase of getTriggerPhrases(lora.model)) {
-      options.push({ group: lora.model.name, label: phrase, value: phrase });
+      options.push({ group: lora.model.name, kind: 'phrase', label: phrase, value: phrase });
     }
   }
 
   if (selectedModel) {
     for (const model of models) {
       if (model.type === 'embedding' && model.base === selectedModel.base) {
-        options.push({ group: compatibleEmbeddingsLabel, label: model.name, value: `<${model.name}>` });
+        options.push({
+          group: compatibleEmbeddingsLabel,
+          kind: 'embedding',
+          label: model.name,
+          value: `<${model.name}>`,
+        });
       }
     }
   }
@@ -99,6 +113,7 @@ export const getPromptTriggerOptions = ({
   });
 };
 
+/** The `+` button's search box, which browses the whole list by name or group. */
 export const filterPromptTriggerOptions = (
   options: readonly PromptTriggerOption[],
   search: string
@@ -108,6 +123,32 @@ export const filterPromptTriggerOptions = (
   return options.filter(
     (option) => !query || option.label.toLowerCase().includes(query) || option.group.toLowerCase().includes(query)
   );
+};
+
+/** Which kind each delimiter stands for. Trigger phrases have no delimiter. */
+const KIND_BY_TRIGGER_KEY: Record<PromptTriggerKey, PromptTriggerKind> = { '<': 'embedding', _: 'wildcard' };
+
+/**
+ * The options an inline `<` or `__` should offer.
+ *
+ * Narrowed to the delimiter's own kind: `<` opens an embedding token and `__` a
+ * wildcard reference, so offering the other under either is offering something
+ * the user cannot have meant. Model and LoRA trigger phrases belong to no
+ * delimiter and stay with the `+` button, which browses everything.
+ *
+ * Matching is on the label alone, unlike the browse search above. The query here
+ * is a name being typed, and folding in the group would make `__w` match every
+ * wildcard on the strength of the word "Wildcards".
+ */
+export const getInlineTriggerOptions = (
+  options: readonly PromptTriggerOption[],
+  key: PromptTriggerKey,
+  search: string
+): PromptTriggerOption[] => {
+  const kind = KIND_BY_TRIGGER_KEY[key];
+  const query = search.trim().toLowerCase();
+
+  return options.filter((option) => option.kind === kind && (!query || option.label.toLowerCase().includes(query)));
 };
 
 export const groupPromptTriggerOptions = (options: readonly PromptTriggerOption[]): PromptTriggerOptionGroup[] =>
