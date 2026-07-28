@@ -448,7 +448,7 @@
       "post": {
         "tags": ["utilities"],
         "summary": "Parse Dynamicprompts",
-        "description": "Creates a batch process",
+        "description": "Expands a prompt's dynamic syntax against the current user's wildcards.",
         "operationId": "parse_dynamicprompts",
         "requestBody": {
           "content": {
@@ -9688,6 +9688,177 @@
             "HTTPBearer": []
           }
         ]
+      }
+    },
+    "/api/v1/wildcards/": {
+      "get": {
+        "tags": ["wildcards"],
+        "summary": "List Wildcards",
+        "description": "Lists the current user's wildcards.",
+        "operationId": "list_wildcards",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/WildcardRecordDTO"
+                  },
+                  "type": "array",
+                  "title": "Response 200 List Wildcards"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": ["wildcards"],
+        "summary": "Create Wildcard",
+        "description": "Creates a wildcard owned by the current user.",
+        "operationId": "create_wildcard",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WildcardWithoutId",
+                "description": "The wildcard to create"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WildcardRecordDTO"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/wildcards/{wildcard_id}": {
+      "patch": {
+        "tags": ["wildcards"],
+        "summary": "Update Wildcard",
+        "description": "Updates a wildcard owned by the current user.",
+        "operationId": "update_wildcard",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "wildcard_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The id of the wildcard to update",
+              "title": "Wildcard Id"
+            },
+            "description": "The id of the wildcard to update"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WildcardChanges",
+                "description": "The changes to apply"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WildcardRecordDTO"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["wildcards"],
+        "summary": "Delete Wildcard",
+        "description": "Deletes a wildcard owned by the current user.",
+        "operationId": "delete_wildcard",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "wildcard_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The id of the wildcard to delete",
+              "title": "Wildcard Id"
+            },
+            "description": "The id of the wildcard to delete"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/client_state/{queue_id}/get_by_key": {
@@ -73956,6 +74127,90 @@
         "required": ["virtual_board_id", "board_name", "date", "image_count", "asset_count"],
         "title": "VirtualSubBoardDTO",
         "description": "A virtual sub-board computed from image metadata, not stored in the database."
+      },
+      "WildcardChanges": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "The wildcard's new name."
+          },
+          "values": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Values",
+            "description": "The wildcard's new values."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "WildcardChanges"
+      },
+      "WildcardRecordDTO": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The wildcard's name, referenced in a prompt as `__name__`."
+          },
+          "values": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Values",
+            "description": "The values this wildcard expands to."
+          },
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "The wildcard ID."
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id",
+            "description": "The user who owns this wildcard."
+          }
+        },
+        "type": "object",
+        "required": ["name", "values", "id", "user_id"],
+        "title": "WildcardRecordDTO"
+      },
+      "WildcardWithoutId": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The wildcard's name, referenced in a prompt as `__name__`."
+          },
+          "values": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Values",
+            "description": "The values this wildcard expands to."
+          }
+        },
+        "type": "object",
+        "required": ["name", "values"],
+        "title": "WildcardWithoutId"
       },
       "Workflow": {
         "properties": {
