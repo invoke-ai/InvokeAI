@@ -1,6 +1,11 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654) and the InvokeAI Team
 import io
+import json
+import os
+import shutil
+import tempfile
 import zlib
+from dataclasses import dataclass
 from pathlib import Path
 from queue import Queue
 from typing import Optional, Union
@@ -16,11 +21,18 @@ from invokeai.app.services.image_files.image_files_common import (
 )
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.util.thumbnails import get_thumbnail_name, make_thumbnail
+from invokeai.backend.util.logging import InvokeAILogger
 
 _PNG_RLE_MIN_PIXELS = 512 * 512
 _PNG_RLE_SAMPLE_TILE = 32
 _PNG_RLE_MIN_RAW_SIZE_PERCENT = 30
 _PNG_RLE_MAX_SAMPLE_SIZE_PERCENT = 102
+
+
+@dataclass
+class _StagedDelete:
+    directory: Path
+    files: list[tuple[Path, Path]]
 
 
 def _get_png_size(image: PILImageType, compress_type: Optional[int] = None) -> int:
@@ -73,6 +85,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
 
     def start(self, invoker: Invoker) -> None:
         self.__invoker = invoker
+        self.__recover_staged_deletes()
 
     @property
     def image_root(self) -> Path:
@@ -157,20 +170,53 @@ class DiskImageFileStorage(ImageFileStorageBase):
             raise ImageFileSaveException from e
 
     def delete(self, image_name: str, image_subfolder: str = "") -> None:
+        token = self.stage_delete(image_name, image_subfolder)
+        self.commit_delete(token)
+
+    def stage_delete(self, image_name: str, image_subfolder: str = "") -> _StagedDelete:
+        candidates = [
+            self.get_path(image_name, image_subfolder=image_subfolder),
+            self.get_path(image_name, thumbnail=True, image_subfolder=image_subfolder),
+        ]
+        staging_dir = Path(tempfile.mkdtemp(prefix=".delete_", dir=self.__output_folder))
+        staged: list[tuple[Path, Path]] = []
         try:
-            image_path = self.get_path(image_name, image_subfolder=image_subfolder)
+            with open(staging_dir / "manifest.json", "w", encoding="utf-8") as manifest:
+                manifest.write(json.dumps({"image_name": image_name, "image_subfolder": image_subfolder}))
+                manifest.flush()
+                os.fsync(manifest.fileno())
+            for index, source in enumerate(candidates):
+                self.__cache.pop(source, None)
+                if source.exists():
+                    destination = staging_dir / str(index)
+                    source.replace(destination)
+                    staged.append((source, destination))
+            return _StagedDelete(directory=staging_dir, files=staged)
+        except Exception as e:
+            for source, destination in reversed(staged):
+                if destination.exists():
+                    source.parent.mkdir(parents=True, exist_ok=True)
+                    destination.replace(source)
+            shutil.rmtree(staging_dir, ignore_errors=True)
+            raise ImageFileDeleteException from e
 
-            if image_path.exists():
-                image_path.unlink()
-            if image_path in self.__cache:
-                del self.__cache[image_path]
+    def commit_delete(self, token: object) -> None:
+        if not isinstance(token, _StagedDelete):
+            raise ImageFileDeleteException("Invalid staged-delete token")
+        try:
+            shutil.rmtree(token.directory)
+        except Exception as e:
+            raise ImageFileDeleteException from e
 
-            thumbnail_path = self.get_path(image_name, True, image_subfolder=image_subfolder)
-
-            if thumbnail_path.exists():
-                thumbnail_path.unlink()
-            if thumbnail_path in self.__cache:
-                del self.__cache[thumbnail_path]
+    def rollback_delete(self, token: object) -> None:
+        if not isinstance(token, _StagedDelete):
+            raise ImageFileDeleteException("Invalid staged-delete token")
+        try:
+            for source, destination in reversed(token.files):
+                if destination.exists():
+                    source.parent.mkdir(parents=True, exist_ok=True)
+                    destination.replace(source)
+            shutil.rmtree(token.directory, ignore_errors=True)
         except Exception as e:
             raise ImageFileDeleteException from e
 
@@ -239,6 +285,37 @@ class DiskImageFileStorage(ImageFileStorageBase):
         folders: list[Path] = [self.__output_folder, self.__thumbnails_folder]
         for folder in folders:
             folder.mkdir(parents=True, exist_ok=True)
+
+    def __recover_staged_deletes(self) -> None:
+        logger = InvokeAILogger.get_logger()
+        for staging_dir in self.__output_folder.glob(".delete_*"):
+            manifest_path = staging_dir / "manifest.json"
+            if not manifest_path.is_file():
+                if not any(staging_dir.iterdir()):
+                    staging_dir.rmdir()
+                continue
+            try:
+                with open(manifest_path, encoding="utf-8") as manifest:
+                    data = json.load(manifest)
+                image_name = data["image_name"]
+                image_subfolder = data.get("image_subfolder", "")
+                candidates = [
+                    self.get_path(image_name, image_subfolder=image_subfolder),
+                    self.get_path(image_name, thumbnail=True, image_subfolder=image_subfolder),
+                ]
+                token = _StagedDelete(
+                    directory=staging_dir,
+                    files=[(source, staging_dir / str(index)) for index, source in enumerate(candidates)],
+                )
+                self.__invoker.services.image_records.get(image_name)
+                self.rollback_delete(token)
+            except Exception as error:
+                from invokeai.app.services.image_records.image_records_common import ImageRecordNotFoundException
+
+                if isinstance(error, ImageRecordNotFoundException):
+                    shutil.rmtree(staging_dir, ignore_errors=True)
+                else:
+                    logger.error(f"Failed to recover staged image deletion {staging_dir}: {error}")
 
     def __get_cache(self, image_name: Path) -> Optional[PILImageType]:
         return None if image_name not in self.__cache else self.__cache[image_name]

@@ -8,6 +8,7 @@ import type {
   SigLIPModelConfig,
   T5EncoderModelConfig,
   TextLLMModelConfig,
+  WanT5EncoderModelConfig,
 } from 'services/api/types';
 
 type EncoderModelConfig =
@@ -17,7 +18,8 @@ type EncoderModelConfig =
   | CLIPVisionModelConfig
   | SigLIPModelConfig
   | LlavaOnevisionModelConfig
-  | TextLLMModelConfig;
+  | TextLLMModelConfig
+  | WanT5EncoderModelConfig;
 
 type Props = {
   modelConfig: EncoderModelConfig;
