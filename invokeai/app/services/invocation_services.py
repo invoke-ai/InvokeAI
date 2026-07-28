@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 
     import torch
 
+    from invokeai.app.services.asset_files.asset_files_base import AssetFilesServiceBase
     from invokeai.app.services.board_image_records.board_image_records_base import BoardImageRecordStorageBase
     from invokeai.app.services.board_images.board_images_base import BoardImagesServiceABC
     from invokeai.app.services.board_records.board_records_base import BoardRecordStorageBase
@@ -54,6 +55,7 @@ class InvocationServices:
 
     def __init__(
         self,
+        asset_files: "AssetFilesServiceBase",
         board_images: "BoardImagesServiceABC",
         board_image_records: "BoardImageRecordStorageBase",
         boards: "BoardServiceABC",
@@ -92,6 +94,7 @@ class InvocationServices:
         gallery: "GalleryServiceABC",
         image_moves: "ImageMoveService | None" = None,
     ):
+        self.asset_files = asset_files
         self.board_images = board_images
         self.board_image_records = board_image_records
         self.boards = boards

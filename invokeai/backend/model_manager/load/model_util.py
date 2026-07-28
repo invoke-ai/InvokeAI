@@ -15,6 +15,7 @@ from transformers import CLIPTokenizer, PreTrainedTokenizerBase, T5Tokenizer
 from invokeai.backend.image_util.depth_anything.depth_anything_pipeline import DepthAnythingPipeline
 from invokeai.backend.image_util.grounding_dino.grounding_dino_pipeline import GroundingDinoPipeline
 from invokeai.backend.image_util.segment_anything.segment_anything_pipeline import SegmentAnythingPipeline
+from invokeai.backend.image_util.triposplat.triposplat_model import TripoSplatModel
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
 from invokeai.backend.model_manager.taxonomy import AnyModel
 from invokeai.backend.onnx.onnx_runtime import IAIOnnxRuntimeModel
@@ -49,6 +50,7 @@ def calc_model_size_by_data(logger: logging.Logger, model: AnyModel) -> int:
             GroundingDinoPipeline,
             SegmentAnythingPipeline,
             DepthAnythingPipeline,
+            TripoSplatModel,
         ),
     ):
         return model.calc_size()

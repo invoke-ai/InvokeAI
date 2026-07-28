@@ -7,6 +7,7 @@ from invokeai.app.services.session_processor.session_processor_default import De
 
 def _services(**overrides):
     services = {
+        "asset_files": object(),
         "board_image_records": object(),
         "board_images": object(),
         "board_records": object(),

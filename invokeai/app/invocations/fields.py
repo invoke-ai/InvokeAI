@@ -245,6 +245,12 @@ class ImageField(BaseModel):
     image_name: str = Field(description="The name of the image")
 
 
+class Asset3DField(BaseModel):
+    """A 3D asset primitive field"""
+
+    asset_name: str = Field(description="The name of the 3D asset file")
+
+
 class VideoField(BaseModel):
     """A video primitive field"""
 

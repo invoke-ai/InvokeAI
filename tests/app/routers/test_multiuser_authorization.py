@@ -88,6 +88,7 @@ def mock_services() -> InvocationServices:
     db = create_mock_sqlite_database(configuration, logger)
 
     return InvocationServices(
+        asset_files=None,  # type: ignore
         board_image_records=SqliteBoardImageRecordStorage(db=db),
         board_images=None,  # type: ignore
         board_records=SqliteBoardRecordStorage(db=db),
@@ -581,6 +582,19 @@ class TestImageReadAuth:
 
         r = client.get(f"/api/v1/images/?board_id={board_id}", headers=_auth(admin_token))
         assert r.status_code == status.HTTP_200_OK
+
+
+class TestAssetReadAuth:
+    """Tests the auth posture of the 3D asset binary endpoint."""
+
+    def test_get_asset_is_unauthenticated(self, enable_multiuser: Any, client: TestClient):
+        # Intentionally unauthenticated, by design and in parity with the image binary
+        # endpoints above: 3D assets are intermediates (raster -> 3D -> raster) with no
+        # DB record or ownership, protected by their server-generated UUID names being
+        # returned only to the generating user's own graph run. Do not "fix" this route
+        # in an auth sweep without revisiting that posture.
+        r = client.get("/api/v1/assets/i/some-asset.ply")
+        assert r.status_code != status.HTTP_401_UNAUTHORIZED
 
 
 # ===========================================================================

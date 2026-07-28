@@ -1,6 +1,7 @@
 import { MenuDivider } from '@invoke-ai/ui-library';
 import { IconMenuItemGroup } from 'common/components/IconMenuItem';
 import { CanvasEntityMenuItemsArrange } from 'features/controlLayers/components/common/CanvasEntityMenuItemsArrange';
+import { CanvasEntityMenuItemsConvertTo3D } from 'features/controlLayers/components/common/CanvasEntityMenuItemsConvertTo3D';
 import { CanvasEntityMenuItemsCropToBbox } from 'features/controlLayers/components/common/CanvasEntityMenuItemsCropToBbox';
 import { CanvasEntityMenuItemsDelete } from 'features/controlLayers/components/common/CanvasEntityMenuItemsDelete';
 import { CanvasEntityMenuItemsDuplicate } from 'features/controlLayers/components/common/CanvasEntityMenuItemsDuplicate';
@@ -28,6 +29,7 @@ export const RasterLayerMenuItems = memo(() => {
       <CanvasEntityMenuItemsFilter />
       <CanvasEntityMenuItemsRunWorkflow />
       <CanvasEntityMenuItemsSelectObject />
+      <CanvasEntityMenuItemsConvertTo3D />
       <RasterLayerMenuItemsAdjustments />
       <MenuDivider />
       <CanvasEntityMenuItemsMergeDown />

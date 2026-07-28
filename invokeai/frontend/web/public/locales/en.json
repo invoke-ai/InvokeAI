@@ -3100,6 +3100,25 @@
             "colorPicker": "Color Picker",
             "text": "Text"
         },
+        "convertTo3D": {
+            "convertTo3D": "Convert to 3D",
+            "isolateSubject": "Isolate subject",
+            "keepBackground": "Keep background",
+            "generating": "Generating 3D…",
+            "orbitView": "Orbit view",
+            "rotateObject": "Rotate object",
+            "cancel": "Cancel",
+            "commitToLayer": "Commit to layer",
+            "generationError": "Problem Converting to 3D",
+            "commitError": "Problem Committing 3D Layer",
+            "loadError": "Problem Loading 3D Asset",
+            "hintDragOrbit": "Drag to orbit view",
+            "hintDragRotate": "Drag to rotate object",
+            "hintRightDragPan": "Right-drag to pan (moves the rotation point)",
+            "hintScrollZoom": "Scroll to zoom",
+            "hintEdgesMove": "Edges to move",
+            "hintCornersResize": "Corners to resize"
+        },
         "filter": {
             "filter": "Filter",
             "filters": "Filters",

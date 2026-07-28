@@ -161,10 +161,15 @@ def test_create_image_upload_entry_requires_auth_before_the_501_stub(
 # - binary <img src>/thumbnail routes: browsers cannot attach a Bearer header to <img> requests. Image and
 #   video media routes now authenticate via the path-scoped media cookie (get_current_media_user_or_default);
 #   the workflow-thumbnail and model-image routes remain open pending the same treatment (see PR #9367)
+# - 3D assets: session-transient splat binaries with no DB records or ownership, protected by
+#   server-generated UUID names returned only to the generating user's own graph run (see
+#   TestAssetReadAuth in test_multiuser_authorization.py); a candidate for the same media-cookie
+#   treatment as the image/video binary routes in a follow-up
 # - version: intentionally public
 # - docs/redoc: API documentation
 PUBLIC_ROUTES = {
     ("GET", "/api/v1/app/version"),
+    ("GET", "/api/v1/assets/i/{asset_name}"),
     ("POST", "/api/v1/auth/login"),
     ("POST", "/api/v1/auth/setup"),
     ("GET", "/api/v1/auth/status"),
