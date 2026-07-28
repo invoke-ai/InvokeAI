@@ -622,19 +622,37 @@ class ModelCache:
 
         The work is therefore handed to a short-lived background thread, exactly as
         cached_model_keys() does with its own reconcile: the thread may wait on the cache lock and
-        do the slow work; the collecting thread returns immediately.
+        do the slow work, while this call returns without ever waiting on a cache, store or budget
+        lock. (Thread.start() does wait for the child to bootstrap, so "immediately" here means
+        "without lock waits", not "without any delay".)
         """
         # Unsynchronized read: the flag is monotonic (put() is the only writer that sets it, and
         # only on a brand-new record), so a False reading is always final and there is nothing to
         # release. Losing a race here at worst spawns a thread that no-ops under the lock.
         if not cache_entry.awaiting_first_use or self._shutdown_event.is_set():
             return
-        threading.Thread(
-            target=self._release_first_use_grace,
-            args=(cache_entry,),
-            name="model-cache-release-grace",
-            daemon=True,
-        ).start()
+        try:
+            threading.Thread(
+                target=self._release_first_use_grace,
+                args=(cache_entry,),
+                name="model-cache-release-grace",
+                daemon=True,
+            ).start()
+        except RuntimeError:
+            # Thread creation failed (thread or process limits). A finalize callback gets no
+            # retry — weakref retires it before invoking it — and an exception here would be
+            # swallowed by sys.unraisablehook, silently losing the release. Fall back to clearing
+            # the flag inline under a NON-blocking acquire: that touches no store or budget lock,
+            # so it cannot deadlock the collecting thread. Deliberately no reconcile afterwards
+            # (that is the slow, lock-taking work this method exists to avoid); a pending request
+            # stays set for the next ordinary cache operation, and put()'s sweep remains the
+            # backstop if the lock is contended here.
+            if self._lock.acquire(blocking=False):
+                try:
+                    if self._cached_models.get(cache_entry.key) is cache_entry and not cache_entry.is_locked:
+                        cache_entry.awaiting_first_use = False
+                finally:
+                    self._lock.release()
 
     @synchronized
     def _release_first_use_grace(self, cache_entry: CacheRecord) -> None:

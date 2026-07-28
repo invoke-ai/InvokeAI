@@ -816,6 +816,13 @@ def test_grace_release_does_not_take_cache_lock_on_the_collecting_thread(mock_lo
     budget = RamBudget(max_bytes=int(S * 1.4), shared_store=store)
     cache_a = _make_cache(store, budget, mock_logger)
     cache_b = _make_cache(store, budget, mock_logger)
+    # The whole point of this test is WHERE the collection happens, so automatic collection must
+    # not pre-empt it: the setup below allocates freely (DummyModule alone is ~70 tracked objects),
+    # and a gen-0 pass landing before the collector thread starts would reclaim the cycle on the
+    # main thread with no store lock held, making the test pass vacuously — or trip the setup
+    # assertions, depending on the ambient allocation count. Disable automatic gc for the setup and
+    # let only the explicit collect below reclaim the cycle.
+    gc.disable()
     try:
         cache_a.put("abandoned", DummyModule())
         loaded_model = LoadedModelWithoutConfig(cache_record=cache_a.get("abandoned"), cache=cache_a)
@@ -833,6 +840,7 @@ def test_grace_release_does_not_take_cache_lock_on_the_collecting_thread(mock_lo
         cache_b.put("peer", DummyModule())
         assert cache_a._budget_reconcile_pending.is_set()
         assert "abandoned" in cache_a._cached_models
+        assert cache_a._cached_models["abandoned"].awaiting_first_use
 
         # The store's real lock is non-reentrant, so a violation would hang the process (and this
         # test's teardown) rather than fail it. Swap in a lock that reports same-thread
@@ -862,6 +870,7 @@ def test_grace_release_does_not_take_cache_lock_on_the_collecting_thread(mock_lo
         assert _wait_until(lambda: "abandoned" not in cache_a._cached_models)
         assert budget.total_in_use() <= budget.max_bytes
     finally:
+        gc.enable()
         cache_a.shutdown()
         cache_b.shutdown()
 
