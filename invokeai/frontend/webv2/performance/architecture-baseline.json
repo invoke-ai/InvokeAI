@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 798478,
+        "brotliBytes": 798414,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 798624,
+        "gzipBytes": 798574,
         "imageRawBytes": 156376,
-        "initialRawBytes": 1832637,
+        "initialRawBytes": 1832589,
         "largestAssetRawBytes": 737748,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 57830,
+        "ownedRawBytes": 57782,
         "requestCount": 31,
         "scriptRequestCount": 15,
         "sourceOwners": [
@@ -239,15 +239,15 @@
         ]
       },
       "limits": {
-        "brotliBytes": 806463,
+        "brotliBytes": 806399,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 806611,
+        "gzipBytes": 806560,
         "imageRawBytes": 157940,
-        "initialRawBytes": 1850964,
+        "initialRawBytes": 1850915,
         "largestAssetRawBytes": 745126,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 57830,
+        "ownedRawBytes": 57782,
         "requestCount": 31,
         "scriptRequestCount": 15
       },
@@ -257,17 +257,17 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 975403,
+        "brotliBytes": 975461,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 974277,
+        "gzipBytes": 974331,
         "imageRawBytes": 156376,
-        "initialRawBytes": 2369740,
+        "initialRawBytes": 2370128,
         "largestAssetRawBytes": 737748,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 108562,
-        "requestCount": 75,
-        "scriptRequestCount": 59,
+        "ownedRawBytes": 108460,
+        "requestCount": 74,
+        "scriptRequestCount": 58,
         "sourceOwners": [
           "package:@ark-ui/react",
           "package:@chakra-ui/react",
@@ -418,6 +418,7 @@
           "source:src/features/generation/core/canvas/compileCanvasGraph.ts",
           "source:src/features/generation/core/canvas/controlValidation.ts",
           "source:src/features/generation/core/canvas/types.ts",
+          "source:src/features/generation/core/catalogSearch.ts",
           "source:src/features/generation/core/componentCompatibility.ts",
           "source:src/features/generation/core/dynamicPrompts.ts",
           "source:src/features/generation/core/graph.ts",
@@ -733,17 +734,17 @@
         ]
       },
       "limits": {
-        "brotliBytes": 985158,
+        "brotliBytes": 985216,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 984020,
+        "gzipBytes": 984075,
         "imageRawBytes": 157940,
-        "initialRawBytes": 2393438,
+        "initialRawBytes": 2393830,
         "largestAssetRawBytes": 745126,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 108562,
-        "requestCount": 75,
-        "scriptRequestCount": 59
+        "ownedRawBytes": 108460,
+        "requestCount": 74,
+        "scriptRequestCount": 58
       },
       "owner": "workbench",
       "remediationTicket": "deepen-widget-registry-loading",

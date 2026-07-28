@@ -1,6 +1,8 @@
 import type { ProjectGraphAction } from '@features/workflow/utility';
 import type { InvocationRoute, InvocationSourceId, ResultDestination } from '@workbench/invocationContracts';
 
+import { GENERATE_UI_STATE_KEYS } from '@features/generation/settings';
+
 import type { CanvasProjectMutation } from './canvasProjectMutations';
 
 import { isInvocationSourceAvailable } from './invocation';
@@ -38,16 +40,16 @@ export const getRouteAfterHighConfidenceEdit = (
 export const getChangedValueKeys = (previous: Record<string, unknown>, patch: Record<string, unknown>): string[] =>
   Object.keys(patch).filter((key) => !Object.is(previous[key], patch[key]));
 
-const GENERATE_UI_NOISE_KEYS: ReadonlySet<string> = new Set([
-  'aspectRatioIsLocked',
-  'batchCount',
-  'negativePromptHeightPx',
-  'positivePromptHeightPx',
-  // Toggling the read-only template view changes nothing about what generates.
-  // Applying a template does, so `promptTemplate` is deliberately not noise.
-  'promptTemplateViewMode',
-]);
+// Named beside the interface they belong to rather than restated here, so a
+// field that is renamed or removed cannot leave a dead string behind. Which
+// fields are arrangement and which are intent is a fact about `GenerateSettings`
+// and reads as one there; this only asks the question.
+const GENERATE_UI_NOISE_KEYS: ReadonlySet<string> = new Set(Object.keys(GENERATE_UI_STATE_KEYS));
 
+// Its own list, and not a subset of the above: Upscale's values are a different
+// shape that happens to share a prompt box and a batch count. It has no aspect
+// lock and no templates, so naming those here would describe a widget that does
+// not exist.
 const UPSCALE_UI_NOISE_KEYS: ReadonlySet<string> = new Set([
   'batchCount',
   'negativePromptHeightPx',

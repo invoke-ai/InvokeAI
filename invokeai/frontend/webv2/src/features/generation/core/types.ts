@@ -150,6 +150,12 @@ export type AspectRatioId =
   | '9:21'
   | '1:8';
 
+/**
+ * Which of the fields below are panel arrangement rather than generation
+ * intent is stated once, as `GENERATE_UI_STATE_KEYS` in `./settings` — beside
+ * the normalization that already enumerates them, and where it costs no module
+ * of its own. This interface stays type-only.
+ */
 export interface GenerateSettings {
   batchCount: number;
   modelKey: string;

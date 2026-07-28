@@ -522,6 +522,30 @@ export const isLoraCompatibleWithModel = (
  * fields fall back to their defaults so old projects keep their prompts and
  * dimensions instead of being reset wholesale.
  */
+/**
+ * The fields of `GenerateSettings` that describe how the panel is arranged
+ * rather than what will be generated.
+ *
+ * They live in the same object because they are saved with the project, and
+ * separating the two is a change to the persisted shape rather than a
+ * rearrangement — worth doing, but not here. What can be stated once is which
+ * is which, and this is it: `satisfies` ties the set to the interface, so a key
+ * that stops existing, or is spelled wrong, fails to compile.
+ *
+ * Everything else is generation intent. Changing one of these is not: dragging
+ * a prompt box taller or looking at the merged template must not be mistaken
+ * for the kind of edit that reroutes the workbench. Applying a template *is*
+ * intent, which is why `promptTemplate` is absent and `promptTemplateViewMode`
+ * is present.
+ */
+export const GENERATE_UI_STATE_KEYS = {
+  aspectRatioIsLocked: true,
+  batchCount: true,
+  negativePromptHeightPx: true,
+  positivePromptHeightPx: true,
+  promptTemplateViewMode: true,
+} satisfies Partial<Record<keyof GenerateSettings, true>>;
+
 export const normalizeGenerateSettings = (values: unknown): GenerateSettings | null => {
   if (!isRecord(values)) {
     return null;
