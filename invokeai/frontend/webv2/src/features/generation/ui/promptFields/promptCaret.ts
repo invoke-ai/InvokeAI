@@ -20,13 +20,19 @@ export interface CaretRect {
   y: number;
 }
 
-/** Everything that decides where a character lands, copied onto the mirror. */
+/**
+ * Everything that decides where a character lands, copied onto the mirror.
+ *
+ * Width is deliberately absent, and set from `clientWidth` below instead.
+ * Copying the resolved `width` does work — it is the border-box width under
+ * `box-sizing: border-box`, which the copied borders and padding then reduce to
+ * the same content width — but it only works because those three travel
+ * together, and it counts a vertical scrollbar as space for text. `clientWidth`
+ * is the padding box with the scrollbar already taken out, which is the width
+ * the field actually wraps at, stated once.
+ */
 const MIRRORED_STYLES = [
-  'borderBottomWidth',
-  'borderLeftWidth',
-  'borderRightWidth',
-  'borderTopWidth',
-  'boxSizing',
+  'direction',
   'fontFamily',
   'fontSize',
   'fontStretch',
@@ -40,9 +46,9 @@ const MIRRORED_STYLES = [
   'paddingRight',
   'paddingTop',
   'tabSize',
+  'textAlign',
   'textIndent',
   'textTransform',
-  'width',
   'wordSpacing',
 ] as const;
 
@@ -76,6 +82,11 @@ export const getTextareaCaretRect = (textarea: HTMLTextAreaElement, index: numbe
   mirror.style.whiteSpace = 'pre-wrap';
   mirror.style.overflowWrap = 'break-word';
   mirror.style.overflow = 'hidden';
+  // `clientWidth` is the padding box, so with no border of its own the mirror
+  // gets exactly the field's own wrapping width.
+  mirror.style.boxSizing = 'border-box';
+  mirror.style.border = '0';
+  mirror.style.width = `${textarea.clientWidth}px`;
 
   mirror.textContent = textarea.value.slice(0, index);
   // A zero-width space so the marker still occupies a line when the caret sits
@@ -85,11 +96,15 @@ export const getTextareaCaretRect = (textarea: HTMLTextAreaElement, index: numbe
   document.body.append(mirror);
 
   const lineHeight = Number.parseFloat(computed.lineHeight);
+  // The offsets are measured from the mirror's padding edge, which the field's
+  // own border sits outside of, so it has to be added back by hand.
+  const borderLeft = Number.parseFloat(computed.borderLeftWidth) || 0;
+  const borderTop = Number.parseFloat(computed.borderTopWidth) || 0;
   const rect: CaretRect = {
     height: Number.isFinite(lineHeight) ? lineHeight : Number.parseFloat(computed.fontSize) * 1.6,
     width: 0,
-    x: textareaRect.left + marker.offsetLeft - textarea.scrollLeft,
-    y: textareaRect.top + marker.offsetTop - textarea.scrollTop,
+    x: textareaRect.left + borderLeft + marker.offsetLeft - textarea.scrollLeft,
+    y: textareaRect.top + borderTop + marker.offsetTop - textarea.scrollTop,
   };
 
   mirror.remove();

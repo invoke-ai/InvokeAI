@@ -1,6 +1,7 @@
 /* oxlint-disable react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop */
 import { ChakraProvider } from '@chakra-ui/react';
 import { PositivePromptField } from '@features/generation/ui/promptFields/PositivePromptField';
+import { getTextareaCaretRect } from '@features/generation/ui/promptFields/promptCaret';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { act } from 'react';
@@ -195,6 +196,29 @@ describe('the caret autocomplete', () => {
     const list = listbox()!.getBoundingClientRect();
 
     expect(list.top - box.top).toBeGreaterThan(60);
+  });
+
+  // The rest of the caret coverage uses hard newlines, which any mirror gets
+  // right. Soft wrapping is the case the mirror's own width decides, and nothing
+  // exercised it. Asserted on the measurement rather than the rendered list,
+  // which flips above the caret near the bottom of a full box.
+  it('agrees with the textarea about where soft wrapping put the caret', () => {
+    const element = textarea();
+    // Long enough to overflow the box, so `scrollHeight` reports the real line
+    // count rather than being floored at the visible height.
+    const text = 'lorem ipsum dolor sit amet '.repeat(100);
+
+    element.value = text;
+
+    const style = getComputedStyle(element);
+    const lineHeight = Number.parseFloat(style.lineHeight);
+    const paddingTop = Number.parseFloat(style.paddingTop);
+    const lines = Math.round((element.scrollHeight - paddingTop - Number.parseFloat(style.paddingBottom)) / lineHeight);
+    const rect = getTextareaCaretRect(element, text.length)!;
+    const line = Math.round((rect.y - element.getBoundingClientRect().top - paddingTop) / lineHeight) + 1;
+
+    expect(lines).toBeGreaterThan(2);
+    expect(line).toBe(lines);
   });
 
   it('inserts the highlighted option on Enter', async () => {
