@@ -754,12 +754,112 @@ def test_abandoned_loaded_model_releases_first_use_grace(mock_logger):
         assert "abandoned" in cache_a._cached_models
         assert budget.total_in_use() == 2 * S
 
-        # Dropping the never-locked wrapper is the only subsequent cache-A lifecycle event.
+        # Dropping the never-locked wrapper is the only subsequent cache-A lifecycle event. The
+        # release is handed to a background thread (the finalizer must not do locking work on the
+        # collecting thread — see ModelCache.release_first_use_grace), so poll for the outcome.
         del loaded_model
         gc.collect()
 
-        assert "abandoned" not in cache_a._cached_models
+        assert _wait_until(lambda: "abandoned" not in cache_a._cached_models)
         assert budget.total_in_use() == S
+        assert budget.total_in_use() <= budget.max_bytes
+    finally:
+        cache_a.shutdown()
+        cache_b.shutdown()
+
+
+class _ReentryReportingLock:
+    """Stand-in for a non-reentrant `threading.Lock` that reports same-thread re-acquisition
+    instead of deadlocking on it, so a lock-order violation fails the test rather than hanging it.
+    """
+
+    def __init__(self, violations: list[str]) -> None:
+        self._lock = threading.Lock()
+        self._owner: int | None = None
+        self._violations = violations
+
+    def acquire(self, blocking: bool = True, timeout: float = -1) -> bool:
+        if self._owner == threading.get_ident():
+            self._violations.append(f"re-acquired on thread {threading.current_thread().name}")
+            raise RuntimeError("non-reentrant lock re-acquired by its holding thread")
+        acquired = self._lock.acquire(blocking, timeout)
+        if acquired:
+            self._owner = threading.get_ident()
+        return acquired
+
+    def release(self) -> None:
+        self._owner = None
+        self._lock.release()
+
+    def __enter__(self) -> "_ReentryReportingLock":
+        self.acquire()
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        self.release()
+
+
+def test_grace_release_does_not_take_cache_lock_on_the_collecting_thread(mock_logger):
+    """The grace release runs from a weakref.finalize callback, i.e. at an arbitrary
+    garbage-collection point in an arbitrary thread — including one that already holds the
+    SharedCpuWeightsStore lock (`acquire()` sums tensor sizes inside its critical section, so a
+    generational collection can fire there, and `put()` reaches it via the cached-model wrapper).
+
+    If the callback takes the cache lock, the synchronized release hook reads
+    RamBudget.available() -> SharedCpuWeightsStore.total_bytes_in_use(), which needs the store lock
+    the collecting thread is already holding. Both store and budget locks are non-reentrant, so the
+    thread deadlocks against itself and wedges the process (every other cache then blocks on the
+    store lock at its next eviction). Guard: collecting an abandoned wrapper while holding the
+    store lock must return promptly, and the release must still happen afterwards.
+    """
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=int(S * 1.4), shared_store=store)
+    cache_a = _make_cache(store, budget, mock_logger)
+    cache_b = _make_cache(store, budget, mock_logger)
+    try:
+        cache_a.put("abandoned", DummyModule())
+        loaded_model = LoadedModelWithoutConfig(cache_record=cache_a.get("abandoned"), cache=cache_a)
+
+        # Trap the wrapper in a reference cycle so only the cyclic collector can reclaim it, which
+        # is what an exception traceback does to an errored loader's local — precisely the
+        # abandoned case the grace release exists for. This forces the callback to run inside
+        # gc.collect() rather than at a refcount-zero decref.
+        cycle: dict[str, object] = {"wrapper": loaded_model}
+        cycle["self"] = cycle
+        del loaded_model, cycle
+
+        # A peer admission drives the shared budget over cap and leaves a reconcile pending on
+        # cache A, so the release hook has real work to do.
+        cache_b.put("peer", DummyModule())
+        assert cache_a._budget_reconcile_pending.is_set()
+        assert "abandoned" in cache_a._cached_models
+
+        # The store's real lock is non-reentrant, so a violation would hang the process (and this
+        # test's teardown) rather than fail it. Swap in a lock that reports same-thread
+        # re-acquisition instead of blocking on it, so the defect surfaces as a failed assertion.
+        violations: list[str] = []
+        store._lock = _ReentryReportingLock(violations)
+
+        collected = threading.Event()
+
+        def collect_holding_store_lock() -> None:
+            with store._lock:
+                gc.collect()
+            collected.set()
+
+        collector = threading.Thread(target=collect_holding_store_lock, daemon=True)
+        collector.start()
+        assert collected.wait(timeout=20), (
+            "the grace-release finalizer deadlocked the collecting thread against the shared-store lock"
+        )
+        collector.join(timeout=5)
+        assert violations == [], (
+            "the grace-release finalizer re-entered the shared-store lock on the collecting thread "
+            f"(would deadlock on the real non-reentrant lock): {violations}"
+        )
+
+        # The release itself still has to happen, just off the collecting thread.
+        assert _wait_until(lambda: "abandoned" not in cache_a._cached_models)
         assert budget.total_in_use() <= budget.max_bytes
     finally:
         cache_a.shutdown()

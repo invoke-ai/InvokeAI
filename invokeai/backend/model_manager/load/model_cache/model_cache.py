@@ -603,9 +603,42 @@ class ModelCache:
                     daemon=True,
                 ).start()
 
-    @synchronized
     def release_first_use_grace(self, cache_entry: CacheRecord) -> None:
-        """Make an abandoned, never-locked record available for budget eviction."""
+        """Make an abandoned, never-locked record available for budget eviction.
+
+        Called from a `weakref.finalize` callback (see LoadedModelWithoutConfig), which runs at an
+        arbitrary decref/garbage-collection point in an arbitrary thread. That thread may already
+        hold the SharedCpuWeightsStore or RamBudget lock — `SharedCpuWeightsStore.acquire()` sums
+        tensor sizes inside its critical section, so a generational collection can fire there — and
+        both of those are plain, non-reentrant locks.
+
+        So this method must do NO locking work itself. Taking the cache lock here would run the
+        synchronized-decorator release hook, whose `_reconcile_budget_if_pending` reads
+        `RamBudget.available()` -> `SharedCpuWeightsStore.total_bytes_in_use()`, i.e. back through
+        the very locks the collecting thread may be holding. That inverts the documented
+        cache-lock -> (store-lock | budget-lock) order (see RamBudget) and deadlocks the thread
+        against itself, wedging the whole process. The same hook would also run evictions,
+        gc.collect() and empty_cache() inline in whatever unrelated thread dropped the reference.
+
+        The work is therefore handed to a short-lived background thread, exactly as
+        cached_model_keys() does with its own reconcile: the thread may wait on the cache lock and
+        do the slow work; the collecting thread returns immediately.
+        """
+        # Unsynchronized read: the flag is monotonic (put() is the only writer that sets it, and
+        # only on a brand-new record), so a False reading is always final and there is nothing to
+        # release. Losing a race here at worst spawns a thread that no-ops under the lock.
+        if not cache_entry.awaiting_first_use or self._shutdown_event.is_set():
+            return
+        threading.Thread(
+            target=self._release_first_use_grace,
+            args=(cache_entry,),
+            name="model-cache-release-grace",
+            daemon=True,
+        ).start()
+
+    @synchronized
+    def _release_first_use_grace(self, cache_entry: CacheRecord) -> None:
+        """Clear an abandoned record's grace, then let the release hook reconcile the budget."""
         if self._cached_models.get(cache_entry.key) is cache_entry and not cache_entry.is_locked:
             cache_entry.awaiting_first_use = False
 
