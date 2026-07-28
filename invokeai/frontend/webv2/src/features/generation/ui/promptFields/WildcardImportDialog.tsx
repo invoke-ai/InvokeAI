@@ -24,6 +24,7 @@ const REJECTION_KEY: Record<WildcardImportRejection, string> = {
   noValues: 'widgets.generate.dynamicPrompts.importRejectedNoValues',
   tooLong: 'widgets.generate.dynamicPrompts.importRejectedTooLong',
   tooManyValues: 'widgets.generate.dynamicPrompts.importRejectedTooManyValues',
+  valueTooLong: 'widgets.generate.dynamicPrompts.importRejectedValueTooLong',
 };
 
 /**

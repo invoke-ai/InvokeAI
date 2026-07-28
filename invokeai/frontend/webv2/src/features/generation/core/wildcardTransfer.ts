@@ -166,7 +166,13 @@ export const wildcardsToNestedRecord = (wildcards: readonly ParsedWildcard[]): R
   return root;
 };
 
-export type WildcardImportRejection = 'duplicate' | 'invalid' | 'noValues' | 'tooLong' | 'tooManyValues';
+export type WildcardImportRejection =
+  | 'duplicate'
+  | 'invalid'
+  | 'noValues'
+  | 'tooLong'
+  | 'tooManyValues'
+  | 'valueTooLong';
 
 export type WildcardImportResolution = 'keepBoth' | 'replace' | 'skip';
 
@@ -211,11 +217,13 @@ export const planWildcardImport = (
     if (wildcard.values.length === 0) {
       return 'noValues';
     }
-    if (
-      wildcard.values.length > MAX_WILDCARD_VALUES ||
-      wildcard.values.some((value) => value.length > MAX_WILDCARD_VALUE_LENGTH)
-    ) {
+    if (wildcard.values.length > MAX_WILDCARD_VALUES) {
       return 'tooManyValues';
+    }
+    // Kept apart from the count: told "too many values", someone holding three
+    // values and one long paragraph has no idea which one to shorten.
+    if (wildcard.values.some((value) => value.length > MAX_WILDCARD_VALUE_LENGTH)) {
+      return 'valueTooLong';
     }
 
     return null;
@@ -224,7 +232,13 @@ export const planWildcardImport = (
   return parsed.map((wildcard) => {
     const rejection = getRejection(wildcard);
 
-    seen.add(wildcard.name);
+    // Only entries that will actually be written claim the name. Recording
+    // rejected ones too meant an empty `colours.txt` earlier in the selection
+    // made a populated `colours.yaml` later in it read as a repeat, and neither
+    // was imported.
+    if (rejection === null) {
+      seen.add(wildcard.name);
+    }
 
     return {
       conflictId: existingByName.get(wildcard.name) ?? null,
@@ -266,6 +280,11 @@ export interface WildcardImportAction {
  *
  * `taken` grows as it goes, so importing two clashing names as "keep both" gives
  * `colours-2` and `colours-3` rather than the same suffix twice.
+ *
+ * It is seeded with the names the import itself is about to claim, not just the
+ * ones already in the catalog. A file holding `colours` (clashing) and a new
+ * `colours-2` otherwise had the first resolve to `colours-2` as well, and the
+ * two creates raced each other to the same name.
  */
 export const getWildcardImportActions = (
   entries: readonly WildcardImportEntry[],
@@ -276,12 +295,17 @@ export const getWildcardImportActions = (
   const actions: WildcardImportAction[] = [];
 
   for (const entry of entries) {
+    if (!entry.rejection) {
+      taken.add(entry.name);
+    }
+  }
+
+  for (const entry of entries) {
     if (entry.rejection) {
       continue;
     }
 
     if (entry.conflictId === null) {
-      taken.add(entry.name);
       actions.push({ name: entry.name, values: entry.values });
       continue;
     }

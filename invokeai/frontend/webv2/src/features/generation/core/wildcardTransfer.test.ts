@@ -185,17 +185,34 @@ describe('planWildcardImport', () => {
     expect(entry.rejection).toBe('noValues');
   });
 
-  it('reports a list past the backend limits', () => {
-    const [tooMany, tooLong] = planWildcardImport(
+  // Two different problems with two different remedies: a list to trim, or a
+  // single value to shorten. Reporting both as "too many values" left someone
+  // holding three values and one long paragraph with nothing to act on.
+  it('tells a long list apart from a long value', () => {
+    const [tooMany, valueTooLong] = planWildcardImport(
       [
         { name: 'many', values: Array.from({ length: 10_001 }, (_, index) => `v${index}`) },
-        { name: 'long', values: ['x'.repeat(2_001)] },
+        { name: 'long', values: ['ok', 'x'.repeat(2_001)] },
       ],
       existing
     );
 
     expect(tooMany.rejection).toBe('tooManyValues');
-    expect(tooLong.rejection).toBe('tooManyValues');
+    expect(valueTooLong.rejection).toBe('valueTooLong');
+  });
+
+  // Regression: the name was recorded as seen whether or not the entry survived,
+  // so a rejected one shadowed a perfectly good later entry and neither landed.
+  it('does not let a rejected entry shadow a good one with the same name', () => {
+    const entries = planWildcardImport(
+      [
+        { name: 'colours', values: [] },
+        { name: 'colours', values: ['red', 'green'] },
+      ],
+      existing
+    );
+
+    expect(entries.map((entry) => entry.rejection)).toEqual(['noValues', null]);
   });
 
   it('keeps the first of a name repeated within one import and reports the rest', () => {
@@ -256,6 +273,24 @@ describe('getWildcardImportActions', () => {
     expect(getWildcardImportActions(entries, { colours: 'keepBoth' }, existingNames)).toEqual([
       { name: 'colours-2', values: ['red'] },
       { name: 'moods', values: ['calm'] },
+    ]);
+  });
+
+  // Regression: only the catalog seeded the taken set, so "keep both" picked
+  // `colours-2` without noticing the same file was already creating one, and the
+  // two creates raced to the same name — the loser aborting the import.
+  it('does not rename onto a name the same import is creating', () => {
+    const clashing = planWildcardImport(
+      [
+        { name: 'colours', values: ['red'] },
+        { name: 'colours-2', values: ['green'] },
+      ],
+      [{ id: 'w1', name: 'colours' }]
+    );
+
+    expect(getWildcardImportActions(clashing, { colours: 'keepBoth' }, new Set(['colours']))).toEqual([
+      { name: 'colours-3', values: ['red'] },
+      { name: 'colours-2', values: ['green'] },
     ]);
   });
 
