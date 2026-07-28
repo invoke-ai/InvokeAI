@@ -3,6 +3,7 @@ import type { Ref, UIEvent } from 'react';
 
 import { Box } from '@chakra-ui/react';
 import { HighlightedPrompt, MAX_HIGHLIGHTED_PROMPT_LENGTH } from '@features/generation/ui/promptFields/PromptHighlight';
+import { getLineNumberGutterCh, PromptLineNumbers } from '@features/generation/ui/promptFields/PromptLineNumbers';
 import { ResizableTextarea } from '@platform/ui';
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 const PROMPT_TEXTAREA_LINE_HEIGHT = '1.6';
@@ -30,6 +31,8 @@ interface PromptTextareaProps extends Omit<ResizableTextareaProps, 'underlay'> {
   /** Resolvable wildcard names; an unknown `__name__` is underlined as an error. */
   knownWildcards?: ReadonlySet<string>;
   showSyntaxHighlighting: boolean;
+  /** Number logical lines in a leading gutter, the way an editor does. */
+  showLineNumbers?: boolean;
   value: string;
 }
 
@@ -53,6 +56,7 @@ export const PromptTextarea = ({
   knownWildcards,
   lineHeight,
   onScroll,
+  showLineNumbers = false,
   showSyntaxHighlighting,
   textareaRef,
   value,
@@ -64,14 +68,21 @@ export const PromptTextarea = ({
   const shouldHighlight = showSyntaxHighlighting && value.length > 0 && value.length <= MAX_HIGHLIGHTED_PROMPT_LENGTH;
   const effectiveFontSize = fontSize ?? '0.82rem';
   const effectiveLineHeight = lineHeight ?? PROMPT_TEXTAREA_LINE_HEIGHT;
+  // The gutter widens with the line count, and the text has to start clear of it.
+  const gutterCh = showLineNumbers ? getLineNumberGutterCh(value.split('\n').length) : 0;
+  const paddingInlineStart = showLineNumbers
+    ? `calc(var(--chakra-spacing-${PROMPT_TEXTAREA_PX}) + ${gutterCh}ch)`
+    : undefined;
 
   const highlightOptions = useMemo(
     () => ({ dynamicPrompts: highlightDynamicPrompts, knownWildcards }),
     [highlightDynamicPrompts, knownWildcards]
   );
 
+  const needsMirror = shouldHighlight || showLineNumbers;
+
   useLayoutEffect(() => {
-    if (!shouldHighlight || !localTextareaRef.current) {
+    if (!needsMirror || !localTextareaRef.current) {
       return;
     }
 
@@ -91,7 +102,7 @@ export const PromptTextarea = ({
       resizeObserver.disconnect();
       window.removeEventListener('resize', syncClientWidth);
     };
-  }, [shouldHighlight, value]);
+  }, [needsMirror, value]);
 
   const handleTextareaRef = useCallback(
     (element: HTMLTextAreaElement | null) => {
@@ -109,7 +120,20 @@ export const PromptTextarea = ({
     [onScroll]
   );
 
-  const underlay = useMemo(
+  const lineNumberMetrics = useMemo(
+    () => ({
+      clientWidth: textareaClientWidth,
+      fontFamily,
+      fontSize: effectiveFontSize,
+      lineHeight: effectiveLineHeight,
+      paddingBlock: `var(--chakra-spacing-${PROMPT_TEXTAREA_PY})`,
+      paddingInline: `var(--chakra-spacing-${PROMPT_TEXTAREA_PX})`,
+      scrollTop: scroll.top,
+    }),
+    [effectiveFontSize, effectiveLineHeight, fontFamily, scroll.top, textareaClientWidth]
+  );
+
+  const highlightUnderlay = useMemo(
     () =>
       shouldHighlight ? (
         <Box
@@ -133,8 +157,9 @@ export const PromptTextarea = ({
             m="0"
             minH="100%"
             overflowWrap="break-word"
-            px={PROMPT_TEXTAREA_PX}
-            py={PROMPT_TEXTAREA_PY}
+            paddingBlock={PROMPT_TEXTAREA_PY}
+            paddingInline={PROMPT_TEXTAREA_PX}
+            paddingInlineStart={paddingInlineStart}
             transform={`translate(${-scroll.left}px, ${-scroll.top}px)`}
             whiteSpace="pre-wrap"
             w={textareaClientWidth ? `${textareaClientWidth}px` : '100%'}
@@ -149,12 +174,24 @@ export const PromptTextarea = ({
       effectiveLineHeight,
       fontFamily,
       highlightOptions,
+      paddingInlineStart,
       scroll.left,
       scroll.top,
       shouldHighlight,
       textareaClientWidth,
       value,
     ]
+  );
+
+  const underlay = useMemo(
+    () =>
+      needsMirror ? (
+        <>
+          {highlightUnderlay}
+          {showLineNumbers ? <PromptLineNumbers metrics={lineNumberMetrics} value={value} /> : null}
+        </>
+      ) : null,
+    [highlightUnderlay, lineNumberMetrics, needsMirror, showLineNumbers, value]
   );
 
   return (
@@ -168,8 +205,9 @@ export const PromptTextarea = ({
       fontSize={effectiveFontSize}
       lineHeight={effectiveLineHeight}
       overflowWrap="break-word"
-      px={PROMPT_TEXTAREA_PX}
-      py={PROMPT_TEXTAREA_PY}
+      paddingBlock={PROMPT_TEXTAREA_PY}
+      paddingInline={PROMPT_TEXTAREA_PX}
+      paddingInlineStart={paddingInlineStart}
       textareaRef={handleTextareaRef}
       underlay={underlay}
       value={value}

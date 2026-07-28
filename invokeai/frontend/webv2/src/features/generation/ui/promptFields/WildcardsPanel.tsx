@@ -3,7 +3,8 @@ import type { WildcardRecord } from '@features/generation/data/wildcards';
 import type { WildcardCatalog } from '@features/generation/ui/useWildcards';
 import type { ChangeEvent } from 'react';
 
-import { HStack, Input, Stack, Text, Textarea } from '@chakra-ui/react';
+import { HStack, Input, Stack, Text } from '@chakra-ui/react';
+import { PromptTextarea } from '@features/generation/ui/promptFields/PromptTextarea';
 import { Button, IconButton } from '@platform/ui/Button';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { Tooltip } from '@platform/ui/Tooltip';
@@ -24,8 +25,10 @@ interface WildcardDraft {
 export const WildcardsPanel = ({
   catalog,
   onInsert,
+  showSyntaxHighlighting,
 }: {
   catalog: WildcardCatalog;
+  showSyntaxHighlighting: boolean;
   /** Splices `__name__` into the prompt at the caret. */
   onInsert: (reference: string) => void;
 }) => {
@@ -83,13 +86,21 @@ export const WildcardsPanel = ({
           value={draft.name}
           onChange={(event: ChangeEvent<HTMLInputElement>) => setDraft({ ...draft, name: event.currentTarget.value })}
         />
-        <Textarea
+        {/* Values are expanded by dynamicprompts too, so a nested `{a|b}` or
+            `__other__` is live syntax here and is coloured as such. The gutter
+            numbers the values, which is what a line means in this editor. */}
+        <PromptTextarea
           aria-label={t('widgets.generate.dynamicPrompts.wildcardValues')}
-          fontFamily="mono"
+          defaultHeightPx={144}
           fontSize="0.72rem"
-          h="9rem"
+          highlightDynamicPrompts
+          knownWildcards={catalog.knownNames}
+          maxHeightPx={320}
+          minHeightPx={96}
           placeholder={t('widgets.generate.dynamicPrompts.wildcardValuesPlaceholder')}
-          resize="none"
+          resizeHandleAriaLabel={t('widgets.generate.dynamicPrompts.resizeWildcardValues')}
+          showLineNumbers
+          showSyntaxHighlighting={showSyntaxHighlighting}
           size="xs"
           value={draft.valuesText}
           onChange={(event: ChangeEvent<HTMLTextAreaElement>) =>

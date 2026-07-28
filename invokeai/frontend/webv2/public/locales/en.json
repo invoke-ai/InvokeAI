@@ -974,7 +974,8 @@
         "wildcardHasNoValues": "No values yet",
         "noWildcardsYet": "No wildcards yet. Create one to reuse a list of values as __name__.",
         "insertWildcard": "Insert into the prompt",
-        "couldNotSaveWildcard": "Could not save this wildcard"
+        "couldNotSaveWildcard": "Could not save this wildcard",
+        "resizeWildcardValues": "Resize wildcard values"
       }
     },
     "upscale": {

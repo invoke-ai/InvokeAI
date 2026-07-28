@@ -118,7 +118,11 @@ export const DynamicPromptsButton = ({
                     onUsePrompt={handleUsePrompt}
                   />
                 ) : (
-                  <WildcardsPanel catalog={catalog} onInsert={handleInsert} />
+                  <WildcardsPanel
+                    catalog={catalog}
+                    showSyntaxHighlighting={showSyntaxHighlighting}
+                    onInsert={handleInsert}
+                  />
                 )}
               </Stack>
             </Popover.Body>
