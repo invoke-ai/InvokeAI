@@ -1,8 +1,10 @@
-"""Tests for VideoUploadLimitASGIMiddleware (PR #9163 review fix).
+"""Tests for VideoUploadLimitASGIMiddleware and the upload route's body handling.
 
-The upload route's MAX_UPLOAD_SIZE check runs only after FastAPI has parsed (and spooled)
-the entire multipart body, so oversized/chunked/concurrent requests could exhaust temp
-storage before rejection. The middleware bounds ingress before the parser runs.
+The middleware (PR #9163 review fix) bounds ingress before any parsing happens, so
+oversized, chunked or too-many-concurrent requests are rejected without touching temp
+storage at all. The route itself then parses the multipart body and streams the file part
+straight into one temp file, enforcing MAX_UPLOAD_SIZE as the bytes arrive — declaring
+`file: UploadFile` used to make Starlette spool a second full-size copy first.
 """
 
 import asyncio
@@ -11,10 +13,10 @@ import time
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
-from fastapi import FastAPI, Response, UploadFile
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.testclient import TestClient
 from starlette.datastructures import Headers
 
@@ -35,10 +37,15 @@ MAX_BODY = 1024  # tiny cap for tests
 MAX_CONCURRENT = 2
 
 
-def test_configured_upload_slots_bound_peak_double_spool_usage() -> None:
+def test_configured_upload_slots_bound_peak_temp_storage_usage() -> None:
+    """Peak temp storage is now one copy per in-flight upload, not two.
+
+    The route parses the multipart body itself and writes the file part straight into its
+    own temp file, so Starlette's spool no longer holds a second full-size copy.
+    """
     assert videos.MAX_CONCURRENT_VIDEO_UPLOADS <= 2
     assert videos.MAX_CONCURRENT_VIDEO_UPLOADS_PER_USER <= 1
-    assert 2 * videos.MAX_UPLOAD_SIZE * videos.MAX_CONCURRENT_VIDEO_UPLOADS <= 4 * 1024 * 1024 * 1024
+    assert videos.MAX_UPLOAD_SIZE * videos.MAX_CONCURRENT_VIDEO_UPLOADS <= 2 * 1024 * 1024 * 1024
 
 
 def test_upload_probe_requires_a_decodable_frame(monkeypatch: pytest.MonkeyPatch):
@@ -443,6 +450,55 @@ async def test_upload_authentication_does_not_block_the_event_loop(monkeypatch: 
     assert offloaded == [_identify_video_upload_user]
 
 
+BOUNDARY = "testboundary"
+
+
+def _multipart_body(
+    file_bytes: bytes,
+    filename: str = "video.mp4",
+    metadata: str | None = None,
+    content_type: str = "video/mp4",
+) -> bytes:
+    parts = []
+    if metadata is not None:
+        parts.append(f'--{BOUNDARY}\r\nContent-Disposition: form-data; name="metadata"\r\n\r\n{metadata}\r\n'.encode())
+    parts.append(
+        f'--{BOUNDARY}\r\nContent-Disposition: form-data; name="file"; filename="{filename}"\r\n'
+        f"Content-Type: {content_type}\r\n\r\n".encode()
+        + file_bytes
+        + b"\r\n"
+    )
+    parts.append(f"--{BOUNDARY}--\r\n".encode())
+    return b"".join(parts)
+
+
+def _fake_upload_request(body: bytes, chunk_size: int = 8) -> MagicMock:
+    """A Request stand-in that dribbles the body out in small chunks."""
+    request = MagicMock()
+    request.headers = {"content-type": f"multipart/form-data; boundary={BOUNDARY}"}
+
+    async def stream():
+        for start in range(0, len(body), chunk_size):
+            yield body[start : start + chunk_size]
+
+    request.stream = stream
+    return request
+
+
+def _run_upload(request: MagicMock) -> Any:
+    return asyncio.run(
+        upload_video(
+            current_user=TokenData(user_id="user", email="user@example.com", is_admin=False),
+            request=request,
+            response=Response(),
+            video_category=ImageCategory.GENERAL,
+            is_intermediate=False,
+            board_id=None,
+            session_id=None,
+        )
+    )
+
+
 def test_upload_video_closes_tmp_handle_when_stream_copy_fails():
     captured_handles: list[Any] = []
     real_named_tmp = tempfile.NamedTemporaryFile
@@ -456,34 +512,141 @@ def test_upload_video_closes_tmp_handle_when_stream_copy_fails():
         captured_handles.append(handle)
         return handle
 
-    upload = MagicMock(spec=UploadFile)
-    upload.filename = "video.mp4"
-    upload.content_type = "video/mp4"
-    upload.read = AsyncMock(side_effect=[b"not-empty", b""])
-
     try:
         with (
             patch("invokeai.app.api.routers.videos.tempfile.NamedTemporaryFile", side_effect=failing_named_tmp),
             patch("invokeai.app.api.routers.videos.run_in_threadpool", side_effect=run_immediately),
             pytest.raises(OSError, match="disk full"),
         ):
-            asyncio.run(
-                upload_video(
-                    current_user=TokenData(user_id="user", email="user@example.com", is_admin=False),
-                    file=upload,
-                    request=MagicMock(),
-                    response=Response(),
-                    video_category=ImageCategory.GENERAL,
-                    is_intermediate=False,
-                    board_id=None,
-                    session_id=None,
-                    metadata=None,
-                )
-            )
+            _run_upload(_fake_upload_request(_multipart_body(b"not-empty")))
 
         assert len(captured_handles) == 1
         assert captured_handles[0].closed
         assert not Path(captured_handles[0].name).exists()
+    finally:
+        for handle in captured_handles:
+            handle.close()
+            Path(handle.name).unlink(missing_ok=True)
+
+
+def test_upload_video_writes_exactly_one_copy_of_the_body():
+    """The file part is written straight to the route's temp file, in order, once."""
+    payload = bytes(range(256)) * 8
+    written: list[bytes] = []
+    captured_handles: list[Any] = []
+    real_named_tmp = tempfile.NamedTemporaryFile
+
+    async def run_immediately(func: Any, *args: Any):
+        return func(*args)
+
+    def recording_named_tmp(*args: Any, **kwargs: Any):
+        handle = real_named_tmp(*args, **kwargs)
+        real_write = handle.write
+        handle.write = lambda chunk: (written.append(bytes(chunk)), real_write(chunk))[1]
+        captured_handles.append(handle)
+        return handle
+
+    try:
+        with (
+            patch("invokeai.app.api.routers.videos.tempfile.NamedTemporaryFile", side_effect=recording_named_tmp),
+            patch("invokeai.app.api.routers.videos.run_in_threadpool", side_effect=run_immediately),
+            patch("invokeai.app.api.routers.videos._is_mp4_file", return_value=False),
+            pytest.raises(HTTPException) as error,
+        ):
+            _run_upload(_fake_upload_request(_multipart_body(payload), chunk_size=13))
+
+        # Stops at the container check — the point is what reached the disk before that.
+        assert error.value.status_code == 415
+        assert b"".join(written) == payload
+    finally:
+        for handle in captured_handles:
+            handle.close()
+            Path(handle.name).unlink(missing_ok=True)
+
+
+def test_upload_video_rejects_bad_file_part_without_finishing_the_body():
+    """A rejected upload must not require reading the rest of the body first.
+
+    The old route could only reject after Starlette had spooled the whole thing; the
+    filename/MIME gate now fires from the part headers, before the payload streams in.
+    """
+    consumed: list[int] = []
+    body = _multipart_body(b"x" * 4096, filename="notes.txt", content_type="text/plain")
+
+    async def run_immediately(func: Any, *args: Any):
+        return func(*args)
+
+    request = MagicMock()
+    request.headers = {"content-type": f"multipart/form-data; boundary={BOUNDARY}"}
+
+    async def stream():
+        for start in range(0, len(body), 64):
+            consumed.append(start)
+            yield body[start : start + 64]
+
+    request.stream = stream
+
+    with (
+        patch("invokeai.app.api.routers.videos.run_in_threadpool", side_effect=run_immediately),
+        pytest.raises(HTTPException) as error,
+    ):
+        _run_upload(request)
+
+    assert error.value.status_code == 415
+    # Rejected from the part headers: only the first chunks were ever read.
+    assert len(consumed) * 64 < len(body)
+
+
+def test_upload_video_requires_a_file_part():
+    async def run_immediately(func: Any, *args: Any):
+        return func(*args)
+
+    body = f'--{BOUNDARY}\r\nContent-Disposition: form-data; name="metadata"\r\n\r\n{{}}\r\n--{BOUNDARY}--\r\n'.encode()
+
+    with (
+        patch("invokeai.app.api.routers.videos.run_in_threadpool", side_effect=run_immediately),
+        pytest.raises(HTTPException) as error,
+    ):
+        _run_upload(_fake_upload_request(body))
+
+    assert error.value.status_code == 422
+
+
+def test_upload_video_rejects_oversized_file_part_mid_stream(monkeypatch: pytest.MonkeyPatch):
+    """The size cap fires while the body streams, not after it has all landed on disk."""
+    monkeypatch.setattr(videos, "MAX_UPLOAD_SIZE", 512)
+    written = 0
+
+    async def run_immediately(func: Any, *args: Any):
+        return func(*args)
+
+    real_named_tmp = tempfile.NamedTemporaryFile
+    captured_handles: list[Any] = []
+
+    def recording_named_tmp(*args: Any, **kwargs: Any):
+        handle = real_named_tmp(*args, **kwargs)
+        real_write = handle.write
+
+        def counting_write(chunk: bytes) -> int:
+            nonlocal written
+            written += len(chunk)
+            return real_write(chunk)
+
+        handle.write = counting_write
+        captured_handles.append(handle)
+        return handle
+
+    try:
+        with (
+            patch("invokeai.app.api.routers.videos.tempfile.NamedTemporaryFile", side_effect=recording_named_tmp),
+            patch("invokeai.app.api.routers.videos.run_in_threadpool", side_effect=run_immediately),
+            pytest.raises(HTTPException) as error,
+        ):
+            _run_upload(_fake_upload_request(_multipart_body(b"y" * 4096), chunk_size=64))
+
+        assert error.value.status_code == 413
+        # Only the bytes up to the cap (plus at most one chunk) were ever written.
+        assert written <= 512 + 64
     finally:
         for handle in captured_handles:
             handle.close()
