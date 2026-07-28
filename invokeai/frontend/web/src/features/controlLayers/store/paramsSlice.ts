@@ -1088,6 +1088,29 @@ export const selectKrea2SeedVarianceRandomizePercent = createParamsSelector(
 export const selectKrea2RebalanceEnabled = createParamsSelector((params) => params.krea2RebalanceEnabled);
 export const selectKrea2RebalanceMultiplier = createParamsSelector((params) => params.krea2RebalanceMultiplier);
 export const selectKrea2RebalanceWeights = createParamsSelector((params) => params.krea2RebalanceWeights);
+
+// The Krea-2 Conditioning Rebalance node taps exactly 12 encoder layers, so its per-layer weights string
+// must be exactly 12 finite comma-separated numbers. Mirrors Krea2ConditioningRebalanceInvocation._parse_weights
+// so an invalid string is blocked before it can queue a generation the backend will reject.
+export const KREA2_REBALANCE_WEIGHT_COUNT = 12;
+
+export const parseKrea2RebalanceWeights = (weights: string): number[] | null => {
+  const parts = weights
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s !== '');
+  if (parts.length !== KREA2_REBALANCE_WEIGHT_COUNT) {
+    return null;
+  }
+  const nums = parts.map(Number);
+  if (nums.some((n) => !Number.isFinite(n))) {
+    return null;
+  }
+  return nums;
+};
+
+export const isValidKrea2RebalanceWeights = (weights: string): boolean => parseKrea2RebalanceWeights(weights) !== null;
+
 export const selectSeamlessXAxis = createParamsSelector((params) => params.seamlessXAxis);
 export const selectSeamlessYAxis = createParamsSelector((params) => params.seamlessYAxis);
 export const selectSeed = createParamsSelector((params) => params.seed);

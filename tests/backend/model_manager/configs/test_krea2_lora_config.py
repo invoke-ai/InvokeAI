@@ -98,6 +98,59 @@ def test_explicit_krea2_override_accepts_diffusion_model_transformer_only_lora(_
 
 
 @patch("invokeai.backend.model_manager.configs.lora.raise_if_not_file")
+def test_explicit_krea2_override_accepts_multiple_complete_pairs(_raise_if_not_file) -> None:
+    # Several fully-paired layers (both lora_A/B and lora_down/up styles) must install cleanly.
+    mod = MagicMock()
+    mod.load_state_dict.return_value = {
+        "transformer.transformer_blocks.0.attn.to_q.lora_A.weight": object(),
+        "transformer.transformer_blocks.0.attn.to_q.lora_B.weight": object(),
+        "transformer.transformer_blocks.0.attn.to_k.lora_down.weight": object(),
+        "transformer.transformer_blocks.0.attn.to_k.lora_up.weight": object(),
+        "transformer.transformer_blocks.1.attn.to_v.lora_A.weight": object(),
+        "transformer.transformer_blocks.1.attn.to_v.lora_B.weight": object(),
+    }
+    config = LoRA_LyCORIS_Krea2_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS, "base": BaseModelType.Krea2})
+    assert config.base is BaseModelType.Krea2
+
+
+# One complete pair plus a dangling half of each kind - every mixed case must be rejected, because an
+# orphaned half installs here but crashes later during LoRA conversion (review 4800904928).
+_ORPHAN_HALVES = [
+    "transformer.transformer_blocks.0.attn.to_k.lora_A.weight",  # missing lora_B
+    "transformer.transformer_blocks.0.attn.to_k.lora_B.weight",  # missing lora_A
+    "transformer.transformer_blocks.0.attn.to_k.lora_down.weight",  # missing lora_up
+    "transformer.transformer_blocks.0.attn.to_k.lora_up.weight",  # missing lora_down
+]
+
+
+@pytest.mark.parametrize("orphan_key", _ORPHAN_HALVES)
+@patch("invokeai.backend.model_manager.configs.lora.raise_if_not_file")
+def test_explicit_krea2_override_rejects_complete_pair_plus_orphan(_raise_if_not_file, orphan_key: str) -> None:
+    mod = MagicMock()
+    mod.load_state_dict.return_value = {
+        "transformer.transformer_blocks.0.attn.to_q.lora_A.weight": object(),
+        "transformer.transformer_blocks.0.attn.to_q.lora_B.weight": object(),
+        orphan_key: object(),
+    }
+    with pytest.raises(NotAMatchError):
+        LoRA_LyCORIS_Krea2_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS, "base": BaseModelType.Krea2})
+
+
+@pytest.mark.parametrize("orphan_key", _ORPHAN_HALVES)
+@patch("invokeai.backend.model_manager.configs.lora.raise_if_not_file")
+def test_automatic_probe_rejects_complete_pair_plus_orphan(_raise_if_not_file, orphan_key: str) -> None:
+    # The automatic (no-override) path also validates completeness. text_fusion.* makes it look like Krea-2.
+    mod = MagicMock()
+    mod.load_state_dict.return_value = {
+        "transformer.text_fusion.0.lora_A.weight": object(),
+        "transformer.text_fusion.0.lora_B.weight": object(),
+        orphan_key: object(),
+    }
+    with pytest.raises(NotAMatchError):
+        LoRA_LyCORIS_Krea2_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS})
+
+
+@patch("invokeai.backend.model_manager.configs.lora.raise_if_not_file")
 def test_explicit_krea2_override_rejects_incomplete_diffusion_model_lora_pair(_raise_if_not_file) -> None:
     mod = MagicMock()
     mod.load_state_dict.return_value = {

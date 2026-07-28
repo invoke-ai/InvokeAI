@@ -382,4 +382,33 @@ describe('ImageMetadataHandlers — Krea-2 recall gating', () => {
       await expect(Promise.resolve().then(() => parsePercent(value, store))).rejects.toThrow();
     });
   });
+
+  // The rebalance weights are free text forwarded to the backend, which requires exactly 12 finite numbers.
+  // Recall must reject anything else so it can't dispatch state that fails at generation (review 4800904928).
+  describe('Krea2RebalanceWeights recall validation', () => {
+    const parseWeights = (value: unknown, store: AppStore) =>
+      (
+        ImageMetadataHandlers.Krea2RebalanceWeights as unknown as {
+          parse: (m: Record<string, unknown>, s: AppStore) => Promise<unknown>;
+        }
+      ).parse({ model: { base: 'krea-2' }, krea2_rebalance_weights: value }, store);
+
+    it('recalls exactly 12 finite comma-separated numbers', async () => {
+      currentBase = 'krea-2';
+      const value = '1,1,1,1,1,1,1,2.5,5,1.1,4,1';
+      expect(await parseWeights(value, makeStore())).toBe(value);
+    });
+
+    it.each([
+      ['too few', '1,2,3'],
+      ['too many', '1,2,3,4,5,6,7,8,9,10,11,12,13'],
+      ['nonnumeric', '1,2,3,4,5,6,7,8,9,10,11,x'],
+      ['nan', '1,2,3,4,5,6,7,8,9,10,11,nan'],
+      ['inf', '1,2,3,4,5,6,7,8,9,10,11,inf'],
+    ])('rejects %s', async (_label, value) => {
+      currentBase = 'krea-2';
+      const store = makeStore();
+      await expect(Promise.resolve().then(() => parseWeights(value, store))).rejects.toThrow();
+    });
+  });
 });

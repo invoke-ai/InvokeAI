@@ -8,7 +8,11 @@ import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { debounce, groupBy, upperFirst } from 'es-toolkit/compat';
 import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectAddedLoRAs } from 'features/controlLayers/store/lorasSlice';
-import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import {
+  isValidKrea2RebalanceWeights,
+  selectMainModelConfig,
+  selectParamsSlice,
+} from 'features/controlLayers/store/paramsSlice';
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { CanvasState, LoRA, ParamsState, RefImagesState } from 'features/controlLayers/store/types';
@@ -346,6 +350,16 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     if (!params.krea2Qwen3VlEncoderModel) {
       reasons.push({ content: i18n.t('parameters.invoke.noKrea2Qwen3VlEncoderModelSelected') });
     }
+  }
+
+  if (
+    model?.base === 'krea-2' &&
+    params.krea2RebalanceEnabled &&
+    !isValidKrea2RebalanceWeights(params.krea2RebalanceWeights)
+  ) {
+    // The rebalance weights are free text forwarded straight to the backend; block generation before an
+    // invalid string (wrong count / nonnumeric / nan / inf) reaches the failing _parse_weights().
+    reasons.push({ content: i18n.t('parameters.invoke.krea2RebalanceWeightsInvalid') });
   }
 
   if (model?.base === 'anima') {
@@ -876,6 +890,16 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     if (!params.krea2Qwen3VlEncoderModel) {
       reasons.push({ content: i18n.t('parameters.invoke.noKrea2Qwen3VlEncoderModelSelected') });
     }
+  }
+
+  if (
+    model?.base === 'krea-2' &&
+    params.krea2RebalanceEnabled &&
+    !isValidKrea2RebalanceWeights(params.krea2RebalanceWeights)
+  ) {
+    // The rebalance weights are free text forwarded straight to the backend; block generation before an
+    // invalid string (wrong count / nonnumeric / nan / inf) reaches the failing _parse_weights().
+    reasons.push({ content: i18n.t('parameters.invoke.krea2RebalanceWeightsInvalid') });
   }
 
   if (model?.base === 'anima') {

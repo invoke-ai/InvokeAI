@@ -14,6 +14,7 @@ import {
   geminiThinkingLevelChanged,
   heightChanged,
   imageSizeChanged,
+  isValidKrea2RebalanceWeights,
   kleinQwen3EncoderModelSelected,
   kleinVaeModelSelected,
   krea2Qwen3VlEncoderModelSelected,
@@ -1660,7 +1661,14 @@ const Krea2RebalanceWeights: SingleMetadataHandler<string> = {
     assert(selectBase(store.getState()) === 'krea-2', 'Krea2RebalanceWeights handler only applies to Krea-2 models');
     assertMetadataModelBase(metadata, 'krea-2', 'Krea2RebalanceWeights');
     const raw = getProperty(metadata, 'krea2_rebalance_weights');
-    return Promise.resolve(z.string().parse(raw));
+    // Only recall a string the backend rebalance node would actually accept (exactly 12 finite numbers),
+    // so recalling stale/garbage metadata can't dispatch state that later fails at generation time.
+    return Promise.resolve(
+      z
+        .string()
+        .refine(isValidKrea2RebalanceWeights, 'expected exactly 12 finite comma-separated numbers')
+        .parse(raw)
+    );
   },
   recall: (value, store) => {
     store.dispatch(setKrea2RebalanceWeights(value));

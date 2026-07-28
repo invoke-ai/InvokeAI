@@ -915,16 +915,51 @@ def _has_krea2_lora_keys(state_dict: dict[str | int, Any]) -> bool:
     return any(isinstance(k, str) and ("text_fusion" in k or "time_mod_proj" in k) for k in state_dict.keys())
 
 
-def _has_complete_lora_pair_for_prefixes(state_dict: dict[str | int, Any], prefixes: tuple[str, ...]) -> bool:
+# Each LoRA weight half must be accompanied by its partner half. An orphaned half installs successfully
+# but crashes later during LoRA conversion, so we reject it at identification time.
+_LORA_PAIR_PARTNERS = {
+    "lora_A.weight": "lora_B.weight",
+    "lora_B.weight": "lora_A.weight",
+    "lora_down.weight": "lora_up.weight",
+    "lora_up.weight": "lora_down.weight",
+}
+
+
+def _lora_weight_keys_are_all_paired(
+    state_dict: dict[str | int, Any], prefixes: tuple[str, ...] | None = None
+) -> bool:
+    """True if *every* lora_A/lora_B/lora_down/lora_up weight (optionally restricted to `prefixes`) has its
+    partner half present. Returns True when there are no such weights at all (nothing to invalidate)."""
     string_keys = {key for key in state_dict if isinstance(key, str)}
-    pairs = (("lora_A.weight", "lora_B.weight"), ("lora_down.weight", "lora_up.weight"))
+    for key in string_keys:
+        if prefixes is not None and not key.startswith(prefixes):
+            continue
+        for suffix, partner_suffix in _LORA_PAIR_PARTNERS.items():
+            if key.endswith(suffix):
+                if f"{key[: -len(suffix)]}{partner_suffix}" not in string_keys:
+                    return False
+                break
+    return True
+
+
+def _has_complete_lora_pair_for_prefixes(state_dict: dict[str | int, Any], prefixes: tuple[str, ...]) -> bool:
+    """True if there is at least one complete LoRA pair under `prefixes` AND no orphaned half under them.
+
+    A single orphaned ``lora_A``/``lora_B``/``lora_down``/``lora_up`` (a valid layer plus a dangling half)
+    would install successfully here but then fail during LoRA conversion, so it is rejected.
+    """
+    string_keys = {key for key in state_dict if isinstance(key, str)}
+    found_complete_pair = False
     for key in string_keys:
         if not key.startswith(prefixes):
             continue
-        for down_suffix, up_suffix in pairs:
-            if key.endswith(down_suffix) and f"{key[: -len(down_suffix)]}{up_suffix}" in string_keys:
-                return True
-    return False
+        for suffix, partner_suffix in _LORA_PAIR_PARTNERS.items():
+            if key.endswith(suffix):
+                if f"{key[: -len(suffix)]}{partner_suffix}" not in string_keys:
+                    return False
+                found_complete_pair = True
+                break
+    return found_complete_pair
 
 
 class LoRA_LyCORIS_Krea2_Config(LoRA_LyCORIS_Config_Base, Config_Base):
@@ -975,9 +1010,12 @@ class LoRA_LyCORIS_Krea2_Config(LoRA_LyCORIS_Config_Base, Config_Base):
                 "dora_scale",
             },
         )
-        if _has_krea2_lora_keys(state_dict) and has_lora_suffix:
-            return
-        raise NotAMatchError("model does not match Krea-2 LoRA heuristics")
+        if not (_has_krea2_lora_keys(state_dict) and has_lora_suffix):
+            raise NotAMatchError("model does not match Krea-2 LoRA heuristics")
+        # Reject a file with an orphaned LoRA half (a valid layer plus a dangling lora_A/B/down/up); it
+        # would install here but fail later during LoRA conversion.
+        if not _lora_weight_keys_are_all_paired(state_dict):
+            raise NotAMatchError("Krea-2 LoRA has an incomplete lora_A/B (or lora_down/up) weight pair")
 
     @classmethod
     def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:

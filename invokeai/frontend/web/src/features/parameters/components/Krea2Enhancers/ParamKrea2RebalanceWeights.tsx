@@ -1,7 +1,11 @@
 import { FormControl, FormLabel, Input } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { selectKrea2RebalanceWeights, setKrea2RebalanceWeights } from 'features/controlLayers/store/paramsSlice';
+import {
+  isValidKrea2RebalanceWeights,
+  selectKrea2RebalanceWeights,
+  setKrea2RebalanceWeights,
+} from 'features/controlLayers/store/paramsSlice';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -18,8 +22,12 @@ const ParamKrea2RebalanceWeights = () => {
     [dispatch]
   );
 
+  // Surface the same requirement readiness enforces (exactly 12 finite numbers), so an invalid string that
+  // blocks generation is visible in the field rather than only in the queue-blocked reason.
+  const isInvalid = !isValidKrea2RebalanceWeights(weights);
+
   return (
-    <FormControl orientation="vertical">
+    <FormControl orientation="vertical" isInvalid={isInvalid}>
       <InformationalPopover feature="krea2RebalanceWeights">
         <FormLabel>{t('parameters.krea2RebalanceWeights')}</FormLabel>
       </InformationalPopover>

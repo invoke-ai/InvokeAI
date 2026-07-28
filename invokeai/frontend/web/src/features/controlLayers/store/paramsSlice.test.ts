@@ -8,6 +8,7 @@ import type {
 import { describe, expect, it } from 'vitest';
 
 import {
+  isValidKrea2RebalanceWeights,
   paramsSliceConfig,
   positivePromptAddedToHistory,
   promptRemovedFromHistory,
@@ -277,5 +278,26 @@ describe('paramsSlice ideogram4Steps normalization (backend requires >= 2)', () 
       typeof getInitialParamsState
     >;
     expect(rehydrated.ideogram4Steps).toBeNull();
+  });
+});
+
+describe('isValidKrea2RebalanceWeights (backend rebalance node requires exactly 12 finite numbers)', () => {
+  it('accepts exactly 12 finite comma-separated numbers', () => {
+    expect(isValidKrea2RebalanceWeights('1,1,1,1,1,1,1,2.5,5,1.1,4,1')).toBe(true);
+    // Tolerates surrounding whitespace and a trailing comma (empty segments are ignored, as in the backend).
+    expect(isValidKrea2RebalanceWeights(' 1 , 2 , 3 , 4 , 5 , 6 , 7 , 8 , 9 , 10 , 11 , 12 ,')).toBe(true);
+    expect(isValidKrea2RebalanceWeights('0,-1,1.5,-2.25,3,4,5,6,7,8,9,10')).toBe(true);
+  });
+
+  it.each([
+    ['too few', '1,2,3'],
+    ['too many', '1,2,3,4,5,6,7,8,9,10,11,12,13'],
+    ['nonnumeric', '1,2,3,4,5,6,7,8,9,10,11,x'],
+    ['nan', '1,2,3,4,5,6,7,8,9,10,11,nan'],
+    ['inf', '1,2,3,4,5,6,7,8,9,10,11,inf'],
+    ['Infinity', '1,2,3,4,5,6,7,8,9,10,11,Infinity'],
+    ['empty', ''],
+  ])('rejects %s', (_label, value) => {
+    expect(isValidKrea2RebalanceWeights(value)).toBe(false);
   });
 });

@@ -1763,6 +1763,7 @@
             "noZImageQwen3EncoderSourceSelected": "No Qwen3 Encoder source: Select Qwen3 Encoder or Qwen3 Source model",
             "noKrea2VaeModelSelected": "Non-diffusers Krea-2: select a VAE in Advanced settings",
             "noKrea2Qwen3VlEncoderModelSelected": "Non-diffusers Krea-2: select a Qwen3-VL Encoder in Advanced settings",
+            "krea2RebalanceWeightsInvalid": "Krea-2 Conditioning Rebalance weights must be exactly 12 finite comma-separated numbers",
             "noAnimaVaeModelSelected": "No Anima VAE model selected",
             "noAnimaQwen3EncoderModelSelected": "No Anima Qwen3 Encoder model selected",
             "fluxModelIncompatibleBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), bbox width is {{width}}",
