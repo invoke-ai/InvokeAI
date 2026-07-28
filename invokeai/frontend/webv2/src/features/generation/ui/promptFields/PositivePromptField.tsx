@@ -4,19 +4,31 @@ import type { ChangeEvent, KeyboardEvent } from 'react';
 
 import { useRegisterGenerateDraftFlusher } from '@features/generation/ui/generateDraftRegistry';
 import { useDebouncedDraftValue } from '@features/generation/ui/useDebouncedDraftValue';
+import { useWildcards } from '@features/generation/ui/useWildcards';
 import { Field } from '@platform/ui';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import type { DynamicPromptsFieldConfig } from './DynamicPromptsPanel';
+
 import { PositivePromptActions, PromptTriggerPopover } from './PositivePromptActions';
 import { PROMPT_ATTENTION_TARGET_PROPS } from './promptAttentionHotkeys';
-import { insertPromptText, type PromptTextRange, registerPositivePromptElement } from './promptFocus';
+import {
+  getPromptTriggerRange,
+  insertPromptText,
+  type PromptTextRange,
+  type PromptTriggerKey,
+  registerPositivePromptElement,
+} from './promptFocus';
 import { promptHistoryNavigation } from './promptHistoryNavigation';
 import { PromptTextarea } from './PromptTextarea';
 
 const PROMPT_INPUT_DEBOUNCE_MS = 250;
 
 interface PositivePromptFieldProps {
+  batchCount?: number;
+  /** Absent on surfaces whose prompt is not batch-expanded (Upscale). */
+  dynamicPrompts?: DynamicPromptsFieldConfig | null;
   heightPx: number;
   loras: GenerateLora[];
   projectId: string;
@@ -30,10 +42,17 @@ interface PositivePromptFieldProps {
 
 type PromptTriggerPickerState = {
   anchorRect: { height: number; width: number; x: number; y: number };
+  /** The keystroke the picker consumed, restored if it is dismissed unpicked. */
+  pendingKey?: PromptTriggerKey;
   range?: PromptTextRange;
 };
 
+/** The positive prompt is the only field whose `__name__` references resolve. */
+const POSITIVE_PROMPT_TRIGGER_KEYS = ['<', '_'] as const;
+
 export const PositivePromptField = ({
+  batchCount = 1,
+  dynamicPrompts = null,
   heightPx,
   loras,
   onChange,
@@ -47,6 +66,7 @@ export const PositivePromptField = ({
   const { t } = useTranslation();
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [triggerPickerState, setTriggerPickerState] = useState<PromptTriggerPickerState | null>(null);
+  const { knownNames: knownWildcards } = useWildcards();
   const { commitDraftValue, draftValue, flushDraftValue, replaceDraftValue, setDraftValue } = useDebouncedDraftValue({
     delayMs: PROMPT_INPUT_DEBOUNCE_MS,
     onCommit: onChange,
@@ -72,31 +92,61 @@ export const PositivePromptField = ({
     [commitDraftValue]
   );
 
-  const openPromptTriggerPicker = useCallback((anchorElement: HTMLElement, range?: PromptTextRange) => {
-    const rect = anchorElement.getBoundingClientRect();
+  const openPromptTriggerPicker = useCallback(
+    (anchorElement: HTMLElement, range?: PromptTextRange, pendingKey?: PromptTriggerKey) => {
+      const rect = anchorElement.getBoundingClientRect();
 
-    setTriggerPickerState({
-      anchorRect: { height: rect.height, width: rect.width, x: rect.x, y: rect.y },
-      range,
-    });
-  }, []);
+      setTriggerPickerState({
+        anchorRect: { height: rect.height, width: rect.width, x: rect.x, y: rect.y },
+        pendingKey,
+        range,
+      });
+    },
+    []
+  );
 
   const handlePromptKeyDown = useCallback(
     (event: KeyboardEvent<HTMLTextAreaElement>) => {
-      if (event.key !== '<' || event.altKey || event.ctrlKey || event.metaKey) {
+      if (event.altKey || event.ctrlKey || event.metaKey) {
         return;
       }
 
+      const trigger = getPromptTriggerRange(
+        event.currentTarget.value,
+        event.currentTarget.selectionStart,
+        event.currentTarget.selectionEnd,
+        event.key,
+        POSITIVE_PROMPT_TRIGGER_KEYS
+      );
+
+      if (!trigger) {
+        return;
+      }
+
+      // The keystroke is held rather than typed, so the picked trigger reads as
+      // one edit. `dismissPromptTriggerPicker` puts it back if nothing is picked.
       event.preventDefault();
-      openPromptTriggerPicker(event.currentTarget, {
-        end: event.currentTarget.selectionEnd,
-        start: event.currentTarget.selectionStart,
-      });
+      openPromptTriggerPicker(event.currentTarget, trigger.range, trigger.key);
     },
     [openPromptTriggerPicker]
   );
 
   const closePromptTriggerPicker = useCallback(() => setTriggerPickerState(null), []);
+
+  /** Escape or click-away: the swallowed keystroke was the user's, so give it back. */
+  const dismissPromptTriggerPicker = useCallback(() => {
+    if (triggerPickerState?.pendingKey) {
+      insertPromptText({
+        onChange: commitPromptChange,
+        range: triggerPickerState.range,
+        textarea: textareaRef.current,
+        text: triggerPickerState.pendingKey === '_' ? '__' : triggerPickerState.pendingKey,
+        value: draftValue,
+      });
+    }
+
+    setTriggerPickerState(null);
+  }, [commitPromptChange, draftValue, triggerPickerState]);
 
   const selectPromptTrigger = useCallback(
     (trigger: string) => {
@@ -130,10 +180,21 @@ export const PositivePromptField = ({
     [openPromptTriggerPicker]
   );
 
+  const insertTextAtCaret = useCallback(
+    (text: string) => {
+      insertPromptText({ onChange: commitPromptChange, textarea: textareaRef.current, text, value: draftValue });
+    },
+    [commitPromptChange, draftValue]
+  );
+
   const labelEnd = useMemo(
     () => (
       <PositivePromptActions
+        batchCount={batchCount}
+        dynamicPrompts={dynamicPrompts}
         isPromptTriggerPickerOpen={triggerPickerState !== null}
+        showSyntaxHighlighting={showSyntaxHighlighting}
+        onInsertText={insertTextAtCaret}
         loras={loras}
         positivePrompt={draftValue}
         projectId={projectId}
@@ -144,13 +205,17 @@ export const PositivePromptField = ({
       />
     ),
     [
+      batchCount,
       commitPromptChangeImmediately,
       draftValue,
+      dynamicPrompts,
       handleOpenPromptTriggerPicker,
       handleUsePrompt,
+      insertTextAtCaret,
       loras,
       projectId,
       selectedModel,
+      showSyntaxHighlighting,
       triggerPickerState,
     ]
   );
@@ -175,6 +240,8 @@ export const PositivePromptField = ({
         resizeHandleAriaLabel={t('widgets.generate.resizePositivePrompt')}
         size="xs"
         fontFamily="mono"
+        highlightDynamicPrompts={dynamicPrompts !== null}
+        knownWildcards={knownWildcards}
         showSyntaxHighlighting={showSyntaxHighlighting}
         textareaRef={handleTextareaRef}
         value={draftValue}
@@ -188,7 +255,7 @@ export const PositivePromptField = ({
           open
           positioning={triggerPickerPositioning}
           selectedModel={selectedModel}
-          onClose={closePromptTriggerPicker}
+          onClose={dismissPromptTriggerPicker}
           onSelect={selectPromptTrigger}
         />
       ) : null}

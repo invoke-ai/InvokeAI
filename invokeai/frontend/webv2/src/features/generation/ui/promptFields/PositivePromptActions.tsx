@@ -1,12 +1,15 @@
 /* eslint-disable react/react-compiler */
 import type { GenerationModelCatalogItem as ModelConfig, PromptHistoryItem } from '@features/generation/contracts';
 import type { GenerateLora, GenerateModelConfig } from '@features/generation/core/types';
+import type { DynamicPromptsFieldConfig } from '@features/generation/ui/promptFields/DynamicPromptsPanel';
 import type { ChangeEvent, MouseEvent } from 'react';
 
 import { HStack, Icon, Image, Input, Popover, Portal, Separator, Stack, Text } from '@chakra-ui/react';
 import { filterPromptHistory } from '@features/generation/core/promptHistory';
 import { expandPrompt, imageToPrompt } from '@features/generation/data/promptUtilities';
 import { GenerationModelSelect as ModelSelect, useGenerationUi } from '@features/generation/ui/GenerationUiContext';
+import { DynamicPromptsButton } from '@features/generation/ui/promptFields/DynamicPromptsButton';
+import { useWildcards } from '@features/generation/ui/useWildcards';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, IconButton, Scrollable, Tooltip } from '@platform/ui';
@@ -19,6 +22,9 @@ const TEXT_LLM_MODEL_TYPES = ['text_llm'];
 const LLAVA_MODEL_TYPES = ['llava_onevision'];
 
 interface PositivePromptActionsProps {
+  batchCount: number;
+  /** Absent on surfaces whose prompt is not batch-expanded (Upscale). */
+  dynamicPrompts: DynamicPromptsFieldConfig | null;
   loras: GenerateLora[];
   isPromptTriggerPickerOpen: boolean;
   onUsePrompt: (prompt: PromptHistoryItem) => void;
@@ -27,18 +33,34 @@ interface PositivePromptActionsProps {
   projectId: string;
   onOpenPromptTriggerPicker: (anchorElement: HTMLElement) => void;
   onPositivePromptChangeImmediate: (prompt: string) => void;
+  onInsertText: (text: string) => void;
+  showSyntaxHighlighting: boolean;
 }
 
 export const PositivePromptActions = ({
+  batchCount,
+  dynamicPrompts,
   isPromptTriggerPickerOpen,
+  onInsertText,
   onOpenPromptTriggerPicker,
   onPositivePromptChangeImmediate,
   onUsePrompt,
   positivePrompt,
   projectId,
+  showSyntaxHighlighting,
 }: PositivePromptActionsProps) => {
   return (
     <HStack gap="0.5">
+      {dynamicPrompts ? (
+        <DynamicPromptsButton
+          batchCount={batchCount}
+          config={dynamicPrompts}
+          positivePrompt={positivePrompt}
+          showSyntaxHighlighting={showSyntaxHighlighting}
+          onInsertText={onInsertText}
+          onUsePrompt={onPositivePromptChangeImmediate}
+        />
+      ) : null}
       <AddPromptTriggerButton
         isOpen={isPromptTriggerPickerOpen}
         onOpenPromptTriggerPicker={onOpenPromptTriggerPicker}
@@ -78,14 +100,24 @@ const getPromptTriggerOptions = ({
   mainModelLabel,
   models,
   selectedModel,
+  wildcards,
+  wildcardsLabel,
 }: {
   compatibleEmbeddingsLabel: string;
   loras: GenerateLora[];
   mainModelLabel: string;
   models: readonly ModelConfig[];
   selectedModel: GenerateModelConfig | undefined;
+  wildcards: readonly { name: string; values: string[] }[];
+  wildcardsLabel: string;
 }): PromptTriggerOption[] => {
   const options: PromptTriggerOption[] = [];
+
+  // A wildcard inserts as `__name__`, which is just another trigger the picker
+  // can splice in, so it rides in the same list as embeddings and LoRA phrases.
+  for (const wildcard of wildcards) {
+    options.push({ group: wildcardsLabel, label: wildcard.name, value: `__${wildcard.name}__` });
+  }
 
   for (const phrase of getTriggerPhrases(selectedModel)) {
     options.push({ group: selectedModel?.name ?? mainModelLabel, label: phrase, value: phrase });
@@ -166,6 +198,7 @@ export const PromptTriggerPopover = ({
 }) => {
   const { t } = useTranslation();
   const { catalog: models, ensureLoaded: ensureModelsLoaded } = useGenerationUi().models;
+  const { wildcards } = useWildcards();
   const [searchTerm, setSearchTerm] = useState('');
 
   const options = useMemo(
@@ -176,8 +209,10 @@ export const PromptTriggerPopover = ({
         mainModelLabel: t('widgets.generate.mainModel'),
         models,
         selectedModel,
+        wildcards,
+        wildcardsLabel: t('widgets.generate.dynamicPrompts.wildcards'),
       }),
-    [loras, models, selectedModel, t]
+    [loras, models, selectedModel, t, wildcards]
   );
 
   const filteredOptions = useMemo(

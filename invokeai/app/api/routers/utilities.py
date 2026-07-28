@@ -2,14 +2,12 @@ import asyncio
 import logging
 import threading
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional
 
 import torch
-from dynamicprompts.generators import CombinatorialPromptGenerator, RandomPromptGenerator
 from fastapi import Body, HTTPException
 from fastapi.routing import APIRouter
 from pydantic import BaseModel, Field
-from pyparsing import ParseException
 from transformers import AutoProcessor, AutoTokenizer, LlavaOnevisionForConditionalGeneration, LlavaOnevisionProcessor
 
 from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
@@ -18,7 +16,8 @@ from invokeai.app.api.routers._access import assert_image_read_access
 from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
 from invokeai.app.services.image_files.image_files_common import ImageFileNotFoundException
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
-from invokeai.app.util.dynamicprompts import find_missing_wildcards
+from invokeai.app.services.wildcard_records.wildcard_records_common import build_wildcard_manager
+from invokeai.app.util.dynamicprompts import expand_dynamic_prompt
 from invokeai.backend.llava_onevision_pipeline import LlavaOnevisionPipeline
 from invokeai.backend.model_manager.taxonomy import ModelType
 from invokeai.backend.text_llm_pipeline import DEFAULT_SYSTEM_PROMPT, TextLLMPipeline
@@ -51,32 +50,17 @@ async def parse_dynamicprompts(
     combinatorial: bool = Body(default=True, description="Whether to use the combinatorial generator"),
     seed: int | None = Body(None, description="The seed to use for random generation. Only used if not combinatorial"),
 ) -> DynamicPromptsResponse:
-    """Creates a batch process"""
-    max_prompts = min(max_prompts, 10000)
-    generator: Union[RandomPromptGenerator, CombinatorialPromptGenerator]
-    error: Optional[str] = None
-
-    # An unknown wildcard used as a variant value sends the combinatorial generator into an infinite
-    # loop, so bail out early with a clear message instead of hanging the request (and with it the UI
-    # preview). The random generator handles unknown wildcards gracefully, so only the combinatorial
-    # path is guarded.
-    if combinatorial:
-        missing_wildcards = find_missing_wildcards(prompt)
-        if missing_wildcards:
-            wildcards = ", ".join(missing_wildcards)
-            return DynamicPromptsResponse(prompts=[prompt], error=f"No values found for wildcard(s): {wildcards}")
-
-    try:
-        if combinatorial:
-            generator = CombinatorialPromptGenerator()
-            prompts = generator.generate(prompt, max_prompts=max_prompts)
-        else:
-            generator = RandomPromptGenerator(seed=seed)
-            prompts = generator.generate(prompt, num_images=max_prompts)
-    except ParseException as e:
-        prompts = [prompt]
-        error = str(e)
-    return DynamicPromptsResponse(prompts=prompts if prompts else [""], error=error)
+    """Expands a prompt's dynamic syntax against the current user's wildcards."""
+    expanded = expand_dynamic_prompt(
+        prompt,
+        max_prompts=min(max_prompts, 10000),
+        combinatorial=combinatorial,
+        seed=seed,
+        wildcard_manager=build_wildcard_manager(
+            ApiDependencies.invoker.services.wildcard_records.get_many(user_id=current_user.user_id)
+        ),
+    )
+    return DynamicPromptsResponse(prompts=expanded.prompts, error=expanded.error)
 
 
 # --- Expand Prompt ---

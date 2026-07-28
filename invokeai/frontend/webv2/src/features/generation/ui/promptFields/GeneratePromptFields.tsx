@@ -1,10 +1,12 @@
 import type { PromptHistoryItem } from '@features/generation/contracts';
+import type { DynamicPromptsConfig } from '@features/generation/core/dynamicPrompts';
 import type { GenerateModelConfig, GenerateSettings } from '@features/generation/core/types';
 
 import { Stack } from '@chakra-ui/react';
 import { getPromptPolicy } from '@features/generation/core/baseGenerationPolicies';
+import { sanitizeBatchCount } from '@features/generation/core/batch';
 import { useGenerationUi } from '@features/generation/ui/GenerationUiContext';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 
 import { NegativePromptField } from './NegativePromptField';
 import { PositivePromptField } from './PositivePromptField';
@@ -24,6 +26,16 @@ interface GeneratePromptValues {
   positivePrompt: string;
   positivePromptHeightPx: number;
 }
+
+/** The flat GenerateSettings field behind each dynamic prompts config key. */
+const DYNAMIC_PROMPT_SETTING_KEYS = {
+  combinatorial: 'dynamicPromptsCombinatorial',
+  maxPrompts: 'dynamicPromptsMaxPrompts',
+  sampleSeed: 'dynamicPromptsSampleSeed',
+  seedBehaviour: 'dynamicPromptsSeedBehaviour',
+} as const satisfies Record<keyof DynamicPromptsConfig, keyof GenerateSettings>;
+
+type DynamicPromptsConfigKey = keyof typeof DYNAMIC_PROMPT_SETTING_KEYS;
 
 const getPromptValues = (values: Record<string, unknown>): GeneratePromptValues => ({
   negativePrompt: typeof values.negativePrompt === 'string' ? values.negativePrompt : '',
@@ -61,6 +73,36 @@ export const GeneratePromptFields = ({
 
   const handlePositivePromptChange = useCallback((positivePrompt: string) => onCommit({ positivePrompt }), [onCommit]);
 
+  const handleDynamicPromptsChange = useCallback(
+    (patch: Partial<DynamicPromptsConfig>) =>
+      onCommitImmediate(
+        Object.fromEntries(
+          Object.entries(patch).map(([key, value]) => [
+            DYNAMIC_PROMPT_SETTING_KEYS[key as DynamicPromptsConfigKey],
+            value,
+          ])
+        )
+      ),
+    [onCommitImmediate]
+  );
+
+  const dynamicPrompts = useMemo(
+    () => ({
+      combinatorial: settings.dynamicPromptsCombinatorial,
+      maxPrompts: settings.dynamicPromptsMaxPrompts,
+      onChange: handleDynamicPromptsChange,
+      sampleSeed: settings.dynamicPromptsSampleSeed,
+      seedBehaviour: settings.dynamicPromptsSeedBehaviour,
+    }),
+    [
+      handleDynamicPromptsChange,
+      settings.dynamicPromptsCombinatorial,
+      settings.dynamicPromptsMaxPrompts,
+      settings.dynamicPromptsSampleSeed,
+      settings.dynamicPromptsSeedBehaviour,
+    ]
+  );
+
   const handlePositivePromptResizeEnd = useCallback(
     (positivePromptHeightPx: number) => onCommitImmediate({ positivePromptHeightPx }),
     [onCommitImmediate]
@@ -81,6 +123,8 @@ export const GeneratePromptFields = ({
   return (
     <Stack gap="1" py="2">
       <PositivePromptField
+        batchCount={sanitizeBatchCount(generateValues.batchCount)}
+        dynamicPrompts={dynamicPrompts}
         heightPx={promptValues.positivePromptHeightPx}
         value={promptValues.positivePrompt}
         loras={settings.loras}

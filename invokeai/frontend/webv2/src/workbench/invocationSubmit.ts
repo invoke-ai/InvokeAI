@@ -13,11 +13,16 @@
  * node-testable with a fake dispatch + a stubbed canvas pipeline.
  */
 
+import type { GenerateSettings } from '@features/generation/contracts';
+import type { ParseDynamicPromptsResponse } from '@features/generation/prompts';
 import type { ModelConfig } from '@features/models';
 import type { AccountScope } from '@platform/state/accountLifecycle';
 import type { ResolvedInvocationRoute } from '@workbench/invocationContracts';
 import type { Project } from '@workbench/projectContracts';
 
+import { resolveDynamicPrompts } from '@features/generation/prompts';
+import { hasDynamicPromptSyntax, normalizeGenerateSettings } from '@features/generation/settings';
+import { queryClient } from '@platform/query/client';
 import { isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 
 import type { PrepareCanvasInvocationArgs } from './widgets/canvas/invoke/prepareCanvasInvocation';
@@ -26,6 +31,9 @@ import type { WorkbenchCommands } from './workbenchStore';
 import { readCanvasCompositingSettings } from './widgets/canvas/invoke/canvasCompositing';
 import { readCanvasDenoisingStrength } from './widgets/canvas/invoke/canvasStrength';
 import { getProjectWidgetValues } from './widgetState';
+
+/** Plain English, like the shell's other notices — this module has no i18n context. */
+const EXPANSION_FAILED_TITLE = 'The prompt could not be expanded';
 
 export interface SubmitResolvedInvocationDeps {
   /** The resolved route to submit — the caller has already checked it is valid. */
@@ -47,6 +55,43 @@ export interface SubmitResolvedInvocationDeps {
   formatControlLayerError?: PrepareCanvasInvocationArgs['formatControlLayerError'];
 }
 
+/**
+ * The GenerateSettings behind a route that expands `{a|b}`, or `null` when the
+ * route submits its prompt literally (Upscale, Workflow) or has no such syntax.
+ */
+const getExpandableSettings = (project: Project, route: ResolvedInvocationRoute): GenerateSettings | null => {
+  if (route.sourceId === 'upscale' || route.sourceId === 'workflow') {
+    return null;
+  }
+
+  const settings = normalizeGenerateSettings(getProjectWidgetValues(project, 'generate'));
+
+  return settings && hasDynamicPromptSyntax(settings.positivePrompt) ? settings : null;
+};
+
+/**
+ * Resolving the expansion here rather than inside Queue keeps Queue free of a
+ * Generation import, which would close a `gallery -> queue -> generation`
+ * dependency cycle. Reading the shared cache means invoking mid-edit still
+ * submits the prompts the backend actually produces.
+ *
+ * `null` means the request itself failed. A response may still carry an `error`
+ * alongside a usable-looking `prompts` — the route is deliberately soft so the
+ * preview can show the message, but the submit path must not act on it.
+ */
+const resolveExpandedPrompts = async (settings: GenerateSettings): Promise<ParseDynamicPromptsResponse | null> => {
+  try {
+    return await resolveDynamicPrompts(queryClient, {
+      combinatorial: settings.dynamicPromptsCombinatorial,
+      max_prompts: settings.dynamicPromptsMaxPrompts,
+      prompt: settings.positivePrompt,
+      seed: settings.dynamicPromptsCombinatorial ? null : settings.dynamicPromptsSampleSeed,
+    });
+  } catch {
+    return null;
+  }
+};
+
 export const submitResolvedInvocation = ({
   commands,
   formatControlLayerError,
@@ -60,6 +105,55 @@ export const submitResolvedInvocation = ({
     return;
   }
 
+  const expandableSettings = getExpandableSettings(project, route);
+
+  // Only a prompt with dynamic syntax pays for a round trip; every other Invoke
+  // stays on the synchronous path it has always taken.
+  if (expandableSettings) {
+    void resolveExpandedPrompts(expandableSettings).then((expansion) => {
+      if (!isAccountScopeCurrent(owner)) {
+        return;
+      }
+
+      // Submitting the authored text would put the literal `{a|b}` or `__name__`
+      // in front of the model, so a prompt that could not be expanded does not
+      // generate at all. The Invoke button gates on the same state; this covers
+      // the hotkey and graph-preview paths, which never see it.
+      if (expansion === null || expansion.error) {
+        commands.notifications.add({
+          kind: 'error',
+          message: expansion?.error ?? undefined,
+          title: EXPANSION_FAILED_TITLE,
+        });
+        return;
+      }
+
+      dispatchResolvedInvocation(
+        { commands, formatControlLayerError, models, owner, prepareCanvasInvocation, project, route },
+        expansion.prompts.length > 0 ? expansion.prompts : undefined
+      );
+    });
+    return;
+  }
+
+  dispatchResolvedInvocation(
+    { commands, formatControlLayerError, models, owner, prepareCanvasInvocation, project, route },
+    undefined
+  );
+};
+
+const dispatchResolvedInvocation = (
+  {
+    commands,
+    formatControlLayerError,
+    models,
+    owner,
+    prepareCanvasInvocation,
+    project,
+    route,
+  }: SubmitResolvedInvocationDeps,
+  positivePrompts: string[] | undefined
+): void => {
   if (route.sourceId === 'canvas') {
     // The canvas graph is composited + compiled asynchronously outside the
     // reducer; fire-and-track (the orchestrator records any failure notice and
@@ -74,6 +168,7 @@ export const submitResolvedInvocation = ({
       generateValues: getProjectWidgetValues(project, 'generate'),
       models,
       owner,
+      positivePrompts,
       projectId: project.id,
       projectSettings: project.settings,
       strength: readCanvasDenoisingStrength(getProjectWidgetValues(project, 'canvas')),
@@ -84,6 +179,7 @@ export const submitResolvedInvocation = ({
   commands.generation.submitResolved({
     backendSupportsCancellation: true,
     models,
+    positivePrompts,
     route,
   });
 };

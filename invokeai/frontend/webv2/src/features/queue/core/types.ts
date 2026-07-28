@@ -1,3 +1,5 @@
+import type { QueuePromptSeedBehaviour } from '@features/queue/core/promptBatch';
+
 export interface QueueBackendInvocation {
   id: string;
   type: string;
@@ -48,7 +50,13 @@ export interface QueueEnqueueGenerateRequest extends QueueEnqueueWorkflowRequest
   negativePromptNodeId: string;
   positivePrompt: string;
   positivePromptNodeId: string;
+  /**
+   * Prompts to submit as a batch dimension, already expanded by the caller.
+   * Absent or empty submits `positivePrompt` verbatim.
+   */
+  positivePrompts?: string[];
   seed: number;
+  seedBehaviour?: QueuePromptSeedBehaviour;
   seedNodeId: string;
   shouldRandomizeSeed: boolean;
 }
@@ -75,7 +83,10 @@ export type QueueCompiledSubmission =
       negativePromptNodeId: string;
       positivePrompt: string;
       positivePromptNodeId: string;
+      /** Absent on items compiled before dynamic prompting shipped. */
+      positivePrompts?: string[];
       seed: number;
+      seedBehaviour?: QueuePromptSeedBehaviour;
       seedNodeId: string;
       shouldRandomizeSeed: boolean;
     }

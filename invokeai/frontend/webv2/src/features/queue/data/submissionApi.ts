@@ -6,6 +6,7 @@ import type {
   QueueResultImageOptions,
 } from '@features/queue/core/types';
 
+import { buildGeneratePromptBatchPlan, sanitizeBatchCount } from '@features/queue/core/promptBatch';
 import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
 import { absolutizeApiUrl, ApiError, apiFetchJson } from '@platform/transport/http';
 
@@ -13,14 +14,6 @@ import type { QueueImageDTO, QueueServerItemDTO } from './serverTypes';
 
 import { buildQueueItemOrigin } from './events';
 import { getQueueItem } from './serverApi';
-
-const SEED_MAX = 4_294_967_295;
-
-const sanitizeBatchCount = (value: unknown): number =>
-  typeof value === 'number' && Number.isFinite(value) ? Math.max(1, Math.round(value)) : 1;
-
-const generateSeedSequence = (start: number, count: number): number[] =>
-  Array.from({ length: sanitizeBatchCount(count) }, (_, index) => (start + index) % SEED_MAX);
 
 const mapEnqueueResult = (result: {
   batch?: { batch_id?: string };
@@ -35,12 +28,17 @@ const mapEnqueueResult = (result: {
 });
 
 export const enqueueGenerate = async (request: QueueEnqueueGenerateRequest): Promise<QueueEnqueueResult> => {
-  const batchCount = sanitizeBatchCount(request.batchCount);
-  const seeds = request.shouldRandomizeSeed ? generateSeedSequence(request.seed, batchCount) : [request.seed];
-  const prompts = request.shouldRandomizeSeed ? seeds.map(() => request.positivePrompt) : [request.positivePrompt];
-  const negativePrompts = request.shouldRandomizeSeed
-    ? seeds.map(() => request.negativePrompt)
-    : [request.negativePrompt];
+  const plan = buildGeneratePromptBatchPlan({
+    batchCount: sanitizeBatchCount(request.batchCount),
+    negativePrompt: request.negativePrompt,
+    negativePromptNodeId: request.negativePromptNodeId,
+    positivePromptNodeId: request.positivePromptNodeId,
+    prompts: request.positivePrompts?.length ? request.positivePrompts : [request.positivePrompt],
+    seed: request.seed,
+    seedBehaviour: request.seedBehaviour ?? 'per-iteration',
+    seedNodeId: request.seedNodeId,
+    shouldRandomizeSeed: request.shouldRandomizeSeed,
+  });
   const result = await apiFetchJson<{
     batch?: { batch_id?: string };
     enqueued?: number;
@@ -49,17 +47,11 @@ export const enqueueGenerate = async (request: QueueEnqueueGenerateRequest): Pro
   }>('/api/v1/queue/default/enqueue_batch', {
     body: JSON.stringify({
       batch: {
-        data: [
-          [
-            { field_name: 'value', items: seeds, node_path: request.seedNodeId },
-            { field_name: 'value', items: prompts, node_path: request.positivePromptNodeId },
-            { field_name: 'value', items: negativePrompts, node_path: request.negativePromptNodeId },
-          ],
-        ],
+        data: plan.data,
         destination: request.destination,
         graph: request.graph,
         origin: buildQueueItemOrigin(request.sourceQueueItemId, request.projectId),
-        runs: request.shouldRandomizeSeed ? 1 : batchCount,
+        runs: plan.runs,
       },
       prepend: false,
     }),

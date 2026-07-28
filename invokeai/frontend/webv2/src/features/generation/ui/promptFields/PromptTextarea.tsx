@@ -1,32 +1,18 @@
-import type { PromptHighlightKind, PromptHighlightSegment } from '@features/generation/core/prompt/highlight';
 import type { ResizableTextareaProps } from '@platform/ui';
 import type { Ref, UIEvent } from 'react';
 
 import { Box } from '@chakra-ui/react';
-import { buildPromptHighlightSegments } from '@features/generation/core/prompt/highlight';
+import { HighlightedPrompt, MAX_HIGHLIGHTED_PROMPT_LENGTH } from '@features/generation/ui/promptFields/PromptHighlight';
+import { getLineNumberGutterCh, PromptLineNumbers } from '@features/generation/ui/promptFields/PromptLineNumbers';
 import { ResizableTextarea } from '@platform/ui';
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
-
-const MAX_HIGHLIGHTED_PROMPT_LENGTH = 20_000;
 const PROMPT_TEXTAREA_LINE_HEIGHT = '1.6';
-const PROMPT_TEXTAREA_PX = '2.5';
-const PROMPT_TEXTAREA_PY = '2';
-
-const HIGHLIGHT_STYLE_BY_KIND: Record<
-  PromptHighlightKind,
-  { bg?: string; color: string; textDecoration?: string; textDecorationColor?: string }
-> = {
-  attention: { color: 'accent.solid' },
-  attentionNumeric: { color: 'fg.success' },
-  embedding: { bg: 'bg.warning', color: 'fg.warning' },
-  error: { bg: 'bg.error', color: 'fg.error', textDecoration: 'underline wavy', textDecorationColor: 'fg.error' },
-  escapedParen: { color: 'fg.muted' },
-  group: { color: 'fg.subtle' },
-  promptFunctionArg: { bg: 'accent.subtle/20', color: 'fg' },
-  promptFunctionMethod: { color: 'accent.fg' },
-  punctuation: { color: 'fg.subtle' },
-  text: { color: 'fg' },
-};
+// Literal lengths rather than spacing tokens: the gutter offset is a `calc()`,
+// and Chakra's generated var name for a fractional token does not resolve inside
+// one, which silently invalidates the whole declaration. These are the `2.5` and
+// `2` spacing tokens.
+const PROMPT_TEXTAREA_PX = '0.625rem';
+const PROMPT_TEXTAREA_PY = '0.5rem';
 
 const PROMPT_TEXTAREA_FORCED_COLORS_CSS = { '@media (forced-colors: active)': { display: 'none' } };
 const PROMPT_TEXTAREA_HIGHLIGHTED_CSS = {
@@ -40,7 +26,17 @@ const PROMPT_TEXTAREA_HIGHLIGHTED_CSS = {
 };
 
 interface PromptTextareaProps extends Omit<ResizableTextareaProps, 'underlay'> {
+  /**
+   * Annotate `{a|b}` syntax. Only surfaces whose prompt is batch-expanded set
+   * this — elsewhere the braces are literal text and colouring them would
+   * promise an expansion that never happens.
+   */
+  highlightDynamicPrompts?: boolean;
+  /** Resolvable wildcard names; an unknown `__name__` is underlined as an error. */
+  knownWildcards?: ReadonlySet<string>;
   showSyntaxHighlighting: boolean;
+  /** Number logical lines in a leading gutter, the way an editor does. */
+  showLineNumbers?: boolean;
   value: string;
 }
 
@@ -57,28 +53,14 @@ const setRef = (ref: Ref<HTMLTextAreaElement> | undefined, element: HTMLTextArea
   (ref as { current: HTMLTextAreaElement | null }).current = element;
 };
 
-const PromptHighlightSpan = ({ segment }: { segment: PromptHighlightSegment }) => {
-  const style = HIGHLIGHT_STYLE_BY_KIND[segment.kind];
-
-  return (
-    <Box
-      as="span"
-      bg={style.bg}
-      borderRadius={style.bg ? '2px' : undefined}
-      color={style.color}
-      textDecoration={style.textDecoration}
-      textDecorationColor={style.textDecorationColor}
-    >
-      {segment.text}
-    </Box>
-  );
-};
-
 export const PromptTextarea = ({
   fontFamily = 'mono',
   fontSize,
+  highlightDynamicPrompts = false,
+  knownWildcards,
   lineHeight,
   onScroll,
+  showLineNumbers = false,
   showSyntaxHighlighting,
   textareaRef,
   value,
@@ -90,14 +72,19 @@ export const PromptTextarea = ({
   const shouldHighlight = showSyntaxHighlighting && value.length > 0 && value.length <= MAX_HIGHLIGHTED_PROMPT_LENGTH;
   const effectiveFontSize = fontSize ?? '0.82rem';
   const effectiveLineHeight = lineHeight ?? PROMPT_TEXTAREA_LINE_HEIGHT;
+  // The gutter widens with the line count, and the text has to start clear of it.
+  const gutterCh = showLineNumbers ? getLineNumberGutterCh(value.split('\n').length) : 0;
+  const paddingInlineStart = showLineNumbers ? `calc(${PROMPT_TEXTAREA_PX} + ${gutterCh}ch)` : undefined;
 
-  const segments = useMemo(
-    () => (shouldHighlight ? buildPromptHighlightSegments(value) : []),
-    [shouldHighlight, value]
+  const highlightOptions = useMemo(
+    () => ({ dynamicPrompts: highlightDynamicPrompts, knownWildcards }),
+    [highlightDynamicPrompts, knownWildcards]
   );
 
+  const needsMirror = shouldHighlight || showLineNumbers;
+
   useLayoutEffect(() => {
-    if (!shouldHighlight || !localTextareaRef.current) {
+    if (!needsMirror || !localTextareaRef.current) {
       return;
     }
 
@@ -117,7 +104,7 @@ export const PromptTextarea = ({
       resizeObserver.disconnect();
       window.removeEventListener('resize', syncClientWidth);
     };
-  }, [shouldHighlight, value]);
+  }, [needsMirror, value]);
 
   const handleTextareaRef = useCallback(
     (element: HTMLTextAreaElement | null) => {
@@ -135,7 +122,20 @@ export const PromptTextarea = ({
     [onScroll]
   );
 
-  const underlay = useMemo(
+  const lineNumberMetrics = useMemo(
+    () => ({
+      clientWidth: textareaClientWidth,
+      fontFamily,
+      fontSize: effectiveFontSize,
+      lineHeight: effectiveLineHeight,
+      paddingBlock: PROMPT_TEXTAREA_PY,
+      paddingInline: PROMPT_TEXTAREA_PX,
+      scrollTop: scroll.top,
+    }),
+    [effectiveFontSize, effectiveLineHeight, fontFamily, scroll.top, textareaClientWidth]
+  );
+
+  const highlightUnderlay = useMemo(
     () =>
       shouldHighlight ? (
         <Box
@@ -159,18 +159,14 @@ export const PromptTextarea = ({
             m="0"
             minH="100%"
             overflowWrap="break-word"
-            px={PROMPT_TEXTAREA_PX}
-            py={PROMPT_TEXTAREA_PY}
+            paddingBlock={PROMPT_TEXTAREA_PY}
+            paddingInline={PROMPT_TEXTAREA_PX}
+            paddingInlineStart={paddingInlineStart}
             transform={`translate(${-scroll.left}px, ${-scroll.top}px)`}
             whiteSpace="pre-wrap"
             w={textareaClientWidth ? `${textareaClientWidth}px` : '100%'}
           >
-            {segments.map((segment) => (
-              <PromptHighlightSpan
-                key={`${segment.range.start}:${segment.range.end}:${segment.kind}`}
-                segment={segment}
-              />
-            ))}
+            <HighlightedPrompt options={highlightOptions} prompt={value} />
             {value.endsWith('\n') ? '\u200b' : null}
           </Box>
         </Box>
@@ -179,13 +175,25 @@ export const PromptTextarea = ({
       effectiveFontSize,
       effectiveLineHeight,
       fontFamily,
+      highlightOptions,
+      paddingInlineStart,
       scroll.left,
       scroll.top,
-      segments,
       shouldHighlight,
       textareaClientWidth,
       value,
     ]
+  );
+
+  const underlay = useMemo(
+    () =>
+      needsMirror ? (
+        <>
+          {highlightUnderlay}
+          {showLineNumbers ? <PromptLineNumbers metrics={lineNumberMetrics} value={value} /> : null}
+        </>
+      ) : null,
+    [highlightUnderlay, lineNumberMetrics, needsMirror, showLineNumbers, value]
   );
 
   return (
@@ -199,8 +207,9 @@ export const PromptTextarea = ({
       fontSize={effectiveFontSize}
       lineHeight={effectiveLineHeight}
       overflowWrap="break-word"
-      px={PROMPT_TEXTAREA_PX}
-      py={PROMPT_TEXTAREA_PY}
+      paddingBlock={PROMPT_TEXTAREA_PY}
+      paddingInline={PROMPT_TEXTAREA_PX}
+      paddingInlineStart={paddingInlineStart}
       textareaRef={handleTextareaRef}
       underlay={underlay}
       value={value}

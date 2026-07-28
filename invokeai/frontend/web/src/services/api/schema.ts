@@ -296,7 +296,7 @@ export type paths = {
         put?: never;
         /**
          * Parse Dynamicprompts
-         * @description Creates a batch process
+         * @description Expands a prompt's dynamic syntax against the current user's wildcards.
          */
         post: operations["parse_dynamicprompts"];
         delete?: never;
@@ -2629,6 +2629,54 @@ export type paths = {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/wildcards/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Wildcards
+         * @description Lists the current user's wildcards.
+         */
+        get: operations["list_wildcards"];
+        put?: never;
+        /**
+         * Create Wildcard
+         * @description Creates a wildcard owned by the current user.
+         */
+        post: operations["create_wildcard"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/wildcards/{wildcard_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Wildcard
+         * @description Deletes a wildcard owned by the current user.
+         */
+        delete: operations["delete_wildcard"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Wildcard
+         * @description Updates a wildcard owned by the current user.
+         */
+        patch: operations["update_wildcard"];
         trace?: never;
     };
     "/api/v1/client_state/{queue_id}/get_by_key": {
@@ -32749,6 +32797,55 @@ export type components = {
              */
             cover_image_name?: string | null;
         };
+        /** WildcardChanges */
+        WildcardChanges: {
+            /**
+             * Name
+             * @description The wildcard's new name.
+             */
+            name?: string | null;
+            /**
+             * Values
+             * @description The wildcard's new values.
+             */
+            values?: string[] | null;
+        };
+        /** WildcardRecordDTO */
+        WildcardRecordDTO: {
+            /**
+             * Name
+             * @description The wildcard's name, referenced in a prompt as `__name__`.
+             */
+            name: string;
+            /**
+             * Values
+             * @description The values this wildcard expands to.
+             */
+            values: string[];
+            /**
+             * Id
+             * @description The wildcard ID.
+             */
+            id: string;
+            /**
+             * User Id
+             * @description The user who owns this wildcard.
+             */
+            user_id: string;
+        };
+        /** WildcardWithoutId */
+        WildcardWithoutId: {
+            /**
+             * Name
+             * @description The wildcard's name, referenced in a prompt as `__name__`.
+             */
+            name: string;
+            /**
+             * Values
+             * @description The values this wildcard expands to.
+             */
+            values: string[];
+        };
         /** Workflow */
         Workflow: {
             /**
@@ -39579,6 +39676,125 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_wildcards: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WildcardRecordDTO"][];
+                };
+            };
+        };
+    };
+    create_wildcard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WildcardWithoutId"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WildcardRecordDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_wildcard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The id of the wildcard to delete */
+                wildcard_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_wildcard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The id of the wildcard to update */
+                wildcard_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WildcardChanges"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WildcardRecordDTO"];
                 };
             };
             /** @description Validation Error */

@@ -448,6 +448,23 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         return json(200, []);
       }
 
+      if (method === 'GET' && (path === '/api/v1/wildcards' || path === '/api/v1/wildcards/')) {
+        return json(200, []);
+      }
+
+      // Dynamic prompt expansion. Enough of the `{a|b}` grammar for journeys to
+      // exercise the preview and the batch dimension; the real generator lives
+      // in the backend.
+      if (method === 'POST' && path === '/api/v1/utilities/dynamicprompts') {
+        const requested = await readJsonBody(request);
+        const prompt = typeof requested?.prompt === 'string' ? requested.prompt : '';
+        const maxPrompts = typeof requested?.max_prompts === 'number' ? requested.max_prompts : 100;
+        const match = /\{([^{}]*)\}/.exec(prompt);
+        const prompts = match ? match[1].split('|').map((value) => prompt.replace(match[0], value.trim())) : [prompt];
+
+        return json(200, { error: null, prompts: prompts.slice(0, Math.max(1, maxPrompts)) });
+      }
+
       if (method === 'GET' && (path === '/api/v2/custom_nodes' || path === '/api/v2/custom_nodes/')) {
         return json(200, state.nodeCatalog);
       }

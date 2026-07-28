@@ -98,6 +98,8 @@ export interface RunCanvasInvocationDeps {
    * composite → upload, releasing pixel resources on both success and failure.
    */
   composeForGeneration: (options: ComposeForGenerationOptions) => Promise<ComposeForGenerationResult>;
+  /** Expanded positive prompts, resolved by the caller before submitting. */
+  positivePrompts?: string[];
   /** Cancels raster capture for this invocation. */
   signal: AbortSignal;
   /** Paint-bitmap persistence barrier, awaited before compositing. */
@@ -401,6 +403,7 @@ export const runCanvasInvocation = async (deps: RunCanvasInvocationDeps): Promis
       },
       graph: compiled.graph,
       canvas: composites.canvas,
+      positivePrompts: deps.positivePrompts,
       projectId,
     });
     composed.dedupeCommit.commit();
@@ -440,6 +443,8 @@ export interface PrepareCanvasInvocationArgs {
   models?: readonly ModelConfig[];
   /** Caller-captured identity lifetime; direct synchronous callers may omit it. */
   owner?: AccountScope;
+  /** Expanded positive prompts, resolved by the caller before submitting. */
+  positivePrompts?: string[];
   projectSettings: Pick<ProjectSettings, 'useCpuNoise'>;
   strength: number;
   signal?: AbortSignal;

@@ -8,6 +8,7 @@ import type {
 } from '@features/queue/core/types';
 import type { BackendConnectionStatus } from '@platform/transport/types';
 
+import { isQueuePromptSeedBehaviour } from '@features/queue/core/promptBatch';
 import { shouldSubmitPendingQueueItem } from '@features/queue/core/submissionRules';
 import {
   createQueueCoordinator,
@@ -114,7 +115,11 @@ export const createQueueItemBackendSubmission = (
       typeof submission.seed !== 'number' ||
       !Number.isFinite(submission.seed) ||
       typeof submission.seedNodeId !== 'string' ||
-      typeof submission.shouldRandomizeSeed !== 'boolean'
+      typeof submission.shouldRandomizeSeed !== 'boolean' ||
+      (submission.positivePrompts !== undefined &&
+        (!Array.isArray(submission.positivePrompts) ||
+          submission.positivePrompts.some((prompt) => typeof prompt !== 'string'))) ||
+      (submission.seedBehaviour !== undefined && !isQueuePromptSeedBehaviour(submission.seedBehaviour))
     ) {
       return { error: 'Queue item has malformed generate submission metadata.', kind: 'invalid' };
     }
