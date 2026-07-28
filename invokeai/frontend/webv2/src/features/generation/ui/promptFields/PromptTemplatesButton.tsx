@@ -7,7 +7,7 @@ import { toPromptTemplateSnapshot } from '@features/generation/data/promptTempla
 import { PromptTemplateEditor } from '@features/generation/ui/promptFields/PromptTemplateEditor';
 import { PromptTemplatesPanel } from '@features/generation/ui/promptFields/PromptTemplatesPanel';
 import { useOnPendingPromptTemplateDraft } from '@features/generation/ui/promptTemplateDraftStore';
-import { usePromptTemplates } from '@features/generation/ui/usePromptTemplates';
+import { isPromptTemplateMissing, usePromptTemplates } from '@features/generation/ui/usePromptTemplates';
 import { IconButton } from '@platform/ui/Button';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { LayoutTemplateIcon } from 'lucide-react';
@@ -37,7 +37,12 @@ export const PromptTemplatesButton = ({
   const triggerId = useId();
   const [isOpen, setIsOpen] = useState(false);
   const [editorTarget, setEditorTarget] = useState<EditorTarget | null>(null);
-  const catalog = usePromptTemplates();
+  // The list is behind the popover, so a closed button has nothing to show —
+  // but an applied template still has to be re-read, both to refresh its text
+  // and to notice it has been deleted. Without this the widget's own gating did
+  // nothing: react-query enables a query if any one observer wants it, and this
+  // observer always did.
+  const catalog = usePromptTemplates({ isEnabled: isOpen || activeTemplate !== null });
   const popoverIds = useMemo(() => ({ trigger: triggerId }), [triggerId]);
   // A draft handed over from the gallery opens the editor straight away.
   useOnPendingPromptTemplateDraft(
@@ -87,8 +92,13 @@ export const PromptTemplatesButton = ({
     [activeTemplate?.id, onApply]
   );
 
+  // Deleted in another tab, or by another session of this one. It keeps
+  // applying — that policy is deliberate — so the only thing wrong is that
+  // nothing said so.
+  const isMissing = isPromptTemplateMissing(catalog, activeTemplate);
+
   const tooltip = activeTemplate
-    ? t('widgets.generate.promptTemplates.applied', { name: activeTemplate.name })
+    ? t(`widgets.generate.promptTemplates.${isMissing ? 'appliedMissing' : 'applied'}`, { name: activeTemplate.name })
     : t('widgets.generate.promptTemplates.title');
 
   return (
@@ -114,7 +124,9 @@ export const PromptTemplatesButton = ({
           >
             <LayoutTemplateIcon />
             {activeTemplate ? (
-              <Text as="span" fontSize="2xs" maxW="6rem" truncate>
+              // Dimmed when it is gone, the same way the icon dims when nothing
+              // is applied — one vocabulary for "not fully live", no new colour.
+              <Text as="span" fontSize="2xs" maxW="6rem" opacity={isMissing ? 0.5 : undefined} truncate>
                 {activeTemplate.name}
               </Text>
             ) : null}
@@ -143,6 +155,7 @@ export const PromptTemplatesButton = ({
               ) : (
                 <PromptTemplatesPanel
                   activeTemplate={activeTemplate}
+                  isActiveTemplateMissing={isMissing}
                   catalog={catalog}
                   onApply={applyAndClose}
                   onDetach={detachTemplate}

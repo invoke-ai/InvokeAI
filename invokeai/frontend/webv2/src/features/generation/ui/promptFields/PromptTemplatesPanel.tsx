@@ -24,6 +24,8 @@ const THUMBNAIL_SIZE = '7';
 interface PromptTemplatesPanelProps {
   catalog: PromptTemplateCatalog;
   activeTemplate: PromptTemplateSnapshot | null;
+  /** The applied template is no longer in the catalog — deleted elsewhere. */
+  isActiveTemplateMissing: boolean;
   onApply: (template: PromptTemplateSnapshot | null) => void;
   /**
    * Stop applying the active template without dismissing the panel — for when it
@@ -43,6 +45,7 @@ const getTemplateProse = (template: PromptTemplateRecord): readonly string[] => 
 export const PromptTemplatesPanel = ({
   activeTemplate,
   catalog,
+  isActiveTemplateMissing,
   onApply,
   onDetach,
   onCreate,
@@ -158,6 +161,14 @@ export const PromptTemplatesPanel = ({
               </Button>
             ) : null}
           </HStack>
+          {/* The list above cannot explain an absence, so this says it in
+              words: the template is gone but still shaping the prompt, and the
+              button beside it is how to stop that. */}
+          {activeTemplate && isActiveTemplateMissing ? (
+            <Text color="fg.subtle" fontSize="2xs">
+              {t('widgets.generate.promptTemplates.appliedMissingHelp', { name: activeTemplate.name })}
+            </Text>
+          ) : null}
         </>
       ) : null}
 

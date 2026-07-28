@@ -1026,6 +1026,8 @@
         "noTemplatesYet": "No templates yet. Create one to reuse a prompt with {prompt} where your own text goes.",
         "noMatches": "No matching templates",
         "applied": "Template: {{name}}",
+        "appliedMissing": "Template: {{name}} (deleted)",
+        "appliedMissingHelp": "\u201c{{name}}\u201d was deleted. It still shapes your prompt until you stop using it.",
         "clearApplied": "Stop using {{name}}",
         "clear": "Clear",
         "name": "Name",

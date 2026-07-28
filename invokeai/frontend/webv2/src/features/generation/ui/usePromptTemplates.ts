@@ -1,3 +1,4 @@
+import type { PromptTemplateSnapshot } from '@features/generation/core/promptTemplates';
 import type { PromptTemplateDraft, PromptTemplateRecord } from '@features/generation/data/promptTemplates';
 
 import {
@@ -22,6 +23,13 @@ export interface PromptTemplateCatalog {
   /** Every visible template, for resolving a stored snapshot. */
   templates: PromptTemplateRecord[];
   isLoading: boolean;
+  /**
+   * The catalog has been read at least once, successfully. Distinct from
+   * `!isLoading`, which is also true of a fetch that failed and of one that
+   * never ran — telling a deleted template apart from an unread catalog needs
+   * the difference.
+   */
+  isLoaded: boolean;
   /** Resolves with the saved record so a caller can refresh an applied snapshot. */
   create: (draft: PromptTemplateDraft) => Promise<PromptTemplateRecord>;
   update: (id: string, draft: PromptTemplateDraft) => Promise<PromptTemplateRecord>;
@@ -89,6 +97,7 @@ export const usePromptTemplates = ({ isEnabled = true }: { isEnabled?: boolean }
     exportCsv: exportPromptTemplates,
     fetchImage: fetchPromptTemplateImage,
     importFile,
+    isLoaded: query.isSuccess,
     isLoading: query.isPending,
     remove,
     templates,
@@ -96,3 +105,16 @@ export const usePromptTemplates = ({ isEnabled = true }: { isEnabled?: boolean }
     userTemplates,
   };
 };
+
+/**
+ * Whether the applied template has been deleted out from under this tab.
+ *
+ * The snapshot keeps applying either way — a queue item has to explain itself
+ * after its template is gone, and a catalog that is empty because it is still
+ * loading or because the fetch failed must not silently change what generates.
+ * That policy is right and stays; this is only what makes it visible.
+ */
+export const isPromptTemplateMissing = (
+  catalog: PromptTemplateCatalog,
+  active: PromptTemplateSnapshot | null
+): boolean => active !== null && catalog.isLoaded && !catalog.templates.some((template) => template.id === active.id);

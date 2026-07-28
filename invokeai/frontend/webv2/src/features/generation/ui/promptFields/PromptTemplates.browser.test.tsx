@@ -46,6 +46,8 @@ const translation = {
         noTemplatesYet: 'No templates yet. Create one to reuse a prompt with {prompt} where your own text goes.',
         noMatches: 'No matching templates',
         applied: 'Template: {{name}}',
+        appliedMissing: 'Template: {{name}} (deleted)',
+        appliedMissingHelp: '“{{name}}” was deleted. It still shapes your prompt until you stop using it.',
         clearApplied: 'Stop using {{name}}',
         clear: 'Clear',
         name: 'Name',
@@ -124,6 +126,7 @@ const createCatalog = (overrides: Partial<PromptTemplateCatalog> = {}): PromptTe
   exportCsv: vi.fn(),
   fetchImage: vi.fn().mockResolvedValue(null),
   importFile: vi.fn(),
+  isLoaded: true,
   isLoading: false,
   remove: vi.fn(),
   templates: [userTemplate, defaultTemplate],
@@ -164,6 +167,7 @@ describe('the prompt templates panel', () => {
     await render(
       <PromptTemplatesPanel
         activeTemplate={null}
+        isActiveTemplateMissing={false}
         catalog={createCatalog()}
         onApply={onApply}
         onCreate={vi.fn()}
@@ -192,6 +196,7 @@ describe('the prompt templates panel', () => {
     await render(
       <PromptTemplatesPanel
         activeTemplate={userTemplate}
+        isActiveTemplateMissing={false}
         catalog={createCatalog()}
         onApply={onApply}
         onCreate={vi.fn()}
@@ -218,6 +223,7 @@ describe('the prompt templates panel', () => {
     await render(
       <PromptTemplatesPanel
         activeTemplate={userTemplate}
+        isActiveTemplateMissing={false}
         catalog={createCatalog()}
         onApply={onApply}
         onCreate={vi.fn()}
@@ -247,6 +253,7 @@ describe('the prompt templates panel', () => {
     await render(
       <PromptTemplatesPanel
         activeTemplate={null}
+        isActiveTemplateMissing={false}
         catalog={createCatalog()}
         onApply={vi.fn()}
         onCreate={vi.fn()}
@@ -265,6 +272,7 @@ describe('the prompt templates panel', () => {
     await render(
       <PromptTemplatesPanel
         activeTemplate={null}
+        isActiveTemplateMissing={false}
         catalog={createCatalog()}
         onApply={vi.fn()}
         onCreate={vi.fn()}
@@ -281,12 +289,50 @@ describe('the prompt templates panel', () => {
     expect(host!.textContent).not.toContain('Cinematic');
   });
 
+  // The snapshot deliberately keeps applying after the template is gone, so a
+  // queue item can still explain itself. Nothing said so, which left a prompt
+  // being reshaped by something the list no longer contains.
+  it('says when the applied template is no longer in the catalog', async () => {
+    await render(
+      <PromptTemplatesPanel
+        activeTemplate={userTemplate}
+        isActiveTemplateMissing
+        catalog={createCatalog({ templates: [defaultTemplate], userTemplates: [] })}
+        onApply={vi.fn()}
+        onCreate={vi.fn()}
+        onDetach={vi.fn()}
+        onEdit={vi.fn()}
+      />
+    );
+
+    expect(host!.textContent).toContain('was deleted');
+    // And the way out is still offered beside it.
+    expect(buttonWithText('Stop using Cinematic')).toBeTruthy();
+  });
+
+  it('says nothing of the sort while the template is still there', async () => {
+    await render(
+      <PromptTemplatesPanel
+        activeTemplate={userTemplate}
+        isActiveTemplateMissing={false}
+        catalog={createCatalog()}
+        onApply={vi.fn()}
+        onCreate={vi.fn()}
+        onDetach={vi.fn()}
+        onEdit={vi.fn()}
+      />
+    );
+
+    expect(host!.textContent).not.toContain('was deleted');
+  });
+
   // The same fuzzy name rule the wildcards panel beside it has always used —
   // these two sit in one popover and used to disagree about what typing means.
   it('matches a name fuzzily', async () => {
     await render(
       <PromptTemplatesPanel
         activeTemplate={null}
+        isActiveTemplateMissing={false}
         catalog={createCatalog()}
         onApply={vi.fn()}
         onCreate={vi.fn()}
