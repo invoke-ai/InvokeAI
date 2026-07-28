@@ -28,7 +28,7 @@ const catalog: WildcardCatalog = {
   wildcards: [{ id: 'w1', name: 'colors', values: ['red', 'green'] }],
 };
 
-const renderPanel = async (showSyntaxHighlighting = true) => {
+const renderPanel = async (showSyntaxHighlighting = true, panelCatalog: WildcardCatalog = catalog) => {
   host = document.createElement('div');
   host.style.width = '380px';
   document.body.append(host);
@@ -37,7 +37,7 @@ const renderPanel = async (showSyntaxHighlighting = true) => {
   await act(() => {
     root?.render(
       <ChakraProvider value={system}>
-        <WildcardsPanel catalog={catalog} showSyntaxHighlighting={showSyntaxHighlighting} onInsert={vi.fn()} />
+        <WildcardsPanel catalog={panelCatalog} showSyntaxHighlighting={showSyntaxHighlighting} onInsert={vi.fn()} />
       </ChakraProvider>
     );
   });
@@ -147,6 +147,76 @@ describe('wildcard name validation', () => {
 
     expect(host!.querySelector('[role="alert"]')).toBeNull();
     expect(saveButton().disabled).toBe(false);
+  });
+});
+
+describe('finding a wildcard', () => {
+  const manyCatalog: WildcardCatalog = {
+    create: vi.fn(),
+    isLoading: false,
+    knownNames: new Set(['colors']),
+    remove: vi.fn(),
+    update: vi.fn(),
+    wildcards: [
+      { id: 'w1', name: 'colors', values: ['red', 'green'] },
+      { id: 'w2', name: 'animals/dogs', values: ['corgi', 'husky'] },
+      { id: 'w3', name: 'animals/cats', values: ['tabby'] },
+      { id: 'w4', name: 'moods', values: ['cyberpunk', 'serene'] },
+    ],
+  };
+
+  const searchInput = () =>
+    [...host!.querySelectorAll('input')].find((input) => input.getAttribute('aria-label')?.includes('searchWildcards'));
+  const referenceLabels = () =>
+    [...host!.querySelectorAll('span')].map((span) => span.textContent).filter((text) => text?.startsWith('__'));
+  const search = async (query: string) => {
+    await act(async () => {
+      await userEvent.fill(searchInput()!, query);
+    });
+  };
+
+  it('offers no search box until there is something to search', async () => {
+    await renderPanel(true, { ...manyCatalog, wildcards: [] });
+
+    expect(searchInput()).toBeUndefined();
+    expect(host!.textContent).toContain('noWildcardsYet');
+  });
+
+  it('matches a name fuzzily', async () => {
+    await renderPanel(true, manyCatalog);
+    await search('adg');
+
+    expect(referenceLabels()).toEqual(['__animals/dogs__']);
+  });
+
+  it('matches a value the name says nothing about', async () => {
+    await renderPanel(true, manyCatalog);
+    await search('cyberpunk');
+
+    expect(referenceLabels()).toEqual(['__moods__']);
+  });
+
+  // "No wildcards yet" would be a lie while four of them are filtered out.
+  it('distinguishes an empty catalog from an empty result', async () => {
+    await renderPanel(true, manyCatalog);
+    await search('zzzz');
+
+    expect(host!.textContent).toContain('noMatchingWildcards');
+    expect(host!.textContent).not.toContain('noWildcardsYet');
+  });
+
+  it('heads nested names with their shared prefix', async () => {
+    await renderPanel(true, manyCatalog);
+
+    expect([...host!.querySelectorAll('p, span')].map((node) => node.textContent)).toContain('animals');
+  });
+
+  // The row is the text you would type, so the header must not shorten it.
+  it('still shows the whole reference under a group header', async () => {
+    await renderPanel(true, manyCatalog);
+
+    expect(referenceLabels()).toContain('__animals/dogs__');
+    expect(referenceLabels()).not.toContain('__dogs__');
   });
 });
 
