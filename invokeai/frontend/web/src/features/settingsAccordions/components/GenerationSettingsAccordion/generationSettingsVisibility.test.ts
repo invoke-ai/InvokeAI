@@ -10,10 +10,18 @@ describe('shouldShowStandardScheduler', () => {
     }
   );
 
-  it.each(['external', 'flux', 'flux2', 'sd-3', 'cogview4', 'z-image', 'qwen-image', 'anima', 'krea-2'] as const)(
-    'hides the standard scheduler for %s',
-    (base) => {
-      expect(shouldShowStandardScheduler(base)).toBe(false);
-    }
-  );
+  it.each([
+    'external',
+    'flux',
+    'flux2',
+    'sd-3',
+    'cogview4',
+    'z-image',
+    'qwen-image',
+    'anima',
+    'krea-2',
+    'ideogram-4',
+  ] as const)('hides the standard scheduler for %s', (base) => {
+    expect(shouldShowStandardScheduler(base)).toBe(false);
+  });
 });

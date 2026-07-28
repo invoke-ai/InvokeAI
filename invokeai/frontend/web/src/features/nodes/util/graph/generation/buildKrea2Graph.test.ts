@@ -32,7 +32,7 @@ const defaultParams = {
   krea2RebalanceMultiplier: 4,
   krea2RebalanceWeights: '1,1,1,1,1,1,1,2.5,5,1.1,4,1',
   krea2SeedVarianceEnabled: false,
-  krea2SeedVarianceStrength: 20,
+  krea2SeedVarianceStrength: 0.5,
   krea2SeedVarianceRandomizePercent: 50,
 };
 
@@ -205,7 +205,7 @@ describe('buildKrea2Graph', () => {
     });
 
     it('inserts the seed-variance node when enabled with strength > 0', async () => {
-      params = { ...defaultParams, krea2SeedVarianceEnabled: true, krea2SeedVarianceStrength: 20 };
+      params = { ...defaultParams, krea2SeedVarianceEnabled: true, krea2SeedVarianceStrength: 0.5 };
       const { g } = await buildTxt2Img();
       expect(nodeTypesOf(g)).toContain('krea2_seed_variance');
       const edge = posConditioningEdge(g);
@@ -223,7 +223,7 @@ describe('buildKrea2Graph', () => {
         ...defaultParams,
         krea2RebalanceEnabled: true,
         krea2SeedVarianceEnabled: true,
-        krea2SeedVarianceStrength: 20,
+        krea2SeedVarianceStrength: 0.5,
       };
       const { g } = await buildTxt2Img();
       const graph = g.getGraph();

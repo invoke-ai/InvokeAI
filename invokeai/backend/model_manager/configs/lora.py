@@ -944,6 +944,10 @@ class LoRA_LyCORIS_Krea2_Config(LoRA_LyCORIS_Config_Base, Config_Base):
             (
                 "transformer.transformer_blocks.",
                 "transformer_blocks.",
+                # The converter also supports the `diffusion_model.` transformer layout
+                # (see krea2_lora_conversion_utils.lora_model_from_krea2_state_dict), so a
+                # transformer-only LoRA using it must be accepted under an explicit Krea-2 override.
+                "diffusion_model.transformer_blocks.",
                 "base_model.model.transformer.transformer_blocks.",
                 "text_encoder.",
                 "base_model.model.text_encoder.",

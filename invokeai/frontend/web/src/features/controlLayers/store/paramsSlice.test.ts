@@ -195,7 +195,7 @@ describe('paramsSliceConfig persisted state migration', () => {
     expect(result.krea2VaeModel).toBeNull();
     expect(result.krea2Qwen3VlEncoderModel).toBeNull();
     expect(result.krea2SeedVarianceEnabled).toBe(false);
-    expect(result.krea2SeedVarianceStrength).toBe(20);
+    expect(result.krea2SeedVarianceStrength).toBe(0.1);
     expect(result.krea2SeedVarianceRandomizePercent).toBe(50);
     expect(result.krea2RebalanceEnabled).toBe(false);
     expect(result.krea2RebalanceMultiplier).toBe(4);

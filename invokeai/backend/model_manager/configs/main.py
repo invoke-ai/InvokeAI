@@ -1382,6 +1382,37 @@ class Main_GGUF_ZImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_B
             raise NotAMatchError("state dict does not look like GGUF quantized")
 
 
+class Main_Diffusers_Ideogram4_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for Ideogram 4 diffusers models (nf4 / fp8 quantized).
+
+    The on-disk layout is a diffusers pipeline folder bundling two transformers
+    (transformer/ + unconditional_transformer/), a Qwen3-VL text_encoder/ + tokenizer/,
+    and a FLUX.2-style vae/. Quantization (nf4 vs fp8) lives inside the component folders
+    and is detected by the loader, not here.
+    """
+
+    base: Literal[BaseModelType.Ideogram4] = Field(BaseModelType.Ideogram4)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        # The Ideogram4Pipeline class name in model_index.json uniquely identifies this base.
+        raise_for_class_name(
+            common_config_paths(mod.path),
+            {"Ideogram4Pipeline"},
+        )
+
+        repo_variant = override_fields.pop("repo_variant", None) or cls._get_repo_variant_or_raise(mod)
+
+        return cls(
+            **override_fields,
+            repo_variant=repo_variant,
+        )
+
+
 class Main_Diffusers_Krea2_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
     """Model config for Krea-2 diffusers models (Krea-2-Turbo)."""
 
@@ -1494,37 +1525,6 @@ class Main_GGUF_Krea2_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Ba
     def _validate_looks_like_gguf_quantized(cls, mod: ModelOnDisk) -> None:
         if not _has_ggml_tensors(mod.load_state_dict()):
             raise NotAMatchError("state dict does not look like GGUF quantized")
-
-
-class Main_Diffusers_Ideogram4_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
-    """Model config for Ideogram 4 diffusers models (nf4 / fp8 quantized).
-
-    The on-disk layout is a diffusers pipeline folder bundling two transformers
-    (transformer/ + unconditional_transformer/), a Qwen3-VL text_encoder/ + tokenizer/,
-    and a FLUX.2-style vae/. Quantization (nf4 vs fp8) lives inside the component folders
-    and is detected by the loader, not here.
-    """
-
-    base: Literal[BaseModelType.Ideogram4] = Field(BaseModelType.Ideogram4)
-
-    @classmethod
-    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
-        raise_if_not_dir(mod)
-
-        raise_for_override_fields(cls, override_fields)
-
-        # The Ideogram4Pipeline class name in model_index.json uniquely identifies this base.
-        raise_for_class_name(
-            common_config_paths(mod.path),
-            {"Ideogram4Pipeline"},
-        )
-
-        repo_variant = override_fields.pop("repo_variant", None) or cls._get_repo_variant_or_raise(mod)
-
-        return cls(
-            **override_fields,
-            repo_variant=repo_variant,
-        )
 
 
 class Main_Diffusers_QwenImage_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):

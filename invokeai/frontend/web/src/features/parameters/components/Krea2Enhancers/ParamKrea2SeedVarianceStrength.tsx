@@ -9,16 +9,16 @@ import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const CONSTRAINTS = {
-  initial: 20,
+  initial: 0.1,
   sliderMin: 0,
-  sliderMax: 50,
+  sliderMax: 1,
   numberInputMin: 0,
-  numberInputMax: 100,
-  fineStep: 1,
-  coarseStep: 5,
+  numberInputMax: 2,
+  fineStep: 0.01,
+  coarseStep: 0.05,
 };
 
-const MARKS = [0, 10, 20, 30, 40, 50];
+const MARKS = [0, 0.25, 0.5, 0.75, 1];
 
 const ParamKrea2SeedVarianceStrength = () => {
   const strength = useAppSelector(selectKrea2SeedVarianceStrength);

@@ -82,8 +82,8 @@ export const AdvancedSettingsAccordion = memo(() => {
               }
               badges.push(vaeBadge);
             }
-            // Ideogram 4 hides the VAE / clip skip / CFG rescale / seamless controls (they don't apply),
-            // so it must not advertise stale badges for them either.
+            // Ideogram 4 and Krea-2 hide the VAE / clip skip / CFG rescale / seamless controls (they don't
+            // apply), so they must not advertise stale badges for them either.
           } else if (!isFlux2 && !isKrea2 && !isIdeogram4) {
             if (vaeConfig) {
               let vaeBadge = vaeConfig.name;

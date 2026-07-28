@@ -112,13 +112,19 @@ def test_rebalance_applies_overall_multiplier() -> None:
     assert torch.allclose(_saved_embeds(saved), torch.full((1, 1, 12, 2), 3.0))
 
 
+# The noise magnitude is auto-calibrated to the embedding std, so tests must use a non-constant tensor
+# (a constant tensor has std 0 and would produce no noise at all).
+def _ramp_embeds() -> torch.Tensor:
+    return torch.arange(1 * 3 * 12 * 4, dtype=torch.float32).reshape(1, 3, 12, 4)
+
+
 def test_seed_variance_is_deterministic_for_a_fixed_seed() -> None:
-    embeds = torch.ones(1, 3, 12, 4)
+    embeds = _ramp_embeds()
     saved_a: dict = {}
     saved_b: dict = {}
     invocation = Krea2SeedVarianceInvocation.model_construct(
         conditioning=Krea2ConditioningField(conditioning_name="c"),
-        strength=20.0,
+        strength=0.5,
         randomize_percent=50.0,
         variance_seed=42,
     )
@@ -130,14 +136,14 @@ def test_seed_variance_is_deterministic_for_a_fixed_seed() -> None:
 
 
 def test_seed_variance_differs_across_seeds() -> None:
-    embeds = torch.ones(1, 3, 12, 4)
+    embeds = _ramp_embeds()
     saved_a: dict = {}
     saved_b: dict = {}
 
     def _run(seed: int, saved: dict) -> None:
         Krea2SeedVarianceInvocation.model_construct(
             conditioning=Krea2ConditioningField(conditioning_name="c"),
-            strength=20.0,
+            strength=0.5,
             randomize_percent=50.0,
             variance_seed=seed,
         ).invoke(_make_context(embeds.clone(), saved))
@@ -149,12 +155,12 @@ def test_seed_variance_differs_across_seeds() -> None:
 
 
 def test_seed_variance_does_not_mutate_the_input_conditioning() -> None:
-    embeds = torch.ones(1, 3, 12, 4)
+    embeds = _ramp_embeds()
     original = embeds.clone()
     saved: dict = {}
     invocation = Krea2SeedVarianceInvocation.model_construct(
         conditioning=Krea2ConditioningField(conditioning_name="c"),
-        strength=20.0,
+        strength=0.5,
         randomize_percent=50.0,
         variance_seed=7,
     )
@@ -164,3 +170,43 @@ def test_seed_variance_does_not_mutate_the_input_conditioning() -> None:
     # The invocation must produce a new tensor, not perturb the caller's embeds in place.
     assert torch.equal(embeds, original)
     assert not torch.equal(_saved_embeds(saved), original)
+
+
+def test_seed_variance_scales_noise_with_embedding_std() -> None:
+    # Auto-calibration: doubling the embedding scale (hence its std) must double the injected noise, so a
+    # fixed `strength` behaves the same relative to the signal regardless of the upstream embedding scale.
+    base = _ramp_embeds()
+    saved_small: dict = {}
+    saved_large: dict = {}
+
+    def _run(embeds: torch.Tensor, saved: dict) -> None:
+        Krea2SeedVarianceInvocation.model_construct(
+            conditioning=Krea2ConditioningField(conditioning_name="c"),
+            strength=0.5,
+            randomize_percent=100.0,
+            variance_seed=1,
+        ).invoke(_make_context(embeds, saved))
+
+    _run(base.clone(), saved_small)
+    _run(base.clone() * 2.0, saved_large)
+
+    # Per-element noise = out - in. With randomize_percent=100 every element is perturbed, so the large-scale
+    # run's noise should be ~2x the small-scale run's (same seed → same underlying uniform draw and mask).
+    noise_small = _saved_embeds(saved_small) - base
+    noise_large = _saved_embeds(saved_large) - base * 2.0
+    assert torch.allclose(noise_large, noise_small * 2.0, atol=1e-4)
+
+
+def test_seed_variance_is_a_noop_when_disabled() -> None:
+    embeds = _ramp_embeds()
+    for strength, percent in ((0.0, 50.0), (0.5, 0.0)):
+        saved: dict = {}
+        out = Krea2SeedVarianceInvocation.model_construct(
+            conditioning=Krea2ConditioningField(conditioning_name="c"),
+            strength=strength,
+            randomize_percent=percent,
+            variance_seed=3,
+        ).invoke(_make_context(embeds.clone(), saved))
+        # Nothing saved, and the output points back at the untouched input conditioning.
+        assert saved == {}
+        assert out.conditioning.conditioning_name == "c"

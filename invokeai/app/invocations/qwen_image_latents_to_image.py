@@ -53,12 +53,13 @@ class QwenImageLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard)
         with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
             context.util.signal_progress("Running VAE")
             # A native-layout qwen_image_vae single file is classified with the Anima base and loaded
-            # as AutoencoderKLWan; reinterpret it as AutoencoderKLQwenImage (identical weights).
+            # as AutoencoderKLWan; reinterpret it as AutoencoderKLQwenImage (identical weights). This is
+            # cache-preserving (returns the same module), keeping partial-loading hooks intact.
             vae = as_qwen_image_vae(vae)
             with SeamlessExt.static_patch_model(vae, self.vae.seamless_axes):
-                # Use the VAE's intended compute device (CUDA/MPS, or CPU if configured cpu_only). Do NOT infer it from
-                # current param residency: partial loading may have temporarily offloaded all weights to RAM, which
-                # would wrongly place the latents (and thus the whole decode) on the CPU (see #9373).
+                # Use the VAE's intended compute device (CUDA/MPS, or CPU if configured cpu_only). Do NOT infer it
+                # from current param residency: partial loading may have temporarily offloaded all weights to RAM,
+                # which would wrongly place the latents (and thus the whole decode) on the CPU (see #9373).
                 latents = latents.to(device=vae_info.compute_device, dtype=vae.dtype)
 
                 vae.disable_tiling()

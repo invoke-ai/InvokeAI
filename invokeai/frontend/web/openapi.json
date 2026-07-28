@@ -848,10 +848,10 @@
                       "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
                     },
                     {
-                      "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
+                      "$ref": "#/components/schemas/Main_Diffusers_Ideogram4_Config"
                     },
                     {
-                      "$ref": "#/components/schemas/Main_Diffusers_Ideogram4_Config"
+                      "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
@@ -1219,10 +1219,10 @@
                       "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
                     },
                     {
-                      "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
+                      "$ref": "#/components/schemas/Main_Diffusers_Ideogram4_Config"
                     },
                     {
-                      "$ref": "#/components/schemas/Main_Diffusers_Ideogram4_Config"
+                      "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
@@ -1590,10 +1590,10 @@
                       "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
                     },
                     {
-                      "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
+                      "$ref": "#/components/schemas/Main_Diffusers_Ideogram4_Config"
                     },
                     {
-                      "$ref": "#/components/schemas/Main_Diffusers_Ideogram4_Config"
+                      "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
@@ -2006,10 +2006,10 @@
                       "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
                     },
                     {
-                      "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
+                      "$ref": "#/components/schemas/Main_Diffusers_Ideogram4_Config"
                     },
                     {
-                      "$ref": "#/components/schemas/Main_Diffusers_Ideogram4_Config"
+                      "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
@@ -2446,10 +2446,10 @@
                       "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
                     },
                     {
-                      "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
+                      "$ref": "#/components/schemas/Main_Diffusers_Ideogram4_Config"
                     },
                     {
-                      "$ref": "#/components/schemas/Main_Diffusers_Ideogram4_Config"
+                      "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
@@ -3716,10 +3716,10 @@
                       "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
                     },
                     {
-                      "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
+                      "$ref": "#/components/schemas/Main_Diffusers_Ideogram4_Config"
                     },
                     {
-                      "$ref": "#/components/schemas/Main_Diffusers_Ideogram4_Config"
+                      "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
@@ -13834,10 +13834,10 @@
             "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
           },
           {
-            "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
+            "$ref": "#/components/schemas/Main_Diffusers_Ideogram4_Config"
           },
           {
-            "$ref": "#/components/schemas/Main_Diffusers_Ideogram4_Config"
+            "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
           },
           {
             "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
@@ -48249,7 +48249,7 @@
         "category": "conditioning",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Inject per-seed diversity into Krea-2 text conditioning.\n\nDistilled few-step models (like Krea-2-Turbo) suffer from low seed variance \u2014 different seeds give\nnear-identical images. This adds seeded uniform noise to a random subset of the text-embedding\nvalues, trading some prompt adherence for variety (the same idea as the Z-Image-Turbo\n`SeedVarianceEnhancer`). Optional pass between the text encoder and denoise; the defaults are\naggressive and may need tuning for Krea-2.",
+        "description": "Inject per-seed diversity into Krea-2 text conditioning.\n\nDistilled few-step models (like Krea-2-Turbo) suffer from low seed variance \u2014 different seeds give\nnear-identical images. This adds seeded uniform noise to a random subset of the text-embedding\nvalues, trading some prompt adherence for variety (the same idea as the Z-Image-Turbo\n`SeedVarianceEnhancer`). Optional pass between the text encoder and denoise.\n\nThe noise magnitude is auto-calibrated relative to the embedding's standard deviation, so a given\n`strength` behaves consistently regardless of the embedding scale \u2014 in particular it stays sane\nwhether or not the upstream Conditioning Rebalance node has scaled the embeddings up.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -48293,22 +48293,24 @@
             "title": "Conditioning"
           },
           "strength": {
-            "default": 20.0,
-            "description": "Magnitude of the uniform noise added to the embeddings (noise in [-strength, +strength]).",
+            "default": 0.1,
+            "description": "Noise strength as a multiplier of the embedding std (0=off, 0.1=subtle, 0.5=strong).",
             "field_kind": "input",
             "input": "any",
-            "orig_default": 20.0,
+            "maximum": 2.0,
+            "minimum": 0.0,
+            "orig_default": 0.1,
             "orig_required": false,
             "title": "Strength",
             "type": "number"
           },
           "randomize_percent": {
             "default": 50.0,
-            "description": "Percentage of embedding values that get perturbed (Bernoulli mask).",
+            "description": "Percentage of embedding values that get perturbed (Bernoulli mask); 0 disables.",
             "field_kind": "input",
             "input": "any",
             "maximum": 100.0,
-            "minimum": 1.0,
+            "minimum": 0.0,
             "orig_default": 50.0,
             "orig_required": false,
             "title": "Randomize Percent",
@@ -62043,10 +62045,10 @@
                 "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
               },
               {
-                "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
+                "$ref": "#/components/schemas/Main_Diffusers_Ideogram4_Config"
               },
               {
-                "$ref": "#/components/schemas/Main_Diffusers_Ideogram4_Config"
+                "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
               },
               {
                 "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
@@ -62660,10 +62662,10 @@
                     "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
                   },
                   {
-                    "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
+                    "$ref": "#/components/schemas/Main_Diffusers_Ideogram4_Config"
                   },
                   {
-                    "$ref": "#/components/schemas/Main_Diffusers_Ideogram4_Config"
+                    "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
                   },
                   {
                     "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
@@ -63162,10 +63164,10 @@
                 "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
               },
               {
-                "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
+                "$ref": "#/components/schemas/Main_Diffusers_Ideogram4_Config"
               },
               {
-                "$ref": "#/components/schemas/Main_Diffusers_Ideogram4_Config"
+                "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
               },
               {
                 "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
@@ -63520,10 +63522,10 @@
                 "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
               },
               {
-                "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
+                "$ref": "#/components/schemas/Main_Diffusers_Ideogram4_Config"
               },
               {
-                "$ref": "#/components/schemas/Main_Diffusers_Ideogram4_Config"
+                "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
               },
               {
                 "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
@@ -64338,10 +64340,10 @@
                   "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
                 },
                 {
-                  "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
+                  "$ref": "#/components/schemas/Main_Diffusers_Ideogram4_Config"
                 },
                 {
-                  "$ref": "#/components/schemas/Main_Diffusers_Ideogram4_Config"
+                  "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
                 },
                 {
                   "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
