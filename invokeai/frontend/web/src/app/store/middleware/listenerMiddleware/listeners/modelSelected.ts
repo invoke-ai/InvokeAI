@@ -17,6 +17,9 @@ import {
   setZImageScheduler,
   syncedToOptimalDimension,
   vaeSelected,
+  wanComponentSourceSelected,
+  wanT5EncoderModelSelected,
+  wanVaeModelSelected,
   zImageQwen3EncoderModelSelected,
   zImageQwen3SourceModelSelected,
   zImageVaeModelSelected,
@@ -36,6 +39,7 @@ import {
   isAspectRatioID,
   isFlux2ReferenceImageConfig,
   isQwenImageReferenceImageConfig,
+  isWanReferenceImageConfig,
 } from 'features/controlLayers/store/types';
 import {
   initialFlux2ReferenceImage,
@@ -43,6 +47,7 @@ import {
   initialFLUXRedux,
   initialIPAdapter,
   initialQwenImageReferenceImage,
+  initialWanReferenceImage,
 } from 'features/controlLayers/store/util';
 import { SUPPORTS_REF_IMAGES_BASE_MODELS } from 'features/modelManagerV2/models';
 import { zModelIdentifierField } from 'features/nodes/types/common';
@@ -61,6 +66,9 @@ import {
   selectQwenImageVAEModels,
   selectQwenVLEncoderModels,
   selectRegionalRefImageModels,
+  selectWanDiffusersModels,
+  selectWanT5EncoderModels,
+  selectWanVAEModels,
   selectZImageDiffusersModels,
 } from 'services/api/hooks/modelsByType';
 import type { FLUXKontextModelConfig, FLUXReduxModelConfig, IPAdapterModelConfig } from 'services/api/types';
@@ -127,7 +135,20 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
             const availableZImageDiffusers = selectZImageDiffusersModels(state);
 
             if (availableZImageDiffusers.length > 0) {
-              const diffusersModel = availableZImageDiffusers[0];
+              // Look up the new model's variant to match turbo vs zbase
+              const modelConfigsResult = selectModelConfigsQuery(state);
+              let selectedVariant: string | null = null;
+              if (modelConfigsResult.data) {
+                const newModelConfig = modelConfigsAdapterSelectors.selectById(modelConfigsResult.data, newModel.key);
+                if (newModelConfig && 'variant' in newModelConfig && typeof newModelConfig.variant === 'string') {
+                  selectedVariant = newModelConfig.variant;
+                }
+              }
+
+              const matchingModel = selectedVariant
+                ? availableZImageDiffusers.find((m) => 'variant' in m && m.variant === selectedVariant)
+                : undefined;
+              const diffusersModel = matchingModel ?? availableZImageDiffusers[0];
               if (diffusersModel) {
                 dispatch(
                   zImageQwen3SourceModelSelected({
@@ -302,6 +323,29 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
           }
         }
 
+        // handle Wan 2.2 component source / standalone VAE / standalone T5 encoder -
+        // clear when switching away. (Auto-default happens unconditionally outside
+        // this block so it fires when switching between Wan variants too.)
+        const {
+          wanComponentSource: wanComponentSourceOnLeave,
+          wanVaeModel: wanVaeModelOnLeave,
+          wanT5EncoderModel: wanT5EncoderModelOnLeave,
+        } = state.params;
+        if (newBase !== 'wan') {
+          if (wanComponentSourceOnLeave) {
+            dispatch(wanComponentSourceSelected(null));
+            modelsUpdatedDisabledOrCleared += 1;
+          }
+          if (wanVaeModelOnLeave) {
+            dispatch(wanVaeModelSelected(null));
+            modelsUpdatedDisabledOrCleared += 1;
+          }
+          if (wanT5EncoderModelOnLeave) {
+            dispatch(wanT5EncoderModelSelected(null));
+            modelsUpdatedDisabledOrCleared += 1;
+          }
+        }
+
         if (newModel.base !== 'external' && SUPPORTS_REF_IMAGES_BASE_MODELS.includes(newModel.base)) {
           // Handle incompatible reference image models - switch to first compatible model, with some smart logic
           // to choose the best available model based on the new main model.
@@ -358,6 +402,22 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
               continue;
             }
 
+            if (newBase === 'wan') {
+              // Switching TO Wan - convert any non-wan configs to wan_reference_image.
+              // The Wan I2V graph builder consumes the first enabled ref image; T2V /
+              // TI2V variants ignore ref images entirely (matches Qwen-generate behavior).
+              if (!isWanReferenceImageConfig(entity.config)) {
+                dispatch(
+                  refImageConfigChanged({
+                    id: entity.id,
+                    config: { ...initialWanReferenceImage },
+                  })
+                );
+                modelsUpdatedDisabledOrCleared += 1;
+              }
+              continue;
+            }
+
             if (isFlux2ReferenceImageConfig(entity.config)) {
               // Switching AWAY from FLUX.2 - convert flux2_reference_image to the appropriate config type
               let newConfig;
@@ -399,6 +459,29 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
                 }
               } else {
                 // No compatible model found - fall back to an empty IP adapter config
+                newConfig = { ...initialIPAdapter };
+              }
+              dispatch(refImageConfigChanged({ id: entity.id, config: newConfig }));
+              modelsUpdatedDisabledOrCleared += 1;
+              continue;
+            }
+
+            if (isWanReferenceImageConfig(entity.config)) {
+              // Switching AWAY from Wan - convert to the appropriate config type for the new base.
+              let newConfig;
+              if (newGlobalRefImageModel) {
+                const parsedModel = zModelIdentifierField.parse(newGlobalRefImageModel);
+                if (newModel.base === 'flux' && newModel.name.toLowerCase().includes('kontext')) {
+                  newConfig = { ...initialFluxKontextReferenceImage, model: parsedModel };
+                } else if (newGlobalRefImageModel.type === 'flux_redux') {
+                  newConfig = { ...initialFLUXRedux, model: parsedModel };
+                } else {
+                  newConfig = { ...initialIPAdapter, model: parsedModel };
+                  if (parsedModel.base === 'flux') {
+                    newConfig.clipVisionModel = 'ViT-L';
+                  }
+                }
+              } else {
                 newConfig = { ...initialIPAdapter };
               }
               dispatch(refImageConfigChanged({ id: entity.id, config: newConfig }));
@@ -461,6 +544,54 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         }
       }
 
+      // Wan 2.2: auto-default Component Source / standalone VAE / standalone T5 encoder
+      // when the new model is Wan. Runs on every Wan selection (including same-base
+      // switches like Diffusers Wan → GGUF Wan) so the user doesn't have to dig into
+      // Advanced when picking a GGUF main. Only sets fields that are currently empty
+      // and only does it for GGUF mains — Diffusers mains carry everything themselves.
+      if (newBase === 'wan') {
+        const modelConfigsResult = selectModelConfigsQuery(state);
+        const newModelConfig = modelConfigsResult.data
+          ? modelConfigsAdapterSelectors.selectById(modelConfigsResult.data, newModel.key)
+          : null;
+        const isNewModelGGUF = newModelConfig?.type === 'main' && newModelConfig.format === 'gguf_quantized';
+        if (isNewModelGGUF) {
+          const { wanComponentSource, wanVaeModel, wanT5EncoderModel } = state.params;
+          // Match component source by variant family — A14B (t2v_a14b/i2v_a14b) and
+          // TI2V-5B use different VAEs (16-ch vs 48-ch); a mismatched component source
+          // would silently load the wrong VAE and produce broken images. The standalone
+          // VAE / encoder configs don't carry variant info, so those still go first-match.
+          const newVariant =
+            newModelConfig && 'variant' in newModelConfig && typeof newModelConfig.variant === 'string'
+              ? newModelConfig.variant
+              : null;
+          const a14bFamily = newVariant === 't2v_a14b' || newVariant === 'i2v_a14b';
+          if (!wanComponentSource) {
+            const availableWanDiffusers = selectWanDiffusersModels(state);
+            const matchingFamily = availableWanDiffusers.find((m) => {
+              const v = 'variant' in m && typeof m.variant === 'string' ? m.variant : null;
+              return a14bFamily ? v === 't2v_a14b' || v === 'i2v_a14b' : v === newVariant;
+            });
+            const diffusersModel = matchingFamily ?? availableWanDiffusers[0];
+            if (diffusersModel) {
+              dispatch(wanComponentSourceSelected(zModelIdentifierField.parse(diffusersModel)));
+            }
+          }
+          if (!wanVaeModel) {
+            const vae = selectWanVAEModels(state)[0];
+            if (vae) {
+              dispatch(wanVaeModelSelected(zModelIdentifierField.parse(vae)));
+            }
+          }
+          if (!wanT5EncoderModel) {
+            const encoder = selectWanT5EncoderModels(state)[0];
+            if (encoder) {
+              dispatch(wanT5EncoderModelSelected(zModelIdentifierField.parse(encoder)));
+            }
+          }
+        }
+      }
+
       // Handle FLUX.2 Klein model changes within the same base (different variants need different encoders)
       // Clear the Qwen3 encoder only when switching between different Klein variants
       // (e.g., klein_4b needs qwen3_4b, klein_9b needs qwen3_8b)
@@ -515,6 +646,35 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
 
           if (diffusersModel) {
             dispatch(qwenImageComponentSourceSelected(zModelIdentifierField.parse(diffusersModel)));
+          }
+        }
+      }
+
+      // Handle Z-Image model changes within the same base (variant may change between turbo/zbase)
+      // Auto-update the Qwen3 source diffusers model to match the new variant
+      if (newBase === 'z-image' && state.params.model?.base === 'z-image' && newModel.key !== state.params.model?.key) {
+        const modelConfigsResult = selectModelConfigsQuery(state);
+        if (modelConfigsResult.data) {
+          const newModelConfig = modelConfigsAdapterSelectors.selectById(modelConfigsResult.data, newModel.key);
+          const newVariant =
+            newModelConfig && 'variant' in newModelConfig && typeof newModelConfig.variant === 'string'
+              ? newModelConfig.variant
+              : null;
+
+          if (newVariant) {
+            const availableZImageDiffusers = selectZImageDiffusersModels(state);
+            const matchingModel = availableZImageDiffusers.find((m) => 'variant' in m && m.variant === newVariant);
+            if (matchingModel) {
+              dispatch(
+                zImageQwen3SourceModelSelected({
+                  key: matchingModel.key,
+                  hash: matchingModel.hash,
+                  name: matchingModel.name,
+                  base: matchingModel.base,
+                  type: matchingModel.type,
+                })
+              );
+            }
           }
         }
       }

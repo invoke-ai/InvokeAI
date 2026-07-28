@@ -10,6 +10,7 @@ import {
 import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import { addAnimaLoRAs } from 'features/nodes/util/graph/generation/addAnimaLoRAs';
+import { addAnimaLLLiteControl } from 'features/nodes/util/graph/generation/addControlAdapters';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
 import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
@@ -175,6 +176,25 @@ export const buildAnimaGraph = async (arg: GraphBuilderArg): Promise<GraphBuilde
   // IP Adapters are not supported for Anima, so delete the unused collector
   g.deleteNode(ipAdapterCollect.id);
 
+  // All ControlNet-LLLite adapters (canvas control layers and/or the inpaint adapter) fan into ONE
+  // collect node feeding denoise.control_lllite.
+  const hasAnimaControlLayers =
+    manager !== null &&
+    canvas.controlLayers.entities.some(
+      (entity) =>
+        entity.isEnabled && entity.controlAdapter.type === 'anima_lllite' && entity.controlAdapter.model !== null
+    );
+  const hasInpaintAdapter =
+    (generationMode === 'inpaint' || generationMode === 'outpaint') && params.animaLLLiteModel !== null;
+
+  let controlLLLiteCollect: Invocation<'collect'> | null = null;
+  if (hasAnimaControlLayers || hasInpaintAdapter) {
+    controlLLLiteCollect = g.addNode({
+      type: 'collect',
+      id: getPrefixedId('control_lllite_collect'),
+    });
+  }
+
   let canvasOutput: Invocation<ImageOutputNodes> = l2i;
 
   if (generationMode === 'txt2img') {
@@ -219,6 +239,7 @@ export const buildAnimaGraph = async (arg: GraphBuilderArg): Promise<GraphBuilde
       vaeSource: modelLoader,
       modelLoader,
       seed,
+      controlLLLiteCollect,
     });
     g.upsertMetadata({ generation_mode: 'anima_inpaint' });
   } else if (generationMode === 'outpaint') {
@@ -238,10 +259,33 @@ export const buildAnimaGraph = async (arg: GraphBuilderArg): Promise<GraphBuilde
       vaeSource: modelLoader,
       modelLoader,
       seed,
+      controlLLLiteCollect,
     });
     g.upsertMetadata({ generation_mode: 'anima_outpaint' });
   } else {
     assert<Equals<typeof generationMode, never>>(false);
+  }
+
+  // Add control layers for all generation modes, then wire the collect node into the denoise node.
+  // The inpaint adapter (if any) was already wired into the collect node by addInpaint/addOutpaint.
+  if (controlLLLiteCollect !== null) {
+    let addedLLLiteAdapters = hasInpaintAdapter ? 1 : 0;
+    if (manager !== null) {
+      const animaControlResult = await addAnimaLLLiteControl({
+        manager,
+        entities: canvas.controlLayers.entities,
+        g,
+        rect: canvas.bbox.rect,
+        collect: controlLLLiteCollect,
+        model,
+      });
+      addedLLLiteAdapters += animaControlResult.addedAnimaLLLiteControls;
+    }
+    if (addedLLLiteAdapters > 0) {
+      g.addEdge(controlLLLiteCollect, 'collection', denoise, 'control_lllite');
+    } else {
+      g.deleteNode(controlLLLiteCollect.id);
+    }
   }
 
   if (state.system.shouldUseNSFWChecker) {

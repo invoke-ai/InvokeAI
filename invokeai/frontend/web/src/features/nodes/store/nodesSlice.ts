@@ -51,6 +51,7 @@ import type {
   StringGeneratorFieldValue,
   StylePresetFieldValue,
   SystemPromptFieldValue,
+  VideoFieldValue,
 } from 'features/nodes/types/field';
 import {
   zBoardFieldValue,
@@ -75,6 +76,7 @@ import {
   zStringGeneratorFieldValue,
   zStylePresetFieldValue,
   zSystemPromptFieldValue,
+  zVideoFieldValue,
 } from 'features/nodes/types/field';
 import type { AnyEdge, AnyNode, ConnectorNode } from 'features/nodes/types/invocation';
 import { isConnectorNode, isInvocationNode, isNotesNode } from 'features/nodes/types/invocation';
@@ -591,6 +593,9 @@ const slice = createSlice({
     fieldImageCollectionValueChanged: (state, action: FieldValueAction<ImageFieldCollectionValue>) => {
       fieldValueReducer(state, action, zImageFieldCollectionValue);
     },
+    fieldVideoValueChanged: (state, action: FieldValueAction<VideoFieldValue>) => {
+      fieldValueReducer(state, action, zVideoFieldValue);
+    },
     fieldLoRACollectionValueChanged: (state, action: FieldValueAction<LoRAFieldCollectionValue>) => {
       fieldValueReducer(state, action, zLoRAFieldCollectionValue);
     },
@@ -809,6 +814,7 @@ export const {
   fieldEnumModelValueChanged,
   fieldImageValueChanged,
   fieldImageCollectionValueChanged,
+  fieldVideoValueChanged,
   fieldLabelChanged,
   fieldLoRACollectionValueChanged,
   fieldModelIdentifierValueChanged,

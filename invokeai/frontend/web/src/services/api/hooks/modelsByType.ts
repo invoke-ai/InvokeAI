@@ -11,6 +11,7 @@ import {
 } from 'services/api/endpoints/models';
 import type { AnyModelConfig, AnyModelConfigWithExternal, MainOrExternalModelConfig } from 'services/api/types';
 import {
+  isAnimaInpaintControlNetModelConfig,
   isAnimaQwen3EncoderModelConfig,
   isAnimaVAEModelConfig,
   isCLIPEmbedModelConfigOrSubmodel,
@@ -37,6 +38,10 @@ import {
   isTextLLMModelConfig,
   isTIModelConfig,
   isVAEModelConfigOrSubmodel,
+  isWanDiffusersMainModelConfig,
+  isWanGGUFLowNoiseMainModelConfig,
+  isWanT5EncoderModelConfig,
+  isWanVAEModelConfig,
   isZImageDiffusersMainModelConfig,
 } from 'services/api/types';
 
@@ -105,12 +110,17 @@ export const useFlux1VAEModels = () => buildModelsHook(isFlux1VAEModelConfig)();
 export const useFlux2VAEModels = () => buildModelsHook(isFlux2VAEModelConfig)();
 export const useAnimaVAEModels = () => buildModelsHook(isAnimaVAEModelConfig)();
 export const useAnimaQwen3EncoderModels = () => buildModelsHook(isAnimaQwen3EncoderModelConfig)();
+export const useAnimaInpaintControlNetModels = () => buildModelsHook(isAnimaInpaintControlNetModelConfig)();
 export const useZImageDiffusersModels = () => buildModelsHook(isZImageDiffusersMainModelConfig)();
 export const useFlux2DiffusersModels = () => buildModelsHook(isFlux2DiffusersMainModelConfig)();
 export const useQwenImageDiffusersModels = () => buildModelsHook(isQwenImageDiffusersMainModelConfig)();
 export const useQwenImageVAEModels = () => buildModelsHook(isQwenImageVAEModelConfig)();
 export const useQwenVLEncoderModels = () => buildModelsHook(isQwenVLEncoderModelConfig)();
 export const useQwen3EncoderModels = () => buildModelsHook(isQwen3EncoderModelConfig)();
+export const useWanDiffusersModels = () => buildModelsHook(isWanDiffusersMainModelConfig)();
+export const useWanGGUFLowNoiseModels = () => buildModelsHook(isWanGGUFLowNoiseMainModelConfig)();
+export const useWanVAEModels = () => buildModelsHook(isWanVAEModelConfig)();
+export const useWanT5EncoderModels = () => buildModelsHook(isWanT5EncoderModelConfig)();
 export const useGlobalReferenceImageModels = buildModelsHook(
   (config) => isIPAdapterModelConfig(config) || isFluxReduxModelConfig(config) || isFluxKontextModelConfig(config)
 );
@@ -153,5 +163,8 @@ export const selectZImageDiffusersModels = buildModelsSelector(isZImageDiffusers
 export const selectFlux2DiffusersModels = buildModelsSelector(isFlux2DiffusersMainModelConfig);
 export const selectFluxVAEModels = buildModelsSelector(isFluxVAEModelConfig);
 export const selectAnimaVAEModels = buildModelsSelector(isAnimaVAEModelConfig);
+export const selectWanDiffusersModels = buildModelsSelector(isWanDiffusersMainModelConfig);
+export const selectWanVAEModels = buildModelsSelector(isWanVAEModelConfig);
+export const selectWanT5EncoderModels = buildModelsSelector(isWanT5EncoderModelConfig);
 export const useTextLLMModels = () => buildModelsHook(isTextLLMModelConfig)();
 export const useLlavaModels = () => buildModelsHook(isLLaVAModelConfig)();

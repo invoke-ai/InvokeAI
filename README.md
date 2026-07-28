@@ -75,6 +75,7 @@ Invoke features an organized gallery system for easily storing, accessing, and r
 - Anima
 - Qwen Image
 - Qwen Image Edit
+- Ideogram 4
 - Nano Banana (API Only)
 - GPT Image (API Only)
 - Wan (API Only)
@@ -105,6 +106,17 @@ Invoke's open-source development is powered by our sponsors. If Invoke is valuab
      such as `JamesIves/github-sponsors-readme-action` to keep them in sync. -->
 
 [![Sponsor Invoke](https://img.shields.io/badge/Sponsor-Invoke-ea4aaa?logo=githubsponsors&logoColor=white)][sponsor link]
+
+We very much thank the following sponsors:
+
+### Backers ($15/mo)
+
+* [apokolypsse](https://github.com/apokolypsse)
+* [Romeotechguy](https://github.com/Romeotechguy)
+
+### Power Users ($50/mo)
+
+* [mickr777](https://github.com/mickr777)
 
 ## Thanks
 

@@ -27,7 +27,7 @@ import {
   SUPPORTS_OPTIMIZED_DENOISING_BASE_MODELS,
   SUPPORTS_REF_IMAGES_BASE_MODELS,
 } from 'features/modelManagerV2/models';
-import type { BaseModelType } from 'features/nodes/types/common';
+import type { BaseModelType, ModelIdentifierField } from 'features/nodes/types/common';
 import { CLIP_SKIP_MAP } from 'features/parameters/types/constants';
 import type {
   ParameterCanvasCoherenceMode,
@@ -39,6 +39,7 @@ import type {
   ParameterControlLoRAModel,
   ParameterFluxDypePreset,
   ParameterGuidance,
+  ParameterIdeogram4SamplerPreset,
   ParameterModel,
   ParameterNegativePrompt,
   ParameterPositivePrompt,
@@ -97,6 +98,23 @@ const slice = createSlice({
     },
     setZImageShift: (state, action: PayloadAction<number | null>) => {
       state.zImageShift = action.payload;
+    },
+    setIdeogram4SamplerPreset: (state, action: PayloadAction<ParameterIdeogram4SamplerPreset>) => {
+      state.ideogram4SamplerPreset = action.payload;
+    },
+    setIdeogram4Steps: (state, action: PayloadAction<number | null>) => {
+      // Normalize through the schema so a stale/out-of-range value (e.g. 1, below the backend's min of 2)
+      // becomes null (= use preset) rather than being dispatched straight into the graph.
+      state.ideogram4Steps = zParamsState.shape.ideogram4Steps.parse(action.payload);
+    },
+    setIdeogram4GuidanceScale: (state, action: PayloadAction<number | null>) => {
+      state.ideogram4GuidanceScale = action.payload;
+    },
+    setIdeogram4Mu: (state, action: PayloadAction<number | null>) => {
+      state.ideogram4Mu = action.payload;
+    },
+    setIdeogram4ColorPalette: (state, action: PayloadAction<string[]>) => {
+      state.ideogram4ColorPalette = action.payload;
     },
     setZImageSeedVarianceEnabled: (state, action: PayloadAction<boolean>) => {
       state.zImageSeedVarianceEnabled = action.payload;
@@ -237,6 +255,20 @@ const slice = createSlice({
       }
       state.animaQwen3EncoderModel = result.data;
     },
+    animaLLLiteModelSelected: (state, action: PayloadAction<ModelIdentifierField | null>) => {
+      const result = zParamsState.shape.animaLLLiteModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.animaLLLiteModel = result.data;
+    },
+    animaLLLiteWeightChanged: (state, action: PayloadAction<number>) => {
+      const result = zParamsState.shape.animaLLLiteWeight.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.animaLLLiteWeight = result.data;
+    },
     setAnimaScheduler: (
       state,
       action: PayloadAction<'euler' | 'heun' | 'dpmpp_2m' | 'dpmpp_2m_sde' | 'er_sde' | 'lcm'>
@@ -289,6 +321,37 @@ const slice = createSlice({
     },
     qwenImageShiftChanged: (state, action: PayloadAction<number | null>) => {
       state.qwenImageShift = action.payload;
+    },
+    wanTransformerLowNoiseSelected: (state, action: PayloadAction<ParameterModel | null>) => {
+      const result = zParamsState.shape.wanTransformerLowNoise.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.wanTransformerLowNoise = result.data;
+    },
+    wanComponentSourceSelected: (state, action: PayloadAction<ParameterModel | null>) => {
+      const result = zParamsState.shape.wanComponentSource.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.wanComponentSource = result.data;
+    },
+    wanVaeModelSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
+      const result = zParamsState.shape.wanVaeModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.wanVaeModel = result.data;
+    },
+    wanT5EncoderModelSelected: (state, action: PayloadAction<{ key: string; name: string; base: string } | null>) => {
+      const result = zParamsState.shape.wanT5EncoderModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.wanT5EncoderModel = result.data;
+    },
+    wanGuidanceScaleLowNoiseChanged: (state, action: PayloadAction<number | null>) => {
+      state.wanGuidanceScaleLowNoise = action.payload;
     },
     vaePrecisionChanged: (state, action: PayloadAction<ParameterPrecision>) => {
       state.vaePrecision = action.payload;
@@ -614,6 +677,7 @@ const resetState = (state: ParamsState): ParamsState => {
   newState.zImageQwen3SourceModel = oldState.zImageQwen3SourceModel;
   newState.animaVaeModel = oldState.animaVaeModel;
   newState.animaQwen3EncoderModel = oldState.animaQwen3EncoderModel;
+  newState.animaLLLiteModel = oldState.animaLLLiteModel;
   newState.kleinVaeModel = oldState.kleinVaeModel;
   newState.kleinQwen3EncoderModel = oldState.kleinQwen3EncoderModel;
   newState.qwenImageComponentSource = oldState.qwenImageComponentSource;
@@ -621,6 +685,11 @@ const resetState = (state: ParamsState): ParamsState => {
   newState.qwenImageQwenVLEncoderModel = oldState.qwenImageQwenVLEncoderModel;
   newState.qwenImageQuantization = oldState.qwenImageQuantization;
   newState.qwenImageShift = oldState.qwenImageShift;
+  newState.wanTransformerLowNoise = oldState.wanTransformerLowNoise;
+  newState.wanComponentSource = oldState.wanComponentSource;
+  newState.wanVaeModel = oldState.wanVaeModel;
+  newState.wanT5EncoderModel = oldState.wanT5EncoderModel;
+  newState.wanGuidanceScaleLowNoise = oldState.wanGuidanceScaleLowNoise;
   return newState;
 };
 
@@ -645,6 +714,11 @@ export const {
   setFluxDypeExponent,
   setZImageScheduler,
   setZImageShift,
+  setIdeogram4SamplerPreset,
+  setIdeogram4Steps,
+  setIdeogram4GuidanceScale,
+  setIdeogram4Mu,
+  setIdeogram4ColorPalette,
   setZImageSeedVarianceEnabled,
   setZImageSeedVarianceStrength,
   setZImageSeedVarianceRandomizePercent,
@@ -673,6 +747,11 @@ export const {
   qwenImageQwenVLEncoderModelSelected,
   qwenImageQuantizationChanged,
   qwenImageShiftChanged,
+  wanTransformerLowNoiseSelected,
+  wanComponentSourceSelected,
+  wanVaeModelSelected,
+  wanT5EncoderModelSelected,
+  wanGuidanceScaleLowNoiseChanged,
   setClipSkip,
   shouldUseCpuNoiseChanged,
   setColorCompensation,
@@ -713,6 +792,8 @@ export const {
   paramsRecalled,
   animaVaeModelSelected,
   animaQwen3EncoderModelSelected,
+  animaLLLiteModelSelected,
+  animaLLLiteWeightChanged,
   setAnimaScheduler,
 } = slice.actions;
 
@@ -758,10 +839,12 @@ export const selectIsFLUX = createParamsSelector((params) => params.model?.base 
 export const selectIsSD3 = createParamsSelector((params) => params.model?.base === 'sd-3');
 export const selectIsCogView4 = createParamsSelector((params) => params.model?.base === 'cogview4');
 export const selectIsZImage = createParamsSelector((params) => params.model?.base === 'z-image');
+export const selectIsIdeogram4 = createParamsSelector((params) => params.model?.base === 'ideogram-4');
 export const selectIsAnima = createParamsSelector((params) => params.model?.base === 'anima');
 export const selectIsFlux2 = createParamsSelector((params) => params.model?.base === 'flux2');
 export const selectIsExternal = createParamsSelector((params) => params.model?.base === 'external');
 export const selectIsQwenImage = createParamsSelector((params) => params.model?.base === 'qwen-image');
+export const selectIsWan = createParamsSelector((params) => params.model?.base === 'wan');
 export const selectIsFluxKontext = createParamsSelector((params) => {
   if (params.model?.base === 'flux' && params.model?.name.toLowerCase().includes('kontext')) {
     return true;
@@ -785,6 +868,8 @@ export const selectZImageQwen3SourceModel = createParamsSelector((params) => par
 export const selectAnimaVaeModel = createParamsSelector((params) => params.animaVaeModel);
 export const selectAnimaQwen3EncoderModel = createParamsSelector((params) => params.animaQwen3EncoderModel);
 export const selectAnimaScheduler = createParamsSelector((params) => params.animaScheduler);
+export const selectAnimaLLLiteModel = createParamsSelector((params) => params.animaLLLiteModel);
+export const selectAnimaLLLiteWeight = createParamsSelector((params) => params.animaLLLiteWeight);
 export const selectKleinVaeModel = createParamsSelector((params) => params.kleinVaeModel);
 export const selectKleinQwen3EncoderModel = createParamsSelector((params) => params.kleinQwen3EncoderModel);
 export const selectQwenImageComponentSource = createParamsSelector((params) => params.qwenImageComponentSource);
@@ -792,6 +877,11 @@ export const selectQwenImageVaeModel = createParamsSelector((params) => params.q
 export const selectQwenImageQwenVLEncoderModel = createParamsSelector((params) => params.qwenImageQwenVLEncoderModel);
 export const selectQwenImageQuantization = createParamsSelector((params) => params.qwenImageQuantization);
 export const selectQwenImageShift = createParamsSelector((params) => params.qwenImageShift);
+export const selectWanTransformerLowNoise = createParamsSelector((params) => params.wanTransformerLowNoise);
+export const selectWanComponentSource = createParamsSelector((params) => params.wanComponentSource);
+export const selectWanVaeModel = createParamsSelector((params) => params.wanVaeModel);
+export const selectWanT5EncoderModel = createParamsSelector((params) => params.wanT5EncoderModel);
+export const selectWanGuidanceScaleLowNoise = createParamsSelector((params) => params.wanGuidanceScaleLowNoise);
 
 export const selectCFGScale = createParamsSelector((params) => params.cfgScale);
 export const selectGuidance = createParamsSelector((params) => params.guidance);
@@ -851,7 +941,16 @@ export const selectModelSupportsRefImages = createSelector(selectModel, selectMo
   if (model.base === 'external') {
     return false;
   }
-  return SUPPORTS_REF_IMAGES_BASE_MODELS.includes(model.base);
+  if (!SUPPORTS_REF_IMAGES_BASE_MODELS.includes(model.base)) {
+    return false;
+  }
+  // Wan: only the I2V variant of A14B consumes a reference image. T2V and
+  // TI2V-5B ignore ref images, so hide the panel for those.
+  if (model.base === 'wan') {
+    const variant = modelConfig && 'variant' in modelConfig ? modelConfig.variant : null;
+    return variant === 'i2v_a14b';
+  }
+  return true;
 });
 export const selectModelSupportsOptimizedDenoising = createSelector(
   selectModel,
@@ -882,6 +981,10 @@ export const selectModelSupportsSteps = createSelector(selectModel, (model) => {
   if (model.base === 'external') {
     return false;
   }
+  if (model.base === 'ideogram-4') {
+    // Ideogram 4 bundles step count into its sampler preset, so there is no standalone steps control.
+    return false;
+  }
   return true;
 });
 export const selectModelSupportsDimensions = createSelector(selectModel, selectModelConfig, (model, modelConfig) => {
@@ -906,6 +1009,11 @@ export const selectFluxDypeScale = createParamsSelector((params) => params.fluxD
 export const selectFluxDypeExponent = createParamsSelector((params) => params.fluxDypeExponent);
 export const selectZImageScheduler = createParamsSelector((params) => params.zImageScheduler);
 export const selectZImageShift = createParamsSelector((params) => params.zImageShift);
+export const selectIdeogram4SamplerPreset = createParamsSelector((params) => params.ideogram4SamplerPreset);
+export const selectIdeogram4Steps = createParamsSelector((params) => params.ideogram4Steps);
+export const selectIdeogram4GuidanceScale = createParamsSelector((params) => params.ideogram4GuidanceScale);
+export const selectIdeogram4Mu = createParamsSelector((params) => params.ideogram4Mu);
+export const selectIdeogram4ColorPalette = createParamsSelector((params) => params.ideogram4ColorPalette);
 export const selectZImageSeedVarianceEnabled = createParamsSelector((params) => params.zImageSeedVarianceEnabled);
 export const selectZImageSeedVarianceStrength = createParamsSelector((params) => params.zImageSeedVarianceStrength);
 export const selectZImageSeedVarianceRandomizePercent = createParamsSelector(

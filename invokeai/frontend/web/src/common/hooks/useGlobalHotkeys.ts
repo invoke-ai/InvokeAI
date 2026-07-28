@@ -1,8 +1,10 @@
 import { useAppStore } from 'app/store/storeHooks';
 import { useDeleteImageModalApi } from 'features/deleteImageModal/store/state';
+import { useDeleteVideoModalApi } from 'features/deleteVideoModal/store/state';
 import { selectSelection } from 'features/gallery/store/gallerySelectors';
+import { isVideoName } from 'features/gallery/store/types';
+import { useCancelCurrentQueueItem } from 'features/queue/hooks/useCancelCurrentQueueItem';
 import { useClearQueue } from 'features/queue/hooks/useClearQueue';
-import { useDeleteCurrentQueueItem } from 'features/queue/hooks/useDeleteCurrentQueueItem';
 import { useInvoke } from 'features/queue/hooks/useInvoke';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
@@ -37,17 +39,19 @@ export const useGlobalHotkeys = () => {
     dependencies: [queue],
   });
 
-  const deleteCurrentQueueItem = useDeleteCurrentQueueItem();
+  const cancelCurrentQueueItem = useCancelCurrentQueueItem();
 
   useRegisteredHotkeys({
     id: 'cancelQueueItem',
     category: 'app',
-    callback: deleteCurrentQueueItem.trigger,
+    callback: () => {
+      cancelCurrentQueueItem.trigger();
+    },
     options: {
-      enabled: !deleteCurrentQueueItem.isDisabled && !deleteCurrentQueueItem.isLoading,
+      enabled: !cancelCurrentQueueItem.isDisabled && !cancelCurrentQueueItem.isLoading,
       preventDefault: true,
     },
-    dependencies: [deleteCurrentQueueItem],
+    dependencies: [cancelCurrentQueueItem],
   });
 
   const clearQueue = useClearQueue();
@@ -118,11 +122,12 @@ export const useGlobalHotkeys = () => {
   });
 
   const deleteImageModalApi = useDeleteImageModalApi();
+  const deleteVideoModalApi = useDeleteVideoModalApi();
 
   useRegisteredHotkeys({
     id: 'deleteSelection',
     category: 'gallery',
-    callback: () => {
+    callback: async () => {
       const focusedRegion = getFocusedRegion();
       if (focusedRegion !== 'gallery' && focusedRegion !== 'viewer') {
         return;
@@ -131,9 +136,27 @@ export const useGlobalHotkeys = () => {
       if (!selection.length) {
         return;
       }
-      deleteImageModalApi.delete(selection);
+      // The gallery selection is polymorphic — route each kind to its own delete flow.
+      // Sequential so the two confirmation dialogs don't stack; canceling one flow
+      // (rejected promise) still lets the other run.
+      const imageNames = selection.filter((name) => !isVideoName(name));
+      const videoNames = selection.filter(isVideoName);
+      if (imageNames.length) {
+        try {
+          await deleteImageModalApi.delete(imageNames);
+        } catch {
+          // User canceled the image deletion — the video flow is independent.
+        }
+      }
+      if (videoNames.length) {
+        try {
+          await deleteVideoModalApi.delete(videoNames);
+        } catch {
+          // User canceled the video deletion.
+        }
+      }
     },
-    dependencies: [getState, deleteImageModalApi],
+    dependencies: [getState, deleteImageModalApi, deleteVideoModalApi],
   });
 
   useRegisteredHotkeys({

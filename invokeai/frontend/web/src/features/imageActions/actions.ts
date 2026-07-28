@@ -35,14 +35,17 @@ import {
 import { calculateNewSize } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
 import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
 import type { BoardId } from 'features/gallery/store/types';
-import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
+import { fieldImageValueChanged, fieldVideoValueChanged } from 'features/nodes/store/nodesSlice';
 import type { FieldIdentifier } from 'features/nodes/types/field';
 import { upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
 import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
+import { toast } from 'features/toast/toast';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { WORKSPACE_PANEL_ID } from 'features/ui/layouts/shared';
+import i18n from 'i18next';
 import { imageDTOToFile, imagesApi, uploadImage } from 'services/api/endpoints/images';
-import type { ImageDTO } from 'services/api/types';
+import { videosApi } from 'services/api/endpoints/videos';
+import type { ImageDTO, VideoDTO } from 'services/api/types';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
@@ -73,6 +76,15 @@ export const setNodeImageFieldImage = (arg: {
 }) => {
   const { imageDTO, fieldIdentifier, dispatch } = arg;
   dispatch(fieldImageValueChanged({ ...fieldIdentifier, value: imageDTO }));
+};
+
+export const setNodeVideoFieldVideo = (arg: {
+  videoDTO: VideoDTO;
+  fieldIdentifier: FieldIdentifier;
+  dispatch: AppDispatch;
+}) => {
+  const { videoDTO, fieldIdentifier, dispatch } = arg;
+  dispatch(fieldVideoValueChanged({ ...fieldIdentifier, value: videoDTO }));
 };
 
 export const setComparisonImage = (arg: { image_name: string; dispatch: AppDispatch }) => {
@@ -322,4 +334,67 @@ export const removeImagesFromBoard = (arg: { image_names: string[]; dispatch: Ap
   const { image_names, dispatch } = arg;
   dispatch(imagesApi.endpoints.removeImagesFromBoard.initiate({ image_names }, { track: false }));
   dispatch(selectionChanged([]));
+};
+
+// Single-video counterparts to addImagesToBoard / removeImagesFromBoard. The video router
+// only exposes single-video endpoints today (POST/DELETE /api/v1/videos/board), so the
+// callers loop per video. Backend permissions: add requires _assert_board_write_access
+// (admin/owner/public dest) AND _assert_video_direct_owner; remove requires
+// _assert_video_direct_owner plus write access on the *source* board.
+type VideoBoardMutation = { videoName: string; request: { unwrap: () => Promise<unknown> } };
+
+const settleVideoBoardMutations = async (mutations: VideoBoardMutation[], dispatch: AppDispatch) => {
+  const results = await Promise.allSettled(mutations.map(({ request }) => request.unwrap()));
+  const failed = results.filter((result) => result.status === 'rejected');
+  if (failed.length === 0) {
+    dispatch(selectionChanged([]));
+    return;
+  }
+  const failedVideoNames = results.flatMap((result, index) =>
+    result.status === 'rejected' && mutations[index] ? [mutations[index].videoName] : []
+  );
+  dispatch(selectionChanged(failedVideoNames));
+  toast({
+    id: 'VIDEOS_FAILED_TO_MOVE',
+    title: i18n.t('toast.videosFailedToMove', { count: failed.length }),
+    status: 'warning',
+  });
+};
+
+export const addVideoToBoard = (arg: { video_name: string; boardId: BoardId; dispatch: AppDispatch }) => {
+  const { video_name, boardId, dispatch } = arg;
+  const mutation = dispatch(
+    videosApi.endpoints.addVideoToBoard.initiate({ video_name, board_id: boardId }, { track: false })
+  );
+  void settleVideoBoardMutations([{ videoName: video_name, request: mutation }], dispatch);
+};
+
+export const removeVideoFromBoard = (arg: { video_name: string; dispatch: AppDispatch }) => {
+  const { video_name, dispatch } = arg;
+  const mutation = dispatch(videosApi.endpoints.removeVideoFromBoard.initiate({ video_name }, { track: false }));
+  void settleVideoBoardMutations([{ videoName: video_name, request: mutation }], dispatch);
+};
+
+// Bulk helpers. No batch endpoint exists for the video router yet, so we fan out per-video over
+// the existing singular mutation — same pattern the change-board modal already uses. Callers
+// (drag-and-drop bulk move-to-board, future bulk actions) get to share the selection-clear and
+// keep their wiring symmetrical with the image-side helpers.
+export const addVideosToBoard = (arg: { video_names: string[]; boardId: BoardId; dispatch: AppDispatch }) => {
+  const { video_names, boardId, dispatch } = arg;
+  const mutations = video_names.map((videoName) => ({
+    videoName,
+    request: dispatch(
+      videosApi.endpoints.addVideoToBoard.initiate({ video_name: videoName, board_id: boardId }, { track: false })
+    ),
+  }));
+  void settleVideoBoardMutations(mutations, dispatch);
+};
+
+export const removeVideosFromBoard = (arg: { video_names: string[]; dispatch: AppDispatch }) => {
+  const { video_names, dispatch } = arg;
+  const mutations = video_names.map((videoName) => ({
+    videoName,
+    request: dispatch(videosApi.endpoints.removeVideoFromBoard.initiate({ video_name: videoName }, { track: false })),
+  }));
+  void settleVideoBoardMutations(mutations, dispatch);
 };
