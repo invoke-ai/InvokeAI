@@ -2,7 +2,6 @@ import type { PromptTemplateRecord } from '@features/generation/data/promptTempl
 import type { PromptTemplateCatalog } from '@features/generation/ui/usePromptTemplates';
 
 import { ChakraProvider } from '@chakra-ui/react';
-import { fetchPromptTemplateImage } from '@features/generation/data/promptTemplates';
 import { PromptTemplateEditor } from '@features/generation/ui/promptFields/PromptTemplateEditor';
 import { PromptTemplatesPanel } from '@features/generation/ui/promptFields/PromptTemplatesPanel';
 import { system } from '@theme/system';
@@ -21,14 +20,6 @@ vi.mock('@features/generation/ui/GenerationUiContext', async (importOriginal) =>
     capabilities: { canManagePromptTemplates: false },
     notifications: { error: vi.fn(), info: vi.fn(), reportError: vi.fn() },
   }),
-}));
-
-// The editor loads an existing preview image back so saving does not drop it.
-// Stubbed so a template with an image is driven from the test rather than the
-// network, and so a regression shows up as a failed assertion.
-vi.mock('@features/generation/data/promptTemplates', async (importOriginal) => ({
-  ...(await importOriginal<object>()),
-  fetchPromptTemplateImage: vi.fn().mockResolvedValue(null),
 }));
 
 // The subtree of `public/locales/en.json` these panels read, copied verbatim so
@@ -131,6 +122,7 @@ const createCatalog = (overrides: Partial<PromptTemplateCatalog> = {}): PromptTe
   create: vi.fn(),
   defaultTemplates: [defaultTemplate],
   exportCsv: vi.fn(),
+  fetchImage: vi.fn().mockResolvedValue(null),
   importFile: vi.fn(),
   isLoading: false,
   remove: vi.fn(),
@@ -353,10 +345,11 @@ describe('the prompt template editor', () => {
     const catalog = createCatalog();
     let resolveImage: (image: Blob) => void = () => {};
 
-    vi.mocked(fetchPromptTemplateImage).mockReturnValueOnce(
-      new Promise<Blob | null>((resolve) => {
-        resolveImage = resolve;
-      })
+    catalog.fetchImage = vi.fn(
+      () =>
+        new Promise<Blob | null>((resolve) => {
+          resolveImage = resolve;
+        })
     );
 
     await render(

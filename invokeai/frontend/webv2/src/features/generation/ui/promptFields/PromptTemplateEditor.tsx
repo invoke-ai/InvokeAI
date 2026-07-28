@@ -6,7 +6,6 @@ import type { ChangeEvent } from 'react';
 
 import { HStack, Image, Input, Stack, Text } from '@chakra-ui/react';
 import { PROMPT_TEMPLATE_PLACEHOLDER } from '@features/generation/core/promptTemplates';
-import { fetchPromptTemplateImage } from '@features/generation/data/promptTemplates';
 import { useGenerationUi } from '@features/generation/ui/GenerationUiContext';
 import { PromptPanelHeader } from '@features/generation/ui/promptFields/PromptPanelHeader';
 import { PromptTextarea } from '@features/generation/ui/promptFields/PromptTextarea';
@@ -109,7 +108,7 @@ export const PromptTemplateEditor = ({
       return;
     }
 
-    void fetchPromptTemplateImage(imageUrl).then((image) => {
+    void catalog.fetchImage(imageUrl).then((image) => {
       if (image) {
         setDraft((current) =>
           current.isExistingImageSettled ? current : { ...current, image, isExistingImageSettled: true }
@@ -133,17 +132,24 @@ export const PromptTemplateEditor = ({
     setIsSaving(true);
     setError(null);
 
-    try {
-      const saved = template ? await catalog.update(template.id, nextDraft) : await catalog.create(nextDraft);
+    let saved: PromptTemplateRecord;
 
-      onSaved(saved);
+    try {
+      saved = template ? await catalog.update(template.id, nextDraft) : await catalog.create(nextDraft);
     } catch (caught) {
       // `ApiError.message` is the raw response body, so the backend's own
       // explanation only reads properly once it is unwrapped.
       setError(getApiErrorMessage(caught, t('widgets.generate.promptTemplates.couldNotSave')));
+      return;
     } finally {
       setIsSaving(false);
     }
+
+    // Deliberately outside the `try`. Handing the saved record back is the
+    // caller's business, and a failure there is not a failure to save — inside,
+    // it was reported as "could not save this template" about a template that
+    // had just been saved. It reaches the caller's own reporting instead.
+    onSaved(saved);
   }, [catalog, draft, onSaved, t, template, trimmedName]);
 
   const insertPlaceholder = useCallback(

@@ -4,6 +4,7 @@ import {
   createPromptTemplate,
   deletePromptTemplate,
   exportPromptTemplates,
+  fetchPromptTemplateImage,
   importPromptTemplates,
   invalidatePromptTemplates,
   promptTemplatesQueryOptions,
@@ -27,6 +28,15 @@ export interface PromptTemplateCatalog {
   remove: (id: string) => Promise<void>;
   importFile: (file: File) => Promise<void>;
   exportCsv: () => Promise<Blob>;
+  /**
+   * The preview image behind a record's `imageUrl`, or null.
+   *
+   * On the port rather than imported straight from `data/` by the one component
+   * that needs it: everything else here is injectable, and a single direct
+   * import made the editor's tests mock a module to stand in for a dependency
+   * they were otherwise handed.
+   */
+  fetchImage: (imageUrl: string) => Promise<Blob | null>;
 }
 
 /**
@@ -77,6 +87,7 @@ export const usePromptTemplates = ({ isEnabled = true }: { isEnabled?: boolean }
     create,
     defaultTemplates,
     exportCsv: exportPromptTemplates,
+    fetchImage: fetchPromptTemplateImage,
     importFile,
     isLoading: query.isPending,
     remove,
