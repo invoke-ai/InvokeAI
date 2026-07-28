@@ -58,6 +58,10 @@ export const buildQueueRecallValues = (
     return {
       ...current,
       positivePrompt,
+      // The recalled text already went through whatever template that run used —
+      // the session metadata carries the merged prompt outright. Keeping the
+      // current template active would wrap it a second time.
+      promptTemplate: null,
       ...(negativePrompt !== undefined
         ? { negativePrompt, negativePromptEnabled: snapshot?.negativePromptEnabled ?? negativePrompt.length > 0 }
         : {}),

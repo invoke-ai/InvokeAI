@@ -283,17 +283,32 @@ const getMetadataVae = (
 
 const getPromptPatch = (
   metadata: unknown
-): Partial<Pick<GenerateWidgetValues, 'negativePrompt' | 'positivePrompt'>> => {
+): Partial<Pick<GenerateWidgetValues, 'negativePrompt' | 'positivePrompt' | 'promptTemplate'>> => {
   const positivePrompt = getString(metadata, 'positive_prompt');
   const negativePrompt = getNullableString(metadata, 'negative_prompt');
+  // Image metadata records the prompt the model was given, so it already has any
+  // template baked in. Clearing the active template stops it wrapping the text a
+  // second time on the next Invoke.
+  const clearTemplate = positivePrompt !== null || negativePrompt !== undefined;
 
   return {
     ...(positivePrompt !== null ? { positivePrompt } : {}),
     ...(negativePrompt !== undefined ? { negativePrompt: negativePrompt ?? '' } : {}),
+    ...(clearTemplate ? { promptTemplate: null } : {}),
   };
 };
 
 const hasPrompt = (metadata: unknown): boolean => Object.keys(getPromptPatch(metadata)).length > 0;
+
+/**
+ * The prompts an image was generated with, for seeding a new prompt template.
+ * These are the merged prompts — metadata records what the model was given — so
+ * the template starts from the text that produced the image.
+ */
+export const getMetadataPrompts = (metadata: unknown): { negativePrompt: string; positivePrompt: string } => ({
+  negativePrompt: getNullableString(metadata, 'negative_prompt') ?? '',
+  positivePrompt: getString(metadata, 'positive_prompt') ?? '',
+});
 
 const hasMetadataSize = (metadata: unknown, model: GenerateModelConfig): boolean =>
   Object.keys(getMetadataSize(metadata, model)).length > 0;

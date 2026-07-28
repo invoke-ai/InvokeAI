@@ -21,7 +21,7 @@ import type { ResolvedInvocationRoute } from '@workbench/invocationContracts';
 import type { Project } from '@workbench/projectContracts';
 
 import { resolveDynamicPrompts } from '@features/generation/prompts';
-import { hasDynamicPromptSyntax, normalizeGenerateSettings } from '@features/generation/settings';
+import { getEffectivePrompts, hasDynamicPromptSyntax, normalizeGenerateSettings } from '@features/generation/settings';
 import { queryClient } from '@platform/query/client';
 import { isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 
@@ -58,6 +58,12 @@ export interface SubmitResolvedInvocationDeps {
 /**
  * The GenerateSettings behind a route that expands `{a|b}`, or `null` when the
  * route submits its prompt literally (Upscale, Workflow) or has no such syntax.
+ *
+ * The returned settings carry the *merged* prompts, so both the gate and the
+ * expansion below see what will actually generate. That matters in both
+ * directions: an active template can introduce `{a|b}` a plain authored prompt
+ * never had, and it always consumes its own `{prompt}` placeholder before the
+ * expander could mistake it for a one-option group.
  */
 const getExpandableSettings = (project: Project, route: ResolvedInvocationRoute): GenerateSettings | null => {
   if (route.sourceId === 'upscale' || route.sourceId === 'workflow') {
@@ -66,7 +72,13 @@ const getExpandableSettings = (project: Project, route: ResolvedInvocationRoute)
 
   const settings = normalizeGenerateSettings(getProjectWidgetValues(project, 'generate'));
 
-  return settings && hasDynamicPromptSyntax(settings.positivePrompt) ? settings : null;
+  if (!settings) {
+    return null;
+  }
+
+  const effectiveSettings = { ...settings, ...getEffectivePrompts(settings) };
+
+  return hasDynamicPromptSyntax(effectiveSettings.positivePrompt) ? effectiveSettings : null;
 };
 
 /**

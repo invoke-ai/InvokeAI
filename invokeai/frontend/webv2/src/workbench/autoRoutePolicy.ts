@@ -43,6 +43,9 @@ const GENERATE_UI_NOISE_KEYS: ReadonlySet<string> = new Set([
   'batchCount',
   'negativePromptHeightPx',
   'positivePromptHeightPx',
+  // Toggling the read-only template view changes nothing about what generates.
+  // Applying a template does, so `promptTemplate` is deliberately not noise.
+  'promptTemplateViewMode',
 ]);
 
 const UPSCALE_UI_NOISE_KEYS: ReadonlySet<string> = new Set([

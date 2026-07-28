@@ -3,7 +3,11 @@ import type { Project } from '@workbench/projectContracts';
 
 import { isGalleryVirtualBoard } from '@features/gallery';
 import { toModelIdentifier } from '@features/generation/graph';
-import { isSupportedGenerateModel, normalizeGenerateWidgetValues } from '@features/generation/settings';
+import {
+  getEffectivePrompts,
+  isSupportedGenerateModel,
+  normalizeGenerateWidgetValues,
+} from '@features/generation/settings';
 import {
   assertAccountScopeCurrent,
   captureAccountScope,
@@ -30,11 +34,16 @@ const buildCanvasSaveMetadata = (project: Project, rect: Rect): Record<string, u
     return dimensions;
   }
 
+  // The merged prompts, matching what a generated image's `core_metadata` records.
+  // A saved canvas is recalled through the same path, so the two must agree or
+  // recalling from a saved image would restore different text.
+  const effectivePrompts = getEffectivePrompts(generateValues);
+
   return {
     ...dimensions,
     ...(isSupportedGenerateModel(generateValues.model) ? { model: toModelIdentifier(generateValues.model) } : {}),
-    ...(generateValues.negativePromptEnabled ? { negative_prompt: generateValues.negativePrompt } : {}),
-    positive_prompt: generateValues.positivePrompt,
+    ...(generateValues.negativePromptEnabled ? { negative_prompt: effectivePrompts.negativePrompt } : {}),
+    positive_prompt: effectivePrompts.positivePrompt,
     seed: generateValues.seed,
   };
 };

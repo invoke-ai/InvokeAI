@@ -2,7 +2,12 @@ import type { InvocationRoute, InvocationSourceId, ResultDestination } from '@wo
 
 import { Flex, Group, HStack, Icon, Menu, Portal, Separator, Stack, Text, VStack } from '@chakra-ui/react';
 import { flushGenerateDrafts, useDynamicPrompts, type DynamicPromptsExpansion } from '@features/generation/react';
-import { sanitizeBatchCount, sanitizeDynamicPromptsConfig } from '@features/generation/settings';
+import {
+  getEffectivePrompts,
+  normalizeGenerateSettings,
+  sanitizeBatchCount,
+  sanitizeDynamicPromptsConfig,
+} from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
 import { useInvocationTemplatesSelector } from '@features/workflow/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
@@ -46,6 +51,17 @@ const readDynamicPromptsConfig = (values: Record<string, unknown>) => ({
   sampleSeed: values.dynamicPromptsSampleSeed,
   seedBehaviour: values.dynamicPromptsSeedBehaviour,
 });
+
+/**
+ * The prompt that will actually be expanded and submitted — the authored text
+ * wrapped by the active template, since a template can introduce `{a|b}` the
+ * authored prompt never had.
+ */
+const readEffectivePositivePrompt = (values: Record<string, unknown>): string => {
+  const settings = normalizeGenerateSettings(values);
+
+  return settings ? getEffectivePrompts(settings).positivePrompt : '';
+};
 
 const getBatchCount = (values: Record<string, unknown>): number => {
   const batchCount = values.batchCount;
@@ -145,7 +161,7 @@ export const InvokeControl = () => {
   // Observing the shared expansion cache here keeps the count honest and costs
   // nothing extra: the Generate preview and the submit path use the same key.
   const promptExpansion = useDynamicPrompts(
-    typeof routeInput.generateValues.positivePrompt === 'string' ? routeInput.generateValues.positivePrompt : '',
+    readEffectivePositivePrompt(routeInput.generateValues),
     invocation.sourceId === 'generate' || invocation.sourceId === 'canvas'
       ? sanitizeDynamicPromptsConfig(readDynamicPromptsConfig(routeInput.generateValues))
       : null

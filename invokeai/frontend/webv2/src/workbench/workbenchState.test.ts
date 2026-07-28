@@ -1654,6 +1654,89 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       expect(getActiveProject(state).queue.items[0]?.snapshot.backendSubmission).not.toHaveProperty('positivePrompts');
     });
 
+    // The template is what introduced the `{…}` here, so the gate has to read the
+    // merged prompt or the expansion would be discarded and the literal submitted.
+    it('keeps an expansion whose dynamic syntax came from the prompt template', () => {
+      const state = workbenchReducer(
+        primeGenerate(undefined, {
+          positivePrompt: 'a cat',
+          promptTemplate: {
+            id: 't1',
+            name: 'Tinted',
+            negativePrompt: '',
+            positivePrompt: '{prompt}, {red|green} tint',
+          },
+        }),
+        {
+          backendSupportsCancellation: true,
+          positivePrompts: ['a cat, red tint', 'a cat, green tint'],
+          route: { destination: 'gallery', destinationLocked: false, sourceId: 'generate', sourceLocked: false },
+          type: 'submitResolvedInvocationSnapshot',
+        }
+      );
+
+      expect(getActiveProject(state).queue.items[0]?.snapshot.backendSubmission).toMatchObject({
+        positivePrompts: ['a cat, red tint', 'a cat, green tint'],
+      });
+    });
+  });
+
+  describe('prompt templates on the compiled submission', () => {
+    const template = {
+      id: 't1',
+      name: 'Cinematic',
+      negativePrompt: '{prompt}, lowres',
+      positivePrompt: '{prompt}, cinematic',
+    };
+
+    it('submits the merged prompts while the widget keeps the authored text', () => {
+      const state = submitGenerate(
+        primeGenerate(undefined, {
+          negativePrompt: 'blurry',
+          negativePromptEnabled: true,
+          positivePrompt: 'a cat',
+          promptTemplate: template,
+        })
+      );
+      const queueItem = getActiveProject(state).queue.items[0];
+
+      expect(queueItem?.snapshot.backendSubmission).toMatchObject({
+        negativePrompt: 'blurry, lowres',
+        positivePrompt: 'a cat, cinematic',
+      });
+      expect(queueItem?.snapshot.widgetStates.generate.values.positivePrompt).toBe('a cat');
+    });
+
+    // Switching the negative field off must not let a template put one back.
+    it('still sends an empty negative prompt when the field is disabled', () => {
+      const state = submitGenerate(
+        primeGenerate(undefined, {
+          negativePrompt: 'blurry',
+          negativePromptEnabled: false,
+          positivePrompt: 'a cat',
+          promptTemplate: template,
+        })
+      );
+
+      expect(getActiveProject(state).queue.items[0]?.snapshot.backendSubmission).toMatchObject({
+        negativePrompt: '',
+      });
+    });
+
+    // Recall and the history popover both write straight back into the textarea,
+    // so history has to hold what the user typed, not what generated.
+    it('records the authored prompt in prompt history', () => {
+      const state = submitGenerate(
+        primeGenerate(undefined, {
+          negativePrompt: 'blurry',
+          negativePromptEnabled: true,
+          positivePrompt: 'a cat',
+          promptTemplate: template,
+        })
+      );
+
+      expect(getActiveProject(state).promptHistory).toEqual([{ negativePrompt: 'blurry', positivePrompt: 'a cat' }]);
+    });
   });
 
   it('records submitted Generate prompt pairs in project prompt history', () => {

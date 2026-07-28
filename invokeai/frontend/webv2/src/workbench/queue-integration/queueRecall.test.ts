@@ -70,6 +70,7 @@ describe('buildQueueRecallValues', () => {
       negativePrompt: 'snap neg',
       negativePromptEnabled: true,
       positivePrompt: 'snap',
+      promptTemplate: null,
     });
   });
 
@@ -85,7 +86,21 @@ describe('buildQueueRecallValues', () => {
       negativePrompt: 'meta neg',
       negativePromptEnabled: true,
       positivePrompt: 'meta',
+      promptTemplate: null,
     });
+  });
+
+  // Session metadata carries the prompt the model was given, template already
+  // applied, so recalling it has to stop the active template wrapping it again.
+  it('clears the active prompt template when recalling prompts', () => {
+    const withTemplate = makeValues({
+      promptTemplate: { id: 't1', name: 'Cinematic', negativePrompt: '', positivePrompt: '{prompt}, cinematic' },
+    });
+
+    expect(
+      buildQueueRecallValues('prompts', { current: withTemplate, meta: { positivePrompt: 'meta' }, snapshot: null })
+        ?.promptTemplate
+    ).toBeNull();
   });
 
   it('prefers the executed session seed and pins randomization off', () => {
