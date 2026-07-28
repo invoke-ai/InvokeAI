@@ -2,10 +2,10 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 798153,
+        "brotliBytes": 798156,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 798421,
+        "gzipBytes": 798434,
         "imageRawBytes": 156376,
         "initialRawBytes": 1831732,
         "largestAssetRawBytes": 737748,
@@ -238,10 +238,10 @@
         ]
       },
       "limits": {
-        "brotliBytes": 806135,
+        "brotliBytes": 806138,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 806406,
+        "gzipBytes": 806419,
         "imageRawBytes": 157940,
         "initialRawBytes": 1850050,
         "largestAssetRawBytes": 745126,
@@ -256,15 +256,15 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 973806,
+        "brotliBytes": 974102,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 972713,
+        "gzipBytes": 973053,
         "imageRawBytes": 156376,
-        "initialRawBytes": 2364794,
+        "initialRawBytes": 2365435,
         "largestAssetRawBytes": 737748,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 108163,
+        "ownedRawBytes": 108337,
         "requestCount": 75,
         "scriptRequestCount": 59,
         "sourceOwners": [
@@ -729,15 +729,15 @@
         ]
       },
       "limits": {
-        "brotliBytes": 983545,
+        "brotliBytes": 983844,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 982441,
+        "gzipBytes": 982784,
         "imageRawBytes": 157940,
-        "initialRawBytes": 2388442,
+        "initialRawBytes": 2389090,
         "largestAssetRawBytes": 745126,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 108163,
+        "ownedRawBytes": 108337,
         "requestCount": 75,
         "scriptRequestCount": 59
       },
@@ -746,7 +746,7 @@
       "source": "src/app/WorkbenchApp.tsx"
     }
   },
-  "capturedAt": "2026-07-27",
+  "capturedAt": "2026-07-28",
   "developmentInvalidation": {
     "platformUiBarrel": {
       "specifier": "@platform/ui",
