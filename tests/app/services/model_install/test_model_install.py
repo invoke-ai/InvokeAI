@@ -1082,6 +1082,94 @@ def test_restore_completes_when_pending_import_hangs(
         installer.stop()
 
 
+def test_deferred_restore_timeout_is_shared_across_markers_for_one_source(
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_record_store,
+    mm2_download_queue,
+    mm2_session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Duplicate markers must not multiply the startup restoration timeout."""
+    installer = ModelInstallService(
+        app_config=mm2_app_config,
+        record_store=mm2_record_store,
+        download_queue=mm2_download_queue,
+        event_bus=TestEventService(),
+        session=mm2_session,
+    )
+    source = URLModelSource(url=Url("https://www.test.foo/download/test_embedding.safetensors"))
+    for index in range(3):
+        _write_test_install_marker(mm2_app_config.models_path / f"{TMPDIR_PREFIX}hung_{index}", str(source))
+
+    with installer._lock:
+        installer._pending_sources.add(str(source))
+
+    clock = 0.0
+    waits: list[float] = []
+
+    def _monotonic() -> float:
+        return clock
+
+    def _wait(timeout: Optional[float] = None) -> None:
+        nonlocal clock
+        assert timeout is not None
+        waits.append(timeout)
+        clock += timeout
+
+    monkeypatch.setattr(model_install_default.time, "monotonic", _monotonic)
+    monkeypatch.setattr(installer._install_cond, "wait", _wait)
+
+    installer._restore_incomplete_installs()
+
+    assert waits == [model_install_default.DEFERRED_RESTORE_TIMEOUT]
+    assert installer._install_jobs == []
+
+
+def test_deferred_restore_remembers_registered_job_after_prune(
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_record_store,
+    mm2_download_queue,
+    mm2_session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Pruning a terminal import job must not make its deferred marker look unowned."""
+    installer = ModelInstallService(
+        app_config=mm2_app_config,
+        record_store=mm2_record_store,
+        download_queue=mm2_download_queue,
+        event_bus=TestEventService(),
+        session=mm2_session,
+    )
+    source = URLModelSource(url=Url("https://www.test.foo/download/test_embedding.safetensors"))
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}stale"
+    _write_test_install_marker(tmpdir, str(source))
+
+    imported_job = ModelInstallJob(
+        id=installer._next_id(),
+        source=source,
+        config_in=ModelRecordChanges(),
+        local_path=mm2_app_config.models_path,
+    )
+    imported_job.status = InstallStatus.COMPLETED
+    with installer._lock:
+        installer._pending_sources.add(str(source))
+
+    def _finish_and_prune_import(timeout: Optional[float] = None) -> None:
+        installer._append_install_job(imported_job)
+        installer._pending_sources.discard(str(source))
+        installer.prune_jobs()
+
+    resumed: list[ModelInstallJob] = []
+    monkeypatch.setattr(installer._install_cond, "wait", _finish_and_prune_import)
+    monkeypatch.setattr(installer, "_resume_remote_download", lambda job: resumed.append(job))
+
+    installer._restore_incomplete_installs()
+
+    assert installer._install_jobs == []
+    assert resumed == []
+    assert tmpdir.exists()
+
+
 def test_huggingface_blob_url_uses_resolve_download_url(mm2_installer: ModelInstallServiceBase) -> None:
     source = URLModelSource(
         url=Url("https://huggingface.co/h94/IP-Adapter/blob/main/sdxl_models/ip-adapter.safetensors")

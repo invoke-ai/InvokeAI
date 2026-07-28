@@ -113,6 +113,10 @@ class ModelInstallService(ModelInstallServiceBase):
         self._event_bus = event_bus
         self._logger = InvokeAILogger.get_logger(name=self.__class__.__name__)
         self._install_jobs: List[ModelInstallJob] = []
+        # Monotonic per-source generations let startup restoration observe that
+        # an import registered a job even if a concurrent prune removes that
+        # terminal job before the deferred recheck.
+        self._source_job_generations: dict[str, int] = {}
         self._install_queue: Queue[ModelInstallJob] = Queue()
         # Lock-order discipline: download-queue callbacks run on download queue
         # threads that already hold the download queue's lock, and they acquire
@@ -231,7 +235,7 @@ class ModelInstallService(ModelInstallServiceBase):
         with self._lock:
             owned_sources = {str(j.source) for j in self._install_jobs if not j.in_terminal_state}
             owned_sources |= {str(j.source) for j in self._download_cache.values() if not j.in_terminal_state}
-        deferred: list[tuple[str, ModelInstallJob, Path, set[int]]] = []
+        deferred: list[tuple[str, ModelInstallJob, Path, int]] = []
         for tmpdir in path.glob(f"{TMPDIR_PREFIX}*"):
             marker = self._read_install_marker(tmpdir)
             if not marker:
@@ -294,19 +298,18 @@ class ModelInstallService(ModelInstallServiceBase):
                     # without registering one, in which case the marker would
                     # be left with no owner. Defer the marker and recheck it
                     # after the scan, once the reservation has resolved. Record
-                    # the IDs of the source's jobs known now (all terminal, or
-                    # already_active would have hit) so the recheck can tell a
-                    # job the reservation registered - even one that has already
-                    # reached a terminal state by then - from these older ones.
+                    # the source's registration generation so the recheck can
+                    # tell whether the reservation registered a job, even if
+                    # that job reached a terminal state and was pruned.
                     self._logger.debug(f"Deferring restore for {source_str} - a pending import has reserved it")
-                    known_job_ids = {j.id for j in self._install_jobs if str(j.source) == source_str}
-                    deferred.append((source_str, job, tmpdir, known_job_ids))
+                    known_generation = self._source_job_generations.get(source_str, 0)
+                    deferred.append((source_str, job, tmpdir, known_generation))
                     continue
                 if source_str in seen_sources:
                     duplicate_tmpdir = True
                 else:
                     seen_sources.add(source_str)
-                    self._install_jobs.append(job)
+                    self._append_install_job(job)
             if duplicate_tmpdir:
                 self._logger.info(f"Removing duplicate temporary directory {tmpdir}")
                 self._safe_rmtree(tmpdir, self._logger)
@@ -325,9 +328,9 @@ class ModelInstallService(ModelInstallServiceBase):
         # helpers hang must not hold up restoration (and with it the startup
         # barrier every import_model call waits on) forever, so on timeout the
         # marker is left on disk for a later startup instead.
-        for source_str, job, tmpdir, known_job_ids in deferred:
+        deadline = time.monotonic() + DEFERRED_RESTORE_TIMEOUT
+        for source_str, job, tmpdir, known_generation in deferred:
             duplicate_tmpdir = False
-            deadline = time.monotonic() + DEFERRED_RESTORE_TIMEOUT
             with self._install_cond:
                 while source_str in self._pending_sources:
                     remaining = deadline - time.monotonic()
@@ -340,9 +343,9 @@ class ModelInstallService(ModelInstallServiceBase):
                         f"leaving {tmpdir} to be restored on a later startup"
                     )
                     continue
-                already_registered = any(
-                    str(j.source) == source_str and j.id not in known_job_ids for j in self._install_jobs
-                ) or any(str(j.source) == source_str for j in self._download_cache.values() if not j.in_terminal_state)
+                already_registered = self._source_job_generations.get(source_str, 0) > known_generation or any(
+                    str(j.source) == source_str for j in self._download_cache.values() if not j.in_terminal_state
+                )
                 if already_registered:
                     self._logger.debug(f"Skipping restore for {source_str} - already being tracked")
                     continue
@@ -350,7 +353,7 @@ class ModelInstallService(ModelInstallServiceBase):
                     duplicate_tmpdir = True
                 else:
                     seen_sources.add(source_str)
-                    self._install_jobs.append(job)
+                    self._append_install_job(job)
             if duplicate_tmpdir:
                 self._logger.info(f"Removing duplicate temporary directory {tmpdir}")
                 self._safe_rmtree(tmpdir, self._logger)
@@ -373,6 +376,12 @@ class ModelInstallService(ModelInstallServiceBase):
                 self._set_error(job, e)
                 if job._install_tmpdir is not None:
                     self._safe_rmtree(job._install_tmpdir, self._logger)
+
+    def _append_install_job(self, job: ModelInstallJob) -> None:
+        """Append a job and record its source generation. Caller must hold _lock."""
+        self._install_jobs.append(job)
+        source_str = str(job.source)
+        self._source_job_generations[source_str] = self._source_job_generations.get(source_str, 0) + 1
 
     def _restore_incomplete_installs_async(self) -> None:
         self._restore_completed_event.clear()
@@ -618,7 +627,7 @@ class ModelInstallService(ModelInstallServiceBase):
             raise
 
         with self._install_cond:
-            self._install_jobs.append(install_job)
+            self._append_install_job(install_job)
             self._pending_sources.discard(source_str)
             self._install_cond.notify_all()
         return install_job
