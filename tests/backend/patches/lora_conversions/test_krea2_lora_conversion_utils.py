@@ -96,3 +96,75 @@ def test_conflicting_transformer_and_diffusion_model_aliases_raise() -> None:
 
     with pytest.raises(ValueError, match="normalize to the same target"):
         lora_model_from_krea2_state_dict(state_dict)
+
+
+def test_native_comfyui_krea2_keys_are_remapped_to_diffusers_layout() -> None:
+    # Native (ComfyUI) Krea-2 LoRAs name modules differently (blocks / attn.wq/wo/gate / mlp / txtfusion).
+    # They must be remapped onto the diffusers Krea2Transformer2DModel layout so the LoRA actually applies.
+    state_dict = {
+        # main transformer block, native gated attention + SwiGLU mlp
+        "diffusion_model.blocks.0.attn.wq.lora_A.weight": torch.ones(2, 4),
+        "diffusion_model.blocks.0.attn.wq.lora_B.weight": torch.ones(4, 2),
+        "diffusion_model.blocks.0.attn.wo.lora_A.weight": torch.ones(2, 4),
+        "diffusion_model.blocks.0.attn.wo.lora_B.weight": torch.ones(4, 2),
+        "diffusion_model.blocks.0.attn.gate.lora_A.weight": torch.ones(2, 4),
+        "diffusion_model.blocks.0.attn.gate.lora_B.weight": torch.ones(4, 2),
+        "diffusion_model.blocks.0.mlp.down.lora_A.weight": torch.ones(2, 8),
+        "diffusion_model.blocks.0.mlp.down.lora_B.weight": torch.ones(4, 2),
+        # text-fusion stage (native `txtfusion`, layerwise + refiner sub-blocks)
+        "diffusion_model.txtfusion.layerwise_blocks.0.attn.wk.lora_A.weight": torch.ones(2, 4),
+        "diffusion_model.txtfusion.layerwise_blocks.0.attn.wk.lora_B.weight": torch.ones(4, 2),
+        "diffusion_model.txtfusion.refiner_blocks.1.mlp.up.lora_A.weight": torch.ones(2, 4),
+        "diffusion_model.txtfusion.refiner_blocks.1.mlp.up.lora_B.weight": torch.ones(8, 2),
+    }
+
+    model = lora_model_from_krea2_state_dict(state_dict)
+    keys = set(model.layers.keys())
+
+    p = KREA2_LORA_TRANSFORMER_PREFIX
+    # blocks -> transformer_blocks; attn.wq/wo/gate -> to_q/to_out.0/to_gate; mlp -> ff
+    assert f"{p}transformer_blocks.0.attn.to_q" in keys
+    assert f"{p}transformer_blocks.0.attn.to_out.0" in keys
+    assert f"{p}transformer_blocks.0.attn.to_gate" in keys
+    assert f"{p}transformer_blocks.0.ff.down" in keys
+    # txtfusion -> text_fusion; layerwise_blocks / refiner_blocks preserved (NOT renamed to transformer_blocks)
+    assert f"{p}text_fusion.layerwise_blocks.0.attn.to_k" in keys
+    assert f"{p}text_fusion.refiner_blocks.1.ff.up" in keys
+    # No native names should survive.
+    assert not any(".wq" in k or ".wo" in k or ".mlp." in k or "txtfusion" in k for k in keys)
+    assert all(isinstance(v, LoRALayer) for v in model.layers.values())
+
+
+def test_native_krea2_dora_magnitude_is_preserved_through_remap() -> None:
+    # A native DoRA slider (A/B + magnitude) must remap AND keep its magnitude, producing a DoRALayer.
+    magnitude = torch.full((4, 1), 2.0)
+    state_dict = {
+        "diffusion_model.blocks.0.attn.wq.lora_A.weight": torch.ones(2, 4),
+        "diffusion_model.blocks.0.attn.wq.lora_B.weight": torch.ones(4, 2),
+        "diffusion_model.blocks.0.attn.wq.lora_magnitude_vector.weight": magnitude,
+        # a second native marker so detection is unambiguous
+        "diffusion_model.blocks.0.attn.gate.lora_A.weight": torch.ones(2, 4),
+        "diffusion_model.blocks.0.attn.gate.lora_B.weight": torch.ones(4, 2),
+    }
+
+    model = lora_model_from_krea2_state_dict(state_dict)
+
+    layer = model.layers[f"{KREA2_LORA_TRANSFORMER_PREFIX}transformer_blocks.0.attn.to_q"]
+    assert isinstance(layer, DoRALayer)
+    assert torch.equal(layer.dora_scale, magnitude)
+
+
+def test_diffusers_layout_krea2_keys_are_left_untouched() -> None:
+    # A LoRA already in the diffusers layout must not be altered by the native remap.
+    state_dict = {
+        "transformer.transformer_blocks.0.attn.to_q.lora_A.weight": torch.ones(2, 4),
+        "transformer.transformer_blocks.0.attn.to_q.lora_B.weight": torch.ones(4, 2),
+        "transformer.text_fusion.0.attn.to_q.lora_A.weight": torch.ones(2, 4),
+        "transformer.text_fusion.0.attn.to_q.lora_B.weight": torch.ones(4, 2),
+    }
+
+    model = lora_model_from_krea2_state_dict(state_dict)
+    keys = set(model.layers.keys())
+    p = KREA2_LORA_TRANSFORMER_PREFIX
+    assert f"{p}transformer_blocks.0.attn.to_q" in keys
+    assert f"{p}text_fusion.0.attn.to_q" in keys

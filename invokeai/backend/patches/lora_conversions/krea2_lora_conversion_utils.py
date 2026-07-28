@@ -7,6 +7,7 @@ Published LoRAs (e.g. krea/Krea-2-LoRA-*) are diffusers PEFT format: keys like
 share the ``transformer.transformer_blocks.`` prefix).
 """
 
+import re
 from typing import Dict
 
 import torch
@@ -20,13 +21,66 @@ from invokeai.backend.patches.lora_conversions.krea2_lora_constants import (
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 
 # Module-name fragments unique to the Krea-2 transformer (text-fusion stage + timestep modulation proj).
-KREA2_TRANSFORMER_SIGNATURE_KEYS = ("text_fusion", "time_mod_proj")
+# ``text_fusion`` is the diffusers name; ``txtfusion`` is the native (ComfyUI) name for the same stage.
+KREA2_TRANSFORMER_SIGNATURE_KEYS = ("text_fusion", "time_mod_proj", "txtfusion")
+
+# --- Native (ComfyUI) -> diffusers key mapping ---------------------------------------------------------------
+# Native Krea-2 LoRAs (e.g. sliders) name the modules differently from InvokeAI's diffusers
+# ``Krea2Transformer2DModel``. The two are a verified 1:1 correspondence (every native module maps onto a real
+# Linear in the diffusers model), so we rewrite native keys to the diffusers layout before conversion:
+#   diffusion_model.blocks.N.              -> transformer_blocks.N.   (top-level blocks only)
+#   diffusion_model.txtfusion.             -> text_fusion.            (layerwise_blocks / refiner_blocks kept)
+#   attn.wq/wk/wv                          -> attn.to_q/to_k/to_v
+#   attn.wo                                -> attn.to_out.0
+#   attn.gate                              -> attn.to_gate
+#   mlp.gate/up/down                       -> ff.gate/up/down         (SwiGLU)
+_NATIVE_KREA2_LEAF_RENAMES = {
+    ".attn.wq.": ".attn.to_q.",
+    ".attn.wk.": ".attn.to_k.",
+    ".attn.wv.": ".attn.to_v.",
+    ".attn.wo.": ".attn.to_out.0.",
+    ".attn.gate.": ".attn.to_gate.",
+    ".mlp.gate.": ".ff.gate.",
+    ".mlp.up.": ".ff.up.",
+    ".mlp.down.": ".ff.down.",
+}
+# The main transformer's top-level `blocks.` (preceded by start-of-string or a dot) becomes
+# `transformer_blocks.`. The text-fusion sub-blocks (`layerwise_blocks`/`refiner_blocks`) are NOT touched
+# because their `blocks` is preceded by `_`, not by a dot.
+_NATIVE_KREA2_BLOCKS_RE = re.compile(r"(^|\.)blocks\.")
+
+
+def _looks_like_native_krea2_lora(str_keys: list[str]) -> bool:
+    """True if the keys use the native (ComfyUI) Krea-2 naming rather than the diffusers PEFT naming."""
+    has_txtfusion = any("txtfusion" in k for k in str_keys)
+    # Native gated attention (`attn.wq` + `attn.gate`) uniquely identifies the ComfyUI Krea-2 layout even for
+    # a transformer-only LoRA without the text-fusion stage.
+    has_native_attn = any(".attn.wq." in k for k in str_keys) and any(".attn.gate." in k for k in str_keys)
+    return has_txtfusion or has_native_attn
+
+
+def _native_krea2_key_to_diffusers(key: str) -> str:
+    key = key.replace("txtfusion.", "text_fusion.")
+    key = _NATIVE_KREA2_BLOCKS_RE.sub(r"\1transformer_blocks.", key)
+    for native, diffusers in _NATIVE_KREA2_LEAF_RENAMES.items():
+        key = key.replace(native, diffusers)
+    return key
+
+
+def _maybe_convert_native_krea2_state_dict(
+    state_dict: Dict[str, torch.Tensor],
+) -> Dict[str, torch.Tensor]:
+    """Rewrite native (ComfyUI) Krea-2 LoRA keys to the diffusers layout, leaving diffusers keys untouched."""
+    str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
+    if not _looks_like_native_krea2_lora(str_keys):
+        return state_dict
+    return {(_native_krea2_key_to_diffusers(k) if isinstance(k, str) else k): v for k, v in state_dict.items()}
 
 
 def is_state_dict_likely_krea2_lora(state_dict: dict[str | int, torch.Tensor]) -> bool:
     """Checks if the provided state dict is likely a Krea-2 LoRA.
 
-    Requires the distinctive Krea-2 ``text_fusion`` / ``time_mod_proj`` modules so it does not
+    Requires the distinctive Krea-2 ``text_fusion`` / ``txtfusion`` / ``time_mod_proj`` modules so it does not
     false-match Qwen-Image or Z-Image LoRAs that also carry ``transformer.transformer_blocks.`` keys.
     """
     str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
@@ -44,6 +98,8 @@ def lora_model_from_krea2_state_dict(state_dict: Dict[str, torch.Tensor], alpha:
     as ``alpha=rank`` internally (the common diffusers default).
     """
     layers: dict[str, BaseLayerPatch] = {}
+    # Normalize native (ComfyUI) naming to the diffusers layout so the rest of the converter is layout-agnostic.
+    state_dict = _maybe_convert_native_krea2_state_dict(state_dict)
     grouped_state_dict = _group_by_layer(state_dict)
 
     transformer_prefixes = (

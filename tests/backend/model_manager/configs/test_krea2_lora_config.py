@@ -198,3 +198,21 @@ def test_automatic_probe_accepts_complete_pair_with_dora_scale(_raise_if_not_fil
     }
     config = LoRA_LyCORIS_Krea2_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS})
     assert config.base is BaseModelType.Krea2
+
+
+@patch("invokeai.backend.model_manager.configs.lora.raise_if_not_file")
+def test_native_comfyui_krea2_lora_is_identified_as_krea2(_raise_if_not_file) -> None:
+    # A native (ComfyUI) Krea-2 slider LoRA uses `blocks.N.attn.wq/gate` + `mlp` (no diffusers `text_fusion`
+    # key). It must auto-identify as Krea-2 via the native gated-attention signature, not fall through to
+    # Anima (whose strict detector previously false-matched the native `blocks.N.mlp.*`).
+    mod = MagicMock()
+    mod.load_state_dict.return_value = {
+        "diffusion_model.blocks.0.attn.wq.lora_A.weight": object(),
+        "diffusion_model.blocks.0.attn.wq.lora_B.weight": object(),
+        "diffusion_model.blocks.0.attn.gate.lora_A.weight": object(),
+        "diffusion_model.blocks.0.attn.gate.lora_B.weight": object(),
+        "diffusion_model.blocks.0.mlp.down.lora_A.weight": object(),
+        "diffusion_model.blocks.0.mlp.down.lora_B.weight": object(),
+    }
+    config = LoRA_LyCORIS_Krea2_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS})
+    assert config.base is BaseModelType.Krea2

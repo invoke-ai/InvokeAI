@@ -911,8 +911,17 @@ class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
 
 
 def _has_krea2_lora_keys(state_dict: dict[str | int, Any]) -> bool:
-    """True if the state dict targets Krea-2's distinctive text-fusion / time-mod-proj modules."""
-    return any(isinstance(k, str) and ("text_fusion" in k or "time_mod_proj" in k) for k in state_dict.keys())
+    """True if the state dict targets Krea-2's distinctive modules.
+
+    Covers both the diffusers naming (``text_fusion`` / ``time_mod_proj``) and the native/ComfyUI naming
+    (``txtfusion``, or the gated attention ``attn.wq`` + ``attn.gate`` unique to Krea-2's single-stream
+    blocks) so native-format LoRAs are recognized as Krea-2 rather than falling through to another base.
+    """
+    str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
+    if any(("text_fusion" in k or "txtfusion" in k or "time_mod_proj" in k) for k in str_keys):
+        return True
+    # Native gated attention identifies a transformer-only Krea-2 LoRA that lacks the text-fusion stage.
+    return any(".attn.wq." in k for k in str_keys) and any(".attn.gate." in k for k in str_keys)
 
 
 # Each LoRA weight half must be accompanied by its partner half. An orphaned half installs successfully
