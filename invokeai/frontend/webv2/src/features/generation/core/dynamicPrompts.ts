@@ -170,14 +170,23 @@ export const getWildcardValuesError = (values: readonly string[]): 'tooManyValue
 };
 
 /**
- * The values as they will be stored: trimmed, with the blanks dropped.
+ * The values as they will be stored: comments removed, trimmed, blanks dropped.
  *
  * Applied wherever a list is authored, so that what is saved is what an export
  * writes and a re-import reads back. Without it a stray blank line survived into
  * the catalog and vanished on the next round trip.
+ *
+ * `#` comments to end of line, and the expander applies that to a substituted
+ * value as readily as to the prompt around it — a value of `poster #1` reaches
+ * the model as `poster `, and `#ff0000 glow` reaches it as nothing at all. There
+ * is no escape for it upstream. Dropping the comment here is what makes that
+ * visible while the list is in front of the user, rather than at generation time
+ * with no clue as to where the text went. The `.txt` reader has always done
+ * this, being the only format with no parser of its own; the rule belongs to the
+ * value rather than to the file it arrived in.
  */
 export const normalizeWildcardValues = (values: readonly string[]): string[] =>
-  values.map((value) => value.trim()).filter((value) => value.length > 0);
+  values.map((value) => value.split('#')[0]?.trim() ?? '').filter((value) => value.length > 0);
 
 /**
  * Why a wildcard name would be rejected, or `null` if it would be accepted.

@@ -20,7 +20,12 @@
  * written rather than riding along in the generate widget's chunk.
  */
 
-import { getWildcardNameError, getWildcardValuesError, MAX_WILDCARD_NAME_LENGTH } from './dynamicPrompts';
+import {
+  getWildcardNameError,
+  getWildcardValuesError,
+  MAX_WILDCARD_NAME_LENGTH,
+  normalizeWildcardValues,
+} from './dynamicPrompts';
 
 export interface ParsedWildcard {
   name: string;
@@ -48,10 +53,7 @@ export const getWildcardNameFromPath = (path: string): string =>
  */
 export const parseWildcardTextFile = (path: string, contents: string): ParsedWildcard => ({
   name: getWildcardNameFromPath(path),
-  values: contents
-    .split(/\r?\n/)
-    .map((line) => line.split('#')[0].trim())
-    .filter((line) => line.length > 0),
+  values: normalizeWildcardValues(contents.split(/\r?\n/)),
 });
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
@@ -69,10 +71,11 @@ const toValues = (value: unknown): string[] | null => {
     return null;
   }
 
-  return value
-    .filter((entry): entry is boolean | number | string => ['boolean', 'number', 'string'].includes(typeof entry))
-    .map((entry) => String(entry).trim())
-    .filter((entry) => entry.length > 0);
+  return normalizeWildcardValues(
+    value
+      .filter((entry): entry is boolean | number | string => ['boolean', 'number', 'string'].includes(typeof entry))
+      .map((entry) => String(entry))
+  );
 };
 
 /**

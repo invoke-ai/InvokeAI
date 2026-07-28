@@ -158,6 +158,17 @@ describe('normalizeWildcardValues', () => {
   it('leaves an already-clean list alone', () => {
     expect(normalizeWildcardValues(['red', 'green'])).toEqual(['red', 'green']);
   });
+
+  // Verified against dynamicprompts itself: a value of `poster #1` expands to
+  // `poster `, and `#ff0000 glow` expands to nothing. There is no escape for it,
+  // so a stored `#` is text that silently never reaches the model.
+  it('drops a comment, and the value that is nothing but one', () => {
+    expect(normalizeWildcardValues(['poster #1', 'red # a colour', '#ff0000 glow', 'blue'])).toEqual([
+      'poster',
+      'red',
+      'blue',
+    ]);
+  });
 });
 
 describe('getWildcardValuesError', () => {

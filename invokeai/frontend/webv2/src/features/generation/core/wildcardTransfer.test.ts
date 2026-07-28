@@ -56,6 +56,15 @@ describe('wildcardsFromNestedRecord', () => {
     ]);
   });
 
+  // The `.txt` reader has always stripped these. A YAML or JSON collection kept
+  // them, so the same list imported two ways gave two different catalogs — and
+  // the one that kept the `#` held values that expand to nothing.
+  it('drops comments the way the text reader does', () => {
+    expect(wildcardsFromNestedRecord({ colours: ['poster #1', '#ff0000 glow', 'blue'] })).toEqual([
+      { name: 'colours', values: ['poster', 'blue'] },
+    ]);
+  });
+
   it('takes a key that already contains a slash as written', () => {
     expect(wildcardsFromNestedRecord({ 'animals/dogs': ['corgi'] })).toEqual([
       { name: 'animals/dogs', values: ['corgi'] },
