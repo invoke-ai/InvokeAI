@@ -117,12 +117,21 @@ export const getActiveTriggerQuery = (
   for (let index = caret - 1; index >= limit; index--) {
     const char = value[index];
 
-    if (char === undefined || char === '\n' || char === '>' || /\s/.test(char)) {
+    if (char === '\n' || char === '>') {
       return null;
     }
 
     if (char === '<' && keys.includes('<')) {
       return { key: '<', query: value.slice(index + 1, caret), range: { end: caret, start: index } };
+    }
+
+    // A space ends a wildcard attempt but not an embedding one. Embedding model
+    // names routinely have spaces in them — `bad hands 5` — so stopping here
+    // meant `<bad ` closed the list for good and the name could never be
+    // reached inline, even though the filter would have matched it. A wildcard
+    // name cannot contain a space, so there the space really is the end.
+    if (/\s/.test(char ?? '')) {
+      return keys.includes('<') ? findEnclosingEmbedding(value, caret, limit, index) : null;
     }
 
     if (char === '_' && value[index - 1] === '_' && keys.includes('_') && !isWordCharacter(value[index - 2])) {
@@ -131,6 +140,34 @@ export const getActiveTriggerQuery = (
       // `__colours__` with the caret after it: the scan reached the *opening*
       // pair, and the closing one is sitting in the query.
       return query.includes('__') ? null : { key: '_', query, range: { end: caret, start: index - 1 } };
+    }
+  }
+
+  return null;
+};
+
+/**
+ * Keeps scanning back past spaces for an unclosed `<`, having already met one.
+ *
+ * Split out so the common path — no space between the caret and the trigger —
+ * stays a single loop, and so the two stopping rules read separately: this one
+ * only stops at a newline or a `>`, which closes the token.
+ */
+const findEnclosingEmbedding = (
+  value: string,
+  caret: number,
+  limit: number,
+  from: number
+): PromptTriggerQuery | null => {
+  for (let index = from; index >= limit; index--) {
+    const char = value[index];
+
+    if (char === '\n' || char === '>') {
+      return null;
+    }
+
+    if (char === '<') {
+      return { key: '<', query: value.slice(index + 1, caret), range: { end: caret, start: index } };
     }
   }
 

@@ -816,6 +816,7 @@
       "concepts": "Concepts",
       "conceptWeight": "{{name}} weight",
       "compatibleEmbeddings": "Compatible embeddings",
+      "completionSuggestions": "Completions",
       "couldNotExpandPrompt": "Could not expand the prompt.",
       "couldNotGeneratePromptFromImage": "Could not generate a prompt from the selected image.",
       "deletePromptHistoryItem": "Delete prompt history item",

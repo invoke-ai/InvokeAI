@@ -136,8 +136,6 @@ export const PositivePromptField = ({
         return;
       }
 
-      // The autocomplete gets first refusal: while its list is open the arrow
-      // keys belong to it rather than to prompt history.
       autocomplete.handleKeyDown(event);
     },
     [autocomplete]

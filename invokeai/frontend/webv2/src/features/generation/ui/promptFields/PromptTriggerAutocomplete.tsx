@@ -8,6 +8,7 @@ import type { MouseEvent } from 'react';
 import { Box, Portal, Stack, Text } from '@chakra-ui/react';
 import { groupPromptTriggerOptions } from '@features/generation/ui/promptFields/promptTriggerOptions';
 import { useCallback, useLayoutEffect, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const LIST_WIDTH_PX = 260;
 const MAX_LIST_HEIGHT_PX = 220;
@@ -44,6 +45,7 @@ export const PromptTriggerAutocomplete = ({
   options: readonly PromptTriggerOption[];
   onSelect: (option: PromptTriggerOption) => void;
 }) => {
+  const { t } = useTranslation();
   const listRef = useRef<HTMLDivElement | null>(null);
   // Each group carries where it starts in the flat list. The hook selects with
   // `options[activeIndex]`, so the ids have to be numbered the same way — and
@@ -93,6 +95,7 @@ export const PromptTriggerAutocomplete = ({
   return (
     <Portal>
       <Box
+        aria-label={t('widgets.generate.completionSuggestions')}
         bg="bg.muted"
         borderColor="border.emphasized"
         borderRadius="md"

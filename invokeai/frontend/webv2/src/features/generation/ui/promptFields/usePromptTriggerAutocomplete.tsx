@@ -61,8 +61,17 @@ export interface PromptTriggerAutocompleteApi {
   close: () => void;
   /** Re-read the trigger under the caret. Call on input, and on click. */
   refresh: (textarea: HTMLTextAreaElement | null) => void;
-  /** `true` when the key drove the list and the field should not also act on it. */
-  handleKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => boolean;
+  /**
+   * Drives the list from the textarea's own keydown.
+   *
+   * Returns nothing on purpose. It used to report whether it had consumed the
+   * key, on the theory that the field would otherwise also act on it — but both
+   * fields discarded that, and there is no contention to resolve: the only other
+   * keyboard feature here is prompt history, which is modifier-gated and so
+   * never reaches this at all. Anything this does take, it takes by calling
+   * `preventDefault` itself.
+   */
+  handleKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
 }
 
 export const usePromptTriggerAutocomplete = ({
@@ -153,20 +162,20 @@ export const usePromptTriggerAutocomplete = ({
   );
 
   const handleKeyDown = useCallback(
-    (event: KeyboardEvent<HTMLTextAreaElement>): boolean => {
+    (event: KeyboardEvent<HTMLTextAreaElement>): void => {
       // While an IME is composing, the arrows move through its candidate window
       // and Enter commits the composition. Taking either would leave a Japanese
       // or Chinese user unable to pick a candidate at all. `keyCode === 229` is
       // the same signal for the browsers that do not set `isComposing`.
       if (!isOpen || event.nativeEvent.isComposing || event.keyCode === 229) {
-        return false;
+        return;
       }
 
       // A caret jump leaves the query behind, so the list goes with it — but the
       // key still belongs to the textarea.
       if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
         setState(null);
-        return false;
+        return;
       }
 
       if (event.key === 'Escape') {
@@ -174,7 +183,7 @@ export const usePromptTriggerAutocomplete = ({
         // Otherwise the popover or dialog this prompt sits in closes too.
         event.stopPropagation();
         setState(null);
-        return true;
+        return;
       }
 
       if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
@@ -182,7 +191,7 @@ export const usePromptTriggerAutocomplete = ({
 
         event.preventDefault();
         setActiveIndex((current) => (current + step + matches.length) % matches.length);
-        return true;
+        return;
       }
 
       if (event.key === 'Enter' || event.key === 'Tab') {
@@ -191,11 +200,8 @@ export const usePromptTriggerAutocomplete = ({
         if (option) {
           event.preventDefault();
           selectOption(option);
-          return true;
         }
       }
-
-      return false;
     },
     [activeIndex, isOpen, matches, selectOption]
   );

@@ -57,6 +57,25 @@ describe('getActiveTriggerQuery', () => {
     expect(query('a __col our')).toBeNull();
   });
 
+  // Embedding names routinely have spaces in them — `bad hands 5`, `Negative
+  // Hand` — so ending the attempt at the first space put a whole class of them
+  // out of reach inline, even though the filter would have matched.
+  it('reads on through spaces inside an unclosed angle bracket', () => {
+    expect(query('a photo of <bad hands')).toEqual({ key: '<', query: 'bad hands', range: { end: 21, start: 11 } });
+  });
+
+  it('still ends at a space when only wildcards are on offer', () => {
+    expect(query('a photo of <bad hands', ['_'])).toBeNull();
+  });
+
+  it('stays shut once the angle bracket is closed', () => {
+    expect(query('a <bad hands 5> photo of ')).toBeNull();
+  });
+
+  it('does not cross a newline looking for an angle bracket', () => {
+    expect(query('a <bad\nhands')).toBeNull();
+  });
+
   it('ends at a newline', () => {
     expect(query('a __col\nmore')).toBeNull();
   });
