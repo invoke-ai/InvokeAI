@@ -8,6 +8,7 @@ import {
   type GalleryImage,
 } from '@features/gallery';
 import { invalidateGallery, invalidateGalleryImages, patchGalleryImageCaches } from '@features/gallery/queries';
+import { setPendingPromptTemplateDraft } from '@features/generation/react';
 import { getMaxReferenceImages, isVaeModelConfig, isSupportedGenerateModel } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
 import { useMountEffect } from '@platform/react/useMountEffect';
@@ -33,6 +34,7 @@ import { appendReferenceImage } from './appendReferenceImage';
 import { recordCanvasImportError } from './canvasImportError';
 import { executeImageRecall, getCurrentGenerateValues } from './executeImageRecall';
 import {
+  getMetadataPrompts,
   EMPTY_IMAGE_RECALL_CAPABILITIES,
   getImageRecallCapabilities,
   type ImageRecallCapabilities,
@@ -55,6 +57,8 @@ export interface ImageActions {
   moveImagesToBoard: (imageNames: string[], boardId: string) => Promise<void>;
   openImageInPreview: (image: GalleryImage) => void;
   recallImageData: (image: GalleryImage, kind: ImageRecallKind) => Promise<void>;
+  /** Opens the generate widget's template editor prefilled from this image's prompts. */
+  savePromptAsTemplate: (image: GalleryImage) => Promise<void>;
   selectForCompare: (image: GalleryImage) => void;
   sendToCanvas: (images: readonly GalleryImage[], destination: GalleryCanvasImportDestination) => Promise<void>;
   setImagesStarred: (imageNames: string[], starred: boolean) => Promise<void>;
@@ -255,6 +259,33 @@ export const useImageActions = ({
             dimensions:
               Number.isFinite(image.width) && image.width >= 64 && Number.isFinite(image.height) && image.height >= 64,
           };
+        }
+      },
+      savePromptAsTemplate: async (image) => {
+        const owner = captureAccountScope();
+
+        try {
+          const metadata = await galleryImages.metadata(image.imageName, owner.signal);
+
+          assertAccountScopeCurrent(owner);
+
+          const { negativePrompt, positivePrompt } = getMetadataPrompts(metadata);
+
+          if (!positivePrompt && !negativePrompt) {
+            notifications.add({ kind: 'info', title: 'This image has no prompt to save' });
+            return;
+          }
+
+          // The widget hosts the editor, so it has to be on screen for the
+          // handoff to be visible.
+          openWorkbenchWidget('generate', { preferredRegions: ['left'] });
+          setPendingPromptTemplateDraft({ negativePrompt, positivePrompt });
+        } catch (error: unknown) {
+          if (!isAccountScopeCurrent(owner)) {
+            return;
+          }
+
+          recordError(error);
         }
       },
       moveImagesToBoard: async (imageNames, boardId) => {

@@ -54,6 +54,7 @@ const createActions = (deleteImages: ImageActions['deleteImages']): ImageActions
   selectForCompare: vi.fn(),
   sendToCanvas: vi.fn(() => Promise.resolve()),
   setImagesStarred: vi.fn(() => Promise.resolve()),
+  savePromptAsTemplate: vi.fn(),
   useAsReferenceImage: vi.fn(),
 });
 
