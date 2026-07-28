@@ -43,6 +43,12 @@ class TestRebalanceParseWeights:
         )
         assert invocation._parse_weights() == [float(i) for i in range(1, 13)]
 
+    def test_accepts_decimal_scientific_notation(self) -> None:
+        invocation = Krea2ConditioningRebalanceInvocation.model_construct(
+            per_layer_weights="1e2,-2.5e-1,3E+1,4,5,6,7,8,9,10,11,12"
+        )
+        assert invocation._parse_weights() == [100.0, -0.25, 30.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0]
+
     @pytest.mark.parametrize("weights", ["1,2,3", "1,2,3,4,5,6,7,8,9,10,11,12,13"])
     def test_rejects_wrong_count(self, weights: str) -> None:
         invocation = Krea2ConditioningRebalanceInvocation.model_construct(per_layer_weights=weights)
@@ -51,6 +57,13 @@ class TestRebalanceParseWeights:
 
     def test_rejects_non_numeric(self) -> None:
         invocation = Krea2ConditioningRebalanceInvocation.model_construct(per_layer_weights="a,b,c,d,e,f,g,h,i,j,k,l")
+        with pytest.raises(ValueError, match="comma-separated numbers"):
+            invocation._parse_weights()
+
+    @pytest.mark.parametrize("value", ["0x10", "0b10", "0o10"])
+    def test_rejects_non_decimal_numeric_syntax(self, value: str) -> None:
+        values = ["1"] * 11 + [value]
+        invocation = Krea2ConditioningRebalanceInvocation.model_construct(per_layer_weights=",".join(values))
         with pytest.raises(ValueError, match="comma-separated numbers"):
             invocation._parse_weights()
 
