@@ -115,11 +115,12 @@ def hidiffusion_patch(
         yield
     finally:
         had_active_exception = sys.exc_info()[0] is not None
+        teardown_error: Exception | None = None
         try:
             remove_hidiffusion(model)
-        except Exception:
+        except Exception as error:
             if not had_active_exception:
-                raise
+                teardown_error = error
         if ratio_overrides is not None and ratio_dicts is not None:
             ratio_dicts[0].clear()
             ratio_dicts[0].update(ratio_overrides[0])
@@ -141,9 +142,16 @@ def hidiffusion_patch(
         if set_config_name_or_path and had_config:
             if had_config_name_or_path:
                 _set_name_or_path_on_config(config, original_config_name_or_path)
-            else:
-                if config is not None:
+            elif config is not None:
+                internal_dict = getattr(config, "_internal_dict", None)
+                if internal_dict is not None:
                     try:
-                        delattr(config, "_name_or_path")
-                    except AttributeError:
+                        internal_dict.pop("_name_or_path", None)
+                    except Exception:
                         pass
+                try:
+                    delattr(config, "_name_or_path")
+                except AttributeError:
+                    pass
+        if teardown_error is not None:
+            raise teardown_error

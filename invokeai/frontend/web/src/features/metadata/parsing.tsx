@@ -694,7 +694,7 @@ const HiDiffusion: SingleMetadataHandler<boolean> = {
   type: 'HiDiffusion',
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'hidiffusion');
-    const parsed = z.boolean().parse(raw);
+    const parsed = raw === undefined ? false : z.boolean().parse(raw);
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {

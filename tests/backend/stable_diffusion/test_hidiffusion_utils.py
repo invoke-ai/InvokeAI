@@ -89,3 +89,69 @@ def test_hidiffusion_patch_restores_state_when_apply_hidiffusion_raises():
         switching_threshold_ratio_dict.update(original_switching)
         text_to_img_controlnet_switching_threshold_ratio_dict.clear()
         text_to_img_controlnet_switching_threshold_ratio_dict.update(original_controlnet)
+
+
+def test_hidiffusion_patch_restores_state_before_propagating_remove_error():
+    original_switching = copy.deepcopy(switching_threshold_ratio_dict)
+    original_controlnet = copy.deepcopy(text_to_img_controlnet_switching_threshold_ratio_dict)
+
+    model = SimpleNamespace(
+        unet=DummyUNet(),
+        _name_or_path="original-model-name",
+        config=SimpleNamespace(_name_or_path="original-config-name"),
+    )
+
+    def fake_apply_hidiffusion(patched_model, **_kwargs):
+        patched_model.unet.num_upsamplers = 99
+
+    try:
+        with (
+            patch("invokeai.backend.hidiffusion.hidiffusion.apply_hidiffusion", side_effect=fake_apply_hidiffusion),
+            patch(
+                "invokeai.backend.hidiffusion.hidiffusion.remove_hidiffusion",
+                side_effect=RuntimeError("remove boom"),
+            ),
+        ):
+            with pytest.raises(RuntimeError, match="remove boom"):
+                with hidiffusion_patch(
+                    model,
+                    name_or_path="patched-model-name",
+                    t1_ratio=0.25,
+                    t2_ratio=0.1,
+                ):
+                    pass
+
+        assert switching_threshold_ratio_dict == original_switching
+        assert text_to_img_controlnet_switching_threshold_ratio_dict == original_controlnet
+        assert model.unet.num_upsamplers == 3
+        assert model._name_or_path == "original-model-name"
+        assert model.config._name_or_path == "original-config-name"
+    finally:
+        switching_threshold_ratio_dict.clear()
+        switching_threshold_ratio_dict.update(original_switching)
+        text_to_img_controlnet_switching_threshold_ratio_dict.clear()
+        text_to_img_controlnet_switching_threshold_ratio_dict.update(original_controlnet)
+
+
+def test_hidiffusion_patch_removes_spoofed_name_from_config_internal_dict():
+    class InternalDictConfig:
+        def __init__(self):
+            self._internal_dict = {}
+
+        def __getattr__(self, name):
+            try:
+                return self._internal_dict[name]
+            except KeyError as error:
+                raise AttributeError(name) from error
+
+    config = InternalDictConfig()
+    model = SimpleNamespace(unet=DummyUNet(), config=config)
+
+    with (
+        patch("invokeai.backend.hidiffusion.hidiffusion.apply_hidiffusion"),
+        patch("invokeai.backend.hidiffusion.hidiffusion.remove_hidiffusion"),
+    ):
+        with hidiffusion_patch(model, name_or_path="patched-model-name"):
+            assert config._internal_dict["_name_or_path"] == "patched-model-name"
+
+    assert "_name_or_path" not in config._internal_dict

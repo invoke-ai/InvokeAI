@@ -4,7 +4,9 @@ title: HiDiffusion
 
 # HiDiffusion
 
-HiDiffusion is an optional denoising enhancement that can improve detail and structure at higher resolutions for SD 1.5 and SDXL. It modifies the UNet during denoising and is most noticeable at 1536px and above.
+HiDiffusion is an optional denoising enhancement that can improve detail and structure at higher resolutions for SD 1.5, SD 2.1, and SDXL. It modifies the UNet during denoising and is most noticeable at 1536px and above.
+
+The vendored implementation includes module-key definitions for SD 1.5 and SDXL. SD 2.1 intentionally reuses the SD 1.5 module-key mapping.
 
 Learn more: https://github.com/megvii-research/HiDiffusion
 
@@ -40,7 +42,3 @@ Learn more: https://github.com/megvii-research/HiDiffusion
 - Try **1536–2048 px** for the clearest benefits (SDXL).
 - If results look worse, disable **Window Attention** first, then RAU‑Net.
 - Effects vary by scheduler and model; compare with the same seed for a fair test.
-
----
-
-TODO: Decide whether HiDiffusion toggles and ratios should always be emitted in metadata for recall.
