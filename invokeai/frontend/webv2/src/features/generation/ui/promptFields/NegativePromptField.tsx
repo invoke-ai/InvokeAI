@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next';
 
 import { AddPromptTriggerButton, PromptTriggerPopover } from './PositivePromptActions';
 import { PROMPT_ATTENTION_TARGET_PROPS } from './promptAttentionHotkeys';
-import { insertPromptText, type PromptTextRange } from './promptFocus';
+import { getPromptTriggerRange, insertPromptText, type PromptTextRange, type PromptTriggerKey } from './promptFocus';
 import { promptHistoryNavigation } from './promptHistoryNavigation';
 import { PromptTextarea } from './PromptTextarea';
 
@@ -33,8 +33,13 @@ interface NegativePromptFieldProps {
 
 type PromptTriggerPickerState = {
   anchorRect: { height: number; width: number; x: number; y: number };
+  /** The keystroke the picker consumed, restored if it is dismissed unpicked. */
+  pendingKey?: PromptTriggerKey;
   range?: PromptTextRange;
 };
+
+/** No `__name__` here: a negative prompt is never expanded, so it has no wildcards. */
+const NEGATIVE_PROMPT_TRIGGER_KEYS = ['<'] as const;
 
 export const NegativePromptField = ({
   heightPx,
@@ -69,31 +74,61 @@ export const NegativePromptField = ({
     [setDraftValue]
   );
 
-  const openPromptTriggerPicker = useCallback((anchorElement: HTMLElement, range?: PromptTextRange) => {
-    const rect = anchorElement.getBoundingClientRect();
+  const openPromptTriggerPicker = useCallback(
+    (anchorElement: HTMLElement, range?: PromptTextRange, pendingKey?: PromptTriggerKey) => {
+      const rect = anchorElement.getBoundingClientRect();
 
-    setTriggerPickerState({
-      anchorRect: { height: rect.height, width: rect.width, x: rect.x, y: rect.y },
-      range,
-    });
-  }, []);
+      setTriggerPickerState({
+        anchorRect: { height: rect.height, width: rect.width, x: rect.x, y: rect.y },
+        pendingKey,
+        range,
+      });
+    },
+    []
+  );
 
   const handlePromptKeyDown = useCallback(
     (event: KeyboardEvent<HTMLTextAreaElement>) => {
-      if (event.key !== '<' || event.altKey || event.ctrlKey || event.metaKey) {
+      if (event.altKey || event.ctrlKey || event.metaKey) {
         return;
       }
 
+      const trigger = getPromptTriggerRange(
+        event.currentTarget.value,
+        event.currentTarget.selectionStart,
+        event.currentTarget.selectionEnd,
+        event.key,
+        NEGATIVE_PROMPT_TRIGGER_KEYS
+      );
+
+      if (!trigger) {
+        return;
+      }
+
+      // The keystroke is held rather than typed, so the picked trigger reads as
+      // one edit. `dismissPromptTriggerPicker` puts it back if nothing is picked.
       event.preventDefault();
-      openPromptTriggerPicker(event.currentTarget, {
-        end: event.currentTarget.selectionEnd,
-        start: event.currentTarget.selectionStart,
-      });
+      openPromptTriggerPicker(event.currentTarget, trigger.range, trigger.key);
     },
     [openPromptTriggerPicker]
   );
 
   const closePromptTriggerPicker = useCallback(() => setTriggerPickerState(null), []);
+
+  /** Escape or click-away: the swallowed keystroke was the user's, so give it back. */
+  const dismissPromptTriggerPicker = useCallback(() => {
+    if (triggerPickerState?.pendingKey) {
+      insertPromptText({
+        onChange: commitPromptChange,
+        range: triggerPickerState.range,
+        textarea: textareaRef.current,
+        text: triggerPickerState.pendingKey,
+        value: draftValue,
+      });
+    }
+
+    setTriggerPickerState(null);
+  }, [commitPromptChange, draftValue, triggerPickerState]);
 
   const selectPromptTrigger = useCallback(
     (trigger: string) => {
@@ -187,7 +222,7 @@ export const NegativePromptField = ({
               open
               positioning={triggerPickerPositioning}
               selectedModel={selectedModel}
-              onClose={closePromptTriggerPicker}
+              onClose={dismissPromptTriggerPicker}
               onSelect={selectPromptTrigger}
             />
           ) : null}

@@ -71,3 +71,48 @@ export const insertPositivePromptText = ({
   text: string;
   value: string;
 }): void => insertPromptText({ onChange, range, textarea: positivePromptElement, text, value });
+
+/** Which trigger keys a field answers to. Wildcards only exist on the positive prompt. */
+export type PromptTriggerKey = '<' | '_';
+
+export interface PromptTriggerMatch {
+  /** The keystroke the picker consumed, so a dismissal can put it back. */
+  key: PromptTriggerKey;
+  /** The span the picked trigger replaces, including anything already typed. */
+  range: PromptTextRange;
+}
+
+/** `_` is a word character, so `snake__case` must not read as the start of a reference. */
+const isWordCharacter = (character: string | undefined): boolean =>
+  character !== undefined && /[A-Za-z0-9_]/.test(character);
+
+/**
+ * Whether `key` opens the trigger picker, and what it would replace.
+ *
+ * `<` opens outright — it only ever starts an embedding token. `__` opens on the
+ * second underscore, but only where a wildcard reference could actually begin:
+ * after whitespace, punctuation, or the start of the prompt. That leaves
+ * `snake__case` as ordinary text, which the same rule in
+ * `core/dynamicPrompts.ts` already excludes from being a reference.
+ */
+export const getPromptTriggerRange = (
+  value: string,
+  selectionStart: number,
+  selectionEnd: number,
+  key: string,
+  keys: readonly PromptTriggerKey[]
+): PromptTriggerMatch | null => {
+  if (key === '<' && keys.includes('<')) {
+    return { key: '<', range: { end: selectionEnd, start: selectionStart } };
+  }
+
+  if (key === '_' && keys.includes('_') && value[selectionStart - 1] === '_') {
+    return isWordCharacter(value[selectionStart - 2])
+      ? null
+      : // The underscore already typed is part of the reference, so the picked
+        // `__name__` replaces it rather than landing after it.
+        { key: '_', range: { end: selectionEnd, start: selectionStart - 1 } };
+  }
+
+  return null;
+};

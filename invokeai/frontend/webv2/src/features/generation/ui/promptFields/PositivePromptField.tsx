@@ -13,7 +13,13 @@ import type { DynamicPromptsFieldConfig } from './DynamicPromptsPanel';
 
 import { PositivePromptActions, PromptTriggerPopover } from './PositivePromptActions';
 import { PROMPT_ATTENTION_TARGET_PROPS } from './promptAttentionHotkeys';
-import { insertPromptText, type PromptTextRange, registerPositivePromptElement } from './promptFocus';
+import {
+  getPromptTriggerRange,
+  insertPromptText,
+  type PromptTextRange,
+  type PromptTriggerKey,
+  registerPositivePromptElement,
+} from './promptFocus';
 import { promptHistoryNavigation } from './promptHistoryNavigation';
 import { PromptTextarea } from './PromptTextarea';
 
@@ -36,8 +42,13 @@ interface PositivePromptFieldProps {
 
 type PromptTriggerPickerState = {
   anchorRect: { height: number; width: number; x: number; y: number };
+  /** The keystroke the picker consumed, restored if it is dismissed unpicked. */
+  pendingKey?: PromptTriggerKey;
   range?: PromptTextRange;
 };
+
+/** The positive prompt is the only field whose `__name__` references resolve. */
+const POSITIVE_PROMPT_TRIGGER_KEYS = ['<', '_'] as const;
 
 export const PositivePromptField = ({
   batchCount = 1,
@@ -81,14 +92,18 @@ export const PositivePromptField = ({
     [commitDraftValue]
   );
 
-  const openPromptTriggerPicker = useCallback((anchorElement: HTMLElement, range?: PromptTextRange) => {
-    const rect = anchorElement.getBoundingClientRect();
+  const openPromptTriggerPicker = useCallback(
+    (anchorElement: HTMLElement, range?: PromptTextRange, pendingKey?: PromptTriggerKey) => {
+      const rect = anchorElement.getBoundingClientRect();
 
-    setTriggerPickerState({
-      anchorRect: { height: rect.height, width: rect.width, x: rect.x, y: rect.y },
-      range,
-    });
-  }, []);
+      setTriggerPickerState({
+        anchorRect: { height: rect.height, width: rect.width, x: rect.x, y: rect.y },
+        pendingKey,
+        range,
+      });
+    },
+    []
+  );
 
   const handlePromptKeyDown = useCallback(
     (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -96,27 +111,42 @@ export const PositivePromptField = ({
         return;
       }
 
-      // `<` opens the picker outright; `__` does too, on the second underscore,
-      // since that is the point where the user has committed to a wildcard.
-      const opensPicker =
-        event.key === '<' ||
-        (event.key === '_' && event.currentTarget.value.slice(0, event.currentTarget.selectionStart).endsWith('_'));
+      const trigger = getPromptTriggerRange(
+        event.currentTarget.value,
+        event.currentTarget.selectionStart,
+        event.currentTarget.selectionEnd,
+        event.key,
+        POSITIVE_PROMPT_TRIGGER_KEYS
+      );
 
-      if (!opensPicker) {
+      if (!trigger) {
         return;
       }
 
+      // The keystroke is held rather than typed, so the picked trigger reads as
+      // one edit. `dismissPromptTriggerPicker` puts it back if nothing is picked.
       event.preventDefault();
-      // The `__` case replaces the underscore already typed, so the inserted
-      // `__name__` does not end up with three leading underscores.
-      const start = event.key === '_' ? event.currentTarget.selectionStart - 1 : event.currentTarget.selectionStart;
-
-      openPromptTriggerPicker(event.currentTarget, { end: event.currentTarget.selectionEnd, start });
+      openPromptTriggerPicker(event.currentTarget, trigger.range, trigger.key);
     },
     [openPromptTriggerPicker]
   );
 
   const closePromptTriggerPicker = useCallback(() => setTriggerPickerState(null), []);
+
+  /** Escape or click-away: the swallowed keystroke was the user's, so give it back. */
+  const dismissPromptTriggerPicker = useCallback(() => {
+    if (triggerPickerState?.pendingKey) {
+      insertPromptText({
+        onChange: commitPromptChange,
+        range: triggerPickerState.range,
+        textarea: textareaRef.current,
+        text: triggerPickerState.pendingKey === '_' ? '__' : triggerPickerState.pendingKey,
+        value: draftValue,
+      });
+    }
+
+    setTriggerPickerState(null);
+  }, [commitPromptChange, draftValue, triggerPickerState]);
 
   const selectPromptTrigger = useCallback(
     (trigger: string) => {
@@ -225,7 +255,7 @@ export const PositivePromptField = ({
           open
           positioning={triggerPickerPositioning}
           selectedModel={selectedModel}
-          onClose={closePromptTriggerPicker}
+          onClose={dismissPromptTriggerPicker}
           onSelect={selectPromptTrigger}
         />
       ) : null}
