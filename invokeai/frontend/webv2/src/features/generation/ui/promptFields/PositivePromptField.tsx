@@ -9,7 +9,7 @@ import { Field } from '@platform/ui';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { DynamicPromptsFieldConfig } from './DynamicPromptsButton';
+import type { DynamicPromptsFieldConfig } from './DynamicPromptsPanel';
 
 import { PositivePromptActions, PromptTriggerPopover } from './PositivePromptActions';
 import { PROMPT_ATTENTION_TARGET_PROPS } from './promptAttentionHotkeys';

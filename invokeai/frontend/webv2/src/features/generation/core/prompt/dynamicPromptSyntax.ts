@@ -11,6 +11,8 @@
  * embedding parser untouched.
  */
 
+import { WILDCARD_REFERENCE_RE } from '@features/generation/core/dynamicPrompts';
+
 import type { PromptRange } from './ast';
 
 export type DynamicPromptSyntaxKind =
@@ -27,7 +29,6 @@ export interface DynamicPromptSyntaxAnnotation {
   range: PromptRange;
 }
 
-const WILDCARD_PATTERN = /__(.+?)__/g;
 /** `2::`, `1.5::` — a variant value's relative weight. */
 const WEIGHT_PATTERN = /^\s*\d+(?:\.\d+)?::/;
 /** `2$$`, `2-3$$`, `-3$$`, and the custom-separator form `2$$, $$`. */
@@ -154,9 +155,9 @@ export const scanDynamicPromptSyntax = (
     annotations[openBrace.annotationIndex].kind = 'error';
   }
 
-  WILDCARD_PATTERN.lastIndex = 0;
+  const wildcardPattern = new RegExp(WILDCARD_REFERENCE_RE, 'g');
 
-  for (let match = WILDCARD_PATTERN.exec(prompt); match; match = WILDCARD_PATTERN.exec(prompt)) {
+  for (let match = wildcardPattern.exec(prompt); match; match = wildcardPattern.exec(prompt)) {
     const wildcardRange = { end: match.index + match[0].length, start: match.index };
 
     if (!variableRanges.some((variableRange) => covers(variableRange, wildcardRange))) {

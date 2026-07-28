@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  findWildcardReferences,
-  hasDynamicPromptSyntax,
-  sanitizeDynamicPromptsConfig,
-  sanitizeMaxPrompts,
-} from './dynamicPrompts';
+import { hasDynamicPromptSyntax, sanitizeDynamicPromptsConfig, sanitizeMaxPrompts } from './dynamicPrompts';
 
 describe('hasDynamicPromptSyntax', () => {
   it('detects a variant anywhere in the prompt', () => {
@@ -25,19 +20,6 @@ describe('hasDynamicPromptSyntax', () => {
     // Not a reference: a name may not start or end with an underscore, so this
     // cannot round-trip through the `__` delimiters.
     expect(hasDynamicPromptSyntax('snake__case word')).toBe(false);
-  });
-});
-
-describe('findWildcardReferences', () => {
-  it('collects each referenced name once, in order', () => {
-    expect(findWildcardReferences('a __colors__ __animals/dogs__ and __colors__ again')).toEqual([
-      'colors',
-      'animals/dogs',
-    ]);
-  });
-
-  it('returns nothing for a prompt with no references', () => {
-    expect(findWildcardReferences('a {red|green} ball')).toEqual([]);
   });
 });
 

@@ -55,7 +55,6 @@ export {
   DYNAMIC_PROMPTS_DEFAULT_MAX_PROMPTS,
   DYNAMIC_PROMPTS_MAX_PROMPTS,
   DYNAMIC_PROMPTS_MIN_PROMPTS,
-  DYNAMIC_PROMPTS_SEED_BEHAVIOURS,
   hasDynamicPromptSyntax,
   isDynamicPromptsSeedBehaviour,
   sanitizeDynamicPromptsConfig,

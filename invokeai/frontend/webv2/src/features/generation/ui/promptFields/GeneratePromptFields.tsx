@@ -27,6 +27,16 @@ interface GeneratePromptValues {
   positivePromptHeightPx: number;
 }
 
+/** The flat GenerateSettings field behind each dynamic prompts config key. */
+const DYNAMIC_PROMPT_SETTING_KEYS = {
+  combinatorial: 'dynamicPromptsCombinatorial',
+  maxPrompts: 'dynamicPromptsMaxPrompts',
+  sampleSeed: 'dynamicPromptsSampleSeed',
+  seedBehaviour: 'dynamicPromptsSeedBehaviour',
+} as const satisfies Record<keyof DynamicPromptsConfig, keyof GenerateSettings>;
+
+type DynamicPromptsConfigKey = keyof typeof DYNAMIC_PROMPT_SETTING_KEYS;
+
 const getPromptValues = (values: Record<string, unknown>): GeneratePromptValues => ({
   negativePrompt: typeof values.negativePrompt === 'string' ? values.negativePrompt : '',
   negativePromptEnabled: values.negativePromptEnabled !== false,
@@ -65,12 +75,14 @@ export const GeneratePromptFields = ({
 
   const handleDynamicPromptsChange = useCallback(
     (patch: Partial<DynamicPromptsConfig>) =>
-      onCommitImmediate({
-        ...(patch.combinatorial === undefined ? {} : { dynamicPromptsCombinatorial: patch.combinatorial }),
-        ...(patch.maxPrompts === undefined ? {} : { dynamicPromptsMaxPrompts: patch.maxPrompts }),
-        ...(patch.sampleSeed === undefined ? {} : { dynamicPromptsSampleSeed: patch.sampleSeed }),
-        ...(patch.seedBehaviour === undefined ? {} : { dynamicPromptsSeedBehaviour: patch.seedBehaviour }),
-      }),
+      onCommitImmediate(
+        Object.fromEntries(
+          Object.entries(patch).map(([key, value]) => [
+            DYNAMIC_PROMPT_SETTING_KEYS[key as DynamicPromptsConfigKey],
+            value,
+          ])
+        )
+      ),
     [onCommitImmediate]
   );
 

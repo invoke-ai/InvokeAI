@@ -18,8 +18,6 @@ export const DYNAMIC_PROMPTS_DEFAULT_MAX_PROMPTS = 100;
 
 export type DynamicPromptsSeedBehaviour = 'per-iteration' | 'per-image';
 
-export const DYNAMIC_PROMPTS_SEED_BEHAVIOURS: readonly DynamicPromptsSeedBehaviour[] = ['per-iteration', 'per-image'];
-
 export interface DynamicPromptsConfig {
   combinatorial: boolean;
   maxPrompts: number;
@@ -32,7 +30,12 @@ export interface DynamicPromptsConfig {
   seedBehaviour: DynamicPromptsSeedBehaviour;
 }
 
-/** `__name__`, the reference form for a wildcard. Mirrors the backend's name rule. */
+/**
+ * `__name__`, the reference form for a wildcard. Mirrors the backend's name rule
+ * exactly — each `/`-separated segment must begin and end alphanumerically, so
+ * `snake__case` is ordinary text rather than a reference. Shared with the syntax
+ * scanner so highlighting and expansion agree on what counts as a wildcard.
+ */
 export const WILDCARD_REFERENCE_RE =
   /__([A-Za-z0-9](?:[A-Za-z0-9_-]*[A-Za-z0-9])?(?:\/[A-Za-z0-9](?:[A-Za-z0-9_-]*[A-Za-z0-9])?)*)__/;
 
@@ -43,20 +46,6 @@ export const WILDCARD_REFERENCE_RE =
  */
 export const hasDynamicPromptSyntax = (prompt: string): boolean =>
   /\{[\s\S]*\}/.test(prompt) || WILDCARD_REFERENCE_RE.test(prompt);
-
-/** The wildcard names a prompt references, in order of first appearance. */
-export const findWildcardReferences = (prompt: string): string[] => {
-  const pattern = new RegExp(WILDCARD_REFERENCE_RE, 'g');
-  const names: string[] = [];
-
-  for (let match = pattern.exec(prompt); match; match = pattern.exec(prompt)) {
-    if (!names.includes(match[1])) {
-      names.push(match[1]);
-    }
-  }
-
-  return names;
-};
 
 export const isDynamicPromptsSeedBehaviour = (value: unknown): value is DynamicPromptsSeedBehaviour =>
   value === 'per-iteration' || value === 'per-image';

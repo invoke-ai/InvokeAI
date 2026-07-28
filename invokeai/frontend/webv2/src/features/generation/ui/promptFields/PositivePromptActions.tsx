@@ -1,16 +1,14 @@
 /* eslint-disable react/react-compiler */
 import type { GenerationModelCatalogItem as ModelConfig, PromptHistoryItem } from '@features/generation/contracts';
 import type { GenerateLora, GenerateModelConfig } from '@features/generation/core/types';
+import type { DynamicPromptsFieldConfig } from '@features/generation/ui/promptFields/DynamicPromptsPanel';
 import type { ChangeEvent, MouseEvent } from 'react';
 
 import { HStack, Icon, Image, Input, Popover, Portal, Separator, Stack, Text } from '@chakra-ui/react';
 import { filterPromptHistory } from '@features/generation/core/promptHistory';
 import { expandPrompt, imageToPrompt } from '@features/generation/data/promptUtilities';
 import { GenerationModelSelect as ModelSelect, useGenerationUi } from '@features/generation/ui/GenerationUiContext';
-import {
-  DynamicPromptsButton,
-  type DynamicPromptsFieldConfig,
-} from '@features/generation/ui/promptFields/DynamicPromptsButton';
+import { DynamicPromptsButton } from '@features/generation/ui/promptFields/DynamicPromptsButton';
 import { useWildcards } from '@features/generation/ui/useWildcards';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { getApiErrorMessage } from '@platform/transport/http';
