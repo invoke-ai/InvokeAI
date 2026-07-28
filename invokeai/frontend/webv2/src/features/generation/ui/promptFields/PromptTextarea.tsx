@@ -1,38 +1,13 @@
-import type { PromptHighlightKind, PromptHighlightSegment } from '@features/generation/core/prompt/highlight';
 import type { ResizableTextareaProps } from '@platform/ui';
 import type { Ref, UIEvent } from 'react';
 
 import { Box } from '@chakra-ui/react';
-import { buildPromptHighlightSegments } from '@features/generation/core/prompt/highlight';
+import { HighlightedPrompt, MAX_HIGHLIGHTED_PROMPT_LENGTH } from '@features/generation/ui/promptFields/PromptHighlight';
 import { ResizableTextarea } from '@platform/ui';
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
-
-const MAX_HIGHLIGHTED_PROMPT_LENGTH = 20_000;
 const PROMPT_TEXTAREA_LINE_HEIGHT = '1.6';
 const PROMPT_TEXTAREA_PX = '2.5';
 const PROMPT_TEXTAREA_PY = '2';
-
-const HIGHLIGHT_STYLE_BY_KIND: Record<
-  PromptHighlightKind,
-  { bg?: string; color: string; textDecoration?: string; textDecorationColor?: string }
-> = {
-  attention: { color: 'accent.solid' },
-  attentionNumeric: { color: 'fg.success' },
-  embedding: { bg: 'bg.warning', color: 'fg.warning' },
-  error: { bg: 'bg.error', color: 'fg.error', textDecoration: 'underline wavy', textDecorationColor: 'fg.error' },
-  escapedParen: { color: 'fg.muted' },
-  group: { color: 'fg.subtle' },
-  promptFunctionArg: { bg: 'accent.subtle/20', color: 'fg' },
-  promptFunctionMethod: { color: 'accent.fg' },
-  promptVariable: { color: 'accent.fg' },
-  punctuation: { color: 'fg.subtle' },
-  text: { color: 'fg' },
-  variantBrace: { color: 'accent.fg' },
-  variantRange: { color: 'fg.success' },
-  variantSeparator: { color: 'fg.muted' },
-  variantWeight: { color: 'fg.success' },
-  wildcard: { color: 'fg.subtle' },
-};
 
 const PROMPT_TEXTAREA_FORCED_COLORS_CSS = { '@media (forced-colors: active)': { display: 'none' } };
 const PROMPT_TEXTAREA_HIGHLIGHTED_CSS = {
@@ -71,23 +46,6 @@ const setRef = (ref: Ref<HTMLTextAreaElement> | undefined, element: HTMLTextArea
   (ref as { current: HTMLTextAreaElement | null }).current = element;
 };
 
-const PromptHighlightSpan = ({ segment }: { segment: PromptHighlightSegment }) => {
-  const style = HIGHLIGHT_STYLE_BY_KIND[segment.kind];
-
-  return (
-    <Box
-      as="span"
-      bg={style.bg}
-      borderRadius={style.bg ? '2px' : undefined}
-      color={style.color}
-      textDecoration={style.textDecoration}
-      textDecorationColor={style.textDecorationColor}
-    >
-      {segment.text}
-    </Box>
-  );
-};
-
 export const PromptTextarea = ({
   fontFamily = 'mono',
   fontSize,
@@ -107,12 +65,9 @@ export const PromptTextarea = ({
   const effectiveFontSize = fontSize ?? '0.82rem';
   const effectiveLineHeight = lineHeight ?? PROMPT_TEXTAREA_LINE_HEIGHT;
 
-  const segments = useMemo(
-    () =>
-      shouldHighlight
-        ? buildPromptHighlightSegments(value, { dynamicPrompts: highlightDynamicPrompts, knownWildcards })
-        : [],
-    [highlightDynamicPrompts, knownWildcards, shouldHighlight, value]
+  const highlightOptions = useMemo(
+    () => ({ dynamicPrompts: highlightDynamicPrompts, knownWildcards }),
+    [highlightDynamicPrompts, knownWildcards]
   );
 
   useLayoutEffect(() => {
@@ -184,12 +139,7 @@ export const PromptTextarea = ({
             whiteSpace="pre-wrap"
             w={textareaClientWidth ? `${textareaClientWidth}px` : '100%'}
           >
-            {segments.map((segment) => (
-              <PromptHighlightSpan
-                key={`${segment.range.start}:${segment.range.end}:${segment.kind}`}
-                segment={segment}
-              />
-            ))}
+            <HighlightedPrompt options={highlightOptions} prompt={value} />
             {value.endsWith('\n') ? '\u200b' : null}
           </Box>
         </Box>
@@ -198,9 +148,9 @@ export const PromptTextarea = ({
       effectiveFontSize,
       effectiveLineHeight,
       fontFamily,
+      highlightOptions,
       scroll.left,
       scroll.top,
-      segments,
       shouldHighlight,
       textareaClientWidth,
       value,

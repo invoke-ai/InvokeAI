@@ -8,6 +8,7 @@ import {
   DYNAMIC_PROMPTS_MIN_PROMPTS,
   sanitizeMaxPrompts,
 } from '@features/generation/core/dynamicPrompts';
+import { HighlightedPrompt } from '@features/generation/ui/promptFields/PromptHighlight';
 import { Button, IconButton } from '@platform/ui/Button';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { Tooltip } from '@platform/ui/Tooltip';
@@ -28,10 +29,12 @@ export const DynamicPromptsPanel = ({
   config,
   expansion,
   onUsePrompt,
+  showSyntaxHighlighting,
 }: {
   batchCount: number;
   config: DynamicPromptsFieldConfig;
   expansion: DynamicPromptsExpansion;
+  showSyntaxHighlighting: boolean;
   onUsePrompt: (prompt: string) => void;
 }) => {
   const { t } = useTranslation();
@@ -167,7 +170,13 @@ export const DynamicPromptsPanel = ({
       <Scrollable h="14rem" label={t('widgets.generate.dynamicPrompts.promptsPreview')}>
         <Stack gap="0">
           {visiblePrompts.map((prompt, index) => (
-            <DynamicPromptRow key={`${index}-${prompt}`} index={index} prompt={prompt} onUsePrompt={onUsePrompt} />
+            <DynamicPromptRow
+              key={`${index}-${prompt}`}
+              index={index}
+              prompt={prompt}
+              showSyntaxHighlighting={showSyntaxHighlighting}
+              onUsePrompt={onUsePrompt}
+            />
           ))}
           {hiddenPromptCount > 0 ? (
             <Text color="fg.subtle" fontSize="2xs" px="2" py="1.5">
@@ -184,9 +193,11 @@ const DynamicPromptRow = ({
   index,
   onUsePrompt,
   prompt,
+  showSyntaxHighlighting,
 }: {
   index: number;
   prompt: string;
+  showSyntaxHighlighting: boolean;
   onUsePrompt: (prompt: string) => void;
 }) => {
   const { t } = useTranslation();
@@ -210,7 +221,9 @@ const DynamicPromptRow = ({
         {index + 1}
       </Text>
       <Text as="span" color="fg" fontFamily="mono" fontSize="0.72rem" textAlign="start" wordBreak="break-word">
-        {prompt}
+        {/* An expanded prompt has no dynamic syntax left in it, so the useful
+            colouring here is attention and embeddings — the defaults. */}
+        <HighlightedPrompt enabled={showSyntaxHighlighting} prompt={prompt} />
       </Text>
     </Button>
   );

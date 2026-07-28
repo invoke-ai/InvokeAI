@@ -34,6 +34,7 @@ interface PositivePromptActionsProps {
   onOpenPromptTriggerPicker: (anchorElement: HTMLElement) => void;
   onPositivePromptChangeImmediate: (prompt: string) => void;
   onInsertText: (text: string) => void;
+  showSyntaxHighlighting: boolean;
 }
 
 export const PositivePromptActions = ({
@@ -46,6 +47,7 @@ export const PositivePromptActions = ({
   onUsePrompt,
   positivePrompt,
   projectId,
+  showSyntaxHighlighting,
 }: PositivePromptActionsProps) => {
   return (
     <HStack gap="0.5">
@@ -54,6 +56,7 @@ export const PositivePromptActions = ({
           batchCount={batchCount}
           config={dynamicPrompts}
           positivePrompt={positivePrompt}
+          showSyntaxHighlighting={showSyntaxHighlighting}
           onInsertText={onInsertText}
           onUsePrompt={onPositivePromptChangeImmediate}
         />

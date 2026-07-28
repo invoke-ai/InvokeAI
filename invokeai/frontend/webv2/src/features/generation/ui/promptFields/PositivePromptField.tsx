@@ -163,6 +163,7 @@ export const PositivePromptField = ({
         batchCount={batchCount}
         dynamicPrompts={dynamicPrompts}
         isPromptTriggerPickerOpen={triggerPickerState !== null}
+        showSyntaxHighlighting={showSyntaxHighlighting}
         onInsertText={insertTextAtCaret}
         loras={loras}
         positivePrompt={draftValue}
@@ -184,6 +185,7 @@ export const PositivePromptField = ({
       loras,
       projectId,
       selectedModel,
+      showSyntaxHighlighting,
       triggerPickerState,
     ]
   );

@@ -58,6 +58,7 @@ const render = async (prompt: string, onUsePrompt = vi.fn()) => {
             batchCount={2}
             config={config}
             positivePrompt={prompt}
+            showSyntaxHighlighting
             onInsertText={vi.fn()}
             onUsePrompt={onUsePrompt}
           />
@@ -119,6 +120,26 @@ describe('dynamic prompts in the positive prompt field', () => {
     });
 
     expect(onUsePrompt).toHaveBeenCalledWith('a red cat');
+  });
+
+  it('colours attention syntax inside the previewed prompts', async () => {
+    parseDynamicPrompts.mockResolvedValue({ error: null, prompts: ['a (red)1.2 cat', 'a green+ cat'] });
+    await render('a {(red)1.2|green+} cat');
+
+    await vi.waitFor(() => expect(findButton().textContent).toContain('2'));
+    await act(async () => {
+      await userEvent.click(findButton());
+    });
+
+    // An expanded prompt has no dynamic syntax left, so what is worth colouring
+    // in the preview is the attention weighting that survived expansion.
+    const row = [...document.querySelectorAll('button')].find((button) =>
+      button.textContent?.includes('a (red)1.2 cat')
+    )!;
+    const weights = [...row.querySelectorAll('span')].map((span) => span.textContent);
+
+    expect(weights).toContain('1.2');
+    expect(weights).toContain('(');
   });
 
   it('stays inert and never expands a prompt with no dynamic syntax', async () => {

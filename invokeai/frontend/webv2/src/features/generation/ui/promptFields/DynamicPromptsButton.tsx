@@ -18,6 +18,7 @@ interface DynamicPromptsButtonProps {
   config: DynamicPromptsFieldConfig;
   batchCount: number;
   positivePrompt: string;
+  showSyntaxHighlighting: boolean;
   onUsePrompt: (prompt: string) => void;
   onInsertText: (text: string) => void;
 }
@@ -28,6 +29,7 @@ export const DynamicPromptsButton = ({
   onInsertText,
   onUsePrompt,
   positivePrompt,
+  showSyntaxHighlighting,
 }: DynamicPromptsButtonProps) => {
   const { t } = useTranslation();
   const triggerId = useId();
@@ -112,6 +114,7 @@ export const DynamicPromptsButton = ({
                     batchCount={batchCount}
                     config={config}
                     expansion={expansion}
+                    showSyntaxHighlighting={showSyntaxHighlighting}
                     onUsePrompt={handleUsePrompt}
                   />
                 ) : (

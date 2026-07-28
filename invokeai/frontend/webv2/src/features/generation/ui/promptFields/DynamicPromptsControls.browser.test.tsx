@@ -59,6 +59,7 @@ const render = async (onChange: (patch: Partial<DynamicPromptsConfig>) => void =
               },
             }}
             positivePrompt="a {red|green} cat"
+            showSyntaxHighlighting
             onInsertText={vi.fn()}
             onUsePrompt={vi.fn()}
           />
