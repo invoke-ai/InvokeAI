@@ -51,7 +51,6 @@ export interface PromptTriggerAutocompleteApi {
     'aria-autocomplete': 'list';
     'aria-controls': string | undefined;
     'aria-expanded': boolean;
-    'aria-multiline': true;
     role: 'combobox';
     onCompositionEnd: (event: CompositionEvent<HTMLTextAreaElement>) => void;
     onCompositionStart: () => void;
@@ -201,10 +200,10 @@ export const usePromptTriggerAutocomplete = ({
       'aria-autocomplete': 'list',
       'aria-controls': isOpen ? listboxId : undefined,
       'aria-expanded': isOpen,
-      // `combobox` overrides the textarea's implicit `textbox` role, which is
-      // what carries multiline-ness; without this a tall prompt box announces
-      // as a single-line field.
-      'aria-multiline': true,
+      // No `aria-multiline`: `combobox` does override the textarea's implicit
+      // `textbox` role and takes multiline-ness with it, but ARIA does not allow
+      // the attribute on a combobox, and axe rejects it as a critical violation.
+      // The loss is real and there is no way to state it here.
       onCompositionEnd: handleCompositionEnd,
       onCompositionStart: handleCompositionStart,
       role: 'combobox',
