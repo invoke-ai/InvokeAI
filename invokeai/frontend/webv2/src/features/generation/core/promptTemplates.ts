@@ -48,10 +48,18 @@ interface AuthoredPrompts {
  * Ported verbatim from the legacy `buildPresetModifiedPrompt` so a template
  * written in either client reads the same: the placeholder is substituted (first
  * occurrence only), and a template without one is appended after a space.
+ *
+ * The replacement is a function rather than the prompt itself. Passing a string
+ * makes `$$`, `$&`, `` $` `` and `$'` inside it special even against a string
+ * pattern, so `a poster reading $$$` lost a character and `x $& y` re-inserted
+ * the literal `{prompt}` — which then reached the expander and came back as the
+ * word "prompt", the exact failure merging first is supposed to prevent. It also
+ * has to stay literal for `getPromptTemplateChunks` below, which splits, to keep
+ * describing what actually generates.
  */
 export const applyPromptTemplate = (templatePrompt: string, prompt: string): string =>
   templatePrompt.includes(PROMPT_TEMPLATE_PLACEHOLDER)
-    ? templatePrompt.replace(PROMPT_TEMPLATE_PLACEHOLDER, prompt)
+    ? templatePrompt.replace(PROMPT_TEMPLATE_PLACEHOLDER, () => prompt)
     : `${prompt} ${templatePrompt}`;
 
 /** The prompts that will actually generate. Identity when no template is active. */

@@ -116,12 +116,41 @@ describe('getPromptTemplateChunks', () => {
 
   // The chunks are only ever rendered, never submitted, so their concatenation
   // has to equal what `applyPromptTemplate` produces or the preview lies.
+  //
+  // The prompts here are the interesting half: the chunks split (literal) while
+  // the merge replaces, and `$&` and friends are special in a replacement string
+  // whatever the pattern is. Holding this over one prompt let that diverge.
   it('concatenates to the merged prompt', () => {
+    const prompts = ['a cat', 'a poster reading $$$', 'x $& y', "x $' y", 'x $` y', 'a $1 note'];
+
     for (const templatePrompt of ['', 'oil painting', 'a photo of {prompt}, 8k', '{prompt} by {prompt}']) {
-      expect(getPromptTemplateChunks('a cat', templatePrompt).join('')).toBe(
-        applyPromptTemplate(templatePrompt, 'a cat')
-      );
+      for (const prompt of prompts) {
+        expect(getPromptTemplateChunks(prompt, templatePrompt).join('')).toBe(
+          applyPromptTemplate(templatePrompt, prompt)
+        );
+      }
     }
+  });
+});
+
+describe('applyPromptTemplate', () => {
+  // Regression: the prompt was passed as a replacement *string*, so `$&` put the
+  // placeholder back and the expander turned it into the word "prompt", while
+  // `$$` swallowed a character outright.
+  it('substitutes the prompt literally, dollars and all', () => {
+    expect(applyPromptTemplate('a photo of {prompt}, 8k', 'x $& y')).toBe('a photo of x $& y, 8k');
+    expect(applyPromptTemplate('a photo of {prompt}, 8k', 'a poster reading $$$')).toBe(
+      'a photo of a poster reading $$$, 8k'
+    );
+    expect(applyPromptTemplate('a photo of {prompt}, 8k', "x $' y")).toBe("a photo of x $' y, 8k");
+  });
+
+  it('substitutes only the first placeholder', () => {
+    expect(applyPromptTemplate('{prompt} by {prompt}', 'a cat')).toBe('a cat by {prompt}');
+  });
+
+  it('appends a template that carries no placeholder', () => {
+    expect(applyPromptTemplate('oil painting', 'a cat')).toBe('a cat oil painting');
   });
 });
 
