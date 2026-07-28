@@ -4,6 +4,7 @@ import {
   applyPromptTemplate,
   getEffectivePrompts,
   getPromptTemplateChunks,
+  isCanonicalPromptTemplateSnapshot,
   type PromptTemplateSnapshot,
   sanitizePromptTemplateSnapshot,
   syncPromptTemplateWithCatalog,
@@ -225,5 +226,38 @@ describe('syncPromptTemplateWithCatalog', () => {
 
   it('stays null when nothing is active', () => {
     expect(syncPromptTemplateWithCatalog(null, [template()])).toBeNull();
+  });
+});
+
+// The whole point of the check is to let normalization hand a stored object
+// straight back. It gates `isGenerateSettings`, so a snapshot it wrongly
+// rejects re-normalises every settings read for as long as one is applied.
+describe('isCanonicalPromptTemplateSnapshot', () => {
+  it('accepts exactly a snapshot', () => {
+    expect(isCanonicalPromptTemplateSnapshot(template())).toBe(true);
+    expect(isCanonicalPromptTemplateSnapshot(template({ name: '', negativePrompt: 'blurry' }))).toBe(true);
+  });
+
+  // A catalog record is a snapshot plus `isDefault` and a host-specific
+  // `imageUrl`; storing one of those was how the fast path came to be dead.
+  it('rejects an object carrying anything more', () => {
+    expect(isCanonicalPromptTemplateSnapshot({ ...template(), imageUrl: null, isDefault: false })).toBe(false);
+  });
+
+  it('rejects a missing or mistyped field', () => {
+    const { negativePrompt: _dropped, ...missing } = template();
+
+    expect(isCanonicalPromptTemplateSnapshot(missing)).toBe(false);
+    expect(isCanonicalPromptTemplateSnapshot({ ...template(), positivePrompt: 42 })).toBe(false);
+  });
+
+  it('rejects an empty id, which resolves against no catalog entry', () => {
+    expect(isCanonicalPromptTemplateSnapshot(template({ id: '' }))).toBe(false);
+  });
+
+  it('rejects what is not a record at all', () => {
+    expect(isCanonicalPromptTemplateSnapshot(null)).toBe(false);
+    expect(isCanonicalPromptTemplateSnapshot([])).toBe(false);
+    expect(isCanonicalPromptTemplateSnapshot('template-1')).toBe(false);
   });
 });

@@ -103,18 +103,35 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
 /**
+ * A snapshot's fields, stated once.
+ *
+ * `satisfies` is doing real work here: a field added to the interface and not to
+ * this list fails to compile, and so does a name here that the interface does
+ * not have. The check below used to carry a hardcoded `length === 4` alongside
+ * four `typeof` tests — two spellings of one fact, and a fifth field would have
+ * quietly made every valid snapshot non-canonical rather than failing the build.
+ *
+ * They are all strings; when one is not, this becomes a map of predicates.
+ */
+const SNAPSHOT_FIELDS = {
+  id: true,
+  name: true,
+  negativePrompt: true,
+  positivePrompt: true,
+} satisfies Record<keyof PromptTemplateSnapshot, true>;
+
+const SNAPSHOT_FIELD_NAMES = Object.keys(SNAPSHOT_FIELDS);
+
+/**
  * True when a stored value is already exactly a snapshot, so normalization can
  * hand back the same object instead of allocating an equal one. `null` is not
  * canonical here — the caller distinguishes it before asking.
  */
 export const isCanonicalPromptTemplateSnapshot = (value: unknown): value is PromptTemplateSnapshot =>
   isRecord(value) &&
-  typeof value.id === 'string' &&
-  value.id.length > 0 &&
-  typeof value.name === 'string' &&
-  typeof value.negativePrompt === 'string' &&
-  typeof value.positivePrompt === 'string' &&
-  Object.keys(value).length === 4;
+  Object.keys(value).length === SNAPSHOT_FIELD_NAMES.length &&
+  SNAPSHOT_FIELD_NAMES.every((field) => typeof value[field] === 'string') &&
+  value.id !== '';
 
 /** Reads an untrusted persisted/transported snapshot, or `null` when unusable. */
 export const sanitizePromptTemplateSnapshot = (value: unknown): PromptTemplateSnapshot | null => {
