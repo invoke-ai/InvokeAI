@@ -2046,10 +2046,14 @@ const enqueueCompiledSnapshot = (
   // Dynamic prompting is a Generate setting, so only the routes compiled from
   // GenerateSettings honour it; Upscale keeps its prompt literal. The caller has
   // already expanded, so the queue item records the exact prompts it will submit.
+  //
+  // A one-prompt expansion counts: `a {red} cat` and a random sample of one both
+  // resolve to a single concrete prompt, and dropping it here would fall the
+  // submission back to the authored text — sending the literal `{…}` to the model.
   const expandedPositivePrompts =
     route.sourceId !== 'upscale' &&
     compiled.positivePrompts &&
-    compiled.positivePrompts.length > 1 &&
+    compiled.positivePrompts.length > 0 &&
     sourceGenerateSettings &&
     hasDynamicPromptSyntax(sourceGenerateSettings.positivePrompt)
       ? compiled.positivePrompts

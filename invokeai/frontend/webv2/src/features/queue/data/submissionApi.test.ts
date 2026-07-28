@@ -138,6 +138,14 @@ describe('enqueueGenerate', () => {
       expect(body.batch.runs).toBe(1);
     });
 
+    it('submits a one-prompt expansion in place of the authored prompt', async () => {
+      const { enqueueGenerate } = await import('./submissionApi');
+
+      await enqueueGenerate(createRequest({ positivePrompt: 'a {red} cat', positivePrompts: ['a red cat'] }));
+
+      expect(getSubmittedBody().batch.data[0][1].items).toEqual(['a red cat']);
+    });
+
     it('gives every image its own seed under per-image behaviour', async () => {
       const { enqueueGenerate } = await import('./submissionApi');
 

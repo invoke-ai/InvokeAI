@@ -1615,6 +1615,44 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(getActiveProject(state).queue.items).toEqual([]);
   });
 
+  describe('expanded positive prompts on the compiled submission', () => {
+    const submitResolvedWithPrompts = (positivePrompt: string, positivePrompts?: string[]) =>
+      workbenchReducer(primeGenerate(undefined, { positivePrompt }), {
+        backendSupportsCancellation: true,
+        positivePrompts,
+        route: { destination: 'gallery', destinationLocked: false, sourceId: 'generate', sourceLocked: false },
+        type: 'submitResolvedInvocationSnapshot',
+      });
+
+    // Regression: a one-prompt expansion used to be dropped, falling the submission
+    // back to `positivePrompt` — which still holds the unexpanded `{…}` syntax.
+    it('records a single expanded prompt rather than falling back to the literal', () => {
+      const state = submitResolvedWithPrompts('a {red} cat', ['a red cat']);
+
+      expect(getActiveProject(state).queue.items[0]?.snapshot.backendSubmission).toMatchObject({
+        positivePrompt: 'a {red} cat',
+        positivePrompts: ['a red cat'],
+      });
+    });
+
+    it('records every prompt of a multi-prompt expansion', () => {
+      const state = submitResolvedWithPrompts('a {red|green} cat', ['a red cat', 'a green cat']);
+      const queueItem = getActiveProject(state).queue.items[0];
+
+      expect(queueItem?.snapshot.backendSubmission).toMatchObject({
+        positivePrompts: ['a red cat', 'a green cat'],
+      });
+      // Placeholder sizing multiplies the iterations by the prompt count.
+      expect(queueItem?.snapshot.presentation.batchCount).toBe(2);
+    });
+
+    it('leaves a prompt with no dynamic syntax alone', () => {
+      const state = submitResolvedWithPrompts('a plain cat');
+
+      expect(getActiveProject(state).queue.items[0]?.snapshot.backendSubmission).not.toHaveProperty('positivePrompts');
+    });
+  });
+
   it('records submitted Generate prompt pairs in project prompt history', () => {
     let state = primeGenerate(undefined, { negativePrompt: ' blurry ', positivePrompt: ' a cat ' });
 
