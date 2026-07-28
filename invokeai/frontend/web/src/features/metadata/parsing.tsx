@@ -1664,10 +1664,7 @@ const Krea2RebalanceWeights: SingleMetadataHandler<string> = {
     // Only recall a string the backend rebalance node would actually accept (exactly 12 finite numbers),
     // so recalling stale/garbage metadata can't dispatch state that later fails at generation time.
     return Promise.resolve(
-      z
-        .string()
-        .refine(isValidKrea2RebalanceWeights, 'expected exactly 12 finite comma-separated numbers')
-        .parse(raw)
+      z.string().refine(isValidKrea2RebalanceWeights, 'expected exactly 12 finite comma-separated numbers').parse(raw)
     );
   },
   recall: (value, store) => {

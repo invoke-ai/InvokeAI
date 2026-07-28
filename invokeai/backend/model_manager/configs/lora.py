@@ -925,9 +925,7 @@ _LORA_PAIR_PARTNERS = {
 }
 
 
-def _lora_weight_keys_are_all_paired(
-    state_dict: dict[str | int, Any], prefixes: tuple[str, ...] | None = None
-) -> bool:
+def _lora_weight_keys_are_all_paired(state_dict: dict[str | int, Any], prefixes: tuple[str, ...] | None = None) -> bool:
     """True if *every* lora_A/lora_B/lora_down/lora_up weight (optionally restricted to `prefixes`) has its
     partner half present. Returns True when there are no such weights at all (nothing to invalidate)."""
     string_keys = {key for key in state_dict if isinstance(key, str)}
