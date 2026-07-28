@@ -11,8 +11,10 @@ import {
   selectIsExternal,
   selectIsFLUX,
   selectIsFlux2,
+  selectIsIdeogram4,
   selectIsKrea2,
   selectIsQwenImage,
+  selectIsWan,
   selectIsZImage,
   selectModelSupportsGuidance,
   selectModelSupportsSteps,
@@ -26,9 +28,11 @@ import ParamFluxDypePreset from 'features/parameters/components/Core/ParamFluxDy
 import ParamFluxDypeScale from 'features/parameters/components/Core/ParamFluxDypeScale';
 import ParamFluxScheduler from 'features/parameters/components/Core/ParamFluxScheduler';
 import ParamGuidance from 'features/parameters/components/Core/ParamGuidance';
+import ParamIdeogram4SamplerPreset from 'features/parameters/components/Core/ParamIdeogram4SamplerPreset';
 import ParamQwenImageShift from 'features/parameters/components/Core/ParamQwenImageShift';
 import ParamScheduler from 'features/parameters/components/Core/ParamScheduler';
 import ParamSteps from 'features/parameters/components/Core/ParamSteps';
+import ParamWanGuidanceScaleLowNoise from 'features/parameters/components/Core/ParamWanGuidanceScaleLowNoise';
 import ParamZImageScheduler from 'features/parameters/components/Core/ParamZImageScheduler';
 import ParamZImageShift from 'features/parameters/components/Core/ParamZImageShift';
 import ParamKrea2EnhancersSettings from 'features/parameters/components/Krea2Enhancers/ParamKrea2EnhancersSettings';
@@ -54,10 +58,12 @@ export const GenerationSettingsAccordion = memo(() => {
   const isFLUX = useAppSelector(selectIsFLUX);
   const isFlux2 = useAppSelector(selectIsFlux2);
   const isZImage = useAppSelector(selectIsZImage);
+  const isIdeogram4 = useAppSelector(selectIsIdeogram4);
   const isExternal = useAppSelector(selectIsExternal);
   const isQwenImage = useAppSelector(selectIsQwenImage);
   const isKrea2 = useAppSelector(selectIsKrea2);
   const isAnima = useAppSelector(selectIsAnima);
+  const isWan = useAppSelector(selectIsWan);
   const fluxDypePreset = useAppSelector(selectFluxDypePreset);
   const modelSupportsGuidance = useAppSelector(selectModelSupportsGuidance);
   const modelSupportsSteps = useAppSelector(selectModelSupportsSteps);
@@ -103,13 +109,15 @@ export const GenerationSettingsAccordion = memo(() => {
                 {shouldShowStandardScheduler(base) && <ParamScheduler />}
                 {!isExternal && (isFLUX || isFlux2) && <ParamFluxScheduler />}
                 {!isExternal && isZImage && <ParamZImageScheduler />}
+                {!isExternal && isIdeogram4 && <ParamIdeogram4SamplerPreset />}
                 {!isExternal && isAnima && <ParamAnimaScheduler />}
                 {modelSupportsSteps && <ParamSteps />}
                 {isExternal && modelSupportsGuidance && <ParamGuidance />}
                 {!isExternal && isFLUX && modelConfig && !isFluxFillMainModelModelConfig(modelConfig) && (
                   <ParamGuidance />
                 )}
-                {!isExternal && !isFLUX && !isFlux2 && <ParamCFGScale />}
+                {!isExternal && !isFLUX && !isFlux2 && !isIdeogram4 && <ParamCFGScale />}
+                {!isExternal && isWan && <ParamWanGuidanceScaleLowNoise />}
                 {!isExternal && isZImage && <ParamZImageShift />}
                 {!isExternal && isQwenImage && <ParamQwenImageShift />}
                 {!isExternal && isFLUX && <ParamFluxDypePreset />}

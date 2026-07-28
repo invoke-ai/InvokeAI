@@ -266,6 +266,7 @@ export const getDenoisingStartAndEnd = (state: RootState): { denoising_start: nu
     case 'sd-2':
     case 'cogview4':
     case 'qwen-image':
+    case 'wan':
     case 'z-image':
     case 'krea-2': {
       return {

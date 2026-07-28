@@ -166,6 +166,7 @@ GENERATION_MODES = Literal[
     "z_image_img2img",
     "z_image_inpaint",
     "z_image_outpaint",
+    "ideogram4_txt2img",
     "qwen_image_txt2img",
     "qwen_image_img2img",
     "qwen_image_inpaint",
@@ -178,6 +179,11 @@ GENERATION_MODES = Literal[
     "krea2_img2img",
     "krea2_inpaint",
     "krea2_outpaint",
+    "wan_txt2img",
+    "wan_img2img",
+    "wan_inpaint",
+    "wan_outpaint",
+    "wan_i2v",
 ]
 
 
@@ -240,6 +246,13 @@ class CoreMetadataInvocation(BaseInvocation):
     qwen3_encoder: Optional[ModelIdentifierField] = InputField(
         default=None,
         description="The Qwen3 text encoder model used for Z-Image inference",
+    )
+    # Ideogram 4 assembles its structured JSON caption at generation time (ideogram4_caption_builder),
+    # so this is a declared field rather than a static extra: the graph wires the builder's output to it
+    # via an edge, capturing the exact caption encoded for each (possibly batched) image.
+    ideogram4_caption: Optional[str] = InputField(
+        default=None,
+        description="The structured JSON caption encoded for Ideogram 4 inference",
     )
 
     # High resolution fix metadata.

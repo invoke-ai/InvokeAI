@@ -23,6 +23,7 @@ import { getImageUsage } from 'features/deleteImageModal/store/state';
 import type { ImageUsage } from 'features/deleteImageModal/store/types';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
+import { toast } from 'features/toast/toast';
 import { atom } from 'nanostores';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -32,7 +33,10 @@ import {
   useDeleteBoardMutation,
   useDeleteUncategorizedImagesMutation,
 } from 'services/api/endpoints/images';
+import { useDeleteUncategorizedVideosMutation } from 'services/api/endpoints/videos';
 import type { BoardDTO } from 'services/api/types';
+
+import { getMediaDeletionSummary } from './getMediaDeletionSummary';
 
 export const $boardToDelete = atom<BoardDTO | 'none' | null>(null);
 
@@ -85,6 +89,9 @@ const DeleteBoardModal = () => {
   const [deleteUncategorizedImages, { isLoading: isDeleteUncategorizedImagesLoading }] =
     useDeleteUncategorizedImagesMutation();
 
+  const [deleteUncategorizedVideos, { isLoading: isDeleteUncategorizedVideosLoading }] =
+    useDeleteUncategorizedVideosMutation();
+
   const imageUsageSummary = useAppSelector(selectImageUsageSummary);
 
   const handleDeleteBoardOnly = useCallback(() => {
@@ -95,21 +102,47 @@ const DeleteBoardModal = () => {
     $boardToDelete.set(null);
   }, [boardToDelete, deleteBoardOnly]);
 
-  const handleDeleteBoardAndImages = useCallback(() => {
+  const handleDeleteBoardAndImages = useCallback(async () => {
     if (!boardToDelete || boardToDelete === 'none') {
       return;
     }
-    deleteBoardAndImages({ board_id: boardToDelete.board_id });
+    const result = await Promise.allSettled([deleteBoardAndImages({ board_id: boardToDelete.board_id }).unwrap()]);
+    const summary = getMediaDeletionSummary(result);
+    if (summary.requestFailed || summary.failedCount > 0) {
+      toast({
+        status: summary.requestFailed ? 'error' : 'warning',
+        title: t('toast.mediaDeleteFailed'),
+        description: summary.requestFailed
+          ? t('toast.mediaDeleteFailedDesc')
+          : t('toast.mediaDeletePartial', { count: summary.failedCount }),
+      });
+    }
     $boardToDelete.set(null);
-  }, [boardToDelete, deleteBoardAndImages]);
+  }, [boardToDelete, deleteBoardAndImages, t]);
 
-  const handleDeleteUncategorizedImages = useCallback(() => {
+  const handleDeleteUncategorizedMedia = useCallback(async () => {
     if (!boardToDelete || boardToDelete !== 'none') {
       return;
     }
-    deleteUncategorizedImages();
+    // The uncategorized bucket is polymorphic (the button says "Images/Videos"), so both
+    // media kinds are deleted. The mutations are independent — a failure in one doesn't
+    // block the other.
+    const results = await Promise.allSettled([
+      deleteUncategorizedImages().unwrap(),
+      deleteUncategorizedVideos().unwrap(),
+    ]);
+    const summary = getMediaDeletionSummary(results);
+    if (summary.requestFailed || summary.failedCount > 0) {
+      toast({
+        status: summary.requestFailed ? 'error' : 'warning',
+        title: t('toast.mediaDeleteFailed'),
+        description: summary.requestFailed
+          ? t('toast.mediaDeleteFailedDesc')
+          : t('toast.mediaDeletePartial', { count: summary.failedCount }),
+      });
+    }
     $boardToDelete.set(null);
-  }, [boardToDelete, deleteUncategorizedImages]);
+  }, [boardToDelete, deleteUncategorizedImages, deleteUncategorizedVideos, t]);
 
   const handleClose = useCallback(() => {
     $boardToDelete.set(null);
@@ -122,8 +155,15 @@ const DeleteBoardModal = () => {
       isDeleteBoardAndImagesLoading ||
       isDeleteBoardOnlyLoading ||
       isFetchingBoardNames ||
+      isDeleteUncategorizedImagesLoading ||
+      isDeleteUncategorizedVideosLoading,
+    [
+      isDeleteBoardAndImagesLoading,
+      isDeleteBoardOnlyLoading,
+      isFetchingBoardNames,
       isDeleteUncategorizedImagesLoading,
-    [isDeleteBoardAndImagesLoading, isDeleteBoardOnlyLoading, isFetchingBoardNames, isDeleteUncategorizedImagesLoading]
+      isDeleteUncategorizedVideosLoading,
+    ]
   );
 
   if (!boardToDelete) {
@@ -151,8 +191,11 @@ const DeleteBoardModal = () => {
                   bottomMessage={t('boards.bottomMessage')}
                 />
               )}
-              {boardToDelete !== 'none' && <Text>{t('boards.deletedBoardsCannotbeRestored')}</Text>}
-              <Text>{t('gallery.deleteImagePermanent')}</Text>
+              {boardToDelete !== 'none' ? (
+                <Text>{t('boards.deletedBoardsCannotbeRestored')}</Text>
+              ) : (
+                <Text>{t('gallery.deleteMediaPermanent')}</Text>
+              )}
             </Flex>
           </AlertDialogBody>
           <AlertDialogFooter>
@@ -167,11 +210,11 @@ const DeleteBoardModal = () => {
               )}
               {boardToDelete !== 'none' && (
                 <Button colorScheme="error" isLoading={isLoading} onClick={handleDeleteBoardAndImages}>
-                  {t('boards.deleteBoardAndImages')}
+                  {t('boards.deleteBoardAndAssets')}
                 </Button>
               )}
               {boardToDelete === 'none' && (
-                <Button colorScheme="error" isLoading={isLoading} onClick={handleDeleteUncategorizedImages}>
+                <Button colorScheme="error" isLoading={isLoading} onClick={handleDeleteUncategorizedMedia}>
                   {t('boards.deleteAllUncategorizedImages')}
                 </Button>
               )}
