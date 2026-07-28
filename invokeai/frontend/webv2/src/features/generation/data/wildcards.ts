@@ -59,6 +59,9 @@ export const deleteWildcard = async (id: string): Promise<void> => {
  * prompt, and the expansion cache is keyed only on the request (with
  * `staleTime: Infinity`). Both caches must therefore be dropped together, or the
  * preview and the submitted batch would both keep serving the old expansion.
+ *
+ * Invalidation is the whole mechanism, so every reader has to consult staleness
+ * — see the `fetchQuery` note in `resolveDynamicPrompts`.
  */
 export const invalidateWildcardDependents = async (queryClient: QueryClient): Promise<void> => {
   await Promise.all([

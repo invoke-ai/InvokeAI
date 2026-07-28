@@ -53,8 +53,16 @@ export const dynamicPromptsQueryOptions = (request: ParseDynamicPromptsRequest) 
     });
   })();
 
-/** Cache-first expansion for the enqueue path, which cannot render a loading state. */
+/**
+ * Cache-first expansion for the enqueue path, which cannot render a loading state.
+ *
+ * `fetchQuery` rather than `ensureQueryData`: the latter returns whatever is in
+ * the cache the moment it holds data, invalidated or not. Under `staleTime:
+ * Infinity` that means an edited wildcard would keep serving its old expansion
+ * to the submit path. `fetchQuery` consults staleness, which invalidation drives,
+ * so an untouched entry still costs no round trip.
+ */
 export const resolveDynamicPrompts = (
   queryClient: QueryClient,
   request: ParseDynamicPromptsRequest
-): Promise<ParseDynamicPromptsResponse> => queryClient.ensureQueryData(dynamicPromptsQueryOptions(request));
+): Promise<ParseDynamicPromptsResponse> => queryClient.fetchQuery(dynamicPromptsQueryOptions(request));
