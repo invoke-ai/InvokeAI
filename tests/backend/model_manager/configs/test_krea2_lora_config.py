@@ -159,3 +159,42 @@ def test_explicit_krea2_override_rejects_incomplete_diffusion_model_lora_pair(_r
 
     with pytest.raises(NotAMatchError):
         LoRA_LyCORIS_Krea2_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS, "base": BaseModelType.Krea2})
+
+
+@patch("invokeai.backend.model_manager.configs.lora.raise_if_not_file")
+def test_explicit_krea2_override_rejects_orphan_outside_approved_prefixes(_raise_if_not_file) -> None:
+    # A complete pair under an approved prefix plus a dangling half elsewhere (text_fusion, which is NOT in
+    # the approved-prefix list) must still be rejected - the orphan crashes conversion (review 4802322488).
+    mod = MagicMock()
+    mod.load_state_dict.return_value = {
+        "transformer.transformer_blocks.0.attn.to_q.lora_A.weight": object(),
+        "transformer.transformer_blocks.0.attn.to_q.lora_B.weight": object(),
+        "transformer.text_fusion.0.lora_A.weight": object(),  # orphan: no matching lora_B
+    }
+    with pytest.raises(NotAMatchError):
+        LoRA_LyCORIS_Krea2_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS, "base": BaseModelType.Krea2})
+
+
+@patch("invokeai.backend.model_manager.configs.lora.raise_if_not_file")
+def test_automatic_probe_rejects_dora_scale_without_weight_pair(_raise_if_not_file) -> None:
+    # dora_scale alone is not a loadable LoRA - there are no A/B (or down/up) weights to apply. text_fusion.*
+    # makes it look like Krea-2, but it must be rejected for lacking a complete pair (review 4802322488).
+    mod = MagicMock()
+    mod.load_state_dict.return_value = {
+        "transformer.text_fusion.0.dora_scale": object(),
+    }
+    with pytest.raises(NotAMatchError):
+        LoRA_LyCORIS_Krea2_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS})
+
+
+@patch("invokeai.backend.model_manager.configs.lora.raise_if_not_file")
+def test_automatic_probe_accepts_complete_pair_with_dora_scale(_raise_if_not_file) -> None:
+    # A complete A/B pair accompanied by dora_scale is a valid DoRA LoRA and must be accepted.
+    mod = MagicMock()
+    mod.load_state_dict.return_value = {
+        "transformer.text_fusion.0.lora_A.weight": object(),
+        "transformer.text_fusion.0.lora_B.weight": object(),
+        "transformer.text_fusion.0.dora_scale": object(),
+    }
+    config = LoRA_LyCORIS_Krea2_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS})
+    assert config.base is BaseModelType.Krea2

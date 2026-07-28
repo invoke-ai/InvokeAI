@@ -940,24 +940,35 @@ def _lora_weight_keys_are_all_paired(state_dict: dict[str | int, Any], prefixes:
     return True
 
 
-def _has_complete_lora_pair_for_prefixes(state_dict: dict[str | int, Any], prefixes: tuple[str, ...]) -> bool:
-    """True if there is at least one complete LoRA pair under `prefixes` AND no orphaned half under them.
+def _has_complete_lora_pair(state_dict: dict[str | int, Any], prefixes: tuple[str, ...] | None = None) -> bool:
+    """True if at least one complete lora_A/B (or lora_down/up) pair exists, optionally under `prefixes`.
 
-    A single orphaned ``lora_A``/``lora_B``/``lora_down``/``lora_up`` (a valid layer plus a dangling half)
-    would install successfully here but then fail during LoRA conversion, so it is rejected.
+    Note this only requires a *complete* pair to exist; it does not by itself reject dangling halves
+    elsewhere — callers pair it with :func:`_lora_weight_keys_are_all_paired` (over the whole state dict)
+    to also reject orphaned halves anywhere.
     """
     string_keys = {key for key in state_dict if isinstance(key, str)}
-    found_complete_pair = False
     for key in string_keys:
-        if not key.startswith(prefixes):
+        if prefixes is not None and not key.startswith(prefixes):
             continue
         for suffix, partner_suffix in _LORA_PAIR_PARTNERS.items():
-            if key.endswith(suffix):
-                if f"{key[: -len(suffix)]}{partner_suffix}" not in string_keys:
-                    return False
-                found_complete_pair = True
-                break
-    return found_complete_pair
+            if key.endswith(suffix) and f"{key[: -len(suffix)]}{partner_suffix}" in string_keys:
+                return True
+    return False
+
+
+# Layouts the converter understands for an explicit Krea-2 override (a transformer-only or text-encoder-only
+# LoRA that lacks the auto-detection text_fusion/time_mod_proj keys still installs under an explicit base).
+_KREA2_SUPPORTED_LORA_PREFIXES = (
+    "transformer.transformer_blocks.",
+    "transformer_blocks.",
+    # The converter also supports the `diffusion_model.` transformer layout
+    # (see krea2_lora_conversion_utils.lora_model_from_krea2_state_dict).
+    "diffusion_model.transformer_blocks.",
+    "base_model.model.transformer.transformer_blocks.",
+    "text_encoder.",
+    "base_model.model.text_encoder.",
+)
 
 
 class LoRA_LyCORIS_Krea2_Config(LoRA_LyCORIS_Config_Base, Config_Base):
@@ -972,21 +983,10 @@ class LoRA_LyCORIS_Krea2_Config(LoRA_LyCORIS_Config_Base, Config_Base):
 
         state_dict = mod.load_state_dict()
         explicit_krea2_override = override_fields.get("base") is BaseModelType.Krea2
-        has_supported_explicit_pair = _has_complete_lora_pair_for_prefixes(
-            state_dict,
-            (
-                "transformer.transformer_blocks.",
-                "transformer_blocks.",
-                # The converter also supports the `diffusion_model.` transformer layout
-                # (see krea2_lora_conversion_utils.lora_model_from_krea2_state_dict), so a
-                # transformer-only LoRA using it must be accepted under an explicit Krea-2 override.
-                "diffusion_model.transformer_blocks.",
-                "base_model.model.transformer.transformer_blocks.",
-                "text_encoder.",
-                "base_model.model.text_encoder.",
-            ),
-        )
-        if explicit_krea2_override and has_supported_explicit_pair:
+        has_supported_explicit_pair = _has_complete_lora_pair(state_dict, _KREA2_SUPPORTED_LORA_PREFIXES)
+        # Reject an orphaned half *anywhere* in the state dict (e.g. a dangling text_fusion half not under
+        # the approved prefixes) — it would install here but fail during LoRA conversion at generation time.
+        if explicit_krea2_override and has_supported_explicit_pair and _lora_weight_keys_are_all_paired(state_dict):
             return cls(**override_fields)
 
         cls._validate_looks_like_lora(mod)
@@ -998,18 +998,12 @@ class LoRA_LyCORIS_Krea2_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         """Krea-2 LoRAs have keys like transformer.text_fusion.* / transformer.transformer_blocks.* with
         a lora_A/lora_B (or lora_down/lora_up) suffix. The text-fusion stage is unique to Krea-2."""
         state_dict = mod.load_state_dict()
-        has_lora_suffix = state_dict_has_any_keys_ending_with(
-            state_dict,
-            {
-                "lora_A.weight",
-                "lora_B.weight",
-                "lora_down.weight",
-                "lora_up.weight",
-                "dora_scale",
-            },
-        )
-        if not (_has_krea2_lora_keys(state_dict) and has_lora_suffix):
-            raise NotAMatchError("model does not match Krea-2 LoRA heuristics")
+        # Require a *complete* lora_A/B (or lora_down/up) pair, not merely any lora/dora suffix: a file with
+        # only ``dora_scale`` and no A/B weights would pass a suffix check but fail later on missing weights.
+        if not (_has_krea2_lora_keys(state_dict) and _has_complete_lora_pair(state_dict)):
+            raise NotAMatchError(
+                "model does not match Krea-2 LoRA heuristics (no complete lora_A/B or lora_down/up pair)"
+            )
         # Reject a file with an orphaned LoRA half (a valid layer plus a dangling lora_A/B/down/up); it
         # would install here but fail later during LoRA conversion.
         if not _lora_weight_keys_are_all_paired(state_dict):

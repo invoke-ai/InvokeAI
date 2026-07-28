@@ -287,6 +287,8 @@ describe('isValidKrea2RebalanceWeights (backend rebalance node requires exactly 
     // Tolerates surrounding whitespace and a trailing comma (empty segments are ignored, as in the backend).
     expect(isValidKrea2RebalanceWeights(' 1 , 2 , 3 , 4 , 5 , 6 , 7 , 8 , 9 , 10 , 11 , 12 ,')).toBe(true);
     expect(isValidKrea2RebalanceWeights('0,-1,1.5,-2.25,3,4,5,6,7,8,9,10')).toBe(true);
+    // Scientific notation and leading-dot decimals are valid Python floats and must be accepted.
+    expect(isValidKrea2RebalanceWeights('1e2,1.5e-3,.5,2.,+1,-1,1E3,3.14,0,10,11,12')).toBe(true);
   });
 
   it.each([
@@ -297,6 +299,10 @@ describe('isValidKrea2RebalanceWeights (backend rebalance node requires exactly 
     ['inf', '1,2,3,4,5,6,7,8,9,10,11,inf'],
     ['Infinity', '1,2,3,4,5,6,7,8,9,10,11,Infinity'],
     ['empty', ''],
+    // JS Number() accepts these, but Python float() (the backend) rejects them, so we must too.
+    ['hex', '0x10,2,3,4,5,6,7,8,9,10,11,12'],
+    ['binary', '0b10,2,3,4,5,6,7,8,9,10,11,12'],
+    ['octal', '0o10,2,3,4,5,6,7,8,9,10,11,12'],
   ])('rejects %s', (_label, value) => {
     expect(isValidKrea2RebalanceWeights(value)).toBe(false);
   });

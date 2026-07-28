@@ -1094,12 +1094,20 @@ export const selectKrea2RebalanceWeights = createParamsSelector((params) => para
 // so an invalid string is blocked before it can queue a generation the backend will reject.
 export const KREA2_REBALANCE_WEIGHT_COUNT = 12;
 
+// Plain decimal / scientific-notation float, matching what Python's float() accepts. Crucially this rejects
+// the hex/binary/octal literals (0x10, 0b10, 0o10) that JS Number() would happily parse but the backend
+// float() rejects — which would otherwise let a graph queue that is guaranteed to fail at generation.
+const KREA2_DECIMAL_NUMBER_RE = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
+
 export const parseKrea2RebalanceWeights = (weights: string): number[] | null => {
   const parts = weights
     .split(',')
     .map((s) => s.trim())
     .filter((s) => s !== '');
   if (parts.length !== KREA2_REBALANCE_WEIGHT_COUNT) {
+    return null;
+  }
+  if (!parts.every((p) => KREA2_DECIMAL_NUMBER_RE.test(p))) {
     return null;
   }
   const nums = parts.map(Number);

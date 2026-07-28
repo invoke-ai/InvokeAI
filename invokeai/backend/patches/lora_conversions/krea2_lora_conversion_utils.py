@@ -77,6 +77,15 @@ def lora_model_from_krea2_state_dict(state_dict: Dict[str, torch.Tensor], alpha:
         else:
             final_key = f"{KREA2_LORA_TRANSFORMER_PREFIX}{clean_key}"
 
+        # The `transformer.` and `diffusion_model.` aliases normalize to the same target key. If two source
+        # layers collide here, silently overwriting one would drop weights based on dict ordering, so reject
+        # the mixed-layout adapter explicitly instead.
+        if final_key in layers:
+            raise ValueError(
+                f"Krea-2 LoRA has conflicting layers that normalize to the same target '{final_key}' "
+                "(e.g. both a 'transformer.' and a 'diffusion_model.' alias for one logical layer). "
+                "This mixed layout is unsupported - refusing to silently drop one of the layers."
+            )
         layers[final_key] = any_lora_layer_from_state_dict(values)
 
     return ModelPatchRaw(layers=layers)
@@ -106,26 +115,33 @@ def _get_lora_layer_values(
     return layer_dict
 
 
+# Maps each recognized weight-key suffix to the canonical value-key used downstream. The PEFT/diffusers DoRA
+# magnitude is published as ``<layer>.lora_magnitude_vector.weight``; it is the same thing InvokeAI stores as
+# ``dora_scale``, so mapping it here lets a standard Diffusers DoRA adapter (A/B + magnitude) load as a
+# DoRALayer instead of being split into a bogus, unrecognized layer.
+_SUFFIX_TO_VALUE_KEY = {
+    ".lora_A.weight": "lora_A.weight",
+    ".lora_B.weight": "lora_B.weight",
+    ".lora_down.weight": "lora_down.weight",
+    ".lora_up.weight": "lora_up.weight",
+    ".dora_scale": "dora_scale",
+    ".lora_magnitude_vector.weight": "dora_scale",
+    ".alpha": "alpha",
+}
+
+
 def _group_by_layer(state_dict: Dict[str, torch.Tensor]) -> dict[str, dict[str, torch.Tensor]]:
     """Groups state dict keys by layer path, splitting off the LoRA weight suffix."""
-    known_suffixes = [
-        ".lora_A.weight",
-        ".lora_B.weight",
-        ".lora_down.weight",
-        ".lora_up.weight",
-        ".dora_scale",
-        ".alpha",
-    ]
     layer_dict: dict[str, dict[str, torch.Tensor]] = {}
     for key in state_dict:
         if not isinstance(key, str):
             continue
         layer_name = None
         key_name = None
-        for suffix in known_suffixes:
+        for suffix, value_key in _SUFFIX_TO_VALUE_KEY.items():
             if key.endswith(suffix):
                 layer_name = key[: -len(suffix)]
-                key_name = suffix[1:]
+                key_name = value_key
                 break
         if layer_name is None:
             parts = key.rsplit(".", maxsplit=2)
