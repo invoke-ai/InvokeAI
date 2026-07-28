@@ -79,8 +79,12 @@ export const GeneratePromptFields = ({
     [onCommitImmediate]
   );
 
+  // View mode is a way of reading one particular template, so it does not carry
+  // over to the next one. Left on, applying a template made the prompt box go
+  // read-only the instant it was picked, with no interaction to explain it.
   const applyPromptTemplate = useCallback(
-    (promptTemplate: PromptTemplateSnapshot | null) => onCommitImmediate({ promptTemplate }),
+    (promptTemplate: PromptTemplateSnapshot | null) =>
+      onCommitImmediate({ promptTemplate, promptTemplateViewMode: false }),
     [onCommitImmediate]
   );
 

@@ -87,10 +87,16 @@ export const NegativePromptField = ({
   }, []);
 
   // Same textarea, read-only, as on the positive side — swapping in a different
-  // component would reset the resizer's mounted height. The `&&` matters: view
-  // mode with no template leaves the prompt editable, so gating on the toggle
-  // alone would kill the autocomplete while the user is still typing.
-  const isViewingMerged = isTemplateViewMode && templateNegativePrompt !== null;
+  // component would reset the resizer's mounted height.
+  //
+  // An empty string here is a template that carries no negative side, which is
+  // most of them: `null` means no template at all. Neither has anything to show,
+  // and treating the empty one as something to view turned this field read-only
+  // and rendered the authored text with the merge's trailing space hanging off
+  // it. Gating on the toggle alone would be worse still — view mode can be on
+  // with no template applied, which leaves the prompt perfectly editable.
+  const viewedTemplatePrompt = isTemplateViewMode && templateNegativePrompt ? templateNegativePrompt : null;
+  const isViewingMerged = viewedTemplatePrompt !== null;
 
   const autocomplete = usePromptTriggerAutocomplete({
     isDisabled: isViewingMerged,
@@ -194,8 +200,8 @@ export const NegativePromptField = ({
   );
 
   const templateChunks = useMemo(
-    () => (isViewingMerged ? getPromptTemplateChunks(draftValue, templateNegativePrompt) : null),
-    [draftValue, isViewingMerged, templateNegativePrompt]
+    () => (viewedTemplatePrompt === null ? null : getPromptTemplateChunks(draftValue, viewedTemplatePrompt)),
+    [draftValue, viewedTemplatePrompt]
   );
   const exitViewMode = useCallback(() => onTemplateViewModeChange?.(false), [onTemplateViewModeChange]);
 
