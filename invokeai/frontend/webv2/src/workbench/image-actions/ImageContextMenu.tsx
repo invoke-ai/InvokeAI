@@ -390,6 +390,9 @@ const SingleImageMenuItems = ({
         onClick={handleUseAsReferenceImage}
       />
       <ContextMenuItem
+        // Same signal "Use Prompt" reads, rather than staying enabled and
+        // raising a toast to say the image had no prompt after all.
+        disabled={isLoadingRecallCapabilities || !recallCapabilities.prompts}
         icon={TypeIcon}
         label="Use as Prompt Template"
         value="use-as-prompt-template"

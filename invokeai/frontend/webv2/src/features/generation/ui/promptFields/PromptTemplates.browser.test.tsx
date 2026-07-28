@@ -175,6 +175,7 @@ describe('the prompt templates panel', () => {
         catalog={createCatalog()}
         onApply={onApply}
         onCreate={vi.fn()}
+        onDetach={vi.fn()}
         onEdit={vi.fn()}
       />
     );
@@ -202,6 +203,7 @@ describe('the prompt templates panel', () => {
         catalog={createCatalog()}
         onApply={onApply}
         onCreate={vi.fn()}
+        onDetach={vi.fn()}
         onEdit={vi.fn()}
       />
     );
@@ -213,6 +215,40 @@ describe('the prompt templates panel', () => {
     expect(onApply).toHaveBeenCalledWith(null);
   });
 
+  // Deleting the applied template has to stop it applying — otherwise it keeps
+  // shaping every prompt with no way left to reach it. But that is not the same
+  // intent as choosing to clear it, so the panel stays open: the user is in the
+  // middle of managing the list.
+  it('detaches rather than clears when the applied template is deleted', async () => {
+    const onApply = vi.fn();
+    const onDetach = vi.fn();
+
+    await render(
+      <PromptTemplatesPanel
+        activeTemplate={userTemplate}
+        catalog={createCatalog()}
+        onApply={onApply}
+        onCreate={vi.fn()}
+        onDetach={onDetach}
+        onEdit={vi.fn()}
+      />
+    );
+
+    await act(async () => {
+      await userEvent.click(host!.querySelector<HTMLButtonElement>('button[aria-label="Delete"]')!);
+    });
+    // The confirmation is portalled, so it is not under `host`.
+    const dialog = document.querySelector('[role="alertdialog"]')!;
+    const confirm = [...dialog.querySelectorAll('button')].find((button) => button.textContent === 'Delete')!;
+
+    await act(async () => {
+      await userEvent.click(confirm);
+    });
+
+    expect(onDetach).toHaveBeenCalled();
+    expect(onApply).not.toHaveBeenCalled();
+  });
+
   // Built-ins are shipped by the backend and rejected by it for non-admins, so
   // offering the controls would only produce a 403.
   it('offers edit and delete on your own templates but not on built-ins', async () => {
@@ -222,6 +258,7 @@ describe('the prompt templates panel', () => {
         catalog={createCatalog()}
         onApply={vi.fn()}
         onCreate={vi.fn()}
+        onDetach={vi.fn()}
         onEdit={vi.fn()}
       />
     );
@@ -239,6 +276,7 @@ describe('the prompt templates panel', () => {
         catalog={createCatalog()}
         onApply={vi.fn()}
         onCreate={vi.fn()}
+        onDetach={vi.fn()}
         onEdit={vi.fn()}
       />
     );

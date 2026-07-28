@@ -65,6 +65,9 @@ export const PromptTemplatesButton = ({
     [onApply]
   );
 
+  /** Deleting the applied template stops it applying, but the panel stays open. */
+  const detachTemplate = useCallback(() => onApply(null), [onApply]);
+
   const startCreate = useCallback(() => setEditorTarget({ record: null }), []);
   const startEdit = useCallback((record: PromptTemplateRecord) => setEditorTarget({ record }), []);
   const closeEditor = useCallback(() => setEditorTarget(null), []);
@@ -142,6 +145,7 @@ export const PromptTemplatesButton = ({
                   activeTemplate={activeTemplate}
                   catalog={catalog}
                   onApply={applyAndClose}
+                  onDetach={detachTemplate}
                   onCreate={startCreate}
                   onEdit={startEdit}
                 />

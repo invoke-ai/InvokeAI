@@ -360,6 +360,30 @@ describe('the caret autocomplete', () => {
     expect(listbox()).toBeNull();
   });
 
+  // Previously only a click could reopen the list over a reference already in
+  // the prompt; arrowing back into one left it shut until another character was
+  // typed, which reads as the feature having given up.
+  it('reopens when the caret arrows back into a reference', async () => {
+    await type('a photo of __co');
+    await press('{Escape}');
+
+    expect(listbox()).toBeNull();
+
+    await press('{ArrowLeft}');
+
+    expect(optionLabels()).toEqual(['colors']);
+  });
+
+  it('closes when the caret arrows out of one', async () => {
+    await type('a photo of __co');
+
+    expect(listbox()).not.toBeNull();
+
+    await press('{Home}');
+
+    expect(listbox()).toBeNull();
+  });
+
   it('closes on Escape and leaves the prompt exactly as typed', async () => {
     await type('a photo of __');
     await press('{Escape}');

@@ -28,6 +28,11 @@ import {
 } from '@features/generation/ui/promptFields/promptTriggerOptions';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 
+/** Move the caret whether or not the list is open. */
+const CARET_KEYS = ['ArrowLeft', 'ArrowRight', 'Home', 'End'];
+/** Move the caret only when the list is not open to take them for its own. */
+const LIST_KEYS = ['ArrowUp', 'ArrowDown'];
+
 interface AutocompleteState {
   caretRect: CaretRect;
   query: PromptTriggerQuery;
@@ -54,6 +59,7 @@ export interface PromptTriggerAutocompleteApi {
     role: 'combobox';
     onCompositionEnd: (event: CompositionEvent<HTMLTextAreaElement>) => void;
     onCompositionStart: () => void;
+    onKeyUp: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
   };
   element: ReactNode;
   isOpen: boolean;
@@ -171,10 +177,9 @@ export const usePromptTriggerAutocomplete = ({
         return;
       }
 
-      // A caret jump leaves the query behind, so the list goes with it — but the
-      // key still belongs to the textarea.
-      if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
-        setState(null);
+      // Caret movement belongs to the textarea. Where it lands is read on the
+      // way back up, once the browser has actually moved it.
+      if (CARET_KEYS.includes(event.key)) {
         return;
       }
 
@@ -206,6 +211,22 @@ export const usePromptTriggerAutocomplete = ({
     [activeIndex, isOpen, matches, selectOption]
   );
 
+  // Read on the way up, not the way down: during keydown the caret has not moved
+  // yet. This is also what lets the list *open* by arrowing back into a `__col`
+  // that is already sitting in the prompt, which before only a click could do.
+  //
+  // The vertical arrows are excluded while the list is open, because there they
+  // drove the highlight and the caret never moved — re-reading would reset the
+  // highlight to the top on every press.
+  const handleKeyUp = useCallback(
+    (event: KeyboardEvent<HTMLTextAreaElement>) => {
+      if (CARET_KEYS.includes(event.key) || (!isOpen && LIST_KEYS.includes(event.key))) {
+        refresh(event.currentTarget);
+      }
+    },
+    [isOpen, refresh]
+  );
+
   const handleCompositionStart = useCallback(() => {
     isComposingRef.current = true;
     setState(null);
@@ -234,6 +255,7 @@ export const usePromptTriggerAutocomplete = ({
       // The loss is real and there is no way to state it here.
       onCompositionEnd: handleCompositionEnd,
       onCompositionStart: handleCompositionStart,
+      onKeyUp: handleKeyUp,
       role: 'combobox',
     },
     element:

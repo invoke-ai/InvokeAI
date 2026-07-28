@@ -24,6 +24,11 @@ interface PromptTemplatesPanelProps {
   catalog: PromptTemplateCatalog;
   activeTemplate: PromptTemplateSnapshot | null;
   onApply: (template: PromptTemplateSnapshot | null) => void;
+  /**
+   * Stop applying the active template without dismissing the panel — for when it
+   * has just been deleted, which is not the same intent as choosing to clear it.
+   */
+  onDetach: () => void;
   onEdit: (template: PromptTemplateRecord) => void;
   onCreate: () => void;
 }
@@ -39,6 +44,7 @@ export const PromptTemplatesPanel = ({
   activeTemplate,
   catalog,
   onApply,
+  onDetach,
   onCreate,
   onEdit,
 }: PromptTemplatesPanelProps) => {
@@ -80,9 +86,11 @@ export const PromptTemplatesPanel = ({
       await catalog.remove(pendingDelete.id);
 
       // Deleting the template that is applied would otherwise leave it silently
-      // shaping every prompt with no way to reach it.
+      // shaping every prompt with no way to reach it. Detached rather than
+      // cleared: the user is in the middle of managing the list, and closing the
+      // panel out from under them is not what they asked for.
       if (activeTemplate?.id === pendingDelete.id) {
-        onApply(null);
+        onDetach();
       }
     } catch (caught) {
       notifications.reportError({
@@ -91,7 +99,7 @@ export const PromptTemplatesPanel = ({
         namespace: 'generation',
       });
     }
-  }, [activeTemplate, catalog, notifications, onApply, pendingDelete, t]);
+  }, [activeTemplate, catalog, notifications, onDetach, pendingDelete, t]);
 
   return (
     <Stack gap="2">
