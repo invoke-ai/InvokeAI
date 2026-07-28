@@ -17,6 +17,15 @@ class LocalUrlService(UrlServiceBase):
 
         return f"{self._base_url}/images/i/{image_basename}/full"
 
+    def get_video_url(self, video_name: str, thumbnail: bool = False) -> str:
+        video_basename = os.path.basename(video_name)
+
+        # These paths are determined by the routes in invokeai/app/api/routers/videos.py
+        if thumbnail:
+            return f"{self._base_url}/videos/i/{video_basename}/thumbnail"
+
+        return f"{self._base_url}/videos/i/{video_basename}/full"
+
     def get_model_image_url(self, model_key: str) -> str:
         return f"{self._base_url_v2}/models/i/{model_key}/image"
 
