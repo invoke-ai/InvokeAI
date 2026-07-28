@@ -17,6 +17,16 @@ describe('hasDynamicPromptSyntax', () => {
   it('detects a wildcard reference', () => {
     expect(hasDynamicPromptSyntax('a __colors__ ball')).toBe(true);
     expect(hasDynamicPromptSyntax('a __animals/dogs__ ball')).toBe(true);
+    expect(hasDynamicPromptSyntax('a __artists/*__ ball')).toBe(true);
+    expect(hasDynamicPromptSyntax('a __~colors__ ball')).toBe(true);
+    expect(hasDynamicPromptSyntax('a __outfit(mood=warm)__ ball')).toBe(true);
+  });
+
+  // A comment is only stripped by going through the expander, and upstream has
+  // no escape for `#`, so any prompt containing one has to take the trip.
+  it('detects a comment', () => {
+    expect(hasDynamicPromptSyntax('a red ball # for now')).toBe(true);
+    expect(hasDynamicPromptSyntax('a red ball \\# for now')).toBe(true);
   });
 
   it('ignores prompts with neither a variant nor a wildcard', () => {

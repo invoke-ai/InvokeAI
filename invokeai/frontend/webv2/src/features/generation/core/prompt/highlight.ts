@@ -17,8 +17,11 @@ export type PromptHighlightKind =
   | 'variantSeparator'
   | 'variantWeight'
   | 'variantRange'
+  | 'variantSampler'
   | 'wildcard'
   | 'promptVariable'
+  | 'promptVariableOperator'
+  | 'comment'
   | 'error';
 
 export interface PromptHighlightOptions {
@@ -46,10 +49,15 @@ interface HighlightAnnotation {
 }
 
 const ANNOTATION_PRIORITY = {
+  // A comment outranks even an error: the parser strips it before it sees the
+  // syntax inside, so nothing in there can be wrong.
+  comment: 110,
   error: 100,
+  promptVariableOperator: 46,
   wildcard: 45,
   promptVariable: 45,
   variantRange: 42,
+  variantSampler: 42,
   variantWeight: 42,
   variantBrace: 41,
   variantSeparator: 41,
@@ -61,6 +69,7 @@ const ANNOTATION_PRIORITY = {
 const BASE_PRIORITY: Record<PromptHighlightKind, number> = {
   attention: 30,
   attentionNumeric: 30,
+  comment: 110,
   embedding: 30,
   error: 100,
   escapedParen: 20,
@@ -68,10 +77,12 @@ const BASE_PRIORITY: Record<PromptHighlightKind, number> = {
   promptFunctionArg: 5,
   promptFunctionMethod: 35,
   promptVariable: 45,
+  promptVariableOperator: 46,
   punctuation: 10,
   text: 0,
   variantBrace: 41,
   variantRange: 42,
+  variantSampler: 42,
   variantSeparator: 41,
   variantWeight: 42,
   wildcard: 45,
