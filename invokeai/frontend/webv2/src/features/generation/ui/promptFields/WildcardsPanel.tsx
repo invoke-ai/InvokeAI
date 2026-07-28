@@ -4,6 +4,7 @@ import type { WildcardCatalog } from '@features/generation/ui/useWildcards';
 import type { ChangeEvent } from 'react';
 
 import { HStack, Input, Stack, Text } from '@chakra-ui/react';
+import { PANEL_HEADER_CONTROL_HEIGHT, PromptPanelHeader } from '@features/generation/ui/promptFields/PromptPanelHeader';
 import { PromptTextarea } from '@features/generation/ui/promptFields/PromptTextarea';
 import { Button, IconButton } from '@platform/ui/Button';
 import { Scrollable } from '@platform/ui/Scrollable';
@@ -74,11 +75,13 @@ export const WildcardsPanel = ({
   if (draft) {
     return (
       <Stack gap="2">
-        <Text color="fg.subtle" fontSize="2xs" fontWeight="700" textTransform="uppercase">
-          {draft.id === null
-            ? t('widgets.generate.dynamicPrompts.newWildcard')
-            : t('widgets.generate.dynamicPrompts.editWildcard')}
-        </Text>
+        <PromptPanelHeader
+          label={
+            draft.id === null
+              ? t('widgets.generate.dynamicPrompts.newWildcard')
+              : t('widgets.generate.dynamicPrompts.editWildcard')
+          }
+        />
         <Input
           aria-label={t('widgets.generate.dynamicPrompts.wildcardName')}
           placeholder={t('widgets.generate.dynamicPrompts.wildcardNamePlaceholder')}
@@ -128,15 +131,12 @@ export const WildcardsPanel = ({
 
   return (
     <Stack gap="2">
-      <HStack justify="space-between">
-        <Text color="fg.subtle" fontSize="2xs" fontWeight="700" textTransform="uppercase">
-          {t('widgets.generate.dynamicPrompts.wildcards')}
-        </Text>
-        <Button size="2xs" variant="ghost" onClick={startCreate}>
+      <PromptPanelHeader label={t('widgets.generate.dynamicPrompts.wildcards')}>
+        <Button h={PANEL_HEADER_CONTROL_HEIGHT} size="2xs" variant="ghost" onClick={startCreate}>
           <PlusIcon />
           {t('widgets.generate.dynamicPrompts.newWildcard')}
         </Button>
-      </HStack>
+      </PromptPanelHeader>
 
       <Scrollable h="14rem" label={t('widgets.generate.dynamicPrompts.wildcards')}>
         {catalog.wildcards.length === 0 ? (

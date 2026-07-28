@@ -1,7 +1,7 @@
 import type { DynamicPromptsConfig } from '@features/generation/core/dynamicPrompts';
 import type { DynamicPromptsExpansion } from '@features/generation/ui/useDynamicPrompts';
 
-import { HStack, Menu, NumberInput, Portal, Stack, Switch, Text } from '@chakra-ui/react';
+import { Badge, HStack, Menu, NumberInput, Portal, Stack, Switch, Text } from '@chakra-ui/react';
 import {
   createDynamicPromptsSampleSeed,
   DYNAMIC_PROMPTS_MAX_PROMPTS,
@@ -9,6 +9,7 @@ import {
   sanitizeMaxPrompts,
 } from '@features/generation/core/dynamicPrompts';
 import { HighlightedPrompt } from '@features/generation/ui/promptFields/PromptHighlight';
+import { PANEL_HEADER_CONTROL_HEIGHT, PromptPanelHeader } from '@features/generation/ui/promptFields/PromptPanelHeader';
 import { Button, IconButton } from '@platform/ui/Button';
 import { MenuContent } from '@platform/ui/Menu';
 import { Scrollable } from '@platform/ui/Scrollable';
@@ -84,11 +85,20 @@ export const DynamicPromptsPanel = ({
 
   return (
     <Stack gap="2.5">
-      <HStack justify="space-between">
-        <Text color="fg.subtle" fontSize="2xs" fontWeight="700" textTransform="uppercase">
-          {t('widgets.generate.dynamicPrompts.title')}
-        </Text>
-        <Text color="fg.muted" css={TABULAR_NUMS} fontSize="2xs">
+      <PromptPanelHeader label={t('widgets.generate.dynamicPrompts.title')}>
+        {/* Monospace rather than inline icons: lucide's X is a close glyph, not a
+            times sign, and there is no arithmetic multiply in the set. Mono with
+            tabular figures also stops the badge jittering as the counts change. */}
+        <Badge
+          color="fg.muted"
+          css={TABULAR_NUMS}
+          fontFamily="mono"
+          fontSize="2xs"
+          fontWeight="500"
+          h={PANEL_HEADER_CONTROL_HEIGHT}
+          px="1.5"
+          variant="subtle"
+        >
           {expansion.isLoading
             ? t('widgets.generate.dynamicPrompts.expanding')
             : t('widgets.generate.dynamicPrompts.summary', {
@@ -96,8 +106,8 @@ export const DynamicPromptsPanel = ({
                 iterations: batchCount,
                 prompts: expansion.count,
               })}
-        </Text>
-      </HStack>
+        </Badge>
+      </PromptPanelHeader>
 
       <HStack align="end" gap="2">
         <Stack flex="1" gap="1" minW="0">

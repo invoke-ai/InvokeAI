@@ -188,6 +188,26 @@ describe('dynamic prompts popover controls', () => {
     expect(row().getBoundingClientRect().height).toBe(combinatorialHeight);
   });
 
+  it('gives both tabs a header control of the same height', async () => {
+    await render();
+    await openPopover();
+
+    const headerControl = () =>
+      document
+        .querySelector('[data-scope="popover"][data-part="content"] p')!
+        .parentElement!.lastElementChild!.getBoundingClientRect().height;
+
+    const summaryHeight = headerControl();
+
+    await act(async () => {
+      await userEvent.click(segmentLabel('wildcards')!);
+    });
+
+    // The summary badge and the "New wildcard" button sit in the same slot on
+    // either tab, so switching tabs must not change the header's shape.
+    expect(headerControl()).toBe(summaryHeight);
+  });
+
   it('keeps the tabs to their content width rather than stretching them', async () => {
     await render(vi.fn());
     await openPopover();
