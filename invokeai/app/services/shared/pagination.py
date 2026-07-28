@@ -4,6 +4,11 @@ from pydantic import BaseModel, Field
 
 GenericBaseModel = TypeVar("GenericBaseModel", bound=BaseModel)
 
+# Upper bound for offset-paginated `limit` query params. Values flow verbatim into
+# SQL LIMIT clauses, where SQLite treats a negative limit as unlimited and a huge one
+# materializes every row into DTOs — routes must clamp with ge=0/le=MAX_PAGE_SIZE.
+MAX_PAGE_SIZE = 1000
+
 
 class CursorPaginatedResults(BaseModel, Generic[GenericBaseModel]):
     """
