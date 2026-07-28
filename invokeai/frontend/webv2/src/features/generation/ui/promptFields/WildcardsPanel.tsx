@@ -9,6 +9,7 @@ import { filterWildcards, groupWildcardsByPrefix } from '@features/generation/co
 import { useGenerationUi } from '@features/generation/ui/GenerationUiContext';
 import { PANEL_HEADER_CONTROL_HEIGHT, PromptPanelHeader } from '@features/generation/ui/promptFields/PromptPanelHeader';
 import { PromptTextarea } from '@features/generation/ui/promptFields/PromptTextarea';
+import { WildcardTransferActions } from '@features/generation/ui/promptFields/WildcardTransferActions';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, IconButton } from '@platform/ui/Button';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
@@ -248,6 +249,9 @@ export const WildcardsPanel = ({
           </Stack>
         )}
       </Scrollable>
+
+      <Separator />
+      <WildcardTransferActions catalog={catalog} />
 
       {/* A wildcard's values are typed by hand and there is no undo, so deleting
           one asks first — as every other destructive action here does. */}

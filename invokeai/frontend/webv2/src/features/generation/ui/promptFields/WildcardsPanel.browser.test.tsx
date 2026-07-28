@@ -222,11 +222,12 @@ describe('finding a wildcard', () => {
 
 describe('deleting a wildcard', () => {
   const clickDelete = async () => {
-    // Insert, edit, delete — the trash is the last control on the row.
-    const buttons = [...host!.querySelectorAll('button')];
+    // By label, not by position: the panel footer has its own controls after the
+    // rows, so "the last button" is no longer the trash.
+    const trash = host!.querySelector<HTMLButtonElement>('button[aria-label="common.delete"]');
 
     await act(async () => {
-      await userEvent.click(buttons.at(-1)!);
+      await userEvent.click(trash!);
     });
   };
   const dialogButton = (label: string) =>
