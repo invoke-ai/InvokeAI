@@ -11,10 +11,11 @@ import {
 import { HighlightedPrompt } from '@features/generation/ui/promptFields/PromptHighlight';
 import { PANEL_HEADER_CONTROL_HEIGHT, PromptPanelHeader } from '@features/generation/ui/promptFields/PromptPanelHeader';
 import { Button, IconButton } from '@platform/ui/Button';
+import { Field } from '@platform/ui/Field';
 import { MenuContent } from '@platform/ui/Menu';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { Tooltip } from '@platform/ui/Tooltip';
-import { CheckIcon, ChevronDownIcon, ShuffleIcon } from 'lucide-react';
+import { ChevronDownIcon, ShuffleIcon } from 'lucide-react';
 import { useCallback, useId, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -47,6 +48,12 @@ export const DynamicPromptsPanel = ({
   // collide with the number input beside it and send label clicks to the wrong
   // control. Explicit ids keep them apart.
   const seedSwitchId = useId();
+  const modeFieldId = useId();
+  const modeTriggerId = useId();
+  // A <label for> cannot name a button, so the trigger is named by the field's
+  // label plus its own text: "Mode" + "All combinations".
+  const modeLabelledBy = `${modeFieldId}-label ${modeTriggerId}`;
+  const modeMenuIds = useMemo(() => ({ trigger: modeTriggerId }), [modeTriggerId]);
   const seedSwitchIds = useMemo(() => ({ hiddenInput: seedSwitchId, label: `${seedSwitchId}-label` }), [seedSwitchId]);
   const visiblePrompts = expansion.prompts.slice(0, MAX_PREVIEW_ROWS);
   const hiddenPromptCount = expansion.prompts.length - visiblePrompts.length;
@@ -110,15 +117,19 @@ export const DynamicPromptsPanel = ({
       </PromptPanelHeader>
 
       <HStack align="end" gap="2">
-        <Stack flex="1" gap="1" minW="0">
-          <Text color="fg.subtle" fontSize="2xs" truncate>
-            {t('widgets.generate.dynamicPrompts.mode')}
-          </Text>
+        <Field id={modeFieldId} label={t('widgets.generate.dynamicPrompts.mode')}>
           {/* A menu rather than a Select: Chakra's Select renders a hidden native
               select whose sync throws inside this popover. */}
-          <Menu.Root positioning={MENU_POSITIONING}>
+          <Menu.Root ids={modeMenuIds} positioning={MENU_POSITIONING}>
             <Menu.Trigger asChild>
-              <Button justifyContent="space-between" minW="0" size="xs" variant="outline" w="full">
+              <Button
+                aria-labelledby={modeLabelledBy}
+                justifyContent="space-between"
+                minW="0"
+                size="xs"
+                variant="outline"
+                w="full"
+              >
                 <Text as="span" truncate>
                   {modeLabel}
                 </Text>
@@ -132,9 +143,7 @@ export const DynamicPromptsPanel = ({
                     {modeItems.map((item) => (
                       <Menu.RadioItem key={item.value} value={item.value}>
                         <Menu.ItemText>{item.label}</Menu.ItemText>
-                        <Menu.ItemIndicator>
-                          <CheckIcon />
-                        </Menu.ItemIndicator>
+                        <Menu.ItemIndicator />
                       </Menu.RadioItem>
                     ))}
                   </Menu.RadioItemGroup>
@@ -142,11 +151,9 @@ export const DynamicPromptsPanel = ({
               </Menu.Positioner>
             </Portal>
           </Menu.Root>
-        </Stack>
-        <Stack gap="1" w="6.5rem">
-          <Text color="fg.subtle" fontSize="2xs" truncate>
-            {maxPromptsLabel}
-          </Text>
+        </Field>
+        {/* Fixed width and no shrink: the mode field takes the slack instead. */}
+        <Field flex="0 0 auto" label={maxPromptsLabel} w="6.5rem">
           <NumberInput.Root
             allowMouseWheel
             max={DYNAMIC_PROMPTS_MAX_PROMPTS}
@@ -156,9 +163,9 @@ export const DynamicPromptsPanel = ({
             onValueChange={handleMaxPromptsChange}
           >
             <NumberInput.Control />
-            <NumberInput.Input aria-label={maxPromptsLabel} paddingStart="2" />
+            <NumberInput.Input paddingStart="2" />
           </NumberInput.Root>
-        </Stack>
+        </Field>
         {/* Always rendered, merely hidden, so switching modes cannot reflow the row. */}
         <Tooltip content={t('widgets.generate.dynamicPrompts.shuffle')}>
           <IconButton

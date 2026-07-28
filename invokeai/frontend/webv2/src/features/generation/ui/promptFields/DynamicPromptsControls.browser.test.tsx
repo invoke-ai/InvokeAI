@@ -178,14 +178,66 @@ describe('dynamic prompts popover controls', () => {
     await act(async () => {
       await userEvent.click(document.querySelector<HTMLElement>('[data-scope="menu"][data-part="trigger"]')!);
     });
+    // A dispatched click rather than userEvent: the menu animates open, and
+    // userEvent waits for the element to be "stable" before it will click.
     await act(async () => {
-      await userEvent.click(
-        [...document.querySelectorAll('[data-scope="menu"][data-part="item"]')].at(-1) as HTMLElement
-      );
+      ([...document.querySelectorAll('[data-scope="menu"][data-part="item"]')].at(-1) as HTMLElement).click();
+      await Promise.resolve();
     });
 
     expect(onChange).toHaveBeenCalledWith({ combinatorial: false });
     expect(row().getBoundingClientRect().height).toBe(combinatorialHeight);
+  });
+
+  it('labels both settings controls with a real, associated label', async () => {
+    await render();
+    await openPopover();
+
+    const popover = document.querySelector('[data-scope="popover"][data-part="content"]')!;
+    const numberInput = popover.querySelector<HTMLInputElement>('[data-scope="number-input"][data-part="input"]')!;
+    const numberLabel = popover.querySelector<HTMLLabelElement>(`label[for="${numberInput.id}"]`);
+
+    // The visible label is wired to the input rather than a detached bit of
+    // text with an aria-label duplicating it.
+    expect(numberLabel, 'number input should have an associated label').toBeTruthy();
+    expect(numberInput.getAttribute('aria-label')).toBeNull();
+
+    // A <label for> cannot name a button, so the trigger is named by the field
+    // label plus its own value.
+    const trigger = popover.querySelector<HTMLElement>('[data-scope="menu"][data-part="trigger"]')!;
+    const namedBy = (trigger.getAttribute('aria-labelledby') ?? '')
+      .split(' ')
+      .map((id) => document.getElementById(id)?.textContent ?? '');
+
+    expect(namedBy.filter(Boolean)).toHaveLength(2);
+  });
+
+  it('anchors the mode menu to its trigger', async () => {
+    // Regression: setting an explicit id on the trigger left zag unable to find
+    // the element, so the positioner had nothing to anchor to and the menu
+    // rendered at the top-left of the screen.
+    await render();
+    await openPopover();
+
+    const trigger = document.querySelector<HTMLElement>('[data-scope="menu"][data-part="trigger"]')!;
+
+    await act(async () => {
+      trigger.click();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await new Promise((resolve) => {
+        window.setTimeout(resolve, 300);
+      });
+    });
+
+    const content = document.querySelector<HTMLElement>('[data-scope="menu"][data-part="content"]')!;
+    const triggerBox = trigger.getBoundingClientRect();
+    const contentBox = content.getBoundingClientRect();
+
+    expect(contentBox.width).toBeGreaterThan(0);
+    expect(Math.abs(contentBox.left - triggerBox.left)).toBeLessThan(40);
+    expect(contentBox.top).toBeGreaterThan(triggerBox.top - 40);
   });
 
   it('gives both tabs a header control of the same height', async () => {
