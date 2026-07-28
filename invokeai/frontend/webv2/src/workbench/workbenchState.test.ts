@@ -155,6 +155,8 @@ const createGenerateValues = (overrides: Partial<GenerateWidgetValues> = {}): Ge
   negativePromptHeightPx: 56,
   positivePrompt: 'first prompt',
   positivePromptHeightPx: 96,
+  promptTemplate: null,
+  promptTemplateViewMode: false,
   qwen3EncoderModel: null,
   qwenVLEncoderModel: null,
   referenceImages: [],
@@ -1651,6 +1653,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
 
       expect(getActiveProject(state).queue.items[0]?.snapshot.backendSubmission).not.toHaveProperty('positivePrompts');
     });
+
   });
 
   it('records submitted Generate prompt pairs in project prompt history', () => {

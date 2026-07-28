@@ -17,6 +17,7 @@ import type {
 import { sanitizeBatchCount } from './batch';
 import { isVaeCompatibleWithGenerateModel } from './componentCompatibility';
 import { isDynamicPromptsSeedBehaviour, sanitizeMaxPrompts, sanitizeSampleSeed } from './dynamicPrompts';
+import { isCanonicalPromptTemplateSnapshot, sanitizePromptTemplateSnapshot } from './promptTemplates';
 import { cloneCroppableImage, isCanonicalCroppableImage, normalizeCroppableImage } from './referenceImage';
 
 /** Preset ratios, with the preset to switch to when dimensions are swapped. */
@@ -385,6 +386,7 @@ export const cloneGenerateWidgetValues = (
   componentSourceModel: values.componentSourceModel ? { ...values.componentSourceModel } : null,
   loras: values.loras.map((lora) => ({ ...lora, model: { ...lora.model } })),
   model: { ...values.model },
+  promptTemplate: values.promptTemplate ? { ...values.promptTemplate } : null,
   qwen3EncoderModel: values.qwen3EncoderModel ? { ...values.qwen3EncoderModel } : null,
   qwenVLEncoderModel: values.qwenVLEncoderModel ? { ...values.qwenVLEncoderModel } : null,
   referenceImages: cloneReferenceImages(values.referenceImages),
@@ -583,6 +585,14 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
       MAX_POSITIVE_PROMPT_HEIGHT_PX,
       DEFAULT_POSITIVE_PROMPT_HEIGHT_PX
     ),
+    // Reuse the stored object when it is already canonical. Callers diff settings
+    // with `Object.is`, so re-sanitizing into a fresh object every pass would make
+    // every commit look like a template change and loop the sync in
+    // `GenerateWidgetView`.
+    promptTemplate: isCanonicalPromptTemplateSnapshot(values.promptTemplate)
+      ? values.promptTemplate
+      : sanitizePromptTemplateSnapshot(values.promptTemplate),
+    promptTemplateViewMode: typeof values.promptTemplateViewMode === 'boolean' ? values.promptTemplateViewMode : false,
     referenceImages: normalizeReferenceImages(values.referenceImages),
     scheduler: values.scheduler as string,
     seamlessXAxis: typeof values.seamlessXAxis === 'boolean' ? values.seamlessXAxis : false,
@@ -635,6 +645,8 @@ export const isGenerateSettings = (values: unknown): values is GenerateSettings 
     Array.isArray(values.referenceImages) &&
     normalizeReferenceImages(values.referenceImages).length === values.referenceImages.length &&
     areReferenceImagesCanonical(values.referenceImages) &&
+    (values.promptTemplate === null || isCanonicalPromptTemplateSnapshot(values.promptTemplate)) &&
+    typeof values.promptTemplateViewMode === 'boolean' &&
     typeof values.seamlessXAxis === 'boolean' &&
     typeof values.seamlessYAxis === 'boolean' &&
     isVaePrecision(values.vaePrecision) &&

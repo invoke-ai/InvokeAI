@@ -63,6 +63,7 @@ export {
   type DynamicPromptsConfig,
   type DynamicPromptsSeedBehaviour,
 } from './core/dynamicPrompts';
+export { getEffectivePrompts } from './core/promptTemplates';
 export {
   addPromptHistoryItem,
   getPromptHistoryItemFromGenerateSettings,

@@ -1,5 +1,6 @@
 import type { BackendGraphContract, GraphContract } from '@features/generation/core/contracts';
 import type { DynamicPromptsSeedBehaviour } from '@features/generation/core/dynamicPrompts';
+import type { PromptTemplateSnapshot } from '@features/generation/core/promptTemplates';
 
 export type ModelIdentifierConfig = {
   key: string;
@@ -157,6 +158,14 @@ export interface GenerateSettings {
   negativePromptEnabled: boolean;
   negativePrompt: string;
   negativePromptHeightPx: number;
+  /**
+   * The active prompt template, copied rather than referenced by id so the pure
+   * submit reducer can resolve prompts with no catalog lookup. See
+   * `core/promptTemplates.ts`.
+   */
+  promptTemplate: PromptTemplateSnapshot | null;
+  /** Show the merged prompt read-only instead of the authored text. */
+  promptTemplateViewMode: boolean;
   /** Expand `{a|b}` into every combination; otherwise draw a random sample. */
   dynamicPromptsCombinatorial: boolean;
   /** Upper bound on expanded prompts (the sample size when not combinatorial). */
