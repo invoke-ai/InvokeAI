@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 798156,
+        "brotliBytes": 798403,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 798434,
+        "gzipBytes": 798539,
         "imageRawBytes": 156376,
-        "initialRawBytes": 1831732,
+        "initialRawBytes": 1832477,
         "largestAssetRawBytes": 737748,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 57669,
+        "ownedRawBytes": 57670,
         "requestCount": 31,
         "scriptRequestCount": 15,
         "sourceOwners": [
@@ -238,15 +238,15 @@
         ]
       },
       "limits": {
-        "brotliBytes": 806138,
+        "brotliBytes": 806388,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 806419,
+        "gzipBytes": 806525,
         "imageRawBytes": 157940,
-        "initialRawBytes": 1850050,
+        "initialRawBytes": 1850802,
         "largestAssetRawBytes": 745126,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 57669,
+        "ownedRawBytes": 57670,
         "requestCount": 31,
         "scriptRequestCount": 15
       },
@@ -256,15 +256,15 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 974102,
+        "brotliBytes": 974958,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 973053,
+        "gzipBytes": 973739,
         "imageRawBytes": 156376,
-        "initialRawBytes": 2365435,
+        "initialRawBytes": 2368342,
         "largestAssetRawBytes": 737748,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 108337,
+        "ownedRawBytes": 108542,
         "requestCount": 75,
         "scriptRequestCount": 59,
         "sourceOwners": [
@@ -425,6 +425,7 @@
           "source:src/features/generation/core/prompt/ast.ts",
           "source:src/features/generation/core/prompt/attention.ts",
           "source:src/features/generation/core/promptHistory.ts",
+          "source:src/features/generation/core/promptTemplates.ts",
           "source:src/features/generation/core/referenceImage.ts",
           "source:src/features/generation/core/settings.ts",
           "source:src/features/generation/data/dynamicPromptsQueries.ts",
@@ -439,6 +440,7 @@
           "source:src/features/generation/ui/promptFields/promptAttentionHotkeys.ts",
           "source:src/features/generation/ui/promptFields/promptFocus.ts",
           "source:src/features/generation/ui/promptFields/promptHistoryNavigation.ts",
+          "source:src/features/generation/ui/promptTemplateDraftStore.ts",
           "source:src/features/generation/ui/useDebouncedDraftValue.ts",
           "source:src/features/generation/ui/useDynamicPrompts.ts",
           "source:src/features/identity/capabilities.ts",
@@ -729,15 +731,15 @@
         ]
       },
       "limits": {
-        "brotliBytes": 983844,
+        "brotliBytes": 984708,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 982784,
+        "gzipBytes": 983477,
         "imageRawBytes": 157940,
-        "initialRawBytes": 2389090,
+        "initialRawBytes": 2392026,
         "largestAssetRawBytes": 745126,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 108337,
+        "ownedRawBytes": 108542,
         "requestCount": 75,
         "scriptRequestCount": 59
       },
