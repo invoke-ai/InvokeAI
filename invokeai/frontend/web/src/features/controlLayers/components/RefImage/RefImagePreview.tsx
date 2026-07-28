@@ -2,6 +2,7 @@ import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Flex, Icon, IconButton, Skeleton, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { round } from 'es-toolkit/compat';
+import { useMediaUrl } from 'features/auth/store/mediaCookieRefresh';
 import { useRefImageDnd } from 'features/controlLayers/components/RefImage/useRefImageDnd';
 import { useRefImageEntity } from 'features/controlLayers/components/RefImage/useRefImageEntity';
 import { useRefImageIdContext } from 'features/controlLayers/contexts/RefImageIdContext';
@@ -88,6 +89,7 @@ export const RefImagePreview = memo(() => {
   const [dndListState, isDragging] = useRefImageDnd(dndRef, id);
 
   const imageDTO = useImageDTOFromCroppableImage(entity.config.image);
+  const imageUrl = useMediaUrl(imageDTO?.image_url);
 
   const sx = useMemo(() => {
     if (!isIPAdapterConfig(entity.config) || isExternalModel) {
@@ -184,7 +186,7 @@ export const RefImagePreview = memo(() => {
         >
           {imageDTO ? (
             <img
-              src={imageDTO.image_url}
+              src={imageUrl}
               style={{ objectFit: 'contain', aspectRatio: '1 / 1', maxWidth: '100%', maxHeight: '100%' }}
               height={imageDTO.height}
               alt={imageDTO.image_name}
