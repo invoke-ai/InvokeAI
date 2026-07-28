@@ -17,9 +17,41 @@ import {
 } from '@features/generation/core/wildcardTransfer';
 import { downloadText } from '@platform/browser/downloadBlob';
 
-export type WildcardExportFormat = 'json' | 'yaml';
+/**
+ * Every collection format, stated once.
+ *
+ * Adding one used to mean editing five places that had no idea about each
+ * other: a union type, two ternaries here, the export menu's array, and an i18n
+ * key built by string concatenation — which silently fell back to "Json" for
+ * anything it did not recognise rather than failing to compile.
+ */
+export const WILDCARD_COLLECTION_FORMATS = [
+  {
+    extensions: ['.yaml', '.yml'],
+    id: 'yaml',
+    labelKey: 'widgets.generate.dynamicPrompts.exportAsYaml',
+    mimeType: 'text/yaml',
+    parse: async (text: string): Promise<unknown> => (await import('yaml')).parse(text),
+    stringify: async (value: unknown): Promise<string> => (await import('yaml')).stringify(value),
+  },
+  {
+    extensions: ['.json'],
+    id: 'json',
+    labelKey: 'widgets.generate.dynamicPrompts.exportAsJson',
+    mimeType: 'application/json',
+    parse: (text: string): Promise<unknown> => Promise.resolve(JSON.parse(text) as unknown),
+    stringify: (value: unknown): Promise<string> => Promise.resolve(`${JSON.stringify(value, null, 2)}\n`),
+  },
+] as const;
 
-export const WILDCARD_IMPORT_ACCEPT = '.txt,.yaml,.yml,.json,text/plain,application/json';
+export type WildcardExportFormat = (typeof WILDCARD_COLLECTION_FORMATS)[number]['id'];
+
+export const WILDCARD_IMPORT_ACCEPT = [
+  '.txt',
+  ...WILDCARD_COLLECTION_FORMATS.flatMap((format) => format.extensions),
+  'text/plain',
+  'application/json',
+].join(',');
 
 /** Directory picking supplies a relative path; a plain pick only has a name. */
 const getFilePath = (file: File): string =>
@@ -81,7 +113,9 @@ const isTextWildcardFile = (path: string): boolean => {
 export const isSupportedWildcardFile = (file: File): boolean => {
   const path = getFilePath(file);
 
-  return hasExtension(path, '.yaml', '.yml', '.json') || isTextWildcardFile(path);
+  return (
+    WILDCARD_COLLECTION_FORMATS.some((format) => hasExtension(path, ...format.extensions)) || isTextWildcardFile(path)
+  );
 };
 
 export const readWildcardFiles = async (files: readonly File[]): Promise<ParsedWildcard[]> => {
@@ -108,20 +142,11 @@ export const readWildcardFiles = async (files: readonly File[]): Promise<ParsedW
 
     const contents = await file.text();
 
-    if (hasExtension(path, '.yaml', '.yml')) {
-      const { parse } = await import('yaml');
+    const collectionFormat = WILDCARD_COLLECTION_FORMATS.find((format) => hasExtension(path, ...format.extensions));
 
+    if (collectionFormat) {
       try {
-        collect(wildcardsFromNestedRecord(parse(contents)), file.name);
-      } catch {
-        throw new WildcardFileError(file.name);
-      }
-      continue;
-    }
-
-    if (hasExtension(path, '.json')) {
-      try {
-        collect(wildcardsFromNestedRecord(JSON.parse(contents)), file.name);
+        collect(wildcardsFromNestedRecord(await collectionFormat.parse(contents)), file.name);
       } catch {
         throw new WildcardFileError(file.name);
       }
@@ -152,9 +177,13 @@ export const readWildcardFiles = async (files: readonly File[]): Promise<ParsedW
  */
 export const downloadWildcards = async (
   wildcards: readonly ParsedWildcard[],
-  format: WildcardExportFormat
+  formatId: WildcardExportFormat
 ): Promise<void> => {
-  const nested = wildcardsToNestedRecord(wildcards);
-  const text = format === 'json' ? `${JSON.stringify(nested, null, 2)}\n` : (await import('yaml')).stringify(nested);
-  downloadText(text, `wildcards.${format}`, format === 'json' ? 'application/json' : 'text/yaml');
+  const format = WILDCARD_COLLECTION_FORMATS.find((candidate) => candidate.id === formatId);
+
+  if (!format) {
+    throw new Error(`Unknown wildcard export format: ${formatId}`);
+  }
+
+  downloadText(await format.stringify(wildcardsToNestedRecord(wildcards)), `wildcards.${format.id}`, format.mimeType);
 };

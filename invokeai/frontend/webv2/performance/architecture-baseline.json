@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 798403,
+        "brotliBytes": 798478,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 798539,
+        "gzipBytes": 798624,
         "imageRawBytes": 156376,
-        "initialRawBytes": 1832477,
+        "initialRawBytes": 1832637,
         "largestAssetRawBytes": 737748,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 57670,
+        "ownedRawBytes": 57830,
         "requestCount": 31,
         "scriptRequestCount": 15,
         "sourceOwners": [
@@ -161,6 +161,7 @@
           "source:src/features/nodes/data/transport.ts",
           "source:src/features/nodes/index.ts",
           "source:src/features/nodes/ui/NodesPage.tsx",
+          "source:src/platform/browser/downloadBlob.ts",
           "source:src/platform/browser/knownBrowserIssues.ts",
           "source:src/platform/i18n/client.ts",
           "source:src/platform/i18n/languages.ts",
@@ -238,15 +239,15 @@
         ]
       },
       "limits": {
-        "brotliBytes": 806388,
+        "brotliBytes": 806463,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 806525,
+        "gzipBytes": 806611,
         "imageRawBytes": 157940,
-        "initialRawBytes": 1850802,
+        "initialRawBytes": 1850964,
         "largestAssetRawBytes": 745126,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 57670,
+        "ownedRawBytes": 57830,
         "requestCount": 31,
         "scriptRequestCount": 15
       },
@@ -256,15 +257,15 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 974958,
+        "brotliBytes": 975403,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 973739,
+        "gzipBytes": 974277,
         "imageRawBytes": 156376,
-        "initialRawBytes": 2368342,
+        "initialRawBytes": 2369740,
         "largestAssetRawBytes": 737748,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 108542,
+        "ownedRawBytes": 108562,
         "requestCount": 75,
         "scriptRequestCount": 59,
         "sourceOwners": [
@@ -533,6 +534,7 @@
           "source:src/features/workflow/ui/workflowUiStore.ts",
           "source:src/features/workflow/utility.ts",
           "source:src/features/workflow/widget.ts",
+          "source:src/platform/browser/downloadBlob.ts",
           "source:src/platform/browser/knownBrowserIssues.ts",
           "source:src/platform/i18n/client.ts",
           "source:src/platform/i18n/languages.ts",
@@ -731,15 +733,15 @@
         ]
       },
       "limits": {
-        "brotliBytes": 984708,
+        "brotliBytes": 985158,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 983477,
+        "gzipBytes": 984020,
         "imageRawBytes": 157940,
-        "initialRawBytes": 2392026,
+        "initialRawBytes": 2393438,
         "largestAssetRawBytes": 745126,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 108542,
+        "ownedRawBytes": 108562,
         "requestCount": 75,
         "scriptRequestCount": 59
       },

@@ -10,6 +10,7 @@ import { WildcardImportDialog } from '@features/generation/ui/promptFields/Wildc
 import { WildcardWriteError } from '@features/generation/ui/useWildcards';
 import {
   downloadWildcards,
+  WILDCARD_COLLECTION_FORMATS,
   isSupportedWildcardFile,
   readWildcardFiles,
   WILDCARD_IMPORT_ACCEPT,
@@ -22,7 +23,6 @@ import { DownloadIcon, UploadIcon } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const EXPORT_FORMATS: WildcardExportFormat[] = ['yaml', 'json'];
 const IMPORT_SOURCES = ['files', 'folder'] as const;
 
 /** Not in React's DOM typings, and `multiple` comes along with it implicitly. */
@@ -208,11 +208,9 @@ export const WildcardTransferActions = ({ catalog }: { catalog: WildcardCatalog 
         <Portal>
           <Menu.Positioner>
             <MenuContent minW="10rem">
-              {EXPORT_FORMATS.map((format) => (
-                <Menu.Item key={format} value={format}>
-                  <Menu.ItemText fontSize="xs">
-                    {t(`widgets.generate.dynamicPrompts.exportAs${format === 'yaml' ? 'Yaml' : 'Json'}`)}
-                  </Menu.ItemText>
+              {WILDCARD_COLLECTION_FORMATS.map((format) => (
+                <Menu.Item key={format.id} value={format.id}>
+                  <Menu.ItemText fontSize="xs">{t(format.labelKey)}</Menu.ItemText>
                 </Menu.Item>
               ))}
             </MenuContent>
