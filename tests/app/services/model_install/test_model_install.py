@@ -1155,7 +1155,7 @@ def test_deferred_restore_remembers_registered_job_after_prune(
         installer._pending_sources.add(str(source))
 
     def _finish_and_prune_import(timeout: Optional[float] = None) -> None:
-        installer._append_install_job(imported_job)
+        installer._append_install_job(imported_job, from_import=True)
         installer._pending_sources.discard(str(source))
         installer.prune_jobs()
 
@@ -1168,6 +1168,113 @@ def test_deferred_restore_remembers_registered_job_after_prune(
     assert installer._install_jobs == []
     assert resumed == []
     assert tmpdir.exists()
+
+
+def test_deferred_restore_ignores_non_import_job_generation(
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_record_store,
+    mm2_download_queue,
+    mm2_session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Only the pending import's registration may satisfy its deferred marker."""
+    installer = ModelInstallService(
+        app_config=mm2_app_config,
+        record_store=mm2_record_store,
+        download_queue=mm2_download_queue,
+        event_bus=TestEventService(),
+        session=mm2_session,
+    )
+    source = URLModelSource(url=Url("https://www.test.foo/download/test_embedding.safetensors"))
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}deferred"
+    _write_test_install_marker(tmpdir, str(source))
+
+    other_restore_job = ModelInstallJob(
+        id=installer._next_id(),
+        source=source,
+        config_in=ModelRecordChanges(),
+        local_path=mm2_app_config.models_path,
+    )
+    other_restore_job.status = InstallStatus.ERROR
+    with installer._lock:
+        installer._pending_sources.add(str(source))
+
+    def _finish_failed_import(timeout: Optional[float] = None) -> None:
+        installer._append_install_job(other_restore_job)
+        installer._pending_sources.discard(str(source))
+        installer.prune_jobs()
+
+    resumed: list[ModelInstallJob] = []
+    monkeypatch.setattr(installer._install_cond, "wait", _finish_failed_import)
+    monkeypatch.setattr(installer, "_resume_remote_download", lambda job: resumed.append(job))
+
+    installer._restore_incomplete_installs()
+
+    assert len(installer._install_jobs) == 1
+    assert installer._install_jobs[0]._install_tmpdir == tmpdir
+    assert resumed == installer._install_jobs
+
+
+@pytest.mark.timeout(timeout=20, method="thread")
+def test_stop_cancels_deferred_restore_and_prevents_late_launch(
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_record_store,
+    mm2_download_queue,
+    mm2_session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Deferred restoration must not launch work after the installer stops."""
+    installer = ModelInstallService(
+        app_config=mm2_app_config,
+        record_store=mm2_record_store,
+        download_queue=mm2_download_queue,
+        event_bus=TestEventService(),
+        session=mm2_session,
+    )
+    source = URLModelSource(url=Url("https://www.test.foo/download/test_embedding.safetensors"))
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}shutdown"
+    _write_test_install_marker(tmpdir, str(source))
+    with installer._lock:
+        installer._pending_sources.add(str(source))
+
+    restore_waiting = threading.Event()
+    real_wait = installer._install_cond.wait
+
+    def _observing_wait(timeout: Optional[float] = None) -> bool:
+        restore_waiting.set()
+        return real_wait(timeout)
+
+    resumed: list[ModelInstallJob] = []
+    monkeypatch.setattr(installer._install_cond, "wait", _observing_wait)
+    monkeypatch.setattr(installer, "_resume_remote_download", lambda job: resumed.append(job))
+
+    try:
+        installer.start()
+        assert restore_waiting.wait(timeout=10)
+        installer.stop()
+
+        with installer._install_cond:
+            installer._pending_sources.discard(str(source))
+            installer._install_cond.notify_all()
+        assert installer._restore_completed_event.wait(timeout=5)
+
+        late_job = ModelInstallJob(
+            id=installer._next_id(),
+            source=source,
+            config_in=ModelRecordChanges(),
+            local_path=tmpdir,
+        )
+        late_job._install_tmpdir = tmpdir
+        installer._launch_restored_job(late_job)
+
+        assert resumed == []
+        assert installer._install_jobs == []
+        assert tmpdir.exists()
+    finally:
+        with installer._install_cond:
+            installer._pending_sources.discard(str(source))
+            installer._install_cond.notify_all()
+        installer.stop()
 
 
 def test_huggingface_blob_url_uses_resolve_download_url(mm2_installer: ModelInstallServiceBase) -> None:

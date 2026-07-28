@@ -116,7 +116,7 @@ class ModelInstallService(ModelInstallServiceBase):
         # Monotonic per-source generations let startup restoration observe that
         # an import registered a job even if a concurrent prune removes that
         # terminal job before the deferred recheck.
-        self._source_job_generations: dict[str, int] = {}
+        self._source_import_generations: dict[str, int] = {}
         self._install_queue: Queue[ModelInstallJob] = Queue()
         # Lock-order discipline: download-queue callbacks run on download queue
         # threads that already hold the download queue's lock, and they acquire
@@ -302,7 +302,7 @@ class ModelInstallService(ModelInstallServiceBase):
                     # tell whether the reservation registered a job, even if
                     # that job reached a terminal state and was pruned.
                     self._logger.debug(f"Deferring restore for {source_str} - a pending import has reserved it")
-                    known_generation = self._source_job_generations.get(source_str, 0)
+                    known_generation = self._source_import_generations.get(source_str, 0)
                     deferred.append((source_str, job, tmpdir, known_generation))
                     continue
                 if source_str in seen_sources:
@@ -332,18 +332,20 @@ class ModelInstallService(ModelInstallServiceBase):
         for source_str, job, tmpdir, known_generation in deferred:
             duplicate_tmpdir = False
             with self._install_cond:
-                while source_str in self._pending_sources:
+                while source_str in self._pending_sources and not self._stop_event.is_set():
                     remaining = deadline - time.monotonic()
                     if remaining <= 0:
                         break
                     self._install_cond.wait(timeout=remaining)
+                if self._stop_event.is_set():
+                    return
                 if source_str in self._pending_sources:
                     self._logger.warning(
                         f"An import of {source_str} has been pending for over {DEFERRED_RESTORE_TIMEOUT}s; "
                         f"leaving {tmpdir} to be restored on a later startup"
                     )
                     continue
-                already_registered = self._source_job_generations.get(source_str, 0) > known_generation or any(
+                already_registered = self._source_import_generations.get(source_str, 0) > known_generation or any(
                     str(j.source) == source_str for j in self._download_cache.values() if not j.in_terminal_state
                 )
                 if already_registered:
@@ -363,7 +365,7 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def _launch_restored_job(self, job: ModelInstallJob) -> None:
         """Kick off a job that _restore_incomplete_installs has just registered."""
-        if job.paused:
+        if self._stop_event.is_set() or job.paused:
             return
 
         if job.status in [InstallStatus.DOWNLOADS_DONE, InstallStatus.RUNNING]:
@@ -377,11 +379,12 @@ class ModelInstallService(ModelInstallServiceBase):
                 if job._install_tmpdir is not None:
                     self._safe_rmtree(job._install_tmpdir, self._logger)
 
-    def _append_install_job(self, job: ModelInstallJob) -> None:
-        """Append a job and record its source generation. Caller must hold _lock."""
+    def _append_install_job(self, job: ModelInstallJob, *, from_import: bool = False) -> None:
+        """Append a job. Caller must hold _lock."""
         self._install_jobs.append(job)
-        source_str = str(job.source)
-        self._source_job_generations[source_str] = self._source_job_generations.get(source_str, 0) + 1
+        if from_import:
+            source_str = str(job.source)
+            self._source_import_generations[source_str] = self._source_import_generations.get(source_str, 0) + 1
 
     def _restore_incomplete_installs_async(self) -> None:
         self._restore_completed_event.clear()
@@ -472,6 +475,8 @@ class ModelInstallService(ModelInstallServiceBase):
             return
         self._logger.debug("calling stop_event.set()")
         self._stop_event.set()
+        with self._install_cond:
+            self._install_cond.notify_all()
         self._clear_pending_jobs()
         self._download_cache.clear()
         assert self._install_thread is not None
@@ -627,7 +632,7 @@ class ModelInstallService(ModelInstallServiceBase):
             raise
 
         with self._install_cond:
-            self._append_install_job(install_job)
+            self._append_install_job(install_job, from_import=True)
             self._pending_sources.discard(source_str)
             self._install_cond.notify_all()
         return install_job
