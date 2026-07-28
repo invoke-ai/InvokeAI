@@ -30778,6 +30778,11 @@ export type components = {
              * @description The names of the images that were starred
              */
             starred_images: string[];
+            /**
+             * Failed Images
+             * @description The names of images that were not starred
+             */
+            failed_images: string[];
         };
         /** StarredVideosResult */
         StarredVideosResult: {
@@ -33135,6 +33140,11 @@ export type components = {
              * @description The names of the images that were unstarred
              */
             unstarred_images: string[];
+            /**
+             * Failed Images
+             * @description The names of images that were not unstarred
+             */
+            failed_images: string[];
         };
         /** UnstarredVideosResult */
         UnstarredVideosResult: {

@@ -55,10 +55,12 @@ class DeleteImagesResult(ResultWithAffectedBoards):
 
 class StarredImagesResult(ResultWithAffectedBoards):
     starred_images: list[str] = Field(description="The names of the images that were starred")
+    failed_images: list[str] = Field(description="The names of images that were not starred")
 
 
 class UnstarredImagesResult(ResultWithAffectedBoards):
     unstarred_images: list[str] = Field(description="The names of the images that were unstarred")
+    failed_images: list[str] = Field(description="The names of images that were not unstarred")
 
 
 class AddImagesToBoardResult(ResultWithAffectedBoards):

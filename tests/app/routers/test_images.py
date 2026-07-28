@@ -9,10 +9,13 @@ from fastapi.testclient import TestClient
 
 from invokeai.app.api.auth_dependencies import get_current_user_or_default
 from invokeai.app.api.dependencies import ApiDependencies
+from invokeai.app.api.routers.images import MAX_IMAGE_BATCH_SIZE
 from invokeai.app.api_app import app
 from invokeai.app.services.auth.token_service import TokenData
 from invokeai.app.services.board_records.board_records_common import BoardRecord
+from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.shared.pagination import MAX_PAGE_SIZE, OffsetPaginatedResults
 
 
 @pytest.fixture(autouse=True, scope="module")
@@ -220,3 +223,135 @@ def test_get_bulk_download_image_image_deleted_after_response(
     client.get("/api/v1/images/download/test.zip")
 
     assert not (tmp_path / "test.zip").exists()
+
+
+def prepare_image_batch_test(monkeypatch: Any, mock_invoker: Invoker) -> MagicMock:
+    """Wires the image router to a MagicMock image service with maintenance inactive.
+
+    Returns the mock service so tests can script per-name update outcomes.
+    """
+    images_service = MagicMock()
+    monkeypatch.setattr(mock_invoker.services, "images", images_service)
+    mock_invoker.services.image_moves = MagicMock()
+    mock_invoker.services.image_moves.is_maintenance_active.return_value = False
+    monkeypatch.setattr(mock_invoker.services.board_image_records, "get_board_for_image", MagicMock(return_value=None))
+
+    mock_deps = MockApiDependencies(mock_invoker)
+    monkeypatch.setattr("invokeai.app.api.routers.images.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.routers._access.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.routers.image_move_maintenance.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", mock_deps)
+    return images_service
+
+
+@pytest.fixture
+def non_admin_user():
+    """Makes ownership decisions depend on image_records.get_user_id rather than admin bypass."""
+
+    async def current_user_override() -> TokenData:
+        return TokenData(user_id="request-user", email="request-user@example.com", is_admin=False)
+
+    app.dependency_overrides[get_current_user_or_default] = current_user_override
+    yield
+    app.dependency_overrides.pop(get_current_user_or_default, None)
+
+
+@pytest.mark.parametrize(
+    ("route", "updated_key"),
+    [("star", "starred_images"), ("unstar", "unstarred_images")],
+)
+def test_star_unstar_reports_failures_and_keeps_partial_successes(
+    monkeypatch: Any,
+    mock_invoker: Invoker,
+    client: TestClient,
+    non_admin_user: None,
+    route: str,
+    updated_key: str,
+) -> None:
+    """A foreign name is skipped, a storage failure is reported, and the rest still apply.
+
+    Both used to abort the whole batch on the first foreign name (discarding the images
+    that HAD been updated) and to silently swallow storage failures, so the client cached
+    a star that never reached the DB.
+    """
+    images_service = prepare_image_batch_test(monkeypatch, mock_invoker)
+    owners = {"ok.png": "request-user", "broken.png": "request-user", "foreign.png": "someone-else"}
+    monkeypatch.setattr(
+        mock_invoker.services.image_records, "get_user_id", MagicMock(side_effect=lambda name: owners.get(name))
+    )
+
+    def update(image_name: str, changes: Any) -> MagicMock:
+        del changes
+        if image_name == "broken.png":
+            raise RuntimeError("storage is on fire")
+        dto = MagicMock()
+        dto.board_id = "board-1"
+        return dto
+
+    images_service.update.side_effect = update
+
+    response = client.post(f"/api/v1/images/{route}", json={"image_names": ["ok.png", "broken.png", "foreign.png"]})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body[updated_key] == ["ok.png"]
+    # The genuine failure is reported; the foreign name is an intentional skip and must
+    # not be toasted as a failure.
+    assert body["failed_images"] == ["broken.png"]
+    assert body["affected_boards"] == ["board-1"]
+
+
+@pytest.mark.parametrize("route", ["star", "unstar"])
+def test_star_unstar_dedupes_repeated_names(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient, non_admin_user: None, route: str
+) -> None:
+    images_service = prepare_image_batch_test(monkeypatch, mock_invoker)
+    monkeypatch.setattr(mock_invoker.services.image_records, "get_user_id", MagicMock(return_value="request-user"))
+    dto = MagicMock()
+    dto.board_id = "board-1"
+    images_service.update.return_value = dto
+
+    response = client.post(f"/api/v1/images/{route}", json={"image_names": ["a.png", "a.png", "a.png"]})
+
+    assert response.status_code == 200
+    assert images_service.update.call_count == 1
+
+
+@pytest.mark.parametrize("path", ["/api/v1/images/delete", "/api/v1/images/star", "/api/v1/images/unstar"])
+def test_image_name_batches_are_bounded(monkeypatch: Any, mock_invoker: Invoker, client: TestClient, path: str) -> None:
+    """An unbounded name list is a free amplification: each name costs a DB lookup."""
+    prepare_image_batch_test(monkeypatch, mock_invoker)
+    response = client.post(
+        path, json={"image_names": [f"image-{index}.png" for index in range(MAX_IMAGE_BATCH_SIZE + 1)]}
+    )
+    assert response.status_code == 422
+
+    response = client.post(path, json={"image_names": ["x" * 256]})
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        # A negative LIMIT means *unlimited* in SQLite — every image row, materialized.
+        {"limit": -1},
+        {"limit": MAX_PAGE_SIZE + 1},
+        {"offset": -1},
+    ],
+)
+def test_list_image_dtos_rejects_out_of_range_pagination(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient, params: dict[str, int]
+) -> None:
+    prepare_image_batch_test(monkeypatch, mock_invoker)
+    assert client.get("/api/v1/images/", params=params).status_code == 422
+
+
+def test_list_image_dtos_allows_count_only_query(monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
+    """The frontend issues limit=0 to read `total` without fetching rows."""
+    images_service = prepare_image_batch_test(monkeypatch, mock_invoker)
+    images_service.get_many.return_value = OffsetPaginatedResults[ImageDTO](items=[], offset=0, limit=0, total=7)
+
+    response = client.get("/api/v1/images/", params={"limit": 0})
+
+    assert response.status_code == 200
+    assert response.json()["total"] == 7
