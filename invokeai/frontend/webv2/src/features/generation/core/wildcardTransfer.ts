@@ -20,7 +20,7 @@
  * written rather than riding along in the generate widget's chunk.
  */
 
-import { getWildcardNameError, MAX_WILDCARD_NAME_LENGTH } from './dynamicPrompts';
+import { getWildcardNameError, getWildcardValuesError, MAX_WILDCARD_NAME_LENGTH } from './dynamicPrompts';
 
 export interface ParsedWildcard {
   name: string;
@@ -28,8 +28,6 @@ export interface ParsedWildcard {
 }
 
 /** Mirrors the backend's per-wildcard limits, so a doomed request is never sent. */
-const MAX_WILDCARD_VALUES = 10_000;
-const MAX_WILDCARD_VALUE_LENGTH = 2_000;
 
 /**
  * `animals/dogs.txt` → `animals/dogs`. Directory picking hands back a relative
@@ -211,22 +209,13 @@ export const planWildcardImport = (
     if (nameError !== null) {
       return 'invalid';
     }
-    if (seen.has(wildcard.name)) {
+    if (seen.has(wildcard.name.trim())) {
       return 'duplicate';
     }
     if (wildcard.values.length === 0) {
       return 'noValues';
     }
-    if (wildcard.values.length > MAX_WILDCARD_VALUES) {
-      return 'tooManyValues';
-    }
-    // Kept apart from the count: told "too many values", someone holding three
-    // values and one long paragraph has no idea which one to shorten.
-    if (wildcard.values.some((value) => value.length > MAX_WILDCARD_VALUE_LENGTH)) {
-      return 'valueTooLong';
-    }
-
-    return null;
+    return getWildcardValuesError(wildcard.values);
   };
 
   return parsed.map((wildcard) => {
@@ -237,12 +226,15 @@ export const planWildcardImport = (
     // made a populated `colours.yaml` later in it read as a repeat, and neither
     // was imported.
     if (rejection === null) {
-      seen.add(wildcard.name);
+      seen.add(wildcard.name.trim());
     }
 
     return {
-      conflictId: existingByName.get(wildcard.name) ?? null,
-      name: wildcard.name,
+      conflictId: existingByName.get(wildcard.name.trim()) ?? null,
+      // The trimmed form throughout: validation trims before deciding, so
+      // storing the untrimmed one would send the server something the client
+      // never checked, and look it up under a name it was not filed under.
+      name: wildcard.name.trim(),
       rejection,
       values: wildcard.values,
     };

@@ -4,7 +4,11 @@ import type { WildcardCatalog } from '@features/generation/ui/useWildcards';
 import type { ChangeEvent } from 'react';
 
 import { HStack, Input, Separator, Stack, Text } from '@chakra-ui/react';
-import { getWildcardNameError } from '@features/generation/core/dynamicPrompts';
+import {
+  getWildcardNameError,
+  getWildcardValuesError,
+  normalizeWildcardValues,
+} from '@features/generation/core/dynamicPrompts';
 import { filterWildcards, groupWildcardsByPrefix } from '@features/generation/core/wildcardCatalog';
 import { useGenerationUi } from '@features/generation/ui/GenerationUiContext';
 import { PANEL_HEADER_CONTROL_HEIGHT, PromptPanelHeader } from '@features/generation/ui/promptFields/PromptPanelHeader';
@@ -22,7 +26,15 @@ import { useTranslation } from 'react-i18next';
 
 /** One value per line: the same shape the user is editing a variant in. */
 const toValuesText = (values: string[]): string => values.join('\n');
-const fromValuesText = (text: string): string[] => text.split('\n');
+// Normalized on the way in, so what is stored is what an export writes and a
+// re-import reads back. A stray blank line used to survive into the catalog and
+// then vanish on the next round trip.
+const fromValuesText = (text: string): string[] => normalizeWildcardValues(text.split('\n'));
+
+const VALUES_ERROR_KEY = {
+  tooManyValues: 'widgets.generate.dynamicPrompts.wildcardTooManyValues',
+  valueTooLong: 'widgets.generate.dynamicPrompts.wildcardValueTooLong',
+} as const;
 
 const NAME_ERROR_KEY = {
   invalid: 'widgets.generate.dynamicPrompts.wildcardNameInvalid',
@@ -62,6 +74,12 @@ export const WildcardsPanel = ({
   const nameError = draft
     ? getWildcardNameError(draft.name, new Set(catalog.wildcards.filter((w) => w.id !== draft.id).map((w) => w.name)))
     : null;
+  // Pre-flighted here as well as on the import path, which is where these bounds
+  // used to live — the editor discovered them as a raw error from the server.
+  const valuesError = draft ? getWildcardValuesError(fromValuesText(draft.valuesText)) : null;
+  // The server's own explanation wins when there is one; otherwise say which
+  // bound the draft is over before it is sent.
+  const draftError = error ?? (valuesError ? t(VALUES_ERROR_KEY[valuesError]) : null);
 
   const startCreate = useCallback(() => {
     setError(null);
@@ -173,9 +191,9 @@ export const WildcardsPanel = ({
             setDraft({ ...draft, valuesText: event.currentTarget.value })
           }
         />
-        {error ? (
+        {draftError ? (
           <Text color="fg.error" fontSize="2xs" wordBreak="break-word">
-            {error}
+            {draftError}
           </Text>
         ) : null}
         <HStack justify="end">
@@ -183,7 +201,7 @@ export const WildcardsPanel = ({
             <XIcon />
             {t('common.cancel')}
           </Button>
-          <Button disabled={nameError !== null} size="xs" onClick={() => void save()}>
+          <Button disabled={nameError !== null || valuesError !== null} size="xs" onClick={() => void save()}>
             <CheckIcon />
             {t('common.save')}
           </Button>

@@ -146,6 +146,40 @@ export const matchesKnownWildcard = (path: string, knownNames: ReadonlySet<strin
 export const MAX_WILDCARD_NAME_LENGTH = 128;
 
 /**
+ * The backend's bounds on a values list, mirrored here so both ways of writing
+ * one can say what is wrong before sending it.
+ *
+ * These lived next to the import planner, which meant an import pre-flighted
+ * them politely while the editor discovered them as a raw error from the server.
+ */
+export const MAX_WILDCARD_VALUES = 10_000;
+export const MAX_WILDCARD_VALUE_LENGTH = 2_000;
+
+/** Why a values list would be rejected, or `null` if it would be accepted. */
+export const getWildcardValuesError = (values: readonly string[]): 'tooManyValues' | 'valueTooLong' | null => {
+  if (values.length > MAX_WILDCARD_VALUES) {
+    return 'tooManyValues';
+  }
+  // Kept apart from the count: told "too many values", someone holding three
+  // values and one long paragraph has no idea which one to shorten.
+  if (values.some((value) => value.length > MAX_WILDCARD_VALUE_LENGTH)) {
+    return 'valueTooLong';
+  }
+
+  return null;
+};
+
+/**
+ * The values as they will be stored: trimmed, with the blanks dropped.
+ *
+ * Applied wherever a list is authored, so that what is saved is what an export
+ * writes and a re-import reads back. Without it a stray blank line survived into
+ * the catalog and vanished on the next round trip.
+ */
+export const normalizeWildcardValues = (values: readonly string[]): string[] =>
+  values.map((value) => value.trim()).filter((value) => value.length > 0);
+
+/**
  * Why a wildcard name would be rejected, or `null` if it would be accepted.
  *
  * The server remains the authority — only it can see the whole catalog at save

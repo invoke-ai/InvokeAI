@@ -1006,6 +1006,8 @@
         "importRejectedValueTooLong": "A value is too long",
         "importedCount_one": "Imported {{count}} wildcard",
         "importedCount_other": "Imported {{count}} wildcards",
+        "wildcardTooManyValues": "Too many values (limit 10,000)",
+        "wildcardValueTooLong": "One value is too long (limit 2,000 characters)",
         "importFiles": "From files…",
         "importFolder": "From a folder…",
         "importNoWildcardFiles": "That folder has no wildcard files in it",

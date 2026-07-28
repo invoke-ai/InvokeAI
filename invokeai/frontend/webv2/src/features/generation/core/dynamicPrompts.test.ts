@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import {
   getWildcardNameError,
+  getWildcardValuesError,
   hasDynamicPromptSyntax,
   matchesKnownWildcard,
+  normalizeWildcardValues,
   sanitizeDynamicPromptsConfig,
   sanitizeMaxPrompts,
 } from './dynamicPrompts';
@@ -142,5 +144,34 @@ describe('matchesKnownWildcard', () => {
 
     expect(matchesKnownWildcard(`${'*'.repeat(24)}q`, names)).toBe(false);
     expect(performance.now() - started).toBeLessThan(100);
+  });
+});
+
+describe('normalizeWildcardValues', () => {
+  // What the editor stores has to be what an export writes and a re-import
+  // reads back. Blank lines used to survive into the catalog and then vanish on
+  // the next round trip, so the two disagreed.
+  it('drops blank lines and trims the rest', () => {
+    expect(normalizeWildcardValues(['red', '', '  green  ', '   ', 'blue'])).toEqual(['red', 'green', 'blue']);
+  });
+
+  it('leaves an already-clean list alone', () => {
+    expect(normalizeWildcardValues(['red', 'green'])).toEqual(['red', 'green']);
+  });
+});
+
+describe('getWildcardValuesError', () => {
+  it('accepts an ordinary list', () => {
+    expect(getWildcardValuesError(['red', 'green'])).toBeNull();
+  });
+
+  it('tells a long list apart from a long value', () => {
+    expect(getWildcardValuesError(Array.from({ length: 10_001 }, () => 'v'))).toBe('tooManyValues');
+    expect(getWildcardValuesError(['ok', 'x'.repeat(2_001)])).toBe('valueTooLong');
+  });
+
+  it('accepts the limits exactly', () => {
+    expect(getWildcardValuesError(Array.from({ length: 10_000 }, () => 'v'))).toBeNull();
+    expect(getWildcardValuesError(['x'.repeat(2_000)])).toBeNull();
   });
 });
