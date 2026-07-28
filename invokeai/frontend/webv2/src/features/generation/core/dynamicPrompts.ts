@@ -31,13 +31,53 @@ export interface DynamicPromptsConfig {
 }
 
 /**
- * `__name__`, the reference form for a wildcard. Mirrors the backend's name rule
- * exactly — each `/`-separated segment must begin and end alphanumerically, so
- * `snake__case` is ordinary text rather than a reference. Shared with the syntax
- * scanner so highlighting and expansion agree on what counts as a wildcard.
+ * One `/`-separated segment of a wildcard name. Mirrors the backend's
+ * `_WILDCARD_NAME_SEGMENT`: it must begin and end alphanumerically, so
+ * `snake__case` is ordinary text rather than a reference.
  */
-export const WILDCARD_REFERENCE_RE =
-  /__([A-Za-z0-9](?:[A-Za-z0-9_-]*[A-Za-z0-9])?(?:\/[A-Za-z0-9](?:[A-Za-z0-9_-]*[A-Za-z0-9])?)*)__/;
+const WILDCARD_NAME_SEGMENT = '[A-Za-z0-9](?:[A-Za-z0-9_-]*[A-Za-z0-9])?';
+const WILDCARD_NAME_SOURCE = `${WILDCARD_NAME_SEGMENT}(?:/${WILDCARD_NAME_SEGMENT})*`;
+
+/**
+ * `__name__`, the reference form for a wildcard. Shared with the syntax scanner
+ * so highlighting and expansion agree on what counts as a wildcard.
+ */
+export const WILDCARD_REFERENCE_RE = new RegExp(`__(${WILDCARD_NAME_SOURCE})__`);
+
+/** The same rule anchored, for validating a name the user is typing. */
+export const WILDCARD_NAME_RE = new RegExp(`^${WILDCARD_NAME_SOURCE}$`);
+
+/** Mirrors the backend's `MAX_WILDCARD_NAME_LENGTH`. */
+export const MAX_WILDCARD_NAME_LENGTH = 128;
+
+/**
+ * Why a wildcard name would be rejected, or `null` if it would be accepted.
+ *
+ * The server remains the authority — only it can see the whole catalog at save
+ * time — but a name is typed character by character, and finding out it was
+ * invalid only after a round trip is a poor way to learn the rule.
+ */
+export const getWildcardNameError = (
+  name: string,
+  existingNames: ReadonlySet<string> = new Set()
+): 'empty' | 'invalid' | 'taken' | 'tooLong' | null => {
+  const normalized = name.trim();
+
+  if (!normalized) {
+    return 'empty';
+  }
+  if (normalized.length > MAX_WILDCARD_NAME_LENGTH) {
+    return 'tooLong';
+  }
+  if (!WILDCARD_NAME_RE.test(normalized)) {
+    return 'invalid';
+  }
+  if (existingNames.has(normalized)) {
+    return 'taken';
+  }
+
+  return null;
+};
 
 /**
  * Whether a prompt is worth sending to the expansion route at all. A prompt with

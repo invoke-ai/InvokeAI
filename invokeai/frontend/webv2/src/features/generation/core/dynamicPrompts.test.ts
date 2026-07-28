@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { hasDynamicPromptSyntax, sanitizeDynamicPromptsConfig, sanitizeMaxPrompts } from './dynamicPrompts';
+import {
+  getWildcardNameError,
+  hasDynamicPromptSyntax,
+  sanitizeDynamicPromptsConfig,
+  sanitizeMaxPrompts,
+} from './dynamicPrompts';
 
 describe('hasDynamicPromptSyntax', () => {
   it('detects a variant anywhere in the prompt', () => {
@@ -56,5 +61,30 @@ describe('sanitizeDynamicPromptsConfig', () => {
       seedBehaviour: 'per-image',
     });
     expect(sanitizeDynamicPromptsConfig({ seedBehaviour: 'PER_PROMPT' })?.seedBehaviour).toBe('per-iteration');
+  });
+});
+
+describe('getWildcardNameError', () => {
+  it('accepts the names the backend accepts', () => {
+    expect(getWildcardNameError('colors')).toBeNull();
+    expect(getWildcardNameError('animals/dogs')).toBeNull();
+    expect(getWildcardNameError('sci-fi_props')).toBeNull();
+    expect(getWildcardNameError('  colors  ')).toBeNull();
+  });
+
+  it('rejects the names the backend rejects', () => {
+    expect(getWildcardNameError('')).toBe('empty');
+    expect(getWildcardNameError('   ')).toBe('empty');
+    expect(getWildcardNameError('colors list')).toBe('invalid');
+    // A leading or trailing underscore would run into the `__` delimiters.
+    expect(getWildcardNameError('_colors')).toBe('invalid');
+    expect(getWildcardNameError('colors_')).toBe('invalid');
+    expect(getWildcardNameError('a'.repeat(129))).toBe('tooLong');
+    expect(getWildcardNameError('a'.repeat(128))).toBeNull();
+  });
+
+  it('reports a name the user already owns', () => {
+    expect(getWildcardNameError('colors', new Set(['colors']))).toBe('taken');
+    expect(getWildcardNameError('shades', new Set(['colors']))).toBeNull();
   });
 });

@@ -7,6 +7,7 @@ import {
   updateWildcard,
   wildcardsQueryOptions,
 } from '@features/generation/data/wildcards';
+import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
 
@@ -36,9 +37,14 @@ export const useWildcards = (): WildcardCatalog => {
     [wildcards]
   );
 
+  // Each mutation captures the identity that started it, so a sign-out mid-flight
+  // does not invalidate the next account's caches on the way back.
   const create = useCallback(
     async (wildcard: { name: string; values: string[] }) => {
+      const owner = captureAccountScope();
+
       await createWildcard(wildcard);
+      assertAccountScopeCurrent(owner);
       await invalidateWildcardDependents(queryClient);
     },
     [queryClient]
@@ -46,7 +52,10 @@ export const useWildcards = (): WildcardCatalog => {
 
   const update = useCallback(
     async (id: string, changes: { name?: string; values?: string[] }) => {
+      const owner = captureAccountScope();
+
       await updateWildcard(id, changes);
+      assertAccountScopeCurrent(owner);
       await invalidateWildcardDependents(queryClient);
     },
     [queryClient]
@@ -54,7 +63,10 @@ export const useWildcards = (): WildcardCatalog => {
 
   const remove = useCallback(
     async (id: string) => {
+      const owner = captureAccountScope();
+
       await deleteWildcard(id);
+      assertAccountScopeCurrent(owner);
       await invalidateWildcardDependents(queryClient);
     },
     [queryClient]

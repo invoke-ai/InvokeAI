@@ -4,18 +4,29 @@ import type { WildcardCatalog } from '@features/generation/ui/useWildcards';
 import type { ChangeEvent } from 'react';
 
 import { HStack, Input, Stack, Text } from '@chakra-ui/react';
+import { getWildcardNameError } from '@features/generation/core/dynamicPrompts';
+import { useGenerationUi } from '@features/generation/ui/GenerationUiContext';
 import { PANEL_HEADER_CONTROL_HEIGHT, PromptPanelHeader } from '@features/generation/ui/promptFields/PromptPanelHeader';
 import { PromptTextarea } from '@features/generation/ui/promptFields/PromptTextarea';
+import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, IconButton } from '@platform/ui/Button';
+import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
+import { Field } from '@platform/ui/Field';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { CheckIcon, PencilIcon, PlusIcon, TrashIcon, XIcon } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /** One value per line: the same shape the user is editing a variant in. */
 const toValuesText = (values: string[]): string => values.join('\n');
 const fromValuesText = (text: string): string[] => text.split('\n');
+
+const NAME_ERROR_KEY = {
+  invalid: 'widgets.generate.dynamicPrompts.wildcardNameInvalid',
+  taken: 'widgets.generate.dynamicPrompts.wildcardNameTaken',
+  tooLong: 'widgets.generate.dynamicPrompts.wildcardNameTooLong',
+} as const;
 
 interface WildcardDraft {
   id: string | null;
@@ -34,8 +45,16 @@ export const WildcardsPanel = ({
   onInsert: (reference: string) => void;
 }) => {
   const { t } = useTranslation();
+  const { notifications } = useGenerationUi();
+  const nameFieldId = useId();
   const [draft, setDraft] = useState<WildcardDraft | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<WildcardRecord | null>(null);
+  // Renaming to your own current name is not a clash, so the wildcard being
+  // edited is excluded from the taken-names set.
+  const nameError = draft
+    ? getWildcardNameError(draft.name, new Set(catalog.wildcards.filter((w) => w.id !== draft.id).map((w) => w.name)))
+    : null;
 
   const startCreate = useCallback(() => {
     setError(null);
@@ -68,9 +87,33 @@ export const WildcardsPanel = ({
       setDraft(null);
       setError(null);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : t('widgets.generate.dynamicPrompts.couldNotSaveWildcard'));
+      // `ApiError.message` is the raw response body, so the backend's own
+      // explanation only reads properly once it is unwrapped.
+      setError(getApiErrorMessage(caught, t('widgets.generate.dynamicPrompts.couldNotSaveWildcard')));
     }
   }, [catalog, draft, t]);
+
+  const closeDeleteDialog = useCallback(() => setPendingDelete(null), []);
+
+  /**
+   * The dialog closes whether or not this throws, so a failure has nowhere inline
+   * to land — it goes to the notification centre like the other Generation errors.
+   */
+  const confirmDelete = useCallback(async () => {
+    if (!pendingDelete) {
+      return;
+    }
+
+    try {
+      await catalog.remove(pendingDelete.id);
+    } catch (caught) {
+      notifications.reportError({
+        area: 'delete-wildcard',
+        message: getApiErrorMessage(caught, t('widgets.generate.dynamicPrompts.couldNotDeleteWildcard')),
+        namespace: 'generation',
+      });
+    }
+  }, [catalog, notifications, pendingDelete, t]);
 
   if (draft) {
     return (
@@ -82,13 +125,21 @@ export const WildcardsPanel = ({
               : t('widgets.generate.dynamicPrompts.editWildcard')
           }
         />
-        <Input
-          aria-label={t('widgets.generate.dynamicPrompts.wildcardName')}
-          placeholder={t('widgets.generate.dynamicPrompts.wildcardNamePlaceholder')}
-          size="xs"
-          value={draft.name}
-          onChange={(event: ChangeEvent<HTMLInputElement>) => setDraft({ ...draft, name: event.currentTarget.value })}
-        />
+        {/* An empty name is the starting state rather than a mistake, so it
+            disables Save without being called out. */}
+        <Field
+          error={nameError === null || nameError === 'empty' ? null : t(NAME_ERROR_KEY[nameError])}
+          id={nameFieldId}
+          label={t('widgets.generate.dynamicPrompts.wildcardName')}
+        >
+          <Input
+            aria-invalid={nameError !== null && nameError !== 'empty' ? true : undefined}
+            placeholder={t('widgets.generate.dynamicPrompts.wildcardNamePlaceholder')}
+            size="xs"
+            value={draft.name}
+            onChange={(event: ChangeEvent<HTMLInputElement>) => setDraft({ ...draft, name: event.currentTarget.value })}
+          />
+        </Field>
         {/* Values are expanded by dynamicprompts too, so a nested `{a|b}` or
             `__other__` is live syntax here and is coloured as such. The gutter
             numbers the values, which is what a line means in this editor. */}
@@ -120,7 +171,7 @@ export const WildcardsPanel = ({
             <XIcon />
             {t('common.cancel')}
           </Button>
-          <Button disabled={!draft.name.trim()} size="xs" onClick={() => void save()}>
+          <Button disabled={nameError !== null} size="xs" onClick={() => void save()}>
             <CheckIcon />
             {t('common.save')}
           </Button>
@@ -148,8 +199,8 @@ export const WildcardsPanel = ({
             {catalog.wildcards.map((wildcard) => (
               <WildcardRow
                 key={wildcard.id}
-                catalog={catalog}
                 wildcard={wildcard}
+                onDelete={setPendingDelete}
                 onEdit={startEdit}
                 onInsert={onInsert}
               />
@@ -157,18 +208,29 @@ export const WildcardsPanel = ({
           </Stack>
         )}
       </Scrollable>
+
+      {/* A wildcard's values are typed by hand and there is no undo, so deleting
+          one asks first — as every other destructive action here does. */}
+      <ConfirmDialog
+        body={t('widgets.generate.dynamicPrompts.deleteWildcardBody', { name: pendingDelete?.name ?? '' })}
+        confirmLabel={t('common.delete')}
+        isOpen={pendingDelete !== null}
+        title={t('widgets.generate.dynamicPrompts.deleteWildcardTitle')}
+        onClose={closeDeleteDialog}
+        onConfirm={confirmDelete}
+      />
     </Stack>
   );
 };
 
 const WildcardRow = ({
-  catalog,
+  onDelete,
   onEdit,
   onInsert,
   wildcard,
 }: {
-  catalog: WildcardCatalog;
   wildcard: WildcardRecord;
+  onDelete: (wildcard: WildcardRecord) => void;
   onEdit: (wildcard: WildcardRecord) => void;
   onInsert: (reference: string) => void;
 }) => {
@@ -211,7 +273,7 @@ const WildcardRow = ({
           colorPalette="red"
           size="2xs"
           variant="ghost"
-          onClick={() => void catalog.remove(wildcard.id)}
+          onClick={() => onDelete(wildcard)}
         >
           <TrashIcon />
         </IconButton>

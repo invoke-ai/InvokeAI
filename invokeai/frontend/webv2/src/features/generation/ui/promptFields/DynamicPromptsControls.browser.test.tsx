@@ -13,6 +13,12 @@ import { userEvent } from 'vitest/browser';
 const parseDynamicPrompts = vi.hoisted(() => vi.fn());
 
 vi.mock('@features/generation/data/promptUtilities', () => ({ parseDynamicPrompts }));
+// The wildcards tab reports delete failures through Generation's UI port, which
+// only the app composes.
+vi.mock('@features/generation/ui/GenerationUiContext', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useGenerationUi: () => ({ notifications: { error: vi.fn(), info: vi.fn(), reportError: vi.fn() } }),
+}));
 vi.mock('@features/generation/data/wildcards', () => ({
   createWildcard: vi.fn(),
   deleteWildcard: vi.fn(),
