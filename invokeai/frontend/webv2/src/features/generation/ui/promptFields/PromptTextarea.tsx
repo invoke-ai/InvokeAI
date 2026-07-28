@@ -37,6 +37,13 @@ interface PromptTextareaProps extends Omit<ResizableTextareaProps, 'underlay'> {
   showSyntaxHighlighting: boolean;
   /** Number logical lines in a leading gutter, the way an editor does. */
   showLineNumbers?: boolean;
+  /**
+   * `[before, authored, after]` from `getPromptTemplateChunks`. When set, the
+   * mirror dims the outer chunks so the template's own words read as context
+   * around the user's text. `value` must be the concatenation of the three, and
+   * the textarea is expected to be `readOnly` — this is a view, not an editor.
+   */
+  templateChunks?: [string, string, string] | null;
   value: string;
 }
 
@@ -62,6 +69,7 @@ export const PromptTextarea = ({
   onScroll,
   showLineNumbers = false,
   showSyntaxHighlighting,
+  templateChunks = null,
   textareaRef,
   value,
   ...props
@@ -69,7 +77,10 @@ export const PromptTextarea = ({
   const localTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [scroll, setScroll] = useState({ left: 0, top: 0 });
   const [textareaClientWidth, setTextareaClientWidth] = useState<number | null>(null);
-  const shouldHighlight = showSyntaxHighlighting && value.length > 0 && value.length <= MAX_HIGHLIGHTED_PROMPT_LENGTH;
+  const isWithinHighlightBudget = value.length > 0 && value.length <= MAX_HIGHLIGHTED_PROMPT_LENGTH;
+  // Template chunks are a legibility device, not a syntax preference, so they
+  // render whether or not highlighting is switched on.
+  const shouldHighlight = (showSyntaxHighlighting || templateChunks !== null) && isWithinHighlightBudget;
   const effectiveFontSize = fontSize ?? '0.82rem';
   const effectiveLineHeight = lineHeight ?? PROMPT_TEXTAREA_LINE_HEIGHT;
   // The gutter widens with the line count, and the text has to start clear of it.
@@ -166,7 +177,23 @@ export const PromptTextarea = ({
             whiteSpace="pre-wrap"
             w={textareaClientWidth ? `${textareaClientWidth}px` : '100%'}
           >
-            <HighlightedPrompt options={highlightOptions} prompt={value} />
+            {templateChunks ? (
+              <>
+                <Box as="span" color="fg.subtle">
+                  {templateChunks[0]}
+                </Box>
+                {showSyntaxHighlighting ? (
+                  <HighlightedPrompt options={highlightOptions} prompt={templateChunks[1]} />
+                ) : (
+                  templateChunks[1]
+                )}
+                <Box as="span" color="fg.subtle">
+                  {templateChunks[2]}
+                </Box>
+              </>
+            ) : (
+              <HighlightedPrompt options={highlightOptions} prompt={value} />
+            )}
             {value.endsWith('\n') ? '\u200b' : null}
           </Box>
         </Box>
@@ -180,6 +207,8 @@ export const PromptTextarea = ({
       scroll.left,
       scroll.top,
       shouldHighlight,
+      showSyntaxHighlighting,
+      templateChunks,
       textareaClientWidth,
       value,
     ]

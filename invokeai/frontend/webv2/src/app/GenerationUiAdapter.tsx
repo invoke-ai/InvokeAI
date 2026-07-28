@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { getSelectedGalleryImageFromValues } from '@features/gallery/contracts';
 import { invalidateGallery } from '@features/gallery/queries';
 import { GenerationUiProvider } from '@features/generation/react';
+import { useCapabilities } from '@features/identity';
 import { ensureModelsLoaded, getModelBaseColorPalette, getModelBaseLabel, useModelsSelector } from '@features/models';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -80,6 +81,11 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
     () => ({ patchGenerateSettings: generation.patchSettings }),
     [generation]
   );
+  const { canManagePromptTemplates } = useCapabilities();
+  const capabilitiesGroup = useMemo<GenerationUiAdapter['capabilities']>(
+    () => ({ canManagePromptTemplates }),
+    [canManagePromptTemplates]
+  );
   const generateSectionsOpen = useWorkbenchPreferenceSelector((preferences) => preferences.generateSectionsOpen);
   const sectionPreferencesGroup = useMemo<GenerationUiAdapter['sectionPreferences']>(
     () => ({
@@ -96,6 +102,7 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
   const adapter = useMemo<GenerationUiAdapter>(
     () => ({
       CanvasCompositingSection: GenerateCanvasCompositingSection,
+      capabilities: capabilitiesGroup,
       gallery: galleryGroup,
       models: modelsGroup,
       notifications: notificationsGroup,
@@ -104,7 +111,16 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
       sectionPreferences: sectionPreferencesGroup,
       settings: settingsGroup,
     }),
-    [galleryGroup, modelsGroup, notificationsGroup, project, promptHistoryGroup, sectionPreferencesGroup, settingsGroup]
+    [
+      capabilitiesGroup,
+      galleryGroup,
+      modelsGroup,
+      notificationsGroup,
+      project,
+      promptHistoryGroup,
+      sectionPreferencesGroup,
+      settingsGroup,
+    ]
   );
 
   return <GenerationUiProvider adapter={adapter}>{children}</GenerationUiProvider>;

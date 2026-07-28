@@ -1,5 +1,6 @@
 import type { PromptHistoryItem } from '@features/generation/contracts';
 import type { DynamicPromptsConfig } from '@features/generation/core/dynamicPrompts';
+import type { PromptTemplateSnapshot } from '@features/generation/core/promptTemplates';
 import type { GenerateModelConfig, GenerateSettings } from '@features/generation/core/types';
 
 import { Stack } from '@chakra-ui/react';
@@ -73,6 +74,22 @@ export const GeneratePromptFields = ({
 
   const handlePositivePromptChange = useCallback((positivePrompt: string) => onCommit({ positivePrompt }), [onCommit]);
 
+  const setTemplateViewMode = useCallback(
+    (promptTemplateViewMode: boolean) => onCommitImmediate({ promptTemplateViewMode }),
+    [onCommitImmediate]
+  );
+
+  const applyPromptTemplate = useCallback(
+    (promptTemplate: PromptTemplateSnapshot | null) => onCommitImmediate({ promptTemplate }),
+    [onCommitImmediate]
+  );
+
+  /** Bake the template into the authored prompt and stop applying it. */
+  const flattenPromptTemplate = useCallback(
+    (positivePrompt: string) => onCommitImmediate({ positivePrompt, promptTemplate: null }),
+    [onCommitImmediate]
+  );
+
   const handleDynamicPromptsChange = useCallback(
     (patch: Partial<DynamicPromptsConfig>) =>
       onCommitImmediate(
@@ -129,10 +146,15 @@ export const GeneratePromptFields = ({
         value={promptValues.positivePrompt}
         loras={settings.loras}
         projectId={projectId}
+        promptTemplate={settings.promptTemplate}
         selectedModel={selectedModel}
         showSyntaxHighlighting={showPromptSyntaxHighlighting}
+        isTemplateViewMode={settings.promptTemplateViewMode}
+        onApplyPromptTemplate={applyPromptTemplate}
         onChange={handlePositivePromptChange}
+        onFlattenPromptTemplate={flattenPromptTemplate}
         onResizeEnd={handlePositivePromptResizeEnd}
+        onTemplateViewModeChange={setTemplateViewMode}
         onUsePrompt={usePromptHistoryItem}
       />
       {promptPolicy.negativeVisible ? (
@@ -143,11 +165,14 @@ export const GeneratePromptFields = ({
           projectId={projectId}
           selectedModel={selectedModel}
           helpText={promptPolicy.negativeHelpText}
+          isTemplateViewMode={settings.promptTemplateViewMode}
           showSyntaxHighlighting={showPromptSyntaxHighlighting}
+          templateNegativePrompt={settings.promptTemplate?.negativePrompt ?? null}
           value={promptValues.negativePrompt}
           onEnabledChange={handleNegativePromptEnabledChange}
           onChange={handleNegativePromptChange}
           onResizeEnd={handleNegativePromptResizeEnd}
+          onTemplateViewModeChange={setTemplateViewMode}
         />
       ) : null}
     </Stack>

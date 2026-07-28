@@ -3,6 +3,7 @@ import type { GenerateLora, GenerateModelConfig } from '@features/generation/cor
 import type { ChangeEvent, KeyboardEvent } from 'react';
 
 import { HStack, Switch } from '@chakra-ui/react';
+import { getPromptTemplateChunks } from '@features/generation/core/promptTemplates';
 import { useRegisterGenerateDraftFlusher } from '@features/generation/ui/generateDraftRegistry';
 import { useDebouncedDraftValue } from '@features/generation/ui/useDebouncedDraftValue';
 import { Field } from '@platform/ui';
@@ -19,6 +20,11 @@ const PROMPT_INPUT_DEBOUNCE_MS = 250;
 
 interface NegativePromptFieldProps {
   heightPx: number;
+  /** The active template's negative side, or null when none is applied. */
+  templateNegativePrompt?: string | null;
+  /** Show the merged prompt read-only instead of the authored text. */
+  isTemplateViewMode?: boolean;
+  onTemplateViewModeChange?: (viewMode: boolean) => void;
   helpText?: string;
   isEnabled: boolean;
   loras: GenerateLora[];
@@ -45,13 +51,16 @@ export const NegativePromptField = ({
   heightPx,
   helpText,
   isEnabled,
+  isTemplateViewMode = false,
   loras,
   onChange,
   onEnabledChange,
   onResizeEnd,
+  onTemplateViewModeChange,
   projectId,
   selectedModel,
   showSyntaxHighlighting,
+  templateNegativePrompt = null,
   value,
 }: NegativePromptFieldProps) => {
   const { t } = useTranslation();
@@ -171,7 +180,7 @@ export const NegativePromptField = ({
       <HStack gap="0.5">
         {isEnabled ? (
           <AddPromptTriggerButton
-            isOpen={triggerPickerState !== null}
+            isOpen={triggerPickerState !== null || isTemplateViewMode}
             onOpenPromptTriggerPicker={handleOpenPromptTriggerPicker}
           />
         ) : null}
@@ -189,13 +198,30 @@ export const NegativePromptField = ({
         </Switch.Root>
       </HStack>
     ),
-    [enableSwitchInputId, handleEnabledChange, handleOpenPromptTriggerPicker, isEnabled, t, triggerPickerState]
+    [
+      enableSwitchInputId,
+      handleEnabledChange,
+      handleOpenPromptTriggerPicker,
+      isEnabled,
+      isTemplateViewMode,
+      t,
+      triggerPickerState,
+    ]
   );
 
   const triggerPickerPositioning = useMemo(
     () => ({ getAnchorRect: () => triggerPickerState?.anchorRect ?? null }),
     [triggerPickerState]
   );
+
+  // Same textarea, read-only, as on the positive side — swapping in a different
+  // component would reset the resizer's mounted height.
+  const isViewingMerged = isTemplateViewMode && templateNegativePrompt !== null;
+  const templateChunks = useMemo(
+    () => (isViewingMerged ? getPromptTemplateChunks(draftValue, templateNegativePrompt) : null),
+    [draftValue, isViewingMerged, templateNegativePrompt]
+  );
+  const exitViewMode = useCallback(() => onTemplateViewModeChange?.(false), [onTemplateViewModeChange]);
 
   return (
     <Field label={t('widgets.generate.negativePrompt')} labelEnd={labelEnd} helpText={isEnabled ? helpText : undefined}>
@@ -209,10 +235,14 @@ export const NegativePromptField = ({
             resizeHandleAriaLabel={t('widgets.generate.resizeNegativePrompt')}
             size="xs"
             fontFamily="mono"
+            readOnly={isViewingMerged}
             showSyntaxHighlighting={showSyntaxHighlighting}
+            templateChunks={templateChunks}
             textareaRef={handleTextareaRef}
-            value={draftValue}
+            title={isViewingMerged ? t('widgets.generate.promptTemplates.editAuthored') : undefined}
+            value={templateChunks ? templateChunks.join('') : draftValue}
             onChange={handlePromptChange}
+            onClick={isViewingMerged ? exitViewMode : undefined}
             onKeyDown={handlePromptKeyDown}
             onResizeEnd={onResizeEnd}
           />

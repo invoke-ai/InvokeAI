@@ -33,6 +33,10 @@ export interface GenerationSelectedImage {
  */
 export interface GenerationUiAdapter {
   CanvasCompositingSection: ComponentType;
+  capabilities: {
+    /** Bulk import/export of prompt templates; the backend routes are admin-only. */
+    canManagePromptTemplates: boolean;
+  };
   gallery: {
     selectedImage: GenerationSelectedImage | null;
     touchImages(): void;

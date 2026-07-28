@@ -1,7 +1,9 @@
 import type { PromptHistoryItem } from '@features/generation/contracts';
+import type { PromptTemplateSnapshot } from '@features/generation/core/promptTemplates';
 import type { GenerateLora, GenerateModelConfig } from '@features/generation/core/types';
 import type { ChangeEvent, KeyboardEvent } from 'react';
 
+import { applyPromptTemplate, getPromptTemplateChunks } from '@features/generation/core/promptTemplates';
 import { useRegisterGenerateDraftFlusher } from '@features/generation/ui/generateDraftRegistry';
 import { useDebouncedDraftValue } from '@features/generation/ui/useDebouncedDraftValue';
 import { useWildcards } from '@features/generation/ui/useWildcards';
@@ -29,6 +31,11 @@ interface PositivePromptFieldProps {
   batchCount?: number;
   /** Absent on surfaces whose prompt is not batch-expanded (Upscale). */
   dynamicPrompts?: DynamicPromptsFieldConfig | null;
+  /** Absent on surfaces with no template concept (Upscale). */
+  promptTemplate?: PromptTemplateSnapshot | null;
+  /** Show the merged prompt read-only instead of the authored text. */
+  isTemplateViewMode?: boolean;
+  onTemplateViewModeChange?: (viewMode: boolean) => void;
   heightPx: number;
   loras: GenerateLora[];
   projectId: string;
@@ -36,6 +43,13 @@ interface PositivePromptFieldProps {
   showSyntaxHighlighting: boolean;
   value: string;
   onChange: (value: string) => void;
+  /**
+   * Replace the authored prompt with already-merged text and drop the template in
+   * one commit. Absent on surfaces with no template concept.
+   */
+  onFlattenPromptTemplate?: (prompt: string) => void;
+  /** Apply or clear the active template. Absent on surfaces with no templates. */
+  onApplyPromptTemplate?: (template: PromptTemplateSnapshot | null) => void;
   onResizeEnd: (heightPx: number) => void;
   onUsePrompt: (prompt: PromptHistoryItem) => void;
 }
@@ -54,11 +68,16 @@ export const PositivePromptField = ({
   batchCount = 1,
   dynamicPrompts = null,
   heightPx,
+  isTemplateViewMode = false,
   loras,
+  onApplyPromptTemplate,
   onChange,
+  onFlattenPromptTemplate,
   onResizeEnd,
+  onTemplateViewModeChange,
   onUsePrompt,
   projectId,
+  promptTemplate = null,
   selectedModel,
   showSyntaxHighlighting,
   value,
@@ -187,6 +206,23 @@ export const PositivePromptField = ({
     [commitPromptChange, draftValue]
   );
 
+  // Merged against the *draft*, not the committed value: the template lives in the
+  // store but the draft runs 250ms ahead of it, and reading the store here would
+  // leave the expansion count a debounce behind what the user is typing.
+  const effectivePositivePrompt = useMemo(
+    () => (promptTemplate ? applyPromptTemplate(promptTemplate.positivePrompt, draftValue) : draftValue),
+    [draftValue, promptTemplate]
+  );
+
+  const flattenPromptTemplate = useCallback(
+    (prompt: string) => {
+      promptHistoryNavigation.reset();
+      replaceDraftValue(prompt);
+      onFlattenPromptTemplate?.(prompt);
+    },
+    [onFlattenPromptTemplate, replaceDraftValue]
+  );
+
   const labelEnd = useMemo(
     () => (
       <PositivePromptActions
@@ -197,6 +233,13 @@ export const PositivePromptField = ({
         onInsertText={insertTextAtCaret}
         loras={loras}
         positivePrompt={draftValue}
+        activeTemplate={promptTemplate}
+        effectivePositivePrompt={effectivePositivePrompt}
+        hasPromptTemplate={promptTemplate !== null}
+        isTemplateViewMode={isTemplateViewMode}
+        onApplyPromptTemplate={onApplyPromptTemplate}
+        onTemplateViewModeChange={onTemplateViewModeChange}
+        onFlattenPromptTemplate={flattenPromptTemplate}
         projectId={projectId}
         selectedModel={selectedModel}
         onOpenPromptTriggerPicker={handleOpenPromptTriggerPicker}
@@ -209,11 +252,17 @@ export const PositivePromptField = ({
       commitPromptChangeImmediately,
       draftValue,
       dynamicPrompts,
+      effectivePositivePrompt,
+      flattenPromptTemplate,
       handleOpenPromptTriggerPicker,
       handleUsePrompt,
       insertTextAtCaret,
+      isTemplateViewMode,
       loras,
+      onApplyPromptTemplate,
+      onTemplateViewModeChange,
       projectId,
+      promptTemplate,
       selectedModel,
       showSyntaxHighlighting,
       triggerPickerState,
@@ -224,6 +273,19 @@ export const PositivePromptField = ({
     (event: ChangeEvent<HTMLTextAreaElement>) => commitPromptChange(event.currentTarget.value),
     [commitPromptChange]
   );
+
+  // View mode keeps the same textarea rather than swapping in a preview
+  // component: `ResizableTextarea` reads its height once on mount, and the
+  // element is also what `focusPositivePrompt` and the attention hotkeys target,
+  // so unmounting it would reset the height and break both.
+  const isViewingMerged = isTemplateViewMode && promptTemplate !== null;
+  const templateChunks = useMemo(
+    () => (isViewingMerged ? getPromptTemplateChunks(draftValue, promptTemplate.positivePrompt) : null),
+    [draftValue, isViewingMerged, promptTemplate]
+  );
+
+  /** Clicking the merged text is the way back to editing, as it is in legacy. */
+  const exitViewMode = useCallback(() => onTemplateViewModeChange?.(false), [onTemplateViewModeChange]);
 
   const triggerPickerPositioning = useMemo(
     () => ({ getAnchorRect: () => triggerPickerState?.anchorRect ?? null }),
@@ -242,10 +304,14 @@ export const PositivePromptField = ({
         fontFamily="mono"
         highlightDynamicPrompts={dynamicPrompts !== null}
         knownWildcards={knownWildcards}
+        readOnly={isViewingMerged}
         showSyntaxHighlighting={showSyntaxHighlighting}
+        templateChunks={templateChunks}
         textareaRef={handleTextareaRef}
-        value={draftValue}
+        title={isViewingMerged ? t('widgets.generate.promptTemplates.editAuthored') : undefined}
+        value={isViewingMerged ? effectivePositivePrompt : draftValue}
         onChange={handlePromptChange}
+        onClick={isViewingMerged ? exitViewMode : undefined}
         onKeyDown={handlePromptKeyDown}
         onResizeEnd={onResizeEnd}
       />
