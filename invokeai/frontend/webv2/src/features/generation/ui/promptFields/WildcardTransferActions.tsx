@@ -9,6 +9,7 @@ import { useGenerationUi } from '@features/generation/ui/GenerationUiContext';
 import { WildcardImportDialog } from '@features/generation/ui/promptFields/WildcardImportDialog';
 import {
   downloadWildcards,
+  isSupportedWildcardFile,
   readWildcardFiles,
   WILDCARD_IMPORT_ACCEPT,
   WildcardFileError,
@@ -21,6 +22,10 @@ import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const EXPORT_FORMATS: WildcardExportFormat[] = ['yaml', 'json'];
+const IMPORT_SOURCES = ['files', 'folder'] as const;
+
+/** Not in React's DOM typings, and `multiple` comes along with it implicitly. */
+const DIRECTORY_INPUT_PROPS = { directory: '', webkitdirectory: '' } as unknown as { webkitdirectory: string };
 
 /**
  * Import and export for the whole catalog.
@@ -34,6 +39,7 @@ export const WildcardTransferActions = ({ catalog }: { catalog: WildcardCatalog 
   const { t } = useTranslation();
   const { notifications } = useGenerationUi();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const directoryInputRef = useRef<HTMLInputElement | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [pendingEntries, setPendingEntries] = useState<WildcardImportEntry[] | null>(null);
 
@@ -126,8 +132,6 @@ export const WildcardTransferActions = ({ catalog }: { catalog: WildcardCatalog 
     [catalog.wildcards, reportError, t]
   );
 
-  const pickFiles = useCallback(() => fileInputRef.current?.click(), []);
-
   const handleFileChange = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
       const files = [...(event.currentTarget.files ?? [])];
@@ -139,6 +143,29 @@ export const WildcardTransferActions = ({ catalog }: { catalog: WildcardCatalog 
       event.currentTarget.value = '';
     },
     [startImport]
+  );
+
+  // A folder hands over everything in it, so the readmes and `.DS_Store` are
+  // dropped here rather than failing the import the way a named file would.
+  const handleDirectoryChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const files = [...(event.currentTarget.files ?? [])].filter(isSupportedWildcardFile);
+
+      event.currentTarget.value = '';
+
+      if (files.length === 0) {
+        notifications.info(t('widgets.generate.dynamicPrompts.importNoWildcardFiles'));
+        return;
+      }
+
+      void startImport(files);
+    },
+    [notifications, startImport, t]
+  );
+
+  const handleImportSelect = useCallback(
+    (details: { value: string }) => (details.value === 'folder' ? directoryInputRef : fileInputRef).current?.click(),
+    []
   );
 
   const handleExportSelect = useCallback(
@@ -155,10 +182,27 @@ export const WildcardTransferActions = ({ catalog }: { catalog: WildcardCatalog 
 
   return (
     <HStack gap="0.5">
-      <Button disabled={isBusy} size="2xs" variant="ghost" onClick={pickFiles}>
-        <UploadIcon />
-        {t('widgets.generate.dynamicPrompts.import')}
-      </Button>
+      <Menu.Root onSelect={handleImportSelect}>
+        <Menu.Trigger asChild>
+          <Button disabled={isBusy} size="2xs" variant="ghost">
+            <UploadIcon />
+            {t('widgets.generate.dynamicPrompts.import')}
+          </Button>
+        </Menu.Trigger>
+        <Portal>
+          <Menu.Positioner>
+            <MenuContent minW="10rem">
+              {IMPORT_SOURCES.map((source) => (
+                <Menu.Item key={source} value={source}>
+                  <Menu.ItemText fontSize="xs">
+                    {t(`widgets.generate.dynamicPrompts.import${source === 'folder' ? 'Folder' : 'Files'}`)}
+                  </Menu.ItemText>
+                </Menu.Item>
+              ))}
+            </MenuContent>
+          </Menu.Positioner>
+        </Portal>
+      </Menu.Root>
       <Menu.Root onSelect={handleExportSelect}>
         <Menu.Trigger asChild>
           <Button disabled={isBusy || catalog.wildcards.length === 0} size="2xs" variant="ghost">
@@ -189,6 +233,10 @@ export const WildcardTransferActions = ({ catalog }: { catalog: WildcardCatalog 
         type="file"
         onChange={handleFileChange}
       />
+      {/* A second input, because one cannot be both. The a1111 layout nests
+          wildcards in folders, and only a directory pick supplies the relative
+          path that turns `animals/dogs.txt` into `animals/dogs`. */}
+      <input {...DIRECTORY_INPUT_PROPS} hidden ref={directoryInputRef} type="file" onChange={handleDirectoryChange} />
       {pendingEntries ? (
         <WildcardImportDialog entries={pendingEntries} onCancel={cancelImport} onConfirm={confirmImport} />
       ) : null}

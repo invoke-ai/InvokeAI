@@ -56,12 +56,31 @@ const MAX_IMPORT_WILDCARDS = 20_000;
  * this app all land in the same list — mixing them in one selection is fine, and
  * duplicate names across files are sorted out later by `planWildcardImport`.
  */
-/** `a.txt` and a bare `wildcards` yes, `README.md` and `preview.png` no. */
+/**
+ * `a.txt` and a bare `LICENSE` yes; `README.md`, `preview.png` and `.DS_Store`
+ * no. An extensionless file is fair game — a wildcard file has no header to
+ * check — but a name that is nothing *but* an extension is a dotfile, and every
+ * folder pick brings a few of those along.
+ */
 const isTextWildcardFile = (path: string): boolean => {
   const name = path.slice(path.lastIndexOf('/') + 1);
   const dot = name.lastIndexOf('.');
 
-  return dot <= 0 || name.slice(dot).toLowerCase() === '.txt';
+  return dot < 0 || name.slice(dot).toLowerCase() === '.txt';
+};
+
+/**
+ * Whether this file is worth handing to `readWildcardFiles` at all.
+ *
+ * For a file the user picked by name, being unreadable is worth saying out loud,
+ * so `readWildcardFiles` throws. A directory pick is the opposite: it hands over
+ * everything in the folder, readmes and `.DS_Store` included, and refusing the
+ * whole import over one of them would make folder picking useless.
+ */
+export const isSupportedWildcardFile = (file: File): boolean => {
+  const path = getFilePath(file);
+
+  return hasExtension(path, '.yaml', '.yml', '.json') || isTextWildcardFile(path);
 };
 
 export const readWildcardFiles = async (files: readonly File[]): Promise<ParsedWildcard[]> => {
