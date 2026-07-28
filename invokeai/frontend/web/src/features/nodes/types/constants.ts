@@ -57,6 +57,7 @@ export const FIELD_COLORS: { [key: string]: string } = {
   CogView4MainModelField: 'teal.500',
   ZImageMainModelField: 'teal.500',
   AnimaMainModelField: 'teal.500',
+  WanMainModelField: 'teal.500',
   SDXLMainModelField: 'teal.500',
   SDXLRefinerModelField: 'teal.500',
   SpandrelImageToImageModelField: 'teal.500',
