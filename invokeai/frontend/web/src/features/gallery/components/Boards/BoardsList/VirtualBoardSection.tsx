@@ -3,6 +3,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectGallerySlice, virtualBoardsSectionOpenChanged } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PiCalendarBold, PiCaretDownBold, PiCaretRightBold } from 'react-icons/pi';
 import { useListVirtualBoardsByDateQuery } from 'services/api/endpoints/virtual_boards';
 
@@ -15,6 +16,7 @@ const selectVirtualBoardsSectionOpen = createSelector(
 );
 
 export const VirtualBoardSection = memo(() => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const showVirtualBoards = useAppSelector(selectShowVirtualBoards);
   const isOpen = useAppSelector(selectVirtualBoardsSectionOpen);
@@ -37,13 +39,13 @@ export const VirtualBoardSection = memo(() => {
         <Flex alignItems="center" gap={1}>
           <Icon as={PiCalendarBold} color="base.500" boxSize={4} />
           <Text fontSize="sm" fontWeight="semibold" userSelect="none" color="base.500">
-            By Date
+            {t('boards.byDate')}
           </Text>
         </Flex>
         <IconButton
           size="sm"
           variant="link"
-          aria-label={isOpen ? 'Collapse' : 'Expand'}
+          aria-label={isOpen ? t('common.collapse') : t('common.expand')}
           icon={isOpen ? <PiCaretDownBold /> : <PiCaretRightBold />}
           onClick={toggleOpen}
         />

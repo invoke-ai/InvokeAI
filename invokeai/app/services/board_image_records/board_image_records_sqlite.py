@@ -80,6 +80,7 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
         board_id: str,
         categories: list[ImageCategory] | None,
         is_intermediate: bool | None,
+        user_id: Optional[str] = None,
     ) -> list[str]:
         with self._db.transaction() as cursor:
             params: list[str | bool] = []
@@ -123,6 +124,13 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
                     AND images.is_intermediate = ?
                     """
                 params.append(is_intermediate)
+
+            # Per-user filter — admins pass user_id=None to skip this clause.
+            if user_id is not None:
+                stmt += """--sql
+                    AND images.user_id = ?
+                    """
+                params.append(user_id)
 
             # Put a ring on it
             stmt += ";"

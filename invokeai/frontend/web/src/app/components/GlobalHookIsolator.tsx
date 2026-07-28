@@ -9,6 +9,7 @@ import { useFocusRegionWatcher } from 'common/hooks/focus';
 import { useCloseChakraTooltipsOnDragFix } from 'common/hooks/useCloseChakraTooltipsOnDragFix';
 import { useGlobalHotkeys } from 'common/hooks/useGlobalHotkeys';
 import { useTouchDeviceClass } from 'common/hooks/useTouchDeviceClass';
+import { useMediaCookieRefresh } from 'features/auth/hooks/useMediaCookieRefresh';
 import { useDndMonitor } from 'features/dnd/useDndMonitor';
 import { useDynamicPromptsWatcher } from 'features/dynamicPrompts/hooks/useDynamicPromptsWatcher';
 import { useStarterModelsToast } from 'features/modelManagerV2/hooks/useStarterModelsToast';
@@ -47,6 +48,7 @@ export const GlobalHookIsolator = memo(() => {
   useDndMonitor();
   useSyncNodeErrors();
   useSyncLangDirection();
+  useMediaCookieRefresh();
 
   // Persistent subscription to the queue counts query - canvas relies on this to know if there are pending
   // and/or in progress canvas sessions.

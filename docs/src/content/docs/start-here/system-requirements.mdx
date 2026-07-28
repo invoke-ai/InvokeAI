@@ -29,6 +29,8 @@ The requirements below are rough guidelines for best performance. GPUs with less
 | FLUX.2 Klein 4B | 1024x1024 | Nvidia 30xx+ | 12GB | 16GB | FP8 works with 8GB+; Diffusers + encoder |
 | FLUX.2 Klein 9B | 1024x1024 | Nvidia 40xx | 24GB | 32GB | FP8 works with 12GB+; Diffusers + encoder |
 | Z-Image Turbo | 1024x1024 | Nvidia 20xx+ | 8GB | 16GB | Q4_K 8GB; Q8/BF16 16GB+ |
+| Wan 2.2 A14B (T2V/I2V) | 1280x720 | Nvidia 30xx+ | 12GB | 32GB | Dual-expert MoE; Q4_K_M 12GB; Q8 18GB+; Diffusers requires 32GB+ |
+| Wan 2.2 TI2V-5B | 1280x720 | Nvidia 20xx+ | 8GB | 16GB | Single transformer; Q4_K_M 6GB+; Q8 8GB+; Diffusers 12GB+ |
 
 :::tip[`tmpfs` on Linux]
   If your temporary directory is mounted as a `tmpfs`, ensure it has sufficient space.
