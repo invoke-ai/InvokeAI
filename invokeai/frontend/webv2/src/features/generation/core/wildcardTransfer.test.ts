@@ -126,6 +126,29 @@ describe('wildcardsToNestedRecord', () => {
       wildcardsFromNestedRecord(wildcardsToNestedRecord(wildcards)).sort((a, b) => a.name.localeCompare(b.name))
     ).toEqual(wildcards.sort((a, b) => a.name.localeCompare(b.name)));
   });
+
+  // Regression: `node[segment] ??= {}` declines to assign when the inherited
+  // value is truthy, so the walk stepped onto `Object.prototype` and wrote the
+  // leaf there. `constructor`, `toString` and `valueOf` are all valid wildcard
+  // names on both sides of the wire.
+  it('nests a name that collides with something on Object.prototype', () => {
+    const inheritedNames = ['constructor', 'toString', 'valueOf', 'hasOwnProperty'];
+    const wildcards = inheritedNames.map((name) => ({ name: `${name}/keys`, values: ['red', 'blue'] }));
+    const nested = wildcardsToNestedRecord(wildcards);
+
+    expect(typeof Object.keys).toBe('function');
+    expect(Object.keys(nested)).toEqual(inheritedNames);
+    expect(JSON.parse(JSON.stringify(nested))).toEqual(
+      Object.fromEntries(inheritedNames.map((name) => [name, { keys: ['red', 'blue'] }]))
+    );
+    expect(wildcardsFromNestedRecord(nested)).toEqual(wildcards);
+  });
+
+  it('keeps such a name as a leaf too', () => {
+    const nested = wildcardsToNestedRecord([{ name: 'constructor', values: ['red'] }]);
+
+    expect(JSON.stringify(nested)).toBe('{"constructor":["red"]}');
+  });
 });
 
 describe('planWildcardImport', () => {

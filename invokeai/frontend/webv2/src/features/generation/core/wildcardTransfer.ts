@@ -124,9 +124,17 @@ const getAncestorNames = (name: string): string[] => {
  * reads back identically. Deciding this from the name set rather than from
  * whatever the loop has written so far keeps the output independent of the order
  * the wildcards arrive in.
+ *
+ * Every level is a null-prototype object, and levels are created through an own
+ * key check rather than `??=`. A name segment is user text, and `constructor`,
+ * `toString` and `valueOf` are all valid wildcard names: on an ordinary `{}` the
+ * inherited value is truthy, so `??=` would decline to assign and the walk would
+ * step onto `Object.prototype` and write the leaf there. `Object.keys` becoming
+ * an array of colours takes the whole tab down, and the wildcard vanishes from
+ * the export either way.
  */
 export const wildcardsToNestedRecord = (wildcards: readonly ParsedWildcard[]): Record<string, unknown> => {
-  const root: Record<string, unknown> = {};
+  const root: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
   const names = new Set(wildcards.map((wildcard) => wildcard.name));
 
   for (const wildcard of wildcards) {
@@ -145,7 +153,10 @@ export const wildcardsToNestedRecord = (wildcards: readonly ParsedWildcard[]): R
     let node = root;
 
     for (const segment of segments) {
-      node[segment] ??= {};
+      if (!Object.hasOwn(node, segment)) {
+        node[segment] = Object.create(null) as Record<string, unknown>;
+      }
+
       node = node[segment] as Record<string, unknown>;
     }
 
