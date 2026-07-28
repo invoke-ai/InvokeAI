@@ -112,13 +112,72 @@ const tokenKind = (token: PromptToken): PromptHighlightKind => {
 const covers = (outer: PromptRange, inner: PromptRange): boolean =>
   outer.start <= inner.start && outer.end >= inner.end;
 
-const getBestAnnotation = (
-  annotations: HighlightAnnotation[],
-  tokenRange: PromptRange
-): HighlightAnnotation | undefined =>
-  annotations
-    .filter((annotation) => covers(annotation.range, tokenRange))
-    .sort((left, right) => right.priority - left.priority)[0];
+/**
+ * Walks the tokens and the annotations together, keeping only the annotations
+ * that could still cover the token in hand.
+ *
+ * This replaced a `filter().sort()` over every annotation for every token. That
+ * is quadratic, and dynamic-prompt highlighting made it bite: a prompt full of
+ * `{a|b|c}` now produces an annotation per brace, separator, weight, range,
+ * sampler, variable, operator, comment and wildcard, so the annotation count
+ * grew to be proportional to the token count. At the 20 000-character ceiling
+ * the highlighter allows, that was tens of milliseconds of blocked main thread
+ * on every keystroke.
+ *
+ * Both inputs are in document order, and an annotation that ends before the
+ * current token cannot reach any later one either, so it is dropped for good.
+ * What is left is the nesting depth at that point, which is small.
+ */
+const forEachTokenAnnotation = (
+  tokens: readonly PromptToken[],
+  annotations: readonly HighlightAnnotation[],
+  visit: (token: PromptToken, annotation: HighlightAnnotation | undefined) => void
+): void => {
+  // Ties are broken by the order the annotations were collected in, which the
+  // stable sort this replaced preserved by accident and callers may rely on.
+  const ordered = annotations
+    .map((annotation, index) => ({ annotation, index }))
+    .sort((left, right) => left.annotation.range.start - right.annotation.range.start || left.index - right.index);
+  const active: { annotation: HighlightAnnotation; index: number }[] = [];
+  let next = 0;
+
+  for (const token of tokens) {
+    while (next < ordered.length && (ordered[next]?.annotation.range.start ?? Infinity) <= token.range.start) {
+      const entry = ordered[next];
+
+      if (entry) {
+        active.push(entry);
+      }
+
+      next++;
+    }
+
+    let kept = 0;
+
+    for (const entry of active) {
+      if (entry.annotation.range.end >= token.range.end) {
+        active[kept] = entry;
+        kept++;
+      }
+    }
+
+    active.length = kept;
+
+    let best: { annotation: HighlightAnnotation; index: number } | undefined;
+
+    for (const entry of active) {
+      if (!covers(entry.annotation.range, token.range)) {
+        continue;
+      }
+
+      if (!best || entry.annotation.priority > best.annotation.priority) {
+        best = entry;
+      }
+    }
+
+    visit(token, best?.annotation);
+  }
+};
 
 const addPromptFunctionAnnotations = (
   prompt: string,
@@ -233,8 +292,7 @@ export const buildPromptHighlightSegments = (
     ];
     const segments: PromptHighlightSegment[] = [];
 
-    for (const token of tokens) {
-      const annotation = getBestAnnotation(annotations, token.range);
+    forEachTokenAnnotation(tokens, annotations, (token, annotation) => {
       const baseKind = tokenKind(token);
       const kind = annotation && annotation.priority > BASE_PRIORITY[baseKind] ? annotation.kind : baseKind;
 
@@ -243,7 +301,7 @@ export const buildPromptHighlightSegments = (
         range: { ...token.range },
         text: prompt.slice(token.range.start, token.range.end),
       });
-    }
+    });
 
     return segments;
   } catch {

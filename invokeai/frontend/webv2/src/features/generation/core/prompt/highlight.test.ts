@@ -124,3 +124,28 @@ describe('prompt highlight segments', () => {
     });
   });
 });
+
+// The annotation lookup used to filter and sort every annotation for every
+// token. Dynamic prompts made that bite: a variant-heavy prompt now carries an
+// annotation per brace, separator, weight, sampler, variable and wildcard, so
+// the annotation count became proportional to the token count. This ran to
+// 469ms on the prompt below, synchronously inside a render, on every keystroke.
+describe('buildPromptHighlightSegments on a large prompt', () => {
+  // eslint-disable-next-line no-template-curly-in-string -- `${v=1}` is dynamic-prompts syntax, not interpolation
+  const prompt = '{a|b|c} __colours__ ${v=1} '.repeat(700);
+  const options = { dynamicPrompts: true, knownWildcards: new Set(['colours']) };
+
+  it('covers the whole prompt exactly once', () => {
+    const segments = buildPromptHighlightSegments(prompt, options);
+
+    expect(segments.map((segment) => segment.text).join('')).toBe(prompt);
+  });
+
+  it('stays well inside a frame', () => {
+    const started = performance.now();
+
+    buildPromptHighlightSegments(prompt, options);
+
+    expect(performance.now() - started).toBeLessThan(150);
+  });
+});

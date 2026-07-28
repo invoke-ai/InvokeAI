@@ -239,11 +239,14 @@ export const scanDynamicPromptSyntax = (
   }
 
   const wildcardPattern = new RegExp(WILDCARD_REFERENCE_RE, 'g');
+  // Concatenated once. Built inside the loop, this allocated a fresh array of
+  // every variable and comment in the prompt for every wildcard reference in it.
+  const enclosingRanges = [...variableRanges, ...commentRanges];
 
   for (let match = wildcardPattern.exec(prompt); match; match = wildcardPattern.exec(prompt)) {
     const wildcardRange = { end: match.index + match[0].length, start: match.index };
 
-    if (![...variableRanges, ...commentRanges].some((outer) => covers(outer, wildcardRange))) {
+    if (!enclosingRanges.some((outer) => covers(outer, wildcardRange))) {
       // An unresolvable wildcard survives expansion as its own literal text, so it earns the
       // same treatment as an unbalanced brace rather than looking like ordinary recognised
       // syntax. `matchesKnownWildcard` resolves globs, which is why a valid `__artists/*__`
