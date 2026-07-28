@@ -34,9 +34,12 @@ export interface PromptTemplateCatalog {
  * started it, so a sign-out mid-flight does not invalidate the next account's
  * cache on the way back — the same rule `useWildcards` follows.
  */
-export const usePromptTemplates = (): PromptTemplateCatalog => {
+export const usePromptTemplates = ({ isEnabled = true }: { isEnabled?: boolean } = {}): PromptTemplateCatalog => {
   const queryClient = useQueryClient();
-  const query = useQuery(promptTemplatesQueryOptions());
+  // Off by default for the widget, which only wants to re-read an applied
+  // template and has nothing to re-read when none is applied. The picker asks
+  // for it in earnest, and shares this cache when it does.
+  const query = useQuery({ ...promptTemplatesQueryOptions(), enabled: isEnabled });
   const templates = useMemo(() => query.data ?? [], [query.data]);
   const defaultTemplates = useMemo(() => templates.filter((template) => template.isDefault), [templates]);
   const userTemplates = useMemo(() => templates.filter((template) => !template.isDefault), [templates]);

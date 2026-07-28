@@ -62,10 +62,6 @@ export const GenerateWidgetView = () => {
   const error = ui.models.error;
   const models = ui.models.catalog;
   const status = ui.models.status;
-  // The active template is stored as a snapshot, so an edit made in another tab
-  // or by another client only lands by re-reading it from the catalog here —
-  // the same treatment model snapshots get in `syncGenerateWidgetValuesWithModels`.
-  const { templates: promptTemplates } = usePromptTemplates();
 
   useMountEffect(() => {
     ui.models.ensureLoaded();
@@ -79,6 +75,17 @@ export const GenerateWidgetView = () => {
   const normalizedSettings = normalizeGenerateSettings(storedValues);
   const selectedModel = supportedModels.find((model) => model.key === normalizedSettings?.modelKey);
   const settings = normalizedSettings ?? getDefaultGenerateSettings(selectedModel ?? supportedModels[0]);
+  // The active template is stored as a snapshot, so an edit made in another tab
+  // or by another client only lands by re-reading it from the catalog here —
+  // the same treatment model snapshots get in `syncGenerateWidgetValuesWithModels`.
+  //
+  // Fetched only when there is something to re-read. Most projects have no
+  // template applied, and asking unconditionally put a request on the widget's
+  // critical path for an answer nothing would use. The picker asks in earnest
+  // and shares this cache when it does.
+  const { templates: promptTemplates } = usePromptTemplates({
+    isEnabled: (normalizedSettings?.promptTemplate ?? null) !== null,
+  });
 
   useEffect(() => {
     const model = selectedModel ?? supportedModels[0];
