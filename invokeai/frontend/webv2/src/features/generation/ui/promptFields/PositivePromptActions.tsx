@@ -37,15 +37,34 @@ const POPOVER_POSITIONING_BOTTOM_END = { placement: 'bottom-end' } as const;
 const TEXT_LLM_MODEL_TYPES = ['text_llm'];
 const LLAVA_MODEL_TYPES = ['llava_onevision'];
 
+/**
+ * Everything the prompt actions know about the applied template, in one prop.
+ *
+ * These arrived as six flat props among nineteen, three of them optional and
+ * one — `hasPromptTemplate` — restating `activeTemplate !== null` at every call
+ * site. Grouping them says what they are: not six settings but one state, which
+ * either exists or does not, and which the buttons around it read to decide
+ * whether the authored prompt is theirs to rewrite.
+ */
+export interface PromptTemplateState {
+  /** The applied template, or null when none is. */
+  active: PromptTemplateSnapshot | null;
+  /** Whether the box is showing the merged result rather than the authored text. */
+  isViewMode: boolean;
+  /** Absent on surfaces with no template concept (Upscale). */
+  onApply?: (template: PromptTemplateSnapshot | null) => void;
+  /** Absent wherever `onApply` is; view mode has nothing to show without it. */
+  onViewModeChange?: (viewMode: boolean) => void;
+  /** Writes already-merged text into the authored field and drops the template. */
+  onFlatten: (prompt: string) => void;
+}
+
 interface PositivePromptActionsProps {
-  /** The applied template, or null. Absent surfaces get no templates button. */
-  activeTemplate: PromptTemplateSnapshot | null;
   batchCount: number;
   /** Absent on surfaces whose prompt is not batch-expanded (Upscale). */
   dynamicPrompts: DynamicPromptsFieldConfig | null;
   /** The authored prompt wrapped by the active template — what actually expands. */
   effectivePositivePrompt: string;
-  hasPromptTemplate: boolean;
   loras: GenerateLora[];
   isPromptTriggerPickerOpen: boolean;
   onUsePrompt: (prompt: PromptHistoryItem) => void;
@@ -54,46 +73,28 @@ interface PositivePromptActionsProps {
   projectId: string;
   onOpenPromptTriggerPicker: (anchorElement: HTMLElement) => void;
   onPositivePromptChangeImmediate: (prompt: string) => void;
-  onFlattenPromptTemplate: (prompt: string) => void;
-  /** Absent on surfaces with no template concept (Upscale). */
-  onApplyPromptTemplate?: (template: PromptTemplateSnapshot | null) => void;
-  isTemplateViewMode: boolean;
-  onTemplateViewModeChange?: (viewMode: boolean) => void;
+  template: PromptTemplateState;
   onInsertText: (text: string) => void;
   showSyntaxHighlighting: boolean;
 }
 
 export const PositivePromptActions = ({
-  activeTemplate,
   batchCount,
   dynamicPrompts,
   effectivePositivePrompt,
-  hasPromptTemplate,
   isPromptTriggerPickerOpen,
-  isTemplateViewMode,
-  onApplyPromptTemplate,
-  onFlattenPromptTemplate,
   onInsertText,
   onOpenPromptTriggerPicker,
   onPositivePromptChangeImmediate,
-  onTemplateViewModeChange,
   onUsePrompt,
   positivePrompt,
   projectId,
   showSyntaxHighlighting,
+  template,
 }: PositivePromptActionsProps) => {
   return (
     <HStack gap="0.5">
-      {onApplyPromptTemplate ? (
-        <PromptTemplatesButton
-          activeTemplate={activeTemplate}
-          showSyntaxHighlighting={showSyntaxHighlighting}
-          onApply={onApplyPromptTemplate}
-        />
-      ) : null}
-      {hasPromptTemplate && onTemplateViewModeChange ? (
-        <TemplateViewModeButton isViewMode={isTemplateViewMode} onChange={onTemplateViewModeChange} />
-      ) : null}
+      <PromptTemplateControls showSyntaxHighlighting={showSyntaxHighlighting} template={template} />
       {dynamicPrompts ? (
         <DynamicPromptsButton
           batchCount={batchCount}
@@ -104,23 +105,23 @@ export const PositivePromptActions = ({
           // Picking one expansion writes already-merged text into the authored
           // field, so the template has to come off in the same commit or the next
           // Invoke would wrap it again.
-          onUsePrompt={hasPromptTemplate ? onFlattenPromptTemplate : onPositivePromptChangeImmediate}
+          onUsePrompt={template.active ? template.onFlatten : onPositivePromptChangeImmediate}
         />
       ) : null}
       {/* These three rewrite the authored prompt, which view mode is hiding, so
           they stay out of reach until the user is looking at their own text. */}
       <AddPromptTriggerButton
-        isOpen={isPromptTriggerPickerOpen || isTemplateViewMode}
+        isOpen={isPromptTriggerPickerOpen || template.isViewMode}
         onOpenPromptTriggerPicker={onOpenPromptTriggerPicker}
       />
       <ExpandPromptButton
-        isDisabled={isTemplateViewMode}
+        isDisabled={template.isViewMode}
         positivePrompt={positivePrompt}
         projectId={projectId}
         onPositivePromptChange={onPositivePromptChangeImmediate}
       />
       <ImageToPromptButton
-        isDisabled={isTemplateViewMode}
+        isDisabled={template.isViewMode}
         projectId={projectId}
         onPositivePromptChange={onPositivePromptChangeImmediate}
       />
@@ -128,6 +129,32 @@ export const PositivePromptActions = ({
     </HStack>
   );
 };
+
+/**
+ * Picking a template, and switching between the authored text and the merged
+ * result. The second button appears only once there is a template to look
+ * through — with nothing applied the two views are the same text.
+ */
+const PromptTemplateControls = ({
+  showSyntaxHighlighting,
+  template,
+}: {
+  showSyntaxHighlighting: boolean;
+  template: PromptTemplateState;
+}) => (
+  <>
+    {template.onApply ? (
+      <PromptTemplatesButton
+        activeTemplate={template.active}
+        showSyntaxHighlighting={showSyntaxHighlighting}
+        onApply={template.onApply}
+      />
+    ) : null}
+    {template.active && template.onViewModeChange ? (
+      <TemplateViewModeButton isViewMode={template.isViewMode} onChange={template.onViewModeChange} />
+    ) : null}
+  </>
+);
 
 /**
  * Swaps the prompt box between the authored text and the merged result. Quiet

@@ -13,7 +13,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { DynamicPromptsFieldConfig } from './DynamicPromptsPanel';
 
-import { PositivePromptActions, PromptTriggerPopover } from './PositivePromptActions';
+import { PositivePromptActions, PromptTriggerPopover, type PromptTemplateState } from './PositivePromptActions';
 import { PROMPT_ATTENTION_TARGET_PROPS } from './promptAttentionHotkeys';
 import { insertPromptText, registerPositivePromptElement } from './promptFocus';
 import { promptHistoryNavigation } from './promptHistoryNavigation';
@@ -178,6 +178,17 @@ export const PositivePromptField = ({
     [onFlattenPromptTemplate, replaceDraftValue]
   );
 
+  const templateState = useMemo(
+    (): PromptTemplateState => ({
+      active: promptTemplate,
+      isViewMode: isTemplateViewMode,
+      onApply: onApplyPromptTemplate,
+      onFlatten: flattenPromptTemplate,
+      onViewModeChange: onTemplateViewModeChange,
+    }),
+    [flattenPromptTemplate, isTemplateViewMode, onApplyPromptTemplate, onTemplateViewModeChange, promptTemplate]
+  );
+
   const labelEnd = useMemo(
     () => (
       <PositivePromptActions
@@ -188,13 +199,8 @@ export const PositivePromptField = ({
         onInsertText={insertTextAtCaret}
         loras={loras}
         positivePrompt={draftValue}
-        activeTemplate={promptTemplate}
         effectivePositivePrompt={effectivePositivePrompt}
-        hasPromptTemplate={promptTemplate !== null}
-        isTemplateViewMode={isTemplateViewMode}
-        onApplyPromptTemplate={onApplyPromptTemplate}
-        onTemplateViewModeChange={onTemplateViewModeChange}
-        onFlattenPromptTemplate={flattenPromptTemplate}
+        template={templateState}
         projectId={projectId}
         selectedModel={selectedModel}
         onOpenPromptTriggerPicker={triggerPicker.open}
@@ -208,17 +214,13 @@ export const PositivePromptField = ({
       draftValue,
       dynamicPrompts,
       effectivePositivePrompt,
-      flattenPromptTemplate,
       handleUsePrompt,
       insertTextAtCaret,
-      isTemplateViewMode,
       loras,
-      onApplyPromptTemplate,
-      onTemplateViewModeChange,
       projectId,
-      promptTemplate,
       selectedModel,
       showSyntaxHighlighting,
+      templateState,
       triggerPicker,
     ]
   );
