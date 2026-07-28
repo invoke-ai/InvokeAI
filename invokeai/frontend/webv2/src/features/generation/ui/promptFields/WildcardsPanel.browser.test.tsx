@@ -20,6 +20,7 @@ let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const catalog: WildcardCatalog = {
+  applyWrites: vi.fn(),
   create: vi.fn(),
   isLoading: false,
   knownNames: new Set(['colors']),
@@ -152,6 +153,7 @@ describe('wildcard name validation', () => {
 
 describe('finding a wildcard', () => {
   const manyCatalog: WildcardCatalog = {
+    applyWrites: vi.fn(),
     create: vi.fn(),
     isLoading: false,
     knownNames: new Set(['colors']),

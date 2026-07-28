@@ -11,6 +11,31 @@ import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
 
+/** One write, as `applyWrites` will perform it. */
+export interface WildcardWrite {
+  name: string;
+  values: string[];
+  /** Present to update that wildcard; absent to create a new one. */
+  id?: string;
+}
+
+/**
+ * A run of writes that stopped part-way, carrying how many had landed.
+ *
+ * The count is the point: the ones already written are real, and a caller that
+ * reports only "it failed" sends the user back for a second run that then
+ * clashes with everything the first one made.
+ */
+export class WildcardWriteError extends Error {
+  constructor(
+    readonly done: number,
+    override readonly cause: unknown
+  ) {
+    super(cause instanceof Error ? cause.message : String(cause));
+    this.name = 'WildcardWriteError';
+  }
+}
+
 export interface WildcardCatalog {
   wildcards: WildcardRecord[];
   /** Names the backend can resolve, for the highlighter's known/unknown split. */
@@ -19,6 +44,16 @@ export interface WildcardCatalog {
   create: (wildcard: { name: string; values: string[] }) => Promise<void>;
   update: (id: string, changes: { name?: string; values?: string[] }) => Promise<void>;
   remove: (id: string) => Promise<void>;
+  /**
+   * A run of writes with a single invalidation at the end.
+   *
+   * Resolves with how many landed, and rethrows whatever stopped it — the caller
+   * needs both to say "stopped after 6 of 40". Ordinary edits go through the
+   * single-write methods above; this exists for import, where doing it one call
+   * at a time meant re-fetching the whole catalog, plus every dynamic-prompt
+   * expansion, between each write and the next.
+   */
+  applyWrites: (writes: readonly WildcardWrite[]) => Promise<number>;
 }
 
 /**
@@ -64,5 +99,43 @@ export const useWildcards = (): WildcardCatalog => {
 
   const remove = useCallback((id: string) => runAndInvalidate(() => deleteWildcard(id)), [runAndInvalidate]);
 
-  return { create, isLoading: query.isPending, knownNames, remove, update, wildcards };
+  const applyWrites = useCallback(
+    async (writes: readonly WildcardWrite[]): Promise<number> => {
+      const owner = captureAccountScope();
+      let done = 0;
+      let failure: unknown;
+
+      try {
+        for (const write of writes) {
+          if (write.id === undefined) {
+            await createWildcard({ name: write.name, values: write.values });
+          } else {
+            await updateWildcard(write.id, { name: write.name, values: write.values });
+          }
+
+          done++;
+        }
+      } catch (caught) {
+        failure = caught;
+      }
+
+      // Whatever landed before the failure is real, so the caches are stale
+      // either way — invalidate on the strength of that rather than on the run
+      // having finished. The scope check stays where it is for every other
+      // mutation: a sign-out mid-run must not drop the next account's caches.
+      if (done > 0) {
+        assertAccountScopeCurrent(owner);
+        await invalidateWildcardDependents(queryClient);
+      }
+
+      if (failure) {
+        throw new WildcardWriteError(done, failure);
+      }
+
+      return done;
+    },
+    [queryClient]
+  );
+
+  return { applyWrites, create, isLoading: query.isPending, knownNames, remove, update, wildcards };
 };

@@ -7,6 +7,7 @@ import { HStack, Menu, Portal } from '@chakra-ui/react';
 import { getWildcardImportActions, planWildcardImport } from '@features/generation/core/wildcardTransfer';
 import { useGenerationUi } from '@features/generation/ui/GenerationUiContext';
 import { WildcardImportDialog } from '@features/generation/ui/promptFields/WildcardImportDialog';
+import { WildcardWriteError } from '@features/generation/ui/useWildcards';
 import {
   downloadWildcards,
   isSupportedWildcardFile,
@@ -56,25 +57,19 @@ export const WildcardTransferActions = ({ catalog }: { catalog: WildcardCatalog 
   const applyImport = useCallback(
     async (entries: readonly WildcardImportEntry[], resolutions: Record<string, WildcardImportResolution>) => {
       const actions = getWildcardImportActions(entries, resolutions, new Set(catalog.wildcards.map((w) => w.name)));
-      let done = 0;
 
       setIsBusy(true);
 
       try {
-        for (const action of actions) {
-          if (action.id === undefined) {
-            await catalog.create({ name: action.name, values: action.values });
-          } else {
-            await catalog.update(action.id, { name: action.name, values: action.values });
-          }
-          done++;
-        }
-
-        notifications.info(t('widgets.generate.dynamicPrompts.importedCount', { count: done }));
+        notifications.info(
+          t('widgets.generate.dynamicPrompts.importedCount', { count: await catalog.applyWrites(actions) })
+        );
       } catch (caught) {
         // Writes go one at a time, so a failure part-way leaves real wildcards
         // behind. Saying only that the import failed sent people back for a
         // second run that then clashed with everything the first one had made.
+        const done = caught instanceof WildcardWriteError ? caught.done : 0;
+
         reportError(
           'import-wildcards',
           caught,
