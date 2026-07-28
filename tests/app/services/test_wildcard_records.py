@@ -1,9 +1,11 @@
 import logging
+import sqlite3
 
 import pytest
 from dynamicprompts.generators import CombinatorialPromptGenerator
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.wildcard_records.wildcard_records_common import (
     WildcardChanges,
     WildcardNameConflictError,
@@ -17,8 +19,21 @@ from tests.fixtures.sqlite_database import create_mock_sqlite_database
 
 
 @pytest.fixture
-def store() -> SqliteWildcardRecordsStorage:
-    db = create_mock_sqlite_database(InvokeAIAppConfig(use_memory_db=True), logging.getLogger(__name__))
+def db() -> SqliteDatabase:
+    database = create_mock_sqlite_database(InvokeAIAppConfig(use_memory_db=True), logging.getLogger(__name__))
+    # Wildcards cascade from their owner, so the owners have to exist. Inserted
+    # directly rather than through UserService: these tests are about storage, and
+    # the only columns the foreign key needs are the ones without a default.
+    with database.transaction() as cursor:
+        cursor.executemany(
+            "INSERT INTO users (user_id, email, password_hash) VALUES (?, ?, ?);",
+            [(user_id, f"{user_id}@example.com", "unused") for user_id in ("user-1", "user-2")],
+        )
+    return database
+
+
+@pytest.fixture
+def store(db: SqliteDatabase) -> SqliteWildcardRecordsStorage:
     return SqliteWildcardRecordsStorage(db=db)
 
 
@@ -70,6 +85,29 @@ def test_delete_removes_the_record(store: SqliteWildcardRecordsStorage) -> None:
     assert store.get_many("user-1") == []
     with pytest.raises(WildcardNotFoundError):
         store.get(created.id)
+
+
+def test_deleting_the_owner_takes_their_wildcards_with_it(
+    db: SqliteDatabase, store: SqliteWildcardRecordsStorage
+) -> None:
+    # `UserService.delete` is a bare DELETE FROM users; without the cascade these
+    # rows would survive their owner, unreachable but forever.
+    kept = store.create(WildcardWithoutId(name="colors", values=["red"]), user_id="user-2")
+    orphaned = store.create(WildcardWithoutId(name="colors", values=["red"]), user_id="user-1")
+
+    with db.transaction() as cursor:
+        cursor.execute("DELETE FROM users WHERE user_id = ?;", ("user-1",))
+
+    with pytest.raises(WildcardNotFoundError):
+        store.get(orphaned.id)
+    assert [w.id for w in store.get_many("user-2")] == [kept.id]
+
+
+def test_an_unknown_owner_is_not_reported_as_a_name_conflict(store: SqliteWildcardRecordsStorage) -> None:
+    # The name is free; it is the owner that does not exist. Mapping this to a
+    # conflict would send the caller renaming a wildcard that is fine.
+    with pytest.raises(sqlite3.IntegrityError):
+        store.create(WildcardWithoutId(name="colors", values=["red"]), user_id="ghost")
 
 
 @pytest.mark.parametrize(

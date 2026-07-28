@@ -16,7 +16,10 @@ class WildcardsMigrationCallback:
                 values_json TEXT NOT NULL DEFAULT '[]',
                 user_id TEXT NOT NULL,
                 created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
-                updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW'))
+                updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
+                -- `delete_user` is a bare DELETE FROM users; every user-owned table created
+                -- since migration_27 leans on the cascade to take its rows with it.
+                FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
             );
             """
         )
@@ -49,6 +52,7 @@ def build_migration() -> Migration:
     """
     return Migration(
         id="2026_07_27_wildcards",
-        depends_on="migration_9",
+        # migration_27 created the users table this one's owner column references.
+        depends_on="migration_27",
         callback=WildcardsMigrationCallback(),
     )

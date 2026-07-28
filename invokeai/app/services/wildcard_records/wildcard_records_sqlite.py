@@ -13,6 +13,15 @@ from invokeai.app.services.wildcard_records.wildcard_records_common import (
 from invokeai.app.util.misc import uuid_string
 
 
+def _is_name_conflict(error: sqlite3.IntegrityError) -> bool:
+    """Whether an integrity failure is the duplicate name and not, say, an unknown owner.
+
+    The table also carries a users foreign key, and reporting a missing owner as
+    "that name is taken" would send the caller chasing the wrong thing.
+    """
+    return "UNIQUE constraint failed" in str(error)
+
+
 class SqliteWildcardRecordsStorage(WildcardRecordsStorageBase):
     def __init__(self, db: SqliteDatabase) -> None:
         super().__init__()
@@ -47,6 +56,8 @@ class SqliteWildcardRecordsStorage(WildcardRecordsStorageBase):
         except sqlite3.IntegrityError as e:
             # The (user_id, name) unique index is the authority on uniqueness, so a concurrent
             # create loses here rather than in a check-then-insert race.
+            if not _is_name_conflict(e):
+                raise
             raise WildcardNameConflictError(f"A wildcard named '{wildcard.name}' already exists") from e
         return self.get(wildcard_id)
 
@@ -68,6 +79,8 @@ class SqliteWildcardRecordsStorage(WildcardRecordsStorageBase):
                         (json.dumps(changes.values), wildcard_id),
                     )
         except sqlite3.IntegrityError as e:
+            if not _is_name_conflict(e):
+                raise
             raise WildcardNameConflictError(f"A wildcard named '{changes.name}' already exists") from e
         return self.get(wildcard_id)
 
