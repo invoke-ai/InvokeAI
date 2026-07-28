@@ -34,6 +34,8 @@ from invokeai.backend.model_manager.taxonomy import (
     Qwen3VariantType,
     QwenImageVariantType,
     SchedulerPredictionType,
+    WanLoRAVariantType,
+    WanVariantType,
     ZImageVariantType,
 )
 
@@ -135,6 +137,8 @@ class ModelRecordChanges(BaseModelExcludeNull):
         | Flux2VariantType
         | ZImageVariantType
         | QwenImageVariantType
+        | WanVariantType
+        | WanLoRAVariantType
         | Qwen3VariantType
         | MistralVariantType
     ] = Field(description="The variant of the model.", default=None)

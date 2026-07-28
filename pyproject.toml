@@ -44,6 +44,8 @@ dependencies = [
   "onnx==1.16.1",
   "onnxruntime==1.19.2",
   "opencv-contrib-python",
+  "imageio[ffmpeg]>=2.37",                 # video encode (for Wan 2.2 T2V/I2V output); encode behavior (macro_block_size) is version-sensitive
+  "psutil>=6",                             # video decode worker process-tree termination
   "safetensors",
   "sentencepiece==0.2.0",                 # 0.2.1 coredumps windows when loading t5 tokenizer
   "spandrel",
@@ -235,6 +237,8 @@ version = { attr = "invokeai.version.__version__" }
 [tool.setuptools.package-data]
 "invokeai.app.assets" = ["**/*.png"]
 "invokeai.backend.anima" = ["tokenizer/*.json"]
+"invokeai.backend.qwen3" = ["tokenizer/*.json", "tokenizer/*.json.gz"]
+"invokeai.backend.t5" = ["tokenizer/*.json"]
 "invokeai.app.services.workflow_records.default_workflows" = ["*.json"]
 "invokeai.app.services.style_preset_records" = ["*.json"]
 "invokeai.app.services.style_preset_images.default_style_preset_images" = [

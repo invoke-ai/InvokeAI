@@ -1,7 +1,7 @@
 import { Center, Spinner } from '@invoke-ai/ui-library';
 import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { logout, sessionExpiredLogout, setCredentials } from 'features/auth/store/authSlice';
+import { externalTokenAdopted, logout, sessionExpiredLogout, setCredentials } from 'features/auth/store/authSlice';
 import type { PropsWithChildren } from 'react';
 import { memo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -52,9 +52,14 @@ export const ProtectedRoute = memo(({ children, requireAdmin = false }: PropsWit
     }
 
     const checkToken = () => {
-      if (!localStorage.getItem('auth_token') && isAuthenticated) {
+      const storedToken = localStorage.getItem('auth_token');
+      if (!storedToken) {
         dispatch(sessionExpiredLogout());
         navigate('/login', { replace: true });
+        return;
+      }
+      if (storedToken !== token) {
+        dispatch(externalTokenAdopted(storedToken));
       }
     };
 
@@ -67,7 +72,7 @@ export const ProtectedRoute = memo(({ children, requireAdmin = false }: PropsWit
       window.removeEventListener('storage', checkToken);
       clearInterval(interval);
     };
-  }, [multiuserEnabled, isAuthenticated, dispatch, navigate]);
+  }, [multiuserEnabled, isAuthenticated, token, dispatch, navigate]);
 
   useEffect(() => {
     // If we successfully fetched user data, update auth state

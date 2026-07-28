@@ -87,6 +87,9 @@ def _build_decode_mocks(latents: torch.Tensor, decoded: torch.Tensor):
 
     vae_info = MagicMock()
     vae_info.model = vae
+    # The invocation places latents on the VAE's intended compute device (see #9373), so this
+    # must be a real torch.device rather than a MagicMock for `latents.to(device=...)` to work.
+    vae_info.compute_device = torch.device("cpu")
     cm = MagicMock()
     cm.__enter__ = MagicMock(return_value=(None, vae))
     cm.__exit__ = MagicMock(return_value=None)
