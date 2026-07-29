@@ -175,6 +175,15 @@ GENERATION_MODES = Literal[
     "anima_img2img",
     "anima_inpaint",
     "anima_outpaint",
+    "krea2_txt2img",
+    "krea2_img2img",
+    "krea2_inpaint",
+    "krea2_outpaint",
+    "wan_txt2img",
+    "wan_img2img",
+    "wan_inpaint",
+    "wan_outpaint",
+    "wan_i2v",
 ]
 
 

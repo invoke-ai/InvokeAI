@@ -31,6 +31,7 @@ import {
   isMainOrExternalModelConfig,
   isPiDDecoderModelConfig,
   isQwen3EncoderModelConfig,
+  isQwen3VLEncoderModelConfig,
   isQwenImageDiffusersMainModelConfig,
   isQwenImageVAEModelConfig,
   isQwenVLEncoderModelConfig,
@@ -40,6 +41,10 @@ import {
   isTextLLMModelConfig,
   isTIModelConfig,
   isVAEModelConfigOrSubmodel,
+  isWanDiffusersMainModelConfig,
+  isWanGGUFLowNoiseMainModelConfig,
+  isWanT5EncoderModelConfig,
+  isWanVAEModelConfig,
   isZImageDiffusersMainModelConfig,
 } from 'services/api/types';
 
@@ -115,6 +120,11 @@ export const useQwenImageDiffusersModels = () => buildModelsHook(isQwenImageDiff
 export const useQwenImageVAEModels = () => buildModelsHook(isQwenImageVAEModelConfig)();
 export const useQwenVLEncoderModels = () => buildModelsHook(isQwenVLEncoderModelConfig)();
 export const useQwen3EncoderModels = () => buildModelsHook(isQwen3EncoderModelConfig)();
+export const useQwen3VLEncoderModels = () => buildModelsHook(isQwen3VLEncoderModelConfig)();
+export const useWanDiffusersModels = () => buildModelsHook(isWanDiffusersMainModelConfig)();
+export const useWanGGUFLowNoiseModels = () => buildModelsHook(isWanGGUFLowNoiseMainModelConfig)();
+export const useWanVAEModels = () => buildModelsHook(isWanVAEModelConfig)();
+export const useWanT5EncoderModels = () => buildModelsHook(isWanT5EncoderModelConfig)();
 export const usePiDDecoderModels = buildModelsHook(isPiDDecoderModelConfig);
 export const useGemma2EncoderModels = () => buildModelsHook(isGemma2EncoderModelConfig)();
 export const useGlobalReferenceImageModels = buildModelsHook(
@@ -159,5 +169,9 @@ export const selectZImageDiffusersModels = buildModelsSelector(isZImageDiffusers
 export const selectFlux2DiffusersModels = buildModelsSelector(isFlux2DiffusersMainModelConfig);
 export const selectFluxVAEModels = buildModelsSelector(isFluxVAEModelConfig);
 export const selectAnimaVAEModels = buildModelsSelector(isAnimaVAEModelConfig);
+export const selectQwen3VLEncoderModels = buildModelsSelector(isQwen3VLEncoderModelConfig);
+export const selectWanDiffusersModels = buildModelsSelector(isWanDiffusersMainModelConfig);
+export const selectWanVAEModels = buildModelsSelector(isWanVAEModelConfig);
+export const selectWanT5EncoderModels = buildModelsSelector(isWanT5EncoderModelConfig);
 export const useTextLLMModels = () => buildModelsHook(isTextLLMModelConfig)();
 export const useLlavaModels = () => buildModelsHook(isLLaVAModelConfig)();

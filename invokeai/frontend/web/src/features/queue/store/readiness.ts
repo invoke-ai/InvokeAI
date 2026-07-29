@@ -8,7 +8,11 @@ import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { debounce, groupBy, upperFirst } from 'es-toolkit/compat';
 import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectAddedLoRAs } from 'features/controlLayers/store/lorasSlice';
-import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import {
+  isValidKrea2RebalanceWeights,
+  selectMainModelConfig,
+  selectParamsSlice,
+} from 'features/controlLayers/store/paramsSlice';
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { CanvasState, LoRA, ParamsState, RefImagesState } from 'features/controlLayers/store/types';
@@ -362,6 +366,19 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     }
   }
 
+  if (model?.base === 'wan' && model.format === 'gguf_quantized') {
+    // GGUF Wan mains carry only the transformer; VAE + UMT5-XXL encoder must
+    // come from either standalone models or the Component Source (Diffusers).
+    // The low-noise A14B partner expert is optional — if omitted, the loader
+    // will use the high-noise expert for the whole schedule (lower quality
+    // but still produces an image).
+    const hasVaeSource = params.wanVaeModel !== null || params.wanComponentSource !== null;
+    const hasEncoderSource = params.wanT5EncoderModel !== null || params.wanComponentSource !== null;
+    if (!hasVaeSource || !hasEncoderSource) {
+      reasons.push({ content: i18n.t('parameters.invoke.noWanComponentSourceSelected') });
+    }
+  }
+
   if (model?.base === 'z-image') {
     // Check if VAE source is available (either separate VAE or Qwen3 Source)
     const hasVaeSource = params.zImageVaeModel !== null || params.zImageQwen3SourceModel !== null;
@@ -382,6 +399,27 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
         reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
       }
     }
+  }
+
+  if (model?.base === 'krea-2' && model.format !== 'diffusers') {
+    // Non-diffusers Krea-2 (single-file checkpoint / GGUF) ships only the transformer, so a standalone
+    // VAE and Qwen3-VL encoder must be selected. Diffusers models bundle them, so they're optional there.
+    if (!params.krea2VaeModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noKrea2VaeModelSelected') });
+    }
+    if (!params.krea2Qwen3VlEncoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noKrea2Qwen3VlEncoderModelSelected') });
+    }
+  }
+
+  if (
+    model?.base === 'krea-2' &&
+    params.krea2RebalanceEnabled &&
+    !isValidKrea2RebalanceWeights(params.krea2RebalanceWeights)
+  ) {
+    // The rebalance weights are free text forwarded straight to the backend; block generation before an
+    // invalid string (wrong count / nonnumeric / nan / inf) reaches the failing _parse_weights().
+    reasons.push({ content: i18n.t('parameters.invoke.krea2RebalanceWeightsInvalid') });
   }
 
   if (model?.base === 'anima') {
@@ -996,6 +1034,19 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     }
   }
 
+  if (model?.base === 'wan' && model.format === 'gguf_quantized') {
+    // GGUF Wan mains carry only the transformer; VAE + UMT5-XXL encoder must
+    // come from either standalone models or the Component Source (Diffusers).
+    // The low-noise A14B partner expert is optional — if omitted, the loader
+    // will use the high-noise expert for the whole schedule (lower quality
+    // but still produces an image).
+    const hasVaeSource = params.wanVaeModel !== null || params.wanComponentSource !== null;
+    const hasEncoderSource = params.wanT5EncoderModel !== null || params.wanComponentSource !== null;
+    if (!hasVaeSource || !hasEncoderSource) {
+      reasons.push({ content: i18n.t('parameters.invoke.noWanComponentSourceSelected') });
+    }
+  }
+
   if (model?.base === 'z-image') {
     // Check if VAE source is available (either separate VAE or Qwen3 Source)
     const hasVaeSource = params.zImageVaeModel !== null || params.zImageQwen3SourceModel !== null;
@@ -1040,6 +1091,27 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
         });
       }
     }
+  }
+
+  if (model?.base === 'krea-2' && model.format !== 'diffusers') {
+    // Non-diffusers Krea-2 (single-file checkpoint / GGUF) ships only the transformer, so a standalone
+    // VAE and Qwen3-VL encoder must be selected. Diffusers models bundle them, so they're optional there.
+    if (!params.krea2VaeModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noKrea2VaeModelSelected') });
+    }
+    if (!params.krea2Qwen3VlEncoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noKrea2Qwen3VlEncoderModelSelected') });
+    }
+  }
+
+  if (
+    model?.base === 'krea-2' &&
+    params.krea2RebalanceEnabled &&
+    !isValidKrea2RebalanceWeights(params.krea2RebalanceWeights)
+  ) {
+    // The rebalance weights are free text forwarded straight to the backend; block generation before an
+    // invalid string (wrong count / nonnumeric / nan / inf) reaches the failing _parse_weights().
+    reasons.push({ content: i18n.t('parameters.invoke.krea2RebalanceWeightsInvalid') });
   }
 
   if (model?.base === 'anima') {

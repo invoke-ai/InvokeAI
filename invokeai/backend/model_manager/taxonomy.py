@@ -60,6 +60,10 @@ class BaseModelType(str, Enum):
     """Indicates the model is associated with Qwen Image Edit 2511 model architecture."""
     Anima = "anima"
     """Indicates the model is associated with Anima model architecture (Cosmos Predict2 DiT + LLM Adapter)."""
+    Krea2 = "krea-2"
+    """Indicates the model is associated with the Krea 2 model architecture, including Krea-2-Turbo."""
+    Wan = "wan"
+    """Indicates the model is associated with the Wan 2.2 model architecture (T2V-A14B / TI2V-5B), used for image generation at num_frames=1."""
     Unknown = "unknown"
     """Indicates the model's base architecture is unknown."""
 
@@ -81,6 +85,8 @@ class ModelType(str, Enum):
     T5Encoder = "t5_encoder"
     Qwen3Encoder = "qwen3_encoder"
     QwenVLEncoder = "qwen_vl_encoder"
+    Qwen3VLEncoder = "qwen3_vl_encoder"
+    WanT5Encoder = "wan_t5_encoder"
     Gemma2Encoder = "gemma2_encoder"
     SpandrelImageToImage = "spandrel_image_to_image"
     SigLIP = "siglip"
@@ -97,6 +103,7 @@ class SubModelType(str, Enum):
 
     UNet = "unet"
     Transformer = "transformer"
+    Transformer2 = "transformer_2"
     TextEncoder = "text_encoder"
     TextEncoder2 = "text_encoder_2"
     TextEncoder3 = "text_encoder_3"
@@ -159,6 +166,22 @@ class ZImageVariantType(str, Enum):
     """Z-Image Base - undistilled foundation model with full CFG and negative prompt support."""
 
 
+class Krea2VariantType(str, Enum):
+    """Krea 2 model variants."""
+
+    Turbo = "krea2_turbo"
+    """Krea-2-Turbo - distilled model optimized for 8 steps with CFG disabled (guidance_scale=0).
+
+    NOTE: the value is ``krea2_turbo`` (not ``turbo``) to avoid colliding with
+    ``ZImageVariantType.Turbo`` in the variant-string adapter and frontend label maps."""
+
+    Base = "krea2_base"
+    """Krea-2-Raw - undistilled base model. Runs with more steps (~28) and CFG enabled (~4.5),
+    using resolution-aware timestep shifting (``is_distilled=false`` in model_index.json).
+
+    NOTE: the value is ``krea2_base`` (not ``base``) for the same disambiguation reason as ``Turbo``."""
+
+
 class QwenImageVariantType(str, Enum):
     """Qwen Image model variants."""
 
@@ -167,6 +190,44 @@ class QwenImageVariantType(str, Enum):
 
     Edit = "edit"
     """Qwen Image Edit - image editing model with reference image support."""
+
+
+class WanVariantType(str, Enum):
+    """Wan 2.2 model variants.
+
+    All variants are used for image generation at num_frames=1. The A14B family
+    is a Mixture-of-Experts (high-noise + low-noise) totalling ~28B params; the
+    T2V sub-variant takes text only, while the I2V sub-variant additionally
+    conditions on a reference image (encoded by the VAE and concatenated to the
+    noise latents along the channel dim — its transformer has ``in_channels=36``
+    instead of ``16``). TI2V-5B is a single ~5B transformer with a
+    higher-compression VAE (z_dim=48).
+    """
+
+    T2V_A14B = "t2v_a14b"
+    """Wan 2.2 T2V-A14B - dual-expert MoE (text only, 16-channel Wan VAE, transformer in_channels=16)."""
+
+    I2V_A14B = "i2v_a14b"
+    """Wan 2.2 I2V-A14B - dual-expert MoE with VAE-latent reference-image conditioning (transformer in_channels=36)."""
+
+    TI2V_5B = "ti2v_5b"
+    """Wan 2.2 TI2V-5B - smaller single-transformer model with Wan2.2-VAE (48 latent channels)."""
+
+
+class WanLoRAVariantType(str, Enum):
+    """Wan 2.2 LoRA variants, identifying which model family a LoRA targets.
+
+    Detected from the LoRA's inner attention dim: A14B has ``inner_dim=5120``,
+    TI2V-5B has ``inner_dim=3072``. A14B and 5B LoRAs are NOT interchangeable —
+    applying one against the wrong main model crashes in the layer patcher
+    with a tensor-shape error.
+    """
+
+    A14B = "a14b"
+    """Targets a Wan 2.2 A14B main (T2V or I2V, inner_dim=5120)."""
+
+    Wan5B = "5b"
+    """Targets the Wan 2.2 TI2V-5B main (inner_dim=3072)."""
 
 
 class Qwen3VariantType(str, Enum):
@@ -214,6 +275,8 @@ class ModelFormat(str, Enum):
     T5Encoder = "t5_encoder"
     Qwen3Encoder = "qwen3_encoder"
     QwenVLEncoder = "qwen_vl_encoder"
+    Qwen3VLEncoder = "qwen3_vl_encoder"
+    WanT5Encoder = "wan_t5_encoder"
     Gemma2Encoder = "gemma2_encoder"
     BnbQuantizedLlmInt8b = "bnb_quantized_int8b"
     BnbQuantizednf4b = "bnb_quantized_nf4b"
@@ -270,7 +333,10 @@ AnyVariant: TypeAlias = Union[
     Flux2VariantType,
     ZImageVariantType,
     QwenImageVariantType,
+    WanVariantType,
+    WanLoRAVariantType,
     Qwen3VariantType,
+    Krea2VariantType,
     PiDDecoderVariantType,
 ]
 variant_type_adapter = TypeAdapter[
@@ -280,7 +346,10 @@ variant_type_adapter = TypeAdapter[
     | Flux2VariantType
     | ZImageVariantType
     | QwenImageVariantType
+    | WanVariantType
+    | WanLoRAVariantType
     | Qwen3VariantType
+    | Krea2VariantType
     | PiDDecoderVariantType
 ](
     ModelVariantType
@@ -289,6 +358,9 @@ variant_type_adapter = TypeAdapter[
     | Flux2VariantType
     | ZImageVariantType
     | QwenImageVariantType
+    | WanVariantType
+    | WanLoRAVariantType
     | Qwen3VariantType
+    | Krea2VariantType
     | PiDDecoderVariantType
 )
