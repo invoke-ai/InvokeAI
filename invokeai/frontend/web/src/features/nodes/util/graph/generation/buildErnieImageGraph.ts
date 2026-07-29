@@ -14,6 +14,7 @@ import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermar
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { selectCanvasOutputFields, selectPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg, GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
+import { UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { Invocation } from 'services/api/types';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
@@ -123,10 +124,11 @@ export const buildErnieImageGraph = async (arg: GraphBuilderArg): Promise<GraphB
 
   // ERNIE-Image is text-to-image only. Its denoise node has no `denoise_mask` input, so
   // masked modes (inpaint/outpaint) are unsupported, and we do not offer image-to-image.
-  assert(
-    generationMode === 'txt2img',
-    `ERNIE-Image only supports text-to-image generation, but got generation mode: ${generationMode}`
-  );
+  if (generationMode !== 'txt2img') {
+    throw new UnsupportedGenerationModeError(
+      `ERNIE-Image only supports text-to-image generation, but got generation mode: ${generationMode}`
+    );
+  }
 
   let canvasOutput: Invocation<ImageOutputNodes> = addTextToImage({ g, state, denoise, l2i });
   g.upsertMetadata({ generation_mode: 'ernie_image_txt2img' });

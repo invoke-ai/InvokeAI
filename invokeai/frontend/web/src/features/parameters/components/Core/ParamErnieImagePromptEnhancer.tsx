@@ -6,9 +6,11 @@ import {
 } from 'features/controlLayers/store/paramsSlice';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const ParamErnieImagePromptEnhancer = () => {
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
   const useEnhancer = useAppSelector(selectErnieImageUsePromptEnhancer);
 
   const onChange = useCallback(
@@ -20,7 +22,7 @@ const ParamErnieImagePromptEnhancer = () => {
 
   return (
     <FormControl>
-      <FormLabel>Prompt Enhancer</FormLabel>
+      <FormLabel>{t('parameters.ernieImagePromptEnhancer')}</FormLabel>
       <Switch isChecked={useEnhancer} onChange={onChange} />
     </FormControl>
   );

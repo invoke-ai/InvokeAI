@@ -71,15 +71,26 @@ def denoise(
         if "sigmas" in set_timesteps_sig.parameters:
             scheduler.set_timesteps(sigmas=sigmas.tolist(), device=img.device)
         else:
-            # Heun/LCM in diffusers don't accept sigmas -- fall back to step count.
+            # FlowMatchHeunDiscreteScheduler.set_timesteps only takes a step count and derives its
+            # own sigmas, so a partial-denoise range cannot be honored. Refuse instead of silently
+            # running a full denoise with the wrong schedule.
+            if not (math.isclose(timesteps[0], 1.0) and math.isclose(timesteps[-1], 0.0, abs_tol=1e-6)):
+                raise ValueError(
+                    f"{type(scheduler).__name__} does not accept an explicit sigma schedule, so it cannot honor "
+                    "denoising_start/denoising_end. Use the euler or lcm scheduler for partial denoising."
+                )
             scheduler.set_timesteps(num_inference_steps=len(sigmas), device=img.device)
 
+        # Higher-order solvers evaluate the model more than once per requested step (Heun's
+        # `set_timesteps(N)` yields 2N-1 timesteps), so drive progress off the actual iteration
+        # count rather than the requested step count.
+        total_steps = len(scheduler.timesteps)
+
         pbar = tqdm(total=total_steps, desc="ERNIE-Image denoising")
-        for step_index in range(len(scheduler.timesteps)):
+        for step_index in range(total_steps):
             timestep = scheduler.timesteps[step_index]
             # The scheduler's timestep is already in `[0, num_train_timesteps]`; pass directly.
             t_model = timestep.item()
-            t_sigma = t_model / model_timestep_scale
             t_vec = torch.full((img.shape[0],), t_model, dtype=img.dtype, device=img.device)
 
             pred = _forward(model, img, t_vec, text_bth, text_lens)
@@ -98,8 +109,9 @@ def denoise(
 
             pbar.update(1)
             # Predicted x0 estimate, unpatched so the preview decoder can use standard
-            # 32-channel latent RGB factors.
-            preview = unpatchify_latents(img - t_sigma * pred)
+            # 32-channel latent RGB factors. `img` has already been stepped to `t_prev`, so the
+            # x0 estimate must use `t_prev` (using the pre-step sigma would over-subtract).
+            preview = unpatchify_latents(img - t_prev * pred)
             step_callback(
                 PipelineIntermediateState(
                     step=step_index + 1,
@@ -136,7 +148,8 @@ def denoise(
             img = inpaint_extension.merge_intermediate_latents_with_init_latents(img, t_next)
 
         pbar.update(1)
-        preview = unpatchify_latents(img - t_curr * pred)
+        # `img` has already been stepped to `t_next`, so the x0 estimate uses `t_next`.
+        preview = unpatchify_latents(img - t_next * pred)
         step_callback(
             PipelineIntermediateState(
                 step=i + 1,

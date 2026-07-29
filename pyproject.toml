@@ -36,13 +36,15 @@ dependencies = [
   "accelerate",
   "bitsandbytes; sys_platform!='darwin'",
   "compel>=2.4.0,<3",
-  "diffusers[torch]==0.37.0",
+  "diffusers[torch]==0.39.0",
   "gguf",
   "mediapipe==0.10.14",                   # needed for "mediapipeface" controlnet model
   "numpy<2.0.0",
   "onnx==1.16.1",
   "onnxruntime==1.19.2",
   "opencv-contrib-python",
+  "imageio[ffmpeg]>=2.37",                 # video encode (for Wan 2.2 T2V/I2V output); encode behavior (macro_block_size) is version-sensitive
+  "psutil>=6",                             # video decode worker process-tree termination
   "safetensors",
   "sentencepiece==0.2.0",                 # 0.2.1 coredumps windows when loading t5 tokenizer
   "spandrel",
@@ -151,12 +153,7 @@ dependencies = [
 [tool.uv]
 # Prevent opencv-python from ever being chosen during dependency resolution.
 # This prevents conflicts with opencv-contrib-python, which Invoke requires.
-# Force transformers>=5.1.0 past compel==2.1.1's ~=4.25 (<5.0) constraint.
-override-dependencies = ["opencv-python; sys_platform=='never'", "transformers>=5.1.0"]
-# diffusers 0.38.0 hard-pins safetensors>=0.8.0-rc.0 (an upstream-side prerelease
-# requirement). Until a diffusers 0.38.x patch releases with a stable safetensors
-# floor, we have to allow that one prerelease through resolution.
-prerelease = "allow"
+override-dependencies = ["opencv-python; sys_platform=='never'"]
 conflicts = [[{ extra = "cpu" }, { extra = "cuda" }, { extra = "rocm" }]]
 index-strategy = "unsafe-best-match"
 # Restrict resolution to the platforms we support: x86_64/aarch64 Linux, Windows,

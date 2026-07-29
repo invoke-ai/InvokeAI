@@ -131,6 +131,24 @@ const slice = createSlice({
     setZImageSeedVarianceRandomizePercent: (state, action: PayloadAction<number>) => {
       state.zImageSeedVarianceRandomizePercent = action.payload;
     },
+    setKrea2SeedVarianceEnabled: (state, action: PayloadAction<boolean>) => {
+      state.krea2SeedVarianceEnabled = action.payload;
+    },
+    setKrea2SeedVarianceStrength: (state, action: PayloadAction<number>) => {
+      state.krea2SeedVarianceStrength = action.payload;
+    },
+    setKrea2SeedVarianceRandomizePercent: (state, action: PayloadAction<number>) => {
+      state.krea2SeedVarianceRandomizePercent = action.payload;
+    },
+    setKrea2RebalanceEnabled: (state, action: PayloadAction<boolean>) => {
+      state.krea2RebalanceEnabled = action.payload;
+    },
+    setKrea2RebalanceMultiplier: (state, action: PayloadAction<number>) => {
+      state.krea2RebalanceMultiplier = action.payload;
+    },
+    setKrea2RebalanceWeights: (state, action: PayloadAction<string>) => {
+      state.krea2RebalanceWeights = action.payload;
+    },
     setUpscaleScheduler: (state, action: PayloadAction<ParameterScheduler>) => {
       state.upscaleScheduler = action.payload;
     },
@@ -247,6 +265,23 @@ const slice = createSlice({
       }
       state.zImageQwen3SourceModel = result.data;
     },
+    krea2VaeModelSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
+      const result = zParamsState.shape.krea2VaeModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.krea2VaeModel = result.data;
+    },
+    krea2Qwen3VlEncoderModelSelected: (
+      state,
+      action: PayloadAction<{ key: string; name: string; base: string } | null>
+    ) => {
+      const result = zParamsState.shape.krea2Qwen3VlEncoderModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.krea2Qwen3VlEncoderModel = result.data;
+    },
     animaVaeModelSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
       const result = zParamsState.shape.animaVaeModel.safeParse(action.payload);
       if (!result.success) {
@@ -327,6 +362,37 @@ const slice = createSlice({
     },
     qwenImageShiftChanged: (state, action: PayloadAction<number | null>) => {
       state.qwenImageShift = action.payload;
+    },
+    wanTransformerLowNoiseSelected: (state, action: PayloadAction<ParameterModel | null>) => {
+      const result = zParamsState.shape.wanTransformerLowNoise.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.wanTransformerLowNoise = result.data;
+    },
+    wanComponentSourceSelected: (state, action: PayloadAction<ParameterModel | null>) => {
+      const result = zParamsState.shape.wanComponentSource.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.wanComponentSource = result.data;
+    },
+    wanVaeModelSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
+      const result = zParamsState.shape.wanVaeModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.wanVaeModel = result.data;
+    },
+    wanT5EncoderModelSelected: (state, action: PayloadAction<{ key: string; name: string; base: string } | null>) => {
+      const result = zParamsState.shape.wanT5EncoderModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.wanT5EncoderModel = result.data;
+    },
+    wanGuidanceScaleLowNoiseChanged: (state, action: PayloadAction<number | null>) => {
+      state.wanGuidanceScaleLowNoise = action.payload;
     },
     vaePrecisionChanged: (state, action: PayloadAction<ParameterPrecision>) => {
       state.vaePrecision = action.payload;
@@ -650,6 +716,8 @@ const resetState = (state: ParamsState): ParamsState => {
   newState.zImageVaeModel = oldState.zImageVaeModel;
   newState.zImageQwen3EncoderModel = oldState.zImageQwen3EncoderModel;
   newState.zImageQwen3SourceModel = oldState.zImageQwen3SourceModel;
+  newState.krea2VaeModel = oldState.krea2VaeModel;
+  newState.krea2Qwen3VlEncoderModel = oldState.krea2Qwen3VlEncoderModel;
   newState.animaVaeModel = oldState.animaVaeModel;
   newState.animaQwen3EncoderModel = oldState.animaQwen3EncoderModel;
   newState.animaLLLiteModel = oldState.animaLLLiteModel;
@@ -660,6 +728,11 @@ const resetState = (state: ParamsState): ParamsState => {
   newState.qwenImageQwenVLEncoderModel = oldState.qwenImageQwenVLEncoderModel;
   newState.qwenImageQuantization = oldState.qwenImageQuantization;
   newState.qwenImageShift = oldState.qwenImageShift;
+  newState.wanTransformerLowNoise = oldState.wanTransformerLowNoise;
+  newState.wanComponentSource = oldState.wanComponentSource;
+  newState.wanVaeModel = oldState.wanVaeModel;
+  newState.wanT5EncoderModel = oldState.wanT5EncoderModel;
+  newState.wanGuidanceScaleLowNoise = oldState.wanGuidanceScaleLowNoise;
   return newState;
 };
 
@@ -694,6 +767,12 @@ export const {
   setZImageSeedVarianceEnabled,
   setZImageSeedVarianceStrength,
   setZImageSeedVarianceRandomizePercent,
+  setKrea2SeedVarianceEnabled,
+  setKrea2SeedVarianceStrength,
+  setKrea2SeedVarianceRandomizePercent,
+  setKrea2RebalanceEnabled,
+  setKrea2RebalanceMultiplier,
+  setKrea2RebalanceWeights,
   setUpscaleScheduler,
   setUpscaleCfgScale,
   setSeed,
@@ -712,6 +791,8 @@ export const {
   zImageVaeModelSelected,
   zImageQwen3EncoderModelSelected,
   zImageQwen3SourceModelSelected,
+  krea2VaeModelSelected,
+  krea2Qwen3VlEncoderModelSelected,
   kleinVaeModelSelected,
   kleinQwen3EncoderModelSelected,
   qwenImageComponentSourceSelected,
@@ -719,6 +800,11 @@ export const {
   qwenImageQwenVLEncoderModelSelected,
   qwenImageQuantizationChanged,
   qwenImageShiftChanged,
+  wanTransformerLowNoiseSelected,
+  wanComponentSourceSelected,
+  wanVaeModelSelected,
+  wanT5EncoderModelSelected,
+  wanGuidanceScaleLowNoiseChanged,
   setClipSkip,
   shouldUseCpuNoiseChanged,
   setColorCompensation,
@@ -792,6 +878,19 @@ export const paramsSliceConfig: SliceConfig<typeof slice> = {
         state.qwenImageQwenVLEncoderModel = null;
       }
 
+      if (state._version === 3) {
+        // v3 -> v4, add Krea-2 standalone component and conditioning enhancer fields
+        state._version = 4;
+        state.krea2VaeModel = null;
+        state.krea2Qwen3VlEncoderModel = null;
+        state.krea2SeedVarianceEnabled = false;
+        state.krea2SeedVarianceStrength = 0.1;
+        state.krea2SeedVarianceRandomizePercent = 50;
+        state.krea2RebalanceEnabled = false;
+        state.krea2RebalanceMultiplier = 4;
+        state.krea2RebalanceWeights = '1.0,1.0,1.0,1.0,1.0,1.0,1.0,2.5,5.0,1.1,4.0,1.0';
+      }
+
       return zParamsState.parse(state);
     },
   },
@@ -812,6 +911,8 @@ export const selectIsFlux2 = createParamsSelector((params) => params.model?.base
 export const selectIsErnieImage = createParamsSelector((params) => params.model?.base === 'ernie-image');
 export const selectIsExternal = createParamsSelector((params) => params.model?.base === 'external');
 export const selectIsQwenImage = createParamsSelector((params) => params.model?.base === 'qwen-image');
+export const selectIsKrea2 = createParamsSelector((params) => params.model?.base === 'krea-2');
+export const selectIsWan = createParamsSelector((params) => params.model?.base === 'wan');
 export const selectIsFluxKontext = createParamsSelector((params) => {
   if (params.model?.base === 'flux' && params.model?.name.toLowerCase().includes('kontext')) {
     return true;
@@ -832,6 +933,8 @@ export const selectCLIPGEmbedModel = createParamsSelector((params) => params.cli
 export const selectZImageVaeModel = createParamsSelector((params) => params.zImageVaeModel);
 export const selectZImageQwen3EncoderModel = createParamsSelector((params) => params.zImageQwen3EncoderModel);
 export const selectZImageQwen3SourceModel = createParamsSelector((params) => params.zImageQwen3SourceModel);
+export const selectKrea2VaeModel = createParamsSelector((params) => params.krea2VaeModel);
+export const selectKrea2Qwen3VlEncoderModel = createParamsSelector((params) => params.krea2Qwen3VlEncoderModel);
 export const selectAnimaVaeModel = createParamsSelector((params) => params.animaVaeModel);
 export const selectAnimaQwen3EncoderModel = createParamsSelector((params) => params.animaQwen3EncoderModel);
 export const selectAnimaScheduler = createParamsSelector((params) => params.animaScheduler);
@@ -844,6 +947,11 @@ export const selectQwenImageVaeModel = createParamsSelector((params) => params.q
 export const selectQwenImageQwenVLEncoderModel = createParamsSelector((params) => params.qwenImageQwenVLEncoderModel);
 export const selectQwenImageQuantization = createParamsSelector((params) => params.qwenImageQuantization);
 export const selectQwenImageShift = createParamsSelector((params) => params.qwenImageShift);
+export const selectWanTransformerLowNoise = createParamsSelector((params) => params.wanTransformerLowNoise);
+export const selectWanComponentSource = createParamsSelector((params) => params.wanComponentSource);
+export const selectWanVaeModel = createParamsSelector((params) => params.wanVaeModel);
+export const selectWanT5EncoderModel = createParamsSelector((params) => params.wanT5EncoderModel);
+export const selectWanGuidanceScaleLowNoise = createParamsSelector((params) => params.wanGuidanceScaleLowNoise);
 
 export const selectCFGScale = createParamsSelector((params) => params.cfgScale);
 export const selectGuidance = createParamsSelector((params) => params.guidance);
@@ -903,7 +1011,16 @@ export const selectModelSupportsRefImages = createSelector(selectModel, selectMo
   if (model.base === 'external') {
     return false;
   }
-  return SUPPORTS_REF_IMAGES_BASE_MODELS.includes(model.base);
+  if (!SUPPORTS_REF_IMAGES_BASE_MODELS.includes(model.base)) {
+    return false;
+  }
+  // Wan: only the I2V variant of A14B consumes a reference image. T2V and
+  // TI2V-5B ignore ref images, so hide the panel for those.
+  if (model.base === 'wan') {
+    const variant = modelConfig && 'variant' in modelConfig ? modelConfig.variant : null;
+    return variant === 'i2v_a14b';
+  }
+  return true;
 });
 export const selectModelSupportsOptimizedDenoising = createSelector(
   selectModel,
@@ -974,6 +1091,45 @@ export const selectZImageSeedVarianceStrength = createParamsSelector((params) =>
 export const selectZImageSeedVarianceRandomizePercent = createParamsSelector(
   (params) => params.zImageSeedVarianceRandomizePercent
 );
+export const selectKrea2SeedVarianceEnabled = createParamsSelector((params) => params.krea2SeedVarianceEnabled);
+export const selectKrea2SeedVarianceStrength = createParamsSelector((params) => params.krea2SeedVarianceStrength);
+export const selectKrea2SeedVarianceRandomizePercent = createParamsSelector(
+  (params) => params.krea2SeedVarianceRandomizePercent
+);
+export const selectKrea2RebalanceEnabled = createParamsSelector((params) => params.krea2RebalanceEnabled);
+export const selectKrea2RebalanceMultiplier = createParamsSelector((params) => params.krea2RebalanceMultiplier);
+export const selectKrea2RebalanceWeights = createParamsSelector((params) => params.krea2RebalanceWeights);
+
+// The Krea-2 Conditioning Rebalance node taps exactly 12 encoder layers, so its per-layer weights string
+// must be exactly 12 finite comma-separated numbers. Mirrors Krea2ConditioningRebalanceInvocation._parse_weights
+// so an invalid string is blocked before it can queue a generation the backend will reject.
+export const KREA2_REBALANCE_WEIGHT_COUNT = 12;
+
+// Plain decimal / scientific-notation float, matching what Python's float() accepts. Crucially this rejects
+// the hex/binary/octal literals (0x10, 0b10, 0o10) that JS Number() would happily parse but the backend
+// float() rejects — which would otherwise let a graph queue that is guaranteed to fail at generation.
+const KREA2_DECIMAL_NUMBER_RE = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
+
+export const parseKrea2RebalanceWeights = (weights: string): number[] | null => {
+  const parts = weights
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s !== '');
+  if (parts.length !== KREA2_REBALANCE_WEIGHT_COUNT) {
+    return null;
+  }
+  if (!parts.every((p) => KREA2_DECIMAL_NUMBER_RE.test(p))) {
+    return null;
+  }
+  const nums = parts.map(Number);
+  if (nums.some((n) => !Number.isFinite(n))) {
+    return null;
+  }
+  return nums;
+};
+
+export const isValidKrea2RebalanceWeights = (weights: string): boolean => parseKrea2RebalanceWeights(weights) !== null;
+
 export const selectSeamlessXAxis = createParamsSelector((params) => params.seamlessXAxis);
 export const selectSeamlessYAxis = createParamsSelector((params) => params.seamlessYAxis);
 export const selectSeed = createParamsSelector((params) => params.seed);

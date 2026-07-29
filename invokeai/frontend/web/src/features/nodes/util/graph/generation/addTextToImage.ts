@@ -32,6 +32,7 @@ export const addTextToImage = ({
   | 'z_image_l2i'
   | 'ernie_image_vae_decode'
   | 'anima_l2i'
+  | 'wan_l2i'
 > => {
   denoise.denoising_start = 0;
   denoise.denoising_end = 1;
@@ -46,7 +47,9 @@ export const addTextToImage = ({
     denoise.type === 'sd3_denoise' ||
     denoise.type === 'z_image_denoise' ||
     denoise.type === 'ernie_image_denoise' ||
-    denoise.type === 'anima_denoise'
+    denoise.type === 'krea2_denoise' ||
+    denoise.type === 'anima_denoise' ||
+    denoise.type === 'wan_denoise'
   ) {
     denoise.width = scaledSize.width;
     denoise.height = scaledSize.height;

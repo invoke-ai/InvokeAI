@@ -82,8 +82,11 @@ class ErnieImageModelLoaderInvocation(BaseInvocation):
 
     def _pipeline_has_prompt_enhancer(self, context: InvocationContext) -> bool:
         """Check whether the pipeline directory ships a prompt-enhancer."""
-        from pathlib import Path
-
         config = context.models.get_config(self.model)
-        pe_dir = Path(config.path) / "pe"
+        # Models inside the Invoke-managed models dir are recorded with paths relative to
+        # `models_path`; only the loader rewrites `config.path` to an absolute path, and that
+        # happens after this check. Resolve against `models_path` the same way the loader does,
+        # otherwise this would silently probe the server process's CWD and never find `pe/`.
+        models_path = context.config.get().models_path
+        pe_dir = (models_path / config.path).resolve() / SubModelType.PromptEnhancer.value
         return pe_dir.is_dir()

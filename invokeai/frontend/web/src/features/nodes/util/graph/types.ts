@@ -19,7 +19,8 @@ export type ImageOutputNodes =
   | 'z_image_l2i'
   | 'ernie_image_vae_decode'
   | 'ideogram4_l2i'
-  | 'anima_l2i';
+  | 'anima_l2i'
+  | 'wan_l2i';
 
 export type LatentToImageNodes =
   | 'l2i'
@@ -30,7 +31,8 @@ export type LatentToImageNodes =
   | 'qwen_image_l2i'
   | 'z_image_l2i'
   | 'ernie_image_vae_decode'
-  | 'anima_l2i';
+  | 'anima_l2i'
+  | 'wan_l2i';
 
 export type ImageToLatentsNodes =
   | 'i2l'
@@ -40,7 +42,8 @@ export type ImageToLatentsNodes =
   | 'cogview4_i2l'
   | 'qwen_image_i2l'
   | 'z_image_i2l'
-  | 'anima_i2l';
+  | 'anima_i2l'
+  | 'wan_i2l';
 
 export type DenoiseLatentsNodes =
   | 'denoise_latents'
@@ -51,7 +54,9 @@ export type DenoiseLatentsNodes =
   | 'qwen_image_denoise'
   | 'z_image_denoise'
   | 'ernie_image_denoise'
-  | 'anima_denoise';
+  | 'krea2_denoise'
+  | 'anima_denoise'
+  | 'wan_denoise';
 
 /**
  * Denoise nodes that support masked denoising (inpaint/outpaint). ERNIE-Image's denoise node
@@ -69,7 +74,9 @@ export type MainModelLoaderNodes =
   | 'qwen_image_model_loader'
   | 'z_image_model_loader'
   | 'ernie_image_model_loader'
-  | 'anima_model_loader';
+  | 'krea2_model_loader'
+  | 'anima_model_loader'
+  | 'wan_model_loader';
 
 export type VaeSourceNodes = 'seamless' | 'vae_loader';
 

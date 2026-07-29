@@ -2,6 +2,7 @@ from contextlib import ExitStack
 from typing import Optional
 
 import torch
+from diffusers.schedulers.scheduling_utils import SchedulerMixin
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
 from invokeai.app.invocations.fields import (
@@ -113,13 +114,16 @@ class ErnieImageDenoiseInvocation(BaseInvocation):
                         "Pass already-patched latents (use the ERNIE-Image VAE encode node)."
                     )
             else:
-                generator = torch.Generator(device=device).manual_seed(self.seed)
+                # Always generate noise on the same device and dtype, then cast, so a given seed
+                # produces the same image regardless of the execution device (CUDA/ROCm/MPS/CPU).
+                rand_device = "cpu"
+                rand_dtype = torch.float32
                 img = torch.randn(
                     (1, in_channels, latent_h, latent_w),
-                    generator=generator,
-                    device=device,
-                    dtype=dtype,
-                )
+                    generator=torch.Generator(device=rand_device).manual_seed(self.seed),
+                    device=rand_device,
+                    dtype=rand_dtype,
+                ).to(device=device, dtype=dtype)
 
             sigmas = sampling_utils.get_schedule(
                 self.steps, denoising_start=self.denoising_start, denoising_end=self.denoising_end
@@ -127,8 +131,7 @@ class ErnieImageDenoiseInvocation(BaseInvocation):
             timesteps = sigmas.tolist()
             cfg_scale = [self.guidance_scale] * (len(timesteps) - 1)
 
-            scheduler_cls = ERNIE_IMAGE_SCHEDULER_MAP[self.scheduler]
-            scheduler = scheduler_cls()
+            scheduler = self._build_scheduler(context)
 
             def _step_callback(state: PipelineIntermediateState) -> None:
                 context.util.sd_step_callback(state, BaseModelType.ErnieImage)
@@ -148,7 +151,40 @@ class ErnieImageDenoiseInvocation(BaseInvocation):
 
         latents = img.detach().to("cpu")
         name = context.tensors.save(tensor=latents)
-        return LatentsOutput.build(latents_name=name, latents=latents, seed=self.seed)
+        # `LatentsOutput.build` assumes unpatched latents at 1/8 scale. ERNIE's latents are
+        # 2x2-patchified on top of the 8x VAE downscale, so report the requested size directly.
+        return LatentsOutput(
+            latents=LatentsField(latents_name=name, seed=self.seed),
+            width=self.width,
+            height=self.height,
+        )
+
+    def _build_scheduler(self, context: InvocationContext) -> SchedulerMixin:
+        """Instantiate the selected scheduler from the pipeline's own `scheduler/` config.
+
+        The diffusers defaults (`shift=1.0`, `num_train_timesteps=1000`) are not necessarily what
+        the checkpoint ships, and both feed the sampling math (`set_timesteps` applies `shift` to
+        the sigmas, and `num_train_timesteps` scales the timestep fed to the transformer). Falling
+        back to a default-constructed scheduler would silently diverge from the reference pipeline.
+        """
+        scheduler_cls = ERNIE_IMAGE_SCHEDULER_MAP[self.scheduler]
+        config = context.models.get_config(self.transformer.transformer)
+        # Model paths in the record store are relative to `models_path` for Invoke-managed models.
+        model_path = (context.config.get().models_path / config.path).resolve()
+        scheduler_dir = model_path / "scheduler"
+        if not scheduler_dir.is_dir():
+            context.logger.warning(
+                f"No scheduler config found at {scheduler_dir}; falling back to {scheduler_cls.__name__} defaults."
+            )
+            return scheduler_cls()
+        try:
+            return scheduler_cls.from_pretrained(model_path, subfolder="scheduler")
+        except Exception as e:
+            context.logger.warning(
+                f"Failed to load scheduler config from {scheduler_dir} ({e}); "
+                f"falling back to {scheduler_cls.__name__} defaults."
+            )
+            return scheduler_cls()
 
     def _load_conditioning(
         self,
