@@ -49,11 +49,13 @@ class ObjectSerializerForwardCache(ObjectSerializerBase[T]):
         return name
 
     def delete(self, name: str) -> None:
-        self._underlying_storage.delete(name)
-        if name in self._cache:
-            del self._cache[name]
-            self._remove_cache_id(name)
-        self._on_deleted(name)
+        try:
+            self._underlying_storage.delete(name)
+        finally:
+            if name in self._cache:
+                del self._cache[name]
+                self._remove_cache_id(name)
+            self._on_deleted(name)
 
     def _remove_cache_id(self, name: str) -> None:
         remaining_ids: list[str] = []

@@ -71,6 +71,12 @@ def test_obj_serializer_disk_deletes(obj_serializer: ObjectSerializerDisk[MockDa
     assert Path(obj_serializer._output_dir, obj_2_name).exists()
 
 
+def test_obj_serializer_disk_delete_is_noop_when_object_is_missing(
+    obj_serializer: ObjectSerializerDisk[MockDataclass],
+):
+    obj_serializer.delete("missing_object_name")
+
+
 def test_obj_serializer_ephemeral_creates_tempdir(tmp_path: Path):
     obj_serializer = ObjectSerializerDisk[MockDataclass](tmp_path, safe_globals=[MockDataclass], ephemeral=True)
     assert isinstance(obj_serializer._tempdir, tempfile.TemporaryDirectory)
@@ -189,12 +195,8 @@ def test_obj_serializer_fwd_cache_calls_delete_callback(fwd_cache: ObjectSeriali
 
 
 def test_obj_serializer_fwd_cache_removes_deleted_ids_from_eviction_queue(
-    tmp_path: Path,
+    fwd_cache: ObjectSerializerForwardCache[MockDataclass],
 ):
-    fwd_cache = ObjectSerializerForwardCache(
-        ObjectSerializerDisk[MockDataclass](tmp_path, safe_globals=[MockDataclass]), max_cache_size=2
-    )
-
     obj_1_name = fwd_cache.save(MockDataclass(foo="bar"))
     obj_2_name = fwd_cache.save(MockDataclass(foo="baz"))
     fwd_cache.delete(obj_1_name)
@@ -205,3 +207,56 @@ def test_obj_serializer_fwd_cache_removes_deleted_ids_from_eviction_queue(
     assert obj_2_name in fwd_cache._cache
     assert obj_3_name in fwd_cache._cache
     assert fwd_cache._cache_ids.qsize() == 2
+
+
+def test_obj_serializer_fwd_cache_cleans_up_when_storage_object_is_missing(
+    fwd_cache: ObjectSerializerForwardCache[MockDataclass],
+):
+    called_names: list[str] = []
+    fwd_cache.on_deleted(called_names.append)
+    obj_name = fwd_cache.save(MockDataclass(foo="bar"))
+    underlying_storage = fwd_cache._underlying_storage
+    assert isinstance(underlying_storage, ObjectSerializerDisk)
+    underlying_storage._get_path(obj_name).unlink()
+
+    fwd_cache.delete(obj_name)
+
+    assert obj_name not in fwd_cache._cache
+    assert fwd_cache._cache_ids.qsize() == 0
+    assert called_names == [obj_name]
+
+
+def test_obj_serializer_fwd_cache_preserves_fifo_order_after_deletion(tmp_path: Path):
+    fwd_cache = ObjectSerializerForwardCache(
+        ObjectSerializerDisk[MockDataclass](tmp_path, safe_globals=[MockDataclass]), max_cache_size=3
+    )
+    obj_1_name = fwd_cache.save(MockDataclass(foo="one"))
+    obj_2_name = fwd_cache.save(MockDataclass(foo="two"))
+    obj_3_name = fwd_cache.save(MockDataclass(foo="three"))
+    fwd_cache.delete(obj_2_name)
+    obj_4_name = fwd_cache.save(MockDataclass(foo="four"))
+    obj_5_name = fwd_cache.save(MockDataclass(foo="five"))
+
+    assert obj_1_name not in fwd_cache._cache
+    assert obj_2_name not in fwd_cache._cache
+    assert obj_3_name in fwd_cache._cache
+    assert obj_4_name in fwd_cache._cache
+    assert obj_5_name in fwd_cache._cache
+    assert fwd_cache._cache_ids.qsize() == 3
+
+
+def test_obj_serializer_fwd_cache_delete_of_evicted_object_is_noop(
+    fwd_cache: ObjectSerializerForwardCache[MockDataclass],
+):
+    obj_1_name = fwd_cache.save(MockDataclass(foo="one"))
+    obj_2_name = fwd_cache.save(MockDataclass(foo="two"))
+    obj_3_name = fwd_cache.save(MockDataclass(foo="three"))
+    cache_before_delete = fwd_cache._cache.copy()
+    queue_size_before_delete = fwd_cache._cache_ids.qsize()
+
+    fwd_cache.delete(obj_1_name)
+
+    assert fwd_cache._cache == cache_before_delete
+    assert fwd_cache._cache_ids.qsize() == queue_size_before_delete
+    assert obj_2_name in fwd_cache._cache
+    assert obj_3_name in fwd_cache._cache

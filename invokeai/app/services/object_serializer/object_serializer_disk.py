@@ -65,7 +65,7 @@ class ObjectSerializerDisk(ObjectSerializerBase[T]):
 
     def delete(self, name: str) -> None:
         file_path = self._get_path(name)
-        file_path.unlink()
+        file_path.unlink(missing_ok=True)
 
     @property
     def _obj_class_name(self) -> str:
