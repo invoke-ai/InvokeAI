@@ -9,22 +9,29 @@ We use `vitest` to run the frontend tests. (See [vite.config.ts](https://github.
 
 Below are some common frontend test commands:
 
-```bash
-# From the repository root, run the frontend test suite once using the Makefile shortcut.
-make frontend-test
+<Tabs>
+  <TabItem label="Make">
+    ```bash
+    # From the repository root, run the frontend test suite once.
+    make frontend-test
+    ```
+  </TabItem>
+  <TabItem label="pnpm">
+    ```bash
+    # From the repository root, run the full frontend test suite in watch mode.
+    pnpm --dir invokeai/frontend/web test
 
-# From the repository root, run the full frontend test suite in watch mode.
-pnpm --dir invokeai/frontend/web test
+    # Run the frontend test suite once without watch mode.
+    pnpm --dir invokeai/frontend/web test:no-watch
 
-# Run the frontend test suite once without watch mode.
-pnpm --dir invokeai/frontend/web test:no-watch
+    # Equivalent one-shot command using the underlying Vitest subcommand.
+    pnpm --dir invokeai/frontend/web test:run
 
-# Equivalent one-shot command using the underlying Vitest subcommand.
-pnpm --dir invokeai/frontend/web test:run
-
-# Open the Vitest UI and collect coverage data while running tests.
-pnpm --dir invokeai/frontend/web test:ui
-```
+    # Open the Vitest UI and collect coverage data while running tests.
+    pnpm --dir invokeai/frontend/web test:ui
+    ```
+  </TabItem>
+</Tabs>
 
 If you are already working from `invokeai/frontend/web`, you can omit the `--dir` flag and run the same `pnpm` scripts directly from that directory.
 
