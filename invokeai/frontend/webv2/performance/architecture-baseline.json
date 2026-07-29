@@ -2,10 +2,10 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 798841,
+        "brotliBytes": 798837,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 798924,
+        "gzipBytes": 798925,
         "imageRawBytes": 156376,
         "initialRawBytes": 1832689,
         "largestAssetRawBytes": 737748,
@@ -239,10 +239,10 @@
         ]
       },
       "limits": {
-        "brotliBytes": 806830,
+        "brotliBytes": 806826,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 806914,
+        "gzipBytes": 806915,
         "imageRawBytes": 157940,
         "initialRawBytes": 1851016,
         "largestAssetRawBytes": 745126,
@@ -257,10 +257,10 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 978307,
+        "brotliBytes": 978287,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 977008,
+        "gzipBytes": 977020,
         "imageRawBytes": 156376,
         "initialRawBytes": 2376527,
         "largestAssetRawBytes": 737748,
@@ -394,7 +394,6 @@
           "source:src/app/WorkbenchApp.tsx",
           "source:src/app/WorkflowUiAdapter.tsx",
           "source:src/app/accountLifecycle.ts",
-          "source:src/app/generateWidgetSyncRuntime.ts",
           "source:src/app/main.tsx",
           "source:src/app/router.tsx",
           "source:src/app/workbenchPorts.tsx",
@@ -440,6 +439,7 @@
           "source:src/features/generation/prompts.ts",
           "source:src/features/generation/queries.ts",
           "source:src/features/generation/react.ts",
+          "source:src/features/generation/runtime.ts",
           "source:src/features/generation/settings.ts",
           "source:src/features/generation/ui/GenerationUiContext.tsx",
           "source:src/features/generation/ui/generateDraftRegistry.ts",
@@ -740,10 +740,10 @@
         ]
       },
       "limits": {
-        "brotliBytes": 988091,
+        "brotliBytes": 988070,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 986779,
+        "gzipBytes": 986791,
         "imageRawBytes": 157940,
         "initialRawBytes": 2400293,
         "largestAssetRawBytes": 745126,
