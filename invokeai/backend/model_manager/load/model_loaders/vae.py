@@ -57,6 +57,7 @@ def _is_sdnq_vae_folder(path: Path) -> bool:
             continue
     return any(key.endswith(".weight") and f"{key[:-7]}.scale" in all_keys for key in all_keys)
 
+
 # Architectural defaults for the Wan 2.2-VAE (TI2V-5B). Verbatim from the
 # vae/config.json shipped with Wan-AI/Wan2.2-TI2V-5B-Diffusers — only the
 # values that differ from diffusers' AutoencoderKLWan defaults are listed.
