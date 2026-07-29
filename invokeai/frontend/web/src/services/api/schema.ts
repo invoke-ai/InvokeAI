@@ -6758,7 +6758,7 @@ export type components = {
             /**
              * Use Cache
              * @description Whether or not to use the cache
-             * @default true
+             * @default false
              */
             use_cache?: boolean;
             /**
@@ -13436,6 +13436,13 @@ export type components = {
             source_prepared_mapping: {
                 [key: string]: string[];
             };
+            /**
+             * Prepared Iteration Paths
+             * @description The iteration coordinates of each prepared execution node
+             */
+            prepared_iteration_paths?: {
+                [key: string]: number[];
+            };
             /** Ready Order */
             ready_order?: string[];
             /**
@@ -18767,7 +18774,7 @@ export type components = {
             /**
              * Use Cache
              * @description Whether or not to use the cache
-             * @default true
+             * @default false
              */
             use_cache?: boolean;
             /**
