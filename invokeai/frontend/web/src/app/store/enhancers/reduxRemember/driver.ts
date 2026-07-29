@@ -1,10 +1,12 @@
 import { logger } from 'app/logging/logger';
 import { StorageError } from 'app/store/enhancers/reduxRemember/errors';
+import { $store } from 'app/store/nanostores/store';
+import { captureAuthGeneration } from 'features/auth/store/authTokenRefresh';
 import type { UseStore } from 'idb-keyval';
 import { createStore as idbCreateStore, del as idbDel, get as idbGet } from 'idb-keyval';
 import type { Driver } from 'redux-remember';
 import { serializeError } from 'serialize-error';
-import { buildV1Url, getBaseUrl } from 'services/api';
+import { acceptRefreshedToken, buildV1Url, getBaseUrl } from 'services/api';
 import type { JsonObject } from 'type-fest';
 
 const log = logger('system');
@@ -68,17 +70,32 @@ const getIdbKey = (key: string) => {
   return `${IDB_STORAGE_PREFIX}${key}`;
 };
 
-// Helper to get auth headers for client_state requests
-const getAuthHeaders = (): Record<string, string> => {
-  const headers: Record<string, string> = {};
-  // Safe access to localStorage (not available in Node.js test environment)
+// Safe access to localStorage (not available in Node.js test environment)
+const getAuthToken = (): string | null => {
   if (typeof window !== 'undefined' && window.localStorage) {
-    const token = localStorage.getItem('auth_token');
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
+    return localStorage.getItem('auth_token');
   }
-  return headers;
+  return null;
+};
+
+// Helper to get auth headers for client_state requests
+const getAuthHeaders = (token: string | null): Record<string, string> => {
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
+// The sliding-window middleware mints X-Refreshed-Token on these POSTs like any other
+// mutation, but this driver bypasses RTK Query (raw fetch), so dynamicBaseQuery's
+// acceptance path never sees the header. Without committing it here, a session whose
+// only server traffic is client-state persistence (canvas/settings tweaks) would
+// never slide its expiry and would hard-expire mid-activity. Fire-and-forget: the
+// cookie sync + commit must not block or fail persistence.
+const commitRefreshedToken = (res: Response, requestToken: string | null, requestGeneration: number): void => {
+  const refreshedToken = res.headers.get('X-Refreshed-Token');
+  const dispatch = $store.get()?.dispatch;
+  if (!refreshedToken || !requestToken || !dispatch) {
+    return;
+  }
+  void acceptRefreshedToken(refreshedToken, requestToken, requestGeneration, dispatch);
 };
 
 const getItem = async (key: string) => {
@@ -86,7 +103,7 @@ const getItem = async (key: string) => {
     const url = getUrl('get_by_key', key);
     const res = await fetch(url, {
       method: 'GET',
-      headers: getAuthHeaders(),
+      headers: getAuthHeaders(getAuthToken()),
     });
     if (!res.ok) {
       throw new Error(`Response status: ${res.status}`);
@@ -146,14 +163,17 @@ const setItem = async (key: string, value: string) => {
     }
     log.trace({ key, last: lastPersistedState.get(key), next: value }, `Persisting state for ${key}`);
     const url = getUrl('set_by_key', key);
+    const requestToken = getAuthToken();
+    const requestGeneration = requestToken !== null ? captureAuthGeneration() : 0;
     const res = await fetch(url, {
       method: 'POST',
       body: value,
-      headers: getAuthHeaders(),
+      headers: getAuthHeaders(requestToken),
     });
     if (!res.ok) {
       throw new Error(`Response status: ${res.status}`);
     }
+    commitRefreshedToken(res, requestToken, requestGeneration);
     const resultValue = await res.json();
     lastPersistedState.set(key, resultValue);
     return resultValue;
@@ -178,13 +198,16 @@ export const clearStorage = async () => {
   try {
     persistRefCount++;
     const url = getUrl('delete');
+    const requestToken = getAuthToken();
+    const requestGeneration = requestToken !== null ? captureAuthGeneration() : 0;
     const res = await fetch(url, {
       method: 'POST',
-      headers: getAuthHeaders(),
+      headers: getAuthHeaders(requestToken),
     });
     if (!res.ok) {
       throw new Error(`Response status: ${res.status}`);
     }
+    commitRefreshedToken(res, requestToken, requestGeneration);
   } catch {
     log.error('Failed to reset client state');
   } finally {
