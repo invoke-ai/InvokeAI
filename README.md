@@ -72,6 +72,7 @@ Invoke features an organized gallery system for easily storing, accessing, and r
 - Flux.2 Klein 9B
 - Z-Image Turbo
 - Z-Image Base
+- Krea 2 Turbo
 - Anima
 - Qwen Image
 - Qwen Image Edit

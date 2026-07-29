@@ -11,6 +11,12 @@ type ImageFieldCollection = z.infer<typeof zImageFieldCollection>;
 export const isImageFieldCollection = (field: unknown): field is ImageFieldCollection =>
   zImageFieldCollection.safeParse(field).success;
 
+export const zVideoField = z.object({
+  video_name: z.string().trim().min(1),
+});
+type VideoField = z.infer<typeof zVideoField>;
+export const isVideoField = (field: unknown): field is VideoField => zVideoField.safeParse(field).success;
+
 export const zBoardField = z.object({
   board_id: z.string().trim().min(1),
 });
@@ -102,9 +108,11 @@ export const zBaseModelType = z.enum([
   'cogview4',
   'qwen-image',
   'z-image',
+  'krea-2',
   'ideogram-4',
   'external',
   'anima',
+  'wan',
   'unknown',
 ]);
 export type BaseModelType = z.infer<typeof zBaseModelType>;
@@ -118,8 +126,10 @@ export const zMainModelBase = z.enum([
   'cogview4',
   'qwen-image',
   'z-image',
+  'krea-2',
   'ideogram-4',
   'anima',
+  'wan',
 ]);
 type MainModelBase = z.infer<typeof zMainModelBase>;
 export const isMainModelBase = (base: unknown): base is MainModelBase => zMainModelBase.safeParse(base).success;
@@ -140,6 +150,8 @@ export const zModelType = z.enum([
   't5_encoder',
   'qwen3_encoder',
   'qwen_vl_encoder',
+  'qwen3_vl_encoder',
+  'wan_t5_encoder',
   'clip_embed',
   'siglip',
   'flux_redux',
@@ -150,6 +162,7 @@ export type ModelType = z.infer<typeof zModelType>;
 export const zSubModelType = z.enum([
   'unet',
   'transformer',
+  'transformer_2',
   'text_encoder',
   'text_encoder_2',
   'text_encoder_3',
@@ -168,7 +181,12 @@ export const zModelVariantType = z.enum(['normal', 'inpaint', 'depth']);
 export const zFluxVariantType = z.enum(['dev', 'dev_fill', 'schnell']);
 export const zFlux2VariantType = z.enum(['klein_4b', 'klein_4b_base', 'klein_9b', 'klein_9b_base']);
 export const zZImageVariantType = z.enum(['turbo', 'zbase']);
+export const zKrea2VariantType = z.enum(['krea2_turbo', 'krea2_base']);
 const zQwenImageVariantType = z.enum(['generate', 'edit']);
+const zWanVariantType = z.enum(['t2v_a14b', 'i2v_a14b', 'ti2v_5b']);
+/** Wan LoRA variant — identifies which model FAMILY (inner_dim) a LoRA
+ *  targets. A14B = inner_dim 5120 (both T2V and I2V), 5B = inner_dim 3072. */
+const zWanLoRAVariantType = z.enum(['a14b', '5b']);
 export const zQwen3VariantType = z.enum(['qwen3_4b', 'qwen3_8b', 'qwen3_06b']);
 export const zAnyModelVariant = z.union([
   zModelVariantType,
@@ -176,7 +194,10 @@ export const zAnyModelVariant = z.union([
   zFluxVariantType,
   zFlux2VariantType,
   zZImageVariantType,
+  zKrea2VariantType,
   zQwenImageVariantType,
+  zWanVariantType,
+  zWanLoRAVariantType,
   zQwen3VariantType,
 ]);
 export type AnyModelVariant = z.infer<typeof zAnyModelVariant>;
@@ -193,6 +214,8 @@ export const zModelFormat = z.enum([
   't5_encoder',
   'qwen3_encoder',
   'qwen_vl_encoder',
+  'qwen3_vl_encoder',
+  'wan_t5_encoder',
   'bnb_quantized_int8b',
   'bnb_quantized_nf4b',
   'gguf_quantized',
