@@ -9,7 +9,7 @@ import { PromptTemplatesPanel } from '@features/generation/ui/promptFields/Promp
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import i18next from 'i18next';
-import { act } from 'react';
+import { act, isValidElement, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -165,13 +165,18 @@ const render = async (element: React.ReactNode, seed?: (queryClient: QueryClient
   const queryClient = new QueryClient();
   seed?.(queryClient);
 
+  const contents = (
+    <I18nextProvider i18n={i18n}>
+      <QueryClientProvider client={queryClient}>
+        <ChakraProvider value={system}>{element}</ChakraProvider>
+      </QueryClientProvider>
+    </I18nextProvider>
+  );
+
   await act(() => {
+    // React only replays Effects when StrictMode wraps the root, not a subtree.
     root?.render(
-      <I18nextProvider i18n={i18n}>
-        <QueryClientProvider client={queryClient}>
-          <ChakraProvider value={system}>{element}</ChakraProvider>
-        </QueryClientProvider>
-      </I18nextProvider>
+      isValidElement(element) && element.type === StrictMode ? <StrictMode>{contents}</StrictMode> : contents
     );
   });
 };
@@ -184,6 +189,7 @@ afterEach(async () => {
   host?.remove();
   host = null;
   root = null;
+  vi.restoreAllMocks();
   document.documentElement.className = '';
   delete document.documentElement.dataset.theme;
 });
@@ -594,21 +600,31 @@ describe('the prompt template editor', () => {
   });
 });
 
-it('revokes a fetched template image blob URL when it unmounts', async () => {
-  const createObjectUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:template-preview');
-  const revokeObjectUrl = vi.spyOn(URL, 'revokeObjectURL');
+it('keeps the fetched image URL live through StrictMode replay and revokes every owned URL', async () => {
+  let sequence = 0;
+  const revokedUrls = new Set<string>();
+  vi.spyOn(URL, 'createObjectURL').mockImplementation(() => `blob:template-preview-${++sequence}`);
+  vi.spyOn(URL, 'revokeObjectURL').mockImplementation((url) => revokedUrls.add(url));
 
-  await render(<PromptTemplateImage alt="" fallback={IMAGE_FALLBACK} template={templateWithImage} />, (queryClient) =>
-    queryClient.setQueryData(promptTemplateKeys.image(templateWithImage.id), new Blob(['image']))
+  await render(
+    <StrictMode>
+      <PromptTemplateImage alt="Fetched preview" fallback={IMAGE_FALLBACK} template={templateWithImage} />
+    </StrictMode>,
+    (queryClient) => queryClient.setQueryData(promptTemplateKeys.image(templateWithImage.id), new Blob(['image']))
   );
 
-  expect(createObjectUrl).toHaveBeenCalledOnce();
+  const image = host!.querySelector<HTMLImageElement>('img[alt="Fetched preview"]')!;
+  const liveUrl = image.getAttribute('src')!;
+
+  expect(sequence).toBeGreaterThan(1);
+  expect(revokedUrls.has('blob:template-preview-1')).toBe(true);
+  expect(revokedUrls.has(liveUrl)).toBe(false);
+  expect(getComputedStyle(image).outlineWidth).toBe('1px');
+  expect(getComputedStyle(image).outlineOffset).toBe('-1px');
+
   await act(() => root?.unmount());
   root = null;
-  expect(revokeObjectUrl).toHaveBeenCalledWith('blob:template-preview');
-
-  createObjectUrl.mockRestore();
-  revokeObjectUrl.mockRestore();
+  expect(revokedUrls.has(liveUrl)).toBe(true);
 });
 
 describe('prompt template image outlines', () => {

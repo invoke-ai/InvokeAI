@@ -56,13 +56,26 @@ export const PromptTemplateImage = ({
     return fallback;
   }
 
-  return <BlobImage key={getBlobKey(query.data)} blob={query.data} imageProps={imageProps} />;
+  return <BlobImage key={getBlobKey(query.data)} blob={query.data} fallback={fallback} imageProps={imageProps} />;
 };
 
-const BlobImage = ({ blob, imageProps }: { blob: Blob; imageProps: Omit<ImageProps, 'src'> }) => {
-  const [src] = useState(() => URL.createObjectURL(blob));
+const BlobImage = ({
+  blob,
+  fallback,
+  imageProps,
+}: {
+  blob: Blob;
+  fallback: ReactNode;
+  imageProps: Omit<ImageProps, 'src'>;
+}) => {
+  const [src, setSrc] = useState<string | null>(null);
 
-  useMountEffect(() => () => URL.revokeObjectURL(src));
+  useMountEffect(() => {
+    const objectUrl = URL.createObjectURL(blob);
+    setSrc(objectUrl);
 
-  return <Image {...IMAGE_OUTLINE_PROPS} {...imageProps} src={src} />;
+    return () => URL.revokeObjectURL(objectUrl);
+  });
+
+  return src ? <Image {...IMAGE_OUTLINE_PROPS} {...imageProps} src={src} /> : fallback;
 };
