@@ -20,7 +20,7 @@ import yaml
 from huggingface_hub import get_token as hf_get_token
 from pydantic.networks import AnyHttpUrl
 from pydantic_core import Url
-from requests import Session
+from requests import RequestException, Session
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.download import DownloadQueueServiceBase, MultiFileDownloadJob
@@ -54,12 +54,18 @@ from invokeai.backend.model_manager.configs.factory import (
 from invokeai.backend.model_manager.configs.unknown import Unknown_Config
 from invokeai.backend.model_manager.metadata import (
     AnyModelRepoMetadata,
+    CivitaiMetadataFetch,
     HuggingFaceMetadataFetch,
     ModelMetadataFetchBase,
     ModelMetadataWithFiles,
     RemoteModelFile,
 )
-from invokeai.backend.model_manager.metadata.metadata_base import HuggingFaceMetadata
+from invokeai.backend.model_manager.metadata.fetch.civitai import is_civitai_model_version_url
+from invokeai.backend.model_manager.metadata.metadata_base import (
+    CivitaiMetadata,
+    HuggingFaceMetadata,
+    UnknownMetadataException,
+)
 from invokeai.backend.model_manager.search import ModelSearch
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
@@ -768,12 +774,19 @@ class ModelInstallService(ModelInstallServiceBase):
         if isinstance(source, URLModelSource):
             try:
                 fetcher = self.get_fetcher_from_url(str(source.url))
+            except ValueError:
+                return [RemoteModelFile(url=source.url, path=Path("."), size=0)], None
+
+            try:
                 kwargs: dict[str, Any] = {"session": self._session}
                 metadata = fetcher(**kwargs).from_url(source.url)
                 assert isinstance(metadata, ModelMetadataWithFiles)
                 return metadata.download_urls(session=self._session), metadata
-            except ValueError:
-                pass
+            except (UnknownMetadataException, RequestException, ValueError) as e:
+                if fetcher is CivitaiMetadataFetch:
+                    self._logger.warning(
+                        f"Unable to fetch metadata for {source.url}: {e}. Falling back to direct download."
+                    )
 
             return [RemoteModelFile(url=self._normalize_huggingface_blob_url(source.url), path=Path("."), size=0)], None
 
@@ -894,8 +907,13 @@ class ModelInstallService(ModelInstallServiceBase):
         job.config_in.source = str(job.source)
         job.config_in.source_type = MODEL_SOURCE_TO_TYPE_MAP[job.source.__class__]
         # enter the metadata, if there is any
-        if isinstance(job.source_metadata, (HuggingFaceMetadata)):
+        if isinstance(job.source_metadata, (HuggingFaceMetadata, CivitaiMetadata)):
             job.config_in.source_api_response = job.source_metadata.api_response
+        if isinstance(job.source_metadata, CivitaiMetadata):
+            if not job.config_in.source_url:
+                job.config_in.source_url = job.source_metadata.source_url
+            if job.source_metadata.trained_words and not job.config_in.trigger_phrases:
+                job.config_in.trigger_phrases = set(job.source_metadata.trained_words)
 
         if job._install_tmpdir is not None:
             self._delete_install_marker(job._install_tmpdir)
@@ -1500,6 +1518,8 @@ class ModelInstallService(ModelInstallServiceBase):
         """
         if re.match(r"^https?://huggingface.co/[^/]+/[^/]+$", url.lower()):
             return HuggingFaceMetadataFetch
+        if is_civitai_model_version_url(url):
+            return CivitaiMetadataFetch
         raise ValueError(f"Unsupported model source: '{url}'")
 
     @staticmethod

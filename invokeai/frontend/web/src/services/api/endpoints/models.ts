@@ -35,6 +35,10 @@ type GetModelConfigsResponse = NonNullable<
   paths['/api/v2/models/']['get']['responses']['200']['content']['application/json']
 >;
 
+type RefreshModelTriggerPhrasesArg = operations['refresh_model_trigger_phrases']['parameters']['path'];
+type RefreshModelTriggerPhrasesResponse =
+  paths['/api/v2/models/i/{key}/refresh_trigger_phrases']['post']['responses']['200']['content']['application/json'];
+
 export type GetStarterModelsResponse =
   paths['/api/v2/models/starter_models']['get']['responses']['200']['content']['application/json'];
 
@@ -174,6 +178,35 @@ export const modelsApi = api.injectEndpoints({
         };
       },
       invalidatesTags: [{ type: 'ModelConfig', id: LIST_TAG }],
+    }),
+    refreshModelTriggerPhrases: build.mutation<RefreshModelTriggerPhrasesResponse, RefreshModelTriggerPhrasesArg>({
+      query: ({ key }) => {
+        return {
+          url: buildModelsUrl(`i/${key}/refresh_trigger_phrases`),
+          method: 'POST',
+        };
+      },
+      onQueryStarted: async (_, { dispatch, queryFulfilled }) => {
+        try {
+          const { data } = await queryFulfilled;
+
+          dispatch(modelsApi.util.upsertQueryData('getModelConfig', data.key, data));
+
+          const { base, name, type } = data;
+          dispatch(modelsApi.util.upsertQueryData('getModelConfigByAttrs', { base, name, type }, data));
+
+          dispatch(
+            modelsApi.util.updateQueryData('getModelConfigs', undefined, (draft) => {
+              modelConfigsAdapter.updateOne(draft, {
+                id: data.key,
+                changes: data,
+              });
+            })
+          );
+        } catch {
+          // no-op
+        }
+      },
     }),
     installModel: build.mutation<InstallModelResponse, InstallModelArg>({
       query: ({ source, inplace = true, config }) => {
@@ -483,6 +516,7 @@ export const {
   useDeleteModelImageMutation,
   useUpdateModelMutation,
   useUpdateModelImageMutation,
+  useRefreshModelTriggerPhrasesMutation,
   useInstallModelMutation,
   useConvertModelMutation,
   useLazyScanFolderQuery,
