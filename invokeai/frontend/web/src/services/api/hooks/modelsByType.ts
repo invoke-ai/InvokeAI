@@ -31,6 +31,7 @@ import {
   isMainOrExternalModelConfig,
   isMistralEncoderModelConfig,
   isQwen3EncoderModelConfig,
+  isQwen3VLEncoderModelConfig,
   isQwenImageDiffusersMainModelConfig,
   isQwenImageVAEModelConfig,
   isQwenVLEncoderModelConfig,
@@ -121,6 +122,7 @@ export const useQwenImageDiffusersModels = () => buildModelsHook(isQwenImageDiff
 export const useQwenImageVAEModels = () => buildModelsHook(isQwenImageVAEModelConfig)();
 export const useQwenVLEncoderModels = () => buildModelsHook(isQwenVLEncoderModelConfig)();
 export const useQwen3EncoderModels = () => buildModelsHook(isQwen3EncoderModelConfig)();
+export const useQwen3VLEncoderModels = () => buildModelsHook(isQwen3VLEncoderModelConfig)();
 export const useWanDiffusersModels = () => buildModelsHook(isWanDiffusersMainModelConfig)();
 export const useWanGGUFLowNoiseModels = () => buildModelsHook(isWanGGUFLowNoiseMainModelConfig)();
 export const useWanVAEModels = () => buildModelsHook(isWanVAEModelConfig)();
@@ -168,6 +170,7 @@ export const selectFlux2DiffusersModels = buildModelsSelector(isFlux2DiffusersMa
 export const selectFlux2DevDiffusersModels = buildModelsSelector(isFlux2DevDiffusersMainModelConfig);
 export const selectFluxVAEModels = buildModelsSelector(isFluxVAEModelConfig);
 export const selectAnimaVAEModels = buildModelsSelector(isAnimaVAEModelConfig);
+export const selectQwen3VLEncoderModels = buildModelsSelector(isQwen3VLEncoderModelConfig);
 export const selectWanDiffusersModels = buildModelsSelector(isWanDiffusersMainModelConfig);
 export const selectWanVAEModels = buildModelsSelector(isWanVAEModelConfig);
 export const selectWanT5EncoderModels = buildModelsSelector(isWanT5EncoderModelConfig);

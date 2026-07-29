@@ -60,6 +60,8 @@ class BaseModelType(str, Enum):
     """Indicates the model is associated with Qwen Image Edit 2511 model architecture."""
     Anima = "anima"
     """Indicates the model is associated with Anima model architecture (Cosmos Predict2 DiT + LLM Adapter)."""
+    Krea2 = "krea-2"
+    """Indicates the model is associated with the Krea 2 model architecture, including Krea-2-Turbo."""
     Wan = "wan"
     """Indicates the model is associated with the Wan 2.2 model architecture (T2V-A14B / TI2V-5B), used for image generation at num_frames=1."""
     Unknown = "unknown"
@@ -83,6 +85,7 @@ class ModelType(str, Enum):
     T5Encoder = "t5_encoder"
     Qwen3Encoder = "qwen3_encoder"
     QwenVLEncoder = "qwen_vl_encoder"
+    Qwen3VLEncoder = "qwen3_vl_encoder"
     MistralEncoder = "mistral_encoder"
     WanT5Encoder = "wan_t5_encoder"
     SpandrelImageToImage = "spandrel_image_to_image"
@@ -163,6 +166,22 @@ class ZImageVariantType(str, Enum):
 
     ZBase = "zbase"
     """Z-Image Base - undistilled foundation model with full CFG and negative prompt support."""
+
+
+class Krea2VariantType(str, Enum):
+    """Krea 2 model variants."""
+
+    Turbo = "krea2_turbo"
+    """Krea-2-Turbo - distilled model optimized for 8 steps with CFG disabled (guidance_scale=0).
+
+    NOTE: the value is ``krea2_turbo`` (not ``turbo``) to avoid colliding with
+    ``ZImageVariantType.Turbo`` in the variant-string adapter and frontend label maps."""
+
+    Base = "krea2_base"
+    """Krea-2-Raw - undistilled base model. Runs with more steps (~28) and CFG enabled (~4.5),
+    using resolution-aware timestep shifting (``is_distilled=false`` in model_index.json).
+
+    NOTE: the value is ``krea2_base`` (not ``base``) for the same disambiguation reason as ``Turbo``."""
 
 
 class QwenImageVariantType(str, Enum):
@@ -261,6 +280,7 @@ class ModelFormat(str, Enum):
     T5Encoder = "t5_encoder"
     Qwen3Encoder = "qwen3_encoder"
     QwenVLEncoder = "qwen_vl_encoder"
+    Qwen3VLEncoder = "qwen3_vl_encoder"
     MistralEncoder = "mistral_encoder"
     WanT5Encoder = "wan_t5_encoder"
     BnbQuantizedLlmInt8b = "bnb_quantized_int8b"
@@ -321,6 +341,7 @@ AnyVariant: TypeAlias = Union[
     WanVariantType,
     WanLoRAVariantType,
     Qwen3VariantType,
+    Krea2VariantType,
     MistralVariantType,
 ]
 variant_type_adapter = TypeAdapter[
@@ -333,6 +354,7 @@ variant_type_adapter = TypeAdapter[
     | WanVariantType
     | WanLoRAVariantType
     | Qwen3VariantType
+    | Krea2VariantType
     | MistralVariantType
 ](
     ModelVariantType
@@ -344,5 +366,6 @@ variant_type_adapter = TypeAdapter[
     | WanVariantType
     | WanLoRAVariantType
     | Qwen3VariantType
+    | Krea2VariantType
     | MistralVariantType
 )

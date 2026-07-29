@@ -51,6 +51,7 @@ export type DenoiseLatentsNodes =
   | 'cogview4_denoise'
   | 'qwen_image_denoise'
   | 'z_image_denoise'
+  | 'krea2_denoise'
   | 'anima_denoise'
   | 'wan_denoise';
 
@@ -64,6 +65,7 @@ export type MainModelLoaderNodes =
   | 'cogview4_model_loader'
   | 'qwen_image_model_loader'
   | 'z_image_model_loader'
+  | 'krea2_model_loader'
   | 'anima_model_loader'
   | 'wan_model_loader';
 
