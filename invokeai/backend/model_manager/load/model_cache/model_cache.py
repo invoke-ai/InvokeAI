@@ -542,6 +542,13 @@ class ModelCache:
         if self._timeout_timer is not None:
             self._timeout_timer.cancel()
             self._timeout_timer = None
+        # Release the resident records' shared-weights references now, synchronously. A shut-down
+        # cache serves no more loads, and waiting for collection would leave the store's refcounts
+        # (and canonical tensors) to the wrappers' finalizers — which only ENQUEUE, and at teardown
+        # there may be no later store operation to drain the queue. shutdown() runs in a normal
+        # thread context, so the direct (locking) release is safe here.
+        for cache_entry in self._cached_models.values():
+            cache_entry.cached_model.release_shared_weights()
 
     @synchronized
     @record_activity
