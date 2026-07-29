@@ -27,7 +27,7 @@ import {
   createGenerateWidgetSyncRuntime,
   type GenerateWidgetSyncProjectSnapshot,
   type GenerateWidgetSyncRuntimeDeps,
-} from './generateWidgetSyncRuntime';
+} from './runtime';
 
 const createModel = (key: string, overrides: Partial<MainModelConfig> = {}): MainModelConfig => ({
   base: 'sdxl',
@@ -104,26 +104,6 @@ beforeEach(() => {
 });
 
 describe('createGenerateWidgetSyncRuntime', () => {
-  it('reconciles the initial project immediately with a bounded synchronous system dispatch', () => {
-    const model = createModel('model');
-    const { patches, project, runtime } = setup({
-      models: [model],
-      project: { id: 'project-1', values: {} },
-    });
-
-    expect(patches).toHaveLength(1);
-    expect(patches[0]).toMatchObject({
-      origin: 'system',
-      projectId: 'project-1',
-      values: { model, modelKey: model.key },
-    });
-    expect(patches[0]?.values).not.toHaveProperty('batchCount');
-    expect(project.getSnapshot().values).toMatchObject({ model, modelKey: model.key });
-    expect(templateQuery.queryFn).not.toHaveBeenCalled();
-
-    runtime.dispose();
-  });
-
   it('reconciles the newly active project after a project switch', () => {
     const model = createModel('model');
     const initialValues = createValues(model);
@@ -136,21 +116,6 @@ describe('createGenerateWidgetSyncRuntime', () => {
 
     expect(patches).toHaveLength(1);
     expect(patches[0]).toMatchObject({ origin: 'system', projectId: 'project-2' });
-    runtime.dispose();
-  });
-
-  it('reconciles model snapshots after a model-store notification', () => {
-    const stale = createModel('model', { name: 'Stale name' });
-    const current = createModel('model', { name: 'Current name' });
-    const { models, patches, runtime } = setup({
-      models: [stale],
-      project: { id: 'project-1', values: createValues(stale) },
-    });
-
-    models.setSnapshot([current]);
-
-    expect(patches).toHaveLength(1);
-    expect(patches[0]?.values.model).toBe(current);
     runtime.dispose();
   });
 

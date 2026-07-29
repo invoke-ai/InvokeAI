@@ -1,11 +1,10 @@
+import { createGenerateWidgetSyncRuntime, type GenerateWidgetSyncProjectSnapshot } from '@features/generation/runtime';
 import { ensureModelsLoaded, getModelsSnapshot, subscribeModels } from '@features/models';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { createProjectedExternalStore } from '@platform/state/projectedExternalStore';
 import { useQueryClient } from '@tanstack/react-query';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useWorkbenchInternalStore } from '@workbench/WorkbenchContext';
-
-import { createGenerateWidgetSyncRuntime, type GenerateWidgetSyncProjectSnapshot } from './generateWidgetSyncRuntime';
 
 /** App-owned production composition of Generation, Models, Query, and Workbench. */
 export const GenerateWidgetSyncRuntime = () => {
