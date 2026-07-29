@@ -10,6 +10,7 @@ import { useState } from 'react';
 
 const blobKeys = new WeakMap<Blob, number>();
 let nextBlobKey = 1;
+const IMAGE_OUTLINE_PROPS = { outline: '1px solid {colors.border.image}', outlineOffset: '-1px' };
 
 const getBlobKey = (blob: Blob): number => {
   const existing = blobKeys.get(blob);
@@ -48,7 +49,7 @@ export const PromptTemplateImage = ({
   });
 
   if (hasLocalOverride) {
-    return localPreviewUrl ? <Image {...imageProps} src={localPreviewUrl} /> : fallback;
+    return localPreviewUrl ? <Image {...IMAGE_OUTLINE_PROPS} {...imageProps} src={localPreviewUrl} /> : fallback;
   }
 
   if (!query.data) {
@@ -63,5 +64,5 @@ const BlobImage = ({ blob, imageProps }: { blob: Blob; imageProps: Omit<ImagePro
 
   useMountEffect(() => () => URL.revokeObjectURL(src));
 
-  return <Image {...imageProps} src={src} />;
+  return <Image {...IMAGE_OUTLINE_PROPS} {...imageProps} src={src} />;
 };

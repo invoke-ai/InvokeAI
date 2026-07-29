@@ -285,8 +285,6 @@ export const PromptTemplateEditor = ({
             <PromptTemplateImage
               alt=""
               boxSize="12"
-              borderColor="border.emphasized"
-              borderWidth="1px"
               flexShrink="0"
               fallback={null}
               localPreviewUrl={draft.imagePreviewUrl}

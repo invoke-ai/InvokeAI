@@ -184,6 +184,8 @@ afterEach(async () => {
   host?.remove();
   host = null;
   root = null;
+  document.documentElement.className = '';
+  delete document.documentElement.dataset.theme;
 });
 
 describe('the prompt templates panel', () => {
@@ -607,4 +609,51 @@ it('revokes a fetched template image blob URL when it unmounts', async () => {
 
   createObjectUrl.mockRestore();
   revokeObjectUrl.mockRestore();
+});
+
+describe('prompt template image outlines', () => {
+  const modes = [
+    ['light', 'light', 'oklch(0 0 0 / 0.1)'],
+    ['dark', 'classic', 'oklch(1 0 0 / 0.1)'],
+  ] as const;
+
+  for (const [mode, theme, outlineColor] of modes) {
+    it(`gives local preview images a one-pixel inset outline in ${mode} mode`, async () => {
+      document.documentElement.className = mode;
+      document.documentElement.dataset.theme = theme;
+
+      await render(
+        <PromptTemplateImage
+          alt="Local preview"
+          fallback={IMAGE_FALLBACK}
+          localPreviewUrl="data:image/png;base64,iVBORw0KGgo="
+          template={templateWithImage}
+        />
+      );
+
+      const image = host!.querySelector<HTMLImageElement>('img[alt="Local preview"]')!;
+
+      expect(getComputedStyle(image).outlineStyle).toBe('solid');
+      expect(getComputedStyle(image).outlineWidth).toBe('1px');
+      expect(getComputedStyle(image).outlineOffset).toBe('-1px');
+      expect(getComputedStyle(image).outlineColor).toBe(outlineColor);
+    });
+  }
+
+  it('allows callers to override the default outline', async () => {
+    await render(
+      <PromptTemplateImage
+        alt="Overridden preview"
+        fallback={IMAGE_FALLBACK}
+        localPreviewUrl="data:image/png;base64,iVBORw0KGgo="
+        outline="2px dotted red"
+        outlineOffset="0"
+        template={templateWithImage}
+      />
+    );
+
+    const image = host!.querySelector<HTMLImageElement>('img[alt="Overridden preview"]')!;
+    expect(getComputedStyle(image).outline).toBe('rgb(255, 0, 0) dotted 2px');
+    expect(getComputedStyle(image).outlineOffset).toBe('0px');
+  });
 });
