@@ -2,6 +2,7 @@ import type { PromptTemplateRecord } from '@features/generation/data/promptTempl
 
 import { promptTemplateKeys } from '@features/generation/data/promptTemplates';
 import { usePromptTemplates, type PromptTemplateCatalog } from '@features/generation/ui/usePromptTemplates';
+import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, createRef, type Ref, useImperativeHandle } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -133,7 +134,10 @@ describe('prompt template mutation invalidation', () => {
     const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
 
     await act(async () => {
-      await catalogRef.current!.importFile(new File(['name,prompt'], 'templates.csv', { type: 'text/csv' }));
+      await catalogRef.current!.importFile(
+        new File(['name,prompt'], 'templates.csv', { type: 'text/csv' }),
+        captureAccountScope()
+      );
     });
 
     expect(invalidateQueries).toHaveBeenCalledTimes(1);

@@ -1,3 +1,4 @@
+import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { act, useLayoutEffect } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -56,6 +57,7 @@ beforeEach(() => {
 afterEach(async () => {
   await act(() => root.unmount());
   host.remove();
+  accountLifecycle.invalidate();
 });
 
 describe('useOnPendingPromptTemplateDraft', () => {
@@ -97,6 +99,17 @@ describe('useOnPendingPromptTemplateDraft', () => {
     await act(() => root.render(<Probe onDraft={onDraft} />));
 
     expect(onDraft).toHaveBeenCalledOnce();
+  });
+
+  it('does not deliver account A draft after account B becomes active', async () => {
+    const onDraft = vi.fn();
+    accountLifecycle.activate('draft-a', ':user:draft-a');
+    setPendingPromptTemplateDraft(beforeMountDraft);
+
+    accountLifecycle.activate('draft-b', ':user:draft-b');
+    await act(() => root.render(<Probe onDraft={onDraft} />));
+
+    expect(onDraft).not.toHaveBeenCalled();
   });
 
   it('stops delivering after cleanup', async () => {

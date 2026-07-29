@@ -3,10 +3,11 @@ import type { PromptTemplateRecord } from '@features/generation/data/promptTempl
 import type { PromptTemplateCatalog } from '@features/generation/ui/usePromptTemplates';
 
 import { Box, ChakraProvider } from '@chakra-ui/react';
-import { promptTemplateKeys } from '@features/generation/data/promptTemplates';
+import { exportPromptTemplates, promptTemplateKeys } from '@features/generation/data/promptTemplates';
 import { PromptTemplateEditor } from '@features/generation/ui/promptFields/PromptTemplateEditor';
 import { PromptTemplateImage } from '@features/generation/ui/promptFields/PromptTemplateImage';
 import { PromptTemplatesPanel } from '@features/generation/ui/promptFields/PromptTemplatesPanel';
+import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import i18next from 'i18next';
@@ -16,14 +17,27 @@ import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
+const dependencies = vi.hoisted(() => ({
+  apiFetch: vi.fn(),
+  canManagePromptTemplates: false,
+  downloadBlob: vi.fn(),
+}));
+
 // Both panels report failures through Generation's UI port and read the
 // import/export capability from it; only the app composes that. The rest is real.
 vi.mock('@features/generation/ui/GenerationUiContext', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   useGenerationUi: () => ({
-    capabilities: { canManagePromptTemplates: false },
+    capabilities: { canManagePromptTemplates: dependencies.canManagePromptTemplates },
     notifications: { error: vi.fn(), info: vi.fn(), reportError: vi.fn() },
   }),
+}));
+
+vi.mock('@platform/browser/downloadBlob', () => ({ downloadBlob: dependencies.downloadBlob }));
+
+vi.mock('@platform/transport/http', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  apiFetch: dependencies.apiFetch,
 }));
 
 // The subtree of `public/locales/en.json` these panels read, copied verbatim so
@@ -210,6 +224,10 @@ afterEach(async () => {
   host = null;
   root = null;
   vi.restoreAllMocks();
+  dependencies.apiFetch.mockReset();
+  dependencies.canManagePromptTemplates = false;
+  dependencies.downloadBlob.mockReset();
+  accountLifecycle.invalidate();
   document.documentElement.className = '';
   delete document.documentElement.dataset.theme;
 });
@@ -672,6 +690,80 @@ it('keeps the fetched image URL live through StrictMode replay and revokes every
   await act(() => root?.unmount());
   root = null;
   expect(revokedUrls.has(liveUrl)).toBe(true);
+});
+
+it('removes a cached fetched image when the authoritative template no longer has one', async () => {
+  let sequence = 0;
+  const revokedUrls = new Set<string>();
+  vi.spyOn(URL, 'createObjectURL').mockImplementation(() => `blob:removed-template-preview-${++sequence}`);
+  vi.spyOn(URL, 'revokeObjectURL').mockImplementation((url) => revokedUrls.add(url));
+
+  const RemovedImageProbe = () => {
+    const [hasImage, setHasImage] = useState(true);
+
+    return (
+      <>
+        <button onClick={() => setHasImage(false)}>Remove stored image</button>
+        <PromptTemplateImage
+          alt="Fetched preview"
+          fallback={IMAGE_FALLBACK}
+          template={hasImage ? templateWithImage : userTemplate}
+        />
+      </>
+    );
+  };
+
+  await render(<RemovedImageProbe />, (queryClient) =>
+    queryClient.setQueryData(promptTemplateKeys.image(templateWithImage.id), new Blob(['image']))
+  );
+
+  const liveUrl = host!.querySelector<HTMLImageElement>('img[alt="Fetched preview"]')!.src;
+
+  await act(async () => {
+    await userEvent.click(buttonWithText('Remove stored image'));
+  });
+
+  expect(host!.querySelector('img[alt="Fetched preview"]')).toBeNull();
+  expect(host!.textContent).toContain('fallback');
+  expect(revokedUrls.has(liveUrl)).toBe(true);
+});
+
+it('does not download a prompt-template export whose body finishes after account rotation', async () => {
+  let resolveBody!: (blob: Blob) => void;
+  const body = new Promise<Blob>((resolve) => {
+    resolveBody = resolve;
+  });
+  const owner = accountLifecycle.activate('prompt-export-a', ':user:prompt-export-a');
+
+  dependencies.canManagePromptTemplates = true;
+  dependencies.apiFetch.mockResolvedValue({ blob: () => body });
+
+  await render(
+    <PromptTemplatesPanel
+      activeTemplate={null}
+      catalog={createCatalog({ exportCsv: exportPromptTemplates })}
+      isActiveTemplateMissing={false}
+      onApply={vi.fn()}
+      onCreate={vi.fn()}
+      onDetach={vi.fn()}
+      onEdit={vi.fn()}
+    />
+  );
+
+  await act(async () => {
+    await userEvent.click(buttonWithText('Export'));
+    await vi.waitFor(() => expect(dependencies.apiFetch).toHaveBeenCalledOnce());
+  });
+
+  expect(dependencies.apiFetch).toHaveBeenCalledWith('/api/v1/style_presets/export', { signal: owner.signal });
+
+  await act(async () => {
+    accountLifecycle.activate('prompt-export-b', ':user:prompt-export-b');
+    resolveBody(new Blob(['name,prompt']));
+    await body;
+  });
+
+  expect(dependencies.downloadBlob).not.toHaveBeenCalled();
 });
 
 describe('prompt template image outlines', () => {

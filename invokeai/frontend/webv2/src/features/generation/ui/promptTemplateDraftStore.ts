@@ -12,6 +12,7 @@
  */
 
 import { useMountEffect } from '@platform/react/useMountEffect';
+import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
 import { useEffectEvent } from 'react';
 
@@ -25,6 +26,11 @@ interface PendingPromptTemplateDraftState {
 }
 
 const store = createExternalStore<PendingPromptTemplateDraftState>({ draft: null });
+
+registerAccountOwnedResource({
+  clear: () => store.setSnapshot({ draft: null }),
+  name: 'pending-prompt-template-draft',
+});
 
 export const setPendingPromptTemplateDraft = (draft: PendingPromptTemplateDraft): void => store.setSnapshot({ draft });
 

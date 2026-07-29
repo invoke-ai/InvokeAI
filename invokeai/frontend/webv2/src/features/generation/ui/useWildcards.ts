@@ -1,4 +1,5 @@
 import type { WildcardRecord } from '@features/generation/data/wildcards';
+import type { AccountScope } from '@platform/state/accountLifecycle';
 
 import {
   createWildcard,
@@ -53,7 +54,7 @@ export interface WildcardCatalog {
    * at a time meant re-fetching the whole catalog, plus every dynamic-prompt
    * expansion, between each write and the next.
    */
-  applyWrites: (writes: readonly WildcardWrite[]) => Promise<number>;
+  applyWrites: (writes: readonly WildcardWrite[], owner: AccountScope) => Promise<number>;
 }
 
 /**
@@ -100,19 +101,21 @@ export const useWildcards = (): WildcardCatalog => {
   const remove = useCallback((id: string) => runAndInvalidate(() => deleteWildcard(id)), [runAndInvalidate]);
 
   const applyWrites = useCallback(
-    async (writes: readonly WildcardWrite[]): Promise<number> => {
-      const owner = captureAccountScope();
+    async (writes: readonly WildcardWrite[], owner: AccountScope): Promise<number> => {
       let done = 0;
       let failure: unknown;
 
       try {
         for (const write of writes) {
+          assertAccountScopeCurrent(owner);
+
           if (write.id === undefined) {
             await createWildcard({ name: write.name, values: write.values });
           } else {
             await updateWildcard(write.id, { name: write.name, values: write.values });
           }
 
+          assertAccountScopeCurrent(owner);
           done++;
         }
       } catch (caught) {

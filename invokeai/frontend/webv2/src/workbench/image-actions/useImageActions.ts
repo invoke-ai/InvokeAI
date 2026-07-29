@@ -66,10 +66,6 @@ export interface ImageActions {
   useAsReferenceImage: (image: GalleryImage) => void;
 }
 
-export const saveBlobToDisk = (blob: Blob, fileName: string): void => {
-  downloadBlob(blob, fileName);
-};
-
 const toErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
 const toPngBlob = async (blob: Blob): Promise<Blob> => {
@@ -209,7 +205,7 @@ export const useImageActions = ({
           const { blob, fileName } = await galleryTransfers.downloadArchive({ imageNames, signal: owner.signal });
 
           assertAccountScopeCurrent(owner);
-          saveBlobToDisk(blob, fileName);
+          downloadBlob(blob, fileName);
           recordSuccess('Download ready');
         } catch (error: unknown) {
           if (!isAccountScopeCurrent(owner)) {

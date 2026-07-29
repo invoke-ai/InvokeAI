@@ -1,7 +1,20 @@
-import { isSupportedWildcardFile, readWildcardFiles, WildcardFileError } from '@features/generation/ui/wildcardFiles';
-import { describe, expect, it } from 'vitest';
+import {
+  downloadWildcards,
+  isSupportedWildcardFile,
+  readWildcardFiles,
+  WILDCARD_COLLECTION_FORMATS,
+  WildcardFileError,
+} from '@features/generation/ui/wildcardFiles';
+import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+const downloadText = vi.hoisted(() => vi.fn());
+
+vi.mock('@platform/browser/downloadBlob', () => ({ downloadText }));
 
 const file = (name: string, contents: string) => new File([contents], name, { type: 'text/plain' });
+const read = (files: readonly File[], source: 'files' | 'folder') =>
+  readWildcardFiles(files, source, accountLifecycle.capture());
 
 /** What a directory pick hands over: a name plus the path relative to the root. */
 const inFolder = (path: string, contents: string): File => {
@@ -12,42 +25,46 @@ const inFolder = (path: string, contents: string): File => {
   return picked;
 };
 
+afterEach(() => {
+  accountLifecycle.invalidate();
+  downloadText.mockReset();
+  vi.restoreAllMocks();
+});
+
 describe('readWildcardFiles', () => {
   it('reads a text file as one wildcard named after it', async () => {
-    await expect(readWildcardFiles([file('colours.txt', 'red\n# a note\n\ngreen')], 'files')).resolves.toEqual([
+    await expect(read([file('colours.txt', 'red\n# a note\n\ngreen')], 'files')).resolves.toEqual([
       { name: 'colours', values: ['red', 'green'] },
     ]);
   });
 
   it('reads a nested yaml collection', async () => {
-    await expect(readWildcardFiles([file('all.yaml', 'animals:\n  dogs:\n    - corgi\n')], 'files')).resolves.toEqual([
+    await expect(read([file('all.yaml', 'animals:\n  dogs:\n    - corgi\n')], 'files')).resolves.toEqual([
       { name: 'animals/dogs', values: ['corgi'] },
     ]);
   });
 
   it('reads a json collection', async () => {
-    await expect(readWildcardFiles([file('all.json', '{"moods":["calm"]}')], 'files')).resolves.toEqual([
+    await expect(read([file('all.json', '{"moods":["calm"]}')], 'files')).resolves.toEqual([
       { name: 'moods', values: ['calm'] },
     ]);
   });
 
   it('takes an extensionless file as text', async () => {
-    await expect(readWildcardFiles([file('colours', 'red')], 'files')).resolves.toEqual([
-      { name: 'colours', values: ['red'] },
-    ]);
+    await expect(read([file('colours', 'red')], 'files')).resolves.toEqual([{ name: 'colours', values: ['red'] }]);
   });
 
   // `accept` on a file input is a hint, not a rule, and a wildcard folder
   // routinely has a readme sitting in it. Read as text, that imported as a
   // wildcard named `README` whose values were the markdown.
   it('refuses a file that is not a supported format', async () => {
-    await expect(readWildcardFiles([file('README.md', '# Wildcards\n\nSome notes.')], 'files')).rejects.toBeInstanceOf(
+    await expect(read([file('README.md', '# Wildcards\n\nSome notes.')], 'files')).rejects.toBeInstanceOf(
       WildcardFileError
     );
   });
 
   it('names the file it could not read', async () => {
-    await expect(readWildcardFiles([file('broken.json', '{ nope')], 'files')).rejects.toMatchObject({
+    await expect(read([file('broken.json', '{ nope')], 'files')).rejects.toMatchObject({
       fileName: 'broken.json',
     });
   });
@@ -58,7 +75,7 @@ describe('readWildcardFiles', () => {
   it('refuses a collection too large to import instead of overflowing', async () => {
     const huge = JSON.stringify(Object.fromEntries(Array.from({ length: 25_000 }, (_, i) => [`w${i}`, ['v']])));
 
-    await expect(readWildcardFiles([file('huge.json', huge)], 'files')).rejects.toBeInstanceOf(WildcardFileError);
+    await expect(read([file('huge.json', huge)], 'files')).rejects.toBeInstanceOf(WildcardFileError);
   });
 
   // The whole point of picking a folder: a1111 nests wildcards in directories,
@@ -67,7 +84,7 @@ describe('readWildcardFiles', () => {
   it('turns a folder`s nesting into `/` names', async () => {
     const picked = [inFolder('wildcards/animals/dogs.txt', 'corgi'), inFolder('wildcards/moods/dogs.txt', 'sleepy')];
 
-    await expect(readWildcardFiles(picked, 'folder')).resolves.toEqual([
+    await expect(read(picked, 'folder')).resolves.toEqual([
       { name: 'animals/dogs', values: ['corgi'] },
       { name: 'moods/dogs', values: ['sleepy'] },
     ]);
@@ -76,7 +93,7 @@ describe('readWildcardFiles', () => {
   it('retains direct file names even when a relative path is present', async () => {
     const picked = inFolder('ignored/animals/dogs.txt', 'corgi');
 
-    await expect(readWildcardFiles([picked], 'files')).resolves.toEqual([{ name: 'dogs', values: ['corgi'] }]);
+    await expect(read([picked], 'files')).resolves.toEqual([{ name: 'dogs', values: ['corgi'] }]);
   });
 });
 
@@ -99,4 +116,22 @@ describe('isSupportedWildcardFile', () => {
       'LICENSE',
     ]);
   });
+});
+
+it('does not download a wildcard export whose YAML serializer finishes after account rotation', async () => {
+  let resolveStringify!: (value: string) => void;
+  const serialized = new Promise<string>((resolve) => {
+    resolveStringify = resolve;
+  });
+  const yaml = WILDCARD_COLLECTION_FORMATS.find((format) => format.id === 'yaml')!;
+  vi.spyOn(yaml, 'stringify').mockReturnValue(serialized);
+  const owner = accountLifecycle.activate('wildcard-export-a', ':user:wildcard-export-a');
+
+  const exportPromise = downloadWildcards([{ name: 'colors', values: ['red'] }], 'yaml', owner);
+  accountLifecycle.activate('wildcard-export-b', ':user:wildcard-export-b');
+  resolveStringify('colors:\\n  - red\\n');
+
+  await exportPromise.catch(() => undefined);
+
+  expect(downloadText).not.toHaveBeenCalled();
 });

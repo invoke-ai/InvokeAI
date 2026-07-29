@@ -11,6 +11,11 @@ import { useGenerationUi } from '@features/generation/ui/GenerationUiContext';
 import { PANEL_HEADER_CONTROL_HEIGHT, PromptPanelHeader } from '@features/generation/ui/promptFields/PromptPanelHeader';
 import { PromptTemplateImage } from '@features/generation/ui/promptFields/PromptTemplateImage';
 import { downloadBlob } from '@platform/browser/downloadBlob';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, IconButton } from '@platform/ui/Button';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
@@ -232,11 +237,16 @@ const PromptTemplateTransferActions = ({ catalog }: { catalog: PromptTemplateCat
 
   const runImport = useCallback(
     async (file: File) => {
+      const owner = captureAccountScope();
       setIsBusy(true);
 
       try {
-        await catalog.importFile(file);
+        await catalog.importFile(file, owner);
       } catch (caught) {
+        if (!isAccountScopeCurrent(owner)) {
+          return;
+        }
+
         reportError('import-prompt-templates', caught, t('widgets.generate.promptTemplates.couldNotImport'));
       } finally {
         setIsBusy(false);
@@ -246,11 +256,19 @@ const PromptTemplateTransferActions = ({ catalog }: { catalog: PromptTemplateCat
   );
 
   const runExport = useCallback(async () => {
+    const owner = captureAccountScope();
     setIsBusy(true);
 
     try {
-      downloadBlob(await catalog.exportCsv(), 'prompt_templates.csv');
+      const blob = await catalog.exportCsv(owner);
+
+      assertAccountScopeCurrent(owner);
+      downloadBlob(blob, 'prompt_templates.csv');
     } catch (caught) {
+      if (!isAccountScopeCurrent(owner)) {
+        return;
+      }
+
       reportError('export-prompt-templates', caught, t('widgets.generate.promptTemplates.couldNotExport'));
     } finally {
       setIsBusy(false);

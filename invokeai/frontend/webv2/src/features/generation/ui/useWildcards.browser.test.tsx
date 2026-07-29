@@ -1,4 +1,5 @@
 import { useWildcards, WildcardWriteError } from '@features/generation/ui/useWildcards';
+import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, createRef, type Ref, useImperativeHandle } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -64,7 +65,7 @@ describe('applyWrites', () => {
   // times over.
   it('invalidates once for the whole run, not once per write', async () => {
     await act(async () => {
-      await catalogRef.current!.applyWrites(WRITES);
+      await catalogRef.current!.applyWrites(WRITES, captureAccountScope());
     });
 
     expect(createWildcard).toHaveBeenCalledTimes(2);
@@ -76,7 +77,7 @@ describe('applyWrites', () => {
     let done = 0;
 
     await act(async () => {
-      done = await catalogRef.current!.applyWrites(WRITES);
+      done = await catalogRef.current!.applyWrites(WRITES, captureAccountScope());
     });
 
     expect(done).toBe(3);
@@ -91,7 +92,7 @@ describe('applyWrites', () => {
     let caught: unknown;
 
     await act(async () => {
-      caught = await catalogRef.current!.applyWrites(WRITES).catch((error: unknown) => error);
+      caught = await catalogRef.current!.applyWrites(WRITES, captureAccountScope()).catch((error: unknown) => error);
     });
 
     expect(caught).toBeInstanceOf(WildcardWriteError);
@@ -104,7 +105,7 @@ describe('applyWrites', () => {
     createWildcard.mockImplementationOnce(() => Promise.reject(new Error('nope')));
 
     await act(async () => {
-      await catalogRef.current!.applyWrites(WRITES).catch(() => undefined);
+      await catalogRef.current!.applyWrites(WRITES, captureAccountScope()).catch(() => undefined);
     });
 
     expect(invalidateWildcardDependents).not.toHaveBeenCalled();

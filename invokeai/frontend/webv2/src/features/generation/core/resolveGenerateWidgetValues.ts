@@ -1,3 +1,5 @@
+import { areJsonValuesStructurallyEqual } from '@platform/core/json';
+
 import type { GenerationModelCatalogItem } from './contracts';
 import type { PromptTemplateSnapshot } from './promptTemplates';
 import type { GenerateWidgetValues } from './types';
@@ -37,40 +39,13 @@ export interface ResolvedGenerateWidgetValues {
 
 const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === 'object';
 
-const areValuesEqual = (left: unknown, right: unknown): boolean => {
-  if (Object.is(left, right)) {
-    return true;
-  }
-
-  if (Array.isArray(left) || Array.isArray(right)) {
-    return (
-      Array.isArray(left) &&
-      Array.isArray(right) &&
-      left.length === right.length &&
-      left.every((value, index) => areValuesEqual(value, right[index]))
-    );
-  }
-
-  if (!isRecord(left) || !isRecord(right)) {
-    return false;
-  }
-
-  const leftKeys = Object.keys(left);
-  const rightKeys = Object.keys(right);
-
-  return (
-    leftKeys.length === rightKeys.length &&
-    leftKeys.every((key) => Object.hasOwn(right, key) && areValuesEqual(left[key], right[key]))
-  );
-};
-
 const hasSystemDifference = (storedValues: unknown, values: GenerateWidgetValues): boolean => {
   if (!isRecord(storedValues)) {
     return true;
   }
 
   return Object.entries(values).some(
-    ([key, value]) => key !== 'batchCount' && !areValuesEqual(storedValues[key], value)
+    ([key, value]) => key !== 'batchCount' && !areJsonValuesStructurallyEqual(storedValues[key], value)
   );
 };
 

@@ -2,6 +2,8 @@ import type { WildcardCatalog } from '@features/generation/ui/useWildcards';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { WildcardsPanel } from '@features/generation/ui/promptFields/WildcardsPanel';
+import { WILDCARD_COLLECTION_FORMATS } from '@features/generation/ui/wildcardFiles';
+import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -68,6 +70,69 @@ afterEach(async () => {
   host?.remove();
   host = null;
   root = null;
+  accountLifecycle.invalidate();
+  vi.restoreAllMocks();
+});
+
+it('does not automatically write a YAML import whose parser finishes after account rotation', async () => {
+  let resolveParse!: (value: unknown) => void;
+  const parsed = new Promise<unknown>((resolve) => {
+    resolveParse = resolve;
+  });
+  const yaml = WILDCARD_COLLECTION_FORMATS.find((format) => format.id === 'yaml')!;
+  const parse = vi.spyOn(yaml, 'parse').mockReturnValue(parsed);
+  const applyWrites = vi.fn(() => Promise.resolve(1));
+
+  accountLifecycle.activate('wildcard-import-a', ':user:wildcard-import-a');
+  await renderPanel(true, { ...catalog, applyWrites, knownNames: new Set(), wildcards: [] });
+
+  const input = host!.querySelector<HTMLInputElement>(
+    `input[accept="${'.txt,.yaml,.yml,.json,text/plain,application/json'}"]`
+  )!;
+  await act(async () => {
+    await userEvent.upload(input, new File(['colors:\\n  - red\\n'], 'wildcards.yaml', { type: 'text/yaml' }));
+    await vi.waitFor(() => expect(parse).toHaveBeenCalledOnce());
+  });
+
+  await act(async () => {
+    accountLifecycle.activate('wildcard-import-b', ':user:wildcard-import-b');
+    resolveParse({ colors: ['red'] });
+    await parsed;
+    await new Promise<void>((resolve) => {
+      globalThis.setTimeout(resolve, 50);
+    });
+  });
+
+  expect(applyWrites).not.toHaveBeenCalled();
+});
+
+it('quietly refuses a conflict-dialog import after its originating account rotates', async () => {
+  const applyWrites = vi.fn(() => Promise.resolve(1));
+
+  accountLifecycle.activate('wildcard-dialog-a', ':user:wildcard-dialog-a');
+  await renderPanel(true, { ...catalog, applyWrites });
+
+  const input = host!.querySelector<HTMLInputElement>(
+    `input[accept="${'.txt,.yaml,.yml,.json,text/plain,application/json'}"]`
+  )!;
+  await act(async () => {
+    await userEvent.upload(input, new File(['blue'], 'colors.txt', { type: 'text/plain' }));
+  });
+  await vi.waitFor(() => expect(document.querySelector('[role="alertdialog"]')).not.toBeNull());
+
+  accountLifecycle.activate('wildcard-dialog-b', ':user:wildcard-dialog-b');
+  const confirm = [...document.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] button')].find((button) =>
+    button.textContent?.includes('import')
+  )!;
+
+  await act(async () => {
+    await userEvent.click(confirm);
+    await new Promise<void>((resolve) => {
+      globalThis.setTimeout(resolve, 50);
+    });
+  });
+
+  expect(applyWrites).not.toHaveBeenCalled();
 });
 
 describe('wildcard values editor', () => {

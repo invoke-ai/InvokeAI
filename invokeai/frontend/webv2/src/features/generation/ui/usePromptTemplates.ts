@@ -4,6 +4,7 @@ import type {
   PromptTemplateRecord,
   PromptTemplateUpdateDraft,
 } from '@features/generation/data/promptTemplates';
+import type { AccountScope } from '@platform/state/accountLifecycle';
 
 import { classifyPromptTemplates, requireOwnedPromptTemplate } from '@features/generation/core/promptTemplateOwnership';
 import {
@@ -42,8 +43,8 @@ export interface PromptTemplateCatalog {
   create: (draft: PromptTemplateCreateDraft) => Promise<PromptTemplateRecord>;
   update: (template: PromptTemplateRecord, draft: PromptTemplateUpdateDraft) => Promise<PromptTemplateRecord>;
   remove: (template: PromptTemplateRecord) => Promise<void>;
-  importFile: (file: File) => Promise<void>;
-  exportCsv: () => Promise<Blob>;
+  importFile: (file: File, owner: AccountScope) => Promise<void>;
+  exportCsv: (owner: AccountScope) => Promise<Blob>;
 }
 
 /**
@@ -61,8 +62,7 @@ export const usePromptTemplates = ({ isEnabled = true }: { isEnabled?: boolean }
   const classified = useMemo(() => classifyPromptTemplates(query.data ?? [], account), [account, query.data]);
 
   const runAndInvalidate = useCallback(
-    async <T>(run: () => Promise<T>, imageId?: string): Promise<T> => {
-      const owner = captureAccountScope();
+    async <T>(run: () => Promise<T>, imageId?: string, owner: AccountScope = captureAccountScope()): Promise<T> => {
       const result = await run();
 
       assertAccountScopeCurrent(owner);
@@ -96,7 +96,7 @@ export const usePromptTemplates = ({ isEnabled = true }: { isEnabled?: boolean }
   );
 
   const importFile = useCallback(
-    (file: File) => runAndInvalidate(() => importPromptTemplates(file)),
+    (file: File, owner: AccountScope) => runAndInvalidate(() => importPromptTemplates(file, owner), undefined, owner),
     [runAndInvalidate]
   );
 

@@ -25,10 +25,6 @@ const ACCEPTED_UPLOAD_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp'])
 
 const toErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
-const saveBlobToDisk = (blob: Blob, fileName: string): void => {
-  downloadBlob(blob, fileName);
-};
-
 export const useGalleryActions = ({
   boards,
   loadMore,
@@ -130,7 +126,7 @@ export const useGalleryActions = ({
           const { blob, fileName } = await downloadGalleryArchive({ boardId, signal: owner.signal });
 
           assertAccountScopeCurrent(owner);
-          saveBlobToDisk(blob, fileName);
+          downloadBlob(blob, fileName);
           recordSuccess('Download ready');
         } catch (error: unknown) {
           if (!isAccountScopeCurrent(owner)) {

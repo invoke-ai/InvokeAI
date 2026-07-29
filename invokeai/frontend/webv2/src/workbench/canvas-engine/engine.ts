@@ -106,6 +106,7 @@ import type { LayerTransform } from '@workbench/canvas-engine/transform/transfor
 import type { Rect, RenderFlags, ToolId, Vec2 } from '@workbench/canvas-engine/types';
 import type { CanvasProjectMutationPort } from '@workbench/canvasProjectMutationPort';
 
+import { areJsonValuesStructurallyEqual } from '@platform/core/json';
 import { ControlPixelController } from '@workbench/canvas-engine/controllers/controlPixelController';
 import { EditingController } from '@workbench/canvas-engine/controllers/editingController';
 import { FilterResultController } from '@workbench/canvas-engine/controllers/filterResultController';
@@ -178,7 +179,7 @@ import { createBitmapStore, type BitmapStore } from './document/bitmapStore';
 import { createDocumentMirror, type DocumentMirror } from './document/documentMirror';
 import { decideLayerChange } from './document/layerChangeDecision';
 import { getSourceBounds, getSourceContentRect, isRenderableLayer, renderableSourceOf } from './document/sources';
-import { createLayerExportGuards, isDeeplyEqual, isSupportedExportSource } from './layerExportGuards';
+import { createLayerExportGuards, isSupportedExportSource } from './layerExportGuards';
 import { createLayerRasterizer } from './layerRasterizer';
 import { createPreviewPublisher } from './previewPublisher';
 import { createRasterSnapshotCapture } from './rasterSnapshotCapture';
@@ -1853,7 +1854,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     expected: CanvasLayerContract
   ): boolean => {
     const current = document?.layers.find((candidate) => candidate.id === expected.id);
-    return current !== undefined && isDeeplyEqual(current, expected);
+    return current !== undefined && areJsonValuesStructurallyEqual(current, expected);
   };
 
   controlPixelController = new ControlPixelController({

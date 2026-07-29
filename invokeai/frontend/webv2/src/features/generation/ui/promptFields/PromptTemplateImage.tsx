@@ -52,7 +52,7 @@ export const PromptTemplateImage = ({
     return localPreviewUrl ? <Image {...IMAGE_OUTLINE_PROPS} {...imageProps} src={localPreviewUrl} /> : fallback;
   }
 
-  if (!query.data) {
+  if (!template.hasImage || !query.data) {
     return fallback;
   }
 

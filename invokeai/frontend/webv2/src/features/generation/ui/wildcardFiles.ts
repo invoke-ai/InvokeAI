@@ -9,6 +9,7 @@
  */
 
 import type { ParsedWildcard } from '@features/generation/core/wildcardTransfer';
+import type { AccountScope } from '@platform/state/accountLifecycle';
 
 import {
   parseWildcardTextFile,
@@ -16,6 +17,7 @@ import {
   wildcardsToNestedRecord,
 } from '@features/generation/core/wildcardTransfer';
 import { downloadText } from '@platform/browser/downloadBlob';
+import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 
 /**
  * Every collection format, stated once.
@@ -130,7 +132,8 @@ export const isSupportedWildcardFile = (file: File): boolean => {
 
 export const readWildcardFiles = async (
   files: readonly File[],
-  source: WildcardFileSource
+  source: WildcardFileSource,
+  owner: AccountScope
 ): Promise<ParsedWildcard[]> => {
   const parsed: ParsedWildcard[] = [];
 
@@ -154,12 +157,23 @@ export const readWildcardFiles = async (
     }
 
     const contents = await file.text();
+    assertAccountScopeCurrent(owner);
 
     const collectionFormat = WILDCARD_COLLECTION_FORMATS.find((format) => hasExtension(path, ...format.extensions));
 
     if (collectionFormat) {
+      let collection: unknown;
+
       try {
-        collect(wildcardsFromNestedRecord(await collectionFormat.parse(contents)), file.name);
+        collection = await collectionFormat.parse(contents);
+      } catch {
+        throw new WildcardFileError(file.name);
+      }
+
+      assertAccountScopeCurrent(owner);
+
+      try {
+        collect(wildcardsFromNestedRecord(collection), file.name);
       } catch {
         throw new WildcardFileError(file.name);
       }
@@ -190,7 +204,8 @@ export const readWildcardFiles = async (
  */
 export const downloadWildcards = async (
   wildcards: readonly ParsedWildcard[],
-  formatId: WildcardExportFormat
+  formatId: WildcardExportFormat,
+  owner: AccountScope
 ): Promise<void> => {
   const format = WILDCARD_COLLECTION_FORMATS.find((candidate) => candidate.id === formatId);
 
@@ -198,5 +213,8 @@ export const downloadWildcards = async (
     throw new Error(`Unknown wildcard export format: ${formatId}`);
   }
 
-  downloadText(await format.stringify(wildcardsToNestedRecord(wildcards)), `wildcards.${format.id}`, format.mimeType);
+  const contents = await format.stringify(wildcardsToNestedRecord(wildcards));
+
+  assertAccountScopeCurrent(owner);
+  downloadText(contents, `wildcards.${format.id}`, format.mimeType);
 };

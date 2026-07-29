@@ -1,6 +1,7 @@
 import type { WildcardImportEntry, WildcardImportResolution } from '@features/generation/core/wildcardTransfer';
 import type { WildcardCatalog } from '@features/generation/ui/useWildcards';
 import type { WildcardExportFormat, WildcardFileSource } from '@features/generation/ui/wildcardFiles';
+import type { AccountScope } from '@platform/state/accountLifecycle';
 import type { ChangeEvent } from 'react';
 
 import { HStack, Menu, Portal } from '@chakra-ui/react';
@@ -16,6 +17,11 @@ import {
   WILDCARD_IMPORT_ACCEPT,
   WildcardFileError,
 } from '@features/generation/ui/wildcardFiles';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button } from '@platform/ui/Button';
 import { MenuContent } from '@platform/ui/Menu';
@@ -42,7 +48,10 @@ export const WildcardTransferActions = ({ catalog }: { catalog: WildcardCatalog 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const directoryInputRef = useRef<HTMLInputElement | null>(null);
   const [isBusy, setIsBusy] = useState(false);
-  const [pendingEntries, setPendingEntries] = useState<WildcardImportEntry[] | null>(null);
+  const [pendingImport, setPendingImport] = useState<{
+    entries: WildcardImportEntry[];
+    owner: AccountScope;
+  } | null>(null);
 
   const reportError = useCallback(
     (area: string, caught: unknown, fallback: string) =>
@@ -55,16 +64,27 @@ export const WildcardTransferActions = ({ catalog }: { catalog: WildcardCatalog 
   );
 
   const applyImport = useCallback(
-    async (entries: readonly WildcardImportEntry[], resolutions: Record<string, WildcardImportResolution>) => {
-      const actions = getWildcardImportActions(entries, resolutions, new Set(catalog.wildcards.map((w) => w.name)));
-
+    async (
+      entries: readonly WildcardImportEntry[],
+      resolutions: Record<string, WildcardImportResolution>,
+      owner: AccountScope
+    ) => {
+      let actionCount = 0;
       setIsBusy(true);
 
       try {
+        assertAccountScopeCurrent(owner);
+        const actions = getWildcardImportActions(entries, resolutions, new Set(catalog.wildcards.map((w) => w.name)));
+
+        actionCount = actions.length;
         notifications.info(
-          t('widgets.generate.dynamicPrompts.importedCount', { count: await catalog.applyWrites(actions) })
+          t('widgets.generate.dynamicPrompts.importedCount', { count: await catalog.applyWrites(actions, owner) })
         );
       } catch (caught) {
+        if (!isAccountScopeCurrent(owner)) {
+          return;
+        }
+
         // Writes go one at a time, so a failure part-way leaves real wildcards
         // behind. Saying only that the import failed sent people back for a
         // second run that then clashed with everything the first one had made.
@@ -74,12 +94,12 @@ export const WildcardTransferActions = ({ catalog }: { catalog: WildcardCatalog 
           'import-wildcards',
           caught,
           done > 0
-            ? t('widgets.generate.dynamicPrompts.couldNotImportAfter', { done, total: actions.length })
+            ? t('widgets.generate.dynamicPrompts.couldNotImportAfter', { done, total: actionCount })
             : t('widgets.generate.dynamicPrompts.couldNotImport')
         );
       } finally {
         setIsBusy(false);
-        setPendingEntries(null);
+        setPendingImport(null);
       }
     },
     [catalog, notifications, reportError, t]
@@ -87,21 +107,30 @@ export const WildcardTransferActions = ({ catalog }: { catalog: WildcardCatalog 
 
   const startImport = useCallback(
     async (files: readonly File[], source: WildcardFileSource) => {
+      const owner = captureAccountScope();
       setIsBusy(true);
 
       try {
-        const entries = planWildcardImport(await readWildcardFiles(files, source), catalog.wildcards);
+        const parsed = await readWildcardFiles(files, source, owner);
+
+        assertAccountScopeCurrent(owner);
+        const entries = planWildcardImport(parsed, catalog.wildcards);
+        assertAccountScopeCurrent(owner);
 
         // Nothing to decide and nothing to explain — the file pick was the
         // confirmation, so a dialog with only an Import button would be a click
         // that tells the user what they already know.
         if (entries.every((entry) => entry.rejection === null && entry.conflictId === null)) {
-          await applyImport(entries, {});
+          await applyImport(entries, {}, owner);
           return;
         }
 
-        setPendingEntries(entries);
+        setPendingImport({ entries, owner });
       } catch (caught) {
+        if (!isAccountScopeCurrent(owner)) {
+          return;
+        }
+
         reportError(
           'import-wildcards',
           caught,
@@ -118,9 +147,15 @@ export const WildcardTransferActions = ({ catalog }: { catalog: WildcardCatalog 
 
   const runExport = useCallback(
     async (format: WildcardExportFormat) => {
+      const owner = captureAccountScope();
+
       try {
-        await downloadWildcards(catalog.wildcards, format);
+        await downloadWildcards(catalog.wildcards, format, owner);
       } catch (caught) {
+        if (!isAccountScopeCurrent(owner)) {
+          return;
+        }
+
         reportError('export-wildcards', caught, t('widgets.generate.dynamicPrompts.couldNotExport'));
       }
     },
@@ -168,11 +203,12 @@ export const WildcardTransferActions = ({ catalog }: { catalog: WildcardCatalog 
     [runExport]
   );
 
-  const cancelImport = useCallback(() => setPendingEntries(null), []);
+  const cancelImport = useCallback(() => setPendingImport(null), []);
 
   const confirmImport = useCallback(
-    (resolutions: Record<string, WildcardImportResolution>) => applyImport(pendingEntries ?? [], resolutions),
-    [applyImport, pendingEntries]
+    (resolutions: Record<string, WildcardImportResolution>) =>
+      pendingImport ? applyImport(pendingImport.entries, resolutions, pendingImport.owner) : Promise.resolve(),
+    [applyImport, pendingImport]
   );
 
   return (
@@ -230,8 +266,8 @@ export const WildcardTransferActions = ({ catalog }: { catalog: WildcardCatalog 
           wildcards in folders, and only a directory pick supplies the relative
           path that turns `animals/dogs.txt` into `animals/dogs`. */}
       <input {...DIRECTORY_INPUT_PROPS} hidden ref={directoryInputRef} type="file" onChange={handleDirectoryChange} />
-      {pendingEntries ? (
-        <WildcardImportDialog entries={pendingEntries} onCancel={cancelImport} onConfirm={confirmImport} />
+      {pendingImport ? (
+        <WildcardImportDialog entries={pendingImport.entries} onCancel={cancelImport} onConfirm={confirmImport} />
       ) : null}
     </HStack>
   );

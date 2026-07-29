@@ -12,6 +12,7 @@
  */
 
 import type { PromptTemplateSnapshot } from '@features/generation/core/promptTemplates';
+import type { AccountScope } from '@platform/state/accountLifecycle';
 import type { QueryClient } from '@tanstack/react-query';
 
 import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
@@ -188,11 +189,13 @@ export const deletePromptTemplate = async (id: string): Promise<void> => {
 };
 
 /** Accepts the CSV and JSON shapes documented by the backend's importer. */
-export const importPromptTemplates = async (file: File): Promise<void> => {
+export const importPromptTemplates = async (file: File, owner: AccountScope): Promise<void> => {
   const body = new FormData();
 
   body.append('file', file);
-  await apiFetch(`${PROMPT_TEMPLATES_BASE}/import`, { body, method: 'POST' });
+  assertAccountScopeCurrent(owner);
+  await apiFetch(`${PROMPT_TEMPLATES_BASE}/import`, { body, method: 'POST', signal: owner.signal });
+  assertAccountScopeCurrent(owner);
 };
 
 /**
@@ -200,10 +203,13 @@ export const importPromptTemplates = async (file: File): Promise<void> => {
  * `apiFetchJson`. It also cannot be an anchor download: the URL alone carries no
  * `Authorization` header, and only the transport injects one.
  */
-export const exportPromptTemplates = async (): Promise<Blob> => {
-  const response = await apiFetch(`${PROMPT_TEMPLATES_BASE}/export`);
+export const exportPromptTemplates = async (owner: AccountScope): Promise<Blob> => {
+  const response = await apiFetch(`${PROMPT_TEMPLATES_BASE}/export`, { signal: owner.signal });
+  assertAccountScopeCurrent(owner);
+  const blob = await response.blob();
 
-  return await response.blob();
+  assertAccountScopeCurrent(owner);
+  return blob;
 };
 
 export const invalidatePromptTemplates = async (queryClient: QueryClient, id?: string): Promise<void> => {
