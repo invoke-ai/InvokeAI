@@ -1,7 +1,8 @@
+import type { PromptTemplateSnapshot } from '@features/generation/core/promptTemplates';
 import type { PromptTemplateRecord } from '@features/generation/data/promptTemplates';
 import type { PromptTemplateCatalog } from '@features/generation/ui/usePromptTemplates';
 
-import { ChakraProvider } from '@chakra-ui/react';
+import { Box, ChakraProvider } from '@chakra-ui/react';
 import { promptTemplateKeys } from '@features/generation/data/promptTemplates';
 import { PromptTemplateEditor } from '@features/generation/ui/promptFields/PromptTemplateEditor';
 import { PromptTemplateImage } from '@features/generation/ui/promptFields/PromptTemplateImage';
@@ -9,7 +10,7 @@ import { PromptTemplatesPanel } from '@features/generation/ui/promptFields/Promp
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import i18next from 'i18next';
-import { act, isValidElement, StrictMode } from 'react';
+import { act, isValidElement, StrictMode, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -157,6 +158,25 @@ const createCatalog = (overrides: Partial<PromptTemplateCatalog> = {}): PromptTe
   ...overrides,
 });
 
+const StatefulPromptTemplatesPanel = ({ catalog }: { catalog: PromptTemplateCatalog }) => {
+  const [activeTemplate, setActiveTemplate] = useState<PromptTemplateSnapshot | null>(null);
+
+  return (
+    <>
+      <Box aria-hidden bg="accent.solid" color="accent.contrast" data-testid="accent-style-probe" />
+      <PromptTemplatesPanel
+        activeTemplate={activeTemplate}
+        catalog={catalog}
+        isActiveTemplateMissing={false}
+        onApply={setActiveTemplate}
+        onCreate={vi.fn()}
+        onDetach={vi.fn()}
+        onEdit={vi.fn()}
+      />
+    </>
+  );
+};
+
 const render = async (element: React.ReactNode, seed?: (queryClient: QueryClient) => void) => {
   host = document.createElement('div');
   host.style.width = '400px';
@@ -222,6 +242,33 @@ describe('the prompt templates panel', () => {
       negativePrompt: userTemplate.negativePrompt,
       positivePrompt: userTemplate.positivePrompt,
     });
+  });
+
+  it('marks the applied template as current with the accent surface and contrast text', async () => {
+    await render(<StatefulPromptTemplatesPanel catalog={createCatalog()} />);
+
+    const activeButton = buttonWithText('Cinematic');
+    const inactiveButton = buttonWithText('Community');
+    await act(async () => {
+      await userEvent.click(activeButton);
+    });
+    await act(
+      () =>
+        new Promise<void>((resolve) => {
+          globalThis.setTimeout(resolve, 200);
+        })
+    );
+
+    const probeStyle = getComputedStyle(host!.querySelector('[data-testid="accent-style-probe"]')!);
+    const activeText = activeButton.querySelectorAll('span');
+
+    expect(activeButton.getAttribute('aria-current')).toBe('true');
+    expect(inactiveButton.hasAttribute('aria-current')).toBe(false);
+    expect(getComputedStyle(activeButton).backgroundColor).toBe(probeStyle.backgroundColor);
+    expect(getComputedStyle(inactiveButton).backgroundColor).not.toBe(probeStyle.backgroundColor);
+    expect(activeText).toHaveLength(2);
+    expect(getComputedStyle(activeText[0]!).color).toBe(probeStyle.color);
+    expect(getComputedStyle(activeText[1]!).color).toBe(probeStyle.color);
   });
 
   it('clears the applied template', async () => {

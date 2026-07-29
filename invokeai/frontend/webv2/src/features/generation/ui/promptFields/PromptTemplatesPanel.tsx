@@ -14,6 +14,7 @@ import { downloadBlob } from '@platform/browser/downloadBlob';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, IconButton } from '@platform/ui/Button';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
+import { Row } from '@platform/ui/Row';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { DownloadIcon, ImageIcon, PencilIcon, PlusIcon, TrashIcon, UploadIcon } from 'lucide-react';
@@ -366,28 +367,41 @@ const TemplateRow = ({
 
   return (
     <HStack align="center" gap="1" pr="1">
-      <Button
-        alignItems="center"
+      <Row
+        active={isActive ? 'accent' : 'none'}
+        aria-current={isActive || undefined}
+        asChild
         flex="1"
         h="auto"
         justifyContent="start"
         minW="0"
         px="2"
         py="1.5"
-        size="xs"
-        variant="ghost"
-        onClick={handleApply}
+        rounded="sm"
       >
-        <TemplateThumbnail template={template} />
-        <Stack align="start" flex="1" gap="0" minW="0">
-          <Text as="span" color={isActive ? 'fg' : 'fg.muted'} fontSize="xs" fontWeight={isActive ? '600' : '400'}>
-            {template.name}
-          </Text>
-          <Text as="span" color="fg.subtle" fontFamily="mono" fontSize="2xs" truncate>
-            {summary}
-          </Text>
-        </Stack>
-      </Button>
+        <button type="button" onClick={handleApply}>
+          <TemplateThumbnail template={template} />
+          <Stack align="start" flex="1" gap="0" minW="0">
+            <Text
+              as="span"
+              color={isActive ? 'accent.contrast' : 'fg.muted'}
+              fontSize="xs"
+              fontWeight={isActive ? '600' : '400'}
+            >
+              {template.name}
+            </Text>
+            <Text
+              as="span"
+              color={isActive ? 'accent.contrast' : 'fg.subtle'}
+              fontFamily="mono"
+              fontSize="2xs"
+              truncate
+            >
+              {summary}
+            </Text>
+          </Stack>
+        </button>
+      </Row>
       {onEdit ? (
         <Tooltip content={t('common.edit')}>
           <IconButton aria-label={t('common.edit')} size="2xs" variant="ghost" onClick={handleEdit}>
