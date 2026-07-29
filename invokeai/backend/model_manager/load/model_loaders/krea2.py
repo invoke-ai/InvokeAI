@@ -60,6 +60,28 @@ def _to_plain_tensor(value: Any) -> Any:
     return value
 
 
+def _put_unique_key(
+    dest: dict[Any, Any], key: Any, value: Any, *, source: Any, source_of: dict[Any, Any], what: str
+) -> None:
+    """Assign ``dest[key] = value``, rejecting a collision produced by a different source key.
+
+    These key normalizers map each source key to exactly one target key. A well-formed checkpoint is
+    either fully native or already in the target layout, so two distinct source keys never collapse to
+    the same target. A malformed *mixed-layout* checkpoint can, though — e.g. it carries both a native
+    ``blocks.0.attn.wq.weight`` and an already-diffusers ``transformer_blocks.0.attn.to_q.weight`` that
+    normalize to the same key. Silently overwriting would make the surviving tensor depend on dict
+    iteration order, so reject with an actionable message instead of dropping one tensor.
+    """
+    if key in dest:
+        raise RuntimeError(
+            f"{what}: source keys {source_of.get(key)!r} and {source!r} both normalize to {key!r}. "
+            "The checkpoint appears to mix native and target key layouts; refusing to silently drop "
+            "one of the tensors."
+        )
+    dest[key] = value
+    source_of[key] = source
+
+
 def _is_native_krea2_format(sd: dict[str, Any]) -> bool:
     """Detect the native/ComfyUI Krea-2 key naming (e.g. GGUF) vs. the diffusers naming."""
     return any(
@@ -118,9 +140,10 @@ def _convert_krea2_native_to_diffusers(sd: dict[str, Any]) -> dict[str, Any]:
     import torch
 
     new_sd: dict[str, Any] = {}
+    source_of: dict[Any, Any] = {}
     for key, value in sd.items():
         if not isinstance(key, str):
-            new_sd[key] = value
+            _put_unique_key(new_sd, key, value, source=key, source_of=source_of, what="Krea-2 checkpoint")
             continue
         # Drop original-only final-block projections (no diffusers equivalent).
         if key in ("last.down.weight", "last.up.weight"):
@@ -179,7 +202,7 @@ def _convert_krea2_native_to_diffusers(sd: dict[str, Any]) -> dict[str, Any]:
             k = k[: -len(".mod.lin")] + ".scale_shift_table"
             value = torch.as_tensor(_to_plain_tensor(value)).reshape(6, -1)
 
-        new_sd[k] = value
+        _put_unique_key(new_sd, k, value, source=key, source_of=source_of, what="Krea-2 checkpoint")
     return new_sd
 
 
@@ -441,18 +464,20 @@ def _remap_qwen3vl_singlefile_keys(sd: dict[str, Any]) -> dict[str, Any]:
     ``model.visual.*`` -> ``visual.*`` and ``model.<rest>`` (layers/embed_tokens/norm) -> ``language_model.<rest>``.
     """
     out: dict[str, Any] = {}
+    source_of: dict[Any, Any] = {}
+    what = "Qwen3-VL encoder checkpoint"
     for k, v in sd.items():
         if not isinstance(k, str):
-            out[k] = v
+            _put_unique_key(out, k, v, source=k, source_of=source_of, what=what)
             continue
         # Strip a leading "model." (some checkpoints prefix everything with it), then route by tower.
         key = k[len("model.") :] if k.startswith("model.") else k
         if key.startswith("visual.") or key.startswith("language_model."):
             # Already the transformers layout (e.g. "model.language_model.*" / "model.visual.*").
-            out[key] = v
+            _put_unique_key(out, key, v, source=k, source_of=source_of, what=what)
         else:
             # Bare language-model keys (layers.* / embed_tokens / norm) belong under language_model.
-            out["language_model." + key] = v
+            _put_unique_key(out, "language_model." + key, v, source=k, source_of=source_of, what=what)
     return out
 
 

@@ -196,6 +196,22 @@ class TestConvertKrea2NativeToDiffusers:
         out = _convert_krea2_native_to_diffusers({sentinel: torch.zeros(1)})  # type: ignore[dict-item]
         assert sentinel in out
 
+    @pytest.mark.parametrize(
+        "keys",
+        [
+            ("blocks.0.attn.wq.weight", "transformer_blocks.0.attn.to_q.weight"),
+            ("transformer_blocks.0.attn.to_q.weight", "blocks.0.attn.wq.weight"),
+        ],
+    )
+    def test_rejects_mixed_layout_alias_collision(self, keys: tuple[str, str]) -> None:
+        # A malformed mixed-layout checkpoint carries a native key and its already-diffusers alias, both
+        # normalizing to transformer_blocks.0.attn.to_q.weight. Distinct tensors under colliding aliases
+        # must be rejected in either insertion order rather than silently dropping one.
+        first, second = keys
+        sd = {first: torch.zeros(1), second: torch.ones(1)}
+        with pytest.raises(RuntimeError, match="both normalize to"):
+            _convert_krea2_native_to_diffusers(sd)
+
 
 class TestRemapQwen3vlSinglefileKeys:
     def test_routes_towers_and_prefixes_bare_language_model_keys(self) -> None:
@@ -218,6 +234,21 @@ class TestRemapQwen3vlSinglefileKeys:
         assert "language_model.layers.2.weight" in out
         # No key retains the leading model. prefix.
         assert not any(k.startswith("model.") for k in out)
+
+    @pytest.mark.parametrize(
+        "keys",
+        [
+            ("model.layers.1.weight", "layers.1.weight"),
+            ("layers.1.weight", "model.layers.1.weight"),
+        ],
+    )
+    def test_rejects_mixed_layout_alias_collision(self, keys: tuple[str, str]) -> None:
+        # A bare LM key and its model.-prefixed alias both route to language_model.layers.1.weight.
+        # Distinct tensors under colliding aliases must be rejected in either order, not silently merged.
+        first, second = keys
+        sd = {first: torch.zeros(1), second: torch.ones(1)}
+        with pytest.raises(RuntimeError, match="both normalize to"):
+            _remap_qwen3vl_singlefile_keys(sd)
 
 
 class TestRejectIncompleteLoad:
