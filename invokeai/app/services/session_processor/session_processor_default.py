@@ -35,7 +35,7 @@ from invokeai.app.services.session_processor.workflow_call_runtime import (
     WorkflowCallQueueLifecycle,
 )
 from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem, SessionQueueItemNotFoundError
-from invokeai.app.services.shared.graph import NodeInputError
+from invokeai.app.services.shared.graph import CollectInvocation, IterateInvocation, NodeInputError
 from invokeai.app.services.shared.invocation_context import InvocationContextData, build_invocation_context
 from invokeai.app.util.profiler import Profiler
 from invokeai.backend.util.device_pool import GENERATION_DEVICE_POOL
@@ -146,10 +146,19 @@ class DefaultSessionRunner(SessionRunnerBase):
                 # Invoke the node, optionally on a borrowed idle GPU (text encoders only).
                 with self._maybe_offload_to_idle_gpu(invocation):
                     output = invocation.invoke_internal(context=context, services=self._services)
+                control_collection = None
+                if self._on_after_run_node_callbacks and isinstance(invocation, (IterateInvocation, CollectInvocation)):
+                    control_collection = invocation.collection
                 # Save output and history
                 queue_item.session.complete(invocation.id, output)
 
-                self._on_after_run_node(invocation, queue_item, output)
+                if control_collection is not None:
+                    invocation.collection = control_collection
+                try:
+                    self._on_after_run_node(invocation, queue_item, output)
+                finally:
+                    if control_collection is not None:
+                        invocation.collection = []
 
         except CanceledException:
             # A CanceledException is raised during the denoising step callback if the cancel event is set. We don't need
@@ -272,7 +281,7 @@ class DefaultSessionRunner(SessionRunnerBase):
             # The queue item may have been canceled or failed while the session was running. We should only complete it
             # if it is not already canceled or failed.
             if queue_item.status not in ["canceled", "failed"] and queue_item.session.is_complete():
-                queue_item = self._services.session_queue.complete_queue_item(queue_item.item_id)
+                queue_item = self._services.session_queue.complete_queue_item(queue_item.item_id, queue_item=queue_item)
 
             # We'll get a GESStatsNotFoundError if we try to log stats for an untracked graph, but in the processor
             # we don't care about that - suppress the error.
