@@ -3,6 +3,7 @@ import logging
 import queue
 import threading
 import time
+import weakref
 from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import wraps
@@ -54,6 +55,48 @@ MIN_RAM_CACHE_BYTES = 4 * GB
 
 _DEFERRED_RECONCILE = object()
 _DEFERRED_STOP = object()
+
+
+def _run_deferred_work(cache_ref: "weakref.ReferenceType[ModelCache]", work_queue: "queue.SimpleQueue[object]") -> None:
+    """Drain one ModelCache's deferred-work queue until it is stopped or the cache is collected.
+
+    Deliberately a module-level function taking a *weak* reference rather than a bound method: a
+    running thread is reachable from `threading._active` and keeps its target alive, so a bound
+    method would make every ModelCache that has ever admitted a model immortal — pinning all of its
+    cached models in RAM for the life of the process unless shutdown() happened to be called. The
+    `weakref.finalize` registered alongside this thread (see ModelCache._ensure_deferred_worker)
+    pushes _DEFERRED_STOP when the cache is collected, so a parked worker wakes and exits rather
+    than leaking a thread per abandoned cache.
+    """
+    while True:
+        work = work_queue.get()
+        cache = None
+        try:
+            if work is _DEFERRED_STOP:
+                return
+            cache = cache_ref()
+            if cache is None:
+                # The cache was collected; nothing can ever need doing again.
+                return
+            if cache._shutdown_event.is_set():
+                continue
+            if work is _DEFERRED_RECONCILE:
+                cache._reconcile_budget_if_pending()
+            else:
+                assert isinstance(work, CacheRecord)
+                cache._release_first_use_grace(work)
+        except Exception:
+            if cache is not None:
+                cache._logger.exception("Error processing deferred model-cache work")
+        finally:
+            # Drop both references before blocking on the next get(): locals stay bound for as long
+            # as this frame lives. `work` may be a CacheRecord, which transitively holds its model's
+            # CPU weights — and _release_first_use_grace's release hook can evict that very record,
+            # removing it from the cache AND subtracting its bytes from the RamBudget, so holding it
+            # would leave the budget under-reporting a model that is still resident. `cache` must go
+            # for the same reason this function takes a weakref at all.
+            work = None
+            cache = None
 
 
 class _ModelLoadReadWriteLock:
@@ -321,6 +364,7 @@ class ModelCache:
         self._shutdown_event = threading.Event()
         self._deferred_work_queue: queue.SimpleQueue[object] = queue.SimpleQueue()
         self._deferred_work_thread: Optional[threading.Thread] = None
+        self._deferred_work_finalizer: Optional[weakref.finalize] = None
 
         if ram_budget is not None:
             ram_budget.register_cache(self)
@@ -552,7 +596,19 @@ class ModelCache:
         # reconcile, peer-requested eviction) until the loader locks it — see CacheRecord. A
         # prefetch admission gets no grace: nothing will come back for it, so it must stay
         # ordinarily evictable.
-        cache_record = CacheRecord(key=key, cached_model=wrapped_model, awaiting_first_use=not prefetch)
+        #
+        # Neither does an admission made while no deferred worker is running to release the grace
+        # if the loader abandons the model. Both states are reachable — put() after shutdown()
+        # (Invoker.stop() stops model_manager before session_processor, so an in-flight generation
+        # can land here), and a worker that could not be started under thread exhaustion — and in
+        # both the flag would never be cleared, leaving the record permanently invisible to every
+        # asynchronous eviction path while its bytes stay charged to the shared budget. Without the
+        # grace the record is merely ordinarily evictable; lock() still clears the flag on the
+        # normal path, so nothing changes when the worker is healthy.
+        worker_running = self._deferred_work_thread is not None and self._deferred_work_thread.is_alive()
+        cache_record = CacheRecord(
+            key=key, cached_model=wrapped_model, awaiting_first_use=not prefetch and worker_running
+        )
         self._cached_models[key] = cache_record
         self._cache_stack.append(key)
         # Account this model's RAM in the global budget. Shared weights are tracked once by the
@@ -662,8 +718,31 @@ class ModelCache:
             return
         if self._deferred_work_thread is not None and self._deferred_work_thread.is_alive():
             return
-        thread = threading.Thread(target=self._run_deferred_work, name="model-cache-deferred-work", daemon=True)
-        thread.start()
+        thread = threading.Thread(
+            target=_run_deferred_work,
+            args=(weakref.ref(self), self._deferred_work_queue),
+            name="model-cache-deferred-work",
+            daemon=True,
+        )
+        try:
+            thread.start()
+        except RuntimeError:
+            # Thread/pid exhaustion (RLIMIT_NPROC, a container's pids.max). Deferred work is an
+            # optimization, so it must not take the model load that this put() is completing down
+            # with it. _dispatch_deferred drops work while no worker is running, and the next put()
+            # both retries the start and clears stale grace flags itself, so no record can stay
+            # shielded from eviction indefinitely.
+            self._logger.warning(
+                "Could not start the model-cache deferred-work thread; deferred cache work is disabled until the "
+                "next model admission."
+            )
+            return
+        if self._deferred_work_finalizer is None:
+            # Wake the parked worker when this cache is collected so it exits instead of leaking.
+            # This binds the queue and the sentinel only — never `self`, which would reintroduce the
+            # strong reference that passing a weakref to the thread exists to avoid.
+            self._deferred_work_finalizer = weakref.finalize(self, self._deferred_work_queue.put, _DEFERRED_STOP)
+            self._deferred_work_finalizer.atexit = False
         self._deferred_work_thread = thread
 
     def _dispatch_deferred(self, work: object) -> None:
@@ -675,9 +754,12 @@ class ModelCache:
         would grow it without bound — and, for a CacheRecord, pin that model's CPU weights for the
         life of the process. Drop the item instead.
 
-        Dropping loses nothing real: put() is what starts the worker, so a cache without one has
-        never admitted a model and therefore has nothing to release or evict, and put() re-runs any
-        still-pending reconcile through the synchronized release hook as soon as it admits one.
+        Dropping loses nothing real, because put() only grants the first-use grace when a worker is
+        running to release it (see put()). So a dropped CacheRecord is one that was never shielded
+        from eviction in the first place, and a dropped reconcile is re-run by the synchronized
+        release hook of the next cache operation — put() additionally clears any stale grace flags
+        itself. What must never happen is a record that is shielded with nothing left to unshield
+        it; that is what the pairing of these two rules prevents.
 
         A shutdown() landing between the check and the put() can still strand a single item in the
         queue. The cache is being torn down at that point and the cost is bounded by one record, so
@@ -689,30 +771,6 @@ class ModelCache:
         if thread is None or not thread.is_alive():
             return
         self._deferred_work_queue.put(work)
-
-    def _run_deferred_work(self) -> None:
-        while True:
-            work = self._deferred_work_queue.get()
-            try:
-                if work is _DEFERRED_STOP:
-                    return
-                if self._shutdown_event.is_set():
-                    continue
-                if work is _DEFERRED_RECONCILE:
-                    self._reconcile_budget_if_pending()
-                else:
-                    assert isinstance(work, CacheRecord)
-                    self._release_first_use_grace(work)
-            except Exception:
-                self._logger.exception("Error processing deferred model-cache work")
-            finally:
-                # Drop the reference before blocking on the next get(): `work` stays bound for as
-                # long as this frame lives, and a CacheRecord transitively holds its model's CPU
-                # weights. _release_first_use_grace's release hook can evict that very record —
-                # removing it from the cache AND subtracting its bytes from the RamBudget — so
-                # holding it here would leave the budget under-reporting a model that is still
-                # resident, until some unrelated item happened to be queued behind it.
-                work = None
 
     @synchronized
     def _release_first_use_grace(self, cache_entry: CacheRecord) -> None:

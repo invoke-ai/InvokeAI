@@ -769,9 +769,17 @@ def test_abandoned_loaded_model_releases_first_use_grace(mock_logger):
         cache_b.shutdown()
 
 
-def test_deferred_worker_start_failure_leaves_admission_unchanged_and_can_retry(mock_logger, monkeypatch):
+def test_deferred_worker_start_failure_does_not_fail_the_admission(mock_logger, monkeypatch):
+    """Thread exhaustion must degrade deferred work, not take the model load down with it.
+
+    put() runs under MODEL_LOAD_LOCK's write lock while completing a load, so a RuntimeError from
+    Thread.start() (RLIMIT_NPROC, a container's pids.max) escaping it would fail the generation.
+    Deferred work is only an optimization, and the next admission retries the start.
+    """
     store = SharedCpuWeightsStore()
-    budget = RamBudget(max_bytes=int(S * 1.4), shared_store=store)
+    # Room for both admissions, so the second does not evict the first and the stale-flag sweep
+    # below is actually observable.
+    budget = RamBudget(max_bytes=int(S * 4), shared_store=store)
     cache = _make_cache(store, budget, mock_logger)
     real_thread_start = threading.Thread.start
     failed_once = False
@@ -787,17 +795,23 @@ def test_deferred_worker_start_failure_leaves_admission_unchanged_and_can_retry(
 
     monkeypatch.setattr(threading.Thread, "start", fail_first_worker_start)
     try:
-        with pytest.raises(RuntimeError, match="forced thread start failure"):
-            cache.put("model", DummyModule())
-
-        assert cache._cached_models == {}
-        assert store.refcount("model") == 0
-        assert budget.total_in_use() == 0
-        assert cache._deferred_work_thread is None
-
         cache.put("model", DummyModule())
+
+        assert failed_once, "the worker start was never attempted"
         assert "model" in cache._cached_models
+        assert budget.total_in_use() == S
+        assert cache._deferred_work_thread is None
+        # PrefixedLoggerAdapter forwards through Logger.log, so assert on the level, not .warning.
+        assert any(call.args and call.args[0] == logging.WARNING for call in mock_logger.log.call_args_list)
+
+        # With no worker, dispatch is dropped rather than queued into a void.
+        cache._dispatch_deferred(model_cache_module._DEFERRED_RECONCILE)
+        assert cache._deferred_work_queue.qsize() == 0
+
+        # The next admission retries the start and clears the stale grace flag itself.
+        cache.put("model2", DummyModule())
         assert cache._deferred_work_thread is not None and cache._deferred_work_thread.is_alive()
+        assert not cache._cached_models["model"].awaiting_first_use
     finally:
         cache.shutdown()
 
@@ -1125,8 +1139,10 @@ def test_deferred_worker_does_not_pin_the_record_it_just_released(mock_logger):
         cache_a.release_first_use_grace(record)
         del record
 
+        # Poll the budget rather than reading it the instant the key disappears: _delete_cache_entry
+        # pops from _cached_models before it releases the weights, so the two are briefly out of step.
         assert _wait_until(lambda: "abandoned" not in cache_a._cached_models)
-        assert budget.total_in_use() == S
+        assert _wait_until(lambda: budget.total_in_use() == S)
 
         # The budget now says those bytes are gone; they must really be gone. No further queue
         # traffic is generated here — that is the point.
@@ -1158,9 +1174,8 @@ def test_deferred_worker_is_revived_after_an_unexpected_death(mock_logger):
         assert not first_worker.is_alive()
         assert first_worker.ident is not None  # so an `ident is None` guard would never recover
 
-        # A dead worker must not be handed work that nothing will ever drain.
-        cache_a._dispatch_deferred(model_cache_module._DEFERRED_RECONCILE)
-        assert cache_a._deferred_work_queue.qsize() == 0
+        # The dead-worker drop is covered by test_deferred_dispatch_is_dropped_when_no_worker_is_running;
+        # keeping it out of this test lets this one fail on the revival defect itself.
 
         # The next admission revives it, and deferred work flows again.
         _use_and_release(cache_a, "first")
@@ -1204,7 +1219,12 @@ def test_deferred_dispatch_is_dropped_when_no_worker_is_running(mock_logger):
 
         # After shutdown the same must hold for a cache that *does* have a (now stopped) worker.
         busy_cache.shutdown()
+        assert busy_cache._deferred_work_thread is not None
         busy_cache._deferred_work_thread.join(timeout=10)
+        assert not busy_cache._deferred_work_thread.is_alive()
+        # The request must be pending, or cached_model_keys' release hook short-circuits before it
+        # ever reaches the dispatch guard and the loop below proves nothing.
+        busy_cache._budget_reconcile_pending.set()
         depth = busy_cache._deferred_work_queue.qsize()
         for _ in range(200):
             busy_cache.cached_model_keys()
@@ -1241,3 +1261,65 @@ def test_post_shutdown_activity_does_not_arm_a_keep_alive_timer(mock_logger):
     finally:
         if cache._timeout_timer is not None:
             cache._timeout_timer.cancel()
+
+
+def test_dropped_cache_is_collectable_and_its_worker_exits(mock_logger):
+    """A ModelCache released without shutdown() must not be kept alive by its own worker thread.
+
+    A running thread is reachable from threading._active and keeps its target alive, so a worker
+    holding a bound method would pin the cache — and every model in it — in RAM for the life of the
+    process. The worker takes a weakref and a finalizer wakes it when the cache goes away.
+    """
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=int(S * 8), shared_store=store)
+
+    def worker_count() -> int:
+        return sum(1 for t in threading.enumerate() if t.name == "model-cache-deferred-work")
+
+    before = worker_count()
+    cache = _make_cache(store, budget, mock_logger)
+    module = DummyModule()
+    cache.put("model", module)
+    assert worker_count() == before + 1
+
+    cache_ref = weakref.ref(cache)
+    module_ref = weakref.ref(module)
+    del cache, module
+    gc.collect()
+
+    assert cache_ref() is None, "the worker thread kept the ModelCache alive"
+    assert module_ref() is None, "the dropped cache's model is still resident in RAM"
+    # The finalizer wakes the parked worker so it exits rather than leaking a thread per cache.
+    assert _wait_until(lambda: worker_count() == before), "the worker thread outlived its cache"
+
+
+def test_admission_without_a_worker_gets_no_first_use_grace(mock_logger):
+    """A record must never be shielded from eviction with nothing left able to unshield it.
+
+    put() after shutdown() is reachable in production — Invoker.stop() stops model_manager before
+    session_processor, so an in-flight generation can admit a model after every cache has been shut
+    down — and _ensure_deferred_worker deliberately does not revive the worker there. Granting the
+    grace anyway would leave the record permanently invisible to both asynchronous eviction paths
+    while its bytes stayed charged to the shared budget.
+    """
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=int(S * 8), shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    try:
+        cache.put("normal", DummyModule())
+        assert cache._cached_models["normal"].awaiting_first_use, "a healthy admission keeps its grace"
+
+        cache.shutdown()
+        assert cache._deferred_work_thread is not None
+        cache._deferred_work_thread.join(timeout=10)
+
+        cache.put("late", DummyModule())
+        record = cache._cached_models["late"]
+        assert cache._deferred_work_thread is not None and not cache._deferred_work_thread.is_alive()
+        assert not record.awaiting_first_use, "admitted with a grace no worker can ever release"
+
+        # Being unshielded, it is reachable by the synchronous eviction path.
+        cache._delete_cache_entry(record)
+        assert "late" not in cache._cached_models
+    finally:
+        cache.shutdown()
