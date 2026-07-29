@@ -33,6 +33,10 @@ export interface GenerationSelectedImage {
  */
 export interface GenerationUiAdapter {
   CanvasCompositingSection: ComponentType;
+  account: {
+    currentUserId: string | null;
+    multiuserEnabled: boolean;
+  };
   capabilities: {
     /** Bulk import/export of prompt templates; the backend routes are admin-only. */
     canManagePromptTemplates: boolean;

@@ -2,8 +2,11 @@ import type { PromptTemplateRecord } from '@features/generation/data/promptTempl
 import type { PromptTemplateCatalog } from '@features/generation/ui/usePromptTemplates';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { promptTemplateKeys } from '@features/generation/data/promptTemplates';
 import { PromptTemplateEditor } from '@features/generation/ui/promptFields/PromptTemplateEditor';
+import { PromptTemplateImage } from '@features/generation/ui/promptFields/PromptTemplateImage';
 import { PromptTemplatesPanel } from '@features/generation/ui/promptFields/PromptTemplatesPanel';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import i18next from 'i18next';
 import { act } from 'react';
@@ -42,6 +45,7 @@ const translation = {
         editTemplate: 'Edit template',
         search: 'Search templates',
         yourTemplates: 'Your templates',
+        sharedTemplates: 'Shared templates',
         defaultTemplates: 'Built-in templates',
         noTemplatesYet: 'No templates yet. Create one to reuse a prompt with {prompt} where your own text goes.',
         noMatches: 'No matching templates',
@@ -94,57 +98,79 @@ let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const templateWithImage: PromptTemplateRecord = {
+  hasImage: true,
   id: 'user-1',
-  imageUrl: 'http://host/image.png',
   isDefault: false,
+  isPublic: false,
   name: 'Cinematic',
   negativePrompt: '',
   positivePrompt: '{prompt}, cinematic',
+  userId: 'user-1',
 };
 
 const userTemplate: PromptTemplateRecord = {
+  hasImage: false,
   id: 'user-1',
-  imageUrl: null,
   isDefault: false,
+  isPublic: false,
   name: 'Cinematic',
   negativePrompt: '',
   positivePrompt: '{prompt}, cinematic still',
+  userId: 'user-1',
+};
+
+const sharedTemplate: PromptTemplateRecord = {
+  hasImage: false,
+  id: 'shared-1',
+  isDefault: false,
+  isPublic: true,
+  name: 'Community',
+  negativePrompt: '',
+  positivePrompt: '{prompt}, shared',
+  userId: 'user-2',
 };
 
 const defaultTemplate: PromptTemplateRecord = {
+  hasImage: false,
   id: 'default-1',
-  imageUrl: null,
   isDefault: true,
+  isPublic: false,
   name: 'Photography',
   negativePrompt: '',
   positivePrompt: '{prompt}. photography, bokeh',
+  userId: 'system',
 };
+const IMAGE_FALLBACK = <span>fallback</span>;
 
 const createCatalog = (overrides: Partial<PromptTemplateCatalog> = {}): PromptTemplateCatalog => ({
   create: vi.fn(),
   defaultTemplates: [defaultTemplate],
   exportCsv: vi.fn(),
-  fetchImage: vi.fn().mockResolvedValue(null),
   importFile: vi.fn(),
   isLoaded: true,
   isLoading: false,
+  personalTemplates: [userTemplate],
   remove: vi.fn(),
-  templates: [userTemplate, defaultTemplate],
+  sharedTemplates: [sharedTemplate],
+  templates: [userTemplate, sharedTemplate, defaultTemplate],
   update: vi.fn(),
-  userTemplates: [userTemplate],
   ...overrides,
 });
 
-const render = async (element: React.ReactNode) => {
+const render = async (element: React.ReactNode, seed?: (queryClient: QueryClient) => void) => {
   host = document.createElement('div');
   host.style.width = '400px';
   document.body.append(host);
   root = createRoot(host);
+  const queryClient = new QueryClient();
+  seed?.(queryClient);
 
   await act(() => {
     root?.render(
       <I18nextProvider i18n={i18n}>
-        <ChakraProvider value={system}>{element}</ChakraProvider>
+        <QueryClientProvider client={queryClient}>
+          <ChakraProvider value={system}>{element}</ChakraProvider>
+        </QueryClientProvider>
       </I18nextProvider>
     );
   });
@@ -180,8 +206,8 @@ describe('the prompt templates panel', () => {
       await userEvent.click(buttonWithText('Cinematic'));
     });
 
-    // The four snapshot fields only. `isDefault` and the absolute `imageUrl`
-    // belong to the catalog, not to persisted project state.
+    // The four snapshot fields only. Ownership and image metadata belong to the
+    // catalog, not to persisted project state.
     expect(onApply).toHaveBeenCalledWith({
       id: userTemplate.id,
       name: userTemplate.name,
@@ -268,7 +294,7 @@ describe('the prompt templates panel', () => {
     expect(labels.filter((label) => label === 'Delete')).toHaveLength(1);
   });
 
-  it('searches prompt text, not just the name', async () => {
+  it('does not search prompt prose', async () => {
     await render(
       <PromptTemplatesPanel
         activeTemplate={null}
@@ -285,7 +311,7 @@ describe('the prompt templates panel', () => {
       await userEvent.fill(host!.querySelector('input')!, 'bokeh');
     });
 
-    expect(host!.textContent).toContain('Photography');
+    expect(host!.textContent).not.toContain('Photography');
     expect(host!.textContent).not.toContain('Cinematic');
   });
 
@@ -297,7 +323,7 @@ describe('the prompt templates panel', () => {
       <PromptTemplatesPanel
         activeTemplate={userTemplate}
         isActiveTemplateMissing
-        catalog={createCatalog({ templates: [defaultTemplate], userTemplates: [] })}
+        catalog={createCatalog({ personalTemplates: [], templates: [sharedTemplate, defaultTemplate] })}
         onApply={vi.fn()}
         onCreate={vi.fn()}
         onDetach={vi.fn()}
@@ -326,9 +352,7 @@ describe('the prompt templates panel', () => {
     expect(host!.textContent).not.toContain('was deleted');
   });
 
-  // The same fuzzy name rule the wildcards panel beside it has always used —
-  // these two sit in one popover and used to disagree about what typing means.
-  it('matches a name fuzzily', async () => {
+  it('does not fuzzy-match a template name', async () => {
     await render(
       <PromptTemplatesPanel
         activeTemplate={null}
@@ -345,8 +369,49 @@ describe('the prompt templates panel', () => {
       await userEvent.fill(host!.querySelector('input')!, 'cnmt');
     });
 
+    expect(host!.textContent).not.toContain('Cinematic');
+    expect(host!.textContent).not.toContain('Photography');
+  });
+
+  it('matches a case-insensitive name substring', async () => {
+    await render(
+      <PromptTemplatesPanel
+        activeTemplate={null}
+        isActiveTemplateMissing={false}
+        catalog={createCatalog()}
+        onApply={vi.fn()}
+        onCreate={vi.fn()}
+        onDetach={vi.fn()}
+        onEdit={vi.fn()}
+      />
+    );
+
+    await act(async () => {
+      await userEvent.fill(host!.querySelector('input')!, 'NEMA');
+    });
+
     expect(host!.textContent).toContain('Cinematic');
     expect(host!.textContent).not.toContain('Photography');
+  });
+
+  it('renders shared templates without edit or delete controls', async () => {
+    await render(
+      <PromptTemplatesPanel
+        activeTemplate={null}
+        isActiveTemplateMissing={false}
+        catalog={createCatalog()}
+        onApply={vi.fn()}
+        onCreate={vi.fn()}
+        onDetach={vi.fn()}
+        onEdit={vi.fn()}
+      />
+    );
+
+    expect(host!.textContent).toContain('Shared templates');
+    expect(host!.textContent).toContain('Community');
+    const labels = [...host!.querySelectorAll('button')].map((button) => button.getAttribute('aria-label'));
+    expect(labels.filter((label) => label === 'Edit')).toHaveLength(1);
+    expect(labels.filter((label) => label === 'Delete')).toHaveLength(1);
   });
 });
 
@@ -405,20 +470,31 @@ describe('the prompt template editor', () => {
     });
   });
 
-  // Regression: the existing image is fetched on mount so that saving does not
-  // drop it, and `image: null` was read as "still loading". Removing it before
-  // that landed therefore looked identical to not having loaded yet, and the
-  // arriving blob put the image the user had just taken off straight back.
-  it('does not resurrect an image removed while it was still loading', async () => {
+  it('preserves an existing image when an edit is saved immediately', async () => {
     const catalog = createCatalog();
-    let resolveImage: (image: Blob) => void = () => {};
 
-    catalog.fetchImage = vi.fn(
-      () =>
-        new Promise<Blob | null>((resolve) => {
-          resolveImage = resolve;
-        })
+    await render(
+      <PromptTemplateEditor
+        catalog={catalog}
+        showSyntaxHighlighting
+        template={templateWithImage}
+        onCancel={vi.fn()}
+        onSaved={vi.fn()}
+      />
     );
+
+    await act(async () => {
+      await userEvent.click(buttonWithText('Save'));
+    });
+
+    expect(catalog.update).toHaveBeenCalledWith(
+      templateWithImage,
+      expect.objectContaining({ image: { kind: 'preserve' } })
+    );
+  });
+
+  it('marks an existing image for removal only after the user removes it', async () => {
+    const catalog = createCatalog();
 
     await render(
       <PromptTemplateEditor
@@ -432,18 +508,39 @@ describe('the prompt template editor', () => {
 
     await act(async () => {
       await userEvent.click(host!.querySelector<HTMLButtonElement>('button[aria-label="Remove image"]')!);
-    });
-
-    await act(async () => {
-      resolveImage(new Blob(['old'], { type: 'image/png' }));
-      await Promise.resolve();
-    });
-
-    await act(async () => {
       await userEvent.click(buttonWithText('Save'));
     });
 
-    expect(catalog.update).toHaveBeenCalledWith('user-1', expect.objectContaining({ image: null }));
+    expect(catalog.update).toHaveBeenCalledWith(
+      templateWithImage,
+      expect.objectContaining({ image: { kind: 'remove' } })
+    );
+  });
+
+  it('marks a picked image as the replacement', async () => {
+    const catalog = createCatalog();
+    const replacement = new File(['new'], 'new.png', { type: 'image/png' });
+
+    await render(
+      <PromptTemplateEditor
+        catalog={catalog}
+        showSyntaxHighlighting
+        template={templateWithImage}
+        onCancel={vi.fn()}
+        onSaved={vi.fn()}
+      />
+    );
+
+    const input = host!.querySelector<HTMLInputElement>('input[type="file"]')!;
+    await act(async () => {
+      await userEvent.upload(input, replacement);
+      await userEvent.click(buttonWithText('Save'));
+    });
+
+    expect(catalog.update).toHaveBeenCalledWith(
+      templateWithImage,
+      expect.objectContaining({ image: { blob: replacement, kind: 'replace' } })
+    );
   });
 
   it('keeps Save out of reach until the template is named', async () => {
@@ -465,4 +562,21 @@ describe('the prompt template editor', () => {
 
     expect(buttonWithText('Save').disabled).toBe(false);
   });
+});
+
+it('revokes a fetched template image blob URL when it unmounts', async () => {
+  const createObjectUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:template-preview');
+  const revokeObjectUrl = vi.spyOn(URL, 'revokeObjectURL');
+
+  await render(<PromptTemplateImage alt="" fallback={IMAGE_FALLBACK} template={templateWithImage} />, (queryClient) =>
+    queryClient.setQueryData(promptTemplateKeys.image(templateWithImage.id), new Blob(['image']))
+  );
+
+  expect(createObjectUrl).toHaveBeenCalledOnce();
+  await act(() => root?.unmount());
+  root = null;
+  expect(revokeObjectUrl).toHaveBeenCalledWith('blob:template-preview');
+
+  createObjectUrl.mockRestore();
+  revokeObjectUrl.mockRestore();
 });

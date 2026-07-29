@@ -1022,6 +1022,7 @@
         "editTemplate": "Edit template",
         "search": "Search templates",
         "yourTemplates": "Your templates",
+        "sharedTemplates": "Shared templates",
         "defaultTemplates": "Built-in templates",
         "noTemplatesYet": "No templates yet. Create one to reuse a prompt with {prompt} where your own text goes.",
         "noMatches": "No matching templates",

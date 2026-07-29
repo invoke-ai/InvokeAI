@@ -3,12 +3,12 @@ import type { PromptTemplateRecord } from '@features/generation/data/promptTempl
 import type { PromptTemplateCatalog } from '@features/generation/ui/usePromptTemplates';
 import type { ChangeEvent } from 'react';
 
-import { Box, HStack, Image, Input, Separator, Stack, Text } from '@chakra-ui/react';
-import { searchCatalog } from '@features/generation/core/catalogSearch';
+import { Box, HStack, Input, Separator, Stack, Text } from '@chakra-ui/react';
 import { PROMPT_TEMPLATE_PLACEHOLDER } from '@features/generation/core/promptTemplates';
 import { toPromptTemplateSnapshot } from '@features/generation/data/promptTemplates';
 import { useGenerationUi } from '@features/generation/ui/GenerationUiContext';
 import { PANEL_HEADER_CONTROL_HEIGHT, PromptPanelHeader } from '@features/generation/ui/promptFields/PromptPanelHeader';
+import { PromptTemplateImage } from '@features/generation/ui/promptFields/PromptTemplateImage';
 import { downloadBlob } from '@platform/browser/downloadBlob';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, IconButton } from '@platform/ui/Button';
@@ -20,6 +20,20 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const THUMBNAIL_SIZE = '7';
+const TEMPLATE_THUMBNAIL_FALLBACK = (
+  <Box
+    alignItems="center"
+    bg="bg.emphasized"
+    boxSize={THUMBNAIL_SIZE}
+    color="fg.subtle"
+    display="flex"
+    flexShrink="0"
+    justifyContent="center"
+    rounded="sm"
+  >
+    <ImageIcon size={12} />
+  </Box>
+);
 
 interface PromptTemplatesPanelProps {
   catalog: PromptTemplateCatalog;
@@ -36,11 +50,14 @@ interface PromptTemplatesPanelProps {
   onCreate: () => void;
 }
 
-/** A template's prose is its two prompts; `searchCatalog` handles the name. */
-const getTemplateProse = (template: PromptTemplateRecord): readonly string[] => [
-  template.positivePrompt,
-  template.negativePrompt,
-];
+const filterTemplatesByName = (
+  templates: readonly PromptTemplateRecord[],
+  searchTerm: string
+): PromptTemplateRecord[] => {
+  const query = searchTerm.trim().toLocaleLowerCase();
+
+  return query ? templates.filter((template) => template.name.toLocaleLowerCase().includes(query)) : [...templates];
+};
 
 export const PromptTemplatesPanel = ({
   activeTemplate,
@@ -57,15 +74,19 @@ export const PromptTemplatesPanel = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [pendingDelete, setPendingDelete] = useState<PromptTemplateRecord | null>(null);
 
-  const userTemplates = useMemo(
-    () => searchCatalog(catalog.userTemplates, searchTerm, getTemplateProse),
-    [catalog.userTemplates, searchTerm]
+  const personalTemplates = useMemo(
+    () => filterTemplatesByName(catalog.personalTemplates, searchTerm),
+    [catalog.personalTemplates, searchTerm]
+  );
+  const sharedTemplates = useMemo(
+    () => filterTemplatesByName(catalog.sharedTemplates, searchTerm),
+    [catalog.sharedTemplates, searchTerm]
   );
   const defaultTemplates = useMemo(
-    () => searchCatalog(catalog.defaultTemplates, searchTerm, getTemplateProse),
+    () => filterTemplatesByName(catalog.defaultTemplates, searchTerm),
     [catalog.defaultTemplates, searchTerm]
   );
-  const hasResults = userTemplates.length > 0 || defaultTemplates.length > 0;
+  const hasResults = personalTemplates.length > 0 || sharedTemplates.length > 0 || defaultTemplates.length > 0;
 
   const handleSearchChange = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => setSearchTerm(event.currentTarget.value),
@@ -85,7 +106,7 @@ export const PromptTemplatesPanel = ({
     }
 
     try {
-      await catalog.remove(pendingDelete.id);
+      await catalog.remove(pendingDelete);
 
       // Deleting the template that is applied would otherwise leave it silently
       // shaping every prompt with no way to reach it. Detached rather than
@@ -135,10 +156,16 @@ export const PromptTemplatesPanel = ({
             <TemplateGroup
               activeTemplateId={activeTemplate?.id ?? null}
               label={t('widgets.generate.promptTemplates.yourTemplates')}
-              templates={userTemplates}
+              templates={personalTemplates}
               onApply={onApply}
               onDelete={setPendingDelete}
               onEdit={onEdit}
+            />
+            <TemplateGroup
+              activeTemplateId={activeTemplate?.id ?? null}
+              label={t('widgets.generate.promptTemplates.sharedTemplates')}
+              templates={sharedTemplates}
+              onApply={onApply}
             />
             <TemplateGroup
               activeTemplateId={activeTemplate?.id ?? null}
@@ -388,20 +415,14 @@ const TemplateRow = ({
   );
 };
 
-const TemplateThumbnail = ({ template }: { template: PromptTemplateRecord }) =>
-  template.imageUrl ? (
-    <Image alt="" boxSize={THUMBNAIL_SIZE} flexShrink="0" objectFit="cover" rounded="sm" src={template.imageUrl} />
-  ) : (
-    <Box
-      alignItems="center"
-      bg="bg.emphasized"
-      boxSize={THUMBNAIL_SIZE}
-      color="fg.subtle"
-      display="flex"
-      flexShrink="0"
-      justifyContent="center"
-      rounded="sm"
-    >
-      <ImageIcon size={12} />
-    </Box>
-  );
+const TemplateThumbnail = ({ template }: { template: PromptTemplateRecord }) => (
+  <PromptTemplateImage
+    alt=""
+    boxSize={THUMBNAIL_SIZE}
+    fallback={TEMPLATE_THUMBNAIL_FALLBACK}
+    flexShrink="0"
+    objectFit="cover"
+    rounded="sm"
+    template={template}
+  />
+);

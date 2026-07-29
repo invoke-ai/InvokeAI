@@ -1,11 +1,15 @@
 import type { PromptTemplateSnapshot } from '@features/generation/core/promptTemplates';
-import type { PromptTemplateDraft, PromptTemplateRecord } from '@features/generation/data/promptTemplates';
+import type {
+  PromptTemplateCreateDraft,
+  PromptTemplateRecord,
+  PromptTemplateUpdateDraft,
+} from '@features/generation/data/promptTemplates';
 
+import { classifyPromptTemplates, requireOwnedPromptTemplate } from '@features/generation/core/promptTemplateOwnership';
 import {
   createPromptTemplate,
   deletePromptTemplate,
   exportPromptTemplates,
-  fetchPromptTemplateImage,
   importPromptTemplates,
   invalidatePromptTemplates,
   promptTemplatesQueryOptions,
@@ -15,9 +19,13 @@ import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
 
+import { useGenerationUi } from './GenerationUiContext';
+
 export interface PromptTemplateCatalog {
   /** The user's own templates, name-ascending as the backend orders them. */
-  userTemplates: PromptTemplateRecord[];
+  personalTemplates: PromptTemplateRecord[];
+  /** Public templates owned by somebody else; applicable but read-only. */
+  sharedTemplates: PromptTemplateRecord[];
   /** Templates shipped with the backend; applicable but not editable. */
   defaultTemplates: PromptTemplateRecord[];
   /** Every visible template, for resolving a stored snapshot. */
@@ -31,20 +39,11 @@ export interface PromptTemplateCatalog {
    */
   isLoaded: boolean;
   /** Resolves with the saved record so a caller can refresh an applied snapshot. */
-  create: (draft: PromptTemplateDraft) => Promise<PromptTemplateRecord>;
-  update: (id: string, draft: PromptTemplateDraft) => Promise<PromptTemplateRecord>;
-  remove: (id: string) => Promise<void>;
+  create: (draft: PromptTemplateCreateDraft) => Promise<PromptTemplateRecord>;
+  update: (template: PromptTemplateRecord, draft: PromptTemplateUpdateDraft) => Promise<PromptTemplateRecord>;
+  remove: (template: PromptTemplateRecord) => Promise<void>;
   importFile: (file: File) => Promise<void>;
   exportCsv: () => Promise<Blob>;
-  /**
-   * The preview image behind a record's `imageUrl`, or null.
-   *
-   * On the port rather than imported straight from `data/` by the one component
-   * that needs it: everything else here is injectable, and a single direct
-   * import made the editor's tests mock a module to stand in for a dependency
-   * they were otherwise handed.
-   */
-  fetchImage: (imageUrl: string) => Promise<Blob | null>;
 }
 
 /**
@@ -54,37 +53,49 @@ export interface PromptTemplateCatalog {
  */
 export const usePromptTemplates = ({ isEnabled = true }: { isEnabled?: boolean } = {}): PromptTemplateCatalog => {
   const queryClient = useQueryClient();
+  const { account } = useGenerationUi();
   // Off by default for the widget, which only wants to re-read an applied
   // template and has nothing to re-read when none is applied. The picker asks
   // for it in earnest, and shares this cache when it does.
   const query = useQuery({ ...promptTemplatesQueryOptions(), enabled: isEnabled });
-  const templates = useMemo(() => query.data ?? [], [query.data]);
-  const defaultTemplates = useMemo(() => templates.filter((template) => template.isDefault), [templates]);
-  const userTemplates = useMemo(() => templates.filter((template) => !template.isDefault), [templates]);
+  const classified = useMemo(() => classifyPromptTemplates(query.data ?? [], account), [account, query.data]);
 
   const runAndInvalidate = useCallback(
-    async <T>(run: () => Promise<T>): Promise<T> => {
+    async <T>(run: () => Promise<T>, imageId?: string): Promise<T> => {
       const owner = captureAccountScope();
       const result = await run();
 
       assertAccountScopeCurrent(owner);
-      await invalidatePromptTemplates(queryClient);
+      await invalidatePromptTemplates(queryClient, imageId);
       return result;
     },
     [queryClient]
   );
 
   const create = useCallback(
-    (draft: PromptTemplateDraft) => runAndInvalidate(() => createPromptTemplate(draft)),
-    [runAndInvalidate]
+    async (draft: PromptTemplateCreateDraft) => {
+      const saved = await runAndInvalidate(() => createPromptTemplate(draft));
+      await invalidatePromptTemplates(queryClient, saved.id);
+      return saved;
+    },
+    [queryClient, runAndInvalidate]
   );
 
   const update = useCallback(
-    (id: string, draft: PromptTemplateDraft) => runAndInvalidate(() => updatePromptTemplate(id, draft)),
-    [runAndInvalidate]
+    (template: PromptTemplateRecord, draft: PromptTemplateUpdateDraft) => {
+      requireOwnedPromptTemplate(template, account);
+      return runAndInvalidate(() => updatePromptTemplate(template.id, draft), template.id);
+    },
+    [account, runAndInvalidate]
   );
 
-  const remove = useCallback((id: string) => runAndInvalidate(() => deletePromptTemplate(id)), [runAndInvalidate]);
+  const remove = useCallback(
+    (template: PromptTemplateRecord) => {
+      requireOwnedPromptTemplate(template, account);
+      return runAndInvalidate(() => deletePromptTemplate(template.id), template.id);
+    },
+    [account, runAndInvalidate]
+  );
 
   const importFile = useCallback(
     (file: File) => runAndInvalidate(() => importPromptTemplates(file)),
@@ -93,16 +104,16 @@ export const usePromptTemplates = ({ isEnabled = true }: { isEnabled?: boolean }
 
   return {
     create,
-    defaultTemplates,
+    defaultTemplates: classified.defaultTemplates,
     exportCsv: exportPromptTemplates,
-    fetchImage: fetchPromptTemplateImage,
     importFile,
     isLoaded: query.isSuccess,
     isLoading: query.isPending,
     remove,
-    templates,
+    personalTemplates: classified.personalTemplates,
+    sharedTemplates: classified.sharedTemplates,
+    templates: classified.templates,
     update,
-    userTemplates,
   };
 };
 

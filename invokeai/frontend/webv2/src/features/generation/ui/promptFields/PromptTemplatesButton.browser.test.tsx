@@ -15,14 +15,14 @@ const catalog: PromptTemplateCatalog = {
   create: vi.fn(),
   defaultTemplates: [],
   exportCsv: vi.fn(),
-  fetchImage: vi.fn().mockResolvedValue(null),
   importFile: vi.fn(),
   isLoaded: true,
   isLoading: false,
+  personalTemplates: [],
   remove: vi.fn(),
+  sharedTemplates: [],
   templates: [],
   update: vi.fn(),
-  userTemplates: [],
 };
 
 const usePromptTemplates = vi.fn((_options?: { isEnabled?: boolean }) => catalog);
@@ -143,7 +143,18 @@ describe('the prompt templates button', () => {
   });
 
   it('leaves the name alone while the template is still there', async () => {
-    usePromptTemplates.mockReturnValue({ ...catalog, templates: [{ ...applied, imageUrl: null, isDefault: false }] });
+    usePromptTemplates.mockReturnValue({
+      ...catalog,
+      templates: [
+        {
+          ...applied,
+          hasImage: false,
+          isDefault: false,
+          isPublic: false,
+          userId: 'user-1',
+        },
+      ],
+    });
     await render(applied);
 
     const name = [...host!.querySelectorAll('span')].find((span) => span.textContent === 'Cinematic');

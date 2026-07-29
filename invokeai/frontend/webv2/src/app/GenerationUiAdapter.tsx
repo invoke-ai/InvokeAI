@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { getSelectedGalleryImageFromValues } from '@features/gallery/contracts';
 import { invalidateGallery } from '@features/gallery/queries';
 import { GenerationUiProvider } from '@features/generation/react';
-import { useCapabilities } from '@features/identity';
+import { useAuthSession, useCapabilities } from '@features/identity';
 import { ensureModelsLoaded, getModelBaseColorPalette, getModelBaseLabel, useModelsSelector } from '@features/models';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -43,6 +43,7 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
   const modelsError = useModelsSelector((snapshot) => snapshot.error);
   const modelsStatus = useModelsSelector((snapshot) => snapshot.status);
   const { generation, notifications } = useWorkbenchCommands();
+  const session = useAuthSession();
   const queryClient = useQueryClient();
   const notify = useNotify();
 
@@ -86,6 +87,13 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
     () => ({ canManagePromptTemplates }),
     [canManagePromptTemplates]
   );
+  const accountGroup = useMemo<GenerationUiAdapter['account']>(
+    () => ({
+      currentUserId: session.user?.user_id ?? null,
+      multiuserEnabled: session.multiuserEnabled,
+    }),
+    [session.multiuserEnabled, session.user?.user_id]
+  );
   const generateSectionsOpen = useWorkbenchPreferenceSelector((preferences) => preferences.generateSectionsOpen);
   const sectionPreferencesGroup = useMemo<GenerationUiAdapter['sectionPreferences']>(
     () => ({
@@ -102,6 +110,7 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
   const adapter = useMemo<GenerationUiAdapter>(
     () => ({
       CanvasCompositingSection: GenerateCanvasCompositingSection,
+      account: accountGroup,
       capabilities: capabilitiesGroup,
       gallery: galleryGroup,
       models: modelsGroup,
@@ -112,6 +121,7 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
       settings: settingsGroup,
     }),
     [
+      accountGroup,
       capabilitiesGroup,
       galleryGroup,
       modelsGroup,
