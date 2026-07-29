@@ -20,6 +20,7 @@ export const getOptimalDimension = (base?: BaseModelType | null): number => {
     case 'cogview4':
     case 'qwen-image':
     case 'z-image':
+    case 'krea-2':
     case 'ideogram-4':
     case 'anima':
     default:
@@ -87,6 +88,7 @@ export const getGridSize = (base?: BaseModelType | null): number => {
     case 'qwen-image':
     case 'wan':
     case 'z-image':
+    case 'krea-2':
     case 'ideogram-4':
       return 16;
     case 'sd-1':

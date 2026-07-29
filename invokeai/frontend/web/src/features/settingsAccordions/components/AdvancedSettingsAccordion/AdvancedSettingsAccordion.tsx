@@ -9,6 +9,7 @@ import {
   selectIsFLUX,
   selectIsFlux2,
   selectIsIdeogram4,
+  selectIsKrea2,
   selectIsQwenImage,
   selectIsSD3,
   selectIsWan,
@@ -23,6 +24,7 @@ import ParamCLIPGEmbedModelSelect from 'features/parameters/components/Advanced/
 import ParamCLIPLEmbedModelSelect from 'features/parameters/components/Advanced/ParamCLIPLEmbedModelSelect';
 import ParamClipSkip from 'features/parameters/components/Advanced/ParamClipSkip';
 import ParamFlux2KleinModelSelect from 'features/parameters/components/Advanced/ParamFlux2KleinModelSelect';
+import ParamKrea2ModelSelects from 'features/parameters/components/Advanced/ParamKrea2ModelSelects';
 import ParamQwenImageComponentSourceSelect from 'features/parameters/components/Advanced/ParamQwenImageComponentSourceSelect';
 import ParamQwenImageQuantization from 'features/parameters/components/Advanced/ParamQwenImageQuantization';
 import ParamT5EncoderModelSelect from 'features/parameters/components/Advanced/ParamT5EncoderModelSelect';
@@ -62,13 +64,14 @@ export const AdvancedSettingsAccordion = memo(() => {
   const isExternal = useAppSelector(selectIsExternal);
   const isQwenImage = useAppSelector(selectIsQwenImage);
   const isAnima = useAppSelector(selectIsAnima);
+  const isKrea2 = useAppSelector(selectIsKrea2);
   const isWan = useAppSelector(selectIsWan);
 
   const selectBadges = useMemo(
     () =>
       createMemoizedSelector(
-        [selectParamsSlice, selectIsFLUX, selectIsFlux2, selectIsIdeogram4],
-        (params, isFLUX, isFlux2, isIdeogram4) => {
+        [selectParamsSlice, selectIsFLUX, selectIsFlux2, selectIsKrea2, selectIsIdeogram4],
+        (params, isFLUX, isFlux2, isKrea2, isIdeogram4) => {
           const badges: (string | number)[] = [];
           // FLUX.2 has VAE built into main model - no badge needed
           if (isFLUX && !isFlux2) {
@@ -79,9 +82,9 @@ export const AdvancedSettingsAccordion = memo(() => {
               }
               badges.push(vaeBadge);
             }
-            // Ideogram 4 hides the VAE / clip skip / CFG rescale / seamless controls (they don't apply),
-            // so it must not advertise stale badges for them either.
-          } else if (!isFlux2 && !isIdeogram4) {
+            // Ideogram 4 and Krea-2 hide the VAE / clip skip / CFG rescale / seamless controls (they don't
+            // apply), so they must not advertise stale badges for them either.
+          } else if (!isFlux2 && !isKrea2 && !isIdeogram4) {
             if (vaeConfig) {
               let vaeBadge = vaeConfig.name;
               if (params.vaePrecision === 'fp16') {
@@ -121,31 +124,39 @@ export const AdvancedSettingsAccordion = memo(() => {
   return (
     <StandaloneAccordion label={t('accordions.advanced.title')} badges={badges} isOpen={isOpen} onToggle={onToggle}>
       <Flex gap={4} alignItems="center" p={4} flexDir="column" data-testid="advanced-settings-accordion">
-        {!isZImage && !isAnima && !isFlux2 && !isQwenImage && !isWan && !isIdeogram4 && (
+        {!isZImage && !isAnima && !isFlux2 && !isQwenImage && !isKrea2 && !isWan && !isIdeogram4 && (
           <Flex gap={4} w="full">
             {isFLUX ? <ParamFLUXVAEModelSelect /> : <ParamVAEModelSelect />}
             {!isFLUX && !isSD3 && <ParamVAEPrecision />}
           </Flex>
         )}
-        {!isFLUX && !isFlux2 && !isSD3 && !isZImage && !isQwenImage && !isAnima && !isWan && !isIdeogram4 && (
-          <>
-            <FormControlGroup formLabelProps={formLabelProps}>
-              <ParamClipSkip />
-              <ParamCFGRescaleMultiplier />
-            </FormControlGroup>
-            <Flex gap={4} w="full">
-              <FormControlGroup formLabelProps={formLabelProps2}>
-                <SimpleGrid columns={2} spacing={4} w="full">
-                  <ParamSeamlessXAxis />
-                  <ParamSeamlessYAxis />
-                  <ParamColorCompensation />
-                  {/* Empty box for visual alignment. Replace with new option when needed. */}
-                  <Box />
-                </SimpleGrid>
+        {!isFLUX &&
+          !isFlux2 &&
+          !isSD3 &&
+          !isZImage &&
+          !isQwenImage &&
+          !isAnima &&
+          !isKrea2 &&
+          !isWan &&
+          !isIdeogram4 && (
+            <>
+              <FormControlGroup formLabelProps={formLabelProps}>
+                <ParamClipSkip />
+                <ParamCFGRescaleMultiplier />
               </FormControlGroup>
-            </Flex>
-          </>
-        )}
+              <Flex gap={4} w="full">
+                <FormControlGroup formLabelProps={formLabelProps2}>
+                  <SimpleGrid columns={2} spacing={4} w="full">
+                    <ParamSeamlessXAxis />
+                    <ParamSeamlessYAxis />
+                    <ParamColorCompensation />
+                    {/* Empty box for visual alignment. Replace with new option when needed. */}
+                    <Box />
+                  </SimpleGrid>
+                </FormControlGroup>
+              </Flex>
+            </>
+          )}
         {isFLUX && !isFlux2 && (
           <FormControlGroup>
             <ParamT5EncoderModelSelect />
@@ -178,6 +189,11 @@ export const AdvancedSettingsAccordion = memo(() => {
         {isAnima && (
           <FormControlGroup>
             <ParamAnimaModelSelect />
+          </FormControlGroup>
+        )}
+        {isKrea2 && (
+          <FormControlGroup>
+            <ParamKrea2ModelSelects />
           </FormControlGroup>
         )}
         {isWan && (
