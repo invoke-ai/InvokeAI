@@ -29,19 +29,25 @@ class LoRAExt(ExtensionBase):
 
     @contextmanager
     def patch_unet(self, unet: UNet2DConditionModel, original_weights: OriginalWeightsStorage):
-        lora_model = self._node_context.models.load(self._model_id).model
-        assert isinstance(lora_model, ModelPatchRaw)
-        LayerPatcher.apply_smart_model_patch(
-            model=unet,
-            prefix="lora_unet_",
-            patch=lora_model,
-            patch_weight=self._weight,
-            original_weights=original_weights,
-            original_modules={},
-            dtype=unet.dtype,
-            force_direct_patching=True,
-            force_sidecar_patching=False,
-        )
-        del lora_model
+        lora_info = self._node_context.models.load(self._model_id)
+        assert isinstance(lora_info.model, ModelPatchRaw)
+        # Pin the LoRA's cache record while its tensors are being read. Direct patching folds the
+        # deltas into the UNet's weights, so the pin only needs to cover the application, not the
+        # yielded scope. Without it, dropping the LoadedModel handle would release the record's
+        # post-admission grace and a peer cache could evict it (un-counting RAM that is still
+        # referenced here) mid-patch.
+        with lora_info.model_in_ram() as lora_model:
+            LayerPatcher.apply_smart_model_patch(
+                model=unet,
+                prefix="lora_unet_",
+                patch=lora_model,
+                patch_weight=self._weight,
+                original_weights=original_weights,
+                original_modules={},
+                dtype=unet.dtype,
+                force_direct_patching=True,
+                force_sidecar_patching=False,
+            )
+        del lora_info, lora_model
 
         yield

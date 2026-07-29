@@ -78,6 +78,93 @@ def test_apply_smart_model_patches_retains_patch_cache_handle_for_context_lifeti
     assert handle_ref is not None and handle_ref() is None
 
 
+class _PinTracker:
+    """A stand-in for the model_in_ram() context manager carried in a 3-tuple patch spec."""
+
+    def __init__(self):
+        self.enter_count = 0
+        self.exit_count = 0
+
+    def __enter__(self):
+        self.enter_count += 1
+        return self
+
+    def __exit__(self, *args):
+        self.exit_count += 1
+        return None
+
+
+def test_apply_smart_model_patches_exits_every_pin_on_normal_exit():
+    """Each pin must be entered before patching and exited exactly once when the context closes.
+
+    Regression guard for the `finally: cache_pins.close()` in apply_smart_model_patches: without it,
+    every LoRA cache record stays locked forever and becomes permanently invisible to eviction while
+    still charged to the shared RAM budget. The weakref-based retention test above cannot catch a
+    dropped close() (the pins would be collected silently), so assert the __exit__ calls directly.
+    """
+    pins = [_PinTracker(), _PinTracker()]
+    patches = [(ModelPatchRaw({}), 0.5, pins[0]), (ModelPatchRaw({}), 0.5, pins[1])]
+
+    model = DummyModuleWithOneLayer(1, 1, device="cpu", dtype=torch.float32)
+    with LayerPatcher.apply_smart_model_patches(model=model, patches=iter(patches), prefix="", dtype=torch.float32):
+        assert all(pin.enter_count == 1 and pin.exit_count == 0 for pin in pins)
+
+    assert all(pin.enter_count == 1 and pin.exit_count == 1 for pin in pins)
+
+
+def test_apply_smart_model_patches_exits_every_pin_when_the_body_raises():
+    pin = _PinTracker()
+
+    model = DummyModuleWithOneLayer(1, 1, device="cpu", dtype=torch.float32)
+    with pytest.raises(RuntimeError, match="boom"):
+        with LayerPatcher.apply_smart_model_patches(
+            model=model, patches=iter([(ModelPatchRaw({}), 0.5, pin)]), prefix="", dtype=torch.float32
+        ):
+            raise RuntimeError("boom")
+
+    assert pin.enter_count == 1
+    assert pin.exit_count == 1
+
+
+def test_apply_smart_model_patches_exits_every_pin_when_restoration_raises(monkeypatch):
+    """A failure while restoring patched weights must still release the cache pins."""
+    from invokeai.backend.util.original_weights_storage import OriginalWeightsStorage
+
+    pin = _PinTracker()
+
+    def raising_get_changed_weights(self):
+        raise RuntimeError("restore failed")
+
+    monkeypatch.setattr(OriginalWeightsStorage, "get_changed_weights", raising_get_changed_weights)
+
+    model = DummyModuleWithOneLayer(1, 1, device="cpu", dtype=torch.float32)
+    with pytest.raises(RuntimeError, match="restore failed"):
+        with LayerPatcher.apply_smart_model_patches(
+            model=model, patches=iter([(ModelPatchRaw({}), 0.5, pin)]), prefix="", dtype=torch.float32
+        ):
+            pass
+
+    assert pin.enter_count == 1
+    assert pin.exit_count == 1
+
+
+def test_apply_smart_model_patches_unwinds_entered_pins_when_a_later_load_raises():
+    """A producer that fails while loading LoRA B must release LoRA A's already-entered pin."""
+    pin_a = _PinTracker()
+
+    def patch_specs():
+        yield (ModelPatchRaw({}), 0.5, pin_a)
+        raise RuntimeError("load of the second LoRA failed")
+
+    model = DummyModuleWithOneLayer(1, 1, device="cpu", dtype=torch.float32)
+    with pytest.raises(RuntimeError, match="load of the second LoRA failed"):
+        with LayerPatcher.apply_smart_model_patches(model=model, patches=patch_specs(), prefix="", dtype=torch.float32):
+            pass
+
+    assert pin_a.enter_count == 1
+    assert pin_a.exit_count == 1
+
+
 @torch.no_grad()
 def test_apply_smart_model_patches_mixed_dotted_and_dotless_keys():
     """Regression test: a patch whose first layer key is a dotless top-level module (e.g. a Flux2 diffusers

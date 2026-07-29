@@ -464,7 +464,21 @@ class ModelCache:
         self._timeout_timer = threading.Timer(timeout_seconds, self._on_timeout)
         # Set as daemon so it doesn't prevent application shutdown
         self._timeout_timer.daemon = True
-        self._timeout_timer.start()
+        try:
+            self._timeout_timer.start()
+        except RuntimeError:
+            # Thread/pid exhaustion (RLIMIT_NPROC, a container's pids.max). The keep-alive timer is
+            # an optimization; it must not fail the cache operation that triggered it. Every
+            # @record_activity method runs this AFTER its real work — e.g. lock_in_ram() has already
+            # incremented the record's lock count — so an exception here would propagate to callers
+            # like LoadedModelWithoutConfig.model_in_ram() before their unlock-pairing try block is
+            # entered, leaking a permanent pin. Swallow it: the next activity re-arms the timer.
+            self._timeout_timer = None
+            self._logger.warning(
+                "Could not start the model-cache keep-alive timer; the keep-alive timeout is disabled until the "
+                "next cache activity."
+            )
+            return
         self._logger.debug(f"Model cache activity recorded. Timeout set to {self._keep_alive_minutes} minutes.")
 
     @synchronized
@@ -843,6 +857,16 @@ class ModelCache:
     @record_activity
     def lock_in_ram(self, cache_entry: CacheRecord) -> None:
         """Pin a cache entry in RAM without moving it to its execution device."""
+        if cache_entry.key not in self._cached_models:
+            # Same diagnostic as lock()/unlock(): without it, a detached record pinned here would
+            # produce only the unlock-side warning at the end of the generation, with no matching
+            # lock-side message to correlate it with.
+            self._logger.info(
+                f"Pinning model cache entry {cache_entry.key} "
+                f"(Type: {cache_entry.cached_model.model.__class__.__name__}), but it has already been dropped from "
+                "the RAM cache. This is a sign that the model loading order is non-optimal in the invocation code "
+                "(See https://github.com/invoke-ai/InvokeAI/issues/7513)."
+            )
         cache_entry.lock()
         cache_entry.awaiting_first_use = False
 

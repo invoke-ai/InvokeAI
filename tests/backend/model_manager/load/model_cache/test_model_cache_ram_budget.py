@@ -132,6 +132,66 @@ def test_model_in_ram_pins_warm_non_shared_model_against_peer_eviction(mock_logg
         cache.shutdown()
 
 
+def test_model_in_ram_on_a_cold_record_ends_the_grace_and_detaches_the_finalizer(mock_logger):
+    """A pin on a never-locked record must clear awaiting_first_use and detach the first-use
+    finalizer — otherwise the warm-path-only coverage leaves both lines of lock_in_ram dead code."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger, keep_ram_copy=False)
+    try:
+        cache.put("lora", DummyModule())
+        record = cache.get("lora")
+        assert record.awaiting_first_use  # cold: still in the post-admission grace
+
+        loaded_model = LoadedModelWithoutConfig(cache_record=record, cache=cache)
+        assert loaded_model._first_use_finalizer is not None
+
+        with loaded_model.model_in_ram():
+            assert record.is_locked
+            assert not record.awaiting_first_use
+            # The grace has been consumed by the pin; the finalizer must be detached so a later GC
+            # of the handle does not queue a redundant grace release.
+            assert not loaded_model._first_use_finalizer.alive
+
+        assert not record.is_locked
+        # Post-pin, the record is ordinary evictable cache content.
+        assert cache.evict_unlocked_for_peer(lambda: False) == 1
+    finally:
+        cache.shutdown()
+
+
+def test_keep_alive_timer_start_failure_does_not_leak_a_pin(mock_logger, monkeypatch):
+    """Timer.start() raising (thread/pid exhaustion) inside @record_activity must not propagate:
+    lock_in_ram has already incremented the lock count, and the caller's unlock-pairing try block
+    in model_in_ram() has not been entered yet — an exception here would pin the record forever."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger, keep_ram_copy=False)
+    cache._keep_alive_minutes = 5  # arm the timer path
+    try:
+        cache.put("lora", DummyModule())
+        record = cache.get("lora")
+        loaded_model = LoadedModelWithoutConfig(cache_record=record, cache=cache)
+
+        def raising_start(self):
+            raise RuntimeError("can't start new thread")
+
+        monkeypatch.setattr(threading.Timer, "start", raising_start)
+
+        with loaded_model.model_in_ram():
+            assert record.is_locked
+
+        assert not record.is_locked  # the unlock paired with the lock; nothing leaked
+        assert cache._timeout_timer is None
+        assert any(
+            call.args[0] == logging.WARNING and "keep-alive timer" in call.args[1]
+            for call in mock_logger.log.call_args_list
+        )
+    finally:
+        monkeypatch.undo()
+        cache.shutdown()
+
+
 def test_global_budget_evicts_lru_in_single_cache(mock_logger):
     # Budget fits one model but not two -> putting the second evicts the first.
     store = SharedCpuWeightsStore()
