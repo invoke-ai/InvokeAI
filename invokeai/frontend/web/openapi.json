@@ -75405,7 +75405,7 @@
         "category": "llm",
         "class": "invocation",
         "classification": "beta",
-        "description": "Run a text language model using a saved system prompt from the System Prompts library.\n\nBehaves identically to the Text LLM node, but the system prompt is selected from a\nDB-backed preset instead of being typed inline. Useful when you maintain a curated\nlibrary of expansion strategies and want to reuse them across workflows.",
+        "description": "Run a text language model using a saved system prompt from the System Prompts library.\n\nBehaves identically to the Text LLM node, but the system prompt is selected from a\nDB-backed preset instead of being typed inline. Useful when you maintain a curated\nlibrary of expansion strategies and want to reuse them across workflows.\n\nNote: the field stores the preset's id, not its text. A workflow exported from one install\nonly resolves on another if that install has a prompt with the same id -- true for the\nseeded defaults (fixed UUIDs), not for user-created prompts. `StylePresetField` has the\nsame limitation.",
         "node_pack": "invokeai",
         "properties": {
           "id": {

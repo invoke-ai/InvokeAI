@@ -3,8 +3,11 @@
 The system_prompts table stores user-managed system prompts (instructions for
 the text LLM) used by the Expand Prompt button. A curated set of default
 prompts (adapted from publicly published prompt-engineering system messages of
-modern image-generation models) is seeded once via INSERT OR IGNORE with fixed
-UUIDs, so deleted defaults stay deleted across restarts.
+modern image-generation models) is seeded with fixed UUIDs.
+
+Deleted or edited defaults stay that way because the migrator runs each migration
+id exactly once; INSERT OR IGNORE additionally makes a re-run within a single
+migration pass a no-op rather than a duplicate or an overwrite.
 
 Sources of the seeded prompts:
 - FLUX.2 Prompt Enhancement: black-forest-labs/flux2 (system_messages.py)
@@ -275,7 +278,9 @@ class CreateSystemPromptsCallback:
             """
         )
         # Backfill columns when an earlier revision of this migration left the table without them
-        # (e.g. a dev DB where the schema was created before the multi-user columns landed).
+        # (a dev DB created from this branch before the multi-user columns landed). The migrator
+        # skips ids already in `applied_migrations`, so this is only reachable because the id was
+        # bumped from `2026_07_09_create_system_prompts` -- the earlier id was never released.
         cursor.execute("PRAGMA table_info(system_prompts);")
         existing_columns = {row[1] for row in cursor.fetchall()}
         if "user_id" not in existing_columns:
@@ -295,7 +300,6 @@ class CreateSystemPromptsCallback:
         )
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_system_prompts_name ON system_prompts(name);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_system_prompts_user_id ON system_prompts(user_id);")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_system_prompts_is_public ON system_prompts(is_public);")
 
     def _seed_default_system_prompts(self, cursor: sqlite3.Cursor) -> None:
         # Seeded defaults are owned by the 'system' user and shared with everyone (is_public=TRUE).
@@ -313,9 +317,14 @@ def build_migration() -> Migration:
 
     Graph-only migration. Depends on migration_33 (the last legacy numeric migration) so it runs
     after the rest of the schema is in place; the system_prompts table itself is independent.
+
+    The id is `2026_07_10_...` rather than `2026_07_09_...` on purpose: an earlier revision of this
+    (unreleased) branch shipped the table without `user_id`/`is_public`, and the migrator skips ids
+    already recorded in `applied_migrations`. A new id makes the ADD COLUMN backfill above actually
+    run on those dev databases. Both DDL and the seed are idempotent, so re-running is harmless.
     """
     return Migration(
-        id="2026_07_09_create_system_prompts",
+        id="2026_07_10_create_system_prompts",
         depends_on="migration_33",
         callback=CreateSystemPromptsCallback(),
     )

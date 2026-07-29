@@ -2,7 +2,7 @@
 
 Covers the per-user scoping semantics added on top of the original CRUD:
 - get_many returns own + public for a user_id, all rows for None (admin)
-- update/delete with a non-owner user_id is a clean no-op (NotFound), no mutation
+- update/delete with a non-owner user_id raises NotFound and leaves the row untouched
 - the migration-seeded defaults (user_id='system', is_public=TRUE) are visible to every user
 """
 
@@ -87,7 +87,7 @@ def test_update_with_non_owner_user_id_raises_and_does_not_mutate() -> None:
     assert after.content == "original"
 
 
-def test_delete_with_non_owner_user_id_is_noop() -> None:
+def test_delete_with_non_owner_user_id_raises_and_does_not_delete() -> None:
     svc = _storage()
     alice = svc.create(
         SystemPromptWithoutId(name="alice secret", content="x"),
@@ -95,9 +95,35 @@ def test_delete_with_non_owner_user_id_is_noop() -> None:
         is_public=False,
     )
 
-    # (d) Non-owner delete silently no-ops; row remains.
-    svc.delete(alice.id, user_id="bob")
+    # (d) Non-owner delete raises NotFound (symmetric with update) and leaves the row alone.
+    try:
+        svc.delete(alice.id, user_id="bob")
+        raise AssertionError("expected SystemPromptNotFoundError")
+    except SystemPromptNotFoundError:
+        pass
     assert svc.get(alice.id).id == alice.id
+
+
+def test_delete_of_unknown_id_raises() -> None:
+    # Unscoped (single-user / admin) deletes must not report success for an id that does not
+    # exist -- the router turns this into a 404, matching GET.
+    svc = _storage()
+    try:
+        svc.delete("does-not-exist", user_id=None)
+        raise AssertionError("expected SystemPromptNotFoundError")
+    except SystemPromptNotFoundError:
+        pass
+
+
+def test_deleting_the_same_row_twice_raises_the_second_time() -> None:
+    svc = _storage()
+    created = svc.create(SystemPromptWithoutId(name="temp", content="x"), user_id="alice", is_public=False)
+    svc.delete(created.id, user_id=None)
+    try:
+        svc.delete(created.id, user_id=None)
+        raise AssertionError("expected SystemPromptNotFoundError on second delete")
+    except SystemPromptNotFoundError:
+        pass
 
 
 def test_admin_can_delete_any_row() -> None:

@@ -114,4 +114,7 @@ async def delete_system_prompt(
         if not current_user.is_admin and existing.user_id != current_user.user_id:
             raise HTTPException(status_code=403, detail="Not authorized to delete this system prompt")
     user_id = None if current_user.is_admin else current_user.user_id
-    ApiDependencies.invoker.services.system_prompt_records.delete(system_prompt_id, user_id=user_id)
+    try:
+        ApiDependencies.invoker.services.system_prompt_records.delete(system_prompt_id, user_id=user_id)
+    except SystemPromptNotFoundError:
+        raise HTTPException(status_code=404, detail="System prompt not found")

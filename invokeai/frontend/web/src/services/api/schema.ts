@@ -32647,6 +32647,11 @@ export type components = {
          *     Behaves identically to the Text LLM node, but the system prompt is selected from a
          *     DB-backed preset instead of being typed inline. Useful when you maintain a curated
          *     library of expansion strategies and want to reuse them across workflows.
+         *
+         *     Note: the field stores the preset's id, not its text. A workflow exported from one install
+         *     only resolves on another if that install has a prompt with the same id -- true for the
+         *     seeded defaults (fixed UUIDs), not for user-created prompts. `StylePresetField` has the
+         *     same limitation.
          */
         TextLLMWithPresetInvocation: {
             /**

@@ -2,18 +2,9 @@ import type { S } from 'services/api/types';
 
 import { api, buildV1Url, LIST_TAG } from '..';
 
-// NOTE: schema.ts is regenerated separately. Until that lands, we manually augment the
-// generated DTOs with the multi-user fields the backend already returns/accepts. After a
-// `pnpm typegen` run that includes migration 32's schema, these intersections become no-ops
-// and can be removed.
-export type SystemPromptRecordDTO = S['SystemPromptRecordDTO'] & {
-  user_id: string;
-  is_public: boolean;
-};
+export type SystemPromptRecordDTO = S['SystemPromptRecordDTO'];
 type SystemPromptWithoutId = S['SystemPromptWithoutId'];
-type SystemPromptChanges = S['SystemPromptChanges'] & {
-  is_public?: boolean | null;
-};
+type SystemPromptChanges = S['SystemPromptChanges'];
 
 const buildSystemPromptsUrl = (path: string = '') => buildV1Url(`system_prompts/${path}`);
 

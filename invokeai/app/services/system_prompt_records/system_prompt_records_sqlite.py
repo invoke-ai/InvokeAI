@@ -87,6 +87,13 @@ class SqliteSystemPromptRecordsStorage(SystemPromptRecordsStorageBase):
         return self.get(system_prompt_id)
 
     def delete(self, system_prompt_id: str, user_id: Optional[str] = None) -> None:
+        """Delete a prompt, optionally scoped to an owner.
+
+        Raises `SystemPromptNotFoundError` when nothing was deleted -- either the id does not
+        exist or (when scoped) it is not owned by `user_id`. Deleting silently would let the
+        single-user router report success for an id that `GET` 404s on, and would make the
+        symmetry with `update()` (which does raise) a trap for the next caller.
+        """
         with self._db.transaction() as cursor:
             if user_id is not None:
                 cursor.execute(
@@ -95,6 +102,8 @@ class SqliteSystemPromptRecordsStorage(SystemPromptRecordsStorageBase):
                 )
             else:
                 cursor.execute("DELETE FROM system_prompts WHERE id = ?;", (system_prompt_id,))
+            if cursor.rowcount == 0:
+                raise SystemPromptNotFoundError(f"System prompt with id {system_prompt_id} not found")
 
     def get_many(self, user_id: Optional[str] = None) -> list[SystemPromptRecordDTO]:
         with self._db.transaction() as cursor:

@@ -3,6 +3,9 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field, TypeAdapter
 
+SYSTEM_PROMPT_DEFAULT_USER_ID = "system"
+"""Owner of the seeded default prompts. They are visible to everyone, like default workflows."""
+
 
 class SystemPromptNotFoundError(Exception):
     """Raised when a system prompt is not found"""
