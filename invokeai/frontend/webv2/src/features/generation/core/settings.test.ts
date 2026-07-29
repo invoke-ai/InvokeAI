@@ -42,6 +42,34 @@ const legacyStoredValues = {
 };
 
 describe('normalizeGenerateSettings', () => {
+  it('enforces template view mode only when a valid template remains', () => {
+    const validTemplate = {
+      id: 'template-1',
+      name: 'Cinematic',
+      negativePrompt: '',
+      positivePrompt: '{prompt}, cinematic',
+    };
+
+    expect(
+      normalizeGenerateSettings({ ...legacyStoredValues, promptTemplate: null, promptTemplateViewMode: true })
+        ?.promptTemplateViewMode
+    ).toBe(false);
+    expect(
+      normalizeGenerateSettings({
+        ...legacyStoredValues,
+        promptTemplate: { id: '', name: 'Broken' },
+        promptTemplateViewMode: true,
+      })?.promptTemplateViewMode
+    ).toBe(false);
+    expect(
+      normalizeGenerateSettings({ ...legacyStoredValues, promptTemplate: validTemplate, promptTemplateViewMode: true })
+        ?.promptTemplateViewMode
+    ).toBe(true);
+    expect(isGenerateSettings({ ...legacyStoredValues, promptTemplate: null, promptTemplateViewMode: true })).toBe(
+      false
+    );
+  });
+
   it('normalizes persisted reference images and drops invalid entries', () => {
     const normalized = normalizeGenerateSettings({
       ...legacyStoredValues,

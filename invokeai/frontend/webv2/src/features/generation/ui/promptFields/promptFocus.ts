@@ -77,10 +77,6 @@ export const insertPositivePromptText = ({
 /** Which trigger keys a field answers to. Wildcards only exist on the positive prompt. */
 export type PromptTriggerKey = '<' | '_';
 
-/** `_` is a word character, so `snake__case` must not read as the start of a reference. */
-const isWordCharacter = (character: string | undefined): boolean =>
-  character !== undefined && /[A-Za-z0-9_]/.test(character);
-
 export interface PromptTriggerQuery {
   key: PromptTriggerKey;
   /** What has been typed since the trigger, for narrowing the list. */
@@ -114,6 +110,22 @@ export const getActiveTriggerQuery = (
   caret: number,
   keys: readonly PromptTriggerKey[]
 ): PromptTriggerQuery | null => {
+  // At a closing `__`, the backwards scan reaches that pair before its opening
+  // pair. Treat a non-empty delimited span as finished even when its content is
+  // malformed: autocomplete must not reopen over text the user has already
+  // closed.
+  const closingStart = caret - 2;
+  const openingStart = value.lastIndexOf('__', closingStart - 1);
+
+  if (
+    keys.includes('_') &&
+    value.slice(closingStart, caret) === '__' &&
+    openingStart >= 0 &&
+    openingStart + 2 < closingStart
+  ) {
+    return null;
+  }
+
   const limit = Math.max(0, caret - MAX_TRIGGER_QUERY_LENGTH);
 
   for (let index = caret - 1; index >= limit; index--) {
@@ -136,7 +148,7 @@ export const getActiveTriggerQuery = (
       return keys.includes('<') ? findEnclosingEmbedding(value, caret, limit, index) : null;
     }
 
-    if (char === '_' && value[index - 1] === '_' && keys.includes('_') && !isWordCharacter(value[index - 2])) {
+    if (char === '_' && value[index - 1] === '_' && keys.includes('_')) {
       const query = value.slice(index + 1, caret);
 
       // `__colours__` with the caret after it: the scan reached the *opening*

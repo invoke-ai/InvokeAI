@@ -93,6 +93,9 @@ describe('the negative prompt in template view mode', () => {
 
     expect(textarea.readOnly).toBe(false);
     expect(textarea.value).toBe('blurry');
+    expect(host!.querySelector<HTMLButtonElement>('[aria-label="widgets.generate.addPromptTrigger"]')?.disabled).toBe(
+      false
+    );
   });
 });
 

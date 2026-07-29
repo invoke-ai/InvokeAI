@@ -150,7 +150,7 @@ export const NegativePromptField = ({
       <HStack gap="0.5">
         {isEnabled ? (
           <AddPromptTriggerButton
-            isOpen={triggerPicker.isOpen || isTemplateViewMode}
+            isOpen={triggerPicker.isOpen || isViewingMerged}
             onOpenPromptTriggerPicker={triggerPicker.open}
           />
         ) : null}
@@ -168,7 +168,7 @@ export const NegativePromptField = ({
         </Switch.Root>
       </HStack>
     ),
-    [enableSwitchInputId, handleEnabledChange, isEnabled, isTemplateViewMode, t, triggerPicker]
+    [enableSwitchInputId, handleEnabledChange, isEnabled, isViewingMerged, t, triggerPicker]
   );
 
   const templateChunks = useMemo(

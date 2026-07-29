@@ -568,6 +568,10 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
   const width = values.width as number;
   const height = values.height as number;
 
+  const promptTemplate = isCanonicalPromptTemplateSnapshot(values.promptTemplate)
+    ? values.promptTemplate
+    : sanitizePromptTemplateSnapshot(values.promptTemplate);
+
   return {
     aspectRatioId: isAspectRatioId(values.aspectRatioId) ? values.aspectRatioId : deriveAspectRatioId(width, height),
     aspectRatioIsLocked: typeof values.aspectRatioIsLocked === 'boolean' ? values.aspectRatioIsLocked : false,
@@ -613,10 +617,8 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
     // with `Object.is`, so re-sanitizing into a fresh object every pass would make
     // every commit look like a template change and loop the sync in
     // `GenerateWidgetView`.
-    promptTemplate: isCanonicalPromptTemplateSnapshot(values.promptTemplate)
-      ? values.promptTemplate
-      : sanitizePromptTemplateSnapshot(values.promptTemplate),
-    promptTemplateViewMode: typeof values.promptTemplateViewMode === 'boolean' ? values.promptTemplateViewMode : false,
+    promptTemplate,
+    promptTemplateViewMode: promptTemplate !== null && values.promptTemplateViewMode === true,
     referenceImages: normalizeReferenceImages(values.referenceImages),
     scheduler: values.scheduler as string,
     seamlessXAxis: typeof values.seamlessXAxis === 'boolean' ? values.seamlessXAxis : false,
@@ -671,6 +673,7 @@ export const isGenerateSettings = (values: unknown): values is GenerateSettings 
     areReferenceImagesCanonical(values.referenceImages) &&
     (values.promptTemplate === null || isCanonicalPromptTemplateSnapshot(values.promptTemplate)) &&
     typeof values.promptTemplateViewMode === 'boolean' &&
+    (values.promptTemplate !== null || values.promptTemplateViewMode === false) &&
     typeof values.seamlessXAxis === 'boolean' &&
     typeof values.seamlessYAxis === 'boolean' &&
     isVaePrecision(values.vaePrecision) &&

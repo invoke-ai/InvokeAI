@@ -20,6 +20,7 @@ describe('hasDynamicPromptSyntax', () => {
 
   it('detects a wildcard reference', () => {
     expect(hasDynamicPromptSyntax('a __colors__ ball')).toBe(true);
+    expect(hasDynamicPromptSyntax('prefix__name__')).toBe(true);
     expect(hasDynamicPromptSyntax('a __animals/dogs__ ball')).toBe(true);
     expect(hasDynamicPromptSyntax('a __artists/*__ ball')).toBe(true);
     expect(hasDynamicPromptSyntax('a __~colors__ ball')).toBe(true);
@@ -44,6 +45,13 @@ describe('hasDynamicPromptSyntax', () => {
 });
 
 describe('scanWildcardReferences', () => {
+  it('recognizes references adjacent to a word and preserves their exact ranges', () => {
+    expect(scanWildcardReferences('prefix__name__')).toEqual([{ lookupPath: 'name', range: { end: 14, start: 6 } }]);
+    expect(scanWildcardReferences('snake__case__ word')).toEqual([
+      { lookupPath: 'case', range: { end: 13, start: 5 } },
+    ]);
+  });
+
   it('returns the full range and lookup path for sampler overrides and parameters', () => {
     const prompt = 'a __~outfit(mood=warm)__ beside __animals/[dc]ogs__';
 
@@ -63,6 +71,12 @@ describe('scanWildcardReferences', () => {
     expect(scanWildcardReferences('snake__case and __valid__')).toEqual([
       { lookupPath: 'valid', range: { end: 25, start: 16 } },
     ]);
+  });
+
+  it('leaves incomplete, malformed, and overlength tokens alone', () => {
+    expect(scanWildcardReferences('snake__case')).toEqual([]);
+    expect(scanWildcardReferences('__not a name__')).toEqual([]);
+    expect(scanWildcardReferences(`__${'x'.repeat(129)}__`)).toEqual([]);
   });
 });
 

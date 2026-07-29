@@ -30,6 +30,10 @@ describe('getActiveTriggerQuery', () => {
     expect(query('a photo of __')).toEqual({ key: '_', query: '', range: { end: 13, start: 11 } });
   });
 
+  it('opens for a wildcard trigger adjacent to a word character', () => {
+    expect(query('prefix__')).toEqual({ key: '_', query: '', range: { end: 8, start: 6 } });
+  });
+
   it('narrows as the name is typed', () => {
     expect(query('a photo of __col')).toEqual({ key: '_', query: 'col', range: { end: 16, start: 11 } });
   });
@@ -46,6 +50,7 @@ describe('getActiveTriggerQuery', () => {
   it('stays shut after a closed reference', () => {
     expect(query('a __colours__')).toBeNull();
     expect(query('a <embedding>')).toBeNull();
+    expect(query('prefix__name__')).toBeNull();
   });
 
   it('stays shut inside an ordinary word', () => {
@@ -89,6 +94,10 @@ describe('getActiveTriggerQuery', () => {
       range: { end: 132, start: 2 },
     });
     expect(query(`a __${maximum}x`)).toBeNull();
+  });
+
+  it('stays shut for malformed wildcard attempts', () => {
+    expect(query('a __not a name')).toBeNull();
   });
 
   it('honours the keys the field answers to', () => {

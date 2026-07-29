@@ -283,7 +283,9 @@ const getMetadataVae = (
 
 const getPromptPatch = (
   metadata: unknown
-): Partial<Pick<GenerateWidgetValues, 'negativePrompt' | 'positivePrompt' | 'promptTemplate'>> => {
+): Partial<
+  Pick<GenerateWidgetValues, 'negativePrompt' | 'positivePrompt' | 'promptTemplate' | 'promptTemplateViewMode'>
+> => {
   const positivePrompt = getString(metadata, 'positive_prompt');
   const negativePrompt = getNullableString(metadata, 'negative_prompt');
   // Image metadata records the prompt the model was given, so it already has any
@@ -294,7 +296,7 @@ const getPromptPatch = (
   return {
     ...(positivePrompt !== null ? { positivePrompt } : {}),
     ...(negativePrompt !== undefined ? { negativePrompt: negativePrompt ?? '' } : {}),
-    ...(clearTemplate ? { promptTemplate: null } : {}),
+    ...(clearTemplate ? { promptTemplate: null, promptTemplateViewMode: false } : {}),
   };
 };
 

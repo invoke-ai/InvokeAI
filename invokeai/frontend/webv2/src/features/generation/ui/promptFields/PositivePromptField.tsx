@@ -181,12 +181,12 @@ export const PositivePromptField = ({
   const templateState = useMemo(
     (): PromptTemplateState => ({
       active: promptTemplate,
-      isViewMode: isTemplateViewMode,
+      isViewMode: isViewingMerged,
       onApply: onApplyPromptTemplate,
       onFlatten: flattenPromptTemplate,
       onViewModeChange: onTemplateViewModeChange,
     }),
-    [flattenPromptTemplate, isTemplateViewMode, onApplyPromptTemplate, onTemplateViewModeChange, promptTemplate]
+    [flattenPromptTemplate, isViewingMerged, onApplyPromptTemplate, onTemplateViewModeChange, promptTemplate]
   );
 
   const labelEnd = useMemo(

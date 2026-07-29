@@ -50,8 +50,9 @@ export interface WildcardReference {
 
 const WILDCARD_GLOB_CHARACTER_RE = /[*?[]/;
 const WILDCARD_REFERENCE_PATH_RE = /^[A-Za-z0-9_/*?[\]!-]+$/;
-const isWildcardBoundaryCharacter = (character: string | undefined): boolean =>
-  character !== undefined && /[A-Za-z0-9_]/.test(character);
+
+/** Mirrors the backend's `MAX_WILDCARD_NAME_LENGTH`. */
+export const MAX_WILDCARD_NAME_LENGTH = 128;
 
 const getWildcardLookupPath = (content: string): string | null => {
   const withoutSampler = content[0] === '~' || content[0] === '@' ? content.slice(1) : content;
@@ -72,7 +73,7 @@ const getWildcardLookupPath = (content: string): string | null => {
     return null;
   }
 
-  if (!lookupPath || !WILDCARD_REFERENCE_PATH_RE.test(lookupPath)) {
+  if (!lookupPath || lookupPath.length > MAX_WILDCARD_NAME_LENGTH || !WILDCARD_REFERENCE_PATH_RE.test(lookupPath)) {
     return null;
   }
 
@@ -85,7 +86,7 @@ export const scanWildcardReferences = (prompt: string): WildcardReference[] => {
   let index = 0;
 
   while (index < prompt.length - 1) {
-    if (prompt[index] !== '_' || prompt[index + 1] !== '_' || isWildcardBoundaryCharacter(prompt[index - 1])) {
+    if (prompt[index] !== '_' || prompt[index + 1] !== '_') {
       index++;
       continue;
     }
@@ -266,9 +267,6 @@ export const matchesKnownWildcard = (path: string, knownNames: ReadonlySet<strin
 
   return false;
 };
-
-/** Mirrors the backend's `MAX_WILDCARD_NAME_LENGTH`. */
-export const MAX_WILDCARD_NAME_LENGTH = 128;
 
 /**
  * The backend's bounds on a values list, mirrored here so both ways of writing
