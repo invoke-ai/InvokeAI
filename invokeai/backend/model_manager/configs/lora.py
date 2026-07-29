@@ -974,6 +974,13 @@ _KREA2_SUPPORTED_LORA_PREFIXES = (
     # The converter also supports the `diffusion_model.` transformer layout
     # (see krea2_lora_conversion_utils.lora_model_from_krea2_state_dict).
     "diffusion_model.transformer_blocks.",
+    "diffusion_model.blocks.",
+    "diffusion_model.txtfusion.",
+    "diffusion_model.first.",
+    "diffusion_model.tmlp.",
+    "diffusion_model.tproj.",
+    "diffusion_model.txtmlp.",
+    "diffusion_model.last.linear.",
     "base_model.model.transformer.transformer_blocks.",
     "text_encoder.",
     "base_model.model.text_encoder.",

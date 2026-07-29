@@ -216,3 +216,24 @@ def test_native_comfyui_krea2_lora_is_identified_as_krea2(_raise_if_not_file) ->
     }
     config = LoRA_LyCORIS_Krea2_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS})
     assert config.base is BaseModelType.Krea2
+
+
+@pytest.mark.parametrize(
+    "native_module",
+    [
+        "blocks.0.attn.wq",
+        "blocks.0.mlp.down",
+        "tproj.1",
+    ],
+)
+@patch("invokeai.backend.model_manager.configs.lora.raise_if_not_file")
+def test_explicit_krea2_override_accepts_single_module_native_lora(_raise_if_not_file, native_module: str) -> None:
+    mod = MagicMock()
+    mod.load_state_dict.return_value = {
+        f"diffusion_model.{native_module}.lora_A.weight": object(),
+        f"diffusion_model.{native_module}.lora_B.weight": object(),
+    }
+
+    config = LoRA_LyCORIS_Krea2_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS, "base": BaseModelType.Krea2})
+
+    assert config.base is BaseModelType.Krea2
