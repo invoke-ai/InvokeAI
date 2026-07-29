@@ -1,9 +1,9 @@
 import type { PromptTemplateRecord } from '@features/generation/data/promptTemplates';
 
 import { promptTemplateKeys } from '@features/generation/data/promptTemplates';
-import { usePromptTemplates } from '@features/generation/ui/usePromptTemplates';
+import { usePromptTemplates, type PromptTemplateCatalog } from '@features/generation/ui/usePromptTemplates';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, useEffect } from 'react';
+import { act, createRef, type Ref, useImperativeHandle } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -49,16 +49,14 @@ const template: PromptTemplateRecord = {
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
-let catalog: ReturnType<typeof usePromptTemplates> | null = null;
 let queryClient: QueryClient;
+const catalogRef = createRef<PromptTemplateCatalog>();
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const Probe = () => {
+const Probe = ({ ref }: { ref: Ref<PromptTemplateCatalog> }) => {
   const value = usePromptTemplates({ isEnabled: false });
 
-  useEffect(() => {
-    catalog = value;
-  }, [value]);
+  useImperativeHandle(ref, () => value, [value]);
 
   return null;
 };
@@ -73,7 +71,7 @@ beforeEach(async () => {
   await act(() => {
     root?.render(
       <QueryClientProvider client={queryClient}>
-        <Probe />
+        <Probe ref={catalogRef} />
       </QueryClientProvider>
     );
   });
@@ -84,7 +82,6 @@ afterEach(async () => {
   host?.remove();
   host = null;
   root = null;
-  catalog = null;
 });
 
 describe('prompt template mutation invalidation', () => {
@@ -93,7 +90,7 @@ describe('prompt template mutation invalidation', () => {
     const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
 
     await act(async () => {
-      await catalog!.create({
+      await catalogRef.current!.create({
         image: null,
         name: dto.name,
         negativePrompt: '',
@@ -123,7 +120,7 @@ describe('prompt template mutation invalidation', () => {
     const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
 
     await act(async () => {
-      await run(catalog!);
+      await run(catalogRef.current!);
     });
 
     expect(invalidateQueries).toHaveBeenCalledTimes(2);
@@ -136,7 +133,7 @@ describe('prompt template mutation invalidation', () => {
     const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
 
     await act(async () => {
-      await catalog!.importFile(new File(['name,prompt'], 'templates.csv', { type: 'text/csv' }));
+      await catalogRef.current!.importFile(new File(['name,prompt'], 'templates.csv', { type: 'text/csv' }));
     });
 
     expect(invalidateQueries).toHaveBeenCalledTimes(1);
