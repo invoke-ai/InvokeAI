@@ -1,17 +1,4 @@
-/**
- * Scanner for adieyal/dynamicprompts syntax (`{a|b}`, `{2::a|b}`, `{2-3$$a|b}`,
- * `__wildcard__`, `${variable}`).
- *
- * This is intentionally a standalone character scanner rather than an extension
- * of `ast.ts`. That tokenizer already emits every character we care about as its
- * own whole token — `{`/`}` fall through to its single-char catch-all, `|`/`$`/`:`
- * are single-char punctuation, and `__wildcard__` reads as one word because `_`
- * is a word character. So the ranges produced here always cover whole tokens and
- * compose with the existing highlight annotations, leaving the attention and
- * embedding parser untouched.
- */
-
-import { WILDCARD_REFERENCE_RE } from '@features/generation/core/dynamicPrompts';
+import { matchesKnownWildcard, scanWildcardReferences } from '@features/generation/core/dynamicPrompts';
 
 import type { PromptRange } from './ast';
 
@@ -20,8 +7,11 @@ export type DynamicPromptSyntaxKind =
   | 'variantSeparator'
   | 'variantWeight'
   | 'variantRange'
+  | 'variantSampler'
   | 'wildcard'
   | 'promptVariable'
+  | 'promptVariableOperator'
+  | 'comment'
   | 'error';
 
 export interface DynamicPromptSyntaxAnnotation {
@@ -29,10 +19,9 @@ export interface DynamicPromptSyntaxAnnotation {
   range: PromptRange;
 }
 
-/** `2::`, `1.5::` — a variant value's relative weight. */
 const WEIGHT_PATTERN = /^\s*\d+(?:\.\d+)?::/;
-/** `2$$`, `2-3$$`, `-3$$`, and the custom-separator form `2$$, $$`. */
 const RANGE_PATTERN = /^\s*(?:\d+)?(?:-\d+)?\$\$(?:[^$|{}]*\$\$)?/;
+const VARIABLE_OPERATOR_PATTERN = /=!?|:/;
 
 const isEscaped = (prompt: string, index: number): boolean => {
   let backslashes = 0;
@@ -65,22 +54,13 @@ const findVariableEnd = (prompt: string, openBraceIndex: number): number => {
 const covers = (outer: PromptRange, inner: PromptRange): boolean =>
   outer.start <= inner.start && outer.end >= inner.end;
 
-/**
- * Annotates a prompt's dynamic syntax. Unmatched braces in either direction are
- * reported as `error` so the textarea can underline them the same way it already
- * underlines unbalanced attention parentheses.
- */
 export const scanDynamicPromptSyntax = (
   prompt: string,
-  /**
-   * Wildcard names the backend can resolve. Omitted means "unknown", so callers
-   * without a catalog get the neutral wildcard colour rather than a false error.
-   */
   knownWildcards?: ReadonlySet<string>
 ): DynamicPromptSyntaxAnnotation[] => {
   const annotations: DynamicPromptSyntaxAnnotation[] = [];
   const variableRanges: PromptRange[] = [];
-  // Open braces awaiting a `}`, paired with the annotation to rewrite if none arrives.
+  const commentRanges: PromptRange[] = [];
   const openBraces: { annotationIndex: number }[] = [];
   let index = 0;
 
@@ -92,11 +72,32 @@ export const scanDynamicPromptSyntax = (
     }
   };
 
+  const annotateVariableOperator = (contentStart: number, contentEnd: number): void => {
+    const name = prompt.slice(contentStart, contentEnd);
+    const operator = name.match(VARIABLE_OPERATOR_PATTERN);
+
+    if (operator?.index !== undefined) {
+      const start = contentStart + operator.index;
+
+      annotations.push({ kind: 'promptVariableOperator', range: { end: start + operator[0].length, start } });
+    }
+  };
+
   while (index < prompt.length) {
     const char = prompt[index];
 
+    if (char === '#') {
+      const lineEnd = prompt.indexOf('\n', index);
+      const end = lineEnd === -1 ? prompt.length : lineEnd;
+
+      annotations.push({ kind: 'comment', range: { end, start: index } });
+      commentRanges.push({ end, start: index });
+      index = end;
+      continue;
+    }
+
     if (char === '\\') {
-      index += 2;
+      index += prompt[index + 1] === '#' ? 1 : 2;
       continue;
     }
 
@@ -106,6 +107,7 @@ export const scanDynamicPromptSyntax = (
       if (end > 0) {
         annotations.push({ kind: 'promptVariable', range: { end, start: index } });
         variableRanges.push({ end, start: index });
+        annotateVariableOperator(index + 2, end - 1);
         index = end;
         continue;
       }
@@ -114,6 +116,11 @@ export const scanDynamicPromptSyntax = (
     if (char === '{') {
       annotations.push({ kind: 'variantBrace', range: { end: index + 1, start: index } });
       openBraces.push({ annotationIndex: annotations.length - 1 });
+
+      if (prompt[index + 1] === '~' || prompt[index + 1] === '@') {
+        annotations.push({ kind: 'variantSampler', range: { end: index + 2, start: index + 1 } });
+        index++;
+      }
 
       const rangePrefix = prompt.slice(index + 1).match(RANGE_PATTERN)?.[0];
 
@@ -155,15 +162,13 @@ export const scanDynamicPromptSyntax = (
     annotations[openBrace.annotationIndex].kind = 'error';
   }
 
-  const wildcardPattern = new RegExp(WILDCARD_REFERENCE_RE, 'g');
+  const enclosingRanges = [...variableRanges, ...commentRanges];
 
-  for (let match = wildcardPattern.exec(prompt); match; match = wildcardPattern.exec(prompt)) {
-    const wildcardRange = { end: match.index + match[0].length, start: match.index };
+  for (const reference of scanWildcardReferences(prompt)) {
+    const wildcardRange = reference.range;
 
-    if (!variableRanges.some((variableRange) => covers(variableRange, wildcardRange))) {
-      // An unresolvable wildcard makes the whole prompt fail to expand, so it earns the same
-      // treatment as an unbalanced brace rather than looking like ordinary recognised syntax.
-      const isUnknown = knownWildcards !== undefined && !knownWildcards.has(match[1]);
+    if (!enclosingRanges.some((outer) => covers(outer, wildcardRange))) {
+      const isUnknown = knownWildcards !== undefined && !matchesKnownWildcard(reference.lookupPath, knownWildcards);
 
       annotations.push({ kind: isUnknown ? 'error' : 'wildcard', range: wildcardRange });
     }

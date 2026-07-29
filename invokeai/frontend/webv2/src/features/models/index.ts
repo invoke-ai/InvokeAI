@@ -11,6 +11,7 @@ export {
   ensureModelsLoaded,
   getModelsSnapshot,
   refreshModels,
+  subscribeModels,
   useModelsSelector,
   useModelsSnapshot,
   type ModelsSnapshot,

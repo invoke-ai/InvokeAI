@@ -10,6 +10,7 @@ export {
   DEFAULT_NEGATIVE_PROMPT_HEIGHT_PX,
   DEFAULT_POSITIVE_PROMPT_HEIGHT_PX,
   deriveAspectRatioId,
+  GENERATE_UI_STATE_KEYS,
   getDefaultLoraWeight,
   getModelDefaultVae,
   hasModelDefaultVae,
@@ -48,6 +49,11 @@ export {
   SCHEDULER_OPTIONS,
   type GenerateModelSelectionResult,
 } from './core/baseGenerationPolicies';
+export {
+  resolveGenerateWidgetValues,
+  type ResolvedGenerateWidgetValues,
+  type ResolveGenerateWidgetValuesInput,
+} from './core/resolveGenerateWidgetValues';
 export { isVaeCompatibleWithGenerateModel } from './core/componentCompatibility';
 export { MIN_BATCH_COUNT, sanitizeBatchCount } from './core/batch';
 export {
@@ -63,6 +69,7 @@ export {
   type DynamicPromptsConfig,
   type DynamicPromptsSeedBehaviour,
 } from './core/dynamicPrompts';
+export { getEffectivePrompts } from './core/promptTemplates';
 export {
   addPromptHistoryItem,
   getPromptHistoryItemFromGenerateSettings,

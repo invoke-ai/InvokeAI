@@ -58,6 +58,16 @@ export const buildQueueRecallValues = (
     return {
       ...current,
       positivePrompt,
+      // The two sources disagree about what they hold, so the template has to
+      // follow whichever one the prompt came from. A snapshot stores the text as
+      // authored, alongside the template that shaped it — recalling the text and
+      // dropping the template would quietly generate something else. The session
+      // metadata has no snapshot and carries the merged prompt outright, so
+      // there the current template has to go or it would wrap it a second time.
+      //
+      // Coalesced because queue history is persisted: a snapshot written before
+      // templates existed has no such field, and must not recall `undefined`.
+      promptTemplate: snapshot ? (snapshot.promptTemplate ?? null) : null,
       ...(negativePrompt !== undefined
         ? { negativePrompt, negativePromptEnabled: snapshot?.negativePromptEnabled ?? negativePrompt.length > 0 }
         : {}),

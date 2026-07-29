@@ -149,7 +149,6 @@ vi.mock('@workbench/image-actions', () => ({
   getImageRecallTitle: () => '',
   getSelectedGalleryImage: () => null,
   getSelectedGalleryImageFromValues: () => null,
-  saveBlobToDisk: () => {},
   useImageActions: () => ({}),
 }));
 

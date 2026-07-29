@@ -67,6 +67,9 @@ const addUpscaleMetadata = (
       modelKey: settings.model.key,
       negativePromptHeightPx: 56,
       positivePromptHeightPx: 96,
+      // Upscale submits its prompt literally, so no template is applied here.
+      promptTemplate: null,
+      promptTemplateViewMode: false,
       referenceImages: [],
       seamlessXAxis: false,
       seamlessYAxis: false,

@@ -208,6 +208,77 @@ def test_update_with_valid_data_changes_record(client: TestClient, user1_token: 
     assert refreshed.name == "After"
 
 
+def test_update_with_preserve_image_does_not_mutate_image(client: TestClient, user1_token: str, mock_invoker: Invoker):
+    mock_invoker.services.style_preset_image_files.get_url.return_value = "/existing.png"
+    user1 = _user_id(mock_invoker, "user1@test.com")
+    seeded = _seed(mock_invoker, user1, name="Before")
+
+    r = client.patch(
+        f"/api/v1/style_presets/i/{seeded.id}",
+        data={**_form(name="After"), "preserve_image": "true"},
+        headers=_auth(user1_token),
+    )
+
+    assert r.status_code == status.HTTP_200_OK
+    mock_invoker.services.style_preset_image_files.save.assert_not_called()
+    mock_invoker.services.style_preset_image_files.delete.assert_not_called()
+    assert mock_invoker.services.style_preset_records.get(seeded.id).name == "After"
+
+
+def test_update_without_image_deletes_existing_image(client: TestClient, user1_token: str, mock_invoker: Invoker):
+    mock_invoker.services.style_preset_image_files.get_url.return_value = None
+    user1 = _user_id(mock_invoker, "user1@test.com")
+    seeded = _seed(mock_invoker, user1)
+
+    r = client.patch(
+        f"/api/v1/style_presets/i/{seeded.id}",
+        data=_form(),
+        headers=_auth(user1_token),
+    )
+
+    assert r.status_code == status.HTTP_200_OK
+    mock_invoker.services.style_preset_image_files.delete.assert_called_once_with(seeded.id)
+    mock_invoker.services.style_preset_image_files.save.assert_not_called()
+
+
+def test_update_with_image_replaces_existing_image(client: TestClient, user1_token: str, mock_invoker: Invoker):
+    mock_invoker.services.style_preset_image_files.get_url.return_value = "/replacement.png"
+    user1 = _user_id(mock_invoker, "user1@test.com")
+    seeded = _seed(mock_invoker, user1)
+
+    r = client.patch(
+        f"/api/v1/style_presets/i/{seeded.id}",
+        data=_form(),
+        files={"image": ("x.png", _png_bytes(), "image/png")},
+        headers=_auth(user1_token),
+    )
+
+    assert r.status_code == status.HTTP_200_OK
+    mock_invoker.services.style_preset_image_files.save.assert_called_once()
+    assert mock_invoker.services.style_preset_image_files.save.call_args.args[0] == seeded.id
+    mock_invoker.services.style_preset_image_files.delete.assert_not_called()
+
+
+def test_update_with_image_and_preserve_image_rejects_without_mutation(
+    client: TestClient, user1_token: str, mock_invoker: Invoker
+):
+    mock_invoker.services.style_preset_image_files.get_url.return_value = None
+    user1 = _user_id(mock_invoker, "user1@test.com")
+    seeded = _seed(mock_invoker, user1, name="Before")
+
+    r = client.patch(
+        f"/api/v1/style_presets/i/{seeded.id}",
+        data={**_form(name="After"), "preserve_image": "true"},
+        files={"image": ("x.png", _png_bytes(), "image/png")},
+        headers=_auth(user1_token),
+    )
+
+    assert r.status_code == status.HTTP_400_BAD_REQUEST
+    mock_invoker.services.style_preset_image_files.save.assert_not_called()
+    mock_invoker.services.style_preset_image_files.delete.assert_not_called()
+    assert mock_invoker.services.style_preset_records.get(seeded.id).name == "Before"
+
+
 def test_update_with_non_image_returns_415(client: TestClient, user1_token: str, mock_invoker: Invoker):
     user1 = _user_id(mock_invoker, "user1@test.com")
     seeded = _seed(mock_invoker, user1, name="X")

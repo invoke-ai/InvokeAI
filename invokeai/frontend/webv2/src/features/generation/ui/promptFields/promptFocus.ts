@@ -1,3 +1,5 @@
+import { MAX_WILDCARD_NAME_LENGTH } from '@features/generation/core/dynamicPrompts';
+
 let positivePromptElement: HTMLTextAreaElement | null = null;
 
 export type PromptTextRange = { end: number; start: number };
@@ -72,46 +74,93 @@ export const insertPositivePromptText = ({
   value: string;
 }): void => insertPromptText({ onChange, range, textarea: positivePromptElement, text, value });
 
-/** Which trigger keys a field answers to. Wildcards only exist on the positive prompt. */
 export type PromptTriggerKey = '<' | '_';
 
-export interface PromptTriggerMatch {
-  /** The keystroke the picker consumed, so a dismissal can put it back. */
+export interface PromptTriggerQuery {
   key: PromptTriggerKey;
-  /** The span the picked trigger replaces, including anything already typed. */
+  query: string;
   range: PromptTextRange;
 }
 
-/** `_` is a word character, so `snake__case` must not read as the start of a reference. */
-const isWordCharacter = (character: string | undefined): boolean =>
-  character !== undefined && /[A-Za-z0-9_]/.test(character);
+const MAX_TRIGGER_QUERY_LENGTH = MAX_WILDCARD_NAME_LENGTH + 2;
 
-/**
- * Whether `key` opens the trigger picker, and what it would replace.
- *
- * `<` opens outright — it only ever starts an embedding token. `__` opens on the
- * second underscore, but only where a wildcard reference could actually begin:
- * after whitespace, punctuation, or the start of the prompt. That leaves
- * `snake__case` as ordinary text, which the same rule in
- * `core/dynamicPrompts.ts` already excludes from being a reference.
- */
-export const getPromptTriggerRange = (
-  value: string,
-  selectionStart: number,
-  selectionEnd: number,
-  key: string,
-  keys: readonly PromptTriggerKey[]
-): PromptTriggerMatch | null => {
-  if (key === '<' && keys.includes('<')) {
-    return { key: '<', range: { end: selectionEnd, start: selectionStart } };
+const isClosingWildcardDelimiter = (value: string, caret: number): boolean => {
+  let tokenStart = caret - 2;
+
+  while (tokenStart > 0 && !/[\s>]/.test(value[tokenStart - 1] ?? '')) {
+    tokenStart--;
   }
 
-  if (key === '_' && keys.includes('_') && value[selectionStart - 1] === '_') {
-    return isWordCharacter(value[selectionStart - 2])
-      ? null
-      : // The underscore already typed is part of the reference, so the picked
-        // `__name__` replaces it rather than landing after it.
-        { key: '_', range: { end: selectionEnd, start: selectionStart - 1 } };
+  let delimiterCount = 0;
+
+  for (let index = tokenStart; index < caret;) {
+    if (value[index] === '_' && value[index + 1] === '_') {
+      delimiterCount++;
+      index += 2;
+    } else {
+      index++;
+    }
+  }
+
+  return delimiterCount % 2 === 0;
+};
+
+export const getActiveTriggerQuery = (
+  value: string,
+  caret: number,
+  keys: readonly PromptTriggerKey[]
+): PromptTriggerQuery | null => {
+  const closingStart = caret - 2;
+
+  if (keys.includes('_') && value.slice(closingStart, caret) === '__' && isClosingWildcardDelimiter(value, caret)) {
+    return null;
+  }
+
+  const limit = Math.max(0, caret - MAX_TRIGGER_QUERY_LENGTH);
+
+  for (let index = caret - 1; index >= limit; index--) {
+    const char = value[index];
+
+    if (char === '\n' || char === '>') {
+      return null;
+    }
+
+    if (char === '<' && keys.includes('<')) {
+      return { key: '<', query: value.slice(index + 1, caret), range: { end: caret, start: index } };
+    }
+
+    if (/\s/.test(char ?? '')) {
+      return keys.includes('<') ? findEnclosingEmbedding(value, caret, limit, index) : null;
+    }
+
+    if (char === '_' && value[index - 1] === '_' && keys.includes('_')) {
+      const query = value.slice(index + 1, caret);
+
+      return query.includes('__') || query.length > MAX_WILDCARD_NAME_LENGTH
+        ? null
+        : { key: '_', query, range: { end: caret, start: index - 1 } };
+    }
+  }
+
+  return null;
+};
+
+const findEnclosingEmbedding = (
+  value: string,
+  caret: number,
+  limit: number,
+  from: number
+): PromptTriggerQuery | null => {
+  for (let index = from; index >= limit; index--) {
+    const char = value[index];
+
+    if (char === '\n' || char === '>') {
+      return null;
+    }
+
+    if (char === '<') {
+      return { key: '<', query: value.slice(index + 1, caret), range: { end: caret, start: index } };
+    }
   }
 
   return null;

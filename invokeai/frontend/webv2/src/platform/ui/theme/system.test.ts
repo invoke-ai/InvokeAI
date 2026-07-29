@@ -55,6 +55,13 @@ describe('ramp + mapping structure', () => {
     expect(resolveToken(sys, 'classic', 'border')).toBe(resolveToken(sys, 'classic', 'neutral.600'));
   });
 
+  it('uses pure black/white low-opacity image outlines by color mode', () => {
+    expect(resolveToken(sys, 'light', 'border.image')).toBe('oklch(0 0 0 / 0.1)');
+    for (const theme of ['classic', 'forest', 'mono', 'ultradark']) {
+      expect(resolveToken(sys, theme, 'border.image')).toBe('oklch(1 0 0 / 0.1)');
+    }
+  });
+
   it('emits surface/text/border tokens via per-theme conditions only — never the leaky mode selectors', () => {
     // Chakra's `_light` selector (`:root &, .light &`) matches under EVERY theme via its
     // `:root &` arm. A surface token placed there leaks its light value into the dark

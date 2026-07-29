@@ -8,8 +8,10 @@ import {
   type GalleryImage,
 } from '@features/gallery';
 import { invalidateGallery, invalidateGalleryImages, patchGalleryImageCaches } from '@features/gallery/queries';
+import { setPendingPromptTemplateDraft } from '@features/generation/react';
 import { getMaxReferenceImages, isVaeModelConfig, isSupportedGenerateModel } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
+import { downloadBlob } from '@platform/browser/downloadBlob';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import {
   assertAccountScopeCurrent,
@@ -33,6 +35,7 @@ import { appendReferenceImage } from './appendReferenceImage';
 import { recordCanvasImportError } from './canvasImportError';
 import { executeImageRecall, getCurrentGenerateValues } from './executeImageRecall';
 import {
+  getMetadataPrompts,
   EMPTY_IMAGE_RECALL_CAPABILITIES,
   getImageRecallCapabilities,
   type ImageRecallCapabilities,
@@ -55,21 +58,13 @@ export interface ImageActions {
   moveImagesToBoard: (imageNames: string[], boardId: string) => Promise<void>;
   openImageInPreview: (image: GalleryImage) => void;
   recallImageData: (image: GalleryImage, kind: ImageRecallKind) => Promise<void>;
+  /** Opens the generate widget's template editor prefilled from this image's prompts. */
+  savePromptAsTemplate: (image: GalleryImage) => Promise<void>;
   selectForCompare: (image: GalleryImage) => void;
   sendToCanvas: (images: readonly GalleryImage[], destination: GalleryCanvasImportDestination) => Promise<void>;
   setImagesStarred: (imageNames: string[], starred: boolean) => Promise<void>;
   useAsReferenceImage: (image: GalleryImage) => void;
 }
-
-export const saveBlobToDisk = (blob: Blob, fileName: string): void => {
-  const objectUrl = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-
-  anchor.href = objectUrl;
-  anchor.download = fileName;
-  anchor.click();
-  URL.revokeObjectURL(objectUrl);
-};
 
 const toErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
@@ -188,13 +183,7 @@ export const useImageActions = ({
           const blob = await response.blob();
 
           assertAccountScopeCurrent(owner);
-          const objectUrl = URL.createObjectURL(blob);
-          const anchor = document.createElement('a');
-
-          anchor.href = objectUrl;
-          anchor.download = image.imageName;
-          anchor.click();
-          URL.revokeObjectURL(objectUrl);
+          downloadBlob(blob, image.imageName);
         } catch (error: unknown) {
           if (!isAccountScopeCurrent(owner)) {
             return;
@@ -216,7 +205,7 @@ export const useImageActions = ({
           const { blob, fileName } = await galleryTransfers.downloadArchive({ imageNames, signal: owner.signal });
 
           assertAccountScopeCurrent(owner);
-          saveBlobToDisk(blob, fileName);
+          downloadBlob(blob, fileName);
           recordSuccess('Download ready');
         } catch (error: unknown) {
           if (!isAccountScopeCurrent(owner)) {
@@ -255,6 +244,33 @@ export const useImageActions = ({
             dimensions:
               Number.isFinite(image.width) && image.width >= 64 && Number.isFinite(image.height) && image.height >= 64,
           };
+        }
+      },
+      savePromptAsTemplate: async (image) => {
+        const owner = captureAccountScope();
+
+        try {
+          const metadata = await galleryImages.metadata(image.imageName, owner.signal);
+
+          assertAccountScopeCurrent(owner);
+
+          const { negativePrompt, positivePrompt } = getMetadataPrompts(metadata);
+
+          if (!positivePrompt && !negativePrompt) {
+            notifications.add({ kind: 'info', title: 'This image has no prompt to save' });
+            return;
+          }
+
+          // The widget hosts the editor, so it has to be on screen for the
+          // handoff to be visible.
+          openWorkbenchWidget('generate', { preferredRegions: ['left'] });
+          setPendingPromptTemplateDraft({ negativePrompt, positivePrompt });
+        } catch (error: unknown) {
+          if (!isAccountScopeCurrent(owner)) {
+            return;
+          }
+
+          recordError(error);
         }
       },
       moveImagesToBoard: async (imageNames, boardId) => {

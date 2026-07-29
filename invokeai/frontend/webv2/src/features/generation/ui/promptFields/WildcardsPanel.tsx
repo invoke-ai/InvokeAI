@@ -3,24 +3,39 @@ import type { WildcardRecord } from '@features/generation/data/wildcards';
 import type { WildcardCatalog } from '@features/generation/ui/useWildcards';
 import type { ChangeEvent } from 'react';
 
-import { HStack, Input, Stack, Text } from '@chakra-ui/react';
-import { getWildcardNameError } from '@features/generation/core/dynamicPrompts';
+import { HStack, Input, Separator, Stack, Text } from '@chakra-ui/react';
+import {
+  getWildcardNameError,
+  getWildcardValuesError,
+  normalizeWildcardValues,
+} from '@features/generation/core/dynamicPrompts';
+import { filterWildcards, groupWildcardsByPrefix } from '@features/generation/core/wildcardCatalog';
 import { useGenerationUi } from '@features/generation/ui/GenerationUiContext';
 import { PANEL_HEADER_CONTROL_HEIGHT, PromptPanelHeader } from '@features/generation/ui/promptFields/PromptPanelHeader';
 import { PromptTextarea } from '@features/generation/ui/promptFields/PromptTextarea';
+import { WildcardTransferActions } from '@features/generation/ui/promptFields/WildcardTransferActions';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, IconButton } from '@platform/ui/Button';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { Field } from '@platform/ui/Field';
+import { Row } from '@platform/ui/Row';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { CheckIcon, PencilIcon, PlusIcon, TrashIcon, XIcon } from 'lucide-react';
-import { useCallback, useId, useState } from 'react';
+import { useCallback, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /** One value per line: the same shape the user is editing a variant in. */
 const toValuesText = (values: string[]): string => values.join('\n');
-const fromValuesText = (text: string): string[] => text.split('\n');
+// Normalized on the way in, so what is stored is what an export writes and a
+// re-import reads back. A stray blank line used to survive into the catalog and
+// then vanish on the next round trip.
+const fromValuesText = (text: string): string[] => normalizeWildcardValues(text.split('\n'));
+
+const VALUES_ERROR_KEY = {
+  tooManyValues: 'widgets.generate.dynamicPrompts.wildcardTooManyValues',
+  valueTooLong: 'widgets.generate.dynamicPrompts.wildcardValueTooLong',
+} as const;
 
 const NAME_ERROR_KEY = {
   invalid: 'widgets.generate.dynamicPrompts.wildcardNameInvalid',
@@ -50,11 +65,22 @@ export const WildcardsPanel = ({
   const [draft, setDraft] = useState<WildcardDraft | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<WildcardRecord | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const groups = useMemo(
+    () => groupWildcardsByPrefix(filterWildcards(catalog.wildcards, searchTerm)),
+    [catalog.wildcards, searchTerm]
+  );
   // Renaming to your own current name is not a clash, so the wildcard being
   // edited is excluded from the taken-names set.
   const nameError = draft
     ? getWildcardNameError(draft.name, new Set(catalog.wildcards.filter((w) => w.id !== draft.id).map((w) => w.name)))
     : null;
+  // Pre-flighted here as well as on the import path, which is where these bounds
+  // used to live — the editor discovered them as a raw error from the server.
+  const valuesError = draft ? getWildcardValuesError(fromValuesText(draft.valuesText)) : null;
+  // The server's own explanation wins when there is one; otherwise say which
+  // bound the draft is over before it is sent.
+  const draftError = error ?? (valuesError ? t(VALUES_ERROR_KEY[valuesError]) : null);
 
   const startCreate = useCallback(() => {
     setError(null);
@@ -92,6 +118,11 @@ export const WildcardsPanel = ({
       setError(getApiErrorMessage(caught, t('widgets.generate.dynamicPrompts.couldNotSaveWildcard')));
     }
   }, [catalog, draft, t]);
+
+  const handleSearchChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => setSearchTerm(event.currentTarget.value),
+    []
+  );
 
   const closeDeleteDialog = useCallback(() => setPendingDelete(null), []);
 
@@ -161,9 +192,9 @@ export const WildcardsPanel = ({
             setDraft({ ...draft, valuesText: event.currentTarget.value })
           }
         />
-        {error ? (
+        {draftError ? (
           <Text color="fg.error" fontSize="2xs" wordBreak="break-word">
-            {error}
+            {draftError}
           </Text>
         ) : null}
         <HStack justify="end">
@@ -171,7 +202,7 @@ export const WildcardsPanel = ({
             <XIcon />
             {t('common.cancel')}
           </Button>
-          <Button disabled={nameError !== null} size="xs" onClick={() => void save()}>
+          <Button disabled={nameError !== null || valuesError !== null} size="xs" onClick={() => void save()}>
             <CheckIcon />
             {t('common.save')}
           </Button>
@@ -189,25 +220,57 @@ export const WildcardsPanel = ({
         </Button>
       </PromptPanelHeader>
 
+      {/* Searching an empty catalog would only offer a way to find nothing, so
+          the input appears once there is something to search. */}
+      {catalog.wildcards.length > 0 ? (
+        <>
+          <Input
+            aria-label={t('widgets.generate.dynamicPrompts.searchWildcards')}
+            placeholder={t('widgets.generate.dynamicPrompts.searchWildcards')}
+            size="xs"
+            value={searchTerm}
+            onChange={handleSearchChange}
+          />
+          <Separator />
+        </>
+      ) : null}
+
       <Scrollable h="14rem" label={t('widgets.generate.dynamicPrompts.wildcards')}>
-        {catalog.wildcards.length === 0 ? (
+        {groups.length === 0 ? (
           <Text color="fg.subtle" fontSize="2xs" px="2" py="1.5">
-            {t('widgets.generate.dynamicPrompts.noWildcardsYet')}
+            {catalog.wildcards.length === 0
+              ? t('widgets.generate.dynamicPrompts.noWildcardsYet')
+              : t('widgets.generate.dynamicPrompts.noMatchingWildcards')}
           </Text>
         ) : (
-          <Stack gap="0">
-            {catalog.wildcards.map((wildcard) => (
-              <WildcardRow
-                key={wildcard.id}
-                wildcard={wildcard}
-                onDelete={setPendingDelete}
-                onEdit={startEdit}
-                onInsert={onInsert}
-              />
+          <Stack gap="2">
+            {groups.map((group) => (
+              <Stack gap="0" key={group.label ?? ''}>
+                {group.label === null ? null : (
+                  <Text color="fg.subtle" fontSize="2xs" fontWeight="700" px="2" textTransform="uppercase">
+                    {group.label}
+                  </Text>
+                )}
+                {group.wildcards.map((wildcard) => (
+                  // The row shows the whole `__animals/dogs__`, header or not:
+                  // it is the exact text you would type, so trimming the prefix
+                  // to match the header above would make it a lie.
+                  <WildcardRow
+                    key={wildcard.id}
+                    wildcard={wildcard}
+                    onDelete={setPendingDelete}
+                    onEdit={startEdit}
+                    onInsert={onInsert}
+                  />
+                ))}
+              </Stack>
             ))}
           </Stack>
         )}
       </Scrollable>
+
+      <Separator />
+      <WildcardTransferActions catalog={catalog} />
 
       {/* A wildcard's values are typed by hand and there is no undo, so deleting
           one asks first — as every other destructive action here does. */}
@@ -238,30 +301,39 @@ const WildcardRow = ({
 
   return (
     <HStack align="start" gap="1" pr="1">
-      <Button
+      <Row
         alignItems="start"
+        asChild
+        borderColor="transparent"
+        borderWidth="1px"
         flex="1"
+        fontWeight="medium"
         h="auto"
         justifyContent="start"
         minW="0"
         px="2"
         py="1.5"
-        size="xs"
+        textStyle="xs"
         title={t('widgets.generate.dynamicPrompts.insertWildcard')}
-        variant="ghost"
-        onClick={() => onInsert(`__${wildcard.name}__`)}
+        whiteSpace="nowrap"
       >
-        <Stack align="start" gap="0" minW="0">
-          <Text as="span" color="fg" fontFamily="mono" fontSize="0.72rem">
-            __{wildcard.name}__
-          </Text>
-          <Text as="span" color="fg.subtle" fontSize="2xs" truncate>
-            {wildcard.values.length > 0
-              ? wildcard.values.join(', ')
-              : t('widgets.generate.dynamicPrompts.wildcardHasNoValues')}
-          </Text>
-        </Stack>
-      </Button>
+        <button
+          aria-label={`${t('widgets.generate.dynamicPrompts.insertWildcard')}: __${wildcard.name}__`}
+          type="button"
+          onClick={() => onInsert(`__${wildcard.name}__`)}
+        >
+          <Stack align="start" gap="0" minW="0">
+            <Text as="span" color="fg" fontFamily="mono" fontSize="0.72rem">
+              __{wildcard.name}__
+            </Text>
+            <Text as="span" color="fg.subtle" fontSize="2xs" truncate>
+              {wildcard.values.length > 0
+                ? wildcard.values.join(', ')
+                : t('widgets.generate.dynamicPrompts.wildcardHasNoValues')}
+            </Text>
+          </Stack>
+        </button>
+      </Row>
       <Tooltip content={t('common.edit')}>
         <IconButton aria-label={t('common.edit')} size="2xs" variant="ghost" onClick={() => onEdit(wildcard)}>
           <PencilIcon />

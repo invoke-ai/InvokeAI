@@ -59,6 +59,7 @@
     "socket.io-client": "^4.8.3",
     "tinykeys": "^4.0.0",
     "use-sync-external-store": "^1.6.0",
+    "yaml": "^2.9.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {

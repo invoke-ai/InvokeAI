@@ -202,4 +202,47 @@ describe('ResizableTextarea', () => {
 
     await expect.poll(() => textarea.value).toBe('hello+ world');
   });
+
+  // Regression: the write goes through the native value setter and a synthetic
+  // `input` event, which React honours even on a read-only textarea. In template
+  // view mode that wrote the merged text back as the authored prompt, and the
+  // next submit merged it a second time.
+  it('leaves a read-only prompt alone', async () => {
+    const ReadOnlyHarness = () => (
+      <PromptTextarea
+        {...PROMPT_ATTENTION_TARGET_PROPS}
+        aria-label="Prompt"
+        defaultHeightPx={96}
+        minHeightPx={56}
+        readOnly
+        resizeHandleAriaLabel="Resize prompt"
+        showSyntaxHighlighting
+        value="hello world"
+        onChange={vi.fn()}
+      />
+    );
+
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+
+    await act(() => {
+      root?.render(
+        <ChakraProvider value={system}>
+          <ReadOnlyHarness />
+        </ChakraProvider>
+      );
+    });
+
+    const textarea = host.querySelector<HTMLTextAreaElement>('textarea')!;
+
+    textarea.focus();
+    textarea.setSelectionRange(0, 5);
+
+    await act(() => {
+      expect(adjustFocusedPromptAttention('increment', false)).toBe(false);
+    });
+
+    expect(textarea.value).toBe('hello world');
+  });
 });

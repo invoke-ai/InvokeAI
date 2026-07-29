@@ -176,6 +176,7 @@ describe('feature public-interface registry', () => {
     // Workbench resolves prompt expansion before submitting, so it reads
     // Generation's prompt cache through the public entry module.
     expect(checkDependency('workbench/invocationSubmit.ts', '@features/generation/prompts')).toEqual([]);
+    expect(checkDependency('app/GenerateWidgetSyncRuntime.tsx', '@features/generation/runtime')).toEqual([]);
     expect(
       checkDependency('workbench/invocationSubmit.ts', '@features/generation/data/dynamicPromptsQueries')
     ).toMatchObject([{ rule: 'feature-private-interface' }]);

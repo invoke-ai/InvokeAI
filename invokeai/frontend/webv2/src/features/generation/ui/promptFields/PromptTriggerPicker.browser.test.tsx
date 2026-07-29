@@ -8,33 +8,39 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
-// The actions row and the picker's own contents need Generation's UI port; neither
-// is what these tests are about. The stub records the two ways out of the picker so
-// they can be invoked directly — a real click would have to compete with the
-// textarea for the same coordinates.
-const picker = vi.hoisted(() => ({ current: null as { onClose: () => void; onSelect: (t: string) => void } | null }));
-
 vi.mock('@features/generation/ui/promptFields/PositivePromptActions', () => ({
   PositivePromptActions: () => null,
-  PromptTriggerPopover: (props: { onClose: () => void; onSelect: (trigger: string) => void }) => {
-    picker.current = props;
-    return null;
-  },
+  PromptTriggerPopover: () => null,
 }));
+
+const MODEL_CATALOG = [{ base: 'sdxl', name: 'easynegative', type: 'embedding' }];
+const SELECTED_MODEL = { base: 'sdxl', name: 'Juggernaut', trigger_phrases: ['jugg'] };
+
+vi.mock('@features/generation/ui/GenerationUiContext', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useGenerationUi: () => ({ models: { catalog: MODEL_CATALOG, ensureLoaded: vi.fn() } }),
+}));
+
+const WILDCARDS = [
+  { id: 'w1', name: 'colors', values: ['red'] },
+  { id: 'w2', name: 'moods', values: ['calm'] },
+];
 
 vi.mock('@features/generation/data/wildcards', () => ({
   createWildcard: vi.fn(),
   deleteWildcard: vi.fn(),
   invalidateWildcardDependents: vi.fn(),
   updateWildcard: vi.fn(),
-  wildcardsQueryOptions: () => ({ queryFn: () => Promise.resolve([]), queryKey: ['generation', 'wildcards'] }),
+  wildcardsQueryOptions: () => ({ queryFn: () => Promise.resolve(WILDCARDS), queryKey: ['generation', 'wildcards'] }),
 }));
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const render = async () => {
+const TEXTAREA_HEIGHT_PX = 320;
+
+const render = async (isTemplateViewMode = false) => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -44,10 +50,11 @@ const render = async () => {
       <QueryClientProvider client={new QueryClient()}>
         <ChakraProvider value={system}>
           <PositivePromptField
-            heightPx={120}
+            heightPx={TEXTAREA_HEIGHT_PX}
+            isTemplateViewMode={isTemplateViewMode}
             loras={[]}
             projectId="project-1"
-            selectedModel={undefined}
+            selectedModel={SELECTED_MODEL as never}
             showSyntaxHighlighting={false}
             value=""
             onChange={vi.fn()}
@@ -58,25 +65,17 @@ const render = async () => {
       </QueryClientProvider>
     );
   });
-};
 
-const textarea = () => host!.querySelector('textarea')!;
-const isPickerOpen = () => picker.current !== null;
-
-/** Runs one of the picker's exits, then lets insertPromptText's caret frame settle. */
-const leavePicker = async (exit: (handlers: NonNullable<typeof picker.current>) => void) => {
-  const handlers = picker.current!;
-
-  await act(() => exit(handlers));
   await act(async () => {
     await new Promise((resolve) => {
-      requestAnimationFrame(() => requestAnimationFrame(resolve));
+      setTimeout(resolve, 0);
     });
   });
 };
 
-const dismissPicker = () => leavePicker((handlers) => handlers.onClose());
-const pickColors = () => leavePicker((handlers) => handlers.onSelect('__colors__'));
+const textarea = () => host!.querySelector('textarea')!;
+const listbox = () => document.querySelector('[role="listbox"]');
+const optionLabels = () => [...(listbox()?.querySelectorAll('[role="option"]') ?? [])].map((o) => o.textContent);
 
 const type = async (text: string) => {
   await act(async () => {
@@ -87,8 +86,18 @@ const type = async (text: string) => {
   });
 };
 
+const press = async (key: string) => {
+  await act(async () => {
+    await userEvent.keyboard(key);
+  });
+  await act(async () => {
+    await new Promise((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(resolve));
+    });
+  });
+};
+
 beforeEach(async () => {
-  picker.current = null;
   await render();
 });
 
@@ -99,50 +108,130 @@ afterEach(async () => {
   root = null;
 });
 
-describe('the prompt trigger picker and the keystroke that opens it', () => {
-  // Regression: the picker opened on any second underscore and swallowed the
-  // keystroke, so an ordinary word containing `__` could not be typed at all.
-  it('leaves an underscore inside a word alone', async () => {
-    await type('a close_up shot');
+describe('the caret autocomplete', () => {
+  it('offers embeddings for `<` and wildcards for `__`, and phrases for neither', async () => {
+    await type('a photo of <');
 
-    expect(textarea().value).toBe('a close_up shot');
-    expect(isPickerOpen()).toBe(false);
+    expect(optionLabels()).toEqual(['easynegative']);
+
+    await press('{Escape}');
+    await type('__');
+
+    expect(optionLabels()).toEqual(['colors', 'moods']);
   });
 
-  it('types a double underscore mid-word without opening the picker', async () => {
-    await type('snake__case');
+  it('narrows as the name is typed, where the user is already looking', async () => {
+    await type('a photo of __mo');
 
-    expect(textarea().value).toBe('snake__case');
-    expect(isPickerOpen()).toBe(false);
+    expect(optionLabels()).toEqual(['moods']);
   });
 
-  it('opens on `__` where a wildcard reference could begin', async () => {
+  it('opens beside the caret, not at the bottom of a tall box', async () => {
     await type('a photo of __');
 
-    expect(isPickerOpen()).toBe(true);
+    const box = textarea().getBoundingClientRect();
+    const list = listbox()!.getBoundingClientRect();
+
+    expect(box.height).toBeGreaterThan(200);
+    expect(list.top - box.top).toBeLessThan(80);
   });
 
-  // Regression: dismissing left the prompt one underscore short of what was typed.
-  it('gives the underscores back when the picker is dismissed', async () => {
+  it('moves the highlight with the arrow keys', async () => {
     await type('a photo of __');
-    await dismissPicker();
+    await press('{ArrowDown}');
+    await press('{Enter}');
 
+    expect(textarea().value).toBe('a photo of __moods__');
+  });
+
+  const mouseDownOnFirstOption = (button: number) => {
+    const option = listbox()!.querySelector('[role="option"]')!;
+
+    return act(() => {
+      option.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button, cancelable: true }));
+    });
+  };
+
+  it('keeps the rest of the prompt when the pointer selects', async () => {
+    await type('a photo of __co');
+    const activeElement = vi.spyOn(document, 'activeElement', 'get').mockReturnValue(document.body);
+    await mouseDownOnFirstOption(0);
+    activeElement.mockRestore();
+
+    expect(textarea().value).toBe('a photo of __colors__');
+  });
+
+  describe('while an IME is composing', () => {
+    const compose = (type: 'compositionend' | 'compositionstart') =>
+      act(() => {
+        textarea().dispatchEvent(new CompositionEvent(type, { bubbles: true, data: 'ねこ' }));
+      });
+
+    const pressWhileComposing = (key: string) =>
+      act(() => {
+        textarea().dispatchEvent(
+          new KeyboardEvent('keydown', { bubbles: true, cancelable: true, isComposing: true, key })
+        );
+      });
+
+    it('leaves navigation and commit keys to the IME, then reopens on composition end', async () => {
+      await type('a photo of __');
+      await compose('compositionstart');
+      expect(listbox()).toBeNull();
+
+      await pressWhileComposing('Enter');
+      await pressWhileComposing('ArrowDown');
+      expect(textarea().value).toBe('a photo of __');
+
+      await compose('compositionend');
+      expect(optionLabels()).toEqual(['colors', 'moods']);
+
+      await press('{Enter}');
+      expect(textarea().value).toBe('a photo of __colors__');
+    });
+  });
+
+  it('closes when something scrolls under it', async () => {
+    await type('a photo of __');
+
+    expect(listbox()).not.toBeNull();
+
+    await act(() => {
+      textarea().dispatchEvent(new Event('scroll'));
+    });
+
+    expect(listbox()).toBeNull();
     expect(textarea().value).toBe('a photo of __');
   });
 
-  it('gives `<` back when the picker is dismissed', async () => {
-    await type('a photo of <');
-    expect(isPickerOpen()).toBe(true);
+  it('closes when the window is resized', async () => {
+    await type('a photo of __');
 
-    await dismissPicker();
+    await act(() => {
+      window.dispatchEvent(new Event('resize'));
+    });
 
-    expect(textarea().value).toBe('a photo of <');
+    expect(listbox()).toBeNull();
   });
 
-  it('replaces the typed underscores with the picked reference', async () => {
+  it('tells assistive tech the textarea is a combobox over the list', async () => {
     await type('a photo of __');
-    await pickColors();
 
-    expect(textarea().value).toBe('a photo of __colors__');
+    const activeId = textarea().getAttribute('aria-activedescendant');
+
+    expect(textarea().getAttribute('role')).toBe('combobox');
+    expect(textarea().getAttribute('aria-expanded')).toBe('true');
+    expect(textarea().getAttribute('aria-controls')).toBe(listbox()!.id);
+    expect(document.getElementById(activeId!)?.getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('still opens when view mode is on but no template is applied', async () => {
+    await act(() => root?.unmount());
+    host?.remove();
+    await render(true);
+    await type('a photo of __');
+
+    expect(textarea().readOnly).toBe(false);
+    expect(optionLabels()).toEqual(['colors', 'moods']);
   });
 });

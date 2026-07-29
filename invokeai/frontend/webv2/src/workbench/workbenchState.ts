@@ -71,6 +71,7 @@ import {
   addPromptHistoryItem,
   applyProjectPromptDraft,
   cloneGenerateWidgetValues,
+  getEffectivePrompts,
   getGenerationModelAvailabilityReasons,
   getPromptDraftFromValues,
   getPromptHistoryItemFromGenerateSettings,
@@ -2043,6 +2044,12 @@ const enqueueCompiledSnapshot = (
         : route.sourceId === 'upscale'
           ? upscaleSettings
           : null;
+  // The prompts that actually generate: the authored text wrapped by the active
+  // prompt template. Computed once here because this is the only place every
+  // Generate-shaped route converges — `generate` and `canvas` both land here, as
+  // do the topbar, hotkey and graph-preview submits. Upscale carries no template
+  // and merges to identity.
+  const effectivePrompts = sourceGenerateSettings ? getEffectivePrompts(sourceGenerateSettings) : null;
   // Dynamic prompting is a Generate setting, so only the routes compiled from
   // GenerateSettings honour it; Upscale keeps its prompt literal. The caller has
   // already expanded, so the queue item records the exact prompts it will submit.
@@ -2050,12 +2057,15 @@ const enqueueCompiledSnapshot = (
   // A one-prompt expansion counts: `a {red} cat` and a random sample of one both
   // resolve to a single concrete prompt, and dropping it here would fall the
   // submission back to the authored text — sending the literal `{…}` to the model.
+  //
+  // The gate reads the *merged* prompt: a template may introduce `{a|b}` that the
+  // authored prompt never had, and the caller expanded the merged text too.
   const expandedPositivePrompts =
     route.sourceId !== 'upscale' &&
     compiled.positivePrompts &&
     compiled.positivePrompts.length > 0 &&
-    sourceGenerateSettings &&
-    hasDynamicPromptSyntax(sourceGenerateSettings.positivePrompt)
+    effectivePrompts &&
+    hasDynamicPromptSyntax(effectivePrompts.positivePrompt)
       ? compiled.positivePrompts
       : undefined;
   const expandedSeedBehaviour = expandedPositivePrompts
@@ -2069,14 +2079,17 @@ const enqueueCompiledSnapshot = (
           graph: backendGraph,
           kind: 'workflow',
         }
-      : sourceGenerateSettings
+      : sourceGenerateSettings && effectivePrompts
         ? {
             batchCount: sourceGenerateSettings.batchCount,
             graph: backendGraph,
             kind: 'generate',
-            negativePrompt: sourceGenerateSettings.negativePromptEnabled ? sourceGenerateSettings.negativePrompt : '',
+            // A disabled negative prompt stays empty, which also suppresses the
+            // template's negative side — switching the field off must not let a
+            // template put one back.
+            negativePrompt: sourceGenerateSettings.negativePromptEnabled ? effectivePrompts.negativePrompt : '',
             negativePromptNodeId: generate?.negativePromptNodeId ?? 'negative_prompt',
-            positivePrompt: sourceGenerateSettings.positivePrompt,
+            positivePrompt: effectivePrompts.positivePrompt,
             positivePromptNodeId: generate?.positivePromptNodeId ?? 'positive_prompt',
             ...(expandedPositivePrompts ? { positivePrompts: expandedPositivePrompts } : {}),
             seed: sourceGenerateSettings.seed,
@@ -2113,7 +2126,9 @@ const enqueueCompiledSnapshot = (
             ? 1
             : backendSubmission.batchCount * (expandedPositivePrompts?.length ?? 1),
         height: presentationDimensions.height,
-        ...(sourceGenerateSettings?.positivePrompt ? { positivePrompt: sourceGenerateSettings.positivePrompt } : {}),
+        // The merged prompt, so the queue row reads the same before and after the
+        // backend session arrives with its own (already merged) field values.
+        ...(effectivePrompts?.positivePrompt ? { positivePrompt: effectivePrompts.positivePrompt } : {}),
         width: presentationDimensions.width,
       },
       sourceId: route.sourceId,

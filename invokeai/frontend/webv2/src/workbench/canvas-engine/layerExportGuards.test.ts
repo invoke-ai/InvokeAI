@@ -10,7 +10,6 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import {
   createLayerExportGuards,
-  isDeeplyEqual,
   isSupportedExportSource,
   type CreateLayerExportGuardsDeps,
   type LayerExportGuards,
@@ -73,22 +72,6 @@ describe('isSupportedExportSource', () => {
     ['polygon shape', { kind: 'polygon', points: [], type: 'shape' } as unknown as CanvasLayerSourceContract, false],
   ])('reports %s as %s', (_label, source, expected) => {
     expect(isSupportedExportSource(source)).toBe(expected);
-  });
-});
-
-describe('isDeeplyEqual', () => {
-  it('compares nested contract shapes structurally, not by identity', () => {
-    expect(isDeeplyEqual({ a: [1, { b: 2 }] }, { a: [1, { b: 2 }] })).toBe(true);
-    expect(isDeeplyEqual({ a: [1, { b: 2 }] }, { a: [1, { b: 3 }] })).toBe(false);
-  });
-
-  it('does not treat an object as equal to a superset of itself', () => {
-    expect(isDeeplyEqual({ a: 1 }, { a: 1, b: 2 })).toBe(false);
-    expect(isDeeplyEqual({ a: 1, b: 2 }, { a: 1 })).toBe(false);
-  });
-
-  it('distinguishes an array from a plain object with the same keys', () => {
-    expect(isDeeplyEqual([1, 2], { 0: 1, 1: 2 })).toBe(false);
   });
 });
 

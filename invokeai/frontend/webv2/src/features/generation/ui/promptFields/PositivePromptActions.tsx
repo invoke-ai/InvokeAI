@@ -1,5 +1,6 @@
 /* eslint-disable react/react-compiler */
 import type { GenerationModelCatalogItem as ModelConfig, PromptHistoryItem } from '@features/generation/contracts';
+import type { PromptTemplateSnapshot } from '@features/generation/core/promptTemplates';
 import type { GenerateLora, GenerateModelConfig } from '@features/generation/core/types';
 import type { DynamicPromptsFieldConfig } from '@features/generation/ui/promptFields/DynamicPromptsPanel';
 import type { ChangeEvent, MouseEvent } from 'react';
@@ -9,11 +10,28 @@ import { filterPromptHistory } from '@features/generation/core/promptHistory';
 import { expandPrompt, imageToPrompt } from '@features/generation/data/promptUtilities';
 import { GenerationModelSelect as ModelSelect, useGenerationUi } from '@features/generation/ui/GenerationUiContext';
 import { DynamicPromptsButton } from '@features/generation/ui/promptFields/DynamicPromptsButton';
-import { useWildcards } from '@features/generation/ui/useWildcards';
+import { PromptTemplatesButton } from '@features/generation/ui/promptFields/PromptTemplatesButton';
+import {
+  filterPromptTriggerOptions,
+  filterPromptTriggerOptionsByKind,
+  groupPromptTriggerOptions,
+  usePromptTriggerOptions,
+  type PromptTriggerKind,
+  type PromptTriggerOption,
+} from '@features/generation/ui/promptFields/promptTriggerOptions';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, IconButton, Scrollable, Tooltip } from '@platform/ui';
-import { HistoryIcon, ImageUpIcon, PlusIcon, SparklesIcon, TrashIcon, Undo2Icon } from 'lucide-react';
+import {
+  EyeIcon,
+  EyeOffIcon,
+  HistoryIcon,
+  ImageUpIcon,
+  PencilSparklesIcon,
+  PlusIcon,
+  TrashIcon,
+  Undo2Icon,
+} from 'lucide-react';
 import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -21,10 +39,34 @@ const POPOVER_POSITIONING_BOTTOM_END = { placement: 'bottom-end' } as const;
 const TEXT_LLM_MODEL_TYPES = ['text_llm'];
 const LLAVA_MODEL_TYPES = ['llava_onevision'];
 
+/**
+ * Everything the prompt actions know about the applied template, in one prop.
+ *
+ * These arrived as six flat props among nineteen, three of them optional and
+ * one — `hasPromptTemplate` — restating `activeTemplate !== null` at every call
+ * site. Grouping them says what they are: not six settings but one state, which
+ * either exists or does not, and which the buttons around it read to decide
+ * whether the authored prompt is theirs to rewrite.
+ */
+export interface PromptTemplateState {
+  /** The applied template, or null when none is. */
+  active: PromptTemplateSnapshot | null;
+  /** Whether the box is showing the merged result rather than the authored text. */
+  isViewMode: boolean;
+  /** Absent on surfaces with no template concept (Upscale). */
+  onApply?: (template: PromptTemplateSnapshot | null) => void;
+  /** Absent wherever `onApply` is; view mode has nothing to show without it. */
+  onViewModeChange?: (viewMode: boolean) => void;
+  /** Writes already-merged text into the authored field and drops the template. */
+  onFlatten: (prompt: string) => void;
+}
+
 interface PositivePromptActionsProps {
   batchCount: number;
   /** Absent on surfaces whose prompt is not batch-expanded (Upscale). */
   dynamicPrompts: DynamicPromptsFieldConfig | null;
+  /** The authored prompt wrapped by the active template — what actually expands. */
+  effectivePositivePrompt: string;
   loras: GenerateLora[];
   isPromptTriggerPickerOpen: boolean;
   onUsePrompt: (prompt: PromptHistoryItem) => void;
@@ -33,6 +75,7 @@ interface PositivePromptActionsProps {
   projectId: string;
   onOpenPromptTriggerPicker: (anchorElement: HTMLElement) => void;
   onPositivePromptChangeImmediate: (prompt: string) => void;
+  template: PromptTemplateState;
   onInsertText: (text: string) => void;
   showSyntaxHighlighting: boolean;
 }
@@ -40,6 +83,7 @@ interface PositivePromptActionsProps {
 export const PositivePromptActions = ({
   batchCount,
   dynamicPrompts,
+  effectivePositivePrompt,
   isPromptTriggerPickerOpen,
   onInsertText,
   onOpenPromptTriggerPicker,
@@ -48,111 +92,96 @@ export const PositivePromptActions = ({
   positivePrompt,
   projectId,
   showSyntaxHighlighting,
+  template,
 }: PositivePromptActionsProps) => {
   return (
     <HStack gap="0.5">
+      <PromptTemplateControls showSyntaxHighlighting={showSyntaxHighlighting} template={template} />
       {dynamicPrompts ? (
         <DynamicPromptsButton
           batchCount={batchCount}
           config={dynamicPrompts}
-          positivePrompt={positivePrompt}
+          positivePrompt={effectivePositivePrompt}
           showSyntaxHighlighting={showSyntaxHighlighting}
           onInsertText={onInsertText}
-          onUsePrompt={onPositivePromptChangeImmediate}
+          // Picking one expansion writes already-merged text into the authored
+          // field, so the template has to come off in the same commit or the next
+          // Invoke would wrap it again.
+          onUsePrompt={template.active ? template.onFlatten : onPositivePromptChangeImmediate}
         />
       ) : null}
+      {/* These three rewrite the authored prompt, which view mode is hiding, so
+          they stay out of reach until the user is looking at their own text. */}
       <AddPromptTriggerButton
-        isOpen={isPromptTriggerPickerOpen}
+        isOpen={isPromptTriggerPickerOpen || template.isViewMode}
         onOpenPromptTriggerPicker={onOpenPromptTriggerPicker}
       />
       <ExpandPromptButton
+        isDisabled={template.isViewMode}
         positivePrompt={positivePrompt}
         projectId={projectId}
         onPositivePromptChange={onPositivePromptChangeImmediate}
       />
-      <ImageToPromptButton projectId={projectId} onPositivePromptChange={onPositivePromptChangeImmediate} />
+      <ImageToPromptButton
+        isDisabled={template.isViewMode}
+        projectId={projectId}
+        onPositivePromptChange={onPositivePromptChangeImmediate}
+      />
       <PositivePromptHistoryButton onUsePrompt={onUsePrompt} />
     </HStack>
   );
 };
 
-type PromptTriggerOption = {
-  group: string;
-  label: string;
-  value: string;
-};
-
-const getTriggerPhrases = (model: unknown): string[] => {
-  if (!model || typeof model !== 'object') {
-    return [];
-  }
-
-  const triggerPhrases = (model as { trigger_phrases?: unknown }).trigger_phrases;
-
-  return Array.isArray(triggerPhrases)
-    ? triggerPhrases.filter((phrase): phrase is string => typeof phrase === 'string' && phrase.trim().length > 0)
-    : [];
-};
-
-const getPromptTriggerOptions = ({
-  compatibleEmbeddingsLabel,
-  loras,
-  mainModelLabel,
-  models,
-  selectedModel,
-  wildcards,
-  wildcardsLabel,
+/**
+ * Picking a template, and switching between the authored text and the merged
+ * result. The second button appears only once there is a template to look
+ * through — with nothing applied the two views are the same text.
+ */
+const PromptTemplateControls = ({
+  showSyntaxHighlighting,
+  template,
 }: {
-  compatibleEmbeddingsLabel: string;
-  loras: GenerateLora[];
-  mainModelLabel: string;
-  models: readonly ModelConfig[];
-  selectedModel: GenerateModelConfig | undefined;
-  wildcards: readonly { name: string; values: string[] }[];
-  wildcardsLabel: string;
-}): PromptTriggerOption[] => {
-  const options: PromptTriggerOption[] = [];
+  showSyntaxHighlighting: boolean;
+  template: PromptTemplateState;
+}) => (
+  <>
+    {template.onApply ? (
+      <PromptTemplatesButton
+        activeTemplate={template.active}
+        showSyntaxHighlighting={showSyntaxHighlighting}
+        onApply={template.onApply}
+      />
+    ) : null}
+    {template.active && template.onViewModeChange ? (
+      <TemplateViewModeButton isViewMode={template.isViewMode} onChange={template.onViewModeChange} />
+    ) : null}
+  </>
+);
 
-  // A wildcard inserts as `__name__`, which is just another trigger the picker
-  // can splice in, so it rides in the same list as embeddings and LoRA phrases.
-  for (const wildcard of wildcards) {
-    options.push({ group: wildcardsLabel, label: wildcard.name, value: `__${wildcard.name}__` });
-  }
+/**
+ * Swaps the prompt box between the authored text and the merged result. Quiet
+ * states only — the icon changes, nothing tints or animates.
+ */
+const TemplateViewModeButton = ({
+  isViewMode,
+  onChange,
+}: {
+  isViewMode: boolean;
+  onChange: (viewMode: boolean) => void;
+}) => {
+  const { t } = useTranslation();
+  const handleClick = useCallback(() => onChange(!isViewMode), [isViewMode, onChange]);
+  const label = isViewMode
+    ? t('widgets.generate.promptTemplates.editAuthored')
+    : t('widgets.generate.promptTemplates.viewMerged');
 
-  for (const phrase of getTriggerPhrases(selectedModel)) {
-    options.push({ group: selectedModel?.name ?? mainModelLabel, label: phrase, value: phrase });
-  }
-
-  for (const lora of loras) {
-    if (!lora.isEnabled) {
-      continue;
-    }
-
-    for (const phrase of getTriggerPhrases(lora.model)) {
-      options.push({ group: lora.model.name, label: phrase, value: phrase });
-    }
-  }
-
-  if (selectedModel) {
-    for (const model of models) {
-      if (model.type === 'embedding' && model.base === selectedModel.base) {
-        options.push({ group: compatibleEmbeddingsLabel, label: model.name, value: `<${model.name}>` });
-      }
-    }
-  }
-
-  const seen = new Set<string>();
-
-  return options.filter((option) => {
-    const key = `${option.group}:${option.value}`;
-
-    if (seen.has(key)) {
-      return false;
-    }
-
-    seen.add(key);
-    return true;
-  });
+  return (
+    <Tooltip content={label}>
+      <IconButton aria-label={label} aria-pressed={isViewMode} size="2xs" variant="ghost" onClick={handleClick}>
+        {isViewMode ? <EyeOffIcon /> : <EyeIcon />}
+      </IconButton>
+    </Tooltip>
+  );
 };
 
 export const AddPromptTriggerButton = ({
@@ -184,6 +213,7 @@ export const AddPromptTriggerButton = ({
 };
 
 export const PromptTriggerPopover = ({
+  allowedKinds,
   loras,
   onClose,
   onSelect,
@@ -191,55 +221,19 @@ export const PromptTriggerPopover = ({
   positioning,
   selectedModel,
 }: Pick<PositivePromptActionsProps, 'loras' | 'selectedModel'> & {
+  allowedKinds?: ReadonlySet<PromptTriggerKind>;
   open: boolean;
   positioning: { getAnchorRect: () => { height: number; width: number; x: number; y: number } | null };
   onClose: () => void;
   onSelect: (trigger: string) => void;
 }) => {
   const { t } = useTranslation();
-  const { catalog: models, ensureLoaded: ensureModelsLoaded } = useGenerationUi().models;
-  const { wildcards } = useWildcards();
+  const { ensureLoaded: ensureModelsLoaded } = useGenerationUi().models;
   const [searchTerm, setSearchTerm] = useState('');
-
-  const options = useMemo(
-    () =>
-      getPromptTriggerOptions({
-        compatibleEmbeddingsLabel: t('widgets.generate.compatibleEmbeddings'),
-        loras,
-        mainModelLabel: t('widgets.generate.mainModel'),
-        models,
-        selectedModel,
-        wildcards,
-        wildcardsLabel: t('widgets.generate.dynamicPrompts.wildcards'),
-      }),
-    [loras, models, selectedModel, t, wildcards]
-  );
-
-  const filteredOptions = useMemo(
-    () =>
-      options.filter((option) => {
-        const query = searchTerm.trim().toLowerCase();
-
-        return !query || option.label.toLowerCase().includes(query) || option.group.toLowerCase().includes(query);
-      }),
-    [options, searchTerm]
-  );
-
-  const groupedOptions = useMemo(
-    () =>
-      filteredOptions.reduce<Array<{ group: string; options: PromptTriggerOption[] }>>((groups, option) => {
-        const existingGroup = groups.find((group) => group.group === option.group);
-
-        if (existingGroup) {
-          existingGroup.options.push(option);
-        } else {
-          groups.push({ group: option.group, options: [option] });
-        }
-
-        return groups;
-      }, []),
-    [filteredOptions]
-  );
+  const allOptions = usePromptTriggerOptions(loras, selectedModel);
+  const options = useMemo(() => filterPromptTriggerOptionsByKind(allOptions, allowedKinds), [allOptions, allowedKinds]);
+  const filteredOptions = useMemo(() => filterPromptTriggerOptions(options, searchTerm), [options, searchTerm]);
+  const groupedOptions = useMemo(() => groupPromptTriggerOptions(filteredOptions), [filteredOptions]);
 
   const popoverPositioning = useMemo(() => ({ ...positioning, placement: 'bottom-start' as const }), [positioning]);
 
@@ -340,10 +334,12 @@ const PromptTriggerOptionButton = ({
 };
 
 const ExpandPromptButton = ({
+  isDisabled,
   onPositivePromptChange,
   positivePrompt,
   projectId,
 }: {
+  isDisabled: boolean;
   positivePrompt: string;
   projectId: string;
   onPositivePromptChange: (prompt: string) => void;
@@ -417,11 +413,11 @@ const ExpandPromptButton = ({
         <Popover.Trigger asChild>
           <IconButton
             aria-label={t('widgets.generate.expandPrompt')}
-            disabled={isLoading || !positivePrompt.trim()}
+            disabled={isDisabled || isLoading || !positivePrompt.trim()}
             size="2xs"
             variant="ghost"
           >
-            <SparklesIcon />
+            <PencilSparklesIcon />
           </IconButton>
         </Popover.Trigger>
       </Tooltip>
@@ -467,9 +463,11 @@ const ExpandPromptButton = ({
 };
 
 const ImageToPromptButton = ({
+  isDisabled,
   onPositivePromptChange,
   projectId,
 }: {
+  isDisabled: boolean;
   projectId: string;
   onPositivePromptChange: (prompt: string) => void;
 }) => {
@@ -541,7 +539,12 @@ const ImageToPromptButton = ({
         ids={popoverIds}
       >
         <Popover.Trigger asChild>
-          <IconButton aria-label={t('widgets.generate.imageToPrompt')} disabled={isLoading} size="2xs" variant="ghost">
+          <IconButton
+            aria-label={t('widgets.generate.imageToPrompt')}
+            disabled={isDisabled || isLoading}
+            size="2xs"
+            variant="ghost"
+          >
             <ImageUpIcon />
           </IconButton>
         </Popover.Trigger>

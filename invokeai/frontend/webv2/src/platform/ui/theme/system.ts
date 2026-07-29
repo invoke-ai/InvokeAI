@@ -145,6 +145,7 @@ const semanticColors = {
   'border.muted': stepRef(600, 300),
   'border.emphasized': stepRef(500, 400),
   'border.error': colorToken(danger),
+  'border.image': colorToken((theme) => (theme.colorScheme === 'light' ? 'oklch(0 0 0 / 0.1)' : 'oklch(1 0 0 / 0.1)')),
 
   /**
    * Chakra's default `colorPalette` is `gray`; re-pointing its virtual-palette

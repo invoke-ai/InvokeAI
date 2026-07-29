@@ -6,7 +6,7 @@
  */
 export const FEATURE_PUBLIC_INTERFACES: Readonly<Record<string, readonly string[]>> = {
   gallery: ['contracts', 'paletteSearch', 'queries', 'react', 'utility', 'widget'],
-  generation: ['components', 'contracts', 'graph', 'prompts', 'react', 'settings', 'widget'],
+  generation: ['components', 'contracts', 'graph', 'prompts', 'queries', 'react', 'runtime', 'settings', 'widget'],
   identity: [],
   models: ['react'],
   nodes: [],

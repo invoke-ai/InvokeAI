@@ -46,6 +46,14 @@ export default defineConfig({
             return 'ag-psd';
           }
 
+          // Same story as ag-psd: `yaml` is reached only through a dynamic
+          // `import('yaml')` in wildcard import/export, and the catch-all below
+          // would otherwise make a parser nobody has asked for part of the
+          // initial load.
+          if (id.includes('/node_modules/yaml/')) {
+            return 'yaml';
+          }
+
           if (id.includes('/node_modules/react-icons/')) {
             return 'react-icons';
           }

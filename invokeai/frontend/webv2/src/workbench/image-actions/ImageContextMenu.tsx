@@ -313,6 +313,7 @@ const SingleImageMenuItems = ({
   const handleRecallDimensions = useRecallImageDataHandler(actions, image, 'dimensions');
   const handleRecallClipSkip = useRecallImageDataHandler(actions, image, 'clipSkip');
   const handleSelectForCompare = useSelectForCompareHandler(actions, image);
+  const handleSavePromptAsTemplate = useCallback(() => void actions.savePromptAsTemplate(image), [actions, image]);
   const handleUseAsReferenceImage = useUseAsReferenceImageHandler(actions, image);
   const { generation, widgets } = useWorkbenchCommands();
   const openWidget = useOpenWorkbenchWidget();
@@ -388,7 +389,15 @@ const SingleImageMenuItems = ({
         value="use-as-reference-image"
         onClick={handleUseAsReferenceImage}
       />
-      <ContextMenuItem disabled icon={TypeIcon} label="Use as Prompt Template" value="use-as-prompt-template" />
+      <ContextMenuItem
+        // Same signal "Use Prompt" reads, rather than staying enabled and
+        // raising a toast to say the image had no prompt after all.
+        disabled={isLoadingRecallCapabilities || !recallCapabilities.prompts}
+        icon={TypeIcon}
+        label="Use as Prompt Template"
+        value="use-as-prompt-template"
+        onClick={handleSavePromptAsTemplate}
+      />
       <ContextMenuItem
         icon={ImagesIcon}
         label="Select for Compare"

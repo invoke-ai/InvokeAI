@@ -17,6 +17,7 @@ import type {
 import { sanitizeBatchCount } from './batch';
 import { isVaeCompatibleWithGenerateModel } from './componentCompatibility';
 import { isDynamicPromptsSeedBehaviour, sanitizeMaxPrompts, sanitizeSampleSeed } from './dynamicPrompts';
+import { isCanonicalPromptTemplateSnapshot, sanitizePromptTemplateSnapshot } from './promptTemplates';
 import { cloneCroppableImage, isCanonicalCroppableImage, normalizeCroppableImage } from './referenceImage';
 
 /** Preset ratios, with the preset to switch to when dimensions are swapped. */
@@ -385,6 +386,7 @@ export const cloneGenerateWidgetValues = (
   componentSourceModel: values.componentSourceModel ? { ...values.componentSourceModel } : null,
   loras: values.loras.map((lora) => ({ ...lora, model: { ...lora.model } })),
   model: { ...values.model },
+  promptTemplate: values.promptTemplate ? { ...values.promptTemplate } : null,
   qwen3EncoderModel: values.qwen3EncoderModel ? { ...values.qwen3EncoderModel } : null,
   qwenVLEncoderModel: values.qwenVLEncoderModel ? { ...values.qwenVLEncoderModel } : null,
   referenceImages: cloneReferenceImages(values.referenceImages),
@@ -520,6 +522,30 @@ export const isLoraCompatibleWithModel = (
  * fields fall back to their defaults so old projects keep their prompts and
  * dimensions instead of being reset wholesale.
  */
+/**
+ * The fields of `GenerateSettings` that describe how the panel is arranged
+ * rather than what will be generated.
+ *
+ * They live in the same object because they are saved with the project, and
+ * separating the two is a change to the persisted shape rather than a
+ * rearrangement — worth doing, but not here. What can be stated once is which
+ * is which, and this is it: `satisfies` ties the set to the interface, so a key
+ * that stops existing, or is spelled wrong, fails to compile.
+ *
+ * Everything else is generation intent. Changing one of these is not: dragging
+ * a prompt box taller or looking at the merged template must not be mistaken
+ * for the kind of edit that reroutes the workbench. Applying a template *is*
+ * intent, which is why `promptTemplate` is absent and `promptTemplateViewMode`
+ * is present.
+ */
+export const GENERATE_UI_STATE_KEYS = {
+  aspectRatioIsLocked: true,
+  batchCount: true,
+  negativePromptHeightPx: true,
+  positivePromptHeightPx: true,
+  promptTemplateViewMode: true,
+} satisfies Partial<Record<keyof GenerateSettings, true>>;
+
 export const normalizeGenerateSettings = (values: unknown): GenerateSettings | null => {
   if (!isRecord(values)) {
     return null;
@@ -541,6 +567,10 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
 
   const width = values.width as number;
   const height = values.height as number;
+
+  const promptTemplate = isCanonicalPromptTemplateSnapshot(values.promptTemplate)
+    ? values.promptTemplate
+    : sanitizePromptTemplateSnapshot(values.promptTemplate);
 
   return {
     aspectRatioId: isAspectRatioId(values.aspectRatioId) ? values.aspectRatioId : deriveAspectRatioId(width, height),
@@ -583,6 +613,12 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
       MAX_POSITIVE_PROMPT_HEIGHT_PX,
       DEFAULT_POSITIVE_PROMPT_HEIGHT_PX
     ),
+    // Reuse the stored object when it is already canonical. Callers diff settings
+    // with `Object.is`, so re-sanitizing into a fresh object every pass would make
+    // every commit look like a template change and loop the sync in
+    // `GenerateWidgetView`.
+    promptTemplate,
+    promptTemplateViewMode: promptTemplate !== null && values.promptTemplateViewMode === true,
     referenceImages: normalizeReferenceImages(values.referenceImages),
     scheduler: values.scheduler as string,
     seamlessXAxis: typeof values.seamlessXAxis === 'boolean' ? values.seamlessXAxis : false,
@@ -635,6 +671,9 @@ export const isGenerateSettings = (values: unknown): values is GenerateSettings 
     Array.isArray(values.referenceImages) &&
     normalizeReferenceImages(values.referenceImages).length === values.referenceImages.length &&
     areReferenceImagesCanonical(values.referenceImages) &&
+    (values.promptTemplate === null || isCanonicalPromptTemplateSnapshot(values.promptTemplate)) &&
+    typeof values.promptTemplateViewMode === 'boolean' &&
+    (values.promptTemplate !== null || values.promptTemplateViewMode === false) &&
     typeof values.seamlessXAxis === 'boolean' &&
     typeof values.seamlessYAxis === 'boolean' &&
     isVaePrecision(values.vaePrecision) &&

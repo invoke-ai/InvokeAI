@@ -7,37 +7,9 @@ import type {
 import type { RasterizationJob } from '@workbench/canvas-engine/controllers/rasterController';
 import type { LayerCacheEntry, LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 
+import { areJsonValuesStructurallyEqual } from '@platform/core/json';
 import { getSourceContentRect, renderableSourceOf } from '@workbench/canvas-engine/document/sources';
 import { isEmpty } from '@workbench/canvas-engine/math/rect';
-
-/** Structural equality for JSON-safe canvas contracts (including synthetic mask paint sources). */
-export const isDeeplyEqual = (left: unknown, right: unknown): boolean => {
-  if (Object.is(left, right)) {
-    return true;
-  }
-  if (typeof left !== 'object' || left === null || typeof right !== 'object' || right === null) {
-    return false;
-  }
-  if (Array.isArray(left) || Array.isArray(right)) {
-    return (
-      Array.isArray(left) &&
-      Array.isArray(right) &&
-      left.length === right.length &&
-      left.every((value, index) => isDeeplyEqual(value, right[index]))
-    );
-  }
-  const leftRecord = left as Record<string, unknown>;
-  const rightRecord = right as Record<string, unknown>;
-  const leftKeys = Object.keys(leftRecord);
-  const rightKeys = Object.keys(rightRecord);
-  return (
-    leftKeys.length === rightKeys.length &&
-    leftKeys.every(
-      (key) =>
-        Object.prototype.hasOwnProperty.call(rightRecord, key) && isDeeplyEqual(leftRecord[key], rightRecord[key])
-    )
-  );
-};
 
 /** Polygon shapes have no raster path, so they can never back an export. */
 export const isSupportedExportSource = (source: CanvasLayerSourceContract): boolean => {
@@ -92,7 +64,7 @@ export const createLayerExportGuards = (deps: CreateLayerExportGuardsDeps): Laye
       !!source &&
       job.version === layerCache.version(layer.id) &&
       job.documentGeneration === deps.getDocumentGeneration() &&
-      isDeeplyEqual(job.source, source)
+      areJsonValuesStructurallyEqual(job.source, source)
     );
   };
 

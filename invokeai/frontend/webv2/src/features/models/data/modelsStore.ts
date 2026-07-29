@@ -115,6 +115,9 @@ export const ensureModelsLoaded = (): Promise<void> => {
 
 export const getModelsSnapshot = (): ModelsSnapshot => store.getSnapshot();
 
+/** Read-only subscription for App-owned cross-feature runtimes. */
+export const subscribeModels = (listener: () => void): (() => void) => store.subscribe(listener);
+
 /** Patch one model in place after a successful update/convert. */
 export const replaceModelInStore = (model: ModelConfig): void => {
   store.patchSnapshot({

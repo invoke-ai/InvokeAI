@@ -1,3 +1,4 @@
+import type { GenerateSettings } from '@features/generation/contracts';
 import type {
   QueueBackendGraph,
   QueueCompiledSubmission,
@@ -8,7 +9,7 @@ import type { CanvasStateContractV2 } from '@workbench/canvas-engine/api';
 import type { GraphContract } from '@workbench/graphContracts';
 import type { WidgetInstanceContract, WidgetInstanceId, WidgetStateMap } from '@workbench/widgetContracts';
 
-import { normalizeGenerateSettings, sanitizeBatchCount } from '@features/generation/settings';
+import { getEffectivePrompts, normalizeGenerateSettings, sanitizeBatchCount } from '@features/generation/settings';
 import { getUpscaleOutputDimensions, normalizeUpscaleWidgetValues } from '@features/upscale';
 
 import type { WorkbenchQueueItem, WorkbenchQueueState } from './queueHistoryContracts';
@@ -159,6 +160,9 @@ const getFiniteDimension = (value: unknown, fallback: number): number =>
 
 const createInvalidSubmission = (message: string): QueueCompiledSubmission => ({ error: message, kind: 'invalid' });
 
+const toPresentationSource = (settings: GenerateSettings | null): PresentationSource =>
+  settings ? { ...settings, positivePrompt: getEffectivePrompts(settings).positivePrompt } : null;
+
 const getBackendSubmission = (
   sourceId: QueueSourceId | null,
   snapshot: UnknownRecord,
@@ -168,8 +172,10 @@ const getBackendSubmission = (
   const backendGraph = graph?.backendGraph;
   const generateCapture = getGenerateCapture(snapshot);
   const generateValues = getWidgetValues(widgetStates, 'generate');
-  const presentationSource = normalizeGenerateSettings(
-    sourceId === 'canvas' ? (generateCapture?.values ?? generateValues) : generateValues
+  // Carries the merged prompt, so a rehydrated row reads the same as it will once
+  // the backend session arrives with its own (already merged) field values.
+  const presentationSource = toPresentationSource(
+    normalizeGenerateSettings(sourceId === 'canvas' ? (generateCapture?.values ?? generateValues) : generateValues)
   );
 
   if (!sourceId) {
@@ -209,18 +215,26 @@ const getBackendSubmission = (
     };
   }
 
+  // Re-deriving the submission has to reapply the prompt template, or a rehydrated
+  // item that is retried would submit the bare authored text. The snapshot rides
+  // in the persisted widget values, so this needs no catalog.
+  const effectivePrompts = getEffectivePrompts(sourceSettings);
+
   return {
-    presentationSource: sourceId === 'upscale' ? null : sourceSettings,
+    // The merged source computed above, not the raw settings: the row is written
+    // at submit time from the merged prompt, so returning the authored text here
+    // made a rehydrated item's prompt change under the user on reload.
+    presentationSource: sourceId === 'upscale' ? null : presentationSource,
     submission: {
       batchCount: sourceSettings.batchCount,
       graph: backendGraph,
       kind: 'generate',
-      negativePrompt: sourceSettings.negativePromptEnabled ? sourceSettings.negativePrompt : '',
+      negativePrompt: sourceSettings.negativePromptEnabled ? effectivePrompts.negativePrompt : '',
       negativePromptNodeId:
         typeof generateCapture?.negativePromptNodeId === 'string'
           ? generateCapture.negativePromptNodeId
           : 'negative_prompt',
-      positivePrompt: sourceSettings.positivePrompt,
+      positivePrompt: effectivePrompts.positivePrompt,
       positivePromptNodeId:
         typeof generateCapture?.positivePromptNodeId === 'string'
           ? generateCapture.positivePromptNodeId

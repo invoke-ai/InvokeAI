@@ -453,11 +453,11 @@ const UpscaleImageField = ({
                 alt={t('widgets.upscale.inputImageAlt')}
                 boxSize="full"
                 objectFit="contain"
-                outline="1px solid rgba(0, 0, 0, 0.1)"
+                outline="1px solid"
+                outlineColor="border.image"
                 outlineOffset="-1px"
                 rounded="sm"
                 src={galleryImageUrls.thumbnail(inputImage.image_name)}
-                _dark={{ outlineColor: 'rgba(255, 255, 255, 0.1)' }}
               />
             </Box>
             <Stack align="start" flex="1" gap="1" justify="center" minW="0">

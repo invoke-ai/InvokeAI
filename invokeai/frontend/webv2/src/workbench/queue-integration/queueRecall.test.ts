@@ -70,6 +70,7 @@ describe('buildQueueRecallValues', () => {
       negativePrompt: 'snap neg',
       negativePromptEnabled: true,
       positivePrompt: 'snap',
+      promptTemplate: null,
     });
   });
 
@@ -85,7 +86,38 @@ describe('buildQueueRecallValues', () => {
       negativePrompt: 'meta neg',
       negativePromptEnabled: true,
       positivePrompt: 'meta',
+      promptTemplate: null,
     });
+  });
+
+  // Session metadata carries the prompt the model was given, template already
+  // applied, so recalling it has to stop the active template wrapping it again.
+  it('clears the active prompt template when recalling prompts from session meta', () => {
+    const withTemplate = makeValues({
+      promptTemplate: { id: 't1', name: 'Cinematic', negativePrompt: '', positivePrompt: '{prompt}, cinematic' },
+    });
+
+    expect(
+      buildQueueRecallValues('prompts', { current: withTemplate, meta: { positivePrompt: 'meta' }, snapshot: null })
+        ?.promptTemplate
+    ).toBeNull();
+  });
+
+  // A snapshot is the other story: it stores the prompt as *authored*, so the
+  // template that shaped it has to come back too. Recalling `a cat` and dropping
+  // `Cinematic` silently generated something other than the item recalled from.
+  it('recalls the snapshot`s own template alongside its authored prompt', () => {
+    const promptTemplate = { id: 't1', name: 'Cinematic', negativePrompt: '', positivePrompt: '{prompt}, cinematic' };
+    const snapshot = makeValues({ positivePrompt: 'a cat', promptTemplate });
+
+    const result = buildQueueRecallValues('prompts', {
+      current: makeValues(),
+      meta: { positivePrompt: 'a cat, cinematic' },
+      snapshot,
+    });
+
+    expect(result?.positivePrompt).toBe('a cat');
+    expect(result?.promptTemplate).toEqual(promptTemplate);
   });
 
   it('prefers the executed session seed and pins randomization off', () => {

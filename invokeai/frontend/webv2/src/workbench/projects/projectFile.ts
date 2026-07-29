@@ -1,5 +1,6 @@
 import type { Project } from '@workbench/projectContracts';
 
+import { downloadText } from '@platform/browser/downloadBlob';
 import {
   type AccountScope,
   assertAccountScopeCurrent,
@@ -62,14 +63,11 @@ export const parseProjectFile = (text: string): Record<string, unknown> | null =
 const sanitizeFileName = (name: string): string => name.replace(/[^\w\- ]+/gu, '').trim() || 'project';
 
 const downloadProjectFile = (name: string, projectDocument: Record<string, unknown>): void => {
-  const blob = new Blob([JSON.stringify(buildProjectFile(projectDocument), null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-
-  anchor.href = url;
-  anchor.download = `${sanitizeFileName(name)}.invokeproject.json`;
-  anchor.click();
-  URL.revokeObjectURL(url);
+  downloadText(
+    JSON.stringify(buildProjectFile(projectDocument), null, 2),
+    `${sanitizeFileName(name)}.invokeproject.json`,
+    'application/json'
+  );
 };
 
 /** Export a closed project straight from its server record. */

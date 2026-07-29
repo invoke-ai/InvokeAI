@@ -20,6 +20,7 @@ describe('Identity route capabilities', () => {
     expect(getCapabilities(session({ multiuserEnabled: false, phase }))).toEqual({
       canManageModels: false,
       canManageNodes: false,
+      canManagePromptTemplates: false,
       canManageUsers: false,
     });
   });
@@ -28,6 +29,7 @@ describe('Identity route capabilities', () => {
     expect(getCapabilities(session({ multiuserEnabled: false }))).toEqual({
       canManageModels: true,
       canManageNodes: true,
+      canManagePromptTemplates: true,
       canManageUsers: false,
     });
   });
@@ -46,11 +48,13 @@ describe('Identity route capabilities', () => {
     expect(getCapabilities(session({ user: { ...baseUser, is_admin: false } }))).toEqual({
       canManageModels: false,
       canManageNodes: false,
+      canManagePromptTemplates: false,
       canManageUsers: false,
     });
     expect(getCapabilities(session({ user: { ...baseUser, is_admin: true } }))).toEqual({
       canManageModels: true,
       canManageNodes: true,
+      canManagePromptTemplates: true,
       canManageUsers: true,
     });
   });

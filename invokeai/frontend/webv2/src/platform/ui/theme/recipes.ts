@@ -475,7 +475,7 @@ export const rowRecipe = defineRecipe({
     textAlign: 'start',
     transition: 'background var(--wb-motion-duration-fast) ease, color var(--wb-motion-duration-fast) ease',
     w: 'full',
-    _hover: { bg: 'bg.muted' },
+    _hover: { bg: 'bg.emphasized' },
     _focusVisible: {
       outline: '2px solid',
       outlineColor: 'accent.solid',

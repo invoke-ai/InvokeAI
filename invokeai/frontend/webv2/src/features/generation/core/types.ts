@@ -1,5 +1,6 @@
 import type { BackendGraphContract, GraphContract } from '@features/generation/core/contracts';
 import type { DynamicPromptsSeedBehaviour } from '@features/generation/core/dynamicPrompts';
+import type { PromptTemplateSnapshot } from '@features/generation/core/promptTemplates';
 
 export type ModelIdentifierConfig = {
   key: string;
@@ -149,6 +150,12 @@ export type AspectRatioId =
   | '9:21'
   | '1:8';
 
+/**
+ * Which of the fields below are panel arrangement rather than generation
+ * intent is stated once, as `GENERATE_UI_STATE_KEYS` in `./settings` — beside
+ * the normalization that already enumerates them, and where it costs no module
+ * of its own. This interface stays type-only.
+ */
 export interface GenerateSettings {
   batchCount: number;
   modelKey: string;
@@ -157,6 +164,14 @@ export interface GenerateSettings {
   negativePromptEnabled: boolean;
   negativePrompt: string;
   negativePromptHeightPx: number;
+  /**
+   * The active prompt template, copied rather than referenced by id so the pure
+   * submit reducer can resolve prompts with no catalog lookup. See
+   * `core/promptTemplates.ts`.
+   */
+  promptTemplate: PromptTemplateSnapshot | null;
+  /** Show the merged prompt read-only instead of the authored text. */
+  promptTemplateViewMode: boolean;
   /** Expand `{a|b}` into every combination; otherwise draw a random sample. */
   dynamicPromptsCombinatorial: boolean;
   /** Upper bound on expanded prompts (the sample size when not combinatorial). */

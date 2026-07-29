@@ -80,6 +80,14 @@ describe('widget edit classification', () => {
     expect(isHighConfidenceGenerateEdit(['futureSetting'])).toBe(true);
     expect(isHighConfidenceUpscaleEdit(['futureSetting'])).toBe(true);
   });
+
+  // The two live in one object and read alike, but only one of them changes
+  // what generates. Looking at the merged prompt is not an edit; applying the
+  // template that produced it is.
+  it('separates looking at a template from applying one', () => {
+    expect(isHighConfidenceGenerateEdit(['promptTemplateViewMode'])).toBe(false);
+    expect(isHighConfidenceGenerateEdit(['promptTemplate'])).toBe(true);
+  });
 });
 
 describe('Canvas edit classification', () => {

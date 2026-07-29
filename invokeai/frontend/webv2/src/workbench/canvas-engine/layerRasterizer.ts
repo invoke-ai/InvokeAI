@@ -8,8 +8,9 @@ import type { LayerCacheStore } from '@workbench/canvas-engine/render/layerCache
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { RasterizeResult } from '@workbench/canvas-engine/render/rasterizers';
 
+import { areJsonValuesStructurallyEqual } from '@platform/core/json';
 import { getSourceContentRect, renderableSourceOf } from '@workbench/canvas-engine/document/sources';
-import { isDeeplyEqual, isSupportedExportSource } from '@workbench/canvas-engine/layerExportGuards';
+import { isSupportedExportSource } from '@workbench/canvas-engine/layerExportGuards';
 import { isEmpty } from '@workbench/canvas-engine/math/rect';
 import { textFontString } from '@workbench/canvas-engine/render/rasterizers/textRasterizer';
 
@@ -125,7 +126,7 @@ export const createLayerRasterizer = (deps: CreateLayerRasterizerDeps): LayerRas
       existing &&
       existing.version === version &&
       existing.documentGeneration === documentGeneration &&
-      isDeeplyEqual(existing.source, source)
+      areJsonValuesStructurallyEqual(existing.source, source)
     ) {
       if (!signal) {
         return existing.promise;
@@ -150,7 +151,7 @@ export const createLayerRasterizer = (deps: CreateLayerRasterizerDeps): LayerRas
           !currentLayer ||
           jobs.getDocumentGeneration() !== documentGeneration ||
           layerCache.version(layer.id) !== version ||
-          !isDeeplyEqual(renderableSourceOf(currentLayer), source)
+          !areJsonValuesStructurallyEqual(renderableSourceOf(currentLayer), source)
         ) {
           return;
         }
@@ -186,7 +187,7 @@ export const createLayerRasterizer = (deps: CreateLayerRasterizerDeps): LayerRas
           !currentLayer ||
           !currentEntry ||
           currentEntry.version !== version ||
-          !isDeeplyEqual(renderableSourceOf(currentLayer), source)
+          !areJsonValuesStructurallyEqual(renderableSourceOf(currentLayer), source)
         ) {
           return 'stale';
         }
@@ -223,7 +224,7 @@ export const createLayerRasterizer = (deps: CreateLayerRasterizerDeps): LayerRas
           jobs.getDocumentGeneration() !== documentGeneration ||
           !currentLayer ||
           layerCache.version(layer.id) !== version ||
-          !isDeeplyEqual(renderableSourceOf(currentLayer), source)
+          !areJsonValuesStructurallyEqual(renderableSourceOf(currentLayer), source)
         ) {
           // The failure describes a layer that has already moved on; reporting it
           // would surface an error about work nobody is waiting for.

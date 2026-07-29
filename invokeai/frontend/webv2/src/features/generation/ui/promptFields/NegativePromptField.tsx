@@ -3,22 +3,30 @@ import type { GenerateLora, GenerateModelConfig } from '@features/generation/cor
 import type { ChangeEvent, KeyboardEvent } from 'react';
 
 import { HStack, Switch } from '@chakra-ui/react';
+import { getPromptTemplateChunks } from '@features/generation/core/promptTemplates';
 import { useRegisterGenerateDraftFlusher } from '@features/generation/ui/generateDraftRegistry';
 import { useDebouncedDraftValue } from '@features/generation/ui/useDebouncedDraftValue';
 import { Field } from '@platform/ui';
-import { useCallback, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useId, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AddPromptTriggerButton, PromptTriggerPopover } from './PositivePromptActions';
 import { PROMPT_ATTENTION_TARGET_PROPS } from './promptAttentionHotkeys';
-import { getPromptTriggerRange, insertPromptText, type PromptTextRange, type PromptTriggerKey } from './promptFocus';
+import { insertPromptText } from './promptFocus';
 import { promptHistoryNavigation } from './promptHistoryNavigation';
 import { PromptTextarea } from './PromptTextarea';
+import { usePromptTriggerAutocomplete } from './usePromptTriggerAutocomplete';
+import { usePromptTriggerPicker } from './usePromptTriggerPicker';
 
 const PROMPT_INPUT_DEBOUNCE_MS = 250;
 
 interface NegativePromptFieldProps {
   heightPx: number;
+  /** The active template's negative side, or null when none is applied. */
+  templateNegativePrompt?: string | null;
+  /** Show the merged prompt read-only instead of the authored text. */
+  isTemplateViewMode?: boolean;
+  onTemplateViewModeChange?: (viewMode: boolean) => void;
   helpText?: string;
   isEnabled: boolean;
   loras: GenerateLora[];
@@ -31,32 +39,28 @@ interface NegativePromptFieldProps {
   onResizeEnd: (heightPx: number) => void;
 }
 
-type PromptTriggerPickerState = {
-  anchorRect: { height: number; width: number; x: number; y: number };
-  /** The keystroke the picker consumed, restored if it is dismissed unpicked. */
-  pendingKey?: PromptTriggerKey;
-  range?: PromptTextRange;
-};
-
 /** No `__name__` here: a negative prompt is never expanded, so it has no wildcards. */
 const NEGATIVE_PROMPT_TRIGGER_KEYS = ['<'] as const;
+const NEGATIVE_PROMPT_TRIGGER_KINDS = new Set(['embedding', 'phrase'] as const);
 
 export const NegativePromptField = ({
   heightPx,
   helpText,
   isEnabled,
+  isTemplateViewMode = false,
   loras,
   onChange,
   onEnabledChange,
   onResizeEnd,
+  onTemplateViewModeChange,
   projectId,
   selectedModel,
   showSyntaxHighlighting,
+  templateNegativePrompt = null,
   value,
 }: NegativePromptFieldProps) => {
   const { t } = useTranslation();
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const [triggerPickerState, setTriggerPickerState] = useState<PromptTriggerPickerState | null>(null);
   const { draftValue, flushDraftValue, setDraftValue } = useDebouncedDraftValue({
     delayMs: PROMPT_INPUT_DEBOUNCE_MS,
     onCommit: onChange,
@@ -74,18 +78,38 @@ export const NegativePromptField = ({
     [setDraftValue]
   );
 
-  const openPromptTriggerPicker = useCallback(
-    (anchorElement: HTMLElement, range?: PromptTextRange, pendingKey?: PromptTriggerKey) => {
-      const rect = anchorElement.getBoundingClientRect();
+  // Same textarea, read-only, as on the positive side — swapping in a different
+  // component would reset the resizer's mounted height.
+  //
+  // An empty string here is a template that carries no negative side, which is
+  // most of them: `null` means no template at all. Neither has anything to show,
+  // and treating the empty one as something to view turned this field read-only
+  // and rendered the authored text with the merge's trailing space hanging off
+  // it. Gating on the toggle alone would be worse still — view mode can be on
+  // with no template applied, which leaves the prompt perfectly editable.
+  const viewedTemplatePrompt = isTemplateViewMode && templateNegativePrompt ? templateNegativePrompt : null;
+  const isViewingMerged = viewedTemplatePrompt !== null;
 
-      setTriggerPickerState({
-        anchorRect: { height: rect.height, width: rect.width, x: rect.x, y: rect.y },
-        pendingKey,
-        range,
+  const autocomplete = usePromptTriggerAutocomplete({
+    isDisabled: isViewingMerged,
+    keys: NEGATIVE_PROMPT_TRIGGER_KEYS,
+    loras,
+    onChange: commitPromptChange,
+    selectedModel,
+  });
+
+  const insertTrigger = useCallback(
+    (trigger: string) => {
+      insertPromptText({
+        onChange: commitPromptChange,
+        textarea: textareaRef.current,
+        text: trigger,
+        value: draftValue,
       });
     },
-    []
+    [commitPromptChange, draftValue]
   );
+  const triggerPicker = usePromptTriggerPicker({ insert: insertTrigger });
 
   const handlePromptKeyDown = useCallback(
     (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -93,60 +117,9 @@ export const NegativePromptField = ({
         return;
       }
 
-      const trigger = getPromptTriggerRange(
-        event.currentTarget.value,
-        event.currentTarget.selectionStart,
-        event.currentTarget.selectionEnd,
-        event.key,
-        NEGATIVE_PROMPT_TRIGGER_KEYS
-      );
-
-      if (!trigger) {
-        return;
-      }
-
-      // The keystroke is held rather than typed, so the picked trigger reads as
-      // one edit. `dismissPromptTriggerPicker` puts it back if nothing is picked.
-      event.preventDefault();
-      openPromptTriggerPicker(event.currentTarget, trigger.range, trigger.key);
+      autocomplete.handleKeyDown(event);
     },
-    [openPromptTriggerPicker]
-  );
-
-  const closePromptTriggerPicker = useCallback(() => setTriggerPickerState(null), []);
-
-  /** Escape or click-away: the swallowed keystroke was the user's, so give it back. */
-  const dismissPromptTriggerPicker = useCallback(() => {
-    if (triggerPickerState?.pendingKey) {
-      insertPromptText({
-        onChange: commitPromptChange,
-        range: triggerPickerState.range,
-        textarea: textareaRef.current,
-        text: triggerPickerState.pendingKey,
-        value: draftValue,
-      });
-    }
-
-    setTriggerPickerState(null);
-  }, [commitPromptChange, draftValue, triggerPickerState]);
-
-  const selectPromptTrigger = useCallback(
-    (trigger: string) => {
-      insertPromptText({
-        onChange: commitPromptChange,
-        range: triggerPickerState?.range,
-        textarea: textareaRef.current,
-        text: trigger,
-        value: draftValue,
-      });
-      closePromptTriggerPicker();
-    },
-    [closePromptTriggerPicker, commitPromptChange, draftValue, triggerPickerState?.range]
-  );
-
-  const handleOpenPromptTriggerPicker = useCallback(
-    (anchorElement: HTMLElement) => openPromptTriggerPicker(anchorElement),
-    [openPromptTriggerPicker]
+    [autocomplete]
   );
 
   const handleEnabledChange = useCallback(
@@ -159,9 +132,15 @@ export const NegativePromptField = ({
   }, []);
 
   const handlePromptChange = useCallback(
-    (event: ChangeEvent<HTMLTextAreaElement>) => commitPromptChange(event.currentTarget.value),
-    [commitPromptChange]
+    (event: ChangeEvent<HTMLTextAreaElement>) => {
+      commitPromptChange(event.currentTarget.value);
+      autocomplete.refresh(event.currentTarget);
+    },
+    [autocomplete, commitPromptChange]
   );
+
+  /** Clicking moves the caret, which may land in — or out of — a trigger. */
+  const handlePromptClick = useCallback(() => autocomplete.refresh(textareaRef.current), [autocomplete]);
 
   // The switch shares the Field.Root with the textarea; an explicit id keeps
   // its label bound to its own hidden input instead of the Field's control id.
@@ -171,8 +150,8 @@ export const NegativePromptField = ({
       <HStack gap="0.5">
         {isEnabled ? (
           <AddPromptTriggerButton
-            isOpen={triggerPickerState !== null}
-            onOpenPromptTriggerPicker={handleOpenPromptTriggerPicker}
+            isOpen={triggerPicker.isOpen || isViewingMerged}
+            onOpenPromptTriggerPicker={triggerPicker.open}
           />
         ) : null}
         <Switch.Root
@@ -189,13 +168,14 @@ export const NegativePromptField = ({
         </Switch.Root>
       </HStack>
     ),
-    [enableSwitchInputId, handleEnabledChange, handleOpenPromptTriggerPicker, isEnabled, t, triggerPickerState]
+    [enableSwitchInputId, handleEnabledChange, isEnabled, isViewingMerged, t, triggerPicker]
   );
 
-  const triggerPickerPositioning = useMemo(
-    () => ({ getAnchorRect: () => triggerPickerState?.anchorRect ?? null }),
-    [triggerPickerState]
+  const templateChunks = useMemo(
+    () => (viewedTemplatePrompt === null ? null : getPromptTemplateChunks(draftValue, viewedTemplatePrompt)),
+    [draftValue, viewedTemplatePrompt]
   );
+  const exitViewMode = useCallback(() => onTemplateViewModeChange?.(false), [onTemplateViewModeChange]);
 
   return (
     <Field label={t('widgets.generate.negativePrompt')} labelEnd={labelEnd} helpText={isEnabled ? helpText : undefined}>
@@ -203,27 +183,36 @@ export const NegativePromptField = ({
         <>
           <PromptTextarea
             {...PROMPT_ATTENTION_TARGET_PROPS}
+            {...autocomplete.comboboxProps}
             aria-label={t('widgets.generate.negativePrompt')}
             defaultHeightPx={heightPx}
             minHeightPx={56}
             resizeHandleAriaLabel={t('widgets.generate.resizeNegativePrompt')}
             size="xs"
             fontFamily="mono"
+            readOnly={isViewingMerged}
             showSyntaxHighlighting={showSyntaxHighlighting}
+            templateChunks={templateChunks}
             textareaRef={handleTextareaRef}
-            value={draftValue}
+            title={isViewingMerged ? t('widgets.generate.promptTemplates.editAuthored') : undefined}
+            value={templateChunks ? templateChunks.join('') : draftValue}
+            onBlur={autocomplete.close}
             onChange={handlePromptChange}
+            onClick={isViewingMerged ? exitViewMode : handlePromptClick}
             onKeyDown={handlePromptKeyDown}
             onResizeEnd={onResizeEnd}
           />
-          {triggerPickerState ? (
+          {autocomplete.element}
+          {triggerPicker.dismissElement}
+          {triggerPicker.isOpen ? (
             <PromptTriggerPopover
+              allowedKinds={NEGATIVE_PROMPT_TRIGGER_KINDS}
               loras={loras}
               open
-              positioning={triggerPickerPositioning}
+              positioning={triggerPicker.positioning}
               selectedModel={selectedModel}
-              onClose={dismissPromptTriggerPicker}
-              onSelect={selectPromptTrigger}
+              onClose={triggerPicker.close}
+              onSelect={triggerPicker.select}
             />
           ) : null}
         </>

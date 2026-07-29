@@ -21,6 +21,8 @@ export const HIGHLIGHT_STYLE_BY_KIND: Record<
 > = {
   attention: { color: 'accent.solid' },
   attentionNumeric: { color: 'fg.success' },
+  // Stripped before generating, so it reads as the quietest thing on the line.
+  comment: { color: 'fg.muted' },
   embedding: { bg: 'bg.warning', color: 'fg.warning' },
   error: { bg: 'bg.error', color: 'fg.error', textDecoration: 'underline wavy', textDecorationColor: 'fg.error' },
   escapedParen: { color: 'fg.muted' },
@@ -28,10 +30,16 @@ export const HIGHLIGHT_STYLE_BY_KIND: Record<
   promptFunctionArg: { bg: 'accent.subtle/20', color: 'fg' },
   promptFunctionMethod: { color: 'accent.fg' },
   promptVariable: { color: 'accent.fg' },
+  // Muted like a variant's `|`: structure, not content. Its presence is what
+  // separates `${lens=85mm}` defining a variable from `${lens}` using one.
+  promptVariableOperator: { color: 'fg.muted' },
   punctuation: { color: 'fg.subtle' },
   text: { color: 'fg' },
   variantBrace: { color: 'accent.fg' },
   variantRange: { color: 'fg.success' },
+  // A sampler override changes how many/which alternatives come out, so it sits
+  // with the other count modifiers rather than earning a colour of its own.
+  variantSampler: { color: 'fg.success' },
   variantSeparator: { color: 'fg.muted' },
   variantWeight: { color: 'fg.success' },
   wildcard: { color: 'fg.subtle' },

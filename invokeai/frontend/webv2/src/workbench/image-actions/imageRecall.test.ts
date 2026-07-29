@@ -55,6 +55,8 @@ const createValues = (overrides: Partial<GenerateWidgetValues> = {}): GenerateWi
   negativePromptHeightPx: 56,
   positivePrompt: '',
   positivePromptHeightPx: 96,
+  promptTemplate: null,
+  promptTemplateViewMode: false,
   qwen3EncoderModel: null,
   qwenVLEncoderModel: null,
   referenceImages: [],
@@ -100,6 +102,60 @@ const metadata = {
 };
 
 describe('image recall', () => {
+  it.each(['all', 'remix', 'prompts'] as const)(
+    'clears the active template and view mode when %s recalls prompt metadata',
+    (kind) => {
+      const result = buildImageRecallSettings({
+        currentValues: createValues({
+          promptTemplate: {
+            id: 'template-1',
+            name: 'Cinematic',
+            negativePrompt: 'lowres',
+            positivePrompt: '{prompt}, cinematic',
+          },
+          promptTemplateViewMode: true,
+        }),
+        image,
+        kind,
+        metadata: { positive_prompt: 'a recalled prompt' },
+        models: [],
+        supportedModels: [],
+        vaeModels: [],
+      });
+
+      expect(result?.values.promptTemplate).toBeNull();
+      expect(result?.values.promptTemplateViewMode).toBe(false);
+    }
+  );
+
+  it.each(['seed', 'dimensions', 'clipSkip'] as const)(
+    'preserves the active template and view mode when %s has no prompt metadata',
+    (kind) => {
+      const currentValues = createValues({
+        ...(kind === 'clipSkip' ? { model: sd1Model, modelKey: sd1Model.key } : {}),
+        promptTemplate: {
+          id: 'template-1',
+          name: 'Cinematic',
+          negativePrompt: 'lowres',
+          positivePrompt: '{prompt}, cinematic',
+        },
+        promptTemplateViewMode: true,
+      });
+      const result = buildImageRecallSettings({
+        currentValues,
+        image,
+        kind,
+        metadata: kind === 'seed' ? { seed: 42 } : kind === 'clipSkip' ? { clip_skip: 1 } : null,
+        models: [],
+        supportedModels: [],
+        vaeModels: [],
+      });
+
+      expect(result?.values.promptTemplate).toEqual(currentValues.promptTemplate);
+      expect(result?.values.promptTemplateViewMode).toBe(true);
+    }
+  );
+
   it('recalls supported image metadata into generate settings', () => {
     const result = buildImageRecallSettings({
       currentValues: createValues(),

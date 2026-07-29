@@ -1,10 +1,12 @@
 import type { PromptHistoryItem } from '@features/generation/contracts';
 import type { DynamicPromptsConfig } from '@features/generation/core/dynamicPrompts';
+import type { PromptTemplateSnapshot } from '@features/generation/core/promptTemplates';
 import type { GenerateModelConfig, GenerateSettings } from '@features/generation/core/types';
 
 import { Stack } from '@chakra-ui/react';
 import { getPromptPolicy } from '@features/generation/core/baseGenerationPolicies';
 import { sanitizeBatchCount } from '@features/generation/core/batch';
+import { flattenPromptTemplateExpansion } from '@features/generation/core/promptTemplates';
 import { useGenerationUi } from '@features/generation/ui/GenerationUiContext';
 import { useCallback, useMemo } from 'react';
 
@@ -73,6 +75,39 @@ export const GeneratePromptFields = ({
 
   const handlePositivePromptChange = useCallback((positivePrompt: string) => onCommit({ positivePrompt }), [onCommit]);
 
+  const setTemplateViewMode = useCallback(
+    (promptTemplateViewMode: boolean) => onCommitImmediate({ promptTemplateViewMode }),
+    [onCommitImmediate]
+  );
+
+  // View mode is a way of reading one particular template, so it does not carry
+  // over to the next one. Left on, applying a template made the prompt box go
+  // read-only the instant it was picked, with no interaction to explain it.
+  const applyPromptTemplate = useCallback(
+    (promptTemplate: PromptTemplateSnapshot | null) =>
+      onCommitImmediate({ promptTemplate, promptTemplateViewMode: false }),
+    [onCommitImmediate]
+  );
+
+  /** Bake the template into the authored prompt and stop applying it. */
+  const flattenPromptTemplate = useCallback(
+    (positivePrompt: string) => {
+      if (!settings.promptTemplate) {
+        onCommitImmediate({ positivePrompt, promptTemplateViewMode: false });
+        return;
+      }
+
+      onCommitImmediate(
+        flattenPromptTemplateExpansion({
+          authoredNegativePrompt: promptValues.negativePrompt,
+          selectedPositivePrompt: positivePrompt,
+          template: settings.promptTemplate,
+        })
+      );
+    },
+    [onCommitImmediate, promptValues.negativePrompt, settings.promptTemplate]
+  );
+
   const handleDynamicPromptsChange = useCallback(
     (patch: Partial<DynamicPromptsConfig>) =>
       onCommitImmediate(
@@ -129,10 +164,15 @@ export const GeneratePromptFields = ({
         value={promptValues.positivePrompt}
         loras={settings.loras}
         projectId={projectId}
+        promptTemplate={settings.promptTemplate}
         selectedModel={selectedModel}
         showSyntaxHighlighting={showPromptSyntaxHighlighting}
+        isTemplateViewMode={settings.promptTemplateViewMode}
+        onApplyPromptTemplate={applyPromptTemplate}
         onChange={handlePositivePromptChange}
+        onFlattenPromptTemplate={flattenPromptTemplate}
         onResizeEnd={handlePositivePromptResizeEnd}
+        onTemplateViewModeChange={setTemplateViewMode}
         onUsePrompt={usePromptHistoryItem}
       />
       {promptPolicy.negativeVisible ? (
@@ -143,11 +183,14 @@ export const GeneratePromptFields = ({
           projectId={projectId}
           selectedModel={selectedModel}
           helpText={promptPolicy.negativeHelpText}
+          isTemplateViewMode={settings.promptTemplateViewMode}
           showSyntaxHighlighting={showPromptSyntaxHighlighting}
+          templateNegativePrompt={settings.promptTemplate?.negativePrompt ?? null}
           value={promptValues.negativePrompt}
           onEnabledChange={handleNegativePromptEnabledChange}
           onChange={handleNegativePromptChange}
           onResizeEnd={handleNegativePromptResizeEnd}
+          onTemplateViewModeChange={setTemplateViewMode}
         />
       ) : null}
     </Stack>
