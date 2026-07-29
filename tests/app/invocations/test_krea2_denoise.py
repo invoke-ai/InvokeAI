@@ -180,6 +180,10 @@ class _Transformer:
     def __init__(self) -> None:
         self.conditioning_values: list[float] = []
 
+    def set_attn_processor(self, processor) -> None:
+        # The real Krea2Transformer2DModel exposes this; denoise swaps in a memory-efficient attention processor.
+        pass
+
     def __call__(self, *, hidden_states, encoder_hidden_states, **_kwargs):
         self.conditioning_values.append(float(encoder_hidden_states.mean()))
         return (torch.zeros_like(hidden_states),)
@@ -305,6 +309,9 @@ def test_run_diffusion_uses_per_prompt_position_ids_when_lengths_differ(monkeypa
     image_seq_len = 1  # width=height=16 -> 2x2 latent -> a single 2x2 patch
 
     class _PositionIdChecker:
+        def set_attn_processor(self, processor) -> None:
+            pass
+
         def __call__(self, *, hidden_states, encoder_hidden_states, position_ids, **_kwargs):
             text_len = encoder_hidden_states.shape[1]
             pos_len = position_ids.shape[0]
@@ -443,3 +450,26 @@ def test_run_diffusion_mu_falls_back_to_krea2_defaults_for_absent_config_keys(mo
         max_shift=1.5,
     )
     assert captured == [pytest.approx(expected)]
+
+
+def test_estimate_working_memory_stays_within_a_24gb_card_at_high_res() -> None:
+    # Regression: with SDPA attention the footprint is ~linear with a small per-token constant. The previous
+    # ~2.6 MiB/token figure demanded ~36 GB at 2560x1440 (14400 tokens), exceeding a 24 GB card, so the cache
+    # offloaded the transformer itself to RAM and the forward pass hung. The estimate plus a fully-resident
+    # ~12.2 GB fp8 transformer must comfortably fit a 24 GB card so the encoder (not the transformer) is what
+    # gets evicted.
+    inv = Krea2DenoiseInvocation.model_construct(transformer=SimpleNamespace(loras=[]))
+    GB = 1024**3
+    transformer_bytes = int(12.3 * GB)  # Krea-2-Turbo fp8
+
+    # 2560x1440 -> (2560/16) x (1440/16) = 160 x 90 = 14400 image tokens.
+    est_hi = inv._estimate_working_memory(image_seq_len=14400, do_cfg=False, num_loras=0)
+    assert est_hi + transformer_bytes < 24 * GB
+
+    # 1280x720 -> 80 x 45 = 3600 image tokens.
+    est_lo = inv._estimate_working_memory(image_seq_len=3600, do_cfg=False, num_loras=0)
+    assert est_lo + transformer_bytes < 24 * GB
+
+    # Monotonic in tokens, and a non-trivial (multi-GB) reservation so eviction is actually triggered.
+    assert est_hi > est_lo
+    assert est_lo > 1 * GB

@@ -25,6 +25,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import TransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.krea2.attention import Krea2MemoryEfficientAttnProcessor
 from invokeai.backend.krea2.sampling_utils import (
     KREA2_BASE_IMAGE_SEQ_LEN,
     KREA2_BASE_SHIFT,
@@ -373,6 +374,12 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 transformer_info.model_on_device(working_mem_bytes=estimated_working_memory)
             )
 
+            # Krea-2 uses grouped-query attention (48 query / 12 KV heads). The stock attention processor asks
+            # SDPA for enable_gqa=True, which PyTorch only supports on the math backend — that materializes the
+            # full O(seq^2) score matrix (~5.7 GB per attention at 1280x720, ~40 GB at 2560x1440) and OOMs. Swap
+            # in a memory-efficient processor that expands the KV heads and uses the O(seq) SDPA kernel instead.
+            transformer.set_attn_processor(Krea2MemoryEfficientAttnProcessor())
+
             exit_stack.enter_context(
                 LayerPatcher.apply_smart_model_patches(
                     model=transformer,
@@ -445,21 +452,30 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     def _estimate_working_memory(self, image_seq_len: int, do_cfg: bool, num_loras: int) -> int:
         """Estimate peak transformer activation memory (bytes) so the model cache reserves enough headroom.
 
-        The MMDiT activation footprint scales with the number of image tokens. The per-token figure is
-        calibrated empirically against the Krea-2-Turbo transformer in bf16 (~2.6 MiB/token covers the
-        attention + feed-forward intermediates and the transient fp8->bf16 weight casts). LoRA sidecar
-        patches add their own (small) weights plus an extra activation branch per patched layer, so we add
-        a fixed margin per LoRA on top.
+        Krea-2's attention runs through diffusers' ``dispatch_attention_fn`` (SDPA / flash), so attention
+        scores are never materialized and the activation footprint scales ~linearly with the image token
+        count with a *small* per-token constant. The previous ~2.6 MiB/token figure assumed materialized
+        O(seq^2) scores and massively over-estimated: at 2560x1440 (14400 tokens) it demanded ~36 GB, which
+        exceeds a 24 GB card, so the cache offloaded the *transformer itself* to RAM and the forward pass ran
+        from system memory over PCIe — no OOM, but effectively hung (no step in minutes).
+
+        The per-token constant below is a safe upper bound on the measured SDPA activation footprint of the
+        Krea-2-Turbo MMDiT in bf16 (residual stream + one block's attention/SwiGLU intermediates), leaving
+        several GB of margin. A fixed base covers the resolution-independent overhead (transient fp8->bf16
+        layerwise weight casts, the text-fusion stage, and allocator/reserved-memory slack). LoRA sidecar
+        patches add a small extra activation branch per patched layer, so we add a per-LoRA margin.
         """
         GB = 1024**3
-        per_token_bytes = int(2.6 * 1024 * 1024)
+        MB = 1024**2
+        per_token_bytes = int(0.5 * MB)
         estimated = image_seq_len * per_token_bytes
+        estimated += int(1.5 * GB)
         if do_cfg:
             # Conditional/unconditional passes are sequential, but the larger combined sequence and extra
             # transient buffers warrant a modest bump.
             estimated = int(estimated * 1.1)
         if num_loras > 0:
-            estimated += int((1.5 + 0.5 * num_loras) * GB)
+            estimated += int(0.5 * num_loras * GB)
         return estimated
 
     def _build_step_callback(self, context: InvocationContext) -> Callable[[PipelineIntermediateState], None]:
