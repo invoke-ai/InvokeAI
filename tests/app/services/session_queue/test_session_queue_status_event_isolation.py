@@ -7,13 +7,12 @@ so unredacted fields would let owner A learn user B's identifiers.
 """
 
 import uuid
-from typing import Optional
 
 import pytest
 
+from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
 from invokeai.app.services.events.events_common import QueueItemStatusChangedEvent
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem
 from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
 from tests.test_nodes import PromptTestInvocation, TestEventService
@@ -45,6 +44,48 @@ def _insert_queue_item(session_queue: SqliteSessionQueue, user_id: str) -> int:
             ("default", session_json, session.id, batch_id, None, 0, None, None, None, None, user_id),
         )
         return cursor.lastrowid  # type: ignore[return-value]
+
+
+def _insert_waiting_workflow_call_parent(
+    session_queue: SqliteSessionQueue, user_id: str
+) -> tuple[int, GraphExecutionState]:
+    parent_graph = Graph()
+    parent_graph.add_node(CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-a"))
+    parent_session = GraphExecutionState(graph=parent_graph)
+    invocation = parent_session.next()
+    assert isinstance(invocation, CallSavedWorkflowInvocation)
+
+    frame = parent_session.build_workflow_call_frame(invocation.id, invocation.workflow_id)
+    child_session = parent_session.create_child_workflow_execution_state(Graph(), frame)
+    parent_session.begin_waiting_on_workflow_call(frame)
+    parent_session.attach_waiting_workflow_call_child_session(child_session)
+
+    batch_id = str(uuid.uuid4())
+    with session_queue._db.transaction() as cursor:
+        cursor.execute(
+            """--sql
+            INSERT INTO session_queue (
+                queue_id, session, session_id, batch_id, field_values,
+                priority, workflow, origin, destination, retried_from_item_id, user_id, status
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "default",
+                parent_session.model_dump_json(warnings=False, exclude_none=True),
+                parent_session.id,
+                batch_id,
+                None,
+                0,
+                None,
+                None,
+                None,
+                None,
+                user_id,
+                "waiting",
+            ),
+        )
+        return cursor.lastrowid, child_session  # type: ignore[return-value]
 
 
 def _last_status_event_for_item(event_bus: TestEventService, item_id: int) -> QueueItemStatusChangedEvent:
@@ -98,6 +139,25 @@ def test_event_redacts_other_users_current_item_identifiers(
     assert a_event.queue_status.canceled == 1
 
 
+def test_get_queue_status_does_not_load_full_current_session(
+    session_queue: SqliteSessionQueue, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    item_id = _insert_queue_item(session_queue, user_id="user-a")
+    in_progress = session_queue.dequeue()
+    assert in_progress is not None and in_progress.item_id == item_id
+
+    def fail_get_current(queue_id: str):
+        raise AssertionError(f"Unexpected full current-item load for queue {queue_id}")
+
+    monkeypatch.setattr(session_queue, "get_current", fail_get_current)
+
+    status = session_queue.get_queue_status("default")
+
+    assert status.item_id == item_id
+    assert status.session_id == in_progress.session_id
+    assert status.batch_id == in_progress.batch_id
+
+
 def test_event_preserves_owner_current_item_identifiers(
     session_queue: SqliteSessionQueue, mock_invoker: Invoker
 ) -> None:
@@ -125,20 +185,11 @@ def test_event_preserves_owner_current_item_identifiers(
     assert a_event.queue_status.completed == 1
 
 
-def test_event_redacts_when_current_item_disappears_between_reads(
+def test_event_redaction_uses_same_lightweight_snapshot(
     session_queue: SqliteSessionQueue,
     mock_invoker: Invoker,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Regression: _set_queue_item_status reads get_current twice — once via
-    get_queue_status (which embeds the in-progress item's identifiers into the
-    SessionQueueStatus) and once again to decide whether to redact those
-    identifiers. The two reads are not atomic. If user B is the in-progress
-    item when the first read happens, and B then completes/cancels before the
-    second read, the redaction guard sees current_item is None and skips
-    scrubbing — leaving B's item_id, session_id, and batch_id in the event
-    sent to user A. The fix must make the redaction decision derive from the
-    same snapshot that supplied the embedded identifiers."""
+    """The status query must use one lightweight snapshot for identifiers and redaction."""
     user_a = "user-a"
     user_b = "user-b"
 
@@ -149,33 +200,11 @@ def test_event_redacts_when_current_item_disappears_between_reads(
     assert in_progress is not None and in_progress.item_id == b_item_id
     assert in_progress.user_id == user_b
 
-    real_get_current = session_queue.get_current
-    b_snapshot = real_get_current(queue_id="default")
-    assert b_snapshot is not None and b_snapshot.user_id == user_b
-
-    # Simulate the race: the read inside get_queue_status sees B's in-progress
-    # item; the redaction read returns None as if B finished in between.
-    call_count = {"n": 0}
-
-    def racey_get_current(queue_id: str) -> Optional[SessionQueueItem]:
-        call_count["n"] += 1
-        if call_count["n"] == 1:
-            return b_snapshot
-        return None
-
-    monkeypatch.setattr(session_queue, "get_current", racey_get_current)
-
     event_bus: TestEventService = mock_invoker.services.events
     event_bus.events.clear()
 
     canceled = session_queue.cancel_queue_item(a_item_id)
     assert canceled.user_id == user_a
-    # The patched read must have been consulted at least once. The pre-fix
-    # implementation made two reads (embedding + redaction) and leaked when
-    # the second returned None; the fixed implementation makes a single read
-    # whose snapshot drives both embedding and redaction. Either way, the
-    # invariant below is the one that matters.
-    assert call_count["n"] >= 1
 
     a_event = _last_status_event_for_item(event_bus, a_item_id)
     assert a_event.user_id == user_a
@@ -208,3 +237,62 @@ def test_event_preserves_identifiers_when_current_item_is_the_changed_item(
     assert a_event.queue_status.item_id == a_item_id
     assert a_event.queue_status.session_id == in_progress.session_id
     assert a_event.queue_status.batch_id == in_progress.batch_id
+
+
+def test_event_carries_owner_per_user_counts(session_queue: SqliteSessionQueue, mock_invoker: Invoker) -> None:
+    """The embedded queue_status carries the event owner's per-user counts so the owner's client
+    can update personal UI (progress bar, spinner, favicon) from the event immediately, without
+    waiting for a status refetch. The sanitized companion nulls these before reaching non-owners."""
+    user_a = "user-a"
+    user_b = "user-b"
+
+    b_item_id = _insert_queue_item(session_queue, user_id=user_b)
+    a_item_1 = _insert_queue_item(session_queue, user_id=user_a)
+    _a_item_2 = _insert_queue_item(session_queue, user_id=user_a)
+
+    in_progress = session_queue.dequeue()
+    assert in_progress is not None and in_progress.item_id == b_item_id
+
+    event_bus: TestEventService = mock_invoker.services.events
+    event_bus.events.clear()
+
+    session_queue.cancel_queue_item(a_item_1)
+
+    a_event = _last_status_event_for_item(event_bus, a_item_1)
+    assert a_event.user_id == user_a
+    # Global counts: A's remaining pending item, B's in-progress item.
+    assert a_event.queue_status.pending == 1
+    assert a_event.queue_status.in_progress == 1
+    # Owner-scoped counts: A has one pending item left and nothing in progress.
+    assert a_event.queue_status.user_pending == 1
+    assert a_event.queue_status.user_in_progress == 0
+
+
+def test_workflow_call_child_enqueue_event_redacts_other_users_current_item_identifiers(
+    session_queue: SqliteSessionQueue, mock_invoker: Invoker
+) -> None:
+    """The child enqueue path emits QueueItemStatusChangedEvent without going through
+    _set_queue_item_status, so it must apply the same per-owner current-item redaction."""
+    user_a = "user-a"
+    user_b = "user-b"
+
+    b_item_id = _insert_queue_item(session_queue, user_id=user_b)
+    parent_item_id, child_session = _insert_waiting_workflow_call_parent(session_queue, user_id=user_a)
+
+    in_progress = session_queue.dequeue()
+    assert in_progress is not None and in_progress.item_id == b_item_id
+    assert in_progress.user_id == user_b
+
+    event_bus: TestEventService = mock_invoker.services.events
+    event_bus.events.clear()
+
+    parent_queue_item = session_queue.get_queue_item(parent_item_id)
+    child_queue_item = session_queue.enqueue_workflow_call_child(parent_queue_item, child_session)
+
+    child_event = _last_status_event_for_item(event_bus, child_queue_item.item_id)
+    assert child_event.user_id == user_a
+    assert child_event.queue_status.item_id is None, "must not leak other user's current item_id"
+    assert child_event.queue_status.session_id is None, "must not leak other user's current session_id"
+    assert child_event.queue_status.batch_id is None, "must not leak other user's current batch_id"
+    assert child_event.queue_status.in_progress == 1
+    assert child_event.queue_status.waiting == 1

@@ -2,6 +2,7 @@ import { deepClone } from 'common/util/deepClone';
 import { merge } from 'es-toolkit/compat';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type {
+  AnimaLLLiteConfig,
   CanvasControlLayerState,
   CanvasImageState,
   CanvasInpaintMaskState,
@@ -21,6 +22,7 @@ import type {
   RegionalGuidanceIPAdapterConfig,
   RgbColor,
   T2IAdapterConfig,
+  WanReferenceImageConfig,
   ZImageControlConfig,
 } from 'features/controlLayers/store/types';
 import type { ImageDTO } from 'services/api/types';
@@ -122,6 +124,10 @@ export const initialQwenImageReferenceImage: QwenImageReferenceImageConfig = {
   type: 'qwen_image_reference_image',
   image: null,
 };
+export const initialWanReferenceImage: WanReferenceImageConfig = {
+  type: 'wan_reference_image',
+  image: null,
+};
 export const initialT2IAdapter: T2IAdapterConfig = {
   type: 't2i_adapter',
   model: null,
@@ -144,6 +150,12 @@ export const initialZImageControl: ZImageControlConfig = {
   type: 'z_image_control',
   model: null,
   weight: 0.75, // control_context_scale, recommended 0.65-0.80
+  beginEndStepPct: [0, 1],
+};
+export const initialAnimaLLLite: AnimaLLLiteConfig = {
+  type: 'anima_lllite',
+  model: null,
+  weight: 1,
   beginEndStepPct: [0, 1],
 };
 

@@ -5,6 +5,7 @@ import { debounce } from 'es-toolkit';
 import { $templates } from 'features/nodes/store/nodesSlice';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { NodesState, Templates } from 'features/nodes/store/types';
+import { nodeAcceptsExtraInputs } from 'features/nodes/types/extraInputs';
 import type {
   FieldInputInstance,
   FieldInputTemplate,
@@ -36,7 +37,12 @@ import {
   isStringFieldCollectionInputInstance,
   isStringFieldCollectionInputTemplate,
 } from 'features/nodes/types/field';
-import { type InvocationNode, type InvocationTemplate, isInvocationNode } from 'features/nodes/types/invocation';
+import {
+  getInvocationNodeInputTemplate,
+  type InvocationNode,
+  type InvocationTemplate,
+  isInvocationNode,
+} from 'features/nodes/types/invocation';
 import { t } from 'i18next';
 import { map } from 'nanostores';
 import { useEffect } from 'react';
@@ -272,9 +278,14 @@ export const getInvocationNodeErrors = (
   }
 
   for (const [fieldName, field] of Object.entries(node.data.inputs)) {
-    const fieldTemplate = nodeTemplate.inputs[fieldName];
+    const fieldTemplate = getInvocationNodeInputTemplate(node.data, nodeTemplate, fieldName);
 
     if (!fieldTemplate) {
+      // Backend nodes with `extra='allow'` accept inputs that aren't declared in the OpenAPI
+      // schema; these carry recall metadata and don't need template-based validation.
+      if (nodeAcceptsExtraInputs(node.data.type)) {
+        continue;
+      }
       errors.push({ type: 'node-error', nodeId, issue: t('parameters.invoke.missingFieldTemplate') });
       continue;
     }
@@ -307,9 +318,12 @@ const syncNodeErrors = (nodesState: NodesState, templates: Templates) => {
     }
 
     for (const [fieldName, field] of Object.entries(node.data.inputs)) {
-      const fieldTemplate = nodeTemplate.inputs[fieldName];
+      const fieldTemplate = getInvocationNodeInputTemplate(node.data, nodeTemplate, fieldName);
 
       if (!fieldTemplate) {
+        if (nodeAcceptsExtraInputs(node.data.type)) {
+          continue;
+        }
         errors.push({ type: 'node-error', nodeId: node.id, issue: t('parameters.invoke.missingFieldTemplate') });
         $nodeErrors.setKey(node.id, errors);
         continue;

@@ -12,9 +12,11 @@ from invokeai.backend.model_manager.configs.external_api import (
 from invokeai.backend.model_manager.taxonomy import (
     AnyVariant,
     BaseModelType,
+    Krea2VariantType,
     ModelFormat,
     ModelType,
     QwenImageVariantType,
+    WanVariantType,
 )
 
 
@@ -99,6 +101,24 @@ t5_8b_quantized_encoder = StarterModel(
     description="T5-XXL text encoder with bitsandbytes LLM.int8() quantization (used in FLUX pipelines). ~5GB",
     type=ModelType.T5Encoder,
     format=ModelFormat.BnbQuantizedLlmInt8b,
+)
+
+t5_gguf_q3_k_s_encoder = StarterModel(
+    name="t5_gguf_q3_k_s_encoder",
+    base=BaseModelType.Any,
+    source="https://huggingface.co/city96/t5-v1_1-xxl-encoder-gguf/resolve/main/t5-v1_1-xxl-encoder-Q3_K_S.gguf",
+    description="T5-XXL text encoder, GGUF Q3_K_S quantized (used in FLUX pipelines). Smallest size for low VRAM, lower quality. ~2.1GB",
+    type=ModelType.T5Encoder,
+    format=ModelFormat.GGUFQuantized,
+)
+
+t5_gguf_q6_k_encoder = StarterModel(
+    name="t5_gguf_q6_k_encoder",
+    base=BaseModelType.Any,
+    source="https://huggingface.co/city96/t5-v1_1-xxl-encoder-gguf/resolve/main/t5-v1_1-xxl-encoder-Q6_K.gguf",
+    description="T5-XXL text encoder, GGUF Q6_K quantized (used in FLUX pipelines). Near-lossless quality. ~3.9GB",
+    type=ModelType.T5Encoder,
+    format=ModelFormat.GGUFQuantized,
 )
 
 clip_l_encoder = StarterModel(
@@ -1085,6 +1105,68 @@ z_image_controlnet_tile = StarterModel(
 )
 # endregion
 
+# region Krea-2
+# Standalone Qwen3-VL text encoder used by Krea-2 (distinct from the Qwen2.5-VL encoder above). Pair
+# with single-file / GGUF Krea-2 transformers, which ship only the transformer. The Qwen-Image VAE
+# dependency reuses the `qwen_image_vae` starter defined in the Qwen Image region.
+qwen3_vl_encoder_4b = StarterModel(
+    name="Qwen3-VL 4B Encoder (Diffusers)",
+    base=BaseModelType.Any,
+    source="Qwen/Qwen3-VL-4B-Instruct",
+    description="Qwen3-VL 4B text encoder (Qwen3VLModel) used by Krea-2, in HuggingFace folder layout "
+    "(includes tokenizer). Use with single-file / GGUF Krea-2 transformers. (~8GB)",
+    type=ModelType.Qwen3VLEncoder,
+    format=ModelFormat.Qwen3VLEncoder,
+)
+
+krea2_turbo = StarterModel(
+    name="Krea-2 Turbo",
+    base=BaseModelType.Krea2,
+    source="krea/Krea-2-Turbo",
+    description="Krea-2 Turbo - distilled 12B parameter text-to-image model (8 steps, CFG disabled). "
+    "Full diffusers pipeline including the Qwen-Image VAE and Qwen3-VL text encoder. ~26GB",
+    type=ModelType.Main,
+    variant=Krea2VariantType.Turbo,
+)
+
+krea2_raw = StarterModel(
+    name="Krea-2 Raw",
+    base=BaseModelType.Krea2,
+    source="krea/Krea-2-Raw",
+    description="Krea-2 Raw - undistilled 12B base model (28 steps, CFG enabled). Full diffusers pipeline "
+    "including the Qwen-Image VAE and Qwen3-VL text encoder. Primarily a base for finetuning / LoRA "
+    "training; Turbo is recommended for standard inference. ~26GB",
+    type=ModelType.Main,
+    variant=Krea2VariantType.Base,
+)
+
+krea2_turbo_gguf_q4_k_m = StarterModel(
+    name="Krea-2 Turbo (Q4_K_M GGUF)",
+    base=BaseModelType.Krea2,
+    source="https://huggingface.co/vantagewithai/Krea-2-Turbo-GGUF/resolve/main/krea2_turbo-Q4_K_M.gguf",
+    description="Krea-2 Turbo transformer quantized to GGUF Q4_K_M for lower VRAM (~7GB transformer). "
+    "GGUF ships only the transformer, so the Qwen-Image VAE and Qwen3-VL encoder are installed as "
+    "dependencies.",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    variant=Krea2VariantType.Turbo,
+    dependencies=[qwen_image_vae, qwen3_vl_encoder_4b],
+)
+
+krea2_turbo_gguf_q8_0 = StarterModel(
+    name="Krea-2 Turbo (Q8_0 GGUF)",
+    base=BaseModelType.Krea2,
+    source="https://huggingface.co/vantagewithai/Krea-2-Turbo-GGUF/resolve/main/krea2_turbo-Q8_0.gguf",
+    description="Krea-2 Turbo transformer quantized to GGUF Q8_0 (near-full quality, ~13GB transformer). "
+    "GGUF ships only the transformer, so the Qwen-Image VAE and Qwen3-VL encoder are installed as "
+    "dependencies.",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    variant=Krea2VariantType.Turbo,
+    dependencies=[qwen_image_vae, qwen3_vl_encoder_4b],
+)
+# endregion
+
 # region External API
 GEMINI_3_IMAGE_ALLOWED_ASPECT_RATIOS = [
     "1:1",
@@ -1299,6 +1381,229 @@ alibabacloud_qwen_image_max = StarterModel(
     default_settings=ExternalApiModelDefaultSettings(width=1328, height=1328, num_images=1),
     panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
 )
+# region Wan 2.2 (local)
+# Shared components — all Wan 2.2 variants use the UMT5-XXL text encoder. A14B
+# (both T2V and I2V) uses a 16-channel VAE; TI2V-5B uses a 48-channel VAE. The
+# two VAEs are not interchangeable.
+wan_22_t5_encoder = StarterModel(
+    name="Wan T5 Encoder (UMT5-XXL)",
+    base=BaseModelType.Any,
+    source="Wan-AI/Wan2.2-T2V-A14B-Diffusers::text_encoder+tokenizer",
+    description="UMT5-XXL text encoder used by all Wan 2.2 variants (T2V/I2V A14B and TI2V-5B). "
+    "Required when running a GGUF Wan main without a Diffusers Component Source. (~11GB)",
+    type=ModelType.WanT5Encoder,
+    format=ModelFormat.WanT5Encoder,
+)
+
+wan_22_a14b_vae = StarterModel(
+    name="Wan 2.2 A14B VAE",
+    base=BaseModelType.Wan,
+    source="Wan-AI/Wan2.2-T2V-A14B-Diffusers::vae/diffusion_pytorch_model.safetensors",
+    description="Wan 2.2 A14B VAE (16-channel). Shared between T2V and I2V A14B variants. "
+    "Not interchangeable with the TI2V-5B VAE. (~250MB)",
+    type=ModelType.VAE,
+    format=ModelFormat.Checkpoint,
+)
+
+wan_22_5b_vae = StarterModel(
+    name="Wan 2.2 TI2V-5B VAE",
+    base=BaseModelType.Wan,
+    source="Wan-AI/Wan2.2-TI2V-5B-Diffusers::vae/diffusion_pytorch_model.safetensors",
+    description="Wan 2.2 TI2V-5B VAE (48-channel). Required for the TI2V-5B model family. "
+    "Not interchangeable with the A14B VAE. (~400MB)",
+    type=ModelType.VAE,
+    format=ModelFormat.Checkpoint,
+)
+
+# T2V A14B — full Diffusers + GGUF expert pairs (Q4_K_M and Q8_0).
+# The high-noise GGUF is the "main" entry the user picks; the low-noise GGUF
+# is wired as the partner expert via the Advanced panel. Each high-noise entry
+# lists its low-noise partner plus the shared VAE/encoder as dependencies so
+# the bundle/dependency installer pulls everything together.
+wan_22_t2v_a14b_diffusers = StarterModel(
+    name="Wan 2.2 T2V A14B (Diffusers)",
+    base=BaseModelType.Wan,
+    source="Wan-AI/Wan2.2-T2V-A14B-Diffusers",
+    description="Full Diffusers Wan 2.2 T2V A14B model — both expert transformers, VAE, and UMT5-XXL "
+    "encoder in a single folder. No additional components needed. (~80GB)",
+    type=ModelType.Main,
+    format=ModelFormat.Diffusers,
+    variant=WanVariantType.T2V_A14B,
+)
+
+wan_22_t2v_a14b_low_gguf_q4_k_m = StarterModel(
+    name="Wan 2.2 T2V A14B Low Noise (Q4_K_M)",
+    base=BaseModelType.Wan,
+    source="https://huggingface.co/QuantStack/Wan2.2-T2V-A14B-GGUF/resolve/main/LowNoise/Wan2.2-T2V-A14B-LowNoise-Q4_K_M.gguf",
+    description="Wan 2.2 T2V A14B low-noise expert transformer (Q4_K_M). Paired with the high-noise "
+    "expert; selected via the Advanced 'Transformer (Low Noise)' field. (~9.7GB)",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    variant=WanVariantType.T2V_A14B,
+)
+
+wan_22_t2v_a14b_gguf_q4_k_m = StarterModel(
+    name="Wan 2.2 T2V A14B High Noise (Q4_K_M)",
+    base=BaseModelType.Wan,
+    source="https://huggingface.co/QuantStack/Wan2.2-T2V-A14B-GGUF/resolve/main/HighNoise/Wan2.2-T2V-A14B-HighNoise-Q4_K_M.gguf",
+    description="Wan 2.2 T2V A14B high-noise expert transformer (Q4_K_M). Pick this as the main model; "
+    "the low-noise partner is wired in Advanced. Good quality/size balance. (~9.7GB)",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    variant=WanVariantType.T2V_A14B,
+    dependencies=[wan_22_a14b_vae, wan_22_t5_encoder, wan_22_t2v_a14b_low_gguf_q4_k_m],
+)
+
+wan_22_t2v_a14b_low_gguf_q8_0 = StarterModel(
+    name="Wan 2.2 T2V A14B Low Noise (Q8_0)",
+    base=BaseModelType.Wan,
+    source="https://huggingface.co/QuantStack/Wan2.2-T2V-A14B-GGUF/resolve/main/LowNoise/Wan2.2-T2V-A14B-LowNoise-Q8_0.gguf",
+    description="Wan 2.2 T2V A14B low-noise expert transformer (Q8_0). Highest quality quantization. (~15.4GB)",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    variant=WanVariantType.T2V_A14B,
+)
+
+wan_22_t2v_a14b_gguf_q8_0 = StarterModel(
+    name="Wan 2.2 T2V A14B High Noise (Q8_0)",
+    base=BaseModelType.Wan,
+    source="https://huggingface.co/QuantStack/Wan2.2-T2V-A14B-GGUF/resolve/main/HighNoise/Wan2.2-T2V-A14B-HighNoise-Q8_0.gguf",
+    description="Wan 2.2 T2V A14B high-noise expert transformer (Q8_0). Pick as the main; pair with the "
+    "low-noise Q8_0 partner in Advanced. Highest quality quantization. (~15.4GB)",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    variant=WanVariantType.T2V_A14B,
+    dependencies=[wan_22_a14b_vae, wan_22_t5_encoder, wan_22_t2v_a14b_low_gguf_q8_0],
+)
+
+# T2V Lightning LoRAs — V1.1 Seko rank-64 pair (4-step inference).
+wan_22_t2v_lightning_high = StarterModel(
+    name="Wan 2.2 T2V Lightning High Noise (4-step, V1.1)",
+    base=BaseModelType.Wan,
+    source="https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-rank64-Seko-V1.1/high_noise_model.safetensors",
+    description="Lightning distillation LoRA for the Wan 2.2 T2V A14B high-noise expert — enables "
+    "4-step generation. Use together with the low-noise variant. Settings: Steps=4, CFG=1.",
+    type=ModelType.LoRA,
+)
+
+wan_22_t2v_lightning_low = StarterModel(
+    name="Wan 2.2 T2V Lightning Low Noise (4-step, V1.1)",
+    base=BaseModelType.Wan,
+    source="https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-rank64-Seko-V1.1/low_noise_model.safetensors",
+    description="Lightning distillation LoRA for the Wan 2.2 T2V A14B low-noise expert — enables "
+    "4-step generation. Use together with the high-noise variant. Settings: Steps=4, CFG=1.",
+    type=ModelType.LoRA,
+)
+
+# I2V A14B — full Diffusers + GGUF expert pairs (Q4_K_M and Q8_0).
+wan_22_i2v_a14b_diffusers = StarterModel(
+    name="Wan 2.2 I2V A14B (Diffusers)",
+    base=BaseModelType.Wan,
+    source="Wan-AI/Wan2.2-I2V-A14B-Diffusers",
+    description="Full Diffusers Wan 2.2 I2V A14B model — both expert transformers, VAE, and UMT5-XXL "
+    "encoder. Use the Reference Images panel to provide the conditioning image. (~80GB)",
+    type=ModelType.Main,
+    format=ModelFormat.Diffusers,
+    variant=WanVariantType.I2V_A14B,
+)
+
+wan_22_i2v_a14b_low_gguf_q4_k_m = StarterModel(
+    name="Wan 2.2 I2V A14B Low Noise (Q4_K_M)",
+    base=BaseModelType.Wan,
+    source="https://huggingface.co/QuantStack/Wan2.2-I2V-A14B-GGUF/resolve/main/LowNoise/Wan2.2-I2V-A14B-LowNoise-Q4_K_M.gguf",
+    description="Wan 2.2 I2V A14B low-noise expert transformer (Q4_K_M). (~9.7GB)",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    variant=WanVariantType.I2V_A14B,
+)
+
+wan_22_i2v_a14b_gguf_q4_k_m = StarterModel(
+    name="Wan 2.2 I2V A14B High Noise (Q4_K_M)",
+    base=BaseModelType.Wan,
+    source="https://huggingface.co/QuantStack/Wan2.2-I2V-A14B-GGUF/resolve/main/HighNoise/Wan2.2-I2V-A14B-HighNoise-Q4_K_M.gguf",
+    description="Wan 2.2 I2V A14B high-noise expert transformer (Q4_K_M). Pick as the main; pair with "
+    "the low-noise partner in Advanced. Use the Reference Images panel for the conditioning image. (~9.7GB)",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    variant=WanVariantType.I2V_A14B,
+    dependencies=[wan_22_a14b_vae, wan_22_t5_encoder, wan_22_i2v_a14b_low_gguf_q4_k_m],
+)
+
+wan_22_i2v_a14b_low_gguf_q8_0 = StarterModel(
+    name="Wan 2.2 I2V A14B Low Noise (Q8_0)",
+    base=BaseModelType.Wan,
+    source="https://huggingface.co/QuantStack/Wan2.2-I2V-A14B-GGUF/resolve/main/LowNoise/Wan2.2-I2V-A14B-LowNoise-Q8_0.gguf",
+    description="Wan 2.2 I2V A14B low-noise expert transformer (Q8_0). Highest quality quantization. (~15.4GB)",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    variant=WanVariantType.I2V_A14B,
+)
+
+wan_22_i2v_a14b_gguf_q8_0 = StarterModel(
+    name="Wan 2.2 I2V A14B High Noise (Q8_0)",
+    base=BaseModelType.Wan,
+    source="https://huggingface.co/QuantStack/Wan2.2-I2V-A14B-GGUF/resolve/main/HighNoise/Wan2.2-I2V-A14B-HighNoise-Q8_0.gguf",
+    description="Wan 2.2 I2V A14B high-noise expert transformer (Q8_0). Highest quality quantization. (~15.4GB)",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    variant=WanVariantType.I2V_A14B,
+    dependencies=[wan_22_a14b_vae, wan_22_t5_encoder, wan_22_i2v_a14b_low_gguf_q8_0],
+)
+
+# I2V Lightning LoRAs — Seko rank-64 pair (4-step inference). Currently only V1.
+wan_22_i2v_lightning_high = StarterModel(
+    name="Wan 2.2 I2V Lightning High Noise (4-step, V1)",
+    base=BaseModelType.Wan,
+    source="https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-I2V-A14B-4steps-lora-rank64-Seko-V1/high_noise_model.safetensors",
+    description="Lightning distillation LoRA for the Wan 2.2 I2V A14B high-noise expert — enables "
+    "4-step image-to-image generation. Use together with the low-noise variant. Settings: Steps=4, CFG=1.",
+    type=ModelType.LoRA,
+)
+
+wan_22_i2v_lightning_low = StarterModel(
+    name="Wan 2.2 I2V Lightning Low Noise (4-step, V1)",
+    base=BaseModelType.Wan,
+    source="https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-I2V-A14B-4steps-lora-rank64-Seko-V1/low_noise_model.safetensors",
+    description="Lightning distillation LoRA for the Wan 2.2 I2V A14B low-noise expert — enables "
+    "4-step image-to-image generation. Use together with the high-noise variant. Settings: Steps=4, CFG=1.",
+    type=ModelType.LoRA,
+)
+
+# TI2V-5B — single-transformer model (no expert pair). Uses its own 48-channel VAE.
+wan_22_ti2v_5b_diffusers = StarterModel(
+    name="Wan 2.2 TI2V-5B (Diffusers)",
+    base=BaseModelType.Wan,
+    source="Wan-AI/Wan2.2-TI2V-5B-Diffusers",
+    description="Full Diffusers Wan 2.2 TI2V-5B model — single 5B transformer, 48-channel VAE, and "
+    "UMT5-XXL encoder. Smaller and faster than A14B; runs on consumer GPUs. (~20GB)",
+    type=ModelType.Main,
+    format=ModelFormat.Diffusers,
+    variant=WanVariantType.TI2V_5B,
+)
+
+wan_22_ti2v_5b_gguf_q4_k_m = StarterModel(
+    name="Wan 2.2 TI2V-5B (Q4_K_M)",
+    base=BaseModelType.Wan,
+    source="https://huggingface.co/QuantStack/Wan2.2-TI2V-5B-GGUF/resolve/main/Wan2.2-TI2V-5B-Q4_K_M.gguf",
+    description="Wan 2.2 TI2V-5B transformer (Q4_K_M). Single-expert model — no low-noise partner needed. (~3.4GB)",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    variant=WanVariantType.TI2V_5B,
+    dependencies=[wan_22_5b_vae, wan_22_t5_encoder],
+)
+
+wan_22_ti2v_5b_gguf_q8_0 = StarterModel(
+    name="Wan 2.2 TI2V-5B (Q8_0)",
+    base=BaseModelType.Wan,
+    source="https://huggingface.co/QuantStack/Wan2.2-TI2V-5B-GGUF/resolve/main/Wan2.2-TI2V-5B-Q8_0.gguf",
+    description="Wan 2.2 TI2V-5B transformer (Q8_0). Highest quality quantization. (~5.4GB)",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    variant=WanVariantType.TI2V_5B,
+    dependencies=[wan_22_5b_vae, wan_22_t5_encoder],
+)
+# endregion
+
 alibabacloud_wan26_t2i = StarterModel(
     name="Wan 2.6 Text-to-Image",
     base=BaseModelType.External,
@@ -1572,6 +1877,84 @@ anima_base = StarterModel(
     format=ModelFormat.Checkpoint,
     dependencies=[anima_qwen3_encoder, anima_vae],
 )
+
+anima_lllite_inpainting = StarterModel(
+    name="Anima LLLite Inpainting",
+    base=BaseModelType.Anima,
+    source="https://huggingface.co/kohya-ss/Anima-LLLite/resolve/main/anima-lllite-inpainting-v2.safetensors",
+    description="ControlNet-LLLite inpainting adapter for Anima by kohya-ss. Conditions the model on the masked image content during inpainting/outpainting. ~66MB",
+    type=ModelType.ControlNet,
+    format=ModelFormat.Checkpoint,
+)
+
+anima_lllite_sketch = StarterModel(
+    name="Anima LLLite Sketch",
+    base=BaseModelType.Anima,
+    source="https://huggingface.co/kohya-ss/Anima-LLLite/resolve/main/anima-lllite-any-test-like-v2.safetensors",
+    description="ControlNet-LLLite control adapter for Anima by kohya-ss. Trained on mixed scribble/HED/lineart/grayscale conditioning images. ~16MB",
+    type=ModelType.ControlNet,
+    format=ModelFormat.Checkpoint,
+)
+
+anima_lllite_depth_preview3 = StarterModel(
+    name="Anima LLLite Depth (Preview3)",
+    base=BaseModelType.Anima,
+    source="https://huggingface.co/kohya-ss/Anima-LLLite/resolve/main/anima-lllite-depth-1.safetensors",
+    description="ControlNet-LLLite depth adapter for Anima by kohya-ss. Trained on the Preview3 build; reduced quality on Anima Base 1.0. ~8MB",
+    type=ModelType.ControlNet,
+    format=ModelFormat.Checkpoint,
+)
+
+anima_lllite_scribble_preview3 = StarterModel(
+    name="Anima LLLite Scribble (Preview3)",
+    base=BaseModelType.Anima,
+    source="https://huggingface.co/kohya-ss/Anima-LLLite/resolve/main/anima-lllite-scribble-1.safetensors",
+    description="ControlNet-LLLite scribble adapter for Anima by kohya-ss. Trained on the Preview3 build; reduced quality on Anima Base 1.0. ~8MB",
+    type=ModelType.ControlNet,
+    format=ModelFormat.Checkpoint,
+)
+
+anima_lllite_lineart_preview3 = StarterModel(
+    name="Anima LLLite Lineart (Preview3)",
+    base=BaseModelType.Anima,
+    source="https://huggingface.co/kohya-ss/Anima-LLLite/resolve/main/anima-lllite-lineart-1.safetensors",
+    description="ControlNet-LLLite lineart adapter for Anima by kohya-ss. Trained on the Preview3 build; reduced quality on Anima Base 1.0. ~8MB",
+    type=ModelType.ControlNet,
+    format=ModelFormat.Checkpoint,
+)
+
+anima_lllite_pose_preview3 = StarterModel(
+    name="Anima LLLite Pose (Preview3)",
+    base=BaseModelType.Anima,
+    source="https://huggingface.co/kohya-ss/Anima-LLLite/resolve/main/anima-lllite-pose-1.safetensors",
+    description="ControlNet-LLLite pose adapter for Anima by kohya-ss. Trained on the Preview3 build; notably weak on Anima Base 1.0. ~23MB",
+    type=ModelType.ControlNet,
+    format=ModelFormat.Checkpoint,
+)
+# endregion
+
+# region Ideogram 4
+# Self-contained diffusers pipelines (both transformers + Qwen3-VL text encoder + VAE in one folder), so
+# no separate dependencies. Gated, non-commercial license: the license must be accepted on the
+# HuggingFace model page and a HuggingFace token configured before the download will succeed — same as
+# FLUX.1 dev.
+ideogram_4_nf4 = StarterModel(
+    name="Ideogram 4 (nf4)",
+    base=BaseModelType.Ideogram4,
+    source="ideogram-ai/ideogram-4-nf4",
+    description="Ideogram 4 text-to-image in nf4-quantized Diffusers format (CUDA only). Structured JSON "
+    "prompting with regional layout control. Non-commercial license — accept it on HuggingFace first. ~16GB",
+    type=ModelType.Main,
+)
+
+ideogram_4_fp8 = StarterModel(
+    name="Ideogram 4 (fp8)",
+    base=BaseModelType.Ideogram4,
+    source="ideogram-ai/ideogram-4-fp8",
+    description="Ideogram 4 text-to-image in fp8-quantized Diffusers format (runs on any device, higher "
+    "memory use). Non-commercial license — accept it on HuggingFace first. ~26GB",
+    type=ModelType.Main,
+)
 # endregion
 
 # List of starter models, displayed on the frontend.
@@ -1584,6 +1967,8 @@ STARTER_MODELS: list[StarterModel] = [
     flux_dev,
     sd35_medium,
     sd35_large,
+    ideogram_4_nf4,
+    ideogram_4_fp8,
     cyberrealistic_sd1,
     rev_animated_sd1,
     dreamshaper_8_sd1,
@@ -1642,6 +2027,8 @@ STARTER_MODELS: list[StarterModel] = [
     swinir,
     t5_base_encoder,
     t5_8b_quantized_encoder,
+    t5_gguf_q3_k_s_encoder,
+    t5_gguf_q6_k_encoder,
     clip_l_encoder,
     siglip,
     flux_redux,
@@ -1690,6 +2077,31 @@ STARTER_MODELS: list[StarterModel] = [
     z_image_qwen3_encoder_quantized,
     z_image_controlnet_union,
     z_image_controlnet_tile,
+    krea2_turbo,
+    krea2_raw,
+    krea2_turbo_gguf_q4_k_m,
+    krea2_turbo_gguf_q8_0,
+    qwen3_vl_encoder_4b,
+    wan_22_t5_encoder,
+    wan_22_a14b_vae,
+    wan_22_5b_vae,
+    wan_22_t2v_a14b_diffusers,
+    wan_22_t2v_a14b_low_gguf_q4_k_m,
+    wan_22_t2v_a14b_gguf_q4_k_m,
+    wan_22_t2v_a14b_low_gguf_q8_0,
+    wan_22_t2v_a14b_gguf_q8_0,
+    wan_22_t2v_lightning_high,
+    wan_22_t2v_lightning_low,
+    wan_22_i2v_a14b_diffusers,
+    wan_22_i2v_a14b_low_gguf_q4_k_m,
+    wan_22_i2v_a14b_gguf_q4_k_m,
+    wan_22_i2v_a14b_low_gguf_q8_0,
+    wan_22_i2v_a14b_gguf_q8_0,
+    wan_22_i2v_lightning_high,
+    wan_22_i2v_lightning_low,
+    wan_22_ti2v_5b_diffusers,
+    wan_22_ti2v_5b_gguf_q4_k_m,
+    wan_22_ti2v_5b_gguf_q8_0,
     gemini_flash_image,
     gemini_pro_image_preview,
     gemini_3_1_flash_image_preview,
@@ -1710,6 +2122,12 @@ STARTER_MODELS: list[StarterModel] = [
     anima_base,
     anima_qwen3_encoder,
     anima_vae,
+    anima_lllite_inpainting,
+    anima_lllite_sketch,
+    anima_lllite_depth_preview3,
+    anima_lllite_scribble_preview3,
+    anima_lllite_lineart_preview3,
+    anima_lllite_pose_preview3,
 ]
 
 sd1_bundle: list[StarterModel] = [
@@ -1797,6 +2215,47 @@ anima_bundle: list[StarterModel] = [
     anima_base,
     anima_qwen3_encoder,
     anima_vae,
+    anima_lllite_inpainting,
+    anima_lllite_sketch,
+]
+
+krea2_bundle: list[StarterModel] = [
+    qwen_image_vae,
+    qwen3_vl_encoder_4b,
+    krea2_turbo,
+    krea2_raw,
+    krea2_turbo_gguf_q4_k_m,
+    krea2_turbo_gguf_q8_0,
+]
+
+# Wan 2.2 starter bundles. Split into T2V and I2V so users only pay for the
+# capability they need: a 12 GB card can install just the T2V bundle and have
+# both text-to-video (T2V-A14B) and a low-VRAM image-to-video option (via
+# TI2V-5B, which handles both modes in one ~3.4 GB model). The I2V bundle adds
+# the heavier I2V-A14B path for users with more headroom. Q8 variants and full
+# Diffusers builds stay available as a-la-carte starters.
+wan_t2v_bundle: list[StarterModel] = [
+    wan_22_t5_encoder,
+    wan_22_a14b_vae,
+    wan_22_5b_vae,
+    wan_22_ti2v_5b_gguf_q4_k_m,
+    wan_22_t2v_a14b_gguf_q4_k_m,
+    wan_22_t2v_a14b_low_gguf_q4_k_m,
+    wan_22_t2v_lightning_high,
+    wan_22_t2v_lightning_low,
+]
+wan_i2v_bundle: list[StarterModel] = [
+    wan_22_t5_encoder,
+    wan_22_a14b_vae,
+    wan_22_i2v_a14b_gguf_q4_k_m,
+    wan_22_i2v_a14b_low_gguf_q4_k_m,
+    wan_22_i2v_lightning_high,
+    wan_22_i2v_lightning_low,
+]
+
+# nf4 is the recommended 24GB CUDA path; the fp8 build is offered separately for non-CUDA / more VRAM.
+ideogram_bundle: list[StarterModel] = [
+    ideogram_4_nf4,
 ]
 
 STARTER_BUNDLES: dict[str, StarterModelBundle] = {
@@ -1807,6 +2266,10 @@ STARTER_BUNDLES: dict[str, StarterModelBundle] = {
     BaseModelType.ZImage: StarterModelBundle(name="Z-Image Turbo", models=zimage_bundle),
     BaseModelType.QwenImage: StarterModelBundle(name="Qwen Image", models=qwen_image_bundle),
     BaseModelType.Anima: StarterModelBundle(name="Anima", models=anima_bundle),
+    BaseModelType.Krea2: StarterModelBundle(name="Krea-2", models=krea2_bundle),
+    "wan_t2v": StarterModelBundle(name="Wan 2.2 Text-to-Video", models=wan_t2v_bundle),
+    "wan_i2v": StarterModelBundle(name="Wan 2.2 Image-to-Video", models=wan_i2v_bundle),
+    BaseModelType.Ideogram4: StarterModelBundle(name="Ideogram 4", models=ideogram_bundle),
 }
 
 assert len(STARTER_MODELS) == len({m.source for m in STARTER_MODELS}), "Duplicate starter models"

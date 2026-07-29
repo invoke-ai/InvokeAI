@@ -1,7 +1,7 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, IconButton, Image } from '@invoke-ai/ui-library';
-import { dropzoneAccept } from 'common/hooks/useImageUploadButton';
 import { typedMemo } from 'common/util/typedMemo';
+import { imageDropzoneAccept } from 'common/util/uploadMediaAccept';
 import { toast } from 'features/toast/toast';
 import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
@@ -31,7 +31,14 @@ type Props = {
 
 const ModelImageUpload = ({ model_key, model_image }: Props) => {
   const [image, setImage] = useState<string | null>(model_image || null);
+  const [prevModelImage, setPrevModelImage] = useState(model_image);
   const { t } = useTranslation();
+
+  // Sync local state when the model_image prop changes (e.g. switching models) without a cascading effect.
+  if (model_image !== prevModelImage) {
+    setPrevModelImage(model_image);
+    setImage(model_image || null);
+  }
 
   const [updateModelImage, request] = useUpdateModelImageMutation();
   const [deleteModelImage] = useDeleteModelImageMutation();
@@ -89,7 +96,7 @@ const ModelImageUpload = ({ model_key, model_image }: Props) => {
   }, [model_key, t, deleteModelImage]);
 
   const { getInputProps, getRootProps } = useDropzone({
-    accept: dropzoneAccept,
+    accept: imageDropzoneAccept,
     onDropAccepted,
     noDrag: true,
     multiple: false,

@@ -14,7 +14,13 @@ import { VIEWER_PANEL_ID, WORKSPACE_PANEL_ID } from 'features/ui/layouts/shared'
 import { t } from 'i18next';
 import { useCallback } from 'react';
 import { serializeError } from 'serialize-error';
-import { checkBoardAccess, checkImageAccess, checkModelAccess } from 'services/api/hooks/accessChecks';
+import { workflowsApi } from 'services/api/endpoints/workflows';
+import {
+  checkBoardAccess,
+  checkImageAccess,
+  checkModelAccess,
+  checkVideoAccess,
+} from 'services/api/hooks/accessChecks';
 import { z } from 'zod';
 import { fromZodError } from 'zod-validation-error';
 
@@ -55,8 +61,13 @@ export const useValidateAndLoadWorkflow = () => {
           workflow: unvalidatedWorkflow,
           templates,
           checkImageAccess,
+          checkVideoAccess,
           checkBoardAccess,
           checkModelAccess,
+          getWorkflow: (workflowId) =>
+            dispatch(
+              workflowsApi.endpoints.getWorkflow.initiate(workflowId, { forceRefetch: true, subscribe: false })
+            ).unwrap(),
         });
 
         if (origin !== 'library') {

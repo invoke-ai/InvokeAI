@@ -15,6 +15,7 @@ import { PiArrowCounterClockwiseBold, PiXBold } from 'react-icons/pi';
 import type { S } from 'services/api/types';
 
 import { COLUMN_WIDTHS, SYSTEM_USER_ID } from './constants';
+import { getQueueItemActionVisibility } from './getQueueItemActionVisibility';
 import QueueItemDetail from './QueueItemDetail';
 
 const selectedStyles = { bg: 'base.700' };
@@ -97,6 +98,7 @@ const QueueItemComponent = ({ index, item }: InnerItemProps) => {
 
   const isCanceled = useMemo(() => ['canceled', 'completed', 'failed'].includes(item.status), [item.status]);
   const isFailed = useMemo(() => ['canceled', 'failed'].includes(item.status), [item.status]);
+  const { canShowCancelQueueItem, canShowRetryQueueItem } = useMemo(() => getQueueItemActionVisibility(item), [item]);
   const originText = useOriginText(item.origin);
   const destinationText = useDestinationText(item.destination);
 
@@ -183,7 +185,7 @@ const QueueItemComponent = ({ index, item }: InnerItemProps) => {
 
         <Flex alignItems="center" w={COLUMN_WIDTHS.actions} pe={3}>
           <ButtonGroup size="xs" variant="ghost">
-            {!isFailed && (
+            {canShowCancelQueueItem && !isFailed && (
               <IconButton
                 onClick={onClickCancelQueueItem}
                 isDisabled={isCanceled || !canManageItem}
@@ -192,7 +194,7 @@ const QueueItemComponent = ({ index, item }: InnerItemProps) => {
                 icon={<PiXBold />}
               />
             )}
-            {isFailed && (
+            {canShowRetryQueueItem && isFailed && (
               <IconButton
                 onClick={onClickRetryQueueItem}
                 isDisabled={!canManageItem}

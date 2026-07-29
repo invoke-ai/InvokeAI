@@ -37,6 +37,72 @@ const mockFluxMainModel = {
   type: 'main' as const,
 };
 
+const mockKrea2MainModel = {
+  key: 'krea2-main-key',
+  hash: 'krea2-main-hash',
+  name: 'Krea-2 Turbo',
+  base: 'krea-2' as const,
+  type: 'main' as const,
+};
+
+// Krea-2 borrows the Qwen-Image VAE and uses a standalone Qwen3-VL encoder for single-file / GGUF transformers.
+const mockKrea2Vae = {
+  key: 'krea2-vae-key',
+  hash: 'krea2-vae-hash',
+  name: 'Qwen Image VAE',
+  base: 'qwen-image' as const,
+  type: 'vae' as const,
+  format: 'checkpoint' as const,
+};
+
+const mockKrea2Qwen3VlEncoder = {
+  key: 'krea2-q3vl-key',
+  hash: 'krea2-q3vl-hash',
+  name: 'Qwen3-VL 4B Encoder',
+  base: 'any' as const,
+  type: 'qwen3_vl_encoder' as const,
+  format: 'qwen3_vl_encoder' as const,
+};
+
+const mockZImageTurboDiffusers = {
+  key: 'zimage-turbo-diff-key',
+  hash: 'zimage-turbo-diff-hash',
+  name: 'Z-Image Turbo Diffusers',
+  base: 'z-image' as const,
+  type: 'main' as const,
+  format: 'diffusers' as const,
+  variant: 'turbo' as const,
+};
+
+const mockZImageZbaseDiffusers = {
+  key: 'zimage-zbase-diff-key',
+  hash: 'zimage-zbase-diff-hash',
+  name: 'Z-Image Base Diffusers',
+  base: 'z-image' as const,
+  type: 'main' as const,
+  format: 'diffusers' as const,
+  variant: 'zbase' as const,
+};
+
+const mockZImageTurboMain = {
+  key: 'zimage-turbo-main-key',
+  hash: 'zimage-turbo-main-hash',
+  name: 'Z-Image Turbo',
+  base: 'z-image' as const,
+  type: 'main' as const,
+};
+
+const mockZImageZbaseMain = {
+  key: 'zimage-zbase-main-key',
+  hash: 'zimage-zbase-main-hash',
+  name: 'Z-Image Base',
+  base: 'z-image' as const,
+  type: 'main' as const,
+};
+
+const mockZImageTurboMainConfig = { ...mockZImageTurboMain, variant: 'turbo' as const };
+const mockZImageZbaseMainConfig = { ...mockZImageZbaseMain, variant: 'zbase' as const };
+
 // Track dispatched actions
 const dispatched: Array<{ type: string; payload: unknown }> = [];
 const mockDispatch = vi.fn((action: { type: string; payload: unknown }) => {
@@ -69,20 +135,39 @@ const mockSelectAnimaQwen3EncoderModels = vi.fn((_state: unknown) => [mockAnimaQ
 
 const mockSelectAnimaVAEModels = vi.fn((_state: unknown) => [mockAnimaVAE]);
 
+// Krea-2 standalone-component selectors (used only by the Krea-2 auto-select branch).
+const mockSelectQwenImageVAEModels = vi.fn((_state: unknown) => [mockKrea2Vae]);
+const mockSelectQwen3VLEncoderModels = vi.fn((_state: unknown) => [mockKrea2Qwen3VlEncoder]);
+const mockSelectZImageDiffusersModels = vi.fn((_state: unknown) => [] as unknown[]);
+
 vi.mock('services/api/hooks/modelsByType', () => ({
   selectAnimaQwen3EncoderModels: (state: unknown) => mockSelectAnimaQwen3EncoderModels(state),
   selectAnimaVAEModels: (state: unknown) => mockSelectAnimaVAEModels(state),
+  selectQwenImageVAEModels: (state: unknown) => mockSelectQwenImageVAEModels(state),
+  selectQwen3VLEncoderModels: (state: unknown) => mockSelectQwen3VLEncoderModels(state),
   selectQwen3EncoderModels: vi.fn(() => []),
-  selectZImageDiffusersModels: vi.fn(() => []),
+  selectZImageDiffusersModels: (state: unknown) => mockSelectZImageDiffusersModels(state),
   selectFluxVAEModels: vi.fn(() => []),
   selectGlobalRefImageModels: vi.fn(() => []),
   selectRegionalRefImageModels: vi.fn(() => []),
 }));
 
-// Mock model configs adapter
+// Mock model configs adapter. Routed through overridable fns so the Krea-2 tests can toggle the resolved
+// model's format (diffusers vs. single-file/GGUF), which drives clear-vs-auto-select.
+const mockSelectModelConfigsQuery = vi.fn((_state: unknown) => ({ data: undefined }) as { data: unknown });
+const mockSelectModelById = vi.fn((_data: unknown, _key: string) => undefined as unknown);
+// Alias: the Z-Image tests drive the same modelConfigsAdapterSelectors.selectById mock under this name.
+const mockModelConfigsSelectById = mockSelectModelById;
+const mockSelectIndividualModelConfig = vi.fn((_state: unknown) => ({ data: undefined }) as { data: unknown });
+
 vi.mock('services/api/endpoints/models', () => ({
-  modelConfigsAdapterSelectors: { selectById: vi.fn() },
-  selectModelConfigsQuery: vi.fn(() => ({ data: undefined })),
+  modelConfigsAdapterSelectors: { selectById: (data: unknown, key: string) => mockSelectModelById(data, key) },
+  modelsApi: {
+    endpoints: {
+      getModelConfig: { select: (_key: string) => (state: unknown) => mockSelectIndividualModelConfig(state) },
+    },
+  },
+  selectModelConfigsQuery: (state: unknown) => mockSelectModelConfigsQuery(state),
 }));
 
 vi.mock('services/api/types', () => ({
@@ -144,8 +229,17 @@ let capturedEffect: ((action: unknown, api: unknown) => void) | null = null;
 const paramsSliceActual = (await vi.importActual('features/controlLayers/store/paramsSlice')) as {
   animaQwen3EncoderModelSelected: { type: string };
   animaVaeModelSelected: { type: string };
+  krea2VaeModelSelected: { type: string };
+  krea2Qwen3VlEncoderModelSelected: { type: string };
+  zImageQwen3SourceModelSelected: { type: string };
 };
-const { animaQwen3EncoderModelSelected, animaVaeModelSelected } = paramsSliceActual;
+const {
+  animaQwen3EncoderModelSelected,
+  animaVaeModelSelected,
+  krea2VaeModelSelected,
+  krea2Qwen3VlEncoderModelSelected,
+  zImageQwen3SourceModelSelected,
+} = paramsSliceActual;
 
 // Import after mocks are set up
 const { addModelSelectedListener } = await import('./modelSelected');
@@ -299,6 +393,100 @@ describe('modelSelected listener - Anima defaulting', () => {
   });
 });
 
+describe('modelSelected listener - Z-Image variant matching', () => {
+  beforeEach(() => {
+    dispatched.length = 0;
+    mockDispatch.mockClear();
+    mockSelectZImageDiffusersModels.mockReturnValue([mockZImageTurboDiffusers, mockZImageZbaseDiffusers]);
+    mockSelectModelConfigsQuery.mockReturnValue({ data: { entities: {} } });
+    mockModelConfigsSelectById.mockImplementation((_data, key) => {
+      if (key === mockZImageTurboMain.key) {
+        return mockZImageTurboMainConfig;
+      }
+      if (key === mockZImageZbaseMain.key) {
+        return mockZImageZbaseMainConfig;
+      }
+      return undefined;
+    });
+  });
+
+  it('should select turbo diffusers when switching from another base to Z-Image Turbo', () => {
+    const state = buildMockState({ model: mockFluxMainModel });
+    const action = modelSelected(zParameterModel.parse(mockZImageTurboMain));
+
+    capturedEffect!(action, { getState: () => state, dispatch: mockDispatch });
+
+    const sourceDispatch = dispatched.find((a) => a.type === zImageQwen3SourceModelSelected.type);
+    expect(sourceDispatch).toBeDefined();
+    expect((sourceDispatch!.payload as { key: string }).key).toBe(mockZImageTurboDiffusers.key);
+  });
+
+  it('should select zbase diffusers when switching from another base to Z-Image Base', () => {
+    const state = buildMockState({ model: mockFluxMainModel });
+    const action = modelSelected(zParameterModel.parse(mockZImageZbaseMain));
+
+    capturedEffect!(action, { getState: () => state, dispatch: mockDispatch });
+
+    const sourceDispatch = dispatched.find((a) => a.type === zImageQwen3SourceModelSelected.type);
+    expect(sourceDispatch).toBeDefined();
+    expect((sourceDispatch!.payload as { key: string }).key).toBe(mockZImageZbaseDiffusers.key);
+  });
+
+  it('should pick by variant, not list order — turbo wins even when zbase is first in the list', () => {
+    // This is the regression: previously the listener took availableZImageDiffusers[0] unconditionally.
+    mockSelectZImageDiffusersModels.mockReturnValue([mockZImageZbaseDiffusers, mockZImageTurboDiffusers]);
+    const state = buildMockState({ model: mockFluxMainModel });
+    const action = modelSelected(zParameterModel.parse(mockZImageTurboMain));
+
+    capturedEffect!(action, { getState: () => state, dispatch: mockDispatch });
+
+    const sourceDispatch = dispatched.find((a) => a.type === zImageQwen3SourceModelSelected.type);
+    expect(sourceDispatch).toBeDefined();
+    expect((sourceDispatch!.payload as { key: string }).key).toBe(mockZImageTurboDiffusers.key);
+  });
+
+  it('should update source from turbo to zbase diffusers when switching variant within the same base', () => {
+    const state = buildMockState({
+      model: mockZImageTurboMain,
+      zImageQwen3SourceModel: mockZImageTurboDiffusers,
+    });
+    const action = modelSelected(zParameterModel.parse(mockZImageZbaseMain));
+
+    capturedEffect!(action, { getState: () => state, dispatch: mockDispatch });
+
+    const sourceDispatches = dispatched.filter((a) => a.type === zImageQwen3SourceModelSelected.type);
+    expect(sourceDispatches).toHaveLength(1);
+    expect((sourceDispatches[0]!.payload as { key: string }).key).toBe(mockZImageZbaseDiffusers.key);
+  });
+
+  it('should update source from zbase to turbo diffusers when switching variant within the same base', () => {
+    const state = buildMockState({
+      model: mockZImageZbaseMain,
+      zImageQwen3SourceModel: mockZImageZbaseDiffusers,
+    });
+    const action = modelSelected(zParameterModel.parse(mockZImageTurboMain));
+
+    capturedEffect!(action, { getState: () => state, dispatch: mockDispatch });
+
+    const sourceDispatches = dispatched.filter((a) => a.type === zImageQwen3SourceModelSelected.type);
+    expect(sourceDispatches).toHaveLength(1);
+    expect((sourceDispatches[0]!.payload as { key: string }).key).toBe(mockZImageTurboDiffusers.key);
+  });
+
+  it('should not update source when re-selecting the same Z-Image model key', () => {
+    const state = buildMockState({
+      model: mockZImageTurboMain,
+      zImageQwen3SourceModel: mockZImageTurboDiffusers,
+    });
+    const action = modelSelected(zParameterModel.parse(mockZImageTurboMain));
+
+    capturedEffect!(action, { getState: () => state, dispatch: mockDispatch });
+
+    const sourceDispatches = dispatched.filter((a) => a.type === zImageQwen3SourceModelSelected.type);
+    expect(sourceDispatches).toHaveLength(0);
+  });
+});
+
 describe('zModelIdentifierField schema validation', () => {
   it('should reject payloads missing hash and type', () => {
     const incomplete = { key: 'some-key', name: 'Some Model', base: 'any' };
@@ -308,5 +496,207 @@ describe('zModelIdentifierField schema validation', () => {
   it('should accept payloads with all required fields', () => {
     const complete = { key: 'some-key', hash: 'some-hash', name: 'Some Model', base: 'any', type: 'qwen3_encoder' };
     expect(zModelIdentifierField.safeParse(complete).success).toBe(true);
+  });
+});
+
+describe('modelSelected listener - Krea-2 defaulting', () => {
+  beforeEach(() => {
+    dispatched.length = 0;
+    mockDispatch.mockClear();
+    // Standalone components installed by default; resolved model defaults to a non-diffusers (single-file /
+    // GGUF) transformer, which is what triggers the auto-select branch.
+    mockSelectQwenImageVAEModels.mockReturnValue([mockKrea2Vae]);
+    mockSelectAnimaVAEModels.mockReturnValue([mockAnimaVAE]);
+    mockSelectQwen3VLEncoderModels.mockReturnValue([mockKrea2Qwen3VlEncoder]);
+    mockSelectModelConfigsQuery.mockReturnValue({ data: {} });
+    mockSelectModelById.mockReturnValue({ format: 'checkpoint' });
+    mockSelectIndividualModelConfig.mockReturnValue({ data: undefined });
+  });
+
+  it('auto-selects a standalone VAE and Qwen3-VL encoder when switching to a single-file/GGUF Krea-2 model', () => {
+    const state = buildMockState({ model: mockFluxMainModel });
+    const action = modelSelected(zParameterModel.parse(mockKrea2MainModel));
+
+    capturedEffect!(action, { getState: () => state, dispatch: mockDispatch });
+
+    const vaeDispatch = dispatched.find((a) => a.type === krea2VaeModelSelected.type);
+    const encoderDispatch = dispatched.find((a) => a.type === krea2Qwen3VlEncoderModelSelected.type);
+
+    expect(vaeDispatch).toBeDefined();
+    expect(encoderDispatch).toBeDefined();
+    // The reducer parses payloads with zModelIdentifierField, so the dispatched values must be complete.
+    expect(zModelIdentifierField.safeParse(vaeDispatch!.payload).success).toBe(true);
+    expect(zModelIdentifierField.safeParse(encoderDispatch!.payload).success).toBe(true);
+    expect(vaeDispatch!.payload).toMatchObject({ key: mockKrea2Vae.key, type: 'vae' });
+    expect(encoderDispatch!.payload).toMatchObject({ key: mockKrea2Qwen3VlEncoder.key, type: 'qwen3_vl_encoder' });
+  });
+
+  it('falls back to an Anima-tagged VAE when no Qwen-Image VAE is installed', () => {
+    mockSelectQwenImageVAEModels.mockReturnValue([]);
+    mockSelectAnimaVAEModels.mockReturnValue([mockAnimaVAE]);
+
+    const state = buildMockState({ model: mockFluxMainModel });
+    const action = modelSelected(zParameterModel.parse(mockKrea2MainModel));
+
+    capturedEffect!(action, { getState: () => state, dispatch: mockDispatch });
+
+    const vaeDispatch = dispatched.find((a) => a.type === krea2VaeModelSelected.type);
+    expect(vaeDispatch).toBeDefined();
+    expect(vaeDispatch!.payload).toMatchObject({ key: mockAnimaVAE.key });
+  });
+
+  it('does not auto-select standalone components when none are installed', () => {
+    // No Qwen-Image VAEs, no Anima VAEs (the fallback), no Qwen3-VL encoders.
+    mockSelectQwenImageVAEModels.mockReturnValue([]);
+    mockSelectAnimaVAEModels.mockReturnValue([]);
+    mockSelectQwen3VLEncoderModels.mockReturnValue([]);
+
+    const state = buildMockState({ model: mockFluxMainModel });
+    const action = modelSelected(zParameterModel.parse(mockKrea2MainModel));
+
+    capturedEffect!(action, { getState: () => state, dispatch: mockDispatch });
+
+    expect(dispatched.find((a) => a.type === krea2VaeModelSelected.type)).toBeUndefined();
+    expect(dispatched.find((a) => a.type === krea2Qwen3VlEncoderModelSelected.type)).toBeUndefined();
+  });
+
+  it('defers standalone component changes while the selected model format is unknown', () => {
+    mockSelectModelConfigsQuery.mockReturnValue({ data: undefined });
+    mockSelectModelById.mockReturnValue(undefined);
+    const state = buildMockState({ model: mockFluxMainModel });
+    const action = modelSelected(zParameterModel.parse(mockKrea2MainModel));
+
+    capturedEffect!(action, { getState: () => state, dispatch: mockDispatch });
+
+    expect(dispatched.find((a) => a.type === krea2VaeModelSelected.type)).toBeUndefined();
+    expect(dispatched.find((a) => a.type === krea2Qwen3VlEncoderModelSelected.type)).toBeUndefined();
+  });
+
+  it('uses the individual model-config cache when the list cache is unavailable', () => {
+    mockSelectModelConfigsQuery.mockReturnValue({ data: undefined });
+    mockSelectModelById.mockReturnValue(undefined);
+    mockSelectIndividualModelConfig.mockReturnValue({ data: { format: 'diffusers' } });
+    const state = buildMockState({
+      model: mockKrea2MainModel,
+      krea2VaeModel: { key: 'stale-vae', hash: 'h', name: 'Stale VAE', base: 'qwen-image', type: 'vae' },
+      krea2Qwen3VlEncoderModel: {
+        key: 'stale-enc',
+        hash: 'h',
+        name: 'Stale Enc',
+        base: 'any',
+        type: 'qwen3_vl_encoder',
+      },
+    });
+    const nextKreaModel = { ...mockKrea2MainModel, key: 'next-krea-key' };
+    const action = modelSelected(zParameterModel.parse(nextKreaModel));
+
+    capturedEffect!(action, { getState: () => state, dispatch: mockDispatch });
+
+    expect(dispatched.find((a) => a.type === krea2VaeModelSelected.type)?.payload).toBeNull();
+    expect(dispatched.find((a) => a.type === krea2Qwen3VlEncoderModelSelected.type)?.payload).toBeNull();
+  });
+
+  it('does not overwrite standalone components the user already selected', () => {
+    const existingVae = {
+      key: 'existing-vae',
+      hash: 'h',
+      name: 'Existing VAE',
+      base: 'qwen-image',
+      type: 'vae',
+      format: 'checkpoint',
+    } as const;
+    const existingEncoder = {
+      key: 'existing-enc',
+      hash: 'h',
+      name: 'Existing Enc',
+      base: 'any',
+      type: 'qwen3_vl_encoder',
+      format: 'qwen3_vl_encoder',
+    } as const;
+    mockSelectQwenImageVAEModels.mockReturnValue([existingVae]);
+    mockSelectQwen3VLEncoderModels.mockReturnValue([existingEncoder]);
+    const state = buildMockState({
+      model: mockFluxMainModel,
+      krea2VaeModel: existingVae,
+      krea2Qwen3VlEncoderModel: existingEncoder,
+    });
+    const action = modelSelected(zParameterModel.parse(mockKrea2MainModel));
+
+    capturedEffect!(action, { getState: () => state, dispatch: mockDispatch });
+
+    // Already set + non-diffusers -> nothing dispatched for the standalone slots.
+    expect(dispatched.find((a) => a.type === krea2VaeModelSelected.type)).toBeUndefined();
+    expect(dispatched.find((a) => a.type === krea2Qwen3VlEncoderModelSelected.type)).toBeUndefined();
+  });
+
+  it('clears stale standalone components when no replacement is installed', () => {
+    mockSelectQwenImageVAEModels.mockReturnValue([]);
+    mockSelectAnimaVAEModels.mockReturnValue([]);
+    mockSelectQwen3VLEncoderModels.mockReturnValue([]);
+    const state = buildMockState({
+      model: mockFluxMainModel,
+      krea2VaeModel: { key: 'deleted-vae', hash: 'h', name: 'Deleted VAE', base: 'qwen-image', type: 'vae' },
+      krea2Qwen3VlEncoderModel: {
+        key: 'deleted-enc',
+        hash: 'h',
+        name: 'Deleted Enc',
+        base: 'any',
+        type: 'qwen3_vl_encoder',
+      },
+    });
+
+    capturedEffect!(modelSelected(zParameterModel.parse(mockKrea2MainModel)), {
+      getState: () => state,
+      dispatch: mockDispatch,
+    });
+
+    expect(dispatched.find((a) => a.type === krea2VaeModelSelected.type)?.payload).toBeNull();
+    expect(dispatched.find((a) => a.type === krea2Qwen3VlEncoderModelSelected.type)?.payload).toBeNull();
+  });
+
+  it('clears stale standalone overrides when switching to a Diffusers Krea-2 model', () => {
+    // A Diffusers pipeline bundles its own VAE + encoder, so any standalone overrides must be cleared.
+    mockSelectModelConfigsQuery.mockReturnValue({ data: {} });
+    mockSelectModelById.mockReturnValue({ format: 'diffusers' });
+
+    const state = buildMockState({
+      model: mockFluxMainModel,
+      krea2VaeModel: { key: 'stale-vae', hash: 'h', name: 'Stale VAE', base: 'qwen-image', type: 'vae' },
+      krea2Qwen3VlEncoderModel: {
+        key: 'stale-enc',
+        hash: 'h',
+        name: 'Stale Enc',
+        base: 'any',
+        type: 'qwen3_vl_encoder',
+      },
+    });
+    const action = modelSelected(zParameterModel.parse(mockKrea2MainModel));
+
+    capturedEffect!(action, { getState: () => state, dispatch: mockDispatch });
+
+    const vaeDispatch = dispatched.find((a) => a.type === krea2VaeModelSelected.type);
+    const encoderDispatch = dispatched.find((a) => a.type === krea2Qwen3VlEncoderModelSelected.type);
+    expect(vaeDispatch).toBeDefined();
+    expect(vaeDispatch!.payload).toBeNull();
+    expect(encoderDispatch).toBeDefined();
+    expect(encoderDispatch!.payload).toBeNull();
+  });
+
+  it('clears Krea-2 standalone components when switching away from Krea-2', () => {
+    const state = buildMockState({
+      model: mockKrea2MainModel,
+      krea2VaeModel: { key: 'vae', hash: 'h', name: 'VAE', base: 'qwen-image', type: 'vae' },
+      krea2Qwen3VlEncoderModel: { key: 'enc', hash: 'h', name: 'Enc', base: 'any', type: 'qwen3_vl_encoder' },
+    });
+    const action = modelSelected(zParameterModel.parse(mockFluxMainModel));
+
+    capturedEffect!(action, { getState: () => state, dispatch: mockDispatch });
+
+    const vaeDispatch = dispatched.find((a) => a.type === krea2VaeModelSelected.type);
+    const encoderDispatch = dispatched.find((a) => a.type === krea2Qwen3VlEncoderModelSelected.type);
+    expect(vaeDispatch).toBeDefined();
+    expect(vaeDispatch!.payload).toBeNull();
+    expect(encoderDispatch).toBeDefined();
+    expect(encoderDispatch!.payload).toBeNull();
   });
 });

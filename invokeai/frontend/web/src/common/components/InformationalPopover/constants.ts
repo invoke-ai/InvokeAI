@@ -13,6 +13,12 @@ export type Feature =
   | 'seedVarianceEnhancer'
   | 'seedVarianceStrength'
   | 'seedVarianceRandomizePercent'
+  | 'krea2ConditioningRebalance'
+  | 'krea2RebalanceMultiplier'
+  | 'krea2RebalanceWeights'
+  | 'krea2SeedVarianceEnhancer'
+  | 'krea2SeedVarianceStrength'
+  | 'krea2SeedVarianceRandomizePercent'
   | 'compositingMaskBlur'
   | 'compositingBlurMethod'
   | 'compositingCoherencePass'
@@ -78,6 +84,7 @@ export type Feature =
   | 'optimizedDenoising'
   | 'fluxDevLicense'
   | 'cpuOnly'
+  | 'cpuOnlyVae'
   | 'fp8Storage';
 
 export type PopoverData = PopoverProps & {

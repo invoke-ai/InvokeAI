@@ -8,23 +8,28 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import type { Param0 } from 'tsafe';
 
-const DndDragPreviewMultipleImage = memo(({ image_names }: { image_names: string[] }) => {
-  const { t } = useTranslation();
-  return (
-    <Flex
-      w={DND_IMAGE_DRAG_PREVIEW_SIZE}
-      h={DND_IMAGE_DRAG_PREVIEW_SIZE}
-      alignItems="center"
-      justifyContent="center"
-      flexDir="column"
-      bg="base.900"
-      borderRadius="base"
-    >
-      <Heading>{image_names.length}</Heading>
-      <Heading size="sm">{t('parameters.images_withCount', { count: image_names.length })}</Heading>
-    </Flex>
-  );
-});
+const DndDragPreviewMultipleImage = memo(
+  ({ image_names, video_names }: { image_names: string[]; video_names: string[] }) => {
+    const { t } = useTranslation();
+    // The whole mixed selection moves on drop (the board drop handler dispatches both
+    // mutations), so the preview counts both kinds to match the "Images/Videos" label.
+    const count = image_names.length + video_names.length;
+    return (
+      <Flex
+        w={DND_IMAGE_DRAG_PREVIEW_SIZE}
+        h={DND_IMAGE_DRAG_PREVIEW_SIZE}
+        alignItems="center"
+        justifyContent="center"
+        flexDir="column"
+        bg="base.900"
+        borderRadius="base"
+      >
+        <Heading>{count}</Heading>
+        <Heading size="sm">{t('parameters.images_withCount', { count })}</Heading>
+      </Flex>
+    );
+  }
+);
 
 DndDragPreviewMultipleImage.displayName = 'DndDragPreviewMultipleImage';
 
@@ -32,10 +37,14 @@ export type DndDragPreviewMultipleImageState = {
   type: 'multiple-image';
   container: HTMLElement;
   image_names: string[];
+  video_names: string[];
 };
 
 export const createMultipleImageDragPreview = (arg: DndDragPreviewMultipleImageState) =>
-  createPortal(<DndDragPreviewMultipleImage image_names={arg.image_names} />, arg.container);
+  createPortal(
+    <DndDragPreviewMultipleImage image_names={arg.image_names} video_names={arg.video_names} />,
+    arg.container
+  );
 
 type SetMultipleDragPreviewArg = {
   multipleImageDndData: MultipleImageDndSourceData;
@@ -51,7 +60,12 @@ export const setMultipleImageDragPreview = ({
   const { nativeSetDragImage, source, location } = onGenerateDragPreviewArgs;
   setCustomNativeDragPreview({
     render({ container }) {
-      setDragPreviewState({ type: 'multiple-image', container, image_names: multipleImageDndData.payload.image_names });
+      setDragPreviewState({
+        type: 'multiple-image',
+        container,
+        image_names: multipleImageDndData.payload.image_names,
+        video_names: multipleImageDndData.payload.video_names,
+      });
       return () => setDragPreviewState(null);
     },
     nativeSetDragImage,

@@ -50,18 +50,25 @@ class ModelLoadService(ModelLoadServiceBase):
         """Return the RAM cache used by this loader."""
         return self._ram_cache
 
-    def load_model(self, model_config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> LoadedModel:
+    def load_model(
+        self,
+        model_config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+        user_id: Optional[str] = None,
+    ) -> LoadedModel:
         """
         Given a model's configuration, load it and return the LoadedModel object.
 
         :param model_config: Model configuration record (as returned by ModelRecordBase.get_model())
         :param submodel: For main (pipeline models), the submodel to fetch.
+        :param user_id: The user whose action triggered the load, threaded into the model load
+            events so they can be routed to that user's UI (defaults to the system user).
         """
 
         # We don't have an invoker during testing
         # TODO(psyche): Mock this method on the invoker in the tests
         if hasattr(self, "_invoker"):
-            self._invoker.services.events.emit_model_load_started(model_config, submodel_type)
+            self._invoker.services.events.emit_model_load_started(model_config, submodel_type, user_id or "system")
 
         implementation, model_config, submodel_type = self._registry.get_implementation(model_config, submodel_type)  # type: ignore
         loaded_model: LoadedModel = implementation(
@@ -71,7 +78,7 @@ class ModelLoadService(ModelLoadServiceBase):
         ).load_model(model_config, submodel_type)
 
         if hasattr(self, "_invoker"):
-            self._invoker.services.events.emit_model_load_complete(model_config, submodel_type)
+            self._invoker.services.events.emit_model_load_complete(model_config, submodel_type, user_id or "system")
 
         return loaded_model
 
