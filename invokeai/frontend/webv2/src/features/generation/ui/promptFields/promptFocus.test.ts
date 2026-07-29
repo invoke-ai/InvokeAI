@@ -58,6 +58,10 @@ describe('getActiveTriggerQuery', () => {
     expect(query('a ____')).toBeNull();
   });
 
+  it('opens a new wildcard trigger immediately after a completed reference', () => {
+    expect(query('__a____')).toEqual({ key: '_', query: '', range: { end: 7, start: 5 } });
+  });
+
   it('stays shut inside an ordinary word', () => {
     expect(query('a snake__case word')).toBeNull();
     expect(query('a photo of a cat')).toBeNull();

@@ -91,6 +91,28 @@ export interface PromptTriggerQuery {
  */
 const MAX_TRIGGER_QUERY_LENGTH = MAX_WILDCARD_NAME_LENGTH + 2;
 
+/** Whether the final `__` closes the current whitespace-delimited wildcard token. */
+const isClosingWildcardDelimiter = (value: string, caret: number): boolean => {
+  let tokenStart = caret - 2;
+
+  while (tokenStart > 0 && !/[\s>]/.test(value[tokenStart - 1] ?? '')) {
+    tokenStart--;
+  }
+
+  let delimiterCount = 0;
+
+  for (let index = tokenStart; index < caret;) {
+    if (value[index] === '_' && value[index + 1] === '_') {
+      delimiterCount++;
+      index += 2;
+    } else {
+      index++;
+    }
+  }
+
+  return delimiterCount % 2 === 0;
+};
+
 /**
  * The unfinished trigger the caret is sitting inside, or `null`.
  *
@@ -111,18 +133,12 @@ export const getActiveTriggerQuery = (
   keys: readonly PromptTriggerKey[]
 ): PromptTriggerQuery | null => {
   // At a closing `__`, the backwards scan reaches that pair before its opening
-  // pair. Treat a non-empty delimited span as finished even when its content is
-  // malformed: autocomplete must not reopen over text the user has already
-  // closed.
+  // pair. Count non-overlapping delimiters in this token so an empty closed
+  // reference stays closed, while a completed reference followed immediately by
+  // a new `__` still opens the next trigger.
   const closingStart = caret - 2;
-  const openingStart = value.lastIndexOf('__', closingStart - 2);
 
-  if (
-    keys.includes('_') &&
-    value.slice(closingStart, caret) === '__' &&
-    openingStart >= 0 &&
-    openingStart + 2 <= closingStart
-  ) {
+  if (keys.includes('_') && value.slice(closingStart, caret) === '__' && isClosingWildcardDelimiter(value, caret)) {
     return null;
   }
 
