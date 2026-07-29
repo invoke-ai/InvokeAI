@@ -62,4 +62,4 @@ class ObjectSerializerForwardCache(ObjectSerializerBase[T]):
             self._cache[name] = data
             self._cache_ids.put(name)
             if self._cache_ids.qsize() > self._max_cache_size:
-                self._cache.pop(self._cache_ids.get())
+                self._cache.pop(self._cache_ids.get(), None)
