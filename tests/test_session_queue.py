@@ -3,6 +3,8 @@ import json
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
+from invokeai.app.invocations.fields import VideoField
+from invokeai.app.invocations.video_frame_extract import VideoFrameExtractInvocation
 from invokeai.app.services.session_queue.session_queue_common import (
     Batch,
     BatchDataCollection,
@@ -86,6 +88,32 @@ def test_create_sessions_from_batch_with_runs(batch_data_collection, batch_graph
     assert json.loads(t[7][1])["graph"]["nodes"]["2"]["prompt"] == "Blueberry sushi"
     assert json.loads(t[7][1])["graph"]["nodes"]["3"]["prompt"] == "Apple sushi"
     assert json.loads(t[7][1])["graph"]["nodes"]["4"]["prompt"] == "Nissan"
+
+
+def test_create_sessions_from_batch_with_video_fields():
+    """VideoField batch data must validate and expand into separate sessions, just like
+    ImageField — video workflows use the same generic batching capability (JPPhoto PR #9163
+    July-10 follow-up: VideoField values used to fail Batch validation before enqueueing)."""
+    g = Graph()
+    g.add_node(VideoFrameExtractInvocation(id="1", video=VideoField(video_name="placeholder.mp4")))
+    b = Batch(
+        graph=g,
+        data=[
+            [
+                BatchDatum(
+                    node_path="1",
+                    field_name="video",
+                    items=[VideoField(video_name="first.mp4"), VideoField(video_name="second.mp4")],
+                )
+            ]
+        ],
+    )
+
+    assert calc_session_count(batch=b) == 2
+    t = list(create_session_nfv_tuples(batch=b, maximum=1000))
+    assert len(t) == 2
+    assert json.loads(t[0][1])["graph"]["nodes"]["1"]["video"]["video_name"] == "first.mp4"
+    assert json.loads(t[1][1])["graph"]["nodes"]["1"]["video"]["video_name"] == "second.mp4"
 
 
 def test_create_sessions_from_batch_without_runs(batch_data_collection, batch_graph):

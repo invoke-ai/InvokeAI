@@ -8,6 +8,7 @@ import { useRecallPrompts } from 'features/gallery/hooks/useRecallPrompts';
 import { useRecallRemix } from 'features/gallery/hooks/useRecallRemix';
 import { useRecallSeed } from 'features/gallery/hooks/useRecallSeed';
 import { selectLastSelectedItem } from 'features/gallery/store/gallerySelectors';
+import { isVideoName } from 'features/gallery/store/types';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { memo } from 'react';
 import { useImageDTO } from 'services/api/endpoints/images';
@@ -16,7 +17,11 @@ import type { ImageDTO } from 'services/api/types';
 export const GlobalImageHotkeys = memo(() => {
   useAssertSingleton('GlobalImageHotkeys');
   const lastSelectedItem = useAppSelector(selectLastSelectedItem);
-  const imageDTO = useImageDTO(lastSelectedItem ?? null);
+  // Recall-hotkeys are image-only; passing a video name through to useImageDTO fires a 404
+  // against /api/v1/images/i/<uuid>.mp4 and emits a noisy "Image record not found" backend
+  // log on every video selection.
+  const imageName = lastSelectedItem && !isVideoName(lastSelectedItem) ? lastSelectedItem : null;
+  const imageDTO = useImageDTO(imageName);
 
   if (!imageDTO) {
     return null;
