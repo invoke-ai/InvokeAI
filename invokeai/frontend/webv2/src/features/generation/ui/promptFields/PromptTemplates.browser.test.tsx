@@ -8,6 +8,7 @@ import { PromptTemplateEditor } from '@features/generation/ui/promptFields/Promp
 import { PromptTemplateImage } from '@features/generation/ui/promptFields/PromptTemplateImage';
 import { PromptTemplatesPanel } from '@features/generation/ui/promptFields/PromptTemplatesPanel';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { Row } from '@platform/ui/Row';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import i18next from 'i18next';
@@ -178,6 +179,11 @@ const StatefulPromptTemplatesPanel = ({ catalog }: { catalog: PromptTemplateCata
   return (
     <>
       <Box aria-hidden bg="accent.solid" color="accent.contrast" data-testid="accent-style-probe" />
+      <Row asChild>
+        <button aria-label="Row probe" type="button">
+          Row probe
+        </button>
+      </Row>
       <PromptTemplatesPanel
         activeTemplate={activeTemplate}
         catalog={catalog}
@@ -287,6 +293,21 @@ describe('the prompt templates panel', () => {
     expect(activeText).toHaveLength(2);
     expect(getComputedStyle(activeText[0]!).color).toBe(probeStyle.color);
     expect(getComputedStyle(activeText[1]!).color).toBe(probeStyle.color);
+  });
+
+  it('uses the shared Row interaction contract for inactive templates and keeps management controls separate', async () => {
+    await render(<StatefulPromptTemplatesPanel catalog={createCatalog()} />);
+
+    const probe = host!.querySelector<HTMLButtonElement>('button[aria-label="Row probe"]')!;
+    const row = buttonWithText('Cinematic');
+    const edit = host!.querySelector<HTMLButtonElement>('button[aria-label="Edit"]')!;
+    const remove = host!.querySelector<HTMLButtonElement>('button[aria-label="Delete"]')!;
+
+    expect(row.getAttribute('aria-current')).toBeNull();
+    expect(row.contains(edit)).toBe(false);
+    expect(row.contains(remove)).toBe(false);
+
+    await expectRowInteractionsToMatch(probe, row);
   });
 
   it('clears the applied template', async () => {
@@ -812,3 +833,51 @@ describe('prompt template image outlines', () => {
     expect(getComputedStyle(image).outlineOffset).toBe('0px');
   });
 });
+
+const expectRowInteractionsToMatch = async (probe: HTMLButtonElement, row: HTMLButtonElement) => {
+  await act(async () => {
+    await userEvent.tab();
+    await userEvent.hover(probe);
+    await waitForTransition();
+  });
+  const expected = getInteractionStyles(probe);
+
+  await act(async () => {
+    await userEvent.unhover(probe);
+    await focusWithKeyboard(row);
+    await userEvent.hover(row);
+    await waitForTransition();
+  });
+
+  expect(getInteractionStyles(row)).toEqual(expected);
+};
+
+const focusWithKeyboard = async (element: HTMLButtonElement) => {
+  for (let index = 0; index < 12; index += 1) {
+    if (document.activeElement === element) {
+      return;
+    }
+    await userEvent.tab();
+  }
+
+  throw new Error(`Could not focus ${element.textContent} with the keyboard`);
+};
+
+const getInteractionStyles = (element: HTMLElement) => {
+  const styles = getComputedStyle(element);
+
+  return {
+    backgroundColor: styles.backgroundColor,
+    borderRadius: styles.borderRadius,
+    outline: styles.outline,
+    outlineOffset: styles.outlineOffset,
+    transitionDuration: styles.transitionDuration,
+    transitionProperty: styles.transitionProperty,
+    transitionTimingFunction: styles.transitionTimingFunction,
+  };
+};
+
+const waitForTransition = () =>
+  new Promise<void>((resolve) => {
+    globalThis.setTimeout(resolve, 200);
+  });

@@ -4,6 +4,7 @@ import { ChakraProvider } from '@chakra-ui/react';
 import { WildcardsPanel } from '@features/generation/ui/promptFields/WildcardsPanel';
 import { WILDCARD_COLLECTION_FORMATS } from '@features/generation/ui/wildcardFiles';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { Row } from '@platform/ui/Row';
 import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -31,7 +32,12 @@ const catalog: WildcardCatalog = {
   wildcards: [{ id: 'w1', name: 'colors', values: ['red', 'green'] }],
 };
 
-const renderPanel = async (showSyntaxHighlighting = true, panelCatalog: WildcardCatalog = catalog) => {
+const renderPanel = async (
+  showSyntaxHighlighting = true,
+  panelCatalog: WildcardCatalog = catalog,
+  onInsert = vi.fn(),
+  includeRowProbe = false
+) => {
   host = document.createElement('div');
   host.style.width = '380px';
   document.body.append(host);
@@ -40,7 +46,14 @@ const renderPanel = async (showSyntaxHighlighting = true, panelCatalog: Wildcard
   await act(() => {
     root?.render(
       <ChakraProvider value={system}>
-        <WildcardsPanel catalog={panelCatalog} showSyntaxHighlighting={showSyntaxHighlighting} onInsert={vi.fn()} />
+        {includeRowProbe ? (
+          <Row asChild>
+            <button aria-label="Row probe" type="button">
+              Row probe
+            </button>
+          </Row>
+        ) : null}
+        <WildcardsPanel catalog={panelCatalog} showSyntaxHighlighting={showSyntaxHighlighting} onInsert={onInsert} />
       </ChakraProvider>
     );
   });
@@ -287,6 +300,32 @@ describe('finding a wildcard', () => {
   });
 });
 
+describe('wildcard list interactions', () => {
+  const selectableWildcardButton = () =>
+    host!.querySelector<HTMLButtonElement>('button[title="widgets.generate.dynamicPrompts.insertWildcard"]')!;
+
+  it('uses the shared Row interaction contract without nesting the edit controls', async () => {
+    const onInsert = vi.fn();
+    await renderPanel(true, catalog, onInsert, true);
+
+    const probe = host!.querySelector<HTMLButtonElement>('button[aria-label="Row probe"]')!;
+    const row = selectableWildcardButton();
+    const edit = host!.querySelector<HTMLButtonElement>('button[aria-label="common.edit"]')!;
+    const remove = host!.querySelector<HTMLButtonElement>('button[aria-label="common.delete"]')!;
+
+    expect(row.contains(edit)).toBe(false);
+    expect(row.contains(remove)).toBe(false);
+
+    await expectRowInteractionsToMatch(probe, row);
+
+    await act(async () => {
+      await userEvent.click(row);
+    });
+
+    expect(onInsert).toHaveBeenCalledWith('__colors__');
+  });
+});
+
 describe('deleting a wildcard', () => {
   const clickDelete = async () => {
     // By label, not by position: the panel footer has its own controls after the
@@ -333,3 +372,51 @@ describe('deleting a wildcard', () => {
     expect(catalog.remove).toHaveBeenCalledWith('w1');
   });
 });
+
+const expectRowInteractionsToMatch = async (probe: HTMLButtonElement, row: HTMLButtonElement) => {
+  await act(async () => {
+    await userEvent.tab();
+    await userEvent.hover(probe);
+    await waitForTransition();
+  });
+  const expected = getInteractionStyles(probe);
+
+  await act(async () => {
+    await userEvent.unhover(probe);
+    await focusWithKeyboard(row);
+    await userEvent.hover(row);
+    await waitForTransition();
+  });
+
+  expect(getInteractionStyles(row)).toEqual(expected);
+};
+
+const focusWithKeyboard = async (element: HTMLButtonElement) => {
+  for (let index = 0; index < 12; index += 1) {
+    if (document.activeElement === element) {
+      return;
+    }
+    await userEvent.tab();
+  }
+
+  throw new Error(`Could not focus ${element.title} with the keyboard`);
+};
+
+const getInteractionStyles = (element: HTMLElement) => {
+  const styles = getComputedStyle(element);
+
+  return {
+    backgroundColor: styles.backgroundColor,
+    borderRadius: styles.borderRadius,
+    outline: styles.outline,
+    outlineOffset: styles.outlineOffset,
+    transitionDuration: styles.transitionDuration,
+    transitionProperty: styles.transitionProperty,
+    transitionTimingFunction: styles.transitionTimingFunction,
+  };
+};
+
+const waitForTransition = () =>
+  new Promise<void>((resolve) => {
+    globalThis.setTimeout(resolve, 200);
+  });

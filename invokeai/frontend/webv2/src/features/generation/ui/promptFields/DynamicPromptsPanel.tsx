@@ -13,6 +13,7 @@ import { PANEL_HEADER_CONTROL_HEIGHT, PromptPanelHeader } from '@features/genera
 import { Button, IconButton } from '@platform/ui/Button';
 import { Field } from '@platform/ui/Field';
 import { MenuContent } from '@platform/ui/Menu';
+import { Row } from '@platform/ui/Row';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { ChevronDownIcon, ShuffleIcon } from 'lucide-react';
@@ -241,27 +242,26 @@ const DynamicPromptRow = ({
   const handleClick = useCallback(() => onUsePrompt(prompt), [onUsePrompt, prompt]);
 
   return (
-    <Button
+    <Row
       alignItems="start"
+      asChild
       gap="2"
       h="auto"
       justifyContent="start"
       px="2"
       py="1.5"
-      size="xs"
       title={t('widgets.generate.dynamicPrompts.usePrompt')}
-      transitionDuration="faster"
-      variant="ghost"
-      onClick={handleClick}
     >
-      <Text as="span" color="fg.subtle" css={TABULAR_NUMS} fontSize="2xs">
-        {index + 1}
-      </Text>
-      <Text as="span" color="fg" fontFamily="mono" fontSize="0.72rem" textAlign="start" wordBreak="break-word">
-        {/* An expanded prompt has no dynamic syntax left in it, so the useful
-            colouring here is attention and embeddings — the defaults. */}
-        <HighlightedPrompt enabled={showSyntaxHighlighting} prompt={prompt} />
-      </Text>
-    </Button>
+      <button type="button" onClick={handleClick}>
+        <Text as="span" color="fg.subtle" css={TABULAR_NUMS} fontSize="2xs">
+          {index + 1}
+        </Text>
+        <Text as="span" color="fg" fontFamily="mono" fontSize="0.72rem" textAlign="start" wordBreak="break-word">
+          {/* An expanded prompt has no dynamic syntax left in it, so the useful
+              colouring here is attention and embeddings — the defaults. */}
+          <HighlightedPrompt enabled={showSyntaxHighlighting} prompt={prompt} />
+        </Text>
+      </button>
+    </Row>
   );
 };

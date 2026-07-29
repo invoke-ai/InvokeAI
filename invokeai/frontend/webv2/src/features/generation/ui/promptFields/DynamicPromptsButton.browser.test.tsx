@@ -3,6 +3,7 @@ import type { DynamicPromptsConfig } from '@features/generation/core/dynamicProm
 import { ChakraProvider } from '@chakra-ui/react';
 import { DynamicPromptsButton } from '@features/generation/ui/promptFields/DynamicPromptsButton';
 import { PromptTextarea } from '@features/generation/ui/promptFields/PromptTextarea';
+import { Row } from '@platform/ui/Row';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { act } from 'react';
@@ -37,6 +38,7 @@ const config: DynamicPromptsConfig & { onChange: () => void } = {
 
 const render = async (prompt: string, onUsePrompt = vi.fn()) => {
   host = document.createElement('div');
+  host.style.width = '400px';
   document.body.append(host);
   root = createRoot(host);
 
@@ -44,6 +46,11 @@ const render = async (prompt: string, onUsePrompt = vi.fn()) => {
     root?.render(
       <QueryClientProvider client={new QueryClient()}>
         <ChakraProvider value={system}>
+          <Row asChild>
+            <button aria-label="Row probe" type="button">
+              Row probe
+            </button>
+          </Row>
           <PromptTextarea
             aria-label="Prompt"
             defaultHeightPx={100}
@@ -122,6 +129,30 @@ describe('dynamic prompts in the positive prompt field', () => {
     expect(onUsePrompt).toHaveBeenCalledWith('a red cat');
   });
 
+  it('uses the shared Row interaction contract for each selectable expanded prompt', async () => {
+    const { onUsePrompt } = await render('a {red|green} cat');
+    const probe = host!.querySelector<HTMLButtonElement>('button[aria-label="Row probe"]')!;
+    const expected = await getRowInteractionStyles(probe);
+
+    await vi.waitFor(() => expect(findButton().textContent).toContain('2'));
+    await act(async () => {
+      await userEvent.click(findButton());
+    });
+
+    const row = [...document.querySelectorAll<HTMLButtonElement>('button')].find(
+      (button) =>
+        button.title === 'widgets.generate.dynamicPrompts.usePrompt' && button.textContent?.includes('a red cat')
+    )!;
+
+    await expectRowInteractionsToMatch(expected, row);
+
+    await act(async () => {
+      await userEvent.click(row);
+    });
+
+    expect(onUsePrompt).toHaveBeenCalledWith('a red cat');
+  });
+
   it('colours attention syntax inside the previewed prompts', async () => {
     parseDynamicPrompts.mockResolvedValue({ error: null, prompts: ['a (red)1.2 cat', 'a green+ cat'] });
     await render('a {(red)1.2|green+} cat');
@@ -155,3 +186,61 @@ describe('dynamic prompts in the positive prompt field', () => {
     expect(findButton().textContent).not.toMatch(/\d/);
   });
 });
+
+const getRowInteractionStyles = async (probe: HTMLButtonElement) => {
+  await act(async () => {
+    await userEvent.tab();
+    await userEvent.hover(probe);
+    await waitForTransition();
+  });
+  const expected = getInteractionStyles(probe);
+
+  await act(async () => {
+    await userEvent.unhover(probe);
+  });
+
+  return expected;
+};
+
+const expectRowInteractionsToMatch = async (
+  expected: ReturnType<typeof getInteractionStyles>,
+  row: HTMLButtonElement
+) => {
+  await act(async () => {
+    await focusWithKeyboard(row);
+    await userEvent.hover(row);
+    await waitForTransition();
+  });
+
+  expect(getInteractionStyles(row)).toEqual(expected);
+};
+
+const focusWithKeyboard = async (element: HTMLButtonElement) => {
+  for (let index = 0; index < 12; index += 1) {
+    if (document.activeElement === element) {
+      return;
+    }
+    await userEvent.tab();
+  }
+
+  throw new Error(`Could not focus ${element.title} with the keyboard`);
+};
+
+const getInteractionStyles = (element: HTMLElement) => {
+  const styles = getComputedStyle(element);
+
+  return {
+    backgroundColor: styles.backgroundColor,
+    borderRadius: styles.borderRadius,
+    outline: styles.outline,
+    outlineOffset: styles.outlineOffset,
+    transitionDuration: styles.transitionDuration,
+    transitionProperty: styles.transitionProperty,
+    transitionTimingFunction: styles.transitionTimingFunction,
+  };
+};
+
+const waitForTransition = () =>
+  new Promise<void>((resolve) => {
+    globalThis.setTimeout(resolve, 200);
+  });
