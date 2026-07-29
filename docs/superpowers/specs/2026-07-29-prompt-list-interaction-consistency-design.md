@@ -18,6 +18,10 @@ That gives every selectable item the same:
 
 No new recipe, color token, duration token, or per-feature hover constant will be added.
 
+The dynamic-prompts and prompt-template popovers use `bg.subtle` as their
+backing surface. This keeps the shared `bg.muted` row hover visibly distinct
+without overriding the `Row` recipe on individual list items.
+
 ## Component treatment
 
 ### Wildcard list

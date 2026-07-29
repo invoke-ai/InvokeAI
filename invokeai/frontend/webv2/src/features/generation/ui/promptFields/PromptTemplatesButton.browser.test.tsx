@@ -1,8 +1,11 @@
 import type { PromptTemplateSnapshot } from '@features/generation/core/promptTemplates';
+import type { PromptTemplateRecord } from '@features/generation/data/promptTemplates';
 import type { PromptTemplateCatalog } from '@features/generation/ui/usePromptTemplates';
 
-import { ChakraProvider } from '@chakra-ui/react';
+import { Box, ChakraProvider } from '@chakra-ui/react';
+import { waitForComputedStyles } from '@features/generation/ui/promptFields/promptFieldsBrowserTestUtils';
 import { PromptTemplatesButton } from '@features/generation/ui/promptFields/PromptTemplatesButton';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import i18next from 'i18next';
 import { act } from 'react';
@@ -76,6 +79,13 @@ const applied: PromptTemplateSnapshot = {
   negativePrompt: '',
   positivePrompt: '{prompt}, cinematic',
 };
+const template: PromptTemplateRecord = {
+  ...applied,
+  hasImage: false,
+  isDefault: false,
+  isPublic: false,
+  userId: 'user-1',
+};
 
 const render = async (activeTemplate: PromptTemplateSnapshot | null) => {
   host = document.createElement('div');
@@ -84,11 +94,14 @@ const render = async (activeTemplate: PromptTemplateSnapshot | null) => {
 
   await act(() => {
     root?.render(
-      <I18nextProvider i18n={i18n}>
-        <ChakraProvider value={system}>
-          <PromptTemplatesButton activeTemplate={activeTemplate} showSyntaxHighlighting={false} onApply={vi.fn()} />
-        </ChakraProvider>
-      </I18nextProvider>
+      <QueryClientProvider client={new QueryClient()}>
+        <I18nextProvider i18n={i18n}>
+          <ChakraProvider value={system}>
+            <Box aria-hidden bg="bg.muted" data-testid="row-hover-style-probe" />
+            <PromptTemplatesButton activeTemplate={activeTemplate} showSyntaxHighlighting={false} onApply={vi.fn()} />
+          </ChakraProvider>
+        </I18nextProvider>
+      </QueryClientProvider>
     );
   });
 };
@@ -96,7 +109,10 @@ const render = async (activeTemplate: PromptTemplateSnapshot | null) => {
 /** What the hook was handed on the most recent render. */
 const lastIsEnabled = (): boolean | undefined => usePromptTemplates.mock.calls.at(-1)?.[0]?.isEnabled;
 
-beforeEach(() => usePromptTemplates.mockClear());
+beforeEach(() => {
+  usePromptTemplates.mockClear();
+  usePromptTemplates.mockReturnValue(catalog);
+});
 
 afterEach(async () => {
   await act(() => root?.unmount());
@@ -123,6 +139,34 @@ describe('the prompt templates button', () => {
     });
 
     expect(lastIsEnabled()).toBe(true);
+  });
+
+  it('keeps the template row hover visible against the popover surface', async () => {
+    usePromptTemplates.mockReturnValue({
+      ...catalog,
+      personalTemplates: [template],
+      templates: [template],
+    });
+    await render(null);
+    const hoverBackgroundColor = getComputedStyle(
+      host!.querySelector('[data-testid="row-hover-style-probe"]')!
+    ).backgroundColor;
+
+    await act(async () => {
+      await userEvent.click(host!.querySelector<HTMLButtonElement>('button[aria-label="Prompt templates"]')!);
+    });
+
+    const row = [...document.querySelectorAll<HTMLButtonElement>('button')].find((button) =>
+      button.textContent?.includes('Cinematic')
+    )!;
+    const popover = row.closest<HTMLElement>('[data-scope="popover"][data-part="content"]')!;
+
+    await act(async () => {
+      await userEvent.hover(row);
+    });
+    await waitForComputedStyles(row, { backgroundColor: hoverBackgroundColor });
+
+    expect(getComputedStyle(row).backgroundColor).not.toBe(getComputedStyle(popover).backgroundColor);
   });
 
   // An applied template has to be re-read whether the list is open or not: to

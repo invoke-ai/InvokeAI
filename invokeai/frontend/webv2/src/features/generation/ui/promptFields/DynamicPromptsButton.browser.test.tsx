@@ -9,6 +9,7 @@ import {
   getRenderedLineCount,
   getXsButtonDensityStyles,
   matchElementWidth,
+  waitForComputedStyles,
 } from '@features/generation/ui/promptFields/promptFieldsBrowserTestUtils';
 import { PromptTextarea } from '@features/generation/ui/promptFields/PromptTextarea';
 import { Button } from '@platform/ui/Button';
@@ -170,6 +171,31 @@ describe('dynamic prompts in the positive prompt field', () => {
     });
 
     expect(onUsePrompt).toHaveBeenCalledWith('a red cat');
+  });
+
+  it('keeps the row hover visible against the popover surface', async () => {
+    await render('a {red|green} cat');
+    const hoverBackgroundColor = getComputedStyle(
+      host!.querySelector('[data-testid="row-hover-style-probe"]')!
+    ).backgroundColor;
+
+    await vi.waitFor(() => expect(findButton().textContent).toContain('2'));
+    await act(async () => {
+      await userEvent.click(findButton());
+    });
+
+    const row = [...document.querySelectorAll<HTMLButtonElement>('button')].find(
+      (button) =>
+        button.title === 'widgets.generate.dynamicPrompts.usePrompt' && button.textContent?.includes('a red cat')
+    )!;
+    const popover = row.closest<HTMLElement>('[data-scope="popover"][data-part="content"]')!;
+
+    await act(async () => {
+      await userEvent.hover(row);
+    });
+    await waitForComputedStyles(row, { backgroundColor: hoverBackgroundColor });
+
+    expect(getComputedStyle(row).backgroundColor).not.toBe(getComputedStyle(popover).backgroundColor);
   });
 
   it('preserves the former xs Button density, typography, border, and wrapping', async () => {

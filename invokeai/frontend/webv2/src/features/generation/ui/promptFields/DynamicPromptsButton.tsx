@@ -100,7 +100,7 @@ export const DynamicPromptsButton = ({
       </Tooltip>
       <Portal>
         <Popover.Positioner>
-          <Popover.Content bg="bg.muted" borderColor="border.emphasized" borderWidth="1px" w="26rem">
+          <Popover.Content bg="bg.subtle" borderColor="border.emphasized" borderWidth="1px" w="26rem">
             <Popover.Body p="2.5">
               <Stack gap="2.5">
                 {/* `alignSelf` keeps the tabs to their content width; stretched across

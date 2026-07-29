@@ -135,7 +135,7 @@ export const PromptTemplatesButton = ({
       </Tooltip>
       <Portal>
         <Popover.Positioner>
-          <Popover.Content bg="bg.muted" borderColor="border.emphasized" borderWidth="1px" w="26rem">
+          <Popover.Content bg="bg.subtle" borderColor="border.emphasized" borderWidth="1px" w="26rem">
             <Popover.Body p="2.5">
               {editorTarget ? (
                 <PromptTemplateEditor
