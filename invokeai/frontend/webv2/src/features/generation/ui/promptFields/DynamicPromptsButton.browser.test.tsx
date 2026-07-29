@@ -1,8 +1,17 @@
 import type { DynamicPromptsConfig } from '@features/generation/core/dynamicPrompts';
 
-import { ChakraProvider } from '@chakra-ui/react';
+import { Box, ChakraProvider, Text } from '@chakra-ui/react';
 import { DynamicPromptsButton } from '@features/generation/ui/promptFields/DynamicPromptsButton';
+import {
+  captureRowInteractionStyles,
+  expectRowInteractionStylesToMatch,
+  getElementBoxMetrics,
+  getRenderedLineCount,
+  getXsButtonDensityStyles,
+  matchElementWidth,
+} from '@features/generation/ui/promptFields/promptFieldsBrowserTestUtils';
 import { PromptTextarea } from '@features/generation/ui/promptFields/PromptTextarea';
+import { Button } from '@platform/ui/Button';
 import { Row } from '@platform/ui/Row';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
@@ -36,7 +45,12 @@ const config: DynamicPromptsConfig & { onChange: () => void } = {
   seedBehaviour: 'per-iteration',
 };
 
-const render = async (prompt: string, onUsePrompt = vi.fn()) => {
+const render = async (
+  prompt: string,
+  onUsePrompt = vi.fn(),
+  densityBaselinePrompt?: string,
+  showSyntaxHighlighting = true
+) => {
   host = document.createElement('div');
   host.style.width = '400px';
   document.body.append(host);
@@ -46,11 +60,13 @@ const render = async (prompt: string, onUsePrompt = vi.fn()) => {
     root?.render(
       <QueryClientProvider client={new QueryClient()}>
         <ChakraProvider value={system}>
+          <Box aria-hidden bg="bg.muted" data-testid="row-hover-style-probe" />
           <Row asChild>
             <button aria-label="Row probe" type="button">
               Row probe
             </button>
           </Row>
+          {densityBaselinePrompt ? <DynamicPromptXsButtonBaseline prompt={densityBaselinePrompt} /> : null}
           <PromptTextarea
             aria-label="Prompt"
             defaultHeightPx={100}
@@ -58,14 +74,14 @@ const render = async (prompt: string, onUsePrompt = vi.fn()) => {
             minHeightPx={60}
             readOnly
             resizeHandleAriaLabel="Resize prompt"
-            showSyntaxHighlighting
+            showSyntaxHighlighting={showSyntaxHighlighting}
             value={prompt}
           />
           <DynamicPromptsButton
             batchCount={2}
             config={config}
             positivePrompt={prompt}
-            showSyntaxHighlighting
+            showSyntaxHighlighting={showSyntaxHighlighting}
             onInsertText={vi.fn()}
             onUsePrompt={onUsePrompt}
           />
@@ -132,7 +148,10 @@ describe('dynamic prompts in the positive prompt field', () => {
   it('uses the shared Row interaction contract for each selectable expanded prompt', async () => {
     const { onUsePrompt } = await render('a {red|green} cat');
     const probe = host!.querySelector<HTMLButtonElement>('button[aria-label="Row probe"]')!;
-    const expected = await getRowInteractionStyles(probe);
+    const hoverBackgroundColor = getComputedStyle(
+      host!.querySelector('[data-testid="row-hover-style-probe"]')!
+    ).backgroundColor;
+    const expected = await captureRowInteractionStyles(probe, hoverBackgroundColor);
 
     await vi.waitFor(() => expect(findButton().textContent).toContain('2'));
     await act(async () => {
@@ -144,13 +163,39 @@ describe('dynamic prompts in the positive prompt field', () => {
         button.title === 'widgets.generate.dynamicPrompts.usePrompt' && button.textContent?.includes('a red cat')
     )!;
 
-    await expectRowInteractionsToMatch(expected, row);
+    await expectRowInteractionStylesToMatch(expected, row, hoverBackgroundColor);
 
     await act(async () => {
       await userEvent.click(row);
     });
 
     expect(onUsePrompt).toHaveBeenCalledWith('a red cat');
+  });
+
+  it('preserves the former xs Button density, typography, border, and wrapping', async () => {
+    const longPrompt =
+      'a documentary portrait of a long-haired golden retriever beside a mountain lake under dramatic evening light';
+    parseDynamicPrompts.mockResolvedValue({ error: null, prompts: [longPrompt, 'a short prompt'] });
+    await render('a {documentary|short} prompt', vi.fn(), longPrompt, false);
+
+    await vi.waitFor(() => expect(findButton().textContent).toContain('2'));
+    await act(async () => {
+      await userEvent.click(findButton());
+    });
+
+    const row = [...document.querySelectorAll<HTMLButtonElement>('button')].find(
+      (button) =>
+        button.title === 'widgets.generate.dynamicPrompts.usePrompt' && button.textContent?.includes(longPrompt)
+    )!;
+    const baseline = host!.querySelector<HTMLButtonElement>('button[aria-label="Dynamic prompt xs Button baseline"]')!;
+    matchElementWidth(baseline, row);
+
+    const rowPrompt = row.children[1] as HTMLElement;
+    const baselinePrompt = baseline.querySelector<HTMLElement>('[data-testid="dynamic-prompt-baseline-text"]')!;
+
+    expect(getXsButtonDensityStyles(row)).toEqual(getXsButtonDensityStyles(baseline));
+    expect(getElementBoxMetrics(row)).toEqual(getElementBoxMetrics(baseline));
+    expect(getRenderedLineCount(rowPrompt)).toBe(getRenderedLineCount(baselinePrompt));
   });
 
   it('colours attention syntax inside the previewed prompts', async () => {
@@ -187,69 +232,31 @@ describe('dynamic prompts in the positive prompt field', () => {
   });
 });
 
-const getRowInteractionStyles = async (probe: HTMLButtonElement) => {
-  const probeBackgroundTransition = waitForBackgroundTransition(probe);
-  await act(async () => {
-    await userEvent.tab();
-    await userEvent.hover(probe);
-  });
-  await probeBackgroundTransition;
-  const expected = getInteractionStyles(probe);
-
-  await act(async () => {
-    await userEvent.unhover(probe);
-  });
-
-  return expected;
-};
-
-const expectRowInteractionsToMatch = async (
-  expected: ReturnType<typeof getInteractionStyles>,
-  row: HTMLButtonElement
-) => {
-  const rowBackgroundTransition = waitForBackgroundTransition(row);
-  await act(async () => {
-    await focusWithKeyboard(row);
-    await userEvent.hover(row);
-  });
-  await rowBackgroundTransition;
-
-  expect(getInteractionStyles(row)).toEqual(expected);
-};
-
-const focusWithKeyboard = async (element: HTMLButtonElement) => {
-  for (let index = 0; index < 12; index += 1) {
-    if (document.activeElement === element) {
-      return;
-    }
-    await userEvent.tab();
-  }
-
-  throw new Error(`Could not focus ${element.title} with the keyboard`);
-};
-
-const getInteractionStyles = (element: HTMLElement) => {
-  const styles = getComputedStyle(element);
-
-  return {
-    backgroundColor: styles.backgroundColor,
-    borderRadius: styles.borderRadius,
-    outline: styles.outline,
-    outlineOffset: styles.outlineOffset,
-    transitionDuration: styles.transitionDuration,
-    transitionProperty: styles.transitionProperty,
-    transitionTimingFunction: styles.transitionTimingFunction,
-  };
-};
-
-const waitForBackgroundTransition = (element: HTMLElement) =>
-  new Promise<void>((resolve) => {
-    const onTransitionEnd = (event: TransitionEvent) => {
-      if (event.target === element && event.propertyName === 'background-color') {
-        element.removeEventListener('transitionend', onTransitionEnd);
-        resolve();
-      }
-    };
-
-    element.addEventListener('transitionend', onTransitionEnd);
-  });
+const DynamicPromptXsButtonBaseline = ({ prompt }: { prompt: string }) => (
+  <Button
+    alignItems="start"
+    aria-label="Dynamic prompt xs Button baseline"
+    gap="2"
+    h="auto"
+    justifyContent="start"
+    px="2"
+    py="1.5"
+    size="xs"
+    variant="ghost"
+  >
+    <Text as="span" color="fg.subtle" fontSize="2xs">
+      1
+    </Text>
+    <Text
+      as="span"
+      color="fg"
+      data-testid="dynamic-prompt-baseline-text"
+      fontFamily="mono"
+      fontSize="0.72rem"
+      textAlign="start"
+      wordBreak="break-word"
+    >
+      {prompt}
+    </Text>
+  </Button>
+);

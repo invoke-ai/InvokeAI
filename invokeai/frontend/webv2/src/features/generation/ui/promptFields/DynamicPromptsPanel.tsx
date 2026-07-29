@@ -245,12 +245,17 @@ const DynamicPromptRow = ({
     <Row
       alignItems="start"
       asChild
+      borderColor="transparent"
+      borderWidth="1px"
+      fontWeight="medium"
       gap="2"
       h="auto"
       justifyContent="start"
       px="2"
       py="1.5"
+      textStyle="xs"
       title={t('widgets.generate.dynamicPrompts.usePrompt')}
+      whiteSpace="nowrap"
     >
       <button type="button" onClick={handleClick}>
         <Text as="span" color="fg.subtle" css={TABULAR_NUMS} fontSize="2xs">

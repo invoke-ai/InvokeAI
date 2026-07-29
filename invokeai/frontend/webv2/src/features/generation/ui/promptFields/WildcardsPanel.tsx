@@ -304,16 +304,21 @@ const WildcardRow = ({
       <Row
         alignItems="start"
         asChild
+        borderColor="transparent"
+        borderWidth="1px"
         flex="1"
+        fontWeight="medium"
         h="auto"
         justifyContent="start"
         minW="0"
         px="2"
         py="1.5"
+        textStyle="xs"
         title={t('widgets.generate.dynamicPrompts.insertWildcard')}
+        whiteSpace="nowrap"
       >
         <button
-          aria-label={t('widgets.generate.dynamicPrompts.insertWildcard')}
+          aria-label={`${t('widgets.generate.dynamicPrompts.insertWildcard')}: __${wildcard.name}__`}
           type="button"
           onClick={() => onInsert(`__${wildcard.name}__`)}
         >

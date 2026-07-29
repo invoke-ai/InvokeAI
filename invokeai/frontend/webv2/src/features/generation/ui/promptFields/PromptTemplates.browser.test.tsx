@@ -4,6 +4,10 @@ import type { PromptTemplateCatalog } from '@features/generation/ui/usePromptTem
 
 import { Box, ChakraProvider } from '@chakra-ui/react';
 import { exportPromptTemplates, promptTemplateKeys } from '@features/generation/data/promptTemplates';
+import {
+  expectRowInteractionsToMatch,
+  waitForComputedStyles,
+} from '@features/generation/ui/promptFields/promptFieldsBrowserTestUtils';
 import { PromptTemplateEditor } from '@features/generation/ui/promptFields/PromptTemplateEditor';
 import { PromptTemplateImage } from '@features/generation/ui/promptFields/PromptTemplateImage';
 import { PromptTemplatesPanel } from '@features/generation/ui/promptFields/PromptTemplatesPanel';
@@ -179,6 +183,7 @@ const StatefulPromptTemplatesPanel = ({ catalog }: { catalog: PromptTemplateCata
   return (
     <>
       <Box aria-hidden bg="accent.solid" color="accent.contrast" data-testid="accent-style-probe" />
+      <Box aria-hidden bg="bg.muted" data-testid="row-hover-style-probe" />
       <Row asChild>
         <button aria-label="Row probe" type="button">
           Row probe
@@ -276,15 +281,12 @@ describe('the prompt templates panel', () => {
     await act(async () => {
       await userEvent.click(activeButton);
     });
-    await act(
-      () =>
-        new Promise<void>((resolve) => {
-          globalThis.setTimeout(resolve, 200);
-        })
-    );
 
     const probeStyle = getComputedStyle(host!.querySelector('[data-testid="accent-style-probe"]')!);
     const activeText = activeButton.querySelectorAll('span');
+    await waitForComputedStyles(activeButton, { backgroundColor: probeStyle.backgroundColor });
+    await waitForComputedStyles(activeText[0]!, { color: probeStyle.color });
+    await waitForComputedStyles(activeText[1]!, { color: probeStyle.color });
 
     expect(activeButton.getAttribute('aria-current')).toBe('true');
     expect(inactiveButton.hasAttribute('aria-current')).toBe(false);
@@ -300,14 +302,17 @@ describe('the prompt templates panel', () => {
 
     const probe = host!.querySelector<HTMLButtonElement>('button[aria-label="Row probe"]')!;
     const row = buttonWithText('Cinematic');
-    const edit = host!.querySelector<HTMLButtonElement>('button[aria-label="Edit"]')!;
-    const remove = host!.querySelector<HTMLButtonElement>('button[aria-label="Delete"]')!;
+    const hoverBackgroundColor = getComputedStyle(
+      host!.querySelector('[data-testid="row-hover-style-probe"]')!
+    ).backgroundColor;
+    const edit = host!.querySelector<HTMLButtonElement>('button[aria-label="Edit: Cinematic"]')!;
+    const remove = host!.querySelector<HTMLButtonElement>('button[aria-label="Delete: Cinematic"]')!;
 
     expect(row.getAttribute('aria-current')).toBeNull();
     expect(row.contains(edit)).toBe(false);
     expect(row.contains(remove)).toBe(false);
 
-    await expectRowInteractionsToMatch(probe, row);
+    await expectRowInteractionsToMatch(probe, row, hoverBackgroundColor);
   });
 
   it('clears the applied template', async () => {
@@ -353,7 +358,7 @@ describe('the prompt templates panel', () => {
     );
 
     await act(async () => {
-      await userEvent.click(host!.querySelector<HTMLButtonElement>('button[aria-label="Delete"]')!);
+      await userEvent.click(host!.querySelector<HTMLButtonElement>('button[aria-label="Delete: Cinematic"]')!);
     });
     // The confirmation is portalled, so it is not under `host`.
     const dialog = document.querySelector('[role="alertdialog"]')!;
@@ -369,7 +374,7 @@ describe('the prompt templates panel', () => {
 
   // Built-ins are shipped by the backend and rejected by it for non-admins, so
   // offering the controls would only produce a 403.
-  it('offers edit and delete on your own templates but not on built-ins', async () => {
+  it('names edit and delete for your own template and omits them from built-ins', async () => {
     await render(
       <PromptTemplatesPanel
         activeTemplate={null}
@@ -384,8 +389,10 @@ describe('the prompt templates panel', () => {
 
     const labels = [...host!.querySelectorAll('button')].map((button) => button.getAttribute('aria-label'));
 
-    expect(labels.filter((label) => label === 'Edit')).toHaveLength(1);
-    expect(labels.filter((label) => label === 'Delete')).toHaveLength(1);
+    expect(labels.filter((label) => label === 'Edit: Cinematic')).toHaveLength(1);
+    expect(labels.filter((label) => label === 'Delete: Cinematic')).toHaveLength(1);
+    expect(labels).not.toContain('Edit: Photography');
+    expect(labels).not.toContain('Delete: Photography');
   });
 
   it('finds fuzzy template names', async () => {
@@ -532,8 +539,10 @@ describe('the prompt templates panel', () => {
     expect(host!.textContent).toContain('Shared templates');
     expect(host!.textContent).toContain('Community');
     const labels = [...host!.querySelectorAll('button')].map((button) => button.getAttribute('aria-label'));
-    expect(labels.filter((label) => label === 'Edit')).toHaveLength(1);
-    expect(labels.filter((label) => label === 'Delete')).toHaveLength(1);
+    expect(labels.filter((label) => label === 'Edit: Cinematic')).toHaveLength(1);
+    expect(labels.filter((label) => label === 'Delete: Cinematic')).toHaveLength(1);
+    expect(labels).not.toContain('Edit: Community');
+    expect(labels).not.toContain('Delete: Community');
   });
 });
 
@@ -833,60 +842,3 @@ describe('prompt template image outlines', () => {
     expect(getComputedStyle(image).outlineOffset).toBe('0px');
   });
 });
-
-const expectRowInteractionsToMatch = async (probe: HTMLButtonElement, row: HTMLButtonElement) => {
-  const probeBackgroundTransition = waitForBackgroundTransition(probe);
-  await act(async () => {
-    await userEvent.tab();
-    await userEvent.hover(probe);
-  });
-  await probeBackgroundTransition;
-  const expected = getInteractionStyles(probe);
-
-  const rowBackgroundTransition = waitForBackgroundTransition(row);
-  await act(async () => {
-    await userEvent.unhover(probe);
-    await focusWithKeyboard(row);
-    await userEvent.hover(row);
-  });
-  await rowBackgroundTransition;
-
-  expect(getInteractionStyles(row)).toEqual(expected);
-};
-
-const focusWithKeyboard = async (element: HTMLButtonElement) => {
-  for (let index = 0; index < 12; index += 1) {
-    if (document.activeElement === element) {
-      return;
-    }
-    await userEvent.tab();
-  }
-
-  throw new Error(`Could not focus ${element.textContent} with the keyboard`);
-};
-
-const getInteractionStyles = (element: HTMLElement) => {
-  const styles = getComputedStyle(element);
-
-  return {
-    backgroundColor: styles.backgroundColor,
-    borderRadius: styles.borderRadius,
-    outline: styles.outline,
-    outlineOffset: styles.outlineOffset,
-    transitionDuration: styles.transitionDuration,
-    transitionProperty: styles.transitionProperty,
-    transitionTimingFunction: styles.transitionTimingFunction,
-  };
-};
-
-const waitForBackgroundTransition = (element: HTMLElement) =>
-  new Promise<void>((resolve) => {
-    const onTransitionEnd = (event: TransitionEvent) => {
-      if (event.target === element && event.propertyName === 'background-color') {
-        element.removeEventListener('transitionend', onTransitionEnd);
-        resolve();
-      }
-    };
-
-    element.addEventListener('transitionend', onTransitionEnd);
-  });

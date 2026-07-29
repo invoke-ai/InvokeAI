@@ -422,7 +422,12 @@ const TemplateRow = ({
       </Row>
       {onEdit ? (
         <Tooltip content={t('common.edit')}>
-          <IconButton aria-label={t('common.edit')} size="2xs" variant="ghost" onClick={handleEdit}>
+          <IconButton
+            aria-label={`${t('common.edit')}: ${template.name}`}
+            size="2xs"
+            variant="ghost"
+            onClick={handleEdit}
+          >
             <PencilIcon />
           </IconButton>
         </Tooltip>
@@ -430,7 +435,7 @@ const TemplateRow = ({
       {onDelete ? (
         <Tooltip content={t('common.delete')}>
           <IconButton
-            aria-label={t('common.delete')}
+            aria-label={`${t('common.delete')}: ${template.name}`}
             colorPalette="red"
             size="2xs"
             variant="ghost"

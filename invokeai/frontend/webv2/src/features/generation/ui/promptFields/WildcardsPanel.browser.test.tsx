@@ -1,9 +1,17 @@
 import type { WildcardCatalog } from '@features/generation/ui/useWildcards';
 
-import { ChakraProvider } from '@chakra-ui/react';
+import { Box, ChakraProvider, Stack, Text } from '@chakra-ui/react';
+import {
+  expectRowInteractionsToMatch,
+  getElementBoxMetrics,
+  getRenderedLineCount,
+  getXsButtonDensityStyles,
+  matchElementWidth,
+} from '@features/generation/ui/promptFields/promptFieldsBrowserTestUtils';
 import { WildcardsPanel } from '@features/generation/ui/promptFields/WildcardsPanel';
 import { WILDCARD_COLLECTION_FORMATS } from '@features/generation/ui/wildcardFiles';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { Button } from '@platform/ui/Button';
 import { Row } from '@platform/ui/Row';
 import { system } from '@theme/system';
 import { act } from 'react';
@@ -47,11 +55,15 @@ const renderPanel = async (
     root?.render(
       <ChakraProvider value={system}>
         {includeRowProbe ? (
-          <Row asChild>
-            <button aria-label="Row probe" type="button">
-              Row probe
-            </button>
-          </Row>
+          <>
+            <Box aria-hidden bg="bg.muted" data-testid="row-hover-style-probe" />
+            <Row asChild>
+              <button aria-label="Row probe" type="button">
+                Row probe
+              </button>
+            </Row>
+            {panelCatalog.wildcards[0] ? <WildcardXsButtonBaseline wildcard={panelCatalog.wildcards[0]} /> : null}
+          </>
         ) : null}
         <WildcardsPanel catalog={panelCatalog} showSyntaxHighlighting={showSyntaxHighlighting} onInsert={onInsert} />
       </ChakraProvider>
@@ -304,11 +316,45 @@ describe('wildcard list interactions', () => {
   const selectableWildcardButton = () =>
     host!.querySelector<HTMLButtonElement>('button[title="widgets.generate.dynamicPrompts.insertWildcard"]')!;
 
+  it('names each selectable row with its visible wildcard reference and inserts the matching wildcard', async () => {
+    const onInsert = vi.fn();
+    const panelCatalog: WildcardCatalog = {
+      ...catalog,
+      knownNames: new Set(['colors', 'moods']),
+      wildcards: [
+        { id: 'w1', name: 'colors', values: ['red', 'green'] },
+        { id: 'w2', name: 'moods', values: ['serene', 'brooding'] },
+      ],
+    };
+    await renderPanel(true, panelCatalog, onInsert);
+
+    const rows = [
+      ...host!.querySelectorAll<HTMLButtonElement>('button[title="widgets.generate.dynamicPrompts.insertWildcard"]'),
+    ];
+    const colorsRow = rows.find((row) => row.getAttribute('aria-label')?.includes('__colors__'))!;
+    const moodsRow = rows.find((row) => row.getAttribute('aria-label')?.includes('__moods__'))!;
+
+    expect(colorsRow).toBeTruthy();
+    expect(moodsRow).toBeTruthy();
+    expect(colorsRow.getAttribute('aria-label')).not.toBe(moodsRow.getAttribute('aria-label'));
+
+    await act(async () => {
+      await userEvent.click(colorsRow);
+      await userEvent.click(moodsRow);
+    });
+
+    expect(onInsert).toHaveBeenNthCalledWith(1, '__colors__');
+    expect(onInsert).toHaveBeenNthCalledWith(2, '__moods__');
+  });
+
   it('uses the shared Row interaction contract without nesting the edit controls', async () => {
     const onInsert = vi.fn();
     await renderPanel(true, catalog, onInsert, true);
 
     const probe = host!.querySelector<HTMLButtonElement>('button[aria-label="Row probe"]')!;
+    const hoverBackgroundColor = getComputedStyle(
+      host!.querySelector('[data-testid="row-hover-style-probe"]')!
+    ).backgroundColor;
     const row = selectableWildcardButton();
     const edit = host!.querySelector<HTMLButtonElement>('button[aria-label="common.edit"]')!;
     const remove = host!.querySelector<HTMLButtonElement>('button[aria-label="common.delete"]')!;
@@ -316,13 +362,44 @@ describe('wildcard list interactions', () => {
     expect(row.contains(edit)).toBe(false);
     expect(row.contains(remove)).toBe(false);
 
-    await expectRowInteractionsToMatch(probe, row);
+    await expectRowInteractionsToMatch(probe, row, hoverBackgroundColor);
 
     await act(async () => {
       await userEvent.click(row);
     });
 
     expect(onInsert).toHaveBeenCalledWith('__colors__');
+  });
+
+  it('preserves the former xs Button density, typography, border, and wrapping', async () => {
+    const longWildcard = {
+      id: 'w-long',
+      name: 'collections/animals/photorealistic/long-haired-dogs/portrait-backgrounds',
+      values: ['golden retriever', 'bernese mountain dog'],
+    };
+    await renderPanel(
+      true,
+      {
+        ...catalog,
+        knownNames: new Set([longWildcard.name]),
+        wildcards: [longWildcard],
+      },
+      vi.fn(),
+      true
+    );
+
+    const baseline = host!.querySelector<HTMLButtonElement>('button[aria-label="Wildcard xs Button baseline"]')!;
+    const row = selectableWildcardButton();
+    matchElementWidth(baseline, row);
+
+    const baselineName = baseline.querySelector<HTMLElement>('[data-testid="wildcard-baseline-name"]')!;
+    const rowName = [...row.querySelectorAll<HTMLElement>('span')].find((element) =>
+      element.textContent?.startsWith('__collections/')
+    )!;
+
+    expect(getXsButtonDensityStyles(row)).toEqual(getXsButtonDensityStyles(baseline));
+    expect(getElementBoxMetrics(row)).toEqual(getElementBoxMetrics(baseline));
+    expect(getRenderedLineCount(rowName)).toBe(getRenderedLineCount(baselineName));
   });
 });
 
@@ -373,59 +450,25 @@ describe('deleting a wildcard', () => {
   });
 });
 
-const expectRowInteractionsToMatch = async (probe: HTMLButtonElement, row: HTMLButtonElement) => {
-  const probeBackgroundTransition = waitForBackgroundTransition(probe);
-  await act(async () => {
-    await userEvent.tab();
-    await userEvent.hover(probe);
-  });
-  await probeBackgroundTransition;
-  const expected = getInteractionStyles(probe);
-
-  const rowBackgroundTransition = waitForBackgroundTransition(row);
-  await act(async () => {
-    await userEvent.unhover(probe);
-    await focusWithKeyboard(row);
-    await userEvent.hover(row);
-  });
-  await rowBackgroundTransition;
-
-  expect(getInteractionStyles(row)).toEqual(expected);
-};
-
-const focusWithKeyboard = async (element: HTMLButtonElement) => {
-  for (let index = 0; index < 12; index += 1) {
-    if (document.activeElement === element) {
-      return;
-    }
-    await userEvent.tab();
-  }
-
-  throw new Error(`Could not focus ${element.title} with the keyboard`);
-};
-
-const getInteractionStyles = (element: HTMLElement) => {
-  const styles = getComputedStyle(element);
-
-  return {
-    backgroundColor: styles.backgroundColor,
-    borderRadius: styles.borderRadius,
-    outline: styles.outline,
-    outlineOffset: styles.outlineOffset,
-    transitionDuration: styles.transitionDuration,
-    transitionProperty: styles.transitionProperty,
-    transitionTimingFunction: styles.transitionTimingFunction,
-  };
-};
-
-const waitForBackgroundTransition = (element: HTMLElement) =>
-  new Promise<void>((resolve) => {
-    const onTransitionEnd = (event: TransitionEvent) => {
-      if (event.target === element && event.propertyName === 'background-color') {
-        element.removeEventListener('transitionend', onTransitionEnd);
-        resolve();
-      }
-    };
-
-    element.addEventListener('transitionend', onTransitionEnd);
-  });
+const WildcardXsButtonBaseline = ({ wildcard }: { wildcard: WildcardCatalog['wildcards'][number] }) => (
+  <Button
+    alignItems="start"
+    aria-label="Wildcard xs Button baseline"
+    h="auto"
+    justifyContent="start"
+    minW="0"
+    px="2"
+    py="1.5"
+    size="xs"
+    variant="ghost"
+  >
+    <Stack align="start" gap="0" minW="0">
+      <Text as="span" color="fg" data-testid="wildcard-baseline-name" fontFamily="mono" fontSize="0.72rem">
+        __{wildcard.name}__
+      </Text>
+      <Text as="span" color="fg.subtle" fontSize="2xs" truncate>
+        {wildcard.values.join(', ')}
+      </Text>
+    </Stack>
+  </Button>
+);
