@@ -18,6 +18,7 @@ import { buildCogView4Graph } from 'features/nodes/util/graph/generation/buildCo
 import { buildExternalGraph } from 'features/nodes/util/graph/generation/buildExternalGraph';
 import { buildFLUXGraph } from 'features/nodes/util/graph/generation/buildFLUXGraph';
 import { buildIdeogram4Graph } from 'features/nodes/util/graph/generation/buildIdeogram4Graph';
+import { buildKrea2Graph } from 'features/nodes/util/graph/generation/buildKrea2Graph';
 import { buildQwenImageGraph } from 'features/nodes/util/graph/generation/buildQwenImageGraph';
 import { buildSD1Graph } from 'features/nodes/util/graph/generation/buildSD1Graph';
 import { buildSD3Graph } from 'features/nodes/util/graph/generation/buildSD3Graph';
@@ -71,6 +72,8 @@ const enqueueCanvas = async (store: AppStore, canvasManager: CanvasManager, prep
         return await buildQwenImageGraph(graphBuilderArg);
       case 'z-image':
         return await buildZImageGraph(graphBuilderArg);
+      case 'krea-2':
+        return await buildKrea2Graph(graphBuilderArg);
       case 'ideogram-4':
         return await buildIdeogram4Graph(graphBuilderArg);
       case 'external':
