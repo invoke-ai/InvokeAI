@@ -87,12 +87,14 @@ class ModelType(str, Enum):
     QwenVLEncoder = "qwen_vl_encoder"
     Qwen3VLEncoder = "qwen3_vl_encoder"
     WanT5Encoder = "wan_t5_encoder"
+    Gemma2Encoder = "gemma2_encoder"
     SpandrelImageToImage = "spandrel_image_to_image"
     SigLIP = "siglip"
     FluxRedux = "flux_redux"
     LlavaOnevision = "llava_onevision"
     TextLLM = "text_llm"
     ExternalImageGenerator = "external_image_generator"
+    PiDDecoder = "pid_decoder"
     Unknown = "unknown"
 
 
@@ -241,6 +243,23 @@ class Qwen3VariantType(str, Enum):
     """Qwen3 0.6B text encoder (hidden_size=1024). Used by Anima."""
 
 
+class PiDDecoderVariantType(str, Enum):
+    """PiD (Pixel Diffusion Decoder) resolution presets distributed by NVIDIA.
+
+    Supported backbones are FLUX.1, FLUX.2, SD3, SDXL and Qwen-Image. Not every backbone ships both
+    presets: FLUX.1 / FLUX.2 / SD3 have both the 2K and the 2K-to-4K preset, while SDXL and Qwen-Image
+    ship only the 2K-to-4K preset. The presets differ only in target output resolution; the underlying
+    (legacy) network is the same. NVIDIA's checkpoint filenames encode this as e.g.
+    `PiD_res2k_sr4x_official_flux_distill_4step` vs `PiD_res2kto4k_sr4x_official_flux_distill_4step`.
+    """
+
+    Res2k_Sr4x = "res2k_sr4x"
+    """Standard 2K target preset (decodes to ~2K via 4x super-resolution)."""
+
+    Res2kTo4k_Sr4x = "res2kto4k_sr4x"
+    """Upsampling preset (designed for chaining to push ~2K inputs to ~4K)."""
+
+
 class ModelFormat(str, Enum):
     """Storage format of model."""
 
@@ -258,6 +277,7 @@ class ModelFormat(str, Enum):
     QwenVLEncoder = "qwen_vl_encoder"
     Qwen3VLEncoder = "qwen3_vl_encoder"
     WanT5Encoder = "wan_t5_encoder"
+    Gemma2Encoder = "gemma2_encoder"
     BnbQuantizedLlmInt8b = "bnb_quantized_int8b"
     BnbQuantizednf4b = "bnb_quantized_nf4b"
     GGUFQuantized = "gguf_quantized"
@@ -318,6 +338,7 @@ AnyVariant: TypeAlias = Union[
     WanLoRAVariantType,
     Qwen3VariantType,
     Krea2VariantType,
+    PiDDecoderVariantType,
 ]
 variant_type_adapter = TypeAdapter[
     ModelVariantType
@@ -330,6 +351,7 @@ variant_type_adapter = TypeAdapter[
     | WanLoRAVariantType
     | Qwen3VariantType
     | Krea2VariantType
+    | PiDDecoderVariantType
 ](
     ModelVariantType
     | ClipVariantType
@@ -341,4 +363,5 @@ variant_type_adapter = TypeAdapter[
     | WanLoRAVariantType
     | Qwen3VariantType
     | Krea2VariantType
+    | PiDDecoderVariantType
 )
