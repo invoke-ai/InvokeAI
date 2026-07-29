@@ -188,11 +188,12 @@ describe('dynamic prompts in the positive prompt field', () => {
 });
 
 const getRowInteractionStyles = async (probe: HTMLButtonElement) => {
+  const probeBackgroundTransition = waitForBackgroundTransition(probe);
   await act(async () => {
     await userEvent.tab();
     await userEvent.hover(probe);
-    await waitForTransition();
   });
+  await probeBackgroundTransition;
   const expected = getInteractionStyles(probe);
 
   await act(async () => {
@@ -206,11 +207,12 @@ const expectRowInteractionsToMatch = async (
   expected: ReturnType<typeof getInteractionStyles>,
   row: HTMLButtonElement
 ) => {
+  const rowBackgroundTransition = waitForBackgroundTransition(row);
   await act(async () => {
     await focusWithKeyboard(row);
     await userEvent.hover(row);
-    await waitForTransition();
   });
+  await rowBackgroundTransition;
 
   expect(getInteractionStyles(row)).toEqual(expected);
 };
@@ -240,7 +242,14 @@ const getInteractionStyles = (element: HTMLElement) => {
   };
 };
 
-const waitForTransition = () =>
+const waitForBackgroundTransition = (element: HTMLElement) =>
   new Promise<void>((resolve) => {
-    globalThis.setTimeout(resolve, 200);
+    const onTransitionEnd = (event: TransitionEvent) => {
+      if (event.target === element && event.propertyName === 'background-color') {
+        element.removeEventListener('transitionend', onTransitionEnd);
+        resolve();
+      }
+    };
+
+    element.addEventListener('transitionend', onTransitionEnd);
   });
