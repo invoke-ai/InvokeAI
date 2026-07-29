@@ -3,13 +3,18 @@ import { ChakraProvider } from '@chakra-ui/react';
 import { NegativePromptField } from '@features/generation/ui/promptFields/NegativePromptField';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
+import i18next from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
 const MODEL_CATALOG = [{ base: 'sdxl', name: 'easynegative', type: 'embedding' }];
 const SELECTED_MODEL = { base: 'sdxl', name: 'Juggernaut', trigger_phrases: ['jugg'] };
+const i18n = i18next.createInstance();
+
+await i18n.use(initReactI18next).init({ fallbackLng: 'en', lng: 'en', resources: { en: { translation: {} } } });
 
 vi.mock('@features/generation/ui/GenerationUiContext', async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -38,25 +43,27 @@ const render = async (templateNegativePrompt: string | null, isTemplateViewMode 
 
   await act(() => {
     root?.render(
-      <QueryClientProvider client={new QueryClient()}>
-        <ChakraProvider value={system}>
-          <NegativePromptField
-            heightPx={56}
-            isEnabled
-            isTemplateViewMode={isTemplateViewMode}
-            loras={[]}
-            projectId="project-1"
-            selectedModel={SELECTED_MODEL as never}
-            showSyntaxHighlighting={false}
-            templateNegativePrompt={templateNegativePrompt}
-            value="blurry"
-            onChange={vi.fn()}
-            onEnabledChange={vi.fn()}
-            onResizeEnd={vi.fn()}
-            onTemplateViewModeChange={vi.fn()}
-          />
-        </ChakraProvider>
-      </QueryClientProvider>
+      <I18nextProvider i18n={i18n}>
+        <QueryClientProvider client={new QueryClient()}>
+          <ChakraProvider value={system}>
+            <NegativePromptField
+              heightPx={56}
+              isEnabled
+              isTemplateViewMode={isTemplateViewMode}
+              loras={[]}
+              projectId="project-1"
+              selectedModel={SELECTED_MODEL as never}
+              showSyntaxHighlighting={false}
+              templateNegativePrompt={templateNegativePrompt}
+              value="blurry"
+              onChange={vi.fn()}
+              onEnabledChange={vi.fn()}
+              onResizeEnd={vi.fn()}
+              onTemplateViewModeChange={vi.fn()}
+            />
+          </ChakraProvider>
+        </QueryClientProvider>
+      </I18nextProvider>
     );
   });
 

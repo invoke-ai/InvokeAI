@@ -115,13 +115,13 @@ export const getActiveTriggerQuery = (
   // malformed: autocomplete must not reopen over text the user has already
   // closed.
   const closingStart = caret - 2;
-  const openingStart = value.lastIndexOf('__', closingStart - 1);
+  const openingStart = value.lastIndexOf('__', closingStart - 2);
 
   if (
     keys.includes('_') &&
     value.slice(closingStart, caret) === '__' &&
     openingStart >= 0 &&
-    openingStart + 2 < closingStart
+    openingStart + 2 <= closingStart
   ) {
     return null;
   }

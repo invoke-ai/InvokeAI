@@ -53,6 +53,11 @@ describe('getActiveTriggerQuery', () => {
     expect(query('prefix__name__')).toBeNull();
   });
 
+  it('stays shut after an empty closed wildcard reference', () => {
+    expect(query('____')).toBeNull();
+    expect(query('a ____')).toBeNull();
+  });
+
   it('stays shut inside an ordinary word', () => {
     expect(query('a snake__case word')).toBeNull();
     expect(query('a photo of a cat')).toBeNull();

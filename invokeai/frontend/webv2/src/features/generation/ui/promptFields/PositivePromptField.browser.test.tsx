@@ -3,9 +3,15 @@ import { ChakraProvider } from '@chakra-ui/react';
 import { PositivePromptField } from '@features/generation/ui/promptFields/PositivePromptField';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
+import i18next from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, expect, it, vi } from 'vitest';
+
+const i18n = i18next.createInstance();
+
+await i18n.use(initReactI18next).init({ fallbackLng: 'en', lng: 'en', resources: { en: { translation: {} } } });
 
 vi.mock('@features/generation/ui/GenerationUiContext', async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -44,22 +50,24 @@ it('keeps positive prompt actions enabled when stale view mode has no active tem
 
   await act(() => {
     root?.render(
-      <QueryClientProvider client={new QueryClient()}>
-        <ChakraProvider value={system}>
-          <PositivePromptField
-            heightPx={96}
-            isTemplateViewMode
-            loras={[]}
-            projectId="project-1"
-            selectedModel={undefined}
-            showSyntaxHighlighting={false}
-            value="a cat"
-            onChange={vi.fn()}
-            onResizeEnd={vi.fn()}
-            onUsePrompt={vi.fn()}
-          />
-        </ChakraProvider>
-      </QueryClientProvider>
+      <I18nextProvider i18n={i18n}>
+        <QueryClientProvider client={new QueryClient()}>
+          <ChakraProvider value={system}>
+            <PositivePromptField
+              heightPx={96}
+              isTemplateViewMode
+              loras={[]}
+              projectId="project-1"
+              selectedModel={undefined}
+              showSyntaxHighlighting={false}
+              value="a cat"
+              onChange={vi.fn()}
+              onResizeEnd={vi.fn()}
+              onUsePrompt={vi.fn()}
+            />
+          </ChakraProvider>
+        </QueryClientProvider>
+      </I18nextProvider>
     );
   });
 
