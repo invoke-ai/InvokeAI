@@ -112,6 +112,7 @@ export const zBaseModelType = z.enum([
   'cogview4',
   'qwen-image',
   'z-image',
+  'krea-2',
   'ideogram-4',
   'external',
   'anima',
@@ -129,6 +130,7 @@ export const zMainModelBase = z.enum([
   'cogview4',
   'qwen-image',
   'z-image',
+  'krea-2',
   'ideogram-4',
   'anima',
   'wan',
@@ -152,6 +154,7 @@ export const zModelType = z.enum([
   't5_encoder',
   'qwen3_encoder',
   'qwen_vl_encoder',
+  'qwen3_vl_encoder',
   'wan_t5_encoder',
   'clip_embed',
   'siglip',
@@ -182,6 +185,7 @@ export const zModelVariantType = z.enum(['normal', 'inpaint', 'depth']);
 export const zFluxVariantType = z.enum(['dev', 'dev_fill', 'schnell']);
 export const zFlux2VariantType = z.enum(['klein_4b', 'klein_4b_base', 'klein_9b', 'klein_9b_base']);
 export const zZImageVariantType = z.enum(['turbo', 'zbase']);
+export const zKrea2VariantType = z.enum(['krea2_turbo', 'krea2_base']);
 const zQwenImageVariantType = z.enum(['generate', 'edit']);
 const zWanVariantType = z.enum(['t2v_a14b', 'i2v_a14b', 'ti2v_5b']);
 /** Wan LoRA variant — identifies which model FAMILY (inner_dim) a LoRA
@@ -194,6 +198,7 @@ export const zAnyModelVariant = z.union([
   zFluxVariantType,
   zFlux2VariantType,
   zZImageVariantType,
+  zKrea2VariantType,
   zQwenImageVariantType,
   zWanVariantType,
   zWanLoRAVariantType,
@@ -213,6 +218,7 @@ export const zModelFormat = z.enum([
   't5_encoder',
   'qwen3_encoder',
   'qwen_vl_encoder',
+  'qwen3_vl_encoder',
   'wan_t5_encoder',
   'bnb_quantized_int8b',
   'bnb_quantized_nf4b',

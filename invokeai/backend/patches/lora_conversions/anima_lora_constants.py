@@ -32,17 +32,20 @@ _PEFT_ANIMA_RE = re.compile(
 )
 
 
-# Subcomponents *uniquely* identifying Anima/Cosmos DiT: ``mlp`` and
-# ``adaln_modulation`` (Wan calls those ``ffn`` and ``modulation`` respectively),
-# plus the Cosmos attention naming with a ``_proj`` suffix on the projection
-# letter (Wan native uses bare ``.q``/``.k``/``.v``/``.o`` — no ``_proj``).
+# Subcomponents *uniquely* identifying Anima/Cosmos DiT: the DiT block MLP (``mlp.layer_0`` / ``mlp_layer1``)
+# and ``adaln_modulation`` (Wan calls those ``ffn`` and ``modulation`` respectively), plus the Cosmos
+# attention naming with a ``_proj`` suffix on the projection letter (Wan native uses bare
+# ``.q``/``.k``/``.v``/``.o`` — no ``_proj``).
 #
-# Used by the probe in ``configs/lora.py`` to make Anima-LoRA detection
-# *mutually exclusive* with Wan-LoRA detection: a state dict carrying only
-# ``cross_attn.q`` / ``ffn.0`` (Wan native) will NOT match here, regardless of
-# the order configs are tried.
+# The MLP matcher requires the Anima-specific ``mlp.layer_N`` (PEFT) / ``mlp_layerN`` (Kohya) naming rather
+# than a bare ``mlp`` — Krea-2's native single-stream blocks also carry ``blocks.N.mlp.{down,gate,up}``, and
+# matching a bare ``mlp`` there would misidentify a native Krea-2 LoRA as Anima.
+#
+# Used by the probe in ``configs/lora.py`` to make Anima-LoRA detection *mutually exclusive* with Wan-LoRA
+# detection: a state dict carrying only ``cross_attn.q`` / ``ffn.0`` (Wan native) will NOT match here,
+# regardless of the order configs are tried.
 _COSMOS_DIT_EXCLUSIVE_SUBCOMPONENTS_RE = (
-    r"(mlp|adaln_modulation|"
+    r"(mlp[._]layer|adaln_modulation|"
     r"(?:cross|self)_attn[._](?:[qkv]_proj|output_proj))"
 )
 
