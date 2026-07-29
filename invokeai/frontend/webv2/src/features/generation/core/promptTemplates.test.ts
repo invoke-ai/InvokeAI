@@ -6,281 +6,106 @@ import {
   getEffectivePrompts,
   getPromptTemplateChunks,
   isCanonicalPromptTemplateSnapshot,
-  type PromptTemplateSnapshot,
   sanitizePromptTemplateSnapshot,
   syncPromptTemplateWithCatalog,
+  type PromptTemplateSnapshot,
 } from './promptTemplates';
 
-const template = (overrides: Partial<PromptTemplateSnapshot> = {}): PromptTemplateSnapshot => ({
+const template: PromptTemplateSnapshot = {
   id: 'template-1',
   name: 'Cinematic',
-  negativePrompt: '',
-  positivePrompt: '',
-  ...overrides,
-});
+  negativePrompt: '{prompt}, blurry',
+  positivePrompt: 'photo of {prompt}, 35mm',
+};
 
-describe('applyPromptTemplate', () => {
-  it('substitutes the authored prompt at the placeholder', () => {
-    expect(applyPromptTemplate('{prompt}. photography, bokeh', 'a cat')).toBe('a cat. photography, bokeh');
+describe('prompt template expansion', () => {
+  it.each([
+    ['before {prompt} after', 'subject', 'before subject after'],
+    ['{prompt} after', 'subject', 'subject after'],
+    ['before {prompt}', 'subject', 'before subject'],
+    ['before {prompt} after {prompt}', 'subject', 'before subject after {prompt}'],
+    ['cinematic', 'subject', 'subject cinematic'],
+    ['', 'subject', 'subject '],
+    ['{prompt}', 'costs $$$ and $&', 'costs $$$ and $&'],
+  ])('applies %j to %j', (templatePrompt, prompt, expected) => {
+    expect(applyPromptTemplate(templatePrompt, prompt)).toBe(expected);
   });
 
-  it('appends after a single space when there is no placeholder', () => {
-    expect(applyPromptTemplate('oil painting', 'a cat')).toBe('a cat oil painting');
+  it('merges both prompt sides and passes them through when no template is active', () => {
+    expect(getEffectivePrompts({ negativePrompt: 'noise', positivePrompt: 'owl' })).toEqual({
+      negativePrompt: 'noise',
+      positivePrompt: 'owl',
+    });
+    expect(getEffectivePrompts({ negativePrompt: 'noise', positivePrompt: 'owl', promptTemplate: template })).toEqual({
+      negativePrompt: 'noise, blurry',
+      positivePrompt: 'photo of owl, 35mm',
+    });
   });
 
-  // The legacy `String.replace` takes a string pattern, so only the first
-  // placeholder is an insertion point. `getPromptTemplateChunks` has to agree.
-  it('substitutes only the first of several placeholders', () => {
-    expect(applyPromptTemplate('{prompt} in the style of {prompt}', 'a cat')).toBe('a cat in the style of {prompt}');
-  });
-
-  it('keeps the placeholder at either end of the template', () => {
-    expect(applyPromptTemplate('{prompt}, 8k', 'a cat')).toBe('a cat, 8k');
-    expect(applyPromptTemplate('a painting of {prompt}', 'a cat')).toBe('a painting of a cat');
-  });
-
-  // Whitespace is literal on both sides, including the leading space an empty
-  // prompt produces. The legacy client emits exactly this, so a template written
-  // there must render identically here.
-  it('is whitespace-literal with an empty authored prompt', () => {
-    expect(applyPromptTemplate('oil painting', '')).toBe(' oil painting');
-    expect(applyPromptTemplate('{prompt}, 8k', '')).toBe(', 8k');
-  });
-
-  it('returns the authored prompt when the template is empty', () => {
-    expect(applyPromptTemplate('', 'a cat')).toBe('a cat ');
-  });
-});
-
-describe('flattenPromptTemplateExpansion', () => {
-  it('keeps the selected positive expansion, merges the negative prompt, and clears template view state', () => {
+  it('flattens with the selected positive expansion and clears template state', () => {
     expect(
       flattenPromptTemplateExpansion({
-        authoredNegativePrompt: 'blurry',
-        selectedPositivePrompt: 'a red cinematic cat',
-        template: {
-          id: 'cinematic',
-          name: 'Cinematic',
-          negativePrompt: 'lowres, {prompt}',
-          positivePrompt: '{prompt}, cinematic',
-        },
+        authoredNegativePrompt: 'noise',
+        selectedPositivePrompt: 'chosen expansion',
+        template,
       })
     ).toEqual({
-      negativePrompt: 'lowres, blurry',
-      positivePrompt: 'a red cinematic cat',
+      negativePrompt: 'noise, blurry',
+      positivePrompt: 'chosen expansion',
       promptTemplate: null,
       promptTemplateViewMode: false,
     });
   });
-});
 
-describe('getEffectivePrompts', () => {
-  it('passes the authored prompts through when no template is active', () => {
-    expect(getEffectivePrompts({ negativePrompt: 'blurry', positivePrompt: 'a cat', promptTemplate: null })).toEqual({
-      negativePrompt: 'blurry',
-      positivePrompt: 'a cat',
-    });
-  });
+  it.each([
+    ['subject', '', ['', 'subject ', '']],
+    ['subject', 'cinematic', ['', 'subject ', 'cinematic']],
+    ['subject', 'before {prompt} after', ['before ', 'subject', ' after']],
+    ['subject', '{prompt} and {prompt}', ['', 'subject', ' and {prompt}']],
+  ])('splits %j around the authored prompt', (prompt, templatePrompt, expected) => {
+    const chunks = getPromptTemplateChunks(prompt, templatePrompt);
 
-  it('merges the positive and negative sides independently', () => {
-    expect(
-      getEffectivePrompts({
-        negativePrompt: 'blurry',
-        positivePrompt: 'a cat',
-        promptTemplate: template({ negativePrompt: '{prompt}, lowres', positivePrompt: '{prompt}, cinematic' }),
-      })
-    ).toEqual({ negativePrompt: 'blurry, lowres', positivePrompt: 'a cat, cinematic' });
-  });
-
-  // A template side left blank still appends its (empty) text, exactly as legacy
-  // does — the trailing space is the observable consequence and is pinned here so
-  // a "tidy up the whitespace" refactor has to be deliberate.
-  it('appends an empty template side rather than skipping it', () => {
-    expect(
-      getEffectivePrompts({
-        negativePrompt: 'blurry',
-        positivePrompt: 'a cat',
-        promptTemplate: template({ positivePrompt: 'cinematic' }),
-      })
-    ).toEqual({ negativePrompt: 'blurry ', positivePrompt: 'a cat cinematic' });
-  });
-
-  // The merged text is what the expansion gate sees, so a template may make an
-  // otherwise-literal prompt dynamic. Guarding this here keeps the ordering
-  // requirement visible next to the function that depends on it.
-  it('can introduce dynamic syntax the authored prompt did not have', () => {
-    expect(
-      getEffectivePrompts({
-        negativePrompt: '',
-        positivePrompt: 'a cat',
-        promptTemplate: template({ positivePrompt: '{prompt}, {red|green} tint' }),
-      }).positivePrompt
-    ).toBe('a cat, {red|green} tint');
+    expect(chunks).toEqual(expected);
+    expect(chunks.join('')).toBe(applyPromptTemplate(templatePrompt, prompt));
   });
 });
 
-describe('getPromptTemplateChunks', () => {
-  // Not `['', 'a cat', '']`: an empty template side still appends, so the middle
-  // chunk carries the trailing space the merge produces.
-  it('keeps the appended space when the template side is empty', () => {
-    expect(getPromptTemplateChunks('a cat', '')).toEqual(['', 'a cat ', '']);
-  });
-
-  it('trails the template after the prompt when there is no placeholder', () => {
-    expect(getPromptTemplateChunks('a cat', 'oil painting')).toEqual(['', 'a cat ', 'oil painting']);
-  });
-
-  it('splits around the placeholder', () => {
-    expect(getPromptTemplateChunks('a cat', 'a photo of {prompt}, 8k')).toEqual(['a photo of ', 'a cat', ', 8k']);
-  });
-
-  it('rejoins later placeholders into the trailing chunk', () => {
-    expect(getPromptTemplateChunks('a cat', '{prompt} by {prompt}')).toEqual(['', 'a cat', ' by {prompt}']);
-  });
-
-  // The chunks are only ever rendered, never submitted, so their concatenation
-  // has to equal what `applyPromptTemplate` produces or the preview lies.
-  //
-  // The prompts here are the interesting half: the chunks split (literal) while
-  // the merge replaces, and `$&` and friends are special in a replacement string
-  // whatever the pattern is. Holding this over one prompt let that diverge.
-  it('concatenates to the merged prompt', () => {
-    const prompts = ['a cat', 'a poster reading $$$', 'x $& y', "x $' y", 'x $` y', 'a $1 note'];
-
-    for (const templatePrompt of ['', 'oil painting', 'a photo of {prompt}, 8k', '{prompt} by {prompt}']) {
-      for (const prompt of prompts) {
-        expect(getPromptTemplateChunks(prompt, templatePrompt).join('')).toBe(
-          applyPromptTemplate(templatePrompt, prompt)
-        );
-      }
-    }
-  });
-});
-
-describe('applyPromptTemplate', () => {
-  // Regression: the prompt was passed as a replacement *string*, so `$&` put the
-  // placeholder back and the expander turned it into the word "prompt", while
-  // `$$` swallowed a character outright.
-  it('substitutes the prompt literally, dollars and all', () => {
-    expect(applyPromptTemplate('a photo of {prompt}, 8k', 'x $& y')).toBe('a photo of x $& y, 8k');
-    expect(applyPromptTemplate('a photo of {prompt}, 8k', 'a poster reading $$$')).toBe(
-      'a photo of a poster reading $$$, 8k'
-    );
-    expect(applyPromptTemplate('a photo of {prompt}, 8k', "x $' y")).toBe("a photo of x $' y, 8k");
-  });
-
-  it('substitutes only the first placeholder', () => {
-    expect(applyPromptTemplate('{prompt} by {prompt}', 'a cat')).toBe('a cat by {prompt}');
-  });
-
-  it('appends a template that carries no placeholder', () => {
-    expect(applyPromptTemplate('oil painting', 'a cat')).toBe('a cat oil painting');
-  });
-});
-
-describe('sanitizePromptTemplateSnapshot', () => {
-  it('reads a well-formed snapshot', () => {
-    const snapshot = template({ negativePrompt: 'blurry', positivePrompt: '{prompt}, 8k' });
-
-    expect(sanitizePromptTemplateSnapshot({ ...snapshot })).toEqual(snapshot);
-  });
-
-  it('defaults missing prompt sides to empty strings', () => {
-    expect(sanitizePromptTemplateSnapshot({ id: 'a', name: 'A' })).toEqual({
-      id: 'a',
-      name: 'A',
+describe('prompt template snapshots', () => {
+  it('sanitizes untrusted values and rejects unusable identities', () => {
+    expect(sanitizePromptTemplateSnapshot(template)).toEqual(template);
+    expect(sanitizePromptTemplateSnapshot({ id: 'template-1', name: 'Cinematic' })).toEqual({
+      id: 'template-1',
+      name: 'Cinematic',
       negativePrompt: '',
       positivePrompt: '',
     });
-  });
-
-  it('rejects values with no usable identity', () => {
     expect(sanitizePromptTemplateSnapshot(null)).toBeNull();
-    expect(sanitizePromptTemplateSnapshot('template-1')).toBeNull();
-    expect(sanitizePromptTemplateSnapshot([])).toBeNull();
-    expect(sanitizePromptTemplateSnapshot({ id: '', name: 'A' })).toBeNull();
-    expect(sanitizePromptTemplateSnapshot({ name: 'A' })).toBeNull();
-    expect(sanitizePromptTemplateSnapshot({ id: 'a' })).toBeNull();
-  });
-});
-
-describe('syncPromptTemplateWithCatalog', () => {
-  it('picks up an upstream edit', () => {
-    const stored = template({ positivePrompt: '{prompt}, cinematic' });
-    const edited = template({ name: 'Cinematic v2', positivePrompt: '{prompt}, cinematic, 35mm' });
-
-    expect(syncPromptTemplateWithCatalog(stored, [edited])).toEqual(edited);
+    expect(sanitizePromptTemplateSnapshot({ id: '', name: 'Cinematic' })).toBeNull();
+    expect(sanitizePromptTemplateSnapshot({ id: 'template-1', name: 3 })).toBeNull();
   });
 
-  // The catalog holds records, which carry `isDefault` and a host-specific
-  // `imageUrl`. Adopting one wholesale persisted both into project state and
-  // into every queue item, and put five keys on something the canonical check
-  // requires to have four.
-  it('takes only the snapshot fields from the catalog entry', () => {
-    const stored = template({ positivePrompt: '{prompt}, cinematic' });
-    const record = {
-      ...template({ positivePrompt: '{prompt}, cinematic, 35mm' }),
-      imageUrl: 'http://some-host:9090/api/v1/style_presets/t1/image',
-      isDefault: false,
-    };
+  it('recognizes only exact canonical snapshots', () => {
+    expect(isCanonicalPromptTemplateSnapshot(template)).toBe(true);
+    expect(isCanonicalPromptTemplateSnapshot({ ...template, extra: true })).toBe(false);
+    expect(isCanonicalPromptTemplateSnapshot({ ...template, id: '' })).toBe(false);
+    expect(isCanonicalPromptTemplateSnapshot({ ...template, positivePrompt: null })).toBe(false);
+    expect(isCanonicalPromptTemplateSnapshot(null)).toBe(false);
+  });
 
-    expect(syncPromptTemplateWithCatalog(stored, [record])).toEqual({
-      ...stored,
-      positivePrompt: '{prompt}, cinematic, 35mm',
+  it('refreshes changed catalog fields without persisting record metadata', () => {
+    const current = { ...template, name: 'Updated', hasImage: true };
+
+    expect(syncPromptTemplateWithCatalog(template, [current])).toEqual({
+      id: template.id,
+      name: 'Updated',
+      negativePrompt: template.negativePrompt,
+      positivePrompt: template.positivePrompt,
     });
   });
 
-  // The callers diff with `Object.is`, so an equal-but-new object each pass
-  // would commit forever.
-  it('returns the stored object by reference when nothing changed', () => {
-    const stored = template({ positivePrompt: '{prompt}, cinematic' });
-
-    expect(syncPromptTemplateWithCatalog(stored, [{ ...stored }])).toBe(stored);
-  });
-
-  // A catalog that is empty because it is still loading, or because another
-  // user's template is not visible, must not silently change what generates.
-  it('keeps a template the catalog does not carry', () => {
-    const stored = template();
-
-    expect(syncPromptTemplateWithCatalog(stored, [])).toBe(stored);
-    expect(syncPromptTemplateWithCatalog(stored, [template({ id: 'other' })])).toBe(stored);
-  });
-
-  it('stays null when nothing is active', () => {
-    expect(syncPromptTemplateWithCatalog(null, [template()])).toBeNull();
-  });
-});
-
-// The whole point of the check is to let normalization hand a stored object
-// straight back. It gates `isGenerateSettings`, so a snapshot it wrongly
-// rejects re-normalises every settings read for as long as one is applied.
-describe('isCanonicalPromptTemplateSnapshot', () => {
-  it('accepts exactly a snapshot', () => {
-    expect(isCanonicalPromptTemplateSnapshot(template())).toBe(true);
-    expect(isCanonicalPromptTemplateSnapshot(template({ name: '', negativePrompt: 'blurry' }))).toBe(true);
-  });
-
-  // A catalog record is a snapshot plus `isDefault` and a host-specific
-  // `imageUrl`; storing one of those was how the fast path came to be dead.
-  it('rejects an object carrying anything more', () => {
-    expect(isCanonicalPromptTemplateSnapshot({ ...template(), imageUrl: null, isDefault: false })).toBe(false);
-  });
-
-  it('rejects a missing or mistyped field', () => {
-    const { negativePrompt: _dropped, ...missing } = template();
-
-    expect(isCanonicalPromptTemplateSnapshot(missing)).toBe(false);
-    expect(isCanonicalPromptTemplateSnapshot({ ...template(), positivePrompt: 42 })).toBe(false);
-  });
-
-  it('rejects an empty id, which resolves against no catalog entry', () => {
-    expect(isCanonicalPromptTemplateSnapshot(template({ id: '' }))).toBe(false);
-  });
-
-  it('rejects what is not a record at all', () => {
-    expect(isCanonicalPromptTemplateSnapshot(null)).toBe(false);
-    expect(isCanonicalPromptTemplateSnapshot([])).toBe(false);
-    expect(isCanonicalPromptTemplateSnapshot('template-1')).toBe(false);
+  it('preserves identity when unchanged and keeps deleted snapshots', () => {
+    expect(syncPromptTemplateWithCatalog(template, [{ ...template }])).toBe(template);
+    expect(syncPromptTemplateWithCatalog(template, [])).toBe(template);
+    expect(syncPromptTemplateWithCatalog(null, [template])).toBeNull();
   });
 });

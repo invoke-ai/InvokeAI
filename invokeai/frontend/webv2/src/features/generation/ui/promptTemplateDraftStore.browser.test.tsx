@@ -61,24 +61,15 @@ afterEach(async () => {
 });
 
 describe('useOnPendingPromptTemplateDraft', () => {
-  it('delivers a draft that was pending before mount', async () => {
+  it('delivers pre-mount and live handoffs once', async () => {
     const onDraft = vi.fn();
     setPendingPromptTemplateDraft(beforeMountDraft);
 
     await act(() => root.render(<Probe onDraft={onDraft} />));
-
-    expect(onDraft).toHaveBeenCalledOnce();
-    expect(onDraft).toHaveBeenCalledWith(beforeMountDraft);
-  });
-
-  it('delivers a draft published after mount', async () => {
-    const onDraft = vi.fn();
+    await act(() => setPendingPromptTemplateDraft(afterMountDraft));
     await act(() => root.render(<Probe onDraft={onDraft} />));
 
-    await act(() => setPendingPromptTemplateDraft(afterMountDraft));
-
-    expect(onDraft).toHaveBeenCalledOnce();
-    expect(onDraft).toHaveBeenCalledWith(afterMountDraft);
+    expect(onDraft.mock.calls).toEqual([[beforeMountDraft], [afterMountDraft]]);
   });
 
   it('uses the latest callback for a draft published during an update layout', async () => {
@@ -89,16 +80,6 @@ describe('useOnPendingPromptTemplateDraft', () => {
 
     expect(onDelivery).toHaveBeenCalledOnce();
     expect(onDelivery).toHaveBeenCalledWith('new:after positive');
-  });
-
-  it('delivers each pending draft only once across rerenders', async () => {
-    const onDraft = vi.fn();
-    await act(() => root.render(<Probe onDraft={onDraft} />));
-    await act(() => setPendingPromptTemplateDraft(afterMountDraft));
-
-    await act(() => root.render(<Probe onDraft={onDraft} />));
-
-    expect(onDraft).toHaveBeenCalledOnce();
   });
 
   it('does not deliver account A draft after account B becomes active', async () => {

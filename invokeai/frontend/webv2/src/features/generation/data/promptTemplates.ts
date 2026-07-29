@@ -1,16 +1,3 @@
-/**
- * The current user's prompt templates, plus the catalog shipped with the backend.
- *
- * The route is `/api/v1/style_presets/` — "style preset" is the backend's name
- * for the same thing, kept for wire compatibility with the legacy client, which
- * writes to and reads from this exact store. Only this module speaks that
- * vocabulary; everything above it says "prompt template".
- *
- * Create and update are multipart because a template may carry a preview image.
- * `apiFetchJson` leaves `FormData` bodies alone, so the browser sets its own
- * boundary while the injected `Authorization` header still rides along.
- */
-
 import type { PromptTemplateSnapshot } from '@features/generation/core/promptTemplates';
 import type { AccountScope } from '@platform/state/accountLifecycle';
 import type { QueryClient } from '@tanstack/react-query';
@@ -21,7 +8,6 @@ import { queryOptions } from '@tanstack/react-query';
 
 const PROMPT_TEMPLATES_BASE = '/api/v1/style_presets';
 
-/** Private snake_case wire shape; never crosses the feature interface. */
 interface PromptTemplateDTO {
   id: string;
   name: string;
@@ -33,23 +19,12 @@ interface PromptTemplateDTO {
 }
 
 export interface PromptTemplateRecord extends PromptTemplateSnapshot {
-  /** `default` templates ship with the backend and are read-only here. */
   isDefault: boolean;
-  /** Whether the authenticated image resource should be requested. */
   hasImage: boolean;
   isPublic: boolean;
   userId: string;
 }
 
-/**
- * The four fields a record shares with a snapshot, and no more.
- *
- * A record is assignable to a snapshot, so applying one type-checks and keeps
- * catalog-only fields such as `isDefault` and `hasImage` along for the ride.
- * They then land in persisted project state and every queue item's widget
- * snapshot. Extra keys also make `isCanonicalPromptTemplateSnapshot` reject the
- * object, so the identity short-circuits in settings normalization never fire.
- */
 export const toPromptTemplateSnapshot = ({
   id,
   name,
@@ -109,11 +84,6 @@ export const promptTemplatesQueryOptions = () =>
     });
   })();
 
-/**
- * Authored templates are always the user's own and private. The backend also
- * models admin-owned `default` templates and an `is_public` share flag; neither
- * is authored from here, so both are pinned rather than exposed.
- */
 const toFormData = (draft: PromptTemplateDraftFields): FormData => {
   const body = new FormData();
 
@@ -188,7 +158,6 @@ export const deletePromptTemplate = async (id: string): Promise<void> => {
   await apiFetch(`${PROMPT_TEMPLATES_BASE}/i/${encodeURIComponent(id)}`, { method: 'DELETE' });
 };
 
-/** Accepts the CSV and JSON shapes documented by the backend's importer. */
 export const importPromptTemplates = async (file: File, owner: AccountScope): Promise<void> => {
   const body = new FormData();
 
@@ -198,11 +167,6 @@ export const importPromptTemplates = async (file: File, owner: AccountScope): Pr
   assertAccountScopeCurrent(owner);
 };
 
-/**
- * Returns CSV, not JSON, so this goes through `apiFetch` rather than
- * `apiFetchJson`. It also cannot be an anchor download: the URL alone carries no
- * `Authorization` header, and only the transport injects one.
- */
 export const exportPromptTemplates = async (owner: AccountScope): Promise<Blob> => {
   const response = await apiFetch(`${PROMPT_TEMPLATES_BASE}/export`, { signal: owner.signal });
   assertAccountScopeCurrent(owner);

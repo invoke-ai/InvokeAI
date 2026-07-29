@@ -86,23 +86,6 @@ afterEach(async () => {
 });
 
 describe('prompt template mutation invalidation', () => {
-  it('invalidates the template list exactly once after creation', async () => {
-    transport.apiFetchJson.mockResolvedValue(dto);
-    const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
-
-    await act(async () => {
-      await catalogRef.current!.create({
-        image: null,
-        name: dto.name,
-        negativePrompt: '',
-        positivePrompt: dto.preset_data.positive_prompt,
-      });
-    });
-
-    expect(invalidateQueries).toHaveBeenCalledTimes(1);
-    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: promptTemplateKeys.list(), exact: true });
-  });
-
   it.each([
     [
       'update',

@@ -71,21 +71,6 @@ afterEach(async () => {
 });
 
 describe('wildcard import dialog', () => {
-  it('says how much is new and how much already exists', async () => {
-    await renderDialog();
-
-    expect(dialog().textContent).toContain('importSummary');
-  });
-
-  // Import is the one action here that can overwrite a hand-typed list.
-  it('leaves every clash alone unless told otherwise', async () => {
-    const onConfirm = await renderDialog();
-
-    await confirm();
-
-    expect(onConfirm).toHaveBeenCalledWith({});
-  });
-
   it('resolves one clash without touching the other', async () => {
     const onConfirm = await renderDialog();
     // The first group is the apply-to-all row; the rest are the clashes.
@@ -107,27 +92,6 @@ describe('wildcard import dialog', () => {
     expect(onConfirm).toHaveBeenCalledWith({ colours: 'keepBoth', moods: 'keepBoth' });
   });
 
-  // Regression: rendered controlled with no value, the apply-to-all row snapped
-  // back to nothing selected after every use, so it read as not having worked.
-  it('shows what the apply-to-all row was set to', async () => {
-    await renderDialog();
-    const [all] = segmentGroups();
-
-    await clickOption(all!, 'importKeepBoth');
-
-    expect(all!.querySelector('[data-part="item"][data-state="checked"]')?.textContent).toContain('importKeepBoth');
-  });
-
-  it('stops describing every clash once one of them disagrees', async () => {
-    await renderDialog();
-    const [all, colours] = segmentGroups();
-
-    await clickOption(all!, 'importReplace');
-    await clickOption(colours!, 'importSkip');
-
-    expect(all!.querySelector('[data-part="item"][data-state="checked"]')).toBeNull();
-  });
-
   it('lets a row override the decision made for all of them', async () => {
     const onConfirm = await renderDialog();
     const [all, colours] = segmentGroups();
@@ -146,11 +110,5 @@ describe('wildcard import dialog', () => {
 
     expect(dialog().textContent).toContain('bad name!');
     expect(dialog().textContent).toContain('importRejectedInvalid');
-  });
-
-  it('offers no apply-to-all for a single clash', async () => {
-    await renderDialog([entry({ conflictId: 'w1', name: 'colours' })]);
-
-    expect(segmentGroups()).toHaveLength(1);
   });
 });

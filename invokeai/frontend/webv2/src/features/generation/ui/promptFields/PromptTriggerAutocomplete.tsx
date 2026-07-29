@@ -12,24 +12,10 @@ import { useTranslation } from 'react-i18next';
 
 const LIST_WIDTH_PX = 260;
 const MAX_LIST_HEIGHT_PX = 220;
-/** Clear of the current line, so the list never covers what is being typed. */
 const CARET_GAP_PX = 4;
 const VIEWPORT_MARGIN_PX = 8;
 const OPTION_HOVER_CSS = { bg: 'bg.emphasized' };
 
-/**
- * The list that follows the caret while a `__` or `<` is being typed.
- *
- * Deliberately not a `Popover`: this must never take focus. The user is typing
- * in the textarea and the textarea stays the active element throughout — arrow
- * keys, Enter and Escape are handled there and only reach here as the
- * `activeIndex` prop. That also makes it a plain positioned surface rather than
- * a dismissable layer, which is why there is no trigger and no close button.
- *
- * The old picker anchored to the whole textarea and opened `bottom-start`, so in
- * a tall prompt box the list appeared at the bottom-left corner — often hundreds
- * of pixels from where the user was looking.
- */
 export const PromptTriggerAutocomplete = ({
   activeIndex,
   caretRect,
@@ -47,10 +33,6 @@ export const PromptTriggerAutocomplete = ({
 }) => {
   const { t } = useTranslation();
   const listRef = useRef<HTMLDivElement | null>(null);
-  // Each group carries where it starts in the flat list. The hook selects with
-  // `options[activeIndex]`, so the ids have to be numbered the same way — and
-  // counting them up as the rows render, which is what this replaced, only
-  // agreed with that while grouping happened to be an order-preserving no-op.
   const groups = useMemo(
     () =>
       groupPromptTriggerOptions(options).reduce<(PromptTriggerOptionGroup & { startIndex: number })[]>(
@@ -66,13 +48,7 @@ export const PromptTriggerAutocomplete = ({
     [options]
   );
 
-  // Below the caret when there is room, above it when there is not, and never
-  // off the right edge of a narrow window.
   const spaceBelow = window.innerHeight - (caretRect.y + caretRect.height);
-  // Clamped: in a short viewport with the caret near the top there is room on
-  // neither side, and the subtraction went negative — `maxH="-2px"` is dropped
-  // by the browser, so the list sprang to full height and was then positioned
-  // from that negative number.
   const height = Math.max(
     0,
     Math.min(MAX_LIST_HEIGHT_PX, Math.max(spaceBelow, caretRect.y) - VIEWPORT_MARGIN_PX - CARET_GAP_PX)
@@ -84,8 +60,6 @@ export const PromptTriggerAutocomplete = ({
   );
   const top = opensBelow ? caretRect.y + caretRect.height + CARET_GAP_PX : caretRect.y - height - CARET_GAP_PX;
 
-  // Keyboard navigation moves a highlight the mouse never touches, so the list
-  // has to follow it rather than waiting to be scrolled.
   useLayoutEffect(() => {
     listRef.current
       ?.querySelector(`#${CSS.escape(`${optionIdPrefix}${activeIndex}`)}`)
@@ -151,9 +125,6 @@ const AutocompleteOption = ({
   option: PromptTriggerOption;
   onSelect: (option: PromptTriggerOption) => void;
 }) => {
-  // On mousedown, not click, and with the default prevented: letting the press
-  // blur the textarea would close the list out from under the pointer. Primary
-  // button only — a right-click is after the context menu, not an insertion.
   const handleMouseDown = useCallback(
     (event: MouseEvent<HTMLDivElement>) => {
       if (event.button !== 0) {
@@ -177,8 +148,6 @@ const AutocompleteOption = ({
       px="2"
       py="1"
       role="option"
-      // Focus stays in the textarea and moves through `aria-activedescendant`;
-      // the options are only ever reachable that way, never by tabbing.
       tabIndex={-1}
       truncate
       _hover={OPTION_HOVER_CSS}

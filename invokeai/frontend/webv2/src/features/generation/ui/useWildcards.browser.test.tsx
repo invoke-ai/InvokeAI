@@ -59,21 +59,7 @@ describe('applyWrites', () => {
     { name: 'c', values: ['3'] },
   ];
 
-  // Every single-write method invalidates the wildcard cache *and* every
-  // dynamic-prompt expansion, and awaits the refetch. Doing that between each
-  // write of a forty-file import meant re-reading a list that grew by one, forty
-  // times over.
   it('invalidates once for the whole run, not once per write', async () => {
-    await act(async () => {
-      await catalogRef.current!.applyWrites(WRITES, captureAccountScope());
-    });
-
-    expect(createWildcard).toHaveBeenCalledTimes(2);
-    expect(updateWildcard).toHaveBeenCalledTimes(1);
-    expect(invalidateWildcardDependents).toHaveBeenCalledTimes(1);
-  });
-
-  it('reports how many landed', async () => {
     let done = 0;
 
     await act(async () => {
@@ -81,10 +67,11 @@ describe('applyWrites', () => {
     });
 
     expect(done).toBe(3);
+    expect(createWildcard).toHaveBeenCalledTimes(2);
+    expect(updateWildcard).toHaveBeenCalledTimes(1);
+    expect(invalidateWildcardDependents).toHaveBeenCalledTimes(1);
   });
 
-  // The ones already written are real, so the caches are stale whether or not
-  // the run finished — and the caller needs the count to say how far it got.
   it('still invalidates, and carries the count, when a write fails', async () => {
     createWildcard.mockImplementationOnce(() => Promise.resolve());
     updateWildcard.mockImplementationOnce(() => Promise.reject(new Error('conflict')));

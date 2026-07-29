@@ -1,12 +1,3 @@
-/**
- * What `<` and `__` can insert: wildcards, the selected model's and each enabled
- * LoRA's trigger phrases, and embeddings compatible with the base.
- *
- * Shared by the two ways of reaching that list — the `+` button's browsable
- * popover and the caret-anchored autocomplete — so the two can never drift into
- * offering different things.
- */
-
 import type { GenerationModelCatalogItem as ModelConfig } from '@features/generation/contracts';
 import type { GenerateLora, GenerateModelConfig } from '@features/generation/core/types';
 import type { PromptTriggerKey } from '@features/generation/ui/promptFields/promptFocus';
@@ -16,11 +7,6 @@ import { useWildcards } from '@features/generation/ui/useWildcards';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-/**
- * What an option inserts. Carried explicitly rather than sniffed back out of
- * `value`, because the inline autocomplete offers only the kind its delimiter
- * actually stands for.
- */
 export type PromptTriggerKind = 'embedding' | 'phrase' | 'wildcard';
 
 export interface PromptTriggerOption {
@@ -66,8 +52,6 @@ export const getPromptTriggerOptions = ({
 }): PromptTriggerOption[] => {
   const options: PromptTriggerOption[] = [];
 
-  // A wildcard inserts as `__name__`, which is just another trigger the picker
-  // can splice in, so it rides in the same list as embeddings and LoRA phrases.
   for (const wildcard of wildcards) {
     options.push({ group: wildcardsLabel, kind: 'wildcard', label: wildcard.name, value: `__${wildcard.name}__` });
   }
@@ -113,7 +97,6 @@ export const getPromptTriggerOptions = ({
   });
 };
 
-/** The `+` button's search box, which browses the whole list by name or group. */
 export const filterPromptTriggerOptions = (
   options: readonly PromptTriggerOption[],
   search: string
@@ -130,21 +113,8 @@ export const filterPromptTriggerOptionsByKind = (
   allowedKinds?: ReadonlySet<PromptTriggerKind>
 ): PromptTriggerOption[] => (allowedKinds ? options.filter((option) => allowedKinds.has(option.kind)) : [...options]);
 
-/** Which kind each delimiter stands for. Trigger phrases have no delimiter. */
 const KIND_BY_TRIGGER_KEY: Record<PromptTriggerKey, PromptTriggerKind> = { '<': 'embedding', _: 'wildcard' };
 
-/**
- * The options an inline `<` or `__` should offer.
- *
- * Narrowed to the delimiter's own kind: `<` opens an embedding token and `__` a
- * wildcard reference, so offering the other under either is offering something
- * the user cannot have meant. Model and LoRA trigger phrases belong to no
- * delimiter and stay with the `+` button, which browses everything.
- *
- * Matching is on the label alone, unlike the browse search above. The query here
- * is a name being typed, and folding in the group would make `__w` match every
- * wildcard on the strength of the word "Wildcards".
- */
 export const getInlineTriggerOptions = (
   options: readonly PromptTriggerOption[],
   key: PromptTriggerKey,
@@ -169,7 +139,6 @@ export const groupPromptTriggerOptions = (options: readonly PromptTriggerOption[
     return groups;
   }, []);
 
-/** The live option list for a field, already localized. */
 export const usePromptTriggerOptions = (
   loras: GenerateLora[],
   selectedModel: GenerateModelConfig | undefined

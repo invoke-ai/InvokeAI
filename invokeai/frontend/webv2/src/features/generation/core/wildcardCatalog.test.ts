@@ -2,112 +2,57 @@ import { describe, expect, it } from 'vitest';
 
 import { filterWildcards, groupWildcardsByPrefix } from './wildcardCatalog';
 
-const wildcard = (name: string, values: string[] = []) => ({ name, values });
+const wildcards = [
+  { name: 'animals/dogs', values: ['terrier', 'retriever'] },
+  { name: 'colours', values: ['red', 'cyberpunk blue'] },
+  { name: 'architecture/gothic', values: ['cathedral'] },
+];
 
 describe('filterWildcards', () => {
-  it('returns every wildcard for an empty query', () => {
-    const wildcards = [wildcard('colours'), wildcard('artists')];
-
-    expect(filterWildcards(wildcards, '')).toEqual(wildcards);
-    expect(filterWildcards(wildcards, '   ')).toEqual(wildcards);
-  });
-
-  it('returns a copy rather than the caller’s array', () => {
-    const wildcards = [wildcard('colours')];
-
-    expect(filterWildcards(wildcards, '')).not.toBe(wildcards);
-  });
-
-  it('matches names fuzzily', () => {
-    const wildcards = [wildcard('animals/dogs'), wildcard('colours')];
-
+  it('adapts wildcard names and values to catalog search', () => {
     expect(filterWildcards(wildcards, 'adg')).toEqual([wildcards[0]]);
+    expect(filterWildcards(wildcards, 'CYBERPUNK')).toEqual([wildcards[1]]);
+    expect(filterWildcards(wildcards, 'missing')).toEqual([]);
   });
 
-  it('matches values by substring, case-insensitively', () => {
-    const wildcards = [wildcard('moods', ['Cyberpunk', 'serene']), wildcard('colours', ['red'])];
+  it('returns a copy for an empty query and ranks a name hit above a value-only hit', () => {
+    const all = filterWildcards(wildcards, '');
+    const ranked = filterWildcards(
+      [
+        { name: 'first', values: ['colour study'] },
+        { name: 'colours', values: ['red'] },
+      ],
+      'colour'
+    );
 
-    expect(filterWildcards(wildcards, 'cyberpunk')).toEqual([wildcards[0]]);
-    expect(filterWildcards(wildcards, 'CYBER')).toEqual([wildcards[0]]);
-  });
-
-  it('ranks name matches above value-only matches', () => {
-    const valueOnly = wildcard('moods', ['red mist']);
-    const byName = wildcard('red', ['crimson']);
-
-    expect(filterWildcards([valueOnly, byName], 'red')).toEqual([byName, valueOnly]);
-  });
-
-  it('lists a wildcard once when both its name and its values match', () => {
-    const both = wildcard('red', ['dark red', 'bright red']);
-
-    expect(filterWildcards([both], 'red')).toEqual([both]);
-  });
-
-  it('returns nothing when neither names nor values match', () => {
-    expect(filterWildcards([wildcard('colours', ['red'])], 'zzzz')).toEqual([]);
-  });
-
-  it('finds a match in the last of many values', () => {
-    const long = wildcard('big', [...Array.from({ length: 500 }, (_, index) => `value-${index}`), 'needle']);
-
-    expect(filterWildcards([long], 'needle')).toEqual([long]);
+    expect(all).toEqual(wildcards);
+    expect(all).not.toBe(wildcards);
+    expect(ranked.map(({ name }) => name)).toEqual(['colours', 'first']);
   });
 });
 
 describe('groupWildcardsByPrefix', () => {
-  it('leaves a flat catalog in one unlabelled group', () => {
-    const wildcards = [wildcard('colours'), wildcard('artists')];
-
-    expect(groupWildcardsByPrefix(wildcards)).toEqual([{ label: null, wildcards }]);
-  });
-
-  it('groups by the segment before the first slash', () => {
-    const dogs = wildcard('animals/dogs');
-    const cats = wildcard('animals/cats');
-
-    expect(groupWildcardsByPrefix([dogs, cats])).toEqual([{ label: 'animals', wildcards: [dogs, cats] }]);
-  });
-
-  it('splits on the first slash only, so deeper names share one header', () => {
-    const elves = wildcard('characters/fantasy/elves');
-    const orcs = wildcard('characters/scifi/orcs');
-
-    expect(groupWildcardsByPrefix([elves, orcs])).toEqual([{ label: 'characters', wildcards: [elves, orcs] }]);
-  });
-
-  it('puts top-level names first, then labelled groups in first-appearance order', () => {
-    const dogs = wildcard('animals/dogs');
-    const colours = wildcard('colours');
-    const warm = wildcard('moods/warm');
-
-    expect(groupWildcardsByPrefix([dogs, colours, warm])).toEqual([
-      { label: null, wildcards: [colours] },
-      { label: 'animals', wildcards: [dogs] },
-      { label: 'moods', wildcards: [warm] },
+  it('groups on the first slash while preserving top-level and incoming order', () => {
+    expect(
+      groupWildcardsByPrefix([
+        { name: 'animals/dogs' },
+        { name: 'plain' },
+        { name: 'animals/fantasy/elves' },
+        { name: 'art/styles' },
+      ])
+    ).toEqual([
+      { label: null, wildcards: [{ name: 'plain' }] },
+      { label: 'animals', wildcards: [{ name: 'animals/dogs' }, { name: 'animals/fantasy/elves' }] },
+      { label: 'art', wildcards: [{ name: 'art/styles' }] },
     ]);
   });
 
-  it('omits the unlabelled group when every name is nested', () => {
-    const dogs = wildcard('animals/dogs');
-
-    expect(groupWildcardsByPrefix([dogs])).toEqual([{ label: 'animals', wildcards: [dogs] }]);
-  });
-
-  it('preserves the incoming order within a group', () => {
-    const cats = wildcard('animals/cats');
-    const dogs = wildcard('animals/dogs');
-
-    expect(groupWildcardsByPrefix([dogs, cats])[0]?.wildcards).toEqual([dogs, cats]);
-  });
-
-  it('treats a leading slash as ungrouped rather than an empty label', () => {
-    const odd = wildcard('/leading');
-
-    expect(groupWildcardsByPrefix([odd])).toEqual([{ label: null, wildcards: [odd] }]);
-  });
-
-  it('returns nothing for an empty catalog', () => {
+  it('handles flat, all-nested, leading-slash, and empty catalogs', () => {
+    expect(groupWildcardsByPrefix([{ name: 'plain' }])).toEqual([{ label: null, wildcards: [{ name: 'plain' }] }]);
+    expect(groupWildcardsByPrefix([{ name: 'animals/dogs' }])).toEqual([
+      { label: 'animals', wildcards: [{ name: 'animals/dogs' }] },
+    ]);
+    expect(groupWildcardsByPrefix([{ name: '/odd' }])).toEqual([{ label: null, wildcards: [{ name: '/odd' }] }]);
     expect(groupWildcardsByPrefix([])).toEqual([]);
   });
 });

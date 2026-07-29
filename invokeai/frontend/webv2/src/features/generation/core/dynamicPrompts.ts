@@ -1,17 +1,5 @@
-/**
- * Dynamic prompting policy: detecting the syntax and bounding the expansion.
- *
- * The backend expands `a {red|green} {cat|dog}` into concrete prompts; the
- * frontend never rebuilds the graph per prompt. Turning the expanded list into a
- * batch dimension over the graph's existing `positive_prompt` string node is
- * Queue's job — see `features/queue/core/promptBatch.ts`.
- */
-
-// Local copy: `core/settings.ts` exports the same bound but imports this module,
-// so taking it from there would be a cycle.
 const SEED_MAX = 4_294_967_295;
 
-/** Matches the backend's `max_prompts: int = Body(ge=1, le=10000)`. */
 export const DYNAMIC_PROMPTS_MIN_PROMPTS = 1;
 export const DYNAMIC_PROMPTS_MAX_PROMPTS = 10_000;
 export const DYNAMIC_PROMPTS_DEFAULT_MAX_PROMPTS = 100;
@@ -21,37 +9,23 @@ export type DynamicPromptsSeedBehaviour = 'per-iteration' | 'per-image';
 export interface DynamicPromptsConfig {
   combinatorial: boolean;
   maxPrompts: number;
-  /**
-   * Seeds the random sampler. Held apart from the generation seed and stable
-   * until the user shuffles, so the previewed prompts are the prompts that
-   * generate. Unused when combinatorial.
-   */
   sampleSeed: number;
   seedBehaviour: DynamicPromptsSeedBehaviour;
 }
 
-/**
- * One `/`-separated segment of a wildcard name. Mirrors the backend's
- * `_WILDCARD_NAME_SEGMENT`: it must begin and end alphanumerically, so
- * `snake__case` is ordinary text rather than a reference.
- */
 const WILDCARD_NAME_SEGMENT = '[A-Za-z0-9](?:[A-Za-z0-9_-]*[A-Za-z0-9])?';
 const WILDCARD_NAME_SOURCE = `${WILDCARD_NAME_SEGMENT}(?:/${WILDCARD_NAME_SEGMENT})*`;
 
-/** The same rule anchored, for validating a name the user is typing. */
 export const WILDCARD_NAME_RE = new RegExp(`^${WILDCARD_NAME_SOURCE}$`);
 
 export interface WildcardReference {
-  /** The path sent to the wildcard manager, without sampler or parameters. */
   lookupPath: string;
-  /** Full `__…__` span in the authored prompt. */
   range: { end: number; start: number };
 }
 
 const WILDCARD_GLOB_CHARACTER_RE = /[*?[]/;
 const WILDCARD_REFERENCE_PATH_RE = /^[A-Za-z0-9_/*?[\]!-]+$/;
 
-/** Mirrors the backend's `MAX_WILDCARD_NAME_LENGTH`. */
 export const MAX_WILDCARD_NAME_LENGTH = 128;
 
 const getWildcardLookupPath = (content: string): string | null => {
@@ -80,7 +54,6 @@ const getWildcardLookupPath = (content: string): string | null => {
   return WILDCARD_GLOB_CHARACTER_RE.test(lookupPath) || WILDCARD_NAME_RE.test(lookupPath) ? lookupPath : null;
 };
 
-/** Scans every backend-compatible wildcard reference without regex state or backtracking. */
 export const scanWildcardReferences = (prompt: string): WildcardReference[] => {
   const references: WildcardReference[] = [];
   let index = 0;
@@ -216,7 +189,6 @@ const globTokenMatches = (token: Exclude<GlobToken, { kind: 'star' }>, character
   return token.negated ? !inClass : inClass;
 };
 
-/** Bounded O(pattern × name) matcher mirroring Python `fnmatchcase`. */
 const matchesGlob = (pattern: string, name: string): boolean => {
   let reachable = Array.from({ length: name.length + 1 }, (_, index) => index === 0);
 
@@ -242,18 +214,6 @@ const matchesGlob = (pattern: string, name: string): boolean => {
   return reachable[name.length] === true;
 };
 
-/**
- * Whether a referenced path resolves against the catalog.
- *
- * A glob matches when *any* known name matches it, mirroring the backend, where
- * `*` is an unanchored run of any characters — `/` included, so `__*s__` reaches
- * `animals/dogs`. `**` is spelt differently but means the same thing there, and
- * falls out of the same translation.
- *
- * A path matching nothing is still worth flagging: the expansion leaves the
- * literal `__name__` in the prompt rather than failing, so an unnoticed typo
- * goes to the model as text.
- */
 export const matchesKnownWildcard = (path: string, knownNames: ReadonlySet<string>): boolean => {
   if (!WILDCARD_GLOB_CHARACTER_RE.test(path)) {
     return knownNames.has(path);
@@ -268,23 +228,13 @@ export const matchesKnownWildcard = (path: string, knownNames: ReadonlySet<strin
   return false;
 };
 
-/**
- * The backend's bounds on a values list, mirrored here so both ways of writing
- * one can say what is wrong before sending it.
- *
- * These lived next to the import planner, which meant an import pre-flighted
- * them politely while the editor discovered them as a raw error from the server.
- */
 export const MAX_WILDCARD_VALUES = 10_000;
 export const MAX_WILDCARD_VALUE_LENGTH = 2_000;
 
-/** Why a values list would be rejected, or `null` if it would be accepted. */
 export const getWildcardValuesError = (values: readonly string[]): 'tooManyValues' | 'valueTooLong' | null => {
   if (values.length > MAX_WILDCARD_VALUES) {
     return 'tooManyValues';
   }
-  // Kept apart from the count: told "too many values", someone holding three
-  // values and one long paragraph has no idea which one to shorten.
   if (values.some((value) => value.length > MAX_WILDCARD_VALUE_LENGTH)) {
     return 'valueTooLong';
   }
@@ -292,32 +242,9 @@ export const getWildcardValuesError = (values: readonly string[]): 'tooManyValue
   return null;
 };
 
-/**
- * The values as they will be stored: comments removed, trimmed, blanks dropped.
- *
- * Applied wherever a list is authored, so that what is saved is what an export
- * writes and a re-import reads back. Without it a stray blank line survived into
- * the catalog and vanished on the next round trip.
- *
- * `#` comments to end of line, and the expander applies that to a substituted
- * value as readily as to the prompt around it — a value of `poster #1` reaches
- * the model as `poster `, and `#ff0000 glow` reaches it as nothing at all. There
- * is no escape for it upstream. Dropping the comment here is what makes that
- * visible while the list is in front of the user, rather than at generation time
- * with no clue as to where the text went. The `.txt` reader has always done
- * this, being the only format with no parser of its own; the rule belongs to the
- * value rather than to the file it arrived in.
- */
 export const normalizeWildcardValues = (values: readonly string[]): string[] =>
   values.map((value) => value.split('#')[0]?.trim() ?? '').filter((value) => value.length > 0);
 
-/**
- * Why a wildcard name would be rejected, or `null` if it would be accepted.
- *
- * The server remains the authority — only it can see the whole catalog at save
- * time — but a name is typed character by character, and finding out it was
- * invalid only after a round trip is a poor way to learn the rule.
- */
 export const getWildcardNameError = (
   name: string,
   existingNames: ReadonlySet<string> = new Set()

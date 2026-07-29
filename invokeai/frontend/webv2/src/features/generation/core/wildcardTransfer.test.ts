@@ -10,308 +10,142 @@ import {
   wildcardsToNestedRecord,
 } from './wildcardTransfer';
 
-describe('getWildcardNameFromPath', () => {
-  it('drops the extension and keeps the nesting', () => {
-    expect(getWildcardNameFromPath('colours.txt')).toBe('colours');
-    expect(getWildcardNameFromPath('animals/dogs.txt')).toBe('animals/dogs');
-    expect(getWildcardNameFromPath('./wildcards/moods.TXT')).toBe('wildcards/moods');
+describe('wildcard file formats', () => {
+  it.each([
+    ['colours.txt', 'colours'],
+    ['animals/dogs.txt', 'animals/dogs'],
+    ['./wildcards/moods.TXT', 'wildcards/moods'],
+    ['colours', 'colours'],
+  ])('derives a wildcard name from %s', (path, expected) => {
+    expect(getWildcardNameFromPath(path)).toBe(expected);
   });
 
-  it('leaves an extensionless path alone', () => {
-    expect(getWildcardNameFromPath('colours')).toBe('colours');
-  });
-});
-
-describe('parseWildcardTextFile', () => {
-  it('reads one value per line', () => {
-    expect(parseWildcardTextFile('colours.txt', 'red\ngreen\nblue')).toEqual({
+  it('normalizes text values without damaging dynamic syntax', () => {
+    expect(parseWildcardTextFile('colours.txt', '# list\r\n red \r\n\r\n{green|blue} # choice\n__other__')).toEqual({
       name: 'colours',
-      values: ['red', 'green', 'blue'],
+      values: ['red', '{green|blue}', '__other__'],
     });
   });
 
-  it('drops comments and blank lines', () => {
-    const parsed = parseWildcardTextFile('colours.txt', '# a list\nred\n\n  green  # the good one\n');
-
-    expect(parsed.values).toEqual(['red', 'green']);
-  });
-
-  it('reads CRLF files', () => {
-    expect(parseWildcardTextFile('colours.txt', 'red\r\ngreen').values).toEqual(['red', 'green']);
-  });
-
-  it('keeps dynamic syntax inside a value', () => {
-    expect(parseWildcardTextFile('c.txt', '{red|green} ball\n__other__').values).toEqual([
-      '{red|green} ball',
-      '__other__',
-    ]);
-  });
-});
-
-describe('wildcardsFromNestedRecord', () => {
-  it('flattens nesting into slash-separated names', () => {
-    expect(wildcardsFromNestedRecord({ animals: { cats: ['tabby'], dogs: ['corgi', 'husky'] } })).toEqual([
-      { name: 'animals/cats', values: ['tabby'] },
-      { name: 'animals/dogs', values: ['corgi', 'husky'] },
-    ]);
-  });
-
-  // The `.txt` reader has always stripped these. A YAML or JSON collection kept
-  // them, so the same list imported two ways gave two different catalogs — and
-  // the one that kept the `#` held values that expand to nothing.
-  it('drops comments the way the text reader does', () => {
-    expect(wildcardsFromNestedRecord({ colours: ['poster #1', '#ff0000 glow', 'blue'] })).toEqual([
-      { name: 'colours', values: ['poster', 'blue'] },
-    ]);
-  });
-
-  it('takes a key that already contains a slash as written', () => {
-    expect(wildcardsFromNestedRecord({ 'animals/dogs': ['corgi'] })).toEqual([
+  it('flattens nested records, normalizes values, and ignores non-list leaves', () => {
+    expect(
+      wildcardsFromNestedRecord({
+        animals: { dogs: ['corgi'] },
+        'animals/cats': ['tabby'],
+        note: 'ignored',
+        colours: ['poster #1', '#ff0000', '', 1970, true],
+      })
+    ).toEqual([
       { name: 'animals/dogs', values: ['corgi'] },
+      { name: 'animals/cats', values: ['tabby'] },
+      { name: 'colours', values: ['poster', '1970', 'true'] },
     ]);
-  });
-
-  it('stringifies scalars an unquoted file produces', () => {
-    expect(wildcardsFromNestedRecord({ years: [1970, 3.5, true] })).toEqual([
-      { name: 'years', values: ['1970', '3.5', 'true'] },
-    ]);
-  });
-
-  it('ignores leaves that are not lists, per the spec', () => {
-    expect(wildcardsFromNestedRecord({ colours: ['red'], note: 'not a list', nothing: null })).toEqual([
-      { name: 'colours', values: ['red'] },
-    ]);
-  });
-
-  it('drops blank entries', () => {
-    expect(wildcardsFromNestedRecord({ colours: ['red', '', '   '] })).toEqual([{ name: 'colours', values: ['red'] }]);
-  });
-
-  it('returns nothing for input that is not a mapping', () => {
-    expect(wildcardsFromNestedRecord(['red'])).toEqual([]);
     expect(wildcardsFromNestedRecord(null)).toEqual([]);
-    expect(wildcardsFromNestedRecord('red')).toEqual([]);
-  });
-});
-
-describe('wildcardsToNestedRecord', () => {
-  it('nests on the slashes', () => {
-    expect(
-      wildcardsToNestedRecord([
-        { name: 'animals/dogs', values: ['corgi'] },
-        { name: 'animals/cats', values: ['tabby'] },
-        { name: 'colours', values: ['red'] },
-      ])
-    ).toEqual({ animals: { cats: ['tabby'], dogs: ['corgi'] }, colours: ['red'] });
   });
 
-  // `animals` holds a value list, so `animals/dogs` has nowhere to nest into.
-  it('falls back to a flat key when a prefix is itself a wildcard', () => {
-    expect(
-      wildcardsToNestedRecord([
-        { name: 'animals', values: ['bear'] },
-        { name: 'animals/dogs', values: ['corgi'] },
-      ])
-    ).toEqual({ animals: ['bear'], 'animals/dogs': ['corgi'] });
-  });
-
-  // Regression: deciding this as the loop went meant the child overwrote the
-  // parent, or the parent the child, depending on which came first.
-  it('resolves a parent/child clash the same way whichever order they arrive in', () => {
+  it('nests slash names and round-trips parent/child collisions independent of order', () => {
     const parent = { name: 'animals', values: ['bear'] };
     const child = { name: 'animals/dogs', values: ['corgi'] };
+    const colours = { name: 'colours', values: ['red'] };
+    const nested = wildcardsToNestedRecord([child, parent, colours]);
 
-    expect(wildcardsToNestedRecord([child, parent])).toEqual(wildcardsToNestedRecord([parent, child]));
+    expect(nested).toEqual({ animals: ['bear'], 'animals/dogs': ['corgi'], colours: ['red'] });
+    expect(wildcardsToNestedRecord([parent, child])).toEqual(wildcardsToNestedRecord([child, parent]));
+    expect(wildcardsFromNestedRecord(nested).sort((a, b) => a.name.localeCompare(b.name))).toEqual(
+      [parent, child, colours].sort((a, b) => a.name.localeCompare(b.name))
+    );
   });
 
-  it('round-trips through the nested form', () => {
-    const wildcards = [
-      { name: 'animals/dogs', values: ['corgi'] },
-      { name: 'animals', values: ['bear'] },
-      { name: 'colours', values: ['red', 'green'] },
-    ];
-
-    expect(
-      wildcardsFromNestedRecord(wildcardsToNestedRecord(wildcards)).sort((a, b) => a.name.localeCompare(b.name))
-    ).toEqual(wildcards.sort((a, b) => a.name.localeCompare(b.name)));
-  });
-
-  // Regression: `node[segment] ??= {}` declines to assign when the inherited
-  // value is truthy, so the walk stepped onto `Object.prototype` and wrote the
-  // leaf there. `constructor`, `toString` and `valueOf` are all valid wildcard
-  // names on both sides of the wire.
-  it('nests a name that collides with something on Object.prototype', () => {
-    const inheritedNames = ['constructor', 'toString', 'valueOf', 'hasOwnProperty'];
-    const wildcards = inheritedNames.map((name) => ({ name: `${name}/keys`, values: ['red', 'blue'] }));
+  it('does not traverse Object.prototype for user-authored path segments', () => {
+    const names = ['constructor', 'toString', 'valueOf', 'hasOwnProperty'];
+    const wildcards = names.map((name) => ({ name: `${name}/keys`, values: ['red'] }));
     const nested = wildcardsToNestedRecord(wildcards);
 
     expect(typeof Object.keys).toBe('function');
-    expect(Object.keys(nested)).toEqual(inheritedNames);
-    expect(JSON.parse(JSON.stringify(nested))).toEqual(
-      Object.fromEntries(inheritedNames.map((name) => [name, { keys: ['red', 'blue'] }]))
-    );
+    expect(Object.keys(nested)).toEqual(names);
     expect(wildcardsFromNestedRecord(nested)).toEqual(wildcards);
-  });
-
-  it('keeps such a name as a leaf too', () => {
-    const nested = wildcardsToNestedRecord([{ name: 'constructor', values: ['red'] }]);
-
-    expect(JSON.stringify(nested)).toBe('{"constructor":["red"]}');
+    expect(JSON.stringify(wildcardsToNestedRecord([{ name: 'constructor', values: ['red'] }]))).toBe(
+      '{"constructor":["red"]}'
+    );
   });
 });
 
-describe('planWildcardImport', () => {
+describe('wildcard import planning', () => {
   const existing = [{ id: 'w1', name: 'colours' }];
 
-  it('marks a clash with the wildcard it would overwrite', () => {
-    const [clashing, fresh] = planWildcardImport(
+  it('marks catalog clashes and distinguishes rejection causes', () => {
+    const entries = planWildcardImport(
       [
         { name: 'colours', values: ['red'] },
-        { name: 'moods', values: ['calm'] },
+        { name: 'new', values: ['calm'] },
+        { name: 'bad name!', values: ['x'] },
+        { name: 'a'.repeat(129), values: ['x'] },
+        { name: 'empty', values: [] },
+        { name: 'many', values: Array.from({ length: 10_001 }, (_, index) => String(index)) },
+        { name: 'long', values: ['x'.repeat(2_001)] },
       ],
       existing
     );
 
-    expect(clashing).toMatchObject({ conflictId: 'w1', rejection: null });
-    expect(fresh).toMatchObject({ conflictId: null, rejection: null });
+    expect(entries.map(({ conflictId, rejection }) => ({ conflictId, rejection }))).toEqual([
+      { conflictId: 'w1', rejection: null },
+      { conflictId: null, rejection: null },
+      { conflictId: null, rejection: 'invalid' },
+      { conflictId: null, rejection: 'tooLong' },
+      { conflictId: null, rejection: 'noValues' },
+      { conflictId: null, rejection: 'tooManyValues' },
+      { conflictId: null, rejection: 'valueTooLong' },
+    ]);
   });
 
-  it('reports a name the backend would refuse rather than mangling it', () => {
-    const [entry] = planWildcardImport([{ name: 'my colours!', values: ['red'] }], existing);
-
-    expect(entry.rejection).toBe('invalid');
+  it('only lets an accepted entry claim a repeated name', () => {
+    expect(
+      planWildcardImport(
+        [
+          { name: 'moods', values: [] },
+          { name: 'moods', values: ['calm'] },
+          { name: 'moods', values: ['tense'] },
+        ],
+        []
+      ).map(({ rejection }) => rejection)
+    ).toEqual(['noValues', null, 'duplicate']);
   });
 
-  it('reports an over-long name', () => {
-    const [entry] = planWildcardImport([{ name: 'a'.repeat(129), values: ['red'] }], existing);
-
-    expect(entry.rejection).toBe('tooLong');
-  });
-
-  it('reports an empty list instead of creating a wildcard that expands to nothing', () => {
-    const [entry] = planWildcardImport([{ name: 'moods', values: [] }], existing);
-
-    expect(entry.rejection).toBe('noValues');
-  });
-
-  // Two different problems with two different remedies: a list to trim, or a
-  // single value to shorten. Reporting both as "too many values" left someone
-  // holding three values and one long paragraph with nothing to act on.
-  it('tells a long list apart from a long value', () => {
-    const [tooMany, valueTooLong] = planWildcardImport(
-      [
-        { name: 'many', values: Array.from({ length: 10_001 }, (_, index) => `v${index}`) },
-        { name: 'long', values: ['ok', 'x'.repeat(2_001)] },
-      ],
-      existing
-    );
-
-    expect(tooMany.rejection).toBe('tooManyValues');
-    expect(valueTooLong.rejection).toBe('valueTooLong');
-  });
-
-  // Regression: the name was recorded as seen whether or not the entry survived,
-  // so a rejected one shadowed a perfectly good later entry and neither landed.
-  it('does not let a rejected entry shadow a good one with the same name', () => {
-    const entries = planWildcardImport(
-      [
-        { name: 'colours', values: [] },
-        { name: 'colours', values: ['red', 'green'] },
-      ],
-      existing
-    );
-
-    expect(entries.map((entry) => entry.rejection)).toEqual(['noValues', null]);
-  });
-
-  it('keeps the first of a name repeated within one import and reports the rest', () => {
-    const entries = planWildcardImport(
-      [
-        { name: 'moods', values: ['calm'] },
-        { name: 'moods', values: ['tense'] },
-      ],
-      existing
-    );
-
-    expect(entries.map((entry) => entry.rejection)).toEqual([null, 'duplicate']);
-  });
-});
-
-describe('getAvailableWildcardName', () => {
-  it('suffixes until the name is free', () => {
-    expect(getAvailableWildcardName('colours', new Set(['colours']))).toBe('colours-2');
+  it('finds a valid available suffix within the name limit', () => {
     expect(getAvailableWildcardName('colours', new Set(['colours', 'colours-2']))).toBe('colours-3');
-  });
-
-  it('trims the base so the suffix fits the length limit', () => {
-    const name = getAvailableWildcardName('a'.repeat(128), new Set());
-
-    expect(name).toHaveLength(128);
-    expect(name.endsWith('-2')).toBe(true);
-  });
-
-  // A name may not end in a hyphen, so trimming must not leave one exposed.
-  it('leaves a valid name after trimming', () => {
+    expect(getAvailableWildcardName('a'.repeat(128), new Set())).toMatch(/^a+-2$/);
     expect(getAvailableWildcardName(`${'a'.repeat(125)}b--`, new Set())).toMatch(/^a+b-2$/);
   });
-});
 
-describe('getWildcardImportActions', () => {
-  const entries = planWildcardImport(
-    [
-      { name: 'colours', values: ['red'] },
-      { name: 'moods', values: ['calm'] },
-      { name: 'bad name!', values: ['x'] },
-    ],
-    [{ id: 'w1', name: 'colours' }]
-  );
-  const existingNames = new Set(['colours']);
-
-  it('creates the new ones and skips clashes by default', () => {
-    expect(getWildcardImportActions(entries, {}, existingNames)).toEqual([{ name: 'moods', values: ['calm'] }]);
-  });
-
-  it('updates in place when a clash is replaced', () => {
-    expect(getWildcardImportActions(entries, { colours: 'replace' }, existingNames)).toEqual([
-      { id: 'w1', name: 'colours', values: ['red'] },
-      { name: 'moods', values: ['calm'] },
-    ]);
-  });
-
-  it('renames when a clash keeps both', () => {
-    expect(getWildcardImportActions(entries, { colours: 'keepBoth' }, existingNames)).toEqual([
-      { name: 'colours-2', values: ['red'] },
-      { name: 'moods', values: ['calm'] },
-    ]);
-  });
-
-  // Regression: only the catalog seeded the taken set, so "keep both" picked
-  // `colours-2` without noticing the same file was already creating one, and the
-  // two creates raced to the same name — the loser aborting the import.
-  it('does not rename onto a name the same import is creating', () => {
-    const clashing = planWildcardImport(
+  it('creates, replaces, skips, and renames planned entries without collisions', () => {
+    const entries = planWildcardImport(
       [
         { name: 'colours', values: ['red'] },
         { name: 'colours-2', values: ['green'] },
+        { name: 'moods', values: ['calm'] },
+        { name: 'bad name!', values: ['x'] },
       ],
-      [{ id: 'w1', name: 'colours' }]
+      existing
     );
 
-    expect(getWildcardImportActions(clashing, { colours: 'keepBoth' }, new Set(['colours']))).toEqual([
+    expect(getWildcardImportActions(entries, {}, new Set(['colours']))).toEqual([
+      { name: 'colours-2', values: ['green'] },
+      { name: 'moods', values: ['calm'] },
+    ]);
+    expect(getWildcardImportActions(entries, { colours: 'replace' }, new Set(['colours']))).toContainEqual({
+      id: 'w1',
+      name: 'colours',
+      values: ['red'],
+    });
+    expect(getWildcardImportActions(entries, { colours: 'keepBoth' }, new Set(['colours']))).toEqual([
       { name: 'colours-3', values: ['red'] },
       { name: 'colours-2', values: ['green'] },
+      { name: 'moods', values: ['calm'] },
     ]);
   });
 
-  it('never emits an action for a rejected entry', () => {
-    const actions = getWildcardImportActions(entries, { 'bad name!': 'replace', colours: 'replace' }, existingNames);
-
-    expect(actions.some((action) => action.name === 'bad name!')).toBe(false);
-  });
-
-  // Two "keep both" clashes must not both land on `-2`.
-  it('gives each kept-both clash its own name', () => {
-    const clashes = planWildcardImport(
+  it('allocates a distinct suffix to each keep-both clash', () => {
+    const entries = planWildcardImport(
       [
         { name: 'colours', values: ['red'] },
         { name: 'moods', values: ['calm'] },
@@ -323,7 +157,7 @@ describe('getWildcardImportActions', () => {
     );
 
     expect(
-      getWildcardImportActions(clashes, { colours: 'keepBoth', moods: 'keepBoth' }, new Set(['colours', 'moods']))
+      getWildcardImportActions(entries, { colours: 'keepBoth', moods: 'keepBoth' }, new Set(['colours', 'moods']))
     ).toEqual([
       { name: 'colours-2', values: ['red'] },
       { name: 'moods-2', values: ['calm'] },
