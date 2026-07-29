@@ -6,6 +6,7 @@ from typing import Any
 from fastapi import FastAPI
 from pydantic import BaseModel
 from socketio import ASGIApp, AsyncServer
+from starlette.types import Message, Receive, Scope, Send
 
 from invokeai.app.services.auth.token_service import verify_token
 from invokeai.app.services.config.config_default import get_config
@@ -100,6 +101,54 @@ BULK_DOWNLOAD_EVENTS = {BulkDownloadStartedEvent, BulkDownloadCompleteEvent, Bul
 WORKFLOW_EVENTS = {WorkflowCreatedEvent, WorkflowUpdatedEvent, WorkflowDeletedEvent}
 
 
+class DisconnectTolerantASGIApp:
+    """Wraps the socket.io ASGI app so a peer that vanishes before its first event is a no-op.
+
+    engine.io's ASGI `translate_request()` returns an empty environ when the first event it
+    receives is a disconnect rather than `http.request`/`websocket.connect`, but its caller
+    `AsyncServer.handle_request()` then indexes `environ["REQUEST_METHOD"]` unconditionally and
+    raises `KeyError`. A client that drops mid-poll - a flaky network, a reloaded tab, a closed
+    tab - therefore surfaces as a spurious traceback for a request nobody is waiting on any more.
+
+    Peeking at the first event lets us skip the socket.io app entirely in that case. On the
+    normal path the event is replayed, so the wrapped app cannot tell the difference.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self._app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] not in ("http", "websocket"):
+            await self._app(scope, receive, send)
+            return
+
+        first_event = await receive()
+        if first_event["type"] in ("http.disconnect", "websocket.disconnect"):
+            if scope["type"] == "http":
+                # Returning without responding is not enough: this mount sits below
+                # `BaseHTTPMiddleware` subclasses, and `call_next()` turns "the app I wrapped
+                # sent nothing" into `RuntimeError("No response returned.")` - swapping one
+                # traceback for another. Emit a throwaway response to satisfy it. Nobody
+                # receives it; uvicorn drops writes once the transport is closed.
+                await send({"type": "http.response.start", "status": 499, "headers": []})
+                await send({"type": "http.response.body", "body": b""})
+            # Websockets need no such placation - `BaseHTTPMiddleware` passes those straight
+            # through. (Under uvicorn a websocket scope always opens with `websocket.connect`,
+            # so that half of this guard is defensive.)
+            return
+
+        replayed = False
+
+        async def replaying_receive() -> Message:
+            nonlocal replayed
+            if not replayed:
+                replayed = True
+                return first_event
+            return await receive()
+
+        await self._app(scope, replaying_receive, send)
+
+
 class SocketIO:
     _sub_queue = "subscribe_queue"
     _unsub_queue = "unsubscribe_queue"
@@ -117,7 +166,7 @@ class SocketIO:
         # handshake 404s. The frontend already targets `{basePath}/ws/socket.io`.
         base_url = get_config().base_url or ""
         self._app = ASGIApp(socketio_server=self._sio, socketio_path=f"{base_url}/ws/socket.io")
-        app.mount("/ws", self._app)
+        app.mount("/ws", DisconnectTolerantASGIApp(self._app))
 
         # Track user information for each socket connection
         self._socket_users: dict[str, dict[str, Any]] = {}
