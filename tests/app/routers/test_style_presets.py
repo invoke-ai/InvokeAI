@@ -208,9 +208,7 @@ def test_update_with_valid_data_changes_record(client: TestClient, user1_token: 
     assert refreshed.name == "After"
 
 
-def test_update_with_preserve_image_does_not_mutate_image(
-    client: TestClient, user1_token: str, mock_invoker: Invoker
-):
+def test_update_with_preserve_image_does_not_mutate_image(client: TestClient, user1_token: str, mock_invoker: Invoker):
     mock_invoker.services.style_preset_image_files.get_url.return_value = "/existing.png"
     user1 = _user_id(mock_invoker, "user1@test.com")
     seeded = _seed(mock_invoker, user1, name="Before")
@@ -227,9 +225,7 @@ def test_update_with_preserve_image_does_not_mutate_image(
     assert mock_invoker.services.style_preset_records.get(seeded.id).name == "After"
 
 
-def test_update_without_image_deletes_existing_image(
-    client: TestClient, user1_token: str, mock_invoker: Invoker
-):
+def test_update_without_image_deletes_existing_image(client: TestClient, user1_token: str, mock_invoker: Invoker):
     mock_invoker.services.style_preset_image_files.get_url.return_value = None
     user1 = _user_id(mock_invoker, "user1@test.com")
     seeded = _seed(mock_invoker, user1)
