@@ -26,7 +26,8 @@ import {
   getInlineTriggerOptions,
   usePromptTriggerOptions,
 } from '@features/generation/ui/promptFields/promptTriggerOptions';
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { DismissOnViewportChange } from '@features/generation/ui/promptFields/useDismissOnViewportChange';
+import { useCallback, useId, useMemo, useRef, useState } from 'react';
 
 /** Move the caret whether or not the list is open. */
 const CARET_KEYS = ['ArrowLeft', 'ArrowRight', 'Home', 'End'];
@@ -106,28 +107,6 @@ export const usePromptTriggerAutocomplete = ({
   );
   const isOpen = state !== null && matches.length > 0;
   const close = useCallback(() => setState(null), []);
-
-  // The list is a fixed-position surface placed from a rect read when it opened,
-  // and nothing re-measures it. Scrolling the panel the prompt sits in — or the
-  // prompt's own box, or dragging its resize handle — moves the caret out from
-  // under it while the textarea keeps focus, so nothing else would close it. A
-  // scroll listener in the capture phase sees element scrolls too, which do not
-  // bubble.
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    const dismiss = () => setState(null);
-
-    window.addEventListener('scroll', dismiss, { capture: true, passive: true });
-    window.addEventListener('resize', dismiss, { passive: true });
-
-    return () => {
-      window.removeEventListener('scroll', dismiss, { capture: true });
-      window.removeEventListener('resize', dismiss);
-    };
-  }, [isOpen]);
 
   const refresh = useCallback(
     (textarea: HTMLTextAreaElement | null) => {
@@ -260,14 +239,17 @@ export const usePromptTriggerAutocomplete = ({
     },
     element:
       isOpen && state ? (
-        <PromptTriggerAutocomplete
-          activeIndex={activeIndex}
-          caretRect={state.caretRect}
-          listboxId={listboxId}
-          optionIdPrefix={optionIdPrefix}
-          options={matches}
-          onSelect={selectOption}
-        />
+        <>
+          <DismissOnViewportChange dismiss={close} enabled />
+          <PromptTriggerAutocomplete
+            activeIndex={activeIndex}
+            caretRect={state.caretRect}
+            listboxId={listboxId}
+            optionIdPrefix={optionIdPrefix}
+            options={matches}
+            onSelect={selectOption}
+          />
+        </>
       ) : null,
     handleKeyDown,
     isOpen,

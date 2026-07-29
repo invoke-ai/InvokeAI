@@ -6,6 +6,7 @@ import type { GenerateModelConfig, GenerateSettings } from '@features/generation
 import { Stack } from '@chakra-ui/react';
 import { getPromptPolicy } from '@features/generation/core/baseGenerationPolicies';
 import { sanitizeBatchCount } from '@features/generation/core/batch';
+import { flattenPromptTemplateExpansion } from '@features/generation/core/promptTemplates';
 import { useGenerationUi } from '@features/generation/ui/GenerationUiContext';
 import { useCallback, useMemo } from 'react';
 
@@ -90,8 +91,21 @@ export const GeneratePromptFields = ({
 
   /** Bake the template into the authored prompt and stop applying it. */
   const flattenPromptTemplate = useCallback(
-    (positivePrompt: string) => onCommitImmediate({ positivePrompt, promptTemplate: null }),
-    [onCommitImmediate]
+    (positivePrompt: string) => {
+      if (!settings.promptTemplate) {
+        onCommitImmediate({ positivePrompt, promptTemplateViewMode: false });
+        return;
+      }
+
+      onCommitImmediate(
+        flattenPromptTemplateExpansion({
+          authoredNegativePrompt: promptValues.negativePrompt,
+          selectedPositivePrompt: positivePrompt,
+          template: settings.promptTemplate,
+        })
+      );
+    },
+    [onCommitImmediate, promptValues.negativePrompt, settings.promptTemplate]
   );
 
   const handleDynamicPromptsChange = useCallback(

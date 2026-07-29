@@ -13,8 +13,10 @@ import { DynamicPromptsButton } from '@features/generation/ui/promptFields/Dynam
 import { PromptTemplatesButton } from '@features/generation/ui/promptFields/PromptTemplatesButton';
 import {
   filterPromptTriggerOptions,
+  filterPromptTriggerOptionsByKind,
   groupPromptTriggerOptions,
   usePromptTriggerOptions,
+  type PromptTriggerKind,
   type PromptTriggerOption,
 } from '@features/generation/ui/promptFields/promptTriggerOptions';
 import { useMountEffect } from '@platform/react/useMountEffect';
@@ -211,6 +213,7 @@ export const AddPromptTriggerButton = ({
 };
 
 export const PromptTriggerPopover = ({
+  allowedKinds,
   loras,
   onClose,
   onSelect,
@@ -218,6 +221,7 @@ export const PromptTriggerPopover = ({
   positioning,
   selectedModel,
 }: Pick<PositivePromptActionsProps, 'loras' | 'selectedModel'> & {
+  allowedKinds?: ReadonlySet<PromptTriggerKind>;
   open: boolean;
   positioning: { getAnchorRect: () => { height: number; width: number; x: number; y: number } | null };
   onClose: () => void;
@@ -226,7 +230,8 @@ export const PromptTriggerPopover = ({
   const { t } = useTranslation();
   const { ensureLoaded: ensureModelsLoaded } = useGenerationUi().models;
   const [searchTerm, setSearchTerm] = useState('');
-  const options = usePromptTriggerOptions(loras, selectedModel);
+  const allOptions = usePromptTriggerOptions(loras, selectedModel);
+  const options = useMemo(() => filterPromptTriggerOptionsByKind(allOptions, allowedKinds), [allOptions, allowedKinds]);
   const filteredOptions = useMemo(() => filterPromptTriggerOptions(options, searchTerm), [options, searchTerm]);
   const groupedOptions = useMemo(() => groupPromptTriggerOptions(filteredOptions), [filteredOptions]);
 

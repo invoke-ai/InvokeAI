@@ -11,8 +11,10 @@
  */
 
 import type { PromptTextRange } from '@features/generation/ui/promptFields/promptFocus';
+import type { ReactNode } from 'react';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { DismissOnViewportChange } from '@features/generation/ui/promptFields/useDismissOnViewportChange';
+import { createElement, useCallback, useMemo, useState } from 'react';
 
 interface AnchorRect {
   height: number;
@@ -25,6 +27,7 @@ export interface PromptTriggerPickerApi {
   isOpen: boolean;
   positioning: { getAnchorRect: () => AnchorRect | null };
   close: () => void;
+  dismissElement: ReactNode;
   open: (anchorElement: HTMLElement) => void;
   /** Inserts the picked trigger, then closes. */
   select: (trigger: string) => void;
@@ -55,24 +58,8 @@ export const usePromptTriggerPicker = ({
 
   const positioning = useMemo(() => ({ getAnchorRect: () => anchorRect }), [anchorRect]);
 
-  // `getAnchorRect` hands back the rect read when the button was pressed, so the
-  // usual re-measuring the popover would do on its own finds the same answer
-  // every time. Scroll the panel and it stays where the button used to be.
-  useEffect(() => {
-    if (anchorRect === null) {
-      return;
-    }
+  const dismissElement =
+    anchorRect === null ? null : createElement(DismissOnViewportChange, { dismiss: close, enabled: true });
 
-    const dismiss = () => setAnchorRect(null);
-
-    window.addEventListener('scroll', dismiss, { capture: true, passive: true });
-    window.addEventListener('resize', dismiss, { passive: true });
-
-    return () => {
-      window.removeEventListener('scroll', dismiss, { capture: true });
-      window.removeEventListener('resize', dismiss);
-    };
-  }, [anchorRect]);
-
-  return { close, isOpen: anchorRect !== null, open, positioning, select };
+  return { close, dismissElement, isOpen: anchorRect !== null, open, positioning, select };
 };

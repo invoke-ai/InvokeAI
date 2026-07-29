@@ -272,8 +272,9 @@ describe('the caret autocomplete', () => {
   // current value, and the insert committed the option over the whole prompt.
   it('keeps the rest of the prompt when the pointer selects', async () => {
     await type('a photo of __co');
-    textarea().blur();
+    const activeElement = vi.spyOn(document, 'activeElement', 'get').mockReturnValue(document.body);
     await mouseDownOnFirstOption(0);
+    activeElement.mockRestore();
 
     expect(textarea().value).toBe('a photo of __colors__');
   });

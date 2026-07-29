@@ -125,6 +125,11 @@ export const filterPromptTriggerOptions = (
   );
 };
 
+export const filterPromptTriggerOptionsByKind = (
+  options: readonly PromptTriggerOption[],
+  allowedKinds?: ReadonlySet<PromptTriggerKind>
+): PromptTriggerOption[] => (allowedKinds ? options.filter((option) => allowedKinds.has(option.kind)) : [...options]);
+
 /** Which kind each delimiter stands for. Trigger phrases have no delimiter. */
 const KIND_BY_TRIGGER_KEY: Record<PromptTriggerKey, PromptTriggerKind> = { '<': 'embedding', _: 'wildcard' };
 

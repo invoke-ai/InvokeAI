@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   applyPromptTemplate,
+  flattenPromptTemplateExpansion,
   getEffectivePrompts,
   getPromptTemplateChunks,
   isCanonicalPromptTemplateSnapshot,
@@ -48,6 +49,28 @@ describe('applyPromptTemplate', () => {
 
   it('returns the authored prompt when the template is empty', () => {
     expect(applyPromptTemplate('', 'a cat')).toBe('a cat ');
+  });
+});
+
+describe('flattenPromptTemplateExpansion', () => {
+  it('keeps the selected positive expansion, merges the negative prompt, and clears template view state', () => {
+    expect(
+      flattenPromptTemplateExpansion({
+        authoredNegativePrompt: 'blurry',
+        selectedPositivePrompt: 'a red cinematic cat',
+        template: {
+          id: 'cinematic',
+          name: 'Cinematic',
+          negativePrompt: 'lowres, {prompt}',
+          positivePrompt: '{prompt}, cinematic',
+        },
+      })
+    ).toEqual({
+      negativePrompt: 'lowres, blurry',
+      positivePrompt: 'a red cinematic cat',
+      promptTemplate: null,
+      promptTemplateViewMode: false,
+    });
   });
 });
 

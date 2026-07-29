@@ -6,22 +6,32 @@ import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 
-vi.mock('@features/generation/ui/promptFields/PositivePromptActions', () => ({
-  AddPromptTriggerButton: () => null,
-  PromptTriggerPopover: () => null,
-}));
+const MODEL_CATALOG = [{ base: 'sdxl', name: 'easynegative', type: 'embedding' }];
+const SELECTED_MODEL = { base: 'sdxl', name: 'Juggernaut', trigger_phrases: ['jugg'] };
 
 vi.mock('@features/generation/ui/GenerationUiContext', async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  useGenerationUi: () => ({ models: { catalog: [], ensureLoaded: vi.fn() } }),
+  useGenerationUi: () => ({ models: { catalog: MODEL_CATALOG, ensureLoaded: vi.fn() } }),
+}));
+
+vi.mock('@features/generation/data/wildcards', () => ({
+  createWildcard: vi.fn(),
+  deleteWildcard: vi.fn(),
+  invalidateWildcardDependents: vi.fn(),
+  updateWildcard: vi.fn(),
+  wildcardsQueryOptions: () => ({
+    queryFn: () => Promise.resolve([{ id: 'wildcard-1', name: 'colors', values: ['red'] }]),
+    queryKey: ['generation', 'wildcards'],
+  }),
 }));
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const render = async (templateNegativePrompt: string | null) => {
+const render = async (templateNegativePrompt: string | null, isTemplateViewMode = true) => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -33,10 +43,10 @@ const render = async (templateNegativePrompt: string | null) => {
           <NegativePromptField
             heightPx={56}
             isEnabled
-            isTemplateViewMode
+            isTemplateViewMode={isTemplateViewMode}
             loras={[]}
             projectId="project-1"
-            selectedModel={undefined}
+            selectedModel={SELECTED_MODEL as never}
             showSyntaxHighlighting={false}
             templateNegativePrompt={templateNegativePrompt}
             value="blurry"
@@ -84,4 +94,16 @@ describe('the negative prompt in template view mode', () => {
     expect(textarea.readOnly).toBe(false);
     expect(textarea.value).toBe('blurry');
   });
+});
+
+it('offers phrases and embeddings in the full picker but excludes wildcards', async () => {
+  await render(null, false);
+
+  await act(async () => {
+    await userEvent.click(host!.querySelector<HTMLButtonElement>('[aria-label="widgets.generate.addPromptTrigger"]')!);
+  });
+  await vi.waitFor(() => expect(document.body.textContent).toContain('easynegative'));
+
+  expect(document.body.textContent).toContain('jugg');
+  expect(document.body.textContent).not.toContain('colors');
 });

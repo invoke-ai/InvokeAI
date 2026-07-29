@@ -76,6 +76,26 @@ export const getEffectivePrompts = (settings: AuthoredPrompts): EffectivePrompts
   };
 };
 
+export const flattenPromptTemplateExpansion = ({
+  authoredNegativePrompt,
+  selectedPositivePrompt,
+  template,
+}: {
+  authoredNegativePrompt: string;
+  selectedPositivePrompt: string;
+  template: PromptTemplateSnapshot;
+}): {
+  negativePrompt: string;
+  positivePrompt: string;
+  promptTemplate: null;
+  promptTemplateViewMode: false;
+} => ({
+  negativePrompt: applyPromptTemplate(template.negativePrompt, authoredNegativePrompt),
+  positivePrompt: selectedPositivePrompt,
+  promptTemplate: null,
+  promptTemplateViewMode: false,
+});
+
 /**
  * The merged prompt split around the authored text, for the read-only view mode:
  * the outer chunks are the template's own words and are dimmed, the middle chunk

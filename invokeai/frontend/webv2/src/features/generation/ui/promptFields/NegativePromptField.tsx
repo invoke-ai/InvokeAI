@@ -41,6 +41,7 @@ interface NegativePromptFieldProps {
 
 /** No `__name__` here: a negative prompt is never expanded, so it has no wildcards. */
 const NEGATIVE_PROMPT_TRIGGER_KEYS = ['<'] as const;
+const NEGATIVE_PROMPT_TRIGGER_KINDS = new Set(['embedding', 'phrase'] as const);
 
 export const NegativePromptField = ({
   heightPx,
@@ -202,8 +203,10 @@ export const NegativePromptField = ({
             onResizeEnd={onResizeEnd}
           />
           {autocomplete.element}
+          {triggerPicker.dismissElement}
           {triggerPicker.isOpen ? (
             <PromptTriggerPopover
+              allowedKinds={NEGATIVE_PROMPT_TRIGGER_KINDS}
               loras={loras}
               open
               positioning={triggerPicker.positioning}

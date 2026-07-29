@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import type { PromptTriggerOption } from './promptTriggerOptions';
 
-import { filterPromptTriggerOptions, getInlineTriggerOptions, getPromptTriggerOptions } from './promptTriggerOptions';
+import {
+  filterPromptTriggerOptions,
+  filterPromptTriggerOptionsByKind,
+  getInlineTriggerOptions,
+  getPromptTriggerOptions,
+} from './promptTriggerOptions';
 
 const OPTIONS: PromptTriggerOption[] = [
   { group: 'Wildcards', kind: 'wildcard', label: 'colours', value: '__colours__' },
@@ -78,5 +83,13 @@ describe('getInlineTriggerOptions', () => {
 
   it('returns nothing when the query matches no label', () => {
     expect(getInlineTriggerOptions(OPTIONS, '_', 'zzz')).toEqual([]);
+  });
+});
+
+describe('filterPromptTriggerOptionsByKind', () => {
+  it('keeps phrases and embeddings while excluding wildcards for a negative prompt', () => {
+    expect(
+      filterPromptTriggerOptionsByKind(OPTIONS, new Set(['embedding', 'phrase'])).map((option) => option.kind)
+    ).toEqual(['embedding', 'phrase']);
   });
 });

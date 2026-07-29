@@ -270,6 +270,7 @@ export const PositivePromptField = ({
         onResizeEnd={onResizeEnd}
       />
       {autocomplete.element}
+      {triggerPicker.dismissElement}
       {triggerPicker.isOpen ? (
         <PromptTriggerPopover
           loras={loras}
