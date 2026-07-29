@@ -100,12 +100,25 @@ def _get_flux_lora_format(mod: ModelOnDisk) -> FluxLoRAFormat | None:
     return value
 
 
-# Matches an SDXL UNet attention key in either kohya (underscore) or diffusers (dot)
-# naming, capturing the transformer_blocks index. Anchored on the UNet `attentions`
-# grouping so it won't match DiT-style transformers (FLUX/Qwen/Z-Image) that also use
-# `transformer_blocks` but without UNet down/up/mid blocks and `attentions`.
+# Matches an SDXL UNet attention key, capturing the transformer_blocks index.
+#
+# Anchored on the `lora_unet_` prefix because that is exactly the key set
+# `convert_sdxl_keys_to_diffusers_format()` can convert at load time — keys outside it
+# (e.g. diffusers/PEFT `unet.….lora_A.weight`) would be identified as SDXL here only to
+# raise `ValueError: Unrecognized SDXL LoRA key prefix` mid-generation.
+#
+# Both kohya `sd-scripts` naming conventions are covered: Stability-AI block names
+# (`input_blocks_8_1`, `middle_block_1`, `output_blocks_0_1`) and diffusers block names
+# (`down_blocks_2_attentions_1`, `mid_block_attentions_0`). Requiring a UNet block name
+# in addition to the prefix keeps DiT-style transformers (FLUX/Qwen/Z-Image), which also
+# use `transformer_blocks`, from matching.
 _SDXL_UNET_ATTENTION_RE = re.compile(
-    r"(down_blocks|up_blocks|mid_block)[._].*attentions[._]\d+[._]transformer_blocks[._](\d+)"
+    r"^lora_unet_"
+    r"(?:(?:down_blocks|up_blocks)_\d+_attentions_\d+"
+    r"|mid_block_attentions_\d+"
+    r"|(?:input_blocks|output_blocks)_\d+_\d+"
+    r"|middle_block_\d+)"
+    r"_transformer_blocks_(\d+)_"
 )
 
 
@@ -118,12 +131,17 @@ def _state_dict_looks_like_sdxl_unet_lora(state_dict: dict[str | int, Any]) -> b
     attention. This lets us identify SDXL from UNet-only LoRAs that lack the
     cross-attention / text-encoder keys `lora_token_vector_length()` relies on
     (e.g. self-attention-only "slider" LoRAs).
+
+    Known limitation: the `>= 2` threshold is what separates SDXL from SD1.x/SD2.x, so an
+    SDXL LoRA confined to the 2-transformer-block attention blocks (`down_blocks_1` /
+    `up_blocks_1`, indices 0-1) is not detected. Such a LoRA is indistinguishable from
+    SD1/SD2 by block structure alone.
     """
     for key in state_dict:
         if not isinstance(key, str):
             continue
-        match = _SDXL_UNET_ATTENTION_RE.search(key)
-        if match is not None and int(match.group(2)) >= 2:
+        match = _SDXL_UNET_ATTENTION_RE.match(key)
+        if match is not None and int(match.group(1)) >= 2:
             return True
     return False
 
