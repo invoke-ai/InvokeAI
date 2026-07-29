@@ -29,14 +29,23 @@ from invokeai.backend.model_manager.taxonomy import (
     FluxLoRAFormat,
     ModelFormat,
     ModelType,
+    WanLoRAVariantType,
     ZImageVariantType,
 )
 from invokeai.backend.model_manager.util.model_util import lora_token_vector_length
 from invokeai.backend.patches.lora_conversions.anima_lora_constants import (
     has_cosmos_dit_kohya_keys,
+    has_cosmos_dit_kohya_keys_strict,
     has_cosmos_dit_peft_keys,
+    has_cosmos_dit_peft_keys_strict,
 )
 from invokeai.backend.patches.lora_conversions.flux_control_lora_utils import is_state_dict_likely_flux_control
+from invokeai.backend.patches.lora_conversions.wan_lora_constants import (
+    detect_wan_lora_variant,
+    has_non_wan_architecture_keys,
+    has_wan_kohya_keys,
+    has_wan_peft_keys,
+)
 
 # Defaults used to compute the effective slider range when one or both bounds
 # are unset. These intentionally mirror the frontend's DEFAULT_LORA_WEIGHT_CONFIG
@@ -887,6 +896,9 @@ class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         # (with the "transformer." prefix and "single_" variant) which would falsely match our check.
         # Flux Kohya LoRAs use lora_unet_double_blocks or lora_unet_single_blocks.
         has_z_image_keys = state_dict_has_any_keys_starting_with(state_dict, {"diffusion_model.layers."})
+        # Krea-2 LoRAs also carry transformer.transformer_blocks. keys, but uniquely include the
+        # text-fusion stage. Exclude them here so they route to LoRA_LyCORIS_Krea2_Config.
+        has_krea2_keys = _has_krea2_lora_keys(state_dict)
         has_flux_keys = state_dict_has_any_keys_starting_with(
             state_dict,
             {
@@ -900,7 +912,7 @@ class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
             },
         )
 
-        if has_qwen_ie_keys and has_lora_suffix and not has_z_image_keys and not has_flux_keys:
+        if has_qwen_ie_keys and has_lora_suffix and not has_z_image_keys and not has_krea2_keys and not has_flux_keys:
             return
 
         raise NotAMatchError("model does not match Qwen Image LoRA heuristics")
@@ -913,6 +925,7 @@ class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
             {"transformer_blocks.", "transformer.transformer_blocks.", "lora_unet_transformer_blocks_"},
         )
         has_z_image_keys = state_dict_has_any_keys_starting_with(state_dict, {"diffusion_model.layers."})
+        has_krea2_keys = _has_krea2_lora_keys(state_dict)
         has_flux_keys = state_dict_has_any_keys_starting_with(
             state_dict,
             {
@@ -926,9 +939,131 @@ class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
             },
         )
 
-        if has_qwen_ie_keys and not has_z_image_keys and not has_flux_keys:
+        if has_qwen_ie_keys and not has_z_image_keys and not has_krea2_keys and not has_flux_keys:
             return BaseModelType.QwenImage
         raise NotAMatchError("model does not look like a Qwen Image Edit LoRA")
+
+
+def _has_krea2_lora_keys(state_dict: dict[str | int, Any]) -> bool:
+    """True if the state dict targets Krea-2's distinctive modules.
+
+    Covers both the diffusers naming (``text_fusion`` / ``time_mod_proj``) and the native/ComfyUI naming
+    (``txtfusion``, or the gated attention ``attn.wq`` + ``attn.gate`` unique to Krea-2's single-stream
+    blocks) so native-format LoRAs are recognized as Krea-2 rather than falling through to another base.
+    """
+    str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
+    if any(("text_fusion" in k or "txtfusion" in k or "time_mod_proj" in k) for k in str_keys):
+        return True
+    # Native gated attention identifies a transformer-only Krea-2 LoRA that lacks the text-fusion stage.
+    return any(".attn.wq." in k for k in str_keys) and any(".attn.gate." in k for k in str_keys)
+
+
+# Each LoRA weight half must be accompanied by its partner half. An orphaned half installs successfully
+# but crashes later during LoRA conversion, so we reject it at identification time.
+_LORA_PAIR_PARTNERS = {
+    "lora_A.weight": "lora_B.weight",
+    "lora_B.weight": "lora_A.weight",
+    "lora_down.weight": "lora_up.weight",
+    "lora_up.weight": "lora_down.weight",
+}
+
+
+def _lora_weight_keys_are_all_paired(state_dict: dict[str | int, Any], prefixes: tuple[str, ...] | None = None) -> bool:
+    """True if *every* lora_A/lora_B/lora_down/lora_up weight (optionally restricted to `prefixes`) has its
+    partner half present. Returns True when there are no such weights at all (nothing to invalidate)."""
+    string_keys = {key for key in state_dict if isinstance(key, str)}
+    for key in string_keys:
+        if prefixes is not None and not key.startswith(prefixes):
+            continue
+        for suffix, partner_suffix in _LORA_PAIR_PARTNERS.items():
+            if key.endswith(suffix):
+                if f"{key[: -len(suffix)]}{partner_suffix}" not in string_keys:
+                    return False
+                break
+    return True
+
+
+def _has_complete_lora_pair(state_dict: dict[str | int, Any], prefixes: tuple[str, ...] | None = None) -> bool:
+    """True if at least one complete lora_A/B (or lora_down/up) pair exists, optionally under `prefixes`.
+
+    Note this only requires a *complete* pair to exist; it does not by itself reject dangling halves
+    elsewhere — callers pair it with :func:`_lora_weight_keys_are_all_paired` (over the whole state dict)
+    to also reject orphaned halves anywhere.
+    """
+    string_keys = {key for key in state_dict if isinstance(key, str)}
+    for key in string_keys:
+        if prefixes is not None and not key.startswith(prefixes):
+            continue
+        for suffix, partner_suffix in _LORA_PAIR_PARTNERS.items():
+            if key.endswith(suffix) and f"{key[: -len(suffix)]}{partner_suffix}" in string_keys:
+                return True
+    return False
+
+
+# Layouts the converter understands for an explicit Krea-2 override (a transformer-only or text-encoder-only
+# LoRA that lacks the auto-detection text_fusion/time_mod_proj keys still installs under an explicit base).
+_KREA2_SUPPORTED_LORA_PREFIXES = (
+    "transformer.transformer_blocks.",
+    "transformer_blocks.",
+    # The converter also supports the `diffusion_model.` transformer layout
+    # (see krea2_lora_conversion_utils.lora_model_from_krea2_state_dict).
+    "diffusion_model.transformer_blocks.",
+    "diffusion_model.blocks.",
+    "diffusion_model.txtfusion.",
+    "diffusion_model.first.",
+    "diffusion_model.tmlp.",
+    "diffusion_model.tproj.",
+    "diffusion_model.txtmlp.",
+    "diffusion_model.last.linear.",
+    "base_model.model.transformer.transformer_blocks.",
+    "text_encoder.",
+    "base_model.model.text_encoder.",
+)
+
+
+class LoRA_LyCORIS_Krea2_Config(LoRA_LyCORIS_Config_Base, Config_Base):
+    """Model config for Krea-2 LoRA models in LyCORIS (single-file diffusers PEFT) format."""
+
+    base: Literal[BaseModelType.Krea2] = Field(default=BaseModelType.Krea2)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+        raise_for_override_fields(cls, override_fields)
+
+        state_dict = mod.load_state_dict()
+        explicit_krea2_override = override_fields.get("base") is BaseModelType.Krea2
+        has_supported_explicit_pair = _has_complete_lora_pair(state_dict, _KREA2_SUPPORTED_LORA_PREFIXES)
+        # Reject an orphaned half *anywhere* in the state dict (e.g. a dangling text_fusion half not under
+        # the approved prefixes) — it would install here but fail during LoRA conversion at generation time.
+        if explicit_krea2_override and has_supported_explicit_pair and _lora_weight_keys_are_all_paired(state_dict):
+            return cls(**override_fields)
+
+        cls._validate_looks_like_lora(mod)
+        cls._validate_base(mod)
+        return cls(**override_fields)
+
+    @classmethod
+    def _validate_looks_like_lora(cls, mod: ModelOnDisk) -> None:
+        """Krea-2 LoRAs have keys like transformer.text_fusion.* / transformer.transformer_blocks.* with
+        a lora_A/lora_B (or lora_down/lora_up) suffix. The text-fusion stage is unique to Krea-2."""
+        state_dict = mod.load_state_dict()
+        # Require a *complete* lora_A/B (or lora_down/up) pair, not merely any lora/dora suffix: a file with
+        # only ``dora_scale`` and no A/B weights would pass a suffix check but fail later on missing weights.
+        if not (_has_krea2_lora_keys(state_dict) and _has_complete_lora_pair(state_dict)):
+            raise NotAMatchError(
+                "model does not match Krea-2 LoRA heuristics (no complete lora_A/B or lora_down/up pair)"
+            )
+        # Reject a file with an orphaned LoRA half (a valid layer plus a dangling lora_A/B/down/up); it
+        # would install here but fail later during LoRA conversion.
+        if not _lora_weight_keys_are_all_paired(state_dict):
+            raise NotAMatchError("Krea-2 LoRA has an incomplete lora_A/B (or lora_down/up) weight pair")
+
+    @classmethod
+    def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
+        if _has_krea2_lora_keys(mod.load_state_dict()):
+            return BaseModelType.Krea2
+        raise NotAMatchError("model does not look like a Krea-2 LoRA")
 
 
 class LoRA_LyCORIS_Anima_Config(LoRA_LyCORIS_Config_Base, Config_Base):
@@ -943,16 +1078,20 @@ class LoRA_LyCORIS_Anima_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         Anima LoRAs have keys like:
         - lora_unet_blocks_0_cross_attn_k_proj.lora_down.weight (Kohya format)
         - diffusion_model.blocks.0.cross_attn.k_proj.lora_A.weight (diffusers PEFT format)
-        - transformer.blocks.0.cross_attn.k_proj.lora_A.weight (diffusers PEFT format)
+        - transformer.blocks.0.mlp.layer_0.lora_A.weight (Anima-only MLP layer)
 
-        Detection requires Cosmos DiT-specific subcomponent names (cross_attn,
-        self_attn, mlp, adaln_modulation) to avoid false-positives on other
-        architectures that also use ``blocks`` in their paths.
+        Uses the **strict** Cosmos-DiT detectors, which require an
+        Anima-exclusive subcomponent name (``mlp``, ``adaln_modulation``, or
+        ``_proj``-suffixed attention). The loose detectors would also accept
+        Wan-native LoRAs (which use ``cross_attn``/``self_attn`` too but with
+        bare ``.q``/``.k``/``.v``/``.o`` rather than ``_proj``), so they're not
+        safe for first-match-wins probing — see the regression tests in
+        ``test_wan_lora_probe_independence.py``.
         """
         state_dict = mod.load_state_dict()
         str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
 
-        has_cosmos_keys = has_cosmos_dit_kohya_keys(str_keys) or has_cosmos_dit_peft_keys(str_keys)
+        has_cosmos_keys = has_cosmos_dit_kohya_keys_strict(str_keys) or has_cosmos_dit_peft_keys_strict(str_keys)
 
         # Also check for LoRA/LoKR weight suffixes
         has_lora_suffix = state_dict_has_any_keys_ending_with(
@@ -975,17 +1114,110 @@ class LoRA_LyCORIS_Anima_Config(LoRA_LyCORIS_Config_Base, Config_Base):
 
     @classmethod
     def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
-        """Anima LoRAs target Cosmos DiT blocks (blocks.X.cross_attn, blocks.X.self_attn, etc.).
+        """Anima LoRAs target Cosmos DiT blocks (blocks.X.mlp, blocks.X.adaln_modulation,
+        blocks.X.cross_attn.q_proj, etc.).
 
-        Uses Cosmos DiT-specific subcomponent names to avoid false-positives.
+        Uses the strict Cosmos-DiT detectors to be mutually exclusive with
+        Wan-LoRA detection — see ``_validate_looks_like_lora`` for rationale.
         """
         state_dict = mod.load_state_dict()
         str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
 
-        if has_cosmos_dit_kohya_keys(str_keys) or has_cosmos_dit_peft_keys(str_keys):
+        if has_cosmos_dit_kohya_keys_strict(str_keys) or has_cosmos_dit_peft_keys_strict(str_keys):
             return BaseModelType.Anima
 
         raise NotAMatchError("model does not look like an Anima LoRA")
+
+
+class LoRA_LyCORIS_Wan_Config(LoRA_LyCORIS_Config_Base, Config_Base):
+    """Model config for Wan 2.2 LoRA models in LyCORIS format.
+
+    Wan LoRAs target ``WanTransformer3DModel`` blocks. The Wan 2.2 A14B family
+    is dual-expert (high-noise + low-noise) — LoRAs are typically trained
+    against one expert. ``expert`` records which one so the model loader
+    invocation can wire it to the correct ``loras`` / ``loras_low_noise`` list.
+    Many LoRAs are expert-agnostic (TI2V-5B family, or community LoRAs that
+    just don't tag the expert) — these get ``expert=None`` and are applied to
+    both experts by default.
+    """
+
+    base: Literal[BaseModelType.Wan] = Field(default=BaseModelType.Wan)
+    expert: Literal["high", "low"] | None = Field(
+        default=None,
+        description="For Wan 2.2 A14B dual-expert LoRAs: 'high' targets the high-noise expert, "
+        "'low' targets the low-noise expert. None means the LoRA is expert-agnostic "
+        "(TI2V-5B, or community LoRAs without explicit tagging) and is applied to both.",
+    )
+    variant: WanLoRAVariantType | None = Field(
+        default=None,
+        description="The Wan model family this LoRA targets, detected from its inner-dim "
+        "(5120 -> A14B, 3072 -> TI2V-5B). A14B LoRAs are incompatible with TI2V-5B mains "
+        "(and vice versa) — they crash with a shape mismatch in the layer patcher. The "
+        "linear-view graph builder filters LoRAs on variant when building the LoRA "
+        "collection. None means the LoRA's inner-dim couldn't be identified.",
+    )
+
+    @classmethod
+    def _validate_looks_like_lora(cls, mod: ModelOnDisk) -> None:
+        """Wan LoRAs target attn1/attn2/ffn.net (diffusers form) or self_attn/cross_attn/ffn.N (native form)."""
+        state_dict = mod.load_state_dict()
+        str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
+
+        has_wan_keys = has_wan_kohya_keys(str_keys) or has_wan_peft_keys(str_keys)
+        has_lora_suffix = state_dict_has_any_keys_ending_with(
+            state_dict,
+            {
+                "lora_A.weight",
+                "lora_B.weight",
+                "lora_down.weight",
+                "lora_up.weight",
+                "dora_scale",
+                ".lokr_w1",
+                ".lokr_w2",
+            },
+        )
+
+        # Reject if any non-Wan architecture signature is present. Without this
+        # guard a Wan LoRA could be falsely identified by Anima (cross_attn /
+        # self_attn name collision) or vice versa.
+        if has_wan_keys and has_lora_suffix and not has_non_wan_architecture_keys(str_keys):
+            return
+
+        raise NotAMatchError("model does not match Wan LoRA heuristics")
+
+    @classmethod
+    def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
+        state_dict = mod.load_state_dict()
+        str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
+
+        if (has_wan_kohya_keys(str_keys) or has_wan_peft_keys(str_keys)) and not has_non_wan_architecture_keys(
+            str_keys
+        ):
+            return BaseModelType.Wan
+
+        raise NotAMatchError("model does not look like a Wan LoRA")
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        # Run the base-class probe (file-check, lora-suffix, base detection).
+        instance = super().from_model_on_disk(mod, override_fields)
+
+        # Auto-detect the expert tag from the filename if the user didn't
+        # override it. ``high_noise`` / ``low_noise`` / hyphenated / concatenated
+        # variants — mirrors the GGUF transformer probe's heuristic.
+        if instance.expert is None:
+            name = mod.path.stem.lower()
+            if any(s in name for s in ("high_noise", "high-noise", "highnoise")):
+                instance.expert = "high"
+            elif any(s in name for s in ("low_noise", "low-noise", "lownoise")):
+                instance.expert = "low"
+
+        # Auto-detect the model-family variant from inner_dim in the state
+        # dict. The override field skips this if the user has set it.
+        if instance.variant is None:
+            instance.variant = detect_wan_lora_variant(mod.load_state_dict())
+
+        return instance
 
 
 class ControlAdapter_Config_Base(ABC, BaseModel):
