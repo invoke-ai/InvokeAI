@@ -1,13 +1,19 @@
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
-import type { PromptTemplateDraft, PromptTemplateRecord } from '@features/generation/data/promptTemplates';
+import type {
+  PromptTemplateCreateDraft,
+  PromptTemplateImageUpdate,
+  PromptTemplateRecord,
+  PromptTemplateUpdateDraft,
+} from '@features/generation/data/promptTemplates';
 import type { PendingPromptTemplateDraft } from '@features/generation/ui/promptTemplateDraftStore';
 import type { PromptTemplateCatalog } from '@features/generation/ui/usePromptTemplates';
 import type { ChangeEvent } from 'react';
 
-import { HStack, Image, Input, Stack, Text } from '@chakra-ui/react';
+import { HStack, Input, Stack, Text } from '@chakra-ui/react';
 import { PROMPT_TEMPLATE_PLACEHOLDER } from '@features/generation/core/promptTemplates';
 import { useGenerationUi } from '@features/generation/ui/GenerationUiContext';
 import { PromptPanelHeader } from '@features/generation/ui/promptFields/PromptPanelHeader';
+import { PromptTemplateImage } from '@features/generation/ui/promptFields/PromptTemplateImage';
 import { PromptTextarea } from '@features/generation/ui/promptFields/PromptTextarea';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { getApiErrorMessage } from '@platform/transport/http';
@@ -16,7 +22,7 @@ import { DropZone } from '@platform/ui/DropZone';
 import { Field } from '@platform/ui/Field';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { CheckIcon, ImageUpIcon, XIcon } from 'lucide-react';
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 interface PromptTemplateEditorProps {
@@ -34,18 +40,13 @@ interface EditorDraft {
   name: string;
   negativePrompt: string;
   positivePrompt: string;
-  image: Blob | null;
-  imagePreviewUrl: string | null;
-  /**
-   * Whether the existing image has been dealt with — fetched, replaced, or
-   * removed. Stated outright because `image: null` is both "not loaded yet" and
-   * "the user took it off", and reading it as the former let a removal be undone
-   * by a fetch that landed afterwards.
-   */
-  isExistingImageSettled: boolean;
+  image: PromptTemplateImageUpdate;
+  /** Undefined keeps the stored image, a URL previews a replacement, null removes it. */
+  imagePreviewUrl?: string | null;
 }
 
 const MAX_NAME_LENGTH = 128;
+const NEW_TEMPLATE_IMAGE = { hasImage: false, id: 'new' } as const;
 
 export const PromptTemplateEditor = ({
   catalog,
@@ -60,9 +61,7 @@ export const PromptTemplateEditor = ({
   const nameFieldId = useId();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [draft, setDraft] = useState<EditorDraft>({
-    image: null,
-    imagePreviewUrl: template?.imageUrl ?? null,
-    isExistingImageSettled: !template?.imageUrl,
+    image: { kind: 'preserve' },
     name: template?.name ?? '',
     negativePrompt: template?.negativePrompt ?? prefill?.negativePrompt ?? '',
     positivePrompt: template?.positivePrompt ?? prefill?.positivePrompt ?? '',
@@ -75,9 +74,8 @@ export const PromptTemplateEditor = ({
    * Swaps in a preview URL for a picked file, releasing the previous one.
    *
    * A blob URL pins the whole file for the document's lifetime, so re-picking
-   * ten images held on to all ten. The remote `template.imageUrl` shares this
-   * field but is not ours to revoke, which is why only what we created is
-   * tracked here.
+   * ten images held on to all ten. Stored images are owned by the shared image
+   * resource; only local replacement previews are tracked here.
    */
   const takeObjectUrl = useCallback((file: Blob | null): string | null => {
     if (objectUrlRef.current) {
@@ -89,53 +87,41 @@ export const PromptTemplateEditor = ({
     return objectUrlRef.current;
   }, []);
 
-  useEffect(
-    () => () => {
-      if (objectUrlRef.current) {
-        URL.revokeObjectURL(objectUrlRef.current);
-      }
-    },
-    []
-  );
-
-  // The backend replaces the whole record, so saving without resending the
-  // existing image would drop it. Load it up front and treat it as part of the
-  // draft from then on.
-  useMountEffect(() => {
-    const imageUrl = template?.imageUrl;
-
-    if (!imageUrl) {
-      return;
+  useMountEffect(() => () => {
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
     }
-
-    void catalog.fetchImage(imageUrl).then((image) => {
-      if (image) {
-        setDraft((current) =>
-          current.isExistingImageSettled ? current : { ...current, image, isExistingImageSettled: true }
-        );
-      }
-    });
   });
 
   const trimmedName = draft.name.trim();
   const isPlaceholderPresent = draft.positivePrompt.includes(PROMPT_TEMPLATE_PLACEHOLDER);
   const nameError = trimmedName.length > MAX_NAME_LENGTH ? t('widgets.generate.promptTemplates.nameTooLong') : null;
+  const hasImage = draft.image.kind === 'replace' || (draft.image.kind === 'preserve' && template?.hasImage === true);
 
   const save = useCallback(async () => {
-    const nextDraft: PromptTemplateDraft = {
-      image: draft.image,
-      name: trimmedName,
-      negativePrompt: draft.negativePrompt,
-      positivePrompt: draft.positivePrompt,
-    };
-
     setIsSaving(true);
     setError(null);
 
     let saved: PromptTemplateRecord;
 
     try {
-      saved = template ? await catalog.update(template.id, nextDraft) : await catalog.create(nextDraft);
+      if (template) {
+        const nextDraft: PromptTemplateUpdateDraft = {
+          image: draft.image,
+          name: trimmedName,
+          negativePrompt: draft.negativePrompt,
+          positivePrompt: draft.positivePrompt,
+        };
+        saved = await catalog.update(template, nextDraft);
+      } else {
+        const nextDraft: PromptTemplateCreateDraft = {
+          image: draft.image.kind === 'replace' ? draft.image.blob : null,
+          name: trimmedName,
+          negativePrompt: draft.negativePrompt,
+          positivePrompt: draft.positivePrompt,
+        };
+        saved = await catalog.create(nextDraft);
+      }
     } catch (caught) {
       // `ApiError.message` is the raw response body, so the backend's own
       // explanation only reads properly once it is unwrapped.
@@ -181,7 +167,11 @@ export const PromptTemplateEditor = ({
       if (file) {
         const imagePreviewUrl = takeObjectUrl(file);
 
-        setDraft((current) => ({ ...current, image: file, imagePreviewUrl, isExistingImageSettled: true }));
+        setDraft((current) => ({
+          ...current,
+          image: { blob: file, kind: 'replace' },
+          imagePreviewUrl,
+        }));
       }
 
       // Reset so re-picking the same file still fires a change.
@@ -192,7 +182,7 @@ export const PromptTemplateEditor = ({
 
   const clearImage = useCallback(() => {
     takeObjectUrl(null);
-    setDraft((current) => ({ ...current, image: null, imagePreviewUrl: null, isExistingImageSettled: true }));
+    setDraft((current) => ({ ...current, image: { kind: 'remove' }, imagePreviewUrl: null }));
   }, [takeObjectUrl]);
 
   const reportSaveError = useCallback(
@@ -291,16 +281,28 @@ export const PromptTemplateEditor = ({
 
       <Field label={t('widgets.generate.promptTemplates.image')}>
         <HStack gap="2">
-          {draft.imagePreviewUrl ? (
-            <Image
+          {template ? (
+            <PromptTemplateImage
               alt=""
               boxSize="12"
               borderColor="border.emphasized"
               borderWidth="1px"
               flexShrink="0"
+              fallback={null}
+              localPreviewUrl={draft.imagePreviewUrl}
               objectFit="cover"
               rounded="md"
-              src={draft.imagePreviewUrl}
+              template={template}
+            />
+          ) : draft.imagePreviewUrl ? (
+            <PromptTemplateImage
+              alt=""
+              boxSize="12"
+              fallback={null}
+              localPreviewUrl={draft.imagePreviewUrl}
+              objectFit="cover"
+              rounded="md"
+              template={NEW_TEMPLATE_IMAGE}
             />
           ) : null}
           <DropZone
@@ -317,12 +319,12 @@ export const PromptTemplateEditor = ({
           >
             <ImageUpIcon size={14} />
             <Text as="span" fontSize="2xs">
-              {draft.imagePreviewUrl
+              {hasImage
                 ? t('widgets.generate.promptTemplates.replaceImage')
                 : t('widgets.generate.promptTemplates.addImage')}
             </Text>
           </DropZone>
-          {draft.imagePreviewUrl ? (
+          {hasImage ? (
             <Tooltip content={t('widgets.generate.promptTemplates.removeImage')}>
               <IconButton
                 aria-label={t('widgets.generate.promptTemplates.removeImage')}

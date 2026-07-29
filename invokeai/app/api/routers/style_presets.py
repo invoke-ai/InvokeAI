@@ -99,6 +99,9 @@ async def get_style_preset(
 async def update_style_preset(
     current_user: CurrentUserOrDefault,
     image: Optional[UploadFile] = File(description="The image file to upload", default=None),
+    preserve_image: bool = Form(
+        description="Preserve the existing image when no replacement image is supplied", default=False
+    ),
     style_preset_id: str = Path(description="The id of the style preset to update"),
     data: str = Form(description="The data of the style preset to update"),
 ) -> StylePresetRecordWithImage:
@@ -121,6 +124,9 @@ async def update_style_preset(
     record = _load_record_or_404(style_preset_id)
     _assert_preset_write(record, current_user)
 
+    if image is not None and preserve_image:
+        raise HTTPException(status_code=400, detail="Cannot preserve and replace an image in the same request")
+
     if image is not None:
         if not image.content_type or not image.content_type.startswith("image"):
             raise HTTPException(status_code=415, detail="Not an image")
@@ -137,7 +143,7 @@ async def update_style_preset(
             ApiDependencies.invoker.services.style_preset_image_files.save(style_preset_id, pil_image)
         except ValueError as e:
             raise HTTPException(status_code=409, detail=str(e))
-    else:
+    elif not preserve_image:
         try:
             ApiDependencies.invoker.services.style_preset_image_files.delete(style_preset_id)
         except StylePresetImageFileNotFoundException:

@@ -4648,6 +4648,12 @@ export type components = {
              */
             image?: Blob | null;
             /**
+             * Preserve Image
+             * @description Preserve the existing image when no replacement image is supplied
+             * @default false
+             */
+            preserve_image?: boolean;
+            /**
              * Data
              * @description The data of the style preset to update
              */

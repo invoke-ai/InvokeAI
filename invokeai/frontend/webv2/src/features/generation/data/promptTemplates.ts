@@ -15,7 +15,7 @@ import type { PromptTemplateSnapshot } from '@features/generation/core/promptTem
 import type { QueryClient } from '@tanstack/react-query';
 
 import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
-import { absolutizeApiUrl, apiFetch, apiFetchJson } from '@platform/transport/http';
+import { apiFetch, apiFetchJson } from '@platform/transport/http';
 import { queryOptions } from '@tanstack/react-query';
 
 const PROMPT_TEMPLATES_BASE = '/api/v1/style_presets';
@@ -34,20 +34,20 @@ interface PromptTemplateDTO {
 export interface PromptTemplateRecord extends PromptTemplateSnapshot {
   /** `default` templates ship with the backend and are read-only here. */
   isDefault: boolean;
-  /** Absolute URL of the preview image, or null when the template has none. */
-  imageUrl: string | null;
+  /** Whether the authenticated image resource should be requested. */
+  hasImage: boolean;
+  isPublic: boolean;
+  userId: string;
 }
 
 /**
  * The four fields a record shares with a snapshot, and no more.
  *
  * A record is assignable to a snapshot, so applying one type-checks and keeps
- * `isDefault` and `imageUrl` along for the ride. Both then land in persisted
- * project state and in every queue item's widget snapshot — an absolute,
- * host-specific image URL among them, stale the moment the server moves. It
- * also puts five keys on an object `isCanonicalPromptTemplateSnapshot` requires
- * to have exactly four, so the identity short-circuits built around it in
- * `normalizeGenerateSettings` and `isGenerateSettings` never fired.
+ * catalog-only fields such as `isDefault` and `hasImage` along for the ride.
+ * They then land in persisted project state and every queue item's widget
+ * snapshot. Extra keys also make `isCanonicalPromptTemplateSnapshot` reject the
+ * object, so the identity short-circuits in settings normalization never fire.
  */
 export const toPromptTemplateSnapshot = ({
   id,
@@ -56,30 +56,37 @@ export const toPromptTemplateSnapshot = ({
   positivePrompt,
 }: PromptTemplateSnapshot): PromptTemplateSnapshot => ({ id, name, negativePrompt, positivePrompt });
 
-export interface PromptTemplateDraft {
+interface PromptTemplateDraftFields {
   name: string;
   negativePrompt: string;
   positivePrompt: string;
-  /**
-   * The image the template should end up with, always stated outright. The
-   * backend replaces the whole record, so an absent image part *deletes* the
-   * stored one — there is no "leave it as it was". The editor therefore loads
-   * the current image up front with `fetchPromptTemplateImage`.
-   */
+}
+
+export interface PromptTemplateCreateDraft extends PromptTemplateDraftFields {
   image: Blob | null;
+}
+
+export type PromptTemplateImageUpdate = { kind: 'preserve' } | { kind: 'remove' } | { blob: Blob; kind: 'replace' };
+
+export interface PromptTemplateUpdateDraft extends PromptTemplateDraftFields {
+  image: PromptTemplateImageUpdate;
 }
 
 export const promptTemplateKeys = {
   all: ['generation', 'promptTemplates'] as const,
+  image: (id: string) => [...promptTemplateKeys.all, 'image', id] as const,
+  list: () => [...promptTemplateKeys.all, 'list'] as const,
 };
 
 const mapPromptTemplate = (dto: PromptTemplateDTO): PromptTemplateRecord => ({
+  hasImage: dto.image !== null,
   id: dto.id,
-  imageUrl: dto.image ? absolutizeApiUrl(dto.image) : null,
   isDefault: dto.type === 'default',
+  isPublic: dto.is_public,
   name: dto.name,
   negativePrompt: dto.preset_data.negative_prompt,
   positivePrompt: dto.preset_data.positive_prompt,
+  userId: dto.user_id,
 });
 
 export const promptTemplatesQueryOptions = () =>
@@ -96,7 +103,7 @@ export const promptTemplatesQueryOptions = () =>
         assertAccountScopeCurrent(owner);
         return templates.map(mapPromptTemplate);
       },
-      queryKey: promptTemplateKeys.all,
+      queryKey: promptTemplateKeys.list(),
       staleTime: 30_000,
     });
   })();
@@ -106,7 +113,7 @@ export const promptTemplatesQueryOptions = () =>
  * models admin-owned `default` templates and an `is_public` share flag; neither
  * is authored from here, so both are pinned rather than exposed.
  */
-const toFormData = (draft: PromptTemplateDraft): FormData => {
+const toFormData = (draft: PromptTemplateDraftFields): FormData => {
   const body = new FormData();
 
   body.append(
@@ -120,40 +127,61 @@ const toFormData = (draft: PromptTemplateDraft): FormData => {
     })
   );
 
+  return body;
+};
+
+export const createPromptTemplate = async (draft: PromptTemplateCreateDraft): Promise<PromptTemplateRecord> => {
+  const body = toFormData(draft);
+
   if (draft.image) {
     body.append('image', draft.image);
   }
 
-  return body;
+  return mapPromptTemplate(
+    await apiFetchJson<PromptTemplateDTO>(`${PROMPT_TEMPLATES_BASE}/`, { body, method: 'POST' })
+  );
 };
 
-export const createPromptTemplate = async (draft: PromptTemplateDraft): Promise<PromptTemplateRecord> =>
-  mapPromptTemplate(
-    await apiFetchJson<PromptTemplateDTO>(`${PROMPT_TEMPLATES_BASE}/`, { body: toFormData(draft), method: 'POST' })
-  );
+export const updatePromptTemplate = async (
+  id: string,
+  draft: PromptTemplateUpdateDraft
+): Promise<PromptTemplateRecord> => {
+  const body = toFormData(draft);
 
-export const updatePromptTemplate = async (id: string, draft: PromptTemplateDraft): Promise<PromptTemplateRecord> =>
-  mapPromptTemplate(
+  if (draft.image.kind === 'preserve') {
+    body.append('preserve_image', 'true');
+  } else if (draft.image.kind === 'replace') {
+    body.append('image', draft.image.blob);
+  }
+
+  return mapPromptTemplate(
     await apiFetchJson<PromptTemplateDTO>(`${PROMPT_TEMPLATES_BASE}/i/${encodeURIComponent(id)}`, {
-      body: toFormData(draft),
+      body,
       method: 'PATCH',
     })
   );
-
-/**
- * Reads a template's existing preview image back as a blob so an edit that does
- * not touch the image can resend it. Returns null if it cannot be read — losing
- * the image is a smaller failure than blocking the edit.
- */
-export const fetchPromptTemplateImage = async (imageUrl: string): Promise<Blob | null> => {
-  try {
-    const response = await apiFetch(imageUrl);
-
-    return await response.blob();
-  } catch {
-    return null;
-  }
 };
+
+export const fetchPromptTemplateImage = async (id: string, signal?: AbortSignal): Promise<Blob> => {
+  const response = await apiFetch(`${PROMPT_TEMPLATES_BASE}/i/${encodeURIComponent(id)}/image`, { signal });
+
+  return await response.blob();
+};
+
+export const promptTemplateImageQueryOptions = (id: string) =>
+  (() => {
+    const owner = captureAccountScope();
+
+    return queryOptions({
+      queryFn: ({ signal }): Promise<Blob> =>
+        fetchPromptTemplateImage(id, AbortSignal.any([signal, owner.signal])).then((image) => {
+          assertAccountScopeCurrent(owner);
+          return image;
+        }),
+      queryKey: promptTemplateKeys.image(id),
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+  })();
 
 export const deletePromptTemplate = async (id: string): Promise<void> => {
   await apiFetch(`${PROMPT_TEMPLATES_BASE}/i/${encodeURIComponent(id)}`, { method: 'DELETE' });
@@ -178,6 +206,14 @@ export const exportPromptTemplates = async (): Promise<Blob> => {
   return await response.blob();
 };
 
-export const invalidatePromptTemplates = async (queryClient: QueryClient): Promise<void> => {
-  await queryClient.invalidateQueries({ queryKey: promptTemplateKeys.all });
+export const invalidatePromptTemplates = async (queryClient: QueryClient, id?: string): Promise<void> => {
+  const invalidations: Promise<void>[] = [
+    queryClient.invalidateQueries({ queryKey: promptTemplateKeys.list(), exact: true }),
+  ];
+
+  if (id) {
+    invalidations.push(queryClient.invalidateQueries({ queryKey: promptTemplateKeys.image(id), exact: true }));
+  }
+
+  await Promise.all(invalidations);
 };

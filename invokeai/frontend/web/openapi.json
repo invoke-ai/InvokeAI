@@ -14097,6 +14097,12 @@
             "title": "Image",
             "description": "The image file to upload"
           },
+          "preserve_image": {
+            "type": "boolean",
+            "title": "Preserve Image",
+            "description": "Preserve the existing image when no replacement image is supplied",
+            "default": false
+          },
           "data": {
             "type": "string",
             "title": "Data",
