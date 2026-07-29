@@ -194,7 +194,18 @@ def synchronized(method: Callable[..., Any]) -> Callable[..., Any]:
             # enclosing synchronized method on this thread, and eviction must not run in
             # the middle of its operation.
             if not self._lock._is_owned():
-                self._reconcile_budget_if_pending()
+                try:
+                    self._reconcile_budget_if_pending()
+                except Exception:
+                    # The reconcile is deferrable housekeeping and must not fail the operation
+                    # that triggered it. It can raise from a sick CUDA context (empty_cache after
+                    # an eviction) — and this hook runs inside the caller's frame AFTER the
+                    # method body, so a raise out of lock_in_ram()/lock() here would propagate
+                    # before LoadedModel's unlock-pairing try block is entered, leaking a
+                    # permanently locked record (the same shape as a keep-alive Timer.start()
+                    # failure, handled in _record_activity). The pending flag is only cleared
+                    # once the budget is satisfied, so the next lock release retries.
+                    self._logger.exception("Error reconciling the shared RAM budget after a lock release")
 
     return wrapper
 

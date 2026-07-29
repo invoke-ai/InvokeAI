@@ -192,6 +192,37 @@ def test_keep_alive_timer_start_failure_does_not_leak_a_pin(mock_logger, monkeyp
         cache.shutdown()
 
 
+def test_reconcile_hook_failure_does_not_leak_a_pin(mock_logger, monkeypatch):
+    """The synchronized-decorator's post-release reconcile runs inside the caller's frame after the
+    method body — a raise there (e.g. TorchDevice.empty_cache on a sick CUDA context) escapes
+    lock_in_ram() after the lock count was incremented, before model_in_ram()'s unlock-pairing try
+    block. It must be swallowed and logged; the pending flag persists so the next release retries."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger, keep_ram_copy=False)
+    try:
+        cache.put("lora", DummyModule())
+        record = cache.get("lora")
+        loaded_model = LoadedModelWithoutConfig(cache_record=record, cache=cache)
+
+        def raising_reconcile(blocking=True):
+            raise RuntimeError("CUDA error: device-side assert triggered")
+
+        monkeypatch.setattr(cache, "_reconcile_budget_if_pending", raising_reconcile)
+
+        with loaded_model.model_in_ram():
+            assert record.is_locked
+
+        assert not record.is_locked  # the unlock paired with the lock; nothing leaked
+        # PrefixedLoggerAdapter forwards exception() through Logger.log at ERROR level.
+        assert any(
+            call.args[0] == logging.ERROR and "reconciling" in call.args[1] for call in mock_logger.log.call_args_list
+        )
+    finally:
+        monkeypatch.undo()
+        cache.shutdown()
+
+
 def test_global_budget_evicts_lru_in_single_cache(mock_logger):
     # Budget fits one model but not two -> putting the second evicts the first.
     store = SharedCpuWeightsStore()
