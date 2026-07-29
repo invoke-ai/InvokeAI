@@ -1,6 +1,6 @@
 import type { WildcardImportEntry, WildcardImportResolution } from '@features/generation/core/wildcardTransfer';
 import type { WildcardCatalog } from '@features/generation/ui/useWildcards';
-import type { WildcardExportFormat } from '@features/generation/ui/wildcardFiles';
+import type { WildcardExportFormat, WildcardFileSource } from '@features/generation/ui/wildcardFiles';
 import type { ChangeEvent } from 'react';
 
 import { HStack, Menu, Portal } from '@chakra-ui/react';
@@ -86,11 +86,11 @@ export const WildcardTransferActions = ({ catalog }: { catalog: WildcardCatalog 
   );
 
   const startImport = useCallback(
-    async (files: readonly File[]) => {
+    async (files: readonly File[], source: WildcardFileSource) => {
       setIsBusy(true);
 
       try {
-        const entries = planWildcardImport(await readWildcardFiles(files), catalog.wildcards);
+        const entries = planWildcardImport(await readWildcardFiles(files, source), catalog.wildcards);
 
         // Nothing to decide and nothing to explain — the file pick was the
         // confirmation, so a dialog with only an Import button would be a click
@@ -132,7 +132,7 @@ export const WildcardTransferActions = ({ catalog }: { catalog: WildcardCatalog 
       const files = [...(event.currentTarget.files ?? [])];
 
       if (files.length > 0) {
-        void startImport(files);
+        void startImport(files, 'files');
       }
 
       event.currentTarget.value = '';
@@ -153,7 +153,7 @@ export const WildcardTransferActions = ({ catalog }: { catalog: WildcardCatalog 
         return;
       }
 
-      void startImport(files);
+      void startImport(files, 'folder');
     },
     [notifications, startImport, t]
   );

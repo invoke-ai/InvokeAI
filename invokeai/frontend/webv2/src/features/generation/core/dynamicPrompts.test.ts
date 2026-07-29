@@ -6,6 +6,7 @@ import {
   hasDynamicPromptSyntax,
   matchesKnownWildcard,
   normalizeWildcardValues,
+  scanWildcardReferences,
   sanitizeDynamicPromptsConfig,
   sanitizeMaxPrompts,
 } from './dynamicPrompts';
@@ -23,6 +24,7 @@ describe('hasDynamicPromptSyntax', () => {
     expect(hasDynamicPromptSyntax('a __artists/*__ ball')).toBe(true);
     expect(hasDynamicPromptSyntax('a __~colors__ ball')).toBe(true);
     expect(hasDynamicPromptSyntax('a __outfit(mood=warm)__ ball')).toBe(true);
+    expect(hasDynamicPromptSyntax('a __colou?__ __animals/[dc]ogs__ ball')).toBe(true);
   });
 
   // A comment is only stripped by going through the expander, and upstream has
@@ -38,6 +40,29 @@ describe('hasDynamicPromptSyntax', () => {
     // Not a reference: a name may not start or end with an underscore, so this
     // cannot round-trip through the `__` delimiters.
     expect(hasDynamicPromptSyntax('snake__case word')).toBe(false);
+  });
+});
+
+describe('scanWildcardReferences', () => {
+  it('returns the full range and lookup path for sampler overrides and parameters', () => {
+    const prompt = 'a __~outfit(mood=warm)__ beside __animals/[dc]ogs__';
+
+    expect(scanWildcardReferences(prompt)).toEqual([
+      {
+        lookupPath: 'outfit',
+        range: { end: 24, start: 2 },
+      },
+      {
+        lookupPath: 'animals/[dc]ogs',
+        range: { end: 51, start: 32 },
+      },
+    ]);
+  });
+
+  it('does not mistake delimiters inside an ordinary word for a reference', () => {
+    expect(scanWildcardReferences('snake__case and __valid__')).toEqual([
+      { lookupPath: 'valid', range: { end: 25, start: 16 } },
+    ]);
   });
 });
 
@@ -119,6 +144,21 @@ describe('matchesKnownWildcard', () => {
     expect(matchesKnownWildcard('*', CATALOG)).toBe(true);
     expect(matchesKnownWildcard('nope/*', CATALOG)).toBe(false);
     expect(matchesKnownWildcard('colours/*', new Set(['colours']))).toBe(false);
+  });
+
+  it('supports question marks, classes, ranges, and negated classes', () => {
+    expect(matchesKnownWildcard('colour?', new Set(['colours']))).toBe(true);
+    expect(matchesKnownWildcard('animals/[dc]ogs', CATALOG)).toBe(true);
+    expect(matchesKnownWildcard('animals/[a-z]ogs', CATALOG)).toBe(true);
+    expect(matchesKnownWildcard('animals/[!c]ogs', CATALOG)).toBe(true);
+    expect(matchesKnownWildcard('animals/[!d]ogs', CATALOG)).toBe(false);
+  });
+
+  it('treats an unclosed or invalid class like Python fnmatch', () => {
+    expect(matchesKnownWildcard('[abc', new Set(['[abc']))).toBe(true);
+    expect(matchesKnownWildcard('[abc', new Set(['a']))).toBe(false);
+    expect(matchesKnownWildcard('[z-a]', new Set(['z', '-', 'a']))).toBe(false);
+    expect(matchesKnownWildcard('[!z-a]', new Set(['q']))).toBe(true);
   });
 
   it('anchors both ends, so the two cannot share characters', () => {

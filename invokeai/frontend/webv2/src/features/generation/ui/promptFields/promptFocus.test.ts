@@ -80,8 +80,15 @@ describe('getActiveTriggerQuery', () => {
     expect(query('a __col\nmore')).toBeNull();
   });
 
-  it('gives up once the query is longer than a name would be', () => {
-    expect(query(`a __${'x'.repeat(60)}`)).toBeNull();
+  it('keeps every valid wildcard-name character in range and closes over the limit', () => {
+    const maximum = 'x'.repeat(128);
+
+    expect(query(`a __${maximum}`)).toEqual({
+      key: '_',
+      query: maximum,
+      range: { end: 132, start: 2 },
+    });
+    expect(query(`a __${maximum}x`)).toBeNull();
   });
 
   it('honours the keys the field answers to', () => {

@@ -1,3 +1,4 @@
+import { scanWildcardReferences } from '@features/generation/core/dynamicPrompts';
 import { describe, expect, it } from 'vitest';
 
 import { scanDynamicPromptSyntax } from './dynamicPromptSyntax';
@@ -84,12 +85,25 @@ describe('scanDynamicPromptSyntax', () => {
   // Regression: globs, sampler overrides and parameters are all valid, and all
   // read as ordinary text — or worse, as errors — before this.
   it('annotates the looser reference forms the backend accepts', () => {
-    expect(annotate('__artists/*__ __~colours__ __@colours__ __outfit(mood=warm)__')).toEqual([
+    expect(
+      annotate('__artists/*__ __artist?__ __animals/[dc]ogs__ __~colours__ __@colours__ __outfit(mood=warm)__')
+    ).toEqual([
       ['wildcard', '__artists/*__'],
+      ['wildcard', '__artist?__'],
+      ['wildcard', '__animals/[dc]ogs__'],
       ['wildcard', '__~colours__'],
       ['wildcard', '__@colours__'],
       ['wildcard', '__outfit(mood=warm)__'],
     ]);
+  });
+
+  it('highlights exactly the references returned by the shared scanner', () => {
+    const prompt = '__artist?__ snake__case __~outfit(mood=warm)__ __animals/[!c]ogs__';
+    const highlighted = scanDynamicPromptSyntax(prompt)
+      .filter(({ kind }) => kind === 'wildcard')
+      .map(({ range }) => range);
+
+    expect(highlighted).toEqual(scanWildcardReferences(prompt).map(({ range }) => range));
   });
 
   it('flags a reference no known wildcard answers to', () => {

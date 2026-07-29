@@ -1,3 +1,5 @@
+import { MAX_WILDCARD_NAME_LENGTH } from '@features/generation/core/dynamicPrompts';
+
 let positivePromptElement: HTMLTextAreaElement | null = null;
 
 export type PromptTextRange = { end: number; start: number };
@@ -91,7 +93,7 @@ export interface PromptTriggerQuery {
  * Past this the user is writing prose, not naming a wildcard, and an
  * autocomplete still hanging around is in the way.
  */
-const MAX_TRIGGER_QUERY_LENGTH = 48;
+const MAX_TRIGGER_QUERY_LENGTH = MAX_WILDCARD_NAME_LENGTH + 2;
 
 /**
  * The unfinished trigger the caret is sitting inside, or `null`.
@@ -139,7 +141,9 @@ export const getActiveTriggerQuery = (
 
       // `__colours__` with the caret after it: the scan reached the *opening*
       // pair, and the closing one is sitting in the query.
-      return query.includes('__') ? null : { key: '_', query, range: { end: caret, start: index - 1 } };
+      return query.includes('__') || query.length > MAX_WILDCARD_NAME_LENGTH
+        ? null
+        : { key: '_', query, range: { end: caret, start: index - 1 } };
     }
   }
 

@@ -38,80 +38,207 @@ export interface DynamicPromptsConfig {
 const WILDCARD_NAME_SEGMENT = '[A-Za-z0-9](?:[A-Za-z0-9_-]*[A-Za-z0-9])?';
 const WILDCARD_NAME_SOURCE = `${WILDCARD_NAME_SEGMENT}(?:/${WILDCARD_NAME_SEGMENT})*`;
 
-/**
- * A referenced path, which is looser than a storable name: `*` may stand
- * anywhere in it, and it may cross `/` while doing so. `__animals/*__`,
- * `__colour*__` and a bare `__*__` are all things the backend resolves.
- */
-const WILDCARD_PATH_SEGMENT = '[A-Za-z0-9*](?:[A-Za-z0-9_*-]*[A-Za-z0-9*])?';
-const WILDCARD_PATH_SOURCE = `${WILDCARD_PATH_SEGMENT}(?:/${WILDCARD_PATH_SEGMENT})*`;
-
-/**
- * `__name__`, the reference form for a wildcard. Shared with the syntax scanner
- * so highlighting and expansion agree on what counts as a wildcard.
- *
- * Three optional parts ride along, all of which the backend accepts and none of
- * which is part of the name being looked up:
- *
- * - a sampler override, `__~name__` (random) or `__@name__` (cyclical);
- * - a glob, `__artists/*__`, resolving to every matching wildcard at once;
- * - parameters, `__name(mood=warm)__`, binding `${mood}` inside the values.
- *
- * Capture group 1 is the path alone — the part to look up.
- */
-export const WILDCARD_REFERENCE_RE = new RegExp(`__[~@]?(${WILDCARD_PATH_SOURCE})(?:\\([^()]*\\))?__`);
-
 /** The same rule anchored, for validating a name the user is typing. */
 export const WILDCARD_NAME_RE = new RegExp(`^${WILDCARD_NAME_SOURCE}$`);
 
-/**
- * Whether `name` matches a glob, given the literal runs between its `*`s.
- *
- * Deliberately not a regex. Translating `a*b*c` to `^a.*b.*c$` reads well but
- * makes adjacent stars into `.*.*`, which backtracks exponentially: a dozen of
- * them against one catalog name took a minute to fail. The path comes straight
- * out of whatever the user is typing, so that is a frozen tab, not a slow test.
- *
- * The greedy scan below is the standard `*`-only matcher and is linear in
- * practice: anchor the first run to the start and the last to the end, then take
- * each middle run at its earliest remaining occurrence. Earliest is always safe
- * when the only wildcard is "any run of anything" — consuming less can never
- * turn a match into a miss.
- */
-const matchesGlobLiterals = (literals: readonly string[], name: string): boolean => {
-  const first = literals[0] ?? '';
-  const last = literals[literals.length - 1] ?? '';
+export interface WildcardReference {
+  /** The path sent to the wildcard manager, without sampler or parameters. */
+  lookupPath: string;
+  /** Full `__…__` span in the authored prompt. */
+  range: { end: number; start: number };
+}
 
-  if (literals.length === 1) {
-    return name === first;
+const WILDCARD_GLOB_CHARACTER_RE = /[*?[]/;
+const WILDCARD_REFERENCE_PATH_RE = /^[A-Za-z0-9_/*?[\]!-]+$/;
+const isWildcardBoundaryCharacter = (character: string | undefined): boolean =>
+  character !== undefined && /[A-Za-z0-9_]/.test(character);
+
+const getWildcardLookupPath = (content: string): string | null => {
+  const withoutSampler = content[0] === '~' || content[0] === '@' ? content.slice(1) : content;
+  const parametersStart = withoutSampler.indexOf('(');
+  let lookupPath = withoutSampler;
+
+  if (parametersStart >= 0) {
+    if (
+      !withoutSampler.endsWith(')') ||
+      withoutSampler.slice(parametersStart + 1, -1).includes('(') ||
+      withoutSampler.slice(parametersStart + 1, -1).includes(')')
+    ) {
+      return null;
+    }
+
+    lookupPath = withoutSampler.slice(0, parametersStart);
+  } else if (withoutSampler.includes(')')) {
+    return null;
   }
 
-  // Checked before the middle runs so the two anchors cannot overlap and count
-  // the same characters twice: `ab*ba` needs four characters, not three.
-  if (name.length < first.length + last.length || !name.startsWith(first) || !name.endsWith(last)) {
-    return false;
+  if (!lookupPath || !WILDCARD_REFERENCE_PATH_RE.test(lookupPath)) {
+    return null;
   }
 
-  const end = name.length - last.length;
-  let index = first.length;
+  return WILDCARD_GLOB_CHARACTER_RE.test(lookupPath) || WILDCARD_NAME_RE.test(lookupPath) ? lookupPath : null;
+};
 
-  for (let position = 1; position < literals.length - 1; position++) {
-    const literal = literals[position];
+/** Scans every backend-compatible wildcard reference without regex state or backtracking. */
+export const scanWildcardReferences = (prompt: string): WildcardReference[] => {
+  const references: WildcardReference[] = [];
+  let index = 0;
 
-    if (literal === undefined || literal.length === 0) {
+  while (index < prompt.length - 1) {
+    if (prompt[index] !== '_' || prompt[index + 1] !== '_' || isWildcardBoundaryCharacter(prompt[index - 1])) {
+      index++;
       continue;
     }
 
-    const found = name.indexOf(literal, index);
+    const closing = prompt.indexOf('__', index + 2);
 
-    if (found < 0 || found + literal.length > end) {
-      return false;
+    if (closing < 0) {
+      break;
     }
 
-    index = found + literal.length;
+    const lookupPath = getWildcardLookupPath(prompt.slice(index + 2, closing));
+
+    if (lookupPath) {
+      references.push({ lookupPath, range: { end: closing + 2, start: index } });
+      index = closing + 2;
+    } else {
+      index += 2;
+    }
   }
 
-  return true;
+  return references;
+};
+
+type GlobToken =
+  | { kind: 'any' }
+  | { kind: 'star' }
+  | { kind: 'literal'; value: string }
+  | {
+      invalid: boolean;
+      kind: 'class';
+      literals: Set<string>;
+      negated: boolean;
+      ranges: { end: string; start: string }[];
+    };
+
+const parseGlobClass = (pattern: string, start: number): { end: number; token: GlobToken } | null => {
+  let cursor = start + 1;
+  const negated = pattern[cursor] === '!';
+
+  if (negated) {
+    cursor++;
+  }
+  if (pattern[cursor] === ']') {
+    cursor++;
+  }
+
+  const closing = pattern.indexOf(']', cursor);
+
+  if (closing < 0) {
+    return null;
+  }
+
+  const contentStart = start + 1 + (negated ? 1 : 0);
+  const content = pattern.slice(contentStart, closing);
+  const literals = new Set<string>();
+  const ranges: { end: string; start: string }[] = [];
+  let invalid = false;
+
+  for (let index = 0; index < content.length; index++) {
+    const character = content[index]!;
+    const rangeEnd = content[index + 2];
+
+    if (content[index + 1] === '-' && rangeEnd !== undefined) {
+      if (character > rangeEnd) {
+        invalid = true;
+      } else {
+        ranges.push({ end: rangeEnd, start: character });
+      }
+      index += 2;
+    } else {
+      literals.add(character);
+    }
+  }
+
+  return {
+    end: closing + 1,
+    token: { invalid, kind: 'class', literals, negated, ranges },
+  };
+};
+
+const tokenizeGlob = (pattern: string): GlobToken[] => {
+  const tokens: GlobToken[] = [];
+  let index = 0;
+
+  while (index < pattern.length) {
+    const character = pattern[index]!;
+
+    if (character === '*') {
+      if (tokens.at(-1)?.kind !== 'star') {
+        tokens.push({ kind: 'star' });
+      }
+      index++;
+    } else if (character === '?') {
+      tokens.push({ kind: 'any' });
+      index++;
+    } else if (character === '[') {
+      const parsed = parseGlobClass(pattern, index);
+
+      if (parsed) {
+        tokens.push(parsed.token);
+        index = parsed.end;
+      } else {
+        tokens.push({ kind: 'literal', value: character });
+        index++;
+      }
+    } else {
+      tokens.push({ kind: 'literal', value: character });
+      index++;
+    }
+  }
+
+  return tokens;
+};
+
+const globTokenMatches = (token: Exclude<GlobToken, { kind: 'star' }>, character: string): boolean => {
+  if (token.kind === 'any') {
+    return true;
+  }
+  if (token.kind === 'literal') {
+    return token.value === character;
+  }
+
+  const inClass =
+    !token.invalid &&
+    (token.literals.has(character) || token.ranges.some((range) => character >= range.start && character <= range.end));
+
+  return token.negated ? !inClass : inClass;
+};
+
+/** Bounded O(pattern × name) matcher mirroring Python `fnmatchcase`. */
+const matchesGlob = (pattern: string, name: string): boolean => {
+  let reachable = Array.from({ length: name.length + 1 }, (_, index) => index === 0);
+
+  for (const token of tokenizeGlob(pattern)) {
+    const next = Array.from({ length: name.length + 1 }, () => false);
+
+    if (token.kind === 'star') {
+      let canReach = false;
+
+      for (let index = 0; index <= name.length; index++) {
+        canReach ||= reachable[index] === true;
+        next[index] = canReach;
+      }
+    } else {
+      for (let index = 0; index < name.length; index++) {
+        next[index + 1] = reachable[index] === true && globTokenMatches(token, name[index]!);
+      }
+    }
+
+    reachable = next;
+  }
+
+  return reachable[name.length] === true;
 };
 
 /**
@@ -127,14 +254,12 @@ const matchesGlobLiterals = (literals: readonly string[], name: string): boolean
  * goes to the model as text.
  */
 export const matchesKnownWildcard = (path: string, knownNames: ReadonlySet<string>): boolean => {
-  if (!path.includes('*')) {
+  if (!WILDCARD_GLOB_CHARACTER_RE.test(path)) {
     return knownNames.has(path);
   }
 
-  const literals = path.split('*');
-
   for (const name of knownNames) {
-    if (matchesGlobLiterals(literals, name)) {
+    if (matchesGlob(path, name)) {
       return true;
     }
   }
@@ -228,7 +353,7 @@ export const getWildcardNameError = (
  * which is a worse surprise than the round trip.
  */
 export const hasDynamicPromptSyntax = (prompt: string): boolean =>
-  /\{[\s\S]*\}/.test(prompt) || prompt.includes('#') || WILDCARD_REFERENCE_RE.test(prompt);
+  /\{[\s\S]*\}/.test(prompt) || prompt.includes('#') || scanWildcardReferences(prompt).length > 0;
 
 export const isDynamicPromptsSeedBehaviour = (value: unknown): value is DynamicPromptsSeedBehaviour =>
   value === 'per-iteration' || value === 'per-image';

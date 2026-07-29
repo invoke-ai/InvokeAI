@@ -40,7 +40,7 @@
  * embedding parser untouched.
  */
 
-import { matchesKnownWildcard, WILDCARD_REFERENCE_RE } from '@features/generation/core/dynamicPrompts';
+import { matchesKnownWildcard, scanWildcardReferences } from '@features/generation/core/dynamicPrompts';
 
 import type { PromptRange } from './ast';
 
@@ -238,20 +238,19 @@ export const scanDynamicPromptSyntax = (
     annotations[openBrace.annotationIndex].kind = 'error';
   }
 
-  const wildcardPattern = new RegExp(WILDCARD_REFERENCE_RE, 'g');
   // Concatenated once. Built inside the loop, this allocated a fresh array of
   // every variable and comment in the prompt for every wildcard reference in it.
   const enclosingRanges = [...variableRanges, ...commentRanges];
 
-  for (let match = wildcardPattern.exec(prompt); match; match = wildcardPattern.exec(prompt)) {
-    const wildcardRange = { end: match.index + match[0].length, start: match.index };
+  for (const reference of scanWildcardReferences(prompt)) {
+    const wildcardRange = reference.range;
 
     if (!enclosingRanges.some((outer) => covers(outer, wildcardRange))) {
       // An unresolvable wildcard survives expansion as its own literal text, so it earns the
       // same treatment as an unbalanced brace rather than looking like ordinary recognised
       // syntax. `matchesKnownWildcard` resolves globs, which is why a valid `__artists/*__`
       // is no longer flagged for the sin of not being a name.
-      const isUnknown = knownWildcards !== undefined && !matchesKnownWildcard(match[1], knownWildcards);
+      const isUnknown = knownWildcards !== undefined && !matchesKnownWildcard(reference.lookupPath, knownWildcards);
 
       annotations.push({ kind: isUnknown ? 'error' : 'wildcard', range: wildcardRange });
     }

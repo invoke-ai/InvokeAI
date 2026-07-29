@@ -53,9 +53,19 @@ export const WILDCARD_IMPORT_ACCEPT = [
   'application/json',
 ].join(',');
 
-/** Directory picking supplies a relative path; a plain pick only has a name. */
-const getFilePath = (file: File): string =>
-  (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
+export type WildcardFileSource = 'files' | 'folder';
+
+/** Folder picks shed the selected root while direct picks retain their file names. */
+const getFilePath = (file: File, source: WildcardFileSource): string => {
+  if (source === 'files') {
+    return file.name;
+  }
+
+  const relativePath = (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
+  const firstSeparator = relativePath.indexOf('/');
+
+  return firstSeparator < 0 ? relativePath : relativePath.slice(firstSeparator + 1);
+};
 
 const hasExtension = (path: string, ...extensions: string[]): boolean =>
   extensions.some((extension) => path.toLowerCase().endsWith(extension));
@@ -111,14 +121,17 @@ const isTextWildcardFile = (path: string): boolean => {
  * whole import over one of them would make folder picking useless.
  */
 export const isSupportedWildcardFile = (file: File): boolean => {
-  const path = getFilePath(file);
+  const path = (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
 
   return (
     WILDCARD_COLLECTION_FORMATS.some((format) => hasExtension(path, ...format.extensions)) || isTextWildcardFile(path)
   );
 };
 
-export const readWildcardFiles = async (files: readonly File[]): Promise<ParsedWildcard[]> => {
+export const readWildcardFiles = async (
+  files: readonly File[],
+  source: WildcardFileSource
+): Promise<ParsedWildcard[]> => {
   const parsed: ParsedWildcard[] = [];
 
   const collect = (wildcards: readonly ParsedWildcard[], fileName: string): void => {
@@ -134,7 +147,7 @@ export const readWildcardFiles = async (files: readonly File[]): Promise<ParsedW
   };
 
   for (const file of files) {
-    const path = getFilePath(file);
+    const path = getFilePath(file, source);
 
     if (file.size > MAX_IMPORT_FILE_BYTES) {
       throw new WildcardFileError(file.name);
