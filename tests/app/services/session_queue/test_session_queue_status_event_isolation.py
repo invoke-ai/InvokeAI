@@ -7,14 +7,12 @@ so unredacted fields would let owner A learn user B's identifiers.
 """
 
 import uuid
-from typing import Optional
 
 import pytest
 
 from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
 from invokeai.app.services.events.events_common import QueueItemStatusChangedEvent
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem
 from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
 from tests.test_nodes import PromptTestInvocation, TestEventService
@@ -141,6 +139,25 @@ def test_event_redacts_other_users_current_item_identifiers(
     assert a_event.queue_status.canceled == 1
 
 
+def test_get_queue_status_does_not_load_full_current_session(
+    session_queue: SqliteSessionQueue, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    item_id = _insert_queue_item(session_queue, user_id="user-a")
+    in_progress = session_queue.dequeue()
+    assert in_progress is not None and in_progress.item_id == item_id
+
+    def fail_get_current(queue_id: str):
+        raise AssertionError(f"Unexpected full current-item load for queue {queue_id}")
+
+    monkeypatch.setattr(session_queue, "get_current", fail_get_current)
+
+    status = session_queue.get_queue_status("default")
+
+    assert status.item_id == item_id
+    assert status.session_id == in_progress.session_id
+    assert status.batch_id == in_progress.batch_id
+
+
 def test_event_preserves_owner_current_item_identifiers(
     session_queue: SqliteSessionQueue, mock_invoker: Invoker
 ) -> None:
@@ -168,20 +185,11 @@ def test_event_preserves_owner_current_item_identifiers(
     assert a_event.queue_status.completed == 1
 
 
-def test_event_redacts_when_current_item_disappears_between_reads(
+def test_event_redaction_uses_same_lightweight_snapshot(
     session_queue: SqliteSessionQueue,
     mock_invoker: Invoker,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Regression: _set_queue_item_status reads get_current twice — once via
-    get_queue_status (which embeds the in-progress item's identifiers into the
-    SessionQueueStatus) and once again to decide whether to redact those
-    identifiers. The two reads are not atomic. If user B is the in-progress
-    item when the first read happens, and B then completes/cancels before the
-    second read, the redaction guard sees current_item is None and skips
-    scrubbing — leaving B's item_id, session_id, and batch_id in the event
-    sent to user A. The fix must make the redaction decision derive from the
-    same snapshot that supplied the embedded identifiers."""
+    """The status query must use one lightweight snapshot for identifiers and redaction."""
     user_a = "user-a"
     user_b = "user-b"
 
@@ -192,33 +200,11 @@ def test_event_redacts_when_current_item_disappears_between_reads(
     assert in_progress is not None and in_progress.item_id == b_item_id
     assert in_progress.user_id == user_b
 
-    real_get_current = session_queue.get_current
-    b_snapshot = real_get_current(queue_id="default")
-    assert b_snapshot is not None and b_snapshot.user_id == user_b
-
-    # Simulate the race: the read inside get_queue_status sees B's in-progress
-    # item; the redaction read returns None as if B finished in between.
-    call_count = {"n": 0}
-
-    def racey_get_current(queue_id: str) -> Optional[SessionQueueItem]:
-        call_count["n"] += 1
-        if call_count["n"] == 1:
-            return b_snapshot
-        return None
-
-    monkeypatch.setattr(session_queue, "get_current", racey_get_current)
-
     event_bus: TestEventService = mock_invoker.services.events
     event_bus.events.clear()
 
     canceled = session_queue.cancel_queue_item(a_item_id)
     assert canceled.user_id == user_a
-    # The patched read must have been consulted at least once. The pre-fix
-    # implementation made two reads (embedding + redaction) and leaked when
-    # the second returned None; the fixed implementation makes a single read
-    # whose snapshot drives both embedding and redaction. Either way, the
-    # invariant below is the one that matters.
-    assert call_count["n"] >= 1
 
     a_event = _last_status_event_for_item(event_bus, a_item_id)
     assert a_event.user_id == user_a
