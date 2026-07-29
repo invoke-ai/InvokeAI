@@ -9,6 +9,7 @@ import gc
 import logging
 import threading
 import time
+import weakref
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -777,7 +778,9 @@ def test_deferred_worker_start_failure_leaves_admission_unchanged_and_can_retry(
 
     def fail_first_worker_start(thread: threading.Thread) -> None:
         nonlocal failed_once
-        if thread is cache._deferred_work_thread and not failed_once:
+        # Identify the worker by name: _ensure_deferred_worker only publishes the thread to
+        # cache._deferred_work_thread once start() has succeeded, so identity is unusable here.
+        if thread.name == "model-cache-deferred-work" and not failed_once:
             failed_once = True
             raise RuntimeError("forced thread start failure")
         real_thread_start(thread)
@@ -790,10 +793,11 @@ def test_deferred_worker_start_failure_leaves_admission_unchanged_and_can_retry(
         assert cache._cached_models == {}
         assert store.refcount("model") == 0
         assert budget.total_in_use() == 0
+        assert cache._deferred_work_thread is None
 
         cache.put("model", DummyModule())
         assert "model" in cache._cached_models
-        assert cache._deferred_work_thread.is_alive()
+        assert cache._deferred_work_thread is not None and cache._deferred_work_thread.is_alive()
     finally:
         cache.shutdown()
 
@@ -811,12 +815,13 @@ def test_shutdown_stops_deferred_worker(mock_logger):
 
 
 @pytest.mark.parametrize("finalizer_order", ["before_cache_release", "after_cache_release"])
-def test_grace_release_thread_start_failure_does_not_starve_reconcile(mock_logger, monkeypatch, finalizer_order):
-    """A failed grace-release thread start must not lose the finalizer's one-shot release.
+def test_grace_release_from_finalizer_never_blocks_and_still_reconciles(mock_logger, finalizer_order):
+    """The finalizer's one-shot release must neither block nor be lost.
 
     Exercise both relevant orders: the finalizer runs while another cache operation owns the
     lock, or after that operation has released the lock and checked for pending reconciliation.
-    Neither order gets another cache operation to rescue a lost wakeup.
+    Neither order gets another cache operation to rescue a lost wakeup, so the deferred worker
+    is the only thing that can carry the release through.
     """
     store = SharedCpuWeightsStore()
     budget = RamBudget(max_bytes=int(S * 1.4), shared_store=store)
@@ -849,16 +854,6 @@ def test_grace_release_thread_start_failure_does_not_starve_reconcile(mock_logge
 
         holder.start()
         assert holding.wait(timeout=10)
-
-        real_thread_start = threading.Thread.start
-
-        def fail_deferred_thread_start(thread: threading.Thread) -> None:
-            if thread is finalizer:
-                real_thread_start(thread)
-                return
-            raise RuntimeError("forced thread start failure")
-
-        monkeypatch.setattr(threading.Thread, "start", fail_deferred_thread_start)
 
         if finalizer_order == "before_cache_release":
             finalizer.start()
@@ -1040,9 +1035,10 @@ def test_cached_model_keys_returns_without_waiting_for_reconcile_work(mock_logge
 
 
 @pytest.mark.parametrize("request_order", ["before_lookup", "while_lookup_holds_lock"])
-def test_cached_model_keys_thread_start_failure_does_not_starve_reconcile(mock_logger, monkeypatch, request_order):
-    """A failed deferred-reconcile thread start must preserve cached_model_keys()' nonblocking
-    contract without leaving an idle cache permanently over budget.
+def test_cached_model_keys_never_blocks_and_still_reconciles(mock_logger, request_order):
+    """cached_model_keys() must preserve its nonblocking contract without leaving an idle cache
+    permanently over budget: the reconcile it observes at release time is handed to the deferred
+    worker rather than run inline or dropped.
 
     Exercise a request already pending at lookup entry and one racing with the lookup while its
     manually managed lock is held.
@@ -1071,20 +1067,11 @@ def test_cached_model_keys_thread_start_failure_does_not_starve_reconcile(mock_l
         except BaseException as error:
             errors.append(error)
 
-    real_thread_start = threading.Thread.start
-
-    def fail_deferred_thread_start(thread: threading.Thread) -> None:
-        if thread is lookup_thread:
-            real_thread_start(thread)
-            return
-        raise RuntimeError("forced thread start failure")
-
     lookup_thread = threading.Thread(target=lookup)
     try:
         cache_b.put("victim", DummyModule())
         _use_and_release(cache_b, "victim")
         budget.add_non_shared(S)
-        monkeypatch.setattr(threading.Thread, "start", fail_deferred_thread_start)
 
         if request_order == "before_lookup":
             cache_b._budget_reconcile_pending.set()
@@ -1111,3 +1098,146 @@ def test_cached_model_keys_thread_start_failure_does_not_starve_reconcile(mock_l
         if lookup_thread.ident is not None:
             lookup_thread.join(timeout=10)
         cache_b.shutdown()
+
+
+def test_deferred_worker_does_not_pin_the_record_it_just_released(mock_logger):
+    """The worker must drop its reference to a processed CacheRecord before blocking again.
+
+    Releasing the grace lets the synchronized release hook evict the record: it leaves
+    _cached_models AND its bytes are subtracted from the RamBudget. If the worker's frame still
+    referenced it while parked in queue.get(), the budget would report RAM it had not actually
+    freed, and the model would stay resident until some unrelated item was queued behind it.
+    """
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=int(S * 1.4), shared_store=store)
+    cache_a = _make_cache(store, budget, mock_logger)
+    cache_b = _make_cache(store, budget, mock_logger)
+    try:
+        cache_a.put("abandoned", DummyModule())
+        record = cache_a.get("abandoned")
+        module_ref = weakref.ref(record.cached_model.model)
+        record_ref = weakref.ref(record)
+
+        # Push the shared budget over its cap so the release hook actually evicts the record.
+        cache_b.put("peer", DummyModule())
+        assert cache_a._budget_reconcile_pending.is_set()
+
+        cache_a.release_first_use_grace(record)
+        del record
+
+        assert _wait_until(lambda: "abandoned" not in cache_a._cached_models)
+        assert budget.total_in_use() == S
+
+        # The budget now says those bytes are gone; they must really be gone. No further queue
+        # traffic is generated here — that is the point.
+        assert _wait_until(lambda: (gc.collect(), record_ref() is None)[1]), "worker pinned the CacheRecord"
+        assert module_ref() is None, "evicted model is still resident in RAM"
+    finally:
+        cache_a.shutdown()
+        cache_b.shutdown()
+
+
+def test_deferred_worker_is_revived_after_an_unexpected_death(mock_logger):
+    """A worker lost to an unexpected error must not silently disable deferred work forever.
+
+    Thread objects cannot be restarted and Thread.ident is never cleared, so a liveness check —
+    not a "was it ever started" check — is what keeps a later put() able to recover.
+    """
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=int(S * 1.4), shared_store=store)
+    cache_a = _make_cache(store, budget, mock_logger)
+    cache_b = _make_cache(store, budget, mock_logger)
+    try:
+        cache_a.put("first", DummyModule())
+        first_worker = cache_a._deferred_work_thread
+        assert first_worker is not None and first_worker.is_alive()
+
+        # Kill the worker the way a raising log handler would: the sentinel makes it return.
+        cache_a._deferred_work_queue.put(model_cache_module._DEFERRED_STOP)
+        first_worker.join(timeout=10)
+        assert not first_worker.is_alive()
+        assert first_worker.ident is not None  # so an `ident is None` guard would never recover
+
+        # A dead worker must not be handed work that nothing will ever drain.
+        cache_a._dispatch_deferred(model_cache_module._DEFERRED_RECONCILE)
+        assert cache_a._deferred_work_queue.qsize() == 0
+
+        # The next admission revives it, and deferred work flows again.
+        _use_and_release(cache_a, "first")
+        cache_a.put("second", DummyModule())
+        revived = cache_a._deferred_work_thread
+        assert revived is not None and revived is not first_worker and revived.is_alive()
+
+        record = cache_a.get("second")
+        cache_b.put("peer", DummyModule())
+        cache_a.release_first_use_grace(record)
+        del record
+        assert _wait_until(lambda: "second" not in cache_a._cached_models), "revived worker did no work"
+    finally:
+        cache_a.shutdown()
+        cache_b.shutdown()
+
+
+def test_deferred_dispatch_is_dropped_when_no_worker_is_running(mock_logger):
+    """Only the worker drains the queue, so dispatching without one would grow it without bound.
+
+    cached_model_keys() runs on every dequeue, so an idle-device cache that never admitted a model
+    (and therefore has no worker and nothing to evict) would otherwise accumulate one queued
+    reconcile per dequeue for the life of the process.
+    """
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=int(S * 1.4), shared_store=store)
+    idle_cache = _make_cache(store, budget, mock_logger)
+    busy_cache = _make_cache(store, budget, mock_logger)
+    try:
+        # Peer RAM keeps the shared budget exceeded, so the request cannot retire itself.
+        busy_cache.put("peer", DummyModule())
+        _use_and_release(busy_cache, "peer")
+        budget.add_non_shared(S)
+        idle_cache._budget_reconcile_pending.set()
+        assert budget.available() < 0
+        assert idle_cache._deferred_work_thread is None
+
+        for _ in range(200):
+            assert idle_cache.cached_model_keys() == set()
+        assert idle_cache._deferred_work_queue.qsize() == 0
+
+        # After shutdown the same must hold for a cache that *does* have a (now stopped) worker.
+        busy_cache.shutdown()
+        busy_cache._deferred_work_thread.join(timeout=10)
+        depth = busy_cache._deferred_work_queue.qsize()
+        for _ in range(200):
+            busy_cache.cached_model_keys()
+        assert busy_cache._deferred_work_queue.qsize() == depth
+    finally:
+        idle_cache.shutdown()
+        busy_cache.shutdown()
+
+
+def test_post_shutdown_activity_does_not_arm_a_keep_alive_timer(mock_logger):
+    """shutdown() is idempotent, so nothing after it may arm a timer a later shutdown won't cancel."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=int(S * 4), shared_store=store)
+    cache = ModelCache(
+        execution_device_working_mem_gb=1.0,
+        enable_partial_loading=False,
+        keep_ram_copy_of_weights=True,
+        execution_device="cpu",
+        storage_device="cpu",
+        logger=mock_logger,
+        shared_cpu_weights=store,
+        ram_budget=budget,
+        keep_alive_minutes=60,
+    )
+    try:
+        cache.put("model", DummyModule())
+        assert cache._timeout_timer is not None
+
+        cache.shutdown()
+        assert cache._timeout_timer is None
+
+        cache.put("after", DummyModule())
+        assert cache._timeout_timer is None, "a shut-down cache re-armed its keep-alive timer"
+    finally:
+        if cache._timeout_timer is not None:
+            cache._timeout_timer.cancel()
