@@ -6,6 +6,7 @@ import { getFocusedRegion } from 'common/hooks/focus';
 import { getItemIndex } from 'features/gallery/components/getItemIndex';
 import { GalleryImage } from 'features/gallery/components/ImageGrid/GalleryImage';
 import { GallerySelectionCountTag } from 'features/gallery/components/ImageGrid/GallerySelectionCountTag';
+import { GalleryVideoItem } from 'features/gallery/components/ImageGrid/GalleryVideoItem';
 import { useGalleryImageNames } from 'features/gallery/components/use-gallery-image-names';
 import { useGalleryStarImageHotkey } from 'features/gallery/hooks/useGalleryStarImageHotkey';
 import type { selectGetImageNamesQueryArgs } from 'features/gallery/store/gallerySelectors';
@@ -16,6 +17,7 @@ import {
   selectSelection,
 } from 'features/gallery/store/gallerySelectors';
 import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
+import { isVideoName } from 'features/gallery/store/types';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { VIEWER_PANEL_ID } from 'features/ui/layouts/shared';
@@ -24,6 +26,7 @@ import type { CSSProperties, MutableRefObject, ReactNode, RefObject } from 'reac
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { imagesApi, useGetImageDTOsByNamesMutation } from 'services/api/endpoints/images';
+import { videosApi } from 'services/api/endpoints/videos';
 import type { ImageDTO } from 'services/api/types';
 import { useThrottledCallback } from 'use-debounce';
 
@@ -289,7 +292,10 @@ const useMasonryImagePrefetching = (
       return;
     }
 
-    const cachedImageNames = imagesApi.util.selectCachedArgsForQuery(store.getState(), 'getImageDTO');
+    const cachedImageNames = [
+      ...imagesApi.util.selectCachedArgsForQuery(store.getState(), 'getImageDTO'),
+      ...imageNames.filter(isVideoName),
+    ];
     const imageNamesToFetch = getMasonryPrefetchImageNames({
       cachedImageNames,
       batchSize: MASONRY_PREFETCH_BATCH_SIZE,
@@ -469,7 +475,10 @@ const useMasonryImageWarmup = (
         return;
       }
 
-      const cachedImageNames = imagesApi.util.selectCachedArgsForQuery(store.getState(), 'getImageDTO');
+      const cachedImageNames = [
+        ...imagesApi.util.selectCachedArgsForQuery(store.getState(), 'getImageDTO'),
+        ...imageNames.filter(isVideoName),
+      ];
       const imageNamesToFetch = getMasonryWarmupImageNames({
         batchSize: MASONRY_WARMUP_BATCH_SIZE,
         cachedImageNames,
@@ -583,22 +592,30 @@ type MasonryImageAtPositionProps = {
 };
 
 const MasonryImageAtPosition = memo(({ data: imageName, context }: MasonryImageAtPositionProps) => {
-  const { currentData: imageDTO, isUninitialized } = imagesApi.endpoints.getImageDTO.useQueryState(imageName);
-  imagesApi.endpoints.getImageDTO.useQuerySubscription(imageName, { skip: isUninitialized });
+  const isVideo = isVideoName(imageName);
+  const imageState = imagesApi.endpoints.getImageDTO.useQueryState(isVideo ? '' : imageName);
+  imagesApi.endpoints.getImageDTO.useQuerySubscription(isVideo ? '' : imageName, {
+    skip: isVideo || imageState.isUninitialized,
+  });
+  const videoState = videosApi.endpoints.getVideoDTO.useQueryState(isVideo ? imageName : '');
+  videosApi.endpoints.getVideoDTO.useQuerySubscription(isVideo ? imageName : '', { skip: !isVideo });
+  const imageDTO = imageState.currentData;
+  const videoDTO = videoState.currentData;
+  const itemDTO = isVideo ? videoDTO : imageDTO;
 
   useLayoutEffect(() => {
-    if (imageDTO) {
+    if (itemDTO) {
       context.notifyItemLayoutChanged();
     }
-  }, [context, imageDTO]);
+  }, [context, itemDTO]);
 
   useEffect(() => {
-    if (!imageDTO) {
+    if (!isVideo && !imageDTO) {
       context.registerMissingImageName(imageName);
     }
-  }, [context, imageDTO, imageName]);
+  }, [context, imageDTO, imageName, isVideo]);
 
-  if (!imageDTO) {
+  if (!itemDTO) {
     return (
       <Box p={`${MASONRY_ITEM_PADDING_PX}px`}>
         <MasonryImagePlaceholder imageName={imageName} />
@@ -608,7 +625,11 @@ const MasonryImageAtPosition = memo(({ data: imageName, context }: MasonryImageA
 
   return (
     <Box p={`${MASONRY_ITEM_PADDING_PX}px`}>
-      <GalleryImage imageDTO={imageDTO} layout="masonry" />
+      {isVideo && videoDTO ? (
+        <GalleryVideoItem videoDTO={videoDTO} layout="masonry" />
+      ) : imageDTO ? (
+        <GalleryImage imageDTO={imageDTO} layout="masonry" />
+      ) : null}
     </Box>
   );
 });
@@ -626,9 +647,11 @@ const StaticMasonryImageGrid = memo(({ columnCount, context, imageNames }: Stati
     () => (state: RootState) => {
       const dimensions = new Map<string, StaticMasonryImageDimensions>();
       for (const imageName of imageNames) {
-        const imageDTO = imagesApi.endpoints.getImageDTO.select(imageName)(state).data;
-        if (imageDTO) {
-          dimensions.set(imageName, { height: imageDTO.height, width: imageDTO.width });
+        const itemDTO = isVideoName(imageName)
+          ? videosApi.endpoints.getVideoDTO.select(imageName)(state).data
+          : imagesApi.endpoints.getImageDTO.select(imageName)(state).data;
+        if (itemDTO) {
+          dimensions.set(imageName, { height: itemDTO.height, width: itemDTO.width });
         }
       }
       return dimensions;

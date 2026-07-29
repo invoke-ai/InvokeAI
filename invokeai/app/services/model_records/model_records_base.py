@@ -26,6 +26,7 @@ from invokeai.backend.model_manager.taxonomy import (
     ClipVariantType,
     Flux2VariantType,
     FluxVariantType,
+    Krea2VariantType,
     ModelFormat,
     ModelSourceType,
     ModelType,
@@ -33,6 +34,8 @@ from invokeai.backend.model_manager.taxonomy import (
     Qwen3VariantType,
     QwenImageVariantType,
     SchedulerPredictionType,
+    WanLoRAVariantType,
+    WanVariantType,
     ZImageVariantType,
 )
 
@@ -134,7 +137,10 @@ class ModelRecordChanges(BaseModelExcludeNull):
         | Flux2VariantType
         | ZImageVariantType
         | QwenImageVariantType
+        | WanVariantType
+        | WanLoRAVariantType
         | Qwen3VariantType
+        | Krea2VariantType
     ] = Field(description="The variant of the model.", default=None)
     prediction_type: Optional[SchedulerPredictionType] = Field(
         description="The prediction type of the model.", default=None
