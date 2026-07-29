@@ -12,16 +12,18 @@ transformer blocks) in its lower-resolution attention blocks, so
 single transformer block (index 0) per attention.
 
 kohya `sd-scripts` emits two block-naming conventions and both must be covered:
-Stability-AI names (`lora_unet_input_blocks_8_1_...`, `middle_block_1`,
-`output_blocks_0_1`) and diffusers names (`lora_unet_down_blocks_2_attentions_1_...`,
-`mid_block_attentions_0`). `convert_sdxl_keys_to_diffusers_format()` accepts both.
+diffusers names (`lora_unet_down_blocks_2_attentions_1_...`, `mid_block_attentions_0`)
+and Stability-AI names (`lora_unet_input_blocks_8_1_...`, `middle_block_1`,
+`output_blocks_0_1`). `convert_sdxl_keys_to_diffusers_format()` accepts both.
 
 The heuristic is deliberately anchored on the `lora_unet_` prefix: that is exactly the
 key set the SDXL loader can convert. Keys outside it (diffusers/PEFT `unet.…`) must NOT
 be identified as SDXL — see `test_diffusers_peft_format_not_matched`.
 
-Real-world example: https://civitai.com/models/1105685 ("Dramatic Lighting
-Slider"), a Kohya-format LoRA whose 840 keys are all `lora_unet_..._attn1_...`.
+The reported LoRA is https://civitai.com/models/1105685 ("Dramatic Lighting Slider").
+`_DRAMATIC_LIGHTING_SLIDER_BLOCKS` below is its real block layout, read off the actual
+file: 840 keys, all `lora_unet_`-prefixed with diffusers block names, all `attn1`, no
+`attn2`, no `lora_te*`, no metadata.
 """
 
 from pathlib import Path
@@ -59,6 +61,25 @@ _REQUIRED_FIELDS = {
 _SDXL_DEEP_BLOCKS_STABILITY = ("input_blocks_8_1", "middle_block_1", "output_blocks_0_1")
 _SDXL_DEEP_BLOCKS_DIFFUSERS = ("down_blocks_2_attentions_1", "mid_block_attentions_0", "up_blocks_0_attentions_2")
 
+# The complete block layout of the real "Dramatic Lighting Slider" LoRA
+# (https://civitai.com/models/1105685), read off the actual .safetensors file: 840 keys, all
+# `lora_unet_`-prefixed, all `attn1`, no `attn2`, no `lora_te*`, no metadata. Each entry is
+# (block name, number of transformer blocks). Note the shallow `*_blocks_1_*` groups stop at
+# index 1 — on their own they would be indistinguishable from SD1/SD2.
+_DRAMATIC_LIGHTING_SLIDER_BLOCKS = (
+    ("down_blocks_1_attentions_0", 2),
+    ("down_blocks_1_attentions_1", 2),
+    ("down_blocks_2_attentions_0", 10),
+    ("down_blocks_2_attentions_1", 10),
+    ("mid_block_attentions_0", 10),
+    ("up_blocks_0_attentions_0", 10),
+    ("up_blocks_0_attentions_1", 10),
+    ("up_blocks_0_attentions_2", 10),
+    ("up_blocks_1_attentions_0", 2),
+    ("up_blocks_1_attentions_1", 2),
+    ("up_blocks_1_attentions_2", 2),
+)
+
 
 def _self_attention_only_keys(groups: tuple[str, ...], transformer_blocks: int = 10) -> dict[str | int, None]:
     """Build a minimal UNet self-attention-only (slider) state dict.
@@ -66,15 +87,25 @@ def _self_attention_only_keys(groups: tuple[str, ...], transformer_blocks: int =
     Mirrors the real "Dramatic Lighting Slider" LoRA: only `attn1` keys, no `attn2` and no
     `lora_te*`. Values are unused by the key-only heuristics under test.
     """
+    return _keys_for_blocks(tuple((group, transformer_blocks) for group in groups))
+
+
+def _keys_for_blocks(blocks: tuple[tuple[str, int], ...]) -> dict[str | int, None]:
+    """Build a self-attention-only state dict from (block name, transformer block count) pairs."""
     sd: dict[str | int, None] = {}
-    for tb in range(transformer_blocks):
-        for group in groups:
+    for group, transformer_blocks in blocks:
+        for tb in range(transformer_blocks):
             for proj in ("to_q", "to_k", "to_v", "to_out_0"):
                 base = f"lora_unet_{group}_transformer_blocks_{tb}_attn1_{proj}"
                 sd[f"{base}.lora_down.weight"] = None
                 sd[f"{base}.lora_up.weight"] = None
                 sd[f"{base}.alpha"] = None
     return sd
+
+
+def _dramatic_lighting_slider_keys() -> dict[str | int, None]:
+    """The real reported LoRA's key set, reproduced from its actual block layout."""
+    return _keys_for_blocks(_DRAMATIC_LIGHTING_SLIDER_BLOCKS)
 
 
 def _sdxl_stability_slider_keys() -> dict[str | int, None]:
@@ -98,8 +129,14 @@ def _diffusers_peft_keys() -> dict[str | int, None]:
 class TestSdxlUnetLoraDetection:
     """Unit tests for the key-only structural heuristic."""
 
+    def test_reported_lora_key_set(self):
+        # The exact block layout of the reported LoRA (#7709). It reaches transformer block 9
+        # in down_blocks_2 / mid_block / up_blocks_0, so the heuristic fires even though its
+        # down_blocks_1 / up_blocks_1 groups stop at index 1.
+        assert _state_dict_looks_like_sdxl_unet_lora(_dramatic_lighting_slider_keys()) is True
+
     def test_stability_named_slider(self):
-        # kohya sd-scripts' Stability-AI block naming — what the reported LoRA uses.
+        # kohya sd-scripts also emits Stability-AI block names; those must work too.
         assert _state_dict_looks_like_sdxl_unet_lora(_sdxl_stability_slider_keys()) is True
 
     def test_diffusers_named_slider(self):
@@ -120,7 +157,9 @@ class TestSdxlUnetLoraDetection:
         assert _state_dict_looks_like_sdxl_unet_lora({key: None}) is True
 
     @pytest.mark.parametrize(
-        "state_dict_factory", [_sdxl_stability_slider_keys, _sdxl_diffusers_slider_keys], ids=["stability", "diffusers"]
+        "state_dict_factory",
+        [_dramatic_lighting_slider_keys, _sdxl_stability_slider_keys, _sdxl_diffusers_slider_keys],
+        ids=["reported-lora", "stability", "diffusers"],
     )
     def test_matched_keys_are_convertible_by_the_loader(self, state_dict_factory):
         # The heuristic must only claim key sets the SDXL loader can actually convert,
@@ -189,7 +228,9 @@ class TestSdxlSliderLoraLyCORISIdentification:
         return mod
 
     @pytest.mark.parametrize(
-        "state_dict_factory", [_sdxl_stability_slider_keys, _sdxl_diffusers_slider_keys], ids=["stability", "diffusers"]
+        "state_dict_factory",
+        [_dramatic_lighting_slider_keys, _sdxl_stability_slider_keys, _sdxl_diffusers_slider_keys],
+        ids=["reported-lora", "stability", "diffusers"],
     )
     @patch("invokeai.backend.model_manager.configs.lora._get_flux_lora_format", return_value=None)
     @patch("invokeai.backend.model_manager.configs.lora.has_cosmos_dit_peft_keys", return_value=False)
