@@ -1,5 +1,5 @@
 from contextlib import ExitStack
-from typing import Callable, Iterator, Optional, Tuple, Union
+from typing import Callable, Iterator, Optional, Union
 
 import einops
 import numpy as np
@@ -58,7 +58,7 @@ from invokeai.backend.flux.sampling_utils import (
 from invokeai.backend.flux.schedulers import FLUX_SCHEDULER_LABELS, FLUX_SCHEDULER_MAP, FLUX_SCHEDULER_NAME_VALUES
 from invokeai.backend.flux.text_conditioning import FluxReduxConditioning, FluxTextConditioning
 from invokeai.backend.model_manager.taxonomy import BaseModelType, FluxVariantType, ModelFormat, ModelType
-from invokeai.backend.patches.layer_patcher import LayerPatcher
+from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
@@ -998,7 +998,7 @@ class FluxDenoiseInvocation(BaseInvocation):
 
         return pos_ip_adapter_extensions, neg_ip_adapter_extensions
 
-    def _lora_iterator(self, context: InvocationContext) -> Iterator[Tuple[ModelPatchRaw, float]]:
+    def _lora_iterator(self, context: InvocationContext) -> Iterator[PatchSpec]:
         loras: list[Union[LoRAField, ControlLoRAField]] = [*self.transformer.loras]
         if self.control_lora:
             # Note: Since FLUX structural control LoRAs modify the shape of some weights, it is important that they are
@@ -1007,8 +1007,7 @@ class FluxDenoiseInvocation(BaseInvocation):
         for lora in loras:
             lora_info = context.models.load(lora.lora)
             assert isinstance(lora_info.model, ModelPatchRaw)
-            yield (lora_info.model, lora.weight)
-            del lora_info
+            yield (lora_info.model, lora.weight, lora_info.model_in_ram())
 
     def _build_step_callback(self, context: InvocationContext) -> Callable[[PipelineIntermediateState], None]:
         def step_callback(state: PipelineIntermediateState) -> None:

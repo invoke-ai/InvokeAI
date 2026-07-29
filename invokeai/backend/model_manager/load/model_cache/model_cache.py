@@ -841,6 +841,13 @@ class ModelCache:
 
     @synchronized
     @record_activity
+    def lock_in_ram(self, cache_entry: CacheRecord) -> None:
+        """Pin a cache entry in RAM without moving it to its execution device."""
+        cache_entry.lock()
+        cache_entry.awaiting_first_use = False
+
+    @synchronized
+    @record_activity
     def lock(self, cache_entry: CacheRecord, working_mem_bytes: Optional[int]) -> None:
         """Lock a model for use and move it into VRAM."""
         if cache_entry.key not in self._cached_models:

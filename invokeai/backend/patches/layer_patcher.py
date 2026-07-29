@@ -1,5 +1,5 @@
 import re
-from contextlib import contextmanager
+from contextlib import AbstractContextManager, ExitStack, contextmanager
 from typing import Dict, Iterable, Optional, Tuple
 
 import torch
@@ -13,6 +13,10 @@ from invokeai.backend.util import InvokeAILogger
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.original_weights_storage import OriginalWeightsStorage
 
+# The optional third item pins the patch's model-cache record without moving the whole patch to VRAM.
+# Two-item specs remain valid for patches that do not come from the model cache.
+PatchSpec = Tuple[ModelPatchRaw, float] | Tuple[ModelPatchRaw, float, AbstractContextManager[object]]
+
 
 class LayerPatcher:
     @staticmethod
@@ -20,7 +24,7 @@ class LayerPatcher:
     @contextmanager
     def apply_smart_model_patches(
         model: torch.nn.Module,
-        patches: Iterable[Tuple[ModelPatchRaw, float]],
+        patches: Iterable[PatchSpec],
         prefix: str,
         dtype: torch.dtype,
         cached_weights: Optional[Dict[str, torch.Tensor]] = None,
@@ -36,6 +40,7 @@ class LayerPatcher:
         original_weights = OriginalWeightsStorage(cached_weights)
         # original_modules are stored for unpatching layers that are wrapped.
         original_modules: dict[str, torch.nn.Module] = {}
+        cache_pins = ExitStack()
         try:
             # Materialize the patch iterable BEFORE acquiring the read lock. Callers pass a lazy
             # generator (e.g. flux_text_encoder._t5_lora_iterator) that constructs each LoRA via
@@ -46,7 +51,13 @@ class LayerPatcher:
             # iterator here lets every LoRA load take (and release) the write lock first, then we
             # take the read lock once for patch application only. This is also compatible with
             # callers that hand us a fresh iterator per call (see wan_denoise.LoRAIteratorFactory).
-            patches = list(patches)
+            # Enter optional model-cache pins before patching and retain them through restoration.
+            materialized_patches: list[PatchSpec] = []
+            for patch_spec in patches:
+                if len(patch_spec) == 3:
+                    cache_pins.enter_context(patch_spec[2])
+                materialized_patches.append(patch_spec)
+            patches = materialized_patches
             # Patching can register new parameters (FLUX Control LoRA shape expansion routes
             # through nn.Module.register_parameter via setattr). Model construction on another
             # worker thread monkey-patches register_parameter process-wide (accelerate's
@@ -55,7 +66,8 @@ class LayerPatcher:
             # patching on different devices may overlap; only construction is exclusive. The lock
             # is released before the yield — patched inference must not block model loads.
             with MODEL_LOAD_LOCK.read_lock():
-                for patch, patch_weight in patches:
+                for patch_spec in patches:
+                    patch, patch_weight = patch_spec[:2]
                     LayerPatcher.apply_smart_model_patch(
                         model=model,
                         prefix=prefix,
@@ -71,15 +83,18 @@ class LayerPatcher:
 
             yield
         finally:
-            # Restore directly patched layers.
-            for param_key, weight in original_weights.get_changed_weights():
-                cur_param = model.get_parameter(param_key)
-                cur_param.data = weight.to(dtype=cur_param.dtype, device=cur_param.device, copy=True)
+            try:
+                # Restore directly patched layers.
+                for param_key, weight in original_weights.get_changed_weights():
+                    cur_param = model.get_parameter(param_key)
+                    cur_param.data = weight.to(dtype=cur_param.dtype, device=cur_param.device, copy=True)
 
-            # Clear patches from all patched modules.
-            # Note: This logic assumes no nested modules in original_modules.
-            for orig_module in original_modules.values():
-                orig_module.clear_patches()
+                # Clear patches from all patched modules.
+                # Note: This logic assumes no nested modules in original_modules.
+                for orig_module in original_modules.values():
+                    orig_module.clear_patches()
+            finally:
+                cache_pins.close()
 
     @staticmethod
     @torch.no_grad()

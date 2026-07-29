@@ -1,3 +1,6 @@
+import gc
+import weakref
+
 import pytest
 import torch
 
@@ -41,6 +44,38 @@ class DummyModuleWithNestedLayer(torch.nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.block(self.top_layer(x))
+
+
+def test_apply_smart_model_patches_retains_patch_cache_handle_for_context_lifetime():
+    """A loaded-model handle must pin each patch's cache record until patch use is complete."""
+
+    class CacheHandle:
+        is_entered = False
+
+        def __enter__(self):
+            self.is_entered = True
+            return self
+
+        def __exit__(self, *args):
+            self.is_entered = False
+            return None
+
+    handle_ref: weakref.ReferenceType[CacheHandle] | None = None
+
+    def patch_specs():
+        nonlocal handle_ref
+        handle = CacheHandle()
+        handle_ref = weakref.ref(handle)
+        yield (ModelPatchRaw({}), 0.0, handle)
+        assert handle.is_entered
+
+    model = DummyModuleWithOneLayer(1, 1, device="cpu", dtype=torch.float32)
+    with LayerPatcher.apply_smart_model_patches(model=model, patches=patch_specs(), prefix="", dtype=torch.float32):
+        gc.collect()
+        assert handle_ref is not None and handle_ref() is not None
+
+    gc.collect()
+    assert handle_ref is not None and handle_ref() is None
 
 
 @torch.no_grad()

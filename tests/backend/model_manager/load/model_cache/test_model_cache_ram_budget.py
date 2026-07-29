@@ -109,6 +109,29 @@ def test_non_shared_model_counts_per_device(mock_logger):
         cache_b.shutdown()
 
 
+def test_model_in_ram_pins_warm_non_shared_model_against_peer_eviction(mock_logger):
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger, keep_ram_copy=False)
+    try:
+        cache.put("lora", DummyModule())
+        record = _use_and_release(cache, "lora")
+        loaded_model = LoadedModelWithoutConfig(cache_record=record, cache=cache)
+        charged_bytes = budget.total_in_use()
+
+        with loaded_model.model_in_ram():
+            assert record.is_locked
+            assert cache.evict_unlocked_for_peer(lambda: False) == 0
+            assert "lora" in cache._cached_models
+            assert budget.total_in_use() == charged_bytes
+
+        assert not record.is_locked
+        assert cache.evict_unlocked_for_peer(lambda: False) == 1
+        assert budget.total_in_use() == 0
+    finally:
+        cache.shutdown()
+
+
 def test_global_budget_evicts_lru_in_single_cache(mock_logger):
     # Budget fits one model but not two -> putting the second evicts the first.
     store = SharedCpuWeightsStore()

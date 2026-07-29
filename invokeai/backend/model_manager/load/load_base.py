@@ -109,6 +109,17 @@ class LoadedModelWithoutConfig:
         """Return the model without locking it."""
         return self._cache_record.cached_model.model
 
+    @contextmanager
+    def model_in_ram(self) -> Generator[AnyModel, None, None]:
+        """Pin the model's cache record in RAM without moving the model to its execution device."""
+        self._cache.lock_in_ram(self._cache_record)
+        if self._first_use_finalizer is not None:
+            self._first_use_finalizer.detach()
+        try:
+            yield self.model
+        finally:
+            self._cache.unlock(self._cache_record)
+
     @property
     def compute_device(self) -> torch.device:
         """Return the model's intended compute device.
