@@ -1,6 +1,6 @@
 import { useWildcards, WildcardWriteError } from '@features/generation/ui/useWildcards';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, useEffect } from 'react';
+import { act, createRef, type Ref, useImperativeHandle } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -18,17 +18,13 @@ vi.mock('@features/generation/data/wildcards', () => ({
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
-let catalog: ReturnType<typeof useWildcards> | null = null;
+const catalogRef = createRef<ReturnType<typeof useWildcards>>();
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const Probe = () => {
+const Probe = ({ ref }: { ref: Ref<ReturnType<typeof useWildcards>> }) => {
   const value = useWildcards();
 
-  // Assigned in an effect rather than during render: reassigning an outer
-  // binding while rendering is a side effect, and the compiler says so.
-  useEffect(() => {
-    catalog = value;
-  }, [value]);
+  useImperativeHandle(ref, () => value, [value]);
 
   return null;
 };
@@ -42,7 +38,7 @@ beforeEach(async () => {
   await act(() => {
     root?.render(
       <QueryClientProvider client={new QueryClient()}>
-        <Probe />
+        <Probe ref={catalogRef} />
       </QueryClientProvider>
     );
   });
@@ -53,7 +49,6 @@ afterEach(async () => {
   host?.remove();
   host = null;
   root = null;
-  catalog = null;
 });
 
 describe('applyWrites', () => {
@@ -69,7 +64,7 @@ describe('applyWrites', () => {
   // times over.
   it('invalidates once for the whole run, not once per write', async () => {
     await act(async () => {
-      await catalog!.applyWrites(WRITES);
+      await catalogRef.current!.applyWrites(WRITES);
     });
 
     expect(createWildcard).toHaveBeenCalledTimes(2);
@@ -81,7 +76,7 @@ describe('applyWrites', () => {
     let done = 0;
 
     await act(async () => {
-      done = await catalog!.applyWrites(WRITES);
+      done = await catalogRef.current!.applyWrites(WRITES);
     });
 
     expect(done).toBe(3);
@@ -96,7 +91,7 @@ describe('applyWrites', () => {
     let caught: unknown;
 
     await act(async () => {
-      caught = await catalog!.applyWrites(WRITES).catch((error: unknown) => error);
+      caught = await catalogRef.current!.applyWrites(WRITES).catch((error: unknown) => error);
     });
 
     expect(caught).toBeInstanceOf(WildcardWriteError);
@@ -109,7 +104,7 @@ describe('applyWrites', () => {
     createWildcard.mockImplementationOnce(() => Promise.reject(new Error('nope')));
 
     await act(async () => {
-      await catalog!.applyWrites(WRITES).catch(() => undefined);
+      await catalogRef.current!.applyWrites(WRITES).catch(() => undefined);
     });
 
     expect(invalidateWildcardDependents).not.toHaveBeenCalled();

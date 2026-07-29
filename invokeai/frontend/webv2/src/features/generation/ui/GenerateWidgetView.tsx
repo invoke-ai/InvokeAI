@@ -1,59 +1,14 @@
 import type { GenerationModelCatalogItem as ModelConfig } from '@features/generation/contracts';
-import type { PromptTemplateSnapshot } from '@features/generation/core/promptTemplates';
-import type {
-  GenerateModelConfig,
-  GenerateSettings,
-  GenerateWidgetValues,
-  LoraModelConfig,
-} from '@features/generation/core/types';
+import type { GenerateModelConfig, GenerateSettings, LoraModelConfig } from '@features/generation/core/types';
 
-import {
-  getAutoFlux2ComponentSourceModel,
-  getDefaultGenerateSettings,
-  isSupportedGenerateModel,
-} from '@features/generation/core/baseGenerationPolicies';
-import { syncPromptTemplateWithCatalog } from '@features/generation/core/promptTemplates';
-import {
-  isLoraModelConfig,
-  normalizeGenerateSettings,
-  normalizeGenerateWidgetValues,
-  syncGenerateWidgetValuesWithModels,
-} from '@features/generation/core/settings';
-import { usePromptTemplates } from '@features/generation/ui/usePromptTemplates';
-import { useMountEffect } from '@platform/react/useMountEffect';
-import { useCallback, useEffect, useMemo } from 'react';
+import { getDefaultGenerateSettings, isSupportedGenerateModel } from '@features/generation/core/baseGenerationPolicies';
+import { isLoraModelConfig, normalizeGenerateSettings } from '@features/generation/core/settings';
+import { resolveGenerateWidgetValues } from '@features/generation/settings';
+import { useCallback, useMemo } from 'react';
 
 import { getGenerateFormCommitPatch } from './generateFormViewModel';
 import { GenerateSettingsForm } from './GenerateSettingsForm';
 import { useGenerationUi } from './GenerationUiContext';
-
-const getSettingsWithAutoComponentSource = (
-  nextSettings: GenerateSettings,
-  model: GenerateModelConfig,
-  models: readonly ModelConfig[]
-): GenerateSettings => {
-  const componentSourceModel = getAutoFlux2ComponentSourceModel(model, nextSettings, models);
-
-  if (componentSourceModel === undefined || componentSourceModel?.key === nextSettings.componentSourceModel?.key) {
-    return nextSettings;
-  }
-
-  return { ...nextSettings, componentSourceModel };
-};
-
-/**
- * Returns the same object when the stored template still matches the catalog, so
- * the identity short-circuit below keeps holding and an unchanged catalog cannot
- * drive a commit loop.
- */
-const getValuesWithSyncedPromptTemplate = (
-  values: GenerateWidgetValues,
-  promptTemplates: readonly PromptTemplateSnapshot[]
-): GenerateWidgetValues => {
-  const promptTemplate = syncPromptTemplateWithCatalog(values.promptTemplate, promptTemplates);
-
-  return promptTemplate === values.promptTemplate ? values : { ...values, promptTemplate };
-};
 
 export const GenerateWidgetView = () => {
   const ui = useGenerationUi();
@@ -63,58 +18,15 @@ export const GenerateWidgetView = () => {
   const models = ui.models.catalog;
   const status = ui.models.status;
 
-  useMountEffect(() => {
-    ui.models.ensureLoaded();
-  });
-
   const supportedModels = useMemo<GenerateModelConfig[]>(() => models.filter(isSupportedGenerateModel), [models]);
   const loraModels = useMemo(
     () => models.filter((model): model is ModelConfig & LoraModelConfig => isLoraModelConfig(model)),
     [models]
   );
-  const normalizedSettings = normalizeGenerateSettings(storedValues);
-  const selectedModel = supportedModels.find((model) => model.key === normalizedSettings?.modelKey);
-  const settings = normalizedSettings ?? getDefaultGenerateSettings(selectedModel ?? supportedModels[0]);
-  // The active template is stored as a snapshot, so an edit made in another tab
-  // or by another client only lands by re-reading it from the catalog here —
-  // the same treatment model snapshots get in `syncGenerateWidgetValuesWithModels`.
-  //
-  // Fetched only when there is something to re-read. Most projects have no
-  // template applied, and asking unconditionally put a request on the widget's
-  // critical path for an answer nothing would use. The picker asks in earnest
-  // and shares this cache when it does.
-  const { templates: promptTemplates } = usePromptTemplates({
-    isEnabled: (normalizedSettings?.promptTemplate ?? null) !== null,
-  });
-
-  useEffect(() => {
-    const model = selectedModel ?? supportedModels[0];
-
-    if (!model) {
-      return;
-    }
-
-    const storedWidgetValues = normalizeGenerateWidgetValues(storedValues);
-    const modelSyncedValues = storedWidgetValues
-      ? syncGenerateWidgetValuesWithModels(storedWidgetValues, models)
-      : null;
-    const syncedWidgetValues = modelSyncedValues
-      ? getValuesWithSyncedPromptTemplate(modelSyncedValues, promptTemplates)
-      : null;
-    const baseSettings = syncedWidgetValues ?? (selectedModel ? settings : getDefaultGenerateSettings(model));
-    const nextSettings = getSettingsWithAutoComponentSource(baseSettings, model, models);
-
-    if (
-      storedWidgetValues &&
-      storedWidgetValues.model.key === model.key &&
-      syncedWidgetValues === storedWidgetValues &&
-      nextSettings === baseSettings
-    ) {
-      return;
-    }
-
-    ui.settings.patchGenerateSettings(getGenerateFormCommitPatch({ ...nextSettings, model }), projectId, 'system');
-  }, [models, projectId, promptTemplates, selectedModel, settings, storedValues, supportedModels, ui]);
+  const resolved = useMemo(() => resolveGenerateWidgetValues({ models, storedValues }), [models, storedValues]);
+  const settings =
+    resolved?.values ?? normalizeGenerateSettings(storedValues) ?? getDefaultGenerateSettings(supportedModels[0]);
+  const selectedModel = resolved?.values.model;
 
   const commitSettings = useCallback(
     (nextSettings: GenerateSettings) => {
@@ -124,13 +36,14 @@ export const GenerateWidgetView = () => {
         return;
       }
 
-      ui.settings.patchGenerateSettings(
-        getGenerateFormCommitPatch({
-          ...getSettingsWithAutoComponentSource(nextSettings, model, models),
-          model,
-        }),
-        projectId
-      );
+      const next = resolveGenerateWidgetValues({
+        models,
+        storedValues: { ...nextSettings, model },
+      });
+
+      if (next) {
+        ui.settings.patchGenerateSettings(getGenerateFormCommitPatch(next.values), projectId);
+      }
     },
     [models, projectId, supportedModels, ui]
   );

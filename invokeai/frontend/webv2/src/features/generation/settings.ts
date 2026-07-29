@@ -49,6 +49,11 @@ export {
   SCHEDULER_OPTIONS,
   type GenerateModelSelectionResult,
 } from './core/baseGenerationPolicies';
+export {
+  resolveGenerateWidgetValues,
+  type ResolvedGenerateWidgetValues,
+  type ResolveGenerateWidgetValuesInput,
+} from './core/resolveGenerateWidgetValues';
 export { isVaeCompatibleWithGenerateModel } from './core/componentCompatibility';
 export { MIN_BATCH_COUNT, sanitizeBatchCount } from './core/batch';
 export {

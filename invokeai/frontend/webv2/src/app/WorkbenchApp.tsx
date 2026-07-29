@@ -12,6 +12,7 @@ import { WorkbenchSessionController } from '@workbench/WorkbenchSessionControlle
 import { WorkbenchWidgetRegistryProvider } from '@workbench/WorkbenchWidgetRegistryContext';
 import { useMemo } from 'react';
 
+import { GenerateWidgetSyncRuntime } from './GenerateWidgetSyncRuntime';
 import { QueueRuntimeAdapter } from './QueueRuntimeAdapter';
 import { WorkbenchUiPorts } from './workbenchPorts';
 
@@ -35,6 +36,7 @@ export const WorkbenchApp = () => {
   return (
     <WorkbenchProvider loadOptions={loadOptions}>
       <WorkbenchWidgetRegistryProvider getWidgetById={getWidgetById} getWidgetsForRegion={getWidgetsForRegion}>
+        <GenerateWidgetSyncRuntime />
         <WorkbenchUiPorts>
           <WorkbenchHotkeyRuntime />
           <WorkbenchCommandPalette />

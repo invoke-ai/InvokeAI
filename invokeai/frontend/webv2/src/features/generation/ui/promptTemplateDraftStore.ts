@@ -11,8 +11,9 @@
  * list rather than resurrecting an old handoff.
  */
 
+import { useMountEffect } from '@platform/react/useMountEffect';
 import { createExternalStore } from '@platform/state/externalStore';
-import { useEffect } from 'react';
+import { useEffectEvent } from 'react';
 
 export interface PendingPromptTemplateDraft {
   negativePrompt: string;
@@ -47,18 +48,18 @@ const takePendingPromptTemplateDraft = (): PendingPromptTemplateDraft | null => 
  * compiler rejects.
  */
 export const useOnPendingPromptTemplateDraft = (onDraft: (draft: PendingPromptTemplateDraft) => void): void => {
-  useEffect(() => {
-    const deliver = () => {
-      const draft = takePendingPromptTemplateDraft();
+  const deliver = useEffectEvent(() => {
+    const draft = takePendingPromptTemplateDraft();
 
-      if (draft) {
-        onDraft(draft);
-      }
-    };
+    if (draft) {
+      onDraft(draft);
+    }
+  });
 
-    // Resubscribing re-runs this, which is harmless: the draft is taken on the
-    // first delivery, so any later pass finds nothing.
+  /* eslint-disable react-hooks/rules-of-hooks -- useMountEffect is the repository's explicit useEffect wrapper */
+  useMountEffect(() => {
     deliver();
     return store.subscribe(deliver);
-  }, [onDraft]);
+  });
+  /* eslint-enable react-hooks/rules-of-hooks */
 };
