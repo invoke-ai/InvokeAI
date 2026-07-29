@@ -40,18 +40,28 @@ class RamBudget:
         self._max_bytes = max_bytes
         self._store = shared_store
         self._non_shared_bytes = 0
-        self._lock = threading.Lock()
+        self._unowned_non_shared_bytes = 0
+        self._lock = threading.RLock()
         # The per-device caches attached to this budget. A cache that has exhausted its own
         # evictable entries uses this to ask its peers to release RAM they are holding (see
         # ModelCache._make_room_internal). Weak references: the budget must not keep a
         # shut-down cache alive.
         self._caches: list[weakref.ReferenceType["ModelCache"]] = []
+        self._non_shared_bytes_by_cache: dict[weakref.ReferenceType["ModelCache"], int] = {}
+
+    def _find_cache_ref(self, cache: "ModelCache") -> Optional[weakref.ReferenceType["ModelCache"]]:
+        return next((ref for ref in self._caches if ref() is cache), None)
+
+    def _on_cache_collected(self, cache_ref: weakref.ReferenceType["ModelCache"]) -> None:
+        with self._lock:
+            self._non_shared_bytes = max(0, self._non_shared_bytes - self._non_shared_bytes_by_cache.pop(cache_ref, 0))
+            self._caches = [ref for ref in self._caches if ref is not cache_ref]
 
     def register_cache(self, cache: "ModelCache") -> None:
         """Register a per-device cache attached to this budget."""
         with self._lock:
-            self._caches = [ref for ref in self._caches if ref() is not None and ref() is not cache]
-            self._caches.append(weakref.ref(cache))
+            if self._find_cache_ref(cache) is None:
+                self._caches.append(weakref.ref(cache, self._on_cache_collected))
 
     def peer_caches(self, exclude: "ModelCache") -> list["ModelCache"]:
         """The other live caches attached to this budget."""
@@ -64,15 +74,40 @@ class RamBudget:
         """The global cap on actual model-cache RAM, in bytes."""
         return self._max_bytes
 
-    def add_non_shared(self, nbytes: int) -> None:
+    def add_non_shared(self, nbytes: int, cache: Optional["ModelCache"] = None) -> None:
         """Record `nbytes` of newly-resident non-deduplicated model RAM."""
         with self._lock:
             self._non_shared_bytes += nbytes
+            if cache is None:
+                self._unowned_non_shared_bytes += nbytes
+                return
 
-    def remove_non_shared(self, nbytes: int) -> None:
+            cache_ref = self._find_cache_ref(cache)
+            if cache_ref is None:
+                cache_ref = weakref.ref(cache, self._on_cache_collected)
+                self._caches.append(cache_ref)
+            self._non_shared_bytes_by_cache[cache_ref] = self._non_shared_bytes_by_cache.get(cache_ref, 0) + nbytes
+
+    def remove_non_shared(self, nbytes: int, cache: Optional["ModelCache"] = None) -> None:
         """Record the release of `nbytes` of non-deduplicated model RAM."""
         with self._lock:
-            self._non_shared_bytes = max(0, self._non_shared_bytes - nbytes)
+            if cache is None:
+                removed_bytes = min(nbytes, self._unowned_non_shared_bytes)
+                self._unowned_non_shared_bytes -= removed_bytes
+                self._non_shared_bytes -= removed_bytes
+                return
+
+            cache_ref = self._find_cache_ref(cache)
+            if cache_ref is None:
+                return
+            tracked_bytes = self._non_shared_bytes_by_cache.get(cache_ref, 0)
+            removed_bytes = min(nbytes, tracked_bytes)
+            self._non_shared_bytes = max(0, self._non_shared_bytes - removed_bytes)
+            remaining_bytes = tracked_bytes - removed_bytes
+            if remaining_bytes > 0:
+                self._non_shared_bytes_by_cache[cache_ref] = remaining_bytes
+            else:
+                self._non_shared_bytes_by_cache.pop(cache_ref, None)
 
     def total_in_use(self) -> int:
         """The true total RAM used by the model caches: shared weights (counted once) + non-shared."""

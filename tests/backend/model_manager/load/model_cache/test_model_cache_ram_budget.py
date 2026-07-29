@@ -1293,6 +1293,31 @@ def test_dropped_cache_is_collectable_and_its_worker_exits(mock_logger):
     assert _wait_until(lambda: worker_count() == before), "the worker thread outlived its cache"
 
 
+def test_dropped_non_shared_cache_releases_only_its_budget_charge(mock_logger):
+    """Collecting a cache must remove only its non-shared bytes from the surviving global budget."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=int(S * 8), shared_store=store)
+    cache_a = _make_cache(store, budget, mock_logger, keep_ram_copy=False)
+    cache_b = _make_cache(store, budget, mock_logger, keep_ram_copy=False)
+    cache_a.put("model-a", DummyModule())
+    cache_bytes = budget.total_in_use()
+    cache_b.put("model-b", DummyModule())
+    budget.add_non_shared(S)
+    assert budget.total_in_use() == cache_bytes * 2 + S
+
+    cache_a_ref = weakref.ref(cache_a)
+    del cache_a
+
+    assert _wait_until(lambda: (gc.collect(), cache_a_ref() is None)[1]), "the cache was not collected"
+    assert budget.total_in_use() == cache_bytes + S
+
+    cache_b_ref = weakref.ref(cache_b)
+    del cache_b
+
+    assert _wait_until(lambda: (gc.collect(), cache_b_ref() is None)[1]), "the cache was not collected"
+    assert budget.total_in_use() == S
+
+
 def test_admission_without_a_worker_gets_no_first_use_grace(mock_logger):
     """A record must never be shielded from eviction with nothing left able to unshield it.
 

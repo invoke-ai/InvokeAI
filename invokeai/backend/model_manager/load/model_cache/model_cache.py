@@ -615,7 +615,7 @@ class ModelCache:
         # SharedCpuWeightsStore; only non-deduplicated models are added to the budget's non-shared
         # total (a non-shared model resident on N devices correctly counts N times).
         if self._ram_budget is not None and not wrapped_model.uses_shared_weights:
-            self._ram_budget.add_non_shared(wrapped_model.total_bytes())
+            self._ram_budget.add_non_shared(wrapped_model.total_bytes(), cache=self)
         self._logger.debug(
             f"Added model {key} (Type: {model.__class__.__name__}, Wrap mode: {wrapped_model.__class__.__name__}, Model size: {size / MB:.2f}MB)"
         )
@@ -1540,7 +1540,7 @@ class ModelCache:
             # Drop the matching non-shared contribution from the global budget (shared weights are
             # released via the store above). Captured before release_shared_weights() flips the flag.
             if self._ram_budget is not None and not uses_shared:
-                self._ram_budget.remove_non_shared(total_bytes)
+                self._ram_budget.remove_non_shared(total_bytes, cache=self)
 
     @synchronized
     def drop_model(self, model_key: str) -> int:
