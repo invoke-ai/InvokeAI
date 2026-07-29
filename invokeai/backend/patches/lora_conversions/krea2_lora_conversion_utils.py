@@ -44,24 +44,42 @@ _NATIVE_KREA2_LEAF_RENAMES = {
     ".mlp.up.": ".ff.up.",
     ".mlp.down.": ".ff.down.",
 }
+_NATIVE_KREA2_TOP_LEVEL_RENAMES = {
+    "first": "img_in",
+    "tmlp.0": "time_embed.linear_1",
+    "tmlp.2": "time_embed.linear_2",
+    "tproj.1": "time_mod_proj",
+    "txtmlp.1": "txt_in.linear_1",
+    "txtmlp.3": "txt_in.linear_2",
+    "last.linear": "final_layer.linear",
+}
 # The main transformer's top-level `blocks.` (preceded by start-of-string or a dot) becomes
 # `transformer_blocks.`. The text-fusion sub-blocks (`layerwise_blocks`/`refiner_blocks`) are NOT touched
 # because their `blocks` is preceded by `_`, not by a dot.
 _NATIVE_KREA2_BLOCKS_RE = re.compile(r"(^|\.)blocks\.")
 
 
+def _replace_module_path(key: str, native: str, diffusers: str) -> str:
+    return re.sub(rf"(^|\.){re.escape(native)}\.", rf"\1{diffusers}.", key)
+
+
+def _looks_like_native_krea2_key(key: str) -> bool:
+    if "txtfusion" in key:
+        return True
+    native_module_names = (*_NATIVE_KREA2_LEAF_RENAMES, *_NATIVE_KREA2_TOP_LEVEL_RENAMES)
+    return any(_replace_module_path(key, native.strip("."), "__native__") != key for native in native_module_names)
+
+
 def _looks_like_native_krea2_lora(str_keys: list[str]) -> bool:
     """True if the keys use the native (ComfyUI) Krea-2 naming rather than the diffusers PEFT naming."""
-    has_txtfusion = any("txtfusion" in k for k in str_keys)
-    # Native gated attention (`attn.wq` + `attn.gate`) uniquely identifies the ComfyUI Krea-2 layout even for
-    # a transformer-only LoRA without the text-fusion stage.
-    has_native_attn = any(".attn.wq." in k for k in str_keys) and any(".attn.gate." in k for k in str_keys)
-    return has_txtfusion or has_native_attn
+    return any(_looks_like_native_krea2_key(key) for key in str_keys)
 
 
 def _native_krea2_key_to_diffusers(key: str) -> str:
     key = key.replace("txtfusion.", "text_fusion.")
     key = _NATIVE_KREA2_BLOCKS_RE.sub(r"\1transformer_blocks.", key)
+    for native, diffusers in _NATIVE_KREA2_TOP_LEVEL_RENAMES.items():
+        key = _replace_module_path(key, native, diffusers)
     for native, diffusers in _NATIVE_KREA2_LEAF_RENAMES.items():
         key = key.replace(native, diffusers)
     return key
@@ -74,7 +92,16 @@ def _maybe_convert_native_krea2_state_dict(
     str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
     if not _looks_like_native_krea2_lora(str_keys):
         return state_dict
-    return {(_native_krea2_key_to_diffusers(k) if isinstance(k, str) else k): v for k, v in state_dict.items()}
+    converted_state_dict: Dict[str, torch.Tensor] = {}
+    for key, value in state_dict.items():
+        converted_key = _native_krea2_key_to_diffusers(key) if _looks_like_native_krea2_key(key) else key
+        if converted_key in converted_state_dict:
+            raise ValueError(
+                f"Krea-2 LoRA has conflicting layers that normalize to the same target '{converted_key}'. "
+                "This mixed layout is unsupported - refusing to silently drop one of the layers."
+            )
+        converted_state_dict[converted_key] = value
+    return converted_state_dict
 
 
 def is_state_dict_likely_krea2_lora(state_dict: dict[str | int, torch.Tensor]) -> bool:

@@ -3,7 +3,10 @@ import torch
 
 from invokeai.backend.patches.layers.dora_layer import DoRALayer
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
-from invokeai.backend.patches.lora_conversions.krea2_lora_constants import KREA2_LORA_TRANSFORMER_PREFIX
+from invokeai.backend.patches.lora_conversions.krea2_lora_constants import (
+    KREA2_LORA_QWEN3VL_PREFIX,
+    KREA2_LORA_TRANSFORMER_PREFIX,
+)
 from invokeai.backend.patches.lora_conversions.krea2_lora_conversion_utils import lora_model_from_krea2_state_dict
 
 
@@ -98,6 +101,20 @@ def test_conflicting_transformer_and_diffusion_model_aliases_raise() -> None:
         lora_model_from_krea2_state_dict(state_dict)
 
 
+def test_conflicting_native_and_diffusers_aliases_raise() -> None:
+    state_dict = {
+        "diffusion_model.blocks.0.attn.wq.lora_A.weight": torch.ones(2, 4),
+        "diffusion_model.blocks.0.attn.wq.lora_B.weight": torch.ones(4, 2),
+        "diffusion_model.blocks.0.attn.gate.lora_A.weight": torch.ones(2, 4),
+        "diffusion_model.blocks.0.attn.gate.lora_B.weight": torch.ones(4, 2),
+        "diffusion_model.transformer_blocks.0.attn.to_q.lora_A.weight": torch.full((2, 4), 2.0),
+        "diffusion_model.transformer_blocks.0.attn.to_q.lora_B.weight": torch.full((4, 2), 2.0),
+    }
+
+    with pytest.raises(ValueError, match="normalize to the same target"):
+        lora_model_from_krea2_state_dict(state_dict)
+
+
 def test_native_comfyui_krea2_keys_are_remapped_to_diffusers_layout() -> None:
     # Native (ComfyUI) Krea-2 LoRAs name modules differently (blocks / attn.wq/wo/gate / mlp / txtfusion).
     # They must be remapped onto the diffusers Krea2Transformer2DModel layout so the LoRA actually applies.
@@ -168,3 +185,68 @@ def test_diffusers_layout_krea2_keys_are_left_untouched() -> None:
     p = KREA2_LORA_TRANSFORMER_PREFIX
     assert f"{p}transformer_blocks.0.attn.to_q" in keys
     assert f"{p}text_fusion.0.attn.to_q" in keys
+
+
+@pytest.mark.parametrize(
+    ("native_module", "diffusers_module"),
+    [
+        ("blocks.0.attn.wq", "transformer_blocks.0.attn.to_q"),
+        ("blocks.0.mlp.down", "transformer_blocks.0.ff.down"),
+    ],
+)
+def test_single_module_native_krea2_lora_is_remapped(
+    native_module: str,
+    diffusers_module: str,
+) -> None:
+    state_dict = {
+        f"diffusion_model.{native_module}.lora_A.weight": torch.ones(2, 4),
+        f"diffusion_model.{native_module}.lora_B.weight": torch.ones(4, 2),
+    }
+
+    model = lora_model_from_krea2_state_dict(state_dict)
+
+    assert set(model.layers) == {f"{KREA2_LORA_TRANSFORMER_PREFIX}{diffusers_module}"}
+
+
+def test_native_transformer_remap_does_not_change_diffusers_text_encoder_blocks() -> None:
+    state_dict = {
+        "diffusion_model.blocks.0.attn.wq.lora_A.weight": torch.ones(2, 4),
+        "diffusion_model.blocks.0.attn.wq.lora_B.weight": torch.ones(4, 2),
+        "text_encoder.visual.blocks.0.attn.qkv.lora_A.weight": torch.ones(2, 4),
+        "text_encoder.visual.blocks.0.attn.qkv.lora_B.weight": torch.ones(4, 2),
+    }
+
+    model = lora_model_from_krea2_state_dict(state_dict)
+
+    assert f"{KREA2_LORA_TRANSFORMER_PREFIX}transformer_blocks.0.attn.to_q" in model.layers
+    assert f"{KREA2_LORA_QWEN3VL_PREFIX}visual.blocks.0.attn.qkv" in model.layers
+
+
+def test_native_krea2_top_level_linear_keys_are_remapped() -> None:
+    native_to_diffusers = {
+        "first": "img_in",
+        "tmlp.0": "time_embed.linear_1",
+        "tmlp.2": "time_embed.linear_2",
+        "tproj.1": "time_mod_proj",
+        "txtmlp.1": "txt_in.linear_1",
+        "txtmlp.3": "txt_in.linear_2",
+        "last.linear": "final_layer.linear",
+    }
+    state_dict = {
+        f"diffusion_model.{module}.{suffix}.weight": torch.ones(2, 4)
+        for module in native_to_diffusers
+        for suffix in ("lora_A", "lora_B")
+    }
+    state_dict.update(
+        {
+            "diffusion_model.txtfusion.layerwise_blocks.0.attn.wq.lora_A.weight": torch.ones(2, 4),
+            "diffusion_model.txtfusion.layerwise_blocks.0.attn.wq.lora_B.weight": torch.ones(4, 2),
+        }
+    )
+
+    model = lora_model_from_krea2_state_dict(state_dict)
+
+    expected_keys = {
+        f"{KREA2_LORA_TRANSFORMER_PREFIX}{diffusers_module}" for diffusers_module in native_to_diffusers.values()
+    }
+    assert expected_keys < set(model.layers)
