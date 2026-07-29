@@ -87,6 +87,14 @@ class Qwen3EncoderField(BaseModel):
     loras: List[LoRAField] = Field(default_factory=list, description="LoRAs to apply on model loading")
 
 
+class Qwen3VLEncoderField(BaseModel):
+    """Field for the Qwen3-VL text encoder used by Krea-2 models."""
+
+    tokenizer: ModelIdentifierField = Field(description="Info to load tokenizer submodel")
+    text_encoder: ModelIdentifierField = Field(description="Info to load text_encoder submodel")
+    loras: List[LoRAField] = Field(default_factory=list, description="LoRAs to apply on model loading")
+
+
 class WanT5EncoderField(BaseModel):
     """Field for the UMT5-XXL text encoder used by Wan 2.2 models."""
 
