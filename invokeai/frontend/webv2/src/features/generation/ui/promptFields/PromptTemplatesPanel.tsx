@@ -4,6 +4,7 @@ import type { PromptTemplateCatalog } from '@features/generation/ui/usePromptTem
 import type { ChangeEvent } from 'react';
 
 import { Box, HStack, Input, Separator, Stack, Text } from '@chakra-ui/react';
+import { searchCatalog } from '@features/generation/core/catalogSearch';
 import { PROMPT_TEMPLATE_PLACEHOLDER } from '@features/generation/core/promptTemplates';
 import { toPromptTemplateSnapshot } from '@features/generation/data/promptTemplates';
 import { useGenerationUi } from '@features/generation/ui/GenerationUiContext';
@@ -50,14 +51,10 @@ interface PromptTemplatesPanelProps {
   onCreate: () => void;
 }
 
-const filterTemplatesByName = (
-  templates: readonly PromptTemplateRecord[],
-  searchTerm: string
-): PromptTemplateRecord[] => {
-  const query = searchTerm.trim().toLocaleLowerCase();
-
-  return query ? templates.filter((template) => template.name.toLocaleLowerCase().includes(query)) : [...templates];
-};
+const getTemplateProse = (template: PromptTemplateRecord): readonly string[] => [
+  template.positivePrompt,
+  template.negativePrompt,
+];
 
 export const PromptTemplatesPanel = ({
   activeTemplate,
@@ -75,15 +72,15 @@ export const PromptTemplatesPanel = ({
   const [pendingDelete, setPendingDelete] = useState<PromptTemplateRecord | null>(null);
 
   const personalTemplates = useMemo(
-    () => filterTemplatesByName(catalog.personalTemplates, searchTerm),
+    () => searchCatalog(catalog.personalTemplates, searchTerm, getTemplateProse),
     [catalog.personalTemplates, searchTerm]
   );
   const sharedTemplates = useMemo(
-    () => filterTemplatesByName(catalog.sharedTemplates, searchTerm),
+    () => searchCatalog(catalog.sharedTemplates, searchTerm, getTemplateProse),
     [catalog.sharedTemplates, searchTerm]
   );
   const defaultTemplates = useMemo(
-    () => filterTemplatesByName(catalog.defaultTemplates, searchTerm),
+    () => searchCatalog(catalog.defaultTemplates, searchTerm, getTemplateProse),
     [catalog.defaultTemplates, searchTerm]
   );
   const hasResults = personalTemplates.length > 0 || sharedTemplates.length > 0 || defaultTemplates.length > 0;

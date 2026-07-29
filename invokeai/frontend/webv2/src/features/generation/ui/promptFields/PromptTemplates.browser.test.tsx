@@ -136,7 +136,7 @@ const defaultTemplate: PromptTemplateRecord = {
   isDefault: true,
   isPublic: false,
   name: 'Photography',
-  negativePrompt: '',
+  negativePrompt: 'low contrast',
   positivePrompt: '{prompt}. photography, bokeh',
   userId: 'system',
 };
@@ -294,7 +294,7 @@ describe('the prompt templates panel', () => {
     expect(labels.filter((label) => label === 'Delete')).toHaveLength(1);
   });
 
-  it('does not search prompt prose', async () => {
+  it('finds fuzzy template names', async () => {
     await render(
       <PromptTemplatesPanel
         activeTemplate={null}
@@ -308,11 +308,11 @@ describe('the prompt templates panel', () => {
     );
 
     await act(async () => {
-      await userEvent.fill(host!.querySelector('input')!, 'bokeh');
+      await userEvent.fill(host!.querySelector('input')!, 'cnmt');
     });
 
+    expect(host!.textContent).toContain('Cinematic');
     expect(host!.textContent).not.toContain('Photography');
-    expect(host!.textContent).not.toContain('Cinematic');
   });
 
   // The snapshot deliberately keeps applying after the template is gone, so a
@@ -352,12 +352,27 @@ describe('the prompt templates panel', () => {
     expect(host!.textContent).not.toContain('was deleted');
   });
 
-  it('does not fuzzy-match a template name', async () => {
+  it.each([
+    ['twilight', 'Cinematic'],
+    ['WATERMARK', 'Cinematic'],
+    ['volumetric', 'Community'],
+    ['FINGERS', 'Community'],
+    ['bokeh', 'Photography'],
+    ['LOW CONTRAST', 'Photography'],
+  ])('finds case-insensitive prompt prose in the owning group (%s)', async (search, expectedName) => {
+    const catalog = createCatalog({
+      defaultTemplates: [defaultTemplate],
+      personalTemplates: [{ ...userTemplate, negativePrompt: 'watermark', positivePrompt: '{prompt}, twilight' }],
+      sharedTemplates: [
+        { ...sharedTemplate, negativePrompt: 'extra fingers', positivePrompt: '{prompt}, volumetric rays' },
+      ],
+    });
+
     await render(
       <PromptTemplatesPanel
         activeTemplate={null}
         isActiveTemplateMissing={false}
-        catalog={createCatalog()}
+        catalog={catalog}
         onApply={vi.fn()}
         onCreate={vi.fn()}
         onDetach={vi.fn()}
@@ -366,19 +381,27 @@ describe('the prompt templates panel', () => {
     );
 
     await act(async () => {
-      await userEvent.fill(host!.querySelector('input')!, 'cnmt');
+      await userEvent.fill(host!.querySelector('input')!, search);
     });
 
-    expect(host!.textContent).not.toContain('Cinematic');
-    expect(host!.textContent).not.toContain('Photography');
+    expect(host!.textContent).toContain(expectedName);
   });
 
-  it('matches a case-insensitive name substring', async () => {
+  it('keeps name hits ahead of prose hits without moving templates between their groups', async () => {
+    const catalog = createCatalog({
+      defaultTemplates: [defaultTemplate],
+      personalTemplates: [
+        { ...userTemplate, name: 'Cinematic', positivePrompt: '{prompt}, bokeh' },
+        { ...userTemplate, id: 'user-2', name: 'Bokeh study', positivePrompt: '{prompt}, portrait' },
+      ],
+      sharedTemplates: [{ ...sharedTemplate, positivePrompt: '{prompt}, bokeh' }],
+    });
+
     await render(
       <PromptTemplatesPanel
         activeTemplate={null}
         isActiveTemplateMissing={false}
-        catalog={createCatalog()}
+        catalog={catalog}
         onApply={vi.fn()}
         onCreate={vi.fn()}
         onDetach={vi.fn()}
@@ -387,11 +410,16 @@ describe('the prompt templates panel', () => {
     );
 
     await act(async () => {
-      await userEvent.fill(host!.querySelector('input')!, 'NEMA');
+      await userEvent.fill(host!.querySelector('input')!, 'BOKEH');
     });
 
-    expect(host!.textContent).toContain('Cinematic');
-    expect(host!.textContent).not.toContain('Photography');
+    const content = host!.textContent!;
+    expect(content.indexOf('Your templates')).toBeLessThan(content.indexOf('Bokeh study'));
+    expect(content.indexOf('Bokeh study')).toBeLessThan(content.indexOf('Cinematic'));
+    expect(content.indexOf('Cinematic')).toBeLessThan(content.indexOf('Shared templates'));
+    expect(content.indexOf('Shared templates')).toBeLessThan(content.indexOf('Community'));
+    expect(content.indexOf('Community')).toBeLessThan(content.indexOf('Built-in templates'));
+    expect(content.indexOf('Built-in templates')).toBeLessThan(content.indexOf('Photography'));
   });
 
   it('renders shared templates without edit or delete controls', async () => {

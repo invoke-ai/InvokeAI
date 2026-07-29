@@ -74,11 +74,9 @@ export const usePromptTemplates = ({ isEnabled = true }: { isEnabled?: boolean }
 
   const create = useCallback(
     async (draft: PromptTemplateCreateDraft) => {
-      const saved = await runAndInvalidate(() => createPromptTemplate(draft));
-      await invalidatePromptTemplates(queryClient, saved.id);
-      return saved;
+      return await runAndInvalidate(() => createPromptTemplate(draft));
     },
-    [queryClient, runAndInvalidate]
+    [runAndInvalidate]
   );
 
   const update = useCallback(
