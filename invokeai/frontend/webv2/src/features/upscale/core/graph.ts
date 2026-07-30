@@ -13,11 +13,11 @@ import {
   toGraphContract,
   toModelIdentifier,
 } from '@features/generation/graph';
-import { coerceSchedulerForGraph, DYNAMIC_PROMPTS_DEFAULT_MAX_PROMPTS } from '@features/generation/settings';
+import { coerceSchedulerForGraph } from '@features/generation/settings';
 
 import type { CompiledUpscaleGraph, UpscaleWidgetValues } from './types';
 
-import { getUpscaleOutputDimensions, getUpscaleValidationReasons } from './settings';
+import { getUpscaleValidationReasons } from './settings';
 
 export const getUpscaleDenoisingStart = (creativity: number): number => ((creativity * -1 + 10) * 4.99) / 100;
 
@@ -48,41 +48,9 @@ const addUpscaleMetadata = (
     return;
   }
 
-  const dimensions = getUpscaleOutputDimensions(settings.inputImage, settings.scale);
-  const activeLoras = getActiveCompatibleLoras(
-    {
-      ...settings,
-      aspectRatioId: 'Free',
-      aspectRatioIsLocked: false,
-      aspectRatioValue: dimensions.width / dimensions.height,
-      cfgRescaleMultiplier: 0,
-      colorCompensation: false,
-      componentSourceModel: null,
-      // Upscale prompts are not batch-expanded; these only satisfy the shape.
-      dynamicPromptsCombinatorial: true,
-      dynamicPromptsMaxPrompts: DYNAMIC_PROMPTS_DEFAULT_MAX_PROMPTS,
-      dynamicPromptsSampleSeed: 0,
-      dynamicPromptsSeedBehaviour: 'per-iteration',
-      height: dimensions.height,
-      modelKey: settings.model.key,
-      negativePromptHeightPx: 56,
-      positivePromptHeightPx: 96,
-      // Upscale submits its prompt literally, so no template is applied here.
-      promptTemplate: null,
-      promptTemplateViewMode: false,
-      referenceImages: [],
-      seamlessXAxis: false,
-      seamlessYAxis: false,
-      t5EncoderModel: null,
-      clipEmbedModel: null,
-      clipLEmbedModel: null,
-      clipGEmbedModel: null,
-      qwen3EncoderModel: null,
-      qwenVLEncoderModel: null,
-      width: dimensions.width,
-    },
-    settings.model
-  );
+  // getActiveCompatibleLoras reads only `loras`, so pass just that rather than fabricating a
+  // whole GenerateSettings whose other fields would be meaningless here.
+  const activeLoras = getActiveCompatibleLoras({ loras: settings.loras }, settings.model);
   const metadata = addNode(graph, {
     cfg_scale: settings.cfgScale,
     creativity: settings.creativity,

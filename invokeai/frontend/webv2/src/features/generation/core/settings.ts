@@ -8,6 +8,7 @@ import type {
   GenerateReferenceImageConfig,
   GenerateSettings,
   GenerateWidgetValues,
+  Ideogram4SamplerPreset,
   LoraModelConfig,
   MainModelConfig,
   VaeModelConfig,
@@ -159,6 +160,44 @@ const getModelIdentifierOrNull = (value: unknown): ComponentModelConfig | null =
 const getMainModelOrNull = (value: unknown): MainModelConfig | null => (isMainModelConfig(value) ? value : null);
 
 const isVaePrecision = (value: unknown): value is VaePrecision => value === 'fp16' || value === 'fp32';
+
+/** Backend defaults from `Ideogram4DenoiseInvocation` / `Krea2*Invocation`. */
+export const IDEOGRAM4_SAMPLER_PRESETS: Ideogram4SamplerPreset[] = ['V4_QUALITY_48', 'V4_DEFAULT_20', 'V4_TURBO_12'];
+export const DEFAULT_IDEOGRAM4_SAMPLER_PRESET: Ideogram4SamplerPreset = 'V4_QUALITY_48';
+export const DEFAULT_KREA2_REBALANCE_MULTIPLIER = 4;
+export const DEFAULT_KREA2_REBALANCE_WEIGHTS = '1.0,1.0,1.0,1.0,1.0,1.0,1.0,2.5,5.0,1.1,4.0,1.0';
+export const KREA2_REBALANCE_WEIGHT_COUNT = 12;
+export const DEFAULT_KREA2_SEED_VARIANCE_STRENGTH = 0.1;
+export const MAX_KREA2_SEED_VARIANCE_STRENGTH = 2;
+export const DEFAULT_KREA2_SEED_VARIANCE_RANDOMIZE_PERCENT = 50;
+
+const isIdeogram4SamplerPreset = (value: unknown): value is Ideogram4SamplerPreset =>
+  IDEOGRAM4_SAMPLER_PRESETS.includes(value as Ideogram4SamplerPreset);
+
+const getOptionalNumber = (value: unknown): number | null =>
+  typeof value === 'number' && Number.isFinite(value) ? value : null;
+
+const getStringArray = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : [];
+
+/**
+ * Krea-2 rebalance weights are free text forwarded straight to the backend's `_parse_weights()`.
+ * Validating here keeps an unparseable string (wrong count, non-numeric, NaN/Infinity) from
+ * reaching a node that would fail mid-generation.
+ */
+export const isValidKrea2RebalanceWeights = (value: string): boolean => {
+  const parts = value.split(',');
+
+  if (parts.length !== KREA2_REBALANCE_WEIGHT_COUNT) {
+    return false;
+  }
+
+  return parts.every((part) => {
+    const trimmed = part.trim();
+
+    return trimmed !== '' && Number.isFinite(Number(trimmed));
+  });
+};
 
 const isGenerateLora = (value: unknown): value is GenerateLora =>
   isRecord(value) &&
@@ -389,6 +428,10 @@ export const cloneGenerateWidgetValues = (
   promptTemplate: values.promptTemplate ? { ...values.promptTemplate } : null,
   qwen3EncoderModel: values.qwen3EncoderModel ? { ...values.qwen3EncoderModel } : null,
   qwenVLEncoderModel: values.qwenVLEncoderModel ? { ...values.qwenVLEncoderModel } : null,
+  qwen3VLEncoderModel: values.qwen3VLEncoderModel ? { ...values.qwen3VLEncoderModel } : null,
+  wanT5EncoderModel: values.wanT5EncoderModel ? { ...values.wanT5EncoderModel } : null,
+  wanLowNoiseModel: values.wanLowNoiseModel ? { ...values.wanLowNoiseModel } : null,
+  ideogram4ColorPalette: [...values.ideogram4ColorPalette],
   referenceImages: cloneReferenceImages(values.referenceImages),
   t5EncoderModel: values.t5EncoderModel ? { ...values.t5EncoderModel } : null,
   vae: values.vae ? { ...values.vae } : null,
@@ -513,7 +556,38 @@ export const isLoraCompatibleWithModel = (
     return false;
   }
 
+  if (mainModel.base === 'wan') {
+    return isWanLoraTargetingMain(loraModel.variant, mainModel.variant);
+  }
+
   return true;
+};
+
+/**
+ * Wan 2.2 main-model variants (`t2v_a14b` / `i2v_a14b` / `ti2v_5b`) and LoRA variants
+ * (`a14b` / `5b`) name the same families with different strings, so plain variant equality
+ * would reject every Wan LoRA. The families are also not interchangeable — A14B LoRAs have
+ * `inner_dim=5120` and 5B `inner_dim=3072`, and applying one to the wrong main crashes the
+ * layer patcher on a tensor-shape mismatch — so the mapping must be explicit rather than
+ * permissive. An unknown variant on either side stays allowed: the backend probe is the
+ * authority, and blocking here would hide a LoRA the backend would have accepted.
+ */
+const WAN_LORA_VARIANT_MAIN_VARIANTS: Record<string, readonly string[]> = {
+  '5b': ['ti2v_5b'],
+  a14b: ['t2v_a14b', 'i2v_a14b'],
+};
+
+export const isWanLoraTargetingMain = (
+  loraVariant: string | null | undefined,
+  mainVariant: string | null | undefined
+): boolean => {
+  if (!loraVariant || !mainVariant) {
+    return true;
+  }
+
+  const compatibleMainVariants = WAN_LORA_VARIANT_MAIN_VARIANTS[loraVariant];
+
+  return compatibleMainVariants ? compatibleMainVariants.includes(mainVariant) : true;
 };
 
 /**
@@ -634,7 +708,39 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
     clipGEmbedModel: getModelIdentifierOrNull(values.clipGEmbedModel),
     qwen3EncoderModel: getModelIdentifierOrNull(values.qwen3EncoderModel),
     qwenVLEncoderModel: getModelIdentifierOrNull(values.qwenVLEncoderModel),
+    qwen3VLEncoderModel: getModelIdentifierOrNull(values.qwen3VLEncoderModel),
+    wanT5EncoderModel: getModelIdentifierOrNull(values.wanT5EncoderModel),
+    wanLowNoiseModel: getMainModelOrNull(values.wanLowNoiseModel),
     componentSourceModel: getMainModelOrNull(values.componentSourceModel),
+    wanGuidanceScaleLowNoise: getOptionalNumber(values.wanGuidanceScaleLowNoise),
+    ideogram4SamplerPreset: isIdeogram4SamplerPreset(values.ideogram4SamplerPreset)
+      ? values.ideogram4SamplerPreset
+      : DEFAULT_IDEOGRAM4_SAMPLER_PRESET,
+    ideogram4Steps: getOptionalNumber(values.ideogram4Steps),
+    ideogram4GuidanceScale: getOptionalNumber(values.ideogram4GuidanceScale),
+    ideogram4Mu: getOptionalNumber(values.ideogram4Mu),
+    ideogram4ColorPalette: getStringArray(values.ideogram4ColorPalette),
+    krea2RebalanceEnabled: values.krea2RebalanceEnabled === true,
+    krea2RebalanceMultiplier: hasFiniteNumber(values, 'krea2RebalanceMultiplier')
+      ? (values.krea2RebalanceMultiplier as number)
+      : DEFAULT_KREA2_REBALANCE_MULTIPLIER,
+    krea2RebalanceWeights:
+      typeof values.krea2RebalanceWeights === 'string' ? values.krea2RebalanceWeights : DEFAULT_KREA2_REBALANCE_WEIGHTS,
+    krea2SeedVarianceEnabled: values.krea2SeedVarianceEnabled === true,
+    krea2SeedVarianceStrength: getClampedNumber(
+      values,
+      'krea2SeedVarianceStrength',
+      0,
+      MAX_KREA2_SEED_VARIANCE_STRENGTH,
+      DEFAULT_KREA2_SEED_VARIANCE_STRENGTH
+    ),
+    krea2SeedVarianceRandomizePercent: getClampedNumber(
+      values,
+      'krea2SeedVarianceRandomizePercent',
+      0,
+      100,
+      DEFAULT_KREA2_SEED_VARIANCE_RANDOMIZE_PERCENT
+    ),
     width,
   };
 };
@@ -684,7 +790,19 @@ export const isGenerateSettings = (values: unknown): values is GenerateSettings 
     (values.clipGEmbedModel === null || isModelIdentifierConfig(values.clipGEmbedModel)) &&
     (values.qwen3EncoderModel === null || isModelIdentifierConfig(values.qwen3EncoderModel)) &&
     (values.qwenVLEncoderModel === null || isModelIdentifierConfig(values.qwenVLEncoderModel)) &&
-    (values.componentSourceModel === null || isMainModelConfig(values.componentSourceModel))
+    (values.qwen3VLEncoderModel === null || isModelIdentifierConfig(values.qwen3VLEncoderModel)) &&
+    (values.wanT5EncoderModel === null || isModelIdentifierConfig(values.wanT5EncoderModel)) &&
+    (values.wanLowNoiseModel === null || isMainModelConfig(values.wanLowNoiseModel)) &&
+    (values.componentSourceModel === null || isMainModelConfig(values.componentSourceModel)) &&
+    isIdeogram4SamplerPreset(values.ideogram4SamplerPreset) &&
+    Array.isArray(values.ideogram4ColorPalette) &&
+    values.ideogram4ColorPalette.every((entry) => typeof entry === 'string') &&
+    typeof values.krea2RebalanceEnabled === 'boolean' &&
+    hasFiniteNumber(values, 'krea2RebalanceMultiplier') &&
+    typeof values.krea2RebalanceWeights === 'string' &&
+    typeof values.krea2SeedVarianceEnabled === 'boolean' &&
+    hasFiniteNumber(values, 'krea2SeedVarianceStrength') &&
+    hasFiniteNumber(values, 'krea2SeedVarianceRandomizePercent')
   );
 };
 

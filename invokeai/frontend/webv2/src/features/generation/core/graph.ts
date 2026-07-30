@@ -928,6 +928,235 @@ const buildAnimaGraph = (
   return graph;
 };
 
+const buildKrea2Graph = (
+  settings: GenerateSettings,
+  model: MainModelConfig,
+  outputIsIntermediate: boolean,
+  projectSettings: GenerationProjectSettings
+): BackendGraphContract => {
+  // Krea-2 has no component-source concept: a non-diffusers transformer (single-file checkpoint
+  // or GGUF) bundles neither VAE nor encoder, so both must be selected. A diffusers model
+  // carries them, and the loader extracts them when these are omitted.
+  const isDiffusers = model.format === 'diffusers';
+  const vaeModel = getCompatibleVae(settings, ['qwen-image']);
+  const qwen3VlEncoderModel = settings.qwen3VLEncoderModel;
+
+  if (!isDiffusers) {
+    requireComponent(vaeModel, 'Krea-2 VAE');
+    requireComponent(qwen3VlEncoderModel, 'Qwen3-VL Encoder');
+  }
+
+  const graph: BackendGraphContract = { edges: [], id: createId('krea2_graph'), nodes: {} };
+  const { negativePrompt, positivePrompt, seed } = addPromptAndSeedNodes(graph);
+  const activeLoras = getActiveCompatibleLoras(settings, model);
+  // Krea-2 accepts negative conditioning only with CFG on; Krea-2-Turbo defaults to CFG off.
+  const useCfg = settings.cfgScale > 1;
+  const modelLoader = addNode(graph, {
+    id: 'model_loader',
+    model,
+    qwen3_vl_encoder_model: qwen3VlEncoderModel ?? undefined,
+    type: 'krea2_model_loader',
+    vae_model: vaeModel ?? undefined,
+  });
+  const loraSource = activeLoras.length
+    ? addTransformerLoraCollectionLoader(graph, activeLoras, 'krea2_lora_collection_loader', modelLoader, [
+        'transformer',
+        'qwen3_vl_encoder',
+      ])
+    : modelLoader;
+  const posCond = addNode(graph, { id: 'pos_cond', type: 'krea2_text_encoder' });
+  const negCond = useCfg ? addNode(graph, { id: 'neg_cond', type: 'krea2_text_encoder' }) : null;
+  const denoise = addNode(graph, {
+    cfg_scale: settings.cfgScale,
+    height: settings.height,
+    id: 'denoise_latents',
+    steps: settings.steps,
+    type: 'krea2_denoise',
+    width: settings.width,
+  });
+  // Krea-2 decodes with the Qwen-Image VAE, so it reuses that family's latents-to-image node.
+  const output = addImageOutputNode(graph, 'qwen_image_l2i', outputIsIntermediate);
+
+  addEdge(graph, loraSource, 'transformer', denoise, 'transformer');
+  addEdge(graph, loraSource, 'qwen3_vl_encoder', posCond, 'qwen3_vl_encoder');
+  addEdge(graph, modelLoader, 'vae', output, 'vae');
+  addEdge(graph, positivePrompt, 'value', posCond, 'prompt');
+
+  // Optional conditioning enhancers, both default-off, chained between the encoder and denoise:
+  // rebalance first (scale the signal toward the prompt), then seed variance (perturb it).
+  let positiveConditioningSource = posCond;
+
+  if (settings.krea2RebalanceEnabled) {
+    const rebalance = addNode(graph, {
+      id: 'krea2_rebalance',
+      multiplier: settings.krea2RebalanceMultiplier,
+      per_layer_weights: settings.krea2RebalanceWeights,
+      type: 'krea2_conditioning_rebalance',
+    });
+
+    addEdge(graph, positiveConditioningSource, 'conditioning', rebalance, 'conditioning');
+    positiveConditioningSource = rebalance;
+  }
+
+  if (settings.krea2SeedVarianceEnabled && settings.krea2SeedVarianceStrength > 0) {
+    const seedVariance = addNode(graph, {
+      id: 'krea2_seed_variance',
+      randomize_percent: settings.krea2SeedVarianceRandomizePercent,
+      strength: settings.krea2SeedVarianceStrength,
+      type: 'krea2_seed_variance',
+    });
+
+    addEdge(graph, positiveConditioningSource, 'conditioning', seedVariance, 'conditioning');
+    addEdge(graph, seed, 'value', seedVariance, 'variance_seed');
+    positiveConditioningSource = seedVariance;
+  }
+
+  addEdge(graph, positiveConditioningSource, 'conditioning', denoise, 'positive_conditioning');
+
+  if (negCond) {
+    addEdge(graph, loraSource, 'qwen3_vl_encoder', negCond, 'qwen3_vl_encoder');
+    addEdge(graph, negativePrompt, 'value', negCond, 'prompt');
+    addEdge(graph, negCond, 'conditioning', denoise, 'negative_conditioning');
+  }
+
+  addEdge(graph, seed, 'value', denoise, 'seed');
+  addEdge(graph, denoise, 'latents', output, 'latents');
+  addMetadata(graph, output, settings, model, 'krea2_txt2img', projectSettings, {
+    krea2_rebalance_enabled: settings.krea2RebalanceEnabled,
+    krea2_rebalance_multiplier: settings.krea2RebalanceMultiplier,
+    krea2_rebalance_weights: settings.krea2RebalanceWeights,
+    krea2_seed_variance_enabled: settings.krea2SeedVarianceEnabled,
+    krea2_seed_variance_randomize_percent: settings.krea2SeedVarianceRandomizePercent,
+    krea2_seed_variance_strength: settings.krea2SeedVarianceStrength,
+    qwen3_vl_encoder: qwen3VlEncoderModel ?? undefined,
+    vae: vaeModel ?? undefined,
+  });
+
+  return graph;
+};
+
+const buildIdeogram4Graph = (
+  settings: GenerateSettings,
+  model: MainModelConfig,
+  outputIsIntermediate: boolean,
+  projectSettings: GenerationProjectSettings
+): BackendGraphContract => {
+  const graph: BackendGraphContract = { edges: [], id: createId('ideogram4_graph'), nodes: {} };
+  // Ideogram 4 is positive-only: there is no negative conditioning input on its denoise node.
+  const { positivePrompt, seed } = addPromptAndSeedNodes(graph);
+  const modelLoader = addNode(graph, { id: 'model_loader', model, type: 'ideogram4_model_loader' });
+  // The caption builder turns the prompt (plus optional colour terms) into Ideogram's own
+  // caption format before encoding.
+  const captionBuilder = addNode(graph, {
+    color_palette: settings.ideogram4ColorPalette,
+    id: 'caption_builder',
+    type: 'ideogram4_caption_builder',
+  });
+  const posCond = addNode(graph, { id: 'pos_cond', type: 'ideogram4_text_encoder' });
+  const denoise = addNode(graph, {
+    height: settings.height,
+    id: 'denoise_latents',
+    // Steps, guidance and mu are preset-derived unless explicitly overridden — sending null
+    // would override the preset with nothing, so unset values are omitted entirely.
+    ...(settings.ideogram4Steps === null ? {} : { steps: settings.ideogram4Steps }),
+    ...(settings.ideogram4GuidanceScale === null ? {} : { guidance_scale: settings.ideogram4GuidanceScale }),
+    ...(settings.ideogram4Mu === null ? {} : { mu: settings.ideogram4Mu }),
+    sampler_preset: settings.ideogram4SamplerPreset,
+    type: 'ideogram4_denoise',
+    width: settings.width,
+  });
+  const output = addImageOutputNode(graph, 'ideogram4_l2i', outputIsIntermediate);
+
+  addEdge(graph, modelLoader, 'transformer', denoise, 'transformer');
+  addEdge(graph, modelLoader, 'qwen3_encoder', posCond, 'qwen3_encoder');
+  addEdge(graph, modelLoader, 'vae', output, 'vae');
+  addEdge(graph, positivePrompt, 'value', captionBuilder, 'prompt');
+  addEdge(graph, captionBuilder, 'value', posCond, 'prompt');
+  addEdge(graph, posCond, 'conditioning', denoise, 'positive_conditioning');
+  addEdge(graph, seed, 'value', denoise, 'seed');
+  addEdge(graph, denoise, 'latents', output, 'latents');
+  addMetadata(graph, output, settings, model, 'ideogram4_txt2img', projectSettings, {
+    ideogram4_color_palette: settings.ideogram4ColorPalette,
+    ideogram4_guidance_scale: settings.ideogram4GuidanceScale ?? undefined,
+    ideogram4_mu: settings.ideogram4Mu ?? undefined,
+    ideogram4_sampler_preset: settings.ideogram4SamplerPreset,
+    ideogram4_steps: settings.ideogram4Steps ?? undefined,
+  });
+
+  return graph;
+};
+
+const buildWanGraph = (
+  settings: GenerateSettings,
+  model: MainModelConfig,
+  outputIsIntermediate: boolean,
+  projectSettings: GenerationProjectSettings
+): BackendGraphContract => {
+  // A GGUF Wan main carries only the transformer, so the VAE and UMT5-XXL encoder come from
+  // standalone models or a Diffusers component source.
+  const sourceModel = getDiffusersSource(settings, model);
+  const vaeModel = getCompatibleVae(settings, ['wan']);
+  const wanT5EncoderModel = settings.wanT5EncoderModel;
+
+  if (!sourceModel && (!vaeModel || !wanT5EncoderModel)) {
+    throw new Error('Wan models require a VAE and Wan T5 Encoder, or a Diffusers component source.');
+  }
+
+  const graph: BackendGraphContract = { edges: [], id: createId('wan_graph'), nodes: {} };
+  const { negativePrompt, positivePrompt, seed } = addPromptAndSeedNodes(graph);
+  const activeLoras = getActiveCompatibleLoras(settings, model);
+  const modelLoader = addNode(graph, {
+    component_source: sourceModel,
+    id: 'model_loader',
+    model,
+    // The second A14B expert. Omitted, the high-noise expert covers the whole schedule.
+    transformer_low_noise_model: settings.wanLowNoiseModel ?? undefined,
+    type: 'wan_model_loader',
+    vae_model: vaeModel ?? undefined,
+    wan_t5_encoder_model: wanT5EncoderModel ?? undefined,
+  });
+  // Wan LoRAs patch only the transformer; the text encoder is untouched.
+  const loraSource = activeLoras.length
+    ? addTransformerLoraCollectionLoader(graph, activeLoras, 'wan_lora_collection_loader', modelLoader, ['transformer'])
+    : modelLoader;
+  const posCond = addNode(graph, { id: 'pos_cond', type: 'wan_text_encoder' });
+  const negCond = addNode(graph, { id: 'neg_cond', type: 'wan_text_encoder' });
+  const denoise = addNode(graph, {
+    guidance_scale: settings.cfgScale,
+    // Null lets the backend reuse guidance_scale for the low-noise half of the schedule.
+    ...(settings.wanGuidanceScaleLowNoise === null
+      ? {}
+      : { guidance_scale_low_noise: settings.wanGuidanceScaleLowNoise }),
+    height: settings.height,
+    id: 'denoise_latents',
+    steps: settings.steps,
+    type: 'wan_denoise',
+    width: settings.width,
+  });
+  // Single-frame image output, not video: `wan_l2i` rather than `wan_l2v`.
+  const output = addImageOutputNode(graph, 'wan_l2i', outputIsIntermediate);
+
+  addEdge(graph, loraSource, 'transformer', denoise, 'transformer');
+  addEdge(graph, modelLoader, 'wan_t5_encoder', posCond, 'wan_t5_encoder');
+  addEdge(graph, modelLoader, 'wan_t5_encoder', negCond, 'wan_t5_encoder');
+  addEdge(graph, modelLoader, 'vae', output, 'vae');
+  addEdge(graph, positivePrompt, 'value', posCond, 'prompt');
+  addEdge(graph, negativePrompt, 'value', negCond, 'prompt');
+  addEdge(graph, posCond, 'conditioning', denoise, 'positive_conditioning');
+  addEdge(graph, negCond, 'conditioning', denoise, 'negative_conditioning');
+  addEdge(graph, seed, 'value', denoise, 'seed');
+  addEdge(graph, denoise, 'latents', output, 'latents');
+  addMetadata(graph, output, settings, model, 'wan_txt2img', projectSettings, {
+    guidance_scale_low_noise: settings.wanGuidanceScaleLowNoise ?? undefined,
+    transformer_low_noise: settings.wanLowNoiseModel ?? undefined,
+    vae: vaeModel ?? undefined,
+    wan_component_source: sourceModel,
+    wan_t5_encoder: wanT5EncoderModel ?? undefined,
+  });
+
+  return graph;
+};
+
 const buildExternalGraph = (
   settings: GenerateSettings,
   model: GenerateModelConfig,
@@ -1005,7 +1234,10 @@ export const GRAPH_BUILDERS = {
   cogview4: buildCogView4Graph,
   'qwen-image': buildQwenImageGraph,
   'z-image': buildZImageGraph,
+  'ideogram-4': buildIdeogram4Graph,
+  'krea-2': buildKrea2Graph,
   anima: buildAnimaGraph,
+  wan: buildWanGraph,
 } satisfies Record<SupportedGenerateBase, GenerateGraphBuilder>;
 
 export const compileGenerateGraph = (

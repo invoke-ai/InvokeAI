@@ -48,7 +48,7 @@ import { DEFAULT_CANVAS_COMPOSITING } from './types';
  * and the legacy per-base builders under
  * `features/nodes/util/graph/generation/`.
  */
-const CANVAS_I2L_NODE_TYPES: Record<SupportedGenerateBase, string> = {
+const CANVAS_I2L_NODE_TYPES: Partial<Record<SupportedGenerateBase, string>> = {
   'sd-1': 'i2l',
   'sd-2': 'i2l',
   sdxl: 'i2l',
@@ -58,7 +58,13 @@ const CANVAS_I2L_NODE_TYPES: Record<SupportedGenerateBase, string> = {
   cogview4: 'cogview4_i2l',
   'qwen-image': 'qwen_image_i2l',
   'z-image': 'z_image_i2l',
+  // Krea-2 shares the Qwen-Image VAE, so it encodes with that family's node too.
+  'krea-2': 'qwen_image_i2l',
   anima: 'anima_i2l',
+  wan: 'wan_i2l',
+  // Ideogram 4 is deliberately absent: it ships no image-to-latents node, so canvas
+  // img2img/inpaint is impossible. requireI2lType turns the missing entry into an
+  // actionable "Canvas generation is not supported" error.
 };
 
 /**

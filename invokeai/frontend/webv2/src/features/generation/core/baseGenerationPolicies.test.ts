@@ -232,6 +232,9 @@ describe('BASE_GENERATION', () => {
       'cogview4',
       'qwen-image',
       'z-image',
+      'ideogram-4',
+      'krea-2',
+      'wan',
       'anima',
     ]);
   });
@@ -822,6 +825,150 @@ describe('component policies', () => {
           ],
         }),
         [model as never]
+      )
+    ).toEqual([]);
+  });
+});
+
+describe('Krea-2, Ideogram 4 and Wan policies', () => {
+  const krea2Vae: VaeModelConfig = { base: 'qwen-image', key: 'krea2-vae', name: 'Qwen VAE', type: 'vae' };
+  const qwen3VlEncoder: ComponentModelConfig = {
+    base: 'any',
+    key: 'qwen3-vl',
+    name: 'Qwen3-VL',
+    type: 'qwen3_vl_encoder',
+  };
+  const wanVae: VaeModelConfig = { base: 'wan', key: 'wan-vae', name: 'Wan VAE', type: 'vae' };
+  const wanT5Encoder: ComponentModelConfig = { base: 'any', key: 'wan-t5', name: 'Wan T5', type: 'wan_t5_encoder' };
+
+  it('uses a 16px grid for all three, matching their transformer patch sizes', () => {
+    expect(getGenerationDimensions(createModel('krea-2'))).toMatchObject({ grid: 16, optimal: 1024 });
+    expect(getGenerationDimensions(createModel('ideogram-4'))).toMatchObject({ grid: 16, optimal: 1024 });
+    expect(getGenerationDimensions(createModel('wan'))).toMatchObject({ grid: 16, optimal: 1024 });
+  });
+
+  it('rejects Ideogram 4 dimensions that are not multiples of 16', () => {
+    const model = createModel('ideogram-4');
+    const reasons = getGenerationValidationReasons(model, createSettings(model, { height: 1020, width: 1000 }));
+
+    expect(reasons).toContain('Generate width must be a multiple of 16.');
+    expect(reasons).toContain('Generate height must be a multiple of 16.');
+  });
+
+  it('requires a VAE and Qwen3-VL encoder for a non-diffusers Krea-2 but not a diffusers one', () => {
+    const checkpoint = createModel('krea-2', { format: 'checkpoint' });
+    const missing = getGenerationValidationReasons(checkpoint, createSettings(checkpoint));
+
+    expect(missing).toContain('Generate needs a VAE for non-Diffusers Krea-2 models.');
+    expect(missing).toContain('Generate needs a Qwen3-VL Encoder for non-Diffusers Krea-2 models.');
+
+    const supplied = getGenerationValidationReasons(
+      checkpoint,
+      createSettings(checkpoint, { qwen3VLEncoderModel: qwen3VlEncoder, vae: krea2Vae })
+    );
+
+    expect(supplied).toEqual([]);
+
+    const diffusers = createModel('krea-2', { format: 'diffusers' });
+
+    expect(getGenerationValidationReasons(diffusers, createSettings(diffusers))).toEqual([]);
+  });
+
+  it('blocks unparseable Krea-2 rebalance weights only while rebalance is on', () => {
+    const model = createModel('krea-2', { format: 'diffusers' });
+    const invalid = { krea2RebalanceEnabled: true, krea2RebalanceWeights: '1.0,2.0' };
+
+    expect(getGenerationValidationReasons(model, createSettings(model, invalid))).toContain(
+      'Krea-2 rebalance weights must be 12 comma-separated numbers.'
+    );
+    // Off, the string never reaches the backend parser, so it must not block generation.
+    expect(
+      getGenerationValidationReasons(model, createSettings(model, { ...invalid, krea2RebalanceEnabled: false }))
+    ).toEqual([]);
+  });
+
+  it('rejects non-numeric Krea-2 weights even at the right count', () => {
+    const model = createModel('krea-2', { format: 'diffusers' });
+    const weights = '1,1,1,1,1,1,1,1,1,1,1,nope';
+
+    expect(
+      getGenerationValidationReasons(
+        model,
+        createSettings(model, { krea2RebalanceEnabled: true, krea2RebalanceWeights: weights })
+      )
+    ).toContain('Krea-2 rebalance weights must be 12 comma-separated numbers.');
+  });
+
+  it('requires a VAE and Wan T5 encoder for a GGUF Wan main', () => {
+    const gguf = createModel('wan', { format: 'gguf_quantized' });
+    const missing = getGenerationValidationReasons(gguf, createSettings(gguf));
+
+    expect(missing).toContain('Generate needs a VAE for Wan models.');
+    expect(missing).toContain('Generate needs a Wan T5 Encoder for Wan models.');
+
+    expect(
+      getGenerationValidationReasons(gguf, createSettings(gguf, { vae: wanVae, wanT5EncoderModel: wanT5Encoder }))
+    ).toEqual([]);
+  });
+
+  it('never requires the low-noise Wan expert, which is an optional quality upgrade', () => {
+    const diffusers = createModel('wan', { format: 'diffusers' });
+
+    expect(getGenerationValidationReasons(diffusers, createSettings(diffusers))).toEqual([]);
+  });
+
+  it('reports an enabled Wan LoRA that targets the other family instead of dropping it silently', () => {
+    const main = createModel('wan', { format: 'diffusers', variant: 'ti2v_5b' });
+    const a14bLora: LoraModelConfig = {
+      base: 'wan',
+      key: 'a14b-lora',
+      name: 'A14B LoRA',
+      type: 'lora',
+      variant: 'a14b',
+    };
+    const reasons = getGenerationValidationReasons(
+      main,
+      createSettings(main, { loras: [{ isEnabled: true, model: a14bLora, weight: 1 }] })
+    );
+
+    expect(reasons).toContain(`A14B LoRA targets a different Wan model family than ${main.name}.`);
+  });
+
+  it('accepts a Wan LoRA whose family matches, across both A14B main variants', () => {
+    const a14bLora: LoraModelConfig = {
+      base: 'wan',
+      key: 'a14b-lora',
+      name: 'A14B LoRA',
+      type: 'lora',
+      variant: 'a14b',
+    };
+
+    for (const variant of ['t2v_a14b', 'i2v_a14b']) {
+      const main = createModel('wan', { format: 'diffusers', variant });
+
+      expect(
+        getGenerationValidationReasons(
+          main,
+          createSettings(main, { loras: [{ isEnabled: true, model: a14bLora, weight: 1 }] })
+        )
+      ).toEqual([]);
+    }
+  });
+
+  it('ignores a disabled mismatched Wan LoRA', () => {
+    const main = createModel('wan', { format: 'diffusers', variant: 'ti2v_5b' });
+    const a14bLora: LoraModelConfig = {
+      base: 'wan',
+      key: 'a14b-lora',
+      name: 'A14B LoRA',
+      type: 'lora',
+      variant: 'a14b',
+    };
+
+    expect(
+      getGenerationValidationReasons(
+        main,
+        createSettings(main, { loras: [{ isEnabled: false, model: a14bLora, weight: 1 }] })
       )
     ).toEqual([]);
   });

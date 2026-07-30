@@ -110,6 +110,9 @@ export const isVaeCompatibleWithGenerateModel = (model: GenerateModelConfig, vae
       return isVaeForBases(['flux'])(vae);
     case 'qwen-image':
       return isVaeForBases(['qwen-image'])(vae);
+    // Krea-2 decodes with the Qwen-Image VAE, which is why its graph reuses `qwen_image_l2i`.
+    case 'krea-2':
+      return isVaeForBases(['qwen-image'])(vae);
     case 'flux2':
       return isVaeForBases(['flux2'])(vae);
     default:

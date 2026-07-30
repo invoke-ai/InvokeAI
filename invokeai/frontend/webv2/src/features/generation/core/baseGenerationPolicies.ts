@@ -30,10 +30,18 @@ import {
 import { DYNAMIC_PROMPTS_DEFAULT_MAX_PROMPTS } from './dynamicPrompts';
 import {
   clampDimension,
+  DEFAULT_IDEOGRAM4_SAMPLER_PRESET,
+  DEFAULT_KREA2_REBALANCE_MULTIPLIER,
+  DEFAULT_KREA2_REBALANCE_WEIGHTS,
+  DEFAULT_KREA2_SEED_VARIANCE_RANDOMIZE_PERCENT,
+  DEFAULT_KREA2_SEED_VARIANCE_STRENGTH,
   DEFAULT_REFERENCE_IMAGE_LIMIT,
   deriveAspectRatioId,
   isGenerateSettings,
   isLoraCompatibleWithModel,
+  isValidKrea2RebalanceWeights,
+  isWanLoraTargetingMain,
+  KREA2_REBALANCE_WEIGHT_COUNT,
   MAX_DIMENSION,
   MIN_DIMENSION,
   normalizeGenerateSettings,
@@ -251,6 +259,41 @@ export const BASE_GENERATION = {
     schedulerAppliesToGraph: true,
     guidanceLabel: 'CFG',
     negativePrompt: { visible: true, usage: 'cfg-gated' },
+    ui: { sdVaeOverride: false, colorCompensation: false, vaePrecision: false, seamless: false, cfgRescale: false },
+  },
+  'ideogram-4': {
+    // Enforced by ideogram4_denoise: width/height carry multipleOf=16.
+    dimensions: { grid: 16, optimalSide: 1024 },
+    // Steps and guidance come from the sampler preset unless explicitly overridden, so the
+    // shared step/CFG fields are inert here; the preset default is V4_QUALITY_48 (48 steps).
+    defaults: { steps: 48, cfgScale: 1, scheduler: 'euler' },
+    schedulerSet: 'flow',
+    schedulerAppliesToGraph: false,
+    guidanceLabel: 'Guidance',
+    negativePrompt: { visible: false, usage: 'never' },
+    ui: { sdVaeOverride: false, colorCompensation: false, vaePrecision: false, seamless: false, cfgRescale: false },
+  },
+  'krea-2': {
+    dimensions: { grid: 16, optimalSide: 1024 },
+    // Krea-2-Turbo's numbers. Krea-2-Raw wants ~28 steps at CFG ~4.5, which comes through the
+    // model's own default_settings rather than being hardcoded per variant here.
+    defaults: { steps: 8, cfgScale: 1, scheduler: 'euler' },
+    schedulerSet: 'flow',
+    schedulerAppliesToGraph: false,
+    guidanceLabel: 'CFG',
+    negativePrompt: { visible: true, usage: 'cfg-gated' },
+    ui: { sdVaeOverride: false, colorCompensation: false, vaePrecision: false, seamless: false, cfgRescale: false },
+  },
+  wan: {
+    // Wan's transformer patch-embeds with stride 2 and un-patches by 2; combined with the VAE's
+    // 8x spatial scale, dimensions must be multiples of 16 or the scheduler step fails on a
+    // latents-vs-noise spatial mismatch.
+    dimensions: { grid: 16, optimalSide: 1024 },
+    defaults: { steps: 40, cfgScale: 4, scheduler: 'euler' },
+    schedulerSet: 'flow',
+    schedulerAppliesToGraph: false,
+    guidanceLabel: 'Guidance',
+    negativePrompt: { visible: true, usage: 'always' },
     ui: { sdVaeOverride: false, colorCompensation: false, vaePrecision: false, seamless: false, cfgRescale: false },
   },
   anima: {
@@ -568,6 +611,21 @@ export const getDefaultGenerateSettings = (model?: GenerateModelConfig): Generat
     promptTemplateViewMode: false,
     qwen3EncoderModel: null,
     qwenVLEncoderModel: null,
+    qwen3VLEncoderModel: null,
+    wanT5EncoderModel: null,
+    wanLowNoiseModel: null,
+    wanGuidanceScaleLowNoise: null,
+    ideogram4SamplerPreset: DEFAULT_IDEOGRAM4_SAMPLER_PRESET,
+    ideogram4Steps: null,
+    ideogram4GuidanceScale: null,
+    ideogram4Mu: null,
+    ideogram4ColorPalette: [],
+    krea2RebalanceEnabled: false,
+    krea2RebalanceMultiplier: DEFAULT_KREA2_REBALANCE_MULTIPLIER,
+    krea2RebalanceWeights: DEFAULT_KREA2_REBALANCE_WEIGHTS,
+    krea2SeedVarianceEnabled: false,
+    krea2SeedVarianceStrength: DEFAULT_KREA2_SEED_VARIANCE_STRENGTH,
+    krea2SeedVarianceRandomizePercent: DEFAULT_KREA2_SEED_VARIANCE_RANDOMIZE_PERCENT,
     referenceImages: [],
     scheduler: defaults.scheduler,
     seamlessXAxis: false,
@@ -615,6 +673,9 @@ export type GenerateComponentValueKey =
   | 'clipGEmbedModel'
   | 'qwen3EncoderModel'
   | 'qwenVLEncoderModel'
+  | 'qwen3VLEncoderModel'
+  | 'wanT5EncoderModel'
+  | 'wanLowNoiseModel'
   | 'componentSourceModel'
   | 'vae';
 
@@ -652,6 +713,8 @@ const TYPE_CLIP_EMBED: ModelTaxonomyType[] = ['clip_embed'];
 const TYPE_MAIN: ModelTaxonomyType[] = ['main'];
 const TYPE_QWEN3: ModelTaxonomyType[] = ['qwen3_encoder'];
 const TYPE_QWEN_VL: ModelTaxonomyType[] = ['qwen_vl_encoder'];
+const TYPE_QWEN3_VL: ModelTaxonomyType[] = ['qwen3_vl_encoder'];
+const TYPE_WAN_T5: ModelTaxonomyType[] = ['wan_t5_encoder'];
 const TYPE_T5: ModelTaxonomyType[] = ['t5_encoder'];
 const TYPE_VAE: ModelTaxonomyType[] = ['vae'];
 
@@ -700,6 +763,40 @@ const qwenVlEncoderSlot = (helpText: string): ComponentSlotPolicy =>
     valueKind: 'component',
     helpText,
     filter: (candidate) => candidate.type === 'qwen_vl_encoder',
+  });
+
+const qwen3VlEncoderSlot = (helpText: string): ComponentSlotPolicy =>
+  slot({
+    key: 'qwen3VLEncoderModel',
+    label: 'Qwen3-VL Encoder',
+    modelTypes: TYPE_QWEN3_VL,
+    valueKind: 'component',
+    helpText,
+    filter: (candidate) => candidate.type === 'qwen3_vl_encoder',
+  });
+
+const wanT5EncoderSlot = (helpText: string): ComponentSlotPolicy =>
+  slot({
+    key: 'wanT5EncoderModel',
+    label: 'Wan T5 Encoder',
+    modelTypes: TYPE_WAN_T5,
+    valueKind: 'component',
+    helpText,
+    filter: (candidate) => candidate.type === 'wan_t5_encoder',
+  });
+
+/**
+ * The second (low-noise) expert of a Wan A14B mixture-of-experts pair. Never required: the
+ * loader falls back to running the high-noise expert across the whole schedule.
+ */
+const wanLowNoiseSlot = (helpText: string): ComponentSlotPolicy =>
+  slot({
+    key: 'wanLowNoiseModel',
+    label: 'Low-noise expert',
+    modelTypes: TYPE_MAIN,
+    valueKind: 'main',
+    helpText,
+    filter: (candidate) => candidate.type === 'main' && candidate.base === 'wan',
   });
 
 const qwen3EncoderSlot = (helpText: string, filter?: GenerateComponentFilter): ComponentSlotPolicy =>
@@ -922,6 +1019,41 @@ export const getComponentSectionPolicy = (
           missingMessage: 'Generate needs a VAE for Z-Image models.',
         },
       ]);
+    case 'krea-2':
+      // A non-diffusers Krea-2 (single-file checkpoint / GGUF) carries only the transformer, so
+      // both submodels must be selected. Diffusers models bundle them, hence optional there.
+      return createPolicy(model.format !== 'diffusers', [
+        {
+          ...vaeSlot('Required for non-Diffusers Krea-2 models.', isVaeForBases(['qwen-image'])),
+          required: (ctx) => ctx.model.format !== 'diffusers',
+          missingMessage: 'Generate needs a VAE for non-Diffusers Krea-2 models.',
+        },
+        {
+          ...qwen3VlEncoderSlot('Required for non-Diffusers Krea-2 models.'),
+          required: (ctx) => ctx.model.format !== 'diffusers',
+          missingMessage: 'Generate needs a Qwen3-VL Encoder for non-Diffusers Krea-2 models.',
+        },
+      ]);
+    case 'wan':
+      // A GGUF Wan main carries only the transformer; the VAE and UMT5-XXL encoder must come
+      // from standalone models or a Diffusers component source.
+      return createPolicy(model.format !== 'diffusers', [
+        componentSourceSlot(
+          (candidate) => isDiffusersMainForBase('wan')(candidate),
+          'Select a Diffusers Wan model to provide VAE and text-encoder components.'
+        ),
+        {
+          ...vaeSlot('Required unless a Diffusers component source is available.', isVaeForBases(['wan'])),
+          required: (ctx) => !isBundledOrDiffusersSourceSatisfied(ctx),
+          missingMessage: 'Generate needs a VAE for Wan models.',
+        },
+        {
+          ...wanT5EncoderSlot('Required unless a Diffusers component source is available.'),
+          required: (ctx) => !isBundledOrDiffusersSourceSatisfied(ctx),
+          missingMessage: 'Generate needs a Wan T5 Encoder for Wan models.',
+        },
+        wanLowNoiseSlot('Optional second A14B expert. Without it the high-noise expert runs the whole schedule.'),
+      ]);
     case 'anima':
       return createPolicy(true, [
         {
@@ -950,6 +1082,9 @@ const getComponentPolicyContext = (model: GenerateModelConfig, settings: Generat
     componentSourceModel: settings.componentSourceModel,
     qwen3EncoderModel: settings.qwen3EncoderModel,
     qwenVLEncoderModel: settings.qwenVLEncoderModel,
+    qwen3VLEncoderModel: settings.qwen3VLEncoderModel,
+    wanT5EncoderModel: settings.wanT5EncoderModel,
+    wanLowNoiseModel: settings.wanLowNoiseModel,
     t5EncoderModel: settings.t5EncoderModel,
     vae: settings.vae,
   },
@@ -961,6 +1096,9 @@ const COMPONENT_SETTING_LABELS: Record<GenerateComponentValueKey, string> = {
   clipLEmbedModel: 'CLIP L',
   qwen3EncoderModel: 'Qwen3 Encoder',
   qwenVLEncoderModel: 'Qwen VL Encoder',
+  qwen3VLEncoderModel: 'Qwen3-VL Encoder',
+  wanT5EncoderModel: 'Wan T5 Encoder',
+  wanLowNoiseModel: 'Low-noise expert',
   t5EncoderModel: 'T5 Encoder',
   vae: 'VAE',
   componentSourceModel: 'Component source',
@@ -1376,6 +1514,36 @@ const getReferenceImageValidationReasons = (model: GenerateModelConfig, settings
   return reasons;
 };
 
+/**
+ * Rules that belong to one model family and have no home in the component-slot policies:
+ * the slot machinery validates model selections, not scalar parameters or LoRA pairings.
+ */
+const getModelFamilyValidationReasons = (model: MainModelConfig, settings: GenerateSettings): string[] => {
+  const reasons: string[] = [];
+
+  // The rebalance weights are free text forwarded straight to the backend's _parse_weights().
+  // Catching a malformed string here beats failing mid-generation on a queued item.
+  if (
+    model.base === 'krea-2' &&
+    settings.krea2RebalanceEnabled &&
+    !isValidKrea2RebalanceWeights(settings.krea2RebalanceWeights)
+  ) {
+    reasons.push(`Krea-2 rebalance weights must be ${KREA2_REBALANCE_WEIGHT_COUNT} comma-separated numbers.`);
+  }
+
+  // A14B and 5B Wan LoRAs are not interchangeable — the layer patcher fails on a tensor-shape
+  // mismatch. getActiveCompatibleLoras would silently drop a mismatched one, so say so instead.
+  if (model.base === 'wan') {
+    for (const lora of settings.loras) {
+      if (lora.isEnabled && !isWanLoraTargetingMain(lora.model.variant, model.variant)) {
+        reasons.push(`${lora.model.name} targets a different Wan model family than ${model.name}.`);
+      }
+    }
+  }
+
+  return reasons;
+};
+
 export const getGenerationValidationReasons = (model: GenerateModelConfig, settings: GenerateSettings): string[] => {
   if (!isSupportedGenerateModel(model)) {
     return ['Generate needs a supported model before it can be invoked.'];
@@ -1400,6 +1568,7 @@ export const getGenerationValidationReasons = (model: GenerateModelConfig, setti
 
   const componentPolicy = getComponentSectionPolicy(model, settings);
   reasons.push(...componentPolicy.validate(getComponentPolicyContext(model, settings)));
+  reasons.push(...getModelFamilyValidationReasons(model, settings));
 
   return reasons;
 };
