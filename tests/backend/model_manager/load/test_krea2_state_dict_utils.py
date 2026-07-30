@@ -17,7 +17,7 @@ import torch
 from invokeai.backend.model_manager.load.model_loaders.krea2 import (
     KREA2_TRANSFORMER_CONFIG,
     _convert_krea2_native_to_diffusers,
-    _dequantize_scaled_fp8,
+    _dequantize_quantized_weights,
     _is_native_krea2_format,
     _normalize_qwen3vl_rope_config,
     _reject_incomplete_load,
@@ -90,19 +90,19 @@ class TestDequantizeScaledFp8:
             "layer.weight": torch.tensor([2.0, 4.0]),
             "layer.weight_scale": torch.tensor(0.5),
         }
-        out = _dequantize_scaled_fp8(sd, torch.float32)
+        out = _dequantize_quantized_weights(sd, torch.float32)
         assert "layer.weight_scale" not in out
         assert torch.allclose(out["layer.weight"], torch.tensor([1.0, 2.0]))
 
     def test_noop_without_scale_keys(self) -> None:
         sd = {"layer.weight": torch.tensor([2.0, 4.0])}
-        out = _dequantize_scaled_fp8(sd, torch.float32)
+        out = _dequantize_quantized_weights(sd, torch.float32)
         assert out is sd
 
     def test_orphan_scale_key_is_dropped(self) -> None:
         # A scale key with no matching weight is simply removed (nothing to multiply).
         sd = {"other.weight": torch.tensor([1.0]), "layer.weight_scale": torch.tensor(0.5)}
-        out = _dequantize_scaled_fp8(sd, torch.float32)
+        out = _dequantize_quantized_weights(sd, torch.float32)
         assert "layer.weight_scale" not in out
         assert "other.weight" in out
 
@@ -118,7 +118,7 @@ class TestDequantizeScaledFp8:
             "layer.weight_scale": torch.tensor([[0.5], [2.0]]),
         }
 
-        out = _dequantize_scaled_fp8(sd, torch.float32)
+        out = _dequantize_quantized_weights(sd, torch.float32)
 
         expected = torch.tensor([[1.0, 1.0], [2.0, 2.0], [12.0, 12.0], [16.0, 16.0]])
         assert torch.allclose(out["layer.weight"], expected)
@@ -134,7 +134,7 @@ class TestDequantizeScaledFp8:
             "layer.weight_scale": torch.tensor(0.5, dtype=torch.float32),
         }
 
-        out = _dequantize_scaled_fp8(sd, torch.bfloat16)
+        out = _dequantize_quantized_weights(sd, torch.bfloat16)
 
         assert out["layer.weight"].dtype is torch.bfloat16
 
@@ -151,7 +151,7 @@ class TestDequantizeScaledFp8:
             "layer.weight_scale": torch.tensor([[127], [128], [126]], dtype=torch.uint8),
         }
 
-        out = _dequantize_scaled_fp8(sd, torch.float32)
+        out = _dequantize_quantized_weights(sd, torch.float32)
 
         assert torch.allclose(out["layer.weight"], torch.tensor([[4.0], [8.0], [2.0]]))
 
@@ -160,7 +160,7 @@ class TestDequantizeScaledFp8:
         # not be reinterpreted as an exponent.
         sd = {"layer.weight": torch.tensor([4.0]), "layer.weight_scale": torch.tensor(2.0)}
 
-        out = _dequantize_scaled_fp8(sd, torch.float32)
+        out = _dequantize_quantized_weights(sd, torch.float32)
 
         assert torch.allclose(out["layer.weight"], torch.tensor([8.0]))
 
@@ -171,7 +171,7 @@ class TestDequantizeScaledFp8:
             "layer.weight_scale": torch.tensor([[128, 126]], dtype=torch.uint8),
         }
 
-        out = _dequantize_scaled_fp8(sd, torch.float32)
+        out = _dequantize_quantized_weights(sd, torch.float32)
 
         # First block doubles, second halves.
         assert torch.allclose(out["layer.weight"], torch.tensor([[4.0, 4.0, 1.0, 1.0]]))
@@ -180,7 +180,7 @@ class TestDequantizeScaledFp8:
         # Qwen2.5-VL fp8_scaled exports use `.scale_weight` rather than `.weight_scale`.
         sd = {"layer.weight": torch.tensor([2.0]), "layer.scale_weight": torch.tensor(3.0)}
 
-        out = _dequantize_scaled_fp8(sd, torch.float32)
+        out = _dequantize_quantized_weights(sd, torch.float32)
 
         assert "layer.scale_weight" not in out
         assert torch.allclose(out["layer.weight"], torch.tensor([6.0]))
@@ -439,7 +439,7 @@ class TestConvertedShapesMatchRealKrea2Transformer:
 
 
 class TestDequantCallSites:
-    """Guards the arity of every `_dequantize_scaled_fp8` call inside the Krea-2 loader.
+    """Guards the arity of every `_dequantize_quantized_weights` call inside the Krea-2 loader.
 
     The loader dequantizes in two places — the transformer single-file path and the Qwen3-VL
     encoder single-file path — and only the first is covered by a functional test. When the
@@ -463,7 +463,7 @@ class TestDequantCallSites:
             for node in ast.walk(tree)
             if isinstance(node, ast.Call)
             and isinstance(node.func, ast.Name)
-            and node.func.id == "_dequantize_scaled_fp8"
+            and node.func.id == "_dequantize_quantized_weights"
         ]
 
         # Both single-file paths must be present; a dropped call site is as much a bug as a

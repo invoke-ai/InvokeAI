@@ -31,21 +31,20 @@ Two scale-key naming schemes are in the wild:
     ``<path>.scale_input`` for activation scaling that we discard)
 """
 
+from collections.abc import Sequence
 from typing import Any
 
 import torch
+
+from invokeai.backend.quantization.dequantize_common import (
+    resolve_target_dtype,
+    to_plain_tensor,
+)
 
 SCALE_SUFFIXES = (".weight_scale", ".scale_weight")
 
 #: Exponent bias for OCP Microscaling E8M0 scale bytes.
 E8M0_EXPONENT_BIAS = 127
-
-
-def _to_plain_tensor(value: Any) -> Any:
-    """Dequantize a GGMLTensor to a plain tensor; pass anything else through."""
-    if hasattr(value, "get_dequantized_tensor"):
-        return value.get_dequantized_tensor()
-    return value
 
 
 def to_scale_multiplier(scale: torch.Tensor, compute_dtype: torch.dtype) -> torch.Tensor:
@@ -80,12 +79,20 @@ def expand_scale_to_weight(weight: torch.Tensor, scale: torch.Tensor) -> torch.T
     return scale
 
 
-def dequantize_scaled_fp8(sd: dict[str, Any], compute_dtype: torch.dtype) -> int:
+def dequantize_scaled_fp8(
+    sd: dict[str, Any],
+    compute_dtype: torch.dtype,
+    *,
+    storage_dtype: torch.dtype | None = None,
+    skip_patterns: Sequence[str] = (),
+) -> int:
     """Dequantize scaled-fp8 weights in ``sd`` in place; returns the number converted.
 
     Weights are dequantized directly to ``compute_dtype`` (see the module docstring on why not via
-    float32). Scale keys are removed, including orphans with no matching weight — nothing can be
-    multiplied by those, and leaving them behind would inflate the caller's size accounting.
+    float32), then stored at ``storage_dtype`` when one is given — see
+    :func:`~invokeai.backend.quantization.dequantize_common.resolve_target_dtype`. Scale keys are
+    removed, including orphans with no matching weight — nothing can be multiplied by those, and
+    leaving them behind would inflate the caller's size accounting.
     """
     scale_keys = [k for k in sd if isinstance(k, str) and k.endswith(SCALE_SUFFIXES)]
     count = 0
@@ -93,13 +100,15 @@ def dequantize_scaled_fp8(sd: dict[str, Any], compute_dtype: torch.dtype) -> int
     for scale_key in scale_keys:
         for suffix in SCALE_SUFFIXES:
             if scale_key.endswith(suffix):
-                weight_key = scale_key[: -len(suffix)] + ".weight"
+                base = scale_key[: -len(suffix)]
+                weight_key = base + ".weight"
                 break
 
         if weight_key in sd:
-            weight = torch.as_tensor(_to_plain_tensor(sd[weight_key])).to(compute_dtype)
-            scale = to_scale_multiplier(torch.as_tensor(_to_plain_tensor(sd[scale_key])), compute_dtype)
-            sd[weight_key] = weight * expand_scale_to_weight(weight, scale)
+            target_dtype = resolve_target_dtype(base, compute_dtype, storage_dtype, skip_patterns)
+            weight = torch.as_tensor(to_plain_tensor(sd[weight_key])).to(compute_dtype)
+            scale = to_scale_multiplier(torch.as_tensor(to_plain_tensor(sd[scale_key])), compute_dtype)
+            sd[weight_key] = (weight * expand_scale_to_weight(weight, scale)).to(target_dtype)
             count += 1
 
         del sd[scale_key]
