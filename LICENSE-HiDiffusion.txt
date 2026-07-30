@@ -1,0 +1,65 @@
+HiDiffusion - License notice
+
+Original project: https://github.com/megvii-research/HiDiffusion
+Vendored from:    https://github.com/monofy-org/HiDiffusion
+Vendored under:   invokeai/backend/hidiffusion/
+
+================================================================================
+CODE (Apache License 2.0)
+================================================================================
+
+The vendored HiDiffusion source code is licensed under the Apache License,
+Version 2.0. The Apache 2.0 license text is available in the root LICENSE file
+and at:
+
+    https://www.apache.org/licenses/LICENSE-2.0
+
+================================================================================
+MODULE KEYS (BSD 3-Clause License)
+================================================================================
+
+The SD 1.5 and SDXL module-key lists under
+invokeai/backend/hidiffusion/sd_module_key/ were sourced from dgenerate at:
+
+    https://github.com/Teriks/dgenerate/tree/d83b839033cc22c5101fb0f987bd4eb2de3d5d12/dgenerate/extras/hidiffusion/sd_module_key
+
+BSD 3-Clause License
+
+Copyright (c) 2023, Teriks
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its
+   contributors may be used to endorse or promote products derived from
+   this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+================================================================================
+LOCAL MODIFICATIONS
+================================================================================
+
+The following changes were applied when integrating HiDiffusion into InvokeAI:
+
+* The code was vendored under the invokeai.backend.hidiffusion package.
+* apply_hidiffusion() was extended to accept a torch.Generator, enabling
+  deterministic image generation from a seed.
+* HiDiffusion patching was integrated with InvokeAI's model loading and
+  generation lifecycle.
