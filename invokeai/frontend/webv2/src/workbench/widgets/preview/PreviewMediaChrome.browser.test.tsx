@@ -2,7 +2,7 @@
 import type { GalleryImageItem, GalleryVideoItem } from '@features/gallery';
 import type { ImageActions } from '@workbench/image-actions';
 
-import { ChakraProvider } from '@chakra-ui/react';
+import { ChakraProvider, Text } from '@chakra-ui/react';
 import { DndContext, PointerSensor, useDndMonitor, useSensor, useSensors, type DragStartEvent } from '@dnd-kit/core';
 import { system } from '@theme/system';
 import { createInstance } from 'i18next';
@@ -220,6 +220,43 @@ describe('PreviewFilmstrip mixed media', () => {
 });
 
 describe('Preview mixed media footer and actions', () => {
+  it('uses the readable muted foreground for compact image and video footer text', async () => {
+    for (const item of [sharedImage, sharedVideo]) {
+      await render(
+        <>
+          <Text color="fg.muted" data-testid="expected-muted">
+            Expected muted
+          </Text>
+          <PreviewFooter
+            actionImage={null}
+            actions={{} as ImageActions}
+            boardItemCount={3}
+            isLoadingBoard={false}
+            isMetadataOpen={false}
+            item={item}
+            selectedIndex={1}
+            onNext={() => undefined}
+            onPrevious={() => undefined}
+            onToggleMetadata={() => undefined}
+          />
+        </>
+      );
+
+      const position = Array.from(host!.querySelectorAll<HTMLElement>('p')).find((element) =>
+        element.textContent?.includes('2 of 3')
+      );
+      const dimensions = Array.from(host!.querySelectorAll<HTMLElement>('p')).find((element) =>
+        element.textContent?.includes(`${item.width} × ${item.height}`)
+      );
+      const details = host!.querySelector<HTMLElement>('button[aria-expanded="false"]');
+      const mutedColor = getComputedStyle(host!.querySelector<HTMLElement>('[data-testid="expected-muted"]')!).color;
+
+      expect(getComputedStyle(position!).color).toBe(mutedColor);
+      expect(getComputedStyle(dimensions!).color).toBe(mutedColor);
+      expect(getComputedStyle(details!).color).toBe(mutedColor);
+    }
+  });
+
   it('shows mixed position, dimensions, duration, and localized fps with tabular numerals', async () => {
     await render(
       <PreviewFooter

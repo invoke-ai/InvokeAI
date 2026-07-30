@@ -53,7 +53,7 @@ export const PreviewMetadataPanel = ({
       <HStack
         as="button"
         aria-expanded={isOpen}
-        color="fg.subtle"
+        color="fg.muted"
         cursor="pointer"
         gap="1"
         w="fit-content"

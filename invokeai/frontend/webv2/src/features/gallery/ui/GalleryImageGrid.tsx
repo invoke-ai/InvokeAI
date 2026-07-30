@@ -30,6 +30,7 @@ import {
   useRef,
   useState,
   type DragEvent,
+  type KeyboardEvent,
   type MouseEvent,
 } from 'react';
 import { useVirtualizer } from 'react-hook-tanstack-virtual';
@@ -151,11 +152,13 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
     viewportWidth > 0 ? Math.max(1, (viewportWidth - GRID_GAP_PX * (columnCount - 1)) / columnCount) : 96;
 
   const rowHeightPx = cellSizePx + GRID_GAP_PX;
+  const estimateRowSize = useCallback(() => rowHeightPx, [rowHeightPx]);
+  const getScrollElement = useCallback(() => viewportRef.current, []);
 
   const virtualizer = useVirtualizer({
     count: rowCount,
-    estimateSize: () => rowHeightPx,
-    getScrollElement: () => viewportRef.current,
+    estimateSize: estimateRowSize,
+    getScrollElement,
     overscan: 4,
   });
 
@@ -782,6 +785,11 @@ const GalleryThumbnail = ({
   );
 
   const handleClick = useCallback((event: MouseEvent) => onClick(item, event), [item, onClick]);
+  const handleActivationKeyDown = useCallback((event: KeyboardEvent<HTMLButtonElement>) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.stopPropagation();
+    }
+  }, []);
 
   const handleToggleStarred = useCallback(
     (event: MouseEvent<HTMLButtonElement>) => {
@@ -825,6 +833,7 @@ const GalleryThumbnail = ({
         style={THUMBNAIL_BUTTON_STYLE}
         type="button"
         onClick={handleClick}
+        onKeyDown={handleActivationKeyDown}
       >
         <img
           alt={item.name}

@@ -54,13 +54,13 @@ export const PreviewFooter = ({
     <Stack borderWidth="1px" borderColor="border.subtle" gap="2" p="3" rounded="lg">
       <HStack align="center" justify="space-between">
         <HStack gap="1" minW="0">
-          <Text color="fg.subtle" fontSize="2xs" fontVariantNumeric="tabular-nums" truncate>
+          <Text color="fg.muted" fontSize="2xs" fontVariantNumeric="tabular-nums" truncate>
             {positionLabel}
           </Text>
           <Text color="fg.subtle" flexShrink={0} fontSize="2xs">
             ·
           </Text>
-          <Text color="fg.subtle" flexShrink={0} fontSize="2xs" fontVariantNumeric="tabular-nums">
+          <Text color="fg.muted" flexShrink={0} fontSize="2xs" fontVariantNumeric="tabular-nums">
             {item.width} × {item.height}
             {item.kind === 'video'
               ? ` · ${t('widgets.preview.videoDuration', {

@@ -3,7 +3,16 @@ import type { GalleryItem, GalleryItemRef } from '@features/gallery/contracts';
 import type { StreamingImageSource } from '@platform/ui/streaming-image/streamingImageSource';
 
 import { ChakraProvider } from '@chakra-ui/react';
-import { DndContext, PointerSensor, useDndMonitor, useSensor, useSensors, type DragStartEvent } from '@dnd-kit/core';
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  useDndMonitor,
+  useSensor,
+  useSensors,
+  type DragStartEvent,
+} from '@dnd-kit/core';
+import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { DEFAULT_GALLERY_SETTINGS } from '@features/gallery/core/settings';
 import { GalleryUiProvider, type GalleryUiAdapter } from '@features/gallery/react';
 import { isGalleryImageDragData } from '@features/gallery/utility';
@@ -17,6 +26,7 @@ import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 
 import type { GalleryStateView } from './galleryStateView';
 import type { GalleryActions, GalleryWidgetContextValue } from './GalleryWidgetContext';
@@ -31,6 +41,7 @@ const mocks = vi.hoisted(() => ({
   virtualizerOptions: [] as Array<{
     count: number;
     estimateSize: () => number;
+    getScrollElement: () => Element | null;
     overscan: number;
   }>,
 }));
@@ -47,7 +58,12 @@ vi.mock('@features/gallery/data/queries', async (importOriginal) => ({
 }));
 
 vi.mock('react-hook-tanstack-virtual', () => ({
-  useVirtualizer: (options: { count: number; estimateSize: () => number; overscan: number }) => {
+  useVirtualizer: (options: {
+    count: number;
+    estimateSize: () => number;
+    getScrollElement: () => Element | null;
+    overscan: number;
+  }) => {
     mocks.virtualizerOptions.push(options);
     const size = options.estimateSize();
 
@@ -314,7 +330,10 @@ const Harness = ({
   coMountPreviewSources?: boolean;
   gallery: GalleryStateView;
 }) => {
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
   const contextValue: GalleryWidgetContextValue = {
     actions: createActions(),
     gallery,
@@ -467,6 +486,22 @@ describe('GalleryImageGrid mixed item cells', () => {
     // dnd-kit briefly suppresses the click following a completed drag. Let
     // that document-level guard expire before the next interaction test.
     await interact(() => pointer('pointerup', videoButton.ownerDocument, 120, 80), 300);
+  });
+
+  it.each([
+    { key: '{Enter}', label: 'Enter' },
+    { key: ' ', label: 'Space' },
+  ])('opens a video with $label without activating keyboard DnD', async ({ key }) => {
+    const video = createItem('video', 'keyboard.mp4');
+
+    await renderGallery(createGallery({ items: [video] }));
+    const videoButton = getButton('Select video keyboard.mp4, duration 1:06, for preview');
+
+    await interact(() => videoButton.focus());
+    await act(() => userEvent.keyboard(key));
+
+    expect(actionMocks.selectItem).toHaveBeenCalledWith(video);
+    expect(onDragStart).not.toHaveBeenCalled();
   });
 
   it('preserves the ordered full selection when an unloaded video is dragged from a loaded image', async () => {
@@ -728,6 +763,18 @@ describe('GalleryImageGrid range selection', () => {
 });
 
 describe('GalleryImageGrid virtualization', () => {
+  it('keeps external-store option callbacks stable across equivalent renders', async () => {
+    const gallery = createGallery({ items: [createItem('video', 'clip.mp4')] });
+
+    await renderGallery(gallery);
+    const firstOptions = mocks.virtualizerOptions.at(-1);
+    await renderGallery({ ...gallery });
+    const secondOptions = mocks.virtualizerOptions.at(-1);
+
+    expect(secondOptions?.estimateSize).toBe(firstOptions?.estimateSize);
+    expect(secondOptions?.getScrollElement).toBe(firstOptions?.getScrollElement);
+  });
+
   it('retains constant row estimates, overscan, and the near-end infinite-load trigger', async () => {
     const items = Array.from({ length: 14 }, (_, index) => createItem('image', `image-${index}.png`));
 
