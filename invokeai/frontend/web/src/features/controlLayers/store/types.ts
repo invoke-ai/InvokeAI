@@ -816,7 +816,7 @@ const zPidMode = z.enum(['off', 'fit', 'native']);
 export type PidMode = z.infer<typeof zPidMode>;
 
 export const zParamsState = z.object({
-  _version: z.literal(4),
+  _version: z.literal(5),
   maskBlur: z.number(),
   maskBlurMethod: zParameterMaskBlurMethod,
   canvasCoherenceMode: zParameterCanvasCoherenceMode,
@@ -947,7 +947,7 @@ export const zParamsState = z.object({
 });
 export type ParamsState = z.infer<typeof zParamsState>;
 export const getInitialParamsState = (): ParamsState => ({
-  _version: 4,
+  _version: 5,
   maskBlur: 16,
   maskBlurMethod: 'box',
   canvasCoherenceMode: 'Gaussian Blur',

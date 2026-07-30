@@ -972,12 +972,12 @@ export const paramsSliceConfig: SliceConfig<typeof slice> = {
       }
 
       if (state._version === 3) {
-        // v3 -> v4, add Krea-2 standalone component and conditioning enhancer fields, the
-        // PiD (Pixel Diffusion Decoder) fields, and merge the separate Klein / [dev] FLUX.2 VAE
-        // slots into one shared flux2VaeModel (both drew from the same FLUX.2 VAE pool). Keep
-        // whichever was set. Also seed the new standalone [dev] Mistral encoder slot — it's
-        // nullable with no default, so a genuine v3 blob without the key fails
-        // zParamsState.parse() otherwise.
+        // v3 -> v4, add Krea-2 standalone component and conditioning enhancer fields and the
+        // PiD (Pixel Diffusion Decoder) fields. Also seed the Wan component fields — they were
+        // added to the schema without a version bump while releases were still writing v3 blobs,
+        // and they're nullable with no default, so a genuine released-build v3 blob without them
+        // fails zParamsState.parse() and wipes the whole slice. Seed only when missing: dev-build
+        // v3 blobs written after the Wan merge already carry (possibly non-null) values.
         state._version = 4;
         state.krea2VaeModel = null;
         state.krea2Qwen3VlEncoderModel = null;
@@ -987,14 +987,35 @@ export const paramsSliceConfig: SliceConfig<typeof slice> = {
         state.krea2RebalanceEnabled = false;
         state.krea2RebalanceMultiplier = 4;
         state.krea2RebalanceWeights = '1.0,1.0,1.0,1.0,1.0,1.0,1.0,2.5,5.0,1.1,4.0,1.0';
-        state.flux2VaeModel = state.kleinVaeModel ?? state.flux2DevVaeModel ?? null;
-        state.flux2DevMistralEncoderModel = null;
-        delete state.kleinVaeModel;
-        delete state.flux2DevVaeModel;
         state.pidMode = 'off';
         state.pidDecoderModel = null;
         state.gemma2EncoderModel = null;
         state.pidSteps = 4;
+        state.wanTransformerLowNoise = state.wanTransformerLowNoise ?? null;
+        state.wanComponentSource = state.wanComponentSource ?? null;
+        state.wanVaeModel = state.wanVaeModel ?? null;
+        state.wanT5EncoderModel = state.wanT5EncoderModel ?? null;
+        state.wanGuidanceScaleLowNoise = state.wanGuidanceScaleLowNoise ?? null;
+      }
+
+      if (state._version === 4) {
+        // v4 -> v5, merge the separate Klein / [dev] FLUX.2 VAE slots into one shared
+        // flux2VaeModel (both drew from the same FLUX.2 VAE pool — keep whichever was set) and
+        // seed the new standalone [dev] Mistral encoder slot. Both parents of the FLUX.2 [dev]
+        // merge shipped incompatible schemas under _version 4 (main added the PiD fields; the
+        // [dev] branch added the flux2 fields), so a v4 blob may be missing either side's keys —
+        // every seed here is conditional, and the PiD keys are re-seeded for blobs written by
+        // pre-merge [dev] builds. All are nullable-with-no-default, so any missing key would
+        // fail zParamsState.parse() and wipe the whole slice.
+        state._version = 5;
+        state.flux2VaeModel = state.flux2VaeModel ?? state.kleinVaeModel ?? state.flux2DevVaeModel ?? null;
+        state.flux2DevMistralEncoderModel = state.flux2DevMistralEncoderModel ?? null;
+        delete state.kleinVaeModel;
+        delete state.flux2DevVaeModel;
+        state.pidMode = state.pidMode ?? 'off';
+        state.pidDecoderModel = state.pidDecoderModel ?? null;
+        state.gemma2EncoderModel = state.gemma2EncoderModel ?? null;
+        state.pidSteps = state.pidSteps ?? 4;
       }
 
       return zParamsState.parse(state);

@@ -164,7 +164,7 @@ describe('paramsSliceConfig persisted state migration', () => {
 
     // v2 migrates all the way through the current chain (v2 -> v3 adds Qwen fields,
     // v3 -> v4 adds Krea-2 and PiD fields).
-    expect(result._version).toBe(4);
+    expect(result._version).toBe(5);
     expect(result.qwenImageVaeModel).toBeNull();
     expect(result.qwenImageQwenVLEncoderModel).toBeNull();
     // Existing params should be preserved
@@ -197,7 +197,7 @@ describe('paramsSliceConfig persisted state migration', () => {
 
     const result = migrate?.(v3State) as ReturnType<typeof getInitialParamsState> & Record<string, unknown>;
 
-    expect(result._version).toBe(4);
+    expect(result._version).toBe(5);
     expect((result.flux2VaeModel as { key: string } | null)?.key).toBe('klein-vae');
     // The new standalone dev Mistral encoder slot must be seeded, not left undefined.
     expect(result.flux2DevMistralEncoderModel).toBeNull();
@@ -231,7 +231,7 @@ describe('paramsSliceConfig persisted state migration', () => {
 
     const result = migrate?.(v3State) as ReturnType<typeof getInitialParamsState>;
 
-    expect(result._version).toBe(4);
+    expect(result._version).toBe(5);
     expect(result.krea2VaeModel).toBeNull();
     expect(result.krea2Qwen3VlEncoderModel).toBeNull();
     expect(result.krea2SeedVarianceEnabled).toBe(false);
@@ -243,6 +243,95 @@ describe('paramsSliceConfig persisted state migration', () => {
     expect(result.positivePrompt).toBe('preserve this prompt');
     expect(result.seed).toBe(1234);
     expect(result.dimensions).toMatchObject({ width: 640, height: 896 });
+  });
+
+  it('seeds the Wan fields for a released-build v3 blob that predates the Wan merge', () => {
+    expect(migrate).toBeDefined();
+
+    const initial = getInitialParamsState();
+    // Released v6.13.x builds wrote v3 blobs before the Wan fields existed. They're nullable
+    // with no default, so if the v3 -> v4 step didn't seed them, parse() would throw and the
+    // whole slice would be wiped on upgrade.
+    const v3State: Record<string, unknown> = {
+      ...initial,
+      _version: 3,
+      positivePrompt: 'a fluffy cat',
+    };
+    delete v3State.wanTransformerLowNoise;
+    delete v3State.wanComponentSource;
+    delete v3State.wanVaeModel;
+    delete v3State.wanT5EncoderModel;
+    delete v3State.wanGuidanceScaleLowNoise;
+    delete v3State.flux2VaeModel;
+    delete v3State.flux2DevMistralEncoderModel;
+
+    const result = migrate?.(v3State) as ReturnType<typeof getInitialParamsState>;
+
+    expect(result._version).toBe(5);
+    expect(result.wanTransformerLowNoise).toBeNull();
+    expect(result.wanComponentSource).toBeNull();
+    expect(result.wanVaeModel).toBeNull();
+    expect(result.wanT5EncoderModel).toBeNull();
+    expect(result.wanGuidanceScaleLowNoise).toBeNull();
+    expect(result.positivePrompt).toBe('a fluffy cat');
+  });
+
+  it('migrates a v4 blob written by main (PiD fields, no flux2 fields) without wiping it', () => {
+    expect(migrate).toBeDefined();
+
+    const initial = getInitialParamsState();
+    const kleinVae = { key: 'klein-vae', hash: 'h', name: 'Klein VAE', base: 'flux2', type: 'vae' };
+    // main and the FLUX.2 [dev] branch both shipped _version 4 with different keys. A blob from
+    // main has the PiD fields and the old kleinVaeModel slot, but no flux2VaeModel /
+    // flux2DevMistralEncoderModel.
+    const mainV4State: Record<string, unknown> = {
+      ...initial,
+      _version: 4,
+      positivePrompt: 'a fluffy cat',
+      pidMode: 'fit',
+      kleinVaeModel: kleinVae,
+    };
+    delete mainV4State.flux2VaeModel;
+    delete mainV4State.flux2DevMistralEncoderModel;
+
+    const result = migrate?.(mainV4State) as ReturnType<typeof getInitialParamsState> & Record<string, unknown>;
+
+    expect(result._version).toBe(5);
+    expect((result.flux2VaeModel as { key: string } | null)?.key).toBe('klein-vae');
+    expect(result.flux2DevMistralEncoderModel).toBeNull();
+    // main's own v4 values must survive untouched.
+    expect(result.pidMode).toBe('fit');
+    expect(result.positivePrompt).toBe('a fluffy cat');
+    expect(result.kleinVaeModel).toBeUndefined();
+  });
+
+  it('migrates a v4 blob written by a pre-merge [dev] build (flux2 fields, no PiD fields) without wiping it', () => {
+    expect(migrate).toBeDefined();
+
+    const initial = getInitialParamsState();
+    const flux2Vae = { key: 'flux2-vae', hash: 'h', name: 'FLUX.2 VAE', base: 'flux2', type: 'vae' };
+    const devV4State: Record<string, unknown> = {
+      ...initial,
+      _version: 4,
+      positivePrompt: 'a fluffy cat',
+      flux2VaeModel: flux2Vae,
+      flux2DevMistralEncoderModel: null,
+    };
+    delete devV4State.pidMode;
+    delete devV4State.pidDecoderModel;
+    delete devV4State.gemma2EncoderModel;
+    delete devV4State.pidSteps;
+
+    const result = migrate?.(devV4State) as ReturnType<typeof getInitialParamsState> & Record<string, unknown>;
+
+    expect(result._version).toBe(5);
+    // The branch's own v4 values must survive untouched.
+    expect((result.flux2VaeModel as { key: string } | null)?.key).toBe('flux2-vae');
+    expect(result.pidMode).toBe('off');
+    expect(result.pidDecoderModel).toBeNull();
+    expect(result.gemma2EncoderModel).toBeNull();
+    expect(result.pidSteps).toBe(4);
+    expect(result.positivePrompt).toBe('a fluffy cat');
   });
 
   it('migrates old positive prompt history entries to prompt pairs', () => {
