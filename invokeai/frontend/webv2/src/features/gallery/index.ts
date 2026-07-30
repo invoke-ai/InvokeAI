@@ -9,6 +9,25 @@ export type {
   GalleryView,
   GeneratedImageContract,
 } from './core/types';
+export {
+  assertNeverGalleryItem,
+  formatGalleryVideoDuration,
+  galleryImageItemToGalleryImage,
+  isGalleryImageItem,
+  legacyGeneratedImageToGalleryItem,
+  parseGalleryItemKey,
+  toGalleryItemKey,
+  toGalleryItemRef,
+  type GalleryImageItem,
+  type GalleryItem,
+  type GalleryItemCategory,
+  type GalleryItemKey,
+  type GalleryItemKind,
+  type GalleryItemMutationResult,
+  type GalleryItemRef,
+  type GalleryItemsPage,
+  type GalleryVideoItem,
+} from './core/items';
 import {
   addImagesToGalleryBoard,
   deleteGalleryImages,

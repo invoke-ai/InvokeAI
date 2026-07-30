@@ -10,6 +10,25 @@ export type {
   GeneratedImageContract,
 } from './core/types';
 export { normalizeGalleryImage } from './core/image';
+export {
+  assertNeverGalleryItem,
+  formatGalleryVideoDuration,
+  galleryImageItemToGalleryImage,
+  isGalleryImageItem,
+  legacyGeneratedImageToGalleryItem,
+  parseGalleryItemKey,
+  toGalleryItemKey,
+  toGalleryItemRef,
+  type GalleryImageItem,
+  type GalleryItem,
+  type GalleryItemCategory,
+  type GalleryItemKey,
+  type GalleryItemKind,
+  type GalleryItemMutationResult,
+  type GalleryItemRef,
+  type GalleryItemsPage,
+  type GalleryVideoItem,
+} from './core/items';
 export { GALLERY_RECENT_IMAGE_LIMIT, getBoundedRecentImages } from './core/recentImages';
 export {
   DEFAULT_GALLERY_SETTINGS,
