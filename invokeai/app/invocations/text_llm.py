@@ -7,7 +7,6 @@ from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.primitives import StringOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.services.system_prompt_records.system_prompt_records_common import (
-    SYSTEM_PROMPT_DEFAULT_USER_ID,
     SystemPromptNotFoundError,
     SystemPromptRecordDTO,
 )
@@ -132,8 +131,17 @@ class TextLLMWithPresetInvocation(BaseInvocation):
 
         The record store is unscoped, so without this check a user could read another user's
         private prompt by enqueueing a graph that references its id -- the content becomes the
-        LLM's system message and is recoverable from the node's output. Mirrors the ownership
-        check in `call_saved_workflow.CallSavedWorkflowInvocation.validate_selected_workflow`.
+        LLM's system message and is recoverable from the node's output.
+
+        The rule is deliberately identical to `routers/system_prompts.get_system_prompt`: owner,
+        public, or admin. Note there is no "owned by the 'system' user" clause, even though the
+        seeded defaults are owned by it -- `SYSTEM_PROMPT_DEFAULT_USER_ID` is also the synthetic
+        id every request carries in single-user mode (`auth_dependencies.get_current_user`), so
+        such a clause would make every prompt created before an install switched to multiuser
+        un-privatizable here while the REST layer still 403s on it. The seeded defaults are
+        `is_public=TRUE`, so `record.is_public` already covers them.
+        (`call_saved_workflow` can keep its default-category clause: workflow `category=default`
+        is a real column value, not an overloaded owner id.)
         """
         system_prompt_id = self.system_prompt.system_prompt_id
         try:
@@ -147,8 +155,7 @@ class TextLLMWithPresetInvocation(BaseInvocation):
             user = context._services.users.get(queue_user_id)
             is_admin = bool(user and user.is_admin)
             is_owner = record.user_id == queue_user_id
-            is_default = record.user_id == SYSTEM_PROMPT_DEFAULT_USER_ID
-            if not (is_default or is_owner or record.is_public or is_admin):
+            if not (is_owner or record.is_public or is_admin):
                 raise ValueError(f"The selected system prompt '{system_prompt_id}' is not accessible to this user.")
 
         return record

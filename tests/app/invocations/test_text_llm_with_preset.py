@@ -105,10 +105,31 @@ def test_preset_node_rejects_another_users_private_prompt_in_multiuser() -> None
     mock_run.assert_not_called()
 
 
+def test_preset_node_rejects_a_privatized_prompt_owned_by_the_single_user_id() -> None:
+    # 'system' is both the seeded-defaults owner and the synthetic id every request carries in
+    # single-user mode, so prompts created before an install switched to multiuser are owned by
+    # it. Once such a prompt is made private it must be unreachable here, exactly as
+    # GET /system_prompts/i/{id} 403s on it -- no "owned by 'system' means built-in" shortcut.
+    inv = _make_invocation(prompt_id="pre-upgrade-private")
+    context = _make_context(
+        prompt_record_content="secret instruction from the single-user era",
+        multiuser=True,
+        record_user_id="system",
+        record_is_public=False,
+        queue_user_id="bob",
+    )
+
+    with patch("invokeai.app.invocations.text_llm._run_text_llm") as mock_run:
+        with pytest.raises(ValueError, match="not accessible to this user"):
+            inv.invoke(context)
+
+    mock_run.assert_not_called()
+
+
 @pytest.mark.parametrize(
     "record_user_id,record_is_public,queue_user_id,queue_user_is_admin",
     [
-        ("system", False, "bob", False),  # seeded default
+        ("system", True, "bob", False),  # seeded default (they are is_public=TRUE)
         ("alice", True, "bob", False),  # explicitly shared
         ("bob", False, "bob", False),  # owner
         ("alice", False, "admin", True),  # admin

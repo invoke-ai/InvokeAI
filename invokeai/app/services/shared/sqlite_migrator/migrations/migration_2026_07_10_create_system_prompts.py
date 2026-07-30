@@ -16,6 +16,7 @@ Sources of the seeded prompts:
 - Z-Image Visual Description Optimizer: Tongyi-MAI/Z-Image-Turbo (pe.py, translated from Chinese)
 - Qwen-Image Multi-Category Rewriter: QwenLM/Qwen-Image (prompt_utils_2512.py, English variant)
 - HiDream SCALIST Prompt Engineer: HiDream-ai/HiDream-O1-Image (prompt_agent.py, translated from Chinese; JSON-wrapper removed)
+- Krea 2 Prompt Expansion: krea-ai/krea-2 (docs/expansion.txt)
 """
 
 import sqlite3
@@ -244,6 +245,26 @@ Use the SCALIST framework to expand every scene:
 
 Output only the final English prompt — no JSON wrapper, no preamble, no explanation."""
 
+_KREA2 = """You are an expert prompt engineer for text-to-image models. Your task is to expand the user's prompt into a highly effective image-generation prompt.
+
+Think step by step about the request before writing the answer:
+- What is the subject and mood?
+- What visual styles, mediums, and lighting options would fit? Consider two or three alternatives and pick the one that best serves the caption.
+- What composition, framing, and grounded details will help the text-to-image model?
+
+Then output a single expanded prompt paragraph.
+
+Follow these rules strictly:
+1. **Faithfulness First:** Preserve all original subjects, actions, colors, and spatial relationships. Do not add new objects, props, characters, or animals unless the user clearly implies them.
+2. **Practical T2I Structure:** Write a prompt that a text-to-image model can parse cleanly. Group subjects with their own attributes and actions. Use grounded phrasing for poses, interactions, and spatial layout.
+3. **Style Planning Stays Internal:** Use your internal reasoning to choose style, medium, framing, and lighting. Do not emit planning tags or wrappers in the visible answer body.
+4. **Text Rendering:** If the user requests visible text, quotes, labels, or typography, specify the exact text clearly and wrap requested words in quotes.
+5. **Avoid Over-Specification:** Do not invent highly specific clothing, colors, materials, or scene details unless the input supports them.
+6. **Structure:** Write one cohesive paragraph after the thinking block. No bullets, JSON, or markdown.
+7. **Respect Existing Detail:** If the user's prompt is already detailed, lightly polish and finalize rather than heavily expanding — preserve their phrasing and direction.
+8. **Respect the Human Form:** Treat depictions of people with dignity. Assume clothing covers genitals and intimate anatomy.
+9. **Preserve User Medium:** When the user explicitly requests a medium (e.g. "photo of", "photograph of", "illustration of", "painting of", "sketch of", "3D render of"), honor it. Do not pivot to a different medium to avoid difficulty — match the user's stated intent."""
+
 
 DEFAULT_SYSTEM_PROMPTS: list[tuple[str, str, str]] = [
     # Mirrors text_llm_pipeline.DEFAULT_SYSTEM_PROMPT — the same fallback the backend applies
@@ -255,6 +276,7 @@ DEFAULT_SYSTEM_PROMPTS: list[tuple[str, str, str]] = [
     ("0f8f5b2e-1c9e-4f2a-9a4e-1f1f1f1f0004", "Z-Image Visual Description Optimizer", _Z_IMAGE),
     ("0f8f5b2e-1c9e-4f2a-9a4e-1f1f1f1f0005", "Qwen-Image Multi-Category Rewriter", _QWEN_2512),
     ("0f8f5b2e-1c9e-4f2a-9a4e-1f1f1f1f0006", "HiDream SCALIST Prompt Engineer", _HIDREAM),
+    ("0f8f5b2e-1c9e-4f2a-9a4e-1f1f1f1f0007", "Krea 2 Prompt Expansion", _KREA2),
 ]
 
 
@@ -287,6 +309,16 @@ class CreateSystemPromptsCallback:
             cursor.execute("ALTER TABLE system_prompts ADD COLUMN user_id TEXT NOT NULL DEFAULT 'system';")
         if "is_public" not in existing_columns:
             cursor.execute("ALTER TABLE system_prompts ADD COLUMN is_public BOOLEAN NOT NULL DEFAULT FALSE;")
+            # ADD COLUMN stamps the DEFAULT onto every pre-existing row, and the seed below is
+            # INSERT OR IGNORE -- so without this the already-seeded defaults would stay
+            # is_public=0 and `get_many(user_id=...)` (own OR public) would return an empty list
+            # for every non-admin. FALSE is the right default for the *user* rows on such a DB;
+            # only the seeded ids are re-shared. Scoped to those ids so a default a user
+            # deliberately made private on a post-backfill DB is never silently re-shared.
+            cursor.execute(
+                f"UPDATE system_prompts SET is_public = TRUE WHERE id IN ({','.join('?' * len(DEFAULT_SYSTEM_PROMPTS))});",
+                [default_id for default_id, _, _ in DEFAULT_SYSTEM_PROMPTS],
+            )
         cursor.execute(
             """--sql
             CREATE TRIGGER IF NOT EXISTS tg_system_prompts_updated_at

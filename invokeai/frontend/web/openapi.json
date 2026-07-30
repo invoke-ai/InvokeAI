@@ -75808,7 +75808,7 @@
           "user_id": {
             "type": "string",
             "title": "User Id",
-            "description": "The owning user id ('system' for built-in defaults)."
+            "description": "The owning user id ('system' for built-in defaults, and for everything created in single-user mode)."
           },
           "is_public": {
             "type": "boolean",

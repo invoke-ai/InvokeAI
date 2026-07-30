@@ -50,13 +50,47 @@ def test_backfills_multiuser_columns_on_a_pre_multiuser_table() -> None:
         """
     )
     cursor.execute("INSERT INTO system_prompts (id, name, content) VALUES ('kept', 'mine', 'body');")
+    # The pre-multiuser table was already seeded, so the defaults exist and the INSERT OR IGNORE
+    # below skips them -- they can only become public again via the backfill's UPDATE.
+    cursor.executemany(
+        "INSERT INTO system_prompts (id, name, content) VALUES (?, ?, ?);",
+        DEFAULT_SYSTEM_PROMPTS,
+    )
 
     CreateSystemPromptsCallback()(cursor)
 
     assert {"user_id", "is_public"} <= _get_columns(cursor, "system_prompts")
-    # The pre-existing row survives and picks up the column defaults.
+    # The pre-existing user row survives and picks up the column defaults.
     cursor.execute("SELECT user_id, is_public, content FROM system_prompts WHERE id = 'kept';")
     assert cursor.fetchone() == ("system", 0, "body")
+
+    # Every seeded default must end up public again, or `get_many(user_id=...)` -- own OR public --
+    # returns nothing at all for a non-admin in multiuser mode.
+    default_ids = [default_id for default_id, _, _ in DEFAULT_SYSTEM_PROMPTS]
+    placeholders = ",".join("?" * len(default_ids))
+    cursor.execute(
+        f"SELECT COUNT(*) FROM system_prompts WHERE id IN ({placeholders}) AND is_public = TRUE;",
+        default_ids,
+    )
+    assert cursor.fetchone()[0] == len(DEFAULT_SYSTEM_PROMPTS)
+
+    db.close()
+
+
+def test_backfill_does_not_reshare_a_default_the_user_made_private() -> None:
+    # The is_public UPDATE lives inside the `"is_public" not in existing_columns` branch, so a
+    # second pass over an already-backfilled table must leave deliberate privatization alone.
+    db = sqlite3.connect(":memory:")
+    cursor = db.cursor()
+
+    CreateSystemPromptsCallback()(cursor)
+    default_id = DEFAULT_SYSTEM_PROMPTS[0][0]
+    cursor.execute("UPDATE system_prompts SET is_public = FALSE WHERE id = ?;", (default_id,))
+
+    CreateSystemPromptsCallback()(cursor)
+
+    cursor.execute("SELECT is_public FROM system_prompts WHERE id = ?;", (default_id,))
+    assert cursor.fetchone()[0] == 0
 
     db.close()
 

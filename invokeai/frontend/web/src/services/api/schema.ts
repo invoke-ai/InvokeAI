@@ -32584,7 +32584,7 @@ export type components = {
             id: string;
             /**
              * User Id
-             * @description The owning user id ('system' for built-in defaults).
+             * @description The owning user id ('system' for built-in defaults, and for everything created in single-user mode).
              */
             user_id: string;
             /**
