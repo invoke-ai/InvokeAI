@@ -27,3 +27,20 @@ class TestErnieImageDefaultSettings:
         s = MainModelDefaultSettings.from_base(BaseModelType.ErnieImage, None, "my ernie", "main/ernie-image/whatever")
         assert s is not None
         assert (s.steps, s.cfg_scale) == (50, 4.0)
+
+    def test_turbo_in_ancestor_directory_is_ignored(self) -> None:
+        # An in-place install records an absolute path, so an unrelated ancestor directory can
+        # contain "turbo". Only the install directory's own name may drive detection — otherwise the
+        # *base* model silently gets Turbo's 8 steps and CFG 1.0.
+        s = MainModelDefaultSettings.from_base(
+            BaseModelType.ErnieImage, None, "my ernie", "/mnt/turbo-nvme/models/ERNIE-Image"
+        )
+        assert s is not None
+        assert (s.steps, s.cfg_scale) == (50, 4.0)
+
+    def test_turbo_in_leaf_directory_still_detected(self) -> None:
+        s = MainModelDefaultSettings.from_base(
+            BaseModelType.ErnieImage, None, "my ernie", "/mnt/turbo-nvme/models/ERNIE-Image-Turbo"
+        )
+        assert s is not None
+        assert (s.steps, s.cfg_scale) == (8, 1.0)

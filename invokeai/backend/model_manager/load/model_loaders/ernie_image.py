@@ -42,13 +42,21 @@ class ErnieImageDiffusersModel(GenericDiffusersLoader):
         # the prompt enhancer ("pe" / "pe_tokenizer").
         model_path = model_path / submodel_type.value
 
+        # Tokenizers take neither a dtype nor a repo variant — mirror the sibling loaders and load
+        # them bare. `local_files_only=True` everywhere keeps loading offline-safe: the files are
+        # already on disk, and without it transformers/diffusers may reach out to the Hub to
+        # validate the repo.
+        if submodel_type in (SubModelType.Tokenizer, SubModelType.PromptEnhancerTokenizer):
+            result: AnyModel = load_class.from_pretrained(model_path, local_files_only=True)
+            return result
+
         target_device = TorchDevice.choose_torch_device()
         dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
         try:
-            result: AnyModel = load_class.from_pretrained(model_path, torch_dtype=dtype, variant=variant)
+            result = load_class.from_pretrained(model_path, torch_dtype=dtype, variant=variant, local_files_only=True)
         except OSError as e:
             if variant and "no file named" in str(e):
-                result = load_class.from_pretrained(model_path, torch_dtype=dtype)
+                result = load_class.from_pretrained(model_path, torch_dtype=dtype, local_files_only=True)
             else:
                 raise
 

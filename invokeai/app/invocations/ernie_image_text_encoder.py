@@ -20,6 +20,12 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     ErnieImageConditioningInfo,
 )
 
+# Hard ceiling on the prompt-enhancer's generation length. Upstream drives `max_new_tokens` off the
+# PE tokenizer's `model_max_length`, but that is unreliable as a bound: if the tokenizer config omits
+# it, transformers substitutes a sentinel (int(1e30)), and a rewrite that never emits EOS would hang
+# the graph. A rewritten image prompt is a few hundred tokens at most, so cap it.
+PE_MAX_NEW_TOKENS = 1024
+
 
 @invocation(
     "ernie_image_text_encoder",
@@ -104,7 +110,7 @@ class ErnieImageTextEncoderInvocation(BaseInvocation):
             inputs = tokenizer(input_text, return_tensors="pt").to(lm.device)
             output_ids = lm.generate(
                 **inputs,
-                max_new_tokens=tokenizer.model_max_length,
+                max_new_tokens=min(tokenizer.model_max_length, PE_MAX_NEW_TOKENS),
                 do_sample=self.pe_temperature != 1.0 or self.pe_top_p != 1.0,
                 temperature=self.pe_temperature,
                 top_p=self.pe_top_p,

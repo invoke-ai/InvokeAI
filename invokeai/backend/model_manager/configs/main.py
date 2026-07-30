@@ -96,9 +96,13 @@ class MainModelDefaultSettings(BaseModel):
             case BaseModelType.ErnieImage:
                 # ERNIE-Image-Turbo (distilled) uses fewer steps and CFG=1.0. The two checkpoints
                 # share an architecture and config, so there is nothing on disk to discriminate on
-                # and no Turbo variant is modeled. Fall back to the name, and also the install path
-                # so that renaming the model in the install dialog doesn't lose the Turbo defaults.
-                haystack = " ".join(part for part in (name, path) if part).lower()
+                # and no Turbo variant is modeled. Fall back to the name, and also the install
+                # directory's own name so that renaming the model in the install dialog doesn't lose
+                # the Turbo defaults. Only the leaf name is matched: an in-place install records an
+                # absolute path, and an unrelated ancestor directory (e.g. /mnt/turbo-nvme/models/)
+                # must not silently give the base model Turbo's 8 steps and CFG 1.0.
+                path_name = Path(path).name if path else None
+                haystack = " ".join(part for part in (name, path_name) if part).lower()
                 if "turbo" in haystack:
                     return cls(steps=8, cfg_scale=1.0, width=1024, height=1024)
                 return cls(steps=50, cfg_scale=4.0, width=1024, height=1024)
