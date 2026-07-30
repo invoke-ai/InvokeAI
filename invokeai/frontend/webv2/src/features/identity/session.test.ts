@@ -39,6 +39,7 @@ const api = vi.hoisted(() => ({
   getCurrentUser: vi.fn(),
   login: vi.fn(),
   logout: vi.fn(),
+  refreshMediaCookie: vi.fn(),
   setupAdmin: vi.fn(),
 }));
 
@@ -128,7 +129,12 @@ beforeEach(async () => {
   api.getCurrentUser.mockReset();
   api.login.mockReset();
   api.logout.mockReset();
+  api.refreshMediaCookie.mockReset();
   api.setupAdmin.mockReset();
+  api.refreshMediaCookie.mockImplementation(() => {
+    testState.events.push('api.refreshMediaCookie');
+    return Promise.resolve({ success: true });
+  });
 
   api.getAuthStatus.mockResolvedValue({
     admin_email: 'admin@example.com',
@@ -419,5 +425,40 @@ describe('identity account transitions', () => {
     expect(await loginOutcome).toBeInstanceOf(session.LoginAttemptSupersededError);
     expect(session.getAuthSession()).toMatchObject({ sessionExpired: true, user: null });
     expect(testState.getToken()).toBeNull();
+  });
+});
+
+describe('media cookie recovery on restore', () => {
+  it('re-issues the media cookie when a stored token restores a session', async () => {
+    testState.tokenAdapter.set('stored-token');
+    api.getCurrentUser.mockResolvedValue(user);
+    const observed = createObservedLifecycle();
+    session.configureIdentityAccountLifecycle(observed.port);
+
+    await session.ensureAuthSession();
+
+    // A restored session has a valid JWT but no media cookie, so every <img> would 401
+    // without this call. Login needs no equivalent — the backend sets the cookie there.
+    expect(api.refreshMediaCookie).toHaveBeenCalledTimes(1);
+    expect(session.getAuthSession()).toMatchObject({ phase: 'ready', user });
+  });
+
+  it('still restores the session when the media cookie refresh fails', async () => {
+    testState.tokenAdapter.set('stored-token');
+    api.getCurrentUser.mockResolvedValue(user);
+    api.refreshMediaCookie.mockRejectedValue(new Error('network down'));
+    const observed = createObservedLifecycle();
+    session.configureIdentityAccountLifecycle(observed.port);
+
+    await session.ensureAuthSession();
+
+    // Broken media is a degraded gallery; it must not present the user as signed out.
+    expect(session.getAuthSession()).toMatchObject({ phase: 'ready', sessionExpired: false, user });
+  });
+
+  it('does not request a media cookie when there is no stored token to restore', async () => {
+    await resolveSignedOutMultiuserSession();
+
+    expect(api.refreshMediaCookie).not.toHaveBeenCalled();
   });
 });

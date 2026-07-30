@@ -3,7 +3,16 @@ import { ApiError } from '@platform/transport/http';
 
 import { shouldExpireUnauthorizedSession } from './core/sessionPolicy';
 import { browserIdentityTokenAdapter } from './core/tokenStorage';
-import { getAuthStatus, getCurrentUser, login, logout, setupAdmin, type AuthStatus, type UserDTO } from './data/api';
+import {
+  getAuthStatus,
+  getCurrentUser,
+  login,
+  logout,
+  refreshMediaCookie,
+  setupAdmin,
+  type AuthStatus,
+  type UserDTO,
+} from './data/api';
 
 /**
  * Session-lived auth state shared by the router guards and shell chrome. When
@@ -192,6 +201,11 @@ const resolveSession = async (): Promise<AuthSession> => {
   if (status.multiuser_enabled && !status.setup_required && browserIdentityTokenAdapter.get()) {
     try {
       user = await getCurrentUser();
+      // This branch is the restore-from-stored-token path, the one case that holds a valid JWT
+      // without the media cookie login would have set. Re-issue it before anything renders an
+      // <img>, or every thumbnail 401s. Awaited (a small POST) so the first paint already has
+      // the cookie, but never fatal: failing here leaves media broken, not the session.
+      await refreshMediaCookie().catch(() => undefined);
     } catch (error) {
       if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
         browserIdentityTokenAdapter.clear();
