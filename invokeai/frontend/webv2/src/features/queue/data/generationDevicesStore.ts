@@ -49,9 +49,19 @@ registerAccountOwnedResource({
   name: 'generation-devices',
 });
 
+/**
+ * `GET/PATCH /api/v1/app/runtime_config` answer with the config nested under `config`
+ * alongside the `set_fields` list — not with the settings at the top level.
+ */
 interface RuntimeConfigResponse {
-  generation_devices?: GenerationDevicesSetting | null;
+  config?: {
+    generation_devices?: GenerationDevicesSetting | null;
+  } | null;
+  set_fields?: string[];
 }
+
+const readGenerationDevices = (response: RuntimeConfigResponse | null): GenerationDevicesSetting | null =>
+  response?.config?.generation_devices ?? null;
 
 /**
  * Load the device options and the current setting together.
@@ -84,7 +94,7 @@ export const refreshGenerationDevices = (): Promise<void> => {
         error: null,
         loadState: 'loaded',
         options,
-        setting: runtimeConfig?.generation_devices ?? null,
+        setting: readGenerationDevices(runtimeConfig),
       });
     })
     .catch((error: unknown) => {
@@ -125,7 +135,7 @@ export const updateGenerationDevices = async (setting: GenerationDevicesSetting)
 
   assertAccountScopeCurrent(owner);
 
-  store.patchSnapshot({ error: null, setting: runtimeConfig?.generation_devices ?? setting });
+  store.patchSnapshot({ error: null, setting: readGenerationDevices(runtimeConfig) ?? setting });
 };
 
 export const getGenerationDevicesSnapshot = (): GenerationDevicesSnapshot => store.getSnapshot();
