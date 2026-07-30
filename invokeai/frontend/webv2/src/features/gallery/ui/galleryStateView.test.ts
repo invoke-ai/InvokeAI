@@ -13,8 +13,16 @@ import {
 } from './galleryStateView';
 
 const boards: GalleryBoard[] = [
-  { archived: false, assetCount: 0, id: 'none', imageCount: 1, kind: 'uncategorized', name: 'Uncategorized' },
-  { archived: false, assetCount: 0, id: 'board-1', imageCount: 2, kind: 'board', name: 'Board 1' },
+  {
+    archived: false,
+    assetCount: 0,
+    id: 'none',
+    imageCount: 1,
+    kind: 'uncategorized',
+    name: 'Uncategorized',
+    videoCount: 0,
+  },
+  { archived: false, assetCount: 0, id: 'board-1', imageCount: 2, kind: 'board', name: 'Board 1', videoCount: 0 },
 ];
 
 const createImage = (imageName: string): GeneratedImageContract => ({

@@ -19,6 +19,7 @@ const UNCATEGORIZED_BOARD: GalleryBoard = {
   imageCount: 0,
   kind: 'uncategorized',
   name: 'Uncategorized',
+  videoCount: 0,
 };
 
 /**

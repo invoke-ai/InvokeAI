@@ -76,7 +76,15 @@ type PreviewImage = GeneratedImageContract & Partial<Pick<GalleryImage, 'boardId
 const EMPTY_PREVIEW_IMAGES: PreviewImage[] = [];
 
 const fallbackBoards: GalleryBoard[] = [
-  { archived: false, assetCount: 0, id: 'none', imageCount: 0, kind: 'uncategorized', name: 'Uncategorized' },
+  {
+    archived: false,
+    assetCount: 0,
+    id: 'none',
+    imageCount: 0,
+    kind: 'uncategorized',
+    name: 'Uncategorized',
+    videoCount: 0,
+  },
 ];
 
 const getGalleryImages = (values: Record<string, unknown>, queueItems: QueueItem[]): PreviewImage[] => {

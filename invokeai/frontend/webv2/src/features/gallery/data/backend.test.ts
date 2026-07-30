@@ -16,12 +16,14 @@ vi.mock('@platform/transport/http', () => ({
 }));
 
 import {
+  deleteGalleryImages,
   downloadGalleryArchive,
   getGalleryImageByName,
   getGalleryImagesByNames,
   imageMakeCanvasAssetChanges,
   imageMakeDurableChanges,
   imageSaveToGalleryChanges,
+  listGalleryBoards,
   listGalleryImages,
 } from './backend';
 
@@ -293,5 +295,122 @@ describe('gallery category queries', () => {
     const images = await categoriesFor('images');
 
     expect([...assets, ...images]).not.toContain('other');
+  });
+});
+
+describe('board media counts and covers', () => {
+  beforeEach(() => {
+    accountLifecycle.activate('user-a');
+    mocks.apiFetchJson.mockReset();
+  });
+
+  it('maps video counts and resolves a video cover to its thumbnail', async () => {
+    mocks.apiFetchJson.mockImplementation((path: string) => {
+      if (path.startsWith('/api/v1/boards/')) {
+        return Promise.resolve([
+          {
+            archived: false,
+            asset_count: 1,
+            board_id: 'board-1',
+            board_name: 'Clips',
+            cover_image_name: null,
+            cover_video_name: 'clip.mp4',
+            image_count: 2,
+            video_count: 3,
+          },
+        ]);
+      }
+
+      // Uncategorized image / asset / video totals.
+      return Promise.resolve({ total: 0 });
+    });
+
+    const boards = await listGalleryBoards();
+
+    expect(boards[1]).toMatchObject({
+      coverThumbnailUrl: 'https://api.test/api/v1/videos/i/clip.mp4/thumbnail',
+      coverVideoName: 'clip.mp4',
+      id: 'board-1',
+      imageCount: 2,
+      videoCount: 3,
+    });
+  });
+
+  it('counts uncategorized videos, which no board DTO reports', async () => {
+    mocks.apiFetchJson.mockImplementation((path: string) => {
+      if (path.startsWith('/api/v1/boards/')) {
+        return Promise.resolve([]);
+      }
+
+      if (path.startsWith('/api/v1/videos/')) {
+        return Promise.resolve({ total: 7 });
+      }
+
+      return Promise.resolve({ total: 4 });
+    });
+
+    const boards = await listGalleryBoards();
+
+    expect(boards[0]).toMatchObject({ id: 'none', kind: 'uncategorized', videoCount: 7 });
+  });
+
+  it('treats a board with only videos as non-empty even though image_count is 0', async () => {
+    mocks.apiFetchJson.mockImplementation((path: string) => {
+      if (path.startsWith('/api/v1/boards/')) {
+        return Promise.resolve([
+          {
+            archived: false,
+            asset_count: 0,
+            board_id: 'video-only',
+            board_name: 'Video only',
+            cover_image_name: null,
+            cover_video_name: 'only.mp4',
+            image_count: 0,
+            video_count: 5,
+          },
+        ]);
+      }
+
+      return Promise.resolve({ total: 0 });
+    });
+
+    const boards = await listGalleryBoards();
+
+    expect(boards[1]).toMatchObject({ imageCount: 0, videoCount: 5 });
+    expect(boards[1]?.coverThumbnailUrl).toBeDefined();
+  });
+});
+
+describe('deleteGalleryImages partial failures', () => {
+  beforeEach(() => {
+    accountLifecycle.activate('user-a');
+    mocks.apiFetchJson.mockReset();
+  });
+
+  it('separates deleted names from ones the backend refused', async () => {
+    mocks.apiFetchJson.mockResolvedValue({
+      affected_boards: ['board-1'],
+      deleted_images: ['gone.png'],
+      failed_images: ['locked.png'],
+    });
+
+    await expect(deleteGalleryImages(['gone.png', 'locked.png'])).resolves.toEqual({
+      deletedImageNames: ['gone.png'],
+      failedImageNames: ['locked.png'],
+    });
+  });
+
+  it('reports no failures when the backend omits failed_images', async () => {
+    mocks.apiFetchJson.mockResolvedValue({ affected_boards: [], deleted_images: ['gone.png'] });
+
+    await expect(deleteGalleryImages(['gone.png'])).resolves.toEqual({
+      deletedImageNames: ['gone.png'],
+      failedImageNames: [],
+    });
+  });
+
+  it('skips the request entirely for an empty selection', async () => {
+    await expect(deleteGalleryImages([])).resolves.toEqual({ deletedImageNames: [], failedImageNames: [] });
+    expect(mocks.apiFetchJson).not.toHaveBeenCalled();
   });
 });

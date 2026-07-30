@@ -159,13 +159,34 @@ export const useImageActions = ({
         const owner = captureAccountScope();
 
         try {
-          await galleryOrganization.deleteImages(imageNames, owner.signal);
+          const { deletedImageNames, failedImageNames } = await galleryOrganization.deleteImages(
+            imageNames,
+            owner.signal
+          );
 
           assertAccountScopeCurrent(owner);
-          patchGalleryImageCaches(queryClient, { imageNames, kind: 'delete' });
-          gallery.removeImages(imageNames);
-          onImagesDeleted?.(imageNames);
-          recordSuccess(imageNames.length === 1 ? 'Deleted image' : `Deleted ${imageNames.length} images`);
+          // Evict only what the backend actually deleted. A name it refused is still on the
+          // server, so dropping it from the cache would hide a live image until a full refresh.
+          if (deletedImageNames.length > 0) {
+            patchGalleryImageCaches(queryClient, { imageNames: deletedImageNames, kind: 'delete' });
+            gallery.removeImages(deletedImageNames);
+            onImagesDeleted?.(deletedImageNames);
+          }
+
+          if (failedImageNames.length > 0) {
+            recordError(
+              new Error(
+                failedImageNames.length === 1
+                  ? `Could not delete ${failedImageNames[0]}`
+                  : `Could not delete ${failedImageNames.length} of ${imageNames.length} images`
+              )
+            );
+          } else {
+            recordSuccess(
+              deletedImageNames.length === 1 ? 'Deleted image' : `Deleted ${deletedImageNames.length} images`
+            );
+          }
+
           void invalidateGallery(queryClient);
         } catch (error: unknown) {
           if (!isAccountScopeCurrent(owner)) {

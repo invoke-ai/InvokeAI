@@ -1,6 +1,7 @@
 import type {
   GalleryBoard,
   GalleryBoardOrderBy,
+  GalleryDeletionResult,
   GalleryImage,
   GalleryImageMetadata,
   GalleryImagesPage,
@@ -13,14 +14,19 @@ import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/
 import { absolutizeApiUrl, apiFetch, apiFetchJson, apiFetchRaw, sleep } from '@platform/transport/http';
 
 import { getGalleryImageThumbnailUrl } from './imageUrls';
+import { getGalleryVideoThumbnailUrl } from './videoUrls';
 
 interface BackendBoardDTO {
   board_id: string;
   board_name: string;
   image_count: number;
   asset_count: number;
+  /** Videos on the board. Counted separately from `image_count` by the backend. */
+  video_count?: number;
   archived: boolean;
   cover_image_name?: string | null;
+  /** Set instead of `cover_image_name` when the board's most recent item is a video. */
+  cover_video_name?: string | null;
   created_at?: string | null;
   /** Board owner's display name; populated only for admins on multi-user backends. */
   owner_username?: string | null;
@@ -88,17 +94,34 @@ const toSearchParams = (entries: Record<string, boolean | number | string | stri
   return params.toString();
 };
 
+/**
+ * The backend sets exactly one of `cover_image_name` / `cover_video_name`, depending on which
+ * kind the board's most recent item is. Both resolve to a static WebP thumbnail, so the cover
+ * renders identically either way.
+ */
+const getBoardCoverThumbnailUrl = (
+  board: Pick<BackendBoardDTO, 'cover_image_name' | 'cover_video_name'>
+): string | undefined => {
+  if (board.cover_image_name) {
+    return getGalleryImageThumbnailUrl(board.cover_image_name);
+  }
+
+  return board.cover_video_name ? getGalleryVideoThumbnailUrl(board.cover_video_name) : undefined;
+};
+
 const mapBoard = (board: BackendBoardDTO): GalleryBoard => ({
   archived: board.archived,
   assetCount: board.asset_count,
   coverImageName: board.cover_image_name,
-  coverThumbnailUrl: board.cover_image_name ? getGalleryImageThumbnailUrl(board.cover_image_name) : undefined,
+  coverThumbnailUrl: getBoardCoverThumbnailUrl(board),
+  coverVideoName: board.cover_video_name,
   createdAt: board.created_at ?? null,
   id: board.board_id,
   imageCount: board.image_count,
   kind: 'board',
   name: board.board_name,
   ownerName: board.owner_username ?? null,
+  videoCount: board.video_count ?? 0,
 });
 
 const getGalleryTotal = async ({
@@ -118,6 +141,23 @@ const getGalleryTotal = async ({
     offset: 0,
   });
   const body = await apiFetchJson<Pick<ListImagesResponse, 'total'>>(`/api/v1/images/?${query}`, { signal });
+
+  return body.total;
+};
+
+/**
+ * Videos carry no category split — the gallery's Images/Assets views are an image-only
+ * distinction — so this counts every non-intermediate video on the board.
+ */
+const getGalleryVideoTotal = async ({
+  boardId,
+  signal,
+}: {
+  boardId: string;
+  signal?: AbortSignal;
+}): Promise<number> => {
+  const query = toSearchParams({ board_id: boardId, is_intermediate: false, limit: 0, offset: 0 });
+  const body = await apiFetchJson<{ total: number }>(`/api/v1/videos/?${query}`, { signal });
 
   return body.total;
 };
@@ -160,10 +200,13 @@ export const listGalleryBoards = async ({
     { signal }
   );
 
-  const [body, uncategorizedImageCount, uncategorizedAssetCount] = await Promise.all([
+  const [body, uncategorizedImageCount, uncategorizedAssetCount, uncategorizedVideoCount] = await Promise.all([
     boardsBodyPromise,
     getGalleryTotal({ boardId: 'none', categories: imageCategories, signal }),
     getGalleryTotal({ boardId: 'none', categories: assetCategories, signal }),
+    // Real boards carry `video_count` in their DTO, but the uncategorized pseudo-board is
+    // assembled here, so its video total needs its own request.
+    getGalleryVideoTotal({ boardId: 'none', signal }),
   ]);
   const boards = Array.isArray(body) ? body : (body.items ?? []);
 
@@ -175,18 +218,25 @@ export const listGalleryBoards = async ({
       imageCount: uncategorizedImageCount,
       kind: 'uncategorized',
       name: 'Uncategorized',
+      videoCount: uncategorizedVideoCount,
     },
     ...boards.filter((board) => includeArchived || !board.archived).map(mapBoard),
   ];
 };
 
+/**
+ * Date boards are now derived from the polymorphic gallery service, so a date can exist
+ * because of videos alone — its `image_count` may be 0 while the board is non-empty.
+ */
 interface VirtualDateBoardDTO {
   virtual_board_id: string;
   board_name: string;
   date: string;
   image_count: number;
   asset_count: number;
+  video_count?: number;
   cover_image_name?: string | null;
+  cover_video_name?: string | null;
 }
 
 export const listGalleryDateBoards = async (signal?: AbortSignal): Promise<GalleryBoard[]> => {
@@ -196,11 +246,13 @@ export const listGalleryDateBoards = async (signal?: AbortSignal): Promise<Galle
     archived: false,
     assetCount: board.asset_count,
     coverImageName: board.cover_image_name,
-    coverThumbnailUrl: board.cover_image_name ? getGalleryImageThumbnailUrl(board.cover_image_name) : undefined,
+    coverThumbnailUrl: getBoardCoverThumbnailUrl(board),
+    coverVideoName: board.cover_video_name,
     id: board.virtual_board_id,
     imageCount: board.image_count,
     kind: 'date',
     name: board.board_name,
+    videoCount: board.video_count ?? 0,
   }));
 };
 
@@ -536,16 +588,39 @@ export const starGalleryImages = (imageNames: string[], signal?: AbortSignal): P
 export const unstarGalleryImages = (imageNames: string[], signal?: AbortSignal): Promise<void> =>
   setGalleryImagesStarred(imageNames, false, signal);
 
-export const deleteGalleryImages = async (imageNames: string[], signal?: AbortSignal): Promise<void> => {
+interface DeleteImagesResponse {
+  deleted_images: string[];
+  /** Names the backend could not delete. Absent on backends predating partial-failure reporting. */
+  failed_images?: string[];
+  affected_boards: string[];
+}
+
+/**
+ * Deletes images and reports the outcome per name.
+ *
+ * The backend deletes each name independently and no longer aborts the batch on the first
+ * failure, so a request can partly succeed. Callers must evict only `deletedImageNames` from
+ * their caches — treating the whole request as successful would hide a still-present image
+ * until the next full refresh.
+ */
+export const deleteGalleryImages = async (
+  imageNames: string[],
+  signal?: AbortSignal
+): Promise<GalleryDeletionResult> => {
   if (imageNames.length === 0) {
-    return;
+    return { deletedImageNames: [], failedImageNames: [] };
   }
 
-  await apiFetchJson('/api/v1/images/delete', {
+  const body = await apiFetchJson<DeleteImagesResponse>('/api/v1/images/delete', {
     body: JSON.stringify({ image_names: imageNames }),
     method: 'POST',
     signal,
   });
+
+  return {
+    deletedImageNames: body.deleted_images,
+    failedImageNames: body.failed_images ?? [],
+  };
 };
 
 const BULK_DOWNLOAD_POLL_INTERVAL_MS = 2000;
