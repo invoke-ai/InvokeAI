@@ -1,6 +1,9 @@
 # Check the `uv` lockfile for consistency with `pyproject.toml`.
 #
 # If this check fails, you should run `uv lock` to update the lockfile.
+#
+# Also checks that the lockfile keeps working for linux/aarch64, which no test job covers.
+# This reads the lockfile only - no ARM hardware or extra resolution needed.
 
 name: 'uv lock checks'
 
@@ -54,9 +57,11 @@ jobs:
             uvlock-pyprojecttoml:
               - 'pyproject.toml'
               - 'uv.lock'
+            aarch64check:
+              - 'scripts/check_aarch64_lock.py'
 
       - name: setup uv
-        if: ${{ steps.changed-files.outputs.uvlock-pyprojecttoml_any_changed == 'true' || inputs.always_run == true }}
+        if: ${{ steps.changed-files.outputs.uvlock-pyprojecttoml_any_changed == 'true' || steps.changed-files.outputs.aarch64check_any_changed == 'true' || inputs.always_run == true }}
         uses: astral-sh/setup-uv@v8.1.0
         with:
           version: '0.6.10'
@@ -65,4 +70,15 @@ jobs:
       - name: check lockfile
         if: ${{ steps.changed-files.outputs.uvlock-pyprojecttoml_any_changed == 'true' || inputs.always_run == true }}
         run: uv lock --locked # this will exit with 1 if the lockfile is not consistent with pyproject.toml
+        shell: bash
+
+      - name: check aarch64 support in lockfile
+        # Also runs when the check itself changes, so edits to it are exercised.
+        if: ${{ steps.changed-files.outputs.uvlock-pyprojecttoml_any_changed == 'true' || steps.changed-files.outputs.aarch64check_any_changed == 'true' || inputs.always_run == true }}
+        # On linux/aarch64 torch and torchvision must resolve from PyPI rather than from the PyTorch WHL
+        # indexes, which have no aarch64 torchvision wheel. Several things in pyproject.toml have to hold
+        # for that, and breaking most of them leaves a lockfile with no torch at all on aarch64 while
+        # `uv lock --locked` above still passes. See the script's docstring.
+        # `--no-project` keeps `uv run` from syncing the whole project just to run this.
+        run: uv run --no-project --with packaging --python 3.12 scripts/check_aarch64_lock.py ./uv.lock
         shell: bash
