@@ -19,8 +19,19 @@ import type {
 } from '@features/gallery/core/types';
 
 import { isTimestampInRange } from '@platform/search/dateTokens';
-import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
-import { absolutizeApiUrl, ApiError, apiFetchJson, apiFetchRaw, sleep } from '@platform/transport/http';
+import {
+  AccountScopeExpiredError,
+  assertAccountScopeCurrent,
+  captureAccountScope,
+} from '@platform/state/accountLifecycle';
+import {
+  absolutizeApiUrl,
+  ApiError,
+  apiFetchJson,
+  apiFetchRaw,
+  HttpRequestIdentityExpiredError,
+  sleep,
+} from '@platform/transport/http';
 
 import { getGalleryImageThumbnailUrl } from './imageUrls';
 import { getGalleryVideoThumbnailUrl } from './videoUrls';
@@ -954,6 +965,17 @@ const mapGalleryItemOrganizationTransportResult = (
   succeededNames: getRequiredStringArray(body, succeededField),
 });
 
+const mapGalleryVideoOrganizationTransportResult = (
+  body: unknown,
+  succeededField: string
+): GalleryItemOrganizationTransportResult => {
+  const result = mapGalleryItemOrganizationTransportResult(body, succeededField);
+
+  getRequiredStringArray(body, 'failed_videos');
+
+  return result;
+};
+
 const emptyGalleryItemOrganizationTransportResult = (): GalleryItemOrganizationTransportResult => ({
   affectedBoardIds: [],
   succeededNames: [],
@@ -1096,7 +1118,7 @@ const mutateGalleryVideoItems = async (
   });
   signal?.throwIfAborted();
 
-  return mapGalleryItemOrganizationTransportResult(body, succeededField);
+  return mapGalleryVideoOrganizationTransportResult(body, succeededField);
 };
 
 export const deleteGalleryVideoItems = (
@@ -1134,6 +1156,13 @@ const moveGalleryVideoItemToBoard = async (
   return mapGalleryItemOrganizationTransportResult(body, removing ? 'removed_videos' : 'added_videos');
 };
 
+const isFatalGalleryVideoMoveError = (error: unknown, signal: AbortSignal): boolean =>
+  signal.aborted ||
+  error instanceof AccountScopeExpiredError ||
+  error instanceof HttpRequestIdentityExpiredError ||
+  (error instanceof ApiError && error.status === 401) ||
+  (error instanceof Error && error.name === 'AbortError');
+
 export const moveGalleryVideoItemsToBoard = async (
   videoNames: string[],
   boardId: string,
@@ -1143,35 +1172,68 @@ export const moveGalleryVideoItemsToBoard = async (
     return emptyGalleryItemOrganizationTransportResult();
   }
 
+  const owner = captureAccountScope();
+  const requestSignal = signal ? AbortSignal.any([signal, owner.signal]) : owner.signal;
   const outcomes: (GalleryItemOrganizationTransportResult | undefined)[] = Array.from({
     length: videoNames.length,
   });
+  const fatalFailure: { error: unknown; occurred: boolean } = { error: undefined, occurred: false };
   let nextIndex = 0;
+
+  const claimNextVideo = (): { index: number; videoName: string } | null => {
+    if (fatalFailure.occurred || requestSignal.aborted) {
+      return null;
+    }
+
+    const index = nextIndex;
+    const videoName = videoNames[index];
+
+    if (videoName === undefined) {
+      return null;
+    }
+    nextIndex += 1;
+
+    return { index, videoName };
+  };
 
   const worker = async (): Promise<void> => {
     while (true) {
-      if (signal?.aborted) {
+      const claim = claimNextVideo();
+
+      if (!claim) {
         return;
       }
-
-      const index = nextIndex;
-      const videoName = videoNames[index];
-
-      if (videoName === undefined) {
-        return;
-      }
-      nextIndex += 1;
 
       try {
-        outcomes[index] = await moveGalleryVideoItemToBoard(videoName, boardId, signal);
-      } catch {
+        const outcome = await moveGalleryVideoItemToBoard(claim.videoName, boardId, requestSignal);
+
+        assertAccountScopeCurrent(owner);
+        requestSignal.throwIfAborted();
+        if (fatalFailure.occurred) {
+          return;
+        }
+        outcomes[claim.index] = outcome;
+      } catch (error: unknown) {
+        if (isFatalGalleryVideoMoveError(error, requestSignal)) {
+          if (!fatalFailure.occurred) {
+            fatalFailure.error = requestSignal.aborted ? (requestSignal.reason ?? error) : error;
+            fatalFailure.occurred = true;
+          }
+          return;
+        }
         // A rejected single-video request is unconfirmed. Other videos may still
-        // return authoritative successes; abort stops workers before scheduling more.
+        // return authoritative successes.
       }
     }
   };
 
   await Promise.all(Array.from({ length: Math.min(4, videoNames.length) }, () => worker()));
+
+  if (fatalFailure.occurred) {
+    throw fatalFailure.error;
+  }
+  assertAccountScopeCurrent(owner);
+  requestSignal.throwIfAborted();
 
   const affectedBoardIds: string[] = [];
   const succeededNames: string[] = [];

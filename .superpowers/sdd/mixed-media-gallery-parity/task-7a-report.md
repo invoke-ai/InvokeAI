@@ -179,6 +179,140 @@ and action behavior.
   side effect.
 - Confirmed `git diff --check` is clean.
 
-No unresolved Task 7A implementation concern remains. Task 7B owns consuming
-the confirmed arrays to patch/prune state, perform one operation-level
-invalidation, and issue one user notification.
+Task 7B owns consuming the confirmed arrays to patch/prune state, perform one
+operation-level invalidation, and issue one user notification. The subsequent
+independent review and Task 7A fix round are recorded below.
+
+## Independent review fix round
+
+An independent review of `35bf5e98ae` found two transport-boundary gaps:
+
+1. Bulk video delete/star/unstar accepted a success array without validating
+   the backend-required `failed_videos` array.
+2. The bounded video-board worker treated authentication, identity-expiry, and
+   abort failures like isolated item failures, allowing later index claims and
+   potentially retaining video successes from a stale identity lifetime.
+
+### Fix-round RED
+
+The focused organization run after adding the malformed DTO and fatal
+concurrency regressions was:
+
+```sh
+pnpm test src/features/gallery/data/organization.test.ts
+```
+
+```text
+Test Files 1 failed (1)
+Tests 9 failed | 13 passed (22)
+```
+
+Six failures showed that missing or wrong-type `failed_videos` still confirmed
+the requested video across star, unstar, and delete. Two failures showed HTTP
+401 and `HttpRequestIdentityExpiredError` were swallowed: all remaining video
+requests were scheduled and their successes retained. The ninth showed that
+an omitted caller signal did not bind movement to the captured account
+lifetime, so account rotation scheduled eight requests instead of stopping at
+the four already in flight.
+
+### Fix-round implementation
+
+- Added a strict bulk-video result mapper that requires arrays containing only
+  non-empty strings for the operation success field, `affected_boards`, and
+  `failed_videos`.
+- Captured the account scope at the start of video board movement and composed
+  its lifetime signal with an optional caller signal.
+- Added one shared fatal sentinel checked synchronously before every worker
+  index claim.
+- Classified caller/account abort, `AccountScopeExpiredError`,
+  `HttpRequestIdentityExpiredError`, and HTTP 401 as partition-fatal.
+- A fatal outcome rejects the video partition after the current workers settle,
+  so the outer `Promise.allSettled` orchestration confirms no video refs while
+  retaining an independently completed image partition.
+- Kept ordinary HTTP 403/500 and malformed per-item move responses isolated to
+  their requested video; later video requests still run and may confirm.
+
+### Fix-round GREEN and full verification
+
+All commands ran from `invokeai/frontend/webv2` on the final formatted tree.
+
+```sh
+pnpm test src/features/gallery/data/organization.test.ts
+```
+
+```text
+Test Files 1 passed (1)
+Tests 22 passed (22)
+```
+
+```sh
+pnpm test \
+  src/features/gallery/core/items.test.ts \
+  src/features/gallery/data/backend.test.ts \
+  src/features/gallery/data/organization.test.ts \
+  src/features/gallery/data/queryCache.test.ts \
+  src/features/gallery/data/itemQueryCache.test.ts
+```
+
+```text
+Test Files 5 passed (5)
+Tests 82 passed (82)
+```
+
+```sh
+pnpm test
+```
+
+```text
+Test Files 376 passed (376)
+Tests 4973 passed (4973)
+```
+
+```sh
+pnpm test:fixtures
+```
+
+```text
+Tests 4 passed (4)
+```
+
+```sh
+pnpm lint:tsc
+```
+
+```text
+tsc --noEmit: passed
+```
+
+```sh
+pnpm lint
+```
+
+```text
+format: all matched files correctly formatted
+oxlint: zero warnings/errors
+tsc --noEmit: passed
+architecture: 3 files passed, 34 tests passed
+```
+
+The first aggregate lint attempt stopped only on formatting in the expanded
+organization test. The repository formatter was applied to that test, then
+the focused suite, full unit suite, fixtures, and aggregate lint were all run
+again with the final counts above.
+
+### Fix-round self-review
+
+- Confirmed malformed bulk video results cannot contribute successes or
+  affected board IDs.
+- Confirmed fatal 401/identity/account/abort outcomes stop new claims and reject
+  the complete video partition.
+- Confirmed an already completed image partition remains independently
+  confirmable through the existing settled orchestration.
+- Confirmed ordinary 403/500 move failures remain item-local and do not stop
+  later video work.
+- Confirmed every video board request is account-lifetime-scoped even when the
+  caller omits a signal.
+- Confirmed Task 7A still performs no cache patch, invalidation, notification,
+  UI/action, or download work.
+- Confirmed no production module, `useEffect`, `@platform/ui` importer,
+  migration exception, or baseline change was added.

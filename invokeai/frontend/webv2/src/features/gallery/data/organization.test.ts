@@ -1,6 +1,7 @@
 import type { GalleryItemRef } from '@features/gallery/core/items';
 
 import { galleryItemOrganization } from '@features/gallery/index';
+import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const MockApiError = vi.hoisted(
@@ -15,6 +16,16 @@ const MockApiError = vi.hoisted(
     }
 );
 
+const MockHttpRequestIdentityExpiredError = vi.hoisted(
+  () =>
+    class HttpRequestIdentityExpiredError extends Error {
+      constructor() {
+        super('The identity lifetime that started this HTTP request is no longer active.');
+        this.name = 'HttpRequestIdentityExpiredError';
+      }
+    }
+);
+
 const mocks = vi.hoisted(() => ({
   apiFetchJson: vi.fn(),
 }));
@@ -25,6 +36,7 @@ vi.mock('@platform/transport/http', () => ({
   apiFetch: vi.fn(),
   apiFetchJson: mocks.apiFetchJson,
   apiFetchRaw: vi.fn(),
+  HttpRequestIdentityExpiredError: MockHttpRequestIdentityExpiredError,
   sleep: vi.fn(),
 }));
 
@@ -33,6 +45,7 @@ const videoRef = (name: string): GalleryItemRef => ({ kind: 'video', name });
 
 describe('galleryItemOrganization transport and confirmed outcomes', () => {
   beforeEach(() => {
+    accountLifecycle.activate('organization-test-user');
     mocks.apiFetchJson.mockReset();
   });
 
@@ -59,8 +72,8 @@ describe('galleryItemOrganization transport and confirmed outcomes', () => {
 
   it('uses the video bulk star, unstar, and delete DTOs without inferring success', async () => {
     mocks.apiFetchJson
-      .mockResolvedValueOnce({ affected_boards: ['board-a'], starred_videos: ['clip.mp4'] })
-      .mockResolvedValueOnce({ affected_boards: ['board-a'], unstarred_videos: ['clip.mp4'] })
+      .mockResolvedValueOnce({ affected_boards: ['board-a'], failed_videos: [], starred_videos: ['clip.mp4'] })
+      .mockResolvedValueOnce({ affected_boards: ['board-a'], failed_videos: [], unstarred_videos: ['clip.mp4'] })
       .mockResolvedValueOnce({
         affected_boards: ['board-a'],
         deleted_videos: ['clip.mp4'],
@@ -98,6 +111,47 @@ describe('galleryItemOrganization transport and confirmed outcomes', () => {
     });
   });
 
+  it.each([
+    {
+      label: 'star with missing failed_videos',
+      mutate: () => galleryItemOrganization.setStarred([videoRef('clip.mp4')], true),
+      response: { affected_boards: ['board-a'], starred_videos: ['clip.mp4'] },
+    },
+    {
+      label: 'star with wrong-type failed_videos',
+      mutate: () => galleryItemOrganization.setStarred([videoRef('clip.mp4')], true),
+      response: { affected_boards: ['board-a'], failed_videos: 'locked.mp4', starred_videos: ['clip.mp4'] },
+    },
+    {
+      label: 'unstar with missing failed_videos',
+      mutate: () => galleryItemOrganization.setStarred([videoRef('clip.mp4')], false),
+      response: { affected_boards: ['board-a'], unstarred_videos: ['clip.mp4'] },
+    },
+    {
+      label: 'unstar with wrong-type failed_videos',
+      mutate: () => galleryItemOrganization.setStarred([videoRef('clip.mp4')], false),
+      response: { affected_boards: ['board-a'], failed_videos: 'locked.mp4', unstarred_videos: ['clip.mp4'] },
+    },
+    {
+      label: 'delete with missing failed_videos',
+      mutate: () => galleryItemOrganization.delete([videoRef('clip.mp4')]),
+      response: { affected_boards: ['board-a'], deleted_videos: ['clip.mp4'] },
+    },
+    {
+      label: 'delete with wrong-type failed_videos',
+      mutate: () => galleryItemOrganization.delete([videoRef('clip.mp4')]),
+      response: { affected_boards: ['board-a'], deleted_videos: ['clip.mp4'], failed_videos: 'locked.mp4' },
+    },
+  ])('does not confirm a video bulk success for $label', async ({ mutate, response }) => {
+    mocks.apiFetchJson.mockResolvedValue(response);
+
+    await expect(mutate()).resolves.toEqual({
+      affectedBoardIds: [],
+      failed: [videoRef('clip.mp4')],
+      succeeded: [],
+    });
+  });
+
   it('isolates same-name media, deduplicates keys, intersects successes, and preserves request order', async () => {
     const refs = [
       videoRef('shared'),
@@ -117,6 +171,7 @@ describe('galleryItemOrganization transport and confirmed outcomes', () => {
 
       return Promise.resolve({
         affected_boards: ['board-video', 'none'],
+        failed_videos: [],
         starred_videos: ['later.mp4', 'unexpected.mp4', 'shared'],
       });
     });
@@ -196,7 +251,7 @@ describe('galleryItemOrganization transport and confirmed outcomes', () => {
     expect(mocks.apiFetchJson).toHaveBeenCalledWith('/api/v1/videos/board', {
       body: JSON.stringify({ board_id: 'destination', video_name: 'one.mp4' }),
       method: 'POST',
-      signal: undefined,
+      signal: expect.any(AbortSignal),
     });
   });
 
@@ -230,7 +285,7 @@ describe('galleryItemOrganization transport and confirmed outcomes', () => {
     expect(mocks.apiFetchJson).toHaveBeenCalledWith('/api/v1/videos/board', {
       body: JSON.stringify({ video_name: 'clip.mp4' }),
       method: 'DELETE',
-      signal: undefined,
+      signal: expect.any(AbortSignal),
     });
   });
 
@@ -280,6 +335,149 @@ describe('galleryItemOrganization transport and confirmed outcomes', () => {
     expect(mocks.apiFetchJson).toHaveBeenCalledTimes(refs.length);
   });
 
+  it.each([
+    {
+      error: () => new MockApiError('Unauthorized', 401),
+      label: 'HTTP 401',
+    },
+    {
+      error: () => new MockHttpRequestIdentityExpiredError(),
+      label: 'expired HTTP identity',
+    },
+  ])(
+    'stops scheduling after fatal $label and discards all video outcomes while retaining the image partition',
+    async ({ error }) => {
+      const refs = [imageRef('still.png'), ...Array.from({ length: 8 }, (_, index) => videoRef(`clip-${index}.mp4`))];
+      const initialVideoReleases: (() => void)[] = [];
+      let rejectFatal: ((error: unknown) => void) | undefined;
+      let videoRequests = 0;
+
+      mocks.apiFetchJson.mockImplementation((url: string, init?: RequestInit) => {
+        if (url === '/api/v1/board_images/batch') {
+          return Promise.resolve({
+            added_images: ['still.png'],
+            affected_boards: ['source-image', 'destination'],
+          });
+        }
+
+        const { video_name: videoName } = JSON.parse(String(init?.body)) as { video_name: string };
+        const videoIndex = Number(videoName.slice('clip-'.length, -'.mp4'.length));
+
+        videoRequests += 1;
+
+        if (videoIndex === 0) {
+          return new Promise((_resolve, reject) => {
+            rejectFatal = reject;
+          });
+        }
+        if (videoIndex < 4) {
+          return new Promise((resolve) => {
+            initialVideoReleases.push(() => {
+              resolve({
+                added_videos: [videoName],
+                affected_boards: ['source-video', 'destination'],
+              });
+            });
+          });
+        }
+
+        return Promise.resolve({
+          added_videos: [videoName],
+          affected_boards: ['must-not-be-reported'],
+        });
+      });
+
+      const movement = galleryItemOrganization.moveToBoard(refs, 'destination');
+
+      await vi.waitFor(() => {
+        expect(videoRequests).toBe(4);
+        expect(rejectFatal).toBeDefined();
+        expect(initialVideoReleases).toHaveLength(3);
+      });
+      rejectFatal?.(error());
+      await Promise.resolve();
+      for (const release of initialVideoReleases) {
+        release();
+      }
+
+      await expect(movement).resolves.toEqual({
+        affectedBoardIds: ['destination', 'source-image'],
+        failed: refs.slice(1),
+        succeeded: [imageRef('still.png')],
+      });
+      expect(videoRequests).toBe(4);
+    }
+  );
+
+  it('binds video movement to the captured account lifetime when the caller omits a signal', async () => {
+    const refs = [imageRef('still.png'), ...Array.from({ length: 8 }, (_, index) => videoRef(`clip-${index}.mp4`))];
+    let videoRequests = 0;
+
+    mocks.apiFetchJson.mockImplementation((url: string, init?: RequestInit) => {
+      if (url === '/api/v1/board_images/batch') {
+        return Promise.resolve({
+          added_images: ['still.png'],
+          affected_boards: ['source-image', 'destination'],
+        });
+      }
+
+      videoRequests += 1;
+      const signal = init?.signal;
+
+      if (!signal) {
+        return Promise.reject(new Error('Video movement did not capture the account lifetime signal.'));
+      }
+
+      return new Promise((_resolve, reject) => {
+        const rejectAborted = () => reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));
+
+        if (signal.aborted) {
+          rejectAborted();
+          return;
+        }
+        signal.addEventListener('abort', rejectAborted, { once: true });
+      });
+    });
+
+    const movement = galleryItemOrganization.moveToBoard(refs, 'destination');
+
+    await vi.waitFor(() => {
+      expect(videoRequests).toBe(4);
+    });
+    accountLifecycle.activate('replacement-user');
+
+    await expect(movement).resolves.toEqual({
+      affectedBoardIds: ['destination', 'source-image'],
+      failed: refs.slice(1),
+      succeeded: [imageRef('still.png')],
+    });
+    expect(videoRequests).toBe(4);
+  });
+
+  it.each([403, 500])('keeps an isolated HTTP %s video move failure item-local', async (status) => {
+    const refs = Array.from({ length: 6 }, (_, index) => videoRef(`clip-${index}.mp4`));
+
+    mocks.apiFetchJson.mockImplementation((_url: string, init?: RequestInit) => {
+      const { video_name: videoName } = JSON.parse(String(init?.body)) as { video_name: string };
+
+      if (videoName === 'clip-0.mp4') {
+        return Promise.reject(new MockApiError('Item move failed', status));
+      }
+
+      return Promise.resolve({
+        added_videos: [videoName],
+        affected_boards: ['destination'],
+      });
+    });
+
+    await expect(galleryItemOrganization.moveToBoard(refs, 'destination')).resolves.toEqual({
+      affectedBoardIds: ['destination'],
+      failed: [videoRef('clip-0.mp4')],
+      succeeded: refs.slice(1),
+    });
+    expect(mocks.apiFetchJson).toHaveBeenCalledTimes(refs.length);
+  });
+
   it('stops scheduling video moves after abort and leaves aborted or unstarted refs unconfirmed', async () => {
     const controller = new AbortController();
     const refs = Array.from({ length: 8 }, (_, index) => videoRef(`clip-${index}.mp4`));
@@ -317,8 +515,8 @@ describe('galleryItemOrganization transport and confirmed outcomes', () => {
   });
 
   it.each([
-    { affected_boards: ['board-a'], starred_videos: 'clip.mp4' },
-    { affected_boards: ['unexpected-board'], starred_videos: ['unexpected.mp4'] },
+    { affected_boards: ['board-a'], failed_videos: [], starred_videos: 'clip.mp4' },
+    { affected_boards: ['unexpected-board'], failed_videos: [], starred_videos: ['unexpected.mp4'] },
   ])('does not confirm malformed or unexpected video success payloads: $starred_videos', async (response) => {
     mocks.apiFetchJson.mockResolvedValue(response);
 
