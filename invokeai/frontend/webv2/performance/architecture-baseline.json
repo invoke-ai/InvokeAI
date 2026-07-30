@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 798991,
+        "brotliBytes": 799074,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 799060,
+        "gzipBytes": 799111,
         "imageRawBytes": 156376,
-        "initialRawBytes": 1833065,
+        "initialRawBytes": 1833206,
         "largestAssetRawBytes": 737748,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 57827,
+        "ownedRawBytes": 57925,
         "requestCount": 31,
         "scriptRequestCount": 15,
         "sourceOwners": [
@@ -239,15 +239,15 @@
         ]
       },
       "limits": {
-        "brotliBytes": 806981,
+        "brotliBytes": 807065,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 807051,
+        "gzipBytes": 807103,
         "imageRawBytes": 157940,
-        "initialRawBytes": 1851396,
+        "initialRawBytes": 1851539,
         "largestAssetRawBytes": 745126,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 57827,
+        "ownedRawBytes": 57925,
         "requestCount": 31,
         "scriptRequestCount": 15
       },
@@ -257,17 +257,17 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 980417,
+        "brotliBytes": 982496,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 979166,
+        "gzipBytes": 981192,
         "imageRawBytes": 156376,
-        "initialRawBytes": 2387077,
+        "initialRawBytes": 2392898,
         "largestAssetRawBytes": 737748,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 110018,
-        "requestCount": 73,
-        "scriptRequestCount": 57,
+        "ownedRawBytes": 110133,
+        "requestCount": 74,
+        "scriptRequestCount": 58,
         "sourceOwners": [
           "package:@ark-ui/react",
           "package:@chakra-ui/react",
@@ -426,6 +426,8 @@
           "source:src/features/generation/core/dynamicPrompts.ts",
           "source:src/features/generation/core/graph.ts",
           "source:src/features/generation/core/graphBuilder.ts",
+          "source:src/features/generation/core/pid.ts",
+          "source:src/features/generation/core/pidGraph.ts",
           "source:src/features/generation/core/projectPromptDraft.ts",
           "source:src/features/generation/core/prompt/ast.ts",
           "source:src/features/generation/core/prompt/attention.ts",
@@ -742,17 +744,17 @@
         ]
       },
       "limits": {
-        "brotliBytes": 990222,
+        "brotliBytes": 992321,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 988958,
+        "gzipBytes": 991004,
         "imageRawBytes": 157940,
-        "initialRawBytes": 2410948,
+        "initialRawBytes": 2416827,
         "largestAssetRawBytes": 745126,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 110018,
-        "requestCount": 73,
-        "scriptRequestCount": 57
+        "ownedRawBytes": 110133,
+        "requestCount": 74,
+        "scriptRequestCount": 58
       },
       "owner": "workbench",
       "remediationTicket": "deepen-widget-registry-loading",

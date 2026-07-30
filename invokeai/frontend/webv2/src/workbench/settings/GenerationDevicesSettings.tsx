@@ -1,4 +1,4 @@
-import type { GenerationDevicesSetting } from '@features/queue/react';
+import type { GenerationDevicesSetting } from '@features/queue/devices';
 
 import { Spinner, Stack, Switch, Text } from '@chakra-ui/react';
 import { useCapabilities } from '@features/identity';
@@ -7,7 +7,7 @@ import {
   refreshGenerationDevices,
   updateGenerationDevices,
   useGenerationDevices,
-} from '@features/queue/react';
+} from '@features/queue/devices';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { useCallback, useMemo, useState } from 'react';
 

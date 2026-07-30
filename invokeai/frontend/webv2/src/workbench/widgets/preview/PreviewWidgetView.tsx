@@ -28,10 +28,10 @@ import {
   galleryImagesInfiniteOptions,
 } from '@features/gallery/queries';
 import { createGenerateFormValuesSelector } from '@features/generation/react';
+import { useDeviceLabel } from '@features/queue/devices';
 import {
   useActiveProgressTarget,
   useActiveProgressTargets,
-  useDeviceLabel,
   useItemProgress,
   useProgressImage,
   useQueueItemProgressImage,

@@ -1,4 +1,4 @@
-import type { GenerationDevicesSnapshot } from '@features/queue/react';
+import type { GenerationDevicesSnapshot } from '@features/queue/devices';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
@@ -18,7 +18,7 @@ vi.mock('@features/identity', () => ({
   useCapabilities: () => ({ canManageAppConfig: mocks.canManageAppConfig }),
 }));
 
-vi.mock('@features/queue/react', async () => {
+vi.mock('@features/queue/devices', async () => {
   const { getDeviceNameLabels } = await import('@features/queue/core/deviceLabels');
 
   return {
