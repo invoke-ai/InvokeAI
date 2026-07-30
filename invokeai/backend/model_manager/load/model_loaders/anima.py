@@ -54,6 +54,28 @@ def _strip_anima_bundle_prefix(sd: dict) -> dict:
     return stripped_sd
 
 
+# Checkpoint tensors that are not part of the transformer's in-memory state. Suffixes match
+# derived buffers that the model regenerates at runtime (registered as non-persistent or
+# recomputed locally); prefixes match metadata that export tools serialize alongside the
+# weights (e.g. sampling schedules). Extend these tuples as new checkpoint variants surface.
+_NON_MODEL_KEY_SUFFIXES = (
+    ".inv_freq",
+    "pos_embedder.dim_spatial_range",
+    "pos_embedder.dim_temporal_range",
+    "pos_embedder.seq",
+)
+_NON_MODEL_KEY_PREFIXES = ("model_sampling.",)
+
+
+def _filter_non_model_keys(sd: dict) -> dict:
+    """Drop checkpoint keys that don't belong to the transformer module's state dict."""
+    return {
+        k: v
+        for k, v in sd.items()
+        if not (k.endswith(_NON_MODEL_KEY_SUFFIXES) or k.startswith(_NON_MODEL_KEY_PREFIXES))
+    }
+
+
 @ModelLoaderRegistry.register(base=BaseModelType.Anima, type=ModelType.Main, format=ModelFormat.Checkpoint)
 class AnimaCheckpointModel(ModelLoader):
     """Class to load Anima transformer models from single-file checkpoints.
@@ -100,6 +122,9 @@ class AnimaCheckpointModel(ModelLoader):
         # Strip the transformer-key prefix (`net.` or bundled `model.diffusion_model.`).
         sd = _strip_anima_bundle_prefix(sd)
 
+        # Drop runtime-derived buffers and exporter metadata that aren't model weights.
+        sd = _filter_non_model_keys(sd)
+
         # Create an empty AnimaTransformer with Anima's default architecture parameters
         with accelerate.init_empty_weights():
             model = AnimaTransformer(
@@ -143,22 +168,6 @@ class AnimaCheckpointModel(ModelLoader):
         for k in sd.keys():
             if sd[k].is_floating_point():
                 sd[k] = sd[k].to(model_dtype)
-
-        # Filter out tensors that are regenerated at runtime and therefore not part of the
-        # in-memory module state. Some community-trained checkpoints (e.g. animaCatTower_v10)
-        # serialize derived pos_embedder buffers/cached tensors that the official model
-        # registers as non-persistent (or recomputes locally). ComfyUI diffusion-model exports
-        # (e.g. arthemyComicsAnima_v20) additionally carry a `model_sampling.sigmas` schedule
-        # buffer that belongs to ComfyUI's sampling wrapper, not the transformer.
-        runtime_only_suffixes = (
-            ".inv_freq",
-            "pos_embedder.dim_spatial_range",
-            "pos_embedder.dim_temporal_range",
-            "pos_embedder.seq",
-        )
-        keys_to_remove = [k for k in sd.keys() if k.endswith(runtime_only_suffixes) or k.startswith("model_sampling.")]
-        for k in keys_to_remove:
-            del sd[k]
 
         load_result = model.load_state_dict(sd, assign=True, strict=False)
         if load_result.unexpected_keys:
