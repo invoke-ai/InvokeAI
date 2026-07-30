@@ -68,8 +68,8 @@ Both are recorded in image metadata and can be recalled.
 ## Multiple conditionings
 
 In the workflow editor, the **Denoise - Krea-2** node accepts one conditioning or a collection for both
-its positive and negative conditioning inputs. Multiple conditionings are combined into one longer text
-token sequence before denoising. They are global conditionings; spatial masks are not supported.
+its positive and negative conditioning inputs. Multiple independently encoded conditionings are concatenated
+after padding tokens are removed. They are global conditionings; spatial masks are not supported.
 
 ## LoRA
 
