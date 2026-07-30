@@ -62,13 +62,21 @@ vi.mock('@features/gallery/queries', () => ({
 vi.mock('@features/models', () => ({
   ensureModelsLoaded: vi.fn(() => Promise.resolve()),
   getModelsSnapshot: () => ({
-    models: [{ base: 'sdxl', key: 'sdxl-model', name: 'SDXL', type: 'main' }],
+    models: [
+      { base: 'sd-1', key: 'sd-1-model', name: 'SD 1', type: 'main' },
+      { base: 'flux', key: 'flux-model', name: 'FLUX', type: 'main' },
+    ],
   }),
   useModelsSelector: (
-    selector: (snapshot: { models: Array<{ base: 'sdxl'; key: string; name: string; type: 'main' }> }) => unknown
+    selector: (snapshot: {
+      models: Array<{ base: 'sd-1' | 'flux'; key: string; name: string; type: 'main' }>;
+    }) => unknown
   ) =>
     selector({
-      models: [{ base: 'sdxl', key: 'sdxl-model', name: 'SDXL', type: 'main' }],
+      models: [
+        { base: 'sd-1', key: 'sd-1-model', name: 'SD 1', type: 'main' },
+        { base: 'flux', key: 'flux-model', name: 'FLUX', type: 'main' },
+      ],
     }),
 }));
 
@@ -126,10 +134,10 @@ interface ItemActionContext {
 let currentItemActionContext: ItemActionContext | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const Probe = ({ ref }: { ref: Ref<ImageActions> }) => {
+const Probe = ({ modelKey = 'sd-1-model', ref }: { modelKey?: string; ref: Ref<ImageActions> }) => {
   const actions = useImageActions({
     boards: [],
-    generateValues: { modelKey: 'sdxl-model' },
+    generateValues: { modelKey },
     getItemActionContext: () => currentItemActionContext,
     projectId: 'project-1',
   });
@@ -165,6 +173,34 @@ afterEach(async () => {
 });
 
 describe('image recall capability cancellation', () => {
+  it('re-derives capabilities from the current generate model without another metadata request', async () => {
+    const image: GalleryImage = {
+      boardId: 'none',
+      height: 512,
+      imageCategory: 'general',
+      imageName: 'recall.png',
+      imageUrl: '/full/recall.png',
+      queuedAt: '2026-07-30T00:00:00.000Z',
+      sourceQueueItemId: 'queue-recall',
+      starred: false,
+      thumbnailUrl: '/thumb/recall.png',
+      width: 512,
+    };
+
+    expect(actionsRef.current?.deriveImageRecallCapabilities(image, { clip_skip: 2 }).clipSkip).toBe(true);
+
+    await act(() => {
+      root?.render(
+        <QueryClientProvider client={new QueryClient()}>
+          <Probe ref={actionsRef} modelKey="flux-model" />
+        </QueryClientProvider>
+      );
+    });
+
+    expect(actionsRef.current?.deriveImageRecallCapabilities(image, { clip_skip: 2 }).clipSkip).toBe(false);
+    expect(mocks.imageMetadata).not.toHaveBeenCalled();
+  });
+
   it('combines a caller signal with the account lifecycle signal for metadata transport', async () => {
     let resolveMetadata!: (value: null) => void;
     const metadata = new Promise<null>((resolve) => {

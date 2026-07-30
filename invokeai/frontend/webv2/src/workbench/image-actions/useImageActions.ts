@@ -10,6 +10,7 @@ import {
   toGalleryItemRef,
   type GalleryBoard,
   type GalleryImage,
+  type GalleryImageMetadata,
   type GalleryItem,
   type GalleryItemMutationResult,
   type GalleryItemRef,
@@ -59,6 +60,11 @@ export interface ImageActions extends GalleryItemActions {
   canUseAsReferenceImage: boolean;
   copyImage: (image: GalleryImage) => Promise<void>;
   deleteImages: (imageNames: string[]) => Promise<void>;
+  /** Derives recall availability from already-fetched metadata and the current generate/model state. */
+  deriveImageRecallCapabilities: (
+    image: GalleryImage,
+    metadata: GalleryImageMetadata | null
+  ) => ImageRecallCapabilities;
   downloadImage: (image: GalleryImage) => Promise<void>;
   downloadImages: (imageNames: string[]) => Promise<void>;
   getImageRecallCapabilities: (image: GalleryImage, signal?: AbortSignal) => Promise<ImageRecallCapabilities>;
@@ -464,6 +470,23 @@ export const useImageActions = ({
         );
       }
     };
+    const deriveImageRecallCapabilities = (
+      image: GalleryImage,
+      metadata: GalleryImageMetadata | null
+    ): ImageRecallCapabilities => {
+      if (!currentGenerateValues) {
+        return EMPTY_IMAGE_RECALL_CAPABILITIES;
+      }
+
+      return getImageRecallCapabilities({
+        currentValues: currentGenerateValues,
+        image,
+        metadata,
+        models,
+        supportedModels,
+        vaeModels,
+      });
+    };
 
     return {
       deleteItems,
@@ -501,6 +524,7 @@ export const useImageActions = ({
         }
       },
       deleteImages: (imageNames) => deleteItems(imageNames.map((name) => ({ kind: 'image', name }))),
+      deriveImageRecallCapabilities,
       downloadImage: async (image) => {
         const owner = captureAccountScope();
 
@@ -531,14 +555,7 @@ export const useImageActions = ({
           const metadata = await galleryImages.metadata(image.imageName, requestSignal);
 
           assertAccountScopeCurrent(owner);
-          return getImageRecallCapabilities({
-            currentValues: currentGenerateValues,
-            image,
-            metadata,
-            models,
-            supportedModels,
-            vaeModels,
-          });
+          return deriveImageRecallCapabilities(image, metadata);
         } catch {
           if (!isAccountScopeCurrent(owner)) {
             return EMPTY_IMAGE_RECALL_CAPABILITIES;

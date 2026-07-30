@@ -99,6 +99,14 @@ const ALL_RECALL_CAPABILITIES: ImageRecallCapabilities = {
   remix: true,
   seed: true,
 };
+const NO_RECALL_CAPABILITIES: ImageRecallCapabilities = {
+  all: false,
+  clipSkip: false,
+  dimensions: false,
+  prompts: false,
+  remix: false,
+  seed: false,
+};
 
 const i18n = createInstance();
 void i18n.use(initReactI18next).init({
@@ -184,6 +192,7 @@ beforeEach(() => {
   galleryMocks.videoMetadata.mockReset().mockResolvedValue(null);
   galleryMocks.videoWorkflow.mockReset().mockResolvedValue({ graph: null, workflow: null });
   actions = {
+    deriveImageRecallCapabilities: vi.fn(() => ALL_RECALL_CAPABILITIES),
     getImageRecallCapabilities: vi.fn(() => Promise.resolve(ALL_RECALL_CAPABILITIES)),
     recallImageData: vi.fn(() => Promise.resolve()),
   } as unknown as ImageActions;
@@ -218,12 +227,6 @@ describe('Preview query-driven Details', () => {
         // Intentionally pending.
       })
     );
-    actions.getImageRecallCapabilities = vi.fn(
-      () =>
-        new Promise<ImageRecallCapabilities>(() => {
-          // Intentionally pending.
-        })
-    );
 
     await renderFooter({ isOpen: true, item: imageItem });
 
@@ -231,26 +234,20 @@ describe('Preview query-driven Details', () => {
     expect(getButton('Recall All').disabled).toBe(true);
   });
 
-  it('passes the Details query signal to image recall capability work and aborts it on close', async () => {
+  it('aborts the sole image metadata transport on close without starting duplicate capability work', async () => {
     const metadata = deferred<null>();
-    const capabilities = deferred<ImageRecallCapabilities>();
-    const getImageRecallCapabilities = vi.fn((_image: GalleryImage, _signal?: AbortSignal) => capabilities.promise);
     galleryMocks.imageMetadata.mockReturnValueOnce(metadata.promise);
-    actions.getImageRecallCapabilities = getImageRecallCapabilities;
 
     await renderFooter({ isOpen: true, item: imageItem });
 
     const metadataSignal = galleryMocks.imageMetadata.mock.calls[0]?.[1] as AbortSignal;
-    const capabilitiesSignal = getImageRecallCapabilities.mock.calls[0]?.[1];
-    expect(capabilitiesSignal).toBe(metadataSignal);
+    expect(actions.getImageRecallCapabilities).not.toHaveBeenCalled();
 
     await renderFooter({ isOpen: false, item: imageItem });
 
     expect(metadataSignal.aborted).toBe(true);
-    expect(capabilitiesSignal?.aborted).toBe(true);
     await interact(() => {
       metadata.resolve(null);
-      capabilities.resolve(ALL_RECALL_CAPABILITIES);
     }, 0);
   });
 
@@ -400,6 +397,24 @@ describe('Preview query-driven Details', () => {
 
     await interact(() => getButton('Recall All').click());
     expect(actions.recallImageData).toHaveBeenCalledWith(actionImage, 'all');
+  });
+
+  it('updates recall buttons when capability inputs change without refetching cached metadata', async () => {
+    galleryMocks.imageMetadata.mockResolvedValueOnce({ positive_prompt: 'cached prompt' });
+
+    await renderFooter({ isOpen: true, item: imageItem });
+    await act(async () => {
+      await vi.waitFor(() => expect(getButton('Recall All').disabled).toBe(false));
+    });
+
+    actions = {
+      ...actions,
+      deriveImageRecallCapabilities: vi.fn(() => NO_RECALL_CAPABILITIES),
+    } as unknown as ImageActions;
+    await renderFooter({ isOpen: true, item: imageItem });
+
+    expect(getButton('Recall All').disabled).toBe(true);
+    expect(galleryMocks.imageMetadata).toHaveBeenCalledOnce();
   });
 });
 

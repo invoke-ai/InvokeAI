@@ -92,10 +92,9 @@ Tests 1 failed | 327 passed (328)
 Its intentionally invalid data-video URL could emit a trusted native media
 error after the test's deterministic manual error when the full suite was
 busy. That second event correctly entered the terminal retry state, racing the
-first-retry assertion. The test harness now suppresses only trusted native
-media errors for that invalid URL; its explicit untrusted recovery events are
-unchanged. The focused file remained green at 17/17 and the repeated full
-browser gate passed 328/328.
+first-retry assertion. The final harness uses a minimal valid media URL for
+tests that dispatch deterministic recovery events and reserves an invalid URL
+for one focused native-error contract. No trusted media error is suppressed.
 
 ### Completion-review follow-up
 
@@ -124,6 +123,49 @@ matches the menu's captured single-video target.
 The same three files then passed all 38 tests. The Details file passed 9/9
 without its prior `act(...)` diagnostics after its asynchronous query
 assertions were wrapped correctly.
+
+### Review-fix round
+
+The next review found that image recall capabilities were cached under only
+the account epoch and item key even though they also depend on current
+generation values and model inventory. The focused regression kept the epoch,
+item, and cached metadata fixed, changed the current capability action, and
+failed because the Recall All button remained enabled:
+
+```text
+Test Files 1 failed (1)
+Tests 1 failed | 9 skipped (10)
+AssertionError: expected false to be true
+```
+
+The cache now owns server metadata only. `ImageActions` exposes a synchronous
+`deriveImageRecallCapabilities(image, metadata)` operation backed by its
+current generation values and model inventory, and Preview calls it on every
+render after metadata resolves. The regression proves that the button updates
+without another metadata request. A second hook-level test switches the
+current model from SD-1 to FLUX and proves clip-skip capability changes without
+starting a metadata transport.
+
+The review also found that a test-host capture listener suppressed every
+trusted media error in the native-video file. A focused browser-generated
+error test failed because protected-media recovery was never called:
+
+```text
+Test Files 1 failed (1)
+Tests 1 failed | 17 skipped (18)
+AssertionError: expected "vi.fn()" to be called once, but got 0 times
+```
+
+The blanket listener was removed. Deterministic synthetic recovery tests use a
+valid media data URL, while the focused invalid-source test observes an
+`isTrusted` browser error and proves it reaches cookie refresh. The existing
+deterministic recovery tests retain terminal failure-UI coverage. The three
+directly affected browser files then passed:
+
+```text
+Test Files 3 passed (3)
+Tests 49 passed (49)
+```
 
 ## Implementation
 
@@ -163,8 +205,11 @@ assertions were wrapped correctly.
   `['preview', 'details', accountEpoch, itemKey]`.
 - Unmounting on close/item/epoch change cancels supported transports through
   the TanStack Query signal.
-- Image recall-capability metadata combines that signal with its account-owned
-  signal, so closing Details aborts both image metadata transports.
+- The image query performs exactly one metadata transport. Recall capabilities
+  are derived synchronously from that cached metadata and the current
+  generation/model state, so they never become stale behind the item-only key.
+- The asynchronous recall-capability port retained for context menus still
+  combines caller and account-lifecycle signals.
 - Video metadata and workflow/graph requests use `Promise.all` and the same
   signal.
 - Video Metadata, Workflow, and Graph use `JsonPreview` from the direct
@@ -200,15 +245,11 @@ pnpm test:browser
 
 ```text
 Test Files 67 passed (67)
-Tests 332 passed (332)
+Tests 335 passed (335)
 ```
 
-The first final full-browser attempt passed every Task 9 test but an unrelated
-existing platform Tabs hover test hit its 15-second timeout under suite load.
-That file immediately passed 1/1 focused; the complete browser rerun above then
-passed 332/332. The full suite retained non-failing React `act(...)`,
-missing-i18n-instance, and intentional error-boundary diagnostics from
-pre-existing files.
+The full suite retained non-failing React `act(...)`, missing-i18n-instance,
+and intentional error-boundary diagnostics from pre-existing files.
 
 ```sh
 pnpm test:fixtures

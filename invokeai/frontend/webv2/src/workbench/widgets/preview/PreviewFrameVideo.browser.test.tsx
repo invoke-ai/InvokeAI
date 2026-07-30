@@ -55,19 +55,14 @@ const videoSource: VideoSource = {
   kind: 'video' as const,
   label: 'Video clip.mp4',
   poster: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="9"/>',
-  src: 'data:video/mp4;base64,AAAA',
+  src: 'data:audio/wav;base64,UklGRiUAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQEAAACA',
 };
+const invalidVideoSource: VideoSource = { ...videoSource, src: 'data:video/mp4;base64,AAAA' };
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 let onDragStart = vi.fn();
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-
-const suppressNativeMediaError = (event: Event): void => {
-  if (event.isTrusted && event.target instanceof HTMLMediaElement) {
-    event.stopImmediatePropagation();
-  }
-};
 
 const interact = (action: () => void, delay = 0): Promise<void> =>
   act(async () => {
@@ -130,9 +125,6 @@ beforeEach(() => {
   onDragStart = vi.fn();
   host = document.createElement('div');
   host.style.cssText = 'height:320px;left:20px;position:fixed;top:20px;width:480px;';
-  // The deliberately invalid data URL may fail at any time under browser-suite
-  // load. Recovery tests dispatch deterministic, untrusted error events.
-  host.addEventListener('error', suppressNativeMediaError, true);
   document.body.append(host);
   root = createRoot(host);
 });
@@ -197,6 +189,32 @@ describe('PreviewFrame native video arm', () => {
 
     expect(onDragStart).not.toHaveBeenCalled();
     expect(document.body.textContent).not.toContain('Drop to compare');
+  });
+
+  it('lets a trusted browser media error enter protected-media recovery', async () => {
+    const trustedErrors: Event[] = [];
+    const recordTrustedMediaError = (event: Event): void => {
+      if (event.isTrusted && event.target instanceof HTMLMediaElement) {
+        trustedErrors.push(event);
+      }
+    };
+    document.addEventListener('error', recordTrustedMediaError, true);
+    identityMocks.refreshProtectedMediaCookie.mockResolvedValueOnce(false);
+
+    try {
+      await renderVideo(() => true, invalidVideoSource);
+      await act(async () => {
+        await vi.waitFor(
+          () => {
+            expect(trustedErrors.length).toBeGreaterThan(0);
+            expect(identityMocks.refreshProtectedMediaCookie).toHaveBeenCalledOnce();
+          },
+          { timeout: 5_000 }
+        );
+      });
+    } finally {
+      document.removeEventListener('error', recordTrustedMediaError, true);
+    }
   });
 
   it('refreshes the protected-media cookie once and reloads after the first media failure', async () => {
@@ -314,7 +332,6 @@ describe('PreviewFrame native video arm', () => {
       ...videoSource,
       itemKey: 'video:next.mp4' as const,
       label: 'Video next.mp4',
-      src: 'data:video/mp4;base64,BBBB',
     };
     await renderVideo(() => true, nextSource);
     const nextVideo = getVideo();
@@ -514,17 +531,6 @@ const renderVideo = async (
   videoControllerRef?: Ref<PreviewVideoFrameController>,
   onCopyAvailabilityChange?: (itemKey: GalleryItemKey, isAvailable: boolean) => void
 ): Promise<void> => {
-  if (videoControllerRef) {
-    // The intentionally invalid data URL may emit a browser media error. Copy
-    // tests exercise the frame controller, not protected-media recovery, so
-    // keep that unrelated async branch pending and silent.
-    identityMocks.refreshProtectedMediaCookie.mockReturnValue(
-      new Promise<boolean>(() => {
-        // Intentionally pending for this render's lifetime.
-      })
-    );
-  }
-
   await interact(() => {
     root?.render(
       <I18nextProvider i18n={i18n}>

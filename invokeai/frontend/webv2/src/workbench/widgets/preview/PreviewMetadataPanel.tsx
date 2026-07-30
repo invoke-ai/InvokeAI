@@ -80,7 +80,6 @@ export const PreviewMetadataPanel = ({
 
 type PreviewDetailsData =
   | {
-      capabilities: ImageRecallCapabilities;
       kind: 'image';
       metadata: GalleryImageMetadata | null;
     }
@@ -109,15 +108,12 @@ const PreviewDetailsQuery = ({
     queryFn: async ({ signal }): Promise<PreviewDetailsData> => {
       if (item.kind === 'image') {
         if (!image) {
-          return { capabilities: EMPTY_IMAGE_RECALL_CAPABILITIES, kind: 'image', metadata: null };
+          return { kind: 'image', metadata: null };
         }
 
-        const [metadata, capabilities] = await Promise.all([
-          galleryImages.metadata(item.name, signal),
-          actions.getImageRecallCapabilities(image, signal),
-        ]);
+        const metadata = await galleryImages.metadata(item.name, signal);
 
-        return { capabilities, kind: 'image', metadata };
+        return { kind: 'image', metadata };
       }
 
       const [metadata, workflow] = await Promise.all([
@@ -152,11 +148,13 @@ const PreviewDetailsQuery = ({
   }
 
   const details = isImageDetails(detailsQuery.data) ? detailsQuery.data : null;
+  const capabilities =
+    image && details ? actions.deriveImageRecallCapabilities(image, details.metadata) : EMPTY_IMAGE_RECALL_CAPABILITIES;
 
   return (
     <ImageDetails
       actions={actions}
-      capabilities={details?.capabilities ?? EMPTY_IMAGE_RECALL_CAPABILITIES}
+      capabilities={capabilities}
       image={image}
       isLoading={detailsQuery.isPending}
       metadata={details?.metadata ?? null}

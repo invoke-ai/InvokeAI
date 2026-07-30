@@ -47,6 +47,7 @@ const createActions = (deleteItems: ImageActions['deleteItems']): ImageActions =
   copyImage: vi.fn(() => Promise.resolve()),
   deleteItems,
   deleteImages: vi.fn(() => Promise.resolve()),
+  deriveImageRecallCapabilities: vi.fn(() => EMPTY_IMAGE_RECALL_CAPABILITIES),
   downloadItem: vi.fn(() => Promise.resolve()),
   downloadItems: vi.fn(() => Promise.resolve()),
   downloadImage: vi.fn(() => Promise.resolve()),
