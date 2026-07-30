@@ -56,11 +56,13 @@ void i18n.use(initReactI18next).init({
         common: { countOfTotal: '{{count}} of {{total}}' },
         widgets: {
           preview: {
+            copyCurrentFrame: 'Copy Current Frame',
             framesPerSecond: '{{count}} fps',
             itemCount_one: '{{count}} item',
             itemCount_other: '{{count}} items',
             nextItemInBoard: 'Next item in board',
             previousItemInBoard: 'Previous item in board',
+            videoDetails: 'Video Details',
             videoDuration: 'Duration {{duration}}',
           },
         },
@@ -251,28 +253,82 @@ describe('Preview mixed media footer and actions', () => {
     expect(host?.querySelector('[aria-label="Next item in board"]')).not.toBeNull();
   });
 
-  it('keeps common video actions and hides image-only compare and clipboard actions', async () => {
+  it('keeps common video actions, adds Preview-only frame/details actions, and hides image-only actions', async () => {
     const actions = {
       downloadItem: vi.fn(() => Promise.resolve()),
       setItemsStarred: vi.fn(() => Promise.resolve()),
     } as unknown as ImageActions;
+    const onCopyCurrentFrame = vi.fn();
+    const onOpenDetails = vi.fn();
 
     await render(
-      <PreviewActionStrip actions={actions} density="full" item={sharedVideo} onOpenMenu={() => undefined} />
+      <PreviewActionStrip
+        actions={actions}
+        density="full"
+        isVideoFrameCopyAvailable={false}
+        item={sharedVideo}
+        onCopyCurrentFrame={onCopyCurrentFrame}
+        onOpenDetails={onOpenDetails}
+        onOpenMenu={() => undefined}
+      />
     );
 
     expect(host?.querySelector('[aria-label="Select for Compare"]')).toBeNull();
     expect(host?.querySelector('[aria-label="Copy to clipboard"]')).toBeNull();
 
+    const copyFrame = host?.querySelector<HTMLButtonElement>('[aria-label="Copy Current Frame"]');
+    const details = host?.querySelector<HTMLButtonElement>('[aria-label="Video Details"]');
     const star = host?.querySelector<HTMLButtonElement>('[aria-label="Unstar video"]');
     const download = host?.querySelector<HTMLButtonElement>('[aria-label="Download video"]');
+    expect(copyFrame).not.toBeNull();
+    expect(copyFrame?.disabled).toBe(true);
+    expect(details).not.toBeNull();
     expect(star).not.toBeNull();
     expect(download).not.toBeNull();
 
+    await interact(() => details?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })));
     await interact(() => star?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })));
     await interact(() => download?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })));
 
+    expect(onOpenDetails).toHaveBeenCalledOnce();
+    expect(onCopyCurrentFrame).not.toHaveBeenCalled();
     expect(actions.setItemsStarred).toHaveBeenCalledWith([{ kind: 'video', name: 'shared' }], false);
     expect(actions.downloadItem).toHaveBeenCalledWith(sharedVideo);
+
+    await render(
+      <PreviewActionStrip
+        actions={actions}
+        density="full"
+        isVideoFrameCopyAvailable
+        item={sharedVideo}
+        onCopyCurrentFrame={onCopyCurrentFrame}
+        onOpenDetails={onOpenDetails}
+        onOpenMenu={() => undefined}
+      />
+    );
+    const enabledCopyFrame = host?.querySelector<HTMLButtonElement>('[aria-label="Copy Current Frame"]');
+    expect(enabledCopyFrame?.disabled).toBe(false);
+
+    await interact(() => enabledCopyFrame?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })));
+    expect(onCopyCurrentFrame).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the existing image clipboard action unchanged', async () => {
+    const actions = {
+      copyImage: vi.fn(() => Promise.resolve()),
+      downloadItem: vi.fn(() => Promise.resolve()),
+      selectForCompare: vi.fn(),
+      setItemsStarred: vi.fn(() => Promise.resolve()),
+    } as unknown as ImageActions;
+
+    await render(
+      <PreviewActionStrip actions={actions} density="full" item={sharedImage} onOpenMenu={() => undefined} />
+    );
+    const copyImage = host?.querySelector<HTMLButtonElement>('[aria-label="Copy to clipboard"]');
+
+    expect(copyImage).not.toBeNull();
+    expect(host?.querySelector('[aria-label="Copy Current Frame"]')).toBeNull();
+    await interact(() => copyImage?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })));
+    expect(actions.copyImage).toHaveBeenCalledWith(expect.objectContaining({ imageName: 'shared' }));
   });
 });

@@ -3,7 +3,7 @@ import type { GalleryItem } from '@features/gallery';
 import { GALLERY_MAX_ROWS } from '@features/gallery/queries';
 import { describe, expect, it } from 'vitest';
 
-import { getMatchingProgressImage, mergePreviewBoardItems } from './PreviewWidgetView';
+import { getMatchingProgressImage, getVideoFrameCopyNotice, mergePreviewBoardItems } from './PreviewWidgetView';
 
 describe('getMatchingProgressImage', () => {
   const placeholder = {
@@ -109,5 +109,19 @@ describe('mergePreviewBoardItems', () => {
     expect(merged[0]?.name).toBe('optimistic-59');
     expect(merged).toContainEqual(expect.objectContaining({ kind: 'image', name: 'shared' }));
     expect(merged).toContainEqual(expect.objectContaining({ kind: 'video', name: 'shared' }));
+  });
+});
+
+describe('getVideoFrameCopyNotice', () => {
+  it.each([
+    [{ ok: true } as const, 'success', 'widgets.preview.copyCurrentFrameSuccess'],
+    [{ ok: false, reason: 'unsupported' } as const, 'error', 'widgets.preview.copyCurrentFrameUnsupported'],
+    [{ ok: false, reason: 'not-ready' } as const, 'error', 'widgets.preview.copyCurrentFrameNotReady'],
+    [{ ok: false, reason: 'draw-failed' } as const, 'error', 'widgets.preview.copyCurrentFrameDrawFailed'],
+    [{ ok: false, reason: 'encode-failed' } as const, 'error', 'widgets.preview.copyCurrentFrameEncodeFailed'],
+    [{ ok: false, reason: 'clipboard-failed' } as const, 'error', 'widgets.preview.copyCurrentFrameWriteFailed'],
+    [{ ok: false, reason: 'stale' } as const, 'error', 'widgets.preview.copyCurrentFrameStale'],
+  ])('maps %o to one localized notification', (result, kind, key) => {
+    expect(getVideoFrameCopyNotice(result, (translationKey) => translationKey)).toEqual({ kind, title: key });
   });
 });

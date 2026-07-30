@@ -18,6 +18,8 @@ export interface PreviewHeaderContext {
   /** The view's `useImageActions` instance (carries delete-neighbor handling). */
   actions: ImageActions | null;
   boardName: string | null;
+  copyCurrentVideoFrame: (() => void) | null;
+  isVideoFrameCopyAvailable: boolean;
   itemName: string | null;
   /**
    * Opens the view's full image context menu anchored at viewport coordinates.
@@ -25,14 +27,18 @@ export interface PreviewHeaderContext {
    * one source of truth for every image verb.
    */
   openItemMenu: ((x: number, y: number) => void) | null;
+  openVideoDetails: (() => void) | null;
 }
 
 const emptyContext: PreviewHeaderContext = {
   actionItem: null,
   actions: null,
   boardName: null,
+  copyCurrentVideoFrame: null,
+  isVideoFrameCopyAvailable: false,
   itemName: null,
   openItemMenu: null,
+  openVideoDetails: null,
 };
 
 const store = createExternalStore<PreviewHeaderContext>(emptyContext);

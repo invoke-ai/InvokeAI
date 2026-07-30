@@ -1,4 +1,4 @@
-import type { GalleryBoard, GalleryImage, GalleryItem, GalleryItemRef } from '@features/gallery';
+import type { GalleryBoard, GalleryImage, GalleryItem, GalleryItemKey, GalleryItemRef } from '@features/gallery';
 import type { GalleryItemContextMenuTarget } from '@features/gallery/react';
 /* eslint-disable react/react-compiler */
 import type { GalleryCanvasImportDestination } from '@workbench/canvas-operations/api';
@@ -22,6 +22,7 @@ import {
   ExternalLinkIcon,
   EyeIcon,
   FileImageIcon,
+  FileJsonIcon,
   FolderIcon,
   ImageIcon,
   ImagesIcon,
@@ -53,6 +54,18 @@ export interface LegacyImageContextMenuTarget {
 }
 
 export type ImageContextMenuTarget = LegacyImageContextMenuTarget | GalleryItemContextMenuTarget;
+
+/**
+ * Extra actions owned by Preview's selected native video. Other hosts omit
+ * this port, so gallery/grid video menus retain their common-action-only
+ * contract and never gain a frame-copy item.
+ */
+export interface PreviewVideoContextActions {
+  isCopyCurrentFrameAvailable: boolean;
+  itemKey: GalleryItemKey;
+  onCopyCurrentFrame: () => void;
+  onOpenDetails: () => void;
+}
 
 /** Extras on top of the shared MenuContent surface styling. */
 const MENU_CONTENT_PROPS = {
@@ -146,11 +159,13 @@ export const getImageContextMenuRecallRequestKey = (image: GalleryImage | null, 
 export const ImageContextMenu = ({
   actions,
   boards,
+  previewVideoActions,
   target,
   onClose,
 }: {
   actions: ImageActions;
   boards: GalleryBoard[];
+  previewVideoActions?: PreviewVideoContextActions;
   target: ImageContextMenuTarget | null;
   onClose: () => void;
 }) => {
@@ -207,6 +222,7 @@ export const ImageContextMenu = ({
             key={`${itemTarget.itemRefs[0] ? toGalleryItemKey(itemTarget.itemRefs[0]) : 'item'}:${itemTarget.itemRefs.length}`}
             actions={actions}
             boards={boards}
+            previewVideoActions={previewVideoActions}
             target={itemTarget}
             onClose={onClose}
             onRequestDeletion={requestDeletion}
@@ -241,12 +257,14 @@ export const ImageContextMenu = ({
 const GalleryItemContextMenuContent = ({
   actions,
   boards,
+  previewVideoActions,
   target,
   onClose,
   onRequestDeletion,
 }: {
   actions: ImageActions;
   boards: GalleryBoard[];
+  previewVideoActions?: PreviewVideoContextActions;
   target: GalleryItemContextMenuTarget;
   onClose: () => void;
   onRequestDeletion: (itemRefs: GalleryItemRef[]) => void;
@@ -302,6 +320,7 @@ const GalleryItemContextMenuContent = ({
                 boards={boards}
                 item={item}
                 itemRef={itemRef}
+                previewVideoActions={previewVideoActions}
                 onRequestDeletion={onRequestDeletion}
               />
             )}
@@ -317,14 +336,17 @@ const SingleItemMenuItems = ({
   boards,
   item,
   itemRef,
+  previewVideoActions,
   onRequestDeletion,
 }: {
   actions: ImageActions;
   boards: GalleryBoard[];
   item: GalleryItem;
   itemRef: GalleryItemRef;
+  previewVideoActions?: PreviewVideoContextActions;
   onRequestDeletion: (itemRefs: GalleryItemRef[]) => void;
 }) => {
+  const { t } = useTranslation();
   const mediaLabel = item.kind === 'video' ? 'video' : 'item';
   const handleOpenInNewTab = useCallback(() => actions.openItemInNewTab(item), [actions, item]);
   const handleDownload = useCallback(() => void actions.downloadItem(item), [actions, item]);
@@ -363,6 +385,24 @@ const SingleItemMenuItems = ({
         />
       </HStack>
       <Menu.Separator borderColor="border.subtle" />
+      {item.kind === 'video' && previewVideoActions && previewVideoActions.itemKey === toGalleryItemKey(item) ? (
+        <>
+          <ContextMenuItem
+            disabled={!previewVideoActions.isCopyCurrentFrameAvailable}
+            icon={CopyIcon}
+            label={t('widgets.preview.copyCurrentFrame')}
+            value="copy-current-video-frame"
+            onClick={previewVideoActions.onCopyCurrentFrame}
+          />
+          <ContextMenuItem
+            icon={FileJsonIcon}
+            label={t('widgets.preview.videoDetails')}
+            value="open-video-details"
+            onClick={previewVideoActions.onOpenDetails}
+          />
+          <Menu.Separator borderColor="border.subtle" />
+        </>
+      ) : null}
       <ChangeBoardSubMenu boards={boards} currentBoardId={item.boardId} onMove={handleMove} />
       <Menu.Separator borderColor="border.subtle" />
       <ContextMenuItem

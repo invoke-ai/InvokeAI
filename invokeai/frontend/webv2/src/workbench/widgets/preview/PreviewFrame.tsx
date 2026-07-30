@@ -10,6 +10,7 @@ import { Button } from '@platform/ui/Button';
 import {
   useCallback,
   useId,
+  useImperativeHandle,
   useMemo,
   useRef,
   useState,
@@ -66,9 +67,12 @@ interface PreviewFrameProps {
   /** Imperative zoom controls, for hotkeys registered by the widget shell. */
   loupeControlsRef?: Ref<PreviewLoupeControls>;
   onContextMenu?: (x: number, y: number) => void;
+  onVideoCopyAvailabilityChange?: (itemKey: GalleryItemKey, isAvailable: boolean) => void;
   padding?: string;
   shouldAntialiasLiveImage: boolean;
   source: PreviewMediaSource | null;
+  /** Preview-owned controller for the selected video's current frame. */
+  videoControllerRef?: Ref<PreviewVideoFrameController>;
   /** `framed` = bordered surface for a selected item; `inset` = flush surface for the empty state. */
   variant: 'framed' | 'inset';
 }
@@ -82,8 +86,10 @@ export const PreviewFrame = (props: PreviewFrameProps) => {
         frameWidth={props.frameWidth}
         isItemCurrent={props.isItemCurrent}
         onContextMenu={props.onContextMenu}
+        onCopyAvailabilityChange={props.onVideoCopyAvailabilityChange}
         padding={props.padding}
         source={props.source}
+        videoControllerRef={props.videoControllerRef}
       />
     );
   }
@@ -105,7 +111,9 @@ const PreviewImageFrame = ({
   shouldAntialiasLiveImage,
   source,
   variant,
-}: Omit<PreviewFrameProps, 'isItemCurrent' | 'source'> & { source: StreamingImageSource | null }) => {
+}: Omit<PreviewFrameProps, 'isItemCurrent' | 'onVideoCopyAvailabilityChange' | 'source' | 'videoControllerRef'> & {
+  source: StreamingImageSource | null;
+}) => {
   const { t } = useTranslation();
   const loupe = usePreviewLoupe({
     controlsRef: loupeControlsRef,
@@ -282,25 +290,111 @@ const PreviewVideo = ({
   frameWidth,
   isItemCurrent,
   onContextMenu,
+  onCopyAvailabilityChange,
   padding,
   source,
+  videoControllerRef,
 }: {
   frameHeight: number;
   frameWidth: number;
   isItemCurrent?: (itemKey: GalleryItemKey) => boolean;
   onContextMenu?: (x: number, y: number) => void;
+  onCopyAvailabilityChange?: (itemKey: GalleryItemKey, isAvailable: boolean) => void;
   padding?: string;
   source: Extract<PreviewMediaSource, { kind: 'video' }>;
+  videoControllerRef?: Ref<PreviewVideoFrameController>;
 }) => {
   const { t } = useTranslation();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const automaticRefreshUsedRef = useRef(false);
   const pendingRefreshRef = useRef<Promise<boolean> | null>(null);
   const [hasFailed, setHasFailed] = useState(false);
-  const setVideoRef = useCallback((video: HTMLVideoElement | null) => {
-    videoRef.current = video;
-  }, []);
+  const publishCopyAvailability = useCallback(() => {
+    onCopyAvailabilityChange?.(source.itemKey, isVideoFrameCopyAvailable(videoRef.current));
+  }, [onCopyAvailabilityChange, source.itemKey]);
+  const setVideoRef = useCallback(
+    (video: HTMLVideoElement | null) => {
+      videoRef.current = video;
+      onCopyAvailabilityChange?.(source.itemKey, isVideoFrameCopyAvailable(video));
+    },
+    [onCopyAvailabilityChange, source.itemKey]
+  );
+  const copyCurrentFrame = useCallback(async (): Promise<PreviewVideoFrameCopyResult> => {
+    const video = videoRef.current;
+    const clipboardItem = globalThis.ClipboardItem;
+    const write = navigator.clipboard?.write?.bind(navigator.clipboard);
+
+    if (!clipboardItem || !write) {
+      return { ok: false, reason: 'unsupported' };
+    }
+
+    if (!isVideoFrameReady(video)) {
+      return { ok: false, reason: 'not-ready' };
+    }
+
+    const accountEpoch = getAuthSession().accountEpoch;
+    const itemKey = source.itemKey;
+    const width = video.videoWidth;
+    const height = video.videoHeight;
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext('2d');
+
+    if (!context) {
+      return { ok: false, reason: 'draw-failed' };
+    }
+
+    try {
+      context.drawImage(video, 0, 0, width, height);
+    } catch {
+      return { ok: false, reason: 'draw-failed' };
+    }
+
+    let blob: Blob | null;
+
+    try {
+      blob = await encodeCanvasPng(canvas);
+    } catch (error: unknown) {
+      return { ok: false, reason: isCanvasSecurityError(error) ? 'draw-failed' : 'encode-failed' };
+    }
+
+    if (!blob) {
+      return { ok: false, reason: 'encode-failed' };
+    }
+
+    const isCurrent = (): boolean =>
+      videoRef.current === video &&
+      getAuthSession().accountEpoch === accountEpoch &&
+      (!isItemCurrent || isItemCurrent(itemKey));
+
+    if (!isCurrent()) {
+      return { ok: false, reason: 'stale' };
+    }
+
+    let item: ClipboardItem;
+
+    try {
+      item = new clipboardItem({ 'image/png': blob });
+      await write([item]);
+    } catch {
+      return { ok: false, reason: 'clipboard-failed' };
+    }
+
+    return isCurrent() ? { ok: true } : { ok: false, reason: 'stale' };
+  }, [isItemCurrent, source.itemKey]);
+  const isCopyAvailable = useCallback(() => isVideoFrameCopyAvailable(videoRef.current), []);
+  useImperativeHandle(
+    videoControllerRef,
+    () => ({
+      copyCurrentFrame,
+      isCopyAvailable,
+      itemKey: source.itemKey,
+    }),
+    [copyCurrentFrame, isCopyAvailable, source.itemKey]
+  );
   const handleVideoError = useCallback(() => {
+    publishCopyAvailability();
     const video = videoRef.current;
 
     if (!video || pendingRefreshRef.current) {
@@ -340,7 +434,7 @@ const PreviewVideo = ({
     };
 
     void refresh.then(finishRefresh, () => finishRefresh(false));
-  }, [isItemCurrent, source.itemKey]);
+  }, [isItemCurrent, publishCopyAvailability, source.itemKey]);
   const handleRetry = useCallback(() => {
     const video = videoRef.current;
 
@@ -352,7 +446,8 @@ const PreviewVideo = ({
     pendingRefreshRef.current = null;
     setHasFailed(false);
     video.load();
-  }, []);
+    publishCopyAvailability();
+  }, [publishCopyAvailability]);
   const handleContextMenu = useCallback(
     (event: MouseEvent<HTMLDivElement>) => {
       if (onContextMenu) {
@@ -402,7 +497,14 @@ const PreviewVideo = ({
           preload="metadata"
           src={source.src}
           style={VIDEO_STYLE}
+          onCanPlay={publishCopyAvailability}
+          onEmptied={publishCopyAvailability}
           onError={handleVideoError}
+          onLoadedData={publishCopyAvailability}
+          onPlaying={publishCopyAvailability}
+          onResize={publishCopyAvailability}
+          onSeeked={publishCopyAvailability}
+          onWaiting={publishCopyAvailability}
         />
         {hasFailed ? (
           <>
@@ -438,6 +540,44 @@ const PreviewVideo = ({
     </Flex>
   );
 };
+
+export type PreviewVideoFrameCopyFailureReason =
+  | 'clipboard-failed'
+  | 'draw-failed'
+  | 'encode-failed'
+  | 'not-ready'
+  | 'stale'
+  | 'unsupported';
+
+export type PreviewVideoFrameCopyResult = { ok: true } | { ok: false; reason: PreviewVideoFrameCopyFailureReason };
+
+export interface PreviewVideoFrameController {
+  copyCurrentFrame(): Promise<PreviewVideoFrameCopyResult>;
+  isCopyAvailable(): boolean;
+  readonly itemKey: GalleryItemKey;
+}
+
+const isVideoFrameReady = (video: HTMLVideoElement | null): video is HTMLVideoElement =>
+  Boolean(
+    video && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && video.videoWidth > 0 && video.videoHeight > 0
+  );
+
+const isVideoFrameCopyAvailable = (video: HTMLVideoElement | null): boolean =>
+  typeof globalThis.ClipboardItem !== 'undefined' &&
+  typeof navigator.clipboard?.write === 'function' &&
+  isVideoFrameReady(video);
+
+const encodeCanvasPng = (canvas: HTMLCanvasElement): Promise<Blob | null> =>
+  new Promise((resolve, reject) => {
+    try {
+      canvas.toBlob(resolve, 'image/png');
+    } catch (error: unknown) {
+      reject(error instanceof Error ? error : new Error(String(error)));
+    }
+  });
+
+const isCanvasSecurityError = (error: unknown): boolean =>
+  error instanceof DOMException && error.name === 'SecurityError';
 
 const VIDEO_STYLE: CSSProperties = {
   display: 'block',

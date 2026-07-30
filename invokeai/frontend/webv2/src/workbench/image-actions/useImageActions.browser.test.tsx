@@ -1,4 +1,4 @@
-import type { GalleryItem, GalleryItemKey, GalleryItemRef } from '@features/gallery';
+import type { GalleryImage, GalleryItem, GalleryItemKey, GalleryItemRef } from '@features/gallery';
 
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   galleryPatchItems: vi.fn(),
   gallerySelectItem: vi.fn(),
   gallerySetItemMultiSelection: vi.fn(),
+  imageMetadata: vi.fn(),
   invalidateGallery: vi.fn(),
   invalidateGalleryItems: vi.fn(),
   itemDelete: vi.fn(),
@@ -34,7 +35,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@features/gallery', () => ({
-  galleryImages: { metadata: vi.fn() },
+  galleryImages: { metadata: (...args: unknown[]) => mocks.imageMetadata(...args) },
   galleryItemOrganization: {
     delete: (...args: unknown[]) => mocks.itemDelete(...args),
     moveToBoard: (...args: unknown[]) => mocks.itemMoveToBoard(...args),
@@ -60,8 +61,15 @@ vi.mock('@features/gallery/queries', () => ({
 
 vi.mock('@features/models', () => ({
   ensureModelsLoaded: vi.fn(() => Promise.resolve()),
-  getModelsSnapshot: () => ({ models: [] }),
-  useModelsSelector: (selector: (snapshot: { models: never[] }) => unknown) => selector({ models: [] }),
+  getModelsSnapshot: () => ({
+    models: [{ base: 'sdxl', key: 'sdxl-model', name: 'SDXL', type: 'main' }],
+  }),
+  useModelsSelector: (
+    selector: (snapshot: { models: Array<{ base: 'sdxl'; key: string; name: string; type: 'main' }> }) => unknown
+  ) =>
+    selector({
+      models: [{ base: 'sdxl', key: 'sdxl-model', name: 'SDXL', type: 'main' }],
+    }),
 }));
 
 vi.mock('@workbench/useOpenWorkbenchWidget', () => ({
@@ -121,7 +129,7 @@ let currentItemActionContext: ItemActionContext | null = null;
 const Probe = ({ ref }: { ref: Ref<ImageActions> }) => {
   const actions = useImageActions({
     boards: [],
-    generateValues: {},
+    generateValues: { modelKey: 'sdxl-model' },
     getItemActionContext: () => currentItemActionContext,
     projectId: 'project-1',
   });
@@ -154,6 +162,52 @@ afterEach(async () => {
   host?.remove();
   host = null;
   root = null;
+});
+
+describe('image recall capability cancellation', () => {
+  it('combines a caller signal with the account lifecycle signal for metadata transport', async () => {
+    let resolveMetadata!: (value: null) => void;
+    const metadata = new Promise<null>((resolve) => {
+      resolveMetadata = resolve;
+    });
+    mocks.imageMetadata.mockReturnValueOnce(metadata);
+    const controller = new AbortController();
+    const image: GalleryImage = {
+      boardId: 'none',
+      height: 512,
+      imageCategory: 'general',
+      imageName: 'recall.png',
+      imageUrl: '/full/recall.png',
+      queuedAt: '2026-07-30T00:00:00.000Z',
+      sourceQueueItemId: 'queue-recall',
+      starred: false,
+      thumbnailUrl: '/thumb/recall.png',
+      width: 512,
+    };
+    const getCapabilities = actionsRef.current?.getImageRecallCapabilities as unknown as (
+      image: GalleryImage,
+      signal?: AbortSignal
+    ) => Promise<unknown>;
+    let result!: Promise<unknown>;
+
+    await act(async () => {
+      result = getCapabilities(image, controller.signal);
+      await Promise.resolve();
+    });
+
+    expect(mocks.imageMetadata).toHaveBeenCalledWith('recall.png', expect.any(AbortSignal));
+    const transportSignal = mocks.imageMetadata.mock.calls[0]?.[1] as AbortSignal;
+    expect(transportSignal).toBeInstanceOf(AbortSignal);
+    expect(transportSignal.aborted).toBe(false);
+
+    controller.abort();
+
+    expect(transportSignal.aborted).toBe(true);
+    resolveMetadata(null);
+    await act(async () => {
+      await result;
+    });
+  });
 });
 
 describe('partial image mutation outcomes', () => {

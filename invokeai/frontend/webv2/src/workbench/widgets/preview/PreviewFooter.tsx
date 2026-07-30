@@ -90,14 +90,13 @@ export const PreviewFooter = ({
           </Button>
         </HStack>
       </HStack>
-      {actionImage ? (
-        <PreviewMetadataPanel
-          actions={actions}
-          image={actionImage}
-          isOpen={isMetadataOpen}
-          onToggle={onToggleMetadata}
-        />
-      ) : null}
+      <PreviewMetadataPanel
+        actions={actions}
+        image={actionImage}
+        isOpen={isMetadataOpen}
+        item={item}
+        onToggle={onToggleMetadata}
+      />
     </Stack>
   );
 };

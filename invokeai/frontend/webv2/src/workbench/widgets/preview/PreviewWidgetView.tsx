@@ -79,7 +79,12 @@ import { resolvePreviewCompareDrop } from './previewCompareDnd';
 import { usePreviewDensity, type PreviewDensity } from './previewDensity';
 import { PreviewFilmstrip } from './PreviewFilmstrip';
 import { PreviewFooter } from './PreviewFooter';
-import { PreviewFrame, type PreviewMediaSource } from './PreviewFrame';
+import {
+  PreviewFrame,
+  type PreviewMediaSource,
+  type PreviewVideoFrameController,
+  type PreviewVideoFrameCopyResult,
+} from './PreviewFrame';
 import { previewHeaderStore } from './previewHeaderStore';
 import {
   getPreviewNavigationCursor,
@@ -94,6 +99,23 @@ import {
 } from './previewSettings';
 
 const EMPTY_PREVIEW_ITEMS: GalleryItem[] = [];
+
+const VIDEO_FRAME_COPY_FAILURE_KEYS = {
+  'clipboard-failed': 'widgets.preview.copyCurrentFrameWriteFailed',
+  'draw-failed': 'widgets.preview.copyCurrentFrameDrawFailed',
+  'encode-failed': 'widgets.preview.copyCurrentFrameEncodeFailed',
+  'not-ready': 'widgets.preview.copyCurrentFrameNotReady',
+  stale: 'widgets.preview.copyCurrentFrameStale',
+  unsupported: 'widgets.preview.copyCurrentFrameUnsupported',
+} as const;
+
+export const getVideoFrameCopyNotice = (
+  result: PreviewVideoFrameCopyResult,
+  translate: (key: string) => string
+): { kind: 'error' | 'success'; title: string } =>
+  result.ok
+    ? { kind: 'success', title: translate('widgets.preview.copyCurrentFrameSuccess') }
+    : { kind: 'error', title: translate(VIDEO_FRAME_COPY_FAILURE_KEYS[result.reason]) };
 
 const fallbackBoards: GalleryBoard[] = [
   {
@@ -278,6 +300,8 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   const hasNavigationContext = shouldFollowLive || hasSelectedItem;
   const { t } = useTranslation();
   const loupeControlsRef = useRef<PreviewLoupeControls | null>(null);
+  const videoControllerRef = useRef<PreviewVideoFrameController | null>(null);
+  const [copyAvailableItemKey, setCopyAvailableItemKey] = useState<GalleryItemKey | null>(null);
   const navigationContextKey = `${shouldFollowLive}:${selectedItemKey ?? ''}:${navigationBoardId}:${navigationGalleryView}:${navigationOrderDir}:${navigationStarredFirst}:${selectedImageQuery.paginationMode}:${selectedImageQuery.page}:${selectedImageQuery.searchTerm}`;
   const navigationQueryKey = `${shouldFollowLive}:${navigationBoardId}:${navigationGalleryView}:${navigationOrderDir}:${navigationStarredFirst}:${selectedImageQuery.paginationMode}:${selectedImageQuery.searchTerm}`;
 
@@ -608,6 +632,48 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     () => widgets.patchValues('preview', { metadataOpen: !isMetadataOpen }),
     [isMetadataOpen, widgets]
   );
+  const openVideoDetails = useCallback(() => widgets.patchValues('preview', { metadataOpen: true }), [widgets]);
+  const handleVideoCopyAvailabilityChange = useCallback((itemKey: GalleryItemKey, isAvailable: boolean) => {
+    setCopyAvailableItemKey((current) => (isAvailable ? itemKey : current === itemKey ? null : current));
+  }, []);
+  const isVideoFrameCopyAvailable =
+    contextMenuItem?.kind === 'video' && copyAvailableItemKey === toGalleryItemKey(contextMenuItem);
+  const copyCurrentVideoFrame = useCallback(() => {
+    const run = async (): Promise<void> => {
+      const controller = videoControllerRef.current;
+      let result: PreviewVideoFrameCopyResult;
+
+      if (
+        contextMenuItem?.kind !== 'video' ||
+        !controller ||
+        controller.itemKey !== toGalleryItemKey(contextMenuItem)
+      ) {
+        result = { ok: false, reason: 'stale' };
+      } else {
+        try {
+          result = await controller.copyCurrentFrame();
+        } catch {
+          result = { ok: false, reason: 'clipboard-failed' };
+        }
+      }
+
+      notifications.add(getVideoFrameCopyNotice(result, t));
+    };
+
+    void run();
+  }, [contextMenuItem, notifications, t]);
+  const previewVideoContextActions = useMemo(
+    () =>
+      contextMenuItem?.kind === 'video'
+        ? {
+            isCopyCurrentFrameAvailable: isVideoFrameCopyAvailable,
+            itemKey: toGalleryItemKey(contextMenuItem),
+            onCopyCurrentFrame: copyCurrentVideoFrame,
+            onOpenDetails: openVideoDetails,
+          }
+        : undefined,
+    [contextMenuItem, copyCurrentVideoFrame, isVideoFrameCopyAvailable, openVideoDetails]
+  );
   const isFilmstripVisible = getPreviewFilmstripVisible(previewValues);
 
   // Drop-to-compare: any all-image gallery-item drag dropped on the frame's drop zone
@@ -677,10 +743,23 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
       actionItem: shouldFollowLive ? null : contextMenuItem,
       actions: shouldFollowLive ? null : imageActions,
       boardName: headerItemName === null ? null : boardName,
+      copyCurrentVideoFrame: !shouldFollowLive && contextMenuItem?.kind === 'video' ? copyCurrentVideoFrame : null,
+      isVideoFrameCopyAvailable: !shouldFollowLive && isVideoFrameCopyAvailable,
       itemName: headerItemName,
       openItemMenu: shouldFollowLive ? null : openItemContextMenu,
+      openVideoDetails: !shouldFollowLive && contextMenuItem?.kind === 'video' ? openVideoDetails : null,
     });
-  }, [boardName, contextMenuItem, headerItemName, imageActions, openItemContextMenu, shouldFollowLive]);
+  }, [
+    boardName,
+    contextMenuItem,
+    copyCurrentVideoFrame,
+    headerItemName,
+    imageActions,
+    isVideoFrameCopyAvailable,
+    openItemContextMenu,
+    openVideoDetails,
+    shouldFollowLive,
+  ]);
 
   useEffect(() => () => previewHeaderStore.clear(), []);
 
@@ -824,8 +903,10 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
                 isLoadingBoard={isLoadingBoard}
                 isMetadataOpen={isMetadataOpen}
                 item={selectedItem}
+                videoControllerRef={videoControllerRef}
                 selectedIndex={navigationCursor}
                 onContextMenu={openItemContextMenu}
+                onCopyAvailabilityChange={handleVideoCopyAvailabilityChange}
                 onNext={selectNextItem}
                 onPrevious={selectPreviousItem}
                 onSelectItem={selectPreviewItem}
@@ -835,6 +916,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
             <ImageContextMenu
               actions={imageActions}
               boards={boards}
+              previewVideoActions={previewVideoContextActions}
               target={contextMenuTarget}
               onClose={closeContextMenu}
             />
@@ -907,12 +989,14 @@ interface SelectedMediaPreviewProps {
   isMetadataOpen: boolean;
   item: GalleryItem;
   loupeControlsRef?: Ref<PreviewLoupeControls>;
+  onCopyAvailabilityChange?: (itemKey: GalleryItemKey, isAvailable: boolean) => void;
   selectedIndex: number;
   onContextMenu: (x: number, y: number) => void;
   onNext: () => void;
   onPrevious: () => void;
   onSelectItem: (item: GalleryItem) => void;
   onToggleMetadata: () => void;
+  videoControllerRef?: Ref<PreviewVideoFrameController>;
 }
 
 const SelectedMediaPreview = ({
@@ -929,6 +1013,7 @@ const SelectedMediaPreview = ({
   isMetadataOpen,
   item,
   loupeControlsRef,
+  onCopyAvailabilityChange,
   selectedIndex,
   source,
   onContextMenu,
@@ -936,6 +1021,7 @@ const SelectedMediaPreview = ({
   onPrevious,
   onSelectItem,
   onToggleMetadata,
+  videoControllerRef,
 }: SelectedMediaPreviewProps & {
   dragItem?: GalleryItemRef;
   frameHeight: number;
@@ -954,10 +1040,12 @@ const SelectedMediaPreview = ({
         isLive={false}
         liveBadgeLabel={t('common.generating')}
         loupeControlsRef={loupeControlsRef}
+        onVideoCopyAvailabilityChange={onCopyAvailabilityChange}
         padding={density === 'full' ? '6' : '3'}
         shouldAntialiasLiveImage
         source={source}
         variant="framed"
+        videoControllerRef={videoControllerRef}
         onContextMenu={onContextMenu}
       />
       {filmstripItems ? (

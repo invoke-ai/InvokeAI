@@ -61,7 +61,7 @@ export interface ImageActions extends GalleryItemActions {
   deleteImages: (imageNames: string[]) => Promise<void>;
   downloadImage: (image: GalleryImage) => Promise<void>;
   downloadImages: (imageNames: string[]) => Promise<void>;
-  getImageRecallCapabilities: (image: GalleryImage) => Promise<ImageRecallCapabilities>;
+  getImageRecallCapabilities: (image: GalleryImage, signal?: AbortSignal) => Promise<ImageRecallCapabilities>;
   moveImagesToBoard: (imageNames: string[], boardId: string) => Promise<void>;
   openImageInPreview: (image: GalleryImage) => void;
   recallImageData: (image: GalleryImage, kind: ImageRecallKind) => Promise<void>;
@@ -519,7 +519,7 @@ export const useImageActions = ({
         }
       },
       downloadImages: (imageNames) => downloadItems(imageNames.map((name) => ({ kind: 'image', name }))),
-      getImageRecallCapabilities: async (image) => {
+      getImageRecallCapabilities: async (image, signal) => {
         const owner = captureAccountScope();
 
         if (!currentGenerateValues) {
@@ -527,7 +527,8 @@ export const useImageActions = ({
         }
 
         try {
-          const metadata = await galleryImages.metadata(image.imageName, owner.signal);
+          const requestSignal = signal ? AbortSignal.any([signal, owner.signal]) : owner.signal;
+          const metadata = await galleryImages.metadata(image.imageName, requestSignal);
 
           assertAccountScopeCurrent(owner);
           return getImageRecallCapabilities({

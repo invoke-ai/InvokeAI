@@ -1,4 +1,4 @@
-import type { GalleryImage, GalleryItem } from '@features/gallery';
+import type { GalleryImage, GalleryItem, GalleryItemKey } from '@features/gallery';
 import type { GalleryItemContextMenuTarget } from '@features/gallery/react';
 
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
@@ -142,7 +142,16 @@ const item = (kind: GalleryItem['kind'], name: string): GalleryItem => {
   return kind === 'video' ? { ...base, durationSeconds: 12, kind } : { ...base, kind };
 };
 
-const renderItemMenu = async (actions: ImageActions, target: GalleryItemContextMenuTarget) => {
+const renderItemMenu = async (
+  actions: ImageActions,
+  target: GalleryItemContextMenuTarget,
+  previewVideoActions?: {
+    isCopyCurrentFrameAvailable: boolean;
+    itemKey: GalleryItemKey;
+    onCopyCurrentFrame: () => void;
+    onOpenDetails: () => void;
+  }
+) => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -153,6 +162,7 @@ const renderItemMenu = async (actions: ImageActions, target: GalleryItemContextM
         <ImageContextMenu
           actions={actions}
           boards={NO_BOARDS}
+          previewVideoActions={previewVideoActions}
           target={target as unknown as ImageContextMenuTarget}
           onClose={vi.fn()}
         />
@@ -274,10 +284,57 @@ describe('ImageContextMenu mixed-media action visibility', () => {
     expect(document.body.textContent).toContain('Change Board');
     expect(document.body.textContent).toContain('Delete Video');
     expect(document.body.textContent).not.toContain('Copy to clipboard');
+    expect(document.body.textContent).not.toContain('widgets.preview.copyCurrentFrame');
     expect(document.body.textContent).not.toContain('Recall Metadata');
     expect(document.body.textContent).not.toContain('Send to Upscale');
     expect(document.body.textContent).not.toContain('Select for Compare');
     expect(document.body.textContent).not.toContain('New from Image');
+  });
+
+  it('shows frame copy and Details only when a Preview host opts a single video into them', async () => {
+    const video = item('video', 'preview.mp4');
+    const onCopyCurrentFrame = vi.fn();
+    const onOpenDetails = vi.fn();
+    await renderItemMenu(
+      createActions(vi.fn()),
+      {
+        itemRefs: [{ kind: 'video', name: video.name }],
+        items: [video],
+        x: 20,
+        y: 20,
+      },
+      { isCopyCurrentFrameAvailable: false, itemKey: 'video:preview.mp4', onCopyCurrentFrame, onOpenDetails }
+    );
+
+    const copy = getMenuItem('widgets.preview.copyCurrentFrame');
+    const details = getMenuItem('widgets.preview.videoDetails');
+    expect(copy.getAttribute('aria-disabled')).toBe('true');
+
+    await interact(() => details.click());
+    expect(onOpenDetails).toHaveBeenCalledOnce();
+    expect(onCopyCurrentFrame).not.toHaveBeenCalled();
+  });
+
+  it('hides Preview video extras when the captured menu target is no longer the selected video', async () => {
+    const video = item('video', 'stale-menu.mp4');
+    await renderItemMenu(
+      createActions(vi.fn()),
+      {
+        itemRefs: [{ kind: 'video', name: video.name }],
+        items: [video],
+        x: 20,
+        y: 20,
+      },
+      {
+        isCopyCurrentFrameAvailable: true,
+        itemKey: 'video:new-selection.mp4',
+        onCopyCurrentFrame: vi.fn(),
+        onOpenDetails: vi.fn(),
+      }
+    );
+
+    expect(document.body.textContent).not.toContain('widgets.preview.copyCurrentFrame');
+    expect(document.body.textContent).not.toContain('widgets.preview.videoDetails');
   });
 
   it('opens the primary video from a video-only multi-selection and keeps image-only actions hidden', async () => {
