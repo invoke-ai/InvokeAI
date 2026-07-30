@@ -1,7 +1,9 @@
+import type { GalleryItem } from '@features/gallery';
+
 import { GALLERY_MAX_ROWS } from '@features/gallery/queries';
 import { describe, expect, it } from 'vitest';
 
-import { getMatchingProgressImage, mergePreviewBoardImages } from './PreviewWidgetView';
+import { getMatchingProgressImage, mergePreviewBoardItems } from './PreviewWidgetView';
 
 describe('getMatchingProgressImage', () => {
   const placeholder = {
@@ -31,54 +33,60 @@ describe('getMatchingProgressImage', () => {
   });
 });
 
-describe('mergePreviewBoardImages', () => {
-  const image = (imageName: string, queuedAt: string, starred = false) => ({
-    height: 64,
-    imageName,
-    imageUrl: `/images/${imageName}`,
-    queuedAt,
-    sourceQueueItemId: 'queue-1',
-    starred,
-    thumbnailUrl: `/images/${imageName}/thumbnail`,
-    width: 64,
+describe('mergePreviewBoardItems', () => {
+  const item = (kind: GalleryItem['kind'], name: string, createdAt: string, starred = false): GalleryItem => {
+    const base = {
+      boardId: 'none',
+      category: 'general' as const,
+      createdAt,
+      fullUrl: `/${kind}/${name}`,
+      height: 64,
+      isIntermediate: false,
+      name,
+      starred,
+      thumbnailUrl: `/${kind}/${name}/thumbnail`,
+      width: 64,
+    };
+
+    return kind === 'video' ? { ...base, durationSeconds: 1, kind } : { ...base, kind };
+  };
+
+  it('deduplicates and chronologically merges optimistic items in either direction', () => {
+    const oldest = item('image', 'oldest', '2026-07-21T00:00:01.000Z');
+    const middle = item('image', 'middle', '2026-07-21T00:00:02.000Z');
+    const newest = item('image', 'newest', '2026-07-21T00:00:03.000Z');
+
+    expect(mergePreviewBoardItems([newest, oldest], [middle, newest], 'DESC', false)).toEqual([newest, middle, oldest]);
+    expect(mergePreviewBoardItems([oldest, newest], [middle, oldest], 'ASC', false)).toEqual([oldest, middle, newest]);
   });
 
-  it('deduplicates and chronologically merges optimistic images in either direction', () => {
-    const oldest = image('oldest', '2026-07-21T00:00:01.000Z');
-    const middle = image('middle', '2026-07-21T00:00:02.000Z');
-    const newest = image('newest', '2026-07-21T00:00:03.000Z');
+  it('keeps starred backend items ahead of optimistic unstarred items', () => {
+    const starred = item('video', 'starred', '2026-07-21T00:00:01.000Z', true);
+    const optimistic = item('image', 'optimistic', '2026-07-21T00:00:03.000Z');
+    const existing = item('video', 'existing', '2026-07-21T00:00:02.000Z');
 
-    expect(mergePreviewBoardImages([newest, oldest], [middle, newest], 'DESC', false)).toEqual([
-      newest,
-      middle,
-      oldest,
-    ]);
-    expect(mergePreviewBoardImages([oldest, newest], [middle, oldest], 'ASC', false)).toEqual([oldest, middle, newest]);
-  });
-
-  it('keeps starred backend images ahead of optimistic unstarred images', () => {
-    const starred = image('starred', '2026-07-21T00:00:01.000Z', true);
-    const optimistic = image('optimistic', '2026-07-21T00:00:03.000Z');
-    const existing = image('existing', '2026-07-21T00:00:02.000Z');
-
-    expect(mergePreviewBoardImages([starred, existing], [optimistic], 'DESC', true)).toEqual([
+    expect(mergePreviewBoardItems([starred, existing], [optimistic], 'DESC', true)).toEqual([
       starred,
       optimistic,
       existing,
     ]);
   });
 
-  it('never renders more than the bounded Gallery window after merging optimistic images', () => {
+  it('keeps same-name media independent and bounds the merged Gallery window', () => {
     const backend = Array.from({ length: GALLERY_MAX_ROWS }, (_, index) =>
-      image(`backend-${index}`, new Date(index * 1_000).toISOString())
+      item('image', `backend-${index}`, new Date(index * 1_000).toISOString())
     );
     const optimistic = Array.from({ length: 60 }, (_, index) =>
-      image(`optimistic-${index}`, new Date((GALLERY_MAX_ROWS + index) * 1_000).toISOString())
+      item('video', `optimistic-${index}`, new Date((GALLERY_MAX_ROWS + index) * 1_000).toISOString())
     );
+    backend[GALLERY_MAX_ROWS - 1] = item('image', 'shared', new Date((GALLERY_MAX_ROWS - 1) * 1_000).toISOString());
+    optimistic[0] = item('video', 'shared', new Date((GALLERY_MAX_ROWS + 1) * 1_000).toISOString());
 
-    const merged = mergePreviewBoardImages(backend, optimistic, 'DESC', false);
+    const merged = mergePreviewBoardItems(backend, optimistic, 'DESC', false);
 
     expect(merged).toHaveLength(GALLERY_MAX_ROWS);
-    expect(merged[0]?.imageName).toBe('optimistic-59');
+    expect(merged[0]?.name).toBe('optimistic-59');
+    expect(merged).toContainEqual(expect.objectContaining({ kind: 'image', name: 'shared' }));
+    expect(merged).toContainEqual(expect.objectContaining({ kind: 'video', name: 'shared' }));
   });
 });

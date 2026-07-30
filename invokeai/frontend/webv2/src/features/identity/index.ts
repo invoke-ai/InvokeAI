@@ -11,6 +11,7 @@ export {
   LoginAttemptSupersededError,
   loginWithCredentials,
   logoutSession,
+  refreshProtectedMediaCookie,
   subscribeAuthSession,
   useAuthSession,
   type AuthSession,

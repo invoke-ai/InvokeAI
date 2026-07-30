@@ -93,7 +93,7 @@ const renderHarness = async () => {
             isLive={false}
             liveBadgeLabel="Generating"
             shouldAntialiasLiveImage
-            source={source}
+            source={{ itemKey: 'image:preview.png', kind: 'image', source }}
             variant="framed"
           />
         </div>

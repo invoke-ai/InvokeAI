@@ -255,6 +255,42 @@ export const ensureAuthSession = (): Promise<AuthSession> => {
   return pendingResolve;
 };
 
+interface ProtectedMediaCookieRefresh {
+  accountEpoch: number;
+  promise: Promise<boolean>;
+}
+
+let pendingProtectedMediaCookieRefresh: ProtectedMediaCookieRefresh | null = null;
+
+/**
+ * Re-issue the cookie used by native media elements without leaking request
+ * failures or completions across authenticated account lifetimes.
+ */
+export const refreshProtectedMediaCookie = (): Promise<boolean> => {
+  const session = store.getSnapshot();
+
+  if (session.phase !== 'ready' || (session.multiuserEnabled && session.user === null)) {
+    return Promise.resolve(false);
+  }
+
+  if (pendingProtectedMediaCookieRefresh?.accountEpoch === session.accountEpoch) {
+    return pendingProtectedMediaCookieRefresh.promise;
+  }
+
+  const accountEpoch = session.accountEpoch;
+  const promise = refreshMediaCookie()
+    .then((result) => result.success && store.getSnapshot().accountEpoch === accountEpoch)
+    .catch(() => false)
+    .finally(() => {
+      if (pendingProtectedMediaCookieRefresh?.promise === promise) {
+        pendingProtectedMediaCookieRefresh = null;
+      }
+    });
+
+  pendingProtectedMediaCookieRefresh = { accountEpoch, promise };
+  return promise;
+};
+
 export type ReadyAuthSession = AuthSession & { phase: 'ready' };
 
 /**

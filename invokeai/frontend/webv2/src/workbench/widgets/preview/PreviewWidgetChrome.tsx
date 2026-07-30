@@ -12,9 +12,9 @@ import { usePreviewHeaderContext } from './previewHeaderStore';
  */
 export const PreviewWidgetLabel = (_props: WidgetLabelProps) => {
   const { t } = useTranslation();
-  const { boardName, imageName } = usePreviewHeaderContext();
+  const { boardName, itemName } = usePreviewHeaderContext();
 
-  if (!imageName || !boardName) {
+  if (!itemName || !boardName) {
     return (
       <Text fontSize="xs" fontWeight="700">
         {t('widgets.labels.preview')}
@@ -31,7 +31,7 @@ export const PreviewWidgetLabel = (_props: WidgetLabelProps) => {
         /
       </Text>
       <Text color="fg.muted" fontSize="xs" truncate>
-        {imageName}
+        {itemName}
       </Text>
     </HStack>
   );

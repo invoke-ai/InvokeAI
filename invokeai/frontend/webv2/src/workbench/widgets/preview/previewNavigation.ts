@@ -1,6 +1,12 @@
-import type { GalleryOrderDir, GalleryQueuePlaceholder, GalleryView } from '@features/gallery/contracts';
+import type {
+  GalleryItemKind,
+  GalleryItemKey,
+  GalleryOrderDir,
+  GalleryQueuePlaceholder,
+  GalleryView,
+} from '@features/gallery/contracts';
 
-import { getGalleryPlaceholderInsertionIndex } from '@features/gallery/contracts';
+import { getGalleryPlaceholderInsertionIndex, toGalleryItemKey } from '@features/gallery/contracts';
 
 /**
  * Pure navigation model for the preview widget's left/right stepping.
@@ -11,16 +17,17 @@ import { getGalleryPlaceholderInsertionIndex } from '@features/gallery/contracts
  * of truth; the cursor is re-resolved from them on every render, never stored.
  */
 
-interface NavigableImage {
-  imageName: string;
+interface NavigableItem {
+  kind: GalleryItemKind;
+  name: string;
   starred?: boolean;
 }
 
-export type PreviewNavigationItem<TImage extends NavigableImage> =
-  | { kind: 'image'; image: TImage }
+export type PreviewNavigationItem<TItem extends NavigableItem> =
+  | { kind: 'item'; item: TItem }
   | { kind: 'placeholder'; placeholder: GalleryQueuePlaceholder };
 
-export const getPreviewNavigationSequence = <TImage extends NavigableImage>({
+export const getPreviewNavigationSequence = <TItem extends NavigableItem>({
   activePlaceholder,
   boardId,
   boardImages,
@@ -30,15 +37,15 @@ export const getPreviewNavigationSequence = <TImage extends NavigableImage>({
 }: {
   /** The live slot from getGalleryGenerationSequence, or null. */
   activePlaceholder: GalleryQueuePlaceholder | null;
-  /** The board backing boardImages — the selected image's own board. */
+  /** The board backing boardImages — the selected item's own board. */
   boardId: string;
-  /** Board images in the gallery's display order. */
-  boardImages: TImage[];
+  /** Board items in the gallery's display order. */
+  boardImages: TItem[];
   galleryView: GalleryView;
   imageOrderDir: GalleryOrderDir;
   starredFirst: boolean;
-}): PreviewNavigationItem<TImage>[] => {
-  const items: PreviewNavigationItem<TImage>[] = boardImages.map((image) => ({ image, kind: 'image' }));
+}): PreviewNavigationItem<TItem>[] => {
+  const items: PreviewNavigationItem<TItem>[] = boardImages.map((item) => ({ item, kind: 'item' }));
   const includePlaceholder =
     activePlaceholder !== null && galleryView === 'images' && activePlaceholder.boardId === boardId;
 
@@ -54,23 +61,23 @@ export const getPreviewNavigationSequence = <TImage extends NavigableImage>({
   return items;
 };
 
-export const getPreviewNavigationCursor = <TImage extends NavigableImage>(
-  sequence: PreviewNavigationItem<TImage>[],
-  { isFollowingLive, selectedImageName }: { isFollowingLive: boolean; selectedImageName: string | null }
+export const getPreviewNavigationCursor = <TItem extends NavigableItem>(
+  sequence: PreviewNavigationItem<TItem>[],
+  { isFollowingLive, selectedItemKey }: { isFollowingLive: boolean; selectedItemKey: GalleryItemKey | null }
 ): number => {
   if (isFollowingLive) {
     return sequence.findIndex((item) => item.kind === 'placeholder');
   }
 
-  if (selectedImageName === null) {
+  if (selectedItemKey === null) {
     return -1;
   }
 
-  return sequence.findIndex((item) => item.kind === 'image' && item.image.imageName === selectedImageName);
+  return sequence.findIndex((entry) => entry.kind === 'item' && toGalleryItemKey(entry.item) === selectedItemKey);
 };
 
-export const getPreviewNavigationTarget = <TImage extends NavigableImage>(
-  sequence: PreviewNavigationItem<TImage>[],
+export const getPreviewNavigationTarget = <TItem extends NavigableItem>(
+  sequence: PreviewNavigationItem<TItem>[],
   cursorIndex: number,
   offset: -1 | 1
-): PreviewNavigationItem<TImage> | null => (cursorIndex === -1 ? null : (sequence[cursorIndex + offset] ?? null));
+): PreviewNavigationItem<TItem> | null => (cursorIndex === -1 ? null : (sequence[cursorIndex + offset] ?? null));

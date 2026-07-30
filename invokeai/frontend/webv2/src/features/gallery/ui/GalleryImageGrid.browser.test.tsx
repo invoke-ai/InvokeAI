@@ -1,5 +1,5 @@
 /* oxlint-disable react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-object-as-prop */
-import type { GalleryItem, GalleryItemRef, GeneratedImageContract } from '@features/gallery/contracts';
+import type { GalleryItem, GalleryItemRef } from '@features/gallery/contracts';
 import type { StreamingImageSource } from '@platform/ui/streaming-image/streamingImageSource';
 
 import { ChakraProvider } from '@chakra-ui/react';
@@ -139,15 +139,6 @@ const createItem = (kind: GalleryItem['kind'], name: string, overrides: Partial<
     : ({ ...base, kind } as GalleryItem);
 };
 
-const createPreviewImage = (name: string): GeneratedImageContract => ({
-  height: 96,
-  imageName: name,
-  imageUrl: `/full/image/${name}`,
-  queuedAt: '2026-07-30T00:00:00.000Z',
-  sourceQueueItemId: 'queue-1',
-  thumbnailUrl: `/thumbnail/image/${name}`,
-  width: 128,
-});
 const previewSource: StreamingImageSource = {
   alt: 'shared',
   height: 96,
@@ -351,13 +342,13 @@ const Harness = ({
                       isLive={false}
                       liveBadgeLabel="Generating"
                       shouldAntialiasLiveImage
-                      source={previewSource}
+                      source={{ itemKey: 'image:shared', kind: 'image', source: previewSource }}
                       variant="framed"
                     />
                     <PreviewFilmstrip
                       density="full"
-                      images={[createPreviewImage('shared'), createPreviewImage('other.png')]}
-                      selectedImageName="shared"
+                      items={[createItem('image', 'shared'), createItem('image', 'other.png')]}
+                      selectedItemKey="image:shared"
                       onSelect={noop}
                     />
                   </>

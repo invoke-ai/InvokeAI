@@ -1,4 +1,4 @@
-import type { GalleryImage } from '@features/gallery';
+import type { GalleryItem } from '@features/gallery';
 import type { ImageActions } from '@workbench/image-actions';
 
 import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
@@ -13,26 +13,26 @@ import { createExternalStore } from '@platform/state/externalStore';
  * static title and hides the action strip.
  */
 export interface PreviewHeaderContext {
-  /** The selected image with board/star context, ready for image actions. */
-  actionImage: GalleryImage | null;
+  /** The selected item with board/star context, ready for common actions. */
+  actionItem: GalleryItem | null;
   /** The view's `useImageActions` instance (carries delete-neighbor handling). */
   actions: ImageActions | null;
   boardName: string | null;
-  imageName: string | null;
+  itemName: string | null;
   /**
    * Opens the view's full image context menu anchored at viewport coordinates.
    * The header's "image actions" dropdown reuses the exact right-click menu —
    * one source of truth for every image verb.
    */
-  openImageMenu: ((x: number, y: number) => void) | null;
+  openItemMenu: ((x: number, y: number) => void) | null;
 }
 
 const emptyContext: PreviewHeaderContext = {
-  actionImage: null,
+  actionItem: null,
   actions: null,
   boardName: null,
-  imageName: null,
-  openImageMenu: null,
+  itemName: null,
+  openItemMenu: null,
 };
 
 const store = createExternalStore<PreviewHeaderContext>(emptyContext);

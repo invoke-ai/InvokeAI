@@ -1,7 +1,8 @@
-import type { GeneratedImageContract } from '@features/gallery';
+import type { GalleryItem, GalleryItemKey } from '@features/gallery';
 
 import { Box, HStack, ScrollArea } from '@chakra-ui/react';
 import { useDraggable } from '@dnd-kit/core';
+import { toGalleryItemKey, toGalleryItemRef } from '@features/gallery/contracts';
 import { getGalleryItemDragData, getGalleryItemDragId } from '@features/gallery/utility';
 import { useCallback, useMemo } from 'react';
 
@@ -15,22 +16,20 @@ import type { PreviewDensity } from './previewDensity';
  * with every existing drop target (canvas zones, boards, drop-to-compare).
  */
 
-type FilmstripImage = GeneratedImageContract & { boardId?: string };
-
 export const PreviewFilmstrip = ({
   density,
-  images,
-  selectedImageName,
+  items,
+  selectedItemKey,
   onSelect,
 }: {
   density: PreviewDensity;
-  images: FilmstripImage[];
-  selectedImageName: string | null;
-  onSelect: (image: GeneratedImageContract) => void;
+  items: GalleryItem[];
+  selectedItemKey: GalleryItemKey | null;
+  onSelect: (item: GalleryItem) => void;
 }) => {
   const thumbSize = density === 'full' ? '12' : '8';
 
-  if (images.length < 2) {
+  if (items.length < 2) {
     return null;
   }
 
@@ -53,15 +52,19 @@ export const PreviewFilmstrip = ({
       <ScrollArea.Viewport h="full" w="full">
         <ScrollArea.Content asChild>
           <HStack align="center" gap="1" h="full">
-            {images.map((image) => (
-              <FilmstripThumb
-                key={image.imageName}
-                image={image}
-                isSelected={image.imageName === selectedImageName}
-                size={thumbSize}
-                onSelect={onSelect}
-              />
-            ))}
+            {items.map((item) => {
+              const itemKey = toGalleryItemKey(item);
+
+              return (
+                <FilmstripThumb
+                  key={itemKey}
+                  item={item}
+                  isSelected={itemKey === selectedItemKey}
+                  size={thumbSize}
+                  onSelect={onSelect}
+                />
+              );
+            })}
           </HStack>
         </ScrollArea.Content>
       </ScrollArea.Viewport>
@@ -73,22 +76,23 @@ export const PreviewFilmstrip = ({
 };
 
 const FilmstripThumb = ({
-  image,
+  item,
   isSelected,
   size,
   onSelect,
 }: {
-  image: FilmstripImage;
+  item: GalleryItem;
   isSelected: boolean;
   size: string;
-  onSelect: (image: GeneratedImageContract) => void;
+  onSelect: (item: GalleryItem) => void;
 }) => {
-  const dragData = useMemo(() => getGalleryItemDragData([{ kind: 'image', name: image.imageName }]), [image.imageName]);
+  const itemRef = useMemo(() => toGalleryItemRef(item), [item]);
+  const dragData = useMemo(() => getGalleryItemDragData([itemRef]), [itemRef]);
   const { listeners, setNodeRef } = useDraggable({
     data: dragData,
-    id: getGalleryItemDragId(dragData.items[0]!, 'preview-filmstrip'),
+    id: getGalleryItemDragId(itemRef, 'preview-filmstrip'),
   });
-  const handleClick = useCallback(() => onSelect(image), [image, onSelect]);
+  const handleClick = useCallback(() => onSelect(item), [item, onSelect]);
   // Ref callbacks re-run when `isSelected` changes, keeping the selected thumb
   // in view without an effect.
   const scrollIntoView = useCallback(
@@ -108,7 +112,7 @@ const FilmstripThumb = ({
       {...listeners}
       as="button"
       aria-current={isSelected || undefined}
-      aria-label={image.imageName}
+      aria-label={item.kind === 'video' ? `Video ${item.name}` : item.name}
       borderColor={isSelected ? 'border.emphasized' : 'border.subtle'}
       borderWidth="1px"
       boxSize={size}
@@ -120,12 +124,7 @@ const FilmstripThumb = ({
       touchAction="none"
       onClick={handleClick}
     >
-      <img
-        alt={image.imageName}
-        loading="lazy"
-        src={image.thumbnailUrl || image.imageUrl}
-        style={FILMSTRIP_IMG_STYLE}
-      />
+      <img alt={item.name} loading="lazy" src={item.thumbnailUrl || item.fullUrl} style={FILMSTRIP_IMG_STYLE} />
       {isSelected ? <Box bg="accent.solid" bottom="0" h="2px" left="0" position="absolute" right="0" /> : null}
     </Box>
   );

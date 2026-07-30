@@ -1,5 +1,5 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop */
-import type { GalleryImage, GalleryItemsPage } from '@features/gallery';
+import type { GalleryImage, GalleryImageItem, GalleryItemsPage, GalleryVideoItem } from '@features/gallery';
 import type { QueueItem } from '@features/queue/contracts';
 import type { WidgetViewProps } from '@workbench/widgetContracts';
 
@@ -29,6 +29,37 @@ const queueItem: QueueItem = {
   status: 'running',
 };
 
+const createImageItem = (name: string, createdAt: string): GalleryImageItem => ({
+  boardId: 'none',
+  category: 'general',
+  createdAt,
+  fullUrl: `/images/${name}/full`,
+  height: 720,
+  isIntermediate: false,
+  kind: 'image',
+  name,
+  sourceQueueItemId: `queue-${name}`,
+  starred: false,
+  thumbnailUrl: `/images/${name}/thumbnail`,
+  width: 1280,
+});
+
+const createVideoItem = (name: string, createdAt: string): GalleryVideoItem => ({
+  boardId: 'none',
+  category: 'general',
+  createdAt,
+  durationSeconds: 65.1,
+  fps: 23.976,
+  fullUrl: `data:video/mp4;base64,${name}`,
+  height: 1080,
+  isIntermediate: false,
+  kind: 'video',
+  name,
+  starred: false,
+  thumbnailUrl: `data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" data-name="${name}"/>`,
+  width: 1920,
+});
+
 const mocks = vi.hoisted(() => {
   const recentImages = [
     {
@@ -54,7 +85,7 @@ const mocks = vi.hoisted(() => {
   return {
     commands: {
       account: { updateProjectPreferences: vi.fn() },
-      gallery: { selectImage: vi.fn(), setCompareImage: vi.fn() },
+      gallery: { selectImage: vi.fn(), selectItem: vi.fn(), setCompareImage: vi.fn(), setCompareItem: vi.fn() },
       notifications: { reportError: vi.fn() },
       widgets: { patchValues: vi.fn() },
     },
@@ -77,6 +108,14 @@ const mocks = vi.hoisted(() => {
     },
     galleryItemPageOffsets: [] as number[],
     galleryItemPages: [] as GalleryItemsPage[],
+    imageActionOptions: null as null | {
+      getItemActionContext?: () => {
+        items: Array<GalleryImageItem | GalleryVideoItem>;
+        loadOrderedRefs: (signal: AbortSignal) => Promise<Array<{ kind: 'image' | 'video'; name: string }>>;
+        selectedItemKey: string | null;
+      };
+      onImagesDeleted?: (imageNames: string[]) => void;
+    },
     recentImages,
     useActiveProgressTarget: vi.fn(() => null as unknown),
     useProgressImage: vi.fn(() => null as unknown),
@@ -88,6 +127,7 @@ vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectSelector: (selector: (project: typeof mocks.project) => unknown) => selector(mocks.project),
   useWidgetValuesSelector: () => ({}),
   useWorkbenchCommands: () => mocks.commands,
+  useWorkbenchQueries: () => ({ getSnapshot: () => ({ activeProject: mocks.project }) }),
 }));
 
 vi.mock('@features/queue/react', async (importOriginal) => ({
@@ -149,7 +189,10 @@ vi.mock('@workbench/image-actions', () => ({
   getImageRecallTitle: () => '',
   getSelectedGalleryImage: () => null,
   getSelectedGalleryImageFromValues: () => null,
-  useImageActions: () => ({}),
+  useImageActions: (options: typeof mocks.imageActionOptions) => {
+    mocks.imageActionOptions = options;
+    return {};
+  },
 }));
 
 vi.mock('@features/generation/react', () => ({
@@ -166,7 +209,27 @@ vi.mock('@features/generation/react', () => ({
 import { PreviewWidgetView } from './PreviewWidgetView';
 
 const i18n = i18next.createInstance();
-await i18n.use(initReactI18next).init({ fallbackLng: 'en', lng: 'en', resources: { en: { translation: {} } } });
+await i18n.use(initReactI18next).init({
+  fallbackLng: 'en',
+  lng: 'en',
+  resources: {
+    en: {
+      translation: {
+        common: { countOfTotal: '{{count}} of {{total}}' },
+        widgets: {
+          preview: {
+            framesPerSecond: '{{count}} fps',
+            itemCount_one: '{{count}} item',
+            itemCount_other: '{{count}} items',
+            nextItemInBoard: 'Next item in board',
+            previousItemInBoard: 'Previous item in board',
+            videoDuration: 'Duration {{duration}}',
+          },
+        },
+      },
+    },
+  },
+});
 
 const disposer = () => {};
 const runtime = {
@@ -224,6 +287,7 @@ const pressArrow = async (key: 'ArrowLeft' | 'ArrowRight') => {
 beforeEach(() => {
   mocks.commands.account.updateProjectPreferences.mockClear();
   mocks.commands.gallery.selectImage.mockClear();
+  mocks.commands.gallery.selectItem.mockClear();
   mocks.project.queue.items = [];
   mocks.project.settings.showProgressImagesInViewer = false;
   delete (mocks.project.widgetInstances.gallery.state.values as Record<string, unknown>).compareImage;
@@ -237,6 +301,7 @@ beforeEach(() => {
   };
   mocks.project.widgetInstances.gallery.state.values.selectedImageName = 'newest';
   mocks.galleryItemPageOffsets.length = 0;
+  mocks.imageActionOptions = null;
   mocks.galleryItemPages = [
     {
       items: mocks.recentImages.map((image) => ({
@@ -279,9 +344,9 @@ describe('preview keyboard navigation boundary', () => {
       await render();
       await pressArrow('ArrowRight');
 
-      expect(mocks.commands.gallery.selectImage).toHaveBeenCalledTimes(1);
-      expect(mocks.commands.gallery.selectImage).toHaveBeenCalledWith(
-        expect.objectContaining({ imageName: 'oldest' }),
+      expect(mocks.commands.gallery.selectItem).toHaveBeenCalledTimes(1);
+      expect(mocks.commands.gallery.selectItem).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'image', name: 'oldest' }),
         undefined,
         expect.any(Number),
         true
@@ -351,15 +416,15 @@ describe('preview keyboard navigation boundary', () => {
     await pressArrow('ArrowRight');
 
     await vi.waitFor(() => {
-      expect(mocks.commands.gallery.selectImage).toHaveBeenCalledWith(
-        expect.objectContaining({ imageName: 'oldest' }),
+      expect(mocks.commands.gallery.selectItem).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'image', name: 'oldest' }),
         undefined,
         expect.any(Number),
         true
       );
     });
     expect(mocks.galleryItemPageOffsets).toEqual([60]);
-    expect(mocks.commands.gallery.selectImage).toHaveBeenCalledTimes(1);
+    expect(mocks.commands.gallery.selectItem).toHaveBeenCalledTimes(1);
   });
 
   it('anchors Preview navigation to the selected paginated Gallery page', async () => {
@@ -431,8 +496,8 @@ describe('preview keyboard navigation boundary', () => {
     await render();
     await pressArrow('ArrowRight');
 
-    expect(mocks.commands.gallery.selectImage).toHaveBeenCalledWith(
-      expect.objectContaining({ imageName: neighbor.imageName }),
+    expect(mocks.commands.gallery.selectItem).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'image', name: neighbor.imageName }),
       undefined,
       1,
       true
@@ -458,7 +523,7 @@ describe('preview keyboard navigation boundary', () => {
     expect(mocks.commands.account.updateProjectPreferences).toHaveBeenCalledWith({
       showProgressImagesInViewer: true,
     });
-    expect(mocks.commands.gallery.selectImage).not.toHaveBeenCalled();
+    expect(mocks.commands.gallery.selectItem).not.toHaveBeenCalled();
   });
 
   it('keeps arrow navigation working while following live', async () => {
@@ -481,9 +546,9 @@ describe('preview keyboard navigation boundary', () => {
     // steps back onto the newest completed image.
     await pressArrow('ArrowRight');
 
-    expect(mocks.commands.gallery.selectImage).toHaveBeenCalledTimes(1);
-    expect(mocks.commands.gallery.selectImage).toHaveBeenCalledWith(
-      expect.objectContaining({ imageName: 'newest' }),
+    expect(mocks.commands.gallery.selectItem).toHaveBeenCalledTimes(1);
+    expect(mocks.commands.gallery.selectItem).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'image', name: 'newest' }),
       undefined,
       expect.any(Number),
       true
@@ -508,8 +573,8 @@ describe('preview keyboard navigation boundary', () => {
     await render();
     await pressArrow('ArrowRight');
 
-    expect(mocks.commands.gallery.selectImage).toHaveBeenCalledWith(
-      expect.objectContaining({ boardId: 'board-live', imageName: 'live-board-image' }),
+    expect(mocks.commands.gallery.selectItem).toHaveBeenCalledWith(
+      expect.objectContaining({ boardId: 'board-live', kind: 'image', name: 'live-board-image' }),
       undefined,
       expect.any(Number),
       true
@@ -522,8 +587,8 @@ describe('preview keyboard navigation boundary', () => {
     await render();
     await pressArrow('ArrowLeft');
 
-    expect(mocks.commands.gallery.selectImage).toHaveBeenCalledWith(
-      expect.objectContaining({ imageName: 'oldest' }),
+    expect(mocks.commands.gallery.selectItem).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'image', name: 'oldest' }),
       undefined,
       expect.any(Number),
       true
@@ -541,10 +606,97 @@ describe('preview keyboard navigation boundary', () => {
       await render();
       await pressArrow('ArrowRight');
 
-      expect(mocks.commands.gallery.selectImage).not.toHaveBeenCalled();
+      expect(mocks.commands.gallery.selectItem).not.toHaveBeenCalled();
       expect(documentKeydown).toHaveBeenCalledTimes(1);
     } finally {
       document.removeEventListener('keydown', documentKeydown);
+    }
+  });
+
+  it('renders and navigates same-name image and video items independently in server order', async () => {
+    const sameNameImage = createImageItem('shared', '2026-07-30T13:00:00Z');
+    const sameNameVideo = createVideoItem('shared', '2026-07-30T12:00:00Z');
+    const oldestImage = createImageItem('oldest-mixed', '2026-07-30T11:00:00Z');
+    const galleryValues = mocks.project.widgetInstances.gallery.state.values as Record<string, unknown>;
+
+    galleryValues.compareImage = {
+      ...mocks.recentImages[0],
+      imageName: 'comparison.png',
+    };
+    galleryValues.recentImages = [];
+    galleryValues.selectedImage = sameNameVideo;
+    galleryValues.selectedImageName = 'video:shared';
+    mocks.galleryItemPages = [{ items: [sameNameImage, sameNameVideo, oldestImage], total: 3 }];
+
+    await render();
+
+    const video = host?.querySelector<HTMLVideoElement>('video');
+    const filmstripPosters = host?.querySelectorAll<HTMLImageElement>('button img');
+
+    expect(video?.getAttribute('src')).toBe(sameNameVideo.fullUrl);
+    expect(video?.getAttribute('poster')).toBe(sameNameVideo.thumbnailUrl);
+    expect(filmstripPosters).toHaveLength(3);
+    expect(host?.textContent).toContain('2 of 3');
+    expect(host?.textContent).toContain('1920 × 1080');
+    expect(host?.textContent).toContain('Duration 1:06');
+    expect(host?.textContent).toContain('23.976 fps');
+    expect(host?.textContent).not.toContain('Drop to compare');
+
+    await pressArrow('ArrowLeft');
+
+    expect(mocks.commands.gallery.selectItem).toHaveBeenCalledWith(sameNameImage, undefined, 0, true);
+  });
+
+  it('uses the common mixed deletion context without the legacy image successor callback', async () => {
+    const sameNameImage = createImageItem('shared', '2026-07-30T13:00:00Z');
+    const sameNameVideo = createVideoItem('shared', '2026-07-30T12:00:00Z');
+    const galleryValues = mocks.project.widgetInstances.gallery.state.values as Record<string, unknown>;
+
+    galleryValues.recentImages = [];
+    galleryValues.selectedImage = sameNameVideo;
+    galleryValues.selectedImageName = 'video:shared';
+    mocks.galleryItemPages = [{ items: [sameNameImage, sameNameVideo], total: 2 }];
+
+    await render();
+
+    expect(mocks.imageActionOptions?.onImagesDeleted).toBeUndefined();
+    const context = mocks.imageActionOptions?.getItemActionContext?.();
+    expect(context?.selectedItemKey).toBe('video:shared');
+    expect(context?.items).toEqual([sameNameImage, sameNameVideo]);
+    await expect(context?.loadOrderedRefs(new AbortController().signal)).resolves.toEqual([
+      { kind: 'image', name: 'shared' },
+      { kind: 'video', name: 'shared' },
+    ]);
+  });
+
+  it('prefetches an image neighbor but never assigns a full video URL to Image', async () => {
+    const previousImage = createImageItem('prefetch-previous', '2026-07-30T13:00:00Z');
+    const selectedImage = createImageItem('prefetch-selected', '2026-07-30T12:00:00Z');
+    const nextVideo = createVideoItem('prefetch-next', '2026-07-30T11:00:00Z');
+    const galleryValues = mocks.project.widgetInstances.gallery.state.values as Record<string, unknown>;
+    const preloadedSources: string[] = [];
+    const NativeImage = globalThis.Image;
+
+    class PreloadImage {
+      set src(value: string) {
+        preloadedSources.push(value);
+      }
+    }
+
+    Object.defineProperty(globalThis, 'Image', { configurable: true, value: PreloadImage, writable: true });
+
+    try {
+      galleryValues.recentImages = [];
+      galleryValues.selectedImage = selectedImage;
+      galleryValues.selectedImageName = 'image:prefetch-selected';
+      mocks.galleryItemPages = [{ items: [previousImage, selectedImage, nextVideo], total: 3 }];
+
+      await render();
+
+      expect(preloadedSources).toContain(previousImage.fullUrl);
+      expect(preloadedSources).not.toContain(nextVideo.fullUrl);
+    } finally {
+      Object.defineProperty(globalThis, 'Image', { configurable: true, value: NativeImage, writable: true });
     }
   });
 });

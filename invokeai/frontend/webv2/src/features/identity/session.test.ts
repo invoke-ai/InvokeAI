@@ -462,3 +462,51 @@ describe('media cookie recovery on restore', () => {
     expect(api.refreshMediaCookie).not.toHaveBeenCalled();
   });
 });
+
+describe('protected media cookie recovery', () => {
+  it('shares one in-flight refresh between concurrent callers in the same account epoch', async () => {
+    await resolveSignedOutMultiuserSession();
+    await session.loginWithCredentials(user.email, 'password', true);
+    const refresh = createDeferred<{ success: boolean }>();
+    api.refreshMediaCookie.mockReturnValueOnce(refresh.promise);
+
+    const first = session.refreshProtectedMediaCookie();
+    const second = session.refreshProtectedMediaCookie();
+
+    expect(api.refreshMediaCookie).toHaveBeenCalledTimes(1);
+
+    refresh.resolve({ success: true });
+
+    await expect(Promise.all([first, second])).resolves.toEqual([true, true]);
+  });
+
+  it('starts a separate refresh for a new account epoch and rejects the stale completion', async () => {
+    await resolveSignedOutMultiuserSession();
+    await session.loginWithCredentials(user.email, 'password', true);
+    const oldRefresh = createDeferred<{ success: boolean }>();
+    const newRefresh = createDeferred<{ success: boolean }>();
+    api.refreshMediaCookie.mockReturnValueOnce(oldRefresh.promise).mockReturnValueOnce(newRefresh.promise);
+
+    const staleOutcome = session.refreshProtectedMediaCookie();
+
+    api.login.mockResolvedValueOnce({ expires_in: 3600, token: 'token-b', user: userB });
+    await session.loginWithCredentials(userB.email, 'password', true);
+    const currentOutcome = session.refreshProtectedMediaCookie();
+
+    expect(api.refreshMediaCookie).toHaveBeenCalledTimes(2);
+
+    newRefresh.resolve({ success: true });
+    await expect(currentOutcome).resolves.toBe(true);
+
+    oldRefresh.resolve({ success: true });
+    await expect(staleOutcome).resolves.toBe(false);
+  });
+
+  it('returns false without throwing when the refresh request fails', async () => {
+    await resolveSignedOutMultiuserSession();
+    await session.loginWithCredentials(user.email, 'password', true);
+    api.refreshMediaCookie.mockRejectedValueOnce(new Error('network down'));
+
+    await expect(session.refreshProtectedMediaCookie()).resolves.toBe(false);
+  });
+});
