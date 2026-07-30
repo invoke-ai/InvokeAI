@@ -19,14 +19,26 @@ import { addImageToImage } from 'features/nodes/util/graph/generation/addImageTo
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
 import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
 import { addOutpaint } from 'features/nodes/util/graph/generation/addOutpaint';
+import {
+  addPidDecode,
+  addPidImageToImageNative,
+  buildPidDecodeChain,
+} from 'features/nodes/util/graph/generation/addPidDecode';
 import { addRegions } from 'features/nodes/util/graph/generation/addRegions';
 import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import { addZImageLoRAs } from 'features/nodes/util/graph/generation/addZImageLoRAs';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
-import { selectCanvasOutputFields, selectPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
+import {
+  getOriginalAndScaledSizesForOtherModes,
+  getOriginalAndScaledSizesForTextToImage,
+  selectCanvasOutputFields,
+  selectPresetModifiedPrompts,
+} from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg, GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
+import { UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
+import { t } from 'i18next';
 import type { Invocation } from 'services/api/types';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
 import type { Equals } from 'tsafe';
@@ -58,7 +70,7 @@ export const buildZImageGraph = async (arg: GraphBuilderArg): Promise<GraphBuild
 
   // Z-Image-Turbo uses guidance_scale (stored as cfgScale), defaults to 1.0 for no CFG
   // (1.0 means no CFG effect, matching FLUX convention)
-  const { cfgScale: guidance_scale, steps, zImageScheduler } = params;
+  const { cfgScale: guidance_scale, steps, zImageScheduler, pidMode } = params;
 
   // Shift override (null = auto-calculate from image dimensions)
   const zImageShift = selectZImageShift(state);
@@ -231,13 +243,43 @@ export const buildZImageGraph = async (arg: GraphBuilderArg): Promise<GraphBuild
 
   let canvasOutput: Invocation<ImageOutputNodes> = l2i;
 
+  if (pidMode !== 'off') {
+    // Inpaint/outpaint are not wired for PiD yet - only txt2img and img2img are supported (Fit and Native).
+    if (generationMode === 'inpaint' || generationMode === 'outpaint') {
+      throw new UnsupportedGenerationModeError(t('toast.pidUnsupportedMode'));
+    }
+    // PiD decodes at 4x the generation resolution. "Scale Before Processing" (Canvas) would silently inflate
+    // the generation size to the model optimal, blowing up the decode - require it off (scaled == original).
+    const { originalSize, scaledSize } = getOriginalAndScaledSizesForTextToImage(state);
+    if (scaledSize.width !== originalSize.width || scaledSize.height !== originalSize.height) {
+      throw new UnsupportedGenerationModeError(t('toast.pidScaleBeforeProcessingOff'));
+    }
+  }
+
   if (generationMode === 'txt2img') {
-    canvasOutput = addTextToImage({
-      g,
-      state,
-      denoise,
-      l2i,
-    });
+    if (pidMode !== 'off') {
+      // PiD replaces the VAE decode entirely - drop the unused l2i (and its edges). Z-Image shares FLUX.1's VAE
+      // and uses the FLUX PiD decoder; the Z-Image VAE (from the model loader) is wired so the node reads its
+      // scaling_factor / shift_factor.
+      g.deleteNode(l2i.id);
+      canvasOutput = addPidDecode({
+        g,
+        state,
+        mode: pidMode,
+        denoise,
+        decodeNodeType: 'z_image_pid_decode',
+        vaeSource: modelLoader,
+        positivePrompt,
+        seed,
+      });
+    } else {
+      canvasOutput = addTextToImage({
+        g,
+        state,
+        denoise,
+        l2i,
+      });
+    }
     g.upsertMetadata({ generation_mode: 'z_image_txt2img' });
   } else if (generationMode === 'img2img') {
     assert(manager !== null);
@@ -246,15 +288,56 @@ export const buildZImageGraph = async (arg: GraphBuilderArg): Promise<GraphBuild
       id: getPrefixedId('z_image_i2l'),
     });
 
-    canvasOutput = await addImageToImage({
-      g,
-      state,
-      manager,
-      denoise,
-      l2i,
-      i2l,
-      vaeSource: modelLoader,
-    });
+    if (pidMode === 'native') {
+      // PiD replaces the VAE decode. Native: the bbox is the 4x target - generate at bbox / 4, PiD decodes
+      // straight back up to the bbox (no downscale), so the full result composites onto the canvas region.
+      g.deleteNode(l2i.id);
+      canvasOutput = await addPidImageToImageNative({
+        g,
+        state,
+        manager,
+        denoise,
+        decodeNodeType: 'z_image_pid_decode',
+        i2l,
+        vaeSource: modelLoader,
+        positivePrompt,
+        seed,
+      });
+    } else if (pidMode === 'fit') {
+      // PiD replaces the VAE decode. Fit: generate at the bbox, PiD decodes 4x, then downscale back to the bbox.
+      g.deleteNode(l2i.id);
+      const { originalSize } = getOriginalAndScaledSizesForOtherModes(state);
+      const pidDecode = buildPidDecodeChain({
+        g,
+        state,
+        denoise,
+        decodeNodeType: 'z_image_pid_decode',
+        vaeSource: modelLoader,
+        positivePrompt,
+        seed,
+        mode: 'fit',
+        fitSize: originalSize,
+      });
+      canvasOutput = await addImageToImage({
+        g,
+        state,
+        manager,
+        denoise,
+        l2i: pidDecode,
+        i2l,
+        vaeSource: modelLoader,
+      });
+    } else {
+      canvasOutput = await addImageToImage({
+        g,
+        state,
+        manager,
+        denoise,
+        l2i,
+        i2l,
+        vaeSource: modelLoader,
+      });
+    }
     g.upsertMetadata({ generation_mode: 'z_image_img2img' });
   } else if (generationMode === 'inpaint') {
     assert(manager !== null);

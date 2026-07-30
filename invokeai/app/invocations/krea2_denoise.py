@@ -2,7 +2,7 @@ import json
 import math
 from contextlib import ExitStack
 from pathlib import Path
-from typing import Callable, Iterator, Optional, Tuple
+from typing import Callable, Iterator, Optional
 
 import torch
 import torchvision.transforms as tv_transforms
@@ -39,7 +39,7 @@ from invokeai.backend.krea2.sampling_utils import (
     unpack_latents,
 )
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat
-from invokeai.backend.patches.layer_patcher import LayerPatcher
+from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.krea2_lora_constants import KREA2_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
@@ -484,12 +484,11 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         return step_callback
 
-    def _lora_iterator(self, context: InvocationContext) -> Iterator[Tuple[ModelPatchRaw, float]]:
+    def _lora_iterator(self, context: InvocationContext) -> Iterator[PatchSpec]:
         for lora in self.transformer.loras:
             lora_info = context.models.load(lora.lora)
             if not isinstance(lora_info.model, ModelPatchRaw):
                 raise TypeError(
                     f"Expected ModelPatchRaw for LoRA '{lora.lora.key}', got {type(lora_info.model).__name__}."
                 )
-            yield (lora_info.model, lora.weight)
-            del lora_info
+            yield (lora_info.model, lora.weight, lora_info.model_in_ram())
