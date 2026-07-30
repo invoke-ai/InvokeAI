@@ -1,5 +1,5 @@
 from contextlib import ExitStack
-from typing import Iterator, Tuple
+from typing import Iterator
 
 import torch
 
@@ -20,7 +20,7 @@ from invokeai.backend.krea2.sampling_utils import (
     KREA2_START_IDX,
 )
 from invokeai.backend.model_manager.load.model_cache.utils import get_effective_device
-from invokeai.backend.patches.layer_patcher import LayerPatcher
+from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.krea2_lora_constants import KREA2_LORA_QWEN3VL_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
@@ -152,7 +152,7 @@ class Krea2TextEncoderInvocation(BaseInvocation):
 
         return prompt_embeds, prompt_mask
 
-    def _lora_iterator(self, context: InvocationContext) -> Iterator[Tuple[ModelPatchRaw, float]]:
+    def _lora_iterator(self, context: InvocationContext) -> Iterator[PatchSpec]:
         """Iterate over the LoRA models to apply to the Qwen3-VL text encoder."""
         for lora in self.qwen3_vl_encoder.loras:
             lora_info = context.models.load(lora.lora)
@@ -160,5 +160,4 @@ class Krea2TextEncoderInvocation(BaseInvocation):
                 raise TypeError(
                     f"Expected ModelPatchRaw for LoRA '{lora.lora.key}', got {type(lora_info.model).__name__}."
                 )
-            yield (lora_info.model, lora.weight)
-            del lora_info
+            yield (lora_info.model, lora.weight, lora_info.model_in_ram())
