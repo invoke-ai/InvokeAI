@@ -1374,11 +1374,15 @@ async def get_stats(current_admin: AdminUserOrDefault) -> Optional[CacheStats]:
         aggregate.misses += stats.misses
         aggregate.in_cache += stats.in_cache
         aggregate.cleared += stats.cleared
-        # cache_size and high_watermark are already system-wide values: every per-device cache
-        # shares one global RamBudget, so each reports the same global capacity and observes the
-        # same global usage. Summing them would over-report an N-GPU system ~N times; take the max.
+        # cache_size, high_watermark and cache_used are already system-wide values: every per-device
+        # cache shares one global RamBudget, so each reports the same global capacity and observes
+        # the same global usage. Summing them would over-report an N-GPU system ~N times; take the
+        # max. cache_used must be carried through explicitly — it is this fork's field for *current*
+        # usage, and the Queue widget's gauge silently falls back to high_watermark (peak) when it
+        # is absent, which reads as a cache that never releases memory.
         aggregate.high_watermark = max(aggregate.high_watermark, stats.high_watermark)
         aggregate.cache_size = max(aggregate.cache_size, stats.cache_size)
+        aggregate.cache_used = max(aggregate.cache_used, stats.cache_used)
         aggregate.loaded_model_sizes.update(stats.loaded_model_sizes)
     return aggregate
 

@@ -1,3 +1,4 @@
+import logging
 import os
 from pathlib import Path
 from typing import Any
@@ -206,6 +207,8 @@ def _make_stats_services(ram_caches: dict) -> Any:
     # The stats route requires auth; in single-user mode the auth dependency only reads
     # configuration.multiuser before returning the default admin user.
     services.configuration = type("Config", (), {"multiuser": False})()
+    # empty_model_cache logs before clearing.
+    services.logger = logging.getLogger("test.model_manager_router")
     return services
 
 
@@ -222,9 +225,9 @@ def test_get_stats_aggregates_per_device_caches(monkeypatch: Any, client: TestCl
 
     # Both caches report the shared global capacity (200). Their high watermarks sample the same
     # global usage at different moments, so the true system high watermark is the max (120).
-    stats_0 = CacheStats(hits=3, misses=1, in_cache=2, cleared=1, cache_size=200, high_watermark=80)
+    stats_0 = CacheStats(hits=3, misses=1, in_cache=2, cleared=1, cache_size=200, high_watermark=80, cache_used=55)
     stats_0.loaded_model_sizes = {"m1": 50}
-    stats_1 = CacheStats(hits=5, misses=2, in_cache=1, cleared=0, cache_size=200, high_watermark=120)
+    stats_1 = CacheStats(hits=5, misses=2, in_cache=1, cleared=0, cache_size=200, high_watermark=120, cache_used=70)
     stats_1.loaded_model_sizes = {"m2": 70}
 
     services = _make_stats_services({"cuda:0": _Cache(stats_0), "cuda:1": _Cache(stats_1)})
@@ -242,6 +245,10 @@ def test_get_stats_aggregates_per_device_caches(monkeypatch: Any, client: TestCl
     assert payload["cleared"] == 1
     assert payload["cache_size"] == 200
     assert payload["high_watermark"] == 120
+    # cache_used is this fork's *current* usage field. It observes the same global RamBudget as
+    # cache_size, so it takes the max, not the sum. If it were dropped from the aggregate it would
+    # report 0 and webv2's usage gauge would silently fall back to high_watermark (peak).
+    assert payload["cache_used"] == 70
     assert payload["loaded_model_sizes"] == {"m1": 50, "m2": 70}
 
 
@@ -264,6 +271,63 @@ def test_get_stats_counts_duplicate_cache_objects_once(monkeypatch: Any, client:
 
     assert response.status_code == 200
     assert response.json()["hits"] == 4
+
+
+def test_empty_model_cache_aggregates_per_device_results(monkeypatch: Any, client: TestClient) -> None:
+    """Upstream's multi-GPU fan-out returns None from this route, but webv2's clearModelCache awaits
+    the cleared-model count and freed bytes to build its toast. Every per-device cache must be
+    cleared and their results summed."""
+    from invokeai.backend.model_manager.load.model_cache.model_cache import CacheClearResult
+
+    class _Cache:
+        def __init__(self, models_cleared: int, bytes_freed: int) -> None:
+            self._result = CacheClearResult(models_cleared=models_cleared, bytes_freed=bytes_freed)
+            self.requested: list[int] = []
+
+        def make_room(self, bytes_needed: int) -> CacheClearResult:
+            self.requested.append(bytes_needed)
+            return self._result
+
+    cache_0 = _Cache(models_cleared=2, bytes_freed=100)
+    cache_1 = _Cache(models_cleared=3, bytes_freed=250)
+    services = _make_stats_services({"cuda:0": cache_0, "cuda:1": cache_1})
+    invoker = DummyInvoker(services)
+    monkeypatch.setattr("invokeai.app.api.routers.model_manager.ApiDependencies", MockApiDependencies(invoker))
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(invoker))
+
+    response = client.post("/api/v2/models/empty_model_cache")
+
+    assert response.status_code == 200
+    assert response.json() == {"models_cleared": 5, "bytes_freed": 350}
+    # Both devices were actually asked to clear, not just the API thread's default cache.
+    assert len(cache_0.requested) == 1
+    assert len(cache_1.requested) == 1
+
+
+def test_empty_model_cache_clears_duplicate_cache_objects_once(monkeypatch: Any, client: TestClient) -> None:
+    """ram_caches can map several device keys to one cache object. Clearing it twice would report
+    the second (already-empty) pass, so the id() guard keeps the totals honest."""
+    from invokeai.backend.model_manager.load.model_cache.model_cache import CacheClearResult
+
+    class _Cache:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def make_room(self, bytes_needed: int) -> CacheClearResult:
+            self.calls += 1
+            return CacheClearResult(models_cleared=2, bytes_freed=100)
+
+    shared = _Cache()
+    services = _make_stats_services({"cuda:0": shared, "cpu": shared})
+    invoker = DummyInvoker(services)
+    monkeypatch.setattr("invokeai.app.api.routers.model_manager.ApiDependencies", MockApiDependencies(invoker))
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(invoker))
+
+    response = client.post("/api/v2/models/empty_model_cache")
+
+    assert response.status_code == 200
+    assert response.json() == {"models_cleared": 2, "bytes_freed": 100}
+    assert shared.calls == 1
 
 
 def test_get_stats_returns_null_when_no_stats(monkeypatch: Any, client: TestClient) -> None:
