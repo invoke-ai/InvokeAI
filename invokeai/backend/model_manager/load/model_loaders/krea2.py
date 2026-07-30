@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 import accelerate
+import torch
 from transformers import AutoConfig, AutoTokenizer
 
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Diffusers_Config_Base
@@ -25,6 +26,7 @@ from invokeai.backend.model_manager.taxonomy import (
     SubModelType,
 )
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
+from invokeai.backend.quantization.scaled_fp8 import dequantize_scaled_fp8
 from invokeai.backend.util.devices import TorchDevice
 
 
@@ -89,27 +91,16 @@ def _is_native_krea2_format(sd: dict[str, Any]) -> bool:
     )
 
 
-def _dequantize_scaled_fp8(sd: dict[str, Any]) -> dict[str, Any]:
-    """Dequantize ComfyUI 'scaled fp8' weights: ``dequant = weight.float() * weight_scale``.
+def _dequantize_scaled_fp8(sd: dict[str, Any], compute_dtype: torch.dtype) -> dict[str, Any]:
+    """Dequantize ComfyUI 'scaled fp8' weights to ``compute_dtype``, returning the same dict.
 
-    Each quantized layer stores an fp8 ``<name>.weight`` plus a (usually scalar) ``<name>.weight_scale``.
-    Returns a new dict with the weights dequantized to float and the ``.weight_scale`` keys removed.
-    No-op if there are no scale keys.
+    Delegates to the shared implementation so this stays in step with the Qwen-Image loader; the
+    two previously had independent copies, and this one had drifted — it multiplied by the raw
+    scale (crashing on the block-wise scales real checkpoints ship) and dequantized via float32
+    (spiking peak RAM to ~4 bytes/param). No-op when there are no scale keys.
     """
-    import torch
-
-    scale_keys = [k for k in sd if isinstance(k, str) and k.endswith(".weight_scale")]
-    if not scale_keys:
-        return sd
-    out = dict(sd)
-    for scale_key in scale_keys:
-        weight_key = scale_key.replace(".weight_scale", ".weight")
-        if weight_key in out:
-            weight = torch.as_tensor(_to_plain_tensor(out[weight_key])).float()
-            scale = torch.as_tensor(_to_plain_tensor(out[scale_key])).float()
-            out[weight_key] = weight * scale
-        del out[scale_key]
-    return out
+    dequantize_scaled_fp8(sd, compute_dtype)
+    return sd
 
 
 def _convert_krea2_native_to_diffusers(sd: dict[str, Any]) -> dict[str, Any]:
@@ -331,16 +322,18 @@ class Krea2CheckpointModel(ModelLoader):
             raise TypeError(f"Expected Main_Checkpoint_Krea2_Config, got {type(config).__name__}.")
         model_path = Path(config.path)
 
+        target_device = TorchDevice.choose_torch_device()
+        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+
         sd = load_file(model_path)
         sd = _strip_comfyui_prefix(sd)
-        # ComfyUI 'scaled fp8' checkpoints: fold the per-tensor weight_scale into the weights (→ float).
-        sd = _dequantize_scaled_fp8(sd)
+        # ComfyUI 'scaled fp8' checkpoints: fold the weight_scale into the weights. Dequantized
+        # straight to the model dtype — via float32 this needs ~4 bytes/param of host RAM, which
+        # for a 12.5 GB fp8 transformer is 50 GB and unloadable on a 32 GB machine.
+        sd = _dequantize_scaled_fp8(sd, model_dtype)
         # Native/ComfyUI key naming → diffusers Krea2Transformer2DModel keys.
         if _is_native_krea2_format(sd):
             sd = _convert_krea2_native_to_diffusers(sd)
-
-        target_device = TorchDevice.choose_torch_device()
-        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
 
         with accelerate.init_empty_weights():
             model = Krea2Transformer2DModel(**KREA2_TRANSFORMER_CONFIG)
@@ -568,7 +561,9 @@ class Qwen3VLEncoderCheckpointLoader(ModelLoader):
             getattr(t, "dtype", None) in (torch.float8_e4m3fn, torch.float8_e5m2) for t in sd.values()
         )
         # ComfyUI 'scaled fp8': fold weight_scale into the weights, then drop quantization metadata.
-        sd = _dequantize_scaled_fp8(sd)
+        # Dequantized straight to the model dtype rather than via float32, which would double peak
+        # host RAM for an 8.9 GB encoder.
+        sd = _dequantize_scaled_fp8(sd, model_dtype)
         for k in list(sd.keys()):
             if isinstance(k, str) and (k.endswith(".comfy_quant") or "scale_input" in k):
                 del sd[k]
