@@ -465,6 +465,7 @@
     "defaultFieldInherited": {
       "cfgRescale": "App default: 0 (off)",
       "cfgScale": "App default: 7",
+      "fp8Storage": "Weights stored at full precision",
       "guidance": "Uses the generator default",
       "height": "App default: 1024",
       "preprocessor": "Chosen automatically per image",
@@ -477,6 +478,7 @@
     "defaultFields": {
       "cfgRescale": "CFG Rescale",
       "cfgScale": "CFG Scale",
+      "fp8Storage": "FP8 storage",
       "guidance": "Guidance",
       "height": "Height",
       "preprocessor": "Preprocessor",
