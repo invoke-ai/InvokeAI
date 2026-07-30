@@ -280,6 +280,38 @@ describe('ImageContextMenu mixed-media action visibility', () => {
     expect(document.body.textContent).not.toContain('New from Image');
   });
 
+  it('opens the primary video from a video-only multi-selection and keeps image-only actions hidden', async () => {
+    const primaryVideo = item('video', 'primary.mp4');
+    const secondaryVideo = item('video', 'secondary.mp4');
+    const actions = createActions(vi.fn());
+    await renderItemMenu(actions, {
+      itemRefs: [
+        { kind: 'video', name: primaryVideo.name },
+        { kind: 'video', name: secondaryVideo.name },
+      ],
+      items: [primaryVideo, secondaryVideo],
+      x: 20,
+      y: 20,
+    });
+
+    const openInNewTab = document.querySelector<HTMLButtonElement>('[aria-label="Open in new tab"]');
+    const openInPreview = document.querySelector<HTMLButtonElement>('[aria-label="Open in preview"]');
+    expect(openInNewTab).not.toBeNull();
+    expect(openInPreview).not.toBeNull();
+
+    await interact(() => {
+      openInNewTab?.click();
+      openInPreview?.click();
+    });
+
+    expect(actions.openItemInNewTab).toHaveBeenCalledWith(primaryVideo);
+    expect(actions.openItemInPreview).toHaveBeenCalledWith(primaryVideo);
+    expect(document.body.textContent).not.toContain('Copy to clipboard');
+    expect(document.body.textContent).not.toContain('Recall Metadata');
+    expect(document.body.textContent).not.toContain('Select for Compare');
+    expect(document.body.textContent).not.toContain('New from Images');
+  });
+
   it('keeps complete mixed refs for common bulk actions and hides image-only bulk actions when a ref is unresolved', async () => {
     const loadedImage = item('image', 'still.png');
     const actions = createActions(vi.fn());
@@ -300,6 +332,17 @@ describe('ImageContextMenu mixed-media action visibility', () => {
     expect(document.body.textContent).toContain('Change Board');
     expect(document.body.textContent).toContain('Delete Selection');
     expect(document.body.textContent).not.toContain('New from Images');
+    const openInNewTab = document.querySelector<HTMLButtonElement>('[aria-label="Open in new tab"]');
+    const openInPreview = document.querySelector<HTMLButtonElement>('[aria-label="Open in preview"]');
+    expect(openInNewTab).not.toBeNull();
+    expect(openInPreview).not.toBeNull();
+
+    await interact(() => {
+      openInNewTab?.click();
+      openInPreview?.click();
+    });
+    expect(actions.openItemInNewTab).toHaveBeenCalledWith(loadedImage);
+    expect(actions.openItemInPreview).toHaveBeenCalledWith(loadedImage);
 
     await interact(() => getMenuItem('Star All').click());
     expect(actions.setItemsStarred).toHaveBeenCalledWith(refs, true);

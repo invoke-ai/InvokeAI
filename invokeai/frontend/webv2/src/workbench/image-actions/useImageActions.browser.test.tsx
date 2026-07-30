@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   galleryRemoveItems: vi.fn(),
   galleryPatchItems: vi.fn(),
   gallerySelectItem: vi.fn(),
+  gallerySetItemMultiSelection: vi.fn(),
   invalidateGallery: vi.fn(),
   invalidateGalleryItems: vi.fn(),
   itemDelete: vi.fn(),
@@ -85,6 +86,7 @@ vi.mock('@workbench/WorkbenchContext', () => ({
       removeItems: (...args: unknown[]) => mocks.galleryRemoveItems(...args),
       selectImage: vi.fn(),
       selectItem: (...args: unknown[]) => mocks.gallerySelectItem(...args),
+      setItemMultiSelection: (...args: unknown[]) => mocks.gallerySetItemMultiSelection(...args),
       setCompareImage: vi.fn(),
     },
     generation: { patchSettings: vi.fn() },
@@ -436,8 +438,14 @@ describe('primary successor after confirmed deletion', () => {
       ]);
     });
 
-    expect(mocks.gallerySelectItem).toHaveBeenCalledWith(survivingBefore, 'project-1');
+    expect(mocks.gallerySetItemMultiSelection).toHaveBeenCalledWith(
+      ['video:failed-before.mp4', 'image:surviving-before.png'],
+      survivingBefore,
+      'project-1'
+    );
+    expect(mocks.gallerySelectItem).not.toHaveBeenCalled();
 
+    mocks.gallerySetItemMultiSelection.mockClear();
     mocks.gallerySelectItem.mockClear();
     mocks.itemDelete.mockResolvedValue({
       affectedBoardIds: [],
@@ -449,6 +457,49 @@ describe('primary successor after confirmed deletion', () => {
       await getItemActions().deleteItems([{ kind: 'image', name: primary.name }]);
     });
 
+    expect(mocks.gallerySetItemMultiSelection).not.toHaveBeenCalled();
+    expect(mocks.gallerySelectItem).not.toHaveBeenCalled();
+  });
+
+  it('atomically retains failed qualified selections while promoting a surviving successor', async () => {
+    const successor = galleryItem('image', 'successor.png');
+    const primary = galleryItem('image', 'shared');
+    const failedSameNameVideo = galleryItem('video', 'shared');
+    const failedImage = galleryItem('image', 'failed.png');
+    const requested = [
+      { kind: 'image' as const, name: failedImage.name },
+      { kind: 'image' as const, name: primary.name },
+      { kind: 'video' as const, name: failedSameNameVideo.name },
+    ];
+    currentItemActionContext = {
+      filterIdentity: 'filter-a',
+      items: [successor, primary, failedSameNameVideo, failedImage],
+      loadOrderedRefs: () =>
+        Promise.resolve([
+          { kind: 'image' as const, name: successor.name },
+          { kind: 'video' as const, name: failedSameNameVideo.name },
+          { kind: 'image' as const, name: primary.name },
+          { kind: 'image' as const, name: failedImage.name },
+        ]),
+      selectedItemKey: 'image:shared',
+    };
+    const result = {
+      affectedBoardIds: ['board-1'],
+      failed: [requested[0], requested[2]],
+      succeeded: [requested[1]],
+    };
+    mocks.itemDelete.mockResolvedValue(result);
+
+    await act(async () => {
+      await getItemActions().deleteItems(requested);
+    });
+
+    expect(mocks.galleryRemoveItems).toHaveBeenCalledWith(['image:shared']);
+    expect(mocks.gallerySetItemMultiSelection).toHaveBeenCalledWith(
+      ['image:failed.png', 'video:shared', 'image:successor.png'],
+      successor,
+      'project-1'
+    );
     expect(mocks.gallerySelectItem).not.toHaveBeenCalled();
   });
 

@@ -293,6 +293,7 @@ const GalleryItemContextMenuContent = ({
                 boards={boards}
                 itemRefs={target.itemRefs}
                 loadedItems={target.items}
+                primaryItem={item}
                 onRequestDeletion={onRequestDeletion}
               />
             ) : (
@@ -380,15 +381,19 @@ const BulkItemMenuItems = ({
   boards,
   itemRefs,
   loadedItems,
+  primaryItem,
   onRequestDeletion,
 }: {
   actions: ImageActions;
   boards: GalleryBoard[];
   itemRefs: GalleryItemRef[];
   loadedItems: GalleryItem[];
+  primaryItem: GalleryItem;
   onRequestDeletion: (itemRefs: GalleryItemRef[]) => void;
 }) => {
   const allStarred = loadedItems.length === itemRefs.length && loadedItems.every((item) => item.starred);
+  const handleOpenInNewTab = useCallback(() => actions.openItemInNewTab(primaryItem), [actions, primaryItem]);
+  const handleOpenPreview = useCallback(() => actions.openItemInPreview(primaryItem), [actions, primaryItem]);
   const handleToggleStarred = useCallback(
     () => void actions.setItemsStarred(itemRefs, !allStarred),
     [actions, allStarred, itemRefs]
@@ -408,6 +413,21 @@ const BulkItemMenuItems = ({
       <Text color="fg.subtle" fontSize="2xs" fontWeight="700" px="3" py="1.5" textTransform="uppercase">
         {itemRefs.length} items selected
       </Text>
+      <Menu.Separator borderColor="border.subtle" />
+      <HStack gap="1">
+        <QuickMenuItem
+          icon={ExternalLinkIcon}
+          label="Open in new tab"
+          value="open-primary-in-new-tab"
+          onClick={handleOpenInNewTab}
+        />
+        <QuickMenuItem
+          icon={EyeIcon}
+          label="Open in preview"
+          value="open-primary-in-preview"
+          onClick={handleOpenPreview}
+        />
+      </HStack>
       <Menu.Separator borderColor="border.subtle" />
       <ContextMenuItem
         icon={StarIcon}

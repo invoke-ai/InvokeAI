@@ -308,7 +308,16 @@ export const useImageActions = ({
           patchGalleryItemCaches(queryClient, { kind: 'delete', result });
           gallery.removeItems(result.succeeded.map(toGalleryItemKey));
           if (successor) {
-            gallery.selectItem(successor, projectId);
+            const failedKeys = new Set(result.failed.map(toGalleryItemKey));
+            const retainedFailedKeys = items
+              .filter((item) => failedKeys.has(toGalleryItemKey(item)))
+              .map(toGalleryItemKey);
+
+            if (retainedFailedKeys.length > 0) {
+              gallery.setItemMultiSelection([...retainedFailedKeys, toGalleryItemKey(successor)], successor, projectId);
+            } else {
+              gallery.selectItem(successor, projectId);
+            }
           }
           onImagesDeleted?.(result.succeeded.filter((item) => item.kind === 'image').map((item) => item.name));
         },

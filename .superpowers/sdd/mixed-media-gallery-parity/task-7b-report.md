@@ -307,3 +307,137 @@ architecture: 3 files passed, 34 tests passed
 ## Concerns
 
 None.
+
+## Independent review fix round
+
+An independent review of `a1ec2acbcb` found two action-integration gaps:
+
+1. After a partial deletion confirmed the primary item deleted,
+   `removeItems()` retained failed qualified refs, but
+   `selectItem(successor)` replaced that surviving selection.
+2. Video-only and mixed common bulk menus omitted the required primary-item
+   `Open in new tab` and `Open in preview` actions.
+
+### Fix-round RED
+
+The partial-deletion selection regression was added first:
+
+```sh
+pnpm test:browser src/workbench/image-actions/useImageActions.browser.test.tsx
+```
+
+```text
+Test Files 1 failed (1)
+Tests 1 failed | 18 passed (19)
+```
+
+The failure showed that no atomic multi-selection write occurred after a
+same-name image primary succeeded while ordered image/video failures remained
+selected.
+
+The two common bulk-menu regressions then produced:
+
+```sh
+pnpm test:browser src/workbench/image-actions/ImageContextMenu.browser.test.tsx
+```
+
+```text
+Test Files 1 failed (1)
+Tests 2 failed | 5 passed (7)
+```
+
+Both a video-only multi-selection and a mixed selection with an unresolved
+secondary ref lacked the primary open actions.
+
+### Fix-round implementation
+
+- Partial delete now intersects `result.failed` with the original ordered
+  requested refs by qualified key. When a successor exists, one
+  `setItemMultiSelection` write retains those failed keys in their original
+  order, appends the successor key, and makes the eligible successor primary.
+- Same-name image/video failures remain separate. A failed ref is never chosen
+  as primary. When no eligible successor exists, the confirmed-only
+  `removeItems` write leaves failed keys materialized/selected without
+  promoting one.
+- Common bulk menus now receive the already-loaded canonical primary item and
+  expose `Open in new tab` and `Open in preview` against it.
+- The bulk path still renders no image clipboard, comparison, canvas,
+  prompt-template, or metadata-recall group. Native video preview rendering
+  remains Task 8.
+
+### Fix-round focused GREEN
+
+```sh
+pnpm test:browser \
+  src/workbench/image-actions/useImageActions.browser.test.tsx \
+  src/workbench/image-actions/ImageContextMenu.browser.test.tsx
+```
+
+```text
+Test Files 2 passed (2)
+Tests 26 passed (26)
+```
+
+### Fix-round full verification
+
+```sh
+pnpm lint:tsc
+```
+
+```text
+tsc --noEmit: passed
+```
+
+```sh
+pnpm test
+```
+
+```text
+Test Files 376 passed (376)
+Tests 4973 passed (4973)
+```
+
+```sh
+pnpm test:browser
+```
+
+```text
+Test Files 64 passed (64)
+Tests 292 passed (292)
+```
+
+The browser suite retained its existing React `act(...)`,
+missing-i18n-instance, and intentional error-boundary diagnostics and exited
+successfully.
+
+```sh
+pnpm test:fixtures
+```
+
+```text
+Tests 4 passed (4)
+```
+
+```sh
+pnpm architecture:check
+```
+
+```text
+Test Files 3 passed (3)
+Tests 34 passed (34)
+```
+
+```sh
+pnpm lint
+```
+
+```text
+format: all matched files correctly formatted
+oxlint: zero warnings/errors
+tsc --noEmit: passed
+architecture: 3 files passed, 34 tests passed
+```
+
+The fix-round diff changes only the two existing action implementations, their
+browser tests, and this report. `git diff --check` is clean, and no Task 8+
+surface or architecture exception was added.
