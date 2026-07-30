@@ -367,8 +367,8 @@ const UpscaleImageField = ({
     onDragEnd: (event) => {
       const data = event.active.data.current;
 
-      if (!isLoading && event.over?.id === DROP_ID && isGalleryImageDragData(data) && data.images.length === 1) {
-        const imageName = data.images[0]?.imageName;
+      if (!isLoading && event.over?.id === DROP_ID && isGalleryImageDragData(data) && data.items.length === 1) {
+        const imageName = data.items[0]?.name;
 
         if (imageName) {
           void setGalleryImage(imageName);

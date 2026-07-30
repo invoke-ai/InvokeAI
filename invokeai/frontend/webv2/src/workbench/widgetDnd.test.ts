@@ -2,7 +2,7 @@ import type { CollisionDetection, DroppableContainer } from '@dnd-kit/core';
 import type { Project, WorkbenchState } from '@workbench/projectContracts';
 import type { WidgetTypeId } from '@workbench/widgetContracts';
 
-import { getGalleryImageDragData } from '@features/gallery/utility';
+import { getGalleryItemDragData } from '@features/gallery/utility';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -193,7 +193,7 @@ describe('widget collision detection', () => {
   it('routes a gallery image drag to an inner canvas target instead of its enclosing widget', () => {
     const collisions = widgetCollisionDetection(
       createCollisionArgs({
-        activeData: getGalleryImageDragData([{ boardId: 'none', imageName: 'image.png' }]),
+        activeData: getGalleryItemDragData([{ kind: 'image', name: 'image.png' }]),
         droppables: [
           {
             data: getWidgetInstanceDragData('center', 'canvas', 'canvas'),
@@ -283,7 +283,7 @@ describe('widget collision detection', () => {
   it('excludes widget droppables from the no-pointer closest-center fallback for non-widget drags', () => {
     const collisions = widgetCollisionDetection(
       createCollisionArgs({
-        activeData: getGalleryImageDragData([{ boardId: 'none', imageName: 'image.png' }]),
+        activeData: getGalleryItemDragData([{ kind: 'image', name: 'image.png' }]),
         collisionRect: getRect(0, 0, 20, 20),
         droppables: [
           {

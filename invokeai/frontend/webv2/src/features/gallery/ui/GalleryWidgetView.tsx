@@ -1,3 +1,4 @@
+import { toGalleryItemKey } from '@features/gallery/core/items';
 import { getBoundedRecentImages } from '@features/gallery/core/recentImages';
 import { getGallerySettings } from '@features/gallery/core/settings';
 import { GALLERY_PAGE_SIZE } from '@features/gallery/data/queries';
@@ -10,7 +11,6 @@ import type { GalleryStateView } from './galleryStateView';
 import { GalleryPanelContent } from './GalleryPanelContent';
 import {
   getGalleryPage,
-  getGalleryImageStateView,
   getGalleryProjectBoardId,
   getGallerySearchTerm,
   getGallerySelectedBoardId,
@@ -77,39 +77,37 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
     liveFollowEnabled,
     liveProgressTarget
   );
-  const imageGallery = useMemo(() => getGalleryImageStateView(gallery), [gallery]);
-
   const lastPublishedTotalRef = useRef<number | null>(null);
 
-  // After a deletion that takes out the previewed image, move the selection to
-  // the image that now occupies the old index, else the one before it.
+  // After a deletion that takes out the previewed item, move the selection to
+  // the item that now occupies the old index, else the one before it.
   const onImagesDeleted = useCallback(
     (imageNames: string[]) => {
-      const deletedNames = new Set(imageNames);
-      const images = imageGallery.images;
-      const anchorName = imageGallery.selectedImageName;
+      const deletedItemKeys = new Set(imageNames.map((name) => toGalleryItemKey({ kind: 'image', name })));
+      const items = gallery.items;
+      const anchorKey = gallery.selectedItemKey;
 
-      if (!anchorName || !deletedNames.has(anchorName)) {
+      if (!anchorKey || !deletedItemKeys.has(anchorKey)) {
         return;
       }
 
-      const anchorIndex = images.findIndex((image) => image.imageName === anchorName);
+      const anchorIndex = items.findIndex((item) => toGalleryItemKey(item) === anchorKey);
 
       if (anchorIndex === -1) {
         return;
       }
 
-      const remaining = images.filter((image) => !deletedNames.has(image.imageName));
-      const remainingBeforeAnchor = images
+      const remaining = items.filter((item) => !deletedItemKeys.has(toGalleryItemKey(item)));
+      const remainingBeforeAnchor = items
         .slice(0, anchorIndex)
-        .filter((image) => !deletedNames.has(image.imageName)).length;
-      const nextImage = remaining[remainingBeforeAnchor] ?? remaining[remainingBeforeAnchor - 1] ?? null;
+        .filter((item) => !deletedItemKeys.has(toGalleryItemKey(item))).length;
+      const nextItem = remaining[remainingBeforeAnchor] ?? remaining[remainingBeforeAnchor - 1] ?? null;
 
-      if (nextImage) {
-        galleryCommands.selectImage(nextImage);
+      if (nextItem) {
+        galleryCommands.selectItem(nextItem);
       }
     },
-    [galleryCommands, imageGallery.images, imageGallery.selectedImageName]
+    [gallery.items, gallery.selectedItemKey, galleryCommands]
   );
 
   const actions = useGalleryActions({

@@ -133,7 +133,7 @@ const surfaces = [
     ready: async (page) => {
       await waitForWorkbench(page);
       await selectLayoutPreset(page, 'Gallery');
-      await page.getByRole('list', { exact: true, name: 'Gallery images' }).waitFor();
+      await page.getByRole('list', { exact: true, name: 'Gallery items' }).waitFor();
     },
   },
   {

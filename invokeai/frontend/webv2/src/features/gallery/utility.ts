@@ -1,14 +1,18 @@
 export {
   getGalleryBoardDropData,
   getGalleryBoardDropId,
-  getGalleryImageDragData,
-  getGalleryImageDragId,
-  getGalleryImageNamesOutsideBoard,
+  getGalleryItemDragData,
+  getGalleryItemDragId,
+  getGalleryItemRefsOutsideBoard,
   isGalleryBoardDropData,
   isGalleryImageDragData,
+  isGalleryItemDragData,
+  resolveGalleryBoardDrop,
   type GalleryBoardDropData,
+  type GalleryBoardDropResolution,
   type GalleryImageDragData,
-  type GalleryImageDragImage,
+  type GalleryImageDragItem,
+  type GalleryItemDragData,
 } from './ui/galleryDnd';
 
 import { getGalleryImageFullUrl, getGalleryImageThumbnailUrl } from './data/imageUrls';

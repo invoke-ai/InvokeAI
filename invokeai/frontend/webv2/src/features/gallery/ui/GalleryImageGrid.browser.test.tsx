@@ -1,0 +1,583 @@
+/* oxlint-disable react-perf/jsx-no-new-object-as-prop */
+import type { GalleryItem, GalleryItemRef } from '@features/gallery/contracts';
+
+import { ChakraProvider } from '@chakra-ui/react';
+import { DndContext, PointerSensor, useDndMonitor, useSensor, useSensors, type DragStartEvent } from '@dnd-kit/core';
+import { DEFAULT_GALLERY_SETTINGS } from '@features/gallery/core/settings';
+import { GalleryUiProvider, type GalleryUiAdapter } from '@features/gallery/react';
+import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { system } from '@theme/system';
+import { createInstance } from 'i18next';
+import { act, type ReactNode } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { I18nextProvider, initReactI18next } from 'react-i18next';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import type { GalleryStateView } from './galleryStateView';
+import type { GalleryActions, GalleryWidgetContextValue } from './GalleryWidgetContext';
+
+import { GalleryImageGrid } from './GalleryImageGrid';
+import { GalleryWidgetContext } from './GalleryWidgetContext';
+
+const mocks = vi.hoisted(() => ({
+  fetchNames: vi.fn(),
+  measure: vi.fn(),
+  scrollToIndex: vi.fn(),
+  virtualizerOptions: [] as Array<{
+    count: number;
+    estimateSize: () => number;
+    overscan: number;
+  }>,
+}));
+
+const getNamesKey = (filter: unknown) => ['test-gallery-item-names', JSON.stringify(filter)] as const;
+
+vi.mock('@features/gallery/data/queries', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  galleryItemNamesOptions: (filter: unknown) => ({
+    queryFn: () => mocks.fetchNames(filter),
+    queryKey: getNamesKey(filter),
+    staleTime: Infinity,
+  }),
+}));
+
+vi.mock('react-hook-tanstack-virtual', () => ({
+  useVirtualizer: (options: { count: number; estimateSize: () => number; overscan: number }) => {
+    mocks.virtualizerOptions.push(options);
+    const size = options.estimateSize();
+
+    return {
+      measure: mocks.measure,
+      scrollToIndex: mocks.scrollToIndex,
+      totalSize: options.count * size,
+      virtualItems: Array.from({ length: options.count }, (_, index) => ({
+        end: (index + 1) * size,
+        index,
+        key: index,
+        size,
+        start: index * size,
+      })),
+    };
+  },
+}));
+
+vi.mock('@features/queue/react', () => ({
+  useQueueItemProgress: () => null,
+  useQueueItemProgressImage: () => null,
+}));
+
+const i18n = createInstance();
+void i18n.use(initReactI18next).init({
+  fallbackLng: 'en',
+  initAsync: false,
+  lng: 'en',
+  resources: {
+    en: {
+      translation: {
+        common: { generating: 'Generating' },
+        widgets: {
+          gallery: {
+            commands: {
+              clearSelection: 'Clear selection',
+              deleteSelection: 'Delete selection',
+              navigationDown: 'Down',
+              navigationLeft: 'Left',
+              navigationRight: 'Right',
+              navigationUp: 'Up',
+              selectAllOnPage: 'Select all',
+              toggleStarImage: 'Toggle star',
+            },
+            generationProgress: 'Generation progress',
+            generationProgressPercent: 'Generation {{percentage}}%',
+            itemsAriaLabel: 'Gallery items',
+            loadingBackendGallery: 'Loading gallery',
+            noImagesMatch: 'No items',
+            selectImageForPreview: 'Select {{name}} for preview',
+            selectVideoForPreview: 'Select video {{name}}, duration {{duration}}, for preview',
+            selectedBoardFallback: 'selected board',
+            starImage: 'Star {{name}}',
+            unstarImage: 'Unstar {{name}}',
+            windowLimit: 'Limited to {{count}}',
+          },
+          preview: {
+            compare: 'Compare',
+            showInProgressDiffusion: 'Show progress',
+            viewing: 'Viewing',
+          },
+        },
+      },
+    },
+  },
+});
+
+const createItem = (kind: GalleryItem['kind'], name: string, overrides: Partial<GalleryItem> = {}): GalleryItem => {
+  const base = {
+    boardId: 'board-a',
+    category: 'general' as const,
+    createdAt: '2026-07-30T00:00:00.000Z',
+    fullUrl: `/full/${kind}/${name}`,
+    height: 96,
+    isIntermediate: false,
+    name,
+    starred: false,
+    thumbnailUrl: `/thumbnail/${kind}/${name}`,
+    width: 128,
+    ...overrides,
+  };
+
+  return kind === 'video'
+    ? ({
+        ...base,
+        durationSeconds: 'durationSeconds' in base ? (base.durationSeconds ?? 65.2) : 65.2,
+        kind,
+      } as GalleryItem)
+    : ({ ...base, kind } as GalleryItem);
+};
+
+const board = {
+  archived: false,
+  assetCount: 0,
+  id: 'board-a',
+  imageCount: 3,
+  kind: 'board',
+  name: 'Board A',
+  videoCount: 1,
+} as const;
+
+const createGallery = (overrides: Partial<GalleryStateView> = {}): GalleryStateView => {
+  const items = overrides.items ?? [
+    createItem('image', 'first.png'),
+    createItem('video', 'shared'),
+    createItem('image', 'last.png'),
+  ];
+
+  return {
+    boards: [board],
+    compareImageKey: null,
+    currentItem: { itemKey: 'image:first.png', kind: 'item' },
+    galleryView: 'images',
+    isLoading: false,
+    items,
+    pendingPlaceholders: [],
+    projectBoardId: null,
+    searchTerm: '',
+    selectedBoardId: board.id,
+    selectedItemKey: 'image:first.png',
+    selectedItemKeys: ['image:first.png'],
+    settings: { ...DEFAULT_GALLERY_SETTINGS, imageDensityPercent: 0, paginationMode: 'paginated' },
+    ...overrides,
+  };
+};
+
+const actionMocks = {
+  loadMore: vi.fn(),
+  selectItem: vi.fn(),
+  selectItemRange: vi.fn(),
+  setCompareItem: vi.fn(),
+  toggleItemInSelection: vi.fn(),
+};
+const imageActionMocks = {
+  deleteImages: vi.fn(),
+  moveImagesToBoard: vi.fn(),
+  moveItemsToBoard: vi.fn(),
+  setImagesStarred: vi.fn(),
+};
+const noop = vi.fn();
+const registeredCommands = new Map<string, () => unknown>();
+const runtime = {
+  commands: {
+    register: ({ handler, id }: { handler: () => unknown; id: string }) => {
+      registeredCommands.set(id, handler);
+      return () => registeredCommands.delete(id);
+    },
+  },
+  hotkeys: { register: () => () => undefined },
+};
+
+const createActions = (): GalleryActions =>
+  ({
+    archiveBoard: vi.fn(),
+    createBoard: vi.fn(),
+    deleteBoard: vi.fn(),
+    downloadBoard: vi.fn(),
+    loadMore: actionMocks.loadMore,
+    refresh: noop,
+    renameBoard: vi.fn(),
+    selectBoard: noop,
+    selectImage: actionMocks.selectItem,
+    selectImageRange: actionMocks.selectItemRange,
+    selectItem: actionMocks.selectItem,
+    selectItemRange: actionMocks.selectItemRange,
+    selectProjectBoard: vi.fn(),
+    setCompareItem: actionMocks.setCompareItem,
+    setSearchTerm: noop,
+    setView: noop,
+    toggleImageInSelection: actionMocks.toggleItemInSelection,
+    toggleItemInSelection: actionMocks.toggleItemInSelection,
+    updateSettings: noop,
+    uploadFiles: vi.fn(),
+  }) as unknown as GalleryActions;
+
+type CanonicalContextTarget = { items: GalleryItem[]; x: number; y: number } | null;
+const ContextMenuProbe = ({ target }: { target: CanonicalContextTarget }) => (
+  <output data-testid="context-target">
+    {JSON.stringify(target?.items.map(({ kind, name }) => ({ kind, name })) ?? null)}
+  </output>
+);
+const NoopProvider = ({ children }: { children: ReactNode }) => children;
+
+const createAdapter = (): GalleryUiAdapter =>
+  ({
+    ImageActionsProvider: NoopProvider,
+    ImageContextMenu: ContextMenuProbe,
+    account: { enableLiveFollow: noop },
+    antialiasProgressImages: false,
+    gallery: {
+      reconcileDeletedBoardOutcome: noop,
+      selectBoard: noop,
+      selectImage: noop,
+      selectItem: noop,
+      setCompareImage: noop,
+      setCompareItem: noop,
+      setItemMultiSelection: noop,
+      setMultiSelection: noop,
+      setPage: noop,
+      setPageInfo: noop,
+      setProjectBoard: noop,
+      setSearchTerm: noop,
+      setView: noop,
+      toggleImageSelection: noop,
+      toggleItemSelection: noop,
+      updateSettings: noop,
+    },
+    galleryValues: {},
+    generateValues: {},
+    liveFollowEnabled: false,
+    liveProgressTarget: null,
+    notifications: { add: noop, reportError: noop },
+    projectId: 'project-1',
+    projectName: 'Project',
+    queueItems: [],
+    widgets: { patchGalleryValues: noop },
+  }) as unknown as GalleryUiAdapter;
+
+let host: HTMLDivElement | null = null;
+let root: Root | null = null;
+let queryClient: QueryClient | null = null;
+let currentGallery = createGallery();
+let onDragStart = vi.fn();
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+const DragMonitor = () => {
+  useDndMonitor({
+    onDragStart: (event: DragStartEvent) => onDragStart({ data: event.active.data.current, id: event.active.id }),
+  });
+
+  return null;
+};
+
+const Harness = ({ gallery }: { gallery: GalleryStateView }) => {
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  const contextValue: GalleryWidgetContextValue = {
+    actions: createActions(),
+    gallery,
+    imageActions: imageActionMocks,
+    isWindowTruncated: false,
+    projectName: 'Project',
+    runtime,
+  } as unknown as GalleryWidgetContextValue;
+
+  return (
+    <I18nextProvider i18n={i18n}>
+      <ChakraProvider value={system}>
+        <QueryClientProvider client={queryClient!}>
+          <GalleryUiProvider adapter={createAdapter()}>
+            <GalleryWidgetContext value={contextValue}>
+              <DndContext sensors={sensors}>
+                <DragMonitor />
+                <GalleryImageGrid layout="wide" />
+              </DndContext>
+            </GalleryWidgetContext>
+          </GalleryUiProvider>
+        </QueryClientProvider>
+      </ChakraProvider>
+    </I18nextProvider>
+  );
+};
+
+const interact = (action: () => void, delay = 0): Promise<void> =>
+  act(async () => {
+    action();
+    await new Promise<void>((resolve) => {
+      globalThis.setTimeout(resolve, delay);
+    });
+  });
+
+const renderGallery = async (gallery = currentGallery) => {
+  currentGallery = gallery;
+  await interact(() => root?.render(<Harness gallery={gallery} />));
+};
+
+const getButton = (label: string): HTMLButtonElement => {
+  const button = host?.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`);
+
+  if (!button) {
+    throw new Error(`Expected button "${label}"`);
+  }
+
+  return button;
+};
+
+const click = (button: HTMLButtonElement, init: MouseEventInit = {}): Promise<void> =>
+  interact(() => button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, ...init })));
+
+const pointer = (type: string, target: EventTarget, clientX: number, clientY: number): void => {
+  target.dispatchEvent(
+    new PointerEvent(type, { bubbles: true, button: 0, clientX, clientY, isPrimary: true, pointerId: 1 })
+  );
+};
+
+beforeEach(() => {
+  accountLifecycle.activate('grid-user');
+  vi.clearAllMocks();
+  registeredCommands.clear();
+  currentGallery = createGallery();
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  host = document.createElement('div');
+  host.style.cssText = 'height:480px;left:20px;position:fixed;top:20px;width:600px;';
+  document.body.append(host);
+  root = createRoot(host);
+  onDragStart = vi.fn();
+});
+
+afterEach(async () => {
+  await interact(() => root?.unmount());
+  host?.remove();
+  queryClient?.clear();
+  host = null;
+  queryClient = null;
+  root = null;
+});
+
+describe('GalleryImageGrid mixed item cells', () => {
+  it('renders same-name media independently and gives a video a static accessible poster', async () => {
+    const gallery = createGallery({
+      items: [createItem('image', 'shared'), createItem('video', 'shared')],
+      selectedItemKey: 'image:shared',
+      selectedItemKeys: ['image:shared'],
+    });
+
+    await renderGallery(gallery);
+
+    const list = host?.querySelector('[role="list"]');
+    const imageButton = getButton('Select shared for preview');
+    const videoButton = getButton('Select video shared, duration 1:06, for preview');
+    const videoCell = videoButton.closest<HTMLElement>('[role="listitem"]');
+    const videoPoster = videoButton.querySelector<HTMLImageElement>('img');
+    const playIcon = videoCell?.querySelector('svg.lucide-play');
+    const durationBadge = playIcon?.parentElement;
+    const durationBadgeStyle = durationBadge ? getComputedStyle(durationBadge) : null;
+
+    expect(list?.getAttribute('aria-label')).toBe('Gallery items');
+    expect(host?.querySelectorAll('[role="listitem"]')).toHaveLength(2);
+    expect(imageButton.getAttribute('aria-pressed')).toBe('true');
+    expect(videoButton.getAttribute('aria-pressed')).toBe('false');
+    expect(videoPoster?.getAttribute('src')).toContain('/thumbnail/video/shared');
+    expect(videoPoster?.getAttribute('decoding')).toBe('async');
+    expect(videoPoster?.hasAttribute('loading')).toBe(false);
+    expect(videoCell?.textContent).toContain('1:06');
+    expect(playIcon?.getAttribute('aria-hidden')).toBe('true');
+    expect(durationBadgeStyle?.fontVariantNumeric).toContain('tabular-nums');
+    expect(durationBadgeStyle?.opacity).toBe('1');
+    expect(durationBadgeStyle?.transitionProperty).toBe('opacity');
+    expect(imageButton.closest('[role="listitem"]')?.textContent).toContain('128x96');
+    expect(host?.querySelector('button[aria-label="Star shared"]')).not.toBeNull();
+    expect(host?.querySelector('video')).toBeNull();
+  });
+
+  it('uses qualified video drag identity and emits a video-capable item payload', async () => {
+    await renderGallery(createGallery({ items: [createItem('video', 'shared')] }));
+    const videoButton = getButton('Select video shared, duration 1:06, for preview');
+
+    await interact(() => pointer('pointerdown', videoButton, 80, 80), 20);
+    await interact(() => pointer('pointermove', videoButton.ownerDocument, 120, 80), 50);
+
+    expect(onDragStart).toHaveBeenCalledWith({
+      data: { items: [{ kind: 'video', name: 'shared' }], kind: 'gallery-item' },
+      id: 'video:shared',
+    });
+
+    // dnd-kit briefly suppresses the click following a completed drag. Let
+    // that document-level guard expire before the next interaction test.
+    await interact(() => pointer('pointerup', videoButton.ownerDocument, 120, 80), 300);
+  });
+
+  it('keeps Alt comparison image-only and forms a one-video context target outside selection', async () => {
+    const image = createItem('image', 'first.png');
+    const video = createItem('video', 'clip.mp4', { durationSeconds: 2 });
+    await renderGallery(
+      createGallery({
+        compareImageKey: 'image:compare.png',
+        items: [image, video],
+        selectedItemKey: 'image:first.png',
+        selectedItemKeys: ['image:first.png'],
+      })
+    );
+
+    await click(getButton('Select first.png for preview'), { altKey: true });
+    expect(actionMocks.setCompareItem).toHaveBeenCalledWith(image);
+    expect(actionMocks.selectItem).not.toHaveBeenCalled();
+
+    const videoButton = getButton('Select video clip.mp4, duration 0:02, for preview');
+    await click(videoButton, { altKey: true });
+    expect(actionMocks.selectItem).toHaveBeenCalledWith(video);
+
+    await interact(() =>
+      videoButton.dispatchEvent(
+        new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 23, clientY: 41 })
+      )
+    );
+    expect(host?.querySelector('[data-testid="context-target"]')?.textContent).toBe(
+      JSON.stringify([{ kind: 'video', name: 'clip.mp4' }])
+    );
+  });
+
+  it('select-all targets ordered mixed refs while image-only hotkeys reject a mixed selection', async () => {
+    const items = [createItem('image', 'shared'), createItem('video', 'shared')];
+    await renderGallery(
+      createGallery({
+        items,
+        selectedItemKey: 'video:shared',
+        selectedItemKeys: ['image:shared', 'video:shared'],
+      })
+    );
+
+    registeredCommands.get('gallery.selectAllOnPage')?.();
+    registeredCommands.get('gallery.deleteSelection')?.();
+    registeredCommands.get('gallery.starImage')?.();
+
+    expect(actionMocks.selectItemRange).toHaveBeenCalledWith(
+      [
+        { kind: 'image', name: 'shared' },
+        { kind: 'video', name: 'shared' },
+      ],
+      items[0]
+    );
+    expect(imageActionMocks.deleteImages).not.toHaveBeenCalled();
+    expect(imageActionMocks.setImagesStarred).not.toHaveBeenCalled();
+  });
+});
+
+describe('GalleryImageGrid range selection', () => {
+  const orderedRefs: GalleryItemRef[] = [
+    { kind: 'image', name: 'first.png' },
+    { kind: 'video', name: 'middle.mp4' },
+    { kind: 'image', name: 'last.png' },
+  ];
+  const rangeItems = [
+    createItem('image', 'first.png'),
+    createItem('video', 'middle.mp4'),
+    createItem('image', 'last.png'),
+  ];
+
+  it('does not load names on render and lazily selects the backend-ordered mixed range on Shift-click', async () => {
+    mocks.fetchNames.mockResolvedValue({ items: orderedRefs, starredCount: 0, total: orderedRefs.length });
+    const gallery = createGallery({ items: rangeItems });
+
+    await renderGallery(gallery);
+    expect(mocks.fetchNames).not.toHaveBeenCalled();
+
+    await click(getButton('Select last.png for preview'), { shiftKey: true });
+    await vi.waitFor(() => expect(actionMocks.selectItemRange).toHaveBeenCalledWith(orderedRefs, rangeItems[2]));
+    expect(mocks.fetchNames).toHaveBeenCalledOnce();
+  });
+
+  it('reuses the date board name list already in the query cache', async () => {
+    const gallery = createGallery({
+      boards: [{ ...board, id: 'by_date:2026-07-30', kind: 'date' }],
+      items: rangeItems,
+      selectedBoardId: 'by_date:2026-07-30',
+    });
+    const filter = {
+      boardId: gallery.selectedBoardId,
+      galleryView: gallery.galleryView,
+      orderDir: gallery.settings.imageOrderDir,
+      searchTerm: '',
+      starredFirst: gallery.settings.starredFirst,
+    };
+    queryClient?.setQueryData(getNamesKey(filter), {
+      items: orderedRefs,
+      starredCount: 0,
+      total: orderedRefs.length,
+    });
+
+    await renderGallery(gallery);
+    await click(getButton('Select last.png for preview'), { shiftKey: true });
+
+    expect(actionMocks.selectItemRange).toHaveBeenCalledWith(orderedRefs, rangeItems[2]);
+    expect(mocks.fetchNames).not.toHaveBeenCalled();
+  });
+
+  it('ignores a names response after the filter identity changes', async () => {
+    let resolveNames: ((value: { items: GalleryItemRef[]; starredCount: number; total: number }) => void) | null = null;
+    mocks.fetchNames.mockReturnValue(
+      new Promise((resolve) => {
+        resolveNames = resolve;
+      })
+    );
+    const gallery = createGallery({ items: rangeItems });
+
+    await renderGallery(gallery);
+    await click(getButton('Select last.png for preview'), { shiftKey: true });
+    await renderGallery({ ...gallery, searchTerm: 'different filter' });
+    await interact(() => resolveNames?.({ items: orderedRefs, starredCount: 0, total: orderedRefs.length }));
+
+    expect(actionMocks.selectItemRange).not.toHaveBeenCalled();
+  });
+
+  it('ignores a names response after the account epoch changes', async () => {
+    let resolveNames: ((value: { items: GalleryItemRef[]; starredCount: number; total: number }) => void) | null = null;
+    mocks.fetchNames.mockReturnValue(
+      new Promise((resolve) => {
+        resolveNames = resolve;
+      })
+    );
+
+    await renderGallery(createGallery({ items: rangeItems }));
+    await click(getButton('Select last.png for preview'), { shiftKey: true });
+    accountLifecycle.activate('other-grid-user');
+    await interact(() => resolveNames?.({ items: orderedRefs, starredCount: 0, total: orderedRefs.length }));
+
+    expect(actionMocks.selectItemRange).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the materialized mixed range when the names request fails', async () => {
+    mocks.fetchNames.mockRejectedValue(new Error('names unavailable'));
+
+    await renderGallery(createGallery({ items: rangeItems }));
+    await click(getButton('Select last.png for preview'), { shiftKey: true });
+
+    await vi.waitFor(() => expect(actionMocks.selectItemRange).toHaveBeenCalledWith(orderedRefs, rangeItems[2]));
+  });
+});
+
+describe('GalleryImageGrid virtualization', () => {
+  it('retains constant row estimates, overscan, and the near-end infinite-load trigger', async () => {
+    const items = Array.from({ length: 14 }, (_, index) => createItem('image', `image-${index}.png`));
+
+    await renderGallery(
+      createGallery({
+        items,
+        settings: { ...DEFAULT_GALLERY_SETTINGS, imageDensityPercent: 0, paginationMode: 'infinite' },
+      })
+    );
+    await vi.waitFor(() => expect(actionMocks.loadMore).toHaveBeenCalled());
+
+    const options = mocks.virtualizerOptions.at(-1);
+    expect(options?.count).toBe(7);
+    expect(options?.overscan).toBe(4);
+    expect(options?.estimateSize()).toBe(options?.estimateSize());
+    expect(host?.querySelector('[role="listitem"]')).toHaveStyle({ aspectRatio: '1 / 1' });
+  });
+});

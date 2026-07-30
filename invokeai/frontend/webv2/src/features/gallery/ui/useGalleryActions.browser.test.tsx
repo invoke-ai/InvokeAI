@@ -32,6 +32,7 @@ let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 const actionsRef = createRef<GalleryActions>();
 const reconcileDeletedBoardOutcome = vi.fn();
+const setItemMultiSelection = vi.fn();
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const Probe = ({ ref }: { ref: Ref<GalleryActions> }) => {
@@ -70,7 +71,10 @@ const adapter: GalleryUiAdapter = {
     reconcileDeletedBoardOutcome,
     selectBoard: noop,
     selectImage: noop,
+    selectItem: noop,
     setCompareImage: noop,
+    setCompareItem: noop,
+    setItemMultiSelection,
     setMultiSelection: noop,
     setPage: noop,
     setPageInfo: noop,
@@ -78,6 +82,7 @@ const adapter: GalleryUiAdapter = {
     setSearchTerm: noop,
     setView: noop,
     toggleImageSelection: noop,
+    toggleItemSelection: noop,
     updateSettings: noop,
   },
   galleryValues: {},
@@ -135,5 +140,34 @@ describe('deleteBoard', () => {
 
     expect(reconcileDeletedBoardOutcome).toHaveBeenCalledOnce();
     expect(reconcileDeletedBoardOutcome).toHaveBeenCalledWith(outcome);
+  });
+});
+
+describe('mixed item selection', () => {
+  it('forwards an ordered same-name mixed range as qualified item keys', () => {
+    const primaryItem = {
+      boardId: 'board-1',
+      category: 'general',
+      createdAt: '2026-07-30T00:00:00.000Z',
+      durationSeconds: 3,
+      fullUrl: '/full/shared',
+      height: 64,
+      isIntermediate: false,
+      kind: 'video',
+      name: 'shared',
+      starred: false,
+      thumbnailUrl: '/thumbnail/shared',
+      width: 64,
+    } as const;
+
+    actionsRef.current?.selectItemRange(
+      [
+        { kind: 'image', name: 'shared' },
+        { kind: 'video', name: 'shared' },
+      ],
+      primaryItem
+    );
+
+    expect(setItemMultiSelection).toHaveBeenCalledWith(['image:shared', 'video:shared'], primaryItem);
   });
 });

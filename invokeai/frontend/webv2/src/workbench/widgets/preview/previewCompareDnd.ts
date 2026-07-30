@@ -2,7 +2,7 @@ import { isGalleryImageDragData } from '@features/gallery/utility';
 
 /**
  * dnd-kit contract for the preview's drop-to-compare target: dropping any
- * gallery-image drag (gallery grid or preview filmstrip thumbs) onto the
+ * all-image gallery-item drag (gallery grid or preview filmstrip thumbs) onto the
  * preview frame arms it as the comparison image.
  */
 
@@ -23,7 +23,7 @@ export const resolvePreviewCompareDrop = (activeData: unknown, overData: unknown
     return null;
   }
 
-  const imageName = activeData.images[0]?.imageName;
+  const imageName = activeData.items[0]?.name;
 
   return imageName ? { imageName } : null;
 };

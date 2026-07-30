@@ -1,19 +1,29 @@
+import type { GalleryImageItem, GalleryItem, GalleryItemRef } from '@features/gallery/core/items';
 import type { GalleryThumbnailFit } from '@features/gallery/core/settings';
-import type { GalleryImage } from '@features/gallery/core/types';
 
 import { Badge, Box, Flex, ProgressCircle, ScrollArea, Skeleton, Spinner, Text } from '@chakra-ui/react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { toGalleryItemKey } from '@features/gallery/contracts';
+import {
+  formatGalleryVideoDuration,
+  isGalleryImageItem,
+  toGalleryItemKey,
+  toGalleryItemRef,
+} from '@features/gallery/core/items';
+import { isDateBoardId, type GalleryItemNames } from '@features/gallery/data/backend';
+import { galleryItemNamesOptions, type GalleryItemsFilter } from '@features/gallery/data/queries';
 import { useQueueItemProgress, useQueueItemProgressImage } from '@features/queue/react';
+import { parseDateTokens } from '@platform/search/dateTokens';
+import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { DropZone, IconButton } from '@platform/ui';
 import { StreamingImageFrame } from '@platform/ui/streaming-image/StreamingImageFrame';
 import { progressImageToStreamingSource } from '@platform/ui/streaming-image/streamingImageSource';
-import { StarIcon, UploadIcon } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { PlayIcon, StarIcon, UploadIcon } from 'lucide-react';
 import {
+  useCallback,
   useEffect,
   useEffectEvent,
-  useCallback,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -24,12 +34,11 @@ import {
 import { useVirtualizer } from 'react-hook-tanstack-virtual';
 import { useTranslation } from 'react-i18next';
 
-import type { GalleryImageDragImage } from './galleryDnd';
 import type { GalleryQueuePlaceholder } from './galleryStateView';
-import type { GalleryImageContextMenuTarget } from './GalleryUiContext';
+import type { GalleryItemContextMenuTarget } from './GalleryUiContext';
 
-import { getGalleryImageDragData, getGalleryImageDragId } from './galleryDnd';
-import { getGalleryImageStateView, getGalleryPlaceholderInsertionIndex } from './galleryStateView';
+import { getGalleryItemDragData, getGalleryItemDragId } from './galleryDnd';
+import { getGalleryPlaceholderInsertionIndex } from './galleryStateView';
 import { useGalleryUi } from './GalleryUiContext';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
@@ -64,16 +73,34 @@ const getGalleryColumnCount = (imageDensityPercent: number, layout: 'stacked' | 
 
 const dragEventContainsFiles = (event: DragEvent): boolean => Array.from(event.dataTransfer.types).includes('Files');
 
+const getGalleryItemRange = (
+  orderedRefs: readonly GalleryItemRef[],
+  anchorItemKey: string,
+  targetItemKey: string
+): GalleryItemRef[] | null => {
+  const anchorIndex = orderedRefs.findIndex((ref) => toGalleryItemKey(ref) === anchorItemKey);
+  const targetIndex = orderedRefs.findIndex((ref) => toGalleryItemKey(ref) === targetItemKey);
+
+  if (anchorIndex === -1 || targetIndex === -1) {
+    return null;
+  }
+
+  const start = Math.min(anchorIndex, targetIndex);
+  const end = Math.max(anchorIndex, targetIndex);
+
+  return orderedRefs.slice(start, end + 1);
+};
+
 type GridCell =
-  | { kind: 'image'; image: GalleryImage; imageIndex: number }
+  | { kind: 'item'; item: GalleryItem; itemIndex: number }
   | { kind: 'placeholder'; placeholder: GalleryQueuePlaceholder };
 
 export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => {
   const { t } = useTranslation();
-  const { actions, gallery: galleryState, imageActions, isWindowTruncated, runtime } = useGalleryWidget();
-  const gallery = useMemo(() => getGalleryImageStateView(galleryState), [galleryState]);
+  const { actions, gallery, imageActions, isWindowTruncated, runtime } = useGalleryWidget();
   const { account, antialiasProgressImages, ImageContextMenu, widgets } = useGalleryUi();
-  const [contextMenuTarget, setContextMenuTarget] = useState<GalleryImageContextMenuTarget | null>(null);
+  const queryClient = useQueryClient();
+  const [contextMenuTarget, setContextMenuTarget] = useState<GalleryItemContextMenuTarget | null>(null);
   const [isDropActive, setIsDropActive] = useState(false);
   const [viewportWidth, setViewportWidth] = useState(() => viewportWidthCache.get(layout) ?? 0);
   const dragDepthRef = useRef(0);
@@ -81,24 +108,25 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
   const { imageDensityPercent, imageOrderDir, paginationMode, showImageDimensions, starredFirst, thumbnailFit } =
     gallery.settings;
   const columnCount = getGalleryColumnCount(imageDensityPercent, layout);
-  const selectedNames = useMemo(() => new Set(gallery.selectedImageNames), [gallery.selectedImageNames]);
+  const selectedItemKeys = useMemo(() => new Set(gallery.selectedItemKeys), [gallery.selectedItemKeys]);
   const isFollowingLive = gallery.currentItem?.kind === 'placeholder';
   const isComparisonActive =
-    gallery.compareImageName !== null &&
-    gallery.selectedImageName !== null &&
-    gallery.compareImageName !== gallery.selectedImageName;
+    gallery.selectedItemKey?.startsWith('image:') === true &&
+    gallery.compareImageKey !== null &&
+    gallery.selectedItemKey !== null &&
+    gallery.compareImageKey !== gallery.selectedItemKey;
   const selectedBoardName =
     gallery.boards.find((board) => board.id === gallery.selectedBoardId)?.name ??
     t('widgets.gallery.selectedBoardFallback');
-  const isEmpty = gallery.images.length === 0 && gallery.pendingPlaceholders.length === 0;
+  const isEmpty = gallery.items.length === 0 && gallery.pendingPlaceholders.length === 0;
 
-  const placeholderInsertionIndex = getGalleryPlaceholderInsertionIndex(gallery.images, imageOrderDir, starredFirst);
+  const placeholderInsertionIndex = getGalleryPlaceholderInsertionIndex(gallery.items, imageOrderDir, starredFirst);
 
   const cells = useMemo<GridCell[]>(() => {
-    const imageCells: GridCell[] = gallery.images.map((image, imageIndex) => ({
-      image,
-      imageIndex,
-      kind: 'image',
+    const itemCells: GridCell[] = gallery.items.map((item, itemIndex) => ({
+      item,
+      itemIndex,
+      kind: 'item',
     }));
     const placeholderCells: GridCell[] = gallery.pendingPlaceholders.map((placeholder) => ({
       kind: 'placeholder',
@@ -106,14 +134,14 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
     }));
 
     return [
-      ...imageCells.slice(0, placeholderInsertionIndex),
+      ...itemCells.slice(0, placeholderInsertionIndex),
       ...placeholderCells,
-      ...imageCells.slice(placeholderInsertionIndex),
+      ...itemCells.slice(placeholderInsertionIndex),
     ];
-  }, [gallery.images, gallery.pendingPlaceholders, placeholderInsertionIndex]);
+  }, [gallery.items, gallery.pendingPlaceholders, placeholderInsertionIndex]);
 
-  const getCellIndexForImage = (imageIndex: number): number =>
-    imageIndex >= placeholderInsertionIndex ? imageIndex + gallery.pendingPlaceholders.length : imageIndex;
+  const getCellIndexForItem = (itemIndex: number): number =>
+    itemIndex >= placeholderInsertionIndex ? itemIndex + gallery.pendingPlaceholders.length : itemIndex;
 
   const rowCount = Math.ceil(cells.length / columnCount);
 
@@ -176,92 +204,166 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
     }
   }, [actions, lastVisibleRowIndex, paginationMode, rowCount]);
 
-  const activeContextMenuTarget = useMemo(() => {
-    const primaryTargetImageName = contextMenuTarget?.images[0]?.imageName;
+  const parsedSearch = useMemo(() => parseDateTokens(gallery.searchTerm), [gallery.searchTerm]);
+  const itemNamesFilter = useMemo<GalleryItemsFilter>(
+    () => ({
+      boardId: gallery.selectedBoardId,
+      ...(parsedSearch.range?.from ? { createdFrom: parsedSearch.range.from } : {}),
+      ...(parsedSearch.range?.to ? { createdTo: parsedSearch.range.to } : {}),
+      galleryView: gallery.galleryView,
+      orderDir: imageOrderDir,
+      searchTerm: parsedSearch.text,
+      starredFirst,
+    }),
+    [gallery.galleryView, gallery.selectedBoardId, imageOrderDir, parsedSearch.range, parsedSearch.text, starredFirst]
+  );
+  const itemNamesFilterIdentity = useMemo(() => JSON.stringify(itemNamesFilter), [itemNamesFilter]);
+  const rangeInteractionContextRef = useRef({
+    filterIdentity: itemNamesFilterIdentity,
+    selectedItemKey: gallery.selectedItemKey,
+  });
+  const syncRangeInteractionContext = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (node) {
+        rangeInteractionContextRef.current = {
+          filterIdentity: itemNamesFilterIdentity,
+          selectedItemKey: gallery.selectedItemKey,
+        };
+      }
+    },
+    [gallery.selectedItemKey, itemNamesFilterIdentity]
+  );
 
-    if (!primaryTargetImageName) {
+  const activeContextMenuTarget = useMemo(() => {
+    const primaryTargetItem = contextMenuTarget?.items[0];
+
+    if (!primaryTargetItem) {
       return contextMenuTarget;
     }
 
-    return gallery.images.some((image) => image.imageName === primaryTargetImageName) ? contextMenuTarget : null;
-  }, [contextMenuTarget, gallery.images]);
+    const primaryTargetItemKey = toGalleryItemKey(primaryTargetItem);
 
-  const handleThumbnailClick = useCallback(
-    (image: GalleryImage, event: MouseEvent) => {
-      if (event.shiftKey) {
-        const targetIndex = gallery.images.findIndex((candidate) => candidate.imageName === image.imageName);
-        const anchorIndex = gallery.images.findIndex((candidate) => candidate.imageName === gallery.selectedImageName);
+    return gallery.items.some((item) => toGalleryItemKey(item) === primaryTargetItemKey) ? contextMenuTarget : null;
+  }, [contextMenuTarget, gallery.items]);
 
-        if (targetIndex !== -1 && anchorIndex !== -1 && targetIndex !== anchorIndex) {
-          const start = Math.min(anchorIndex, targetIndex);
-          const end = Math.max(anchorIndex, targetIndex);
+  const selectItemRange = useCallback(
+    async (item: GalleryItem) => {
+      const owner = captureAccountScope();
+      const capturedContext = rangeInteractionContextRef.current;
+      const anchorItemKey = capturedContext.selectedItemKey;
+      const targetItemKey = toGalleryItemKey(item);
 
-          actions.selectImageRange(
-            gallery.images.slice(start, end + 1).map((candidate) => candidate.imageName),
-            image
-          );
+      if (!anchorItemKey) {
+        actions.selectItem(item);
+        return;
+      }
+
+      const isInteractionCurrent = () =>
+        isAccountScopeCurrent(owner) &&
+        rangeInteractionContextRef.current.filterIdentity === capturedContext.filterIdentity &&
+        rangeInteractionContextRef.current.selectedItemKey === capturedContext.selectedItemKey;
+      const selectFromRefs = (refs: readonly GalleryItemRef[]): boolean => {
+        const range = getGalleryItemRange(refs, anchorItemKey, targetItemKey);
+
+        if (!range) {
+          return false;
+        }
+
+        actions.selectItemRange(range, item);
+        return true;
+      };
+      const materializedRefs = gallery.items.map(toGalleryItemRef);
+      const namesOptions = galleryItemNamesOptions(itemNamesFilter);
+
+      try {
+        const orderedRefs = isDateBoardId(itemNamesFilter.boardId)
+          ? queryClient.getQueryData<GalleryItemNames>(namesOptions.queryKey)?.items
+          : (await queryClient.fetchQuery(namesOptions)).items;
+
+        if (!isInteractionCurrent()) {
+          return;
+        }
+
+        if (orderedRefs && selectFromRefs(orderedRefs)) {
+          return;
+        }
+      } catch {
+        if (!isInteractionCurrent()) {
           return;
         }
       }
 
-      if (event.ctrlKey || event.metaKey) {
-        const itemKey = toGalleryItemKey({ kind: 'image', name: image.imageName });
-        const remainingItemKeys = galleryState.selectedItemKeys.filter((key) => key !== itemKey);
-        const nextPrimaryItem =
-          galleryState.selectedItemKey === itemKey
-            ? (galleryState.items.find(
-                (item) => toGalleryItemKey(item) === remainingItemKeys[remainingItemKeys.length - 1]
-              ) ?? null)
-            : null;
-
-        actions.toggleImageInSelection(image, nextPrimaryItem);
-      } else {
-        actions.selectImage(image);
+      if (!selectFromRefs(materializedRefs)) {
+        actions.selectItem(item);
       }
     },
-    [
-      actions,
-      gallery.images,
-      gallery.selectedImageName,
-      galleryState.items,
-      galleryState.selectedItemKey,
-      galleryState.selectedItemKeys,
-    ]
+    [actions, gallery.items, itemNamesFilter, queryClient]
   );
 
-  const handleThumbnailContextMenu = useCallback(
-    (image: GalleryImage, x: number, y: number) => {
-      if (selectedNames.has(image.imageName) && selectedNames.size > 1) {
-        const selectionImages = [
-          image,
-          ...gallery.images.filter(
-            (candidate) => candidate.imageName !== image.imageName && selectedNames.has(candidate.imageName)
-          ),
-        ];
-
-        setContextMenuTarget({ images: selectionImages, x, y });
+  const handleThumbnailClick = useCallback(
+    (item: GalleryItem, event: MouseEvent) => {
+      if (event.shiftKey) {
+        void selectItemRange(item);
         return;
       }
 
-      setContextMenuTarget({ images: [image], x, y });
-    },
-    [gallery.images, selectedNames]
-  );
-
-  const getDragImages = useCallback(
-    (image: GalleryImage): GalleryImageDragImage[] => {
-      if (selectedNames.has(image.imageName) && selectedNames.size > 1) {
-        return gallery.images
-          .filter((candidate) => selectedNames.has(candidate.imageName))
-          .map((candidate) => ({
-            boardId: candidate.boardId,
-            imageName: candidate.imageName,
-          }));
+      if (event.altKey && isGalleryImageItem(item)) {
+        actions.setCompareItem(item);
+        return;
       }
 
-      return [{ boardId: image.boardId, imageName: image.imageName }];
+      if (event.ctrlKey || event.metaKey) {
+        const itemKey = toGalleryItemKey(item);
+        const remainingItemKeys = gallery.selectedItemKeys.filter((key) => key !== itemKey);
+        const nextPrimaryItem =
+          gallery.selectedItemKey === itemKey
+            ? (gallery.items.find(
+                (candidate) => toGalleryItemKey(candidate) === remainingItemKeys[remainingItemKeys.length - 1]
+              ) ?? null)
+            : null;
+
+        actions.toggleItemInSelection(item, nextPrimaryItem);
+      } else {
+        actions.selectItem(item);
+      }
     },
-    [gallery.images, selectedNames]
+    [actions, gallery.items, gallery.selectedItemKey, gallery.selectedItemKeys, selectItemRange]
+  );
+
+  const handleThumbnailContextMenu = useCallback(
+    (item: GalleryItem, x: number, y: number) => {
+      const itemKey = toGalleryItemKey(item);
+
+      if (selectedItemKeys.has(itemKey) && selectedItemKeys.size > 1) {
+        const selectionItems = [
+          item,
+          ...gallery.items.filter(
+            (candidate) => toGalleryItemKey(candidate) !== itemKey && selectedItemKeys.has(toGalleryItemKey(candidate))
+          ),
+        ];
+
+        setContextMenuTarget({ items: selectionItems, x, y });
+        return;
+      }
+
+      setContextMenuTarget({ items: [item], x, y });
+    },
+    [gallery.items, selectedItemKeys]
+  );
+
+  const getDragItems = useCallback(
+    (item: GalleryItem): GalleryItemRef[] => {
+      const itemKey = toGalleryItemKey(item);
+
+      if (selectedItemKeys.has(itemKey) && selectedItemKeys.size > 1) {
+        return gallery.items
+          .filter((candidate) => selectedItemKeys.has(toGalleryItemKey(candidate)))
+          .map(toGalleryItemRef);
+      }
+
+      return [toGalleryItemRef(item)];
+    },
+    [gallery.items, selectedItemKeys]
   );
 
   const handleDragEnter = useCallback((event: DragEvent) => {
@@ -312,41 +414,57 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
   }, [account]);
 
   const handleToggleStarred = useCallback(
-    (image: GalleryImage) => void imageActions.setImagesStarred([image.imageName], !image.starred),
+    (item: GalleryImageItem) => void imageActions.setImagesStarred([item.name], !item.starred),
     [imageActions]
   );
 
   const handleCloseContextMenu = useCallback(() => setContextMenuTarget(null), []);
 
-  const navigate = useEffectEvent((direction: 'down' | 'left' | 'right' | 'up') => {
-    const imageCount = gallery.images.length;
+  // TODO(Task 7): Common item actions will consume the canonical selection.
+  // Until then, reject video, mixed, or unresolved selections at the existing
+  // image-only hotkey boundary.
+  const imageOnlyActionSelection = useMemo<GalleryImageItem[] | null>(() => {
+    const itemKeys =
+      gallery.selectedItemKeys.length > 0
+        ? gallery.selectedItemKeys
+        : gallery.selectedItemKey
+          ? [gallery.selectedItemKey]
+          : [];
+    const items = itemKeys.flatMap((itemKey) => {
+      const item = gallery.items.find((candidate) => toGalleryItemKey(candidate) === itemKey);
 
-    if (imageCount === 0) {
+      return item ? [item] : [];
+    });
+
+    return items.length === itemKeys.length && items.every(isGalleryImageItem) ? items : null;
+  }, [gallery.items, gallery.selectedItemKey, gallery.selectedItemKeys]);
+
+  const navigate = useEffectEvent((direction: 'down' | 'left' | 'right' | 'up') => {
+    const itemCount = gallery.items.length;
+
+    if (itemCount === 0) {
       return;
     }
 
-    const selectedIndex = gallery.images.findIndex((image) => image.imageName === gallery.selectedImageName);
+    const selectedIndex = gallery.items.findIndex((item) => toGalleryItemKey(item) === gallery.selectedItemKey);
     const fallbackIndex = selectedIndex === -1 ? 0 : selectedIndex;
     const delta =
       direction === 'right' ? 1 : direction === 'left' ? -1 : direction === 'down' ? columnCount : -columnCount;
-    const nextIndex = Math.min(imageCount - 1, Math.max(0, fallbackIndex + delta));
-    const nextImage = gallery.images[nextIndex];
+    const nextIndex = Math.min(itemCount - 1, Math.max(0, fallbackIndex + delta));
+    const nextItem = gallery.items[nextIndex];
 
-    if (nextImage && (nextIndex !== selectedIndex || selectedIndex === -1)) {
-      actions.selectImage(nextImage);
-      virtualizer.scrollToIndex(Math.floor(getCellIndexForImage(nextIndex) / columnCount));
+    if (nextItem && (nextIndex !== selectedIndex || selectedIndex === -1)) {
+      actions.selectItem(nextItem);
+      virtualizer.scrollToIndex(Math.floor(getCellIndexForItem(nextIndex) / columnCount));
     }
   });
 
   const executeGalleryHotkey = useEffectEvent((commandId: string) => {
     if (commandId === 'gallery.selectAllOnPage') {
-      const primaryImage = gallery.images[0];
+      const primaryItem = gallery.items[0];
 
-      if (primaryImage) {
-        actions.selectImageRange(
-          gallery.images.map((image) => image.imageName),
-          primaryImage
-        );
+      if (primaryItem) {
+        actions.selectItemRange(gallery.items.map(toGalleryItemRef), primaryItem);
       }
       return;
     }
@@ -360,24 +478,18 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
       return;
     }
 
-    if (commandId === 'gallery.deleteSelection' && gallery.selectedImageNames.length > 0) {
-      void imageActions.deleteImages(gallery.selectedImageNames);
+    if (commandId === 'gallery.deleteSelection' && imageOnlyActionSelection?.length) {
+      void imageActions.deleteImages(imageOnlyActionSelection.map((item) => item.name));
       return;
     }
 
-    if (commandId === 'gallery.starImage') {
-      const imageNames = gallery.selectedImageNames.length
-        ? gallery.selectedImageNames
-        : gallery.selectedImageName
-          ? [gallery.selectedImageName]
-          : [];
-      const selectedImages = gallery.images.filter((image) => imageNames.includes(image.imageName));
+    if (commandId === 'gallery.starImage' && imageOnlyActionSelection?.length) {
+      const shouldStar = imageOnlyActionSelection.some((item) => !item.starred);
 
-      if (selectedImages.length > 0) {
-        const shouldStar = selectedImages.some((image) => !image.starred);
-
-        void imageActions.setImagesStarred(imageNames, shouldStar);
-      }
+      void imageActions.setImagesStarred(
+        imageOnlyActionSelection.map((item) => item.name),
+        shouldStar
+      );
     }
   });
 
@@ -417,6 +529,7 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
 
   return (
     <Box
+      ref={syncRangeInteractionContext}
       flex="1"
       maxW="full"
       minH="0"
@@ -437,7 +550,7 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
       ) : (
         <ScrollArea.Root h="full" minH="0" size="xs" variant="hover" w="full">
           <ScrollArea.Viewport ref={viewportRef} h="full" w="full" outline="none">
-            <ScrollArea.Content aria-label={t('widgets.gallery.imagesAriaLabel')} role="list">
+            <ScrollArea.Content aria-label={t('widgets.gallery.itemsAriaLabel')} role="list">
               <Box h={`${virtualizer.totalSize}px`} position="relative" w="full">
                 {virtualRows.map((virtualRow) => (
                   <Box
@@ -469,20 +582,20 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
                           />
                         ) : (
                           <GalleryThumbnailCell
-                            key={cell.image.imageName}
+                            key={toGalleryItemKey(cell.item)}
                             alwaysShowDimensions={showImageDimensions}
                             compareRole={
-                              isComparisonActive && cell.image.imageName === gallery.selectedImageName
+                              isComparisonActive && toGalleryItemKey(cell.item) === gallery.selectedItemKey
                                 ? t('widgets.preview.viewing')
-                                : isComparisonActive && cell.image.imageName === gallery.compareImageName
+                                : isComparisonActive && toGalleryItemKey(cell.item) === gallery.compareImageKey
                                   ? t('widgets.preview.compare')
                                   : null
                             }
                             fit={thumbnailFit}
-                            getDragImages={getDragImages}
-                            image={cell.image}
-                            isPrimary={!isFollowingLive && cell.image.imageName === gallery.selectedImageName}
-                            isSelected={!isFollowingLive && selectedNames.has(cell.image.imageName)}
+                            getDragItems={getDragItems}
+                            item={cell.item}
+                            isPrimary={!isFollowingLive && toGalleryItemKey(cell.item) === gallery.selectedItemKey}
+                            isSelected={!isFollowingLive && selectedItemKeys.has(toGalleryItemKey(cell.item))}
                             onClick={handleThumbnailClick}
                             onContextMenu={handleThumbnailContextMenu}
                             onToggleStarred={handleToggleStarred}
@@ -492,7 +605,7 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
                   </Box>
                 ))}
               </Box>
-              {paginationMode === 'infinite' && gallery.isLoading && gallery.images.length > 0 && (
+              {paginationMode === 'infinite' && gallery.isLoading && gallery.items.length > 0 && (
                 <Flex align="center" justify="center" py="2">
                   <Spinner color="fg.subtle" size="xs" />
                 </Flex>
@@ -500,7 +613,7 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
               {paginationMode === 'infinite' && !gallery.isLoading && isWindowTruncated && (
                 <Flex align="center" justify="center" py="3">
                   <Text color="fg.subtle" fontSize="xs" textAlign="center">
-                    {t('widgets.gallery.windowLimit', { count: gallery.images.length })}
+                    {t('widgets.gallery.windowLimit', { count: gallery.items.length })}
                   </Text>
                 </Flex>
               )}
@@ -630,9 +743,9 @@ const GalleryPlaceholderCircularProgress = ({ percentage }: { percentage: number
 const GalleryThumbnail = ({
   alwaysShowDimensions,
   compareRole,
-  dragImages,
+  dragItems,
   fit,
-  image,
+  item,
   isPrimary,
   isSelected,
   onClick,
@@ -641,21 +754,22 @@ const GalleryThumbnail = ({
 }: {
   alwaysShowDimensions: boolean;
   compareRole: string | null;
-  dragImages: GalleryImageDragImage[];
+  dragItems: GalleryItemRef[];
   fit: GalleryThumbnailFit;
-  image: GalleryImage;
+  item: GalleryItem;
   isPrimary: boolean;
   isSelected: boolean;
-  onClick: (image: GalleryImage, event: MouseEvent) => void;
-  onContextMenu: (image: GalleryImage, x: number, y: number) => void;
-  onToggleStarred: (image: GalleryImage) => void;
+  onClick: (item: GalleryItem, event: MouseEvent) => void;
+  onContextMenu: (item: GalleryItem, x: number, y: number) => void;
+  onToggleStarred: (item: GalleryImageItem) => void;
 }) => {
   const { t } = useTranslation();
   const isCompared = compareRole !== null;
+  const duration = item.kind === 'video' ? formatGalleryVideoDuration(item.durationSeconds) : null;
 
   const { isDragging, listeners, setNodeRef, transform } = useDraggable({
-    data: getGalleryImageDragData(dragImages),
-    id: getGalleryImageDragId(image.imageName),
+    data: getGalleryItemDragData(dragItems),
+    id: getGalleryItemDragId(toGalleryItemRef(item)),
   });
 
   const containerStyle = useMemo(() => ({ transform: CSS.Transform.toString(transform) }), [transform]);
@@ -677,19 +791,22 @@ const GalleryThumbnail = ({
   const handleContextMenu = useCallback(
     (event: MouseEvent) => {
       event.preventDefault();
-      onContextMenu(image, event.clientX, event.clientY);
+      onContextMenu(item, event.clientX, event.clientY);
     },
-    [image, onContextMenu]
+    [item, onContextMenu]
   );
 
-  const handleClick = useCallback((event: MouseEvent) => onClick(image, event), [image, onClick]);
+  const handleClick = useCallback((event: MouseEvent) => onClick(item, event), [item, onClick]);
 
   const handleToggleStarred = useCallback(
     (event: MouseEvent<HTMLButtonElement>) => {
       event.stopPropagation();
-      onToggleStarred(image);
+
+      if (isGalleryImageItem(item)) {
+        onToggleStarred(item);
+      }
     },
-    [image, onToggleStarred]
+    [item, onToggleStarred]
   );
 
   return (
@@ -716,13 +833,23 @@ const GalleryThumbnail = ({
     >
       <button
         aria-current={isPrimary ? 'true' : undefined}
-        aria-label={t('widgets.gallery.selectImageForPreview', { name: image.imageName })}
+        aria-label={
+          item.kind === 'video'
+            ? t('widgets.gallery.selectVideoForPreview', { duration, name: item.name })
+            : t('widgets.gallery.selectImageForPreview', { name: item.name })
+        }
         aria-pressed={isSelected}
         style={THUMBNAIL_BUTTON_STYLE}
         type="button"
         onClick={handleClick}
       >
-        <img alt={image.imageName} draggable={false} src={image.thumbnailUrl || image.imageUrl} style={imageStyle} />
+        <img
+          alt={item.name}
+          decoding={item.kind === 'video' ? 'async' : undefined}
+          draggable={false}
+          src={item.thumbnailUrl || item.fullUrl}
+          style={imageStyle}
+        />
       </button>
       {compareRole && (
         <Badge
@@ -737,27 +864,29 @@ const GalleryThumbnail = ({
           {compareRole}
         </Badge>
       )}
-      <IconButton
-        aria-label={
-          image.starred
-            ? t('widgets.gallery.unstarImage', { name: image.imageName })
-            : t('widgets.gallery.starImage', { name: image.imageName })
-        }
-        className="gallery-thumb-overlay"
-        colorPalette={image.starred ? 'yellow' : 'gray'}
-        insetInlineEnd="1"
-        opacity={image.starred ? 1 : 0}
-        position="absolute"
-        size="2xs"
-        top="1"
-        transition="opacity var(--wb-motion-duration-medium) ease"
-        variant="solid"
-        zIndex="1"
-        onClick={handleToggleStarred}
-      >
-        <StarIcon fill={image.starred ? 'currentColor' : 'none'} />
-      </IconButton>
-      {image.width > 0 && image.height > 0 && (
+      {item.kind === 'image' ? (
+        <IconButton
+          aria-label={
+            item.starred
+              ? t('widgets.gallery.unstarImage', { name: item.name })
+              : t('widgets.gallery.starImage', { name: item.name })
+          }
+          className="gallery-thumb-overlay"
+          colorPalette={item.starred ? 'yellow' : 'gray'}
+          insetInlineEnd="1"
+          opacity={item.starred ? 1 : 0}
+          position="absolute"
+          size="2xs"
+          top="1"
+          transition="opacity var(--wb-motion-duration-medium) ease"
+          variant="solid"
+          zIndex="1"
+          onClick={handleToggleStarred}
+        >
+          <StarIcon fill={item.starred ? 'currentColor' : 'none'} />
+        </IconButton>
+      ) : null}
+      {item.kind === 'image' && item.width > 0 && item.height > 0 && (
         <Badge
           bottom="1"
           className="gallery-thumb-overlay"
@@ -770,7 +899,26 @@ const GalleryThumbnail = ({
           variant="solid"
           zIndex="1"
         >
-          {image.width}x{image.height}
+          {item.width}x{item.height}
+        </Badge>
+      )}
+      {duration !== null && (
+        <Badge
+          bottom="1"
+          display="flex"
+          fontVariantNumeric="tabular-nums"
+          gap="1"
+          insetInlineStart="1"
+          opacity={1}
+          pointerEvents="none"
+          position="absolute"
+          size="xs"
+          transition="opacity var(--wb-motion-duration-medium) ease"
+          variant="solid"
+          zIndex="1"
+        >
+          <PlayIcon aria-hidden="true" fill="currentColor" />
+          {duration}
         </Badge>
       )}
     </Box>
@@ -778,13 +926,13 @@ const GalleryThumbnail = ({
 };
 
 const GalleryThumbnailCell = ({
-  image,
-  getDragImages,
+  item,
+  getDragItems,
   ...props
-}: Omit<Parameters<typeof GalleryThumbnail>[0], 'dragImages'> & {
-  getDragImages: (image: GalleryImage) => GalleryImageDragImage[];
+}: Omit<Parameters<typeof GalleryThumbnail>[0], 'dragItems'> & {
+  getDragItems: (item: GalleryItem) => GalleryItemRef[];
 }) => {
-  const dragImages = useMemo(() => getDragImages(image), [getDragImages, image]);
+  const dragItems = useMemo(() => getDragItems(item), [getDragItems, item]);
 
-  return <GalleryThumbnail {...props} dragImages={dragImages} image={image} />;
+  return <GalleryThumbnail {...props} dragItems={dragItems} item={item} />;
 };

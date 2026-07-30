@@ -3,7 +3,7 @@ import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngi
 import type { Project } from '@workbench/projectContracts';
 import type { WorkbenchCanvasCommands } from '@workbench/workbenchStore';
 
-import { getGalleryImageDragData } from '@features/gallery/utility';
+import { getGalleryItemDragData } from '@features/gallery/utility';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -54,13 +54,13 @@ describe('canvas image drop layout', () => {
 });
 
 describe('resolveCanvasImageDrop', () => {
-  const galleryDrag = getGalleryImageDragData([
-    { boardId: 'board-a', imageName: 'third.png' },
-    { boardId: 'board-b', imageName: 'first.png' },
-    { boardId: 'board-a', imageName: 'second.png' },
+  const galleryDrag = getGalleryItemDragData([
+    { kind: 'image', name: 'third.png' },
+    { kind: 'image', name: 'first.png' },
+    { kind: 'image', name: 'second.png' },
   ]);
 
-  it('accepts a gallery-image to canvas-image-target pair and preserves requested order', () => {
+  it('accepts an all-image gallery item payload and preserves requested order', () => {
     expect(resolveCanvasImageDrop(galleryDrag, getCanvasImageDropData('control-resized'))).toEqual({
       destination: 'control-resized',
       imageNames: ['third.png', 'first.png', 'second.png'],
@@ -70,10 +70,18 @@ describe('resolveCanvasImageDrop', () => {
   it.each([
     [null, getCanvasImageDropData('raster')],
     [{ kind: 'widget-instance' }, getCanvasImageDropData('raster')],
+    [getGalleryItemDragData([{ kind: 'video', name: 'clip.mp4' }]), getCanvasImageDropData('raster')],
+    [
+      getGalleryItemDragData([
+        { kind: 'image', name: 'still.png' },
+        { kind: 'video', name: 'clip.mp4' },
+      ]),
+      getCanvasImageDropData('raster'),
+    ],
     [galleryDrag, null],
     [galleryDrag, { destination: 'raster', kind: 'widget-region' }],
     [galleryDrag, { destination: 'regional-guidance', kind: 'canvas-image-target' }],
-  ])('rejects a non gallery-image to canvas-image-target pair', (activeData, overData) => {
+  ])('rejects non-image-only gallery payloads and invalid canvas drop pairs', (activeData, overData) => {
     expect(resolveCanvasImageDrop(activeData, overData)).toBeNull();
   });
 });

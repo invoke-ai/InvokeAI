@@ -2,7 +2,7 @@ import type { GeneratedImageContract } from '@features/gallery';
 
 import { Box, HStack, ScrollArea } from '@chakra-ui/react';
 import { useDraggable } from '@dnd-kit/core';
-import { getGalleryImageDragData } from '@features/gallery/utility';
+import { getGalleryItemDragData, getGalleryItemDragId } from '@features/gallery/utility';
 import { useCallback, useMemo } from 'react';
 
 import type { PreviewDensity } from './previewDensity';
@@ -11,7 +11,7 @@ import type { PreviewDensity } from './previewDensity';
  * A docked strip of the current board's thumbnails between frame and footer —
  * the same `boardImages` the "N of M" counter is derived from, made spatial.
  * Fixed height (`flexShrink=0`) so the fitted frame's `100cqh` math is never
- * stolen from. Thumbs are standard gallery-image drag sources, so they work
+ * stolen from. Thumbs are standard all-image gallery-item drag sources, so they work
  * with every existing drop target (canvas zones, boards, drop-to-compare).
  */
 
@@ -83,13 +83,10 @@ const FilmstripThumb = ({
   size: string;
   onSelect: (image: GeneratedImageContract) => void;
 }) => {
-  const dragData = useMemo(
-    () => getGalleryImageDragData([{ boardId: image.boardId ?? 'none', imageName: image.imageName }]),
-    [image.boardId, image.imageName]
-  );
+  const dragData = useMemo(() => getGalleryItemDragData([{ kind: 'image', name: image.imageName }]), [image.imageName]);
   const { listeners, setNodeRef } = useDraggable({
     data: dragData,
-    id: `preview-filmstrip:${image.imageName}`,
+    id: getGalleryItemDragId(dragData.items[0]!),
   });
   const handleClick = useCallback(() => onSelect(image), [image, onSelect]);
   // Ref callbacks re-run when `isSelected` changes, keeping the selected thumb

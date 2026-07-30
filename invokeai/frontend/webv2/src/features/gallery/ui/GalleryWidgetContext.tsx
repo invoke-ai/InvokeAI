@@ -1,6 +1,6 @@
-import type { GalleryItem } from '@features/gallery/contracts';
+import type { GalleryImageItem, GalleryItem, GalleryItemRef } from '@features/gallery/contracts';
 import type { GallerySettings } from '@features/gallery/core/settings';
-import type { GalleryImage, GalleryView } from '@features/gallery/core/types';
+import type { GalleryView } from '@features/gallery/core/types';
 
 import { createContext, use } from 'react';
 
@@ -22,12 +22,13 @@ export interface GalleryActions {
   refresh: () => void;
   renameBoard: (boardId: string, boardName: string) => Promise<void>;
   selectBoard: (boardId: string) => void;
-  selectImage: (image: GalleryImage) => void;
-  selectImageRange: (imageNames: string[], primaryImage: GalleryImage) => void;
+  selectItem: (item: GalleryItem) => void;
+  selectItemRange: (items: GalleryItemRef[], primaryItem: GalleryItem) => void;
   selectProjectBoard: () => Promise<void>;
+  setCompareItem: (image: GalleryImageItem | null) => void;
   setSearchTerm: (searchTerm: string) => void;
   setView: (galleryView: GalleryView) => void;
-  toggleImageInSelection: (image: GalleryImage, nextPrimaryItem: GalleryItem | null) => void;
+  toggleItemInSelection: (item: GalleryItem, nextPrimaryItem: GalleryItem | null) => void;
   updateSettings: (settings: Partial<GallerySettings>) => void;
   uploadFiles: (files: File[]) => Promise<void>;
 }

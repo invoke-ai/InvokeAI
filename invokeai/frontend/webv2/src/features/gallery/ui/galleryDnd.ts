@@ -1,13 +1,19 @@
+import type { GalleryItem, GalleryItemKey, GalleryItemRef } from '@features/gallery/core/items';
 import type { GalleryBoardKind } from '@features/gallery/core/types';
 
-export interface GalleryImageDragImage {
-  boardId: string;
-  imageName: string;
+import { toGalleryItemKey } from '@features/gallery/core/items';
+
+export interface GalleryItemDragData {
+  kind: 'gallery-item';
+  items: GalleryItemRef[];
 }
 
-export interface GalleryImageDragData {
-  kind: 'gallery-image';
-  images: GalleryImageDragImage[];
+export interface GalleryImageDragItem extends GalleryItemRef {
+  kind: 'image';
+}
+
+export interface GalleryImageDragData extends GalleryItemDragData {
+  items: [GalleryImageDragItem, ...GalleryImageDragItem[]];
 }
 
 export interface GalleryBoardDropData {
@@ -16,13 +22,18 @@ export interface GalleryBoardDropData {
   kind: 'gallery-board';
 }
 
-export const getGalleryImageDragId = (imageName: string): string => `gallery-image:${imageName}`;
+export interface GalleryBoardDropResolution {
+  boardId: string;
+  items: GalleryItemRef[];
+}
+
+export const getGalleryItemDragId = (item: GalleryItemRef): GalleryItemKey => toGalleryItemKey(item);
 
 export const getGalleryBoardDropId = (boardId: string): string => `gallery-board:${boardId}`;
 
-export const getGalleryImageDragData = (images: GalleryImageDragImage[]): GalleryImageDragData => ({
-  images,
-  kind: 'gallery-image',
+export const getGalleryItemDragData = (items: readonly GalleryItemRef[]): GalleryItemDragData => ({
+  items: [...items],
+  kind: 'gallery-item',
 });
 
 export const getGalleryBoardDropData = (boardId: string, boardKind: GalleryBoardKind): GalleryBoardDropData => ({
@@ -31,13 +42,15 @@ export const getGalleryBoardDropData = (boardId: string, boardKind: GalleryBoard
   kind: 'gallery-board',
 });
 
-export const isGalleryImageDragData = (value: unknown): value is GalleryImageDragData =>
+export const isGalleryItemDragData = (value: unknown): value is GalleryItemDragData =>
   isRecord(value) &&
-  value.kind === 'gallery-image' &&
-  Array.isArray(value.images) &&
-  value.images.every(
-    (image) => isRecord(image) && typeof image.imageName === 'string' && typeof image.boardId === 'string'
-  );
+  value.kind === 'gallery-item' &&
+  Array.isArray(value.items) &&
+  value.items.length > 0 &&
+  value.items.every(isGalleryItemRef);
+
+export const isGalleryImageDragData = (value: unknown): value is GalleryImageDragData =>
+  isGalleryItemDragData(value) && value.items.every((item): item is GalleryImageDragItem => item.kind === 'image');
 
 export const isGalleryBoardDropData = (value: unknown): value is GalleryBoardDropData =>
   isRecord(value) &&
@@ -45,10 +58,37 @@ export const isGalleryBoardDropData = (value: unknown): value is GalleryBoardDro
   typeof value.boardId === 'string' &&
   isGalleryBoardKind(value.boardKind);
 
-export const getGalleryImageNamesOutsideBoard = (dragData: GalleryImageDragData, boardId: string): string[] =>
-  dragData.images.filter((image) => image.boardId !== boardId).map((image) => image.imageName);
+export const getGalleryItemRefsOutsideBoard = (
+  dragData: GalleryItemDragData,
+  boardId: string,
+  loadedItems: readonly GalleryItem[]
+): GalleryItemRef[] => {
+  const loadedItemsByKey = new Map(loadedItems.map((item) => [toGalleryItemKey(item), item]));
+
+  return dragData.items.filter((ref) => loadedItemsByKey.get(toGalleryItemKey(ref))?.boardId !== boardId);
+};
+
+export const resolveGalleryBoardDrop = (
+  activeData: unknown,
+  overData: unknown,
+  loadedItems: readonly GalleryItem[]
+): GalleryBoardDropResolution | null => {
+  if (!isGalleryItemDragData(activeData) || !isGalleryBoardDropData(overData) || overData.boardKind !== 'board') {
+    return null;
+  }
+
+  const items = getGalleryItemRefsOutsideBoard(activeData, overData.boardId, loadedItems);
+
+  return items.length > 0 ? { boardId: overData.boardId, items } : null;
+};
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
+
+const isGalleryItemRef = (value: unknown): value is GalleryItemRef =>
+  isRecord(value) &&
+  (value.kind === 'image' || value.kind === 'video') &&
+  typeof value.name === 'string' &&
+  value.name.length > 0;
 
 const isGalleryBoardKind = (value: unknown): value is GalleryBoardKind =>
   value === 'board' || value === 'date' || value === 'uncategorized';

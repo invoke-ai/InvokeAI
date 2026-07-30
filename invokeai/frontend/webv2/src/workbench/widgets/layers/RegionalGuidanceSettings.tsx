@@ -69,7 +69,7 @@ const formatWeight = (value: number): string => value.toFixed(2);
 
 const REGIONAL_PROMPT_HEIGHT_PX = 72;
 
-/** DnD droppable id for a specific region's reference-image slot (gallery-image drop target). */
+/** DnD droppable id for a specific region's reference-image slot (all-image gallery-item drop target). */
 const referenceImageDropId = (layerId: string, refId: string): string => `regional-ref-image:${layerId}:${refId}`;
 
 /**
@@ -295,7 +295,7 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
     [notifications, queryClient, setReferenceImageAsset]
   );
 
-  // A single monitor routes gallery-image drops to the region's ref slot the drop
+  // A single monitor routes all-image gallery-item drops to the region's ref slot the drop
   // landed on (each row registers a droppable keyed by layer + ref id).
   useDndMonitor({
     onDragEnd: (event) => {
@@ -305,12 +305,12 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
         return;
       }
       const data = event.active.data.current;
-      if (!isGalleryImageDragData(data) || data.images.length === 0) {
+      if (!isGalleryImageDragData(data)) {
         return;
       }
       const refId = overId.slice(prefix.length);
-      const [first] = data.images;
-      void galleryImages.resolveMany([first.imageName]).then((images) => {
+      const [first] = data.items;
+      void galleryImages.resolveMany([first.name]).then((images) => {
         if (images[0]) {
           setReferenceImageAsset(refId, images[0]);
         }

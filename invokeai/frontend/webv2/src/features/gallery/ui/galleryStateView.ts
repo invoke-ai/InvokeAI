@@ -2,8 +2,6 @@ import type { GalleryBoard, GalleryImage, GalleryOrderDir, GalleryView } from '@
 import type { QueueItem } from '@features/queue/contracts';
 
 import {
-  galleryImageItemToGalleryImage,
-  isGalleryImageItem,
   legacyGeneratedImageToGalleryItem,
   parseGalleryItemKey,
   toGalleryItemKey,
@@ -434,33 +432,6 @@ export const getGalleryStateView = (
     settings,
   };
 };
-
-export interface GalleryImageStateView extends GalleryStateView {
-  compareImageName: string | null;
-  images: GalleryImage[];
-  selectedImageName: string | null;
-  selectedImageNames: string[];
-}
-
-/**
- * TODO(Task 6): Remove when the Gallery grid renders `GalleryItem` directly.
- * This is the only image-only Gallery projection and it narrows by kind before
- * producing any `GalleryImage` contract.
- */
-export const getGalleryImageStateView = (gallery: GalleryStateView): GalleryImageStateView => ({
-  ...gallery,
-  compareImageName: gallery.compareImageKey ? parseGalleryItemKey(gallery.compareImageKey).name : null,
-  images: gallery.items.filter(isGalleryImageItem).map(galleryImageItemToGalleryImage),
-  selectedImageName:
-    gallery.selectedItemKey && parseGalleryItemKey(gallery.selectedItemKey).kind === 'image'
-      ? parseGalleryItemKey(gallery.selectedItemKey).name
-      : null,
-  selectedImageNames: gallery.selectedItemKeys.flatMap((key) => {
-    const ref = parseGalleryItemKey(key);
-
-    return ref.kind === 'image' ? [ref.name] : [];
-  }),
-});
 
 export const getBoardCounts = (board: GalleryBoard): { assetCount: number; imageCount: number } => ({
   assetCount: board.assetCount,

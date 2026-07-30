@@ -201,7 +201,7 @@ export const GenerateReferenceImagesSection = ({
       const data = event.active.data.current;
 
       if (event.over?.id === 'generate-reference-images' && isGalleryImageDragData(data) && canAdd) {
-        void addGalleryImages(data.images.map((image) => image.imageName));
+        void addGalleryImages(data.items.map((item) => item.name));
       }
     },
   });

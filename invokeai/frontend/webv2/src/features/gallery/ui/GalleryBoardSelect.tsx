@@ -1,3 +1,4 @@
+import type { GalleryItem, GalleryItemRef } from '@features/gallery/core/items';
 import type { GalleryBoard } from '@features/gallery/core/types';
 
 import {
@@ -46,12 +47,33 @@ import { GalleryBoardMenu, type GalleryBoardMenuTarget } from './GalleryBoardMen
 import {
   getGalleryBoardDropData,
   getGalleryBoardDropId,
-  getGalleryImageNamesOutsideBoard,
-  isGalleryBoardDropData,
-  isGalleryImageDragData,
+  getGalleryItemRefsOutsideBoard,
+  isGalleryItemDragData,
+  resolveGalleryBoardDrop,
 } from './galleryDnd';
 import { getBoardCounts } from './galleryStateView';
 import { useGalleryWidget } from './GalleryWidgetContext';
+
+export const forwardGalleryBoardDrop = ({
+  activeData,
+  loadedItems,
+  moveItemsToBoard,
+  overData,
+}: {
+  activeData: unknown;
+  loadedItems: readonly GalleryItem[];
+  moveItemsToBoard: (items: GalleryItemRef[], boardId: string) => void;
+  overData: unknown;
+}): boolean => {
+  const resolution = resolveGalleryBoardDrop(activeData, overData, loadedItems);
+
+  if (!resolution) {
+    return false;
+  }
+
+  moveItemsToBoard(resolution.items, resolution.boardId);
+  return true;
+};
 
 export const GalleryBoardSelect = () => {
   const { t } = useTranslation();
@@ -62,7 +84,7 @@ export const GalleryBoardSelect = () => {
   const [boardMenuTarget, setBoardMenuTarget] = useState<GalleryBoardMenuTarget | null>(null);
   const boardMenuActiveRef = useRef(false);
   const dragOpenedMenuRef = useRef(false);
-  const isGalleryImageDragActive = isGalleryImageDragData(active?.data.current);
+  const isGalleryItemDragActive = isGalleryItemDragData(active?.data.current);
   const trimmedSearchTerm = boardSearchTerm.trim();
   const normalizedSearchTerm = trimmedSearchTerm.toLowerCase();
   const matchesSearch = useCallback(
@@ -98,20 +120,19 @@ export const GalleryBoardSelect = () => {
       const dragData = event.active.data.current;
       const dropData = event.over?.data.current;
 
-      if (isGalleryImageDragData(dragData) && isGalleryBoardDropData(dropData) && dropData.boardKind === 'board') {
-        const imageNames = getGalleryImageNamesOutsideBoard(dragData, dropData.boardId);
-
-        if (imageNames.length > 0) {
-          void imageActions.moveImagesToBoard(imageNames, dropData.boardId);
-        }
-      }
+      forwardGalleryBoardDrop({
+        activeData: dragData,
+        loadedItems: gallery.items,
+        moveItemsToBoard: (items, boardId) => void imageActions.moveItemsToBoard(items, boardId),
+        overData: dropData,
+      });
 
       if (dragOpenedMenuRef.current) {
         dragOpenedMenuRef.current = false;
         closeAndReset();
       }
     },
-    [closeAndReset, imageActions]
+    [closeAndReset, gallery.items, imageActions]
   );
 
   const handleDragCancel = useCallback(() => {
@@ -122,7 +143,7 @@ export const GalleryBoardSelect = () => {
   }, [closeAndReset]);
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
-    if (!isGalleryImageDragData(event.active.data.current)) {
+    if (!isGalleryItemDragData(event.active.data.current)) {
       return;
     }
 
@@ -175,13 +196,13 @@ export const GalleryBoardSelect = () => {
         return;
       }
 
-      if (boardMenuActiveRef.current || isGalleryImageDragActive) {
+      if (boardMenuActiveRef.current || isGalleryItemDragActive) {
         return;
       }
 
       closeAndReset();
     },
-    [closeAndReset, isGalleryImageDragActive]
+    [closeAndReset, isGalleryItemDragActive]
   );
 
   const handleSearchChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
@@ -448,16 +469,17 @@ const BoardRow = ({
 }) => {
   const { t } = useTranslation();
   const { active } = useDndContext();
+  const { gallery } = useGalleryWidget();
   const dragData = active?.data.current;
 
-  const canDropImages =
+  const canDropItems =
     board.kind === 'board' &&
-    isGalleryImageDragData(dragData) &&
-    getGalleryImageNamesOutsideBoard(dragData, board.id).length > 0;
+    isGalleryItemDragData(dragData) &&
+    getGalleryItemRefsOutsideBoard(dragData, board.id, gallery.items).length > 0;
 
   const { isOver, setNodeRef } = useDroppable({
     data: getGalleryBoardDropData(board.id, board.kind),
-    disabled: !canDropImages,
+    disabled: !canDropItems,
     id: getGalleryBoardDropId(board.id),
   });
 
@@ -508,8 +530,8 @@ const BoardRow = ({
       // DropZone tokens without the DropZone component: an outline (not a border) so the drop affordance never shifts menu layout.
       bg={isOver ? 'accent.muted' : undefined}
       css={hoverCss}
-      outline={canDropImages ? '1px dashed' : undefined}
-      outlineColor={canDropImages ? 'accent.solid' : undefined}
+      outline={canDropItems ? '1px dashed' : undefined}
+      outlineColor={canDropItems ? 'accent.solid' : undefined}
       value={board.id}
       onClick={handleSelect}
       onContextMenu={onOpenMenu ? handleContextMenu : undefined}

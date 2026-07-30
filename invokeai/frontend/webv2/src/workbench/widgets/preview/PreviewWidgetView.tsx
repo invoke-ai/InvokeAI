@@ -636,7 +636,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   const isFilmstripVisible = getPreviewFilmstripVisible(previewValues);
   const selectImage = selectPreviewImage;
 
-  // Drop-to-compare: any gallery-image drag dropped on the frame's drop zone
+  // Drop-to-compare: any all-image gallery-item drag dropped on the frame's drop zone
   // arms that image for comparison. The drag payload only carries names, so
   // the full contract is fetched before dispatching.
   const handleCompareDrop = useCallback(
@@ -885,14 +885,11 @@ const SelectedImagePreview = ({
   });
   const previewWidth = previewImage?.width ?? image.width;
   const previewHeight = previewImage?.height ?? image.height;
-  const dragImage = useMemo(
-    () => ({ boardId: actionImage?.boardId ?? 'none', imageName: image.imageName }),
-    [actionImage?.boardId, image.imageName]
-  );
+  const dragItem = useMemo(() => ({ kind: 'image', name: image.imageName }) as const, [image.imageName]);
   return (
     <Stack gap="2" h="full" minH="0" w="full">
       <PreviewFrame
-        dragImage={dragImage}
+        dragItem={dragItem}
         frameHeight={previewHeight}
         frameWidth={previewWidth}
         isLive={false}

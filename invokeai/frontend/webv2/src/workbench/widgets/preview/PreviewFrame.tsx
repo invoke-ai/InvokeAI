@@ -1,10 +1,10 @@
-import type { GalleryImageDragImage } from '@features/gallery/utility';
+import type { GalleryItemRef } from '@features/gallery';
 /* eslint-disable react/react-compiler */
 import type { StreamingImageSource } from '@platform/ui/streaming-image/streamingImageSource';
 
 import { Badge, Box, Flex, type SystemStyleObject } from '@chakra-ui/react';
 import { useDraggable } from '@dnd-kit/core';
-import { getGalleryImageDragData } from '@features/gallery/utility';
+import { getGalleryItemDragData, getGalleryItemDragId } from '@features/gallery/utility';
 import { useCallback, useMemo, type CSSProperties, type MouseEvent, type ReactNode, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -36,7 +36,7 @@ export const getFittedFrameCss = (width: number, height: number): SystemStyleObj
 
 export const PreviewFrame = ({
   children,
-  dragImage,
+  dragItem,
   frameHeight,
   frameWidth,
   isLive,
@@ -52,7 +52,7 @@ export const PreviewFrame = ({
   /** Rendered instead of the fitted frame when there is no image source (inset variant only). */
   children?: ReactNode;
   /** Saved gallery image represented by this frame. Live progress frames are never draggable. */
-  dragImage?: GalleryImageDragImage;
+  dragItem?: GalleryItemRef;
   frameHeight: number;
   frameWidth: number;
   isLive: boolean;
@@ -74,8 +74,8 @@ export const PreviewFrame = ({
     enabled: variant === 'framed' && !isLive,
     naturalWidth: frameWidth,
   });
-  const dragData = useMemo(() => (dragImage ? getGalleryImageDragData([dragImage]) : undefined), [dragImage]);
-  const isDragDisabled = !dragImage || isLive || loupe.isZoomed;
+  const dragData = useMemo(() => (dragItem ? getGalleryItemDragData([dragItem]) : undefined), [dragItem]);
+  const isDragDisabled = !dragItem || isLive || loupe.isZoomed;
   const {
     isDragging,
     listeners,
@@ -83,7 +83,7 @@ export const PreviewFrame = ({
   } = useDraggable({
     data: dragData,
     disabled: isDragDisabled,
-    id: `preview-image:${dragImage?.imageName ?? 'none'}`,
+    id: getGalleryItemDragId(dragItem ?? { kind: 'image', name: 'none' }),
   });
   const setContentRef = useCallback(
     (element: HTMLDivElement | null) => {

@@ -31,7 +31,7 @@ export const resolveCanvasImageDrop = (activeData: unknown, overData: unknown): 
 
   return {
     destination: overData.destination,
-    imageNames: activeData.images.map((image) => image.imageName),
+    imageNames: activeData.items.map((item) => item.name),
   };
 };
 

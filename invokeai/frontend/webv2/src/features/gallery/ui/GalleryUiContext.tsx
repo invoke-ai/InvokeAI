@@ -1,4 +1,4 @@
-import type { GalleryItem } from '@features/gallery/contracts';
+import type { GalleryImageItem, GalleryItem, GalleryItemKey, GalleryItemRef } from '@features/gallery/contracts';
 import type { GallerySettings } from '@features/gallery/core/settings';
 import type { GalleryBoard, GalleryBoardDeletionResult, GalleryImage, GalleryView } from '@features/gallery/core/types';
 import type { QueueItem } from '@features/queue/contracts';
@@ -9,6 +9,11 @@ import type { GalleryLiveTarget } from './galleryStateView';
 
 export interface GalleryImageActions {
   deleteImages(imageNames: string[]): Promise<void>;
+  /**
+   * TODO(Task 7): Move this narrow board-drop intent to `GalleryItemActions`
+   * when common item mutations gain their mixed-media implementation.
+   */
+  moveItemsToBoard(items: GalleryItemRef[], boardId: string): Promise<void>;
   moveImagesToBoard(imageNames: string[], boardId: string): Promise<void>;
   setImagesStarred(imageNames: string[], starred: boolean): Promise<void>;
 }
@@ -20,30 +25,34 @@ export interface GalleryImageActionsOptions {
   projectId: string;
 }
 
-export interface GalleryImageContextMenuTarget {
-  images: GalleryImage[];
+export interface GalleryItemContextMenuTarget {
+  items: GalleryItem[];
   x: number;
   y: number;
 }
 
-export interface GalleryImageContextMenuProps {
+export interface GalleryItemContextMenuProps {
   actions: GalleryImageActions;
   boards: GalleryBoard[];
-  target: GalleryImageContextMenuTarget | null;
+  target: GalleryItemContextMenuTarget | null;
   onClose(): void;
 }
 
 export interface GalleryCommandsPort {
   reconcileDeletedBoardOutcome(outcome: GalleryBoardDeletionResult): void;
   selectBoard(boardId: string): void;
+  selectItem(item: GalleryItem): void;
   selectImage(image: GalleryImage): void;
+  setCompareItem(image: GalleryImageItem | null): void;
   setCompareImage(image: GalleryImage | null): void;
+  setItemMultiSelection(itemKeys: GalleryItemKey[], primaryItem: GalleryItem): void;
   setMultiSelection(imageNames: string[], primaryImage: GalleryImage): void;
   setPage(page: number): void;
   setPageInfo(totalImages: number): void;
   setProjectBoard(boardId: string): void;
   setSearchTerm(searchTerm: string): void;
   setView(view: GalleryView): void;
+  toggleItemSelection(item: GalleryItem, nextPrimaryItem: GalleryItem | null): void;
   toggleImageSelection(image: GalleryImage, nextPrimaryItem: GalleryItem | null): void;
   updateSettings(settings: Partial<GallerySettings>): void;
 }
@@ -74,7 +83,7 @@ export interface GalleryWidgetProps {
  */
 export interface GalleryUiAdapter {
   ImageActionsProvider: ComponentType<GalleryImageActionsOptions & { children: ReactNode }>;
-  ImageContextMenu: ComponentType<GalleryImageContextMenuProps>;
+  ImageContextMenu: ComponentType<GalleryItemContextMenuProps>;
   account: { enableLiveFollow(): void };
   antialiasProgressImages: boolean;
   gallery: GalleryCommandsPort;

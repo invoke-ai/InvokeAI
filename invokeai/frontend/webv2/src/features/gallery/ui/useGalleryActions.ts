@@ -1,5 +1,6 @@
 import type { GalleryBoard } from '@features/gallery/core/types';
 
+import { toGalleryItemKey } from '@features/gallery/core/items';
 import {
   createGalleryBoard,
   deleteGalleryBoard,
@@ -156,8 +157,8 @@ export const useGalleryActions = ({
         }
       },
       selectBoard: gallery.selectBoard,
-      selectImage: gallery.selectImage,
-      selectImageRange: gallery.setMultiSelection,
+      selectItem: gallery.selectItem,
+      selectItemRange: (items, primaryItem) => gallery.setItemMultiSelection(items.map(toGalleryItemKey), primaryItem),
       selectProjectBoard: async () => {
         const owner = captureAccountScope();
 
@@ -186,9 +187,10 @@ export const useGalleryActions = ({
           recordError(error);
         }
       },
+      setCompareItem: gallery.setCompareItem,
       setSearchTerm: gallery.setSearchTerm,
       setView: gallery.setView,
-      toggleImageInSelection: gallery.toggleImageSelection,
+      toggleItemInSelection: gallery.toggleItemSelection,
       updateSettings: gallery.updateSettings,
       uploadFiles: async (files) => {
         const owner = captureAccountScope();
