@@ -43,6 +43,7 @@ const paint = (
     layerId: 'L',
     opacity: opts.opacity,
     size: opts.size,
+    pressureOpacity: false,
     thinning: opts.thinning,
     tool: 'brush',
   });

@@ -44,6 +44,7 @@ import type { PlacedSurface, PointerInput, Rect, Vec2 } from '@workbench/canvas-
 
 import { strokeToPath, type StrokeSamplePoint } from '@workbench/canvas-engine/freehand';
 import { expand, intersect, isEmpty, roundOut, union } from '@workbench/canvas-engine/math/rect';
+import { getPressureBands } from '@workbench/canvas-engine/pressureBands';
 
 import type { StrokeCommittedEvent, ToolContext } from './tool';
 
@@ -58,6 +59,11 @@ export interface StrokeSessionConfig {
   opacity: number;
   /** Freehand thinning; 0 disables pressure sensitivity. */
   thinning: number;
+  /**
+   * Whether pen pressure modulates alpha along the stroke. Costs a full-region scratch
+   * refill per frame (see the band fill below), so it is opt-in.
+   */
+  pressureOpacity: boolean;
   /** Fill color (brush only; ignored for the eraser). */
   color: string;
   /**
@@ -291,7 +297,20 @@ const surroundingStrips = (inner: Rect, outer: Rect): Rect[] => {
 
 /** Creates a paint session that grows the target layer's content-sized cache. */
 export const createStrokeSession = (config: StrokeSessionConfig): StrokeSession => {
-  const { clipMask, clipRect, color, composite, createdLayer, ctx, layerId, opacity, size, thinning, tool } = config;
+  const {
+    clipMask,
+    clipRect,
+    color,
+    composite,
+    createdLayer,
+    ctx,
+    layerId,
+    opacity,
+    pressureOpacity,
+    size,
+    thinning,
+    tool,
+  } = config;
 
   const layers: LayerCacheStore = ctx.layers;
   // A per-frame scratch surface for the filled stroke, sized to the paint region.
@@ -423,8 +442,13 @@ export const createStrokeSession = (config: StrokeSessionConfig): StrokeSession 
     //    one already sitting there — so re-clearing and re-filling the whole
     //    region was redrawing pixels to their existing values. A region change
     //    resizes the scratch, which clears it, so that case still refills whole.
+    //
+    //    Pressure-opacity forces the whole region to refresh instead. Bands are painted as
+    //    replace, so a band straddling the changed strip would be half-punched by a partial
+    //    refill and lose its earlier half. Refilling whole keeps the band sequence intact,
+    //    at the cost of the per-frame saving above — which is why it stays opt-in.
     const scratchCleared = !previousRect || !sameRect(previousRect, region);
-    const refresh = scratchCleared ? region : changed;
+    const refresh = scratchCleared || pressureOpacity ? region : changed;
     const scratch = ensureStroke(region.width, region.height);
     const strokeCtx = scratch.ctx;
     strokeCtx.setTransform(1, 0, 0, 1, -region.x, -region.y);
@@ -433,10 +457,30 @@ export const createStrokeSession = (config: StrokeSessionConfig): StrokeSession 
     strokeCtx.rect(refresh.x, refresh.y, refresh.width, refresh.height);
     strokeCtx.clip();
     strokeCtx.clearRect(refresh.x, refresh.y, refresh.width, refresh.height);
-    strokeCtx.globalCompositeOperation = 'source-over';
-    strokeCtx.globalAlpha = 1;
     strokeCtx.fillStyle = color;
-    strokeCtx.fill(path);
+
+    if (pressureOpacity) {
+      // Each band replaces its own footprint rather than blending into it: punch the band's
+      // outline out of whatever is already there, then fill it at the band's alpha. Blending
+      // would compound alpha wherever bands overlap — the exact darkening the single
+      // full-alpha fill below exists to prevent. Replacing means the later (newer) band wins
+      // in the overlap, which is the pressure the user is applying now.
+      for (const band of getPressureBands(points)) {
+        const bandPath = strokeToPath(band.points, { last, size, thinning }, ctx.createPath2D).path;
+
+        strokeCtx.globalCompositeOperation = 'destination-out';
+        strokeCtx.globalAlpha = 1;
+        strokeCtx.fill(bandPath);
+        strokeCtx.globalCompositeOperation = 'source-over';
+        strokeCtx.globalAlpha = band.alpha;
+        strokeCtx.fill(bandPath);
+      }
+    } else {
+      strokeCtx.globalCompositeOperation = 'source-over';
+      strokeCtx.globalAlpha = 1;
+      strokeCtx.fill(path);
+    }
+
     strokeCtx.restore();
 
     // 4b. Selection clip: keep only the stroke pixels inside the selection mask.

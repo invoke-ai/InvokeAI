@@ -32,7 +32,14 @@ export interface BrushOptions {
   /** Per-stroke opacity in [0, 1]. */
   opacity: number;
   /** Whether pen pressure modulates the stroke width. */
-  pressureSensitivity: boolean;
+  pressureAffectsWidth: boolean;
+  /**
+   * Whether pen pressure modulates the stroke's alpha along its length.
+   *
+   * Off by default: unlike width, it costs a full-region scratch refill per frame (see
+   * `strokeSession`), and it changes how a stroke reads rather than just its shape.
+   */
+  pressureAffectsOpacity: boolean;
 }
 
 /** Eraser tool options. */
@@ -190,7 +197,8 @@ export const MAX_BRUSH_SIZE = 2000;
 export const DEFAULT_BRUSH_OPTIONS: BrushOptions = {
   color: '#000000',
   opacity: 1,
-  pressureSensitivity: true,
+  pressureAffectsOpacity: false,
+  pressureAffectsWidth: true,
   size: 50,
 };
 
@@ -547,7 +555,8 @@ const brushOptionsEqual = (a: BrushOptions, b: BrushOptions): boolean =>
   a.size === b.size &&
   a.color === b.color &&
   a.opacity === b.opacity &&
-  a.pressureSensitivity === b.pressureSensitivity;
+  a.pressureAffectsWidth === b.pressureAffectsWidth &&
+  a.pressureAffectsOpacity === b.pressureAffectsOpacity;
 
 const eraserOptionsEqual = (a: EraserOptions, b: EraserOptions): boolean =>
   a.size === b.size && a.opacity === b.opacity;

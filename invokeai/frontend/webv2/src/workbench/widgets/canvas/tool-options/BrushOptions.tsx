@@ -69,8 +69,13 @@ export const BrushOptions = ({ engine }: ToolOptionsComponentProps) => {
     [engine, options]
   );
 
-  const onPressureToggle = useCallback(
-    (checked: boolean) => engine.interaction.set('brushOptions', { ...options, pressureSensitivity: checked }),
+  const onPressureWidthToggle = useCallback(
+    (checked: boolean) => engine.interaction.set('brushOptions', { ...options, pressureAffectsWidth: checked }),
+    [engine, options]
+  );
+
+  const onPressureOpacityToggle = useCallback(
+    (checked: boolean) => engine.interaction.set('brushOptions', { ...options, pressureAffectsOpacity: checked }),
     [engine, options]
   );
 
@@ -114,10 +119,21 @@ export const BrushOptions = ({ engine }: ToolOptionsComponentProps) => {
         w="6rem"
         onValueChange={onOpacityChange}
       />
+      {/*
+        Two independent dots rather than one pressure switch: width and opacity are separate
+        pressure responses, and opacity additionally costs a full scratch refill per frame.
+        Each ToggleDot is an aria-labelled button, so unlike sibling switches sharing a
+        Field.Root they cannot collide on a hidden-input id.
+      */}
       <ToggleDot
-        checked={options.pressureSensitivity}
-        label={t('widgets.canvas.toolOptions.pressureSensitivity')}
-        onCheckedChange={onPressureToggle}
+        checked={options.pressureAffectsWidth}
+        label={t('widgets.canvas.toolOptions.pressureAffectsWidth')}
+        onCheckedChange={onPressureWidthToggle}
+      />
+      <ToggleDot
+        checked={options.pressureAffectsOpacity}
+        label={t('widgets.canvas.toolOptions.pressureAffectsOpacity')}
+        onCheckedChange={onPressureOpacityToggle}
       />
     </HStack>
   );

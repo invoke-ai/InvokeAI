@@ -36,6 +36,8 @@ export interface PaintToolSpec {
   color(ctx: ToolContext): string;
   /** Freehand thinning for this gesture; 0 disables pressure sensitivity. */
   thinning(ctx: ToolContext): number;
+  /** Whether pen pressure modulates alpha along the stroke. Absent means never (eraser). */
+  pressureOpacity?(ctx: ToolContext): boolean;
 }
 
 /** Colour brush strokes paint into a MASK cache: an opaque stencil (only alpha matters). */
@@ -236,6 +238,9 @@ export const createPaintTool = (spec: PaintToolSpec): Tool => {
           // Mask strokes are forced opaque (an alpha stencil is all-or-nothing); a
           // brush-opacity mask stroke would silently attenuate the denoise strength.
           opacity: target.forceOpaque ? 1 : spec.opacity(ctx),
+          // A mask stroke is an all-or-nothing alpha stencil, so pressure must not thin it —
+          // a partially-transparent mask would silently attenuate the denoise strength.
+          pressureOpacity: !target.forceOpaque && (spec.pressureOpacity?.(ctx) ?? false),
           size: spec.size(ctx),
           thinning: spec.thinning(ctx),
           tool: spec.id,
