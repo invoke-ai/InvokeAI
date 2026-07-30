@@ -5,7 +5,7 @@ import type { FormEvent } from 'react';
 
 import { chakra, createListCollection, Dialog, Portal, Stack, Text } from '@chakra-ui/react';
 import { galleryDurability, galleryImages } from '@features/gallery';
-import { invalidateGalleryImages } from '@features/gallery/queries';
+import { invalidateGalleryItems } from '@features/gallery/queries';
 import { runUtilityGraph } from '@features/queue/utility';
 import {
   buildLayerWorkflowGraph,
@@ -373,7 +373,7 @@ export const RunLayerWorkflowDialog = ({
           saveToGallery: galleryDurability.save,
           touchGallery: () => {
             if (isAccountScopeCurrent(owner)) {
-              void invalidateGalleryImages(queryClient, owner);
+              void invalidateGalleryItems(queryClient, owner);
             }
           },
           uploadIntermediate: (blob, signal) => {

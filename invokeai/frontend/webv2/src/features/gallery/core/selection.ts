@@ -1,30 +1,76 @@
 import type { GalleryImage, GeneratedImageContract } from './types';
 
-const isGeneratedImage = (value: unknown): value is GeneratedImageContract =>
-  Boolean(value) && typeof value === 'object' && typeof (value as GeneratedImageContract).imageName === 'string';
+import {
+  galleryImageItemToGalleryImage,
+  isGalleryImageItem,
+  legacyGeneratedImageToGalleryItem,
+  parseGalleryItemKey,
+  type GalleryItem,
+} from './items';
 
-const toGalleryImage = (
+const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === 'object';
+
+const isGeneratedImage = (value: unknown): value is GeneratedImageContract =>
+  isRecord(value) && typeof value.imageName === 'string';
+
+const isGalleryItem = (value: unknown): value is GalleryItem => {
+  if (
+    !isRecord(value) ||
+    (value.kind !== 'image' && value.kind !== 'video') ||
+    typeof value.name !== 'string' ||
+    typeof value.boardId !== 'string' ||
+    typeof value.category !== 'string' ||
+    typeof value.createdAt !== 'string' ||
+    typeof value.fullUrl !== 'string' ||
+    typeof value.height !== 'number' ||
+    typeof value.isIntermediate !== 'boolean' ||
+    typeof value.starred !== 'boolean' ||
+    typeof value.thumbnailUrl !== 'string' ||
+    typeof value.width !== 'number'
+  ) {
+    return false;
+  }
+
+  return value.kind === 'image' || typeof value.durationSeconds === 'number';
+};
+
+const legacyImageToGalleryItem = (
   image: GeneratedImageContract & Partial<GalleryImage>,
   galleryValues: Record<string, unknown>
-): GalleryImage => ({
-  ...image,
-  boardId:
-    image.boardId ?? (typeof galleryValues.selectedBoardId === 'string' ? galleryValues.selectedBoardId : 'none'),
-  imageCategory: image.imageCategory ?? 'general',
-  starred: image.starred ?? false,
-});
+): GalleryItem =>
+  legacyGeneratedImageToGalleryItem({
+    ...image,
+    boardId:
+      image.boardId ?? (typeof galleryValues.selectedBoardId === 'string' ? galleryValues.selectedBoardId : 'none'),
+  });
 
-export const getSelectedGalleryImageFromValues = (galleryValues: Record<string, unknown>): GalleryImage | null => {
+export const getSelectedGalleryItemFromValues = (galleryValues: Record<string, unknown>): GalleryItem | null => {
+  if (isGalleryItem(galleryValues.selectedImage)) {
+    return galleryValues.selectedImage;
+  }
+
   if (isGeneratedImage(galleryValues.selectedImage)) {
-    return toGalleryImage(galleryValues.selectedImage, galleryValues);
+    return legacyImageToGalleryItem(galleryValues.selectedImage, galleryValues);
   }
 
   const selectedImageName =
     typeof galleryValues.selectedImageName === 'string' ? galleryValues.selectedImageName : null;
+  const selectedRef = selectedImageName ? parseGalleryItemKey(selectedImageName) : null;
+
+  if (!selectedRef || selectedRef.kind !== 'image') {
+    return null;
+  }
+
   const recentImages = Array.isArray(galleryValues.recentImages) ? galleryValues.recentImages : [];
   const recentImage = recentImages.find(
-    (image): image is GeneratedImageContract => isGeneratedImage(image) && image.imageName === selectedImageName
+    (image): image is GeneratedImageContract => isGeneratedImage(image) && image.imageName === selectedRef.name
   );
 
-  return recentImage ? toGalleryImage(recentImage, galleryValues) : null;
+  return recentImage ? legacyImageToGalleryItem(recentImage, galleryValues) : null;
+};
+
+export const getSelectedGalleryImageFromValues = (galleryValues: Record<string, unknown>): GalleryImage | null => {
+  const item = getSelectedGalleryItemFromValues(galleryValues);
+
+  return item && isGalleryImageItem(item) ? galleryImageItemToGalleryImage(item) : null;
 };

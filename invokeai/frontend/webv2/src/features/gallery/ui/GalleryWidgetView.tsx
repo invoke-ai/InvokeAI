@@ -10,6 +10,7 @@ import type { GalleryStateView } from './galleryStateView';
 import { GalleryPanelContent } from './GalleryPanelContent';
 import {
   getGalleryPage,
+  getGalleryImageStateView,
   getGalleryProjectBoardId,
   getGallerySearchTerm,
   getGallerySelectedBoardId,
@@ -70,12 +71,13 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
   const gallery = getGalleryStateView(
     galleryValues,
     data.boards,
-    data.images,
-    data.isLoadingImages,
+    data.items,
+    data.isLoadingItems,
     queueItems,
     liveFollowEnabled,
     liveProgressTarget
   );
+  const imageGallery = useMemo(() => getGalleryImageStateView(gallery), [gallery]);
 
   const lastPublishedTotalRef = useRef<number | null>(null);
 
@@ -84,8 +86,8 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
   const onImagesDeleted = useCallback(
     (imageNames: string[]) => {
       const deletedNames = new Set(imageNames);
-      const images = gallery.images;
-      const anchorName = gallery.selectedImageName;
+      const images = imageGallery.images;
+      const anchorName = imageGallery.selectedImageName;
 
       if (!anchorName || !deletedNames.has(anchorName)) {
         return;
@@ -107,7 +109,7 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
         galleryCommands.selectImage(nextImage);
       }
     },
-    [gallery.images, gallery.selectedImageName, galleryCommands]
+    [galleryCommands, imageGallery.images, imageGallery.selectedImageName]
   );
 
   const actions = useGalleryActions({
@@ -161,7 +163,7 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
   }, [galleryCommands, page, settings.paginationMode, total]);
 
   if (region === 'bottom' && presentation !== 'expanded') {
-    return <StatusWidgetChip icon={ImageIcon}>Gallery: {total ?? gallery.images.length}</StatusWidgetChip>;
+    return <StatusWidgetChip icon={ImageIcon}>Gallery: {total ?? gallery.items.length}</StatusWidgetChip>;
   }
 
   return (

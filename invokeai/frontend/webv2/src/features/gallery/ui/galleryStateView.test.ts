@@ -1,3 +1,4 @@
+import type { GalleryImageItem, GalleryItem, GalleryVideoItem } from '@features/gallery/core/items';
 import type { GalleryBoard, GeneratedImageContract } from '@features/gallery/core/types';
 import type { QueueHistoryItemStatus, QueueItem } from '@features/queue/contracts';
 
@@ -34,6 +35,29 @@ const createImage = (imageName: string): GeneratedImageContract => ({
   sourceQueueItemId: 'queue-item-1',
   thumbnailUrl: `/api/v1/images/i/${imageName}/thumbnail`,
   width: 512,
+});
+
+const createImageItem = (name: string): GalleryImageItem => ({
+  boardId: 'none',
+  category: 'general',
+  createdAt: '2026-06-09T00:00:00.000Z',
+  fullUrl: `/api/v1/images/i/${name}/full`,
+  height: 768,
+  isIntermediate: false,
+  kind: 'image',
+  name,
+  sourceQueueItemId: 'queue-item-1',
+  starred: false,
+  thumbnailUrl: `/api/v1/images/i/${name}/thumbnail`,
+  width: 512,
+});
+
+const createVideoItem = (name: string): GalleryVideoItem => ({
+  ...createImageItem(name),
+  durationSeconds: 3,
+  fullUrl: `/api/v1/videos/i/${name}/full`,
+  kind: 'video',
+  thumbnailUrl: `/api/v1/videos/i/${name}/thumbnail`,
 });
 
 const createQueueItem = ({
@@ -96,7 +120,7 @@ describe('gallery state view', () => {
     const values = { recentImages: [createImage('local-fallback.png')], selectedBoardId: 'none' };
     const gallery = getGalleryStateView(values, boards, null, true);
 
-    expect(gallery.images).toEqual([]);
+    expect((gallery as typeof gallery & { items?: GalleryItem[] }).items).toEqual([]);
     expect(gallery.isLoading).toBe(true);
   });
 
@@ -122,26 +146,64 @@ describe('gallery state view', () => {
     });
   });
 
-  it('derives the multi-selection from persisted values with a single-selection fallback', () => {
+  it('qualifies legacy names and preserves ordered mixed-media selection keys', () => {
+    const gallery = getGalleryStateView(
+      { selectedImageNames: ['a.png', 'video:shared', 'image:shared', 7] },
+      boards,
+      [],
+      false
+    ) as ReturnType<typeof getGalleryStateView> & { selectedItemKeys?: string[] };
+
+    expect(gallery.selectedItemKeys).toEqual(['image:a.png', 'video:shared', 'image:shared']);
     expect(
-      getGalleryStateView({ selectedImageNames: ['a.png', 'b.png', 7] }, boards, [], false).selectedImageNames
-    ).toEqual(['a.png', 'b.png']);
-    expect(getGalleryStateView({ selectedImageName: 'a.png' }, boards, [], false).selectedImageNames).toEqual([
-      'a.png',
-    ]);
+      (
+        getGalleryStateView({ selectedImageName: 'a.png' }, boards, [], false) as ReturnType<
+          typeof getGalleryStateView
+        > & { selectedItemKeys?: string[] }
+      ).selectedItemKeys
+    ).toEqual(['image:a.png']);
   });
 
-  it('restores the selection set from a visible primary image after tab switches clear it', () => {
-    const image = createImage('selected.png');
+  it('restores the selection set from a visible primary item after tab switches clear it', () => {
+    const image = createImageItem('selected.png');
     const gallery = getGalleryStateView(
-      { selectedImageName: image.imageName, selectedImageNames: [] },
+      { selectedImageName: 'image:selected.png', selectedImageNames: [] },
       boards,
-      [{ ...image, boardId: 'none', imageCategory: 'general', starred: false }],
+      [image],
       false
-    );
+    ) as ReturnType<typeof getGalleryStateView> & {
+      selectedItemKey?: string | null;
+      selectedItemKeys?: string[];
+    };
 
-    expect(gallery.selectedImageName).toBe(image.imageName);
-    expect(gallery.selectedImageNames).toEqual([image.imageName]);
+    expect(gallery.selectedItemKey).toBe('image:selected.png');
+    expect(gallery.selectedItemKeys).toEqual(['image:selected.png']);
+  });
+
+  it('projects same-name images and videos independently by qualified key', () => {
+    const image = createImageItem('shared');
+    const video = createVideoItem('shared');
+    const gallery = getGalleryStateView(
+      {
+        compareImage: image,
+        selectedImage: video,
+        selectedImageName: 'video:shared',
+        selectedImageNames: ['image:shared', 'video:shared'],
+      },
+      boards,
+      [image, video],
+      false
+    ) as ReturnType<typeof getGalleryStateView> & {
+      compareImageKey?: string | null;
+      items?: GalleryItem[];
+      selectedItemKey?: string | null;
+      selectedItemKeys?: string[];
+    };
+
+    expect(gallery.items?.map((item) => `${item.kind}:${item.name}`)).toEqual(['image:shared', 'video:shared']);
+    expect(gallery.selectedItemKey).toBe('video:shared');
+    expect(gallery.selectedItemKeys).toEqual(['image:shared', 'video:shared']);
+    expect(gallery.compareImageKey).toBe('image:shared');
   });
 
   it('creates placeholders for in-flight gallery queue items on the viewed board', () => {
@@ -297,7 +359,7 @@ describe('gallery state view', () => {
         activePlaceholder: placeholder,
         isComparisonActive: false,
         liveFollowEnabled: true,
-        selectedImageName: 'saved.png',
+        selectedItemKey: 'image:saved.png',
       })
     ).toEqual({ kind: 'placeholder', placeholder });
     expect(
@@ -305,21 +367,16 @@ describe('gallery state view', () => {
         activePlaceholder: placeholder,
         isComparisonActive: false,
         liveFollowEnabled: false,
-        selectedImageName: 'saved.png',
+        selectedItemKey: 'image:saved.png',
       })
-    ).toEqual({ imageName: 'saved.png', kind: 'image' });
+    ).toEqual({ itemKey: 'image:saved.png', kind: 'item' });
   });
 
   it('keeps the visible image selected when the active placeholder belongs to another board', () => {
-    const image = {
-      ...createImage('selected.png'),
-      boardId: 'board-1',
-      imageCategory: 'general',
-      starred: false,
-    } as const;
+    const image = { ...createImageItem('selected.png'), boardId: 'board-1' } as const;
     const activeItem = createQueueItem({ boardId: 'board-2', localId: 'active-other-board', status: 'running' });
     const gallery = getGalleryStateView(
-      { selectedBoardId: 'board-1', selectedImageName: image.imageName },
+      { selectedBoardId: 'board-1', selectedImageName: 'image:selected.png' },
       boards,
       [image],
       false,
@@ -328,7 +385,7 @@ describe('gallery state view', () => {
       { itemIndex: 1, queueItemId: activeItem.id }
     );
 
-    expect(gallery.currentItem).toEqual({ imageName: image.imageName, kind: 'image' });
+    expect(gallery.currentItem).toEqual({ itemKey: 'image:selected.png', kind: 'item' });
   });
 
   it('skips cancelled backend item slots when creating placeholders', () => {
@@ -379,12 +436,7 @@ describe('gallery state view', () => {
 
   it('hides only pending placeholders when the persisted setting is disabled', () => {
     const queueItems = [createQueueItem({ boardId: 'none', status: 'pending' })];
-    const image = {
-      ...createImage('completed.png'),
-      boardId: 'none',
-      imageCategory: 'general',
-      starred: false,
-    } as const;
+    const image = createImageItem('completed.png');
     const gallery = getGalleryStateView(
       { selectedBoardId: 'none', showPendingItems: false },
       boards,
@@ -394,7 +446,7 @@ describe('gallery state view', () => {
     );
 
     expect(gallery.pendingPlaceholders).toEqual([]);
-    expect(gallery.images).toEqual([image]);
+    expect((gallery as typeof gallery & { items?: GalleryItem[] }).items).toEqual([image]);
     expect(gallery.settings.showPendingItems).toBe(false);
   });
 });

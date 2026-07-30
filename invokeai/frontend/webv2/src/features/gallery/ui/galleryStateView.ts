@@ -1,14 +1,17 @@
-import type {
-  GalleryBoard,
-  GalleryImage,
-  GalleryOrderDir,
-  GalleryView,
-  GeneratedImageContract,
-} from '@features/gallery/core/types';
+import type { GalleryBoard, GalleryImage, GalleryOrderDir, GalleryView } from '@features/gallery/core/types';
 import type { QueueItem } from '@features/queue/contracts';
 
-import { normalizeGalleryImage } from '@features/gallery/core/image';
+import {
+  galleryImageItemToGalleryImage,
+  isGalleryImageItem,
+  legacyGeneratedImageToGalleryItem,
+  parseGalleryItemKey,
+  toGalleryItemKey,
+  type GalleryItem,
+  type GalleryItemKey,
+} from '@features/gallery/core/items';
 import { getBoundedRecentImages } from '@features/gallery/core/recentImages';
+import { getSelectedGalleryImageFromValues, getSelectedGalleryItemFromValues } from '@features/gallery/core/selection';
 import { getGallerySettings, type GallerySettings } from '@features/gallery/core/settings';
 import { getQueueItemSnapshotBatchCount, getQueueItemSnapshotDimensions } from '@features/queue/contracts';
 
@@ -53,23 +56,23 @@ export interface GalleryGenerationSequence {
 }
 
 export type GalleryCurrentItem =
-  | { kind: 'image'; imageName: string }
+  | { kind: 'item'; itemKey: GalleryItemKey }
   | { kind: 'placeholder'; placeholder: GalleryQueuePlaceholder }
   | null;
 
 export interface GalleryStateView {
   boards: GalleryBoard[];
-  compareImageName: string | null;
+  compareImageKey: GalleryItemKey | null;
   currentItem: GalleryCurrentItem;
   galleryView: GalleryView;
-  images: GalleryImage[];
+  items: GalleryItem[];
   isLoading: boolean;
   pendingPlaceholders: GalleryQueuePlaceholder[];
   projectBoardId: string | null;
   searchTerm: string;
   selectedBoardId: string;
-  selectedImageName: string | null;
-  selectedImageNames: string[];
+  selectedItemKey: GalleryItemKey | null;
+  selectedItemKeys: GalleryItemKey[];
   settings: GallerySettings;
 }
 
@@ -196,18 +199,18 @@ export const getGalleryCurrentItem = ({
   activePlaceholder,
   isComparisonActive,
   liveFollowEnabled,
-  selectedImageName,
+  selectedItemKey,
 }: {
   activePlaceholder: GalleryQueuePlaceholder | null;
   isComparisonActive: boolean;
   liveFollowEnabled: boolean;
-  selectedImageName: string | null;
+  selectedItemKey: GalleryItemKey | null;
 }): GalleryCurrentItem => {
   if (liveFollowEnabled && !isComparisonActive && activePlaceholder) {
     return { kind: 'placeholder', placeholder: activePlaceholder };
   }
 
-  return selectedImageName ? { imageName: selectedImageName, kind: 'image' } : null;
+  return selectedItemKey ? { itemKey: selectedItemKey, kind: 'item' } : null;
 };
 
 export const getGalleryView = (values: Record<string, unknown>): GalleryView =>
@@ -226,12 +229,22 @@ export const getGallerySelectedBoardId = (values: Record<string, unknown>, backe
   return 'none';
 };
 
-export const getGallerySelectedImageNames = (values: Record<string, unknown>): string[] => {
+const canonicalizePersistedItemKey = (key: string): GalleryItemKey => toGalleryItemKey(parseGalleryItemKey(key));
+
+export const getGallerySelectedItemKeys = (values: Record<string, unknown>): GalleryItemKey[] => {
   if (Array.isArray(values.selectedImageNames)) {
-    return (values.selectedImageNames as unknown[]).filter((name): name is string => typeof name === 'string');
+    return (values.selectedImageNames as unknown[])
+      .filter((name): name is string => typeof name === 'string')
+      .map(canonicalizePersistedItemKey);
   }
 
-  return typeof values.selectedImageName === 'string' ? [values.selectedImageName] : [];
+  if (typeof values.selectedImageName === 'string') {
+    return [canonicalizePersistedItemKey(values.selectedImageName)];
+  }
+
+  const selectedItem = getSelectedGalleryItemFromValues(values);
+
+  return selectedItem ? [toGalleryItemKey(selectedItem)] : [];
 };
 
 export const getGalleryPage = (values: Record<string, unknown>): number =>
@@ -297,19 +310,12 @@ export const getGalleryTotalImages = (values: Record<string, unknown>): number |
 export const getGalleryProjectBoardId = (values: Record<string, unknown>): string | null =>
   typeof values.projectBoardId === 'string' ? values.projectBoardId : null;
 
-export const getGalleryCompareImage = (values: Record<string, unknown>): GeneratedImageContract | null => {
-  const compareImage = values.compareImage;
-
-  if (
-    compareImage &&
-    typeof compareImage === 'object' &&
-    typeof (compareImage as GeneratedImageContract).imageName === 'string'
-  ) {
-    return compareImage as GeneratedImageContract;
-  }
-
-  return null;
-};
+export const getGalleryCompareImage = (values: Record<string, unknown>): GalleryImage | null =>
+  getSelectedGalleryImageFromValues({
+    selectedBoardId: values.selectedBoardId,
+    selectedImage: values.compareImage,
+    selectedImageName: null,
+  });
 
 export const getGalleryQueuePlaceholders = (
   queueItems: QueueItem[],
@@ -349,28 +355,45 @@ const getVisibleGalleryQueuePlaceholders = (
 export const getGalleryStateView = (
   values: Record<string, unknown>,
   backendBoards: GalleryBoard[],
-  backendImages: GalleryImage[] | null,
+  backendItems: GalleryItem[] | null,
   isLoading: boolean,
   queueItems: QueueItem[] = [],
   liveFollowEnabled = false,
   liveTarget: GalleryLiveTarget | null = null
 ): GalleryStateView => {
-  const localImages = getBoundedRecentImages(values.recentImages).map((image) => normalizeGalleryImage(image));
-  const images = backendImages ?? (isLoading ? [] : localImages);
-  const selectedImageName = typeof values.selectedImageName === 'string' ? values.selectedImageName : null;
-  const visibleSelectedImageName = images.some((image) => image.imageName === selectedImageName)
-    ? selectedImageName
-    : null;
-  const selectedImageNames = getGallerySelectedImageNames(values);
+  const localItems = getBoundedRecentImages(values.recentImages).map(legacyGeneratedImageToGalleryItem);
+  const items = backendItems ?? (isLoading ? [] : localItems);
+  const selectedItem = getSelectedGalleryItemFromValues(values);
+  const persistedSelectedItemKey =
+    typeof values.selectedImageName === 'string'
+      ? canonicalizePersistedItemKey(values.selectedImageName)
+      : selectedItem
+        ? toGalleryItemKey(selectedItem)
+        : null;
+  const visibleSelectedItemKey =
+    persistedSelectedItemKey && items.some((item) => toGalleryItemKey(item) === persistedSelectedItemKey)
+      ? persistedSelectedItemKey
+      : null;
+  const selectedItemKeys = getGallerySelectedItemKeys(values);
   const galleryView = getGalleryView(values);
   const settings = getGallerySettings(values);
   const searchTerm = getGallerySearchTerm(values);
-  const boards = backendBoards.length ? backendBoards : [{ ...UNCATEGORIZED_BOARD, imageCount: images.length }];
+  const boards = backendBoards.length
+    ? backendBoards
+    : [
+        {
+          ...UNCATEGORIZED_BOARD,
+          imageCount: items.filter((item) => item.kind === 'image' && item.category === 'general').length,
+          videoCount: items.filter((item) => item.kind === 'video').length,
+        },
+      ];
   const selectedBoardId = getGallerySelectedBoardId(values, backendBoards);
   const compareImage = getGalleryCompareImage(values);
-  const compareImageName = compareImage?.imageName ?? null;
+  const compareImageKey = compareImage ? toGalleryItemKey({ kind: 'image', name: compareImage.imageName }) : null;
   const isComparisonActive =
-    visibleSelectedImageName !== null && compareImageName !== null && compareImageName !== visibleSelectedImageName;
+    visibleSelectedItemKey?.startsWith('image:') === true &&
+    compareImageKey !== null &&
+    compareImageKey !== visibleSelectedItemKey;
   const generationSequence = getGalleryGenerationSequence(queueItems, liveTarget);
   const visibleActivePlaceholder =
     settings.showPendingItems && galleryView === 'images' && searchTerm.trim() === ''
@@ -382,15 +405,15 @@ export const getGalleryStateView = (
     activePlaceholder: visibleActivePlaceholder,
     isComparisonActive,
     liveFollowEnabled,
-    selectedImageName: visibleSelectedImageName,
+    selectedItemKey: visibleSelectedItemKey,
   });
 
   return {
     boards,
-    compareImageName,
+    compareImageKey,
     currentItem,
     galleryView,
-    images,
+    items,
     isLoading,
     pendingPlaceholders: settings.showPendingItems
       ? getVisibleGalleryQueuePlaceholders(generationSequence.chronologicalSlots, {
@@ -403,14 +426,41 @@ export const getGalleryStateView = (
     projectBoardId: getGalleryProjectBoardId(values),
     searchTerm,
     selectedBoardId,
-    selectedImageName: visibleSelectedImageName,
-    selectedImageNames:
-      visibleSelectedImageName && !selectedImageNames.includes(visibleSelectedImageName)
-        ? [visibleSelectedImageName, ...selectedImageNames]
-        : selectedImageNames,
+    selectedItemKey: visibleSelectedItemKey,
+    selectedItemKeys:
+      visibleSelectedItemKey && !selectedItemKeys.includes(visibleSelectedItemKey)
+        ? [visibleSelectedItemKey, ...selectedItemKeys]
+        : selectedItemKeys,
     settings,
   };
 };
+
+export interface GalleryImageStateView extends GalleryStateView {
+  compareImageName: string | null;
+  images: GalleryImage[];
+  selectedImageName: string | null;
+  selectedImageNames: string[];
+}
+
+/**
+ * TODO(Task 6): Remove when the Gallery grid renders `GalleryItem` directly.
+ * This is the only image-only Gallery projection and it narrows by kind before
+ * producing any `GalleryImage` contract.
+ */
+export const getGalleryImageStateView = (gallery: GalleryStateView): GalleryImageStateView => ({
+  ...gallery,
+  compareImageName: gallery.compareImageKey ? parseGalleryItemKey(gallery.compareImageKey).name : null,
+  images: gallery.items.filter(isGalleryImageItem).map(galleryImageItemToGalleryImage),
+  selectedImageName:
+    gallery.selectedItemKey && parseGalleryItemKey(gallery.selectedItemKey).kind === 'image'
+      ? parseGalleryItemKey(gallery.selectedItemKey).name
+      : null,
+  selectedImageNames: gallery.selectedItemKeys.flatMap((key) => {
+    const ref = parseGalleryItemKey(key);
+
+    return ref.kind === 'image' ? [ref.name] : [];
+  }),
+});
 
 export const getBoardCounts = (board: GalleryBoard): { assetCount: number; imageCount: number } => ({
   assetCount: board.assetCount,

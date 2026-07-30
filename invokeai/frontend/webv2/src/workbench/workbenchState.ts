@@ -43,8 +43,15 @@ import type {
 import {
   getBoundedRecentImages,
   getGallerySettings,
+  getSelectedGalleryItemFromValues,
+  legacyGeneratedImageToGalleryItem,
   normalizeGalleryImage,
+  parseGalleryItemKey,
+  toGalleryItemKey,
   type GalleryImage,
+  type GalleryImageItem,
+  type GalleryItem,
+  type GalleryItemKey,
   type GallerySettings,
   type GeneratedImageContract,
 } from '@features/gallery/contracts';
@@ -247,15 +254,15 @@ type WorkbenchReducerAction =
   | { type: 'routeQueueItemResults'; projectId: string; queueItemId: string; images: GeneratedImageContract[] }
   | { type: 'appendCanvasStagingCandidate'; projectId: string; candidate: CanvasStagingCandidateContract }
   | {
-      type: 'selectGalleryImage';
-      image: GeneratedImageContract;
+      type: 'selectGalleryItem';
+      item: GalleryItem;
       preserveNavigationQuery?: boolean;
       projectId?: string;
       selectionPage?: number;
     }
-  | { type: 'toggleGalleryImageInSelection'; image: GeneratedImageContract; projectId?: string }
-  | { type: 'setGalleryMultiSelection'; imageNames: string[]; primaryImage: GeneratedImageContract; projectId?: string }
-  | { type: 'setGalleryCompareImage'; image: GeneratedImageContract | null; projectId?: string }
+  | { type: 'toggleGalleryItemInSelection'; item: GalleryItem; projectId?: string }
+  | { type: 'setGalleryMultiSelection'; itemKeys: GalleryItemKey[]; primaryItem: GalleryItem; projectId?: string }
+  | { type: 'setGalleryCompareImage'; image: GalleryImageItem | null; projectId?: string }
   | { type: 'selectGalleryBoard'; boardId: string; projectId?: string }
   | { type: 'setGalleryView'; galleryView: 'images' | 'assets'; projectId?: string }
   | { type: 'setGallerySearchTerm'; searchTerm: string; projectId?: string }
@@ -263,12 +270,24 @@ type WorkbenchReducerAction =
   | { type: 'setGalleryPage'; page: number; projectId?: string }
   | { type: 'setGalleryPageInfo'; totalImages: number; projectId?: string }
   | {
-      type: 'patchGalleryImages';
-      changes: Partial<Pick<GalleryImage, 'boardId' | 'starred'>>;
-      imageNames: string[];
+      type: 'patchGalleryItems';
+      changes: Partial<Pick<GalleryItem, 'boardId' | 'starred'>>;
+      itemKeys: GalleryItemKey[];
     }
-  | { type: 'removeGalleryImages'; imageNames: string[] }
-  | { type: 'reconcileDeletedGalleryBoard'; boardId: string; includeImages: boolean }
+  | { type: 'removeGalleryItems'; itemKeys: GalleryItemKey[] }
+  | {
+      type: 'reconcileDeletedGalleryBoard';
+      boardId: string;
+      deletedImageNames: string[];
+      deletedVideoNames: string[];
+      failedImageNames: string[];
+      failedVideoNames: string[];
+    }
+  /**
+   * TODO(Task 7): Remove after board deletion returns and forwards the
+   * authoritative per-kind outcome arrays.
+   */
+  | { type: 'reconcileDeletedGalleryBoardLegacy'; boardId: string; includeImages: boolean }
   | { type: 'setGalleryProjectBoardId'; boardId: string; projectId?: string }
   | {
       type: 'applyCanvasProjectMutation';
@@ -690,13 +709,30 @@ const clampCanvasStagingSelection = (project: Project): Project => {
 const getGalleryImages = (values: Record<string, unknown>): GeneratedImageContract[] =>
   getBoundedRecentImages(values.recentImages);
 
-const getGallerySelectedImageNames = (values: Record<string, unknown>): string[] => {
+const canonicalizeGalleryItemKey = (key: string): GalleryItemKey => toGalleryItemKey(parseGalleryItemKey(key));
+
+const getGallerySelectedItemKeys = (values: Record<string, unknown>): GalleryItemKey[] => {
   if (Array.isArray(values.selectedImageNames)) {
-    return (values.selectedImageNames as unknown[]).filter((name): name is string => typeof name === 'string');
+    return (values.selectedImageNames as unknown[])
+      .filter((name): name is string => typeof name === 'string')
+      .map(canonicalizeGalleryItemKey);
   }
 
-  return typeof values.selectedImageName === 'string' ? [values.selectedImageName] : [];
+  if (typeof values.selectedImageName === 'string') {
+    return [canonicalizeGalleryItemKey(values.selectedImageName)];
+  }
+
+  const selectedItem = getSelectedGalleryItemFromValues(values);
+
+  return selectedItem ? [toGalleryItemKey(selectedItem)] : [];
 };
+
+const getGalleryItemFromPersistedValue = (values: Record<string, unknown>, value: unknown): GalleryItem | null =>
+  getSelectedGalleryItemFromValues({
+    selectedBoardId: values.selectedBoardId,
+    selectedImage: value,
+    selectedImageName: null,
+  });
 
 /**
  * Deep-clones an already-v2 canvas state and normalizes staging candidate placements. Not a
@@ -1761,32 +1797,127 @@ const updateAllProjectGalleryValues = (
   return didChange ? { ...state, projects } : state;
 };
 
-const removeGalleryImagesFromAllProjects = (
+const patchGalleryItemsAcrossProjects = (
   state: WorkbenchState,
-  removedImageNames: ReadonlySet<string>
+  itemKeys: ReadonlySet<GalleryItemKey>,
+  changes: Partial<Pick<GalleryItem, 'boardId' | 'starred'>>
 ): WorkbenchState => {
-  if (removedImageNames.size === 0) {
+  if (itemKeys.size === 0) {
     return state;
   }
 
+  return updateAllProjectGalleryValues(state, (values) => {
+    let didChange = false;
+    const patchPersistedItem = (value: unknown, imageOnly = false): unknown => {
+      const item = getGalleryItemFromPersistedValue(values, value);
+
+      if (!item || (imageOnly && item.kind !== 'image') || !itemKeys.has(toGalleryItemKey(item))) {
+        return value;
+      }
+
+      didChange = true;
+      return { ...item, ...changes };
+    };
+    const recentImages = getGalleryImages(values).map((image) => {
+      if (!itemKeys.has(toGalleryItemKey({ kind: 'image', name: image.imageName }))) {
+        return image;
+      }
+
+      didChange = true;
+      return { ...image, ...changes };
+    });
+    const selectedImage = patchPersistedItem(values.selectedImage);
+    const compareImage = patchPersistedItem(values.compareImage, true);
+    const selectedImageMoved = changes.boardId !== undefined && selectedImage !== values.selectedImage;
+    const selectedImageQuery =
+      selectedImageMoved && values.selectedImageQuery && typeof values.selectedImageQuery === 'object'
+        ? {
+            ...(values.selectedImageQuery as Record<string, unknown>),
+            boardId: changes.boardId,
+            page: 0,
+            paginationMode: 'infinite',
+            searchTerm: '',
+          }
+        : values.selectedImageQuery;
+
+    return didChange
+      ? {
+          ...values,
+          compareImage,
+          recentImages,
+          selectedImage,
+          ...(selectedImageMoved ? { selectedImagePage: 0, selectedImageQuery } : {}),
+        }
+      : values;
+  });
+};
+
+const getLocallyKnownGalleryItemsOnBoard = (
+  state: WorkbenchState,
+  boardId: string
+): Map<GalleryItemKey, GalleryItem> => {
+  const items = new Map<GalleryItemKey, GalleryItem>();
+
+  for (const project of state.projects) {
+    const values = getWidgetValues(project, 'gallery');
+    const candidates: GalleryItem[] = [
+      ...getGalleryImages(values).map((image) => legacyGeneratedImageToGalleryItem(image)),
+      ...[values.selectedImage, values.compareImage].flatMap((value) => {
+        const item = getGalleryItemFromPersistedValue(values, value);
+
+        return item ? [item] : [];
+      }),
+    ];
+
+    for (const item of candidates) {
+      if (item.boardId === boardId) {
+        items.set(toGalleryItemKey(item), item);
+      }
+    }
+  }
+
+  return items;
+};
+
+const removeGalleryItemsFromAllProjects = (
+  state: WorkbenchState,
+  removedItemKeys: ReadonlySet<GalleryItemKey>
+): WorkbenchState => {
+  if (removedItemKeys.size === 0) {
+    return state;
+  }
+
+  const removedImageNames = new Set(
+    [...removedItemKeys].flatMap((key) => {
+      const ref = parseGalleryItemKey(key);
+
+      return ref.kind === 'image' ? [ref.name] : [];
+    })
+  );
   let didChange = false;
   const projects = state.projects.map((project) => {
-    const withoutGalleryImages = updateProjectWidgetValues(project, 'gallery', (values) => {
-      const selectedImage = values.selectedImage as GeneratedImageContract | null | undefined;
-      const compareImage = values.compareImage as GeneratedImageContract | null | undefined;
+    const withoutGalleryItems = updateProjectWidgetValues(project, 'gallery', (values) => {
+      const selectedImage = values.selectedImage;
+      const compareImage = values.compareImage;
       const selectedImageName = typeof values.selectedImageName === 'string' ? values.selectedImageName : null;
       const recentImages = getGalleryImages(values);
-      const selectedImageNames = getGallerySelectedImageNames(values);
-      const nextRecentImages = recentImages.filter((image) => !removedImageNames.has(image.imageName));
-      const nextSelectedImageNames = selectedImageNames.filter((name) => !removedImageNames.has(name));
-      const nextSelectedImage = selectedImage && removedImageNames.has(selectedImage.imageName) ? null : selectedImage;
-      const nextCompareImage = compareImage && removedImageNames.has(compareImage.imageName) ? null : compareImage;
-      const nextSelectedImageName =
-        selectedImageName && removedImageNames.has(selectedImageName) ? null : selectedImageName;
+      const selectedItemKeys = getGallerySelectedItemKeys(values);
+      const selectedItem = getGalleryItemFromPersistedValue(values, selectedImage);
+      const compareItem = getGalleryItemFromPersistedValue(values, compareImage);
+      const selectedImageKey = selectedItem ? toGalleryItemKey(selectedItem) : null;
+      const compareImageKey = compareItem ? toGalleryItemKey(compareItem) : null;
+      const selectedNameKey = selectedImageName ? canonicalizeGalleryItemKey(selectedImageName) : null;
+      const nextRecentImages = recentImages.filter(
+        (image) => !removedItemKeys.has(toGalleryItemKey({ kind: 'image', name: image.imageName }))
+      );
+      const nextSelectedItemKeys = selectedItemKeys.filter((key) => !removedItemKeys.has(key));
+      const nextSelectedImage = selectedImageKey && removedItemKeys.has(selectedImageKey) ? null : selectedImage;
+      const nextCompareImage = compareImageKey && removedItemKeys.has(compareImageKey) ? null : compareImage;
+      const nextSelectedImageName = selectedNameKey && removedItemKeys.has(selectedNameKey) ? null : selectedImageName;
 
       if (
         nextRecentImages.length === recentImages.length &&
-        nextSelectedImageNames.length === selectedImageNames.length &&
+        nextSelectedItemKeys.length === selectedItemKeys.length &&
         nextSelectedImage === selectedImage &&
         nextCompareImage === compareImage &&
         nextSelectedImageName === selectedImageName
@@ -1800,10 +1931,10 @@ const removeGalleryImagesFromAllProjects = (
         recentImages: nextRecentImages,
         selectedImage: nextSelectedImage,
         selectedImageName: nextSelectedImageName,
-        selectedImageNames: nextSelectedImageNames,
+        selectedImageNames: nextSelectedItemKeys,
       };
     });
-    const withoutUpscaleInput = updateProjectWidgetValues(withoutGalleryImages, 'upscale', (rawValues) => {
+    const withoutUpscaleInput = updateProjectWidgetValues(withoutGalleryItems, 'upscale', (rawValues) => {
       const values = normalizeUpscaleWidgetValues(rawValues);
 
       if (!values?.inputImage || !removedImageNames.has(values.inputImage.image_name)) {
@@ -1818,6 +1949,55 @@ const removeGalleryImagesFromAllProjects = (
   });
 
   return didChange ? { ...state, projects } : state;
+};
+
+const reconcileDeletedGalleryBoard = (
+  state: WorkbenchState,
+  boardId: string,
+  deletedItemKeys: ReadonlySet<GalleryItemKey>
+): WorkbenchState => {
+  const survivingItemKeys = new Set(
+    [...getLocallyKnownGalleryItemsOnBoard(state, boardId).keys()].filter((key) => !deletedItemKeys.has(key))
+  );
+  const withoutDeletedItems = removeGalleryItemsFromAllProjects(state, deletedItemKeys);
+  const withSurvivorsMoved = patchGalleryItemsAcrossProjects(withoutDeletedItems, survivingItemKeys, {
+    boardId: 'none',
+  });
+  const withBoardReferencesCleared = updateAllProjectGalleryValues(withSurvivorsMoved, (values) => {
+    const selectedBoardWasDeleted = values.selectedBoardId === boardId;
+    const projectBoardWasDeleted = values.projectBoardId === boardId;
+
+    if (!selectedBoardWasDeleted && !projectBoardWasDeleted) {
+      return values;
+    }
+
+    return {
+      ...values,
+      ...(selectedBoardWasDeleted ? { galleryPage: 0, selectedBoardId: 'none' } : {}),
+      ...(projectBoardWasDeleted ? { projectBoardId: null } : {}),
+    };
+  });
+  let didChangeQueue = false;
+  const projects = withBoardReferencesCleared.projects.map((project) => {
+    let didChangeItems = false;
+    const items = project.queue.items.map((item) => {
+      if ((item.status !== 'pending' && item.status !== 'running') || item.snapshot.galleryBoardId !== boardId) {
+        return item;
+      }
+
+      didChangeItems = true;
+      return { ...item, snapshot: { ...item.snapshot, galleryBoardId: 'none' } };
+    });
+
+    if (!didChangeItems) {
+      return project;
+    }
+
+    didChangeQueue = true;
+    return { ...project, queue: { ...project.queue, items } };
+  });
+
+  return didChangeQueue ? { ...withBoardReferencesCleared, projects } : withBoardReferencesCleared;
 };
 
 const updateGalleryValuesAndPauseLiveFollow = (
@@ -1915,14 +2095,16 @@ const updateGalleryWithResultImages = (project: Project, images: GeneratedImageC
   const shouldSelectIncomingImage =
     project.settings.showProgressImagesInViewer || typeof galleryValues.selectedImageName !== 'string';
   const nextSelectedImage = shouldSelectIncomingImage ? newImages[0] : undefined;
+  const nextSelectedItem = nextSelectedImage ? legacyGeneratedImageToGalleryItem(nextSelectedImage) : undefined;
+  const nextSelectedItemKey = nextSelectedItem ? toGalleryItemKey(nextSelectedItem) : undefined;
   const gallerySettings = getGallerySettings(galleryValues);
 
   return updateProjectWidgetValues(project, 'gallery', () => ({
     ...galleryValues,
     recentImages: getBoundedRecentImages([...newImages, ...previousImages]),
-    selectedImage: nextSelectedImage ?? galleryValues.selectedImage,
-    selectedImageName: nextSelectedImage?.imageName ?? galleryValues.selectedImageName,
-    selectedImageNames: nextSelectedImage ? [nextSelectedImage.imageName] : getGallerySelectedImageNames(galleryValues),
+    selectedImage: nextSelectedItem ?? galleryValues.selectedImage,
+    selectedImageName: nextSelectedItemKey ?? galleryValues.selectedImageName,
+    selectedImageNames: nextSelectedItemKey ? [nextSelectedItemKey] : getGallerySelectedItemKeys(galleryValues),
     ...(nextSelectedImage
       ? {
           selectedImagePage: 0,
@@ -2878,7 +3060,7 @@ export const __workbenchReducerInternal = (
         appendCanvasStagingCandidate(project, action.candidate)
       );
     }
-    case 'selectGalleryImage': {
+    case 'selectGalleryItem': {
       return updateGalleryValuesAndPauseLiveFollow(
         state,
         (values) => {
@@ -2905,12 +3087,14 @@ export const __workbenchReducerInternal = (
                   searchTerm: typeof values.searchTerm === 'string' ? values.searchTerm : '',
                   starredFirst: settings.starredFirst,
                 };
+          const itemKey = toGalleryItemKey(action.item);
 
           return {
             ...values,
-            selectedImage: action.image,
-            selectedImageName: action.image.imageName,
-            selectedImageNames: [action.image.imageName],
+            ...(action.item.kind === 'video' ? { compareImage: null } : {}),
+            selectedImage: action.item,
+            selectedImageName: itemKey,
+            selectedImageNames: [itemKey],
             selectedImagePage,
             selectedImageQuery,
           };
@@ -2918,14 +3102,14 @@ export const __workbenchReducerInternal = (
         action.projectId
       );
     }
-    case 'toggleGalleryImageInSelection': {
+    case 'toggleGalleryItemInSelection': {
       return updateGalleryValuesAndPauseLiveFollow(
         state,
         (values) => {
-          const imageName = action.image.imageName;
-          const selectedImageNames = getGallerySelectedImageNames(values);
+          const itemKey = toGalleryItemKey(action.item);
+          const selectedItemKeys = getGallerySelectedItemKeys(values);
 
-          if (!selectedImageNames.includes(imageName)) {
+          if (!selectedItemKeys.includes(itemKey)) {
             const settings = getGallerySettings(values);
             const selectedImagePage =
               typeof values.galleryPage === 'number' && Number.isFinite(values.galleryPage)
@@ -2934,9 +3118,10 @@ export const __workbenchReducerInternal = (
 
             return {
               ...values,
-              selectedImage: action.image,
-              selectedImageName: imageName,
-              selectedImageNames: [...selectedImageNames, imageName],
+              ...(action.item.kind === 'video' ? { compareImage: null } : {}),
+              selectedImage: action.item,
+              selectedImageName: itemKey,
+              selectedImageNames: [...selectedItemKeys, itemKey],
               selectedImagePage,
               selectedImageQuery: {
                 boardId: typeof values.selectedBoardId === 'string' ? values.selectedBoardId : 'none',
@@ -2950,16 +3135,23 @@ export const __workbenchReducerInternal = (
             };
           }
 
-          const remainingImageNames = selectedImageNames.filter((name) => name !== imageName);
-          const wasPrimary = values.selectedImageName === imageName;
+          const remainingItemKeys = selectedItemKeys.filter((key) => key !== itemKey);
+          const selectedItem = getSelectedGalleryItemFromValues(values);
+          const selectedItemKey =
+            typeof values.selectedImageName === 'string'
+              ? canonicalizeGalleryItemKey(values.selectedImageName)
+              : selectedItem
+                ? toGalleryItemKey(selectedItem)
+                : null;
+          const wasPrimary = selectedItemKey === itemKey;
 
           return {
             ...values,
             selectedImage: wasPrimary ? null : values.selectedImage,
             selectedImageName: wasPrimary
-              ? (remainingImageNames[remainingImageNames.length - 1] ?? null)
+              ? (remainingItemKeys[remainingItemKeys.length - 1] ?? null)
               : values.selectedImageName,
-            selectedImageNames: remainingImageNames,
+            selectedImageNames: remainingItemKeys,
           };
         },
         action.projectId
@@ -2977,9 +3169,10 @@ export const __workbenchReducerInternal = (
 
           return {
             ...values,
-            selectedImage: action.primaryImage,
-            selectedImageName: action.primaryImage.imageName,
-            selectedImageNames: action.imageNames,
+            ...(action.primaryItem.kind === 'video' ? { compareImage: null } : {}),
+            selectedImage: action.primaryItem,
+            selectedImageName: toGalleryItemKey(action.primaryItem),
+            selectedImageNames: action.itemKeys,
             selectedImagePage,
             selectedImageQuery: {
               boardId: typeof values.selectedBoardId === 'string' ? values.selectedBoardId : 'none',
@@ -3075,160 +3268,28 @@ export const __workbenchReducerInternal = (
         action.projectId
       );
     }
-    case 'patchGalleryImages': {
-      const imageNames = new Set(action.imageNames);
-
-      return updateAllProjectGalleryValues(state, (values) => {
-        let didChange = false;
-        const patchImage = (value: unknown): unknown => {
-          if (
-            !value ||
-            typeof value !== 'object' ||
-            typeof (value as Partial<GeneratedImageContract>).imageName !== 'string' ||
-            !imageNames.has((value as GeneratedImageContract).imageName)
-          ) {
-            return value;
-          }
-
-          didChange = true;
-          return { ...value, ...action.changes };
-        };
-        const recentImages = getGalleryImages(values).map(patchImage) as GeneratedImageContract[];
-        const selectedImage = patchImage(values.selectedImage);
-        const compareImage = patchImage(values.compareImage);
-        const selectedImageMoved = action.changes.boardId !== undefined && selectedImage !== values.selectedImage;
-        const selectedImageQuery =
-          selectedImageMoved && values.selectedImageQuery && typeof values.selectedImageQuery === 'object'
-            ? {
-                ...(values.selectedImageQuery as Record<string, unknown>),
-                boardId: action.changes.boardId,
-                page: 0,
-                paginationMode: 'infinite',
-                searchTerm: '',
-              }
-            : values.selectedImageQuery;
-
-        return didChange
-          ? {
-              ...values,
-              compareImage,
-              recentImages,
-              selectedImage,
-              ...(selectedImageMoved ? { selectedImagePage: 0, selectedImageQuery } : {}),
-            }
-          : values;
-      });
+    case 'patchGalleryItems': {
+      return patchGalleryItemsAcrossProjects(state, new Set(action.itemKeys), action.changes);
     }
-    case 'removeGalleryImages': {
-      return removeGalleryImagesFromAllProjects(state, new Set(action.imageNames));
+    case 'removeGalleryItems': {
+      return removeGalleryItemsFromAllProjects(state, new Set(action.itemKeys));
     }
     case 'reconcileDeletedGalleryBoard': {
-      const imageNames = new Set<string>();
+      const deletedItemKeys = new Set<GalleryItemKey>([
+        ...action.deletedImageNames.map((name) => toGalleryItemKey({ kind: 'image', name })),
+        ...action.deletedVideoNames.map((name) => toGalleryItemKey({ kind: 'video', name })),
+      ]);
 
-      for (const project of state.projects) {
-        const values = getWidgetValues(project, 'gallery');
-        const candidates = [
-          ...getGalleryImages(values),
-          values.selectedImage as GeneratedImageContract | null | undefined,
-          values.compareImage as GeneratedImageContract | null | undefined,
-        ];
+      // Failed and otherwise unconfirmed local items survive. The reconciler
+      // moves every locally known key not confirmed deleted to Uncategorized.
+      return reconcileDeletedGalleryBoard(state, action.boardId, deletedItemKeys);
+    }
+    case 'reconcileDeletedGalleryBoardLegacy': {
+      const deletedItemKeys = action.includeImages
+        ? new Set(getLocallyKnownGalleryItemsOnBoard(state, action.boardId).keys())
+        : new Set<GalleryItemKey>();
 
-        for (const candidate of candidates) {
-          if (
-            candidate &&
-            typeof candidate === 'object' &&
-            (candidate as Partial<GalleryImage>).boardId === action.boardId
-          ) {
-            imageNames.add(candidate.imageName);
-          }
-        }
-      }
-
-      const reconciledState = action.includeImages
-        ? removeGalleryImagesFromAllProjects(state, imageNames)
-        : updateAllProjectGalleryValues(state, (values) => {
-            let didChange = false;
-            const patchBoard = (value: unknown): unknown => {
-              if (!value || typeof value !== 'object' || (value as Partial<GalleryImage>).boardId !== action.boardId) {
-                return value;
-              }
-
-              didChange = true;
-              return { ...value, boardId: 'none' };
-            };
-            const recentImages = getGalleryImages(values).map(patchBoard) as GeneratedImageContract[];
-            const selectedImage = patchBoard(values.selectedImage);
-            const compareImage = patchBoard(values.compareImage);
-            const selectedImageMoved = selectedImage !== values.selectedImage;
-
-            return didChange
-              ? {
-                  ...values,
-                  compareImage,
-                  recentImages,
-                  selectedImage,
-                  ...(selectedImageMoved
-                    ? {
-                        selectedImagePage: 0,
-                        selectedImageQuery: {
-                          ...(values.selectedImageQuery && typeof values.selectedImageQuery === 'object'
-                            ? (values.selectedImageQuery as Record<string, unknown>)
-                            : {}),
-                          boardId: 'none',
-                          page: 0,
-                          paginationMode: 'infinite',
-                          searchTerm: '',
-                        },
-                      }
-                    : {}),
-                }
-              : values;
-          });
-
-      const boardReferencesState = updateAllProjectGalleryValues(reconciledState, (values) => {
-        const selectedBoardWasDeleted = values.selectedBoardId === action.boardId;
-        const projectBoardWasDeleted = values.projectBoardId === action.boardId;
-
-        if (!selectedBoardWasDeleted && !projectBoardWasDeleted) {
-          return values;
-        }
-
-        return {
-          ...values,
-          ...(selectedBoardWasDeleted
-            ? {
-                galleryPage: 0,
-                selectedBoardId: 'none',
-                ...(action.includeImages ? { selectedImageNames: [] } : {}),
-              }
-            : {}),
-          ...(projectBoardWasDeleted ? { projectBoardId: null } : {}),
-        };
-      });
-      let didChangeQueue = false;
-      const projects = boardReferencesState.projects.map((project) => {
-        let didChangeItems = false;
-        const items = project.queue.items.map((item) => {
-          if (
-            (item.status !== 'pending' && item.status !== 'running') ||
-            item.snapshot.galleryBoardId !== action.boardId
-          ) {
-            return item;
-          }
-
-          didChangeItems = true;
-          return { ...item, snapshot: { ...item.snapshot, galleryBoardId: 'none' } };
-        });
-
-        if (!didChangeItems) {
-          return project;
-        }
-
-        didChangeQueue = true;
-        return { ...project, queue: { ...project.queue, items } };
-      });
-
-      return didChangeQueue ? { ...boardReferencesState, projects } : boardReferencesState;
+      return reconcileDeletedGalleryBoard(state, action.boardId, deletedItemKeys);
     }
     case 'setGalleryProjectBoardId': {
       return updateGalleryValues(state, (values) => ({ ...values, projectBoardId: action.boardId }), action.projectId);

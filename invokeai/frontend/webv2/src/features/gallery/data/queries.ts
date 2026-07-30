@@ -1,11 +1,5 @@
 import type { GalleryItem, GalleryItemsPage } from '@features/gallery/core/items';
-import type {
-  GalleryBoardOrderBy,
-  GalleryImage,
-  GalleryImagesPage,
-  GalleryOrderDir,
-  GalleryView,
-} from '@features/gallery/core/types';
+import type { GalleryBoardOrderBy, GalleryOrderDir, GalleryView } from '@features/gallery/core/types';
 import type { AccountScope } from '@platform/state/accountLifecycle';
 
 import { toGalleryItemKey } from '@features/gallery/core/items';
@@ -28,7 +22,6 @@ import {
   listGalleryDateBoards,
   listGalleryItemNames,
   listGalleryItems,
-  listPaletteImages,
 } from './backend';
 
 export const GALLERY_PAGE_SIZE = 60;
@@ -90,18 +83,6 @@ type GalleryItemsAnchorQueryKey = readonly [...GalleryItemsInfiniteQueryKey, 'an
 
 export type GalleryItemsListQueryKey = GalleryItemsAnchorQueryKey | GalleryItemsInfiniteQueryKey;
 
-type LegacyGalleryImagesInfiniteQueryKey = readonly [
-  'gallery',
-  'legacy-images',
-  'list',
-  GalleryAccountKey,
-  CanonicalGalleryItemsFilter,
-];
-
-type LegacyGalleryImagesAnchorQueryKey = readonly [...LegacyGalleryImagesInfiniteQueryKey, 'anchor', number];
-
-type LegacyGalleryImagesListQueryKey = LegacyGalleryImagesAnchorQueryKey | LegacyGalleryImagesInfiniteQueryKey;
-
 const canonicalizeBoardsQuery = (query: GalleryBoardsQuery): CanonicalGalleryBoardsQuery => ({
   includeArchived: query.includeArchived ?? false,
   includeDateBoards: query.includeDateBoards ?? false,
@@ -149,25 +130,6 @@ export const galleryKeys = {
   itemNamesForAccount: (owner: AccountScope) => [...galleryKeys.itemNamesRoot(), getAccountKey(owner)] as const,
   itemNames: (owner: AccountScope, filter: CanonicalGalleryItemsFilter) =>
     [...galleryKeys.itemNamesForAccount(owner), filter] as const,
-
-  /**
-   * TODO(Task 5/7): Remove the legacy image query domain after Gallery state,
-   * projection, and preview consumers use GalleryItem throughout.
-   */
-  legacyImagesRoot: () => [...galleryKeys.all, 'legacy-images'] as const,
-  legacyImageListsRoot: () => [...galleryKeys.legacyImagesRoot(), 'list'] as const,
-  legacyImageListsForAccount: (owner: AccountScope) =>
-    [...galleryKeys.legacyImageListsRoot(), getAccountKey(owner)] as const,
-  legacyImages: (
-    owner: AccountScope,
-    filter: CanonicalGalleryItemsFilter,
-    window: GalleryItemsWindow = { kind: 'infinite' }
-  ): LegacyGalleryImagesListQueryKey =>
-    [
-      ...galleryKeys.legacyImageListsForAccount(owner),
-      filter,
-      ...getWindowKey(window),
-    ] as LegacyGalleryImagesListQueryKey,
 };
 
 const galleryItemNamesOptionsForOwner = (owner: AccountScope, filter: CanonicalGalleryItemsFilter) =>
@@ -419,111 +381,3 @@ export const getGalleryItemsFilterFromKey = (queryKey: QueryKey): CanonicalGalle
 
 export const getGalleryItemListQueries = (client: QueryClient, owner: AccountScope = captureAccountScope()) =>
   client.getQueryCache().findAll({ queryKey: galleryKeys.itemListsForAccount(owner) });
-
-/**
- * TODO(Task 5/7): Remove this image-page compatibility query after Gallery
- * state/projection and Preview consume `galleryItemsInfiniteOptions`.
- * It is isolated under `gallery/legacy-images` and never changes the mixed
- * query's GalleryItemsPage result.
- */
-export const galleryImagesInfiniteOptions = (
-  inputFilter: GalleryItemsFilter,
-  window: GalleryItemsWindow = { kind: 'infinite' }
-) => {
-  const owner = captureAccountScope();
-  const filter = canonicalizeGalleryItemsFilter(inputFilter);
-  const normalizedWindow =
-    window.kind === 'infinite' ? window : ({ ...window, offset: normalizePageOffset(window.offset) } as const);
-  const initialPageParam = normalizedWindow.kind === 'infinite' ? 0 : normalizedWindow.offset;
-
-  return infiniteQueryOptions<
-    GalleryImagesPage,
-    Error,
-    InfiniteData<GalleryImagesPage, number>,
-    LegacyGalleryImagesListQueryKey,
-    number
-  >({
-    ...(normalizedWindow.kind === 'infinite' ? {} : { gcTime: 0 }),
-    getNextPageParam: (lastPage, allPages, lastPageParam) =>
-      allPages.length >= GALLERY_MAX_INFINITE_PAGES
-        ? undefined
-        : getNextPageParam(normalizedWindow, lastPage, lastPageParam),
-    getPreviousPageParam: (_firstPage, allPages, firstPageParam) =>
-      allPages.length < GALLERY_MAX_INFINITE_PAGES && firstPageParam >= GALLERY_PAGE_SIZE
-        ? firstPageParam - GALLERY_PAGE_SIZE
-        : undefined,
-    initialPageParam,
-    maxPages: GALLERY_MAX_INFINITE_PAGES,
-    queryFn: async ({ pageParam, signal }) => {
-      const requestSignal = AbortSignal.any([signal, owner.signal]);
-      const result = await listPaletteImages({
-        ...filter,
-        limit: GALLERY_PAGE_SIZE,
-        offset: pageParam,
-        signal: requestSignal,
-      });
-
-      assertAccountScopeCurrent(owner);
-      requestSignal.throwIfAborted();
-
-      return result.images.length <= GALLERY_PAGE_SIZE
-        ? result
-        : { ...result, images: result.images.slice(0, GALLERY_PAGE_SIZE) };
-    },
-    queryKey: galleryKeys.legacyImages(owner, filter, normalizedWindow),
-    staleTime: 60_000,
-  });
-};
-
-/** TODO(Task 5/7): Remove with `galleryImagesInfiniteOptions`. */
-export const flattenGalleryImagesData = (data: InfiniteData<GalleryImagesPage, number> | undefined): GalleryImage[] => {
-  if (!data) {
-    return [];
-  }
-
-  const imageNames = new Set<string>();
-  const images: GalleryImage[] = [];
-
-  for (const page of data.pages) {
-    for (const image of page.images) {
-      if (imageNames.has(image.imageName)) {
-        continue;
-      }
-
-      imageNames.add(image.imageName);
-      images.push(image);
-
-      if (images.length === GALLERY_MAX_ROWS) {
-        return images;
-      }
-    }
-  }
-
-  return images;
-};
-
-/** TODO(Task 5/7): Remove legacy image cache discovery. */
-export const getGalleryImageListQueries = (client: QueryClient, owner: AccountScope = captureAccountScope()) =>
-  client.getQueryCache().findAll({ queryKey: galleryKeys.legacyImageListsForAccount(owner) });
-
-/** TODO(Task 5/7): Remove legacy image key guard. */
-export const getGalleryImagesFilterFromKey = (queryKey: QueryKey): CanonicalGalleryItemsFilter | null => {
-  if (
-    queryKey[0] !== 'gallery' ||
-    queryKey[1] !== 'legacy-images' ||
-    queryKey[2] !== 'list' ||
-    !queryKey[4] ||
-    typeof queryKey[4] !== 'object'
-  ) {
-    return null;
-  }
-
-  return queryKey[4] as CanonicalGalleryItemsFilter;
-};
-
-/** TODO(Task 5/7): Remove legacy type aliases with the image-only consumers. */
-export type GalleryImagesFilter = GalleryItemsFilter;
-export type CanonicalGalleryImagesFilter = CanonicalGalleryItemsFilter;
-export type GalleryImagesWindow = GalleryItemsWindow;
-export type GalleryImagesListQueryKey = LegacyGalleryImagesListQueryKey;
-export const canonicalizeGalleryImagesFilter = canonicalizeGalleryItemsFilter;

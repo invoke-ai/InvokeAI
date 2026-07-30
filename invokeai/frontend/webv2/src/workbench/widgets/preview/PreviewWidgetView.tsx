@@ -16,16 +16,22 @@ import {
   getGalleryLiveSlots,
   getGallerySelectedImageQuery,
   getGallerySettings,
+  getSelectedGalleryImageFromValues,
+  getSelectedGalleryItemFromValues,
   getBoundedRecentImages,
+  galleryImageItemToGalleryImage,
+  isGalleryImageItem,
   normalizeGalleryImage,
+  parseGalleryItemKey,
+  type GalleryItemsPage,
   type GalleryQueuePlaceholder,
 } from '@features/gallery/contracts';
 import {
-  flattenGalleryImagesData,
+  flattenGalleryItemsData,
   GALLERY_MAX_ROWS,
   GALLERY_PAGE_SIZE,
   galleryBoardsOptions,
-  galleryImagesInfiniteOptions,
+  galleryItemsInfiniteOptions,
 } from '@features/gallery/queries';
 import { createGenerateFormValuesSelector } from '@features/generation/react';
 import { useDeviceLabel } from '@features/queue/devices';
@@ -43,7 +49,7 @@ import {
   progressImageToStreamingSource,
 } from '@platform/ui/streaming-image/streamingImageSource';
 import { useStreamingImageSource } from '@platform/ui/streaming-image/useStreamingImageSource';
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery, type InfiniteData } from '@tanstack/react-query';
 import {
   ImageContextMenu,
   useImageActions,
@@ -105,23 +111,31 @@ const getGalleryImages = (values: Record<string, unknown>, queueItems: QueueItem
 };
 
 const getSelectedImage = (values: Record<string, unknown>, localImages: PreviewImage[]): PreviewImage | null => {
-  const selectedImage = values.selectedImage;
-  const selectedImageName = typeof values.selectedImageName === 'string' ? values.selectedImageName : null;
+  const selectedItem = getSelectedGalleryItemFromValues(values);
 
-  if (
-    selectedImage &&
-    typeof selectedImage === 'object' &&
-    typeof (selectedImage as GeneratedImageContract).imageName === 'string'
-  ) {
-    const image = selectedImage as PreviewImage;
-
-    return typeof image.boardId === 'string'
-      ? image
-      : (localImages.find((candidate) => candidate.imageName === image.imageName) ?? image);
+  if (selectedItem?.kind === 'video') {
+    return null;
   }
 
-  return localImages.find((image) => image.imageName === selectedImageName) ?? localImages[0] ?? null;
+  const selectedImage = getSelectedGalleryImageFromValues(values);
+
+  if (selectedImage) {
+    return localImages.find((candidate) => candidate.imageName === selectedImage.imageName) ?? selectedImage;
+  }
+
+  if (typeof values.selectedImageName === 'string' && parseGalleryItemKey(values.selectedImageName).kind === 'video') {
+    return null;
+  }
+
+  return localImages[0] ?? null;
 };
+
+/**
+ * TODO(Task 8): Remove when Preview navigates `GalleryItem` directly.
+ * The compatibility projection narrows before creating image contracts.
+ */
+const flattenPreviewImages = (data: InfiniteData<GalleryItemsPage, number> | undefined): GalleryImage[] =>
+  flattenGalleryItemsData(data).filter(isGalleryImageItem).map(galleryImageItemToGalleryImage);
 
 const getOrderedPreviewImages = (
   images: PreviewImage[],
@@ -330,7 +344,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     isFetchingNextPage: isFetchingNextBoardImagesPage,
     isFetchingPreviousPage: isFetchingPreviousBoardImagesPage,
   } = useInfiniteQuery({
-    ...galleryImagesInfiniteOptions(
+    ...galleryItemsInfiniteOptions(
       {
         boardId: navigationBoardId,
         createdFrom: shouldFollowLive ? undefined : selectedImageSearch.range?.from,
@@ -349,7 +363,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   const selectPreviewImage = useCallback(
     (image: GeneratedImageContract) => {
       const pageIndex = boardImagesData?.pages.findIndex((page) =>
-        page.images.some((candidate) => candidate.imageName === image.imageName)
+        page.items.some((candidate) => isGalleryImageItem(candidate) && candidate.name === image.imageName)
       );
       const pageParam = pageIndex === undefined || pageIndex < 0 ? undefined : boardImagesData?.pageParams[pageIndex];
       const selectionPage =
@@ -398,7 +412,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
 
     return [selectedImage, ...localBoardImages];
   }, [localBoardImages, selectedImage, shouldFollowLive]);
-  const backendBoardImages = useMemo(() => flattenGalleryImagesData(boardImagesData), [boardImagesData]);
+  const backendBoardImages = useMemo(() => flattenPreviewImages(boardImagesData), [boardImagesData]);
   const boardImages = useMemo(
     () =>
       !hasNavigationContext
@@ -481,7 +495,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
           return;
         }
 
-        const nextBackendBoardImages = flattenGalleryImagesData(result.data);
+        const nextBackendBoardImages = flattenPreviewImages(result.data);
         const nextBoardImages = mergePreviewBoardImages(
           nextBackendBoardImages,
           previewLocalBoardImages,

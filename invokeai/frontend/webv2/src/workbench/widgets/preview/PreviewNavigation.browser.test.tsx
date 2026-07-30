@@ -1,5 +1,5 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop */
-import type { GalleryImage, GalleryImagesPage } from '@features/gallery';
+import type { GalleryImage, GalleryItemsPage } from '@features/gallery';
 import type { QueueItem } from '@features/queue/contracts';
 import type { WidgetViewProps } from '@workbench/widgetContracts';
 
@@ -75,8 +75,8 @@ const mocks = vi.hoisted(() => {
         preview: { state: { values: {} }, typeId: 'preview' },
       },
     },
-    galleryImagePageOffsets: [] as number[],
-    galleryImagePages: [] as GalleryImagesPage[],
+    galleryItemPageOffsets: [] as number[],
+    galleryItemPages: [] as GalleryItemsPage[],
     recentImages,
     useActiveProgressTarget: vi.fn(() => null as unknown),
     useProgressImage: vi.fn(() => null as unknown),
@@ -99,36 +99,36 @@ vi.mock('@features/queue/react', async (importOriginal) => ({
 vi.mock('@features/gallery/queries', () => ({
   GALLERY_MAX_ROWS: 600,
   GALLERY_PAGE_SIZE: 60,
-  flattenGalleryImagesData: (data: InfiniteData<GalleryImagesPage, number> | undefined): GalleryImage[] =>
-    data?.pages.flatMap((page) => page.images) ?? [],
+  flattenGalleryItemsData: (data: InfiniteData<GalleryItemsPage, number> | undefined) =>
+    data?.pages.flatMap((page) => page.items) ?? [],
   galleryBoardsOptions: () => ({ queryFn: () => [], queryKey: ['test-boards'], staleTime: Infinity }),
-  galleryImagesInfiniteOptions: (
+  galleryItemsInfiniteOptions: (
     query: { boardId: string; orderDir?: 'ASC' | 'DESC' },
     window: { kind: 'anchor' | 'infinite' | 'page'; offset?: number } = { kind: 'infinite' }
   ) => {
-    const pages = mocks.galleryImagePages.map((page) => {
-      const images = page.images.filter((image) => image.boardId === query.boardId);
+    const pages = mocks.galleryItemPages.map((page) => {
+      const items = page.items.filter((item) => item.boardId === query.boardId);
 
       return {
         ...page,
-        images: query.orderDir === 'ASC' ? images.reverse() : images,
+        items: query.orderDir === 'ASC' ? items.reverse() : items,
       };
     });
     const initialOffset = window.kind === 'infinite' ? 0 : (window.offset ?? 0);
-    const initialPage = pages[initialOffset / 60] ?? { images: [], total: 0 };
+    const initialPage = pages[initialOffset / 60] ?? { items: [], total: 0 };
 
     return {
-      getNextPageParam: (_lastPage: GalleryImagesPage, _allPages: GalleryImagesPage[], lastPageParam: number) =>
+      getNextPageParam: (_lastPage: GalleryItemsPage, _allPages: GalleryItemsPage[], lastPageParam: number) =>
         pages[lastPageParam / 60 + 1] ? lastPageParam + 60 : undefined,
-      getPreviousPageParam: (_firstPage: GalleryImagesPage, _allPages: GalleryImagesPage[], firstPageParam: number) =>
+      getPreviousPageParam: (_firstPage: GalleryItemsPage, _allPages: GalleryItemsPage[], firstPageParam: number) =>
         firstPageParam >= 60 ? firstPageParam - 60 : undefined,
       initialData: { pageParams: [initialOffset], pages: [initialPage] },
       initialPageParam: initialOffset,
       queryFn: ({ pageParam }: { pageParam: number }) => {
-        mocks.galleryImagePageOffsets.push(pageParam);
-        return Promise.resolve(pages[pageParam / 60] ?? { images: [], total: 0 });
+        mocks.galleryItemPageOffsets.push(pageParam);
+        return Promise.resolve(pages[pageParam / 60] ?? { items: [], total: 0 });
       },
-      queryKey: ['test-images', query.boardId, query.orderDir, window.kind, initialOffset],
+      queryKey: ['test-items', query.boardId, query.orderDir, window.kind, initialOffset],
       staleTime: Infinity,
     };
   },
@@ -236,14 +236,22 @@ beforeEach(() => {
     boardId: 'none',
   };
   mocks.project.widgetInstances.gallery.state.values.selectedImageName = 'newest';
-  mocks.galleryImagePageOffsets.length = 0;
-  mocks.galleryImagePages = [
+  mocks.galleryItemPageOffsets.length = 0;
+  mocks.galleryItemPages = [
     {
-      images: mocks.recentImages.map((image) => ({
-        ...image,
+      items: mocks.recentImages.map((image) => ({
         boardId: 'none',
-        imageCategory: 'general',
+        category: 'general' as const,
+        createdAt: image.queuedAt,
+        fullUrl: image.imageUrl,
+        height: image.height,
+        isIntermediate: false,
+        kind: 'image' as const,
+        name: image.imageName,
+        sourceQueueItemId: image.sourceQueueItemId,
         starred: false,
+        thumbnailUrl: image.thumbnailUrl,
+        width: image.width,
       })),
       total: mocks.recentImages.length,
     },
@@ -298,9 +306,45 @@ describe('preview keyboard navigation boundary', () => {
       starred: false,
     };
     mocks.project.widgetInstances.gallery.state.values.recentImages = [mocks.recentImages[0]];
-    mocks.galleryImagePages = [
-      { images: [newest], total: 2 },
-      { images: [oldest], total: 2 },
+    mocks.galleryItemPages = [
+      {
+        items: [
+          {
+            boardId: newest.boardId,
+            category: newest.imageCategory,
+            createdAt: newest.queuedAt,
+            fullUrl: newest.imageUrl,
+            height: newest.height,
+            isIntermediate: false,
+            kind: 'image',
+            name: newest.imageName,
+            sourceQueueItemId: newest.sourceQueueItemId,
+            starred: newest.starred,
+            thumbnailUrl: newest.thumbnailUrl,
+            width: newest.width,
+          },
+        ],
+        total: 2,
+      },
+      {
+        items: [
+          {
+            boardId: oldest.boardId,
+            category: oldest.imageCategory,
+            createdAt: oldest.queuedAt,
+            fullUrl: oldest.imageUrl,
+            height: oldest.height,
+            isIntermediate: false,
+            kind: 'image',
+            name: oldest.imageName,
+            sourceQueueItemId: oldest.sourceQueueItemId,
+            starred: oldest.starred,
+            thumbnailUrl: oldest.thumbnailUrl,
+            width: oldest.width,
+          },
+        ],
+        total: 2,
+      },
     ];
 
     await render();
@@ -314,7 +358,7 @@ describe('preview keyboard navigation boundary', () => {
         true
       );
     });
-    expect(mocks.galleryImagePageOffsets).toEqual([60]);
+    expect(mocks.galleryItemPageOffsets).toEqual([60]);
     expect(mocks.commands.gallery.selectImage).toHaveBeenCalledTimes(1);
   });
 
@@ -347,9 +391,41 @@ describe('preview keyboard navigation boundary', () => {
     galleryValues.recentImages = [];
     galleryValues.selectedImage = selected;
     galleryValues.selectedImageName = selected.imageName;
-    mocks.galleryImagePages = [
-      { images: [pageZero], total: 3 },
-      { images: [selected, neighbor], total: 3 },
+    mocks.galleryItemPages = [
+      {
+        items: [pageZero].map((image) => ({
+          boardId: image.boardId,
+          category: image.imageCategory,
+          createdAt: image.queuedAt,
+          fullUrl: image.imageUrl,
+          height: image.height,
+          isIntermediate: false,
+          kind: 'image' as const,
+          name: image.imageName,
+          sourceQueueItemId: image.sourceQueueItemId,
+          starred: image.starred,
+          thumbnailUrl: image.thumbnailUrl,
+          width: image.width,
+        })),
+        total: 3,
+      },
+      {
+        items: [selected, neighbor].map((image) => ({
+          boardId: image.boardId,
+          category: image.imageCategory,
+          createdAt: image.queuedAt,
+          fullUrl: image.imageUrl,
+          height: image.height,
+          isIntermediate: false,
+          kind: 'image' as const,
+          name: image.imageName,
+          sourceQueueItemId: image.sourceQueueItemId,
+          starred: image.starred,
+          thumbnailUrl: image.thumbnailUrl,
+          width: image.width,
+        })),
+        total: 3,
+      },
     ];
 
     await render();

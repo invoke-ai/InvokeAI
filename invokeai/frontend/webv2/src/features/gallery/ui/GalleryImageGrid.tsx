@@ -28,7 +28,7 @@ import type { GalleryQueuePlaceholder } from './galleryStateView';
 import type { GalleryImageContextMenuTarget } from './GalleryUiContext';
 
 import { getGalleryImageDragData, getGalleryImageDragId } from './galleryDnd';
-import { getGalleryPlaceholderInsertionIndex } from './galleryStateView';
+import { getGalleryImageStateView, getGalleryPlaceholderInsertionIndex } from './galleryStateView';
 import { useGalleryUi } from './GalleryUiContext';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
@@ -69,7 +69,8 @@ type GridCell =
 
 export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => {
   const { t } = useTranslation();
-  const { actions, gallery, imageActions, isWindowTruncated, runtime } = useGalleryWidget();
+  const { actions, gallery: galleryState, imageActions, isWindowTruncated, runtime } = useGalleryWidget();
+  const gallery = useMemo(() => getGalleryImageStateView(galleryState), [galleryState]);
   const { account, antialiasProgressImages, ImageContextMenu, widgets } = useGalleryUi();
   const [contextMenuTarget, setContextMenuTarget] = useState<GalleryImageContextMenuTarget | null>(null);
   const [isDropActive, setIsDropActive] = useState(false);

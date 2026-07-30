@@ -4,10 +4,12 @@ import {
   galleryImages,
   galleryOrganization,
   galleryTransfers,
+  toGalleryItemKey,
   type GalleryBoard,
   type GalleryImage,
+  type GalleryItemMutationResult,
 } from '@features/gallery';
-import { invalidateGallery, invalidateGalleryImages, patchGalleryImageCaches } from '@features/gallery/queries';
+import { invalidateGallery, invalidateGalleryItems, patchGalleryItemCaches } from '@features/gallery/queries';
 import { setPendingPromptTemplateDraft } from '@features/generation/react';
 import { getMaxReferenceImages, isVaeModelConfig, isSupportedGenerateModel } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
@@ -67,6 +69,14 @@ export interface ImageActions {
 }
 
 const toErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+
+const getImageMutationResult = (
+  succeededImageNames: readonly string[],
+  failedImageNames: readonly string[] = []
+): GalleryItemMutationResult => ({
+  failed: failedImageNames.map((name) => ({ kind: 'image', name })),
+  succeeded: succeededImageNames.map((name) => ({ kind: 'image', name })),
+});
 
 const toPngBlob = async (blob: Blob): Promise<Blob> => {
   if (blob.type === 'image/png') {
@@ -168,8 +178,10 @@ export const useImageActions = ({
           // Evict only what the backend actually deleted. A name it refused is still on the
           // server, so dropping it from the cache would hide a live image until a full refresh.
           if (deletedImageNames.length > 0) {
-            patchGalleryImageCaches(queryClient, { imageNames: deletedImageNames, kind: 'delete' });
-            gallery.removeImages(deletedImageNames);
+            const result = getImageMutationResult(deletedImageNames, failedImageNames);
+
+            patchGalleryItemCaches(queryClient, { kind: 'delete', result });
+            gallery.removeItems(result.succeeded.map(toGalleryItemKey));
             onImagesDeleted?.(deletedImageNames);
           }
 
@@ -305,8 +317,10 @@ export const useImageActions = ({
           }
 
           assertAccountScopeCurrent(owner);
-          patchGalleryImageCaches(queryClient, { boardId, imageNames, kind: 'move' });
-          gallery.patchImages(imageNames, { boardId });
+          const result = getImageMutationResult(imageNames);
+
+          patchGalleryItemCaches(queryClient, { boardId, kind: 'move', result });
+          gallery.patchItems(result.succeeded.map(toGalleryItemKey), { boardId });
           recordSuccess(
             imageNames.length === 1
               ? `Moved image to ${getBoardName(boardId)}`
@@ -389,14 +403,15 @@ export const useImageActions = ({
       },
       setImagesStarred: async (imageNames, starred) => {
         const owner = captureAccountScope();
-        const rollback = patchGalleryImageCaches(queryClient, { imageNames, kind: 'star', starred });
+        const result = getImageMutationResult(imageNames);
+        const rollback = patchGalleryItemCaches(queryClient, { kind: 'star', result, starred });
 
         try {
           await galleryOrganization.setStarred(imageNames, starred, owner.signal);
 
           assertAccountScopeCurrent(owner);
-          gallery.patchImages(imageNames, { starred });
-          void invalidateGalleryImages(queryClient);
+          gallery.patchItems(result.succeeded.map(toGalleryItemKey), { starred });
+          void invalidateGalleryItems(queryClient);
         } catch (error: unknown) {
           rollback();
 
@@ -404,7 +419,7 @@ export const useImageActions = ({
             return;
           }
 
-          void invalidateGalleryImages(queryClient);
+          void invalidateGalleryItems(queryClient);
           recordError(error);
         }
       },

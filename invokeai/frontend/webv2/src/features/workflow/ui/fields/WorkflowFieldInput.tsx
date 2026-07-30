@@ -2,7 +2,8 @@ import type { ModelConfig, ModelTaxonomyType } from '@features/models/react';
 import type { FieldInputTemplate } from '@features/workflow/contracts';
 
 import { createListCollection, HStack, Input, Switch, Text } from '@chakra-ui/react';
-import { galleryDestinations, type GalleryBoard, type GeneratedImageContract } from '@features/gallery';
+import { galleryDestinations, type GalleryBoard } from '@features/gallery';
+import { getSelectedGalleryImageFromValues } from '@features/gallery/contracts';
 import { SCHEDULER_OPTIONS } from '@features/generation/settings';
 import { useWorkflowProjectSelector } from '@features/workflow/ui/WorkflowUiContext';
 import {
@@ -20,6 +21,8 @@ const MODEL_SELECT_FALLBACK = (
     Loading models…
   </Button>
 );
+
+export const getWorkflowSelectedGalleryImage = getSelectedGalleryImageFromValues;
 
 /**
  * Direct-input controls for workflow fields, shared between the node editor
@@ -365,8 +368,8 @@ const BoardInput = ({ id, invalid, onChange, template, value }: WorkflowFieldInp
 };
 
 const ImageInput = ({ invalid, onChange, value }: WorkflowFieldInputProps) => {
-  const gallerySelection = useWorkflowProjectSelector(
-    (project) => project.galleryValues.selectedImage as GeneratedImageContract | null | undefined
+  const gallerySelection = useWorkflowProjectSelector((project) =>
+    getWorkflowSelectedGalleryImage(project.galleryValues)
   );
   const imageName =
     typeof (value as { image_name?: unknown } | null)?.image_name === 'string'

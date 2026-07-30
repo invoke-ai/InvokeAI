@@ -52,4 +52,4 @@ export {
   type GalleryQueuePlaceholder,
   type GallerySelectedImageQuery,
 } from './ui/galleryStateView';
-export { getSelectedGalleryImageFromValues } from './core/selection';
+export { getSelectedGalleryImageFromValues, getSelectedGalleryItemFromValues } from './core/selection';

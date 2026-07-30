@@ -1,4 +1,4 @@
-import type { GeneratedImageContract } from '@features/gallery';
+import type { GalleryImageItem, GalleryVideoItem, GeneratedImageContract } from '@features/gallery';
 import type { GenerateWidgetValues, MainModelConfig } from '@features/generation/contracts';
 import type {
   CanvasControlLayerContract,
@@ -10,7 +10,7 @@ import type {
 import type { GraphContract } from '@workbench/graphContracts';
 import type { Project, WorkbenchState } from '@workbench/projectContracts';
 
-import { GALLERY_RECENT_IMAGE_LIMIT } from '@features/gallery/contracts';
+import { GALLERY_RECENT_IMAGE_LIMIT, legacyGeneratedImageToGalleryItem } from '@features/gallery/contracts';
 import { MAX_PROMPT_HISTORY } from '@features/generation/settings';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -200,6 +200,40 @@ const createImage = (imageName: string, sourceQueueItemId: string): GeneratedIma
   sourceQueueItemId,
   thumbnailUrl: `/api/v1/images/i/${imageName}/thumbnail`,
   width: 512,
+});
+
+const createGalleryImageItem = (name: string, boardId = 'none'): GalleryImageItem => ({
+  boardId,
+  category: 'general',
+  createdAt: '2026-07-30T00:00:00.000Z',
+  fullUrl: `/api/v1/images/i/${name}/full`,
+  height: 768,
+  isIntermediate: false,
+  kind: 'image',
+  name,
+  sourceQueueItemId: 'backend-gallery',
+  starred: false,
+  thumbnailUrl: `/api/v1/images/i/${name}/thumbnail`,
+  width: 512,
+});
+
+const createGalleryVideoItem = (name: string, boardId = 'none'): GalleryVideoItem => ({
+  ...createGalleryImageItem(name, boardId),
+  durationSeconds: 3,
+  fullUrl: `/api/v1/videos/i/${name}/full`,
+  kind: 'video',
+  thumbnailUrl: `/api/v1/videos/i/${name}/thumbnail`,
+});
+
+const galleryItemToRecentImage = (item: GalleryImageItem): GeneratedImageContract & { boardId: string } => ({
+  boardId: item.boardId,
+  height: item.height,
+  imageName: item.name,
+  imageUrl: item.fullUrl,
+  queuedAt: item.createdAt,
+  sourceQueueItemId: item.sourceQueueItemId ?? 'backend-gallery',
+  thumbnailUrl: item.thumbnailUrl,
+  width: item.width,
 });
 
 const createStagingCandidate = (
@@ -1924,14 +1958,14 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     const expectedImage = {
       ...createImage('gallery-image.png', queueItem.id),
       boardId: 'none',
-      imageCategory: 'general',
+      imageCategory: 'general' as const,
       starred: false,
     };
 
     expect(updatedProject.canvas.stagingArea.pendingImages).toEqual([]);
     expect(galleryValues.recentImages).toEqual([expectedImage]);
-    expect(galleryValues.selectedImage).toEqual(expectedImage);
-    expect(galleryValues.selectedImageName).toBe('gallery-image.png');
+    expect(galleryValues.selectedImage).toEqual(legacyGeneratedImageToGalleryItem(expectedImage));
+    expect(galleryValues.selectedImageName).toBe('image:gallery-image.png');
   });
 
   it('preserves the destination board on freshly routed Gallery results', () => {
@@ -1953,7 +1987,8 @@ describe('workbenchReducer Phase 5 generation flow', () => {
 
     expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImage).toMatchObject({
       boardId: 'board-1',
-      imageName: image.imageName,
+      kind: 'image',
+      name: image.imageName,
     });
   });
 
@@ -2016,8 +2051,8 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(recentImageNames).toEqual(
       Array.from({ length: GALLERY_RECENT_IMAGE_LIMIT }, (_, index) => `gallery-image-${999 - index}.png`)
     );
-    expect(galleryValues.selectedImageName).toBe('gallery-image-999.png');
-    expect(galleryValues.selectedImageNames).toEqual(['gallery-image-999.png']);
+    expect(galleryValues.selectedImageName).toBe('image:gallery-image-999.png');
+    expect(galleryValues.selectedImageNames).toEqual(['image:gallery-image-999.png']);
   });
 
   it('omits transient recent images from immutable queue snapshots', () => {
@@ -2148,7 +2183,9 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       });
     }
 
-    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('gallery-image-3.png');
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe(
+      'image:gallery-image-3.png'
+    );
 
     state = workbenchReducer(state, {
       images,
@@ -2157,7 +2194,9 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       type: 'routeQueueItemResults',
     });
 
-    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('gallery-image-3.png');
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe(
+      'image:gallery-image-3.png'
+    );
   });
 
   it('does not reorder existing results when an older batch final aggregate arrives late', () => {
@@ -2222,7 +2261,9 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       type: 'routeQueueItemResults',
     });
 
-    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('gallery-image-3.png');
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe(
+      'image:gallery-image-3.png'
+    );
   });
 
   it('pauses live-follow when the user selects a saved Gallery image', () => {
@@ -2230,10 +2271,13 @@ describe('workbenchReducer Phase 5 generation flow', () => {
 
     expect(getActiveProject(state).settings.showProgressImagesInViewer).toBe(true);
 
-    state = workbenchReducer(state, { image: createImage('selected.png', 'gallery'), type: 'selectGalleryImage' });
+    state = workbenchReducer(state, {
+      item: createGalleryImageItem('selected.png'),
+      type: 'selectGalleryItem',
+    });
 
     expect(getActiveProject(state).settings.showProgressImagesInViewer).toBe(false);
-    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('selected.png');
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('image:selected.png');
   });
 
   it('preserves a manually selected image when later Gallery results arrive', () => {
@@ -2243,8 +2287,8 @@ describe('workbenchReducer Phase 5 generation flow', () => {
 
     const project = getActiveProject(state);
     const queueItem = project.queue.items[0];
-    const selectedImage = createImage('selected.png', 'backend-gallery');
-    state = workbenchReducer(state, { image: selectedImage, type: 'selectGalleryImage' });
+    const selectedImage = createGalleryImageItem('selected.png');
+    state = workbenchReducer(state, { item: selectedImage, type: 'selectGalleryItem' });
     state = workbenchReducer(state, {
       images: [createImage('completed.png', queueItem.id)],
       projectId: project.id,
@@ -2252,17 +2296,17 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       type: 'routeQueueItemResults',
     });
 
-    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe(selectedImage.imageName);
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('image:selected.png');
   });
 
   it('pauses live-follow for saved Gallery multi-selection and comparison intents', () => {
-    const primaryImage = createImage('primary.png', 'gallery');
-    const compareImage = createImage('compare.png', 'gallery');
+    const primaryImage = createGalleryImageItem('primary.png');
+    const compareImage = createGalleryImageItem('compare.png');
     let state = createInitialWorkbenchState();
 
     state = workbenchReducer(state, {
-      imageNames: [primaryImage.imageName, compareImage.imageName],
-      primaryImage,
+      itemKeys: ['image:primary.png', 'image:compare.png'],
+      primaryItem: primaryImage,
       type: 'setGalleryMultiSelection',
     });
 
@@ -2292,11 +2336,13 @@ describe('workbenchReducer Phase 5 generation flow', () => {
 
   it('stores full selected gallery image data for Preview widget', () => {
     let state = createInitialWorkbenchState();
-    const image = createImage('backend-selected.png', 'backend-gallery');
+    const image = createGalleryImageItem('backend-selected.png');
 
-    state = workbenchReducer(state, { image, type: 'selectGalleryImage' });
+    state = workbenchReducer(state, { item: image, type: 'selectGalleryItem' });
 
-    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('backend-selected.png');
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe(
+      'image:backend-selected.png'
+    );
     expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImage).toEqual(image);
   });
 });
@@ -2370,6 +2416,191 @@ describe('workbench backend connection recovery', () => {
     expect(state.backendConnection.lastConnectedAt).toBeDefined();
   });
 
+  it('writes canonical mixed selections with ordered qualified keys and clears comparison for video', () => {
+    const image = createGalleryImageItem('shared');
+    const video = createGalleryVideoItem('shared');
+    let state = createInitialWorkbenchState();
+
+    state = workbenchReducer(state, { image, type: 'setGalleryCompareImage' });
+    state = workbenchReducer(state, { item: video, type: 'selectGalleryItem' });
+
+    let values = getProjectWidgetValues(getActiveProject(state), 'gallery');
+
+    expect(values.selectedImage).toBe(video);
+    expect(values.selectedImageName).toBe('video:shared');
+    expect(values.selectedImageNames).toEqual(['video:shared']);
+    expect(values.compareImage).toBeNull();
+
+    state = workbenchReducer(state, { item: image, type: 'toggleGalleryItemInSelection' });
+    values = getProjectWidgetValues(getActiveProject(state), 'gallery');
+
+    expect(values.selectedImage).toBe(image);
+    expect(values.selectedImageName).toBe('image:shared');
+    expect(values.selectedImageNames).toEqual(['video:shared', 'image:shared']);
+
+    state = workbenchReducer(state, {
+      itemKeys: ['image:shared', 'video:shared'],
+      primaryItem: video,
+      type: 'setGalleryMultiSelection',
+    });
+    values = getProjectWidgetValues(getActiveProject(state), 'gallery');
+
+    expect(values.selectedImage).toBe(video);
+    expect(values.selectedImageName).toBe('video:shared');
+    expect(values.selectedImageNames).toEqual(['image:shared', 'video:shared']);
+    expect(values.compareImage).toBeNull();
+  });
+
+  it('prunes qualified items across projects without treating a same-name video as an image input', () => {
+    const image = createGalleryImageItem('shared');
+    const video = createGalleryVideoItem('shared');
+    const recentImage = galleryItemToRecentImage(image);
+    let state = createInitialWorkbenchState();
+    const firstProjectId = state.activeProjectId;
+
+    state = workbenchReducer(state, { type: 'createProject' });
+    const secondProjectId = state.activeProjectId;
+    state = workbenchReducer(state, {
+      projectId: firstProjectId,
+      type: 'patchWidgetValues',
+      values: {
+        compareImage: image,
+        recentImages: [recentImage],
+        selectedImage: image,
+        selectedImageName: 'image:shared',
+        selectedImageNames: ['image:shared'],
+      },
+      widgetId: 'gallery',
+    });
+    state = workbenchReducer(state, {
+      projectId: secondProjectId,
+      type: 'patchWidgetValues',
+      values: {
+        recentImages: [recentImage],
+        selectedImage: video,
+        selectedImageName: 'video:shared',
+        selectedImageNames: ['video:shared'],
+      },
+      widgetId: 'gallery',
+    });
+    for (const projectId of [firstProjectId, secondProjectId]) {
+      state = workbenchReducer(state, {
+        projectId,
+        type: 'patchWidgetValues',
+        values: { inputImage: { height: image.height, image_name: image.name, width: image.width } },
+        widgetId: 'upscale',
+      });
+    }
+
+    state = workbenchReducer(state, {
+      itemKeys: ['video:shared'],
+      type: 'removeGalleryItems',
+    });
+
+    expect(getProjectWidgetValues(getProject(state, firstProjectId), 'gallery')).toMatchObject({
+      compareImage: image,
+      recentImages: [recentImage],
+      selectedImage: image,
+      selectedImageName: 'image:shared',
+      selectedImageNames: ['image:shared'],
+    });
+    expect(getProjectWidgetValues(getProject(state, secondProjectId), 'gallery')).toMatchObject({
+      recentImages: [recentImage],
+      selectedImage: null,
+      selectedImageName: null,
+      selectedImageNames: [],
+    });
+    expect(getProjectWidgetValues(getProject(state, firstProjectId), 'upscale').inputImage).not.toBeNull();
+    expect(getProjectWidgetValues(getProject(state, secondProjectId), 'upscale').inputImage).not.toBeNull();
+
+    state = workbenchReducer(state, {
+      itemKeys: ['image:shared'],
+      type: 'removeGalleryItems',
+    });
+
+    for (const projectId of [firstProjectId, secondProjectId]) {
+      expect(getProjectWidgetValues(getProject(state, projectId), 'gallery').recentImages).toEqual([]);
+      expect(getProjectWidgetValues(getProject(state, projectId), 'upscale').inputImage).toBeNull();
+    }
+  });
+
+  it('reconciles authoritative board outcomes by deleting confirmed media and moving every survivor', () => {
+    const boardId = 'deleted-board';
+    const deletedImage = createGalleryImageItem('deleted-image', boardId);
+    const failedImage = createGalleryImageItem('failed-image', boardId);
+    const deletedVideo = createGalleryVideoItem('deleted-video', boardId);
+    const failedVideo = createGalleryVideoItem('failed-video', boardId);
+    let state = createInitialWorkbenchState();
+
+    while (state.projects.length < 4) {
+      state = workbenchReducer(state, { type: 'createProject' });
+    }
+
+    const fixtures = [
+      {
+        item: deletedImage,
+        recentImages: [galleryItemToRecentImage(deletedImage)],
+      },
+      {
+        item: failedImage,
+        recentImages: [galleryItemToRecentImage(failedImage)],
+      },
+      { item: deletedVideo, recentImages: [] },
+      { item: failedVideo, recentImages: [] },
+    ] as const;
+
+    for (const [index, project] of state.projects.entries()) {
+      const fixture = fixtures[index]!;
+      state = workbenchReducer(state, {
+        projectId: project.id,
+        type: 'patchWidgetValues',
+        values: {
+          projectBoardId: index === 0 ? boardId : null,
+          recentImages: fixture.recentImages,
+          selectedBoardId: boardId,
+          selectedImage: fixture.item,
+          selectedImageName: `${fixture.item.kind}:${fixture.item.name}`,
+          selectedImageNames: [`${fixture.item.kind}:${fixture.item.name}`],
+        },
+        widgetId: 'gallery',
+      });
+    }
+
+    state = workbenchReducer(state, {
+      boardId,
+      deletedImageNames: [deletedImage.name],
+      deletedVideoNames: [deletedVideo.name],
+      failedImageNames: [failedImage.name],
+      failedVideoNames: [failedVideo.name],
+      type: 'reconcileDeletedGalleryBoard',
+    });
+
+    const [deletedImageProject, failedImageProject, deletedVideoProject, failedVideoProject] = state.projects.map(
+      (project) => getProjectWidgetValues(project, 'gallery')
+    );
+
+    expect(deletedImageProject).toMatchObject({
+      projectBoardId: null,
+      recentImages: [],
+      selectedBoardId: 'none',
+      selectedImage: null,
+      selectedImageName: null,
+      selectedImageNames: [],
+    });
+    expect(failedImageProject?.selectedImage).toMatchObject({ boardId: 'none', kind: 'image', name: failedImage.name });
+    expect(failedImageProject?.recentImages).toEqual([{ ...galleryItemToRecentImage(failedImage), boardId: 'none' }]);
+    expect(deletedVideoProject).toMatchObject({
+      selectedImage: null,
+      selectedImageName: null,
+      selectedImageNames: [],
+    });
+    expect(failedVideoProject?.selectedImage).toMatchObject({ boardId: 'none', kind: 'video', name: failedVideo.name });
+
+    for (const values of [failedImageProject, deletedVideoProject, failedVideoProject]) {
+      expect(values?.selectedBoardId).toBe('none');
+    }
+  });
+
   it('reconciles moved and starred metadata across every project recent-image overlay', () => {
     let state = createInitialWorkbenchState();
     const image = createImage('patched.png', 'backend-gallery');
@@ -2385,16 +2616,17 @@ describe('workbench backend connection recovery', () => {
     }
     state = workbenchReducer(state, {
       changes: { boardId: 'board-2', starred: true },
-      imageNames: [image.imageName],
-      type: 'patchGalleryImages',
+      itemKeys: [`image:${image.imageName}`],
+      type: 'patchGalleryItems',
     });
 
     for (const project of state.projects) {
       const values = getProjectWidgetValues(project, 'gallery');
+      const patchedImage = { ...image, boardId: 'board-2', starred: true };
 
-      expect(values.recentImages).toEqual([{ ...image, boardId: 'board-2', starred: true }]);
-      expect(values.selectedImage).toEqual({ ...image, boardId: 'board-2', starred: true });
-      expect(values.compareImage).toEqual({ ...image, boardId: 'board-2', starred: true });
+      expect(values.recentImages).toEqual([patchedImage]);
+      expect(values.selectedImage).toEqual(legacyGeneratedImageToGalleryItem(patchedImage));
+      expect(values.compareImage).toEqual(legacyGeneratedImageToGalleryItem(patchedImage));
     }
   });
 
@@ -2427,8 +2659,8 @@ describe('workbench backend connection recovery', () => {
     }
 
     state = workbenchReducer(state, {
-      imageNames: [image.imageName],
-      type: 'removeGalleryImages',
+      itemKeys: [`image:${image.imageName}`],
+      type: 'removeGalleryItems',
     });
 
     expect(getProjectWidgetValues(getProject(state, firstProjectId), 'gallery').recentImages).toEqual([]);

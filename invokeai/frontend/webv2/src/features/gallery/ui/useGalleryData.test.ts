@@ -4,7 +4,7 @@ import type { GalleryImage, GeneratedImageContract } from '@features/gallery/cor
 import { getBoundedRecentImages } from '@features/gallery/core/recentImages';
 import { describe, expect, it } from 'vitest';
 
-import { isGalleryWindowTruncated, mergeGalleryImageWindow, mergeGalleryItemWindow } from './useGalleryData';
+import { isGalleryWindowTruncated, mergeGalleryItemWindow } from './useGalleryData';
 
 const createImage = (index: number, overrides: Partial<GalleryImage> = {}): GalleryImage => ({
   boardId: 'none',
@@ -29,66 +29,6 @@ const filter = {
   searchTerm: '',
   starredFirst: false,
 };
-
-describe('mergeGalleryImageWindow', () => {
-  it('deduplicates the recent overlay and keeps newest-first ordering', () => {
-    const backend = [createImage(1), createImage(2)];
-    const recent = [asGenerated(createImage(3)), asGenerated(createImage(2))];
-
-    expect(
-      mergeGalleryImageWindow({ backendImages: backend, filter, maxRows: 600, recentImages: recent }).map(
-        (image) => image.imageName
-      )
-    ).toEqual(['image-0003.png', 'image-0002.png', 'image-0001.png']);
-  });
-
-  it('bounds both the optimistic overlay and the rendered infinite window', () => {
-    const backend = Array.from({ length: 600 }, (_, index) => createImage(index));
-    const rawRecent = Array.from({ length: 1_000 }, (_, index) => asGenerated(createImage(1_000 + index)));
-    const recent = getBoundedRecentImages(rawRecent);
-    const images = mergeGalleryImageWindow({ backendImages: backend, filter, maxRows: 600, recentImages: recent });
-
-    expect(recent).toHaveLength(60);
-    expect(images).toHaveLength(600);
-    expect(images.slice(0, 60).map((image) => image.imageName)).toEqual(
-      recent.map((image) => image.imageName).reverse()
-    );
-  });
-
-  it('does not overlay recent images into incompatible board, asset, search, or date filters', () => {
-    const recent = [asGenerated(createImage(2))];
-    const filters = [
-      { ...filter, boardId: 'board-2' },
-      { ...filter, galleryView: 'assets' as const },
-      { ...filter, searchTerm: 'portrait' },
-      { ...filter, createdFrom: '2026-01-01' },
-      { ...filter, boardId: 'by_date:2026-01-01' },
-    ];
-
-    for (const candidate of filters) {
-      expect(
-        mergeGalleryImageWindow({
-          backendImages: [createImage(1)],
-          filter: candidate,
-          maxRows: 600,
-          recentImages: recent,
-        })
-      ).toHaveLength(1);
-    }
-  });
-
-  it('preserves starred-first ordering and the paginated row cap', () => {
-    const images = mergeGalleryImageWindow({
-      backendImages: Array.from({ length: 60 }, (_, index) => createImage(index)),
-      filter: { ...filter, starredFirst: true },
-      maxRows: 60,
-      recentImages: [asGenerated(createImage(100, { starred: true }))],
-    });
-
-    expect(images).toHaveLength(60);
-    expect(images[0]).toMatchObject({ imageName: 'image-0100.png', starred: true });
-  });
-});
 
 describe('mergeGalleryItemWindow', () => {
   it('deduplicates by qualified key and mirrors server starred/time/kind/name ordering', () => {
@@ -136,6 +76,31 @@ describe('mergeGalleryItemWindow', () => {
         recentImages: [],
       }).map(({ kind, name }) => `${kind}:${name}`)
     ).toEqual(['image:shared', 'video:shared']);
+  });
+
+  it('bounds the optimistic image overlay and the mixed rendered window', () => {
+    const createItem = (index: number): GalleryItem => ({
+      boardId: 'none',
+      category: 'general',
+      createdAt: new Date(Date.UTC(2026, 0, 1, 0, 0, index)).toISOString(),
+      fullUrl: `/images/${index}`,
+      height: 512,
+      isIntermediate: false,
+      kind: 'image',
+      name: `image-${index}.png`,
+      starred: false,
+      thumbnailUrl: `/thumbnails/${index}`,
+      width: 512,
+    });
+    const backendItems = Array.from({ length: 600 }, (_, index) => createItem(index));
+    const recentImages = getBoundedRecentImages(
+      Array.from({ length: 1_000 }, (_, index) => asGenerated(createImage(1_000 + index)))
+    );
+    const items = mergeGalleryItemWindow({ backendItems, filter, maxRows: 600, recentImages });
+
+    expect(recentImages).toHaveLength(60);
+    expect(items).toHaveLength(600);
+    expect(items.slice(0, 60).map((item) => item.name)).toEqual(recentImages.map((image) => image.imageName).reverse());
   });
 
   it('uses SQLite binary ordering for mixed-case and punctuation name ties in both directions', () => {
