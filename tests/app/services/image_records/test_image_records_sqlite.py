@@ -10,11 +10,7 @@ import pytest
 from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
 from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
-from invokeai.app.services.image_records.image_records_common import (
-    ImageCategory,
-    ImageRecordChanges,
-    ResourceOrigin,
-)
+from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.backend.util.logging import InvokeAILogger
@@ -48,11 +44,12 @@ def _save(
     subfolder: str = "",
     is_intermediate: bool = False,
     user_id: str | None = None,
+    category: ImageCategory = ImageCategory.GENERAL,
 ) -> None:
     store.save(
         image_name=name,
         image_origin=ResourceOrigin.INTERNAL,
-        image_category=ImageCategory.GENERAL,
+        image_category=category,
         width=64,
         height=64,
         has_workflow=False,
@@ -60,6 +57,18 @@ def _save(
         image_subfolder=subfolder,
         user_id=user_id,
     )
+
+
+def _capture_names_plan(store: SqliteImageRecordStorage, **kwargs):
+    statements: list[str] = []
+    store._db._conn.set_trace_callback(statements.append)
+    try:
+        result = store.get_image_names(**kwargs)
+    finally:
+        store._db._conn.set_trace_callback(None)
+    statement = next(statement for statement in statements if "SELECT images.image_name" in statement)
+    details = [row[3] for row in store._db._conn.execute(f"EXPLAIN QUERY PLAN {statement}").fetchall()]
+    return result, statement, details
 
 
 class TestImageSubfolderRoundTrip:
@@ -266,99 +275,82 @@ class TestOwnershipFilteringOmittedBoard:
         assert result.image_names == ["u1-uncat.png"]
 
 
-class TestGetImageNamesBoardFilterAndOrdering:
-    """get_image_names() board filtering (via (NOT) EXISTS) and starred-first ordering.
+class TestGetImageNamesQueryPlans:
+    def test_default_category_query_retains_covering_index(self, store: SqliteImageRecordStorage) -> None:
+        _save(store, "image.png", user_id="alice")
 
-    Seeds six images with distinct, known created_at values: img-1/img-4 live on a
-    board, img-2 (uncategorized) and img-1 (boarded) are starred.
-    """
+        result, statement, details = _capture_names_plan(
+            store,
+            categories=[ImageCategory.GENERAL],
+            is_intermediate=False,
+            is_admin=True,
+        )
 
-    def _seed_gallery(
+        assert result.image_names == ["image.png"]
+        assert "LEFT JOIN board_images" not in statement
+        assert any("COVERING INDEX idx_images_gallery_names" in detail for detail in details)
+
+    @pytest.mark.parametrize(
+        ("kwargs", "expected_access"),
+        [
+            ({"search_term": "does-not-match"}, "idx_images_image_category"),
+            ({"user_id": "alice", "is_admin": False}, "idx_images_user_id"),
+            ({"user_id": "alice", "is_admin": False, "starred_first": False}, "idx_images_user_id"),
+            (
+                {"user_id": "alice", "is_admin": False, "order_dir": SQLiteDirection.Ascending},
+                "SCAN images",
+            ),
+        ],
+    )
+    def test_noncovering_shapes_avoid_gallery_index(
         self,
-        stores: tuple[SqliteImageRecordStorage, SqliteBoardRecordStorage, SqliteBoardImageRecordStorage],
-    ) -> str:
+        store: SqliteImageRecordStorage,
+        kwargs,
+        expected_access: str,
+    ) -> None:
+        _save(store, "image.png", user_id="alice")
+
+        _, statement, details = _capture_names_plan(
+            store,
+            categories=[ImageCategory.GENERAL],
+            is_intermediate=False,
+            **kwargs,
+        )
+
+        assert "LEFT JOIN board_images" not in statement
+        assert all("idx_images_gallery_names" not in detail for detail in details)
+        assert any(expected_access in detail for detail in details)
+
+    def test_none_board_uses_anti_membership_filter(self, stores) -> None:
         image_store, board_store, board_image_store = stores
-        names = [f"img-{i}.png" for i in range(6)]
-        for name in names:
-            _save(image_store, name)
-        with image_store._db.transaction() as cursor:
-            for i, name in enumerate(names):
-                cursor.execute(
-                    "UPDATE images SET created_at = ? WHERE image_name = ?;",
-                    (f"2026-07-{10 + i:02d} 00:00:00.000", name),
-                )
-        board = board_store.save(board_name="Board", user_id="user1")
-        board_image_store.add_image_to_board(board_id=board.board_id, image_name="img-1.png")
-        board_image_store.add_image_to_board(board_id=board.board_id, image_name="img-4.png")
-        image_store.update("img-1.png", ImageRecordChanges(starred=True))
-        image_store.update("img-2.png", ImageRecordChanges(starred=True))
-        return board.board_id
+        _save(image_store, "boarded.png", user_id="alice")
+        _save(image_store, "unboarded.png", user_id="alice")
+        board = board_store.save("Board", "alice")
+        board_image_store.add_image_to_board(board.board_id, "boarded.png")
 
-    def test_none_board_excludes_boarded_images_and_orders_starred_first(
-        self,
-        stores: tuple[SqliteImageRecordStorage, SqliteBoardRecordStorage, SqliteBoardImageRecordStorage],
-    ) -> None:
-        self._seed_gallery(stores)
-        image_store = stores[0]
+        result, statement, _ = _capture_names_plan(
+            image_store,
+            board_id="none",
+            user_id="alice",
+            is_admin=False,
+            starred_first=False,
+        )
 
-        result = image_store.get_image_names(board_id="none")
+        assert result.image_names == ["unboarded.png"]
+        assert "NOT EXISTS" in statement
+        assert "LEFT JOIN board_images" not in statement
 
-        assert result.image_names == ["img-2.png", "img-5.png", "img-3.png", "img-0.png"]
-        assert result.starred_count == 1
-        assert result.total_count == 4
+    def test_nonadmin_asset_query_uses_category_index(self, store: SqliteImageRecordStorage) -> None:
+        _save(store, "asset.png", user_id="alice", category=ImageCategory.CONTROL)
 
-    def test_explicit_board_returns_only_board_contents_ordered(
-        self,
-        stores: tuple[SqliteImageRecordStorage, SqliteBoardRecordStorage, SqliteBoardImageRecordStorage],
-    ) -> None:
-        board_id = self._seed_gallery(stores)
-        image_store = stores[0]
+        result, _, details = _capture_names_plan(
+            store,
+            categories=[ImageCategory.CONTROL],
+            is_intermediate=False,
+            user_id="alice",
+            is_admin=False,
+        )
 
-        result = image_store.get_image_names(board_id=board_id)
-
-        assert result.image_names == ["img-1.png", "img-4.png"]
-        assert result.starred_count == 1
-        assert result.total_count == 2
-
-    def test_no_board_filter_returns_all_images(
-        self,
-        stores: tuple[SqliteImageRecordStorage, SqliteBoardRecordStorage, SqliteBoardImageRecordStorage],
-    ) -> None:
-        self._seed_gallery(stores)
-        image_store = stores[0]
-
-        result = image_store.get_image_names()
-
-        assert result.image_names == [
-            "img-2.png",
-            "img-1.png",
-            "img-5.png",
-            "img-4.png",
-            "img-3.png",
-            "img-0.png",
-        ]
-        assert result.starred_count == 2
-        assert result.total_count == 6
-
-    def test_none_board_ascending_order_keeps_starred_first(
-        self,
-        stores: tuple[SqliteImageRecordStorage, SqliteBoardRecordStorage, SqliteBoardImageRecordStorage],
-    ) -> None:
-        self._seed_gallery(stores)
-        image_store = stores[0]
-
-        result = image_store.get_image_names(board_id="none", order_dir=SQLiteDirection.Ascending)
-
-        assert result.image_names == ["img-2.png", "img-0.png", "img-3.png", "img-5.png"]
-
-    def test_none_board_without_starred_first_orders_by_created_at_only(
-        self,
-        stores: tuple[SqliteImageRecordStorage, SqliteBoardRecordStorage, SqliteBoardImageRecordStorage],
-    ) -> None:
-        self._seed_gallery(stores)
-        image_store = stores[0]
-
-        result = image_store.get_image_names(board_id="none", starred_first=False)
-
-        assert result.image_names == ["img-5.png", "img-3.png", "img-2.png", "img-0.png"]
-        assert result.starred_count == 0
+        assert result.image_names == ["asset.png"]
+        assert all("idx_images_gallery_names" not in detail for detail in details)
+        assert any("idx_images_image_category" in detail for detail in details)

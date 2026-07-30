@@ -14,7 +14,7 @@ Key differences from Z-Image text encoder:
 """
 
 from contextlib import ExitStack
-from typing import Iterator, Tuple
+from typing import Iterator
 
 import torch
 from transformers import PreTrainedModel, PreTrainedTokenizerBase
@@ -31,7 +31,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import Qwen3EncoderField
 from invokeai.app.invocations.primitives import AnimaConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.patches.layer_patcher import LayerPatcher
+from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.anima_lora_constants import ANIMA_LORA_QWEN3_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
@@ -59,6 +59,7 @@ QWEN3_MAX_SEQ_LEN = 8192
     category="conditioning",
     version="1.4.0",
     classification=Classification.Prototype,
+    idle_gpu_offloadable=True,
 )
 class AnimaTextEncoderInvocation(BaseInvocation):
     """Encodes and preps a prompt for an Anima image.
@@ -206,7 +207,7 @@ class AnimaTextEncoderInvocation(BaseInvocation):
 
         return qwen3_embeds, t5xxl_ids, None
 
-    def _lora_iterator(self, context: InvocationContext) -> Iterator[Tuple[ModelPatchRaw, float]]:
+    def _lora_iterator(self, context: InvocationContext) -> Iterator[PatchSpec]:
         """Iterate over LoRA models to apply to the Qwen3 text encoder."""
         for lora in self.qwen3_encoder.loras:
             lora_info = context.models.load(lora.lora)
@@ -215,5 +216,4 @@ class AnimaTextEncoderInvocation(BaseInvocation):
                     f"Expected ModelPatchRaw for LoRA '{lora.lora.key}', got {type(lora_info.model).__name__}. "
                     "The LoRA model may be corrupted or incompatible."
                 )
-            yield (lora_info.model, lora.weight)
-            del lora_info
+            yield (lora_info.model, lora.weight, lora_info.model_in_ram())

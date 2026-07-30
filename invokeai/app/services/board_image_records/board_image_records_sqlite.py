@@ -80,6 +80,7 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
         board_id: str,
         categories: list[ImageCategory] | None,
         is_intermediate: bool | None,
+        user_id: Optional[str] = None,
     ) -> list[str]:
         with self._db.transaction() as cursor:
             params: list[str | bool] = []
@@ -124,6 +125,13 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
                     """
                 params.append(is_intermediate)
 
+            # Per-user filter — admins pass user_id=None to skip this clause.
+            if user_id is not None:
+                stmt += """--sql
+                    AND images.user_id = ?
+                    """
+                params.append(user_id)
+
             # Put a ring on it
             stmt += ";"
 
@@ -161,7 +169,9 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
                 f"""--sql
                     SELECT COUNT(*)
                     FROM board_images
-                    INNER JOIN images ON board_images.image_name = images.image_name
+                    -- Keep work proportional to this board's membership instead of allowing
+                    -- the gallery index to make images the outer loop for this query.
+                    CROSS JOIN images ON board_images.image_name = images.image_name
                     WHERE images.is_intermediate = FALSE AND images.image_category IN ( {placeholders} )
                     AND board_images.board_id = ?;
                     """,
@@ -180,7 +190,9 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
                 f"""--sql
                     SELECT COUNT(*)
                     FROM board_images
-                    INNER JOIN images ON board_images.image_name = images.image_name
+                    -- Keep work proportional to this board's membership instead of allowing
+                    -- the gallery index to make images the outer loop for this query.
+                    CROSS JOIN images ON board_images.image_name = images.image_name
                     WHERE images.is_intermediate = FALSE AND images.image_category IN ( {placeholders} )
                     AND board_images.board_id = ?;
                     """,

@@ -431,6 +431,25 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         is_admin: bool = False,
     ) -> ImageNamesResult:
         with self._db.transaction() as cursor:
+            # The gallery index is ideal for the default single-category path, but it is
+            # non-covering when search or user isolation needs columns outside the index.
+            # Keep those shapes on their pre-index access paths instead of scanning the
+            # gallery index and looking up every candidate row in the images table.
+            names_index_hint = ""
+            starred_count_index_hint = ""
+            has_general_category_filter = categories is not None and set(categories) == {ImageCategory.GENERAL}
+            has_non_admin_user_filter = user_id is not None and not is_admin
+            if search_term:
+                names_index_hint = "INDEXED BY idx_images_image_category" if categories is not None else "NOT INDEXED"
+                starred_count_index_hint = "INDEXED BY idx_images_starred"
+            elif has_non_admin_user_filter and (categories is None or has_general_category_filter):
+                if not starred_first or order_dir == SQLiteDirection.Descending:
+                    names_index_hint = "INDEXED BY idx_images_user_id"
+                else:
+                    names_index_hint = "NOT INDEXED"
+            elif has_non_admin_user_filter and categories is not None:
+                names_index_hint = "INDEXED BY idx_images_image_category"
+
             # Build query conditions (reused for both starred count and image names queries)
             query_conditions = ""
             query_params: list[Union[int, str, bool]] = []
@@ -456,10 +475,6 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 """
                 query_params.append(is_intermediate)
 
-            # Board membership is checked with (NOT) EXISTS rather than a LEFT JOIN so the
-            # planner can serve the ordered scan from idx_images_gallery_names without a
-            # temp B-tree sort. board_images.image_name is that table's primary key, so an
-            # image has at most one board row and the two forms are equivalent.
             if board_id == "none":
                 query_conditions += """--sql
                 AND NOT EXISTS (
@@ -508,7 +523,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             if starred_first:
                 starred_count_query = f"""--sql
                 SELECT COUNT(*)
-                FROM images
+                FROM images {starred_count_index_hint}
                 WHERE images.starred = TRUE AND (1=1{query_conditions})
                 """
                 cursor.execute(starred_count_query, query_params)
@@ -518,14 +533,14 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             if starred_first:
                 names_query = f"""--sql
                 SELECT images.image_name
-                FROM images
+                FROM images {names_index_hint}
                 WHERE 1=1{query_conditions}
                 ORDER BY images.starred DESC, images.created_at {order_dir.value}
                 """
             else:
                 names_query = f"""--sql
                 SELECT images.image_name
-                FROM images
+                FROM images {names_index_hint}
                 WHERE 1=1{query_conditions}
                 ORDER BY images.created_at {order_dir.value}
                 """

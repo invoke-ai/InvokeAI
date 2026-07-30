@@ -8,7 +8,11 @@ import type {
 import { describe, expect, it } from 'vitest';
 
 import {
+  isValidKrea2RebalanceWeights,
+  KREA2_REBALANCE_WEIGHT_COUNT,
+  modelChanged,
   paramsSliceConfig,
+  parseKrea2RebalanceWeights,
   positivePromptAddedToHistory,
   promptRemovedFromHistory,
   selectModelSupportsDimensions,
@@ -158,7 +162,9 @@ describe('paramsSliceConfig persisted state migration', () => {
 
     const result = migrate?.(v2State) as ReturnType<typeof getInitialParamsState>;
 
-    expect(result._version).toBe(3);
+    // v2 migrates all the way through the current chain (v2 -> v3 adds Qwen fields,
+    // v3 -> v4 adds Krea-2 and PiD fields).
+    expect(result._version).toBe(4);
     expect(result.qwenImageVaeModel).toBeNull();
     expect(result.qwenImageQwenVLEncoderModel).toBeNull();
     // Existing params should be preserved
@@ -167,6 +173,42 @@ describe('paramsSliceConfig persisted state migration', () => {
     expect(result.shouldRandomizeSeed).toBe(false);
     expect(result.dimensions.width).toBe(768);
     expect(result.dimensions.height).toBe(768);
+  });
+
+  it('backfills Krea-2 fields when migrating from v3 and preserves existing params', () => {
+    expect(migrate).toBeDefined();
+
+    const initial = getInitialParamsState();
+    const v3State: Record<string, unknown> = {
+      ...initial,
+      _version: 3,
+      positivePrompt: 'preserve this prompt',
+      seed: 1234,
+      dimensions: { ...initial.dimensions, width: 640, height: 896 },
+    };
+    delete v3State.krea2VaeModel;
+    delete v3State.krea2Qwen3VlEncoderModel;
+    delete v3State.krea2SeedVarianceEnabled;
+    delete v3State.krea2SeedVarianceStrength;
+    delete v3State.krea2SeedVarianceRandomizePercent;
+    delete v3State.krea2RebalanceEnabled;
+    delete v3State.krea2RebalanceMultiplier;
+    delete v3State.krea2RebalanceWeights;
+
+    const result = migrate?.(v3State) as ReturnType<typeof getInitialParamsState>;
+
+    expect(result._version).toBe(4);
+    expect(result.krea2VaeModel).toBeNull();
+    expect(result.krea2Qwen3VlEncoderModel).toBeNull();
+    expect(result.krea2SeedVarianceEnabled).toBe(false);
+    expect(result.krea2SeedVarianceStrength).toBe(0.1);
+    expect(result.krea2SeedVarianceRandomizePercent).toBe(50);
+    expect(result.krea2RebalanceEnabled).toBe(false);
+    expect(result.krea2RebalanceMultiplier).toBe(4);
+    expect(result.krea2RebalanceWeights).toBe('1.0,1.0,1.0,1.0,1.0,1.0,1.0,2.5,5.0,1.1,4.0,1.0');
+    expect(result.positivePrompt).toBe('preserve this prompt');
+    expect(result.seed).toBe(1234);
+    expect(result.dimensions).toMatchObject({ width: 640, height: 896 });
   });
 
   it('migrates old positive prompt history entries to prompt pairs', () => {
@@ -181,6 +223,50 @@ describe('paramsSliceConfig persisted state migration', () => {
     const result = migrate?.(v3State) as ReturnType<typeof getInitialParamsState>;
 
     expect(result.positivePromptHistory).toEqual([{ positivePrompt: 'a fluffy cat', negativePrompt: null }]);
+  });
+});
+
+describe('paramsSlice PiD state on base change (modelChanged)', () => {
+  const fluxModel = { key: 'flux', hash: 'h', name: 'FLUX', base: 'flux', type: 'main' };
+  const modelWithBase = (base: string) => ({ key: base, hash: 'h', name: base, base, type: 'main' });
+
+  const stateOnFluxWithNativePid = () =>
+    ({
+      ...getInitialParamsState(),
+      model: fluxModel,
+      pidMode: 'native',
+      pidDecoderModel: { key: 'd', name: 'flux decoder', base: 'flux' },
+    }) as ReturnType<typeof getInitialParamsState>;
+
+  it('clears an incompatible PiD decoder when switching to a different PiD base (FLUX -> SDXL)', () => {
+    const next = paramsSliceConfig.slice.reducer(
+      stateOnFluxWithNativePid(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      modelChanged({ model: modelWithBase('sdxl') as any, previousModel: fluxModel as any })
+    );
+    // The FLUX decoder is invalid for SDXL, so it is cleared; SDXL supports PiD so the mode is kept.
+    expect(next.pidDecoderModel).toBeNull();
+    expect(next.pidMode).toBe('native');
+  });
+
+  it('keeps the FLUX decoder when switching to Z-Image (which reuses the FLUX decoder)', () => {
+    const next = paramsSliceConfig.slice.reducer(
+      stateOnFluxWithNativePid(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      modelChanged({ model: modelWithBase('z-image') as any, previousModel: fluxModel as any })
+    );
+    expect(next.pidDecoderModel).not.toBeNull();
+    expect(next.pidMode).toBe('native');
+  });
+
+  it('turns PiD off (and clears the decoder) when switching to a non-PiD base (FLUX -> SD1)', () => {
+    const next = paramsSliceConfig.slice.reducer(
+      stateOnFluxWithNativePid(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      modelChanged({ model: modelWithBase('sd-1') as any, previousModel: fluxModel as any })
+    );
+    expect(next.pidMode).toBe('off');
+    expect(next.pidDecoderModel).toBeNull();
   });
 });
 
@@ -241,5 +327,34 @@ describe('paramsSlice ideogram4Steps normalization (backend requires >= 2)', () 
       typeof getInitialParamsState
     >;
     expect(rehydrated.ideogram4Steps).toBeNull();
+  });
+});
+
+describe('isValidKrea2RebalanceWeights (backend rebalance node requires exactly 12 finite numbers)', () => {
+  it('accepts exactly 12 finite comma-separated numbers', () => {
+    const parsed = parseKrea2RebalanceWeights('1,1,1,1,1,1,1,2.5,5,1.1,4,1');
+    expect(parsed).toEqual([1, 1, 1, 1, 1, 1, 1, 2.5, 5, 1.1, 4, 1]);
+    expect(parsed).toHaveLength(KREA2_REBALANCE_WEIGHT_COUNT);
+    // Tolerates surrounding whitespace and a trailing comma (empty segments are ignored, as in the backend).
+    expect(isValidKrea2RebalanceWeights(' 1 , 2 , 3 , 4 , 5 , 6 , 7 , 8 , 9 , 10 , 11 , 12 ,')).toBe(true);
+    expect(isValidKrea2RebalanceWeights('0,-1,1.5,-2.25,3,4,5,6,7,8,9,10')).toBe(true);
+    // Scientific notation and leading-dot decimals are valid Python floats and must be accepted.
+    expect(isValidKrea2RebalanceWeights('1e2,1.5e-3,.5,2.,+1,-1,1E3,3.14,0,10,11,12')).toBe(true);
+  });
+
+  it.each([
+    ['too few', '1,2,3'],
+    ['too many', '1,2,3,4,5,6,7,8,9,10,11,12,13'],
+    ['nonnumeric', '1,2,3,4,5,6,7,8,9,10,11,x'],
+    ['nan', '1,2,3,4,5,6,7,8,9,10,11,nan'],
+    ['inf', '1,2,3,4,5,6,7,8,9,10,11,inf'],
+    ['Infinity', '1,2,3,4,5,6,7,8,9,10,11,Infinity'],
+    ['empty', ''],
+    // JS Number() accepts these, but Python float() (the backend) rejects them, so we must too.
+    ['hex', '0x10,2,3,4,5,6,7,8,9,10,11,12'],
+    ['binary', '0b10,2,3,4,5,6,7,8,9,10,11,12'],
+    ['octal', '0o10,2,3,4,5,6,7,8,9,10,11,12'],
+  ])('rejects %s', (_label, value) => {
+    expect(isValidKrea2RebalanceWeights(value)).toBe(false);
   });
 });
