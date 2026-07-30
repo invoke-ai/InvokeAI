@@ -118,6 +118,7 @@ const LayerThumbnailContent = ({
           minH="0"
           minW="0"
           onClick={retry}
+          onPointerDown={stopPropagation}
           position="absolute"
           size="xs"
           variant="surface"
@@ -149,3 +150,5 @@ export const LayerThumbnail = ({
     />
   );
 };
+
+const stopPropagation = (event: { stopPropagation: () => void }): void => event.stopPropagation();

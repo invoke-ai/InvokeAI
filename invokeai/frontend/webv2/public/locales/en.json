@@ -1691,6 +1691,7 @@
         "reorder": "Reorder layer",
         "runWorkflow": "Run workflow",
         "saveLayerToAssets": "Save layer to assets",
+        "select": "Select {{name}}",
         "selectObject": "Select object",
         "show": "Show layer",
         "toggleAutoNegative": "Toggle auto-negative",

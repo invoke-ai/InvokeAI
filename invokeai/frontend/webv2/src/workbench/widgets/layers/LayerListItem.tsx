@@ -3,12 +3,12 @@ import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
 import type { Dispatch, KeyboardEvent, MouseEvent } from 'react';
 
-import { Badge, Box, HStack, Input, Stack, Text } from '@chakra-ui/react';
+import { Badge, Box, chakra, HStack, Input, Stack, Text } from '@chakra-ui/react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { IconButton, Row, ToggleDot } from '@platform/ui';
 import { isHideableLayer, isLayerHidden } from '@workbench/canvas-engine/api';
-import { EyeIcon, EyeOffIcon, LockIcon, LockOpenIcon } from 'lucide-react';
+import { EyeIcon, EyeOffIcon, GripVerticalIcon, LockIcon, LockOpenIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -24,6 +24,49 @@ import { createLayerMenuTargetFromContextEvent } from './layerMenuState';
 import { applyStructural } from './layerOps';
 import { LayerPropertiesPopover, type LayerPropertiesEngine } from './LayerPropertiesPopover';
 import { LayerThumbnail } from './LayerThumbnail';
+
+const ROW_INTERACTIVE_DESCENDANTS = {
+  '& button, & input': {
+    pointerEvents: 'auto',
+  },
+};
+const ROW_SELECTION_FOCUS = {
+  outline: '2px solid',
+  outlineColor: 'accent.solid',
+  outlineOffset: '-2px',
+};
+const VISIBILITY_DOT_BASE = {
+  borderRadius: 'full',
+  borderWidth: '1px',
+  content: '""',
+  h: '3',
+  inset: '50% auto auto 50%',
+  position: 'absolute',
+  transform: 'translate(-50%, -50%)',
+  transition: 'background var(--wb-motion-duration-fast), border-color var(--wb-motion-duration-fast)',
+  w: '3',
+};
+const VISIBILITY_DOT_CHECKED = {
+  ...VISIBILITY_DOT_BASE,
+  bg: 'accent.solid',
+  borderColor: 'accent.solid',
+};
+const VISIBILITY_DOT_UNCHECKED = {
+  ...VISIBILITY_DOT_BASE,
+  bg: 'transparent',
+  borderColor: 'border.emphasized',
+};
+const VISIBILITY_DOT_CHECKED_HOVER = {
+  _before: {
+    bg: 'accent.emphasized',
+    borderColor: 'accent.emphasized',
+  },
+};
+const VISIBILITY_DOT_UNCHECKED_HOVER = {
+  _before: {
+    borderColor: 'fg.muted',
+  },
+};
 
 export type LayerListItemEngine = LayerContextMenuEngine & LayerPropertiesEngine & Pick<CanvasEngineHandle, 'previews'>;
 
@@ -56,10 +99,10 @@ export const getLayerListItemInteractionState = (editingLocked: boolean) => ({
 /**
  * One layer row: thumbnail, name (double-click to rename), type badge,
  * visibility + lock toggles, a properties popover (blend mode + the layer's
- * type-specific settings), and an overflow/context menu. The whole row is the
- * drag target — no visible handle — with a pointer distance activation
- * constraint so clicks, double-click rename, and the row buttons still work;
- * the selected layer's opacity (and mask fill swatch) lives in the panel header.
+ * type-specific settings), and an overflow/context menu. The whole row remains
+ * the pointer drag target, while a dedicated reorder button owns keyboard
+ * sorting. The pointer distance constraint keeps clicks, double-click rename,
+ * and row buttons working; selected-layer opacity lives in the panel header.
  */
 export const LayerListItem = ({
   dispatch,
@@ -72,7 +115,7 @@ export const LayerListItem = ({
 }: LayerListItemProps) => {
   const { t } = useTranslation();
   const interaction = getLayerListItemInteractionState(editingLocked);
-  const { attributes, isDragging, listeners, setNodeRef, transform, transition } = useSortable({
+  const { attributes, isDragging, listeners, setActivatorNodeRef, setNodeRef, transform, transition } = useSortable({
     disabled: interaction.sortableDisabled,
     id: layer.id,
   });
@@ -211,34 +254,59 @@ export const LayerListItem = ({
    */
   const sortableListeners = useMemo(() => {
     if (interaction.sortableDisabled || !listeners) {
-      return {};
+      return { handle: {}, row: {} };
     }
     const { onKeyDown, ...rest } = listeners;
     return {
-      ...rest,
-      onKeyDown: (event: KeyboardEvent<HTMLElement>) => {
-        if (!shouldStartLayerKeyboardDrag(event, rowRef.current)) {
-          return;
-        }
-        onKeyDown?.(event);
+      handle: {
+        onKeyDown: (event: KeyboardEvent<HTMLElement>) => {
+          if (!shouldStartLayerKeyboardDrag(event, rowRef.current)) {
+            return;
+          }
+          onKeyDown?.(event);
+        },
       },
+      row: rest,
     };
   }, [interaction.sortableDisabled, listeners]);
 
   return (
     <Box ref={setRowRef} style={dndStyle}>
       <Row
-        {...(interaction.sortableDisabled ? {} : attributes)}
-        {...sortableListeners}
+        {...sortableListeners.row}
         active={isSelected ? 'muted' : undefined}
         cursor={isDragging ? 'grabbing' : 'default'}
         display="flex"
         gap="1.5"
         p="1.5"
-        onClick={handleSelect}
+        position="relative"
         onContextMenu={handleContextMenu}
       >
-        <HStack gap="1.5" w="full">
+        <chakra.button
+          aria-label={t('widgets.layers.actions.select', { name: layer.name })}
+          aria-pressed={isSelected}
+          inset="0"
+          position="absolute"
+          rounded="sm"
+          type="button"
+          _focusVisible={ROW_SELECTION_FOCUS}
+          onClick={handleSelect}
+          onDoubleClick={interaction.canRename ? startEditing : undefined}
+        />
+        <HStack css={ROW_INTERACTIVE_DESCENDANTS} gap="1.5" pointerEvents="none" position="relative" w="full">
+          <IconButton
+            ref={setActivatorNodeRef}
+            {...(interaction.sortableDisabled ? {} : attributes)}
+            {...sortableListeners.handle}
+            aria-label={`${t('widgets.layers.actions.reorder')}: ${layer.name}`}
+            color="fg.subtle"
+            cursor={isDragging ? 'grabbing' : 'grab'}
+            disabled={interaction.sortableDisabled}
+            size="2xs"
+            variant="ghost"
+          >
+            <GripVerticalIcon aria-hidden="true" />
+          </IconButton>
           <LayerThumbnail engine={engine} layer={layer} />
           <Stack flex="1" gap="0.5" minW="0">
             {isEditing ? (
@@ -254,13 +322,7 @@ export const LayerListItem = ({
                 onPointerDown={stopPropagation}
               />
             ) : (
-              <Text
-                aria-disabled={!interaction.canRename}
-                fontSize="2xs"
-                fontWeight="700"
-                truncate
-                onDoubleClick={interaction.canRename ? startEditing : undefined}
-              >
+              <Text aria-disabled={!interaction.canRename} fontSize="2xs" fontWeight="700" truncate>
                 {layer.name}
               </Text>
             )}
@@ -287,10 +349,19 @@ export const LayerListItem = ({
           ) : null}
           <Box flexShrink="0" onClick={stopPropagation} onPointerDown={stopPropagation}>
             <ToggleDot
+              _before={layer.isEnabled ? VISIBILITY_DOT_CHECKED : VISIBILITY_DOT_UNCHECKED}
+              _focusVisible={ROW_SELECTION_FOCUS}
+              _hover={layer.isEnabled ? VISIBILITY_DOT_CHECKED_HOVER : VISIBILITY_DOT_UNCHECKED_HOVER}
+              bg="transparent"
+              borderWidth="0"
               checked={layer.isEnabled}
               cursor={interaction.canToggleVisibility ? 'pointer' : 'not-allowed'}
               disabled={!interaction.canToggleVisibility}
+              h="6"
               label={t('widgets.layers.actions.toggleVisibility')}
+              position="relative"
+              transition="none"
+              w="6"
               onCheckedChange={handleToggleVisible}
             />
           </Box>
