@@ -8,7 +8,7 @@ import type { S } from 'services/api/types';
 import { REDACTED_USER_ID } from 'services/events/eventScope';
 import { QUEUE_CHANGED_TAGS } from 'services/events/queueCacheTags';
 import { getUpdatedQueueStatusOnQueueItemStatusChanged } from 'services/events/queueStatusEvents';
-import { $lastProgressEvent } from 'services/events/stores';
+import { $lastProgressEvent, clearProgressEvent } from 'services/events/stores';
 
 const log = logger('events');
 
@@ -118,6 +118,8 @@ export const buildOnQueueItemStatusChanged = (dispatch: AppDispatch, coordinator
       }
       // If the queue item is completed, failed, or cancelled, we want to clear the last progress event
       $lastProgressEvent.set(null);
+      // Also remove this session's per-item progress so its stacked progress bar disappears.
+      clearProgressEvent(item_id);
     }
   };
 };

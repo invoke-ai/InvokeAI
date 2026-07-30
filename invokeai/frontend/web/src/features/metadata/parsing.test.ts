@@ -191,6 +191,7 @@ describe('HiDiffusion metadata parsing', () => {
       store
     );
 
+    expect(store.dispatch).toHaveBeenCalledWith(setHiDiffusionEnabled(false));
     expect(hiDiffusionEnabled).toBe(false);
   });
 });

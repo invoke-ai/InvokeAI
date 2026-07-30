@@ -11,6 +11,7 @@ import type {
   AspectRatioID,
   InfillMethod,
   ParamsState,
+  PidMode,
   PromptHistoryItem,
   RgbaColor,
 } from 'features/controlLayers/store/types';
@@ -50,7 +51,13 @@ import type {
   ParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
 import { getExternalPanelControl, hasExternalPanelControl } from 'features/parameters/util/externalPanelSchema';
-import { getGridSize, getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
+import {
+  getGridSize,
+  getIsSizeOptimal,
+  getOptimalDimension,
+  getPidScale,
+} from 'features/parameters/util/optimalDimension';
+import { getPidDecoderBaseForMainBase } from 'features/parameters/util/pid';
 import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
 import type { AnyModelConfigWithExternal } from 'services/api/types';
 import { isExternalApiModelConfig, isNonRefinerMainModelConfig } from 'services/api/types';
@@ -125,6 +132,24 @@ const slice = createSlice({
     setZImageSeedVarianceRandomizePercent: (state, action: PayloadAction<number>) => {
       state.zImageSeedVarianceRandomizePercent = action.payload;
     },
+    setKrea2SeedVarianceEnabled: (state, action: PayloadAction<boolean>) => {
+      state.krea2SeedVarianceEnabled = action.payload;
+    },
+    setKrea2SeedVarianceStrength: (state, action: PayloadAction<number>) => {
+      state.krea2SeedVarianceStrength = action.payload;
+    },
+    setKrea2SeedVarianceRandomizePercent: (state, action: PayloadAction<number>) => {
+      state.krea2SeedVarianceRandomizePercent = action.payload;
+    },
+    setKrea2RebalanceEnabled: (state, action: PayloadAction<boolean>) => {
+      state.krea2RebalanceEnabled = action.payload;
+    },
+    setKrea2RebalanceMultiplier: (state, action: PayloadAction<number>) => {
+      state.krea2RebalanceMultiplier = action.payload;
+    },
+    setKrea2RebalanceWeights: (state, action: PayloadAction<string>) => {
+      state.krea2RebalanceWeights = action.payload;
+    },
     setUpscaleScheduler: (state, action: PayloadAction<ParameterScheduler>) => {
       state.upscaleScheduler = action.payload;
     },
@@ -181,6 +206,33 @@ const slice = createSlice({
       }
 
       applyClipSkip(state, model, state.clipSkip);
+
+      // PiD decoders are trained per backbone, so a decoder selected for the old base is invalid for a
+      // different one. Clear it unless the new base maps to the same decoder base (e.g. Z-Image reuses the
+      // FLUX decoder), so enqueue requires a matching decoder instead of failing during PiD execution.
+      const pidDecoderBase = getPidDecoderBaseForMainBase(model.base);
+      if (state.pidDecoderModel && state.pidDecoderModel.base !== pidDecoderBase) {
+        state.pidDecoderModel = null;
+      }
+      // If the new base cannot do PiD at all, turn PiD off. A stuck `native` mode is hidden by the UI
+      // (PidSettings is gated on the base) but keeps warping dimensions via getPidScale (4x grid / 2048
+      // optimum) with no way to disable it. Re-fit dimensions to the plain scale on the new base.
+      if (pidDecoderBase === null && state.pidMode !== 'off') {
+        const prevPidScale = getPidScale(state.pidMode);
+        state.pidMode = 'off';
+        const nextPidScale = getPidScale('off');
+        if (prevPidScale !== nextPidScale) {
+          const optimalDimension = getOptimalDimension(model.base, nextPidScale);
+          const { width, height } = calculateNewSize(
+            state.dimensions.aspectRatio.value,
+            optimalDimension * optimalDimension,
+            model.base,
+            nextPidScale
+          );
+          state.dimensions.width = width;
+          state.dimensions.height = height;
+        }
+      }
     },
     vaeSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
       // null is a valid VAE!
@@ -256,6 +308,23 @@ const slice = createSlice({
       }
       state.zImageQwen3SourceModel = result.data;
     },
+    krea2VaeModelSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
+      const result = zParamsState.shape.krea2VaeModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.krea2VaeModel = result.data;
+    },
+    krea2Qwen3VlEncoderModelSelected: (
+      state,
+      action: PayloadAction<{ key: string; name: string; base: string } | null>
+    ) => {
+      const result = zParamsState.shape.krea2Qwen3VlEncoderModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.krea2Qwen3VlEncoderModel = result.data;
+    },
     animaVaeModelSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
       const result = zParamsState.shape.animaVaeModel.safeParse(action.payload);
       if (!result.success) {
@@ -306,6 +375,46 @@ const slice = createSlice({
         return;
       }
       state.kleinQwen3EncoderModel = result.data;
+    },
+    pidModeChanged: (state, action: PayloadAction<PidMode>) => {
+      const prevPidScale = getPidScale(state.pidMode);
+      const nextPidScale = getPidScale(action.payload);
+      state.pidMode = action.payload;
+      // Entering/leaving native mode reinterprets the dimensions (4x target <-> generation resolution), so
+      // re-fit them to the new mode's optimal target on the new grid, preserving aspect ratio.
+      if (prevPidScale !== nextPidScale) {
+        const base = state.model?.base as BaseModelType | undefined;
+        const optimalDimension = getOptimalDimension(base, nextPidScale);
+        const { width, height } = calculateNewSize(
+          state.dimensions.aspectRatio.value,
+          optimalDimension * optimalDimension,
+          base,
+          nextPidScale
+        );
+        state.dimensions.width = width;
+        state.dimensions.height = height;
+      }
+    },
+    pidDecoderModelSelected: (state, action: PayloadAction<{ key: string; name: string; base: string } | null>) => {
+      const result = zParamsState.shape.pidDecoderModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.pidDecoderModel = result.data;
+    },
+    gemma2EncoderModelSelected: (state, action: PayloadAction<{ key: string; name: string; base: string } | null>) => {
+      const result = zParamsState.shape.gemma2EncoderModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.gemma2EncoderModel = result.data;
+    },
+    pidStepsChanged: (state, action: PayloadAction<number>) => {
+      const result = zParamsState.shape.pidSteps.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.pidSteps = result.data;
     },
     qwenImageComponentSourceSelected: (state, action: PayloadAction<ParameterModel | null>) => {
       const result = zParamsState.shape.qwenImageComponentSource.safeParse(action.payload);
@@ -470,7 +579,7 @@ const slice = createSlice({
     //#region Dimensions
     sizeRecalled: (state, action: PayloadAction<{ width: number; height: number }>) => {
       const { width, height } = action.payload;
-      const gridSize = getGridSize(state.model?.base as BaseModelType | undefined);
+      const gridSize = getGridSize(state.model?.base as BaseModelType | undefined, getPidScale(state.pidMode));
       state.dimensions.width = Math.max(roundDownToMultiple(width, gridSize), 64);
       state.dimensions.height = Math.max(roundDownToMultiple(height, gridSize), 64);
       state.dimensions.aspectRatio.value = state.dimensions.width / state.dimensions.height;
@@ -479,7 +588,7 @@ const slice = createSlice({
     },
     widthChanged: (state, action: PayloadAction<{ width: number; updateAspectRatio?: boolean; clamp?: boolean }>) => {
       const { width, updateAspectRatio, clamp } = action.payload;
-      const gridSize = getGridSize(state.model?.base as BaseModelType | undefined);
+      const gridSize = getGridSize(state.model?.base as BaseModelType | undefined, getPidScale(state.pidMode));
       state.dimensions.width = clamp ? Math.max(roundDownToMultiple(width, gridSize), 64) : width;
 
       if (state.dimensions.aspectRatio.isLocked) {
@@ -497,7 +606,7 @@ const slice = createSlice({
     },
     heightChanged: (state, action: PayloadAction<{ height: number; updateAspectRatio?: boolean; clamp?: boolean }>) => {
       const { height, updateAspectRatio, clamp } = action.payload;
-      const gridSize = getGridSize(state.model?.base as BaseModelType | undefined);
+      const gridSize = getGridSize(state.model?.base as BaseModelType | undefined, getPidScale(state.pidMode));
       state.dimensions.height = clamp ? Math.max(roundDownToMultiple(height, gridSize), 64) : height;
 
       if (state.dimensions.aspectRatio.isLocked) {
@@ -535,7 +644,8 @@ const slice = createSlice({
           const { width, height } = calculateNewSize(
             state.dimensions.aspectRatio.value,
             state.dimensions.width * state.dimensions.height,
-            state.model?.base as BaseModelType | undefined
+            state.model?.base as BaseModelType | undefined,
+            getPidScale(state.pidMode)
           );
           state.dimensions.width = width;
           state.dimensions.height = height;
@@ -553,7 +663,8 @@ const slice = createSlice({
         const { width, height } = calculateNewSize(
           state.dimensions.aspectRatio.value,
           state.dimensions.width * state.dimensions.height,
-          state.model?.base as BaseModelType | undefined
+          state.model?.base as BaseModelType | undefined,
+          getPidScale(state.pidMode)
         );
         state.dimensions.width = width;
         state.dimensions.height = height;
@@ -561,12 +672,14 @@ const slice = createSlice({
       }
     },
     sizeOptimized: (state) => {
-      const optimalDimension = getOptimalDimension(state.model?.base as BaseModelType | undefined);
+      const pidScale = getPidScale(state.pidMode);
+      const optimalDimension = getOptimalDimension(state.model?.base as BaseModelType | undefined, pidScale);
       if (state.dimensions.aspectRatio.isLocked) {
         const { width, height } = calculateNewSize(
           state.dimensions.aspectRatio.value,
           optimalDimension * optimalDimension,
-          state.model?.base as BaseModelType | undefined
+          state.model?.base as BaseModelType | undefined,
+          pidScale
         );
         state.dimensions.width = width;
         state.dimensions.height = height;
@@ -577,19 +690,22 @@ const slice = createSlice({
       }
     },
     syncedToOptimalDimension: (state) => {
-      const optimalDimension = getOptimalDimension(state.model?.base as BaseModelType | undefined);
+      const pidScale = getPidScale(state.pidMode);
+      const optimalDimension = getOptimalDimension(state.model?.base as BaseModelType | undefined, pidScale);
 
       if (
         !getIsSizeOptimal(
           state.dimensions.width,
           state.dimensions.height,
-          state.model?.base as BaseModelType | undefined
+          state.model?.base as BaseModelType | undefined,
+          pidScale
         )
       ) {
         const bboxDims = calculateNewSize(
           state.dimensions.aspectRatio.value,
           optimalDimension * optimalDimension,
-          state.model?.base as BaseModelType | undefined
+          state.model?.base as BaseModelType | undefined,
+          pidScale
         );
         state.dimensions.width = bboxDims.width;
         state.dimensions.height = bboxDims.height;
@@ -690,11 +806,17 @@ const resetState = (state: ParamsState): ParamsState => {
   newState.zImageVaeModel = oldState.zImageVaeModel;
   newState.zImageQwen3EncoderModel = oldState.zImageQwen3EncoderModel;
   newState.zImageQwen3SourceModel = oldState.zImageQwen3SourceModel;
+  newState.krea2VaeModel = oldState.krea2VaeModel;
+  newState.krea2Qwen3VlEncoderModel = oldState.krea2Qwen3VlEncoderModel;
   newState.animaVaeModel = oldState.animaVaeModel;
   newState.animaQwen3EncoderModel = oldState.animaQwen3EncoderModel;
   newState.animaLLLiteModel = oldState.animaLLLiteModel;
   newState.kleinVaeModel = oldState.kleinVaeModel;
   newState.kleinQwen3EncoderModel = oldState.kleinQwen3EncoderModel;
+  newState.pidMode = oldState.pidMode;
+  newState.pidDecoderModel = oldState.pidDecoderModel;
+  newState.gemma2EncoderModel = oldState.gemma2EncoderModel;
+  newState.pidSteps = oldState.pidSteps;
   newState.qwenImageComponentSource = oldState.qwenImageComponentSource;
   newState.qwenImageVaeModel = oldState.qwenImageVaeModel;
   newState.qwenImageQwenVLEncoderModel = oldState.qwenImageQwenVLEncoderModel;
@@ -737,6 +859,12 @@ export const {
   setZImageSeedVarianceEnabled,
   setZImageSeedVarianceStrength,
   setZImageSeedVarianceRandomizePercent,
+  setKrea2SeedVarianceEnabled,
+  setKrea2SeedVarianceStrength,
+  setKrea2SeedVarianceRandomizePercent,
+  setKrea2RebalanceEnabled,
+  setKrea2RebalanceMultiplier,
+  setKrea2RebalanceWeights,
   setUpscaleScheduler,
   setUpscaleCfgScale,
   setSeed,
@@ -760,8 +888,14 @@ export const {
   zImageVaeModelSelected,
   zImageQwen3EncoderModelSelected,
   zImageQwen3SourceModelSelected,
+  krea2VaeModelSelected,
+  krea2Qwen3VlEncoderModelSelected,
   kleinVaeModelSelected,
   kleinQwen3EncoderModelSelected,
+  pidModeChanged,
+  pidDecoderModelSelected,
+  gemma2EncoderModelSelected,
+  pidStepsChanged,
   qwenImageComponentSourceSelected,
   qwenImageVaeModelSelected,
   qwenImageQwenVLEncoderModelSelected,
@@ -845,6 +979,24 @@ export const paramsSliceConfig: SliceConfig<typeof slice> = {
         state.qwenImageQwenVLEncoderModel = null;
       }
 
+      if (state._version === 3) {
+        // v3 -> v4, add Krea-2 standalone component and conditioning enhancer fields, and the
+        // PiD (Pixel Diffusion Decoder) fields
+        state._version = 4;
+        state.krea2VaeModel = null;
+        state.krea2Qwen3VlEncoderModel = null;
+        state.krea2SeedVarianceEnabled = false;
+        state.krea2SeedVarianceStrength = 0.1;
+        state.krea2SeedVarianceRandomizePercent = 50;
+        state.krea2RebalanceEnabled = false;
+        state.krea2RebalanceMultiplier = 4;
+        state.krea2RebalanceWeights = '1.0,1.0,1.0,1.0,1.0,1.0,1.0,2.5,5.0,1.1,4.0,1.0';
+        state.pidMode = 'off';
+        state.pidDecoderModel = null;
+        state.gemma2EncoderModel = null;
+        state.pidSteps = 4;
+      }
+
       if (!('hiDiffusionEnabled' in state)) {
         state.hiDiffusionEnabled = false;
       }
@@ -880,6 +1032,7 @@ export const selectIsAnima = createParamsSelector((params) => params.model?.base
 export const selectIsFlux2 = createParamsSelector((params) => params.model?.base === 'flux2');
 export const selectIsExternal = createParamsSelector((params) => params.model?.base === 'external');
 export const selectIsQwenImage = createParamsSelector((params) => params.model?.base === 'qwen-image');
+export const selectIsKrea2 = createParamsSelector((params) => params.model?.base === 'krea-2');
 export const selectIsWan = createParamsSelector((params) => params.model?.base === 'wan');
 export const selectIsFluxKontext = createParamsSelector((params) => {
   if (params.model?.base === 'flux' && params.model?.name.toLowerCase().includes('kontext')) {
@@ -901,6 +1054,8 @@ export const selectCLIPGEmbedModel = createParamsSelector((params) => params.cli
 export const selectZImageVaeModel = createParamsSelector((params) => params.zImageVaeModel);
 export const selectZImageQwen3EncoderModel = createParamsSelector((params) => params.zImageQwen3EncoderModel);
 export const selectZImageQwen3SourceModel = createParamsSelector((params) => params.zImageQwen3SourceModel);
+export const selectKrea2VaeModel = createParamsSelector((params) => params.krea2VaeModel);
+export const selectKrea2Qwen3VlEncoderModel = createParamsSelector((params) => params.krea2Qwen3VlEncoderModel);
 export const selectAnimaVaeModel = createParamsSelector((params) => params.animaVaeModel);
 export const selectAnimaQwen3EncoderModel = createParamsSelector((params) => params.animaQwen3EncoderModel);
 export const selectAnimaScheduler = createParamsSelector((params) => params.animaScheduler);
@@ -908,6 +1063,10 @@ export const selectAnimaLLLiteModel = createParamsSelector((params) => params.an
 export const selectAnimaLLLiteWeight = createParamsSelector((params) => params.animaLLLiteWeight);
 export const selectKleinVaeModel = createParamsSelector((params) => params.kleinVaeModel);
 export const selectKleinQwen3EncoderModel = createParamsSelector((params) => params.kleinQwen3EncoderModel);
+export const selectPidMode = createParamsSelector((params) => params.pidMode);
+export const selectPidDecoderModel = createParamsSelector((params) => params.pidDecoderModel);
+export const selectPidSteps = createParamsSelector((params) => params.pidSteps);
+export const selectGemma2EncoderModel = createParamsSelector((params) => params.gemma2EncoderModel);
 export const selectQwenImageComponentSource = createParamsSelector((params) => params.qwenImageComponentSource);
 export const selectQwenImageVaeModel = createParamsSelector((params) => params.qwenImageVaeModel);
 export const selectQwenImageQwenVLEncoderModel = createParamsSelector((params) => params.qwenImageQwenVLEncoderModel);
@@ -1060,6 +1219,45 @@ export const selectZImageSeedVarianceStrength = createParamsSelector((params) =>
 export const selectZImageSeedVarianceRandomizePercent = createParamsSelector(
   (params) => params.zImageSeedVarianceRandomizePercent
 );
+export const selectKrea2SeedVarianceEnabled = createParamsSelector((params) => params.krea2SeedVarianceEnabled);
+export const selectKrea2SeedVarianceStrength = createParamsSelector((params) => params.krea2SeedVarianceStrength);
+export const selectKrea2SeedVarianceRandomizePercent = createParamsSelector(
+  (params) => params.krea2SeedVarianceRandomizePercent
+);
+export const selectKrea2RebalanceEnabled = createParamsSelector((params) => params.krea2RebalanceEnabled);
+export const selectKrea2RebalanceMultiplier = createParamsSelector((params) => params.krea2RebalanceMultiplier);
+export const selectKrea2RebalanceWeights = createParamsSelector((params) => params.krea2RebalanceWeights);
+
+// The Krea-2 Conditioning Rebalance node taps exactly 12 encoder layers, so its per-layer weights string
+// must be exactly 12 finite comma-separated numbers. Mirrors Krea2ConditioningRebalanceInvocation._parse_weights
+// so an invalid string is blocked before it can queue a generation the backend will reject.
+export const KREA2_REBALANCE_WEIGHT_COUNT = 12;
+
+// Plain decimal / scientific-notation float, matching what Python's float() accepts. Crucially this rejects
+// the hex/binary/octal literals (0x10, 0b10, 0o10) that JS Number() would happily parse but the backend
+// float() rejects — which would otherwise let a graph queue that is guaranteed to fail at generation.
+const KREA2_DECIMAL_NUMBER_RE = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
+
+export const parseKrea2RebalanceWeights = (weights: string): number[] | null => {
+  const parts = weights
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s !== '');
+  if (parts.length !== KREA2_REBALANCE_WEIGHT_COUNT) {
+    return null;
+  }
+  if (!parts.every((p) => KREA2_DECIMAL_NUMBER_RE.test(p))) {
+    return null;
+  }
+  const nums = parts.map(Number);
+  if (nums.some((n) => !Number.isFinite(n))) {
+    return null;
+  }
+  return nums;
+};
+
+export const isValidKrea2RebalanceWeights = (weights: string): boolean => parseKrea2RebalanceWeights(weights) !== null;
+
 export const selectSeamlessXAxis = createParamsSelector((params) => params.seamlessXAxis);
 export const selectSeamlessYAxis = createParamsSelector((params) => params.seamlessYAxis);
 export const selectSeed = createParamsSelector((params) => params.seed);

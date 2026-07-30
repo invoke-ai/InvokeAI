@@ -87,6 +87,14 @@ class Qwen3EncoderField(BaseModel):
     loras: List[LoRAField] = Field(default_factory=list, description="LoRAs to apply on model loading")
 
 
+class Qwen3VLEncoderField(BaseModel):
+    """Field for the Qwen3-VL text encoder used by Krea-2 models."""
+
+    tokenizer: ModelIdentifierField = Field(description="Info to load tokenizer submodel")
+    text_encoder: ModelIdentifierField = Field(description="Info to load text_encoder submodel")
+    loras: List[LoRAField] = Field(default_factory=list, description="LoRAs to apply on model loading")
+
+
 class WanT5EncoderField(BaseModel):
     """Field for the UMT5-XXL text encoder used by Wan 2.2 models."""
 
@@ -98,6 +106,19 @@ class WanT5EncoderField(BaseModel):
 class VAEField(BaseModel):
     vae: ModelIdentifierField = Field(description="Info to load vae submodel")
     seamless_axes: List[str] = Field(default_factory=list, description='Axes("x" and "y") to which apply seamless')
+
+
+class Gemma2EncoderField(BaseModel):
+    """Field for the Gemma-2 text encoder used by PiD decoders."""
+
+    tokenizer: ModelIdentifierField = Field(description="Info to load tokenizer submodel")
+    text_encoder: ModelIdentifierField = Field(description="Info to load text_encoder submodel")
+
+
+class PiDDecoderField(BaseModel):
+    """Field for a PiD (Pixel Diffusion Decoder) checkpoint."""
+
+    decoder: ModelIdentifierField = Field(description="Info to load PiD decoder checkpoint")
 
 
 class ControlLoRAField(LoRAField):

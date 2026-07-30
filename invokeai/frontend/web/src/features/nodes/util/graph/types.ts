@@ -11,6 +11,12 @@ export type ImageOutputNodes =
   | 'img_resize'
   | 'invokeai_img_blend'
   | 'apply_mask_to_image'
+  | 'flux_pid_decode'
+  | 'flux2_pid_decode'
+  | 'sd3_pid_decode'
+  | 'sdxl_pid_decode'
+  | 'z_image_pid_decode'
+  | 'qwen_image_pid_decode'
   | 'flux_vae_decode'
   | 'flux2_vae_decode'
   | 'sd3_l2i'
@@ -51,6 +57,7 @@ export type DenoiseLatentsNodes =
   | 'cogview4_denoise'
   | 'qwen_image_denoise'
   | 'z_image_denoise'
+  | 'krea2_denoise'
   | 'anima_denoise'
   | 'wan_denoise';
 
@@ -63,6 +70,7 @@ export type MainModelLoaderNodes =
   | 'cogview4_model_loader'
   | 'qwen_image_model_loader'
   | 'z_image_model_loader'
+  | 'krea2_model_loader'
   | 'anima_model_loader'
   | 'wan_model_loader';
 

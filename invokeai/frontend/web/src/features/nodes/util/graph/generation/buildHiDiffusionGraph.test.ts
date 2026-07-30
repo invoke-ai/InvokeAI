@@ -43,6 +43,7 @@ const defaultParams = {
   vae: null,
   colorCompensation: false,
   refinerModel: null,
+  pidMode: 'off',
 };
 
 let currentModel: typeof sd1Model | typeof sdxlModel = sd1Model;
@@ -116,6 +117,11 @@ vi.mock('features/nodes/util/graph/generation/addWatermarker', () => ({
 }));
 
 vi.mock('features/nodes/util/graph/graphBuilderUtils', () => ({
+  getOriginalAndScaledSizesForTextToImage: vi.fn(() => ({
+    originalSize: { width: 1024, height: 1024 },
+    scaledSize: { width: 1024, height: 1024 },
+    aspectRatio: { id: 'Free', value: 1 },
+  })),
   selectCanvasOutputFields: vi.fn(() => ({})),
   selectPresetModifiedPrompts: vi.fn(() => ({
     positive: 'a prompt',

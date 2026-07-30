@@ -6,6 +6,7 @@ export type Feature =
   | 'fluxDypePreset'
   | 'fluxDypeScale'
   | 'fluxDypeExponent'
+  | 'pidMode'
   | 'hrf'
   | 'paramNegativeConditioning'
   | 'paramPositiveConditioning'
@@ -13,6 +14,12 @@ export type Feature =
   | 'seedVarianceEnhancer'
   | 'seedVarianceStrength'
   | 'seedVarianceRandomizePercent'
+  | 'krea2ConditioningRebalance'
+  | 'krea2RebalanceMultiplier'
+  | 'krea2RebalanceWeights'
+  | 'krea2SeedVarianceEnhancer'
+  | 'krea2SeedVarianceStrength'
+  | 'krea2SeedVarianceRandomizePercent'
   | 'compositingMaskBlur'
   | 'compositingBlurMethod'
   | 'compositingCoherencePass'
@@ -107,6 +114,10 @@ export const POPOVER_DATA: { [key in Feature]?: PopoverData } = {
   },
   fluxDypeExponent: {
     placement: 'right',
+  },
+  pidMode: {
+    placement: 'right',
+    href: 'https://github.com/nv-tlabs/PiD',
   },
   inpainting: {
     href: 'https://support.invoke.ai/support/solutions/articles/151000096702-inpainting-outpainting-and-bounding-box',
