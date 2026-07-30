@@ -30,6 +30,16 @@ export default defineConfig({
             return 'shared';
           }
 
+          // Mixed-gallery item helpers cross the eager editor shell and its
+          // lazy Gallery/Preview chunks. Keep them with the already-eager
+          // gallery state projection instead of emitting one extra request.
+          if (
+            id.endsWith('/features/gallery/core/items.ts') ||
+            id.endsWith('/features/gallery/ui/galleryStateView.ts')
+          ) {
+            return 'gallery-state';
+          }
+
           if (!id.includes('/node_modules/')) {
             return undefined;
           }
