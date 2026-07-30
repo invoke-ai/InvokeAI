@@ -99,8 +99,8 @@ describe('image mutation outcomes', () => {
 
   it('returns only images confirmed added to or removed from a board', async () => {
     mocks.apiFetchJson
-      .mockResolvedValueOnce({ added_images: ['moved.png'] })
-      .mockResolvedValueOnce({ removed_images: ['removed.png'] });
+      .mockResolvedValueOnce({ added_images: ['moved.png'], affected_boards: ['board-1', 'none'] })
+      .mockResolvedValueOnce({ affected_boards: ['board-1', 'none'], removed_images: ['removed.png'] });
 
     await expect(addImagesToGalleryBoard('board-1', ['moved.png', 'locked.png'])).resolves.toEqual(['moved.png']);
     await expect(removeImagesFromGalleryBoard(['removed.png', 'locked.png'])).resolves.toEqual(['removed.png']);
@@ -108,8 +108,8 @@ describe('image mutation outcomes', () => {
 
   it('returns only images confirmed starred or unstarred', async () => {
     mocks.apiFetchJson
-      .mockResolvedValueOnce({ starred_images: ['starred.png'] })
-      .mockResolvedValueOnce({ unstarred_images: ['unstarred.png'] });
+      .mockResolvedValueOnce({ affected_boards: ['board-1'], starred_images: ['starred.png'] })
+      .mockResolvedValueOnce({ affected_boards: ['board-1'], unstarred_images: ['unstarred.png'] });
 
     await expect(starGalleryImages(['starred.png', 'locked.png'])).resolves.toEqual(['starred.png']);
     await expect(unstarGalleryImages(['unstarred.png', 'locked.png'])).resolves.toEqual(['unstarred.png']);

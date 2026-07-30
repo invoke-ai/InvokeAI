@@ -906,77 +906,157 @@ export const deleteGalleryBoard = async (
   };
 };
 
-export const addImagesToGalleryBoard = async (
+export interface GalleryItemOrganizationTransportResult {
+  affectedBoardIds: string[];
+  succeededNames: string[];
+}
+
+interface GalleryImageDeleteTransportResult extends GalleryItemOrganizationTransportResult {
+  failedNames: string[];
+}
+
+const getRequiredStringArray = (body: unknown, field: string): string[] => {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    throw new TypeError(`Gallery mutation response must be an object with "${field}".`);
+  }
+
+  const value = Reflect.get(body, field);
+
+  if (!Array.isArray(value) || !value.every((item): item is string => typeof item === 'string' && item.length > 0)) {
+    throw new TypeError(`Gallery mutation response field "${field}" must be an array of non-empty strings.`);
+  }
+
+  return value;
+};
+
+const getOptionalStringArray = (body: unknown, field: string): string[] => {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    throw new TypeError(`Gallery mutation response must be an object.`);
+  }
+
+  const value = Reflect.get(body, field);
+
+  if (value === undefined) {
+    return [];
+  }
+  if (!Array.isArray(value) || !value.every((item): item is string => typeof item === 'string' && item.length > 0)) {
+    throw new TypeError(`Gallery mutation response field "${field}" must be an array of non-empty strings.`);
+  }
+
+  return value;
+};
+
+const mapGalleryItemOrganizationTransportResult = (
+  body: unknown,
+  succeededField: string
+): GalleryItemOrganizationTransportResult => ({
+  affectedBoardIds: getRequiredStringArray(body, 'affected_boards'),
+  succeededNames: getRequiredStringArray(body, succeededField),
+});
+
+const emptyGalleryItemOrganizationTransportResult = (): GalleryItemOrganizationTransportResult => ({
+  affectedBoardIds: [],
+  succeededNames: [],
+});
+
+const isInvalidGalleryBoardDestination = (boardId: string): boolean =>
+  boardId === 'generated' || boardId === 'assets' || isDateBoardId(boardId);
+
+export const addGalleryImageItemsToBoard = async (
   boardId: string,
   imageNames: string[],
   signal?: AbortSignal
-): Promise<string[]> => {
-  if (
-    boardId === 'none' ||
-    boardId === 'generated' ||
-    boardId === 'assets' ||
-    isDateBoardId(boardId) ||
-    imageNames.length === 0
-  ) {
-    return [];
+): Promise<GalleryItemOrganizationTransportResult> => {
+  if (boardId === 'none' || isInvalidGalleryBoardDestination(boardId) || imageNames.length === 0) {
+    return emptyGalleryItemOrganizationTransportResult();
   }
 
-  const body = await apiFetchJson<{ added_images: string[] }>('/api/v1/board_images/batch', {
+  signal?.throwIfAborted();
+  const body = await apiFetchJson<unknown>('/api/v1/board_images/batch', {
     body: JSON.stringify({ board_id: boardId, image_names: imageNames }),
     method: 'POST',
     signal,
   });
+  signal?.throwIfAborted();
 
-  return body.added_images;
+  return mapGalleryItemOrganizationTransportResult(body, 'added_images');
 };
 
-export const removeImagesFromGalleryBoard = async (imageNames: string[], signal?: AbortSignal): Promise<string[]> => {
+export const addImagesToGalleryBoard = async (
+  boardId: string,
+  imageNames: string[],
+  signal?: AbortSignal
+): Promise<string[]> => (await addGalleryImageItemsToBoard(boardId, imageNames, signal)).succeededNames;
+
+export const removeGalleryImageItemsFromBoard = async (
+  imageNames: string[],
+  signal?: AbortSignal
+): Promise<GalleryItemOrganizationTransportResult> => {
   if (imageNames.length === 0) {
-    return [];
+    return emptyGalleryItemOrganizationTransportResult();
   }
 
-  const body = await apiFetchJson<{ removed_images: string[] }>('/api/v1/board_images/batch/delete', {
+  signal?.throwIfAborted();
+  const body = await apiFetchJson<unknown>('/api/v1/board_images/batch/delete', {
     body: JSON.stringify({ image_names: imageNames }),
     method: 'POST',
     signal,
   });
+  signal?.throwIfAborted();
 
-  return body.removed_images;
+  return mapGalleryItemOrganizationTransportResult(body, 'removed_images');
 };
 
-const setGalleryImagesStarred = async (
+export const removeImagesFromGalleryBoard = async (imageNames: string[], signal?: AbortSignal): Promise<string[]> =>
+  (await removeGalleryImageItemsFromBoard(imageNames, signal)).succeededNames;
+
+export const setGalleryImageItemsStarred = async (
   imageNames: string[],
   starred: boolean,
   signal?: AbortSignal
-): Promise<string[]> => {
+): Promise<GalleryItemOrganizationTransportResult> => {
   if (imageNames.length === 0) {
-    return [];
+    return emptyGalleryItemOrganizationTransportResult();
   }
 
-  const body = await apiFetchJson<{ starred_images?: string[]; unstarred_images?: string[] }>(
-    `/api/v1/images/${starred ? 'star' : 'unstar'}`,
-    {
-      body: JSON.stringify({ image_names: imageNames }),
-      method: 'POST',
-      signal,
-    }
-  );
+  signal?.throwIfAborted();
+  const body = await apiFetchJson<unknown>(`/api/v1/images/${starred ? 'star' : 'unstar'}`, {
+    body: JSON.stringify({ image_names: imageNames }),
+    method: 'POST',
+    signal,
+  });
+  signal?.throwIfAborted();
 
-  return (starred ? body.starred_images : body.unstarred_images) ?? [];
+  return mapGalleryItemOrganizationTransportResult(body, starred ? 'starred_images' : 'unstarred_images');
 };
 
 export const starGalleryImages = (imageNames: string[], signal?: AbortSignal): Promise<string[]> =>
-  setGalleryImagesStarred(imageNames, true, signal);
+  setGalleryImageItemsStarred(imageNames, true, signal).then((result) => result.succeededNames);
 
 export const unstarGalleryImages = (imageNames: string[], signal?: AbortSignal): Promise<string[]> =>
-  setGalleryImagesStarred(imageNames, false, signal);
+  setGalleryImageItemsStarred(imageNames, false, signal).then((result) => result.succeededNames);
 
-interface DeleteImagesResponse {
-  deleted_images: string[];
-  /** Names the backend could not delete. Absent on backends predating partial-failure reporting. */
-  failed_images?: string[];
-  affected_boards: string[];
-}
+export const deleteGalleryImageItems = async (
+  imageNames: string[],
+  signal?: AbortSignal
+): Promise<GalleryImageDeleteTransportResult> => {
+  if (imageNames.length === 0) {
+    return { ...emptyGalleryItemOrganizationTransportResult(), failedNames: [] };
+  }
+
+  signal?.throwIfAborted();
+  const body = await apiFetchJson<unknown>('/api/v1/images/delete', {
+    body: JSON.stringify({ image_names: imageNames }),
+    method: 'POST',
+    signal,
+  });
+  signal?.throwIfAborted();
+
+  return {
+    ...mapGalleryItemOrganizationTransportResult(body, 'deleted_images'),
+    failedNames: getOptionalStringArray(body, 'failed_images'),
+  };
+};
 
 /**
  * Deletes images and reports the outcome per name.
@@ -990,20 +1070,123 @@ export const deleteGalleryImages = async (
   imageNames: string[],
   signal?: AbortSignal
 ): Promise<GalleryDeletionResult> => {
-  if (imageNames.length === 0) {
-    return { deletedImageNames: [], failedImageNames: [] };
+  const result = await deleteGalleryImageItems(imageNames, signal);
+
+  return {
+    deletedImageNames: result.succeededNames,
+    failedImageNames: result.failedNames,
+  };
+};
+
+const mutateGalleryVideoItems = async (
+  videoNames: string[],
+  operation: 'delete' | 'star' | 'unstar',
+  succeededField: 'deleted_videos' | 'starred_videos' | 'unstarred_videos',
+  signal?: AbortSignal
+): Promise<GalleryItemOrganizationTransportResult> => {
+  if (videoNames.length === 0) {
+    return emptyGalleryItemOrganizationTransportResult();
   }
 
-  const body = await apiFetchJson<DeleteImagesResponse>('/api/v1/images/delete', {
-    body: JSON.stringify({ image_names: imageNames }),
+  signal?.throwIfAborted();
+  const body = await apiFetchJson<unknown>(`/api/v1/videos/${operation}`, {
+    body: JSON.stringify({ video_names: videoNames }),
     method: 'POST',
     signal,
   });
+  signal?.throwIfAborted();
 
-  return {
-    deletedImageNames: body.deleted_images,
-    failedImageNames: body.failed_images ?? [],
+  return mapGalleryItemOrganizationTransportResult(body, succeededField);
+};
+
+export const deleteGalleryVideoItems = (
+  videoNames: string[],
+  signal?: AbortSignal
+): Promise<GalleryItemOrganizationTransportResult> =>
+  mutateGalleryVideoItems(videoNames, 'delete', 'deleted_videos', signal);
+
+export const setGalleryVideoItemsStarred = (
+  videoNames: string[],
+  starred: boolean,
+  signal?: AbortSignal
+): Promise<GalleryItemOrganizationTransportResult> =>
+  mutateGalleryVideoItems(
+    videoNames,
+    starred ? 'star' : 'unstar',
+    starred ? 'starred_videos' : 'unstarred_videos',
+    signal
+  );
+
+const moveGalleryVideoItemToBoard = async (
+  videoName: string,
+  boardId: string,
+  signal?: AbortSignal
+): Promise<GalleryItemOrganizationTransportResult> => {
+  signal?.throwIfAborted();
+  const removing = boardId === 'none';
+  const body = await apiFetchJson<unknown>('/api/v1/videos/board', {
+    body: JSON.stringify(removing ? { video_name: videoName } : { board_id: boardId, video_name: videoName }),
+    method: removing ? 'DELETE' : 'POST',
+    signal,
+  });
+  signal?.throwIfAborted();
+
+  return mapGalleryItemOrganizationTransportResult(body, removing ? 'removed_videos' : 'added_videos');
+};
+
+export const moveGalleryVideoItemsToBoard = async (
+  videoNames: string[],
+  boardId: string,
+  signal?: AbortSignal
+): Promise<GalleryItemOrganizationTransportResult> => {
+  if (videoNames.length === 0 || isInvalidGalleryBoardDestination(boardId)) {
+    return emptyGalleryItemOrganizationTransportResult();
+  }
+
+  const outcomes: (GalleryItemOrganizationTransportResult | undefined)[] = Array.from({
+    length: videoNames.length,
+  });
+  let nextIndex = 0;
+
+  const worker = async (): Promise<void> => {
+    while (true) {
+      if (signal?.aborted) {
+        return;
+      }
+
+      const index = nextIndex;
+      const videoName = videoNames[index];
+
+      if (videoName === undefined) {
+        return;
+      }
+      nextIndex += 1;
+
+      try {
+        outcomes[index] = await moveGalleryVideoItemToBoard(videoName, boardId, signal);
+      } catch {
+        // A rejected single-video request is unconfirmed. Other videos may still
+        // return authoritative successes; abort stops workers before scheduling more.
+      }
+    }
   };
+
+  await Promise.all(Array.from({ length: Math.min(4, videoNames.length) }, () => worker()));
+
+  const affectedBoardIds: string[] = [];
+  const succeededNames: string[] = [];
+
+  for (const [index, outcome] of outcomes.entries()) {
+    const videoName = videoNames[index];
+
+    if (!videoName || !outcome?.succeededNames.includes(videoName)) {
+      continue;
+    }
+    succeededNames.push(videoName);
+    affectedBoardIds.push(...outcome.affectedBoardIds);
+  }
+
+  return { affectedBoardIds, succeededNames };
 };
 
 const BULK_DOWNLOAD_POLL_INTERVAL_MS = 2000;

@@ -43,6 +43,8 @@ export interface GalleryItemsPage {
 }
 
 export interface GalleryItemMutationResult {
+  /** Boards whose contents/counts changed for at least one confirmed success. */
+  affectedBoardIds?: string[];
   failed: GalleryItemRef[];
   succeeded: GalleryItemRef[];
 }
