@@ -212,7 +212,7 @@ describe('listPaletteImages created-at range', () => {
   });
 
   it('queries a date board normally when its day is inside the range', async () => {
-    mocks.apiFetchJson.mockResolvedValue({ image_names: [], total_count: 0 });
+    mocks.apiFetchJson.mockResolvedValue({ items: [], starred_count: 0, total_count: 0 });
 
     await expect(
       listPaletteImages({

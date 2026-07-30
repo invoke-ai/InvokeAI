@@ -44,7 +44,7 @@ const createData = (pages: GalleryImage[][]): GalleryImagesData => {
 };
 
 const getImagesKey = (boardId: string, owner: AccountScope = captureAccountScope()) =>
-  galleryKeys.images(
+  galleryKeys.legacyImages(
     owner,
     canonicalizeGalleryImagesFilter({
       boardId,
@@ -213,7 +213,7 @@ describe('Gallery cache invalidation', () => {
       galleryView: 'images',
       searchTerm: '',
     });
-    const oldDateNamesKey = galleryKeys.dateBoardNames(oldOwner, oldFilter);
+    const oldDateNamesKey = galleryKeys.itemNames(oldOwner, oldFilter);
     const oldBoardsKey = galleryKeys.boards(oldOwner, {
       includeArchived: false,
       includeDateBoards: true,
@@ -233,7 +233,7 @@ describe('Gallery cache invalidation', () => {
       galleryView: 'images',
       searchTerm: '',
     });
-    const currentDateNamesKey = galleryKeys.dateBoardNames(currentOwner, currentFilter);
+    const currentDateNamesKey = galleryKeys.itemNames(currentOwner, currentFilter);
     const currentBoardsKey = galleryKeys.boards(currentOwner, {
       includeArchived: false,
       includeDateBoards: true,

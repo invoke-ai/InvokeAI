@@ -1,9 +1,10 @@
+import type { GalleryItem } from '@features/gallery/core/items';
 import type { GalleryImage, GeneratedImageContract } from '@features/gallery/core/types';
 
 import { getBoundedRecentImages } from '@features/gallery/core/recentImages';
 import { describe, expect, it } from 'vitest';
 
-import { isGalleryWindowTruncated, mergeGalleryImageWindow } from './useGalleryData';
+import { isGalleryWindowTruncated, mergeGalleryImageWindow, mergeGalleryItemWindow } from './useGalleryData';
 
 const createImage = (index: number, overrides: Partial<GalleryImage> = {}): GalleryImage => ({
   boardId: 'none',
@@ -86,6 +87,55 @@ describe('mergeGalleryImageWindow', () => {
 
     expect(images).toHaveLength(60);
     expect(images[0]).toMatchObject({ imageName: 'image-0100.png', starred: true });
+  });
+});
+
+describe('mergeGalleryItemWindow', () => {
+  it('deduplicates by qualified key and mirrors server starred/time/kind/name ordering', () => {
+    const image = {
+      boardId: 'none',
+      category: 'general',
+      createdAt: '2026-07-30T12:00:00.000Z',
+      fullUrl: '/images/shared',
+      height: 64,
+      isIntermediate: false,
+      kind: 'image',
+      name: 'shared',
+      starred: false,
+      thumbnailUrl: '/thumbnails/shared',
+      width: 64,
+    } satisfies GalleryItem;
+    const video = {
+      ...image,
+      durationSeconds: 2,
+      fullUrl: '/videos/shared',
+      kind: 'video',
+    } satisfies GalleryItem;
+    const recent = asGenerated(
+      createImage(99, {
+        imageName: 'recent',
+        queuedAt: image.createdAt,
+        starred: true,
+      })
+    );
+
+    expect(
+      mergeGalleryItemWindow({
+        backendItems: [image, video, image],
+        filter: { ...filter, starredFirst: true },
+        maxRows: 60,
+        recentImages: [recent],
+      }).map(({ kind, name }) => `${kind}:${name}`)
+    ).toEqual(['image:recent', 'video:shared', 'image:shared']);
+
+    expect(
+      mergeGalleryItemWindow({
+        backendItems: [image, video],
+        filter: { ...filter, orderDir: 'ASC' },
+        maxRows: 60,
+        recentImages: [],
+      }).map(({ kind, name }) => `${kind}:${name}`)
+    ).toEqual(['image:shared', 'video:shared']);
   });
 });
 

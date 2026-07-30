@@ -1,7 +1,9 @@
+import type { GalleryItem } from '@features/gallery/core/items';
 import type { GallerySettings } from '@features/gallery/core/settings';
 import type { GalleryBoard, GalleryImage, GalleryView, GeneratedImageContract } from '@features/gallery/core/types';
 
 import { normalizeGalleryImage } from '@features/gallery/core/image';
+import { legacyGeneratedImageToGalleryItem, toGalleryItemKey } from '@features/gallery/core/items';
 import { GALLERY_RECENT_IMAGE_LIMIT } from '@features/gallery/core/recentImages';
 import { ALL_READABLE_BOARDS_ID, isDateBoardId } from '@features/gallery/data/backend';
 import {
@@ -77,6 +79,84 @@ const compareGalleryImages = (
   return orderDir === 'ASC' ? chronologicalOrder : -chronologicalOrder;
 };
 
+const isRecentItemVisible = (item: GalleryItem, filter: GalleryImagesFilter): boolean => {
+  if (
+    filter.searchTerm !== '' ||
+    filter.createdFrom !== undefined ||
+    filter.createdTo !== undefined ||
+    isDateBoardId(filter.boardId)
+  ) {
+    return false;
+  }
+
+  const hasMatchingBoard = filter.boardId === ALL_READABLE_BOARDS_ID || filter.boardId === item.boardId;
+  const hasMatchingCategory =
+    filter.galleryView === 'images'
+      ? item.category === 'general'
+      : item.kind === 'image' && item.category !== 'general';
+
+  return hasMatchingBoard && hasMatchingCategory;
+};
+
+const compareGalleryItems = (
+  a: GalleryItem,
+  b: GalleryItem,
+  { orderDir = 'DESC', starredFirst = false }: GalleryImagesFilter
+): number => {
+  if (starredFirst && a.starred !== b.starred) {
+    return a.starred ? -1 : 1;
+  }
+
+  const direction = orderDir === 'ASC' ? 1 : -1;
+  const chronologicalOrder = a.createdAt.localeCompare(b.createdAt);
+
+  if (chronologicalOrder !== 0) {
+    return direction * chronologicalOrder;
+  }
+
+  const kindOrder = a.kind.localeCompare(b.kind);
+
+  if (kindOrder !== 0) {
+    return direction * kindOrder;
+  }
+
+  return direction * a.name.localeCompare(b.name);
+};
+
+export const mergeGalleryItemWindow = ({
+  backendItems,
+  filter,
+  maxRows,
+  recentImages,
+}: {
+  backendItems: readonly GalleryItem[];
+  filter: GalleryImagesFilter;
+  maxRows: number;
+  recentImages: readonly GeneratedImageContract[];
+}): GalleryItem[] => {
+  const backendItemKeys = new Set(backendItems.map(toGalleryItemKey));
+  const missingRecentItems = recentImages
+    .slice(0, GALLERY_RECENT_IMAGE_LIMIT)
+    .map(legacyGeneratedImageToGalleryItem)
+    .filter((item) => !backendItemKeys.has(toGalleryItemKey(item)) && isRecentItemVisible(item, filter));
+  const seenItemKeys = new Set<string>();
+
+  return [...missingRecentItems, ...backendItems]
+    .filter((item) => {
+      const key = toGalleryItemKey(item);
+
+      if (seenItemKeys.has(key)) {
+        return false;
+      }
+
+      seenItemKeys.add(key);
+      return true;
+    })
+    .sort((a, b) => compareGalleryItems(a, b, filter))
+    .slice(0, maxRows);
+};
+
+/** TODO(Task 5): Remove after the Gallery projection consumes GalleryItem. */
 export const mergeGalleryImageWindow = ({
   backendImages,
   filter,

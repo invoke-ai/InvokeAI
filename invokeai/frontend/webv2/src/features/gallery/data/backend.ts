@@ -19,7 +19,7 @@ import type {
 
 import { isTimestampInRange } from '@platform/search/dateTokens';
 import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
-import { absolutizeApiUrl, apiFetch, apiFetchJson, apiFetchRaw, sleep } from '@platform/transport/http';
+import { absolutizeApiUrl, ApiError, apiFetch, apiFetchJson, apiFetchRaw, sleep } from '@platform/transport/http';
 
 import { getGalleryImageThumbnailUrl } from './imageUrls';
 import { getGalleryVideoThumbnailUrl } from './videoUrls';
@@ -386,6 +386,28 @@ export const getGalleryImagesByNames = async (imageNames: string[], signal?: Abo
   });
 };
 
+export const getGalleryImageItemsByNames = async (
+  imageNames: string[],
+  signal?: AbortSignal
+): Promise<GalleryImageItem[]> => {
+  if (imageNames.length === 0) {
+    return [];
+  }
+
+  const body = await apiFetchJson<BackendImageDTO[]>('/api/v1/images/images_by_names', {
+    body: JSON.stringify({ image_names: imageNames }),
+    method: 'POST',
+    signal,
+  });
+  const imagesByName = new Map(body.map((image) => [image.image_name, mapBackendImageToGalleryItem(image)]));
+
+  return imageNames.flatMap((imageName) => {
+    const image = imagesByName.get(imageName);
+
+    return image ? [image] : [];
+  });
+};
+
 export const getGalleryImageByName = async (imageName: string, signal?: AbortSignal): Promise<GalleryImage> => {
   const body = await apiFetchJson<BackendImageDTO>(`/api/v1/images/i/${encodeURIComponent(imageName)}`, { signal });
 
@@ -425,7 +447,7 @@ export interface GalleryVideoWorkflow {
 export const getGalleryVideoWorkflow = (videoName: string, signal?: AbortSignal): Promise<GalleryVideoWorkflow> =>
   apiFetchJson<GalleryVideoWorkflow>(`/api/v1/videos/i/${encodeURIComponent(videoName)}/workflow`, { signal });
 
-export interface GalleryDateBoardImageNames {
+interface PaletteDateBoardImageNames {
   imageNames: string[];
   total: number;
 }
@@ -435,7 +457,7 @@ export interface GalleryDateBoardImageNames {
  * caches this ordered name list once per semantic filter, then each infinite
  * page hydrates only its own fixed-size slice.
  */
-export const listGalleryDateBoardImageNames = async ({
+const listPaletteDateBoardImageNames = async ({
   boardId,
   createdFrom,
   createdTo,
@@ -453,14 +475,98 @@ export const listGalleryDateBoardImageNames = async ({
   searchTerm: string;
   signal?: AbortSignal;
   starredFirst: boolean;
-}): Promise<GalleryDateBoardImageNames> => {
-  // The board already pins a single day; a date filter either contains that
-  // day (and constrains nothing further) or excludes the whole board.
+}): Promise<PaletteDateBoardImageNames> => {
+  // Palette results remain intentionally image-only, but derive from the
+  // polymorphic item_names endpoint so no webv2 path regresses to image_names.
+  const result = await listGalleryDateBoardItemNames({
+    boardId,
+    createdFrom,
+    createdTo,
+    galleryView,
+    orderDir,
+    searchTerm,
+    signal,
+    starredFirst,
+  });
+  const imageNames = result.items.filter((ref) => ref.kind === 'image').map((ref) => ref.name);
+
+  return {
+    imageNames,
+    total: imageNames.length,
+  };
+};
+
+export interface GalleryItemNames {
+  items: GalleryItemRef[];
+  starredCount: number;
+  total: number;
+}
+
+interface GalleryItemNamesRequest {
+  boardId: string;
+  createdFrom?: string;
+  createdTo?: string;
+  galleryView: GalleryView;
+  orderDir: GalleryOrderDir;
+  searchTerm: string;
+  signal?: AbortSignal;
+  starredFirst: boolean;
+}
+
+const mapGalleryItemNames = (body: {
+  items: GalleryItemRef[];
+  starred_count: number;
+  total_count: number;
+}): GalleryItemNames => ({
+  items: body.items,
+  starredCount: normalizeTotal(body.starred_count, 0),
+  total: normalizeTotal(body.total_count, body.items.length),
+});
+
+export const listGalleryItemNames = async ({
+  boardId,
+  createdFrom,
+  createdTo,
+  galleryView,
+  orderDir,
+  searchTerm,
+  signal,
+  starredFirst,
+}: GalleryItemNamesRequest): Promise<GalleryItemNames> => {
+  const query = toSearchParams({
+    board_id: boardId,
+    categories: galleryView === 'assets' ? assetCategories : imageCategories,
+    created_from: createdFrom,
+    created_to: createdTo,
+    is_intermediate: false,
+    order_dir: orderDir,
+    search_term: searchTerm.trim() || undefined,
+    starred_first: starredFirst,
+  });
+  const body = await apiFetchJson<{
+    items: GalleryItemRef[];
+    starred_count: number;
+    total_count: number;
+  }>(`/api/v1/gallery/items/names?${query}`, { signal });
+
+  return mapGalleryItemNames(body);
+};
+
+export const listGalleryDateBoardItemNames = async ({
+  boardId,
+  createdFrom,
+  createdTo,
+  galleryView,
+  orderDir,
+  searchTerm,
+  signal,
+  starredFirst,
+}: GalleryItemNamesRequest): Promise<GalleryItemNames> => {
   if (
     (createdFrom !== undefined || createdTo !== undefined) &&
     !isTimestampInRange(getDateFromBoardId(boardId), { from: createdFrom, to: createdTo })
   ) {
-    return { imageNames: [], total: 0 };
+    return { items: [], starredCount: 0, total: 0 };
   }
 
   const query = toSearchParams({
@@ -469,24 +575,83 @@ export const listGalleryDateBoardImageNames = async ({
     search_term: searchTerm.trim() || undefined,
     starred_first: starredFirst,
   });
-  const body = await apiFetchJson<{ image_names: string[]; total_count: number }>(
-    `/api/v1/virtual_boards/by_date/${encodeURIComponent(getDateFromBoardId(boardId))}/image_names?${query}`,
-    { signal }
-  );
+  const body = await apiFetchJson<{
+    items: GalleryItemRef[];
+    starred_count: number;
+    total_count: number;
+  }>(`/api/v1/virtual_boards/by_date/${encodeURIComponent(getDateFromBoardId(boardId))}/item_names?${query}`, {
+    signal,
+  });
 
-  return {
-    imageNames: body.image_names,
-    total: normalizeTotal(body.total_count, body.image_names.length),
-  };
+  return mapGalleryItemNames(body);
 };
 
-export const hydrateGalleryDateBoardImagePage = async ({
+const hydrateVideoRefs = async (
+  refs: readonly GalleryItemRef[],
+  signal?: AbortSignal
+): Promise<Map<number, GalleryVideoItem>> => {
+  const videos = new Map<number, GalleryVideoItem>();
+  let nextIndex = 0;
+
+  const worker = async (): Promise<void> => {
+    while (nextIndex < refs.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      const ref = refs[index];
+
+      if (!ref || ref.kind !== 'video') {
+        continue;
+      }
+
+      try {
+        videos.set(index, await getGalleryVideoByName(ref.name, signal));
+      } catch (error: unknown) {
+        if (!(error instanceof ApiError && error.status === 404)) {
+          throw error;
+        }
+      }
+    }
+  };
+
+  await Promise.all(Array.from({ length: Math.min(6, refs.length) }, () => worker()));
+
+  return videos;
+};
+
+export const hydrateGalleryDateBoardItemPage = async ({
+  items,
+  limit,
+  offset,
+  signal,
+  total,
+}: Pick<GalleryItemNames, 'items' | 'total'> & {
+  limit: number;
+  offset: number;
+  signal?: AbortSignal;
+}): Promise<GalleryItemsPage> => {
+  const refs = items.slice(offset, offset + limit);
+  const imageNames = refs.filter((ref) => ref.kind === 'image').map((ref) => ref.name);
+  const [images, videosByIndex] = await Promise.all([
+    getGalleryImageItemsByNames(imageNames, signal),
+    hydrateVideoRefs(refs, signal),
+  ]);
+  const imagesByName = new Map(images.map((image) => [image.name, image]));
+  const hydrated = refs.flatMap((ref, index) => {
+    const item = ref.kind === 'image' ? imagesByName.get(ref.name) : videosByIndex.get(index);
+
+    return item ? [item] : [];
+  });
+
+  return { items: hydrated, total };
+};
+
+const hydratePaletteDateBoardImagePage = async ({
   imageNames,
   limit,
   offset,
   signal,
   total,
-}: GalleryDateBoardImageNames & {
+}: PaletteDateBoardImageNames & {
   limit: number;
   offset: number;
   signal?: AbortSignal;
@@ -563,7 +728,7 @@ export const listPaletteImages = async ({
   starredFirst = false,
 }: GalleryListRequest): Promise<GalleryImagesPage> => {
   if (isDateBoardId(boardId)) {
-    const names = await listGalleryDateBoardImageNames({
+    const names = await listPaletteDateBoardImageNames({
       boardId,
       createdFrom,
       createdTo,
@@ -574,7 +739,7 @@ export const listPaletteImages = async ({
       starredFirst,
     });
 
-    return hydrateGalleryDateBoardImagePage({ ...names, limit, offset, signal });
+    return hydratePaletteDateBoardImagePage({ ...names, limit, offset, signal });
   }
 
   const query = toSearchParams({
@@ -600,13 +765,6 @@ export const listPaletteImages = async ({
     ),
   };
 };
-
-/**
- * TODO(Task 4): Remove this image-page compatibility alias when gallery query
- * consumers switch to `listGalleryItems`. Palette search must call
- * `listPaletteImages` directly and remain image-only.
- */
-export const listGalleryImages = listPaletteImages;
 
 /**
  * The `ImageRecordChanges` body that promotes a staged canvas candidate (an
