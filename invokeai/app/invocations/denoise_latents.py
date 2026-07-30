@@ -42,7 +42,7 @@ from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelVariantType
 from invokeai.backend.model_patcher import ModelPatcher
-from invokeai.backend.patches.layer_patcher import LayerPatcher
+from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.stable_diffusion import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext, DenoiseInputs
@@ -1001,12 +1001,11 @@ class DenoiseLatentsInvocation(BaseInvocation):
         def step_callback(state: PipelineIntermediateState) -> None:
             context.util.sd_step_callback(state, unet_config.base)
 
-        def _lora_loader() -> Iterator[Tuple[ModelPatchRaw, float]]:
+        def _lora_loader() -> Iterator[PatchSpec]:
             for lora in self.unet.loras:
                 lora_info = context.models.load(lora.lora)
                 assert isinstance(lora_info.model, ModelPatchRaw)
-                yield (lora_info.model, lora.weight)
-                del lora_info
+                yield (lora_info.model, lora.weight, lora_info.model_in_ram())
             return
 
         with (
