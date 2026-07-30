@@ -18,6 +18,7 @@ vi.mock('@platform/transport/http', () => ({
 
 import {
   addImagesToGalleryBoard,
+  classifyGalleryUpload,
   deleteGalleryBoard,
   deleteGalleryImages,
   downloadGalleryArchive,
@@ -34,6 +35,8 @@ import {
   removeImagesFromGalleryBoard,
   starGalleryImages,
   unstarGalleryImages,
+  uploadGalleryImage,
+  uploadGalleryVideo,
 } from './backend';
 
 describe('deleteGalleryBoard outcomes', () => {
@@ -758,5 +761,129 @@ describe('deleteGalleryImages partial failures', () => {
   it('skips the request entirely for an empty selection', async () => {
     await expect(deleteGalleryImages([])).resolves.toEqual({ deletedImageNames: [], failedImageNames: [] });
     expect(mocks.apiFetchJson).not.toHaveBeenCalled();
+  });
+});
+
+describe('classifyGalleryUpload', () => {
+  it.each([
+    ['image/png', 'photo.bin', 'image'],
+    ['image/jpeg', 'photo.bin', 'image'],
+    ['image/jpg', 'photo.bin', 'image'],
+    ['image/webp', 'photo.bin', 'image'],
+    ['video/mp4', 'clip.bin', 'video'],
+    ['', 'photo.PNG', 'image'],
+    ['application/octet-stream', 'photo.jpeg', 'image'],
+    ['binary/octet-stream', 'clip.MP4', 'video'],
+    ['application/pdf', 'photo.png', 'image'],
+  ] as const)('classifies MIME %s and name %s as %s', (type, name, kind) => {
+    expect(classifyGalleryUpload(new File(['media'], name, { type }))).toEqual({ kind });
+  });
+
+  it.each([
+    ['application/pdf', 'document.pdf'],
+    ['', 'archive.zip'],
+    ['video/webm', 'clip.webm'],
+    ['image/gif', 'animation.gif'],
+  ] as const)('rejects unsupported MIME %s and name %s', (type, name) => {
+    expect(classifyGalleryUpload(new File(['media'], name, { type }))).toBeNull();
+  });
+
+  it('uses a supported MIME before a conflicting extension', () => {
+    expect(classifyGalleryUpload(new File(['media'], 'looks-like-video.mp4', { type: 'image/png' }))).toEqual({
+      kind: 'image',
+    });
+  });
+});
+
+describe('gallery uploads', () => {
+  beforeEach(() => {
+    accountLifecycle.activate('user-a');
+    mocks.apiFetchJson.mockReset();
+  });
+
+  it('uploads images as user assets and never sends a synthetic board id', async () => {
+    mocks.apiFetchJson.mockResolvedValue({
+      board_id: null,
+      created_at: '2026-07-30T12:00:00.000Z',
+      height: 64,
+      image_category: 'user',
+      image_name: 'photo.png',
+      image_url: '/images/photo.png',
+      is_intermediate: false,
+      starred: false,
+      thumbnail_url: '/thumbnails/photo.webp',
+      width: 64,
+    });
+
+    await uploadGalleryImage(new File(['image'], 'photo.png', { type: 'image/png' }), 'all');
+
+    const [url, init] = mocks.apiFetchJson.mock.calls[0] as [string, RequestInit];
+    const query = new URLSearchParams(url.split('?')[1]);
+    expect(url.split('?')[0]).toBe('/api/v1/images/upload');
+    expect(query.get('image_category')).toBe('user');
+    expect(query.get('is_intermediate')).toBe('false');
+    expect(query.has('board_id')).toBe(false);
+    expect(init.method).toBe('POST');
+    expect(init.body).toBeInstanceOf(FormData);
+  });
+
+  it('uploads videos as durable general media to a real board', async () => {
+    const controller = new AbortController();
+    mocks.apiFetchJson.mockResolvedValue({
+      board_id: 'board-1',
+      created_at: '2026-07-30T12:00:00.000Z',
+      duration: 4.2,
+      fps: 24,
+      height: 360,
+      is_intermediate: false,
+      starred: false,
+      thumbnail_url: '/videos/clip.webp',
+      video_category: 'general',
+      video_name: 'clip.mp4',
+      video_url: '/videos/clip.mp4',
+      width: 640,
+    });
+
+    await expect(
+      uploadGalleryVideo(new File(['video'], 'clip.mp4', { type: 'video/mp4' }), 'board-1', {
+        signal: controller.signal,
+      })
+    ).resolves.toMatchObject({
+      boardId: 'board-1',
+      category: 'general',
+      durationSeconds: 4.2,
+      kind: 'video',
+      name: 'clip.mp4',
+    });
+
+    const [url, init] = mocks.apiFetchJson.mock.calls[0] as [string, RequestInit];
+    const query = new URLSearchParams(url.split('?')[1]);
+    expect(url.split('?')[0]).toBe('/api/v1/videos/upload');
+    expect(query.get('video_category')).toBe('general');
+    expect(query.get('is_intermediate')).toBe('false');
+    expect(query.get('board_id')).toBe('board-1');
+    expect(init).toMatchObject({ method: 'POST', signal: controller.signal });
+    expect(init.body).toBeInstanceOf(FormData);
+  });
+
+  it.each(['none', 'all', 'by_date:2026-07-30'])('omits synthetic board %s from video uploads', async (boardId) => {
+    mocks.apiFetchJson.mockResolvedValue({
+      board_id: null,
+      created_at: '2026-07-30T12:00:00.000Z',
+      duration: 4,
+      height: 360,
+      is_intermediate: false,
+      starred: false,
+      thumbnail_url: '/videos/clip.webp',
+      video_category: 'general',
+      video_name: 'clip.mp4',
+      video_url: '/videos/clip.mp4',
+      width: 640,
+    });
+
+    await uploadGalleryVideo(new File(['video'], 'clip.mp4', { type: 'video/mp4' }), boardId);
+
+    const url = mocks.apiFetchJson.mock.calls[0]?.[0] as string;
+    expect(new URLSearchParams(url.split('?')[1]).has('board_id')).toBe(false);
   });
 });

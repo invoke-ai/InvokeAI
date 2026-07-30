@@ -17,14 +17,66 @@ const mocks = vi.hoisted(() => ({
   downloadGalleryArchive: vi.fn(),
   invalidateGallery: vi.fn(),
   notificationsAdd: vi.fn(),
+  notificationsReportError: vi.fn(),
+  uploadGalleryImage: vi.fn(),
+  uploadGalleryVideo: vi.fn(),
 }));
 
 vi.mock('@features/gallery/data/backend', () => ({
+  classifyGalleryUpload: (file: File) => {
+    const type = file.type.toLowerCase();
+    const name = file.name.toLowerCase();
+
+    if (['image/jpeg', 'image/jpg', 'image/png', 'image/webp'].includes(type) || /\.(jpe?g|png|webp)$/.test(name)) {
+      return { kind: 'image' as const };
+    }
+    if (type === 'video/mp4' || name.endsWith('.mp4')) {
+      return { kind: 'video' as const };
+    }
+    return null;
+  },
   createGalleryBoard: vi.fn(),
   deleteGalleryBoard: (...args: unknown[]) => mocks.deleteGalleryBoard(...args),
   downloadGalleryArchive: (...args: unknown[]) => mocks.downloadGalleryArchive(...args),
+  isDateBoardId: (boardId: string) => boardId.startsWith('by_date:'),
   updateGalleryBoard: vi.fn(),
-  uploadGalleryImage: vi.fn(),
+  uploadGalleryImage: (...args: unknown[]) => mocks.uploadGalleryImage(...args),
+  uploadGalleryVideo: (...args: unknown[]) => mocks.uploadGalleryVideo(...args),
+}));
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, values?: Record<string, unknown>) => {
+      const messages: Record<string, string> = {
+        'widgets.gallery.boardArchivePreparing': `Preparing an image archive of "${String(values?.name)}". ${String(
+          values?.count
+        )} video will be omitted.`,
+        'widgets.gallery.deleteBoardMediaOutcome': `Deleted ${String(values?.images)} and ${String(
+          values?.videos
+        )}; ${String(values?.failedImages)} and ${String(values?.failedVideos)} failed.`,
+        'widgets.gallery.deleteBoardMoveOutcome': `Moved ${String(values?.images)} and ${String(
+          values?.videos
+        )} to Uncategorized.`,
+        'widgets.gallery.deleteBoardPartialTitle': `Deleted board "${String(values?.name)}" with partial media cleanup`,
+        'widgets.gallery.deleteBoardSuccessTitle': `Deleted board "${String(values?.name)}"`,
+        'widgets.gallery.downloadReady': 'Download ready',
+        'widgets.gallery.imageCount': `${String(values?.count)} images`,
+        'widgets.gallery.preparingDownload': 'Preparing download',
+        'widgets.gallery.uploadDateBoardUnavailable': 'Uploads are unavailable for date boards.',
+        'widgets.gallery.uploadFailed': `No files uploaded. ${String(values?.failed)} failed.`,
+        'widgets.gallery.uploadPartialTitle': `Uploaded ${String(values?.succeeded)} of ${String(values?.total)} files`,
+        'widgets.gallery.uploadSplit': 'Images appear in Assets; videos appear in Images.',
+        'widgets.gallery.uploadSummary': `${String(values?.images)} and ${String(values?.videos)} uploaded to ${String(
+          values?.board
+        )}. ${String(values?.failed)} failed.`,
+        'widgets.gallery.uploadSuccessTitle': `Uploaded ${String(values?.count)} files`,
+        'widgets.gallery.uploadUnsupported': 'No supported media files to upload (PNG, JPEG, WebP, or MP4).',
+        'widgets.gallery.videoCount': `${String(values?.count)} videos`,
+      };
+
+      return messages[key] ?? key;
+    },
+  }),
 }));
 
 vi.mock('@features/gallery/data/queryCache', () => ({
@@ -39,10 +91,19 @@ let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 const actionsRef = createRef<GalleryActions>();
 const reconcileDeletedBoardOutcome = vi.fn();
+const selectItem = vi.fn();
 const setItemMultiSelection = vi.fn();
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const Probe = ({ ref }: { ref: Ref<GalleryActions> }) => {
+const Probe = ({
+  galleryView,
+  ref,
+  selectedBoardId,
+}: {
+  galleryView: 'images' | 'assets';
+  ref: Ref<GalleryActions>;
+  selectedBoardId: string;
+}) => {
   const actions = useGalleryActions({
     boards: [
       {
@@ -58,7 +119,8 @@ const Probe = ({ ref }: { ref: Ref<GalleryActions> }) => {
     loadMore: vi.fn(),
     projectBoardId: null,
     projectName: 'Project',
-    selectedBoardId: 'board-1',
+    selectedBoardId,
+    galleryView,
   });
 
   useImperativeHandle(ref, () => actions, [actions]);
@@ -78,7 +140,7 @@ const adapter: GalleryUiAdapter = {
     reconcileDeletedBoardOutcome,
     selectBoard: noop,
     selectImage: noop,
-    selectItem: noop,
+    selectItem,
     setCompareImage: noop,
     setCompareItem: noop,
     setItemMultiSelection,
@@ -96,29 +158,40 @@ const adapter: GalleryUiAdapter = {
   generateValues: {},
   liveFollowEnabled: false,
   liveProgressTarget: null,
-  notifications: { add: (...args: unknown[]) => mocks.notificationsAdd(...args), reportError: noop },
+  notifications: {
+    add: (...args: unknown[]) => mocks.notificationsAdd(...args),
+    reportError: (...args: unknown[]) => mocks.notificationsReportError(...args),
+  },
   projectId: 'project-1',
   projectName: 'Project',
   queueItems: [],
   widgets: { patchGalleryValues: noop },
 };
 
-beforeEach(async () => {
-  vi.clearAllMocks();
-  accountLifecycle.activate('user-a');
-  host = document.createElement('div');
-  document.body.append(host);
-  root = createRoot(host);
+let selectedBoardId = 'board-1';
+let galleryView: 'images' | 'assets' = 'images';
 
+const renderProbe = async () => {
   await act(() => {
     root?.render(
       <QueryClientProvider client={new QueryClient()}>
         <GalleryUiProvider adapter={adapter}>
-          <Probe ref={actionsRef} />
+          <Probe galleryView={galleryView} ref={actionsRef} selectedBoardId={selectedBoardId} />
         </GalleryUiProvider>
       </QueryClientProvider>
     );
   });
+};
+
+beforeEach(async () => {
+  vi.clearAllMocks();
+  accountLifecycle.activate('user-a');
+  selectedBoardId = 'board-1';
+  galleryView = 'images';
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
+  await renderProbe();
 });
 
 afterEach(async () => {
@@ -147,6 +220,33 @@ describe('deleteBoard', () => {
 
     expect(reconcileDeletedBoardOutcome).toHaveBeenCalledOnce();
     expect(reconcileDeletedBoardOutcome).toHaveBeenCalledWith(outcome);
+    expect(mocks.notificationsAdd).toHaveBeenCalledWith({
+      kind: 'success',
+      message: 'Moved 1 images and 1 videos to Uncategorized.',
+      title: 'Deleted board "Board 1"',
+    });
+  });
+
+  it('reports authoritative deleted and failed image/video outcomes', async () => {
+    mocks.deleteGalleryBoard.mockResolvedValue({
+      boardId: 'board-1',
+      deletedBoardImageNames: [],
+      deletedBoardVideoNames: [],
+      deletedImageNames: ['one.png', 'two.png'],
+      deletedVideoNames: ['one.mp4'],
+      failedImageNames: ['locked.png'],
+      failedVideoNames: ['locked.mp4'],
+    });
+
+    await act(async () => {
+      await actionsRef.current?.deleteBoard('board-1', true);
+    });
+
+    expect(mocks.notificationsAdd).toHaveBeenCalledWith({
+      kind: 'success',
+      message: 'Deleted 2 images and 1 videos; 1 images and 1 videos failed.',
+      title: 'Deleted board "Board 1" with partial media cleanup',
+    });
   });
 });
 
@@ -199,5 +299,181 @@ describe('board image archive omission', () => {
       boardId: 'board-1',
       signal: expect.any(AbortSignal),
     });
+  });
+});
+
+const imageUpload = (name: string, queuedAt: string) => ({
+  boardId: 'board-1',
+  height: 64,
+  imageCategory: 'user' as const,
+  imageName: name,
+  imageUrl: `/images/${name}`,
+  queuedAt,
+  sourceQueueItemId: 'upload',
+  starred: false,
+  thumbnailUrl: `/thumbnails/${name}`,
+  width: 64,
+});
+
+const videoUpload = (name: string, createdAt: string) => ({
+  boardId: 'board-1',
+  category: 'general' as const,
+  createdAt,
+  durationSeconds: 4,
+  fullUrl: `/videos/${name}`,
+  height: 64,
+  isIntermediate: false,
+  kind: 'video' as const,
+  name,
+  starred: false,
+  thumbnailUrl: `/video-thumbnails/${name}`,
+  width: 64,
+});
+
+describe('mixed gallery upload', () => {
+  it('rejects a date-board upload before starting any request', async () => {
+    selectedBoardId = 'by_date:2026-07-30';
+    await renderProbe();
+
+    await act(async () => {
+      await actionsRef.current?.uploadFiles([new File(['image'], 'photo.png', { type: 'image/png' })]);
+    });
+
+    expect(mocks.uploadGalleryImage).not.toHaveBeenCalled();
+    expect(mocks.uploadGalleryVideo).not.toHaveBeenCalled();
+    expect(mocks.notificationsReportError).toHaveBeenCalledOnce();
+    expect(mocks.notificationsReportError).toHaveBeenCalledWith({
+      area: 'gallery-upload',
+      message: 'Uploads are unavailable for date boards.',
+      namespace: 'gallery',
+    });
+  });
+
+  it('retains concurrent image uploads while running videos sequentially and continuing after failure', async () => {
+    let resolveFirstImage: ((value: ReturnType<typeof imageUpload>) => void) | undefined;
+    let resolveSecondImage: ((value: ReturnType<typeof imageUpload>) => void) | undefined;
+    let resolveFirstVideo: ((value: ReturnType<typeof videoUpload>) => void) | undefined;
+    const firstImage = new Promise<ReturnType<typeof imageUpload>>((resolve) => {
+      resolveFirstImage = resolve;
+    });
+    const secondImage = new Promise<ReturnType<typeof imageUpload>>((resolve) => {
+      resolveSecondImage = resolve;
+    });
+    const firstVideo = new Promise<ReturnType<typeof videoUpload>>((resolve) => {
+      resolveFirstVideo = resolve;
+    });
+    mocks.uploadGalleryImage.mockReturnValueOnce(firstImage).mockReturnValueOnce(secondImage);
+    mocks.uploadGalleryVideo
+      .mockReturnValueOnce(firstVideo)
+      .mockRejectedValueOnce(new Error('bad second video'))
+      .mockResolvedValueOnce(videoUpload('third.mp4', '2026-07-30T12:00:05.000Z'));
+
+    let upload: Promise<void> | undefined;
+    act(() => {
+      upload = actionsRef.current?.uploadFiles([
+        new File(['image'], 'one.png', { type: 'image/png' }),
+        new File(['image'], 'two.webp', { type: 'image/webp' }),
+        new File(['video'], 'one.mp4', { type: 'video/mp4' }),
+        new File(['video'], 'two.mp4', { type: 'video/mp4' }),
+        new File(['video'], 'three.mp4', { type: 'video/mp4' }),
+      ]);
+    });
+
+    await vi.waitFor(() => {
+      expect(mocks.uploadGalleryImage).toHaveBeenCalledTimes(2);
+      expect(mocks.uploadGalleryVideo).toHaveBeenCalledTimes(1);
+    });
+
+    resolveFirstImage?.(imageUpload('one.png', '2026-07-30T12:00:01.000Z'));
+    resolveSecondImage?.(imageUpload('two.webp', '2026-07-30T12:00:02.000Z'));
+    resolveFirstVideo?.(videoUpload('one.mp4', '2026-07-30T12:00:03.000Z'));
+
+    await act(async () => {
+      await upload;
+    });
+
+    expect(mocks.uploadGalleryVideo).toHaveBeenCalledTimes(3);
+    expect(mocks.uploadGalleryVideo.mock.invocationCallOrder[1]).toBeLessThan(
+      mocks.uploadGalleryVideo.mock.invocationCallOrder[2] ?? Number.POSITIVE_INFINITY
+    );
+    expect(mocks.invalidateGallery).toHaveBeenCalledOnce();
+    expect(mocks.notificationsAdd).toHaveBeenCalledOnce();
+    expect(mocks.notificationsAdd).toHaveBeenCalledWith({
+      kind: 'success',
+      message: '2 images and 2 videos uploaded to Board 1. 1 failed. Images appear in Assets; videos appear in Images.',
+      title: 'Uploaded 4 of 5 files',
+    });
+  });
+
+  it('selects the newest successful upload visible in the active view', async () => {
+    galleryView = 'assets';
+    await renderProbe();
+    mocks.uploadGalleryImage
+      .mockResolvedValueOnce(imageUpload('older.png', '2026-07-30T12:00:01.000Z'))
+      .mockResolvedValueOnce(imageUpload('newer.png', '2026-07-30T12:00:04.000Z'));
+    mocks.uploadGalleryVideo.mockResolvedValue(videoUpload('newest.mp4', '2026-07-30T12:00:05.000Z'));
+
+    await act(async () => {
+      await actionsRef.current?.uploadFiles([
+        new File(['image'], 'older.png', { type: 'image/png' }),
+        new File(['video'], 'newest.mp4', { type: 'video/mp4' }),
+        new File(['image'], 'newer.png', { type: 'image/png' }),
+      ]);
+    });
+
+    expect(selectItem).toHaveBeenCalledOnce();
+    expect(selectItem).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'image', name: 'newer.png', category: 'user' })
+    );
+  });
+
+  it('reports unsupported and rejected files once without aborting supported uploads', async () => {
+    mocks.uploadGalleryVideo.mockRejectedValue(new Error('corrupt video'));
+
+    await act(async () => {
+      await actionsRef.current?.uploadFiles([
+        new File(['text'], 'notes.txt', { type: 'text/plain' }),
+        new File(['video'], 'corrupt.mp4', { type: 'video/mp4' }),
+      ]);
+    });
+
+    expect(mocks.notificationsAdd).not.toHaveBeenCalled();
+    expect(mocks.notificationsReportError).toHaveBeenCalledOnce();
+    expect(mocks.notificationsReportError).toHaveBeenCalledWith({
+      area: 'gallery-upload',
+      message: 'No files uploaded. 2 failed.',
+      namespace: 'gallery',
+    });
+  });
+
+  it('does not schedule another expensive video after the account lifetime aborts', async () => {
+    let rejectFirstVideo: ((reason: unknown) => void) | undefined;
+    mocks.uploadGalleryVideo.mockReturnValueOnce(
+      new Promise((_, reject) => {
+        rejectFirstVideo = reject;
+      })
+    );
+
+    let upload: Promise<void> | undefined;
+    act(() => {
+      upload = actionsRef.current?.uploadFiles([
+        new File(['video'], 'one.mp4', { type: 'video/mp4' }),
+        new File(['video'], 'two.mp4', { type: 'video/mp4' }),
+      ]);
+    });
+
+    await vi.waitFor(() => {
+      expect(mocks.uploadGalleryVideo).toHaveBeenCalledOnce();
+    });
+    accountLifecycle.invalidate();
+    rejectFirstVideo?.(new DOMException('The operation was aborted.', 'AbortError'));
+
+    await act(async () => {
+      await upload;
+    });
+
+    expect(mocks.uploadGalleryVideo).toHaveBeenCalledOnce();
+    expect(mocks.notificationsAdd).not.toHaveBeenCalled();
+    expect(mocks.notificationsReportError).not.toHaveBeenCalled();
   });
 });

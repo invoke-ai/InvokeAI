@@ -137,7 +137,8 @@ export const useImageActions = ({
         projectId,
       });
     const recordSuccess = (title: string, message?: string) => notifications.add({ kind: 'success', message, title });
-    const getBoardName = (boardId: string) => boards.find((board) => board.id === boardId)?.name ?? 'Uncategorized';
+    const getBoardName = (boardId: string) =>
+      boards.find((board) => board.id === boardId)?.name ?? t('widgets.gallery.uncategorized');
     const getLatestGenerateValues = () => {
       const snapshot = queries.getSnapshot();
       const project = projectId
@@ -158,10 +159,6 @@ export const useImageActions = ({
             t(`widgets.gallery.itemActions.${action}.${result.succeeded.length > 0 ? 'partial' : 'failure'}`, {
               board: boardId ? getBoardName(boardId) : undefined,
               count: requestedCount,
-              defaultValue:
-                result.succeeded.length > 0
-                  ? `${result.succeeded.length} of ${requestedCount} items succeeded; ${result.failed.length} failed.`
-                  : `Could not ${action} ${requestedCount === 1 ? 'item' : `${requestedCount} items`}.`,
               failed: result.failed.length,
               succeeded: result.succeeded.length,
             })
@@ -174,14 +171,6 @@ export const useImageActions = ({
         t(`widgets.gallery.itemActions.${action}.success`, {
           board: boardId ? getBoardName(boardId) : undefined,
           count: result.succeeded.length,
-          defaultValue:
-            action === 'move'
-              ? `Moved ${result.succeeded.length === 1 ? 'item' : `${result.succeeded.length} items`} to ${getBoardName(
-                  boardId ?? 'none'
-                )}.`
-              : `${action === 'delete' ? 'Deleted' : action === 'star' ? 'Starred' : 'Unstarred'} ${
-                  result.succeeded.length === 1 ? 'item' : `${result.succeeded.length} items`
-                }.`,
         })
       );
     };
@@ -455,7 +444,6 @@ export const useImageActions = ({
           new Error(
             t('widgets.gallery.itemActions.download.partial', {
               count: items.length,
-              defaultValue: `${succeededCount} of ${items.length} items downloaded; ${failedCount} failed or skipped.`,
               failed: failedCount,
               succeeded: succeededCount,
             })
@@ -465,7 +453,6 @@ export const useImageActions = ({
         recordSuccess(
           t('widgets.gallery.itemActions.download.success', {
             count: succeededCount,
-            defaultValue: 'Download ready',
           })
         );
       }

@@ -965,7 +965,7 @@ const SelectedVideoPreview = ({
     () => ({
       itemKey: toGalleryItemKey(item),
       kind: 'video',
-      label: t('widgets.preview.videoLabel', { defaultValue: `Video ${item.name}`, name: item.name }),
+      label: t('widgets.preview.videoLabel', { name: item.name }),
       poster: item.thumbnailUrl,
       src: item.fullUrl,
     }),

@@ -5,6 +5,7 @@ import { StatusWidgetChip } from '@platform/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { ImageIcon } from 'lucide-react';
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import type { GalleryStateView } from './galleryStateView';
 
@@ -39,6 +40,18 @@ export const shouldPublishGalleryTotal = ({
   total: number | null;
 }): boolean =>
   typeof total === 'number' && Number.isFinite(total) && total !== knownTotalImages && total !== lastPublishedTotal;
+
+export const GalleryStatusChip = ({ count }: { count: number }) => {
+  const { t } = useTranslation();
+
+  return (
+    <StatusWidgetChip icon={ImageIcon}>
+      {t('widgets.gallery.statusChip', {
+        count,
+      })}
+    </StatusWidgetChip>
+  );
+};
 
 export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidgetProps) => {
   const {
@@ -108,6 +121,7 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
 
   const actions = useGalleryActions({
     boards: data.boards,
+    galleryView,
     loadMore,
     projectBoardId: getGalleryProjectBoardId(galleryValues),
     projectName,
@@ -157,7 +171,7 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
   }, [galleryCommands, page, settings.paginationMode, total]);
 
   if (region === 'bottom' && presentation !== 'expanded') {
-    return <StatusWidgetChip icon={ImageIcon}>Gallery: {total ?? gallery.items.length}</StatusWidgetChip>;
+    return <GalleryStatusChip count={total ?? gallery.items.length} />;
   }
 
   return (

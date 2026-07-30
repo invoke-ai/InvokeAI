@@ -630,7 +630,7 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
         >
           <UploadIcon size="20" />
           <Text fontSize="xs" fontWeight="600">
-            {t('widgets.gallery.dropImagesToUploadToBoard', { name: selectedBoardName })}
+            {t('widgets.gallery.dropMediaToUploadToBoard', { name: selectedBoardName })}
           </Text>
         </DropZone>
       )}

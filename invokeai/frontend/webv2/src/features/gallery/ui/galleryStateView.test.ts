@@ -124,8 +124,12 @@ describe('gallery state view', () => {
     expect(gallery.isLoading).toBe(true);
   });
 
-  it('exposes both image and asset counts for board labels', () => {
-    expect(getBoardCounts(boards[1])).toEqual({ assetCount: 0, imageCount: 2 });
+  it('exposes image, video, and asset counts for board labels', () => {
+    expect(getBoardCounts({ ...boards[1], videoCount: 3 })).toEqual({
+      assetCount: 0,
+      imageCount: 2,
+      videoCount: 3,
+    });
   });
 
   it('parses persisted gallery settings with safe defaults', () => {

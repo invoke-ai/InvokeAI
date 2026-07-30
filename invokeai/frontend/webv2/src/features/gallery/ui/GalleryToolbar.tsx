@@ -25,7 +25,7 @@ import { useTranslation } from 'react-i18next';
 import { GalleryBoardSelect } from './GalleryBoardSelect';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
-const ACCEPTED_UPLOAD_EXTENSIONS = 'image/png,image/jpeg,image/webp';
+const ACCEPTED_UPLOAD_EXTENSIONS = 'image/png,image/jpeg,image/webp,video/mp4,.png,.jpg,.jpeg,.webp,.mp4';
 const galleryViewTabs = [
   { labelKey: 'common.images', value: 'images' },
   { labelKey: 'common.assets', value: 'assets' },
@@ -233,7 +233,7 @@ const GalleryUploadButton = () => {
         aria-label={
           isVirtualTarget
             ? t('widgets.gallery.uploadsUnavailableForDateBoards')
-            : t('widgets.gallery.uploadImagesToBoard', {
+            : t('widgets.gallery.uploadMediaToBoard', {
                 name: selectedBoard?.name ?? t('widgets.gallery.selectedBoardFallback'),
               })
         }

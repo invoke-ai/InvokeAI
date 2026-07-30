@@ -64,6 +64,45 @@ export const isDateBoardId = (boardId: string): boolean => boardId.startsWith(DA
 
 const getDateFromBoardId = (boardId: string): string => boardId.slice(DATE_BOARD_ID_PREFIX.length);
 
+const getUploadBoardId = (boardId: string): string | undefined =>
+  boardId === 'none' || boardId === ALL_READABLE_BOARDS_ID || isDateBoardId(boardId) ? undefined : boardId;
+
+export type GalleryUploadKind = 'image' | 'video';
+
+const GALLERY_UPLOAD_KIND_BY_MIME = new Map<string, GalleryUploadKind>([
+  ['image/jpeg', 'image'],
+  ['image/jpg', 'image'],
+  ['image/png', 'image'],
+  ['image/webp', 'image'],
+  ['video/mp4', 'video'],
+]);
+
+const GALLERY_UPLOAD_KIND_BY_EXTENSION = new Map<string, GalleryUploadKind>([
+  ['.jpeg', 'image'],
+  ['.jpg', 'image'],
+  ['.png', 'image'],
+  ['.webp', 'image'],
+  ['.mp4', 'video'],
+]);
+
+export const classifyGalleryUpload = (file: Pick<File, 'name' | 'type'>): { kind: GalleryUploadKind } | null => {
+  const mimeKind = GALLERY_UPLOAD_KIND_BY_MIME.get(file.type.toLowerCase());
+
+  if (mimeKind) {
+    return { kind: mimeKind };
+  }
+
+  const lowerName = file.name.toLowerCase();
+
+  for (const [extension, kind] of GALLERY_UPLOAD_KIND_BY_EXTENSION) {
+    if (lowerName.endsWith(extension)) {
+      return { kind };
+    }
+  }
+
+  return null;
+};
+
 interface BackendImageDTO {
   image_name: string;
   image_url: string;
@@ -1320,7 +1359,7 @@ export const uploadGalleryImage = async (
   options: { isIntermediate?: boolean; signal?: AbortSignal } = {}
 ): Promise<GalleryImage> => {
   const query = toSearchParams({
-    board_id: boardId === 'none' || isDateBoardId(boardId) ? undefined : boardId,
+    board_id: getUploadBoardId(boardId),
     image_category: 'user',
     is_intermediate: options.isIntermediate ?? false,
   });
@@ -1334,4 +1373,26 @@ export const uploadGalleryImage = async (
   });
 
   return mapImage(uploadedImage);
+};
+
+export const uploadGalleryVideo = async (
+  file: File,
+  boardId: string,
+  options: { signal?: AbortSignal } = {}
+): Promise<GalleryVideoItem> => {
+  const query = toSearchParams({
+    board_id: getUploadBoardId(boardId),
+    is_intermediate: false,
+    video_category: 'general',
+  });
+  const body = new FormData();
+  body.append('file', file);
+
+  const uploadedVideo = await apiFetchJson<BackendVideoDTO>(`/api/v1/videos/upload?${query}`, {
+    body,
+    method: 'POST',
+    signal: options.signal,
+  });
+
+  return mapVideo(uploadedVideo);
 };

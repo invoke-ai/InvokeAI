@@ -433,7 +433,10 @@ export const getGalleryStateView = (
   };
 };
 
-export const getBoardCounts = (board: GalleryBoard): { assetCount: number; imageCount: number } => ({
+export const getBoardCounts = (
+  board: GalleryBoard
+): { assetCount: number; imageCount: number; videoCount: number } => ({
   assetCount: board.assetCount,
   imageCount: board.imageCount,
+  videoCount: board.videoCount,
 });

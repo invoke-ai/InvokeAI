@@ -207,8 +207,9 @@ export const GalleryBoardMenu = ({
                   </Text>
                   <Text color="fg.subtle" fontSize="2xs">
                     {t('widgets.gallery.boardItemCounts', {
-                      assets: deleteTarget?.assetCount ?? 0,
-                      images: deleteTarget?.imageCount ?? 0,
+                      assets: t('widgets.gallery.assetCount', { count: deleteTarget?.assetCount ?? 0 }),
+                      images: t('widgets.gallery.imageCount', { count: deleteTarget?.imageCount ?? 0 }),
+                      videos: t('widgets.gallery.videoCount', { count: deleteTarget?.videoCount ?? 0 }),
                     })}
                   </Text>
                 </Stack>
@@ -221,7 +222,7 @@ export const GalleryBoardMenu = ({
                   {t('widgets.gallery.deleteBoardOnly')}
                 </Button>
                 <Button colorPalette="red" size="xs" onClick={handleDeleteBoardAndImages}>
-                  {t('widgets.gallery.deleteBoardAndImages')}
+                  {t('widgets.gallery.deleteBoardAndMedia')}
                 </Button>
               </Dialog.Footer>
             </Dialog.Content>
@@ -236,12 +237,11 @@ const BoardDownloadMenuItem = ({ board }: { board: GalleryBoard }) => {
   const { t } = useTranslation();
   const { actions } = useGalleryWidget();
   const handleClick = useCallback(() => void actions.downloadBoard(board.id), [actions, board.id]);
-  const omittedVideos = `${board.videoCount} ${board.videoCount === 1 ? 'video' : 'videos'} omitted`;
 
   return (
     <BoardMenuItem
       icon={DownloadIcon}
-      label={`${t('widgets.gallery.downloadBoard')} (${omittedVideos})`}
+      label={t('widgets.gallery.downloadBoardWithOmission', { count: board.videoCount })}
       value="download-board"
       onClick={handleClick}
     />

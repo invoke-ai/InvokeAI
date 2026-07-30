@@ -17,7 +17,7 @@ import {
 } from '@chakra-ui/react';
 import { useDndContext, useDndMonitor, useDroppable, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core';
 import { toGalleryItemKey } from '@features/gallery/core/items';
-import { Button, CloseButton, IconButton } from '@platform/ui';
+import { Button, CloseButton, IconButton, Tooltip } from '@platform/ui';
 import {
   ArchiveIcon,
   ArrowDownAZIcon,
@@ -27,6 +27,7 @@ import {
   ImageIcon,
   MoreVerticalIcon,
   PinIcon,
+  PlayIcon,
   PlusIcon,
   type LucideIcon,
   SearchIcon,
@@ -566,7 +567,7 @@ const BoardRow = ({
   );
 };
 
-const BoardOptionContent = ({
+export const BoardOptionContent = ({
   badge,
   badgeColor = 'gray',
   board,
@@ -580,7 +581,12 @@ const BoardOptionContent = ({
   /** Render the owner line (admins on multi-user backends); off in the compact trigger. */
   showOwner?: boolean;
 }) => {
+  const { t } = useTranslation();
   const counts = getBoardCounts(board);
+  const mediaCountBreakdown = t('widgets.gallery.boardMediaCountBreakdown', {
+    images: t('widgets.gallery.imageCount', { count: counts.imageCount }),
+    videos: t('widgets.gallery.videoCount', { count: counts.videoCount }),
+  });
 
   return (
     <HStack gap="2" minW="0" w="full">
@@ -601,9 +607,17 @@ const BoardOptionContent = ({
             {badge}
           </Badge>
         )}
-        <Badge flexShrink={0} size="xs" variant={isSelected ? 'solid' : 'subtle'}>
-          {counts.imageCount} | {counts.assetCount}
-        </Badge>
+        <Tooltip content={mediaCountBreakdown}>
+          <Badge
+            aria-label={mediaCountBreakdown}
+            flexShrink={0}
+            fontVariantNumeric="tabular-nums"
+            size="xs"
+            variant={isSelected ? 'solid' : 'subtle'}
+          >
+            {counts.imageCount + counts.videoCount} | {counts.assetCount}
+          </Badge>
+        </Tooltip>
       </Flex>
     </HStack>
   );
@@ -625,20 +639,37 @@ const BoardCoverIcon = ({ icon }: { icon: LucideIcon }) => (
   </Flex>
 );
 
-const BoardCover = ({ board }: { board: GalleryBoard }) => {
+export const BoardCover = ({ board }: { board: GalleryBoard }) => {
   if (board.coverThumbnailUrl) {
     return (
-      <Image
-        alt=""
-        bg="bg.emphasized"
-        borderWidth="1px"
-        borderColor="border.subtle"
-        boxSize="7"
-        flexShrink={0}
-        objectFit="cover"
-        rounded="md"
-        src={board.coverThumbnailUrl}
-      />
+      <Flex boxSize="7" flexShrink={0} position="relative">
+        <Image
+          alt=""
+          bg="bg.emphasized"
+          borderWidth="1px"
+          borderColor="border.subtle"
+          boxSize="7"
+          objectFit="cover"
+          rounded="md"
+          src={board.coverThumbnailUrl}
+        />
+        {board.coverVideoName ? (
+          <Flex
+            align="center"
+            aria-hidden="true"
+            bg="blackAlpha.700"
+            bottom="0.5"
+            boxSize="3"
+            color="white"
+            justify="center"
+            position="absolute"
+            right="0.5"
+            rounded="full"
+          >
+            <Icon as={PlayIcon} boxSize="2" fill="currentColor" />
+          </Flex>
+        ) : null}
+      </Flex>
     );
   }
 
