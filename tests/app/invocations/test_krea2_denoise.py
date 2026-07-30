@@ -166,6 +166,109 @@ def test_get_noise_is_deterministic_and_correctly_shaped() -> None:
     assert not torch.equal(noise_a, noise_other)
 
 
+def test_load_text_conditioning_concatenates_only_valid_tokens() -> None:
+    invocation = Krea2DenoiseInvocation.model_construct()
+    first_embeds = torch.stack(
+        [
+            torch.full((12, 8), 1.0),
+            torch.full((12, 8), 99.0),
+            torch.full((12, 8), 3.0),
+        ],
+        dim=0,
+    ).unsqueeze(0)
+    conditionings = {
+        "first": ConditioningFieldData(
+            conditionings=[
+                Krea2ConditioningInfo(
+                    prompt_embeds=first_embeds,
+                    prompt_embeds_mask=torch.tensor([[True, False, True]]),
+                )
+            ]
+        ),
+        "second": ConditioningFieldData(
+            conditionings=[Krea2ConditioningInfo(prompt_embeds=torch.full((1, 3, 12, 8), 2.0))]
+        ),
+    }
+    context = SimpleNamespace(conditioning=SimpleNamespace(load=lambda name: conditionings[name]))
+
+    prompt_embeds, prompt_mask = invocation._load_text_conditioning(
+        context=context,
+        conditioning_field=[
+            Krea2ConditioningField(conditioning_name="first"),
+            Krea2ConditioningField(conditioning_name="second"),
+        ],
+        dtype=torch.float32,
+        device=torch.device("cpu"),
+    )
+
+    assert prompt_embeds.shape == (1, 5, 12, 8)
+    assert torch.equal(prompt_embeds[:, 0], torch.full((1, 12, 8), 1.0))
+    assert torch.equal(prompt_embeds[:, 1], torch.full((1, 12, 8), 3.0))
+    assert torch.equal(prompt_embeds[:, 2:], torch.full((1, 3, 12, 8), 2.0))
+    assert prompt_mask is None
+
+
+def test_load_text_conditioning_compacts_a_single_masked_conditioning() -> None:
+    invocation = Krea2DenoiseInvocation.model_construct()
+    embeds = torch.arange(4 * 12 * 8, dtype=torch.float32).reshape(1, 4, 12, 8)
+    conditionings = {
+        "prompt": ConditioningFieldData(
+            conditionings=[
+                Krea2ConditioningInfo(
+                    prompt_embeds=embeds,
+                    prompt_embeds_mask=torch.tensor([[True, False, True, False]]),
+                )
+            ]
+        )
+    }
+    context = SimpleNamespace(conditioning=SimpleNamespace(load=lambda name: conditionings[name]))
+
+    prompt_embeds, prompt_mask = invocation._load_text_conditioning(
+        context=context,
+        conditioning_field=Krea2ConditioningField(conditioning_name="prompt"),
+        dtype=torch.float32,
+        device=torch.device("cpu"),
+    )
+
+    assert torch.equal(prompt_embeds, embeds[:, [0, 2]])
+    assert prompt_mask is None
+
+
+def test_load_text_conditioning_preserves_none_when_all_masks_are_none() -> None:
+    invocation = Krea2DenoiseInvocation.model_construct()
+    conditionings = {
+        "first": ConditioningFieldData(conditionings=[Krea2ConditioningInfo(prompt_embeds=torch.ones(1, 2, 12, 8))]),
+        "second": ConditioningFieldData(conditionings=[Krea2ConditioningInfo(prompt_embeds=torch.ones(1, 3, 12, 8))]),
+    }
+    context = SimpleNamespace(conditioning=SimpleNamespace(load=lambda name: conditionings[name]))
+
+    prompt_embeds, prompt_mask = invocation._load_text_conditioning(
+        context=context,
+        conditioning_field=[
+            Krea2ConditioningField(conditioning_name="first"),
+            Krea2ConditioningField(conditioning_name="second"),
+        ],
+        dtype=torch.float32,
+        device=torch.device("cpu"),
+    )
+
+    assert prompt_embeds.shape == (1, 5, 12, 8)
+    assert prompt_mask is None
+
+
+def test_load_text_conditioning_rejects_an_empty_collection() -> None:
+    invocation = Krea2DenoiseInvocation.model_construct()
+    context = SimpleNamespace(conditioning=SimpleNamespace(load=lambda _name: None))
+
+    with pytest.raises(ValueError, match="At least one Krea-2 conditioning is required"):
+        invocation._load_text_conditioning(
+            context=context,
+            conditioning_field=[],
+            dtype=torch.float32,
+            device=torch.device("cpu"),
+        )
+
+
 class _Scheduler:
     def __init__(self, **_kwargs) -> None:
         self.config = SimpleNamespace(num_train_timesteps=1000)
@@ -208,11 +311,18 @@ def _model_identifier() -> ModelIdentifierField:
     )
 
 
-def _runtime_invocation(*, cfg_scale: float | list[float], with_mask: bool = False) -> Krea2DenoiseInvocation:
+def _runtime_invocation(
+    *,
+    cfg_scale: float | list[float],
+    with_mask: bool = False,
+    negative_conditioning: Krea2ConditioningField | list[Krea2ConditioningField] | None = None,
+) -> Krea2DenoiseInvocation:
     return Krea2DenoiseInvocation.model_construct(
         transformer=TransformerField(transformer=_model_identifier(), loras=[]),
         positive_conditioning=Krea2ConditioningField(conditioning_name="positive"),
-        negative_conditioning=Krea2ConditioningField(conditioning_name="negative"),
+        negative_conditioning=negative_conditioning
+        if negative_conditioning is not None
+        else Krea2ConditioningField(conditioning_name="negative"),
         cfg_scale=cfg_scale,
         width=16,
         height=16,
@@ -275,6 +385,19 @@ def test_run_diffusion_applies_mixed_cfg_only_at_enabled_steps(monkeypatch, tmp_
 
     assert latents.shape == (1, KREA2_LATENT_CHANNELS, 1, 2, 2)
     assert transformer.conditioning_values == [1.0, 0.0, 1.0]
+
+
+def test_run_diffusion_treats_an_empty_negative_collection_as_absent(monkeypatch, tmp_path) -> None:
+    _patch_runtime(monkeypatch)
+    transformer = _Transformer()
+
+    latents = _runtime_invocation(
+        cfg_scale=2.0,
+        negative_conditioning=[],
+    )._run_diffusion(_runtime_context(tmp_path, transformer))
+
+    assert latents.shape == (1, KREA2_LATENT_CHANNELS, 1, 2, 2)
+    assert transformer.conditioning_values == [1.0, 1.0]
 
 
 def test_run_diffusion_reaches_masked_denoising_merge(monkeypatch, tmp_path) -> None:
@@ -463,13 +586,34 @@ def test_estimate_working_memory_stays_within_a_24gb_card_at_high_res() -> None:
     transformer_bytes = int(12.3 * GB)  # Krea-2-Turbo fp8
 
     # 2560x1440 -> (2560/16) x (1440/16) = 160 x 90 = 14400 image tokens.
-    est_hi = inv._estimate_working_memory(image_seq_len=14400, do_cfg=False, num_loras=0)
+    est_hi = inv._estimate_working_memory(
+        image_seq_len=14400, positive_text_seq_len=512, negative_text_seq_len=None, do_cfg=False, num_loras=0
+    )
     assert est_hi + transformer_bytes < 24 * GB
 
     # 1280x720 -> 80 x 45 = 3600 image tokens.
-    est_lo = inv._estimate_working_memory(image_seq_len=3600, do_cfg=False, num_loras=0)
+    est_lo = inv._estimate_working_memory(
+        image_seq_len=3600, positive_text_seq_len=512, negative_text_seq_len=None, do_cfg=False, num_loras=0
+    )
     assert est_lo + transformer_bytes < 24 * GB
 
     # Monotonic in tokens, and a non-trivial (multi-GB) reservation so eviction is actually triggered.
     assert est_hi > est_lo
     assert est_lo > 1 * GB
+
+
+def test_estimate_working_memory_accounts_for_the_longest_text_conditioning() -> None:
+    inv = Krea2DenoiseInvocation.model_construct(transformer=SimpleNamespace(loras=[]))
+
+    short_text = inv._estimate_working_memory(
+        image_seq_len=3600, positive_text_seq_len=64, negative_text_seq_len=32, do_cfg=True, num_loras=0
+    )
+    long_positive = inv._estimate_working_memory(
+        image_seq_len=3600, positive_text_seq_len=256, negative_text_seq_len=32, do_cfg=True, num_loras=0
+    )
+    long_negative = inv._estimate_working_memory(
+        image_seq_len=3600, positive_text_seq_len=64, negative_text_seq_len=256, do_cfg=True, num_loras=0
+    )
+
+    assert long_positive > short_text
+    assert long_negative == long_positive
