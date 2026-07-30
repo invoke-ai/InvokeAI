@@ -146,3 +146,15 @@ def test_directory_encoder_loader_reaches_transformers_from_pretrained(monkeypat
         low_cpu_mem_usage=True,
         local_files_only=True,
     )
+
+
+def test_directory_encoder_loader_estimates_standalone_root_weights(tmp_path) -> None:
+    (tmp_path / "config.json").write_text("{}")
+    weight_size = 4096
+    (tmp_path / "model.safetensors").write_bytes(b"\0" * weight_size)
+    config = Qwen3VLEncoder_Qwen3VLEncoder_Config.model_construct(path=str(tmp_path))
+    loader = object.__new__(Qwen3VLEncoderLoader)
+
+    estimated_size = loader.get_size_fs(config, tmp_path, SubModelType.TextEncoder)
+
+    assert estimated_size == weight_size

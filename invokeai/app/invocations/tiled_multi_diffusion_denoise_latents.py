@@ -1,6 +1,6 @@
 import copy
 from contextlib import ExitStack
-from typing import Iterator, Tuple
+from typing import Iterator
 
 import torch
 from diffusers.models.unets.unet_2d_condition import UNet2DConditionModel
@@ -22,7 +22,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import UNetField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.patches.layer_patcher import LayerPatcher
+from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.stable_diffusion.diffusers_pipeline import ControlNetData, PipelineIntermediateState
 from invokeai.backend.stable_diffusion.multi_diffusion_pipeline import (
@@ -193,12 +193,11 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
             context.util.sd_step_callback(state, unet_config.base)
 
         # Prepare an iterator that yields the UNet's LoRA models and their weights.
-        def _lora_loader() -> Iterator[Tuple[ModelPatchRaw, float]]:
+        def _lora_loader() -> Iterator[PatchSpec]:
             for lora in self.unet.loras:
                 lora_info = context.models.load(lora.lora)
                 assert isinstance(lora_info.model, ModelPatchRaw)
-                yield (lora_info.model, lora.weight)
-                del lora_info
+                yield (lora_info.model, lora.weight, lora_info.model_in_ram())
 
         device = TorchDevice.choose_torch_device()
         with (

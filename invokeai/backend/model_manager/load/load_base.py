@@ -8,6 +8,7 @@ from contextlib import contextmanager
 from logging import Logger
 from pathlib import Path
 from typing import Any, Dict, Generator, Optional, Tuple
+from weakref import finalize
 
 import torch
 
@@ -17,7 +18,7 @@ from invokeai.backend.model_manager.load.model_cache.cache_record import CacheRe
 from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_with_partial_load import (
     CachedModelWithPartialLoad,
 )
-from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
+from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK, ModelCache
 from invokeai.backend.model_manager.taxonomy import AnyModel, SubModelType
 
 
@@ -55,9 +56,24 @@ class LoadedModelWithoutConfig:
     def __init__(self, cache_record: CacheRecord, cache: ModelCache):
         self._cache_record = cache_record
         self._cache = cache
+        release_first_use_grace = getattr(cache, "release_first_use_grace", None)
+        self._first_use_finalizer = (
+            finalize(self, release_first_use_grace, cache_record)
+            if cache_record.awaiting_first_use and release_first_use_grace is not None
+            else None
+        )
+        if self._first_use_finalizer is not None:
+            self._first_use_finalizer.atexit = False
 
     def __enter__(self) -> AnyModel:
-        self._cache.lock(self._cache_record, None)
+        # Hold the MODEL_LOAD_LOCK read lock across the VRAM load (lock() runs
+        # load_state_dict(assign=True), which calls register_parameter) so it can't overlap a
+        # concurrent model construction that has the global register_parameter -> meta patch active.
+        # Acquired before the cache's own lock to keep a consistent lock order (see MODEL_LOAD_LOCK).
+        with MODEL_LOAD_LOCK.read_lock():
+            self._cache.lock(self._cache_record, None)
+        if self._first_use_finalizer is not None:
+            self._first_use_finalizer.detach()
         try:
             self.repair_required_tensors_on_device()
             return self.model
@@ -77,7 +93,11 @@ class LoadedModelWithoutConfig:
         :param working_mem_bytes: The amount of working memory to keep available on the compute device when loading the
             model.
         """
-        self._cache.lock(self._cache_record, working_mem_bytes)
+        # See __enter__ for why the VRAM load is wrapped in the read lock.
+        with MODEL_LOAD_LOCK.read_lock():
+            self._cache.lock(self._cache_record, working_mem_bytes)
+        if self._first_use_finalizer is not None:
+            self._first_use_finalizer.detach()
         try:
             self.repair_required_tensors_on_device()
             yield (self._cache_record.cached_model.get_cpu_state_dict(), self._cache_record.cached_model.model)
@@ -88,6 +108,17 @@ class LoadedModelWithoutConfig:
     def model(self) -> AnyModel:
         """Return the model without locking it."""
         return self._cache_record.cached_model.model
+
+    @contextmanager
+    def model_in_ram(self) -> Generator[AnyModel, None, None]:
+        """Pin the model's cache record in RAM without moving the model to its execution device."""
+        self._cache.lock_in_ram(self._cache_record)
+        if self._first_use_finalizer is not None:
+            self._first_use_finalizer.detach()
+        try:
+            yield self.model
+        finally:
+            self._cache.unlock(self._cache_record)
 
     @property
     def compute_device(self) -> torch.device:
@@ -105,7 +136,12 @@ class LoadedModelWithoutConfig:
         cached_model = self._cache_record.cached_model
         if not isinstance(cached_model, CachedModelWithPartialLoad):
             return 0
-        return cached_model.repair_required_tensors_on_compute_device()
+        # Repair runs load_state_dict(assign=True) -> register_parameter, so it must hold the read
+        # lock to avoid being hijacked onto the `meta` device by a concurrent construction. This is
+        # also called directly (outside __enter__/model_on_device) by some text-encoder invocations,
+        # so the guard lives here rather than only at the call sites.
+        with MODEL_LOAD_LOCK.read_lock():
+            return cached_model.repair_required_tensors_on_compute_device()
 
 
 class LoadedModel(LoadedModelWithoutConfig):
