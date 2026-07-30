@@ -36,10 +36,6 @@ def test_single_file_loader_constructs_and_materializes_model(monkeypatch, tmp_p
     ram_cache = SimpleNamespace(make_room=MagicMock())
     loader = object.__new__(Krea2CheckpointModel)
     loader._ram_cache = ram_cache
-    # The loader resolves the fp8-storage decision itself (to stream the cast during dequantization
-    # rather than re-quantize a full bf16 state dict), and `_should_use_fp8` reads `_torch_device`.
-    # CPU means fp8 storage is off, so this exercises the plain bf16 path.
-    loader._torch_device = torch.device("cpu")
     loader._apply_fp8_layerwise_casting = lambda model, _config, _submodel: model
 
     monkeypatch.setattr(diffusers, "Krea2Transformer2DModel", _TinyKrea2Transformer, raising=False)

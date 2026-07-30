@@ -20,7 +20,6 @@ from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
     SubModelType,
 )
-from invokeai.backend.quantization.dequantize_common import FP8_STORAGE_SKIP_PATTERNS
 from invokeai.backend.util.devices import TorchDevice
 
 # Layer classes that benefit from FP8 storage. Mirrors diffusers'
@@ -39,10 +38,18 @@ _FP8_SUPPORTED_PYTORCH_LAYERS: tuple[type[torch.nn.Module], ...] = (
     torch.nn.Embedding,
 )
 
-# Re-exported under the historical name; defined in the quantization layer because single-file
-# loaders apply the same skip list when they cast weights to FP8 during dequantization (which keeps
-# peak host RAM at the FP8 model size rather than the full bf16 one).
-_FP8_DEFAULT_SKIP_PATTERNS = FP8_STORAGE_SKIP_PATTERNS
+# Module-path regexes (matched against `named_modules()` dotted paths) for precision-sensitive
+# layers that should never be cast to FP8. Mirrors diffusers' `DEFAULT_SKIP_MODULES_PATTERN`
+# — without these, FLUX RMSNorm.scale and similar tiny learned scalars get crushed to FP8 and
+# inference quality degrades. Includes anything named `norm`, position/patch embeddings, and
+# the in/out projection of transformer blocks.
+_FP8_DEFAULT_SKIP_PATTERNS: tuple[str, ...] = (
+    "pos_embed",
+    "patch_embed",
+    "norm",
+    r"^proj_in$",
+    r"^proj_out$",
+)
 
 
 # TO DO: The loader is not thread safe!
@@ -206,15 +213,10 @@ class ModelLoader(ModelLoaderBase):
 
         # Detect the model's current dtype to use as compute dtype, since models
         # (e.g. Flux) may require a specific dtype (bf16) that differs from the global torch dtype (fp16).
-        # Params that are *already* fp8 are skipped: a loader may have stored weights at fp8 directly
-        # (streaming the cast during dequantization, to avoid a full-bf16 peak in host RAM), and
-        # adopting fp8 as the compute dtype would make the upcast hooks no-ops and run the forward
-        # pass in fp8.
         if isinstance(model, torch.nn.Module):
-            compute_dtype = next(
-                (p.dtype for p in model.parameters() if p.dtype not in (torch.float8_e4m3fn, torch.float8_e5m2)),
-                compute_dtype,
-            )
+            first_param = next(model.parameters(), None)
+            if first_param is not None:
+                compute_dtype = first_param.dtype
 
         # We use our own hook-based path for every nn.Module — including diffusers ModelMixin —
         # rather than `model.enable_layerwise_casting()`. Diffusers' LayerwiseCastingHook installs

@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Any, Optional
 
 import accelerate
-import torch
 from transformers import AutoConfig, AutoTokenizer
 
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Diffusers_Config_Base
@@ -25,13 +24,7 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelType,
     SubModelType,
 )
-from invokeai.backend.quantization.dequantize_common import (
-    FP8_STORAGE_SKIP_PATTERNS,
-    read_declared_quantization_formats,
-)
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
-from invokeai.backend.quantization.nvfp4 import dequantize_nvfp4, is_nvfp4_state_dict
-from invokeai.backend.quantization.scaled_fp8 import dequantize_scaled_fp8
 from invokeai.backend.util.devices import TorchDevice
 
 
@@ -96,59 +89,27 @@ def _is_native_krea2_format(sd: dict[str, Any]) -> bool:
     )
 
 
-def _is_supported_quantization_format(fmt: str) -> bool:
-    """Whether a format string from a checkpoint's ``_quantization_metadata`` is one we dequantize.
+def _dequantize_scaled_fp8(sd: dict[str, Any]) -> dict[str, Any]:
+    """Dequantize ComfyUI 'scaled fp8' weights: ``dequant = weight.float() * weight_scale``.
 
-    Matches any fp8 spelling (``fp8``, ``mxfp8``, ``scaled_fp8``, ``fp8_e4m3``, ...) plus NVFP4.
-    Deliberately does *not* match bare ``fp4``/``mxfp4``: those pack two 4-bit values per byte like
-    NVFP4 but carry a single block scale and no ``.weight_scale_2``, so NVFP4 detection would miss
-    them and the scaled-fp8 path would silently multiply a packed weight by a block scale.
+    Each quantized layer stores an fp8 ``<name>.weight`` plus a (usually scalar) ``<name>.weight_scale``.
+    Returns a new dict with the weights dequantized to float and the ``.weight_scale`` keys removed.
+    No-op if there are no scale keys.
     """
-    return fmt == "nvfp4" or "fp8" in fmt
+    import torch
 
-
-def _reject_unsupported_quantization(model_path: Path, *, what: str) -> None:
-    """Raise on a checkpoint that declares a quantization format we cannot dequantize.
-
-    Without this, an unsupported format reaches ``load_state_dict`` as a wrongly-shaped state dict
-    and fails with one "size mismatch for ..." line per quantized layer — hundreds of lines that
-    name every tensor in the model and identify neither the format nor the fix.
-    """
-    unsupported = sorted(
-        f for f in read_declared_quantization_formats(model_path) if not _is_supported_quantization_format(f)
-    )
-    if unsupported:
-        raise RuntimeError(
-            f"{what}: checkpoint declares quantization format(s) {', '.join(unsupported)}, which "
-            f"InvokeAI cannot dequantize. Supported single-file formats are NVFP4, fp8 variants "
-            f"(ComfyUI 'scaled fp8' / MXFP8) and unquantized bf16/fp16; GGUF is supported as its own "
-            f"model format. Re-download this model in one of those formats."
-        )
-
-
-def _dequantize_quantized_weights(
-    sd: dict[str, Any],
-    compute_dtype: torch.dtype,
-    *,
-    storage_dtype: torch.dtype | None = None,
-) -> dict[str, Any]:
-    """Fold single-file quantization scales into the weights in place, returning the same dict.
-
-    Dispatches on the format actually present. NVFP4 has to be tested first: it uses the same
-    ``.weight_scale`` key as ComfyUI 'scaled fp8' and is distinguished only by its per-tensor
-    ``.weight_scale_2``, so the scaled-fp8 path would otherwise multiply a *packed* 4-bit weight by
-    an NVFP4 block scale and hand ``load_state_dict`` a half-width tensor.
-
-    Both branches delegate to shared implementations so this stays in step with the Qwen-Image
-    loader; the two previously had independent copies of the fp8 path, and this one had drifted — it
-    multiplied by the raw scale (crashing on the block-wise scales real checkpoints ship) and
-    dequantized via float32 (spiking peak RAM to ~4 bytes/param). No-op when there are no scale keys.
-    """
-    if is_nvfp4_state_dict(sd):
-        dequantize_nvfp4(sd, compute_dtype, storage_dtype=storage_dtype, skip_patterns=FP8_STORAGE_SKIP_PATTERNS)
-    else:
-        dequantize_scaled_fp8(sd, compute_dtype, storage_dtype=storage_dtype, skip_patterns=FP8_STORAGE_SKIP_PATTERNS)
-    return sd
+    scale_keys = [k for k in sd if isinstance(k, str) and k.endswith(".weight_scale")]
+    if not scale_keys:
+        return sd
+    out = dict(sd)
+    for scale_key in scale_keys:
+        weight_key = scale_key.replace(".weight_scale", ".weight")
+        if weight_key in out:
+            weight = torch.as_tensor(_to_plain_tensor(out[weight_key])).float()
+            scale = torch.as_tensor(_to_plain_tensor(out[scale_key])).float()
+            out[weight_key] = weight * scale
+        del out[scale_key]
+    return out
 
 
 def _convert_krea2_native_to_diffusers(sd: dict[str, Any]) -> dict[str, Any]:
@@ -370,42 +331,24 @@ class Krea2CheckpointModel(ModelLoader):
             raise TypeError(f"Expected Main_Checkpoint_Krea2_Config, got {type(config).__name__}.")
         model_path = Path(config.path)
 
-        target_device = TorchDevice.choose_torch_device()
-        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
-
-        _reject_unsupported_quantization(model_path, what="Krea-2 single-file checkpoint")
-
-        # Resolved before dequantizing, not after loading: with fp8 storage on, each weight is cast
-        # to fp8 as it is dequantized, so the state dict never holds the full bf16 model. Dequantizing
-        # everything to bf16 first and letting `_apply_fp8_layerwise_casting` re-quantize afterwards
-        # is numerically identical but transiently needs 23.9 GiB for a 12.8 B-parameter transformer,
-        # which does not fit on a 32 GB host that also has to hold a ~5 GiB text encoder.
-        storage_dtype = torch.float8_e4m3fn if self._should_use_fp8(config, SubModelType.Transformer) else None
-
         sd = load_file(model_path)
         sd = _strip_comfyui_prefix(sd)
-        # NVFP4 or ComfyUI 'scaled fp8': fold the scales into the weights. Dequantized straight to
-        # the storage dtype — via float32 this needs ~4 bytes/param of host RAM, which for a 12.5 GB
-        # fp8 transformer is 50 GB and unloadable on a 32 GB machine.
-        sd = _dequantize_quantized_weights(sd, model_dtype, storage_dtype=storage_dtype)
+        # ComfyUI 'scaled fp8' checkpoints: fold the per-tensor weight_scale into the weights (→ float).
+        sd = _dequantize_scaled_fp8(sd)
         # Native/ComfyUI key naming → diffusers Krea2Transformer2DModel keys.
         if _is_native_krea2_format(sd):
             sd = _convert_krea2_native_to_diffusers(sd)
 
+        target_device = TorchDevice.choose_torch_device()
+        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+
         with accelerate.init_empty_weights():
             model = Krea2Transformer2DModel(**KREA2_TRANSFORMER_CONFIG)
 
-        # Leave already-fp8 weights alone; casting them up to `model_dtype` here would undo the
-        # streaming above and reintroduce the full-bf16 peak this path exists to avoid.
-        preserved_dtypes = (torch.float8_e4m3fn, torch.float8_e5m2) if storage_dtype is not None else ()
-        new_sd_size = sum(
-            ten.nelement() * (ten.element_size() if ten.dtype in preserved_dtypes else model_dtype.itemsize)
-            for ten in sd.values()
-        )
+        new_sd_size = sum(ten.nelement() * model_dtype.itemsize for ten in sd.values())
         self._ram_cache.make_room(new_sd_size)
         for k in sd.keys():
-            if sd[k].dtype not in preserved_dtypes:
-                sd[k] = sd[k].to(model_dtype)
+            sd[k] = sd[k].to(model_dtype)
 
         model.load_state_dict(sd, assign=True, strict=False)
         _reject_incomplete_load(model, what="Krea-2 single-file checkpoint")
@@ -617,20 +560,15 @@ class Qwen3VLEncoderCheckpointLoader(ModelLoader):
         target_device = TorchDevice.choose_torch_device()
         model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
 
-        _reject_unsupported_quantization(model_path, what="Qwen3-VL encoder checkpoint")
-
         sd = load_file(str(model_path))
-        # Detect a quantized source (NVFP4 / ComfyUI 'scaled fp8' scale keys, or raw float8 weights)
-        # BEFORE dequantizing. A quantized-on-disk encoder is kept fp8-resident with layerwise
-        # upcasting below, so it occupies ~half the VRAM of the dequantized bf16 model (the whole
-        # point of shipping it quantized).
+        # Detect an fp8 source (ComfyUI 'scaled fp8' weight_scale keys, or raw float8 weights) BEFORE
+        # dequantizing. An fp8-on-disk encoder is kept fp8-resident with layerwise upcasting below, so
+        # it occupies ~half the VRAM of the dequantized bf16 model (the whole point of shipping fp8).
         source_is_fp8 = any(isinstance(k, str) and k.endswith(".weight_scale") for k in sd) or any(
             getattr(t, "dtype", None) in (torch.float8_e4m3fn, torch.float8_e5m2) for t in sd.values()
         )
-        # NVFP4 or ComfyUI 'scaled fp8': fold the scales into the weights, then drop quantization
-        # metadata. Dequantized straight to the model dtype rather than via float32, which would
-        # double peak host RAM for an 8.9 GB encoder.
-        sd = _dequantize_quantized_weights(sd, model_dtype)
+        # ComfyUI 'scaled fp8': fold weight_scale into the weights, then drop quantization metadata.
+        sd = _dequantize_scaled_fp8(sd)
         for k in list(sd.keys()):
             if isinstance(k, str) and (k.endswith(".comfy_quant") or "scale_input" in k):
                 del sd[k]

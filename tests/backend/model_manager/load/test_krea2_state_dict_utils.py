@@ -17,7 +17,7 @@ import torch
 from invokeai.backend.model_manager.load.model_loaders.krea2 import (
     KREA2_TRANSFORMER_CONFIG,
     _convert_krea2_native_to_diffusers,
-    _dequantize_quantized_weights,
+    _dequantize_scaled_fp8,
     _is_native_krea2_format,
     _normalize_qwen3vl_rope_config,
     _reject_incomplete_load,
@@ -90,100 +90,21 @@ class TestDequantizeScaledFp8:
             "layer.weight": torch.tensor([2.0, 4.0]),
             "layer.weight_scale": torch.tensor(0.5),
         }
-        out = _dequantize_quantized_weights(sd, torch.float32)
+        out = _dequantize_scaled_fp8(sd)
         assert "layer.weight_scale" not in out
         assert torch.allclose(out["layer.weight"], torch.tensor([1.0, 2.0]))
 
     def test_noop_without_scale_keys(self) -> None:
         sd = {"layer.weight": torch.tensor([2.0, 4.0])}
-        out = _dequantize_quantized_weights(sd, torch.float32)
+        out = _dequantize_scaled_fp8(sd)
         assert out is sd
 
     def test_orphan_scale_key_is_dropped(self) -> None:
         # A scale key with no matching weight is simply removed (nothing to multiply).
         sd = {"other.weight": torch.tensor([1.0]), "layer.weight_scale": torch.tensor(0.5)}
-        out = _dequantize_quantized_weights(sd, torch.float32)
+        out = _dequantize_scaled_fp8(sd)
         assert "layer.weight_scale" not in out
         assert "other.weight" in out
-
-    def test_expands_block_wise_scales(self) -> None:
-        """Regression: real Krea-2 fp8 checkpoints carry one scale per block of rows.
-
-        A (4, 2) weight with a (2, 1) scale used to raise "The size of tensor a (4) must match the
-        size of tensor b (2) at non-singleton dimension 0" because the raw scale was multiplied in
-        directly. Each scale must cover its block of rows.
-        """
-        sd = {
-            "layer.weight": torch.tensor([[2.0, 2.0], [4.0, 4.0], [6.0, 6.0], [8.0, 8.0]]),
-            "layer.weight_scale": torch.tensor([[0.5], [2.0]]),
-        }
-
-        out = _dequantize_quantized_weights(sd, torch.float32)
-
-        expected = torch.tensor([[1.0, 1.0], [2.0, 2.0], [12.0, 12.0], [16.0, 16.0]])
-        assert torch.allclose(out["layer.weight"], expected)
-
-    def test_dequantizes_to_the_requested_dtype_without_a_float32_detour(self) -> None:
-        """The dtype is the whole point: a float32 intermediate doubles peak host RAM.
-
-        A 12.5 GB fp8 transformer needs ~50 GB via float32 versus ~25 GB straight to bf16, which is
-        the difference between loadable and OOM-killed on a 32 GB machine.
-        """
-        sd = {
-            "layer.weight": torch.tensor([2.0, 4.0], dtype=torch.float32),
-            "layer.weight_scale": torch.tensor(0.5, dtype=torch.float32),
-        }
-
-        out = _dequantize_quantized_weights(sd, torch.bfloat16)
-
-        assert out["layer.weight"].dtype is torch.bfloat16
-
-    def test_decodes_e8m0_microscaling_exponents_rather_than_multiplying_the_byte(self) -> None:
-        """Regression: MXFP8 stores the scale as a uint8 biased power-of-two exponent.
-
-        Multiplying by the raw byte does not crash — it scales weights by ~10^6, so the model loads
-        and silently generates garbage. A real Krea-2 MXFP8 transformer goes from std ~0.03 to
-        ~14000 that way, which is exactly the failure this guards.
-        """
-        # Byte 127 is 2**0, so it must leave the weight untouched; 128 is 2**1 and 126 is 2**-1.
-        sd = {
-            "layer.weight": torch.tensor([[4.0], [4.0], [4.0]]),
-            "layer.weight_scale": torch.tensor([[127], [128], [126]], dtype=torch.uint8),
-        }
-
-        out = _dequantize_quantized_weights(sd, torch.float32)
-
-        assert torch.allclose(out["layer.weight"], torch.tensor([[4.0], [8.0], [2.0]]))
-
-    def test_treats_a_float_scale_as_a_plain_multiplier(self) -> None:
-        # ComfyUI scaled-fp8 (FLUX / Z-Image / Qwen style) stores a linear float scale, which must
-        # not be reinterpreted as an exponent.
-        sd = {"layer.weight": torch.tensor([4.0]), "layer.weight_scale": torch.tensor(2.0)}
-
-        out = _dequantize_quantized_weights(sd, torch.float32)
-
-        assert torch.allclose(out["layer.weight"], torch.tensor([8.0]))
-
-    def test_expands_a_block_wise_e8m0_scale_over_its_block(self) -> None:
-        # The combination that actually ships: block-wise scales that are also E8M0 exponents.
-        sd = {
-            "layer.weight": torch.tensor([[2.0, 2.0, 2.0, 2.0]]),
-            "layer.weight_scale": torch.tensor([[128, 126]], dtype=torch.uint8),
-        }
-
-        out = _dequantize_quantized_weights(sd, torch.float32)
-
-        # First block doubles, second halves.
-        assert torch.allclose(out["layer.weight"], torch.tensor([[4.0, 4.0, 1.0, 1.0]]))
-
-    def test_supports_the_scale_weight_naming_variant(self) -> None:
-        # Qwen2.5-VL fp8_scaled exports use `.scale_weight` rather than `.weight_scale`.
-        sd = {"layer.weight": torch.tensor([2.0]), "layer.scale_weight": torch.tensor(3.0)}
-
-        out = _dequantize_quantized_weights(sd, torch.float32)
-
-        assert "layer.scale_weight" not in out
-        assert torch.allclose(out["layer.weight"], torch.tensor([6.0]))
 
 
 class TestConvertKrea2NativeToDiffusers:
@@ -436,38 +357,3 @@ class TestConvertedShapesMatchRealKrea2Transformer:
         for name in table_keys:
             if name.startswith(("transformer_blocks.", "text_fusion.")):
                 assert expected[name][0] == 6, f"{name} expected 6 modulation rows, got {expected[name]}"
-
-
-class TestDequantCallSites:
-    """Guards the arity of every `_dequantize_quantized_weights` call inside the Krea-2 loader.
-
-    The loader dequantizes in two places — the transformer single-file path and the Qwen3-VL
-    encoder single-file path — and only the first is covered by a functional test. When the
-    function gained its `compute_dtype` parameter, the encoder call site was missed and shipped a
-    TypeError that only surfaced at generation time.
-
-    mypy would catch this (`strict = true` flags a missing positional argument), but the module
-    already carries hundreds of pre-existing errors, so it cannot serve as a gate. This asserts the
-    property directly and cheaply instead.
-    """
-
-    def test_every_call_site_passes_a_compute_dtype(self) -> None:
-        import ast
-        import inspect
-
-        from invokeai.backend.model_manager.load.model_loaders import krea2
-
-        tree = ast.parse(inspect.getsource(krea2))
-        calls = [
-            node
-            for node in ast.walk(tree)
-            if isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Name)
-            and node.func.id == "_dequantize_quantized_weights"
-        ]
-
-        # Both single-file paths must be present; a dropped call site is as much a bug as a
-        # miscalled one.
-        assert len(calls) == 2, f"expected 2 call sites, found {len(calls)}"
-        for call in calls:
-            assert len(call.args) == 2, f"call at line {call.lineno} passes {len(call.args)} args, expected 2"
