@@ -317,9 +317,12 @@ describe('component policies', () => {
     });
     const settings = createSettings(model);
 
+    // FLUX.2 supports PiD, so its two slots follow the base's own components.
     expect(getComponentSectionPolicy(model, settings).slots.map((slot) => slot.key)).toEqual([
       'qwen3EncoderModel',
       'vae',
+      'pidDecoderModel',
+      'gemma2EncoderModel',
     ]);
     expect(getAutoFlux2ComponentSourceModel(model, settings, [incompatibleSource, source])?.key).toBe(source.key);
     expect(
@@ -401,10 +404,26 @@ describe('component policies', () => {
   });
 
   it('renders no component slots for bases without extra requirements', () => {
-    expect(getComponentSectionPolicy(createModel('sdxl'), createSettings(createModel('sdxl'))).slots).toEqual([]);
     expect(getComponentSectionPolicy(createModel('cogview4'), createSettings(createModel('cogview4'))).slots).toEqual(
       []
     );
+  });
+
+  it('offers only the PiD slots for a PiD-capable base with no other components', () => {
+    // SDXL needs no encoders or VAE of its own, but it can decode through PiD, so the two
+    // PiD slots are offered (and are only *required* once PiD is switched on).
+    const model = createModel('sdxl');
+
+    expect(getComponentSectionPolicy(model, createSettings(model)).slots.map((slot) => slot.key)).toEqual([
+      'pidDecoderModel',
+      'gemma2EncoderModel',
+    ]);
+  });
+
+  it('does not offer PiD slots for a base with no PiD decode node', () => {
+    const model = createModel('cogview4');
+
+    expect(getComponentSectionPolicy(model, createSettings(model)).slots).toEqual([]);
   });
 
   it('clears incompatible selections when the selected model changes', () => {

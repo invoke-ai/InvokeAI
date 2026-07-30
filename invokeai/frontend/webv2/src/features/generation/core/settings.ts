@@ -18,6 +18,7 @@ import type {
 import { sanitizeBatchCount } from './batch';
 import { isVaeCompatibleWithGenerateModel } from './componentCompatibility';
 import { isDynamicPromptsSeedBehaviour, sanitizeMaxPrompts, sanitizeSampleSeed } from './dynamicPrompts';
+import { clampPidSteps, DEFAULT_PID_STEPS, isPidMode } from './pid';
 import { isCanonicalPromptTemplateSnapshot, sanitizePromptTemplateSnapshot } from './promptTemplates';
 import { cloneCroppableImage, isCanonicalCroppableImage, normalizeCroppableImage } from './referenceImage';
 
@@ -741,6 +742,10 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
       100,
       DEFAULT_KREA2_SEED_VARIANCE_RANDOMIZE_PERCENT
     ),
+    pidMode: isPidMode(values.pidMode) ? values.pidMode : 'off',
+    pidDecoderModel: getModelIdentifierOrNull(values.pidDecoderModel),
+    gemma2EncoderModel: getModelIdentifierOrNull(values.gemma2EncoderModel),
+    pidSteps: clampPidSteps(hasFiniteNumber(values, 'pidSteps') ? (values.pidSteps as number) : DEFAULT_PID_STEPS),
     width,
   };
 };

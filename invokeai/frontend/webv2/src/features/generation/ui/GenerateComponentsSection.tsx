@@ -38,6 +38,8 @@ const getComponentPolicyContext = (model: GenerateModelConfig, settings: Generat
     wanT5EncoderModel: settings.wanT5EncoderModel,
     wanLowNoiseModel: settings.wanLowNoiseModel,
     t5EncoderModel: settings.t5EncoderModel,
+    pidDecoderModel: settings.pidDecoderModel,
+    gemma2EncoderModel: settings.gemma2EncoderModel,
     vae: settings.vae,
   },
 });

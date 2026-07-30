@@ -722,3 +722,194 @@ describe('Krea-2, Ideogram 4 and Wan graphs', () => {
     expect(getEdge(graph, 'pos_cond', 'wan_t5_encoder')?.source.node_id).toBe('model_loader');
   });
 });
+
+describe('PiD decode', () => {
+  const pidDecoder = (base: string): ComponentModelConfig => ({
+    base,
+    key: `pid-${base}`,
+    name: `PiD ${base}`,
+    type: 'pid_decoder',
+  });
+  const gemma2: ComponentModelConfig = { base: 'any', key: 'gemma2', name: 'Gemma 2 2B', type: 'gemma2_encoder' };
+
+  const pidSettings = (base: string, overrides: Partial<GenerateSettings> = {}): Partial<GenerateSettings> => ({
+    gemma2EncoderModel: gemma2,
+    pidDecoderModel: pidDecoder(base),
+    pidMode: 'fit',
+    ...overrides,
+  });
+
+  it('keeps the ordinary VAE decode when PiD is off', () => {
+    const graph = compile(fluxModel, { clipEmbedModel: clipEmbed, t5EncoderModel: t5Encoder, vae: fluxVae });
+
+    expect(getNodeByType(graph, 'flux_vae_decode')).toBeDefined();
+    expect(getNodeByType(graph, 'flux_pid_decode')).toBeUndefined();
+  });
+
+  it('replaces the VAE decode with a PiD decode and downscales in fit mode', () => {
+    const graph = compile(fluxModel, {
+      clipEmbedModel: clipEmbed,
+      t5EncoderModel: t5Encoder,
+      vae: fluxVae,
+      ...pidSettings('flux'),
+      height: 1024,
+      width: 1024,
+    });
+
+    expect(getNodeByType(graph, 'flux_vae_decode')).toBeUndefined();
+    const decode = getNodeByType(graph, 'flux_pid_decode');
+    expect(decode).toBeDefined();
+    // The resize is the output, because the 4x decode must come back to the asked-for size.
+    const output = graph.nodes.canvas_output;
+    expect(output?.type).toBe('img_resize');
+    expect(output).toMatchObject({ height: 1024, width: 1024 });
+    expect(getEdge(graph, 'canvas_output', 'image')?.source.node_id).toBe(decode?.id);
+  });
+
+  it('generates at the full size in fit mode', () => {
+    const graph = compile(fluxModel, {
+      clipEmbedModel: clipEmbed,
+      t5EncoderModel: t5Encoder,
+      vae: fluxVae,
+      ...pidSettings('flux'),
+      height: 1024,
+      width: 1024,
+    });
+
+    expect(graph.nodes.denoise_latents).toMatchObject({ height: 1024, width: 1024 });
+  });
+
+  it('generates at a quarter size in native mode and makes the decode the output', () => {
+    const graph = compile(fluxModel, {
+      clipEmbedModel: clipEmbed,
+      t5EncoderModel: t5Encoder,
+      vae: fluxVae,
+      ...pidSettings('flux', { pidMode: 'native' }),
+      height: 2048,
+      width: 2048,
+    });
+
+    expect(graph.nodes.denoise_latents).toMatchObject({ height: 512, width: 512 });
+    // No downscale: PiD's 4x output IS the result.
+    expect(graph.nodes.canvas_output?.type).toBe('flux_pid_decode');
+    expect(getNodeByType(graph, 'img_resize')).toBeUndefined();
+  });
+
+  it('wires the prompt, seed and both loaders into the decode', () => {
+    const graph = compile(fluxModel, {
+      clipEmbedModel: clipEmbed,
+      t5EncoderModel: t5Encoder,
+      vae: fluxVae,
+      ...pidSettings('flux'),
+    });
+    const decode = getNodeByType(graph, 'flux_pid_decode');
+
+    expect(getEdge(graph, decode!.id, 'prompt')?.source.node_id).toBe('positive_prompt');
+    expect(getEdge(graph, decode!.id, 'seed')?.source.node_id).toBe('seed');
+    expect(getEdge(graph, decode!.id, 'latents')?.source.node_id).toBe('denoise_latents');
+    expect(getNodeByType(graph, 'pid_decoder_loader')).toMatchObject({ pid_decoder_model: pidDecoder('flux') });
+    expect(getNodeByType(graph, 'gemma2_encoder_loader')).toMatchObject({ gemma2_model: gemma2 });
+  });
+
+  it('does not wire a VAE into decoders that use fixed constants', () => {
+    const graph = compile(fluxModel, {
+      clipEmbedModel: clipEmbed,
+      t5EncoderModel: t5Encoder,
+      vae: fluxVae,
+      ...pidSettings('flux'),
+    });
+    const decode = getNodeByType(graph, 'flux_pid_decode');
+
+    // FLUX.1 and SD3 use fixed VAE constants and expose no `vae` input.
+    expect(getEdge(graph, decode!.id, 'vae')).toBeUndefined();
+  });
+
+  it('wires a VAE into decoders that read its constants at runtime', () => {
+    const graph = compile(qwenImageModel, { ...pidSettings('qwen-image') });
+    const decode = getNodeByType(graph, 'qwen_image_pid_decode');
+
+    expect(getEdge(graph, decode!.id, 'vae')?.source.node_id).toBe('model_loader');
+  });
+
+  it('uses a FLUX decoder for Z-Image, which shares its VAE', () => {
+    const graph = compile(zImageModel, { ...pidSettings('flux') });
+
+    expect(getNodeByType(graph, 'z_image_pid_decode')).toBeDefined();
+    expect(getNodeByType(graph, 'pid_decoder_loader')).toMatchObject({ pid_decoder_model: pidDecoder('flux') });
+  });
+
+  it('decodes through PiD for SDXL, sizing the noise node instead of the denoise node', () => {
+    const graph = compile(sdxlModel, { ...pidSettings('sdxl', { pidMode: 'native' }), height: 2048, width: 2048 });
+
+    // SDXL is sized via its noise node; its grid is 8, so 2048 / 4 = 512.
+    expect(graph.nodes.noise).toMatchObject({ height: 512, width: 512 });
+    expect(graph.nodes.canvas_output?.type).toBe('sdxl_pid_decode');
+  });
+
+  it('decodes through PiD for SD3', () => {
+    const graph = compile(sd3Model, { ...pidSettings('sd-3') });
+
+    expect(getNodeByType(graph, 'sd3_pid_decode')).toBeDefined();
+    expect(getNodeByType(graph, 'sd3_l2i')).toBeUndefined();
+  });
+
+  it('decodes through PiD for FLUX.2', () => {
+    const graph = compile(flux2Model, { ...pidSettings('flux2') });
+
+    expect(getNodeByType(graph, 'flux2_pid_decode')).toBeDefined();
+    expect(getNodeByType(graph, 'flux2_vae_decode')).toBeUndefined();
+  });
+
+  it('records the PiD settings in metadata', () => {
+    const graph = compile(fluxModel, {
+      clipEmbedModel: clipEmbed,
+      t5EncoderModel: t5Encoder,
+      vae: fluxVae,
+      ...pidSettings('flux'),
+    });
+    const metadata = getNodeByType(graph, 'core_metadata');
+
+    expect(metadata).toMatchObject({ pid_mode: 'fit', pid_steps: 4 });
+  });
+
+  it('refuses to compile PiD on an unsupported base rather than silently ignoring it', () => {
+    // CogView4 has no PiD decode node. Falling back to an ordinary decode would leave the
+    // user wondering why the output is not 4x.
+    expect(() => compile(cogView4Model, { pidMode: 'fit' })).toThrow(/PiD is not supported/);
+  });
+
+  it('requires both PiD models before compiling', () => {
+    expect(() =>
+      compile(fluxModel, {
+        clipEmbedModel: clipEmbed,
+        t5EncoderModel: t5Encoder,
+        vae: fluxVae,
+        pidMode: 'fit',
+        pidDecoderModel: pidDecoder('flux'),
+      })
+    ).toThrow(/Gemma-2 encoder/);
+    expect(() =>
+      compile(fluxModel, {
+        clipEmbedModel: clipEmbed,
+        t5EncoderModel: t5Encoder,
+        vae: fluxVae,
+        pidMode: 'fit',
+        gemma2EncoderModel: gemma2,
+      })
+    ).toThrow(/PiD decoder/);
+  });
+
+  it('enforces the 4x grid on the requested size in native mode', () => {
+    // FLUX's grid is 16, so native requires multiples of 64.
+    expect(() =>
+      compile(fluxModel, {
+        clipEmbedModel: clipEmbed,
+        t5EncoderModel: t5Encoder,
+        vae: fluxVae,
+        ...pidSettings('flux', { pidMode: 'native' }),
+        height: 2048,
+        width: 2032,
+      })
+    ).toThrow(/multiple of 64/);
+  });
+});

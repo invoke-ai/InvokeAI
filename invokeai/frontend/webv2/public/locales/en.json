@@ -1085,7 +1085,15 @@
       "weight": "Weight",
       "width": "Width",
       "xAxis": "X axis",
-      "yAxis": "Y axis"
+      "yAxis": "Y axis",
+      "pid": "PiD Decode",
+      "pidOff": "Off",
+      "pidFit": "Fit to size",
+      "pidNative": "Native 4x",
+      "pidSteps": "PiD steps",
+      "pidHelp": "Replaces the VAE decode with a 4x super-resolution decode.",
+      "pidFitHelp": "Generates at the requested size, then decodes 4x and scales back down.",
+      "pidNativeHelp": "The requested size is the 4x target; generation runs at a quarter of it."
     },
     "upscale": {
       "addLora": "LoRAs",

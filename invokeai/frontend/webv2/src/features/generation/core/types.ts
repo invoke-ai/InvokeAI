@@ -235,7 +235,26 @@ export interface GenerateSettings {
   krea2SeedVarianceEnabled: boolean;
   krea2SeedVarianceStrength: number;
   krea2SeedVarianceRandomizePercent: number;
+  /**
+   * PiD (Pixel Diffusion Decoder) replaces the VAE decode with a caption-conditioned
+   * 4x super-resolution decode. Off by default; requires a PiD decoder and a Gemma-2
+   * caption encoder.
+   */
+  pidMode: PidMode;
+  /** PiD decoder checkpoint. Trained per backbone, so it must match the main model's base. */
+  pidDecoderModel: ComponentModelConfig | null;
+  /** The shared Gemma-2 caption encoder PiD conditions its decode on. */
+  gemma2EncoderModel: ComponentModelConfig | null;
+  pidSteps: number;
 }
+
+/**
+ * - `off`: ordinary VAE decode.
+ * - `fit`: generate at the requested size, decode 4x, downscale back to it.
+ * - `native`: the requested size IS the 4x target; generate at size / 4 and keep the
+ *   full 4x output.
+ */
+export type PidMode = 'off' | 'fit' | 'native';
 
 /**
  * Ideogram 4 sampler presets. Each fixes a step count and guidance schedule; the explicit
