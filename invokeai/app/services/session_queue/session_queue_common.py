@@ -15,7 +15,7 @@ from pydantic import (
 )
 from pydantic_core import to_jsonable_python
 
-from invokeai.app.invocations.fields import ImageField
+from invokeai.app.invocations.fields import ImageField, VideoField
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState, NodeNotFoundError
 from invokeai.app.services.workflow_records.workflow_records_common import (
     WorkflowWithoutID,
@@ -51,7 +51,7 @@ class SessionQueueItemNotFoundError(ValueError):
 
 # region Batch
 
-BatchScalarDataType = Union[StrictStr, float, int, ImageField]
+BatchScalarDataType = Union[StrictStr, float, int, ImageField, VideoField]
 BatchDataType = Union[BatchScalarDataType, list[BatchScalarDataType]]
 
 

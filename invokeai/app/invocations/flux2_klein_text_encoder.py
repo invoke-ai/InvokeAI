@@ -25,7 +25,6 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import Qwen3EncoderField
 from invokeai.app.invocations.primitives import FluxConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.model_manager.load.model_cache.utils import get_effective_device
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_T5_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
@@ -101,8 +100,11 @@ class Flux2KleinTextEncoderInvocation(BaseInvocation):
         tokenizer_info = context.models.load(self.qwen3_encoder.tokenizer)
         (_, tokenizer) = exit_stack.enter_context(tokenizer_info.model_on_device())
 
+        # Repair any required tensors left on the CPU by a previous interrupted run, then run on the encoder's
+        # intended compute device. Do NOT infer the device from current parameter residency: partial loading may
+        # have temporarily offloaded all weights to RAM, which would wrongly run the whole encode on the CPU.
         repaired_tensors = text_encoder_info.repair_required_tensors_on_device()
-        device = get_effective_device(text_encoder)
+        device = text_encoder_info.compute_device
         if repaired_tensors > 0:
             context.logger.warning(
                 f"Recovered {repaired_tensors} required Qwen3 tensor(s) onto {device} after a partial device mismatch."
