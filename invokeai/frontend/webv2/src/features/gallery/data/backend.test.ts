@@ -1,3 +1,4 @@
+import { galleryItems } from '@features/gallery';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -20,11 +21,14 @@ import {
   downloadGalleryArchive,
   getGalleryImageByName,
   getGalleryImagesByNames,
+  getGalleryVideoMetadata,
+  getGalleryVideoWorkflow,
   imageMakeCanvasAssetChanges,
   imageMakeDurableChanges,
   imageSaveToGalleryChanges,
   listGalleryBoards,
-  listGalleryImages,
+  listGalleryItems,
+  listPaletteImages,
 } from './backend';
 
 describe('downloadGalleryArchive', () => {
@@ -148,14 +152,14 @@ describe('getGalleryImagesByNames', () => {
   });
 });
 
-describe('listGalleryImages created-at range', () => {
+describe('listPaletteImages created-at range', () => {
   beforeEach(() => {
     mocks.apiFetchJson.mockReset();
     mocks.apiFetchJson.mockResolvedValue({ items: [], limit: 20, offset: 0, total: 0 });
   });
 
   it('sends created_from/created_to as query params', async () => {
-    await listGalleryImages({
+    await listPaletteImages({
       boardId: 'board-1',
       createdFrom: '2026-07-01',
       createdTo: '2026-07-15',
@@ -172,7 +176,7 @@ describe('listGalleryImages created-at range', () => {
   it('sends the explicit all-readable scope and forwards cancellation', async () => {
     const controller = new AbortController();
 
-    await listGalleryImages({
+    await listPaletteImages({
       boardId: 'all',
       galleryView: 'images',
       searchTerm: 'sunset',
@@ -186,7 +190,7 @@ describe('listGalleryImages created-at range', () => {
   });
 
   it('omits the range params when no range is given', async () => {
-    await listGalleryImages({ boardId: 'board-1', galleryView: 'images', searchTerm: 'sunset' });
+    await listPaletteImages({ boardId: 'board-1', galleryView: 'images', searchTerm: 'sunset' });
 
     const url = mocks.apiFetchJson.mock.calls[0]?.[0] as string;
     const params = new URLSearchParams(url.split('?')[1]);
@@ -196,7 +200,7 @@ describe('listGalleryImages created-at range', () => {
 
   it('short-circuits a date board that falls outside the range without a request', async () => {
     await expect(
-      listGalleryImages({
+      listPaletteImages({
         boardId: 'by_date:2026-07-18',
         createdFrom: '2026-07-01',
         createdTo: '2026-07-15',
@@ -211,7 +215,7 @@ describe('listGalleryImages created-at range', () => {
     mocks.apiFetchJson.mockResolvedValue({ image_names: [], total_count: 0 });
 
     await expect(
-      listGalleryImages({
+      listPaletteImages({
         boardId: 'by_date:2026-07-10',
         createdFrom: '2026-07-01',
         createdTo: '2026-07-15',
@@ -220,6 +224,263 @@ describe('listGalleryImages created-at range', () => {
       })
     ).resolves.toEqual({ images: [], total: 0 });
     expect(mocks.apiFetchJson).toHaveBeenCalledOnce();
+  });
+});
+
+describe('listGalleryItems', () => {
+  beforeEach(() => {
+    mocks.apiFetchJson.mockReset();
+  });
+
+  it('maps a mixed page by kind and normalizes transport-only fields', async () => {
+    mocks.apiFetchJson.mockResolvedValue({
+      items: [
+        {
+          board_id: null,
+          category: 'general',
+          created_at: '2026-07-20T10:00:00.000Z',
+          duration: 8.5,
+          full_url: '/images/still.png',
+          height: 512,
+          is_intermediate: false,
+          kind: 'image',
+          name: 'still.png',
+          starred: true,
+          thumbnail_url: '/thumbnails/still.webp',
+          width: 768,
+        },
+        {
+          board_id: 'board-1',
+          category: 'general',
+          created_at: '2026-07-20T09:00:00.000Z',
+          duration: 3.25,
+          fps: null,
+          full_url: '/videos/clip.mp4',
+          height: 720,
+          is_intermediate: true,
+          kind: 'video',
+          name: 'clip.mp4',
+          starred: false,
+          thumbnail_url: '/thumbnails/clip.webp',
+          width: 1280,
+        },
+      ],
+      limit: 20,
+      offset: 0,
+      total: 2,
+    });
+
+    await expect(listGalleryItems({ boardId: 'board-1', galleryView: 'images', searchTerm: '' })).resolves.toEqual({
+      items: [
+        {
+          boardId: 'none',
+          category: 'general',
+          createdAt: '2026-07-20T10:00:00.000Z',
+          fullUrl: 'https://api.test/images/still.png',
+          height: 512,
+          isIntermediate: false,
+          kind: 'image',
+          name: 'still.png',
+          starred: true,
+          thumbnailUrl: 'https://api.test/thumbnails/still.webp',
+          width: 768,
+        },
+        {
+          boardId: 'board-1',
+          category: 'general',
+          createdAt: '2026-07-20T09:00:00.000Z',
+          durationSeconds: 3.25,
+          fullUrl: 'https://api.test/videos/clip.mp4',
+          height: 720,
+          isIntermediate: true,
+          kind: 'video',
+          name: 'clip.mp4',
+          starred: false,
+          thumbnailUrl: 'https://api.test/thumbnails/clip.webp',
+          width: 1280,
+        },
+      ],
+      total: 2,
+    });
+  });
+
+  it.each([undefined, null, Number.NaN, Number.POSITIVE_INFINITY])(
+    'rejects a video whose duration is not finite: %s',
+    async (duration) => {
+      mocks.apiFetchJson.mockResolvedValue({
+        items: [
+          {
+            board_id: null,
+            category: 'general',
+            created_at: '2026-07-20T09:00:00.000Z',
+            duration,
+            full_url: '/videos/broken.mp4',
+            height: 720,
+            is_intermediate: false,
+            kind: 'video',
+            name: 'broken.mp4',
+            starred: false,
+            thumbnail_url: '/thumbnails/broken.webp',
+            width: 1280,
+          },
+        ],
+        limit: 20,
+        offset: 0,
+        total: 1,
+      });
+
+      await expect(listGalleryItems({ boardId: 'none', galleryView: 'images', searchTerm: '' })).rejects.toThrow(
+        'finite duration'
+      );
+    }
+  );
+
+  it('forwards gallery filters and pagination to the polymorphic endpoint', async () => {
+    const controller = new AbortController();
+    mocks.apiFetchJson.mockResolvedValue({ items: [], limit: 17, offset: 34, total: 0 });
+
+    await listGalleryItems({
+      boardId: 'board-1',
+      createdFrom: '2026-07-01',
+      createdTo: '2026-07-15',
+      galleryView: 'images',
+      isIntermediate: true,
+      limit: 17,
+      offset: 34,
+      orderDir: 'ASC',
+      searchTerm: '  summer clip  ',
+      signal: controller.signal,
+      starredFirst: true,
+    });
+
+    const [url, init] = mocks.apiFetchJson.mock.calls[0] as [string, RequestInit];
+    const params = new URLSearchParams(url.split('?')[1]);
+
+    expect(url.split('?')[0]).toBe('/api/v1/gallery/items/');
+    expect(params.get('board_id')).toBe('board-1');
+    expect(params.getAll('categories')).toEqual(['general']);
+    expect(params.get('created_from')).toBe('2026-07-01');
+    expect(params.get('created_to')).toBe('2026-07-15');
+    expect(params.get('is_intermediate')).toBe('true');
+    expect(params.get('limit')).toBe('17');
+    expect(params.get('offset')).toBe('34');
+    expect(params.get('order_dir')).toBe('ASC');
+    expect(params.get('starred_first')).toBe('true');
+    expect(params.get('search_term')).toBe('summer clip');
+    expect(init.signal).toBe(controller.signal);
+  });
+
+  it('uses asset categories so general-category videos stay out of Assets', async () => {
+    mocks.apiFetchJson.mockResolvedValue({ items: [], limit: 100, offset: 0, total: 0 });
+
+    await listGalleryItems({ boardId: 'board-1', galleryView: 'assets', searchTerm: '' });
+
+    const url = mocks.apiFetchJson.mock.calls[0]?.[0] as string;
+    const categories = new URLSearchParams(url.split('?')[1]).getAll('categories');
+
+    expect(categories).toEqual(['control', 'mask', 'user']);
+    expect(categories).not.toContain('general');
+  });
+});
+
+describe('palette image search', () => {
+  beforeEach(() => {
+    mocks.apiFetchJson.mockReset();
+    mocks.apiFetchJson.mockResolvedValue({ items: [], limit: 20, offset: 0, total: 0 });
+  });
+
+  it('keeps all-readable palette searches on the image-only endpoint', async () => {
+    await listPaletteImages({ boardId: 'all', galleryView: 'images', limit: 20, searchTerm: '  portrait  ' });
+
+    const url = mocks.apiFetchJson.mock.calls[0]?.[0] as string;
+    const params = new URLSearchParams(url.split('?')[1]);
+
+    expect(url.split('?')[0]).toBe('/api/v1/images/');
+    expect(params.get('board_id')).toBe('all');
+    expect(params.get('search_term')).toBe('portrait');
+  });
+});
+
+describe('mixed gallery item details', () => {
+  beforeEach(() => {
+    mocks.apiFetchJson.mockReset();
+  });
+
+  it('resolves an image ref through the strict image DTO mapper', async () => {
+    mocks.apiFetchJson.mockResolvedValue({
+      board_id: null,
+      created_at: '2026-07-20T10:00:00.000Z',
+      height: 512,
+      image_category: 'general',
+      image_name: 'folder/still.png',
+      image_url: '/images/still.png',
+      is_intermediate: false,
+      starred: false,
+      thumbnail_url: '/thumbnails/still.webp',
+      width: 768,
+    });
+
+    await expect(galleryItems.resolve({ kind: 'image', name: 'folder/still.png' })).resolves.toMatchObject({
+      kind: 'image',
+      name: 'folder/still.png',
+    });
+    expect(mocks.apiFetchJson).toHaveBeenCalledWith('/api/v1/images/i/folder%2Fstill.png', { signal: undefined });
+  });
+
+  it('resolves a video ref and omits absent fps', async () => {
+    mocks.apiFetchJson.mockResolvedValue({
+      board_id: null,
+      created_at: '2026-07-20T10:00:00.000Z',
+      duration: 4.5,
+      fps: null,
+      height: 720,
+      is_intermediate: false,
+      starred: true,
+      thumbnail_url: '/thumbnails/clip.webp',
+      video_category: 'general',
+      video_name: 'folder/clip.mp4',
+      video_url: '/videos/clip.mp4',
+      width: 1280,
+    });
+
+    const item = await galleryItems.resolve({ kind: 'video', name: 'folder/clip.mp4' });
+
+    expect(item).toEqual({
+      boardId: 'none',
+      category: 'general',
+      createdAt: '2026-07-20T10:00:00.000Z',
+      durationSeconds: 4.5,
+      fullUrl: 'https://api.test/videos/clip.mp4',
+      height: 720,
+      isIntermediate: false,
+      kind: 'video',
+      name: 'folder/clip.mp4',
+      starred: true,
+      thumbnailUrl: 'https://api.test/thumbnails/clip.webp',
+      width: 1280,
+    });
+    expect(mocks.apiFetchJson).toHaveBeenCalledWith('/api/v1/videos/i/folder%2Fclip.mp4', { signal: undefined });
+  });
+
+  it('fetches focused video metadata and workflow details', async () => {
+    const controller = new AbortController();
+    mocks.apiFetchJson
+      .mockResolvedValueOnce({ positive_prompt: 'moving portrait' })
+      .mockResolvedValueOnce({ graph: '{"nodes":[]}', workflow: null });
+
+    await expect(getGalleryVideoMetadata('folder/clip.mp4', controller.signal)).resolves.toEqual({
+      positive_prompt: 'moving portrait',
+    });
+    await expect(getGalleryVideoWorkflow('folder/clip.mp4', controller.signal)).resolves.toEqual({
+      graph: '{"nodes":[]}',
+      workflow: null,
+    });
+    expect(mocks.apiFetchJson).toHaveBeenNthCalledWith(1, '/api/v1/videos/i/folder%2Fclip.mp4/metadata', {
+      signal: controller.signal,
+    });
+    expect(mocks.apiFetchJson).toHaveBeenNthCalledWith(2, '/api/v1/videos/i/folder%2Fclip.mp4/workflow', {
+      signal: controller.signal,
+    });
   });
 });
 
@@ -266,7 +527,7 @@ describe('gallery category queries', () => {
   });
 
   const categoriesFor = async (galleryView: 'images' | 'assets'): Promise<string[]> => {
-    await listGalleryImages({ boardId: 'board-1', galleryView, searchTerm: '' });
+    await listPaletteImages({ boardId: 'board-1', galleryView, searchTerm: '' });
     const url = mocks.apiFetchJson.mock.calls[0]?.[0] as string;
 
     return new URLSearchParams(url.split('?')[1]).getAll('categories');

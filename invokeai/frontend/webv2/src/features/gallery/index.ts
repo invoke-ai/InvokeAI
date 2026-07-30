@@ -35,6 +35,9 @@ import {
   getGalleryImageByName,
   getGalleryImageMetadata,
   getGalleryImagesByNames,
+  getGalleryItemByRef,
+  getGalleryVideoMetadata,
+  getGalleryVideoWorkflow,
   isDateBoardId,
   listGalleryBoards,
   makeImageCanvasAsset,
@@ -51,6 +54,17 @@ export const galleryImages = {
   metadata: getGalleryImageMetadata,
   resolve: getGalleryImageByName,
   resolveMany: getGalleryImagesByNames,
+} as const;
+
+/** Resolve either media kind while keeping the legacy image port strictly image-only. */
+export const galleryItems = {
+  resolve: getGalleryItemByRef,
+} as const;
+
+/** Focused read-only details needed by mixed-media preview surfaces. */
+export const galleryVideos = {
+  metadata: getGalleryVideoMetadata,
+  workflow: getGalleryVideoWorkflow,
 } as const;
 
 /** Import/export intents shared by image-producing and image-consuming features. */

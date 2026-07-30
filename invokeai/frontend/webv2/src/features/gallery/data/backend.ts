@@ -1,4 +1,12 @@
 import type {
+  GalleryImageItem,
+  GalleryItem,
+  GalleryItemCategory,
+  GalleryItemRef,
+  GalleryItemsPage,
+  GalleryVideoItem,
+} from '@features/gallery/core/items';
+import type {
   GalleryBoard,
   GalleryBoardOrderBy,
   GalleryDeletionResult,
@@ -55,6 +63,37 @@ interface BackendImageDTO {
   is_intermediate: boolean;
   starred?: boolean;
   board_id?: string | null;
+}
+
+export interface BackendGalleryItemDTO {
+  board_id?: string | null;
+  category: GalleryItemCategory;
+  created_at: string;
+  duration?: number | null;
+  fps?: number | null;
+  full_url: string;
+  height: number;
+  is_intermediate: boolean;
+  kind: 'image' | 'video';
+  name: string;
+  starred: boolean;
+  thumbnail_url: string;
+  width: number;
+}
+
+interface BackendVideoDTO {
+  board_id?: string | null;
+  created_at: string;
+  duration: number;
+  fps?: number | null;
+  height: number;
+  is_intermediate: boolean;
+  starred: boolean;
+  thumbnail_url: string;
+  video_category: GalleryItemCategory;
+  video_name: string;
+  video_url: string;
+  width: number;
 }
 
 interface ListImagesResponse {
@@ -175,6 +214,77 @@ const mapImage = (image: BackendImageDTO): GalleryImage => ({
   width: image.width,
 });
 
+const mapGalleryItemBase = (
+  item: BackendGalleryItemDTO
+): Omit<GalleryItem, 'durationSeconds' | 'fps' | 'kind' | 'sourceQueueItemId'> => ({
+  boardId: item.board_id ?? 'none',
+  category: item.category,
+  createdAt: item.created_at,
+  fullUrl: absolutizeApiUrl(item.full_url),
+  height: item.height,
+  isIntermediate: item.is_intermediate,
+  name: item.name,
+  starred: item.starred,
+  thumbnailUrl: absolutizeApiUrl(item.thumbnail_url),
+  width: item.width,
+});
+
+const mapGalleryItem = (item: BackendGalleryItemDTO): GalleryItem => {
+  const base = mapGalleryItemBase(item);
+
+  if (item.kind === 'image') {
+    return { ...base, kind: 'image' };
+  }
+
+  if (typeof item.duration !== 'number' || !Number.isFinite(item.duration)) {
+    throw new TypeError(`Gallery video "${item.name}" must have a finite duration.`);
+  }
+
+  return {
+    ...base,
+    durationSeconds: item.duration,
+    ...(item.fps === null || item.fps === undefined ? {} : { fps: item.fps }),
+    kind: 'video',
+  };
+};
+
+const mapBackendImageToGalleryItem = (image: BackendImageDTO): GalleryImageItem => ({
+  boardId: image.board_id ?? 'none',
+  category: image.image_category,
+  createdAt: image.created_at,
+  fullUrl: absolutizeApiUrl(image.image_url),
+  height: image.height,
+  isIntermediate: image.is_intermediate,
+  kind: 'image',
+  name: image.image_name,
+  sourceQueueItemId: 'backend-gallery',
+  starred: image.starred ?? false,
+  thumbnailUrl: absolutizeApiUrl(image.thumbnail_url),
+  width: image.width,
+});
+
+const mapVideo = (video: BackendVideoDTO): GalleryVideoItem => {
+  if (!Number.isFinite(video.duration)) {
+    throw new TypeError(`Gallery video "${video.video_name}" must have a finite duration.`);
+  }
+
+  return {
+    boardId: video.board_id ?? 'none',
+    category: video.video_category,
+    createdAt: video.created_at,
+    durationSeconds: video.duration,
+    ...(video.fps === null || video.fps === undefined ? {} : { fps: video.fps }),
+    fullUrl: absolutizeApiUrl(video.video_url),
+    height: video.height,
+    isIntermediate: video.is_intermediate,
+    kind: 'video',
+    name: video.video_name,
+    starred: video.starred,
+    thumbnailUrl: absolutizeApiUrl(video.thumbnail_url),
+    width: video.width,
+  };
+};
+
 const normalizeTotal = (value: unknown, fallback: number): number =>
   typeof value === 'number' && Number.isFinite(value) ? Math.max(0, value) : Math.max(0, fallback);
 
@@ -282,6 +392,39 @@ export const getGalleryImageByName = async (imageName: string, signal?: AbortSig
   return mapImage(body);
 };
 
+export const getGalleryVideoByName = async (videoName: string, signal?: AbortSignal): Promise<GalleryVideoItem> => {
+  const body = await apiFetchJson<BackendVideoDTO>(`/api/v1/videos/i/${encodeURIComponent(videoName)}`, { signal });
+
+  return mapVideo(body);
+};
+
+export const getGalleryItemByRef = async (ref: GalleryItemRef, signal?: AbortSignal): Promise<GalleryItem> => {
+  if (ref.kind === 'image') {
+    const body = await apiFetchJson<BackendImageDTO>(`/api/v1/images/i/${encodeURIComponent(ref.name)}`, { signal });
+
+    return mapBackendImageToGalleryItem(body);
+  }
+
+  return getGalleryVideoByName(ref.name, signal);
+};
+
+export const getGalleryVideoMetadata = async (
+  videoName: string,
+  signal?: AbortSignal
+): Promise<Record<string, unknown> | null> => {
+  const body = await apiFetchJson<unknown>(`/api/v1/videos/i/${encodeURIComponent(videoName)}/metadata`, { signal });
+
+  return body && typeof body === 'object' && !Array.isArray(body) ? (body as Record<string, unknown>) : null;
+};
+
+export interface GalleryVideoWorkflow {
+  graph: string | null;
+  workflow: string | null;
+}
+
+export const getGalleryVideoWorkflow = (videoName: string, signal?: AbortSignal): Promise<GalleryVideoWorkflow> =>
+  apiFetchJson<GalleryVideoWorkflow>(`/api/v1/videos/i/${encodeURIComponent(videoName)}/workflow`, { signal });
+
 export interface GalleryDateBoardImageNames {
   imageNames: string[];
   total: number;
@@ -352,18 +495,7 @@ export const hydrateGalleryDateBoardImagePage = async ({
   total,
 });
 
-export const listGalleryImages = async ({
-  boardId,
-  createdFrom,
-  createdTo,
-  galleryView,
-  limit = 100,
-  offset = 0,
-  orderDir = 'DESC',
-  searchTerm,
-  signal,
-  starredFirst = false,
-}: {
+interface GalleryListRequest {
   boardId: string;
   createdFrom?: string;
   createdTo?: string;
@@ -374,7 +506,62 @@ export const listGalleryImages = async ({
   searchTerm: string;
   signal?: AbortSignal;
   starredFirst?: boolean;
-}): Promise<GalleryImagesPage> => {
+}
+
+interface GalleryItemsRequest extends GalleryListRequest {
+  isIntermediate?: boolean;
+}
+
+export const listGalleryItems = async ({
+  boardId,
+  createdFrom,
+  createdTo,
+  galleryView,
+  isIntermediate = false,
+  limit = 100,
+  offset = 0,
+  orderDir = 'DESC',
+  searchTerm,
+  signal,
+  starredFirst = false,
+}: GalleryItemsRequest): Promise<GalleryItemsPage> => {
+  const query = toSearchParams({
+    board_id: boardId,
+    categories: galleryView === 'assets' ? assetCategories : imageCategories,
+    created_from: createdFrom,
+    created_to: createdTo,
+    is_intermediate: isIntermediate,
+    limit,
+    offset,
+    order_dir: orderDir,
+    search_term: searchTerm.trim() || undefined,
+    starred_first: starredFirst,
+  });
+  const body = await apiFetchJson<{
+    items: BackendGalleryItemDTO[];
+    limit: number;
+    offset: number;
+    total: number;
+  }>(`/api/v1/gallery/items/?${query}`, { signal });
+
+  return {
+    items: body.items.map(mapGalleryItem),
+    total: normalizeTotal(body.total, offset + body.items.length),
+  };
+};
+
+export const listPaletteImages = async ({
+  boardId,
+  createdFrom,
+  createdTo,
+  galleryView,
+  limit = 100,
+  offset = 0,
+  orderDir = 'DESC',
+  searchTerm,
+  signal,
+  starredFirst = false,
+}: GalleryListRequest): Promise<GalleryImagesPage> => {
   if (isDateBoardId(boardId)) {
     const names = await listGalleryDateBoardImageNames({
       boardId,
@@ -413,6 +600,13 @@ export const listGalleryImages = async ({
     ),
   };
 };
+
+/**
+ * TODO(Task 4): Remove this image-page compatibility alias when gallery query
+ * consumers switch to `listGalleryItems`. Palette search must call
+ * `listPaletteImages` directly and remain image-only.
+ */
+export const listGalleryImages = listPaletteImages;
 
 /**
  * The `ImageRecordChanges` body that promotes a staged canvas candidate (an
