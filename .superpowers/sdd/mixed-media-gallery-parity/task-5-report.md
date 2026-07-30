@@ -222,9 +222,7 @@ The remaining adapters are deliberately narrow and type-safe:
    before dispatch.
 3. Preview's mixed-query image projection is marked `TODO(Task 8)` and filters
    before converting.
-4. The boolean board-deletion adapter is marked `TODO(Task 7)`; the canonical
-   outcome command and reducer already require the four authoritative arrays.
-5. `CurrentImageFlowNode` remains intentionally image-only by reading only
+4. `CurrentImageFlowNode` remains intentionally image-only by reading only
    `recentImages`.
 
 No adapter accepts a video as an image or relies on an unsafe mixed-to-image
@@ -276,3 +274,142 @@ cast.
 - `invokeai/frontend/webv2/src/features/gallery/ui/useGalleryData.test.ts`
 - `invokeai/frontend/webv2/src/workbench/widgets/preview/PreviewNavigation.browser.test.tsx`
 - `invokeai/frontend/webv2/src/workbench/workbenchState.test.ts`
+
+## Review follow-up: authoritative mutation outcomes
+
+The review of `a86b7cba25..8ac2a4fff0` identified three correctness gaps. This
+follow-up fixes all three without adding the Task 7 mixed/video action ports.
+
+### Follow-up RED evidence
+
+The primary-toggle regression reproduced the inconsistent mixed selection:
+
+```sh
+pnpm test src/workbench/workbenchState.test.ts -t "atomically promotes"
+```
+
+```text
+Test Files 1 failed (1)
+Tests 1 failed | 158 skipped (159)
+```
+
+The reducer retained `selectedImageName: "video:shared"` while clearing the
+primary object and retaining the stale image comparison.
+
+The board deletion transport regressions reproduced the discarded response:
+
+```sh
+pnpm test src/features/gallery/data/backend.test.ts \
+  -t "deleteGalleryBoard outcomes"
+```
+
+```text
+Test Files 1 failed (1)
+Tests 2 failed | 36 skipped (38)
+```
+
+Both `include_images=true` and `include_images=false` returned `undefined`
+instead of the backend outcome.
+
+The image move/star transport regressions reproduced the other discarded
+responses:
+
+```sh
+pnpm test src/features/gallery/data/backend.test.ts \
+  -t "image mutation outcomes"
+```
+
+```text
+Test Files 1 failed (1)
+Tests 2 failed | 38 skipped (40)
+```
+
+The action-level browser regressions then reproduced the manufactured
+all-requested success:
+
+```sh
+pnpm test:browser \
+  src/workbench/image-actions/useImageActions.browser.test.tsx
+```
+
+```text
+Test Files 1 failed (1)
+Tests 2 failed (2)
+```
+
+Both move and star patches included the backend-unconfirmed image.
+
+### Follow-up fixes
+
+- Primary toggle now receives the canonical next-primary item at the
+  action/command boundary. The reducer validates its qualified key and updates
+  object, key, ordered selection, and compare state atomically. Promoting a
+  video clears compare; an unresolved primary clears the leftover selection
+  instead of persisting orphan keys.
+- Board deletion maps `board_id`, `deleted_board_images`,
+  `deleted_board_videos`, `deleted_images`, `deleted_videos`, `failed_images`,
+  and `failed_videos` into `GalleryBoardDeletionResult`. The UI forwards that
+  exact outcome to Workbench. Confirmed media deletes are removed; failed,
+  relationship-only, and otherwise locally known survivors move to `none`.
+- The boolean board-deletion compatibility action and command were removed.
+- Board add/remove and star/unstar map their authoritative success arrays.
+  Image actions compute success as the intersection of requested and confirmed
+  names, treat missing requested names as failed/ambiguous, and patch cache and
+  Workbench state only for confirmed names.
+- Star/unstar no longer applies an optimistic all-requested patch.
+
+### Follow-up GREEN and full verification
+
+Focused integration:
+
+```text
+Unit:    2 files passed, 200 tests passed
+Browser: 2 files passed, 3 tests passed
+```
+
+Full gates from `invokeai/frontend/webv2`:
+
+```text
+pnpm test
+  Test Files 374 passed (374)
+  Tests 4944 passed (4944)
+
+pnpm test:browser
+  Test Files 60 passed (60)
+  Tests 243 passed (243)
+
+pnpm test:fixtures
+  Tests 4 passed (4)
+
+pnpm architecture:check
+  Test Files 3 passed (3)
+  Tests 34 passed (34)
+
+pnpm format:check
+  all matched files correctly formatted
+
+pnpm lint:oxc
+  zero warnings/errors
+
+pnpm lint:tsc
+  tsc --noEmit passed
+```
+
+Relative to the pre-follow-up full verification, the suites increased from
+4,938 to 4,944 unit tests and from 240 to 243 browser tests. The full browser
+run retained the repository's existing React `act(...)`, missing-i18n-instance,
+and intentional error-boundary console output and exited successfully.
+
+### Follow-up self-review and concerns
+
+- Confirmed the canonical board result preserves both relationship arrays, so
+  `include_images=false` moves retained images and videos rather than removing
+  them.
+- Confirmed every requested-but-unconfirmed image remains in cache/state for
+  partial move and star outcomes.
+- Confirmed the queue organization adapter type-checks while intentionally
+  ignoring the newly returned image success arrays.
+- Confirmed the legacy boolean board action/command has no remaining callers.
+- Confirmed no mixed/video image-action port was added; that remains Task 7.
+- Confirmed no `useEffect` was added.
+- No unresolved implementation concern.

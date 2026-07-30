@@ -51,6 +51,21 @@ export interface GalleryDeletionResult {
   failedImageNames: string[];
 }
 
+/**
+ * Authoritative outcome of deleting a board. Deleting the board with its
+ * contents reports deleted/failed media; retaining its contents reports the
+ * removed board relationships instead.
+ */
+export interface GalleryBoardDeletionResult {
+  boardId: string;
+  deletedBoardImageNames: string[];
+  deletedBoardVideoNames: string[];
+  deletedImageNames: string[];
+  deletedVideoNames: string[];
+  failedImageNames: string[];
+  failedVideoNames: string[];
+}
+
 export interface GalleryImagesPage {
   images: GalleryImage[];
   total: number;

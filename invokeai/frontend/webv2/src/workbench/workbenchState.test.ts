@@ -2431,7 +2431,7 @@ describe('workbench backend connection recovery', () => {
     expect(values.selectedImageNames).toEqual(['video:shared']);
     expect(values.compareImage).toBeNull();
 
-    state = workbenchReducer(state, { item: image, type: 'toggleGalleryItemInSelection' });
+    state = workbenchReducer(state, { item: image, nextPrimaryItem: null, type: 'toggleGalleryItemInSelection' });
     values = getProjectWidgetValues(getActiveProject(state), 'gallery');
 
     expect(values.selectedImage).toBe(image);
@@ -2449,6 +2449,31 @@ describe('workbench backend connection recovery', () => {
     expect(values.selectedImageName).toBe('video:shared');
     expect(values.selectedImageNames).toEqual(['image:shared', 'video:shared']);
     expect(values.compareImage).toBeNull();
+  });
+
+  it('atomically promotes the remaining video when the image primary is toggled off', () => {
+    const image = createGalleryImageItem('shared');
+    const video = createGalleryVideoItem('shared');
+    let state = createInitialWorkbenchState();
+
+    state = workbenchReducer(state, {
+      itemKeys: ['video:shared', 'image:shared'],
+      primaryItem: image,
+      type: 'setGalleryMultiSelection',
+    });
+    state = workbenchReducer(state, { image, type: 'setGalleryCompareImage' });
+    state = workbenchReducer(state, {
+      item: image,
+      nextPrimaryItem: video,
+      type: 'toggleGalleryItemInSelection',
+    });
+
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery')).toMatchObject({
+      compareImage: null,
+      selectedImage: video,
+      selectedImageName: 'video:shared',
+      selectedImageNames: ['video:shared'],
+    });
   });
 
   it('prunes qualified items across projects without treating a same-name video as an image input', () => {
@@ -2567,11 +2592,15 @@ describe('workbench backend connection recovery', () => {
     }
 
     state = workbenchReducer(state, {
-      boardId,
-      deletedImageNames: [deletedImage.name],
-      deletedVideoNames: [deletedVideo.name],
-      failedImageNames: [failedImage.name],
-      failedVideoNames: [failedVideo.name],
+      outcome: {
+        boardId,
+        deletedBoardImageNames: [],
+        deletedBoardVideoNames: [],
+        deletedImageNames: [deletedImage.name],
+        deletedVideoNames: [deletedVideo.name],
+        failedImageNames: [failedImage.name],
+        failedVideoNames: [failedVideo.name],
+      },
       type: 'reconcileDeletedGalleryBoard',
     });
 
@@ -2599,6 +2628,47 @@ describe('workbench backend connection recovery', () => {
     for (const values of [failedImageProject, deletedVideoProject, failedVideoProject]) {
       expect(values?.selectedBoardId).toBe('none');
     }
+  });
+
+  it('moves image and video board relationships to Uncategorized when board contents are retained', () => {
+    const boardId = 'deleted-board';
+    const image = createGalleryImageItem('retained-image', boardId);
+    const video = createGalleryVideoItem('retained-video', boardId);
+    let state = createInitialWorkbenchState();
+
+    state = workbenchReducer(state, {
+      type: 'patchWidgetValues',
+      values: {
+        recentImages: [galleryItemToRecentImage(image)],
+        selectedBoardId: boardId,
+        selectedImage: video,
+        selectedImageName: `video:${video.name}`,
+        selectedImageNames: [`image:${image.name}`, `video:${video.name}`],
+      },
+      widgetId: 'gallery',
+    });
+    state = workbenchReducer(state, {
+      outcome: {
+        boardId,
+        deletedBoardImageNames: [image.name],
+        deletedBoardVideoNames: [video.name],
+        deletedImageNames: [],
+        deletedVideoNames: [],
+        failedImageNames: [],
+        failedVideoNames: [],
+      },
+      type: 'reconcileDeletedGalleryBoard',
+    });
+
+    const values = getProjectWidgetValues(getActiveProject(state), 'gallery');
+
+    expect(values).toMatchObject({
+      recentImages: [{ ...galleryItemToRecentImage(image), boardId: 'none' }],
+      selectedBoardId: 'none',
+      selectedImage: { ...video, boardId: 'none' },
+      selectedImageName: `video:${video.name}`,
+      selectedImageNames: [`image:${image.name}`, `video:${video.name}`],
+    });
   });
 
   it('reconciles moved and starred metadata across every project recent-image overlay', () => {

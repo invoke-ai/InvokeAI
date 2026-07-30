@@ -8,6 +8,7 @@ import type {
 } from '@features/gallery/core/items';
 import type {
   GalleryBoard,
+  GalleryBoardDeletionResult,
   GalleryBoardOrderBy,
   GalleryDeletionResult,
   GalleryImage,
@@ -19,7 +20,7 @@ import type {
 
 import { isTimestampInRange } from '@platform/search/dateTokens';
 import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
-import { absolutizeApiUrl, ApiError, apiFetch, apiFetchJson, apiFetchRaw, sleep } from '@platform/transport/http';
+import { absolutizeApiUrl, ApiError, apiFetchJson, apiFetchRaw, sleep } from '@platform/transport/http';
 
 import { getGalleryImageThumbnailUrl } from './imageUrls';
 import { getGalleryVideoThumbnailUrl } from './videoUrls';
@@ -882,17 +883,34 @@ export const deleteGalleryBoard = async (
   boardId: string,
   includeImages: boolean,
   signal?: AbortSignal
-): Promise<void> => {
+): Promise<GalleryBoardDeletionResult> => {
   const query = toSearchParams({ include_images: includeImages });
+  const body = await apiFetchJson<{
+    board_id: string;
+    deleted_board_images: string[];
+    deleted_board_videos?: string[];
+    deleted_images: string[];
+    deleted_videos?: string[];
+    failed_images?: string[];
+    failed_videos?: string[];
+  }>(`/api/v1/boards/${encodeURIComponent(boardId)}?${query}`, { method: 'DELETE', signal });
 
-  await apiFetch(`/api/v1/boards/${encodeURIComponent(boardId)}?${query}`, { method: 'DELETE', signal });
+  return {
+    boardId: body.board_id,
+    deletedBoardImageNames: body.deleted_board_images,
+    deletedBoardVideoNames: body.deleted_board_videos ?? [],
+    deletedImageNames: body.deleted_images,
+    deletedVideoNames: body.deleted_videos ?? [],
+    failedImageNames: body.failed_images ?? [],
+    failedVideoNames: body.failed_videos ?? [],
+  };
 };
 
 export const addImagesToGalleryBoard = async (
   boardId: string,
   imageNames: string[],
   signal?: AbortSignal
-): Promise<void> => {
+): Promise<string[]> => {
   if (
     boardId === 'none' ||
     boardId === 'generated' ||
@@ -900,44 +918,57 @@ export const addImagesToGalleryBoard = async (
     isDateBoardId(boardId) ||
     imageNames.length === 0
   ) {
-    return;
+    return [];
   }
 
-  await apiFetchJson('/api/v1/board_images/batch', {
+  const body = await apiFetchJson<{ added_images: string[] }>('/api/v1/board_images/batch', {
     body: JSON.stringify({ board_id: boardId, image_names: imageNames }),
     method: 'POST',
     signal,
   });
+
+  return body.added_images;
 };
 
-export const removeImagesFromGalleryBoard = async (imageNames: string[], signal?: AbortSignal): Promise<void> => {
+export const removeImagesFromGalleryBoard = async (imageNames: string[], signal?: AbortSignal): Promise<string[]> => {
   if (imageNames.length === 0) {
-    return;
+    return [];
   }
 
-  await apiFetchJson('/api/v1/board_images/batch/delete', {
+  const body = await apiFetchJson<{ removed_images: string[] }>('/api/v1/board_images/batch/delete', {
     body: JSON.stringify({ image_names: imageNames }),
     method: 'POST',
     signal,
   });
+
+  return body.removed_images;
 };
 
-const setGalleryImagesStarred = async (imageNames: string[], starred: boolean, signal?: AbortSignal): Promise<void> => {
+const setGalleryImagesStarred = async (
+  imageNames: string[],
+  starred: boolean,
+  signal?: AbortSignal
+): Promise<string[]> => {
   if (imageNames.length === 0) {
-    return;
+    return [];
   }
 
-  await apiFetchJson(`/api/v1/images/${starred ? 'star' : 'unstar'}`, {
-    body: JSON.stringify({ image_names: imageNames }),
-    method: 'POST',
-    signal,
-  });
+  const body = await apiFetchJson<{ starred_images?: string[]; unstarred_images?: string[] }>(
+    `/api/v1/images/${starred ? 'star' : 'unstar'}`,
+    {
+      body: JSON.stringify({ image_names: imageNames }),
+      method: 'POST',
+      signal,
+    }
+  );
+
+  return (starred ? body.starred_images : body.unstarred_images) ?? [];
 };
 
-export const starGalleryImages = (imageNames: string[], signal?: AbortSignal): Promise<void> =>
+export const starGalleryImages = (imageNames: string[], signal?: AbortSignal): Promise<string[]> =>
   setGalleryImagesStarred(imageNames, true, signal);
 
-export const unstarGalleryImages = (imageNames: string[], signal?: AbortSignal): Promise<void> =>
+export const unstarGalleryImages = (imageNames: string[], signal?: AbortSignal): Promise<string[]> =>
   setGalleryImagesStarred(imageNames, false, signal);
 
 interface DeleteImagesResponse {

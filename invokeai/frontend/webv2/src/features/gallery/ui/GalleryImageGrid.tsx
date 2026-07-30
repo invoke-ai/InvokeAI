@@ -4,6 +4,7 @@ import type { GalleryImage } from '@features/gallery/core/types';
 import { Badge, Box, Flex, ProgressCircle, ScrollArea, Skeleton, Spinner, Text } from '@chakra-ui/react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
+import { toGalleryItemKey } from '@features/gallery/contracts';
 import { useQueueItemProgress, useQueueItemProgressImage } from '@features/queue/react';
 import { DropZone, IconButton } from '@platform/ui';
 import { StreamingImageFrame } from '@platform/ui/streaming-image/StreamingImageFrame';
@@ -204,12 +205,28 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
       }
 
       if (event.ctrlKey || event.metaKey) {
-        actions.toggleImageInSelection(image);
+        const itemKey = toGalleryItemKey({ kind: 'image', name: image.imageName });
+        const remainingItemKeys = galleryState.selectedItemKeys.filter((key) => key !== itemKey);
+        const nextPrimaryItem =
+          galleryState.selectedItemKey === itemKey
+            ? (galleryState.items.find(
+                (item) => toGalleryItemKey(item) === remainingItemKeys[remainingItemKeys.length - 1]
+              ) ?? null)
+            : null;
+
+        actions.toggleImageInSelection(image, nextPrimaryItem);
       } else {
         actions.selectImage(image);
       }
     },
-    [actions, gallery.images, gallery.selectedImageName]
+    [
+      actions,
+      gallery.images,
+      gallery.selectedImageName,
+      galleryState.items,
+      galleryState.selectedItemKey,
+      galleryState.selectedItemKeys,
+    ]
   );
 
   const handleThumbnailContextMenu = useCallback(

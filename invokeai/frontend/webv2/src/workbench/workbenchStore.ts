@@ -100,15 +100,9 @@ const createCommands = (dispatch: WorkbenchDispatch, getState: () => WorkbenchSt
       })),
       reconcileDeletedBoardOutcome: command(
         'reconcileDeletedGalleryBoard',
-        (boardId: string, outcome: Omit<ActionPayload<'reconcileDeletedGalleryBoard'>, 'boardId'>) => ({
-          boardId,
-          ...outcome,
-        })
+        (outcome: ActionPayload<'reconcileDeletedGalleryBoard'>['outcome']) => ({ outcome })
       ),
-      /**
-       * TODO(Task 7): Remove these image/boolean adapters when image actions
-       * and board deletion dispatch confirmed mixed-media outcomes directly.
-       */
+      /** TODO(Task 7): Remove these image adapters with the mixed-media action port. */
       patchImages: (imageNames: string[], changes: ActionPayload<'patchGalleryItems'>['changes']): void =>
         dispatch({
           changes,
@@ -120,13 +114,6 @@ const createCommands = (dispatch: WorkbenchDispatch, getState: () => WorkbenchSt
           itemKeys: imageNames.map((name) => toGalleryItemKey({ kind: 'image', name })),
           type: 'removeGalleryItems',
         }),
-      reconcileDeletedBoard: command(
-        'reconcileDeletedGalleryBoardLegacy',
-        (boardId: string, includeImages: boolean) => ({
-          boardId,
-          includeImages,
-        })
-      ),
       selectItem: command(
         'selectGalleryItem',
         (
@@ -155,8 +142,13 @@ const createCommands = (dispatch: WorkbenchDispatch, getState: () => WorkbenchSt
       ),
       toggleItemSelection: command(
         'toggleGalleryItemInSelection',
-        (item: ActionPayload<'toggleGalleryItemInSelection'>['item'], projectId?: string) => ({
+        (
+          item: ActionPayload<'toggleGalleryItemInSelection'>['item'],
+          nextPrimaryItem: ActionPayload<'toggleGalleryItemInSelection'>['nextPrimaryItem'],
+          projectId?: string
+        ) => ({
           item,
+          nextPrimaryItem,
           projectId,
         })
       ),
@@ -194,9 +186,14 @@ const createCommands = (dispatch: WorkbenchDispatch, getState: () => WorkbenchSt
           projectId,
           type: 'setGalleryMultiSelection',
         }),
-      toggleImageSelection: (image: GeneratedImageContract & Partial<GalleryImage>, projectId?: string): void =>
+      toggleImageSelection: (
+        image: GeneratedImageContract & Partial<GalleryImage>,
+        nextPrimaryItem: ActionPayload<'toggleGalleryItemInSelection'>['nextPrimaryItem'],
+        projectId?: string
+      ): void =>
         dispatch({
           item: legacyGeneratedImageToGalleryItem(image),
+          nextPrimaryItem,
           projectId,
           type: 'toggleGalleryItemInSelection',
         }),

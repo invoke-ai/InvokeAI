@@ -52,6 +52,7 @@ import {
   type GalleryImageItem,
   type GalleryItem,
   type GalleryItemKey,
+  type GalleryBoardDeletionResult,
   type GallerySettings,
   type GeneratedImageContract,
 } from '@features/gallery/contracts';
@@ -260,7 +261,12 @@ type WorkbenchReducerAction =
       projectId?: string;
       selectionPage?: number;
     }
-  | { type: 'toggleGalleryItemInSelection'; item: GalleryItem; projectId?: string }
+  | {
+      type: 'toggleGalleryItemInSelection';
+      item: GalleryItem;
+      nextPrimaryItem: GalleryItem | null;
+      projectId?: string;
+    }
   | { type: 'setGalleryMultiSelection'; itemKeys: GalleryItemKey[]; primaryItem: GalleryItem; projectId?: string }
   | { type: 'setGalleryCompareImage'; image: GalleryImageItem | null; projectId?: string }
   | { type: 'selectGalleryBoard'; boardId: string; projectId?: string }
@@ -277,17 +283,8 @@ type WorkbenchReducerAction =
   | { type: 'removeGalleryItems'; itemKeys: GalleryItemKey[] }
   | {
       type: 'reconcileDeletedGalleryBoard';
-      boardId: string;
-      deletedImageNames: string[];
-      deletedVideoNames: string[];
-      failedImageNames: string[];
-      failedVideoNames: string[];
+      outcome: GalleryBoardDeletionResult;
     }
-  /**
-   * TODO(Task 7): Remove after board deletion returns and forwards the
-   * authoritative per-kind outcome arrays.
-   */
-  | { type: 'reconcileDeletedGalleryBoardLegacy'; boardId: string; includeImages: boolean }
   | { type: 'setGalleryProjectBoardId'; boardId: string; projectId?: string }
   | {
       type: 'applyCanvasProjectMutation';
@@ -1954,10 +1951,13 @@ const removeGalleryItemsFromAllProjects = (
 const reconcileDeletedGalleryBoard = (
   state: WorkbenchState,
   boardId: string,
-  deletedItemKeys: ReadonlySet<GalleryItemKey>
+  deletedItemKeys: ReadonlySet<GalleryItemKey>,
+  confirmedMovedItemKeys: ReadonlySet<GalleryItemKey>
 ): WorkbenchState => {
   const survivingItemKeys = new Set(
-    [...getLocallyKnownGalleryItemsOnBoard(state, boardId).keys()].filter((key) => !deletedItemKeys.has(key))
+    [...getLocallyKnownGalleryItemsOnBoard(state, boardId).keys(), ...confirmedMovedItemKeys].filter(
+      (key) => !deletedItemKeys.has(key)
+    )
   );
   const withoutDeletedItems = removeGalleryItemsFromAllProjects(state, deletedItemKeys);
   const withSurvivorsMoved = patchGalleryItemsAcrossProjects(withoutDeletedItems, survivingItemKeys, {
@@ -3145,13 +3145,28 @@ export const __workbenchReducerInternal = (
                 : null;
           const wasPrimary = selectedItemKey === itemKey;
 
+          if (!wasPrimary) {
+            return {
+              ...values,
+              selectedImageNames: remainingItemKeys,
+            };
+          }
+
+          const expectedNextPrimaryKey = remainingItemKeys[remainingItemKeys.length - 1] ?? null;
+          const nextPrimaryItem =
+            expectedNextPrimaryKey &&
+            action.nextPrimaryItem &&
+            toGalleryItemKey(action.nextPrimaryItem) === expectedNextPrimaryKey
+              ? action.nextPrimaryItem
+              : null;
+          const nextPrimaryKey = nextPrimaryItem ? toGalleryItemKey(nextPrimaryItem) : null;
+
           return {
             ...values,
-            selectedImage: wasPrimary ? null : values.selectedImage,
-            selectedImageName: wasPrimary
-              ? (remainingItemKeys[remainingItemKeys.length - 1] ?? null)
-              : values.selectedImageName,
-            selectedImageNames: remainingItemKeys,
+            ...(nextPrimaryItem?.kind === 'image' ? {} : { compareImage: null }),
+            selectedImage: nextPrimaryItem,
+            selectedImageName: nextPrimaryKey,
+            selectedImageNames: expectedNextPrimaryKey && !nextPrimaryItem ? [] : remainingItemKeys,
           };
         },
         action.projectId
@@ -3275,21 +3290,21 @@ export const __workbenchReducerInternal = (
       return removeGalleryItemsFromAllProjects(state, new Set(action.itemKeys));
     }
     case 'reconcileDeletedGalleryBoard': {
+      const { outcome } = action;
       const deletedItemKeys = new Set<GalleryItemKey>([
-        ...action.deletedImageNames.map((name) => toGalleryItemKey({ kind: 'image', name })),
-        ...action.deletedVideoNames.map((name) => toGalleryItemKey({ kind: 'video', name })),
+        ...outcome.deletedImageNames.map((name) => toGalleryItemKey({ kind: 'image', name })),
+        ...outcome.deletedVideoNames.map((name) => toGalleryItemKey({ kind: 'video', name })),
+      ]);
+      const confirmedMovedItemKeys = new Set<GalleryItemKey>([
+        ...outcome.deletedBoardImageNames.map((name) => toGalleryItemKey({ kind: 'image', name })),
+        ...outcome.deletedBoardVideoNames.map((name) => toGalleryItemKey({ kind: 'video', name })),
+        ...outcome.failedImageNames.map((name) => toGalleryItemKey({ kind: 'image', name })),
+        ...outcome.failedVideoNames.map((name) => toGalleryItemKey({ kind: 'video', name })),
       ]);
 
       // Failed and otherwise unconfirmed local items survive. The reconciler
       // moves every locally known key not confirmed deleted to Uncategorized.
-      return reconcileDeletedGalleryBoard(state, action.boardId, deletedItemKeys);
-    }
-    case 'reconcileDeletedGalleryBoardLegacy': {
-      const deletedItemKeys = action.includeImages
-        ? new Set(getLocallyKnownGalleryItemsOnBoard(state, action.boardId).keys())
-        : new Set<GalleryItemKey>();
-
-      return reconcileDeletedGalleryBoard(state, action.boardId, deletedItemKeys);
+      return reconcileDeletedGalleryBoard(state, outcome.boardId, deletedItemKeys, confirmedMovedItemKeys);
     }
     case 'setGalleryProjectBoardId': {
       return updateGalleryValues(state, (values) => ({ ...values, projectBoardId: action.boardId }), action.projectId);

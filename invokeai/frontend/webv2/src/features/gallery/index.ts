@@ -1,5 +1,6 @@
 export type {
   GalleryBoard,
+  GalleryBoardDeletionResult,
   GalleryBoardKind,
   GalleryBoardOrderBy,
   GalleryImage,
@@ -86,7 +87,7 @@ export const galleryOrganization = {
   addToBoard: addImagesToGalleryBoard,
   deleteImages: deleteGalleryImages,
   removeFromBoard: removeImagesFromGalleryBoard,
-  setStarred: (imageNames: string[], starred: boolean, signal?: AbortSignal): Promise<void> =>
+  setStarred: (imageNames: string[], starred: boolean, signal?: AbortSignal): Promise<string[]> =>
     starred ? starGalleryImages(imageNames, signal) : unstarGalleryImages(imageNames, signal),
 } as const;
 

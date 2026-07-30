@@ -1,5 +1,6 @@
 export type {
   GalleryBoard,
+  GalleryBoardDeletionResult,
   GalleryBoardKind,
   GalleryBoardOrderBy,
   GalleryImage,

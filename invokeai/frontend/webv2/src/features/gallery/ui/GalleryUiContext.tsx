@@ -1,5 +1,6 @@
+import type { GalleryItem } from '@features/gallery/contracts';
 import type { GallerySettings } from '@features/gallery/core/settings';
-import type { GalleryBoard, GalleryImage, GalleryView } from '@features/gallery/core/types';
+import type { GalleryBoard, GalleryBoardDeletionResult, GalleryImage, GalleryView } from '@features/gallery/core/types';
 import type { QueueItem } from '@features/queue/contracts';
 
 import { createContext, use, type ComponentType, type ReactNode } from 'react';
@@ -33,7 +34,7 @@ export interface GalleryImageContextMenuProps {
 }
 
 export interface GalleryCommandsPort {
-  reconcileDeletedBoard(boardId: string, includeImages: boolean): void;
+  reconcileDeletedBoardOutcome(outcome: GalleryBoardDeletionResult): void;
   selectBoard(boardId: string): void;
   selectImage(image: GalleryImage): void;
   setCompareImage(image: GalleryImage | null): void;
@@ -43,7 +44,7 @@ export interface GalleryCommandsPort {
   setProjectBoard(boardId: string): void;
   setSearchTerm(searchTerm: string): void;
   setView(view: GalleryView): void;
-  toggleImageSelection(image: GalleryImage): void;
+  toggleImageSelection(image: GalleryImage, nextPrimaryItem: GalleryItem | null): void;
   updateSettings(settings: Partial<GallerySettings>): void;
 }
 

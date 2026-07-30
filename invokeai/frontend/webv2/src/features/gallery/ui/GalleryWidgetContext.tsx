@@ -1,3 +1,4 @@
+import type { GalleryItem } from '@features/gallery/contracts';
 import type { GallerySettings } from '@features/gallery/core/settings';
 import type { GalleryImage, GalleryView } from '@features/gallery/core/types';
 
@@ -26,7 +27,7 @@ export interface GalleryActions {
   selectProjectBoard: () => Promise<void>;
   setSearchTerm: (searchTerm: string) => void;
   setView: (galleryView: GalleryView) => void;
-  toggleImageInSelection: (image: GalleryImage) => void;
+  toggleImageInSelection: (image: GalleryImage, nextPrimaryItem: GalleryItem | null) => void;
   updateSettings: (settings: Partial<GallerySettings>) => void;
   uploadFiles: (files: File[]) => Promise<void>;
 }

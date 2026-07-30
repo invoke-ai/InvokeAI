@@ -95,7 +95,7 @@ export const useGalleryActions = ({
         try {
           const boardName = getBoardName(boardId);
 
-          await deleteGalleryBoard(boardId, includeImages, owner.signal);
+          const outcome = await deleteGalleryBoard(boardId, includeImages, owner.signal);
 
           assertAccountScopeCurrent(owner);
           recordSuccess(
@@ -103,7 +103,7 @@ export const useGalleryActions = ({
             includeImages ? 'Its images were permanently deleted.' : 'Its images were moved to Uncategorized.'
           );
 
-          gallery.reconcileDeletedBoard(boardId, includeImages);
+          gallery.reconcileDeletedBoardOutcome(outcome);
           refresh();
         } catch (error: unknown) {
           if (!isAccountScopeCurrent(owner)) {

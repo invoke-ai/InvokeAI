@@ -17,6 +17,8 @@ vi.mock('@platform/transport/http', () => ({
 }));
 
 import {
+  addImagesToGalleryBoard,
+  deleteGalleryBoard,
   deleteGalleryImages,
   downloadGalleryArchive,
   getGalleryImageByName,
@@ -29,7 +31,90 @@ import {
   listGalleryBoards,
   listGalleryItems,
   listPaletteImages,
+  removeImagesFromGalleryBoard,
+  starGalleryImages,
+  unstarGalleryImages,
 } from './backend';
+
+describe('deleteGalleryBoard outcomes', () => {
+  beforeEach(() => {
+    accountLifecycle.activate('user-a');
+    mocks.apiFetchJson.mockReset();
+  });
+
+  it('maps confirmed and failed media when deleting a board with its contents', async () => {
+    mocks.apiFetchJson.mockResolvedValue({
+      board_id: 'board-1',
+      deleted_board_images: [],
+      deleted_board_videos: [],
+      deleted_images: ['gone.png'],
+      deleted_videos: ['gone.mp4'],
+      failed_images: ['locked.png'],
+      failed_videos: ['locked.mp4'],
+    });
+
+    await expect(deleteGalleryBoard('board-1', true)).resolves.toEqual({
+      boardId: 'board-1',
+      deletedBoardImageNames: [],
+      deletedBoardVideoNames: [],
+      deletedImageNames: ['gone.png'],
+      deletedVideoNames: ['gone.mp4'],
+      failedImageNames: ['locked.png'],
+      failedVideoNames: ['locked.mp4'],
+    });
+  });
+
+  it('maps removed board relationships when retaining the board contents', async () => {
+    mocks.apiFetchJson.mockResolvedValue({
+      board_id: 'board-1',
+      deleted_board_images: ['moved.png'],
+      deleted_board_videos: ['moved.mp4'],
+      deleted_images: [],
+      deleted_videos: [],
+      failed_images: [],
+      failed_videos: [],
+    });
+
+    await expect(deleteGalleryBoard('board-1', false)).resolves.toEqual({
+      boardId: 'board-1',
+      deletedBoardImageNames: ['moved.png'],
+      deletedBoardVideoNames: ['moved.mp4'],
+      deletedImageNames: [],
+      deletedVideoNames: [],
+      failedImageNames: [],
+      failedVideoNames: [],
+    });
+    expect(mocks.apiFetchJson).toHaveBeenCalledWith('/api/v1/boards/board-1?include_images=false', {
+      method: 'DELETE',
+      signal: undefined,
+    });
+  });
+});
+
+describe('image mutation outcomes', () => {
+  beforeEach(() => {
+    accountLifecycle.activate('user-a');
+    mocks.apiFetchJson.mockReset();
+  });
+
+  it('returns only images confirmed added to or removed from a board', async () => {
+    mocks.apiFetchJson
+      .mockResolvedValueOnce({ added_images: ['moved.png'] })
+      .mockResolvedValueOnce({ removed_images: ['removed.png'] });
+
+    await expect(addImagesToGalleryBoard('board-1', ['moved.png', 'locked.png'])).resolves.toEqual(['moved.png']);
+    await expect(removeImagesFromGalleryBoard(['removed.png', 'locked.png'])).resolves.toEqual(['removed.png']);
+  });
+
+  it('returns only images confirmed starred or unstarred', async () => {
+    mocks.apiFetchJson
+      .mockResolvedValueOnce({ starred_images: ['starred.png'] })
+      .mockResolvedValueOnce({ unstarred_images: ['unstarred.png'] });
+
+    await expect(starGalleryImages(['starred.png', 'locked.png'])).resolves.toEqual(['starred.png']);
+    await expect(unstarGalleryImages(['unstarred.png', 'locked.png'])).resolves.toEqual(['unstarred.png']);
+  });
+});
 
 describe('downloadGalleryArchive', () => {
   beforeEach(() => {

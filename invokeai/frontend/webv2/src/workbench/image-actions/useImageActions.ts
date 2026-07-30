@@ -78,6 +78,19 @@ const getImageMutationResult = (
   succeeded: succeededImageNames.map((name) => ({ kind: 'image', name })),
 });
 
+const getConfirmedImageMutationResult = (
+  requestedImageNames: readonly string[],
+  confirmedImageNames: readonly string[]
+): GalleryItemMutationResult => {
+  const confirmed = new Set(confirmedImageNames);
+  const requested = [...new Set(requestedImageNames)];
+
+  return getImageMutationResult(
+    requested.filter((name) => confirmed.has(name)),
+    requested.filter((name) => !confirmed.has(name))
+  );
+};
+
 const toPngBlob = async (blob: Blob): Promise<Blob> => {
   if (blob.type === 'image/png') {
     return blob;
@@ -310,22 +323,34 @@ export const useImageActions = ({
         const owner = captureAccountScope();
 
         try {
-          if (boardId === 'none') {
-            await galleryOrganization.removeFromBoard(imageNames, owner.signal);
-          } else {
-            await galleryOrganization.addToBoard(boardId, imageNames, owner.signal);
-          }
+          const confirmedImageNames =
+            boardId === 'none'
+              ? await galleryOrganization.removeFromBoard(imageNames, owner.signal)
+              : await galleryOrganization.addToBoard(boardId, imageNames, owner.signal);
 
           assertAccountScopeCurrent(owner);
-          const result = getImageMutationResult(imageNames);
+          const result = getConfirmedImageMutationResult(imageNames, confirmedImageNames);
 
-          patchGalleryItemCaches(queryClient, { boardId, kind: 'move', result });
-          gallery.patchItems(result.succeeded.map(toGalleryItemKey), { boardId });
-          recordSuccess(
-            imageNames.length === 1
-              ? `Moved image to ${getBoardName(boardId)}`
-              : `Moved ${imageNames.length} images to ${getBoardName(boardId)}`
-          );
+          if (result.succeeded.length > 0) {
+            patchGalleryItemCaches(queryClient, { boardId, kind: 'move', result });
+            gallery.patchItems(result.succeeded.map(toGalleryItemKey), { boardId });
+          }
+
+          if (result.failed.length > 0) {
+            recordError(
+              new Error(
+                result.failed.length === 1
+                  ? `Could not move ${result.failed[0]?.name}`
+                  : `Could not move ${result.failed.length} of ${imageNames.length} images`
+              )
+            );
+          } else {
+            recordSuccess(
+              imageNames.length === 1
+                ? `Moved image to ${getBoardName(boardId)}`
+                : `Moved ${imageNames.length} images to ${getBoardName(boardId)}`
+            );
+          }
           void invalidateGallery(queryClient);
         } catch (error: unknown) {
           if (!isAccountScopeCurrent(owner)) {
@@ -403,18 +428,29 @@ export const useImageActions = ({
       },
       setImagesStarred: async (imageNames, starred) => {
         const owner = captureAccountScope();
-        const result = getImageMutationResult(imageNames);
-        const rollback = patchGalleryItemCaches(queryClient, { kind: 'star', result, starred });
 
         try {
-          await galleryOrganization.setStarred(imageNames, starred, owner.signal);
+          const confirmedImageNames = await galleryOrganization.setStarred(imageNames, starred, owner.signal);
 
           assertAccountScopeCurrent(owner);
-          gallery.patchItems(result.succeeded.map(toGalleryItemKey), { starred });
+          const result = getConfirmedImageMutationResult(imageNames, confirmedImageNames);
+
+          if (result.succeeded.length > 0) {
+            patchGalleryItemCaches(queryClient, { kind: 'star', result, starred });
+            gallery.patchItems(result.succeeded.map(toGalleryItemKey), { starred });
+          }
+
+          if (result.failed.length > 0) {
+            recordError(
+              new Error(
+                result.failed.length === 1
+                  ? `Could not ${starred ? 'star' : 'unstar'} ${result.failed[0]?.name}`
+                  : `Could not ${starred ? 'star' : 'unstar'} ${result.failed.length} of ${imageNames.length} images`
+              )
+            );
+          }
           void invalidateGalleryItems(queryClient);
         } catch (error: unknown) {
-          rollback();
-
           if (!isAccountScopeCurrent(owner)) {
             return;
           }
