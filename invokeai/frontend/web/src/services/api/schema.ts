@@ -19414,15 +19414,17 @@ export type components = {
              */
             transformer?: components["schemas"]["TransformerField"] | null;
             /**
+             * Positive Conditioning
              * @description Positive conditioning tensor
              * @default null
              */
-            positive_conditioning?: components["schemas"]["Krea2ConditioningField"] | null;
+            positive_conditioning?: components["schemas"]["Krea2ConditioningField"] | components["schemas"]["Krea2ConditioningField"][] | null;
             /**
+             * Negative Conditioning
              * @description Negative conditioning tensor
              * @default null
              */
-            negative_conditioning?: components["schemas"]["Krea2ConditioningField"] | null;
+            negative_conditioning?: components["schemas"]["Krea2ConditioningField"] | components["schemas"]["Krea2ConditioningField"][] | null;
             /**
              * CFG Scale
              * @description Classifier-Free Guidance scale

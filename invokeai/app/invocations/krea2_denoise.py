@@ -56,7 +56,7 @@ KREA2_LATENT_CHANNELS = 16
     title="Denoise - Krea-2",
     tags=["image", "krea2", "krea-2"],
     category="image",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
 class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -75,10 +75,10 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     transformer: TransformerField = InputField(
         description=FieldDescriptions.krea2_model, input=Input.Connection, title="Transformer"
     )
-    positive_conditioning: Krea2ConditioningField = InputField(
+    positive_conditioning: Krea2ConditioningField | list[Krea2ConditioningField] = InputField(
         description=FieldDescriptions.positive_cond, input=Input.Connection
     )
-    negative_conditioning: Optional[Krea2ConditioningField] = InputField(
+    negative_conditioning: Krea2ConditioningField | list[Krea2ConditioningField] | None = InputField(
         default=None, description=FieldDescriptions.negative_cond, input=Input.Connection
     )
     # CFG uses the standard formulation (uncond + cfg_scale*(cond-uncond)); cfg_scale <= 1 disables it.
@@ -134,16 +134,42 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     def _load_text_conditioning(
         self,
         context: InvocationContext,
-        conditioning_name: str,
+        conditioning_field: Krea2ConditioningField | list[Krea2ConditioningField],
         dtype: torch.dtype,
         device: torch.device,
     ) -> tuple[torch.Tensor, torch.Tensor | None]:
-        cond_data = context.conditioning.load(conditioning_name)
-        assert len(cond_data.conditionings) == 1
-        conditioning = cond_data.conditionings[0]
-        assert isinstance(conditioning, Krea2ConditioningInfo)
-        conditioning = conditioning.to(dtype=dtype, device=device)
-        return conditioning.prompt_embeds, conditioning.prompt_embeds_mask
+        conditioning_fields = (
+            [conditioning_field] if isinstance(conditioning_field, Krea2ConditioningField) else conditioning_field
+        )
+        if not conditioning_fields:
+            raise ValueError("At least one Krea-2 conditioning is required.")
+
+        prompt_embeds: list[torch.Tensor] = []
+        for field in conditioning_fields:
+            cond_data = context.conditioning.load(field.conditioning_name)
+            assert len(cond_data.conditionings) == 1
+            conditioning = cond_data.conditionings[0]
+            assert isinstance(conditioning, Krea2ConditioningInfo)
+            conditioning = conditioning.to(dtype=dtype, device=device)
+            embeds = conditioning.prompt_embeds
+            if conditioning.prompt_embeds_mask is not None:
+                mask = conditioning.prompt_embeds_mask.to(device=device, dtype=torch.bool)
+                if mask.shape != embeds.shape[:2]:
+                    raise ValueError(
+                        f"Krea-2 conditioning mask shape {tuple(mask.shape)} does not match "
+                        f"prompt embedding shape {tuple(embeds.shape[:2])}."
+                    )
+                valid_token_counts = mask.sum(dim=1)
+                if not torch.equal(valid_token_counts, valid_token_counts[:1].expand_as(valid_token_counts)):
+                    raise ValueError("All Krea-2 conditioning batch items must have the same valid token count.")
+                embeds = torch.stack(
+                    [batch_embeds[batch_mask] for batch_embeds, batch_mask in zip(embeds, mask, strict=True)]
+                )
+            prompt_embeds.append(embeds)
+
+        # Masked padding does not contribute to attention. Remove it before concatenation to avoid multiplying
+        # the text sequence length by the encoder's fixed 512-token allocation for every conditioning.
+        return torch.cat(prompt_embeds, dim=1), None
 
     def _get_noise(self, height: int, width: int, dtype: torch.dtype, device: torch.device, seed: int) -> torch.Tensor:
         rand_device = "cpu"
@@ -224,7 +250,7 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         transformer_info = context.models.load(self.transformer.transformer)
 
         pos_prompt_embeds, pos_prompt_mask = self._load_text_conditioning(
-            context, self.positive_conditioning.conditioning_name, inference_dtype, device
+            context, self.positive_conditioning, inference_dtype, device
         )
 
         latent_height = self.height // LATENT_SCALE_FACTOR
@@ -291,13 +317,13 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         # Load negative conditioning only if at least one active step actually uses CFG. CFG is still
         # decided per step below so values at or below 1.0 use the conditional prediction directly.
-        has_negative_conditioning = self.negative_conditioning is not None
+        has_negative_conditioning = bool(self.negative_conditioning)
         do_cfg = has_negative_conditioning and any(value > 1.0 for value in cfg_scale)
         neg_prompt_embeds = None
         neg_prompt_mask = None
         if do_cfg and self.negative_conditioning is not None:
             neg_prompt_embeds, neg_prompt_mask = self._load_text_conditioning(
-                context, self.negative_conditioning.conditioning_name, inference_dtype, device
+                context, self.negative_conditioning, inference_dtype, device
             )
 
         # Load initial latents (img2img).
@@ -365,6 +391,8 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         # forward OOMs once the LoRA's extra activations are added.
         estimated_working_memory = self._estimate_working_memory(
             image_seq_len=image_seq_len,
+            positive_text_seq_len=pos_prompt_embeds.shape[1],
+            negative_text_seq_len=neg_prompt_embeds.shape[1] if neg_prompt_embeds is not None else None,
             do_cfg=do_cfg,
             num_loras=len(self.transformer.loras),
         )
@@ -449,7 +477,14 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         latents = latents.unsqueeze(2)
         return latents
 
-    def _estimate_working_memory(self, image_seq_len: int, do_cfg: bool, num_loras: int) -> int:
+    def _estimate_working_memory(
+        self,
+        image_seq_len: int,
+        positive_text_seq_len: int,
+        negative_text_seq_len: int | None,
+        do_cfg: bool,
+        num_loras: int,
+    ) -> int:
         """Estimate peak transformer activation memory (bytes) so the model cache reserves enough headroom.
 
         Krea-2's attention runs through diffusers' ``dispatch_attention_fn`` (SDPA / flash), so attention
@@ -461,14 +496,16 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         The per-token constant below is a safe upper bound on the measured SDPA activation footprint of the
         Krea-2-Turbo MMDiT in bf16 (residual stream + one block's attention/SwiGLU intermediates), leaving
-        several GB of margin. A fixed base covers the resolution-independent overhead (transient fp8->bf16
-        layerwise weight casts, the text-fusion stage, and allocator/reserved-memory slack). LoRA sidecar
+        several GB of margin. Conditional and unconditional passes run sequentially, so peak memory depends
+        on the longer text sequence rather than their sum. A fixed base covers resolution-independent overhead
+        (transient fp8->bf16 layerwise weight casts and allocator/reserved-memory slack). LoRA sidecar
         patches add a small extra activation branch per patched layer, so we add a per-LoRA margin.
         """
         GB = 1024**3
         MB = 1024**2
         per_token_bytes = int(0.5 * MB)
-        estimated = image_seq_len * per_token_bytes
+        text_seq_len = max(positive_text_seq_len, negative_text_seq_len or 0)
+        estimated = (image_seq_len + text_seq_len) * per_token_bytes
         estimated += int(1.5 * GB)
         if do_cfg:
             # Conditional/unconditional passes are sequential, but the larger combined sequence and extra
