@@ -168,3 +168,91 @@ Tests 72 passed (72)
 - Confirmed cancellation and identity checks surround both names and page hydration.
 - Confirmed no `useEffect` was added.
 - No unresolved implementation concern. The listed Task 5/7 removals are deliberate branch-compatibility debt, not mixed-contract ambiguity.
+
+## Fix Round 1
+
+### Review issues addressed
+
+1. Replaced locale-sensitive Gallery item ordering with a deterministic SQLite-BINARY-compatible text comparator. The same comparator now handles `createdAt`, `kind`, and `name`; the ASC/DESC multiplier is applied exactly once to each non-zero comparison result.
+2. Added explicit `TODO(Task 5/7)` blocks above the legacy query/cache exports in `features/gallery/queries.ts` and directly above `patchGalleryImageCaches`.
+
+### RED evidence
+
+Command from `invokeai/frontend/webv2`:
+
+```sh
+pnpm test src/features/gallery/ui/useGalleryData.test.ts
+```
+
+Result before the production fix:
+
+```text
+Test Files 1 failed (1)
+Tests 1 failed | 10 passed (11)
+```
+
+The new mixed-case/punctuation regression expected SQLite binary ascending order:
+
+```text
+!bang.png, A.png, Z.png, _draft.png, a.png
+```
+
+The locale-sensitive comparator instead produced:
+
+```text
+_draft.png, !bang.png, a.png, A.png, Z.png
+```
+
+### GREEN evidence
+
+The same focused command after replacing `localeCompare`:
+
+```text
+Test Files 1 passed (1)
+Tests 11 passed (11)
+```
+
+Focused overlay/query/cache regression command:
+
+```sh
+pnpm test src/features/gallery/ui/useGalleryData.test.ts src/features/gallery/data/mixedQueries.test.ts src/features/gallery/data/queries.test.ts src/features/gallery/data/itemQueryCache.test.ts src/features/gallery/data/queryCache.test.ts
+```
+
+Result:
+
+```text
+Test Files 5 passed (5)
+Tests 30 passed (30)
+```
+
+Static verification:
+
+```sh
+pnpm run lint:tsc
+pnpm run lint:oxc
+pnpm run format:check
+```
+
+Results:
+
+```text
+tsc --noEmit: passed
+oxlint --deny-warnings: passed
+oxfmt --check: all matched files correctly formatted
+```
+
+### Files changed
+
+- `invokeai/frontend/webv2/src/features/gallery/ui/useGalleryData.ts`
+- `invokeai/frontend/webv2/src/features/gallery/ui/useGalleryData.test.ts`
+- `invokeai/frontend/webv2/src/features/gallery/queries.ts`
+- `invokeai/frontend/webv2/src/features/gallery/data/queryCache.ts`
+- `.superpowers/sdd/mixed-media-gallery-parity/task-4-report.md`
+
+### Fix self-review
+
+- The comparator uses direct deterministic string ordering, which matches SQLite BINARY for the ASCII ISO timestamps, item kinds, and regression names in this path.
+- Both ascending and descending punctuation/mixed-case expectations are pinned; direction is not inverted or multiplied twice.
+- The earlier starred-first and kind tie-break tests remain green.
+- The public legacy facade and implementation-level cache wrapper now carry explicit removal obligations.
+- No new compatibility surface or `useEffect` was introduced.

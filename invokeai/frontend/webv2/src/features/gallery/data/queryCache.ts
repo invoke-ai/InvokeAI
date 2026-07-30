@@ -331,6 +331,9 @@ const patchInfiniteData = (
  * Applies a small mutation to every currently cached page for this account.
  * The returned rollback is concurrency-safe: it only restores an entry while
  * the optimistic value is still the current cache value.
+ *
+ * TODO(Task 5/7): Remove after image actions use confirmed mixed mutation
+ * results with `patchGalleryItemCaches`.
  */
 export const patchGalleryImageCaches = (client: QueryClient, patch: GalleryImageCachePatch): (() => void) => {
   if (patch.imageNames.length === 0) {

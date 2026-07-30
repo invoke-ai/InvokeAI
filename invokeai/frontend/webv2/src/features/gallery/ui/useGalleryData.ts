@@ -98,6 +98,8 @@ const isRecentItemVisible = (item: GalleryItem, filter: GalleryImagesFilter): bo
   return hasMatchingBoard && hasMatchingCategory;
 };
 
+const compareSqliteBinaryText = (a: string, b: string): number => (a === b ? 0 : a < b ? -1 : 1);
+
 const compareGalleryItems = (
   a: GalleryItem,
   b: GalleryItem,
@@ -108,19 +110,19 @@ const compareGalleryItems = (
   }
 
   const direction = orderDir === 'ASC' ? 1 : -1;
-  const chronologicalOrder = a.createdAt.localeCompare(b.createdAt);
+  const chronologicalOrder = compareSqliteBinaryText(a.createdAt, b.createdAt);
 
   if (chronologicalOrder !== 0) {
     return direction * chronologicalOrder;
   }
 
-  const kindOrder = a.kind.localeCompare(b.kind);
+  const kindOrder = compareSqliteBinaryText(a.kind, b.kind);
 
   if (kindOrder !== 0) {
     return direction * kindOrder;
   }
 
-  return direction * a.name.localeCompare(b.name);
+  return direction * compareSqliteBinaryText(a.name, b.name);
 };
 
 export const mergeGalleryItemWindow = ({

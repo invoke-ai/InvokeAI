@@ -137,6 +137,41 @@ describe('mergeGalleryItemWindow', () => {
       }).map(({ kind, name }) => `${kind}:${name}`)
     ).toEqual(['image:shared', 'video:shared']);
   });
+
+  it('uses SQLite binary ordering for mixed-case and punctuation name ties in both directions', () => {
+    const createTiedItem = (name: string): GalleryItem => ({
+      boardId: 'none',
+      category: 'general',
+      createdAt: '2026-07-30T12:00:00.000Z',
+      fullUrl: `/images/${name}`,
+      height: 64,
+      isIntermediate: false,
+      kind: 'image',
+      name,
+      starred: false,
+      thumbnailUrl: `/thumbnails/${name}`,
+      width: 64,
+    });
+    const items = ['a.png', 'Z.png', '_draft.png', 'A.png', '!bang.png'].map(createTiedItem);
+
+    expect(
+      mergeGalleryItemWindow({
+        backendItems: items,
+        filter: { ...filter, orderDir: 'ASC' },
+        maxRows: 60,
+        recentImages: [],
+      }).map((item) => item.name)
+    ).toEqual(['!bang.png', 'A.png', 'Z.png', '_draft.png', 'a.png']);
+
+    expect(
+      mergeGalleryItemWindow({
+        backendItems: items,
+        filter: { ...filter, orderDir: 'DESC' },
+        maxRows: 60,
+        recentImages: [],
+      }).map((item) => item.name)
+    ).toEqual(['a.png', '_draft.png', 'Z.png', 'A.png', '!bang.png']);
+  });
 });
 
 describe('isGalleryWindowTruncated', () => {
