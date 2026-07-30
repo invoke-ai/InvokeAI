@@ -19634,6 +19634,11 @@ export type components = {
              * @description The name of conditioning tensor
              */
             conditioning_name: string;
+            /**
+             * @description The mask associated with this conditioning tensor for regional prompting. Excluded regions should be set to False, included regions should be set to True.
+             * @default null
+             */
+            mask?: components["schemas"]["TensorField"] | null;
         };
         /**
          * Krea2ConditioningOutput
@@ -20110,6 +20115,11 @@ export type components = {
              * @default null
              */
             prompt?: string | null;
+            /**
+             * @description A mask defining the image region that this conditioning prompt applies to.
+             * @default null
+             */
+            mask?: components["schemas"]["TensorField"] | null;
             /**
              * Qwen3-VL Encoder
              * @description Qwen3-VL tokenizer and text encoder

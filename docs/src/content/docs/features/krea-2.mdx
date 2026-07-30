@@ -69,7 +69,14 @@ Both are recorded in image metadata and can be recalled.
 
 In the workflow editor, the **Denoise - Krea-2** node accepts one conditioning or a collection for both
 its positive and negative conditioning inputs. Multiple independently encoded conditionings are concatenated
-after padding tokens are removed. They are global conditionings; spatial masks are not supported.
+after padding tokens are removed.
+
+The **Text Encoder - Krea-2** node also accepts an optional mask. A masked conditioning applies to that
+image region; an unmasked conditioning applies to the background not covered by any regional mask. Krea-2
+uses the same restricted-attention strategy as FLUX.1 on alternating main transformer blocks, leaving the
+other blocks unrestricted to preserve image-wide coherence. Positive regional prompts are available on the
+canvas. In workflows, masked conditioning collections can also be supplied to the negative input when CFG
+is enabled. Canvas regional negative prompts, auto-negative, and regional reference images are not supported.
 
 ## LoRA
 

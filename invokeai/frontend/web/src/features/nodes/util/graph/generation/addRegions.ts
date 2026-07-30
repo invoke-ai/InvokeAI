@@ -39,6 +39,7 @@ type AddRegionsArg = {
     | 'flux2_klein_text_encoder'
     | 'z_image_text_encoder'
     | 'anima_text_encoder'
+    | 'krea2_text_encoder'
   >;
   negCond: Invocation<
     | 'compel'
@@ -47,6 +48,7 @@ type AddRegionsArg = {
     | 'flux2_klein_text_encoder'
     | 'z_image_text_encoder'
     | 'anima_text_encoder'
+    | 'krea2_text_encoder'
   > | null;
   posCondCollect: Invocation<'collect'>;
   negCondCollect: Invocation<'collect'> | null;
@@ -88,6 +90,7 @@ export const addRegions = async ({
   const isFlux2 = model.base === 'flux2';
   const isZImage = model.base === 'z-image';
   const isAnima = model.base === 'anima';
+  const isKrea2 = model.base === 'krea-2';
 
   const validRegions = regions
     .filter((entity) => entity.isEnabled)
@@ -135,6 +138,7 @@ export const addRegions = async ({
         | 'flux2_klein_text_encoder'
         | 'z_image_text_encoder'
         | 'anima_text_encoder'
+        | 'krea2_text_encoder'
       >;
       if (isSDXL) {
         regionalPosCond = g.addNode({
@@ -164,6 +168,12 @@ export const addRegions = async ({
       } else if (isAnima) {
         regionalPosCond = g.addNode({
           type: 'anima_text_encoder',
+          id: getPrefixedId('prompt_region_positive_cond'),
+          prompt: region.positivePrompt,
+        });
+      } else if (isKrea2) {
+        regionalPosCond = g.addNode({
+          type: 'krea2_text_encoder',
           id: getPrefixedId('prompt_region_positive_cond'),
           prompt: region.positivePrompt,
         });
@@ -215,6 +225,12 @@ export const addRegions = async ({
           clone.destination.node_id = regionalPosCond.id;
           g.addEdgeFromObj(clone);
         }
+      } else if (posCond.type === 'krea2_text_encoder') {
+        for (const edge of g.getEdgesTo(posCond, ['qwen3_vl_encoder', 'mask'])) {
+          const clone = deepClone(edge);
+          clone.destination.node_id = regionalPosCond.id;
+          g.addEdgeFromObj(clone);
+        }
       } else {
         assert(false, 'Unsupported positive conditioning node type.');
       }
@@ -224,6 +240,7 @@ export const addRegions = async ({
       // FLUX.2 regions with negative prompts are filtered out by getRegionalGuidanceWarnings; fail
       // loudly if that ever changes, because there is no flux2 branch below.
       assert(!isFlux2, 'Regional negative prompts are not supported for FLUX.2 Klein');
+      assert(!isKrea2, 'Canvas regional negative prompts are not supported for Krea-2');
       assert(negCond, 'Negative conditioning node is required if there is a negative prompt');
       assert(negCondCollect, 'Negative conditioning collector is required if there is a negative prompt');
 
@@ -309,6 +326,7 @@ export const addRegions = async ({
     if (region.autoNegative && region.positivePrompt) {
       // See note on the negative prompt branch above — unreachable for FLUX.2 via validators.
       assert(!isFlux2, 'Auto-negative is not supported for FLUX.2 Klein');
+      assert(!isKrea2, 'Canvas auto-negative is not supported for Krea-2');
       assert(negCondCollect, 'Negative conditioning collector is required if there is an auto-negative setting');
 
       result.addedAutoNegativePositivePrompt = true;
@@ -398,6 +416,7 @@ export const addRegions = async ({
     for (const { id, config } of region.referenceImages) {
       if (isRegionalGuidanceIPAdapterConfig(config)) {
         assert(!isFLUX, 'Regional IP adapters are not supported for FLUX.');
+        assert(!isKrea2, 'Regional IP adapters are not supported for Krea-2.');
 
         result.addedIPAdapters++;
         const { weight, model, clipVisionModel, method, beginEndStepPct, image } = config;

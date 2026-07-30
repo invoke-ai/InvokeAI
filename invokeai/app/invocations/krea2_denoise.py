@@ -25,7 +25,11 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import TransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.krea2.attention import Krea2MemoryEfficientAttnProcessor
+from invokeai.backend.krea2.attention import Krea2RegionalPromptingState, build_krea2_attention_processors
+from invokeai.backend.krea2.regional_prompting import (
+    Krea2RegionalPromptingExtension,
+    Krea2TextConditioning,
+)
 from invokeai.backend.krea2.sampling_utils import (
     KREA2_BASE_IMAGE_SEQ_LEN,
     KREA2_BASE_SHIFT,
@@ -56,7 +60,7 @@ KREA2_LATENT_CHANNELS = 16
     title="Denoise - Krea-2",
     tags=["image", "krea2", "krea-2"],
     category="image",
-    version="1.1.0",
+    version="1.2.0",
     classification=Classification.Prototype,
 )
 class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -135,16 +139,18 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         self,
         context: InvocationContext,
         conditioning_field: Krea2ConditioningField | list[Krea2ConditioningField],
+        grid_height: int,
+        grid_width: int,
         dtype: torch.dtype,
         device: torch.device,
-    ) -> tuple[torch.Tensor, torch.Tensor | None]:
+    ) -> Krea2RegionalPromptingExtension:
         conditioning_fields = (
             [conditioning_field] if isinstance(conditioning_field, Krea2ConditioningField) else conditioning_field
         )
         if not conditioning_fields:
             raise ValueError("At least one Krea-2 conditioning is required.")
 
-        prompt_embeds: list[torch.Tensor] = []
+        text_conditionings: list[Krea2TextConditioning] = []
         for field in conditioning_fields:
             cond_data = context.conditioning.load(field.conditioning_name)
             assert len(cond_data.conditionings) == 1
@@ -165,11 +171,24 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 embeds = torch.stack(
                     [batch_embeds[batch_mask] for batch_embeds, batch_mask in zip(embeds, mask, strict=True)]
                 )
-            prompt_embeds.append(embeds)
+            regional_mask = None
+            if field.mask is not None:
+                mask = context.tensors.load(field.mask.tensor_name)
+                regional_mask = Krea2RegionalPromptingExtension.preprocess_regional_prompt_mask(
+                    mask=mask,
+                    grid_height=grid_height,
+                    grid_width=grid_width,
+                    dtype=dtype,
+                    device=device,
+                )
+            text_conditionings.append(Krea2TextConditioning(prompt_embeds=embeds, mask=regional_mask))
 
         # Masked padding does not contribute to attention. Remove it before concatenation to avoid multiplying
         # the text sequence length by the encoder's fixed 512-token allocation for every conditioning.
-        return torch.cat(prompt_embeds, dim=1), None
+        return Krea2RegionalPromptingExtension.from_text_conditionings(
+            text_conditionings=text_conditionings,
+            image_seq_len=grid_height * grid_width,
+        )
 
     def _get_noise(self, height: int, width: int, dtype: torch.dtype, device: torch.device, seed: int) -> torch.Tensor:
         rand_device = "cpu"
@@ -249,15 +268,20 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         transformer_info = context.models.load(self.transformer.transformer)
 
-        pos_prompt_embeds, pos_prompt_mask = self._load_text_conditioning(
-            context, self.positive_conditioning, inference_dtype, device
-        )
-
         latent_height = self.height // LATENT_SCALE_FACTOR
         latent_width = self.width // LATENT_SCALE_FACTOR
         grid_height = latent_height // 2
         grid_width = latent_width // 2
         image_seq_len = grid_height * grid_width
+        pos_extension = self._load_text_conditioning(
+            context,
+            self.positive_conditioning,
+            grid_height,
+            grid_width,
+            inference_dtype,
+            device,
+        )
+        pos_prompt_embeds = pos_extension.regional_text_conditioning.prompt_embeds
 
         # Scheduler: load from the model's scheduler/ dir if present, else construct with Krea-2 defaults.
         model_path = context.models.get_absolute_path(context.models.get_config(self.transformer.transformer))
@@ -319,12 +343,18 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         # decided per step below so values at or below 1.0 use the conditional prediction directly.
         has_negative_conditioning = bool(self.negative_conditioning)
         do_cfg = has_negative_conditioning and any(value > 1.0 for value in cfg_scale)
+        neg_extension: Krea2RegionalPromptingExtension | None = None
         neg_prompt_embeds = None
-        neg_prompt_mask = None
         if do_cfg and self.negative_conditioning is not None:
-            neg_prompt_embeds, neg_prompt_mask = self._load_text_conditioning(
-                context, self.negative_conditioning, inference_dtype, device
+            neg_extension = self._load_text_conditioning(
+                context,
+                self.negative_conditioning,
+                grid_height,
+                grid_width,
+                inference_dtype,
+                device,
             )
+            neg_prompt_embeds = neg_extension.regional_text_conditioning.prompt_embeds
 
         # Load initial latents (img2img).
         init_latents = context.tensors.load(self.latents.latents_name) if self.latents else None
@@ -395,6 +425,8 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             negative_text_seq_len=neg_prompt_embeds.shape[1] if neg_prompt_embeds is not None else None,
             do_cfg=do_cfg,
             num_loras=len(self.transformer.loras),
+            regional_attention_mask_bytes=pos_extension.attention_mask_numel
+            + (neg_extension.attention_mask_numel if neg_extension is not None else 0),
         )
 
         with ExitStack() as exit_stack:
@@ -406,7 +438,11 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             # SDPA for enable_gqa=True, which PyTorch only supports on the math backend — that materializes the
             # full O(seq^2) score matrix (~5.7 GB per attention at 1280x720, ~40 GB at 2560x1440) and OOMs. Swap
             # in a memory-efficient processor that expands the KV heads and uses the O(seq) SDPA kernel instead.
-            transformer.set_attn_processor(Krea2MemoryEfficientAttnProcessor())
+            regional_prompting_state = Krea2RegionalPromptingState()
+            transformer.set_attn_processor(build_krea2_attention_processors(transformer, regional_prompting_state))
+            # The processors remain installed on the cached transformer after this invocation. Do not let them
+            # retain a potentially multi-GB regional mask between generations, including when denoising raises.
+            exit_stack.callback(regional_prompting_state.set_attention_mask, None)
 
             exit_stack.enter_context(
                 LayerPatcher.apply_smart_model_patches(
@@ -419,14 +455,18 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 )
             )
 
+            pos_regional_attention_mask = pos_extension.get_attention_mask()
+            neg_regional_attention_mask = neg_extension.get_attention_mask() if neg_extension is not None else None
+
             for step_idx, t in enumerate(tqdm(timesteps_sched)):
                 # The pipeline passes timestep / num_train_timesteps to the transformer.
                 timestep = (t / num_train_timesteps).expand(latents.shape[0]).to(inference_dtype)
 
+                regional_prompting_state.set_attention_mask(pos_regional_attention_mask)
                 noise_pred_cond = transformer(
                     hidden_states=latents,
                     encoder_hidden_states=pos_prompt_embeds,
-                    encoder_attention_mask=pos_prompt_mask,
+                    encoder_attention_mask=None,
                     timestep=timestep,
                     position_ids=position_ids,
                     return_dict=False,
@@ -435,10 +475,11 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 if self._should_apply_cfg_for_step(
                     cfg_scale[step_idx], has_negative_conditioning=neg_prompt_embeds is not None
                 ):
+                    regional_prompting_state.set_attention_mask(neg_regional_attention_mask)
                     noise_pred_uncond = transformer(
                         hidden_states=latents,
                         encoder_hidden_states=neg_prompt_embeds,
-                        encoder_attention_mask=neg_prompt_mask,
+                        encoder_attention_mask=None,
                         timestep=timestep,
                         position_ids=neg_position_ids,
                         return_dict=False,
@@ -484,6 +525,7 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         negative_text_seq_len: int | None,
         do_cfg: bool,
         num_loras: int,
+        regional_attention_mask_bytes: int = 0,
     ) -> int:
         """Estimate peak transformer activation memory (bytes) so the model cache reserves enough headroom.
 
@@ -511,6 +553,7 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             # Conditional/unconditional passes are sequential, but the larger combined sequence and extra
             # transient buffers warrant a modest bump.
             estimated = int(estimated * 1.1)
+        estimated += regional_attention_mask_bytes
         if num_loras > 0:
             estimated += int(0.5 * num_loras * GB)
         return estimated

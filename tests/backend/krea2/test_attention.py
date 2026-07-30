@@ -1,7 +1,7 @@
 import torch
 from diffusers.models.transformers.transformer_krea2 import Krea2Attention, Krea2AttnProcessor
 
-from invokeai.backend.krea2.attention import Krea2MemoryEfficientAttnProcessor
+from invokeai.backend.krea2.attention import Krea2MemoryEfficientAttnProcessor, Krea2RegionalPromptingState
 
 
 def _build_gqa_attention() -> Krea2Attention:
@@ -43,3 +43,18 @@ def test_memory_efficient_processor_handles_equal_head_counts() -> None:
         out_efficient = attn(hidden_states, attention_mask=None, image_rotary_emb=None)
 
     assert torch.allclose(out_stock, out_efficient, atol=1e-4, rtol=1e-4)
+
+
+def test_regional_state_matches_stock_processor_with_a_dense_attention_mask() -> None:
+    attn = _build_gqa_attention()
+    hidden_states = torch.randn(1, 24, attn.hidden_size)
+    mask = torch.tril(torch.ones(24, 24, dtype=torch.bool))
+    state = Krea2RegionalPromptingState(attention_mask=mask)
+
+    with torch.no_grad():
+        attn.set_processor(Krea2AttnProcessor())
+        out_stock = attn(hidden_states, attention_mask=mask, image_rotary_emb=None)
+        attn.set_processor(Krea2MemoryEfficientAttnProcessor(regional_prompting_state=state))
+        out_regional = attn(hidden_states, attention_mask=None, image_rotary_emb=None)
+
+    assert torch.allclose(out_stock, out_regional, atol=1e-4, rtol=1e-4)
