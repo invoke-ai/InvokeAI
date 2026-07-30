@@ -25251,11 +25251,21 @@
               }
             ],
             "default": null,
-            "description": "Optional starting latents for img2img (must already be VAE-encoded, BN-normalized, and patchified).",
+            "description": "Optional starting latents. Must be patched ERNIE-Image latents: either clean ones (VAE-encoded, BN-normalized, patchified) with `add_noise` on, or the output of an earlier ERNIE-Image denoise stage with `add_noise` off.",
             "field_kind": "input",
             "input": "connection",
             "orig_default": null,
             "orig_required": false
+          },
+          "add_noise": {
+            "default": true,
+            "description": "Noise the starting latents up to `denoising_start` before denoising. Turn this off to continue an earlier denoise stage, whose output already sits at that sigma. Ignored when no starting latents are connected.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": true,
+            "orig_required": false,
+            "title": "Add Noise",
+            "type": "boolean"
           },
           "width": {
             "default": 1024,

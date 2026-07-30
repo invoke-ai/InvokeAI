@@ -51,9 +51,13 @@ vi.mock('features/nodes/util/graph/generation/addWatermarker', () => ({
   addWatermarker: vi.fn((_g, node) => node),
 }));
 
-// Stand in for the real `addTextToImage`, which is what resolves the generation dimensions and
-// writes them onto the denoise node. The size it reports is what the enhancer must end up with.
-let scaledSize = { width: 832, height: 1216 };
+// `originalSize` is the final output size; `scaledSize` is the intermediate render size that
+// canvas scaling produces. The enhancer must be told the former.
+let originalSize = { width: 832, height: 1216 };
+let scaledSize = { width: 512, height: 768 };
+
+// Stand in for the real `addTextToImage`, which resolves the dimensions and writes the *scaled*
+// ones onto the denoise node.
 vi.mock('features/nodes/util/graph/generation/addTextToImage', () => ({
   addTextToImage: vi.fn(({ denoise, l2i }) => {
     denoise.width = scaledSize.width;
@@ -63,6 +67,7 @@ vi.mock('features/nodes/util/graph/generation/addTextToImage', () => ({
 }));
 
 vi.mock('features/nodes/util/graph/graphBuilderUtils', () => ({
+  getOriginalAndScaledSizesForTextToImage: vi.fn(() => ({ originalSize, scaledSize })),
   selectCanvasOutputFields: vi.fn(() => ({})),
   selectPresetModifiedPrompts: vi.fn(() => ({
     positive: 'a prompt',
@@ -104,7 +109,8 @@ describe('buildErnieImageGraph', () => {
     nextId = 0;
     params = { ...defaultParams };
     usePromptEnhancer = true;
-    scaledSize = { width: 832, height: 1216 };
+    originalSize = { width: 832, height: 1216 };
+    scaledSize = { width: 512, height: 768 };
   });
 
   it('builds the core txt2img node chain', async () => {
@@ -133,10 +139,19 @@ describe('buildErnieImageGraph', () => {
     });
 
     it('tracks the generation dimensions rather than hardcoding them', async () => {
-      scaledSize = { width: 1536, height: 640 };
+      originalSize = { width: 1536, height: 640 };
       const { g } = await build();
 
       expect(positiveEncoder(g)).toMatchObject({ pe_width: 1536, pe_height: 640 });
+    });
+
+    it('reports the original size, not the intermediate scaled render size', async () => {
+      // With canvas scaling active the denoise node carries the scaled size, but the image the
+      // user ends up with has the original dimensions -- that is the aspect ratio to enhance for.
+      const { g } = await build();
+
+      expect(positiveEncoder(g)).toMatchObject({ pe_width: originalSize.width });
+      expect(positiveEncoder(g)).not.toMatchObject({ pe_width: scaledSize.width });
     });
 
     it('wires the enhancer edge only when the toggle is on', async () => {

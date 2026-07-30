@@ -52,8 +52,20 @@ class ErnieImageDenoiseInvocation(BaseInvocation):
     )
     latents: Optional[LatentsField] = InputField(
         default=None,
-        description="Optional starting latents for img2img (must already be VAE-encoded, BN-normalized, and patchified).",
+        description=(
+            "Optional starting latents. Must be patched ERNIE-Image latents: either clean ones "
+            "(VAE-encoded, BN-normalized, patchified) with `add_noise` on, or the output of an "
+            "earlier ERNIE-Image denoise stage with `add_noise` off."
+        ),
         input=Input.Connection,
+    )
+    add_noise: bool = InputField(
+        default=True,
+        description=(
+            "Noise the starting latents up to `denoising_start` before denoising. Turn this off to "
+            "continue an earlier denoise stage, whose output already sits at that sigma. Ignored "
+            "when no starting latents are connected."
+        ),
     )
 
     width: int = InputField(default=1024, multiple_of=16, description="Generation width.")
@@ -123,12 +135,13 @@ class ErnieImageDenoiseInvocation(BaseInvocation):
                 dtype=rand_dtype,
             ).to(device=device, dtype=dtype)
 
-            init_latents = (
-                context.tensors.load(self.latents.latents_name).to(device=device, dtype=dtype)
-                if self.latents is not None
-                else None
-            )
-            img = self._prepare_initial_latents(noise, init_latents, float(timesteps[0]))
+            init_latents = self._load_init_latents(context, noise, device=device, dtype=dtype)
+            if init_latents is not None and not self.add_noise:
+                # The latents already sit at the schedule's first sigma (they came out of an
+                # earlier denoise stage), so start from them directly instead of re-noising.
+                img, init_latents = init_latents, None
+            else:
+                img = noise
 
             scheduler = self._build_scheduler(context)
 
@@ -146,6 +159,13 @@ class ErnieImageDenoiseInvocation(BaseInvocation):
                 neg_text_bth=neg_text_bth,
                 neg_text_lens=neg_text_lens,
                 scheduler=scheduler,
+                init_latents=init_latents,
+                # Stochastic schedulers (LCM) re-noise the sample on every step. Without an
+                # explicit generator they draw from the global RNG, so the `seed` field would only
+                # control the initial latent and the same seed would not reproduce the image.
+                # XOR mirrors `denoise_latents.py` and keeps the step noise decorrelated from the
+                # initial noise, which is drawn from `self.seed` directly.
+                generator=torch.Generator(device=rand_device).manual_seed(self.seed ^ 0xFFFFFFFF),
             )
 
         latents = img.detach().to("cpu")
@@ -158,27 +178,29 @@ class ErnieImageDenoiseInvocation(BaseInvocation):
             height=self.height,
         )
 
-    def _prepare_initial_latents(
+    def _load_init_latents(
         self,
+        context: InvocationContext,
         noise: torch.Tensor,
-        init_latents: Optional[torch.Tensor],
-        first_sigma: float,
-    ) -> torch.Tensor:
-        """Build the sample the denoise loop starts from.
+        device: torch.device,
+        dtype: torch.dtype,
+    ) -> Optional[torch.Tensor]:
+        """Load and validate the optional image-to-image starting latents.
 
-        The loop assumes its input already sits at `first_sigma` on the rectified-flow path, so
-        image-to-image init latents must be blended with noise rather than passed through clean --
-        otherwise the model is told the sample is at `first_sigma` when it is really at 0.
+        The blend with `noise` deliberately happens in the denoise loop rather than here: only that
+        layer knows the *post-shift* first sigma, since `get_schedule` emits raw schedule values and
+        the scheduler applies its `shift` inside `set_timesteps`.
         """
-        if init_latents is None:
+        if self.latents is None:
             if self.denoising_start > 0:
                 raise ValueError(
                     "denoising_start must be 0 when no initial latents are provided. There is nothing to "
                     "partially denoise, and starting from full-magnitude noise at a reduced sigma tells the "
                     "model the sample is already partly denoised, which produces garbage."
                 )
-            return noise
+            return None
 
+        init_latents = context.tensors.load(self.latents.latents_name).to(device=device, dtype=dtype)
         if init_latents.shape != noise.shape:
             raise ValueError(
                 f"Input latents have shape {tuple(init_latents.shape)} but this graph expects "
@@ -186,7 +208,7 @@ class ErnieImageDenoiseInvocation(BaseInvocation):
                 "VAE-encoded, BN-normalized (`sampling_utils.vae_normalize`) and 2x2-patchified "
                 "(`sampling_utils.patchify_latents`) before they can be denoised."
             )
-        return first_sigma * noise + (1.0 - first_sigma) * init_latents
+        return init_latents
 
     def _build_scheduler(self, context: InvocationContext) -> SchedulerMixin:
         """Instantiate the selected scheduler from the pipeline's own `scheduler/` config.

@@ -12,7 +12,11 @@ import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChec
 import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
-import { selectCanvasOutputFields, selectPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
+import {
+  getOriginalAndScaledSizesForTextToImage,
+  selectCanvasOutputFields,
+  selectPresetModifiedPrompts,
+} from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg, GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
 import { UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
@@ -134,10 +138,12 @@ export const buildErnieImageGraph = async (arg: GraphBuilderArg): Promise<GraphB
   g.upsertMetadata({ generation_mode: 'ernie_image_txt2img' });
 
   // The prompt enhancer is handed the target size and rewrites the prompt to suit that aspect
-  // ratio, so it needs the real generation dimensions. `addTextToImage` is what resolves them, so
-  // this has to run after it -- otherwise the enhancer always sees the node's 1024x1024 defaults.
-  posCond.pe_width = denoise.width;
-  posCond.pe_height = denoise.height;
+  // ratio, so it needs the real dimensions rather than the node's 1024x1024 defaults. Use the
+  // *original* size: with canvas scaling active the denoise node carries the intermediate render
+  // size, but what the user ends up looking at is the original.
+  const { originalSize } = getOriginalAndScaledSizesForTextToImage(state);
+  posCond.pe_width = originalSize.width;
+  posCond.pe_height = originalSize.height;
 
   if (state.system.shouldUseNSFWChecker) {
     canvasOutput = addNSFWChecker(g, canvasOutput);

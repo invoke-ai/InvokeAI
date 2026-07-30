@@ -4,7 +4,12 @@ from diffusers import FlowMatchEulerDiscreteScheduler, FlowMatchHeunDiscreteSche
 
 from invokeai.backend.ernie_image.denoise import denoise
 from invokeai.backend.ernie_image.sampling_utils import get_schedule
+from invokeai.backend.flux.schedulers import ERNIE_IMAGE_SCHEDULER_MAP
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
+
+# LCM is the stochastic option in the dropdown, but it is not in every diffusers release.
+_LCM = ERNIE_IMAGE_SCHEDULER_MAP.get("lcm")
+_HAS_LCM = _LCM is not None
 
 
 class _StubTransformer(torch.nn.Module):
@@ -21,15 +26,23 @@ class _StubTransformer(torch.nn.Module):
         return torch.zeros_like(hidden_states)
 
 
-def _run(scheduler, steps: int, denoising_start: float = 0.0, denoising_end: float = 1.0):
+def _run(
+    scheduler,
+    steps: int,
+    denoising_start: float = 0.0,
+    denoising_end: float = 1.0,
+    img: torch.Tensor | None = None,
+    init_latents: torch.Tensor | None = None,
+    generator: torch.Generator | None = None,
+):
     states: list[PipelineIntermediateState] = []
     # 128 channels is the patched channel count; the spatial dims are tiny to keep this fast.
-    img = torch.zeros(1, 128, 2, 2)
+    img = torch.zeros(1, 128, 2, 2) if img is None else img
     text_bth = torch.zeros(1, 4, 8)
     text_lens = torch.tensor([4])
     sigmas = get_schedule(steps, denoising_start=denoising_start, denoising_end=denoising_end)
 
-    denoise(
+    out = denoise(
         model=_StubTransformer(),
         img=img,
         text_bth=text_bth,
@@ -38,12 +51,14 @@ def _run(scheduler, steps: int, denoising_start: float = 0.0, denoising_end: flo
         step_callback=states.append,
         cfg_scale=[1.0] * (len(sigmas) - 1),
         scheduler=scheduler,
+        init_latents=init_latents,
+        generator=generator,
     )
-    return states, sigmas
+    return states, sigmas, out
 
 
 def test_euler_progress_matches_requested_steps() -> None:
-    states, _ = _run(FlowMatchEulerDiscreteScheduler(), steps=8)
+    states, _, _ = _run(FlowMatchEulerDiscreteScheduler(), steps=8)
 
     assert len(states) == 8
     # Progress must never overrun: the last emitted step equals the reported total.
@@ -53,7 +68,7 @@ def test_euler_progress_matches_requested_steps() -> None:
 def test_heun_progress_does_not_overrun_total_steps() -> None:
     # Heun is 2nd order: `set_timesteps(8)` yields 15 timesteps, so the loop runs 15 times.
     # `total_steps` must reflect the real iteration count, otherwise progress runs past 100%.
-    states, _ = _run(FlowMatchHeunDiscreteScheduler(), steps=8)
+    states, _, _ = _run(FlowMatchHeunDiscreteScheduler(), steps=8)
 
     assert len(states) > 8
     assert all(s.step <= s.total_steps for s in states)
@@ -77,7 +92,7 @@ def test_denoising_end_stops_at_the_requested_sigma(denoising_end: float) -> Non
     stopping early, which breaks every multi-stage handoff built on this field.
     """
     scheduler = FlowMatchEulerDiscreteScheduler()
-    states, sigmas = _run(scheduler, steps=8, denoising_end=denoising_end)
+    states, sigmas, _ = _run(scheduler, steps=8, denoising_end=denoising_end)
 
     scheduler_sigmas = scheduler.sigmas
     assert scheduler_sigmas is not None
@@ -109,3 +124,90 @@ def test_degenerate_denoising_window_is_rejected() -> None:
     """
     with pytest.raises(ValueError, match="rounds to zero steps"):
         get_schedule(8, denoising_end=0.1)
+
+
+@pytest.mark.skipif(not _HAS_LCM, reason="FlowMatchLCMScheduler not available in this diffusers")
+def test_stochastic_scheduler_honors_the_seed() -> None:
+    """LCM re-noises the sample on every step, so it needs an explicit generator.
+
+    Without one, `scheduler.step` draws from the global RNG. The seeded initial latent then only
+    fixes the starting point, and the same seed produces a different image on every run in a
+    long-lived server process -- silently breaking seed recall from gallery metadata.
+    """
+    assert _LCM is not None
+    img = torch.randn(1, 128, 2, 2, generator=torch.Generator().manual_seed(7))
+
+    def once() -> torch.Tensor:
+        # Advance the global RNG between runs, exactly as a long-lived process does.
+        torch.rand(64)
+        _, _, out = _run(_LCM(), steps=4, img=img.clone(), generator=torch.Generator().manual_seed(1234))
+        return out
+
+    assert torch.equal(once(), once())
+
+
+@pytest.mark.skipif(not _HAS_LCM, reason="FlowMatchLCMScheduler not available in this diffusers")
+def test_stochastic_scheduler_respects_different_seeds() -> None:
+    """Guard against the previous test passing because the generator is ignored entirely."""
+    assert _LCM is not None
+    img = torch.randn(1, 128, 2, 2, generator=torch.Generator().manual_seed(7))
+
+    _, _, a = _run(_LCM(), steps=4, img=img.clone(), generator=torch.Generator().manual_seed(1))
+    _, _, b = _run(_LCM(), steps=4, img=img.clone(), generator=torch.Generator().manual_seed(2))
+
+    assert not torch.equal(a, b)
+
+
+def test_deterministic_scheduler_is_unaffected_by_the_generator() -> None:
+    """Euler is deterministic here (`s_churn` is 0), so the generator must not perturb it."""
+    img = torch.randn(1, 128, 2, 2, generator=torch.Generator().manual_seed(7))
+
+    _, _, a = _run(FlowMatchEulerDiscreteScheduler(), steps=4, img=img.clone(), generator=None)
+    _, _, b = _run(
+        FlowMatchEulerDiscreteScheduler(), steps=4, img=img.clone(), generator=torch.Generator().manual_seed(99)
+    )
+
+    assert torch.equal(a, b)
+
+
+@pytest.mark.parametrize("shift", [1.0, 3.0])
+def test_init_latents_are_blended_at_the_post_shift_sigma(shift: float) -> None:
+    """The blend must use the sigma the loop actually opens at, not the raw schedule value.
+
+    `get_schedule` emits raw linspace values; the scheduler applies `shift` inside `set_timesteps`.
+    Blending at the raw value builds the sample at one sigma and then tells the first model call it
+    is at another -- exact only when `shift == 1` or `denoising_start == 0`.
+    """
+    noise = torch.ones(1, 128, 2, 2)
+    init = torch.zeros(1, 128, 2, 2)
+    scheduler = FlowMatchEulerDiscreteScheduler(shift=shift)
+
+    captured: list[torch.Tensor] = []
+
+    class _CapturingTransformer(_StubTransformer):
+        def forward(self, hidden_states, timestep, text_bth, text_lens, return_dict=False):
+            captured.append(hidden_states.clone())
+            return torch.zeros_like(hidden_states)
+
+    states: list[PipelineIntermediateState] = []
+    sigmas = get_schedule(8, denoising_start=0.5)
+    denoise(
+        model=_CapturingTransformer(),
+        img=noise,
+        text_bth=torch.zeros(1, 4, 8),
+        text_lens=torch.tensor([4]),
+        timesteps=sigmas.tolist(),
+        step_callback=states.append,
+        cfg_scale=[1.0] * (len(sigmas) - 1),
+        scheduler=scheduler,
+        init_latents=init,
+    )
+
+    scheduler_sigmas = scheduler.sigmas
+    assert scheduler_sigmas is not None
+    expected_sigma = float(scheduler_sigmas[0])
+    # noise is all ones and init is all zeros, so the blend collapses to the sigma itself.
+    assert captured[0].flatten()[0].item() == pytest.approx(expected_sigma, abs=1e-6)
+    if shift != 1.0:
+        # Pin the actual bug: the raw schedule value would have been 0.5.
+        assert expected_sigma != pytest.approx(float(sigmas[0]), abs=1e-6)

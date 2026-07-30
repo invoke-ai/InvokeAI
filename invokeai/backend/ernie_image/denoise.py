@@ -30,13 +30,16 @@ def denoise(
     neg_text_lens: Optional[torch.Tensor] = None,
     scheduler: Any = None,
     inpaint_extension: Optional[RectifiedFlowInpaintExtension] = None,
+    init_latents: Optional[torch.Tensor] = None,
+    generator: Optional[torch.Generator] = None,
 ) -> torch.Tensor:
     """Run the ERNIE-Image denoise loop.
 
     Args:
         model: `ErnieImageTransformer2DModel` from diffusers.
         img: Patched latents `[B, 128, H/2, W/2]` (already 2x2-patchified, BN-normalized
-            if coming from VAE encode -- see `sampling_utils`).
+            if coming from VAE encode -- see `sampling_utils`). When `init_latents` is given
+            this is the *noise* to blend into them, not the starting sample.
         text_bth: Padded text embeddings `[B, Tmax, text_in_dim]` for the positive prompt.
         text_lens: Actual lengths of each prompt's text encoding `[B]`.
         timesteps: Sigma schedule (descending, in [0,1]). Length = num_steps + 1; the final
@@ -50,6 +53,13 @@ def denoise(
             the supplied sigmas.
         inpaint_extension: Optional inpainting helper that merges the noised init latents
             into the prediction at each step.
+        init_latents: Optional clean image-to-image latents to blend with `img` at the loop's
+            first sigma. The blend happens here rather than in the caller because only this
+            function knows the *post-shift* sigma: `timesteps` carries raw schedule values and
+            the scheduler applies its `shift` inside `set_timesteps`.
+        generator: RNG for stochastic schedulers. `FlowMatchLCMScheduler.step` re-noises the
+            sample every step, so without this it would draw from the global RNG and the same
+            seed would produce a different image on every run.
 
     Returns:
         Denoised, still-patched latents `[B, 128, H/2, W/2]`. Caller is responsible for
@@ -86,6 +96,13 @@ def denoise(
                 )
             scheduler.set_timesteps(num_inference_steps=len(timesteps) - 1, device=img.device)
 
+        if init_latents is not None:
+            # `scheduler.sigmas[0]` is the *shifted* first sigma; `timesteps[0]` is the raw one.
+            # Blending at the raw value would build a sample at one sigma and then tell the first
+            # model call it is at another. Equivalent to `scheduler.scale_noise`, spelled out
+            # because it has to agree with the Euler math below.
+            img = _blend_init_latents(init_latents, img, float(scheduler.sigmas[0]))
+
         # Higher-order solvers evaluate the model more than once per requested step (Heun's
         # `set_timesteps(N)` yields 2N-1 timesteps), so drive progress off the actual iteration
         # count rather than the requested step count.
@@ -106,7 +123,9 @@ def denoise(
                 neg_pred = _forward(model, img, t_vec, neg_text_bth, neg_text_lens)
                 pred = neg_pred + step_cfg * (pred - neg_pred)
 
-            img = scheduler.step(model_output=pred, timestep=timestep, sample=img).prev_sample
+            # `generator` matters for stochastic schedulers (LCM re-noises every step). Euler and
+            # Heun accept it too and only consult it when `s_churn > 0`, which is 0 on this path.
+            img = scheduler.step(model_output=pred, timestep=timestep, sample=img, generator=generator).prev_sample
 
             t_prev = scheduler.sigmas[step_index + 1].item() if step_index + 1 < len(scheduler.sigmas) else 0.0
             if inpaint_extension is not None:
@@ -130,7 +149,11 @@ def denoise(
         return img
 
     # Manual Euler over the supplied sigmas. This mirrors the upstream pipeline when no
-    # explicit scheduler is configured.
+    # explicit scheduler is configured. No scheduler means no `shift`, so the raw first sigma
+    # is the right one to blend at here.
+    if init_latents is not None:
+        img = _blend_init_latents(init_latents, img, float(timesteps[0]))
+
     pbar = tqdm(total=total_steps, desc="ERNIE-Image denoising")
     for i in range(total_steps):
         t_curr = timesteps[i]
@@ -166,6 +189,16 @@ def denoise(
         )
     pbar.close()
     return img
+
+
+def _blend_init_latents(init_latents: torch.Tensor, noise: torch.Tensor, sigma: float) -> torch.Tensor:
+    """Rectified-flow forward process: place clean latents at `sigma` on the noise path.
+
+    The loop assumes its starting sample already sits at the first sigma, so image-to-image init
+    latents have to be noised to get there. Passing them through clean would tell the model the
+    sample is at `sigma` when it is really at 0.
+    """
+    return sigma * noise + (1.0 - sigma) * init_latents
 
 
 def _forward(

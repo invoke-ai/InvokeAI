@@ -9907,10 +9907,16 @@ export type components = {
              */
             negative_conditioning?: components["schemas"]["ErnieImageConditioningField"] | null;
             /**
-             * @description Optional starting latents for img2img (must already be VAE-encoded, BN-normalized, and patchified).
+             * @description Optional starting latents. Must be patched ERNIE-Image latents: either clean ones (VAE-encoded, BN-normalized, patchified) with `add_noise` on, or the output of an earlier ERNIE-Image denoise stage with `add_noise` off.
              * @default null
              */
             latents?: components["schemas"]["LatentsField"] | null;
+            /**
+             * Add Noise
+             * @description Noise the starting latents up to `denoising_start` before denoising. Turn this off to continue an earlier denoise stage, whose output already sits at that sigma. Ignored when no starting latents are connected.
+             * @default true
+             */
+            add_noise?: boolean;
             /**
              * Width
              * @description Generation width.
