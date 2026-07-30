@@ -720,3 +720,11 @@ def test_estimate_working_memory_accounts_for_regional_attention_masks() -> None
     )
 
     assert with_regional_masks == without_regional_masks + 1234
+
+
+def test_regional_attention_memory_includes_both_masks_and_peak_build_scratch() -> None:
+    positive = SimpleNamespace(attention_mask_numel=120, attention_mask_build_scratch_numel=40)
+    negative = SimpleNamespace(attention_mask_numel=100, attention_mask_build_scratch_numel=40)
+
+    assert Krea2DenoiseInvocation._regional_attention_mask_bytes(positive, negative) == 260
+    assert Krea2DenoiseInvocation._regional_attention_mask_bytes(positive, None) == 160

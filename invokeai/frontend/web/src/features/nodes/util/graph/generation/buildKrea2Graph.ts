@@ -98,6 +98,36 @@ export const buildKrea2Graph = async (arg: GraphBuilderArg): Promise<GraphBuilde
     id: getPrefixedId('seed'),
     type: 'integer',
   });
+
+  type Krea2ConditioningSource = Invocation<
+    'krea2_text_encoder' | 'krea2_conditioning_rebalance' | 'krea2_seed_variance'
+  >;
+  const addConditioningEnhancers = (conditioning: Invocation<'krea2_text_encoder'>): Krea2ConditioningSource => {
+    let conditioningSource: Krea2ConditioningSource = conditioning;
+    if (krea2RebalanceEnabled) {
+      const rebalance = g.addNode({
+        type: 'krea2_conditioning_rebalance',
+        id: getPrefixedId('krea2_rebalance'),
+        multiplier: krea2RebalanceMultiplier,
+        per_layer_weights: krea2RebalanceWeights,
+      });
+      g.addEdge(conditioningSource, 'conditioning', rebalance, 'conditioning');
+      conditioningSource = rebalance;
+    }
+    if (krea2SeedVarianceEnabled && krea2SeedVarianceStrength > 0) {
+      const seedVariance = g.addNode({
+        type: 'krea2_seed_variance',
+        id: getPrefixedId('krea2_seed_variance'),
+        strength: krea2SeedVarianceStrength,
+        randomize_percent: krea2SeedVarianceRandomizePercent,
+      });
+      g.addEdge(conditioningSource, 'conditioning', seedVariance, 'conditioning');
+      g.addEdge(seed, 'value', seedVariance, 'variance_seed');
+      conditioningSource = seedVariance;
+    }
+    return conditioningSource;
+  };
+
   const denoise = g.addNode({
     type: 'krea2_denoise',
     id: getPrefixedId('denoise_latents'),
@@ -119,41 +149,8 @@ export const buildKrea2Graph = async (arg: GraphBuilderArg): Promise<GraphBuilde
   // Optional conditioning enhancers between the text encoder and denoise. Both default OFF (params), so
   // by default the conditioning flows straight through and stock Krea-2 behaviour is unchanged. Order:
   // rebalance (scale the signal toward the prompt) first, then seed variance (perturb for variety).
-  if (krea2RebalanceEnabled) {
-    const rebalance = g.addNode({
-      type: 'krea2_conditioning_rebalance',
-      id: getPrefixedId('krea2_rebalance'),
-      multiplier: krea2RebalanceMultiplier,
-      per_layer_weights: krea2RebalanceWeights,
-    });
-    g.addEdge(posCond, 'conditioning', rebalance, 'conditioning');
-
-    if (krea2SeedVarianceEnabled && krea2SeedVarianceStrength > 0) {
-      const seedVariance = g.addNode({
-        type: 'krea2_seed_variance',
-        id: getPrefixedId('krea2_seed_variance'),
-        strength: krea2SeedVarianceStrength,
-        randomize_percent: krea2SeedVarianceRandomizePercent,
-      });
-      g.addEdge(rebalance, 'conditioning', seedVariance, 'conditioning');
-      g.addEdge(seed, 'value', seedVariance, 'variance_seed');
-      g.addEdge(seedVariance, 'conditioning', posCondCollect, 'item');
-    } else {
-      g.addEdge(rebalance, 'conditioning', posCondCollect, 'item');
-    }
-  } else if (krea2SeedVarianceEnabled && krea2SeedVarianceStrength > 0) {
-    const seedVariance = g.addNode({
-      type: 'krea2_seed_variance',
-      id: getPrefixedId('krea2_seed_variance'),
-      strength: krea2SeedVarianceStrength,
-      randomize_percent: krea2SeedVarianceRandomizePercent,
-    });
-    g.addEdge(posCond, 'conditioning', seedVariance, 'conditioning');
-    g.addEdge(seed, 'value', seedVariance, 'variance_seed');
-    g.addEdge(seedVariance, 'conditioning', posCondCollect, 'item');
-  } else {
-    g.addEdge(posCond, 'conditioning', posCondCollect, 'item');
-  }
+  const positiveConditioningSource = addConditioningEnhancers(posCond);
+  g.addEdge(positiveConditioningSource, 'conditioning', posCondCollect, 'item');
   g.addEdge(posCondCollect, 'collection', denoise, 'positive_conditioning');
 
   if (negCond !== null) {
@@ -181,6 +178,10 @@ export const buildKrea2Graph = async (arg: GraphBuilderArg): Promise<GraphBuilde
       negCondCollect: null,
       ipAdapterCollect,
       fluxReduxCollect: null,
+      transformRegionalPositiveConditioning: (conditioning) => {
+        assert(conditioning.type === 'krea2_text_encoder');
+        return addConditioningEnhancers(conditioning);
+      },
     });
   }
   // Krea-2 does not support regional reference-image adapters.

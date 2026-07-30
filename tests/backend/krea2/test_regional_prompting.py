@@ -25,6 +25,7 @@ def test_no_regional_masks_concatenates_conditionings_without_allocating_an_atte
     assert regional.prompt_embeds.shape == (1, 5, 12, 8)
     assert [(item.start, item.end) for item in regional.embedding_ranges] == [(0, 2), (2, 5)]
     assert extension.attention_mask_numel == 0
+    assert extension.attention_mask_build_scratch_numel == 0
     assert extension.get_attention_mask() is None
 
 
@@ -37,6 +38,7 @@ def test_restricted_attention_mask_matches_flux_style_region_semantics() -> None
     )
 
     assert extension.attention_mask_numel == 16
+    assert extension.attention_mask_build_scratch_numel == 4
     mask = extension.get_attention_mask()
     assert mask is not None
     assert mask.dtype == torch.bool

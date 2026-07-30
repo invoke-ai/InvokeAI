@@ -425,8 +425,7 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             negative_text_seq_len=neg_prompt_embeds.shape[1] if neg_prompt_embeds is not None else None,
             do_cfg=do_cfg,
             num_loras=len(self.transformer.loras),
-            regional_attention_mask_bytes=pos_extension.attention_mask_numel
-            + (neg_extension.attention_mask_numel if neg_extension is not None else 0),
+            regional_attention_mask_bytes=self._regional_attention_mask_bytes(pos_extension, neg_extension),
         )
 
         with ExitStack() as exit_stack:
@@ -517,6 +516,17 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         latents = unpack_latents(latents, latent_height, latent_width)
         latents = latents.unsqueeze(2)
         return latents
+
+    @staticmethod
+    def _regional_attention_mask_bytes(
+        pos_extension: Krea2RegionalPromptingExtension,
+        neg_extension: Krea2RegionalPromptingExtension | None,
+    ) -> int:
+        """Return final mask storage plus the peak scratch needed to construct either mask."""
+        extensions = [pos_extension] if neg_extension is None else [pos_extension, neg_extension]
+        final_mask_bytes = sum(extension.attention_mask_numel for extension in extensions)
+        peak_build_scratch_bytes = max(extension.attention_mask_build_scratch_numel for extension in extensions)
+        return final_mask_bytes + peak_build_scratch_bytes
 
     def _estimate_working_memory(
         self,

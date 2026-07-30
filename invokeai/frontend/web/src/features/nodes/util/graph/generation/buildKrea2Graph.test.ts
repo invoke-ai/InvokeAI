@@ -275,6 +275,57 @@ describe('buildKrea2Graph', () => {
         )
       ).toBe(true);
     });
+
+    it('applies enabled enhancers to regional conditioning before collection', async () => {
+      params = {
+        ...defaultParams,
+        krea2RebalanceEnabled: true,
+        krea2SeedVarianceEnabled: true,
+        krea2SeedVarianceStrength: 0.5,
+      };
+      vi.mocked(addRegions).mockImplementationOnce((arg) => {
+        const regionalPosCond = arg.g.addNode({
+          type: 'krea2_text_encoder',
+          id: 'regional-positive',
+          prompt: 'regional prompt',
+        });
+        const transformRegionalPositiveConditioning = (
+          arg as typeof arg & {
+            transformRegionalPositiveConditioning?: (conditioning: typeof regionalPosCond) => {
+              id: string;
+              type: string;
+            };
+          }
+        ).transformRegionalPositiveConditioning;
+        const conditioningSource = transformRegionalPositiveConditioning?.(regionalPosCond) ?? regionalPosCond;
+        arg.g.addEdgeFromObj({
+          source: { node_id: conditioningSource.id, field: 'conditioning' },
+          destination: { node_id: arg.posCondCollect.id, field: 'item' },
+        });
+        return Promise.resolve([]);
+      });
+
+      const { g } = await buildCanvasMode('img2img');
+      const graph = g.getGraph();
+      const regionalRebalanceEdge = graph.edges.find(
+        (edge) =>
+          edge.source.node_id === 'regional-positive' &&
+          graph.nodes[edge.destination.node_id]?.type === 'krea2_conditioning_rebalance'
+      );
+      expect(regionalRebalanceEdge).toBeDefined();
+      const regionalSeedVarianceEdge = graph.edges.find(
+        (edge) =>
+          edge.source.node_id === regionalRebalanceEdge!.destination.node_id &&
+          graph.nodes[edge.destination.node_id]?.type === 'krea2_seed_variance'
+      );
+      expect(regionalSeedVarianceEdge).toBeDefined();
+      expect(graph.edges).toContainEqual(
+        expect.objectContaining({
+          source: { node_id: regionalSeedVarianceEdge!.destination.node_id, field: 'conditioning' },
+          destination: expect.objectContaining({ field: 'item' }),
+        })
+      );
+    });
   });
 
   describe('standalone components for non-diffusers transformers', () => {

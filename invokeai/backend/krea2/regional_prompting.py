@@ -39,6 +39,13 @@ class Krea2RegionalPromptingExtension:
         total_seq_len = self.regional_text_conditioning.prompt_embeds.shape[1] + self.image_seq_len
         return total_seq_len**2
 
+    @property
+    def attention_mask_build_scratch_numel(self) -> int:
+        """Peak boolean scratch allocation used while constructing the image-to-image attention block."""
+        if not self.has_regional_masks:
+            return 0
+        return self.image_seq_len**2
+
     @classmethod
     def from_text_conditionings(
         cls, text_conditionings: list[Krea2TextConditioning], image_seq_len: int

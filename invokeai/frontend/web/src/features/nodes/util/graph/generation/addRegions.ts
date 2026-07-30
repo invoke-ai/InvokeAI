@@ -26,21 +26,27 @@ type AddedRegionResult = {
   addedFLUXReduxes: number;
 };
 
+type RegionalPositiveConditioning = Invocation<
+  | 'compel'
+  | 'sdxl_compel_prompt'
+  | 'flux_text_encoder'
+  | 'flux2_klein_text_encoder'
+  | 'z_image_text_encoder'
+  | 'anima_text_encoder'
+  | 'krea2_text_encoder'
+>;
+
+type PositiveConditioningSource = Invocation<
+  RegionalPositiveConditioning['type'] | 'krea2_conditioning_rebalance' | 'krea2_seed_variance'
+>;
+
 type AddRegionsArg = {
   manager: CanvasManager;
   regions: CanvasRegionalGuidanceState[];
   g: Graph;
   bbox: Rect;
   model: MainModelConfig;
-  posCond: Invocation<
-    | 'compel'
-    | 'sdxl_compel_prompt'
-    | 'flux_text_encoder'
-    | 'flux2_klein_text_encoder'
-    | 'z_image_text_encoder'
-    | 'anima_text_encoder'
-    | 'krea2_text_encoder'
-  >;
+  posCond: RegionalPositiveConditioning;
   negCond: Invocation<
     | 'compel'
     | 'sdxl_compel_prompt'
@@ -54,6 +60,7 @@ type AddRegionsArg = {
   negCondCollect: Invocation<'collect'> | null;
   ipAdapterCollect: Invocation<'collect'>;
   fluxReduxCollect: Invocation<'collect'> | null;
+  transformRegionalPositiveConditioning?: (conditioning: RegionalPositiveConditioning) => PositiveConditioningSource;
 };
 
 /**
@@ -84,6 +91,7 @@ export const addRegions = async ({
   negCondCollect,
   ipAdapterCollect,
   fluxReduxCollect,
+  transformRegionalPositiveConditioning,
 }: AddRegionsArg): Promise<AddedRegionResult[]> => {
   const isSDXL = model.base === 'sdxl';
   const isFLUX = model.base === 'flux';
@@ -131,15 +139,7 @@ export const addRegions = async ({
     if (region.positivePrompt) {
       // The main positive conditioning node
       result.addedPositivePrompt = true;
-      let regionalPosCond: Invocation<
-        | 'compel'
-        | 'sdxl_compel_prompt'
-        | 'flux_text_encoder'
-        | 'flux2_klein_text_encoder'
-        | 'z_image_text_encoder'
-        | 'anima_text_encoder'
-        | 'krea2_text_encoder'
-      >;
+      let regionalPosCond: RegionalPositiveConditioning;
       if (isSDXL) {
         regionalPosCond = g.addNode({
           type: 'sdxl_compel_prompt',
@@ -186,8 +186,6 @@ export const addRegions = async ({
       }
       // Connect the mask to the conditioning
       g.addEdge(maskToTensor, 'mask', regionalPosCond, 'mask');
-      // Connect the conditioning to the collector
-      g.addEdge(regionalPosCond, 'conditioning', posCondCollect, 'item');
       // Copy the connections to the "global" positive conditioning node to the regional cond
       if (posCond.type === 'compel') {
         for (const edge of g.getEdgesTo(posCond, ['clip', 'mask'])) {
@@ -234,6 +232,9 @@ export const addRegions = async ({
       } else {
         assert(false, 'Unsupported positive conditioning node type.');
       }
+      // Apply any model-specific conditioning transforms before collection.
+      const conditioningSource = transformRegionalPositiveConditioning?.(regionalPosCond) ?? regionalPosCond;
+      g.addEdge(conditioningSource, 'conditioning', posCondCollect, 'item');
     }
 
     if (region.negativePrompt) {
