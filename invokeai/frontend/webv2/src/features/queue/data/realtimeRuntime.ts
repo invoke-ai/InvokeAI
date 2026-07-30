@@ -14,6 +14,8 @@ export interface QueueItemProgressPort {
   set(
     itemId: number,
     progress: {
+      /** The GPU running this session, e.g. `cuda:1`; null on non-CUDA and single-device installs. */
+      device?: string | null;
       image?: { dataUrl: string; height: number; width: number };
       message: string;
       percentage: number | null;
@@ -108,6 +110,7 @@ export const createQueueRealtimeRuntime = ({
         const event = payload as unknown as InvocationProgressEvent;
 
         progress.set(event.item_id, {
+          device: event.device,
           image: event.image?.dataURL
             ? { dataUrl: event.image.dataURL, height: event.image.height, width: event.image.width }
             : undefined,

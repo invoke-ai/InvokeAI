@@ -33,6 +33,13 @@ export interface GalleryQueuePlaceholder {
   itemIndex: number;
   width: number;
   height: number;
+  /**
+   * The backend queue item id, once the slot has been claimed by one — null while the
+   * submission is still local-only. Progress keyed by *local* id cannot distinguish
+   * two slots of the same batch running on two GPUs, so surfaces that need per-session
+   * facts (which GPU is rendering this tile) resolve them through this id.
+   */
+  backendItemId: number | null;
 }
 
 export interface GalleryLiveTarget {
@@ -124,6 +131,7 @@ export const getGalleryGenerationSequence = (
       sortableSlots.push({
         backendItemId,
         placeholder: {
+          backendItemId,
           boardId,
           height,
           id: `${item.id}:${index}`,
@@ -165,6 +173,24 @@ export const getGalleryGenerationSequence = (
 
   return { chronologicalSlots, liveSlot };
 };
+
+/**
+ * The slots for every concurrently-running session, in chronological order.
+ *
+ * Multi-GPU runs one session per GPU, so more than one slot can be live at once.
+ * Ordering comes from `chronologicalSlots` (sorted by backend item id) rather than
+ * from the order the targets happened to start reporting, so tiles keep a stable
+ * left-to-right position for as long as they run.
+ */
+export const getGalleryLiveSlots = (
+  chronologicalSlots: GalleryQueuePlaceholder[],
+  liveTargets: readonly GalleryLiveTarget[]
+): GalleryQueuePlaceholder[] =>
+  liveTargets.length === 0
+    ? []
+    : chronologicalSlots.filter((slot) =>
+        liveTargets.some((target) => target.queueItemId === slot.queueItemId && target.itemIndex === slot.itemIndex)
+      );
 
 export const getGalleryCurrentItem = ({
   activePlaceholder,

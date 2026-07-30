@@ -15,6 +15,7 @@ interface TestImage {
 }
 
 const placeholder: GalleryQueuePlaceholder = {
+  backendItemId: null,
   boardId: 'none',
   height: 1024,
   id: 'queue-1:1',

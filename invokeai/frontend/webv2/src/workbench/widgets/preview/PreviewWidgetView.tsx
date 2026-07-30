@@ -1,7 +1,7 @@
 import type { QueueItem } from '@features/queue/contracts';
 import type { WidgetViewProps } from '@workbench/widgetContracts';
 
-import { Box, Stack, Text } from '@chakra-ui/react';
+import { Box, SimpleGrid, Stack, Text } from '@chakra-ui/react';
 import { useDndMonitor, type DragEndEvent } from '@dnd-kit/core';
 import {
   galleryImages,
@@ -13,6 +13,7 @@ import {
 import {
   getGalleryCompareImage,
   getGalleryGenerationSequence,
+  getGalleryLiveSlots,
   getGallerySelectedImageQuery,
   getGallerySettings,
   getBoundedRecentImages,
@@ -27,7 +28,15 @@ import {
   galleryImagesInfiniteOptions,
 } from '@features/gallery/queries';
 import { createGenerateFormValuesSelector } from '@features/generation/react';
-import { useActiveProgressTarget, useProgressImage, type LatestProgressImageSnapshot } from '@features/queue/react';
+import {
+  useActiveProgressTarget,
+  useActiveProgressTargets,
+  useDeviceLabel,
+  useItemProgress,
+  useProgressImage,
+  useQueueItemProgressImage,
+  type LatestProgressImageSnapshot,
+} from '@features/queue/react';
 import { parseDateTokens } from '@platform/search/dateTokens';
 import {
   imageUrlToStreamingSource,
@@ -239,6 +248,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   );
   const progressImage = useProgressImage();
   const activeProgressTarget = useActiveProgressTarget();
+  const activeProgressTargets = useActiveProgressTargets();
   const { account, gallery, notifications, widgets } = useWorkbenchCommands();
   const { density, rootRef } = usePreviewDensity(region);
   const recentImages = galleryValues.recentImages;
@@ -257,9 +267,16 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   const selectedImageName = selectedImage?.imageName ?? null;
   const isComparing =
     selectedImage !== null && compareImage !== null && compareImage.imageName !== selectedImage.imageName;
-  const activeGalleryPlaceholder = useMemo(
-    () => getGalleryGenerationSequence(queueItems, activeProgressTarget).liveSlot,
+  const generationSequence = useMemo(
+    () => getGalleryGenerationSequence(queueItems, activeProgressTarget),
     [activeProgressTarget, queueItems]
+  );
+  const activeGalleryPlaceholder = generationSequence.liveSlot;
+  // Multi-GPU runs one session per GPU, so several slots can be live at once. One
+  // live slot keeps the existing single-frame preview; two or more are tiled.
+  const liveGalleryPlaceholders = useMemo(
+    () => getGalleryLiveSlots(generationSequence.chronologicalSlots, activeProgressTargets),
+    [activeProgressTargets, generationSequence.chronologicalSlots]
   );
   const matchingProgressImage = getMatchingProgressImage(progressImage, activeGalleryPlaceholder);
   const shouldFollowLive = showProgressImagesInViewer && activeGalleryPlaceholder !== null && !isComparing;
@@ -751,7 +768,12 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
         w="full"
         onKeyDown={handleNavigationKeyDown}
       >
-        {shouldFollowLive && activeGalleryPlaceholder ? (
+        {shouldFollowLive && liveGalleryPlaceholders.length > 1 ? (
+          <LivePreviewTiles
+            placeholders={liveGalleryPlaceholders}
+            shouldAntialiasProgressImage={antialiasProgressImages}
+          />
+        ) : shouldFollowLive && activeGalleryPlaceholder ? (
           <LivePreview
             placeholder={activeGalleryPlaceholder}
             progressImage={matchingProgressImage}
@@ -920,6 +942,70 @@ const LivePreview = ({
     />
   );
 };
+
+/**
+ * One tile in the multi-session grid.
+ *
+ * Subscribes to its own slot's progress image rather than receiving it from the
+ * parent, so a frame from one GPU's session re-renders only that tile.
+ */
+const LivePreviewTile = ({
+  placeholder,
+  shouldAntialiasProgressImage,
+}: {
+  placeholder: GalleryQueuePlaceholder;
+  shouldAntialiasProgressImage: boolean;
+}) => {
+  const { t } = useTranslation();
+  const progressImage = useQueueItemProgressImage(placeholder.queueItemId, placeholder.itemIndex);
+  // Keyed by the backend item id, not the local one: two slots of the same batch can
+  // be running on two GPUs, and the local-keyed store holds one entry for both.
+  const itemProgress = useItemProgress(placeholder.backendItemId);
+  const deviceLabel = useDeviceLabel(itemProgress?.device);
+  const previewImage = useStreamingImageSource({
+    liveImage: progressImageToStreamingSource(progressImage),
+  });
+
+  return (
+    <PreviewFrame
+      frameHeight={previewImage?.height ?? placeholder.height}
+      frameWidth={previewImage?.width ?? placeholder.width}
+      isLive
+      liveBadgeLabel={
+        deviceLabel ? t('widgets.queue.device.shortLabel', { index: deviceLabel.index }) : t('common.generating')
+      }
+      liveQueueItemId={placeholder.queueItemId}
+      shouldAntialiasLiveImage={shouldAntialiasProgressImage}
+      source={previewImage}
+      variant="inset"
+    />
+  );
+};
+
+/**
+ * Side-by-side previews for concurrent sessions (multi-GPU).
+ *
+ * Only mounted for two or more live slots; a single session keeps the full-size
+ * single-frame preview so nothing changes on a single-GPU install. The grid is a
+ * plain auto-fit so two GPUs sit side by side and four wrap to a 2×2.
+ */
+const LivePreviewTiles = ({
+  placeholders,
+  shouldAntialiasProgressImage,
+}: {
+  placeholders: GalleryQueuePlaceholder[];
+  shouldAntialiasProgressImage: boolean;
+}) => (
+  <SimpleGrid gap="2" h="full" minH="0" columns={placeholders.length > 2 ? 2 : placeholders.length}>
+    {placeholders.map((placeholder) => (
+      <LivePreviewTile
+        key={placeholder.id}
+        placeholder={placeholder}
+        shouldAntialiasProgressImage={shouldAntialiasProgressImage}
+      />
+    ))}
+  </SimpleGrid>
+);
 
 const EmptyPreview = () => {
   const { t } = useTranslation();

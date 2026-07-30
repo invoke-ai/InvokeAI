@@ -22,6 +22,7 @@ export {
   getGalleryCompareImage,
   getGalleryCurrentItem,
   getGalleryGenerationSequence,
+  getGalleryLiveSlots,
   getGalleryPage,
   getGallerySelectedImagePage,
   getGallerySelectedImageQuery,

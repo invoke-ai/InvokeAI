@@ -1,3 +1,4 @@
+import { refreshGenerationDevices } from '@features/queue/data/generationDevicesStore';
 import { itemProgressStore } from '@features/queue/data/itemProgressStore';
 import { createProductionQueueRealtimeRuntime } from '@features/queue/publicApi';
 import { queryClient } from '@platform/query/client';
@@ -13,6 +14,11 @@ export const attachQueueDataRuntime = (): (() => void) => {
     progress: itemProgressStore,
     refreshModelCache: refreshModelCacheStats,
   });
+
+  // The device options never change without a restart, so one read at startup is
+  // enough. Every surface that labels an item or a progress tile with its GPU reads
+  // from this store, and on a single-GPU install the labels stay hidden.
+  void refreshGenerationDevices();
 
   runtime.start();
 

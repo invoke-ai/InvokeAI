@@ -1310,7 +1310,26 @@
       "settingsRecalledDescription": "Loaded these settings into Generate.",
       "took": "Took",
       "waiting_one": "{{count}} waiting",
-      "waiting_other": "{{count}} waiting"
+      "waiting_other": "{{count}} waiting",
+      "device": {
+        "label": "GPU",
+        "shortLabel": "GPU {{index}}",
+        "tooltip": "Ran on {{name}}"
+      },
+      "devices": {
+        "title": "Generation Devices",
+        "description": "GPUs used for generation. With more than one selected, InvokeAI runs a session on each at the same time.",
+        "restartRequired": "Restart InvokeAI for changes to take effect.",
+        "auto": "Use every available GPU",
+        "autoHint": "New GPUs are picked up automatically.",
+        "custom": "Choose specific GPUs",
+        "loadFailed": "Could not load generation devices.",
+        "saveFailed": "Could not save generation devices.",
+        "saved": "Generation devices updated",
+        "atLeastOne": "Select at least one GPU.",
+        "unavailable": "No CUDA GPUs were detected, so generation runs on a single device.",
+        "adminOnly": "Only an administrator can change which GPUs are used."
+      }
     },
     "autosaveStatus": {
       "chipLabel": "Autosave: {{status}}",

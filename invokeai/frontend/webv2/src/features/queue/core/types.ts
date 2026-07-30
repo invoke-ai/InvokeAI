@@ -133,6 +133,8 @@ export interface QueueItemReadModel {
   completedAt?: string | null;
   createdAt: string;
   destination?: string | null;
+  /** The GPU that processed this item, e.g. `cuda:1`. Null on non-CUDA and single-device installs. */
+  device?: string | null;
   errorMessage?: string | null;
   errorTraceback?: string | null;
   errorType?: string | null;

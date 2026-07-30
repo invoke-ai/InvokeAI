@@ -7,6 +7,7 @@ import {
   getBoardCounts,
   getGalleryCurrentItem,
   getGalleryGenerationSequence,
+  getGalleryLiveSlots,
   getGalleryQueuePlaceholders,
   getGallerySelectedBoardId,
   getGalleryStateView,
@@ -282,6 +283,7 @@ describe('gallery state view', () => {
 
   it('uses one derived current item while live-follow is active', () => {
     const placeholder = {
+      backendItemId: null,
       boardId: 'board-1',
       height: 768,
       id: 'queue-item:0',
@@ -394,5 +396,49 @@ describe('gallery state view', () => {
     expect(gallery.pendingPlaceholders).toEqual([]);
     expect(gallery.images).toEqual([image]);
     expect(gallery.settings.showPendingItems).toBe(false);
+  });
+});
+
+describe('getGalleryLiveSlots', () => {
+  const slot = (queueItemId: string, itemIndex: number, backendItemId: number | null) => ({
+    backendItemId,
+    boardId: 'none',
+    height: 512,
+    id: `${queueItemId}:${itemIndex - 1}`,
+    itemIndex,
+    queueItemId,
+    width: 512,
+  });
+
+  it('returns nothing when no session is live', () => {
+    expect(getGalleryLiveSlots([slot('queue-1', 1, 10)], [])).toEqual([]);
+  });
+
+  it('returns one slot per live target', () => {
+    const slots = [slot('queue-1', 1, 10), slot('queue-1', 2, 11), slot('queue-1', 3, 12)];
+
+    expect(
+      getGalleryLiveSlots(slots, [
+        { itemIndex: 1, queueItemId: 'queue-1' },
+        { itemIndex: 3, queueItemId: 'queue-1' },
+      ])
+    ).toEqual([slots[0], slots[2]]);
+  });
+
+  it('orders tiles chronologically, not by the order sessions started reporting', () => {
+    // Tiles must keep a stable position, so ordering follows the chronological slot
+    // list (sorted by backend item id) rather than the target list.
+    const slots = [slot('queue-1', 1, 10), slot('queue-1', 2, 11)];
+
+    expect(
+      getGalleryLiveSlots(slots, [
+        { itemIndex: 2, queueItemId: 'queue-1' },
+        { itemIndex: 1, queueItemId: 'queue-1' },
+      ])
+    ).toEqual([slots[0], slots[1]]);
+  });
+
+  it('ignores targets with no matching slot', () => {
+    expect(getGalleryLiveSlots([slot('queue-1', 1, 10)], [{ itemIndex: 4, queueItemId: 'queue-9' }])).toEqual([]);
   });
 });

@@ -5,6 +5,7 @@ import { getMatchingProgressImage, mergePreviewBoardImages } from './PreviewWidg
 
 describe('getMatchingProgressImage', () => {
   const placeholder = {
+    backendItemId: null,
     boardId: 'none',
     height: 768,
     id: 'queue-1:1',
