@@ -344,6 +344,21 @@
           "signature": "(source: str | AnyHttpUrl, loader: Optional[Callable[[Path], AnyModel]] = None) -> LoadedModelWithoutConfig"
         },
         {
+          "description": "Move a model (and all of its submodels) from VRAM to RAM, freeing its VRAM but keeping it cached.\nUse this when an invocation is done with a model for the rest of the run - e.g. a one-shot text encoder -\nso the next, larger load does not have to compete with it for VRAM. The model stays in the RAM cache, so\na subsequent load only re-streams it back to VRAM rather than rebuilding it from disk.",
+          "name": "offload_from_vram",
+          "parameters": [
+            {
+              "default": "",
+              "description": "The key or ModelField representing the model to offload.",
+              "name": "identifier",
+              "type": "Union[str, ModelIdentifierField]"
+            }
+          ],
+          "return_type": "int",
+          "returns": "The number of VRAM bytes freed.",
+          "signature": "(identifier: Union[str, ModelIdentifierField]) -> int"
+        },
+        {
           "description": "Search for models by attributes.",
           "name": "search_by_attrs",
           "parameters": [

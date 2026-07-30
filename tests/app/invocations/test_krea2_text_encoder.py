@@ -61,10 +61,31 @@ def _invocation() -> Krea2TextEncoderInvocation:
     return Krea2TextEncoderInvocation.model_construct(prompt="a prompt", qwen3_vl_encoder=field)
 
 
-def _context(lora_model) -> SimpleNamespace:
+class _LoRAInfo:
+    """Stands in for LoadedModel: the encoder pins the LoRA's cache record for the patch's lifetime."""
+
+    def __init__(self, model) -> None:
+        self.model = model
+        self.pin_depth = 0
+        self.pinned_at_least_once = False
+
+    @contextmanager
+    def model_in_ram(self):
+        self.pin_depth += 1
+        self.pinned_at_least_once = True
+        try:
+            yield self.model
+        finally:
+            self.pin_depth -= 1
+
+
+def _context(lora_model, lora_infos: list | None = None) -> SimpleNamespace:
     def load(identifier):
         if identifier.key == "lora":
-            return SimpleNamespace(model=lora_model)
+            info = _LoRAInfo(lora_model)
+            if lora_infos is not None:
+                lora_infos.append(info)
+            return info
         if identifier.submodel_type is SubModelType.Tokenizer:
             return _TokenizerInfo()
         return _TextEncoderInfo()
@@ -90,13 +111,22 @@ def test_encode_applies_qwen3_vl_lora_and_returns_selected_hidden_layers(monkeyp
         lambda _device: torch.float32,
     )
 
-    embeds, mask = _invocation()._encode(_context(ModelPatchRaw(layers={})))
+    lora_infos: list[_LoRAInfo] = []
+    embeds, mask = _invocation()._encode(_context(ModelPatchRaw(layers={}), lora_infos))
 
     assert embeds.shape == (1, 512, 12, 4)
     assert mask is not None
     assert mask.shape == (1, 512)
     assert captured["prefix"] == KREA2_LORA_QWEN3VL_PREFIX
     assert captured["patches"][0][1] == 0.5
+
+    # The patch spec must carry a cache pin so LayerPatcher can hold the LoRA's record in RAM for the
+    # lifetime of the patch. The patcher itself is stubbed out here, so the pin arrives un-entered.
+    assert len(captured["patches"][0]) == 3
+    assert lora_infos[0].pin_depth == 0
+    with captured["patches"][0][2]:
+        assert lora_infos[0].pin_depth == 1
+    assert lora_infos[0].pin_depth == 0
 
 
 def test_encode_rejects_a_loaded_non_patch_lora(monkeypatch) -> None:
