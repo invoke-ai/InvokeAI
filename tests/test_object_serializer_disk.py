@@ -1,6 +1,9 @@
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
+from queue import Empty
+from threading import Event, get_ident
 
 import pytest
 import torch
@@ -260,3 +263,58 @@ def test_obj_serializer_fwd_cache_delete_of_evicted_object_is_noop(
     assert fwd_cache._cache_ids.qsize() == queue_size_before_delete
     assert obj_2_name in fwd_cache._cache
     assert obj_3_name in fwd_cache._cache
+
+
+def test_obj_serializer_fwd_cache_concurrent_deletes_do_not_leave_stale_eviction_ids(
+    fwd_cache: ObjectSerializerForwardCache[MockDataclass], monkeypatch: pytest.MonkeyPatch
+):
+    obj_1_name = fwd_cache.save(MockDataclass(foo="one"))
+    obj_2_name = fwd_cache.save(MockDataclass(foo="two"))
+    first_delete_thread_id: int | None = None
+    first_drained_queue = Event()
+    release_first_delete = Event()
+    second_delete_started = Event()
+    second_delete_finished = Event()
+    original_get_nowait = fwd_cache._cache_ids.get_nowait
+
+    def controlled_get_nowait():
+        try:
+            return original_get_nowait()
+        except Empty:
+            if get_ident() == first_delete_thread_id:
+                first_drained_queue.set()
+                assert release_first_delete.wait(timeout=5)
+            raise
+
+    monkeypatch.setattr(fwd_cache._cache_ids, "get_nowait", controlled_get_nowait)
+
+    def delete_first():
+        nonlocal first_delete_thread_id
+        first_delete_thread_id = get_ident()
+        fwd_cache.delete(obj_1_name)
+
+    def delete_second():
+        second_delete_started.set()
+        fwd_cache.delete(obj_2_name)
+        second_delete_finished.set()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        first_delete = executor.submit(delete_first)
+        assert first_drained_queue.wait(timeout=5)
+        second_delete = executor.submit(delete_second)
+        assert second_delete_started.wait(timeout=5)
+        try:
+            assert not second_delete_finished.wait(timeout=0.1)
+        finally:
+            release_first_delete.set()
+        first_delete.result(timeout=5)
+        second_delete.result(timeout=5)
+
+    assert fwd_cache._cache == {}
+    assert fwd_cache._cache_ids.qsize() == 0
+
+    obj_3_name = fwd_cache.save(MockDataclass(foo="three"))
+    obj_4_name = fwd_cache.save(MockDataclass(foo="four"))
+
+    assert set(fwd_cache._cache) == {obj_3_name, obj_4_name}
+    assert fwd_cache._cache_ids.qsize() == 2

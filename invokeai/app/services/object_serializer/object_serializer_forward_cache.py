@@ -1,4 +1,5 @@
 from queue import Empty, Queue
+from threading import RLock
 from typing import TYPE_CHECKING, Optional, TypeVar
 
 from invokeai.app.services.object_serializer.object_serializer_base import ObjectSerializerBase
@@ -20,6 +21,7 @@ class ObjectSerializerForwardCache(ObjectSerializerBase[T]):
         self._underlying_storage = underlying_storage
         self._cache: dict[str, T] = {}
         self._cache_ids = Queue[str]()
+        self._cache_lock = RLock()
         self._max_cache_size = max_cache_size
 
     def start(self, invoker: "Invoker") -> None:
@@ -35,13 +37,14 @@ class ObjectSerializerForwardCache(ObjectSerializerBase[T]):
             stop_op(invoker)
 
     def load(self, name: str) -> T:
-        cache_item = self._get_cache(name)
-        if cache_item is not None:
-            return cache_item
+        with self._cache_lock:
+            cache_item = self._get_cache(name)
+            if cache_item is not None:
+                return cache_item
 
-        obj = self._underlying_storage.load(name)
-        self._set_cache(name, obj)
-        return obj
+            obj = self._underlying_storage.load(name)
+            self._set_cache(name, obj)
+            return obj
 
     def save(self, obj: T) -> str:
         name = self._underlying_storage.save(obj)
@@ -50,32 +53,38 @@ class ObjectSerializerForwardCache(ObjectSerializerBase[T]):
 
     def delete(self, name: str) -> None:
         try:
-            self._underlying_storage.delete(name)
+            with self._cache_lock:
+                try:
+                    self._underlying_storage.delete(name)
+                finally:
+                    if name in self._cache:
+                        del self._cache[name]
+                        self._remove_cache_id(name)
         finally:
-            if name in self._cache:
-                del self._cache[name]
-                self._remove_cache_id(name)
             self._on_deleted(name)
 
     def _remove_cache_id(self, name: str) -> None:
-        remaining_ids: list[str] = []
-        while True:
-            try:
-                cache_id = self._cache_ids.get_nowait()
-            except Empty:
-                break
-            if cache_id != name:
-                remaining_ids.append(cache_id)
+        with self._cache_lock:
+            remaining_ids: list[str] = []
+            while True:
+                try:
+                    cache_id = self._cache_ids.get_nowait()
+                except Empty:
+                    break
+                if cache_id != name:
+                    remaining_ids.append(cache_id)
 
-        for cache_id in remaining_ids:
-            self._cache_ids.put(cache_id)
+            for cache_id in remaining_ids:
+                self._cache_ids.put(cache_id)
 
     def _get_cache(self, name: str) -> Optional[T]:
-        return None if name not in self._cache else self._cache[name]
+        with self._cache_lock:
+            return None if name not in self._cache else self._cache[name]
 
     def _set_cache(self, name: str, data: T):
-        if name not in self._cache:
-            self._cache[name] = data
-            self._cache_ids.put(name)
-            if self._cache_ids.qsize() > self._max_cache_size:
-                self._cache.pop(self._cache_ids.get())
+        with self._cache_lock:
+            if name not in self._cache:
+                self._cache[name] = data
+                self._cache_ids.put(name)
+                if self._cache_ids.qsize() > self._max_cache_size:
+                    self._cache.pop(self._cache_ids.get())
