@@ -944,6 +944,21 @@
                       "$ref": "#/components/schemas/VAE_Diffusers_Wan_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/PiDDecoder_Checkpoint_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PiDDecoder_Checkpoint_Flux2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PiDDecoder_Checkpoint_SD3_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PiDDecoder_Checkpoint_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PiDDecoder_Checkpoint_QwenImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
                     },
                     {
@@ -1053,6 +1068,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Gemma2Encoder_Gemma2Encoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
@@ -1318,6 +1339,21 @@
                       "$ref": "#/components/schemas/VAE_Diffusers_Wan_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/PiDDecoder_Checkpoint_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PiDDecoder_Checkpoint_Flux2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PiDDecoder_Checkpoint_SD3_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PiDDecoder_Checkpoint_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PiDDecoder_Checkpoint_QwenImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
                     },
                     {
@@ -1427,6 +1463,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Gemma2Encoder_Gemma2Encoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
@@ -1692,6 +1734,21 @@
                       "$ref": "#/components/schemas/VAE_Diffusers_Wan_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/PiDDecoder_Checkpoint_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PiDDecoder_Checkpoint_Flux2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PiDDecoder_Checkpoint_SD3_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PiDDecoder_Checkpoint_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PiDDecoder_Checkpoint_QwenImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
                     },
                     {
@@ -1801,6 +1858,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Gemma2Encoder_Gemma2Encoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
@@ -2111,6 +2174,21 @@
                       "$ref": "#/components/schemas/VAE_Diffusers_Wan_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/PiDDecoder_Checkpoint_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PiDDecoder_Checkpoint_Flux2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PiDDecoder_Checkpoint_SD3_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PiDDecoder_Checkpoint_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PiDDecoder_Checkpoint_QwenImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
                     },
                     {
@@ -2220,6 +2298,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Gemma2Encoder_Gemma2Encoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
@@ -2554,6 +2638,21 @@
                       "$ref": "#/components/schemas/VAE_Diffusers_Wan_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/PiDDecoder_Checkpoint_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PiDDecoder_Checkpoint_Flux2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PiDDecoder_Checkpoint_SD3_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PiDDecoder_Checkpoint_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PiDDecoder_Checkpoint_QwenImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
                     },
                     {
@@ -2663,6 +2762,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Gemma2Encoder_Gemma2Encoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
@@ -3827,6 +3932,21 @@
                       "$ref": "#/components/schemas/VAE_Diffusers_Wan_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/PiDDecoder_Checkpoint_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PiDDecoder_Checkpoint_Flux2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PiDDecoder_Checkpoint_SD3_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PiDDecoder_Checkpoint_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PiDDecoder_Checkpoint_QwenImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
                     },
                     {
@@ -3936,6 +4056,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Gemma2Encoder_Gemma2Encoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
@@ -4095,7 +4221,7 @@
       "get": {
         "tags": ["model_manager"],
         "summary": "Get model manager RAM cache performance statistics.",
-        "description": "Return performance statistics on the model manager's RAM cache. Will return null if no models have been loaded.",
+        "description": "Return performance statistics on the model manager's RAM cache. In multi-GPU mode there is\none cache per generation device; their statistics are aggregated. Will return null if no models\nhave been loaded.",
         "operationId": "get_stats",
         "responses": {
           "200": {
@@ -8579,6 +8705,35 @@
         ]
       }
     },
+    "/api/v1/app/generation_device_options": {
+      "get": {
+        "tags": ["app"],
+        "summary": "Get Generation Device Options",
+        "description": "List the devices available for generation, for use with the `generation_devices` setting.",
+        "operationId": "get_generation_device_options",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/GenerationDeviceOption"
+                  },
+                  "type": "array",
+                  "title": "Response Get Generation Device Options"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/app/runtime_config": {
       "get": {
         "tags": ["app"],
@@ -9603,7 +9758,7 @@
       "put": {
         "tags": ["queue"],
         "summary": "Clear",
-        "description": "Clears the queue entirely. Admin users clear all items; non-admin users only clear their own items. If there's a currently-executing item, users can only cancel it if they own it or are an admin.",
+        "description": "Clears the queue. Admin users clear (and cancel) all items; non-admin users clear only their\nown items \u2014 other users' queued and running items are untouched.",
         "operationId": "clear",
         "security": [
           {
@@ -13948,6 +14103,21 @@
             "$ref": "#/components/schemas/VAE_Diffusers_Wan_Config"
           },
           {
+            "$ref": "#/components/schemas/PiDDecoder_Checkpoint_FLUX_Config"
+          },
+          {
+            "$ref": "#/components/schemas/PiDDecoder_Checkpoint_Flux2_Config"
+          },
+          {
+            "$ref": "#/components/schemas/PiDDecoder_Checkpoint_SD3_Config"
+          },
+          {
+            "$ref": "#/components/schemas/PiDDecoder_Checkpoint_SDXL_Config"
+          },
+          {
+            "$ref": "#/components/schemas/PiDDecoder_Checkpoint_QwenImage_Config"
+          },
+          {
             "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
           },
           {
@@ -14057,6 +14227,12 @@
           },
           {
             "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
+          },
+          {
+            "$ref": "#/components/schemas/Gemma2Encoder_Gemma2Encoder_Config"
+          },
+          {
+            "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
           },
           {
             "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
@@ -28806,6 +28982,189 @@
           "$ref": "#/components/schemas/FluxConditioningOutput"
         }
       },
+      "Flux2PiDDecodeInvocation": {
+        "category": "latents",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Decode a FLUX.2 Klein latent with the PiD pixel-diffusion decoder.\n\nProduces a 4x super-resolved image in a single pass. The stored FLUX.2 latent\nis patchified from ``(B, 32, H/8, W/8)`` to the ``(B, 128, H/16, W/16)`` layout\nPiD's FLUX.2 backbone expects, then decoded directly (it is already in raw,\nBN-denormalized space; see the module docstring).",
+        "node_pack": "invokeai",
+        "properties": {
+          "board": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The board to save the image to",
+            "field_kind": "internal",
+            "input": "direct",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "latents": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Latents tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Text prompt the latent was generated from. PiD conditions on it.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "Prompt",
+            "ui_component": "textarea"
+          },
+          "gemma2_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Gemma2EncoderField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Gemma-2 caption encoder. Required by PiD.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Gemma-2 Encoder"
+          },
+          "pid_decoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PiDDecoderField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "PiD FLUX.2 decoder checkpoint.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "PiD Decoder"
+          },
+          "vae": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VAEField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "FLUX.2 VAE, used only to read a scalar scaling_factor / shift_factor if one exists. FLUX.2 normalises latents with BatchNorm (already inverted in flux2_denoise), so this is normally an identity transform and the input can be left unconnected.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "VAE"
+          },
+          "num_inference_steps": {
+            "default": 4,
+            "description": "Number of PiD distill steps. The released checkpoints are distilled for 4; the student schedule has only 4 transitions, so higher counts cannot add sampling steps.",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 4,
+            "minimum": 1,
+            "orig_default": 4,
+            "orig_required": false,
+            "title": "Num Inference Steps",
+            "type": "integer"
+          },
+          "seed": {
+            "default": 0,
+            "description": "Seed for the PiD decoder's noise.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Seed",
+            "type": "integer"
+          },
+          "type": {
+            "const": "flux2_pid_decode",
+            "default": "flux2_pid_decode",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["latents", "image", "pid", "flux2", "klein", "upscale"],
+        "title": "Latents to Image - FLUX.2 + PiD (4x SR)",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/ImageOutput"
+        }
+      },
       "Flux2VaeDecodeInvocation": {
         "category": "latents",
         "class": "invocation",
@@ -31264,6 +31623,172 @@
         "title": "FluxModelLoaderOutput",
         "type": "object"
       },
+      "FluxPiDDecodeInvocation": {
+        "category": "latents",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Decode a FLUX latent with the PiD pixel-diffusion decoder.\n\nThe FLUX AutoEncoder usually denormalises the stored latent internally\nbefore its conv decoder runs (`z / scale + shift`); we apply the same\ntransform manually here so PiD sees the raw latent it was trained on.",
+        "node_pack": "invokeai",
+        "properties": {
+          "board": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The board to save the image to",
+            "field_kind": "internal",
+            "input": "direct",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "latents": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Latents tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Text prompt the latent was generated from. PiD conditions on it.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "Prompt",
+            "ui_component": "textarea"
+          },
+          "gemma2_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Gemma2EncoderField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Gemma-2 caption encoder. Required by PiD.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Gemma-2 Encoder"
+          },
+          "pid_decoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PiDDecoderField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "PiD FLUX decoder checkpoint.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "PiD Decoder"
+          },
+          "num_inference_steps": {
+            "default": 4,
+            "description": "Number of PiD distill steps. The released checkpoints are distilled for 4; the student schedule has only 4 transitions, so higher counts cannot add sampling steps.",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 4,
+            "minimum": 1,
+            "orig_default": 4,
+            "orig_required": false,
+            "title": "Num Inference Steps",
+            "type": "integer"
+          },
+          "seed": {
+            "default": 0,
+            "description": "Seed for the PiD decoder's noise.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Seed",
+            "type": "integer"
+          },
+          "type": {
+            "const": "flux_pid_decode",
+            "default": "flux_pid_decode",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["latents", "image", "pid", "flux", "upscale"],
+        "title": "Latents to Image - FLUX + PiD (4x SR)",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/ImageOutput"
+        }
+      },
       "FluxReduxConditioningField": {
         "description": "A FLUX Redux conditioning tensor primitive value",
         "properties": {
@@ -32370,6 +32895,381 @@
           "$ref": "#/components/schemas/ImageCollectionOutput"
         }
       },
+      "Gemma2EncoderField": {
+        "description": "Field for the Gemma-2 text encoder used by PiD decoders.",
+        "properties": {
+          "tokenizer": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "Info to load tokenizer submodel"
+          },
+          "text_encoder": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "Info to load text_encoder submodel"
+          }
+        },
+        "required": ["tokenizer", "text_encoder"],
+        "title": "Gemma2EncoderField",
+        "type": "object"
+      },
+      "Gemma2EncoderLoaderInvocation": {
+        "category": "model",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Loads a Gemma-2 causal LM directory and exposes its tokenizer + decoder\nsubmodels for use by a PiD decode node.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "gemma2_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Gemma-2 model used to encode captions for PiD decoders.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "Gemma-2",
+            "ui_model_type": ["gemma2_encoder"]
+          },
+          "type": {
+            "const": "gemma2_encoder_loader",
+            "default": "gemma2_encoder_loader",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["model", "gemma2", "pid"],
+        "title": "Gemma-2 Encoder - PiD",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/Gemma2EncoderOutput"
+        }
+      },
+      "Gemma2EncoderOutput": {
+        "class": "output",
+        "properties": {
+          "gemma2_encoder": {
+            "$ref": "#/components/schemas/Gemma2EncoderField",
+            "description": "Gemma-2 text encoder used by PiD decoders",
+            "field_kind": "output",
+            "title": "Gemma-2 Encoder",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "gemma2_encoder_output",
+            "default": "gemma2_encoder_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "gemma2_encoder", "type", "type"],
+        "title": "Gemma2EncoderOutput",
+        "type": "object"
+      },
+      "Gemma2Encoder_GGUF_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "base": {
+            "type": "string",
+            "const": "any",
+            "title": "Base",
+            "default": "any"
+          },
+          "type": {
+            "type": "string",
+            "const": "gemma2_encoder",
+            "title": "Type",
+            "default": "gemma2_encoder"
+          },
+          "format": {
+            "type": "string",
+            "const": "gguf_quantized",
+            "title": "Format",
+            "default": "gguf_quantized"
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "base",
+          "type",
+          "format",
+          "cpu_only"
+        ],
+        "title": "Gemma2Encoder_GGUF_Config",
+        "description": "Single-file GGUF-quantized Gemma-2-2b encoder for PiD (llama.cpp GGUF, e.g. gemma-2-2b-it-Q4_K_M.gguf).\n\nUnlike the diffusers-directory config, this is a single ``.gguf`` file. transformers dequantizes it\n(``gemma2`` is in its GGUF config mapping) and reads the tokenizer from the GGUF metadata, so no\ncompanion config.json / tokenizer files are required. Only Gemma-2-2b (2304-dim) is accepted, matching\nPiD's fixed caption projection; 9B/27B GGUFs are rejected here as for the directory config."
+      },
+      "Gemma2Encoder_Gemma2Encoder_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "base": {
+            "type": "string",
+            "const": "any",
+            "title": "Base",
+            "default": "any"
+          },
+          "type": {
+            "type": "string",
+            "const": "gemma2_encoder",
+            "title": "Type",
+            "default": "gemma2_encoder"
+          },
+          "format": {
+            "type": "string",
+            "const": "gemma2_encoder",
+            "title": "Format",
+            "default": "gemma2_encoder"
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "base",
+          "type",
+          "format",
+          "cpu_only"
+        ],
+        "title": "Gemma2Encoder_Gemma2Encoder_Config",
+        "description": "Standalone Gemma-2 causal LM directory used as a text encoder by PiD.\n\nExpected directory layout (HuggingFace `from_pretrained`-compatible)::\n\n    <model_root>/\n        config.json             # architectures: [\"Gemma2ForCausalLM\"]\n        tokenizer.json\n        tokenizer_config.json\n        model-*.safetensors     # or model.safetensors / *.bin"
+      },
       "GeneratePasswordResponse": {
         "properties": {
           "password": {
@@ -32382,6 +33282,24 @@
         "required": ["password"],
         "title": "GeneratePasswordResponse",
         "description": "Response containing a generated password."
+      },
+      "GenerationDeviceOption": {
+        "properties": {
+          "device": {
+            "type": "string",
+            "title": "Device",
+            "description": "The device identifier, e.g. 'cuda:0', 'mps', or 'cpu'"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Human-readable device name"
+          }
+        },
+        "type": "object",
+        "required": ["device", "name"],
+        "title": "GenerationDeviceOption",
+        "description": "A device that may be selected for generation."
       },
       "GetMaskBoundingBoxInvocation": {
         "category": "mask",
@@ -32766,6 +33684,9 @@
                   "$ref": "#/components/schemas/Flux2KleinTextEncoderInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/Flux2PiDDecodeInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/Flux2VaeDecodeInvocation"
                 },
                 {
@@ -32802,6 +33723,9 @@
                   "$ref": "#/components/schemas/FluxModelLoaderInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/FluxPiDDecodeInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/FluxReduxInvocation"
                 },
                 {
@@ -32818,6 +33742,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/GeminiImageGenerationInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/Gemma2EncoderLoaderInvocation"
                 },
                 {
                   "$ref": "#/components/schemas/GetMaskBoundingBoxInvocation"
@@ -33156,6 +34083,12 @@
                   "$ref": "#/components/schemas/PasteImageIntoBoundingBoxInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/PiDDecoderLoaderInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/PiDUpscaleInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/PiDiNetEdgeDetectionInvocation"
                 },
                 {
@@ -33181,6 +34114,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/QwenImageModelLoaderInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/QwenImagePiDDecodeInvocation"
                 },
                 {
                   "$ref": "#/components/schemas/QwenImageTextEncoderInvocation"
@@ -33219,6 +34155,9 @@
                   "$ref": "#/components/schemas/SD3LatentsToImageInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/SD3PiDDecodeInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/SDXLCompelPromptInvocation"
                 },
                 {
@@ -33229,6 +34168,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/SDXLModelLoaderInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/SDXLPiDDecodeInvocation"
                 },
                 {
                   "$ref": "#/components/schemas/SDXLRefinerCompelPromptInvocation"
@@ -33397,6 +34339,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/ZImageModelLoaderInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/ZImagePiDDecodeInvocation"
                 },
                 {
                   "$ref": "#/components/schemas/ZImageSeedVarianceEnhancerInvocation"
@@ -33576,6 +34521,9 @@
                   "$ref": "#/components/schemas/FluxReduxOutput"
                 },
                 {
+                  "$ref": "#/components/schemas/Gemma2EncoderOutput"
+                },
+                {
                   "$ref": "#/components/schemas/GradientMaskOutput"
                 },
                 {
@@ -33682,6 +34630,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/PairTileImageOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/PiDDecoderOutput"
                 },
                 {
                   "$ref": "#/components/schemas/PromptTemplateOutput"
@@ -41232,6 +42183,9 @@
                 "$ref": "#/components/schemas/Flux2KleinTextEncoderInvocation"
               },
               {
+                "$ref": "#/components/schemas/Flux2PiDDecodeInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/Flux2VaeDecodeInvocation"
               },
               {
@@ -41268,6 +42222,9 @@
                 "$ref": "#/components/schemas/FluxModelLoaderInvocation"
               },
               {
+                "$ref": "#/components/schemas/FluxPiDDecodeInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/FluxReduxInvocation"
               },
               {
@@ -41284,6 +42241,9 @@
               },
               {
                 "$ref": "#/components/schemas/GeminiImageGenerationInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Gemma2EncoderLoaderInvocation"
               },
               {
                 "$ref": "#/components/schemas/GetMaskBoundingBoxInvocation"
@@ -41622,6 +42582,12 @@
                 "$ref": "#/components/schemas/PasteImageIntoBoundingBoxInvocation"
               },
               {
+                "$ref": "#/components/schemas/PiDDecoderLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/PiDUpscaleInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/PiDiNetEdgeDetectionInvocation"
               },
               {
@@ -41647,6 +42613,9 @@
               },
               {
                 "$ref": "#/components/schemas/QwenImageModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImagePiDDecodeInvocation"
               },
               {
                 "$ref": "#/components/schemas/QwenImageTextEncoderInvocation"
@@ -41685,6 +42654,9 @@
                 "$ref": "#/components/schemas/SD3LatentsToImageInvocation"
               },
               {
+                "$ref": "#/components/schemas/SD3PiDDecodeInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/SDXLCompelPromptInvocation"
               },
               {
@@ -41695,6 +42667,9 @@
               },
               {
                 "$ref": "#/components/schemas/SDXLModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/SDXLPiDDecodeInvocation"
               },
               {
                 "$ref": "#/components/schemas/SDXLRefinerCompelPromptInvocation"
@@ -41865,6 +42840,9 @@
                 "$ref": "#/components/schemas/ZImageModelLoaderInvocation"
               },
               {
+                "$ref": "#/components/schemas/ZImagePiDDecodeInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/ZImageSeedVarianceEnhancerInvocation"
               },
               {
@@ -41999,6 +42977,9 @@
                 "$ref": "#/components/schemas/FluxReduxOutput"
               },
               {
+                "$ref": "#/components/schemas/Gemma2EncoderOutput"
+              },
+              {
                 "$ref": "#/components/schemas/GradientMaskOutput"
               },
               {
@@ -42105,6 +43086,9 @@
               },
               {
                 "$ref": "#/components/schemas/PairTileImageOutput"
+              },
+              {
+                "$ref": "#/components/schemas/PiDDecoderOutput"
               },
               {
                 "$ref": "#/components/schemas/PromptTemplateOutput"
@@ -42523,6 +43507,9 @@
                 "$ref": "#/components/schemas/Flux2KleinTextEncoderInvocation"
               },
               {
+                "$ref": "#/components/schemas/Flux2PiDDecodeInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/Flux2VaeDecodeInvocation"
               },
               {
@@ -42559,6 +43546,9 @@
                 "$ref": "#/components/schemas/FluxModelLoaderInvocation"
               },
               {
+                "$ref": "#/components/schemas/FluxPiDDecodeInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/FluxReduxInvocation"
               },
               {
@@ -42575,6 +43565,9 @@
               },
               {
                 "$ref": "#/components/schemas/GeminiImageGenerationInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Gemma2EncoderLoaderInvocation"
               },
               {
                 "$ref": "#/components/schemas/GetMaskBoundingBoxInvocation"
@@ -42913,6 +43906,12 @@
                 "$ref": "#/components/schemas/PasteImageIntoBoundingBoxInvocation"
               },
               {
+                "$ref": "#/components/schemas/PiDDecoderLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/PiDUpscaleInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/PiDiNetEdgeDetectionInvocation"
               },
               {
@@ -42938,6 +43937,9 @@
               },
               {
                 "$ref": "#/components/schemas/QwenImageModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImagePiDDecodeInvocation"
               },
               {
                 "$ref": "#/components/schemas/QwenImageTextEncoderInvocation"
@@ -42976,6 +43978,9 @@
                 "$ref": "#/components/schemas/SD3LatentsToImageInvocation"
               },
               {
+                "$ref": "#/components/schemas/SD3PiDDecodeInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/SDXLCompelPromptInvocation"
               },
               {
@@ -42986,6 +43991,9 @@
               },
               {
                 "$ref": "#/components/schemas/SDXLModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/SDXLPiDDecodeInvocation"
               },
               {
                 "$ref": "#/components/schemas/SDXLRefinerCompelPromptInvocation"
@@ -43154,6 +44162,9 @@
               },
               {
                 "$ref": "#/components/schemas/ZImageModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/ZImagePiDDecodeInvocation"
               },
               {
                 "$ref": "#/components/schemas/ZImageSeedVarianceEnhancerInvocation"
@@ -43431,6 +44442,9 @@
           "flux2_klein_text_encoder": {
             "$ref": "#/components/schemas/FluxConditioningOutput"
           },
+          "flux2_pid_decode": {
+            "$ref": "#/components/schemas/ImageOutput"
+          },
           "flux2_vae_decode": {
             "$ref": "#/components/schemas/ImageOutput"
           },
@@ -43470,6 +44484,9 @@
           "flux_model_loader": {
             "$ref": "#/components/schemas/FluxModelLoaderOutput"
           },
+          "flux_pid_decode": {
+            "$ref": "#/components/schemas/ImageOutput"
+          },
           "flux_redux": {
             "$ref": "#/components/schemas/FluxReduxOutput"
           },
@@ -43487,6 +44504,9 @@
           },
           "gemini_image_generation": {
             "$ref": "#/components/schemas/ImageCollectionOutput"
+          },
+          "gemma2_encoder_loader": {
+            "$ref": "#/components/schemas/Gemma2EncoderOutput"
           },
           "get_image_mask_bounding_box": {
             "$ref": "#/components/schemas/BoundingBoxOutput"
@@ -43830,6 +44850,12 @@
           "pbr_maps": {
             "$ref": "#/components/schemas/PBRMapsOutput"
           },
+          "pid_decoder_loader": {
+            "$ref": "#/components/schemas/PiDDecoderOutput"
+          },
+          "pid_upscale": {
+            "$ref": "#/components/schemas/ImageOutput"
+          },
           "pidi_edge_detection": {
             "$ref": "#/components/schemas/ImageOutput"
           },
@@ -43856,6 +44882,9 @@
           },
           "qwen_image_model_loader": {
             "$ref": "#/components/schemas/QwenImageModelLoaderOutput"
+          },
+          "qwen_image_pid_decode": {
+            "$ref": "#/components/schemas/ImageOutput"
           },
           "qwen_image_text_encoder": {
             "$ref": "#/components/schemas/QwenImageConditioningOutput"
@@ -43902,6 +44931,9 @@
           "sd3_model_loader": {
             "$ref": "#/components/schemas/Sd3ModelLoaderOutput"
           },
+          "sd3_pid_decode": {
+            "$ref": "#/components/schemas/ImageOutput"
+          },
           "sd3_text_encoder": {
             "$ref": "#/components/schemas/SD3ConditioningOutput"
           },
@@ -43916,6 +44948,9 @@
           },
           "sdxl_model_loader": {
             "$ref": "#/components/schemas/SDXLModelLoaderOutput"
+          },
+          "sdxl_pid_decode": {
+            "$ref": "#/components/schemas/ImageOutput"
           },
           "sdxl_refiner_compel_prompt": {
             "$ref": "#/components/schemas/ConditioningOutput"
@@ -44076,6 +45111,9 @@
           "z_image_model_loader": {
             "$ref": "#/components/schemas/ZImageModelLoaderOutput"
           },
+          "z_image_pid_decode": {
+            "$ref": "#/components/schemas/ImageOutput"
+          },
           "z_image_seed_variance_enhancer": {
             "$ref": "#/components/schemas/ZImageConditioningOutput"
           },
@@ -44159,6 +45197,7 @@
           "flux2_klein_lora_loader",
           "flux2_klein_model_loader",
           "flux2_klein_text_encoder",
+          "flux2_pid_decode",
           "flux2_vae_decode",
           "flux2_vae_encode",
           "flux_control_lora_loader",
@@ -44172,12 +45211,14 @@
           "flux_lora_collection_loader",
           "flux_lora_loader",
           "flux_model_loader",
+          "flux_pid_decode",
           "flux_redux",
           "flux_text_encoder",
           "flux_vae_decode",
           "flux_vae_encode",
           "freeu",
           "gemini_image_generation",
+          "gemma2_encoder_loader",
           "get_image_mask_bounding_box",
           "grounding_dino",
           "hed_edge_detection",
@@ -44292,6 +45333,8 @@
           "pair_tile_image",
           "paste_image_into_bounding_box",
           "pbr_maps",
+          "pid_decoder_loader",
+          "pid_upscale",
           "pidi_edge_detection",
           "prompt_from_file",
           "prompt_template",
@@ -44301,6 +45344,7 @@
           "qwen_image_lora_collection_loader",
           "qwen_image_lora_loader",
           "qwen_image_model_loader",
+          "qwen_image_pid_decode",
           "qwen_image_text_encoder",
           "rand_float",
           "rand_int",
@@ -44316,11 +45360,13 @@
           "sd3_i2l",
           "sd3_l2i",
           "sd3_model_loader",
+          "sd3_pid_decode",
           "sd3_text_encoder",
           "sdxl_compel_prompt",
           "sdxl_lora_collection_loader",
           "sdxl_lora_loader",
           "sdxl_model_loader",
+          "sdxl_pid_decode",
           "sdxl_refiner_compel_prompt",
           "sdxl_refiner_model_loader",
           "seamless",
@@ -44374,6 +45420,7 @@
           "z_image_lora_collection_loader",
           "z_image_lora_loader",
           "z_image_model_loader",
+          "z_image_pid_decode",
           "z_image_seed_variance_enhancer",
           "z_image_text_encoder"
         ]
@@ -44679,6 +45726,9 @@
                 "$ref": "#/components/schemas/Flux2KleinTextEncoderInvocation"
               },
               {
+                "$ref": "#/components/schemas/Flux2PiDDecodeInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/Flux2VaeDecodeInvocation"
               },
               {
@@ -44715,6 +45765,9 @@
                 "$ref": "#/components/schemas/FluxModelLoaderInvocation"
               },
               {
+                "$ref": "#/components/schemas/FluxPiDDecodeInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/FluxReduxInvocation"
               },
               {
@@ -44731,6 +45784,9 @@
               },
               {
                 "$ref": "#/components/schemas/GeminiImageGenerationInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Gemma2EncoderLoaderInvocation"
               },
               {
                 "$ref": "#/components/schemas/GetMaskBoundingBoxInvocation"
@@ -45069,6 +46125,12 @@
                 "$ref": "#/components/schemas/PasteImageIntoBoundingBoxInvocation"
               },
               {
+                "$ref": "#/components/schemas/PiDDecoderLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/PiDUpscaleInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/PiDiNetEdgeDetectionInvocation"
               },
               {
@@ -45094,6 +46156,9 @@
               },
               {
                 "$ref": "#/components/schemas/QwenImageModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImagePiDDecodeInvocation"
               },
               {
                 "$ref": "#/components/schemas/QwenImageTextEncoderInvocation"
@@ -45132,6 +46197,9 @@
                 "$ref": "#/components/schemas/SD3LatentsToImageInvocation"
               },
               {
+                "$ref": "#/components/schemas/SD3PiDDecodeInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/SDXLCompelPromptInvocation"
               },
               {
@@ -45142,6 +46210,9 @@
               },
               {
                 "$ref": "#/components/schemas/SDXLModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/SDXLPiDDecodeInvocation"
               },
               {
                 "$ref": "#/components/schemas/SDXLRefinerCompelPromptInvocation"
@@ -45312,6 +46383,9 @@
                 "$ref": "#/components/schemas/ZImageModelLoaderInvocation"
               },
               {
+                "$ref": "#/components/schemas/ZImagePiDDecodeInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/ZImageSeedVarianceEnhancerInvocation"
               },
               {
@@ -45356,6 +46430,19 @@
             ],
             "default": null,
             "description": "An image representing the current state of the progress"
+          },
+          "device": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The device processing this session, e.g. 'cuda:1' (set only when running on a CUDA GPU)",
+            "title": "Device"
           }
         },
         "required": [
@@ -45371,7 +46458,8 @@
           "invocation_source_id",
           "message",
           "percentage",
-          "image"
+          "image",
+          "device"
         ],
         "title": "InvocationProgressEvent",
         "type": "object"
@@ -45677,6 +46765,9 @@
                 "$ref": "#/components/schemas/Flux2KleinTextEncoderInvocation"
               },
               {
+                "$ref": "#/components/schemas/Flux2PiDDecodeInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/Flux2VaeDecodeInvocation"
               },
               {
@@ -45713,6 +46804,9 @@
                 "$ref": "#/components/schemas/FluxModelLoaderInvocation"
               },
               {
+                "$ref": "#/components/schemas/FluxPiDDecodeInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/FluxReduxInvocation"
               },
               {
@@ -45729,6 +46823,9 @@
               },
               {
                 "$ref": "#/components/schemas/GeminiImageGenerationInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Gemma2EncoderLoaderInvocation"
               },
               {
                 "$ref": "#/components/schemas/GetMaskBoundingBoxInvocation"
@@ -46067,6 +47164,12 @@
                 "$ref": "#/components/schemas/PasteImageIntoBoundingBoxInvocation"
               },
               {
+                "$ref": "#/components/schemas/PiDDecoderLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/PiDUpscaleInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/PiDiNetEdgeDetectionInvocation"
               },
               {
@@ -46092,6 +47195,9 @@
               },
               {
                 "$ref": "#/components/schemas/QwenImageModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImagePiDDecodeInvocation"
               },
               {
                 "$ref": "#/components/schemas/QwenImageTextEncoderInvocation"
@@ -46130,6 +47236,9 @@
                 "$ref": "#/components/schemas/SD3LatentsToImageInvocation"
               },
               {
+                "$ref": "#/components/schemas/SD3PiDDecodeInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/SDXLCompelPromptInvocation"
               },
               {
@@ -46140,6 +47249,9 @@
               },
               {
                 "$ref": "#/components/schemas/SDXLModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/SDXLPiDDecodeInvocation"
               },
               {
                 "$ref": "#/components/schemas/SDXLRefinerCompelPromptInvocation"
@@ -46308,6 +47420,9 @@
               },
               {
                 "$ref": "#/components/schemas/ZImageModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/ZImagePiDDecodeInvocation"
               },
               {
                 "$ref": "#/components/schemas/ZImageSeedVarianceEnhancerInvocation"
@@ -46712,6 +47827,29 @@
             "description": "Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `mps`, `cuda:N` (where N is a device number)",
             "default": "auto"
           },
+          "generation_devices": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "auto"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ],
+            "title": "Generation Devices",
+            "description": "Devices to use for parallel generation. `auto` (the default) uses every available GPU, running one generation session per GPU concurrently and distributing jobs fairly across users. Provide an explicit list (e.g. `[cuda:0, cuda:1]`) to use specific devices, or a single-device list (e.g. `[cuda:0]`) to run serially. On systems without a GPU, `auto` resolves to the single `cpu`/`mps` device.<br>Valid values: `auto`, or a list whose entries are each `cpu`, `cuda`, `mps`, or `cuda:N` (where N is a device number)",
+            "default": "auto"
+          },
+          "offload_text_encoders_to_idle_gpus": {
+            "type": "boolean",
+            "title": "Offload Text Encoders To Idle Gpus",
+            "description": "When running on multiple GPUs, load text encoders onto a currently-idle GPU instead of the one running the denoise pipeline. This avoids churning the denoise model in and out of VRAM to make room for the encoder, and lets a cached encoder be reused across generations. Has no effect unless at least two `generation_devices` are configured and a GPU is idle; under full load encoders run on the session's own GPU as before.",
+            "default": true
+          },
           "precision": {
             "type": "string",
             "enum": ["auto", "float16", "bfloat16", "float32"],
@@ -46761,7 +47899,7 @@
             "type": "string",
             "enum": ["FIFO", "round_robin"],
             "title": "Session Queue Mode",
-            "description": "Session queue mode. Use 'FIFO' for traditional first-in-first-out, or 'round_robin' to serve each user's jobs in turn. In single-user mode, FIFO is always used regardless of this setting.",
+            "description": "Session queue mode. Use 'FIFO' for strict first-in-first-out, or 'round_robin' to serve each user's jobs in turn. In round-robin mode, priority orders each user's own jobs, but the user rotation takes precedence: one user's high-priority job does not preempt another user's turn. In single-user mode, jobs are served in submission order either way \u2014 except that on multi-GPU systems the default 'round_robin' allows same-priority jobs to be reordered slightly so a freed GPU prefers jobs whose models it already has loaded. Set 'FIFO' to disable that reordering and enforce strict submission order.",
             "default": "round_robin"
           },
           "clear_queue_on_startup": {
@@ -48470,6 +49608,12 @@
                 "$ref": "#/components/schemas/Krea2ConditioningField"
               },
               {
+                "items": {
+                  "$ref": "#/components/schemas/Krea2ConditioningField"
+                },
+                "type": "array"
+              },
+              {
                 "type": "null"
               }
             ],
@@ -48477,12 +49621,19 @@
             "description": "Positive conditioning tensor",
             "field_kind": "input",
             "input": "connection",
-            "orig_required": true
+            "orig_required": true,
+            "title": "Positive Conditioning"
           },
           "negative_conditioning": {
             "anyOf": [
               {
                 "$ref": "#/components/schemas/Krea2ConditioningField"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Krea2ConditioningField"
+                },
+                "type": "array"
               },
               {
                 "type": "null"
@@ -48493,7 +49644,8 @@
             "field_kind": "input",
             "input": "connection",
             "orig_default": null,
-            "orig_required": false
+            "orig_required": false,
+            "title": "Negative Conditioning"
           },
           "cfg_scale": {
             "anyOf": [
@@ -48589,7 +49741,7 @@
         "tags": ["image", "krea2", "krea-2"],
         "title": "Denoise - Krea-2",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -62683,6 +63835,7 @@
           "qwen_vl_encoder",
           "qwen3_vl_encoder",
           "wan_t5_encoder",
+          "gemma2_encoder",
           "bnb_quantized_int8b",
           "bnb_quantized_nf4b",
           "gguf_quantized",
@@ -63056,6 +64209,21 @@
                 "$ref": "#/components/schemas/VAE_Diffusers_Wan_Config"
               },
               {
+                "$ref": "#/components/schemas/PiDDecoder_Checkpoint_FLUX_Config"
+              },
+              {
+                "$ref": "#/components/schemas/PiDDecoder_Checkpoint_Flux2_Config"
+              },
+              {
+                "$ref": "#/components/schemas/PiDDecoder_Checkpoint_SD3_Config"
+              },
+              {
+                "$ref": "#/components/schemas/PiDDecoder_Checkpoint_SDXL_Config"
+              },
+              {
+                "$ref": "#/components/schemas/PiDDecoder_Checkpoint_QwenImage_Config"
+              },
+              {
                 "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
               },
               {
@@ -63165,6 +64333,12 @@
               },
               {
                 "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Gemma2Encoder_Gemma2Encoder_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
               },
               {
                 "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
@@ -63676,6 +64850,21 @@
                     "$ref": "#/components/schemas/VAE_Diffusers_Wan_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/PiDDecoder_Checkpoint_FLUX_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PiDDecoder_Checkpoint_Flux2_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PiDDecoder_Checkpoint_SD3_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PiDDecoder_Checkpoint_SDXL_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PiDDecoder_Checkpoint_QwenImage_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
                   },
                   {
@@ -63785,6 +64974,12 @@
                   },
                   {
                     "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Gemma2Encoder_Gemma2Encoder_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
                   },
                   {
                     "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
@@ -64181,6 +65376,21 @@
                 "$ref": "#/components/schemas/VAE_Diffusers_Wan_Config"
               },
               {
+                "$ref": "#/components/schemas/PiDDecoder_Checkpoint_FLUX_Config"
+              },
+              {
+                "$ref": "#/components/schemas/PiDDecoder_Checkpoint_Flux2_Config"
+              },
+              {
+                "$ref": "#/components/schemas/PiDDecoder_Checkpoint_SD3_Config"
+              },
+              {
+                "$ref": "#/components/schemas/PiDDecoder_Checkpoint_SDXL_Config"
+              },
+              {
+                "$ref": "#/components/schemas/PiDDecoder_Checkpoint_QwenImage_Config"
+              },
+              {
                 "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
               },
               {
@@ -64290,6 +65500,12 @@
               },
               {
                 "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Gemma2Encoder_Gemma2Encoder_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
               },
               {
                 "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
@@ -64542,6 +65758,21 @@
                 "$ref": "#/components/schemas/VAE_Diffusers_Wan_Config"
               },
               {
+                "$ref": "#/components/schemas/PiDDecoder_Checkpoint_FLUX_Config"
+              },
+              {
+                "$ref": "#/components/schemas/PiDDecoder_Checkpoint_Flux2_Config"
+              },
+              {
+                "$ref": "#/components/schemas/PiDDecoder_Checkpoint_SD3_Config"
+              },
+              {
+                "$ref": "#/components/schemas/PiDDecoder_Checkpoint_SDXL_Config"
+              },
+              {
+                "$ref": "#/components/schemas/PiDDecoder_Checkpoint_QwenImage_Config"
+              },
+              {
                 "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
               },
               {
@@ -64651,6 +65882,12 @@
               },
               {
                 "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Gemma2Encoder_Gemma2Encoder_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
               },
               {
                 "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
@@ -65071,6 +66308,9 @@
                 "$ref": "#/components/schemas/Krea2VariantType"
               },
               {
+                "$ref": "#/components/schemas/PiDDecoderVariantType"
+              },
+              {
                 "type": "null"
               }
             ],
@@ -65211,6 +66451,7 @@
           "qwen_vl_encoder",
           "qwen3_vl_encoder",
           "wan_t5_encoder",
+          "gemma2_encoder",
           "spandrel_image_to_image",
           "siglip",
           "flux_redux",
@@ -65218,6 +66459,7 @@
           "prompt_enhancer",
           "text_llm",
           "external_image_generator",
+          "pid_decoder",
           "unknown"
         ],
         "title": "ModelType",
@@ -65364,6 +66606,21 @@
                   "$ref": "#/components/schemas/VAE_Diffusers_Wan_Config"
                 },
                 {
+                  "$ref": "#/components/schemas/PiDDecoder_Checkpoint_FLUX_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/PiDDecoder_Checkpoint_Flux2_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/PiDDecoder_Checkpoint_SD3_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/PiDDecoder_Checkpoint_SDXL_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/PiDDecoder_Checkpoint_QwenImage_Config"
+                },
+                {
                   "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
                 },
                 {
@@ -65473,6 +66730,12 @@
                 },
                 {
                   "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/Gemma2Encoder_Gemma2Encoder_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
                 },
                 {
                   "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
@@ -67083,6 +68346,991 @@
         "required": ["type", "id"],
         "tags": ["image", "crop"],
         "title": "Paste Image into Bounding Box",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/ImageOutput"
+        }
+      },
+      "PiDDecoderField": {
+        "description": "Field for a PiD (Pixel Diffusion Decoder) checkpoint.",
+        "properties": {
+          "decoder": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "Info to load PiD decoder checkpoint"
+          }
+        },
+        "required": ["decoder"],
+        "title": "PiDDecoderField",
+        "type": "object"
+      },
+      "PiDDecoderLoaderInvocation": {
+        "category": "model",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Loads a PiD decoder checkpoint, outputting a PiDDecoderField for use\nby the per-backbone PiD decode nodes.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "pid_decoder_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "PiD decoder checkpoint matching the upstream backbone.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "PiD Decoder",
+            "ui_model_type": ["pid_decoder"]
+          },
+          "type": {
+            "const": "pid_decoder_loader",
+            "default": "pid_decoder_loader",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["model", "pid", "decoder"],
+        "title": "PiD Decoder - FLUX / FLUX.2 / SD3 / SDXL / Qwen-Image",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/PiDDecoderOutput"
+        }
+      },
+      "PiDDecoderOutput": {
+        "class": "output",
+        "properties": {
+          "pid_decoder": {
+            "$ref": "#/components/schemas/PiDDecoderField",
+            "description": "PiD (Pixel Diffusion Decoder) checkpoint",
+            "field_kind": "output",
+            "title": "PiD Decoder",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "pid_decoder_output",
+            "default": "pid_decoder_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "pid_decoder", "type", "type"],
+        "title": "PiDDecoderOutput",
+        "type": "object"
+      },
+      "PiDDecoderVariantType": {
+        "type": "string",
+        "enum": ["res2k_sr4x", "res2kto4k_sr4x"],
+        "title": "PiDDecoderVariantType",
+        "description": "PiD (Pixel Diffusion Decoder) resolution presets distributed by NVIDIA.\n\nSupported backbones are FLUX.1, FLUX.2, SD3, SDXL and Qwen-Image. Not every backbone ships both\npresets: FLUX.1 / FLUX.2 / SD3 have both the 2K and the 2K-to-4K preset, while SDXL and Qwen-Image\nship only the 2K-to-4K preset. The presets differ only in target output resolution; the underlying\n(legacy) network is the same. NVIDIA's checkpoint filenames encode this as e.g.\n`PiD_res2k_sr4x_official_flux_distill_4step` vs `PiD_res2kto4k_sr4x_official_flux_distill_4step`."
+      },
+      "PiDDecoder_Checkpoint_FLUX_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "type": {
+            "type": "string",
+            "const": "pid_decoder",
+            "title": "Type",
+            "default": "pid_decoder"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "base": {
+            "type": "string",
+            "const": "flux",
+            "title": "Base",
+            "default": "flux"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/PiDDecoderVariantType",
+            "description": "Resolution preset of the PiD decoder checkpoint."
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "config_path",
+          "type",
+          "format",
+          "base",
+          "variant"
+        ],
+        "title": "PiDDecoder_Checkpoint_FLUX_Config",
+        "description": "PiD decoder for the FLUX.1 backbone (16-channel latent)."
+      },
+      "PiDDecoder_Checkpoint_Flux2_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "type": {
+            "type": "string",
+            "const": "pid_decoder",
+            "title": "Type",
+            "default": "pid_decoder"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "base": {
+            "type": "string",
+            "const": "flux2",
+            "title": "Base",
+            "default": "flux2"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/PiDDecoderVariantType",
+            "description": "Resolution preset of the PiD decoder checkpoint."
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "config_path",
+          "type",
+          "format",
+          "base",
+          "variant"
+        ],
+        "title": "PiDDecoder_Checkpoint_Flux2_Config",
+        "description": "PiD decoder for the FLUX.2 backbone (128-channel latent)."
+      },
+      "PiDDecoder_Checkpoint_QwenImage_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "type": {
+            "type": "string",
+            "const": "pid_decoder",
+            "title": "Type",
+            "default": "pid_decoder"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "base": {
+            "type": "string",
+            "const": "qwen-image",
+            "title": "Base",
+            "default": "qwen-image"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/PiDDecoderVariantType",
+            "description": "Resolution preset of the PiD decoder checkpoint."
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "config_path",
+          "type",
+          "format",
+          "base",
+          "variant"
+        ],
+        "title": "PiDDecoder_Checkpoint_QwenImage_Config",
+        "description": "PiD decoder for the Qwen-Image backbone (16-channel latent).\n\nShares the 16-channel latent shape with FLUX.1 and SD3, so it relies on the same\nfilename / directory-name disambiguation (or a trusted explicit ``base`` override)\nas SD3 - see ``_validate_base``."
+      },
+      "PiDDecoder_Checkpoint_SD3_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "type": {
+            "type": "string",
+            "const": "pid_decoder",
+            "title": "Type",
+            "default": "pid_decoder"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "base": {
+            "type": "string",
+            "const": "sd-3",
+            "title": "Base",
+            "default": "sd-3"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/PiDDecoderVariantType",
+            "description": "Resolution preset of the PiD decoder checkpoint."
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "config_path",
+          "type",
+          "format",
+          "base",
+          "variant"
+        ],
+        "title": "PiDDecoder_Checkpoint_SD3_Config",
+        "description": "PiD decoder for the Stable Diffusion 3 backbone (16-channel latent)."
+      },
+      "PiDDecoder_Checkpoint_SDXL_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "type": {
+            "type": "string",
+            "const": "pid_decoder",
+            "title": "Type",
+            "default": "pid_decoder"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "base": {
+            "type": "string",
+            "const": "sdxl",
+            "title": "Base",
+            "default": "sdxl"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/PiDDecoderVariantType",
+            "description": "Resolution preset of the PiD decoder checkpoint."
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "config_path",
+          "type",
+          "format",
+          "base",
+          "variant"
+        ],
+        "title": "PiDDecoder_Checkpoint_SDXL_Config",
+        "description": "PiD decoder for the SDXL backbone (4-channel latent)."
+      },
+      "PiDUpscaleInvocation": {
+        "category": "image",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Upscale any image 4x via FLUX VAE encode + PiD pixel-diffusion decode.\n\nWorks for source images that the FLUX VAE can encode (i.e. natural\nphotos / generated images at any size that lands on the VAE's 8-pixel\ngrid). The caption is used to condition the PiD decoder; leaving it\nempty produces an unconditional decode and is the cheapest option, but\nthe model was distilled with rich captions and benefits from one.",
+        "node_pack": "invokeai",
+        "properties": {
+          "board": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The board to save the image to",
+            "field_kind": "internal",
+            "input": "direct",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Image to upscale.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true
+          },
+          "vae": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VAEField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "FLUX AutoEncoder VAE. PiD upscale runs the FLUX backbone and applies FLUX VAE scaling, and the encode path only supports InvokeAI's FLUX AutoEncoder \u2014 a diffusers AutoencoderKL (e.g. Z-Image) is not supported here.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "gemma2_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Gemma2EncoderField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Gemma-2 caption encoder. Required by PiD.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Gemma-2 Encoder"
+          },
+          "pid_decoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PiDDecoderField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "PiD FLUX decoder checkpoint.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "PiD Decoder"
+          },
+          "prompt": {
+            "default": "",
+            "description": "Optional caption describing the image. Empty -> empty-caption decode.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "",
+            "orig_required": false,
+            "title": "Prompt",
+            "type": "string",
+            "ui_component": "textarea"
+          },
+          "num_inference_steps": {
+            "default": 4,
+            "description": "Number of PiD distill steps. The released checkpoints are distilled for 4; the student schedule has only 4 transitions, so higher counts cannot add sampling steps.",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 4,
+            "minimum": 1,
+            "orig_default": 4,
+            "orig_required": false,
+            "title": "Num Inference Steps",
+            "type": "integer"
+          },
+          "seed": {
+            "default": 0,
+            "description": "Seed for the PiD decoder's noise.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Seed",
+            "type": "integer"
+          },
+          "type": {
+            "const": "pid_upscale",
+            "default": "pid_upscale",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["upscale", "image", "pid", "super-resolution", "flux"],
+        "title": "PiD Upscale (4x) - FLUX VAE",
         "type": "object",
         "version": "1.0.0",
         "output": {
@@ -69548,6 +71796,189 @@
         "title": "QwenImageModelLoaderOutput",
         "type": "object"
       },
+      "QwenImagePiDDecodeInvocation": {
+        "category": "latents",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Decode a Qwen-Image latent with the PiD pixel-diffusion decoder.\n\nProduces a 4x super-resolved image in a single pass. The 5D Qwen latent is\nreduced to 2D and per-channel denormalized (``z * std + mean``) before PiD.",
+        "node_pack": "invokeai",
+        "properties": {
+          "board": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The board to save the image to",
+            "field_kind": "internal",
+            "input": "direct",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "latents": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Latents tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Text prompt the latent was generated from. PiD conditions on it.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "Prompt",
+            "ui_component": "textarea"
+          },
+          "gemma2_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Gemma2EncoderField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Gemma-2 caption encoder. Required by PiD.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Gemma-2 Encoder"
+          },
+          "pid_decoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PiDDecoderField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "PiD Qwen-Image decoder checkpoint.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "PiD Decoder"
+          },
+          "vae": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VAEField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Qwen-Image VAE, used to read the per-channel latents_mean / latents_std. If omitted, the diffusers default Qwen-Image constants are used.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "VAE"
+          },
+          "num_inference_steps": {
+            "default": 4,
+            "description": "Number of PiD distill steps. The released checkpoints are distilled for 4; the student schedule has only 4 transitions, so higher counts cannot add sampling steps.",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 4,
+            "minimum": 1,
+            "orig_default": 4,
+            "orig_required": false,
+            "title": "Num Inference Steps",
+            "type": "integer"
+          },
+          "seed": {
+            "default": 0,
+            "description": "Seed for the PiD decoder's noise.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Seed",
+            "type": "integer"
+          },
+          "type": {
+            "const": "qwen_image_pid_decode",
+            "default": "qwen_image_pid_decode",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["latents", "image", "pid", "qwen-image", "upscale"],
+        "title": "Latents to Image - Qwen-Image + PiD (4x SR)",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/ImageOutput"
+        }
+      },
       "QwenImageTextEncoderInvocation": {
         "category": "conditioning",
         "class": "invocation",
@@ -71735,6 +74166,172 @@
           "$ref": "#/components/schemas/ImageOutput"
         }
       },
+      "SD3PiDDecodeInvocation": {
+        "category": "latents",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Decode an SD3 latent with the PiD pixel-diffusion decoder.",
+        "node_pack": "invokeai",
+        "properties": {
+          "board": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The board to save the image to",
+            "field_kind": "internal",
+            "input": "direct",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "latents": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Latents tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Text prompt the latent was generated from. PiD conditions on it.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "Prompt",
+            "ui_component": "textarea"
+          },
+          "gemma2_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Gemma2EncoderField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Gemma-2 caption encoder. Required by PiD.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Gemma-2 Encoder"
+          },
+          "pid_decoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PiDDecoderField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "PiD SD3 decoder checkpoint.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "PiD Decoder"
+          },
+          "num_inference_steps": {
+            "default": 4,
+            "description": "Number of PiD distill steps. The released checkpoints are distilled for 4; the student schedule has only 4 transitions, so higher counts cannot add sampling steps.",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 4,
+            "minimum": 1,
+            "orig_default": 4,
+            "orig_required": false,
+            "title": "Num Inference Steps",
+            "type": "integer"
+          },
+          "seed": {
+            "default": 0,
+            "description": "Seed for the PiD decoder's noise.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Seed",
+            "type": "integer"
+          },
+          "type": {
+            "const": "sd3_pid_decode",
+            "default": "sd3_pid_decode",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["latents", "image", "pid", "sd3", "upscale"],
+        "title": "Latents to Image - SD3 + PiD (4x SR)",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/ImageOutput"
+        }
+      },
       "SDXLCompelPromptInvocation": {
         "category": "prompt",
         "class": "invocation",
@@ -72333,6 +74930,189 @@
         "required": ["output_meta", "unet", "clip", "clip2", "vae", "type", "type"],
         "title": "SDXLModelLoaderOutput",
         "type": "object"
+      },
+      "SDXLPiDDecodeInvocation": {
+        "category": "latents",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Decode an SDXL latent with the PiD pixel-diffusion decoder.\n\nProduces a 4x super-resolved image in a single pass. The SDXL latent is\n4-channel at an 8x down-factor, so it is denormalized (``z / scaling_factor``)\nand handed straight to PiD - no packing needed.",
+        "node_pack": "invokeai",
+        "properties": {
+          "board": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The board to save the image to",
+            "field_kind": "internal",
+            "input": "direct",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "latents": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Latents tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Text prompt the latent was generated from. PiD conditions on it.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "Prompt",
+            "ui_component": "textarea"
+          },
+          "gemma2_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Gemma2EncoderField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Gemma-2 caption encoder. Required by PiD.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Gemma-2 Encoder"
+          },
+          "pid_decoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PiDDecoderField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "PiD SDXL decoder checkpoint.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "PiD Decoder"
+          },
+          "vae": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VAEField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "SDXL VAE, used to read scaling_factor / shift_factor. If omitted, the SDXL fallback constants (0.13025 / 0.0) are used.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "VAE"
+          },
+          "num_inference_steps": {
+            "default": 4,
+            "description": "Number of PiD distill steps. The released checkpoints are distilled for 4; the student schedule has only 4 transitions, so higher counts cannot add sampling steps.",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 4,
+            "minimum": 1,
+            "orig_default": 4,
+            "orig_required": false,
+            "title": "Num Inference Steps",
+            "type": "integer"
+          },
+          "seed": {
+            "default": 0,
+            "description": "Seed for the PiD decoder's noise.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Seed",
+            "type": "integer"
+          },
+          "type": {
+            "const": "sdxl_pid_decode",
+            "default": "sdxl_pid_decode",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["latents", "image", "pid", "sdxl", "upscale"],
+        "title": "Latents to Image - SDXL + PiD (4x SR)",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/ImageOutput"
+        }
       },
       "SDXLRefinerCompelPromptInvocation": {
         "category": "prompt",
@@ -74231,6 +77011,18 @@
             "title": "Retried From Item Id",
             "description": "The item_id of the queue item that this item was retried from"
           },
+          "device": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device",
+            "description": "The device that processed this queue item, e.g. 'cuda:1' (set only when running on a CUDA GPU)"
+          },
           "workflow_call_id": {
             "anyOf": [
               {
@@ -75234,6 +78026,9 @@
                 "$ref": "#/components/schemas/Krea2VariantType"
               },
               {
+                "$ref": "#/components/schemas/PiDDecoderVariantType"
+              },
+              {
                 "type": "null"
               }
             ],
@@ -75401,6 +78196,9 @@
               },
               {
                 "$ref": "#/components/schemas/Krea2VariantType"
+              },
+              {
+                "$ref": "#/components/schemas/PiDDecoderVariantType"
               },
               {
                 "type": "null"
@@ -76345,6 +79143,9 @@
               },
               {
                 "$ref": "#/components/schemas/Krea2VariantType"
+              },
+              {
+                "$ref": "#/components/schemas/PiDDecoderVariantType"
               },
               {
                 "type": "null"
@@ -79540,6 +82341,10 @@
             ],
             "title": "Max Queue History",
             "description": "Keep the last N completed, failed, and canceled queue items on startup. Set to 0 to prune all terminal items."
+          },
+          "generation_devices": {
+            "title": "Generation Devices",
+            "description": "Devices to use for parallel generation. `auto` uses every available GPU; provide an explicit list (e.g. `[cuda:0, cuda:1]`) to use specific devices. Takes effect after restarting InvokeAI."
           }
         },
         "type": "object",
@@ -86924,6 +89729,189 @@
         "required": ["output_meta", "transformer", "qwen3_encoder", "vae", "type", "type"],
         "title": "ZImageModelLoaderOutput",
         "type": "object"
+      },
+      "ZImagePiDDecodeInvocation": {
+        "category": "latents",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Decode a Z-Image latent with the PiD pixel-diffusion decoder.\n\nProduces a 4x super-resolved image in a single pass (Z-Image decoder is\ntrained on FLUX.1 latents; ``sr_scale=4`` with the FLUX VAE's 8x spatial\ndown-factor gives a 32x linear scale from latent to pixel).",
+        "node_pack": "invokeai",
+        "properties": {
+          "board": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The board to save the image to",
+            "field_kind": "internal",
+            "input": "direct",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "latents": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Latents tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Text prompt the latent was generated from. PiD conditions on it.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "Prompt",
+            "ui_component": "textarea"
+          },
+          "gemma2_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Gemma2EncoderField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Gemma-2 caption encoder. Required by PiD.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Gemma-2 Encoder"
+          },
+          "pid_decoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PiDDecoderField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "PiD FLUX decoder checkpoint.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "PiD Decoder"
+          },
+          "vae": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VAEField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Z-Image VAE used to read scaling_factor / shift_factor. If omitted, the FLUX.1 fallback constants (0.3611 / 0.1159) are used.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "VAE"
+          },
+          "num_inference_steps": {
+            "default": 4,
+            "description": "Number of PiD distill steps. The released checkpoints are distilled for 4; the student schedule has only 4 transitions, so higher counts cannot add sampling steps.",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 4,
+            "minimum": 1,
+            "orig_default": 4,
+            "orig_required": false,
+            "title": "Num Inference Steps",
+            "type": "integer"
+          },
+          "seed": {
+            "default": 0,
+            "description": "Seed for the PiD decoder's noise.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Seed",
+            "type": "integer"
+          },
+          "type": {
+            "const": "z_image_pid_decode",
+            "default": "z_image_pid_decode",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["latents", "image", "pid", "z-image", "upscale"],
+        "title": "Latents to Image - Z-Image + PiD (4x SR)",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/ImageOutput"
+        }
       },
       "ZImageSeedVarianceEnhancerInvocation": {
         "category": "prompt",

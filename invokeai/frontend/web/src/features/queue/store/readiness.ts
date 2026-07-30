@@ -38,7 +38,7 @@ import { resolveBatchValue } from 'features/nodes/util/node/resolveBatchValue';
 import type { UpscaleState } from 'features/parameters/store/upscaleSlice';
 import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
 import { isFlux2KleinQwen3Compatible } from 'features/parameters/util/flux2Klein';
-import { getGridSize } from 'features/parameters/util/optimalDimension';
+import { getGridSize, getPidScale } from 'features/parameters/util/optimalDimension';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { TabName } from 'features/ui/store/uiTypes';
 import i18n from 'i18next';
@@ -291,6 +291,14 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     if (!params.fluxVAE) {
       reasons.push({ content: i18n.t('parameters.invoke.noFLUXVAEModelSelected') });
     }
+    if (params.pidMode !== 'off') {
+      if (!params.pidDecoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+      }
+      if (!params.gemma2EncoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
+      }
+    }
   }
 
   if (model?.base === 'flux2' && model.format !== 'diffusers') {
@@ -305,6 +313,39 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     }
   }
 
+  if (model?.base === 'flux2' && params.pidMode !== 'off') {
+    // PiD decode (any FLUX.2 format) needs both a PiD decoder and the Gemma-2 caption encoder.
+    if (!params.pidDecoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+    }
+    if (!params.gemma2EncoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
+    }
+  }
+
+  if (model?.base === 'sd-3' && params.pidMode !== 'off') {
+    // PiD decode needs both a PiD decoder and the Gemma-2 caption encoder.
+    if (!params.pidDecoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+    }
+    if (!params.gemma2EncoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
+    }
+  }
+
+  if (model?.base === 'sdxl' && params.pidMode !== 'off') {
+    // PiD decode needs the decoder + Gemma-2 encoder, and is not compatible with the SDXL Refiner.
+    if (!params.pidDecoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+    }
+    if (!params.gemma2EncoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
+    }
+    if (params.refinerModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.pidIncompatibleWithRefiner') });
+    }
+  }
+
   if (model?.base === 'qwen-image' && model.format === 'gguf_quantized') {
     // GGUF needs sources for VAE + encoder. Each can come from either a standalone
     // model or the Component Source (Diffusers).
@@ -312,6 +353,16 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     const hasEncoderSource = params.qwenImageQwenVLEncoderModel !== null || params.qwenImageComponentSource !== null;
     if (!hasVaeSource || !hasEncoderSource) {
       reasons.push({ content: i18n.t('parameters.invoke.noQwenImageComponentSourceSelected') });
+    }
+  }
+
+  if (model?.base === 'qwen-image' && params.pidMode !== 'off') {
+    // PiD decode (any Qwen-Image format) needs both a PiD decoder and the Gemma-2 caption encoder.
+    if (!params.pidDecoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+    }
+    if (!params.gemma2EncoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
     }
   }
 
@@ -338,6 +389,15 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     const hasQwen3Source = params.zImageQwen3EncoderModel !== null || params.zImageQwen3SourceModel !== null;
     if (!hasQwen3Source) {
       reasons.push({ content: i18n.t('parameters.invoke.noZImageQwen3EncoderSourceSelected') });
+    }
+    // PiD decode (Z-Image reuses the FLUX decoder) needs both a PiD decoder and the Gemma-2 caption encoder.
+    if (params.pidMode !== 'off') {
+      if (!params.pidDecoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+      }
+      if (!params.gemma2EncoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
+      }
     }
   }
 
@@ -609,7 +669,23 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     }
 
     const { bbox } = canvas;
-    const gridSize = getGridSize('flux');
+    // In PiD native mode the bbox is the 4x target, so it must snap to a larger grid (16 * 4) for bbox / 4 to land
+    // on the FLUX grid. getPidScale returns 1 for off/fit, leaving the normal 16px grid.
+    const gridSize = getGridSize('flux', getPidScale(params.pidMode));
+
+    if (params.pidMode !== 'off') {
+      if (!params.pidDecoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+      }
+      if (!params.gemma2EncoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
+      }
+      // PiD decodes at 4x the generation resolution; "Scale Before Processing" would inflate the generation
+      // size and blow up the decode. Require it to be off (None) so generation == bbox.
+      if (bbox.scaleMethod !== 'none') {
+        reasons.push({ content: i18n.t('parameters.invoke.pidScaleBeforeProcessingMustBeOff') });
+      }
+    }
 
     if (bbox.scaleMethod === 'none') {
       if (bbox.rect.width % gridSize !== 0) {
@@ -666,7 +742,23 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     }
 
     const { bbox } = canvas;
-    const gridSize = getGridSize('flux'); // FLUX.2 uses same grid size as FLUX.1
+    // FLUX.2 uses the same 16px grid as FLUX.1. In PiD native mode the bbox is the 4x target, so it must snap to
+    // a larger grid (16 * 4) for bbox / 4 to land on the FLUX grid. getPidScale returns 1 for off/fit.
+    const gridSize = getGridSize('flux2', getPidScale(params.pidMode));
+
+    if (params.pidMode !== 'off') {
+      if (!params.pidDecoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+      }
+      if (!params.gemma2EncoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
+      }
+      // PiD decodes at 4x the generation resolution; "Scale Before Processing" would inflate the generation
+      // size and blow up the decode. Require it to be off (None) so generation == bbox.
+      if (bbox.scaleMethod !== 'none') {
+        reasons.push({ content: i18n.t('parameters.invoke.pidScaleBeforeProcessingMustBeOff') });
+      }
+    }
 
     if (bbox.scaleMethod === 'none') {
       if (bbox.rect.width % gridSize !== 0) {
@@ -706,6 +798,79 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
           }),
         });
       }
+    }
+  }
+
+  if (model?.base === 'sd-3' && params.pidMode !== 'off') {
+    // PiD decode on the Canvas: needs the decoder + Gemma-2 encoder, and "Scale Before Processing" must be off
+    // (PiD decodes at 4x the generation resolution; scaling would inflate the generation size and blow up the decode).
+    if (!params.pidDecoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+    }
+    if (!params.gemma2EncoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
+    }
+    if (canvas.bbox.scaleMethod !== 'none') {
+      reasons.push({ content: i18n.t('parameters.invoke.pidScaleBeforeProcessingMustBeOff') });
+    }
+    // Native mode generates at bbox/4, so the bbox must be a multiple of the PiD-scaled grid (grid*4) for
+    // bbox/4 to land on the SD3 grid; without this a 1040px bbox silently becomes a 256px generation.
+    const gridSize = getGridSize('sd-3', getPidScale(params.pidMode));
+    if (canvas.bbox.rect.width % gridSize !== 0) {
+      reasons.push({
+        content: i18n.t('parameters.invoke.modelIncompatibleBboxWidth', {
+          model: 'SD3',
+          width: canvas.bbox.rect.width,
+          multiple: gridSize,
+        }),
+      });
+    }
+    if (canvas.bbox.rect.height % gridSize !== 0) {
+      reasons.push({
+        content: i18n.t('parameters.invoke.modelIncompatibleBboxHeight', {
+          model: 'SD3',
+          height: canvas.bbox.rect.height,
+          multiple: gridSize,
+        }),
+      });
+    }
+  }
+
+  if (model?.base === 'sdxl' && params.pidMode !== 'off') {
+    // PiD decode on the Canvas: decoder + Gemma-2 encoder required, "Scale Before Processing" off, and not
+    // compatible with the SDXL Refiner.
+    if (!params.pidDecoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+    }
+    if (!params.gemma2EncoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
+    }
+    if (params.refinerModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.pidIncompatibleWithRefiner') });
+    }
+    if (canvas.bbox.scaleMethod !== 'none') {
+      reasons.push({ content: i18n.t('parameters.invoke.pidScaleBeforeProcessingMustBeOff') });
+    }
+    // Native mode generates at bbox/4, so the bbox must be a multiple of the PiD-scaled grid (grid*4) for
+    // bbox/4 to land on the SDXL grid; without this a 1040px bbox silently becomes a 256px generation.
+    const gridSize = getGridSize('sdxl', getPidScale(params.pidMode));
+    if (canvas.bbox.rect.width % gridSize !== 0) {
+      reasons.push({
+        content: i18n.t('parameters.invoke.modelIncompatibleBboxWidth', {
+          model: 'SDXL',
+          width: canvas.bbox.rect.width,
+          multiple: gridSize,
+        }),
+      });
+    }
+    if (canvas.bbox.rect.height % gridSize !== 0) {
+      reasons.push({
+        content: i18n.t('parameters.invoke.modelIncompatibleBboxHeight', {
+          model: 'SDXL',
+          height: canvas.bbox.rect.height,
+          multiple: gridSize,
+        }),
+      });
     }
   }
 
@@ -756,7 +921,21 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
 
   if (model?.base === 'qwen-image') {
     const { bbox } = canvas;
-    const gridSize = getGridSize('qwen-image');
+    // In PiD native mode the bbox is the 4x target, so it must snap to a larger grid (16 * 4) for bbox / 4 to land
+    // on the Qwen grid. getPidScale returns 1 for off/fit, leaving the normal 16px grid.
+    const gridSize = getGridSize('qwen-image', getPidScale(params.pidMode));
+
+    if (params.pidMode !== 'off') {
+      if (!params.pidDecoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+      }
+      if (!params.gemma2EncoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
+      }
+      if (bbox.scaleMethod !== 'none') {
+        reasons.push({ content: i18n.t('parameters.invoke.pidScaleBeforeProcessingMustBeOff') });
+      }
+    }
 
     if (bbox.scaleMethod === 'none') {
       if (bbox.rect.width % gridSize !== 0) {
@@ -924,6 +1103,39 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     const hasQwen3Source = params.zImageQwen3EncoderModel !== null || params.zImageQwen3SourceModel !== null;
     if (!hasQwen3Source) {
       reasons.push({ content: i18n.t('parameters.invoke.noZImageQwen3EncoderSourceSelected') });
+    }
+    // PiD decode on the Canvas: decoder + Gemma-2 encoder required, and "Scale Before Processing" must be off.
+    if (params.pidMode !== 'off') {
+      if (!params.pidDecoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+      }
+      if (!params.gemma2EncoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
+      }
+      if (canvas.bbox.scaleMethod !== 'none') {
+        reasons.push({ content: i18n.t('parameters.invoke.pidScaleBeforeProcessingMustBeOff') });
+      }
+      // Native mode generates at bbox/4, so the bbox must be a multiple of the PiD-scaled grid (grid*4) for
+      // bbox/4 to land on the grid; without this a 1040px bbox silently becomes a 256px generation.
+      const gridSize = getGridSize('z-image', getPidScale(params.pidMode));
+      if (canvas.bbox.rect.width % gridSize !== 0) {
+        reasons.push({
+          content: i18n.t('parameters.invoke.modelIncompatibleBboxWidth', {
+            model: 'Z-Image',
+            width: canvas.bbox.rect.width,
+            multiple: gridSize,
+          }),
+        });
+      }
+      if (canvas.bbox.rect.height % gridSize !== 0) {
+        reasons.push({
+          content: i18n.t('parameters.invoke.modelIncompatibleBboxHeight', {
+            model: 'Z-Image',
+            height: canvas.bbox.rect.height,
+            multiple: gridSize,
+          }),
+        });
+      }
     }
   }
 

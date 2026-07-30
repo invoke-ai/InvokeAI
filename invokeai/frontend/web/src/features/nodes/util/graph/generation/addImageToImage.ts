@@ -9,8 +9,8 @@ import {
 } from 'features/nodes/util/graph/graphBuilderUtils';
 import type {
   DenoiseLatentsNodes,
+  ImageOutputNodes,
   ImageToLatentsNodes,
-  LatentToImageNodes,
   MainModelLoaderNodes,
   VaeSourceNodes,
 } from 'features/nodes/util/graph/types';
@@ -21,7 +21,9 @@ type AddImageToImageArg = {
   g: Graph;
   state: RootState;
   manager: CanvasManager;
-  l2i: Invocation<LatentToImageNodes>;
+  // Only the `.image` output is consumed downstream, so any image-producing node works here (e.g. a PiD decode
+  // chain substituted for the regular VAE decode).
+  l2i: Invocation<ImageOutputNodes>;
   i2l: Invocation<ImageToLatentsNodes>;
   noise?: Invocation<'noise'>;
   denoise: Invocation<DenoiseLatentsNodes>;
@@ -37,7 +39,7 @@ export const addImageToImage = async ({
   noise,
   denoise,
   vaeSource,
-}: AddImageToImageArg): Promise<Invocation<LatentToImageNodes | 'img_resize'>> => {
+}: AddImageToImageArg): Promise<Invocation<ImageOutputNodes>> => {
   const { denoising_start, denoising_end } = getDenoisingStartAndEnd(state);
   denoise.denoising_start = denoising_start;
   denoise.denoising_end = denoising_end;

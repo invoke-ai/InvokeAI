@@ -813,6 +813,9 @@ const zPositivePromptHistory = z
 export const zInfillMethod = z.enum(['patchmatch', 'lama', 'cv2', 'color', 'tile']);
 export type InfillMethod = z.infer<typeof zInfillMethod>;
 
+const zPidMode = z.enum(['off', 'fit', 'native']);
+export type PidMode = z.infer<typeof zPidMode>;
+
 export const zParamsState = z.object({
   _version: z.literal(4),
   maskBlur: z.number(),
@@ -892,6 +895,14 @@ export const zParamsState = z.object({
   // Flux2 Klein model components - uses Qwen3 instead of CLIP+T5
   kleinVaeModel: zParameterVAEModel.nullable(), // Optional: Separate FLUX.2 VAE for Klein
   kleinQwen3EncoderModel: zModelIdentifierField.nullable(), // Optional: Separate Qwen3 Encoder for Klein
+  // PiD (Pixel Diffusion Decoder) - optional 4x super-resolution decode replacing the VAE decode.
+  // - 'off':    regular VAE decode
+  // - 'fit':    PiD decodes 4x internally, then downscales back to the bbox (compositing-safe; works in canvas/inpaint)
+  // - 'native': PiD's full 4x output IS the result; the user-facing dimensions are the target, generation runs at target / 4
+  pidMode: zPidMode,
+  pidDecoderModel: zModelIdentifierField.nullable(), // PiD decoder checkpoint (matched to the main model's base)
+  gemma2EncoderModel: zModelIdentifierField.nullable(), // Gemma-2 caption encoder required by PiD
+  pidSteps: z.number().int().min(1).max(4), // PiD distill steps: student schedule has only 4 transitions, so 1-4
   // Qwen Image Edit model components - GGUF transformer needs a Diffusers source for VAE/encoder
   qwenImageComponentSource: zParameterModel.nullable(), // Diffusers model providing VAE + text encoder
   qwenImageVaeModel: zParameterVAEModel.nullable(), // Optional: Standalone Qwen Image VAE checkpoint
@@ -1004,6 +1015,10 @@ export const getInitialParamsState = (): ParamsState => ({
   animaLLLiteWeight: 1,
   kleinVaeModel: null,
   kleinQwen3EncoderModel: null,
+  pidMode: 'off',
+  pidDecoderModel: null,
+  gemma2EncoderModel: null,
+  pidSteps: 4,
   qwenImageComponentSource: null,
   qwenImageVaeModel: null,
   qwenImageQwenVLEncoderModel: null,

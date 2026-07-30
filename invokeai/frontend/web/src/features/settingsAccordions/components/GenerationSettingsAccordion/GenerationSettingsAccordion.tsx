@@ -22,6 +22,7 @@ import {
 } from 'features/controlLayers/store/paramsSlice';
 import { LoRAList } from 'features/lora/components/LoRAList';
 import LoRASelect from 'features/lora/components/LoRASelect';
+import PidSettings from 'features/parameters/components/Advanced/PidSettings';
 import ParamAnimaScheduler from 'features/parameters/components/Core/ParamAnimaScheduler';
 import ParamCFGScale from 'features/parameters/components/Core/ParamCFGScale';
 import ParamErnieImageScheduler from 'features/parameters/components/Core/ParamErnieImageScheduler';
@@ -39,6 +40,7 @@ import ParamZImageScheduler from 'features/parameters/components/Core/ParamZImag
 import ParamZImageShift from 'features/parameters/components/Core/ParamZImageShift';
 import ParamKrea2EnhancersSettings from 'features/parameters/components/Krea2Enhancers/ParamKrea2EnhancersSettings';
 import ParamZImageSeedVarianceSettings from 'features/parameters/components/SeedVariance/ParamZImageSeedVarianceSettings';
+import { getIsPidSupportedBase } from 'features/parameters/util/pid';
 import { MainModelPicker } from 'features/settingsAccordions/components/GenerationSettingsAccordion/MainModelPicker';
 import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
@@ -70,6 +72,8 @@ export const GenerationSettingsAccordion = memo(() => {
   const fluxDypePreset = useAppSelector(selectFluxDypePreset);
   const modelSupportsGuidance = useAppSelector(selectModelSupportsGuidance);
   const modelSupportsSteps = useAppSelector(selectModelSupportsSteps);
+  // PiD is available for any base whose graph builder wires a PiD decode (currently FLUX and FLUX.2).
+  const isPidSupported = getIsPidSupportedBase(modelConfig?.base);
   const hasExpanderContent = isExternal ? modelSupportsGuidance || modelSupportsSteps : true;
 
   const selectBadges = useMemo(
@@ -128,6 +132,7 @@ export const GenerationSettingsAccordion = memo(() => {
                 {!isExternal && isFLUX && fluxDypePreset === 'manual' && <ParamFluxDypeScale />}
                 {!isExternal && isFLUX && fluxDypePreset === 'manual' && <ParamFluxDypeExponent />}
               </FormControlGroup>
+              {!isExternal && isPidSupported && <PidSettings />}
               {!isExternal && isZImage && <ParamZImageSeedVarianceSettings />}
               {!isExternal && isKrea2 && <ParamKrea2EnhancersSettings />}
             </Flex>
