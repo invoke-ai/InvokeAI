@@ -215,3 +215,79 @@ No added `useEffect` matched.
 - `PreviewVideo` remains local to `PreviewFrame.tsx`; Task 9 can extend its
   video-only UI without adding another media element or weakening image
   contracts.
+
+## Independent-review follow-up
+
+The independent review found one critical, three important, and two minor
+issues. All six were addressed in a separate follow-up:
+
+- Protected-cookie recovery now captures the immutable account lifecycle scope
+  and passes its abort signal into the transport. An account transition aborts
+  the stale request synchronously, a new scope gets a distinct single flight,
+  and stale completion still resolves `false`.
+- Preview ordering now reuses the gallery's canonical SQLite-compatible
+  timestamp, kind, and name comparator, including direction-aware ties.
+- A video without a thumbnail renders a neutral filmstrip placeholder and
+  never falls back to its protected full URL in an `<img>`.
+- Keyboard events originating from native video controls are left untouched,
+  while compare and zoom registrations are present only for image selections.
+- The footer position text uses tabular numerals.
+- The video Retry control imports the platform Button directly.
+
+The lifecycle and ordering regression tests first failed as expected:
+
+```text
+Test Files 2 failed (2)
+Tests 2 failed, 21 passed (23)
+```
+
+They passed after implementation, together with the existing gallery merge
+coverage:
+
+```text
+Test Files 3 passed (3)
+Tests 31 passed (31)
+```
+
+The UI regressions first failed as expected:
+
+```text
+Test Files 2 failed (2)
+Tests 3 failed, 15 passed (18)
+```
+
+They then passed:
+
+```text
+Test Files 2 passed (2)
+Tests 18 passed (18)
+```
+
+The broader focused browser set passed 5 files and 41 tests.
+
+Final full verification after the follow-up:
+
+```text
+pnpm lint
+format: passed
+OXC: passed
+tsc --noEmit: passed
+architecture: 3 files, 34 tests passed
+
+pnpm test
+Test Files 376 passed (376)
+Tests 4978 passed (4978)
+
+pnpm test:browser
+Test Files 66 passed (66)
+Tests 310 passed (310)
+
+pnpm test:fixtures
+Tests 4 passed (4)
+```
+
+The browser suite retained its existing non-failing React `act(...)`,
+missing-i18n-instance, and intentional error-boundary diagnostics.
+
+The source-policy scans again found exactly one production `<video>` in
+`PreviewFrame.tsx`, no added `useEffect`, and no whitespace errors.
