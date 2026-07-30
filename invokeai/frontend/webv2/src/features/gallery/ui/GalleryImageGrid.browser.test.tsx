@@ -199,9 +199,15 @@ const actionMocks = {
   toggleItemInSelection: vi.fn(),
 };
 const imageActionMocks = {
+  deleteItems: vi.fn(),
   deleteImages: vi.fn(),
+  downloadItem: vi.fn(),
+  downloadItems: vi.fn(),
   moveImagesToBoard: vi.fn(),
   moveItemsToBoard: vi.fn(),
+  openItemInNewTab: vi.fn(),
+  openItemInPreview: vi.fn(),
+  setItemsStarred: vi.fn(),
   setImagesStarred: vi.fn(),
 };
 const noop = vi.fn();
@@ -262,7 +268,7 @@ const NoopProvider = ({ children }: { children: ReactNode }) => children;
 
 const createAdapter = (): GalleryUiAdapter =>
   ({
-    ImageActionsProvider: NoopProvider,
+    ItemActionsProvider: NoopProvider,
     ImageContextMenu: ContextMenuProbe,
     account: { enableLiveFollow: noop },
     antialiasProgressImages: false,
@@ -321,7 +327,7 @@ const Harness = ({
   const contextValue: GalleryWidgetContextValue = {
     actions: createActions(),
     gallery,
-    imageActions: imageActionMocks,
+    itemActions: imageActionMocks,
     isWindowTruncated: false,
     projectName: 'Project',
     runtime,
@@ -588,7 +594,7 @@ describe('GalleryImageGrid mixed item cells', () => {
     );
   });
 
-  it('select-all targets ordered mixed refs while image-only hotkeys reject a mixed selection', async () => {
+  it('select-all and common hotkeys target ordered same-name mixed refs independently', async () => {
     const items = [createItem('image', 'shared'), createItem('video', 'shared')];
     await renderGallery(
       createGallery({
@@ -609,8 +615,31 @@ describe('GalleryImageGrid mixed item cells', () => {
       ],
       items[0]
     );
-    expect(imageActionMocks.deleteImages).not.toHaveBeenCalled();
-    expect(imageActionMocks.setImagesStarred).not.toHaveBeenCalled();
+    expect(imageActionMocks.deleteItems).toHaveBeenCalledWith([
+      { kind: 'image', name: 'shared' },
+      { kind: 'video', name: 'shared' },
+    ]);
+    expect(imageActionMocks.setItemsStarred).toHaveBeenCalledWith(
+      [
+        { kind: 'image', name: 'shared' },
+        { kind: 'video', name: 'shared' },
+      ],
+      true
+    );
+  });
+
+  it('stars a video from its grid affordance through the common qualified action', async () => {
+    await renderGallery(
+      createGallery({
+        items: [createItem('video', 'clip.mp4')],
+        selectedItemKey: 'video:clip.mp4',
+        selectedItemKeys: ['video:clip.mp4'],
+      })
+    );
+
+    await click(getButton('Star clip.mp4'));
+
+    expect(imageActionMocks.setItemsStarred).toHaveBeenCalledWith([{ kind: 'video', name: 'clip.mp4' }], true);
   });
 });
 

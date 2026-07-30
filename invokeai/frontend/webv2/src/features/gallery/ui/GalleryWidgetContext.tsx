@@ -5,7 +5,7 @@ import type { GalleryView } from '@features/gallery/core/types';
 import { createContext, use } from 'react';
 
 import type { GalleryStateView } from './galleryStateView';
-import type { GalleryImageActions, GalleryWidgetRuntime } from './GalleryUiContext';
+import type { GalleryItemActions, GalleryWidgetRuntime } from './GalleryUiContext';
 
 /**
  * Gallery-widget intents. The provider (GalleryWidgetView) is the only place
@@ -36,7 +36,7 @@ export interface GalleryActions {
 export interface GalleryWidgetContextValue {
   gallery: GalleryStateView;
   actions: GalleryActions;
-  imageActions: GalleryImageActions;
+  itemActions: GalleryItemActions;
   /** The infinite window is full and the board holds images it cannot reach. */
   isWindowTruncated: boolean;
   projectName: string;

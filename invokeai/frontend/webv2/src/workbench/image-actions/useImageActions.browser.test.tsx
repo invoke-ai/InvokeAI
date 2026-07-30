@@ -1,3 +1,5 @@
+import type { GalleryItem, GalleryItemKey, GalleryItemRef } from '@features/gallery';
+
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, createRef, type Ref, useImperativeHandle } from 'react';
@@ -11,26 +13,42 @@ import { useImageActions } from './useImageActions';
 const mocks = vi.hoisted(() => ({
   addToBoard: vi.fn(),
   deleteImages: vi.fn(),
+  downloadArchive: vi.fn(),
+  downloadBlob: vi.fn(),
+  galleryRemoveItems: vi.fn(),
   galleryPatchItems: vi.fn(),
+  gallerySelectItem: vi.fn(),
   invalidateGallery: vi.fn(),
   invalidateGalleryItems: vi.fn(),
+  itemDelete: vi.fn(),
+  itemMoveToBoard: vi.fn(),
+  itemSetStarred: vi.fn(),
+  notificationsAdd: vi.fn(),
   openWorkbenchWidget: vi.fn(),
   patchGalleryItemCaches: vi.fn((..._args: unknown[]) => vi.fn()),
   removeFromBoard: vi.fn(),
   reportError: vi.fn(),
+  resolveItem: vi.fn(),
   setStarred: vi.fn(),
 }));
 
 vi.mock('@features/gallery', () => ({
   galleryImages: { metadata: vi.fn() },
+  galleryItemOrganization: {
+    delete: (...args: unknown[]) => mocks.itemDelete(...args),
+    moveToBoard: (...args: unknown[]) => mocks.itemMoveToBoard(...args),
+    setStarred: (...args: unknown[]) => mocks.itemSetStarred(...args),
+  },
+  galleryItems: { resolve: (...args: unknown[]) => mocks.resolveItem(...args) },
   galleryOrganization: {
     addToBoard: (...args: unknown[]) => mocks.addToBoard(...args),
     deleteImages: (...args: unknown[]) => mocks.deleteImages(...args),
     removeFromBoard: (...args: unknown[]) => mocks.removeFromBoard(...args),
     setStarred: (...args: unknown[]) => mocks.setStarred(...args),
   },
-  galleryTransfers: { downloadArchive: vi.fn() },
+  galleryTransfers: { downloadArchive: (...args: unknown[]) => mocks.downloadArchive(...args) },
   toGalleryItemKey: ({ kind, name }: { kind: string; name: string }) => `${kind}:${name}`,
+  toGalleryItemRef: ({ kind, name }: { kind: 'image' | 'video'; name: string }) => ({ kind, name }),
 }));
 
 vi.mock('@features/gallery/queries', () => ({
@@ -49,6 +67,10 @@ vi.mock('@workbench/useOpenWorkbenchWidget', () => ({
   useOpenWorkbenchWidget: () => mocks.openWorkbenchWidget,
 }));
 
+vi.mock('@platform/browser/downloadBlob', () => ({
+  downloadBlob: (...args: unknown[]) => mocks.downloadBlob(...args),
+}));
+
 vi.mock('@workbench/canvas-operations/api', () => ({
   getCanvasEngine: vi.fn(),
   getCanvasImportNotice: vi.fn(),
@@ -60,12 +82,16 @@ vi.mock('@workbench/WorkbenchContext', () => ({
     canvas: { apply: vi.fn() },
     gallery: {
       patchItems: (...args: unknown[]) => mocks.galleryPatchItems(...args),
-      removeItems: vi.fn(),
+      removeItems: (...args: unknown[]) => mocks.galleryRemoveItems(...args),
       selectImage: vi.fn(),
+      selectItem: (...args: unknown[]) => mocks.gallerySelectItem(...args),
       setCompareImage: vi.fn(),
     },
     generation: { patchSettings: vi.fn() },
-    notifications: { add: vi.fn(), reportError: (...args: unknown[]) => mocks.reportError(...args) },
+    notifications: {
+      add: (...args: unknown[]) => mocks.notificationsAdd(...args),
+      reportError: (...args: unknown[]) => mocks.reportError(...args),
+    },
   }),
   useWorkbenchQueries: () => ({
     getProject: vi.fn(),
@@ -81,12 +107,20 @@ vi.mock('react-i18next', () => ({
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 const actionsRef = createRef<ImageActions>();
+interface ItemActionContext {
+  filterIdentity: string;
+  items: GalleryItem[];
+  loadOrderedRefs(): Promise<GalleryItemRef[]>;
+  selectedItemKey: GalleryItemKey | null;
+}
+let currentItemActionContext: ItemActionContext | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const Probe = ({ ref }: { ref: Ref<ImageActions> }) => {
   const actions = useImageActions({
     boards: [],
     generateValues: {},
+    getItemActionContext: () => currentItemActionContext,
     projectId: 'project-1',
   });
 
@@ -97,7 +131,9 @@ const Probe = ({ ref }: { ref: Ref<ImageActions> }) => {
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  mocks.invalidateGallery.mockResolvedValue(undefined);
   accountLifecycle.activate('user-a');
+  currentItemActionContext = null;
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -120,13 +156,18 @@ afterEach(async () => {
 
 describe('partial image mutation outcomes', () => {
   it('moves and patches only images confirmed by the backend', async () => {
-    mocks.addToBoard.mockResolvedValue(['moved.png']);
+    mocks.itemMoveToBoard.mockResolvedValue({
+      affectedBoardIds: ['board-1'],
+      failed: [{ kind: 'image', name: 'locked.png' }],
+      succeeded: [{ kind: 'image', name: 'moved.png' }],
+    });
 
     await act(async () => {
       await actionsRef.current?.moveImagesToBoard(['moved.png', 'locked.png'], 'board-1');
     });
 
     const result = {
+      affectedBoardIds: ['board-1'],
       failed: [{ kind: 'image', name: 'locked.png' }],
       succeeded: [{ kind: 'image', name: 'moved.png' }],
     };
@@ -140,13 +181,18 @@ describe('partial image mutation outcomes', () => {
   });
 
   it('stars and patches only images confirmed by the backend', async () => {
-    mocks.setStarred.mockResolvedValue(['starred.png']);
+    mocks.itemSetStarred.mockResolvedValue({
+      affectedBoardIds: [],
+      failed: [{ kind: 'image', name: 'locked.png' }],
+      succeeded: [{ kind: 'image', name: 'starred.png' }],
+    });
 
     await act(async () => {
       await actionsRef.current?.setImagesStarred(['starred.png', 'locked.png'], true);
     });
 
     const result = {
+      affectedBoardIds: [],
       failed: [{ kind: 'image', name: 'locked.png' }],
       succeeded: [{ kind: 'image', name: 'starred.png' }],
     };
@@ -157,5 +203,475 @@ describe('partial image mutation outcomes', () => {
       starred: true,
     });
     expect(mocks.galleryPatchItems).toHaveBeenCalledWith(['image:starred.png'], { starred: true });
+  });
+});
+
+type ExpectedItemActions = {
+  deleteItems(refs: Array<{ kind: 'image' | 'video'; name: string }>): Promise<void>;
+  downloadItem(item: { fullUrl: string; kind: 'image' | 'video'; name: string }): Promise<void>;
+  downloadItems(
+    refs: Array<{ kind: 'image' | 'video'; name: string }>,
+    loadedItems?: Array<{ fullUrl: string; kind: 'image' | 'video'; name: string }>
+  ): Promise<void>;
+  moveItemsToBoard(refs: Array<{ kind: 'image' | 'video'; name: string }>, boardId: string): Promise<void>;
+  setItemsStarred(refs: Array<{ kind: 'image' | 'video'; name: string }>, starred: boolean): Promise<void>;
+};
+
+const getItemActions = (): ExpectedItemActions => actionsRef.current as unknown as ExpectedItemActions;
+
+describe('mixed item mutation outcomes', () => {
+  it('moves mixed refs through the common organization result and patches only confirmed qualified keys', async () => {
+    const refs = [
+      { kind: 'image' as const, name: 'shared' },
+      { kind: 'video' as const, name: 'shared' },
+    ];
+    const result = {
+      affectedBoardIds: ['board-1', 'board-2'],
+      failed: [refs[1]],
+      succeeded: [refs[0]],
+    };
+    mocks.itemMoveToBoard.mockResolvedValue(result);
+
+    await act(async () => {
+      await getItemActions().moveItemsToBoard(refs, 'board-2');
+    });
+
+    expect(mocks.itemMoveToBoard).toHaveBeenCalledWith(refs, 'board-2', expect.any(AbortSignal));
+    expect(mocks.patchGalleryItemCaches).toHaveBeenCalledWith(expect.anything(), {
+      boardId: 'board-2',
+      kind: 'move',
+      result,
+    });
+    expect(mocks.galleryPatchItems).toHaveBeenCalledWith(['image:shared'], { boardId: 'board-2' });
+    expect(mocks.invalidateGallery).toHaveBeenCalledOnce();
+    expect(mocks.notificationsAdd.mock.calls.length + mocks.reportError.mock.calls.length).toBe(1);
+  });
+
+  it('stars same-name media independently and preserves a failed selected item', async () => {
+    const refs = [
+      { kind: 'image' as const, name: 'shared' },
+      { kind: 'video' as const, name: 'shared' },
+    ];
+    const result = {
+      affectedBoardIds: [],
+      failed: [refs[0]],
+      succeeded: [refs[1]],
+    };
+    mocks.itemSetStarred.mockResolvedValue(result);
+
+    await act(async () => {
+      await getItemActions().setItemsStarred(refs, true);
+    });
+
+    expect(mocks.patchGalleryItemCaches).toHaveBeenCalledWith(expect.anything(), {
+      kind: 'star',
+      result,
+      starred: true,
+    });
+    expect(mocks.galleryPatchItems).toHaveBeenCalledWith(['video:shared'], { starred: true });
+    expect(mocks.galleryRemoveItems).not.toHaveBeenCalled();
+    expect(mocks.invalidateGallery).toHaveBeenCalledOnce();
+    expect(mocks.notificationsAdd.mock.calls.length + mocks.reportError.mock.calls.length).toBe(1);
+  });
+
+  it('deletes only confirmed refs and does not prune an ambiguous failed ref', async () => {
+    const refs = [
+      { kind: 'video' as const, name: 'gone.mp4' },
+      { kind: 'image' as const, name: 'locked.png' },
+    ];
+    const result = {
+      affectedBoardIds: ['board-1'],
+      failed: [refs[1]],
+      succeeded: [refs[0]],
+    };
+    mocks.itemDelete.mockResolvedValue(result);
+
+    await act(async () => {
+      await getItemActions().deleteItems(refs);
+    });
+
+    expect(mocks.patchGalleryItemCaches).toHaveBeenCalledWith(expect.anything(), { kind: 'delete', result });
+    expect(mocks.galleryRemoveItems).toHaveBeenCalledWith(['video:gone.mp4']);
+    expect(mocks.invalidateGallery).toHaveBeenCalledOnce();
+    expect(mocks.notificationsAdd.mock.calls.length + mocks.reportError.mock.calls.length).toBe(1);
+  });
+
+  it('attempts operation-level invalidation only once when invalidation itself rejects', async () => {
+    const ref = { kind: 'video' as const, name: 'clip.mp4' };
+    mocks.itemSetStarred.mockResolvedValue({
+      affectedBoardIds: [],
+      failed: [],
+      succeeded: [ref],
+    });
+    mocks.invalidateGallery.mockRejectedValue(new Error('invalidation failed'));
+
+    await act(async () => {
+      await getItemActions().setItemsStarred([ref], true);
+    });
+
+    expect(mocks.invalidateGallery).toHaveBeenCalledOnce();
+    expect(mocks.notificationsAdd.mock.calls.length + mocks.reportError.mock.calls.length).toBe(1);
+  });
+});
+
+const galleryItem = (kind: GalleryItem['kind'], name: string): GalleryItem => {
+  const base = {
+    boardId: 'board-1',
+    category: 'general' as const,
+    createdAt: '2026-07-30T00:00:00.000Z',
+    fullUrl: `/full/${name}`,
+    height: 64,
+    isIntermediate: false,
+    name,
+    starred: false,
+    thumbnailUrl: `/thumb/${name}`,
+    width: 64,
+  };
+
+  return kind === 'video' ? { ...base, durationSeconds: 4, kind } : { ...base, kind };
+};
+
+describe('primary successor after confirmed deletion', () => {
+  it('selects the nearest surviving predecessor from ordered names before a successor', async () => {
+    const before = galleryItem('video', 'before.mp4');
+    const primary = galleryItem('image', 'primary.png');
+    const after = galleryItem('image', 'after.png');
+    const refs = [before, primary, after].map(({ kind, name }) => ({ kind, name }));
+    currentItemActionContext = {
+      filterIdentity: 'filter-a',
+      items: [before, primary, after],
+      loadOrderedRefs: () => Promise.resolve(refs),
+      selectedItemKey: 'image:primary.png',
+    };
+    mocks.itemDelete.mockResolvedValue({
+      affectedBoardIds: ['board-1'],
+      failed: [],
+      succeeded: [{ kind: 'image', name: 'primary.png' }],
+    });
+
+    await act(async () => {
+      await getItemActions().deleteItems([{ kind: 'image', name: 'primary.png' }]);
+    });
+
+    expect(mocks.gallerySelectItem).toHaveBeenCalledWith(before, 'project-1');
+  });
+
+  it('resolves an unloaded predecessor by qualified ref', async () => {
+    const primary = galleryItem('image', 'primary.png');
+    const after = galleryItem('image', 'after.png');
+    const unloaded = galleryItem('video', 'unloaded.mp4');
+    currentItemActionContext = {
+      filterIdentity: 'filter-a',
+      items: [primary, after],
+      loadOrderedRefs: () =>
+        Promise.resolve([
+          { kind: 'video' as const, name: unloaded.name },
+          { kind: 'image' as const, name: primary.name },
+          { kind: 'image' as const, name: after.name },
+        ]),
+      selectedItemKey: 'image:primary.png',
+    };
+    mocks.resolveItem.mockResolvedValue(unloaded);
+    mocks.itemDelete.mockResolvedValue({
+      affectedBoardIds: ['board-1'],
+      failed: [],
+      succeeded: [{ kind: 'image', name: primary.name }],
+    });
+
+    await act(async () => {
+      await getItemActions().deleteItems([{ kind: 'image', name: primary.name }]);
+    });
+
+    expect(mocks.resolveItem).toHaveBeenCalledWith({ kind: 'video', name: unloaded.name }, expect.any(AbortSignal));
+    expect(mocks.gallerySelectItem).toHaveBeenCalledWith(unloaded, 'project-1');
+  });
+
+  it('falls back to materialized order and then the nearest successor when names fail', async () => {
+    const primary = galleryItem('image', 'primary.png');
+    const after = galleryItem('video', 'after.mp4');
+    currentItemActionContext = {
+      filterIdentity: 'filter-a',
+      items: [primary, after],
+      loadOrderedRefs: () => Promise.reject(new Error('names unavailable')),
+      selectedItemKey: 'image:primary.png',
+    };
+    mocks.itemDelete.mockResolvedValue({
+      affectedBoardIds: ['board-1'],
+      failed: [],
+      succeeded: [{ kind: 'image', name: primary.name }],
+    });
+
+    await act(async () => {
+      await getItemActions().deleteItems([{ kind: 'image', name: primary.name }]);
+    });
+
+    expect(mocks.gallerySelectItem).toHaveBeenCalledWith(after, 'project-1');
+  });
+
+  it('does not promote a failed deletion and keeps a failed primary selected', async () => {
+    const failedBefore = galleryItem('video', 'failed-before.mp4');
+    const survivingBefore = galleryItem('image', 'surviving-before.png');
+    const primary = galleryItem('image', 'primary.png');
+    currentItemActionContext = {
+      filterIdentity: 'filter-a',
+      items: [survivingBefore, failedBefore, primary],
+      loadOrderedRefs: () =>
+        Promise.resolve([
+          { kind: 'image' as const, name: survivingBefore.name },
+          { kind: 'video' as const, name: failedBefore.name },
+          { kind: 'image' as const, name: primary.name },
+        ]),
+      selectedItemKey: 'image:primary.png',
+    };
+    mocks.itemDelete.mockResolvedValue({
+      affectedBoardIds: ['board-1'],
+      failed: [{ kind: 'video', name: failedBefore.name }],
+      succeeded: [{ kind: 'image', name: primary.name }],
+    });
+
+    await act(async () => {
+      await getItemActions().deleteItems([
+        { kind: 'video', name: failedBefore.name },
+        { kind: 'image', name: primary.name },
+      ]);
+    });
+
+    expect(mocks.gallerySelectItem).toHaveBeenCalledWith(survivingBefore, 'project-1');
+
+    mocks.gallerySelectItem.mockClear();
+    mocks.itemDelete.mockResolvedValue({
+      affectedBoardIds: [],
+      failed: [{ kind: 'image', name: primary.name }],
+      succeeded: [],
+    });
+
+    await act(async () => {
+      await getItemActions().deleteItems([{ kind: 'image', name: primary.name }]);
+    });
+
+    expect(mocks.gallerySelectItem).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unloaded successor after the filter or selection becomes stale', async () => {
+    const primary = galleryItem('image', 'primary.png');
+    const successor = galleryItem('video', 'successor.mp4');
+    let resolveItem = (_item: GalleryItem): void => undefined;
+    currentItemActionContext = {
+      filterIdentity: 'filter-a',
+      items: [primary],
+      loadOrderedRefs: () =>
+        Promise.resolve([
+          { kind: 'image' as const, name: primary.name },
+          { kind: 'video' as const, name: successor.name },
+        ]),
+      selectedItemKey: 'image:primary.png',
+    };
+    mocks.resolveItem.mockReturnValue(
+      new Promise((resolve) => {
+        resolveItem = resolve;
+      })
+    );
+    mocks.itemDelete.mockResolvedValue({
+      affectedBoardIds: ['board-1'],
+      failed: [],
+      succeeded: [{ kind: 'image', name: primary.name }],
+    });
+
+    const deletion = getItemActions().deleteItems([{ kind: 'image', name: primary.name }]);
+    await vi.waitFor(() => expect(mocks.resolveItem).toHaveBeenCalledOnce());
+    currentItemActionContext = {
+      filterIdentity: 'filter-b',
+      items: [],
+      loadOrderedRefs: () => Promise.resolve([]),
+      selectedItemKey: 'video:other.mp4',
+    };
+    resolveItem(successor);
+    await act(() => deletion);
+
+    expect(mocks.gallerySelectItem).not.toHaveBeenCalled();
+  });
+
+  it('does not apply confirmed deletion side effects after the account changes while resolving a successor', async () => {
+    const primary = galleryItem('image', 'primary.png');
+    const successor = galleryItem('video', 'successor.mp4');
+    let resolveItem = (_item: GalleryItem): void => undefined;
+    currentItemActionContext = {
+      filterIdentity: 'filter-a',
+      items: [primary],
+      loadOrderedRefs: () =>
+        Promise.resolve([
+          { kind: 'image' as const, name: primary.name },
+          { kind: 'video' as const, name: successor.name },
+        ]),
+      selectedItemKey: 'image:primary.png',
+    };
+    mocks.resolveItem.mockReturnValue(
+      new Promise((resolve) => {
+        resolveItem = resolve;
+      })
+    );
+    mocks.itemDelete.mockResolvedValue({
+      affectedBoardIds: ['board-1'],
+      failed: [],
+      succeeded: [{ kind: 'image', name: primary.name }],
+    });
+
+    const deletion = getItemActions().deleteItems([{ kind: 'image', name: primary.name }]);
+    await vi.waitFor(() => expect(mocks.resolveItem).toHaveBeenCalledOnce());
+    accountLifecycle.activate('user-b');
+    resolveItem(successor);
+    await act(() => deletion);
+
+    expect(mocks.patchGalleryItemCaches).not.toHaveBeenCalled();
+    expect(mocks.galleryRemoveItems).not.toHaveBeenCalled();
+    expect(mocks.gallerySelectItem).not.toHaveBeenCalled();
+    expect(mocks.invalidateGallery).not.toHaveBeenCalled();
+  });
+
+  it('does not promote an unrelated item when the captured order does not contain the deleted primary', async () => {
+    const primary = galleryItem('image', 'primary.png');
+    const unrelated = galleryItem('video', 'unrelated.mp4');
+    currentItemActionContext = {
+      filterIdentity: 'filter-a',
+      items: [primary, unrelated],
+      loadOrderedRefs: () => Promise.resolve([{ kind: 'video', name: unrelated.name }]),
+      selectedItemKey: 'image:primary.png',
+    };
+    mocks.itemDelete.mockResolvedValue({
+      affectedBoardIds: ['board-1'],
+      failed: [],
+      succeeded: [{ kind: 'image', name: primary.name }],
+    });
+
+    await act(async () => {
+      await getItemActions().deleteItems([{ kind: 'image', name: primary.name }]);
+    });
+
+    expect(mocks.gallerySelectItem).not.toHaveBeenCalled();
+  });
+});
+
+describe('mixed item downloads', () => {
+  const image = { fullUrl: '/full/still.png', kind: 'image' as const, name: 'still.png' };
+  const firstVideo = { fullUrl: '/full/first.mp4', kind: 'video' as const, name: 'first.mp4' };
+  const secondVideo = { fullUrl: '/full/second.mp4', kind: 'video' as const, name: 'second.mp4' };
+
+  it('creates exactly one existing archive for an image-only selection', async () => {
+    mocks.downloadArchive.mockResolvedValue({
+      blob: new Blob(['archive']),
+      fileName: 'images.zip',
+    });
+    vi.stubGlobal('fetch', vi.fn());
+
+    await act(async () => {
+      await getItemActions().downloadItems([{ kind: 'image', name: image.name }], [image]);
+    });
+
+    expect(mocks.downloadArchive).toHaveBeenCalledOnce();
+    expect(mocks.downloadArchive).toHaveBeenCalledWith({
+      imageNames: [image.name],
+      signal: expect.any(AbortSignal),
+    });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(mocks.downloadBlob).toHaveBeenCalledWith(expect.any(Blob), 'images.zip');
+  });
+
+  it('downloads a single video from its protected full URL with its actual name', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('video-one')));
+
+    await act(async () => {
+      await getItemActions().downloadItem(firstVideo);
+    });
+
+    expect(fetch).toHaveBeenCalledWith(firstVideo.fullUrl, { signal: expect.any(AbortSignal) });
+    expect(mocks.downloadBlob).toHaveBeenCalledWith(expect.any(Blob), firstVideo.name);
+  });
+
+  it('downloads a mixed selection archive-first and videos sequentially', async () => {
+    const order: string[] = [];
+    mocks.downloadArchive.mockImplementation(() => {
+      order.push('archive');
+      return Promise.resolve({ blob: new Blob(['archive']), fileName: 'images.zip' });
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        order.push(url);
+        return Promise.resolve(new Response(url));
+      })
+    );
+    mocks.downloadBlob.mockImplementation((_blob: Blob, name: string) => order.push(`save:${name}`));
+
+    await act(async () => {
+      await getItemActions().downloadItems(
+        [
+          { kind: 'video', name: firstVideo.name },
+          { kind: 'image', name: image.name },
+          { kind: 'video', name: secondVideo.name },
+        ],
+        [image, firstVideo, secondVideo]
+      );
+    });
+
+    expect(mocks.downloadArchive).toHaveBeenCalledWith({
+      imageNames: [image.name],
+      signal: expect.any(AbortSignal),
+    });
+    expect(order).toEqual([
+      'archive',
+      'save:images.zip',
+      firstVideo.fullUrl,
+      `save:${firstVideo.name}`,
+      secondVideo.fullUrl,
+      `save:${secondVideo.name}`,
+    ]);
+  });
+
+  it('continues after a failed video and summarizes the partial outcome once', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockRejectedValueOnce(new Error('first failed')).mockResolvedValueOnce(new Response('video-two'))
+    );
+
+    await act(async () => {
+      await getItemActions().downloadItems(
+        [
+          { kind: 'video', name: firstVideo.name },
+          { kind: 'video', name: secondVideo.name },
+        ],
+        [firstVideo, secondVideo]
+      );
+    });
+
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(mocks.downloadBlob).toHaveBeenCalledOnce();
+    expect(mocks.downloadBlob).toHaveBeenCalledWith(expect.any(Blob), secondVideo.name);
+    expect(mocks.notificationsAdd.mock.calls.length + mocks.reportError.mock.calls.length).toBe(1);
+  });
+
+  it('skips an unresolved video and continues with the next video in order', async () => {
+    mocks.resolveItem.mockRejectedValueOnce(new Error('missing video')).mockResolvedValueOnce(secondVideo);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('video-two')));
+
+    await act(async () => {
+      await getItemActions().downloadItems([
+        { kind: 'video', name: firstVideo.name },
+        { kind: 'video', name: secondVideo.name },
+      ]);
+    });
+
+    expect(mocks.resolveItem).toHaveBeenNthCalledWith(
+      1,
+      { kind: 'video', name: firstVideo.name },
+      expect.any(AbortSignal)
+    );
+    expect(mocks.resolveItem).toHaveBeenNthCalledWith(
+      2,
+      { kind: 'video', name: secondVideo.name },
+      expect.any(AbortSignal)
+    );
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(mocks.downloadBlob).toHaveBeenCalledWith(expect.any(Blob), secondVideo.name);
+    expect(mocks.notificationsAdd.mock.calls.length + mocks.reportError.mock.calls.length).toBe(1);
   });
 });

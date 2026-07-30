@@ -1,4 +1,5 @@
-import type { GalleryImage } from '@features/gallery';
+import type { GalleryImage, GalleryItem } from '@features/gallery';
+import type { GalleryItemContextMenuTarget } from '@features/gallery/react';
 
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
 import { ChakraProvider } from '@chakra-ui/react';
@@ -41,18 +42,25 @@ const image = (imageName: string): GalleryImage => ({
   width: 512,
 });
 
-const createActions = (deleteImages: ImageActions['deleteImages']): ImageActions => ({
+const createActions = (deleteItems: ImageActions['deleteItems']): ImageActions => ({
   canUseAsReferenceImage: false,
   copyImage: vi.fn(() => Promise.resolve()),
-  deleteImages,
+  deleteItems,
+  deleteImages: vi.fn(() => Promise.resolve()),
+  downloadItem: vi.fn(() => Promise.resolve()),
+  downloadItems: vi.fn(() => Promise.resolve()),
   downloadImage: vi.fn(() => Promise.resolve()),
   downloadImages: vi.fn(() => Promise.resolve()),
   getImageRecallCapabilities: vi.fn(() => Promise.resolve(EMPTY_IMAGE_RECALL_CAPABILITIES)),
+  moveItemsToBoard: vi.fn(() => Promise.resolve()),
   moveImagesToBoard: vi.fn(() => Promise.resolve()),
+  openItemInNewTab: vi.fn(),
+  openItemInPreview: vi.fn(),
   openImageInPreview: vi.fn(),
   recallImageData: vi.fn(() => Promise.resolve()),
   selectForCompare: vi.fn(),
   sendToCanvas: vi.fn(() => Promise.resolve()),
+  setItemsStarred: vi.fn(() => Promise.resolve()),
   setImagesStarred: vi.fn(() => Promise.resolve()),
   savePromptAsTemplate: vi.fn(),
   useAsReferenceImage: vi.fn(),
@@ -117,6 +125,42 @@ const renderMenu = async (actions: ImageActions, images: GalleryImage[]) => {
   });
 };
 
+const item = (kind: GalleryItem['kind'], name: string): GalleryItem => {
+  const base = {
+    boardId: 'none',
+    category: 'general' as const,
+    createdAt: '2026-06-15T00:00:00Z',
+    fullUrl: `/full/${name}`,
+    height: 512,
+    isIntermediate: false,
+    name,
+    starred: false,
+    thumbnailUrl: `/thumb-${name}`,
+    width: 512,
+  };
+
+  return kind === 'video' ? { ...base, durationSeconds: 12, kind } : { ...base, kind };
+};
+
+const renderItemMenu = async (actions: ImageActions, target: GalleryItemContextMenuTarget) => {
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
+
+  await interact(() => {
+    root?.render(
+      <ChakraProvider value={system}>
+        <ImageContextMenu
+          actions={actions}
+          boards={NO_BOARDS}
+          target={target as unknown as ImageContextMenuTarget}
+          onClose={vi.fn()}
+        />
+      </ChakraProvider>
+    );
+  });
+};
+
 beforeEach(() => {
   preferences.confirmImageDeletion = true;
 });
@@ -142,7 +186,7 @@ describe('ImageContextMenu deletion confirmation', () => {
     await interact(() => getButton('Delete').click());
 
     expect(deleteImages).toHaveBeenCalledOnce();
-    expect(deleteImages).toHaveBeenCalledWith(['single.png']);
+    expect(deleteImages).toHaveBeenCalledWith([{ kind: 'image', name: 'single.png' }]);
     expect(getOpenAlertDialog()).toBeNull();
   });
 
@@ -165,7 +209,7 @@ describe('ImageContextMenu deletion confirmation', () => {
     await interact(() => getMenuItem('Delete Image').click());
 
     expect(deleteImages).toHaveBeenCalledOnce();
-    expect(deleteImages).toHaveBeenCalledWith(['immediate.png']);
+    expect(deleteImages).toHaveBeenCalledWith([{ kind: 'image', name: 'immediate.png' }]);
     expect(getOpenAlertDialog()).toBeNull();
   });
 
@@ -188,7 +232,10 @@ describe('ImageContextMenu deletion confirmation', () => {
     const confirmButton = getButton('Delete');
     const closeButton = document.querySelector<HTMLButtonElement>('button[aria-label="Close"]');
     expect(deleteImages).toHaveBeenCalledOnce();
-    expect(deleteImages).toHaveBeenCalledWith(['first.png', 'second.png']);
+    expect(deleteImages).toHaveBeenCalledWith([
+      { kind: 'image', name: 'first.png' },
+      { kind: 'image', name: 'second.png' },
+    ]);
     expect(cancelButton.disabled).toBe(true);
     expect(confirmButton.disabled).toBe(true);
     expect(closeButton?.disabled).toBe(true);
@@ -207,5 +254,54 @@ describe('ImageContextMenu deletion confirmation', () => {
     await interact(() => resolveDeletion?.());
 
     expect(getOpenAlertDialog()).toBeNull();
+  });
+});
+
+describe('ImageContextMenu mixed-media action visibility', () => {
+  it('shows common actions for a single video and hides every image-only action', async () => {
+    const video = item('video', 'clip.mp4');
+    await renderItemMenu(createActions(vi.fn()), {
+      itemRefs: [{ kind: 'video', name: video.name }],
+      items: [video],
+      x: 20,
+      y: 20,
+    });
+
+    expect(document.querySelector('[aria-label="Open in new tab"]')).not.toBeNull();
+    expect(document.querySelector('[aria-label="Download video"]')).not.toBeNull();
+    expect(document.querySelector('[aria-label="Open in preview"]')).not.toBeNull();
+    expect(document.querySelector('[aria-label="Star video"]')).not.toBeNull();
+    expect(document.body.textContent).toContain('Change Board');
+    expect(document.body.textContent).toContain('Delete Video');
+    expect(document.body.textContent).not.toContain('Copy to clipboard');
+    expect(document.body.textContent).not.toContain('Recall Metadata');
+    expect(document.body.textContent).not.toContain('Send to Upscale');
+    expect(document.body.textContent).not.toContain('Select for Compare');
+    expect(document.body.textContent).not.toContain('New from Image');
+  });
+
+  it('keeps complete mixed refs for common bulk actions and hides image-only bulk actions when a ref is unresolved', async () => {
+    const loadedImage = item('image', 'still.png');
+    const actions = createActions(vi.fn());
+    const refs = [
+      { kind: 'image' as const, name: loadedImage.name },
+      { kind: 'video' as const, name: 'unloaded.mp4' },
+    ];
+    await renderItemMenu(actions, {
+      itemRefs: refs,
+      items: [loadedImage],
+      x: 20,
+      y: 20,
+    });
+
+    expect(document.body.textContent).toContain('2 items selected');
+    expect(document.body.textContent).toContain('Star All');
+    expect(document.body.textContent).toContain('Download Selection');
+    expect(document.body.textContent).toContain('Change Board');
+    expect(document.body.textContent).toContain('Delete Selection');
+    expect(document.body.textContent).not.toContain('New from Images');
+
+    await interact(() => getMenuItem('Star All').click());
+    expect(actions.setItemsStarred).toHaveBeenCalledWith(refs, true);
   });
 });

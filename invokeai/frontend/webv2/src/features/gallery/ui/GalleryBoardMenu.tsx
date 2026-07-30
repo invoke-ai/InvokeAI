@@ -141,7 +141,7 @@ export const GalleryBoardMenu = ({
           <Menu.Positioner>
             {board && (
               <Menu.Content minW="12rem" py="1" px={MENU_CONTENT_PADDING_X}>
-                <BoardDownloadMenuItem boardId={board.id} />
+                <BoardDownloadMenuItem board={board} />
                 {isManagedBoard && (
                   <>
                     <BoardRenameMenuItem board={board} onRename={setRenameTarget} onRenameValue={setRenameValue} />
@@ -232,15 +232,16 @@ export const GalleryBoardMenu = ({
   );
 };
 
-const BoardDownloadMenuItem = ({ boardId }: { boardId: string }) => {
+const BoardDownloadMenuItem = ({ board }: { board: GalleryBoard }) => {
   const { t } = useTranslation();
   const { actions } = useGalleryWidget();
-  const handleClick = useCallback(() => void actions.downloadBoard(boardId), [actions, boardId]);
+  const handleClick = useCallback(() => void actions.downloadBoard(board.id), [actions, board.id]);
+  const omittedVideos = `${board.videoCount} ${board.videoCount === 1 ? 'video' : 'videos'} omitted`;
 
   return (
     <BoardMenuItem
       icon={DownloadIcon}
-      label={t('widgets.gallery.downloadBoard')}
+      label={`${t('widgets.gallery.downloadBoard')} (${omittedVideos})`}
       value="download-board"
       onClick={handleClick}
     />

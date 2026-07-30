@@ -15,8 +15,8 @@ import { lazy, useMemo } from 'react';
 
 const selectWidgetValues = (values: Record<string, unknown>): Record<string, unknown> => values;
 
-const GalleryImageActionsAdapter = lazy(() =>
-  import('./GalleryImageActionsBridge').then((module) => ({ default: module.GalleryImageActionsAdapter }))
+const GalleryItemActionsAdapter = lazy(() =>
+  import('./GalleryImageActionsBridge').then((module) => ({ default: module.GalleryItemActionsAdapter }))
 );
 const GalleryImageContextMenu = lazy(() =>
   import('./GalleryImageActionsBridge').then((module) => ({ default: module.GalleryImageContextMenu }))
@@ -45,7 +45,7 @@ export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) 
       gallery,
       galleryValues,
       generateValues,
-      ImageActionsProvider: GalleryImageActionsAdapter,
+      ItemActionsProvider: GalleryItemActionsAdapter,
       ImageContextMenu: GalleryImageContextMenu,
       liveFollowEnabled,
       liveProgressTarget,

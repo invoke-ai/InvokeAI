@@ -1,8 +1,8 @@
-import { toGalleryItemKey } from '@features/gallery/core/items';
 import { getBoundedRecentImages } from '@features/gallery/core/recentImages';
 import { getGallerySettings } from '@features/gallery/core/settings';
-import { GALLERY_PAGE_SIZE } from '@features/gallery/data/queries';
+import { GALLERY_PAGE_SIZE, galleryItemNamesOptions } from '@features/gallery/data/queries';
 import { StatusWidgetChip } from '@platform/ui';
+import { useQueryClient } from '@tanstack/react-query';
 import { ImageIcon } from 'lucide-react';
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef } from 'react';
 
@@ -19,8 +19,9 @@ import {
   getGalleryView,
 } from './galleryStateView';
 import {
-  useGalleryImageActions,
+  useGalleryItemActions,
   useGalleryUi,
+  type GalleryItemActionContext,
   type GalleryWidgetProps,
   type GalleryWidgetRuntime,
 } from './GalleryUiContext';
@@ -49,7 +50,7 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
     projectId,
     projectName,
     queueItems,
-    ImageActionsProvider,
+    ItemActionsProvider,
   } = useGalleryUi();
   const galleryView = getGalleryView(galleryValues);
   const searchTerm = getGallerySearchTerm(galleryValues);
@@ -57,6 +58,7 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
   const page = getGalleryPage(galleryValues);
   const knownTotalImages = getGalleryTotalImages(galleryValues);
   const settings = getGallerySettings(galleryValues);
+  const queryClient = useQueryClient();
   const data = useGalleryData({
     galleryView,
     page,
@@ -78,37 +80,31 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
     liveProgressTarget
   );
   const lastPublishedTotalRef = useRef<number | null>(null);
+  const itemActionFilterIdentity = useMemo(() => JSON.stringify(data.filter), [data.filter]);
+  const loadOrderedItemRefs = useCallback(
+    async (signal: AbortSignal) => {
+      signal.throwIfAborted();
+      const result = await queryClient.fetchQuery(galleryItemNamesOptions(data.filter));
 
-  // After a deletion that takes out the previewed item, move the selection to
-  // the item that now occupies the old index, else the one before it.
-  const onImagesDeleted = useCallback(
-    (imageNames: string[]) => {
-      const deletedItemKeys = new Set(imageNames.map((name) => toGalleryItemKey({ kind: 'image', name })));
-      const items = gallery.items;
-      const anchorKey = gallery.selectedItemKey;
-
-      if (!anchorKey || !deletedItemKeys.has(anchorKey)) {
-        return;
-      }
-
-      const anchorIndex = items.findIndex((item) => toGalleryItemKey(item) === anchorKey);
-
-      if (anchorIndex === -1) {
-        return;
-      }
-
-      const remaining = items.filter((item) => !deletedItemKeys.has(toGalleryItemKey(item)));
-      const remainingBeforeAnchor = items
-        .slice(0, anchorIndex)
-        .filter((item) => !deletedItemKeys.has(toGalleryItemKey(item))).length;
-      const nextItem = remaining[remainingBeforeAnchor] ?? remaining[remainingBeforeAnchor - 1] ?? null;
-
-      if (nextItem) {
-        galleryCommands.selectItem(nextItem);
-      }
+      signal.throwIfAborted();
+      return result.items;
     },
-    [gallery.items, gallery.selectedItemKey, galleryCommands]
+    [data.filter, queryClient]
   );
+  const itemActionContextRef = useRef<GalleryItemActionContext | null>(null);
+
+  // This ref is a live read port for an in-flight deletion. An effect would
+  // leave a commit-sized stale window, while the action must compare against
+  // the exact filter and selection from the latest render.
+  // eslint-disable-next-line react/react-compiler
+  itemActionContextRef.current = {
+    filterIdentity: itemActionFilterIdentity,
+    items: gallery.items,
+    loadOrderedRefs: loadOrderedItemRefs,
+    selectedItemKey: gallery.selectedItemKey,
+  };
+
+  const getItemActionContext = useCallback(() => itemActionContextRef.current, []);
 
   const actions = useGalleryActions({
     boards: data.boards,
@@ -165,11 +161,11 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
   }
 
   return (
-    <ImageActionsProvider
+    <ItemActionsProvider
       boards={data.boards}
       generateValues={generateValues}
+      getItemActionContext={getItemActionContext}
       projectId={projectId}
-      onImagesDeleted={onImagesDeleted}
     >
       <GalleryWidgetContent
         actions={actions}
@@ -179,7 +175,7 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
         projectName={projectName}
         runtime={runtime}
       />
-    </ImageActionsProvider>
+    </ItemActionsProvider>
   );
 };
 
@@ -198,10 +194,10 @@ const GalleryWidgetContent = ({
   projectName: string;
   runtime: GalleryWidgetRuntime;
 }) => {
-  const imageActions = useGalleryImageActions();
+  const itemActions = useGalleryItemActions();
   const contextValue = useMemo<GalleryWidgetContextValue>(
-    () => ({ actions, gallery, imageActions, isWindowTruncated, projectName, runtime }),
-    [actions, gallery, imageActions, isWindowTruncated, projectName, runtime]
+    () => ({ actions, gallery, isWindowTruncated, itemActions, projectName, runtime }),
+    [actions, gallery, isWindowTruncated, itemActions, projectName, runtime]
   );
 
   return (

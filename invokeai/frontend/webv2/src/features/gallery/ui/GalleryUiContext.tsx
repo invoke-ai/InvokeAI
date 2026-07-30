@@ -7,21 +7,27 @@ import { createContext, use, type ComponentType, type ReactNode } from 'react';
 
 import type { GalleryLiveTarget } from './galleryStateView';
 
-export interface GalleryImageActions {
-  deleteImages(imageNames: string[]): Promise<void>;
-  /**
-   * TODO(Task 7): Move this narrow board-drop intent to `GalleryItemActions`
-   * when common item mutations gain their mixed-media implementation.
-   */
+export interface GalleryItemActions {
+  deleteItems(items: GalleryItemRef[]): Promise<void>;
+  downloadItem(item: GalleryItem): Promise<void>;
+  downloadItems(items: GalleryItemRef[], loadedItems?: GalleryItem[]): Promise<void>;
   moveItemsToBoard(items: GalleryItemRef[], boardId: string): Promise<void>;
-  moveImagesToBoard(imageNames: string[], boardId: string): Promise<void>;
-  setImagesStarred(imageNames: string[], starred: boolean): Promise<void>;
+  openItemInNewTab(item: GalleryItem): void;
+  openItemInPreview(item: GalleryItem): void;
+  setItemsStarred(items: GalleryItemRef[], starred: boolean): Promise<void>;
 }
 
-export interface GalleryImageActionsOptions {
+export interface GalleryItemActionContext {
+  filterIdentity: string;
+  items: GalleryItem[];
+  loadOrderedRefs(signal: AbortSignal): Promise<GalleryItemRef[]>;
+  selectedItemKey: GalleryItemKey | null;
+}
+
+export interface GalleryItemActionsOptions {
   boards: GalleryBoard[];
   generateValues: Record<string, unknown>;
-  onImagesDeleted(imageNames: string[]): void;
+  getItemActionContext?(): GalleryItemActionContext | null;
   projectId: string;
 }
 
@@ -33,7 +39,6 @@ export interface GalleryItemContextMenuTarget {
 }
 
 export interface GalleryItemContextMenuProps {
-  actions: GalleryImageActions;
   boards: GalleryBoard[];
   target: GalleryItemContextMenuTarget | null;
   onClose(): void;
@@ -83,7 +88,7 @@ export interface GalleryWidgetProps {
  * may not import workbench), not a test seam; no second adapter is expected.
  */
 export interface GalleryUiAdapter {
-  ImageActionsProvider: ComponentType<GalleryImageActionsOptions & { children: ReactNode }>;
+  ItemActionsProvider: ComponentType<GalleryItemActionsOptions & { children: ReactNode }>;
   ImageContextMenu: ComponentType<GalleryItemContextMenuProps>;
   account: { enableLiveFollow(): void };
   antialiasProgressImages: boolean;
@@ -100,21 +105,21 @@ export interface GalleryUiAdapter {
 }
 
 const GalleryUiContext = createContext<GalleryUiAdapter | null>(null);
-const GalleryImageActionsContext = createContext<GalleryImageActions | null>(null);
+const GalleryItemActionsContext = createContext<GalleryItemActions | null>(null);
 
-export const GalleryImageActionsProvider = ({
+export const GalleryItemActionsProvider = ({
   actions,
   children,
 }: {
-  actions: GalleryImageActions;
+  actions: GalleryItemActions;
   children: ReactNode;
-}) => <GalleryImageActionsContext value={actions}>{children}</GalleryImageActionsContext>;
+}) => <GalleryItemActionsContext value={actions}>{children}</GalleryItemActionsContext>;
 
-export const useGalleryImageActions = (): GalleryImageActions => {
-  const actions = use(GalleryImageActionsContext);
+export const useGalleryItemActions = (): GalleryItemActions => {
+  const actions = use(GalleryItemActionsContext);
 
   if (!actions) {
-    throw new Error('Gallery image actions require the App-owned image-actions adapter.');
+    throw new Error('Gallery item actions require the App-owned action adapter.');
   }
 
   return actions;

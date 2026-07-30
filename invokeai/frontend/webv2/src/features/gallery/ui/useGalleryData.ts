@@ -19,6 +19,7 @@ import { useCallback, useMemo } from 'react';
 
 export interface GalleryData {
   boards: GalleryBoard[];
+  filter: GalleryItemsFilter;
   hasMore: boolean;
   isLoadingItems: boolean;
   /**
@@ -242,5 +243,5 @@ export const useGalleryData = ({
     void fetchNextPage();
   }, [fetchNextPage, hasMore, isFetchingNextPage]);
 
-  return { boards, hasMore, isLoadingItems: isFetching, isWindowTruncated, items, loadMore, total };
+  return { boards, filter, hasMore, isLoadingItems: isFetching, isWindowTruncated, items, loadMore, total };
 };

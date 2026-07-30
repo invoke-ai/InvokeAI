@@ -1,30 +1,52 @@
 /* oxlint-disable react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-object-as-prop */
 import type { GalleryImageItem, GalleryItemRef } from '@features/gallery/contracts';
-import type { GalleryImageActions, GalleryItemContextMenuTarget } from '@features/gallery/react';
+import type { GalleryItemActions, GalleryItemContextMenuTarget } from '@features/gallery/react';
 import type { ReactNode, Ref } from 'react';
 
-import { useGalleryImageActions } from '@features/gallery/ui/GalleryUiContext';
+import { useGalleryItemActions } from '@features/gallery/ui/GalleryUiContext';
 import { act, createRef, useImperativeHandle } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { GalleryImageActionsAdapter, GalleryImageContextMenu } from './GalleryImageActionsBridge';
+import { GalleryImageContextMenu, GalleryItemActionsAdapter } from './GalleryImageActionsBridge';
 
 const mocks = vi.hoisted(() => ({
-  moveImagesToBoard: vi.fn(),
+  moveItemsToBoard: vi.fn(),
+  useImageActions: vi.fn(),
 }));
 
 vi.mock('@workbench/image-actions', () => ({
-  ImageContextMenu: ({ target }: { target: { images: Array<{ imageName: string }> } | null }) => (
+  ImageContextMenu: ({
+    target,
+  }: {
+    target: { itemRefs: GalleryItemRef[]; items: Array<{ kind: string; name: string }> } | null;
+  }) => (
     <output data-testid="image-context-target">
-      {JSON.stringify(target?.images.map((image) => image.imageName) ?? null)}
+      {JSON.stringify(
+        target
+          ? {
+              itemRefs: target.itemRefs,
+              items: target.items.map(({ kind, name }) => ({ kind, name })),
+            }
+          : null
+      )}
     </output>
   ),
-  useImageActions: () => ({
-    deleteImages: vi.fn(),
-    moveImagesToBoard: mocks.moveImagesToBoard,
-    setImagesStarred: vi.fn(),
-  }),
+  useImageActions: (options: unknown) => {
+    mocks.useImageActions(options);
+    return {
+      deleteItems: vi.fn(),
+      deleteImages: vi.fn(),
+      downloadItem: vi.fn(),
+      downloadItems: vi.fn(),
+      moveImagesToBoard: vi.fn(),
+      moveItemsToBoard: mocks.moveItemsToBoard,
+      openItemInNewTab: vi.fn(),
+      openItemInPreview: vi.fn(),
+      setItemsStarred: vi.fn(),
+      setImagesStarred: vi.fn(),
+    };
+  },
 }));
 
 const loadedImage: GalleryImageItem = {
@@ -45,20 +67,14 @@ const mixedRefs: GalleryItemRef[] = [
   { kind: 'video', name: 'unloaded.mp4' },
 ];
 const noop = vi.fn();
-const directActions: GalleryImageActions = {
-  deleteImages: vi.fn(),
-  moveImagesToBoard: mocks.moveImagesToBoard,
-  moveItemsToBoard: vi.fn(),
-  setImagesStarred: vi.fn(),
-};
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
-const actionsRef = createRef<GalleryImageActions>();
+const actionsRef = createRef<GalleryItemActions>();
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const ActionsProbe = ({ ref }: { ref: Ref<GalleryImageActions> }) => {
-  const actions = useGalleryImageActions();
+const ActionsProbe = ({ ref }: { ref: Ref<GalleryItemActions> }) => {
+  const actions = useGalleryItemActions();
   useImperativeHandle(ref, () => actions, [actions]);
   return null;
 };
@@ -86,7 +102,7 @@ afterEach(async () => {
 });
 
 describe('GalleryImageActionsBridge mixed selection boundaries', () => {
-  it('does not expose a partial image context target when an unloaded video ref is selected', async () => {
+  it('forwards the complete canonical context target without narrowing a mixed selection', async () => {
     const target: GalleryItemContextMenuTarget = {
       itemRefs: mixedRefs,
       items: [loadedImage],
@@ -94,22 +110,52 @@ describe('GalleryImageActionsBridge mixed selection boundaries', () => {
       y: 40,
     };
 
-    await render(<GalleryImageContextMenu actions={directActions} boards={[]} target={target} onClose={noop} />);
+    await render(
+      <GalleryItemActionsAdapter boards={[]} generateValues={{}} projectId="project-1">
+        <GalleryImageContextMenu boards={[]} target={target} onClose={noop} />
+      </GalleryItemActionsAdapter>
+    );
 
-    expect(host?.querySelector('[data-testid="image-context-target"]')?.textContent).toBe('null');
+    expect(host?.querySelector('[data-testid="image-context-target"]')?.textContent).toBe(
+      JSON.stringify({
+        itemRefs: mixedRefs,
+        items: [{ kind: 'image', name: loadedImage.name }],
+      })
+    );
   });
 
-  it('does not move the loaded image subset of an image plus unloaded-video ref vector', async () => {
+  it('forwards an ordered mixed board move through the common action port', async () => {
     await render(
-      <GalleryImageActionsAdapter boards={[]} generateValues={{}} projectId="project-1" onImagesDeleted={noop}>
+      <GalleryItemActionsAdapter boards={[]} generateValues={{}} projectId="project-1">
         <ActionsProbe ref={actionsRef} />
-      </GalleryImageActionsAdapter>
+      </GalleryItemActionsAdapter>
     );
 
     await act(async () => {
       await actionsRef.current?.moveItemsToBoard(mixedRefs, 'board-b');
     });
 
-    expect(mocks.moveImagesToBoard).not.toHaveBeenCalled();
+    expect(mocks.moveItemsToBoard).toHaveBeenCalledWith(mixedRefs, 'board-b');
+  });
+
+  it('forwards the live gallery action context getter used by guarded delete successor selection', async () => {
+    const getItemActionContext = vi.fn(() => null);
+
+    await render(
+      <GalleryItemActionsAdapter
+        boards={[]}
+        generateValues={{}}
+        getItemActionContext={getItemActionContext}
+        projectId="project-1"
+      >
+        <ActionsProbe ref={actionsRef} />
+      </GalleryItemActionsAdapter>
+    );
+
+    expect(mocks.useImageActions).toHaveBeenCalledWith(
+      expect.objectContaining({
+        getItemActionContext,
+      })
+    );
   });
 });

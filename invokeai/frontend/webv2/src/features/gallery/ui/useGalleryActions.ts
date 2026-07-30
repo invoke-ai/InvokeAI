@@ -47,7 +47,8 @@ export const useGalleryActions = ({
       notifications.reportError({ area: 'gallery-actions', message: toErrorMessage(error), namespace: 'gallery' });
     const recordSuccess = (title: string, message?: string) => notifications.add({ kind: 'success', message, title });
     const refresh = () => void invalidateGallery(queryClient);
-    const getBoardName = (boardId: string) => boards.find((board) => board.id === boardId)?.name ?? 'Uncategorized';
+    const getBoard = (boardId: string) => boards.find((board) => board.id === boardId);
+    const getBoardName = (boardId: string) => getBoard(boardId)?.name ?? 'Uncategorized';
 
     return {
       archiveBoard: async (boardId, archived) => {
@@ -118,9 +119,14 @@ export const useGalleryActions = ({
         const owner = captureAccountScope();
 
         try {
+          const board = getBoard(boardId);
+          const videoCount = board?.videoCount ?? 0;
+
           notifications.add({
             kind: 'info',
-            message: `Preparing an archive of "${getBoardName(boardId)}".`,
+            message: `Preparing an image archive of "${getBoardName(boardId)}". ${videoCount} ${
+              videoCount === 1 ? 'video' : 'videos'
+            } will be omitted.`,
             title: 'Preparing download',
           });
 

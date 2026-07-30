@@ -1,4 +1,4 @@
-import type { GalleryImageItem, GalleryItem, GalleryItemRef } from '@features/gallery/core/items';
+import type { GalleryItem, GalleryItemRef } from '@features/gallery/core/items';
 import type { GalleryThumbnailFit } from '@features/gallery/core/settings';
 
 import { Badge, Box, Flex, ProgressCircle, ScrollArea, Skeleton, Spinner, Text } from '@chakra-ui/react';
@@ -98,7 +98,7 @@ type GridCell =
 
 export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => {
   const { t } = useTranslation();
-  const { actions, gallery, imageActions, isWindowTruncated, runtime } = useGalleryWidget();
+  const { actions, gallery, isWindowTruncated, itemActions, runtime } = useGalleryWidget();
   const { account, antialiasProgressImages, ImageContextMenu, widgets } = useGalleryUi();
   const queryClient = useQueryClient();
   const [contextMenuTarget, setContextMenuTarget] = useState<GalleryItemContextMenuTarget | null>(null);
@@ -415,30 +415,21 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
   }, [account]);
 
   const handleToggleStarred = useCallback(
-    (item: GalleryImageItem) => void imageActions.setImagesStarred([item.name], !item.starred),
-    [imageActions]
+    (item: GalleryItem) => void itemActions.setItemsStarred([toGalleryItemRef(item)], !item.starred),
+    [itemActions]
   );
 
   const handleCloseContextMenu = useCallback(() => setContextMenuTarget(null), []);
 
-  // TODO(Task 7): Common item actions will consume the canonical selection.
-  // Until then, reject video, mixed, or unresolved selections at the existing
-  // image-only hotkey boundary.
-  const imageOnlyActionSelection = useMemo<GalleryImageItem[] | null>(() => {
-    const itemKeys =
-      gallery.selectedItemKeys.length > 0
-        ? gallery.selectedItemKeys
+  const actionSelectionRefs = useMemo(
+    () =>
+      selectedItemRefs.length > 0
+        ? selectedItemRefs
         : gallery.selectedItemKey
-          ? [gallery.selectedItemKey]
-          : [];
-    const items = itemKeys.flatMap((itemKey) => {
-      const item = gallery.items.find((candidate) => toGalleryItemKey(candidate) === itemKey);
-
-      return item ? [item] : [];
-    });
-
-    return items.length === itemKeys.length && items.every(isGalleryImageItem) ? items : null;
-  }, [gallery.items, gallery.selectedItemKey, gallery.selectedItemKeys]);
+          ? [parseGalleryItemKey(gallery.selectedItemKey)]
+          : [],
+    [gallery.selectedItemKey, selectedItemRefs]
+  );
 
   const navigate = useEffectEvent((direction: 'down' | 'left' | 'right' | 'up') => {
     const itemCount = gallery.items.length;
@@ -479,18 +470,16 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
       return;
     }
 
-    if (commandId === 'gallery.deleteSelection' && imageOnlyActionSelection?.length) {
-      void imageActions.deleteImages(imageOnlyActionSelection.map((item) => item.name));
+    if (commandId === 'gallery.deleteSelection' && actionSelectionRefs.length > 0) {
+      void itemActions.deleteItems(actionSelectionRefs);
       return;
     }
 
-    if (commandId === 'gallery.starImage' && imageOnlyActionSelection?.length) {
-      const shouldStar = imageOnlyActionSelection.some((item) => !item.starred);
+    if (commandId === 'gallery.starImage' && actionSelectionRefs.length > 0) {
+      const loadedItemsByKey = new Map(gallery.items.map((item) => [toGalleryItemKey(item), item]));
+      const shouldStar = actionSelectionRefs.some((ref) => !loadedItemsByKey.get(toGalleryItemKey(ref))?.starred);
 
-      void imageActions.setImagesStarred(
-        imageOnlyActionSelection.map((item) => item.name),
-        shouldStar
-      );
+      void itemActions.setItemsStarred(actionSelectionRefs, shouldStar);
     }
   });
 
@@ -645,12 +634,7 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
           </Text>
         </DropZone>
       )}
-      <ImageContextMenu
-        actions={imageActions}
-        boards={gallery.boards}
-        target={activeContextMenuTarget}
-        onClose={handleCloseContextMenu}
-      />
+      <ImageContextMenu boards={gallery.boards} target={activeContextMenuTarget} onClose={handleCloseContextMenu} />
     </Box>
   );
 };
@@ -762,7 +746,7 @@ const GalleryThumbnail = ({
   isSelected: boolean;
   onClick: (item: GalleryItem, event: MouseEvent) => void;
   onContextMenu: (item: GalleryItem, x: number, y: number) => void;
-  onToggleStarred: (item: GalleryImageItem) => void;
+  onToggleStarred: (item: GalleryItem) => void;
 }) => {
   const { t } = useTranslation();
   const isCompared = compareRole !== null;
@@ -803,9 +787,7 @@ const GalleryThumbnail = ({
     (event: MouseEvent<HTMLButtonElement>) => {
       event.stopPropagation();
 
-      if (isGalleryImageItem(item)) {
-        onToggleStarred(item);
-      }
+      onToggleStarred(item);
     },
     [item, onToggleStarred]
   );
@@ -865,28 +847,26 @@ const GalleryThumbnail = ({
           {compareRole}
         </Badge>
       )}
-      {item.kind === 'image' ? (
-        <IconButton
-          aria-label={
-            item.starred
-              ? t('widgets.gallery.unstarImage', { name: item.name })
-              : t('widgets.gallery.starImage', { name: item.name })
-          }
-          className="gallery-thumb-overlay"
-          colorPalette={item.starred ? 'yellow' : 'gray'}
-          insetInlineEnd="1"
-          opacity={item.starred ? 1 : 0}
-          position="absolute"
-          size="2xs"
-          top="1"
-          transition="opacity var(--wb-motion-duration-medium) ease"
-          variant="solid"
-          zIndex="1"
-          onClick={handleToggleStarred}
-        >
-          <StarIcon fill={item.starred ? 'currentColor' : 'none'} />
-        </IconButton>
-      ) : null}
+      <IconButton
+        aria-label={
+          item.starred
+            ? t('widgets.gallery.unstarImage', { name: item.name })
+            : t('widgets.gallery.starImage', { name: item.name })
+        }
+        className="gallery-thumb-overlay"
+        colorPalette={item.starred ? 'yellow' : 'gray'}
+        insetInlineEnd="1"
+        opacity={item.starred ? 1 : 0}
+        position="absolute"
+        size="2xs"
+        top="1"
+        transition="opacity var(--wb-motion-duration-medium) ease"
+        variant="solid"
+        zIndex="1"
+        onClick={handleToggleStarred}
+      >
+        <StarIcon fill={item.starred ? 'currentColor' : 'none'} />
+      </IconButton>
       {item.kind === 'image' && item.width > 0 && item.height > 0 && (
         <Badge
           bottom="1"

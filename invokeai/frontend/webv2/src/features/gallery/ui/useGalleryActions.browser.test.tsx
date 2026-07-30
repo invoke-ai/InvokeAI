@@ -13,19 +13,26 @@ import { useGalleryActions } from './useGalleryActions';
 
 const mocks = vi.hoisted(() => ({
   deleteGalleryBoard: vi.fn(),
+  downloadBlob: vi.fn(),
+  downloadGalleryArchive: vi.fn(),
   invalidateGallery: vi.fn(),
+  notificationsAdd: vi.fn(),
 }));
 
 vi.mock('@features/gallery/data/backend', () => ({
   createGalleryBoard: vi.fn(),
   deleteGalleryBoard: (...args: unknown[]) => mocks.deleteGalleryBoard(...args),
-  downloadGalleryArchive: vi.fn(),
+  downloadGalleryArchive: (...args: unknown[]) => mocks.downloadGalleryArchive(...args),
   updateGalleryBoard: vi.fn(),
   uploadGalleryImage: vi.fn(),
 }));
 
 vi.mock('@features/gallery/data/queryCache', () => ({
   invalidateGallery: (...args: unknown[]) => mocks.invalidateGallery(...args),
+}));
+
+vi.mock('@platform/browser/downloadBlob', () => ({
+  downloadBlob: (...args: unknown[]) => mocks.downloadBlob(...args),
 }));
 
 let host: HTMLDivElement | null = null;
@@ -63,7 +70,7 @@ const NoopProvider = ({ children }: { children: ReactNode }) => children;
 const NoopContextMenu = () => null;
 const noop = vi.fn();
 const adapter: GalleryUiAdapter = {
-  ImageActionsProvider: NoopProvider,
+  ItemActionsProvider: NoopProvider,
   ImageContextMenu: NoopContextMenu,
   account: { enableLiveFollow: noop },
   antialiasProgressImages: false,
@@ -89,7 +96,7 @@ const adapter: GalleryUiAdapter = {
   generateValues: {},
   liveFollowEnabled: false,
   liveProgressTarget: null,
-  notifications: { add: noop, reportError: noop },
+  notifications: { add: (...args: unknown[]) => mocks.notificationsAdd(...args), reportError: noop },
   projectId: 'project-1',
   projectName: 'Project',
   queueItems: [],
@@ -169,5 +176,28 @@ describe('mixed item selection', () => {
     );
 
     expect(setItemMultiSelection).toHaveBeenCalledWith(['image:shared', 'video:shared'], primaryItem);
+  });
+});
+
+describe('board image archive omission', () => {
+  it('states the exact existing board video count in the preparation notification without fetching it', async () => {
+    mocks.downloadGalleryArchive.mockResolvedValue({
+      blob: new Blob(['archive']),
+      fileName: 'board-1.zip',
+    });
+
+    await act(async () => {
+      await actionsRef.current?.downloadBoard('board-1');
+    });
+
+    expect(mocks.notificationsAdd).toHaveBeenNthCalledWith(1, {
+      kind: 'info',
+      message: 'Preparing an image archive of "Board 1". 1 video will be omitted.',
+      title: 'Preparing download',
+    });
+    expect(mocks.downloadGalleryArchive).toHaveBeenCalledWith({
+      boardId: 'board-1',
+      signal: expect.any(AbortSignal),
+    });
   });
 });

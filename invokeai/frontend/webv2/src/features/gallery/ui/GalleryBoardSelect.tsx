@@ -77,7 +77,7 @@ export const forwardGalleryBoardDrop = ({
 
 export const GalleryBoardSelect = () => {
   const { t } = useTranslation();
-  const { actions, gallery, imageActions, projectName } = useGalleryWidget();
+  const { actions, gallery, itemActions, projectName } = useGalleryWidget();
   const { active } = useDndContext();
   const [isOpen, setIsOpen] = useState(false);
   const [boardSearchTerm, setBoardSearchTerm] = useState('');
@@ -127,7 +127,7 @@ export const GalleryBoardSelect = () => {
       forwardGalleryBoardDrop({
         activeData: dragData,
         loadedItems: gallery.items,
-        moveItemsToBoard: (items, boardId) => void imageActions.moveItemsToBoard(items, boardId),
+        moveItemsToBoard: (items, boardId) => void itemActions.moveItemsToBoard(items, boardId),
         overData: dropData,
       });
 
@@ -136,7 +136,7 @@ export const GalleryBoardSelect = () => {
         closeAndReset();
       }
     },
-    [closeAndReset, gallery.items, imageActions]
+    [closeAndReset, gallery.items, itemActions]
   );
 
   const handleDragCancel = useCallback(() => {
