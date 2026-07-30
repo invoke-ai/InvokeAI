@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Optional
 
 from fastapi import HTTPException, Query
@@ -38,6 +39,12 @@ async def list_gallery_items(
     order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
     starred_first: bool = Query(default=True, description="Whether to sort by starred items first"),
     search_term: Optional[str] = Query(default=None, description="The term to search for"),
+    created_from: Optional[date] = Query(
+        default=None, description="Inclusive start date (YYYY-MM-DD) to filter by created_at."
+    ),
+    created_to: Optional[date] = Query(
+        default=None, description="Inclusive end date (YYYY-MM-DD) to filter by created_at."
+    ),
 ) -> OffsetPaginatedResults[GalleryItem]:
     """Returns a paginated, time-sorted stream of polymorphic gallery items (images + videos)."""
     if board_id is not None and board_id != "none":
@@ -55,6 +62,8 @@ async def list_gallery_items(
         search_term=search_term,
         user_id=current_user.user_id,
         is_admin=current_user.is_admin,
+        created_from=created_from.isoformat() if created_from else None,
+        created_to=created_to.isoformat() if created_to else None,
     )
 
 
@@ -78,6 +87,12 @@ async def get_gallery_item_names(
     order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
     starred_first: bool = Query(default=True, description="Whether to sort by starred items first"),
     search_term: Optional[str] = Query(default=None, description="The term to search for"),
+    created_from: Optional[date] = Query(
+        default=None, description="Inclusive start date (YYYY-MM-DD) to filter by created_at."
+    ),
+    created_to: Optional[date] = Query(
+        default=None, description="Inclusive end date (YYYY-MM-DD) to filter by created_at."
+    ),
 ) -> GalleryItemNamesResult:
     """Returns an ordered (kind, name) list — used to drive virtualized gallery selection."""
     if board_id is not None and board_id != "none":
@@ -94,6 +109,8 @@ async def get_gallery_item_names(
             search_term=search_term,
             user_id=current_user.user_id,
             is_admin=current_user.is_admin,
+            created_from=created_from.isoformat() if created_from else None,
+            created_to=created_to.isoformat() if created_to else None,
         )
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to get gallery item names")

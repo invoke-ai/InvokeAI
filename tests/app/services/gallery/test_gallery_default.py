@@ -15,6 +15,8 @@ Covers JPPhoto's code-review findings (PR #9163):
    ``list_item_names`` so virtual boards cover both kinds.
 """
 
+from types import SimpleNamespace
+
 import pytest
 
 from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
@@ -123,6 +125,35 @@ def _backdate(services, table: str, name_col: str, name: str, created_at: str) -
         cursor.execute(f"UPDATE {table} SET created_at = ? WHERE {name_col} = ?", (created_at, name))
 
 
+def _start_gallery_for_item_results(services) -> None:
+    """Provide the URL service dependency required when gallery rows become item DTOs."""
+    urls = SimpleNamespace(
+        get_image_url=lambda name, thumbnail=False: f"/images/{name}{'?thumbnail=1' if thumbnail else ''}",
+        get_video_url=lambda name, thumbnail=False: f"/videos/{name}{'?thumbnail=1' if thumbnail else ''}",
+    )
+    services["gallery"].start(SimpleNamespace(services=SimpleNamespace(urls=urls)))
+
+
+def _seed_created_range(services) -> None:
+    """Seed inclusive-day boundaries, excluded neighbours, and another user's matching media."""
+    for name in ("before.png", "range-start.png", "range-end.png", "after.png"):
+        _save_image(services["images"], name, user_id="alice")
+    for name in ("before.mp4", "range-video.mp4", "range-video-end.mp4", "bob-range.mp4"):
+        _save_video(services["videos"], name, user_id="bob" if name == "bob-range.mp4" else "alice")
+
+    for table, name_col, name, created_at in [
+        ("images", "image_name", "before.png", "2026-03-09 23:59:59.999"),
+        ("images", "image_name", "range-start.png", "2026-03-10 00:00:00.000"),
+        ("images", "image_name", "range-end.png", "2026-03-11 23:59:59.999"),
+        ("images", "image_name", "after.png", "2026-03-12 00:00:00.000"),
+        ("videos", "video_name", "before.mp4", "2026-03-09 23:59:59.999"),
+        ("videos", "video_name", "range-video.mp4", "2026-03-10 15:00:00.000"),
+        ("videos", "video_name", "range-video-end.mp4", "2026-03-11 09:00:00.000"),
+        ("videos", "video_name", "bob-range.mp4", "2026-03-11 12:00:00.000"),
+    ]:
+        _backdate(services, table, name_col, name, created_at)
+
+
 class TestGetDatesPolymorphic:
     def test_video_only_date_appears(self, services) -> None:
         # A date with videos and no images must still produce a virtual board — with the
@@ -213,6 +244,61 @@ class TestListItemNamesByCreatedDate:
         result = services["gallery"].list_item_names(user_id="alice", is_admin=False, created_date="2026-01-07")
 
         assert [(item.kind, item.name) for item in result.items] == [(GalleryItemKind.VIDEO, "alice-day.mp4")]
+
+
+class TestCreatedRangeFiltering:
+    def test_list_items_includes_utc_day_bounds_and_reports_total(self, services) -> None:
+        _seed_created_range(services)
+        _start_gallery_for_item_results(services)
+
+        result = services["gallery"].list_items(
+            limit=10,
+            user_id="alice",
+            is_admin=False,
+            created_from="2026-03-10",
+            created_to="2026-03-11",
+        )
+
+        assert [(item.kind, item.name) for item in result.items] == [
+            (GalleryItemKind.IMAGE, "range-end.png"),
+            (GalleryItemKind.VIDEO, "range-video-end.mp4"),
+            (GalleryItemKind.VIDEO, "range-video.mp4"),
+            (GalleryItemKind.IMAGE, "range-start.png"),
+        ]
+        assert result.total == 4
+
+    def test_list_item_names_created_range_matches_item_order_and_counts(self, services) -> None:
+        _seed_created_range(services)
+
+        result = services["gallery"].list_item_names(
+            user_id="alice",
+            is_admin=False,
+            created_from="2026-03-10",
+            created_to="2026-03-11",
+        )
+
+        assert [(item.kind, item.name) for item in result.items] == [
+            (GalleryItemKind.IMAGE, "range-end.png"),
+            (GalleryItemKind.VIDEO, "range-video-end.mp4"),
+            (GalleryItemKind.VIDEO, "range-video.mp4"),
+            (GalleryItemKind.IMAGE, "range-start.png"),
+        ]
+        assert result.total_count == 4
+
+    def test_created_date_remains_an_exact_day_filter_without_ranges(self, services) -> None:
+        _seed_created_range(services)
+
+        result = services["gallery"].list_item_names(
+            user_id="alice",
+            is_admin=False,
+            created_date="2026-03-10",
+        )
+
+        assert [(item.kind, item.name) for item in result.items] == [
+            (GalleryItemKind.VIDEO, "range-video.mp4"),
+            (GalleryItemKind.IMAGE, "range-start.png"),
+        ]
+        assert result.total_count == 2
 
 
 class TestGetBoardMediaSummaries:

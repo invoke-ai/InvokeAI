@@ -47,6 +47,8 @@ class SqliteGalleryService(GalleryServiceABC):
         search_term: Optional[str] = None,
         user_id: Optional[str] = None,
         is_admin: bool = False,
+        created_from: Optional[str] = None,
+        created_to: Optional[str] = None,
     ) -> OffsetPaginatedResults[GalleryItem]:
         image_half, image_params, image_count_query = self._build_half(
             kind="image",
@@ -57,6 +59,8 @@ class SqliteGalleryService(GalleryServiceABC):
             search_term=search_term,
             user_id=user_id,
             is_admin=is_admin,
+            created_from=created_from,
+            created_to=created_to,
         )
         video_half, video_params, video_count_query = self._build_half(
             kind="video",
@@ -67,6 +71,8 @@ class SqliteGalleryService(GalleryServiceABC):
             search_term=search_term,
             user_id=user_id,
             is_admin=is_admin,
+            created_from=created_from,
+            created_to=created_to,
         )
 
         order_clause = self._build_order_clause(starred_first, order_dir)
@@ -112,6 +118,8 @@ class SqliteGalleryService(GalleryServiceABC):
         user_id: Optional[str] = None,
         is_admin: bool = False,
         created_date: Optional[str] = None,
+        created_from: Optional[str] = None,
+        created_to: Optional[str] = None,
     ) -> GalleryItemNamesResult:
         image_half, image_params, _ = self._build_half(
             kind="image",
@@ -124,6 +132,8 @@ class SqliteGalleryService(GalleryServiceABC):
             is_admin=is_admin,
             names_only=True,
             created_date=created_date,
+            created_from=created_from,
+            created_to=created_to,
         )
         video_half, video_params, _ = self._build_half(
             kind="video",
@@ -136,6 +146,8 @@ class SqliteGalleryService(GalleryServiceABC):
             is_admin=is_admin,
             names_only=True,
             created_date=created_date,
+            created_from=created_from,
+            created_to=created_to,
         )
 
         order_clause = self._build_order_clause(starred_first, order_dir)
@@ -343,6 +355,8 @@ class SqliteGalleryService(GalleryServiceABC):
         is_admin: bool,
         names_only: bool = False,
         created_date: Optional[str] = None,
+        created_from: Optional[str] = None,
+        created_to: Optional[str] = None,
     ) -> tuple[str, list[Union[int, str, bool]], str]:
         """Builds one half of the union (either `images` or `videos`).
 
@@ -417,6 +431,14 @@ class SqliteGalleryService(GalleryServiceABC):
         if created_date is not None:
             conditions += f" AND DATE({base_table}.created_at) = ? "
             params.append(created_date)
+
+        if created_from is not None:
+            conditions += f" AND {base_table}.created_at >= ? "
+            params.append(created_from)
+
+        if created_to is not None:
+            conditions += f" AND {base_table}.created_at < DATE(?, '+1 day') "
+            params.append(created_to)
 
         if board_id == "none":
             conditions += f" AND {join_table}.board_id IS NULL "

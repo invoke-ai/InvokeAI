@@ -25,6 +25,8 @@ class GalleryServiceABC(ABC):
         search_term: Optional[str] = None,
         user_id: Optional[str] = None,
         is_admin: bool = False,
+        created_from: Optional[str] = None,
+        created_to: Optional[str] = None,
     ) -> OffsetPaginatedResults[GalleryItem]:
         """Lists a paginated, time-sorted stream of image + video items."""
         pass
@@ -42,11 +44,15 @@ class GalleryServiceABC(ABC):
         user_id: Optional[str] = None,
         is_admin: bool = False,
         created_date: Optional[str] = None,
+        created_from: Optional[str] = None,
+        created_to: Optional[str] = None,
     ) -> GalleryItemNamesResult:
         """Returns ordered (kind, name) refs for optimistic UI / virtualized lists.
 
         `created_date` restricts the result to items created on the given ISO date — used by
         date-based virtual boards.
+
+        `created_from` and `created_to` are inclusive YYYY-MM-DD bounds on created_at (UTC days).
         """
         pass
 
