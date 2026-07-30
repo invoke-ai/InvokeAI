@@ -10,7 +10,6 @@ import inspect
 import math
 from typing import Any, Callable, Optional
 
-import numpy as np
 import torch
 from tqdm import tqdm
 
@@ -65,11 +64,17 @@ def denoise(
     model_timestep_scale = float(scheduler.config.num_train_timesteps) if use_scheduler else 1000.0
 
     if use_scheduler:
-        # Drop the final sigma -- diffusers schedulers append it themselves.
-        sigmas = np.array(timesteps[:-1], dtype=np.float32)
         set_timesteps_sig = inspect.signature(scheduler.set_timesteps)
         if "sigmas" in set_timesteps_sig.parameters:
-            scheduler.set_timesteps(sigmas=sigmas.tolist(), device=img.device)
+            # Hand the scheduler the *whole* window -- terminal sigma included -- and then drop the
+            # extra zero it unconditionally appends. Passing `timesteps[:-1]` instead would let that
+            # appended zero stand in for the requested end sigma, so `denoising_end < 1.0` would
+            # silently run a full denoise in fewer, coarser steps rather than stopping early.
+            # Truncating (instead of patching the last sigma by hand) keeps the scheduler's own
+            # `shift` applied to the terminal sigma, which manual math here would get wrong.
+            scheduler.set_timesteps(sigmas=list(timesteps), device=img.device)
+            scheduler.sigmas = scheduler.sigmas[:-1]
+            scheduler.timesteps = scheduler.timesteps[:-1]
         else:
             # FlowMatchHeunDiscreteScheduler.set_timesteps only takes a step count and derives its
             # own sigmas, so a partial-denoise range cannot be honored. Refuse instead of silently
@@ -79,7 +84,7 @@ def denoise(
                     f"{type(scheduler).__name__} does not accept an explicit sigma schedule, so it cannot honor "
                     "denoising_start/denoising_end. Use the euler or lcm scheduler for partial denoising."
                 )
-            scheduler.set_timesteps(num_inference_steps=len(sigmas), device=img.device)
+            scheduler.set_timesteps(num_inference_steps=len(timesteps) - 1, device=img.device)
 
         # Higher-order solvers evaluate the model more than once per requested step (Heun's
         # `set_timesteps(N)` yields 2N-1 timesteps), so drive progress off the actual iteration

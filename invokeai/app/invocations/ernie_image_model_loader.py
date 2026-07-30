@@ -1,3 +1,5 @@
+import json
+
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
@@ -81,12 +83,29 @@ class ErnieImageModelLoaderInvocation(BaseInvocation):
         )
 
     def _pipeline_has_prompt_enhancer(self, context: InvocationContext) -> bool:
-        """Check whether the pipeline directory ships a prompt-enhancer."""
+        """Check whether the pipeline ships a *loadable* prompt-enhancer.
+
+        Both the LM and its tokenizer are required, and both must be declared in `model_index.json`:
+        `GenericDiffusersLoader.get_hf_load_class` resolves each submodel's class from that file and
+        raises "the ... submodel is not available for this model" on a missing key. Gating on the
+        directory alone would let a partial install pass this check and then hard-fail the whole
+        generation at load time -- and since the toggle defaults to on, that would be the default
+        experience for such an install.
+        """
         config = context.models.get_config(self.model)
         # Models inside the Invoke-managed models dir are recorded with paths relative to
         # `models_path`; only the loader rewrites `config.path` to an absolute path, and that
         # happens after this check. Resolve against `models_path` the same way the loader does,
         # otherwise this would silently probe the server process's CWD and never find `pe/`.
         models_path = context.config.get().models_path
-        pe_dir = (models_path / config.path).resolve() / SubModelType.PromptEnhancer.value
-        return pe_dir.is_dir()
+        model_path = (models_path / config.path).resolve()
+
+        required = (SubModelType.PromptEnhancer, SubModelType.PromptEnhancerTokenizer)
+        if not all((model_path / submodel.value).is_dir() for submodel in required):
+            return False
+
+        try:
+            index = json.loads((model_path / "model_index.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return False
+        return all(submodel.value in index for submodel in required)

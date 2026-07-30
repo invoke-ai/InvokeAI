@@ -67,7 +67,16 @@ def get_schedule(num_steps: int, denoising_start: float = 0.0, denoising_end: fl
     start = int(num_steps * denoising_start)
     end = int(num_steps * denoising_end)
     # Slice to [start, end] inclusive of both ends so the caller can use adjacent pairs.
-    return sigmas[start : end + 1]
+    window = sigmas[start : end + 1]
+    if window.numel() < 2:
+        # A window that rounds down to a single sigma yields zero adjacent pairs, i.e. zero steps.
+        # The denoise loop would then return its input untouched and the graph would decode raw
+        # noise with no error, so refuse instead.
+        raise ValueError(
+            f"The denoising window [{denoising_start}, {denoising_end}] rounds to zero steps at "
+            f"steps={num_steps}. Increase steps or widen the window."
+        )
+    return window
 
 
 def vae_normalize(latents: torch.Tensor, bn: torch.nn.Module, eps: float = 1e-5) -> torch.Tensor:

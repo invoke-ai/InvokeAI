@@ -133,6 +133,12 @@ export const buildErnieImageGraph = async (arg: GraphBuilderArg): Promise<GraphB
   let canvasOutput: Invocation<ImageOutputNodes> = addTextToImage({ g, state, denoise, l2i });
   g.upsertMetadata({ generation_mode: 'ernie_image_txt2img' });
 
+  // The prompt enhancer is handed the target size and rewrites the prompt to suit that aspect
+  // ratio, so it needs the real generation dimensions. `addTextToImage` is what resolves them, so
+  // this has to run after it -- otherwise the enhancer always sees the node's 1024x1024 defaults.
+  posCond.pe_width = denoise.width;
+  posCond.pe_height = denoise.height;
+
   if (state.system.shouldUseNSFWChecker) {
     canvasOutput = addNSFWChecker(g, canvasOutput);
   }

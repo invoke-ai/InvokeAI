@@ -106,30 +106,29 @@ class ErnieImageDenoiseInvocation(BaseInvocation):
             latent_h = self.height // sampling_utils.VAE_SCALE_FACTOR
             latent_w = self.width // sampling_utils.VAE_SCALE_FACTOR
 
-            if self.latents is not None:
-                img = context.tensors.load(self.latents.latents_name).to(device=device, dtype=dtype)
-                if img.shape[1] != in_channels:
-                    raise ValueError(
-                        f"Input latents have {img.shape[1]} channels but transformer expects {in_channels}. "
-                        "Pass already-patched latents (use the ERNIE-Image VAE encode node)."
-                    )
-            else:
-                # Always generate noise on the same device and dtype, then cast, so a given seed
-                # produces the same image regardless of the execution device (CUDA/ROCm/MPS/CPU).
-                rand_device = "cpu"
-                rand_dtype = torch.float32
-                img = torch.randn(
-                    (1, in_channels, latent_h, latent_w),
-                    generator=torch.Generator(device=rand_device).manual_seed(self.seed),
-                    device=rand_device,
-                    dtype=rand_dtype,
-                ).to(device=device, dtype=dtype)
-
             sigmas = sampling_utils.get_schedule(
                 self.steps, denoising_start=self.denoising_start, denoising_end=self.denoising_end
             )
             timesteps = sigmas.tolist()
             cfg_scale = [self.guidance_scale] * (len(timesteps) - 1)
+
+            # Always generate noise on the same device and dtype, then cast, so a given seed
+            # produces the same image regardless of the execution device (CUDA/ROCm/MPS/CPU).
+            rand_device = "cpu"
+            rand_dtype = torch.float32
+            noise = torch.randn(
+                (1, in_channels, latent_h, latent_w),
+                generator=torch.Generator(device=rand_device).manual_seed(self.seed),
+                device=rand_device,
+                dtype=rand_dtype,
+            ).to(device=device, dtype=dtype)
+
+            init_latents = (
+                context.tensors.load(self.latents.latents_name).to(device=device, dtype=dtype)
+                if self.latents is not None
+                else None
+            )
+            img = self._prepare_initial_latents(noise, init_latents, float(timesteps[0]))
 
             scheduler = self._build_scheduler(context)
 
@@ -158,6 +157,36 @@ class ErnieImageDenoiseInvocation(BaseInvocation):
             width=self.width,
             height=self.height,
         )
+
+    def _prepare_initial_latents(
+        self,
+        noise: torch.Tensor,
+        init_latents: Optional[torch.Tensor],
+        first_sigma: float,
+    ) -> torch.Tensor:
+        """Build the sample the denoise loop starts from.
+
+        The loop assumes its input already sits at `first_sigma` on the rectified-flow path, so
+        image-to-image init latents must be blended with noise rather than passed through clean --
+        otherwise the model is told the sample is at `first_sigma` when it is really at 0.
+        """
+        if init_latents is None:
+            if self.denoising_start > 0:
+                raise ValueError(
+                    "denoising_start must be 0 when no initial latents are provided. There is nothing to "
+                    "partially denoise, and starting from full-magnitude noise at a reduced sigma tells the "
+                    "model the sample is already partly denoised, which produces garbage."
+                )
+            return noise
+
+        if init_latents.shape != noise.shape:
+            raise ValueError(
+                f"Input latents have shape {tuple(init_latents.shape)} but this graph expects "
+                f"{tuple(noise.shape)} (batch, patched channels, height, width). ERNIE-Image latents must be "
+                "VAE-encoded, BN-normalized (`sampling_utils.vae_normalize`) and 2x2-patchified "
+                "(`sampling_utils.patchify_latents`) before they can be denoised."
+            )
+        return first_sigma * noise + (1.0 - first_sigma) * init_latents
 
     def _build_scheduler(self, context: InvocationContext) -> SchedulerMixin:
         """Instantiate the selected scheduler from the pipeline's own `scheduler/` config.
