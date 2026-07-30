@@ -109,7 +109,9 @@ Tests 15 passed (15)
 
 - Added `GalleryItemDragData` with `kind: 'gallery-item'` and an ordered
   `GalleryItemRef[]`.
-- Draggable IDs are exact `GalleryItemKey` values.
+- Draggable IDs retain the exact `GalleryItemKey` under a source namespace so
+  co-mounted Grid, Preview frame, and Preview filmstrip registrations remain
+  independent.
 - Added the non-empty item guard and retained
   `isGalleryImageDragData()` as a non-empty all-image refinement whose narrowed
   items expose image names without a media cast.
@@ -225,8 +227,9 @@ architecture: 3 files passed, 34 tests passed
    an all-image vector and rejects video/mixed vectors without moving an image
    subset.
 2. The canonical Gallery context target is converted to the current
-   `ImageContextMenu` target only when every target item is an image. Video and
-   mixed targets are rejected pending the Task 7 common item action menu.
+   `ImageContextMenu` target only when its complete ordered ref vector resolves
+   to images. Video, mixed, and unresolved targets are rejected pending the
+   Task 7 common item action menu.
 3. Grid delete/star hotkeys still call the image-action port only for a fully
    resolved all-image selection. Video, mixed, and unresolved selections are
    rejected pending Task 7.
@@ -244,7 +247,9 @@ architecture: 3 files passed, 34 tests passed
    comparison targets remain intentionally image-only. Their shared refinement
    accepts only non-empty all-image item payloads.
 
-No retained adapter converts or casts a video to an image.
+The App context-menu bridge retains
+`actions as unknown as ImageActions` as a Task 7 compatibility cast. It does
+not cast a media value or allow a video to cross an image-only boundary.
 
 ## Self-review
 
@@ -259,3 +264,114 @@ No retained adapter converts or casts a video to an image.
   regression test.
 - Confirmed `git diff --check` is clean.
 - No unresolved implementation concern.
+
+## Review follow-up: ordered identity and drop presentation
+
+An independent review of `4c5aae43c1` found four interaction gaps. The
+follow-up keeps the original scope and constraints while correcting them:
+
+1. Grid drag payloads now derive the complete ordered ref vector directly from
+   `selectedItemKeys`. Lazy range members that are not materialized remain in
+   the payload, including videos that must make the Task 7 image bridge reject
+   the entire move.
+2. Context targets carry both the complete ordered `itemRefs` and the currently
+   loaded canonical `items`. The App image menu resolves every ref by qualified
+   key and rejects mixed or unresolved targets instead of exposing a loaded
+   image subset.
+3. Draggable registrations use
+   `gallery-grid|preview-frame|preview-filmstrip:<GalleryItemKey>`. This keeps
+   co-mounted sources independent while preserving qualified identity in every
+   ID. Disabled frames use a per-mount React ID instead of a synthetic
+   `image:none` registration.
+4. Upscale, Generate Reference Images, and Regional Guidance share a compatible
+   image-droppable boundary. It disables dnd-kit registration and suppresses
+   visible `isOver` for video/mixed active payloads while continuing to accept
+   all-image payloads.
+
+The board menu now also memoizes one `GalleryItemKey -> boardId` index and
+passes it to every row, avoiding a complete loaded-item index rebuild per row.
+
+### Follow-up RED
+
+The full-ref Grid regressions initially produced:
+
+```text
+Test Files 1 failed (1)
+Tests 3 failed | 9 passed (12)
+```
+
+The failures showed the unloaded video missing from the drag payload and
+`itemRefs` missing from single and mixed context targets. The App bridge
+regression then produced:
+
+```text
+Test Files 1 failed (1)
+Tests 1 failed | 1 passed (2)
+```
+
+It exposed `["loaded.png"]` for a target whose complete selection also
+contained an unloaded video.
+
+The co-mounted registration regressions produced:
+
+```text
+Unit:    1 failed | 6 passed (7)
+Browser: 1 failed | 12 passed (13)
+```
+
+The unit failure showed an un-namespaced `image:shared` ID. The browser failure
+showed Preview's single-image registration replacing the Grid's mixed payload.
+
+The visual-target regression initially failed at suite import because the
+compatible image-droppable boundary did not exist:
+
+```text
+Test Files 1 failed (1)
+Tests no tests
+```
+
+### Follow-up GREEN
+
+The combined affected unit run was:
+
+```text
+Test Files 5 passed (5)
+Tests 37 passed (37)
+```
+
+The combined affected browser run covered the App bridge, Grid, all three
+image-only visual targets, Preview frame, and Preview comparison:
+
+```text
+Test Files 5 passed (5)
+Tests 27 passed (27)
+```
+
+### Follow-up verification
+
+```text
+pnpm lint:tsc
+tsc --noEmit: passed
+
+pnpm test
+Test Files 375 passed (375)
+Tests 4951 passed (4951)
+
+pnpm test:browser
+Test Files 63 passed (63)
+Tests 268 passed (268)
+
+pnpm test:fixtures
+Tests 4 passed (4)
+
+pnpm architecture:check
+Test Files 3 passed (3)
+Tests 34 passed (34)
+
+pnpm lint
+format, oxlint, tsc, and architecture: passed
+```
+
+The full browser suite again emitted its existing React `act(...)`,
+missing-i18n-instance, and intentional error-boundary diagnostics and exited
+successfully.

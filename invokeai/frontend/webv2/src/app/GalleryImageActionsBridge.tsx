@@ -5,7 +5,7 @@ import type {
 } from '@features/gallery/react';
 import type { ReactNode } from 'react';
 
-import { galleryImageItemToGalleryImage, isGalleryImageItem } from '@features/gallery/contracts';
+import { galleryImageItemToGalleryImage, isGalleryImageItem, toGalleryItemKey } from '@features/gallery/contracts';
 import { GalleryImageActionsProvider } from '@features/gallery/react';
 import { getGalleryItemDragData, isGalleryImageDragData } from '@features/gallery/utility';
 import { ImageContextMenu, useImageActions, type ImageActions } from '@workbench/image-actions';
@@ -14,17 +14,28 @@ import { useMemo } from 'react';
 const GalleryImageContextMenuComponent = ({ actions, boards, onClose, target }: GalleryItemContextMenuProps) => {
   // TODO(Task 7): The current App action menu is image-only. Keep its input
   // strict until the canonical mixed-media context menu/actions port lands.
-  const imageTarget = useMemo(
-    () =>
-      target && target.items.length > 0 && target.items.every(isGalleryImageItem)
-        ? {
-            images: target.items.map(galleryImageItemToGalleryImage),
-            x: target.x,
-            y: target.y,
-          }
-        : null,
-    [target]
-  );
+  const imageTarget = useMemo(() => {
+    if (!target || target.itemRefs.length === 0 || target.itemRefs.some((ref) => ref.kind !== 'image')) {
+      return null;
+    }
+
+    const loadedItemsByKey = new Map(target.items.map((item) => [toGalleryItemKey(item), item]));
+    const imageItems = target.itemRefs.flatMap((ref) => {
+      const item = loadedItemsByKey.get(toGalleryItemKey(ref));
+
+      return item && isGalleryImageItem(item) ? [item] : [];
+    });
+
+    if (imageItems.length !== target.itemRefs.length) {
+      return null;
+    }
+
+    return {
+      images: imageItems.map(galleryImageItemToGalleryImage),
+      x: target.x,
+      y: target.y,
+    };
+  }, [target]);
 
   return (
     <ImageContextMenu

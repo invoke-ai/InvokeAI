@@ -26,6 +26,7 @@ export interface GalleryImageActionsOptions {
 }
 
 export interface GalleryItemContextMenuTarget {
+  itemRefs: GalleryItemRef[];
   items: GalleryItem[];
   x: number;
   y: number;

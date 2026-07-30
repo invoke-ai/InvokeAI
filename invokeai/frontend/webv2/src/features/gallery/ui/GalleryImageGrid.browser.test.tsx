@@ -1,13 +1,17 @@
-/* oxlint-disable react-perf/jsx-no-new-object-as-prop */
-import type { GalleryItem, GalleryItemRef } from '@features/gallery/contracts';
+/* oxlint-disable react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-object-as-prop */
+import type { GalleryItem, GalleryItemRef, GeneratedImageContract } from '@features/gallery/contracts';
+import type { StreamingImageSource } from '@platform/ui/streaming-image/streamingImageSource';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { DndContext, PointerSensor, useDndMonitor, useSensor, useSensors, type DragStartEvent } from '@dnd-kit/core';
 import { DEFAULT_GALLERY_SETTINGS } from '@features/gallery/core/settings';
 import { GalleryUiProvider, type GalleryUiAdapter } from '@features/gallery/react';
+import { isGalleryImageDragData } from '@features/gallery/utility';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
+import { PreviewFilmstrip } from '@workbench/widgets/preview/PreviewFilmstrip';
+import { PreviewFrame } from '@workbench/widgets/preview/PreviewFrame';
 import { createInstance } from 'i18next';
 import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -135,6 +139,23 @@ const createItem = (kind: GalleryItem['kind'], name: string, overrides: Partial<
     : ({ ...base, kind } as GalleryItem);
 };
 
+const createPreviewImage = (name: string): GeneratedImageContract => ({
+  height: 96,
+  imageName: name,
+  imageUrl: `/full/image/${name}`,
+  queuedAt: '2026-07-30T00:00:00.000Z',
+  sourceQueueItemId: 'queue-1',
+  thumbnailUrl: `/thumbnail/image/${name}`,
+  width: 128,
+});
+const previewSource: StreamingImageSource = {
+  alt: 'shared',
+  height: 96,
+  kind: 'final',
+  src: '/full/image/shared',
+  width: 128,
+};
+
 const board = {
   archived: false,
   assetCount: 0,
@@ -219,10 +240,22 @@ const createActions = (): GalleryActions =>
     uploadFiles: vi.fn(),
   }) as unknown as GalleryActions;
 
-type CanonicalContextTarget = { items: GalleryItem[]; x: number; y: number } | null;
+type CanonicalContextTarget = {
+  itemRefs?: GalleryItemRef[];
+  items: GalleryItem[];
+  x: number;
+  y: number;
+} | null;
 const ContextMenuProbe = ({ target }: { target: CanonicalContextTarget }) => (
   <output data-testid="context-target">
-    {JSON.stringify(target?.items.map(({ kind, name }) => ({ kind, name })) ?? null)}
+    {JSON.stringify(
+      target
+        ? {
+            itemRefs: target.itemRefs ?? null,
+            items: target.items.map(({ kind, name }) => ({ kind, name })),
+          }
+        : null
+    )}
   </output>
 );
 const NoopProvider = ({ children }: { children: ReactNode }) => children;
@@ -277,7 +310,13 @@ const DragMonitor = () => {
   return null;
 };
 
-const Harness = ({ gallery }: { gallery: GalleryStateView }) => {
+const Harness = ({
+  coMountPreviewSources = false,
+  gallery,
+}: {
+  coMountPreviewSources?: boolean;
+  gallery: GalleryStateView;
+}) => {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const contextValue: GalleryWidgetContextValue = {
     actions: createActions(),
@@ -297,6 +336,26 @@ const Harness = ({ gallery }: { gallery: GalleryStateView }) => {
               <DndContext sensors={sensors}>
                 <DragMonitor />
                 <GalleryImageGrid layout="wide" />
+                {coMountPreviewSources ? (
+                  <>
+                    <PreviewFrame
+                      dragItem={{ kind: 'image', name: 'shared' }}
+                      frameHeight={96}
+                      frameWidth={128}
+                      isLive={false}
+                      liveBadgeLabel="Generating"
+                      shouldAntialiasLiveImage
+                      source={previewSource}
+                      variant="framed"
+                    />
+                    <PreviewFilmstrip
+                      density="full"
+                      images={[createPreviewImage('shared'), createPreviewImage('other.png')]}
+                      selectedImageName="shared"
+                      onSelect={noop}
+                    />
+                  </>
+                ) : null}
               </DndContext>
             </GalleryWidgetContext>
           </GalleryUiProvider>
@@ -314,9 +373,9 @@ const interact = (action: () => void, delay = 0): Promise<void> =>
     });
   });
 
-const renderGallery = async (gallery = currentGallery) => {
+const renderGallery = async (gallery = currentGallery, coMountPreviewSources = false) => {
   currentGallery = gallery;
-  await interact(() => root?.render(<Harness gallery={gallery} />));
+  await interact(() => root?.render(<Harness coMountPreviewSources={coMountPreviewSources} gallery={gallery} />));
 };
 
 const getButton = (label: string): HTMLButtonElement => {
@@ -405,12 +464,67 @@ describe('GalleryImageGrid mixed item cells', () => {
 
     expect(onDragStart).toHaveBeenCalledWith({
       data: { items: [{ kind: 'video', name: 'shared' }], kind: 'gallery-item' },
-      id: 'video:shared',
+      id: 'gallery-grid:video:shared',
     });
 
     // dnd-kit briefly suppresses the click following a completed drag. Let
     // that document-level guard expire before the next interaction test.
     await interact(() => pointer('pointerup', videoButton.ownerDocument, 120, 80), 300);
+  });
+
+  it('preserves the ordered full selection when an unloaded video is dragged from a loaded image', async () => {
+    await renderGallery(
+      createGallery({
+        items: [createItem('image', 'loaded.png')],
+        selectedItemKey: 'image:loaded.png',
+        selectedItemKeys: ['image:loaded.png', 'video:unloaded.mp4'],
+      })
+    );
+    const imageButton = getButton('Select loaded.png for preview');
+
+    await interact(() => pointer('pointerdown', imageButton, 80, 80), 20);
+    await interact(() => pointer('pointermove', imageButton.ownerDocument, 120, 80), 50);
+
+    const drag = onDragStart.mock.calls[0]?.[0];
+    await interact(() => pointer('pointerup', imageButton.ownerDocument, 120, 80), 300);
+
+    expect(drag).toEqual({
+      data: {
+        items: [
+          { kind: 'image', name: 'loaded.png' },
+          { kind: 'video', name: 'unloaded.mp4' },
+        ],
+        kind: 'gallery-item',
+      },
+      id: 'gallery-grid:image:loaded.png',
+    });
+    expect(isGalleryImageDragData(drag?.data)).toBe(false);
+  });
+
+  it('keeps grid multi-selection data when preview sources for the same image are co-mounted', async () => {
+    await renderGallery(
+      createGallery({
+        items: [createItem('image', 'shared'), createItem('video', 'selected.mp4')],
+        selectedItemKey: 'image:shared',
+        selectedItemKeys: ['image:shared', 'video:selected.mp4'],
+      }),
+      true
+    );
+    const imageButton = getButton('Select shared for preview');
+
+    await interact(() => pointer('pointerdown', imageButton, 80, 80), 20);
+    await interact(() => pointer('pointermove', imageButton.ownerDocument, 120, 80), 50);
+
+    const drag = onDragStart.mock.calls[0]?.[0];
+    await interact(() => pointer('pointerup', imageButton.ownerDocument, 120, 80), 300);
+
+    expect(drag?.data).toEqual({
+      items: [
+        { kind: 'image', name: 'shared' },
+        { kind: 'video', name: 'selected.mp4' },
+      ],
+      kind: 'gallery-item',
+    });
   });
 
   it('keeps Alt comparison image-only and forms a one-video context target outside selection', async () => {
@@ -439,7 +553,38 @@ describe('GalleryImageGrid mixed item cells', () => {
       )
     );
     expect(host?.querySelector('[data-testid="context-target"]')?.textContent).toBe(
-      JSON.stringify([{ kind: 'video', name: 'clip.mp4' }])
+      JSON.stringify({
+        itemRefs: [{ kind: 'video', name: 'clip.mp4' }],
+        items: [{ kind: 'video', name: 'clip.mp4' }],
+      })
+    );
+  });
+
+  it('retains an unloaded video ref when opening the context menu inside a mixed selection', async () => {
+    const image = createItem('image', 'loaded.png');
+    await renderGallery(
+      createGallery({
+        items: [image],
+        selectedItemKey: 'image:loaded.png',
+        selectedItemKeys: ['image:loaded.png', 'video:unloaded.mp4'],
+      })
+    );
+    const imageButton = getButton('Select loaded.png for preview');
+
+    await interact(() =>
+      imageButton.dispatchEvent(
+        new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 23, clientY: 41 })
+      )
+    );
+
+    expect(host?.querySelector('[data-testid="context-target"]')?.textContent).toBe(
+      JSON.stringify({
+        itemRefs: [
+          { kind: 'image', name: 'loaded.png' },
+          { kind: 'video', name: 'unloaded.mp4' },
+        ],
+        items: [{ kind: 'image', name: 'loaded.png' }],
+      })
     );
   });
 

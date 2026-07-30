@@ -7,6 +7,7 @@ import { CSS } from '@dnd-kit/utilities';
 import {
   formatGalleryVideoDuration,
   isGalleryImageItem,
+  parseGalleryItemKey,
   toGalleryItemKey,
   toGalleryItemRef,
 } from '@features/gallery/core/items';
@@ -109,6 +110,7 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
     gallery.settings;
   const columnCount = getGalleryColumnCount(imageDensityPercent, layout);
   const selectedItemKeys = useMemo(() => new Set(gallery.selectedItemKeys), [gallery.selectedItemKeys]);
+  const selectedItemRefs = useMemo(() => gallery.selectedItemKeys.map(parseGalleryItemKey), [gallery.selectedItemKeys]);
   const isFollowingLive = gallery.currentItem?.kind === 'placeholder';
   const isComparisonActive =
     gallery.selectedItemKey?.startsWith('image:') === true &&
@@ -335,6 +337,7 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
       const itemKey = toGalleryItemKey(item);
 
       if (selectedItemKeys.has(itemKey) && selectedItemKeys.size > 1) {
+        const itemRefs = selectedItemRefs;
         const selectionItems = [
           item,
           ...gallery.items.filter(
@@ -342,13 +345,13 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
           ),
         ];
 
-        setContextMenuTarget({ items: selectionItems, x, y });
+        setContextMenuTarget({ itemRefs, items: selectionItems, x, y });
         return;
       }
 
-      setContextMenuTarget({ items: [item], x, y });
+      setContextMenuTarget({ itemRefs: [toGalleryItemRef(item)], items: [item], x, y });
     },
-    [gallery.items, selectedItemKeys]
+    [gallery.items, selectedItemKeys, selectedItemRefs]
   );
 
   const getDragItems = useCallback(
@@ -356,14 +359,12 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
       const itemKey = toGalleryItemKey(item);
 
       if (selectedItemKeys.has(itemKey) && selectedItemKeys.size > 1) {
-        return gallery.items
-          .filter((candidate) => selectedItemKeys.has(toGalleryItemKey(candidate)))
-          .map(toGalleryItemRef);
+        return selectedItemRefs;
       }
 
       return [toGalleryItemRef(item)];
     },
-    [gallery.items, selectedItemKeys]
+    [selectedItemKeys, selectedItemRefs]
   );
 
   const handleDragEnter = useCallback((event: DragEvent) => {
@@ -769,7 +770,7 @@ const GalleryThumbnail = ({
 
   const { isDragging, listeners, setNodeRef, transform } = useDraggable({
     data: getGalleryItemDragData(dragItems),
-    id: getGalleryItemDragId(toGalleryItemRef(item)),
+    id: getGalleryItemDragId(toGalleryItemRef(item), 'gallery-grid'),
   });
 
   const containerStyle = useMemo(() => ({ transform: CSS.Transform.toString(transform) }), [transform]);

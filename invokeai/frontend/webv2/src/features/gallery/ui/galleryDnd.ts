@@ -1,6 +1,7 @@
 import type { GalleryItem, GalleryItemKey, GalleryItemRef } from '@features/gallery/core/items';
 import type { GalleryBoardKind } from '@features/gallery/core/types';
 
+import { useDndContext, useDroppable, type UseDroppableArguments } from '@dnd-kit/core';
 import { toGalleryItemKey } from '@features/gallery/core/items';
 
 export interface GalleryItemDragData {
@@ -27,7 +28,11 @@ export interface GalleryBoardDropResolution {
   items: GalleryItemRef[];
 }
 
-export const getGalleryItemDragId = (item: GalleryItemRef): GalleryItemKey => toGalleryItemKey(item);
+export type GalleryItemDragSource = 'gallery-grid' | 'preview-filmstrip' | 'preview-frame';
+export type GalleryItemDragId = `${GalleryItemDragSource}:${GalleryItemKey}`;
+
+export const getGalleryItemDragId = (item: GalleryItemRef, source: GalleryItemDragSource): GalleryItemDragId =>
+  `${source}:${toGalleryItemKey(item)}`;
 
 export const getGalleryBoardDropId = (boardId: string): string => `gallery-board:${boardId}`;
 
@@ -51,6 +56,14 @@ export const isGalleryItemDragData = (value: unknown): value is GalleryItemDragD
 
 export const isGalleryImageDragData = (value: unknown): value is GalleryImageDragData =>
   isGalleryItemDragData(value) && value.items.every((item): item is GalleryImageDragItem => item.kind === 'image');
+
+export const useGalleryImageDroppable = ({ disabled = false, ...args }: UseDroppableArguments) => {
+  const { active } = useDndContext();
+  const acceptsActiveDrag = isGalleryImageDragData(active?.data.current);
+  const droppable = useDroppable({ ...args, disabled: disabled || !acceptsActiveDrag });
+
+  return { ...droppable, isOver: acceptsActiveDrag && droppable.isOver };
+};
 
 export const isGalleryBoardDropData = (value: unknown): value is GalleryBoardDropData =>
   isRecord(value) &&

@@ -1,4 +1,4 @@
-import type { GalleryItem, GalleryItemRef } from '@features/gallery/core/items';
+import type { GalleryItem, GalleryItemKey, GalleryItemRef } from '@features/gallery/core/items';
 import type { GalleryBoard } from '@features/gallery/core/types';
 
 import {
@@ -16,6 +16,7 @@ import {
   Text,
 } from '@chakra-ui/react';
 import { useDndContext, useDndMonitor, useDroppable, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core';
+import { toGalleryItemKey } from '@features/gallery/core/items';
 import { Button, CloseButton, IconButton } from '@platform/ui';
 import {
   ArchiveIcon,
@@ -47,7 +48,6 @@ import { GalleryBoardMenu, type GalleryBoardMenuTarget } from './GalleryBoardMen
 import {
   getGalleryBoardDropData,
   getGalleryBoardDropId,
-  getGalleryItemRefsOutsideBoard,
   isGalleryItemDragData,
   resolveGalleryBoardDrop,
 } from './galleryDnd';
@@ -85,6 +85,10 @@ export const GalleryBoardSelect = () => {
   const boardMenuActiveRef = useRef(false);
   const dragOpenedMenuRef = useRef(false);
   const isGalleryItemDragActive = isGalleryItemDragData(active?.data.current);
+  const loadedItemBoardIds = useMemo(
+    () => new Map<GalleryItemKey, string>(gallery.items.map((item) => [toGalleryItemKey(item), item.boardId])),
+    [gallery.items]
+  );
   const trimmedSearchTerm = boardSearchTerm.trim();
   const normalizedSearchTerm = trimmedSearchTerm.toLowerCase();
   const matchesSearch = useCallback(
@@ -284,6 +288,7 @@ export const GalleryBoardSelect = () => {
                           badgeColor="blue"
                           board={projectBoard}
                           isSelected={projectBoard.id === gallery.selectedBoardId}
+                          loadedItemBoardIds={loadedItemBoardIds}
                           onOpenMenu={openBoardMenu}
                           onSelectBoard={actions.selectBoard}
                           onSelectComplete={closeAndReset}
@@ -305,6 +310,7 @@ export const GalleryBoardSelect = () => {
                       <BoardRow
                         board={uncategorizedBoard}
                         isSelected={uncategorizedBoard.id === gallery.selectedBoardId}
+                        loadedItemBoardIds={loadedItemBoardIds}
                         onOpenMenu={openBoardMenu}
                         onSelectBoard={actions.selectBoard}
                         onSelectComplete={closeAndReset}
@@ -318,6 +324,7 @@ export const GalleryBoardSelect = () => {
                             key={board.id}
                             board={board}
                             isSelected={board.id === gallery.selectedBoardId}
+                            loadedItemBoardIds={loadedItemBoardIds}
                             onSelectBoard={actions.selectBoard}
                             onSelectComplete={closeAndReset}
                           />
@@ -334,6 +341,7 @@ export const GalleryBoardSelect = () => {
                         badgeColor="gray"
                         board={board}
                         isSelected={board.id === gallery.selectedBoardId}
+                        loadedItemBoardIds={loadedItemBoardIds}
                         onOpenMenu={openBoardMenu}
                         onSelectBoard={actions.selectBoard}
                         onSelectComplete={closeAndReset}
@@ -455,6 +463,7 @@ const BoardRow = ({
   badgeColor,
   board,
   isSelected,
+  loadedItemBoardIds,
   onOpenMenu,
   onSelectBoard,
   onSelectComplete,
@@ -463,19 +472,19 @@ const BoardRow = ({
   badgeColor?: 'blue' | 'gray';
   board: GalleryBoard;
   isSelected: boolean;
+  loadedItemBoardIds: ReadonlyMap<GalleryItemKey, string>;
   onOpenMenu?: (board: GalleryBoard, x: number, y: number) => void;
   onSelectBoard: (boardId: string) => void;
   onSelectComplete: () => void;
 }) => {
   const { t } = useTranslation();
   const { active } = useDndContext();
-  const { gallery } = useGalleryWidget();
   const dragData = active?.data.current;
 
   const canDropItems =
     board.kind === 'board' &&
     isGalleryItemDragData(dragData) &&
-    getGalleryItemRefsOutsideBoard(dragData, board.id, gallery.items).length > 0;
+    dragData.items.some((ref) => loadedItemBoardIds.get(toGalleryItemKey(ref)) !== board.id);
 
   const { isOver, setNodeRef } = useDroppable({
     data: getGalleryBoardDropData(board.id, board.kind),

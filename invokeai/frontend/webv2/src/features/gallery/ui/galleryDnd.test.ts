@@ -30,7 +30,7 @@ const createItem = (kind: GalleryItem['kind'], name: string, boardId: string): G
 };
 
 describe('galleryDnd', () => {
-  it('constructs the shared item payload and uses qualified item keys as draggable ids', () => {
+  it('constructs the shared item payload and namespaces qualified draggable ids by source', () => {
     const refs = [
       { kind: 'image', name: 'shared' },
       { kind: 'video', name: 'shared' },
@@ -40,8 +40,10 @@ describe('galleryDnd', () => {
       items: refs,
       kind: 'gallery-item',
     });
-    expect(getGalleryItemDragId(refs[0])).toBe('image:shared');
-    expect(getGalleryItemDragId(refs[1])).toBe('video:shared');
+    expect(getGalleryItemDragId(refs[0], 'gallery-grid')).toBe('gallery-grid:image:shared');
+    expect(getGalleryItemDragId(refs[0], 'preview-frame')).toBe('preview-frame:image:shared');
+    expect(getGalleryItemDragId(refs[0], 'preview-filmstrip')).toBe('preview-filmstrip:image:shared');
+    expect(getGalleryItemDragId(refs[1], 'gallery-grid')).toBe('gallery-grid:video:shared');
   });
 
   it('recognizes only non-empty, well-formed gallery item payloads', () => {

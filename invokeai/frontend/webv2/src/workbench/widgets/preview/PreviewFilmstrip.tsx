@@ -86,7 +86,7 @@ const FilmstripThumb = ({
   const dragData = useMemo(() => getGalleryItemDragData([{ kind: 'image', name: image.imageName }]), [image.imageName]);
   const { listeners, setNodeRef } = useDraggable({
     data: dragData,
-    id: getGalleryItemDragId(dragData.items[0]!),
+    id: getGalleryItemDragId(dragData.items[0]!, 'preview-filmstrip'),
   });
   const handleClick = useCallback(() => onSelect(image), [image, onSelect]);
   // Ref callbacks re-run when `isSelected` changes, keeping the selected thumb

@@ -5,7 +5,7 @@ import type { StreamingImageSource } from '@platform/ui/streaming-image/streamin
 import { Badge, Box, Flex, type SystemStyleObject } from '@chakra-ui/react';
 import { useDraggable } from '@dnd-kit/core';
 import { getGalleryItemDragData, getGalleryItemDragId } from '@features/gallery/utility';
-import { useCallback, useMemo, type CSSProperties, type MouseEvent, type ReactNode, type Ref } from 'react';
+import { useCallback, useId, useMemo, type CSSProperties, type MouseEvent, type ReactNode, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { PreviewCompareDropZone } from './PreviewCompareDropZone';
@@ -76,6 +76,7 @@ export const PreviewFrame = ({
   });
   const dragData = useMemo(() => (dragItem ? getGalleryItemDragData([dragItem]) : undefined), [dragItem]);
   const isDragDisabled = !dragItem || isLive || loupe.isZoomed;
+  const disabledDragId = useId();
   const {
     isDragging,
     listeners,
@@ -83,7 +84,7 @@ export const PreviewFrame = ({
   } = useDraggable({
     data: dragData,
     disabled: isDragDisabled,
-    id: getGalleryItemDragId(dragItem ?? { kind: 'image', name: 'none' }),
+    id: dragItem ? getGalleryItemDragId(dragItem, 'preview-frame') : `preview-frame:disabled:${disabledDragId}`,
   });
   const setContentRef = useCallback(
     (element: HTMLDivElement | null) => {

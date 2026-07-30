@@ -12,10 +12,10 @@ import type { CanvasStructuralEngine } from '@workbench/widgets/layers/layerOps'
 import type { ChangeEvent, CSSProperties, FocusEvent } from 'react';
 
 import { Box, createListCollection, HStack, IconButton, Input, Stack, Switch, Text } from '@chakra-ui/react';
-import { useDndMonitor, useDroppable } from '@dnd-kit/core';
+import { useDndMonitor } from '@dnd-kit/core';
 import { galleryImages, galleryTransfers } from '@features/gallery';
 import { invalidateGallery } from '@features/gallery/queries';
-import { isGalleryImageDragData } from '@features/gallery/utility';
+import { isGalleryImageDragData, useGalleryImageDroppable } from '@features/gallery/utility';
 import { FluxReduxControls, PROMPT_ATTENTION_TARGET_PROPS, PromptTextarea } from '@features/generation/components';
 import { useModelsSelector } from '@features/models';
 import {
@@ -502,7 +502,10 @@ const ReferenceImageRow = ({
   const { t } = useTranslation();
   const { config } = referenceImage;
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const { isOver, setNodeRef } = useDroppable({ data: { kind: 'regional-reference-image' }, id: dropId });
+  const { isOver, setNodeRef } = useGalleryImageDroppable({
+    data: { kind: 'regional-reference-image' },
+    id: dropId,
+  });
 
   const replaceRef = useCallback(
     (next: RegionalGuidanceReferenceImage) => {

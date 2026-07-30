@@ -46,7 +46,7 @@ const interact = (action: () => void): Promise<void> =>
 const DraggableThumb = () => {
   const { listeners, setNodeRef } = useDraggable({
     data: getGalleryItemDragData([{ kind: 'image', name: 'dragged.png' }]),
-    id: getGalleryItemDragId({ kind: 'image', name: 'dragged.png' }),
+    id: getGalleryItemDragId({ kind: 'image', name: 'dragged.png' }, 'gallery-grid'),
   });
 
   return (

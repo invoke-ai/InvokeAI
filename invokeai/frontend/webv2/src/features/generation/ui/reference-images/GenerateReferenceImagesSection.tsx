@@ -9,9 +9,9 @@ import type { GenerateSettingsUpdate } from '@features/generation/ui/generateDeb
 import type { ChangeEvent } from 'react';
 
 import { Badge, HStack, Input, Stack, Text } from '@chakra-ui/react';
-import { useDndMonitor, useDroppable } from '@dnd-kit/core';
+import { useDndMonitor } from '@dnd-kit/core';
 import { galleryImages, galleryTransfers } from '@features/gallery';
-import { isGalleryImageDragData } from '@features/gallery/utility';
+import { isGalleryImageDragData, useGalleryImageDroppable } from '@features/gallery/utility';
 import {
   createReferenceImageId,
   getDefaultReferenceImageConfig,
@@ -59,7 +59,7 @@ export const GenerateReferenceImagesSection = ({
   const isSupported = isReferenceImageSupported(selectedModel);
   const maxReferenceImages = getMaxReferenceImages(selectedModel);
   const canAdd = referenceImages.length < maxReferenceImages;
-  const { isOver, setNodeRef } = useDroppable({
+  const { isOver, setNodeRef } = useGalleryImageDroppable({
     data: { kind: 'generate-reference-images' },
     disabled: !canAdd,
     id: 'generate-reference-images',
