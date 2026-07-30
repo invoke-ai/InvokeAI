@@ -577,6 +577,23 @@ describe('Krea-2, Ideogram 4 and Wan graphs', () => {
     });
   });
 
+  it('sends an anima-registered Qwen-Image VAE to the Krea-2 loader', () => {
+    // Regression: the builder filtered VAEs to base `qwen-image`, so a Qwen-Image VAE
+    // installed under the `anima` base was dropped and the loader got no VAE at all.
+    const animaRegisteredVae: VaeModelConfig = {
+      base: 'anima',
+      key: 'anima-qwen-vae',
+      name: 'Qwen VAE (installed for Anima)',
+      type: 'vae',
+    };
+    const graph = compile(krea2Checkpoint, {
+      qwen3VLEncoderModel: qwen3VlEncoder,
+      vae: animaRegisteredVae,
+    });
+
+    expect(graph.nodes.model_loader).toMatchObject({ vae_model: animaRegisteredVae });
+  });
+
   it('refuses to compile a non-diffusers Krea-2 with a missing submodel', () => {
     // Validation runs ahead of the builder, so the user-facing reason surfaces rather than the
     // builder's internal guard. Both layers exist; this pins which one the user actually sees.

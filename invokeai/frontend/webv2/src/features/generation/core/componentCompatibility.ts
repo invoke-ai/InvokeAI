@@ -98,6 +98,15 @@ export const getCompatibleDiffusersComponentSource = <T extends GenerateComponen
 
 export const isAnimaVae = isVaeForBases(['anima', 'qwen-image', 'flux']);
 
+/**
+ * Krea-2 decodes with the Qwen-Image VAE (16-channel), which is why its graph reuses
+ * `qwen_image_l2i`. `anima` is accepted alongside `qwen-image` because the same physical VAE
+ * is registered under either base depending on which family it was installed for — matching
+ * `krea2_model_loader`'s own `ui_model_base=[QwenImage, Anima]`. Restricting this to
+ * `qwen-image` hides a working VAE that the backend would have accepted.
+ */
+export const isKrea2Vae = isVaeForBases(['qwen-image', 'anima']);
+
 export const isVaeCompatibleWithGenerateModel = (model: GenerateModelConfig, vae: VaeModelConfig): boolean => {
   if (model.type === 'external_image_generator') {
     return false;
@@ -110,9 +119,8 @@ export const isVaeCompatibleWithGenerateModel = (model: GenerateModelConfig, vae
       return isVaeForBases(['flux'])(vae);
     case 'qwen-image':
       return isVaeForBases(['qwen-image'])(vae);
-    // Krea-2 decodes with the Qwen-Image VAE, which is why its graph reuses `qwen_image_l2i`.
     case 'krea-2':
-      return isVaeForBases(['qwen-image'])(vae);
+      return isKrea2Vae(vae);
     case 'flux2':
       return isVaeForBases(['flux2'])(vae);
     default:

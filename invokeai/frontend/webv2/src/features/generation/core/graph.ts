@@ -31,6 +31,7 @@ import {
   isAnimaVae,
   isFlux2Qwen3EncoderForModel,
   isNonAnimaQwen3Encoder,
+  isKrea2Vae,
   isVaeForBases,
 } from './componentCompatibility';
 import {
@@ -938,7 +939,10 @@ const buildKrea2Graph = (
   // or GGUF) bundles neither VAE nor encoder, so both must be selected. A diffusers model
   // carries them, and the loader extracts them when these are omitted.
   const isDiffusers = model.format === 'diffusers';
-  const vaeModel = getCompatibleVae(settings, ['qwen-image']);
+  // Same base set as the picker (`isKrea2Vae`) and the backend loader: a Qwen-Image VAE
+  // installed under the `anima` base is still the VAE Krea-2 wants. Narrowing it here would
+  // silently drop a VAE the user had legitimately selected.
+  const vaeModel = settings.vae && isKrea2Vae(settings.vae) ? settings.vae : null;
   const qwen3VlEncoderModel = settings.qwen3VLEncoderModel;
 
   if (!isDiffusers) {

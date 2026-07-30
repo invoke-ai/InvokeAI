@@ -19,6 +19,7 @@ import {
   getCompatibleDiffusersComponentSource,
   isAnimaQwen3Encoder,
   isAnimaVae,
+  isKrea2Vae,
   isClipVariant,
   isDiffusersMainForBase,
   isFlux2DiffusersSourceForModel,
@@ -1024,7 +1025,7 @@ export const getComponentSectionPolicy = (
       // both submodels must be selected. Diffusers models bundle them, hence optional there.
       return createPolicy(model.format !== 'diffusers', [
         {
-          ...vaeSlot('Required for non-Diffusers Krea-2 models.', isVaeForBases(['qwen-image'])),
+          ...vaeSlot('Required for non-Diffusers Krea-2 models. Qwen-Image VAEs are used.', isKrea2Vae),
           required: (ctx) => ctx.model.format !== 'diffusers',
           missingMessage: 'Generate needs a VAE for non-Diffusers Krea-2 models.',
         },

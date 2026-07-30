@@ -855,6 +855,48 @@ describe('Krea-2, Ideogram 4 and Wan policies', () => {
     expect(reasons).toContain('Generate height must be a multiple of 16.');
   });
 
+  it('accepts a Qwen-Image VAE registered under the anima base, as the backend loader does', () => {
+    // The same physical Qwen-Image VAE is registered as `anima` or `qwen-image` depending on
+    // which family it was installed for, and krea2_model_loader declares
+    // ui_model_base=[QwenImage, Anima]. Accepting only `qwen-image` hid a working VAE.
+    const animaRegisteredVae: VaeModelConfig = {
+      base: 'anima',
+      key: 'anima-qwen-vae',
+      name: 'Qwen VAE (installed for Anima)',
+      type: 'vae',
+    };
+    const checkpoint = createModel('krea-2', { format: 'checkpoint' });
+    const settings = createSettings(checkpoint, {
+      qwen3VLEncoderModel: qwen3VlEncoder,
+      vae: animaRegisteredVae,
+    });
+
+    expect(getGenerationValidationReasons(checkpoint, settings)).toEqual([]);
+
+    const slots = getComponentSectionPolicy(checkpoint, settings).slots;
+    const vaeSlotPolicy = slots.find((slot) => slot.key === 'vae');
+
+    // The picker filter and the validator must agree, or the dropdown hides a VAE that
+    // validation would then demand.
+    expect(
+      vaeSlotPolicy?.filter?.(animaRegisteredVae, {
+        model: checkpoint,
+        selectedComponents: { ...settings },
+        settings,
+      })
+    ).toBe(true);
+  });
+
+  it('still rejects a VAE from an unrelated family for Krea-2', () => {
+    const checkpoint = createModel('krea-2', { format: 'checkpoint' });
+    const reasons = getGenerationValidationReasons(
+      checkpoint,
+      createSettings(checkpoint, { qwen3VLEncoderModel: qwen3VlEncoder, vae: sdxlVae })
+    );
+
+    expect(reasons).toContain('Generate needs a VAE for non-Diffusers Krea-2 models.');
+  });
+
   it('requires a VAE and Qwen3-VL encoder for a non-diffusers Krea-2 but not a diffusers one', () => {
     const checkpoint = createModel('krea-2', { format: 'checkpoint' });
     const missing = getGenerationValidationReasons(checkpoint, createSettings(checkpoint));
