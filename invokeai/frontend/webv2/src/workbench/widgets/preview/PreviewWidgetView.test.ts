@@ -72,6 +72,27 @@ describe('mergePreviewBoardItems', () => {
     ]);
   });
 
+  it('uses the server kind/name tie-breakers for equal timestamps in both directions', () => {
+    const createdAt = '2026-07-21T00:00:01.000Z';
+    const imageA = item('image', 'a', createdAt);
+    const imageZ = item('image', 'z', createdAt);
+    const videoA = item('video', 'a', createdAt);
+    const videoZ = item('video', 'z', createdAt);
+
+    expect(mergePreviewBoardItems([videoA, imageZ], [videoZ, imageA], 'ASC', false)).toEqual([
+      imageA,
+      imageZ,
+      videoA,
+      videoZ,
+    ]);
+    expect(mergePreviewBoardItems([imageA, videoZ], [imageZ, videoA], 'DESC', false)).toEqual([
+      videoZ,
+      videoA,
+      imageZ,
+      imageA,
+    ]);
+  });
+
   it('keeps same-name media independent and bounds the merged Gallery window', () => {
     const backend = Array.from({ length: GALLERY_MAX_ROWS }, (_, index) =>
       item('image', `backend-${index}`, new Date(index * 1_000).toISOString())

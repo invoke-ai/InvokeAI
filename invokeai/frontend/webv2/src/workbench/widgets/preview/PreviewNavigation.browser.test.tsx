@@ -231,10 +231,29 @@ await i18n.use(initReactI18next).init({
   },
 });
 
-const disposer = () => {};
+const registeredCommands = new Map<string, () => void>();
+const registeredHotkeys = new Map<string, readonly string[]>();
 const runtime = {
-  commands: { register: () => disposer },
-  hotkeys: { register: () => disposer },
+  commands: {
+    register: ({ handler, id }: { handler: () => void; id: string }) => {
+      registeredCommands.set(id, handler);
+      return () => {
+        if (registeredCommands.get(id) === handler) {
+          registeredCommands.delete(id);
+        }
+      };
+    },
+  },
+  hotkeys: {
+    register: ({ defaultKeys, id }: { defaultKeys: readonly string[]; id: string }) => {
+      registeredHotkeys.set(id, defaultKeys);
+      return () => {
+        if (registeredHotkeys.get(id) === defaultKeys) {
+          registeredHotkeys.delete(id);
+        }
+      };
+    },
+  },
   instanceId: 'preview-instance',
   workbench: { closeWidgetInstance: () => {} },
 } as unknown as WidgetViewProps['runtime'];
@@ -285,6 +304,8 @@ const pressArrow = async (key: 'ArrowLeft' | 'ArrowRight') => {
 };
 
 beforeEach(() => {
+  registeredCommands.clear();
+  registeredHotkeys.clear();
   mocks.commands.account.updateProjectPreferences.mockClear();
   mocks.commands.gallery.selectImage.mockClear();
   mocks.commands.gallery.selectItem.mockClear();
@@ -645,6 +666,46 @@ describe('preview keyboard navigation boundary', () => {
     await pressArrow('ArrowLeft');
 
     expect(mocks.commands.gallery.selectItem).toHaveBeenCalledWith(sameNameImage, undefined, 0, true);
+  });
+
+  it('leaves native video keys untouched and omits image-only hotkey registrations', async () => {
+    const videoItem = createVideoItem('native-controls', '2026-07-30T12:00:00Z');
+    const galleryValues = mocks.project.widgetInstances.gallery.state.values as Record<string, unknown>;
+
+    galleryValues.recentImages = [];
+    galleryValues.selectedImage = videoItem;
+    galleryValues.selectedImageName = 'video:native-controls';
+    mocks.galleryItemPages = [{ items: [videoItem], total: 1 }];
+
+    await render();
+
+    const video = host?.querySelector<HTMLVideoElement>('video');
+    expect(video).not.toBeNull();
+
+    for (const key of ['ArrowLeft', 'ArrowRight', 'f', '1']) {
+      const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key });
+      await act(async () => {
+        video?.dispatchEvent(event);
+        await Promise.resolve();
+      });
+      expect(event.defaultPrevented).toBe(false);
+    }
+
+    expect(mocks.commands.gallery.selectItem).not.toHaveBeenCalled();
+    expect([...registeredHotkeys.keys()]).not.toContain('viewer.swapImages');
+    expect([...registeredHotkeys.keys()]).not.toContain('viewer.zoomToActual');
+    expect([...registeredHotkeys.keys()]).not.toContain('viewer.zoomToFit');
+  });
+
+  it('retains compare and zoom hotkey registrations for images', async () => {
+    await render();
+
+    expect([...registeredHotkeys.keys()]).toEqual(
+      expect.arrayContaining(['viewer.swapImages', 'viewer.zoomToActual', 'viewer.zoomToFit'])
+    );
+    expect([...registeredCommands.keys()]).toEqual(
+      expect.arrayContaining(['viewer.swapImages', 'viewer.zoomToActual', 'viewer.zoomToFit'])
+    );
   });
 
   it('uses the common mixed deletion context without the legacy image successor callback', async () => {

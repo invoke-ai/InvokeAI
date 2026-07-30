@@ -1,4 +1,4 @@
-import type { GalleryImage, GeneratedImageContract } from './types';
+import type { GalleryImage, GalleryOrderDir, GeneratedImageContract } from './types';
 
 export type GalleryItemKind = 'image' | 'video';
 
@@ -69,6 +69,34 @@ export const isGalleryImageItem = (item: GalleryItem): item is GalleryImageItem 
 
 export const assertNeverGalleryItem = (item: never): never => {
   throw new Error(`Unexpected gallery item: ${String(item)}`);
+};
+
+const compareSqliteBinaryText = (a: string, b: string): number => (a === b ? 0 : a < b ? -1 : 1);
+
+/** Mirrors the backend's starred/time/kind/name order for mixed gallery items. */
+export const compareGalleryItems = (
+  a: GalleryItem,
+  b: GalleryItem,
+  { orderDir = 'DESC', starredFirst = false }: { orderDir?: GalleryOrderDir; starredFirst?: boolean }
+): number => {
+  if (starredFirst && a.starred !== b.starred) {
+    return a.starred ? -1 : 1;
+  }
+
+  const direction = orderDir === 'ASC' ? 1 : -1;
+  const chronologicalOrder = compareSqliteBinaryText(a.createdAt, b.createdAt);
+
+  if (chronologicalOrder !== 0) {
+    return direction * chronologicalOrder;
+  }
+
+  const kindOrder = compareSqliteBinaryText(a.kind, b.kind);
+
+  if (kindOrder !== 0) {
+    return direction * kindOrder;
+  }
+
+  return direction * compareSqliteBinaryText(a.name, b.name);
 };
 
 type LegacyGalleryImage = GeneratedImageContract & Partial<Pick<GalleryImage, 'boardId' | 'imageCategory' | 'starred'>>;

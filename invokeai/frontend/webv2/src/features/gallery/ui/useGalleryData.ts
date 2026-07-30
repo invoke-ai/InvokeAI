@@ -2,7 +2,7 @@ import type { GalleryItem } from '@features/gallery/core/items';
 import type { GallerySettings } from '@features/gallery/core/settings';
 import type { GalleryBoard, GalleryView, GeneratedImageContract } from '@features/gallery/core/types';
 
-import { legacyGeneratedImageToGalleryItem, toGalleryItemKey } from '@features/gallery/core/items';
+import { compareGalleryItems, legacyGeneratedImageToGalleryItem, toGalleryItemKey } from '@features/gallery/core/items';
 import { GALLERY_RECENT_IMAGE_LIMIT } from '@features/gallery/core/recentImages';
 import { ALL_READABLE_BOARDS_ID, isDateBoardId } from '@features/gallery/data/backend';
 import {
@@ -65,33 +65,6 @@ const isRecentItemVisible = (item: GalleryItem, filter: GalleryItemsFilter): boo
       : item.kind === 'image' && item.category !== 'general';
 
   return hasMatchingBoard && hasMatchingCategory;
-};
-
-const compareSqliteBinaryText = (a: string, b: string): number => (a === b ? 0 : a < b ? -1 : 1);
-
-const compareGalleryItems = (
-  a: GalleryItem,
-  b: GalleryItem,
-  { orderDir = 'DESC', starredFirst = false }: GalleryItemsFilter
-): number => {
-  if (starredFirst && a.starred !== b.starred) {
-    return a.starred ? -1 : 1;
-  }
-
-  const direction = orderDir === 'ASC' ? 1 : -1;
-  const chronologicalOrder = compareSqliteBinaryText(a.createdAt, b.createdAt);
-
-  if (chronologicalOrder !== 0) {
-    return direction * chronologicalOrder;
-  }
-
-  const kindOrder = compareSqliteBinaryText(a.kind, b.kind);
-
-  if (kindOrder !== 0) {
-    return direction * kindOrder;
-  }
-
-  return direction * compareSqliteBinaryText(a.name, b.name);
 };
 
 export const mergeGalleryItemWindow = ({

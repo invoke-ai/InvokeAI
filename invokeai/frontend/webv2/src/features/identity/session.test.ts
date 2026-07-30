@@ -96,19 +96,21 @@ const createObservedLifecycle = (): {
     },
     name: 'test-account-cache',
   });
+  const port = {
+    activate: (accountId: string, storageSuffix?: string) => {
+      testState.events.push(`lifecycle.activate:${accountId}`);
+      return lifecycle.activate(accountId, storageSuffix);
+    },
+    capture: () => lifecycle.capture(),
+    invalidate: () => {
+      testState.events.push('lifecycle.invalidate');
+      return lifecycle.invalidate();
+    },
+  };
 
   return {
     lifecycle,
-    port: {
-      activate: (accountId, storageSuffix) => {
-        testState.events.push(`lifecycle.activate:${accountId}`);
-        return lifecycle.activate(accountId, storageSuffix);
-      },
-      invalidate: () => {
-        testState.events.push('lifecycle.invalidate');
-        return lifecycle.invalidate();
-      },
-    },
+    port,
   };
 };
 
@@ -271,6 +273,7 @@ describe('identity account transitions', () => {
     const { lifecycle } = createObservedLifecycle();
     session.configureIdentityAccountLifecycle({
       activate: (accountId, storageSuffix) => lifecycle.activate(accountId, storageSuffix),
+      capture: () => lifecycle.capture(),
       invalidate: () => lifecycle.invalidate(),
     });
 
@@ -480,20 +483,49 @@ describe('protected media cookie recovery', () => {
     await expect(Promise.all([first, second])).resolves.toEqual([true, true]);
   });
 
-  it('starts a separate refresh for a new account epoch and rejects the stale completion', async () => {
+  it('aborts the old cookie request before a new account transport starts and gives the new epoch a fresh flight', async () => {
     await resolveSignedOutMultiuserSession();
     await session.loginWithCredentials(user.email, 'password', true);
     const oldRefresh = createDeferred<{ success: boolean }>();
     const newRefresh = createDeferred<{ success: boolean }>();
-    api.refreshMediaCookie.mockReturnValueOnce(oldRefresh.promise).mockReturnValueOnce(newRefresh.promise);
+    let oldSignal: AbortSignal | undefined;
+    let newSignal: AbortSignal | undefined;
+    api.refreshMediaCookie
+      .mockImplementationOnce((signal?: AbortSignal) => {
+        oldSignal = signal;
+        signal?.addEventListener(
+          'abort',
+          () => {
+            testState.events.push('refresh.abort');
+          },
+          { once: true }
+        );
+        return oldRefresh.promise;
+      })
+      .mockImplementationOnce((signal?: AbortSignal) => {
+        newSignal = signal;
+        return newRefresh.promise;
+      });
 
     const staleOutcome = session.refreshProtectedMediaCookie();
+    expect(oldSignal?.aborted).toBe(false);
 
-    api.login.mockResolvedValueOnce({ expires_in: 3600, token: 'token-b', user: userB });
+    testState.events.length = 0;
+    api.login.mockImplementationOnce(() => {
+      testState.events.push('api.login:new-account');
+      return Promise.resolve({ expires_in: 3600, token: 'token-b', user: userB });
+    });
     await session.loginWithCredentials(userB.email, 'password', true);
+
+    expect(oldSignal?.aborted).toBe(true);
+    expect(testState.events.indexOf('refresh.abort')).toBeGreaterThanOrEqual(0);
+    expect(testState.events.indexOf('refresh.abort')).toBeLessThan(testState.events.indexOf('api.login:new-account'));
+
     const currentOutcome = session.refreshProtectedMediaCookie();
 
     expect(api.refreshMediaCookie).toHaveBeenCalledTimes(2);
+    expect(newSignal?.aborted).toBe(false);
+    expect(newSignal).not.toBe(oldSignal);
 
     newRefresh.resolve({ success: true });
     await expect(currentOutcome).resolves.toBe(true);

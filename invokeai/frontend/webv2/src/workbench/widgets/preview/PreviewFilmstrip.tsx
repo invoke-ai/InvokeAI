@@ -88,6 +88,7 @@ const FilmstripThumb = ({
 }) => {
   const itemRef = useMemo(() => toGalleryItemRef(item), [item]);
   const dragData = useMemo(() => getGalleryItemDragData([itemRef]), [itemRef]);
+  const thumbnailSrc = item.thumbnailUrl || (item.kind === 'image' ? item.fullUrl : null);
   const { listeners, setNodeRef } = useDraggable({
     data: dragData,
     id: getGalleryItemDragId(itemRef, 'preview-filmstrip'),
@@ -124,7 +125,11 @@ const FilmstripThumb = ({
       touchAction="none"
       onClick={handleClick}
     >
-      <img alt={item.name} loading="lazy" src={item.thumbnailUrl || item.fullUrl} style={FILMSTRIP_IMG_STYLE} />
+      {thumbnailSrc ? (
+        <img alt={item.name} loading="lazy" src={thumbnailSrc} style={FILMSTRIP_IMG_STYLE} />
+      ) : (
+        <Box aria-hidden bg="bg.muted" h="full" w="full" />
+      )}
       {isSelected ? <Box bg="accent.solid" bottom="0" h="2px" left="0" position="absolute" right="0" /> : null}
     </Box>
   );

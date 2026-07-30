@@ -13,6 +13,7 @@ export type {
 export { normalizeGalleryImage } from './core/image';
 export {
   assertNeverGalleryItem,
+  compareGalleryItems,
   formatGalleryVideoDuration,
   galleryImageItemToGalleryImage,
   isGalleryImageItem,

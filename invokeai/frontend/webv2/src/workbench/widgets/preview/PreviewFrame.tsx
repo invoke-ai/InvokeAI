@@ -2,10 +2,11 @@ import type { GalleryItemKey, GalleryItemRef } from '@features/gallery';
 /* eslint-disable react/react-compiler */
 import type { StreamingImageSource } from '@platform/ui/streaming-image/streamingImageSource';
 
-import { Badge, Box, Button, Flex, Text, type SystemStyleObject } from '@chakra-ui/react';
+import { Badge, Box, Flex, Text, type SystemStyleObject } from '@chakra-ui/react';
 import { useDraggable } from '@dnd-kit/core';
 import { getGalleryItemDragData, getGalleryItemDragId } from '@features/gallery/utility';
 import { getAuthSession, refreshProtectedMediaCookie } from '@features/identity';
+import { Button } from '@platform/ui/Button';
 import {
   useCallback,
   useId,

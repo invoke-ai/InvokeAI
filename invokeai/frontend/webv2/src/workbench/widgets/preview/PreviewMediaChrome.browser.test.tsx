@@ -189,6 +189,32 @@ describe('PreviewFilmstrip mixed media', () => {
 
     await interact(() => pointer('pointerup', videoButton.ownerDocument, 150, 80), 300);
   });
+
+  it('never falls back to the protected full video URL when a poster is unavailable', async () => {
+    const videoWithoutPoster = {
+      ...sharedVideo,
+      fullUrl: '/protected/videos/shared.mp4',
+      thumbnailUrl: '',
+    };
+
+    await render(
+      <DndContext>
+        <PreviewFilmstrip
+          density="full"
+          items={[sharedImage, videoWithoutPoster]}
+          selectedItemKey="video:shared"
+          onSelect={() => undefined}
+        />
+      </DndContext>
+    );
+
+    const videoButton = host?.querySelector<HTMLButtonElement>('[aria-label="Video shared"]');
+
+    expect(videoButton?.querySelector('img')).toBeNull();
+    expect(
+      [...host!.querySelectorAll<HTMLImageElement>('img')].map((image) => image.getAttribute('src'))
+    ).not.toContain(videoWithoutPoster.fullUrl);
+  });
 });
 
 describe('Preview mixed media footer and actions', () => {
@@ -216,7 +242,11 @@ describe('Preview mixed media footer and actions', () => {
     const status = Array.from(host!.querySelectorAll<HTMLElement>('p')).find((element) =>
       element.textContent?.includes('1920 × 1080')
     );
+    const position = Array.from(host!.querySelectorAll<HTMLElement>('p')).find((element) =>
+      element.textContent?.includes('2 of 3')
+    );
     expect(status ? getComputedStyle(status).fontVariantNumeric : '').toContain('tabular-nums');
+    expect(position ? getComputedStyle(position).fontVariantNumeric : '').toContain('tabular-nums');
     expect(host?.querySelector('[aria-label="Previous item in board"]')).not.toBeNull();
     expect(host?.querySelector('[aria-label="Next item in board"]')).not.toBeNull();
   });

@@ -46,6 +46,7 @@ const store = createExternalStore<AuthSession>({
 
 export interface IdentityAccountLifecycle {
   activate(accountId: string, storageSuffix?: string): { readonly epoch: number };
+  capture(): { readonly epoch: number; readonly signal: AbortSignal };
   invalidate(): { readonly epoch: number };
 }
 
@@ -256,7 +257,7 @@ export const ensureAuthSession = (): Promise<AuthSession> => {
 };
 
 interface ProtectedMediaCookieRefresh {
-  accountEpoch: number;
+  scope: ReturnType<IdentityAccountLifecycle['capture']>;
   promise: Promise<boolean>;
 }
 
@@ -273,13 +274,25 @@ export const refreshProtectedMediaCookie = (): Promise<boolean> => {
     return Promise.resolve(false);
   }
 
-  if (pendingProtectedMediaCookieRefresh?.accountEpoch === session.accountEpoch) {
+  const lifecycle = getAccountLifecycle();
+  const scope = lifecycle.capture();
+
+  if (scope.signal.aborted || scope.epoch !== session.accountEpoch) {
+    return Promise.resolve(false);
+  }
+
+  if (pendingProtectedMediaCookieRefresh?.scope === scope) {
     return pendingProtectedMediaCookieRefresh.promise;
   }
 
-  const accountEpoch = session.accountEpoch;
-  const promise = refreshMediaCookie()
-    .then((result) => result.success && store.getSnapshot().accountEpoch === accountEpoch)
+  const promise = refreshMediaCookie(scope.signal)
+    .then(
+      (result) =>
+        result.success &&
+        !scope.signal.aborted &&
+        lifecycle.capture() === scope &&
+        store.getSnapshot().accountEpoch === scope.epoch
+    )
     .catch(() => false)
     .finally(() => {
       if (pendingProtectedMediaCookieRefresh?.promise === promise) {
@@ -287,7 +300,7 @@ export const refreshProtectedMediaCookie = (): Promise<boolean> => {
       }
     });
 
-  pendingProtectedMediaCookieRefresh = { accountEpoch, promise };
+  pendingProtectedMediaCookieRefresh = { promise, scope };
   return promise;
 };
 

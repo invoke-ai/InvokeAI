@@ -21,6 +21,7 @@ import {
   getGallerySettings,
   getSelectedGalleryItemFromValues,
   getBoundedRecentImages,
+  compareGalleryItems,
   galleryImageItemToGalleryImage,
   isGalleryImageItem,
   legacyGeneratedImageToGalleryItem,
@@ -137,14 +138,10 @@ const getOrderedPreviewItems = (
   items
     .map((item, index) => ({ index, item }))
     .sort((a, b) => {
-      if (starredFirst && a.item.starred !== b.item.starred) {
-        return a.item.starred ? -1 : 1;
-      }
+      const canonicalOrder = compareGalleryItems(a.item, b.item, { orderDir: imageOrderDir, starredFirst });
 
-      const chronological = a.item.createdAt.localeCompare(b.item.createdAt);
-
-      if (chronological !== 0) {
-        return imageOrderDir === 'DESC' ? -chronological : chronological;
+      if (canonicalOrder !== 0) {
+        return canonicalOrder;
       }
 
       return inputOrder === 'newest-first' && imageOrderDir === 'ASC' ? b.index - a.index : a.index - b.index;
@@ -533,6 +530,10 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
 
   const handleNavigationKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
+      if (event.target instanceof Element && event.target.closest('video')) {
+        return;
+      }
+
       if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') {
         return;
       }
@@ -734,11 +735,15 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   useEffect(() => {
     const hotkeys = [
       ['viewer.toggleViewer', t('widgets.preview.commands.togglePreview'), ['z']],
-      ['viewer.swapImages', t('widgets.preview.commands.swapComparisonImages'), ['c']],
       ['viewer.deleteImage', t('widgets.preview.commands.deletePreviewImage'), ['delete', 'backspace']],
-      ['viewer.zoomToActual', t('widgets.preview.commands.zoomToActual'), ['1']],
-      ['viewer.zoomToFit', t('widgets.preview.commands.zoomToFit'), ['f']],
       ['viewer.toggleFilmstrip', t('widgets.preview.commands.toggleFilmstrip'), ['t']],
+      ...(selectedItem?.kind === 'image'
+        ? ([
+            ['viewer.swapImages', t('widgets.preview.commands.swapComparisonImages'), ['c']],
+            ['viewer.zoomToActual', t('widgets.preview.commands.zoomToActual'), ['1']],
+            ['viewer.zoomToFit', t('widgets.preview.commands.zoomToFit'), ['f']],
+          ] as const)
+        : []),
     ] as const;
     const disposers = hotkeys.flatMap(([id, title, defaultKeys]) => [
       runtime.commands.register({ handler: () => executeViewerHotkey(id), id, title }),
@@ -748,7 +753,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     return () => {
       disposers.forEach((dispose) => dispose());
     };
-  }, [runtime.commands, runtime.hotkeys, t]);
+  }, [runtime.commands, runtime.hotkeys, selectedItem?.kind, t]);
 
   return (
     <Box ref={rootRef} p="2" h="full">

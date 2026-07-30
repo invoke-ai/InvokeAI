@@ -12,6 +12,7 @@ export type {
 } from './core/types';
 export {
   assertNeverGalleryItem,
+  compareGalleryItems,
   formatGalleryVideoDuration,
   galleryImageItemToGalleryImage,
   isGalleryImageItem,
