@@ -21,8 +21,10 @@ class ObjectSerializerForwardCache(ObjectSerializerBase[T]):
         self._underlying_storage = underlying_storage
         self._cache: dict[str, T] = {}
         self._cache_ids = Queue[str]()
-        self._cache_lock = RLock()
         self._max_cache_size = max_cache_size
+        # Guards the in-memory cache and eviction queue so concurrent session-processor workers (multi-GPU)
+        # cannot interleave cache transitions. Reentrancy allows transition helpers to share this lock.
+        self._cache_lock = RLock()
 
     def start(self, invoker: "Invoker") -> None:
         self._invoker = invoker
