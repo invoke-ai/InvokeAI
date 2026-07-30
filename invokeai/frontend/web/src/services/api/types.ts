@@ -122,6 +122,8 @@ export type MistralEncoderModelConfig = Extract<InternalAnyModelConfig, { type: 
 export type QwenVLEncoderModelConfig = Extract<InternalAnyModelConfig, { type: 'qwen_vl_encoder' }>;
 export type Qwen3VLEncoderModelConfig = Extract<InternalAnyModelConfig, { type: 'qwen3_vl_encoder' }>;
 export type WanT5EncoderModelConfig = Extract<InternalAnyModelConfig, { type: 'wan_t5_encoder' }>;
+type Gemma2EncoderModelConfig = Extract<InternalAnyModelConfig, { type: 'gemma2_encoder' }>;
+type PiDDecoderModelConfig = Extract<InternalAnyModelConfig, { type: 'pid_decoder' }>;
 export type SpandrelImageToImageModelConfig = Extract<InternalAnyModelConfig, { type: 'spandrel_image_to_image' }>;
 export type CheckpointModelConfig = Extract<InternalAnyModelConfig, { type: 'main'; format: 'checkpoint' }>;
 export type CLIPVisionModelConfig = Extract<InternalAnyModelConfig, { type: 'clip_vision' }>;
@@ -418,6 +420,14 @@ export const isQwen3VLEncoderModelConfig = (config: AnyModelConfig): config is Q
 
 export const isWanT5EncoderModelConfig = (config: AnyModelConfig): config is WanT5EncoderModelConfig => {
   return config.type === 'wan_t5_encoder';
+};
+
+export const isGemma2EncoderModelConfig = (config: AnyModelConfig): config is Gemma2EncoderModelConfig => {
+  return config.type === 'gemma2_encoder';
+};
+
+export const isPiDDecoderModelConfig = (config: AnyModelConfig): config is PiDDecoderModelConfig => {
+  return config.type === 'pid_decoder';
 };
 
 export const isCLIPEmbedModelConfigOrSubmodel = (

@@ -60,6 +60,21 @@ def _has_t5_encoder_keys(state_dict: dict[str | int, Any]) -> bool:
     return False
 
 
+def _has_gemma2_keys(state_dict: dict[str | int, Any]) -> bool:
+    """Check if a state dict looks like a llama.cpp Gemma-2/3 model.
+
+    Gemma GGUFs also carry ``token_embd.weight`` + ``blk.*`` keys, so they satisfy the generic Qwen3 GGUF
+    heuristic (``_has_qwen3_keys``). But Gemma uses post-attention and post-feedforward RMSNorms
+    (``blk.*.post_attention_norm``, ``blk.*.post_ffw_norm``) that a Qwen3 encoder never has (Qwen3 has
+    ``attn_q_norm``/``attn_k_norm`` instead). We use this to keep the Gemma2 and Qwen3 encoder configs
+    mutually exclusive so a Gemma GGUF is not misidentified as a Qwen3 encoder.
+    """
+    for key in state_dict.keys():
+        if isinstance(key, str) and (".post_attention_norm" in key or ".post_ffw_norm" in key):
+            return True
+    return False
+
+
 def _has_qwen_vl_visual_tower(state_dict: dict[str | int, Any]) -> bool:
     """Check if state dict bundles a Qwen-VL vision tower (Qwen2-VL / Qwen2.5-VL / Qwen3-VL).
 
@@ -184,6 +199,14 @@ class Qwen3Encoder_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
         # block prefix, and must be classified as T5Encoder (Qwen3 encoders never have ``enc.blk.*`` keys).
         if _has_t5_encoder_keys(state_dict):
             raise NotAMatchError("state dict looks like a T5 encoder (has 'enc.blk.*' keys), not a Qwen3 encoder")
+        # Reject Gemma-2/3 encoders: their GGUFs also carry token_embd.weight + blk.* keys but use
+        # post-attention / post-feedforward norms a Qwen3 encoder never has; they must be classified as
+        # Gemma2Encoder (otherwise a Gemma GGUF matches both configs and can be re-identified wrongly).
+        if _has_gemma2_keys(state_dict):
+            raise NotAMatchError(
+                "state dict looks like a Gemma-2 encoder (has post_attention_norm/post_ffw_norm keys), "
+                "not a Qwen3 encoder"
+            )
         # Reject Qwen2.5-VL / Qwen2-VL encoders: they carry a visual tower and must be
         # classified as QwenVLEncoder (text-only Qwen3 encoders never have one).
         if _has_qwen_vl_visual_tower(state_dict):
@@ -334,6 +357,14 @@ class Qwen3Encoder_GGUF_Config(Checkpoint_Config_Base, Config_Base):
         # block prefix, and must be classified as T5Encoder (Qwen3 encoders never have ``enc.blk.*`` keys).
         if _has_t5_encoder_keys(state_dict):
             raise NotAMatchError("state dict looks like a T5 encoder (has 'enc.blk.*' keys), not a Qwen3 encoder")
+        # Reject Gemma-2/3 encoders: their GGUFs also carry token_embd.weight + blk.* keys but use
+        # post-attention / post-feedforward norms a Qwen3 encoder never has; they must be classified as
+        # Gemma2Encoder (otherwise a Gemma GGUF matches both configs and can be re-identified wrongly).
+        if _has_gemma2_keys(state_dict):
+            raise NotAMatchError(
+                "state dict looks like a Gemma-2 encoder (has post_attention_norm/post_ffw_norm keys), "
+                "not a Qwen3 encoder"
+            )
         # Reject Qwen2.5-VL / Qwen2-VL encoders: they carry a visual tower and must be
         # classified as QwenVLEncoder (text-only Qwen3 encoders never have one).
         if _has_qwen_vl_visual_tower(state_dict):

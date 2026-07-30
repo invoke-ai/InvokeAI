@@ -8,11 +8,13 @@ import {
   isControlNetModelConfig,
   isExternalApiModelConfig,
   isFluxReduxModelConfig,
+  isGemma2EncoderModelConfig,
   isIPAdapterModelConfig,
   isLLaVAModelConfig,
   isLoRAModelConfig,
   isMistralEncoderModelConfig,
   isNonRefinerMainModelConfig,
+  isPiDDecoderModelConfig,
   isQwen3EncoderModelConfig,
   isQwen3VLEncoderModelConfig,
   isQwenVLEncoderModelConfig,
@@ -102,6 +104,16 @@ const MODEL_CATEGORIES: Record<ModelCategoryType, ModelCategoryData> = {
     category: 'wan_t5_encoder',
     i18nKey: 'modelManager.wanT5Encoder',
     filter: isWanT5EncoderModelConfig,
+  },
+  gemma2_encoder: {
+    category: 'gemma2_encoder',
+    i18nKey: 'modelManager.gemma2Encoder',
+    filter: isGemma2EncoderModelConfig,
+  },
+  pid_decoder: {
+    category: 'pid_decoder',
+    i18nKey: 'modelManager.pidDecoder',
+    filter: isPiDDecoderModelConfig,
   },
   control_lora: {
     category: 'control_lora',
@@ -211,11 +223,13 @@ export const MODEL_TYPE_TO_LONG_NAME: Record<ModelType, string> = {
   mistral_encoder: 'Mistral Encoder',
   qwen3_vl_encoder: 'Qwen3-VL Encoder',
   wan_t5_encoder: 'Wan T5 Encoder',
+  gemma2_encoder: 'Gemma-2 Encoder',
   clip_embed: 'CLIP Embed',
   siglip: 'SigLIP',
   flux_redux: 'FLUX Redux',
   text_llm: 'Text LLM',
   external_image_generator: 'External Image Generator',
+  pid_decoder: 'PiD Decoder',
   unknown: 'Unknown',
 };
 
@@ -294,6 +308,8 @@ export const MODEL_VARIANT_TO_LONG_NAME: Record<AnyModelVariant, string> = {
   qwen3_06b: 'Qwen3 0.6B',
   cow_mistral3_small: 'cow-mistral3-small (FLUX.2)',
   mistral3_24b: 'Mistral Small 3 (24B, FLUX.2)',
+  res2k_sr4x: 'PiD 2K (4x SR)',
+  res2kto4k_sr4x: 'PiD 4K (4x SR Upscale)',
 };
 
 export const MODEL_FORMAT_TO_LONG_NAME: Record<ModelFormat, string> = {
@@ -313,6 +329,7 @@ export const MODEL_FORMAT_TO_LONG_NAME: Record<ModelFormat, string> = {
   mistral_encoder: 'Mistral Encoder',
   qwen3_vl_encoder: 'Qwen3-VL Encoder',
   wan_t5_encoder: 'Wan T5 Encoder (UMT5-XXL)',
+  gemma2_encoder: 'Gemma-2 Encoder',
   bnb_quantized_int8b: 'BNB Quantized (int8b)',
   bnb_quantized_nf4b: 'BNB Quantized (nf4b)',
   gguf_quantized: 'GGUF Quantized',

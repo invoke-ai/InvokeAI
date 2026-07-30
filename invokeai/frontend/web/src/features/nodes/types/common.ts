@@ -153,10 +153,12 @@ export const zModelType = z.enum([
   'mistral_encoder',
   'qwen3_vl_encoder',
   'wan_t5_encoder',
+  'gemma2_encoder',
   'clip_embed',
   'siglip',
   'flux_redux',
   'external_image_generator',
+  'pid_decoder',
   'unknown',
 ]);
 export type ModelType = z.infer<typeof zModelType>;
@@ -190,6 +192,7 @@ const zWanVariantType = z.enum(['t2v_a14b', 'i2v_a14b', 'ti2v_5b']);
 const zWanLoRAVariantType = z.enum(['a14b', '5b']);
 export const zQwen3VariantType = z.enum(['qwen3_4b', 'qwen3_8b', 'qwen3_06b']);
 const zMistralVariantType = z.enum(['cow_mistral3_small', 'mistral3_24b']);
+const zPiDDecoderVariantType = z.enum(['res2k_sr4x', 'res2kto4k_sr4x']);
 export const zAnyModelVariant = z.union([
   zModelVariantType,
   zClipVariantType,
@@ -202,6 +205,7 @@ export const zAnyModelVariant = z.union([
   zWanLoRAVariantType,
   zQwen3VariantType,
   zMistralVariantType,
+  zPiDDecoderVariantType,
 ]);
 export type AnyModelVariant = z.infer<typeof zAnyModelVariant>;
 export const zModelFormat = z.enum([
@@ -220,6 +224,7 @@ export const zModelFormat = z.enum([
   'mistral_encoder',
   'qwen3_vl_encoder',
   'wan_t5_encoder',
+  'gemma2_encoder',
   'bnb_quantized_int8b',
   'bnb_quantized_nf4b',
   'gguf_quantized',
