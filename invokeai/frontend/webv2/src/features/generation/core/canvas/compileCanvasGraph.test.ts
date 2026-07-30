@@ -384,6 +384,23 @@ describe('compileCanvasGraph', () => {
     it('rejects external image generators for img2img', () => {
       expect(() => compile(externalModel, 'img2img')).toThrow('does not support canvas generation');
     });
+
+    it('rejects PiD with an actionable message rather than an internal VAE error', () => {
+      // Canvas compilation resolves the VAE from a `canvas_output.vae` edge and renames
+      // that node when compositing back; a PiD chain has neither, so without the guard
+      // this surfaces as "could not resolve a VAE source in the base graph".
+      for (const mode of ['txt2img', 'img2img'] as const) {
+        expect(() =>
+          compile(sdxlModel, mode, {
+            settings: {
+              gemma2EncoderModel: { base: 'any', key: 'g', name: 'Gemma 2', type: 'gemma2_encoder' },
+              pidDecoderModel: { base: 'sdxl', key: 'pid', name: 'PiD SDXL', type: 'pid_decoder' },
+              pidMode: 'fit',
+            },
+          })
+        ).toThrow('PiD decoding is not supported on the canvas yet.');
+      }
+    });
   });
 
   describe('validation', () => {

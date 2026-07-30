@@ -30,6 +30,7 @@ import type { GenerateModelConfig, GenerateSettings } from '@features/generation
 import { getGenerationValidationReasons } from '@features/generation/core/baseGenerationPolicies';
 import { GRAPH_BUILDERS } from '@features/generation/core/graph';
 import { addEdge, addNode, toGraphContract } from '@features/generation/core/graphBuilder';
+import { getIsPidSupportedBase } from '@features/generation/core/pid';
 
 import type {
   CanvasCompositingSettings,
@@ -99,6 +100,14 @@ const getCanvasValidationReasons = (input: CompileCanvasGraphInput): string[] =>
   if (model.type === 'external_image_generator') {
     reasons.push(`${model.name} does not support canvas generation.`);
     return reasons;
+  }
+
+  // PiD is wired for text-to-image only. Canvas compilation finds the VAE by looking for
+  // a `canvas_output.vae` edge and renames that node when compositing back; a PiD chain
+  // has neither, so without this guard the user would get an internal
+  // "could not resolve a VAE source" error instead of an actionable one.
+  if (input.settings.pidMode !== 'off' && getIsPidSupportedBase(model.base)) {
+    reasons.push('PiD decoding is not supported on the canvas yet. Turn PiD off to generate here.');
   }
 
   if (!Number.isFinite(bbox.width) || !Number.isFinite(bbox.height) || bbox.width <= 0 || bbox.height <= 0) {
