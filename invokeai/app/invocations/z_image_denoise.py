@@ -1,7 +1,7 @@
 import inspect
 import math
 from contextlib import ExitStack
-from typing import Callable, Iterator, Optional, Tuple
+from typing import Callable, Iterator, Optional
 
 import einops
 import torch
@@ -29,7 +29,7 @@ from invokeai.app.invocations.z_image_image_to_latents import ZImageImageToLaten
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.schedulers import ZIMAGE_SCHEDULER_LABELS, ZIMAGE_SCHEDULER_MAP, ZIMAGE_SCHEDULER_NAME_VALUES
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat
-from invokeai.backend.patches.layer_patcher import LayerPatcher
+from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.z_image_lora_constants import Z_IMAGE_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
@@ -570,7 +570,7 @@ class ZImageDenoiseInvocation(BaseInvocation):
                 # Use diffusers scheduler for stepping
                 # Use tqdm with total_steps (user-facing steps) not num_scheduler_steps (internal steps)
                 # This ensures progress bar shows 1/8, 2/8, etc. even when scheduler uses more internal steps
-                pbar = tqdm(total=total_steps, desc="Denoising")
+                pbar = tqdm(total=total_steps, desc=f"Denoising{TorchDevice.get_session_device_label()}")
                 for step_index in range(num_scheduler_steps):
                     sched_timestep = scheduler.timesteps[step_index]
                     # Convert scheduler timestep (0-1000) to normalized sigma (0-1)
@@ -687,7 +687,7 @@ class ZImageDenoiseInvocation(BaseInvocation):
                 pbar.close()
             else:
                 # Original Euler implementation (default, optimized for Z-Image)
-                for step_idx in tqdm(range(total_steps)):
+                for step_idx in tqdm(range(total_steps), desc=f"Denoising{TorchDevice.get_session_device_label()}"):
                     sigma_curr = sigmas[step_idx]
                     sigma_prev = sigmas[step_idx + 1]
 
@@ -800,7 +800,7 @@ class ZImageDenoiseInvocation(BaseInvocation):
 
         return step_callback
 
-    def _lora_iterator(self, context: InvocationContext) -> Iterator[Tuple[ModelPatchRaw, float]]:
+    def _lora_iterator(self, context: InvocationContext) -> Iterator[PatchSpec]:
         """Iterate over LoRA models to apply to the transformer."""
         for lora in self.transformer.loras:
             lora_info = context.models.load(lora.lora)
@@ -809,5 +809,4 @@ class ZImageDenoiseInvocation(BaseInvocation):
                     f"Expected ModelPatchRaw for LoRA '{lora.lora.key}', got {type(lora_info.model).__name__}. "
                     "The LoRA model may be corrupted or incompatible."
                 )
-            yield (lora_info.model, lora.weight)
-            del lora_info
+            yield (lora_info.model, lora.weight, lora_info.model_in_ram())
