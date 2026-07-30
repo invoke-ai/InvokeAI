@@ -8,7 +8,11 @@ import {
   KREA2_REBALANCE_WEIGHT_COUNT,
   MAX_KREA2_SEED_VARIANCE_STRENGTH,
 } from '@features/generation/core/settings';
-import { Field, Select } from '@platform/ui';
+// Imported by subpath rather than from the `@platform/ui` barrel: the barrel is at its
+// direct-importer budget (a dev-invalidation limit), and depending on the two components
+// actually used means this module only rebuilds when those change.
+import { Field } from '@platform/ui/Field';
+import { Select } from '@platform/ui/Select';
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 
