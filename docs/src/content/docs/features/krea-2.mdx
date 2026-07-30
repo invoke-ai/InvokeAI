@@ -1,7 +1,7 @@
 ---
 title: Krea-2
 description: Generate images with the Krea-2 text-to-image models (Turbo and Raw), including the GGUF / single-file workflow and the conditioning enhancers.
-lastUpdated: 2026-07-13
+lastUpdated: 2026-07-30
 sidebar:
   order: 5
 ---
@@ -64,6 +64,12 @@ transform the text conditioning and are especially useful for the distilled Turb
   prompt adherence for variety.
 
 Both are recorded in image metadata and can be recalled.
+
+## Multiple conditionings
+
+In the workflow editor, the **Denoise - Krea-2** node accepts one conditioning or a collection for both
+its positive and negative conditioning inputs. Multiple independently encoded conditionings are concatenated
+after padding tokens are removed. They are global conditionings; spatial masks are not supported.
 
 ## LoRA
 
