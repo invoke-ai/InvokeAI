@@ -56,7 +56,7 @@ KREA2_LATENT_CHANNELS = 16
     title="Denoise - Krea-2",
     tags=["image", "krea2", "krea-2"],
     category="image",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
 class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -75,10 +75,10 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     transformer: TransformerField = InputField(
         description=FieldDescriptions.krea2_model, input=Input.Connection, title="Transformer"
     )
-    positive_conditioning: Krea2ConditioningField = InputField(
+    positive_conditioning: Krea2ConditioningField | list[Krea2ConditioningField] = InputField(
         description=FieldDescriptions.positive_cond, input=Input.Connection
     )
-    negative_conditioning: Optional[Krea2ConditioningField] = InputField(
+    negative_conditioning: Krea2ConditioningField | list[Krea2ConditioningField] | None = InputField(
         default=None, description=FieldDescriptions.negative_cond, input=Input.Connection
     )
     # CFG uses the standard formulation (uncond + cfg_scale*(cond-uncond)); cfg_scale <= 1 disables it.
@@ -134,16 +134,41 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     def _load_text_conditioning(
         self,
         context: InvocationContext,
-        conditioning_name: str,
+        conditioning_field: Krea2ConditioningField | list[Krea2ConditioningField],
         dtype: torch.dtype,
         device: torch.device,
     ) -> tuple[torch.Tensor, torch.Tensor | None]:
-        cond_data = context.conditioning.load(conditioning_name)
-        assert len(cond_data.conditionings) == 1
-        conditioning = cond_data.conditionings[0]
-        assert isinstance(conditioning, Krea2ConditioningInfo)
-        conditioning = conditioning.to(dtype=dtype, device=device)
-        return conditioning.prompt_embeds, conditioning.prompt_embeds_mask
+        conditioning_fields = (
+            [conditioning_field] if isinstance(conditioning_field, Krea2ConditioningField) else conditioning_field
+        )
+        if not conditioning_fields:
+            raise ValueError("At least one Krea-2 conditioning is required.")
+
+        prompt_embeds: list[torch.Tensor] = []
+        prompt_masks: list[torch.Tensor | None] = []
+        for field in conditioning_fields:
+            cond_data = context.conditioning.load(field.conditioning_name)
+            assert len(cond_data.conditionings) == 1
+            conditioning = cond_data.conditionings[0]
+            assert isinstance(conditioning, Krea2ConditioningInfo)
+            conditioning = conditioning.to(dtype=dtype, device=device)
+            prompt_embeds.append(conditioning.prompt_embeds)
+            prompt_masks.append(conditioning.prompt_embeds_mask)
+
+        combined_prompt_embeds = torch.cat(prompt_embeds, dim=1)
+        if all(mask is None for mask in prompt_masks):
+            return combined_prompt_embeds, None
+
+        combined_prompt_mask = torch.cat(
+            [
+                mask.to(device=device, dtype=torch.bool)
+                if mask is not None
+                else torch.ones(embeds.shape[:2], device=device, dtype=torch.bool)
+                for embeds, mask in zip(prompt_embeds, prompt_masks, strict=True)
+            ],
+            dim=1,
+        )
+        return combined_prompt_embeds, combined_prompt_mask
 
     def _get_noise(self, height: int, width: int, dtype: torch.dtype, device: torch.device, seed: int) -> torch.Tensor:
         rand_device = "cpu"
@@ -224,7 +249,7 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         transformer_info = context.models.load(self.transformer.transformer)
 
         pos_prompt_embeds, pos_prompt_mask = self._load_text_conditioning(
-            context, self.positive_conditioning.conditioning_name, inference_dtype, device
+            context, self.positive_conditioning, inference_dtype, device
         )
 
         latent_height = self.height // LATENT_SCALE_FACTOR
@@ -297,7 +322,7 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         neg_prompt_mask = None
         if do_cfg and self.negative_conditioning is not None:
             neg_prompt_embeds, neg_prompt_mask = self._load_text_conditioning(
-                context, self.negative_conditioning.conditioning_name, inference_dtype, device
+                context, self.negative_conditioning, inference_dtype, device
             )
 
         # Load initial latents (img2img).

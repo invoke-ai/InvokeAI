@@ -166,6 +166,74 @@ def test_get_noise_is_deterministic_and_correctly_shaped() -> None:
     assert not torch.equal(noise_a, noise_other)
 
 
+def test_load_text_conditioning_concatenates_multiple_conditionings() -> None:
+    invocation = Krea2DenoiseInvocation.model_construct()
+    conditionings = {
+        "first": ConditioningFieldData(
+            conditionings=[
+                Krea2ConditioningInfo(
+                    prompt_embeds=torch.ones(1, 2, 12, 8),
+                    prompt_embeds_mask=torch.tensor([[True, False]]),
+                )
+            ]
+        ),
+        "second": ConditioningFieldData(
+            conditionings=[Krea2ConditioningInfo(prompt_embeds=torch.full((1, 3, 12, 8), 2.0))]
+        ),
+    }
+    context = SimpleNamespace(conditioning=SimpleNamespace(load=lambda name: conditionings[name]))
+
+    prompt_embeds, prompt_mask = invocation._load_text_conditioning(
+        context=context,
+        conditioning_field=[
+            Krea2ConditioningField(conditioning_name="first"),
+            Krea2ConditioningField(conditioning_name="second"),
+        ],
+        dtype=torch.float32,
+        device=torch.device("cpu"),
+    )
+
+    assert prompt_embeds.shape == (1, 5, 12, 8)
+    assert torch.equal(prompt_embeds[:, :2], torch.ones(1, 2, 12, 8))
+    assert torch.equal(prompt_embeds[:, 2:], torch.full((1, 3, 12, 8), 2.0))
+    assert torch.equal(prompt_mask, torch.tensor([[True, False, True, True, True]]))
+
+
+def test_load_text_conditioning_preserves_none_when_all_masks_are_none() -> None:
+    invocation = Krea2DenoiseInvocation.model_construct()
+    conditionings = {
+        "first": ConditioningFieldData(conditionings=[Krea2ConditioningInfo(prompt_embeds=torch.ones(1, 2, 12, 8))]),
+        "second": ConditioningFieldData(conditionings=[Krea2ConditioningInfo(prompt_embeds=torch.ones(1, 3, 12, 8))]),
+    }
+    context = SimpleNamespace(conditioning=SimpleNamespace(load=lambda name: conditionings[name]))
+
+    prompt_embeds, prompt_mask = invocation._load_text_conditioning(
+        context=context,
+        conditioning_field=[
+            Krea2ConditioningField(conditioning_name="first"),
+            Krea2ConditioningField(conditioning_name="second"),
+        ],
+        dtype=torch.float32,
+        device=torch.device("cpu"),
+    )
+
+    assert prompt_embeds.shape == (1, 5, 12, 8)
+    assert prompt_mask is None
+
+
+def test_load_text_conditioning_rejects_an_empty_collection() -> None:
+    invocation = Krea2DenoiseInvocation.model_construct()
+    context = SimpleNamespace(conditioning=SimpleNamespace(load=lambda _name: None))
+
+    with pytest.raises(ValueError, match="At least one Krea-2 conditioning is required"):
+        invocation._load_text_conditioning(
+            context=context,
+            conditioning_field=[],
+            dtype=torch.float32,
+            device=torch.device("cpu"),
+        )
+
+
 class _Scheduler:
     def __init__(self, **_kwargs) -> None:
         self.config = SimpleNamespace(num_train_timesteps=1000)
