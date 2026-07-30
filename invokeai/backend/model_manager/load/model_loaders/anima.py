@@ -147,14 +147,16 @@ class AnimaCheckpointModel(ModelLoader):
         # Filter out tensors that are regenerated at runtime and therefore not part of the
         # in-memory module state. Some community-trained checkpoints (e.g. animaCatTower_v10)
         # serialize derived pos_embedder buffers/cached tensors that the official model
-        # registers as non-persistent (or recomputes locally).
+        # registers as non-persistent (or recomputes locally). ComfyUI diffusion-model exports
+        # (e.g. arthemyComicsAnima_v20) additionally carry a `model_sampling.sigmas` schedule
+        # buffer that belongs to ComfyUI's sampling wrapper, not the transformer.
         runtime_only_suffixes = (
             ".inv_freq",
             "pos_embedder.dim_spatial_range",
             "pos_embedder.dim_temporal_range",
             "pos_embedder.seq",
         )
-        keys_to_remove = [k for k in sd.keys() if k.endswith(runtime_only_suffixes)]
+        keys_to_remove = [k for k in sd.keys() if k.endswith(runtime_only_suffixes) or k.startswith("model_sampling.")]
         for k in keys_to_remove:
             del sd[k]
 
