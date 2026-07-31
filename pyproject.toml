@@ -161,6 +161,11 @@ index-strategy = "unsafe-best-match"
 # Linux torch/torchvision fall back to PyPI via the markers below.)
 environments = ["sys_platform == 'win32' or sys_platform == 'darwin' or (sys_platform == 'linux' and (platform_machine == 'x86_64' or platform_machine == 'aarch64'))"]
 
+# compel, could you please not pull in all of Jupyter
+exclude-dependencies = [
+    { package = { name = "compel" }, dependencies = ["notebook"] },
+]
+
 [tool.uv.sources]
 # Exclude linux_aarch64 from the PyTorch WHL indexes so that uv resolves torch /
 # torchvision from PyPI on that platform. The indexes DO carry aarch64 torch wheels
