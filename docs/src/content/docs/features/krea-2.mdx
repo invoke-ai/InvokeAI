@@ -74,20 +74,21 @@ its positive and negative conditioning inputs. Multiple independently encoded co
 after padding tokens are removed.
 
 The **Text Encoder - Krea-2** node also accepts an optional mask. A masked conditioning applies to that
-image region; an unmasked conditioning applies to the background not covered by any regional mask. Krea-2
-uses the same restricted-attention strategy as FLUX.1 on alternating main transformer blocks, leaving the
-other blocks unrestricted to preserve image-wide coherence. Positive regional prompts are available on the
-canvas. In workflows, masked conditioning collections can also be supplied to the negative input when CFG
-is enabled. Canvas regional negative prompts, auto-negative, and regional reference images are not supported.
+image region; an unmasked conditioning applies to the background not covered by any regional mask. If
+regional masks cover the full image, an unmasked conditioning falls back to the full image instead of being
+ignored. Krea-2 uses restricted attention on alternating main transformer blocks, leaving the other blocks
+unrestricted to preserve image-wide coherence. Positive regional prompts are available on the canvas. In
+workflows, masked conditioning collections can also be supplied to the negative input when CFG is enabled.
+Canvas regional negative prompts, auto-negative, and regional reference images are not supported.
 
 :::caution[Regional prompting memory]
 Regional prompting builds a dense boolean attention mask whose memory grows quadratically with the combined
-text and image token count. Invoke reserves memory for the retained masks and their construction scratch
-space, but fused memory-efficient attention support for dense masks depends on the GPU, PyTorch build, dtype,
-and sequence shape. When no fused kernel is available, PyTorch falls back to math attention, which may use
-substantially more VRAM and can cause an out-of-memory error. Reducing image resolution or disabling regional
-prompting is the practical fallback. Automated CUDA coverage is skipped on unsupported hardware and cannot
-exercise every GPU/backend combination.
+text and image token count. Invoke reserves memory for retained masks, construction scratch space, and the
+dtype-sized additive attention bias created by SDPA. Fused memory-efficient attention support for dense masks
+still depends on the GPU, PyTorch build, dtype, and sequence shape. When no fused kernel is available, PyTorch
+falls back to math attention, which may use substantially more VRAM and can cause an out-of-memory error.
+Reducing image resolution or disabling regional prompting is the practical fallback. Automated CUDA coverage
+is skipped on unsupported hardware and cannot exercise every GPU/backend combination.
 :::
 
 ## LoRA

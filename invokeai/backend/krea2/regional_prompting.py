@@ -93,6 +93,11 @@ class Krea2RegionalPromptingExtension:
         for image_mask in conditioning.image_masks:
             if image_mask is not None:
                 background_mask &= ~(image_mask.reshape(-1) > 0.5)
+        # Canvas graphs always include an unmasked global prompt. If regional masks cover the full image,
+        # there is no background for it; fall back to image-wide text/image attention instead of silently
+        # disconnecting that conditioning. Keep background_mask unchanged so regional image/image isolation
+        # remains intact.
+        unmasked_conditioning_mask = background_mask | ~background_mask.any()
 
         image_attention_mask = attention_mask[text_seq_len:, text_seq_len:]
         for image_mask, embedding_range in zip(conditioning.image_masks, conditioning.embedding_ranges, strict=True):
@@ -100,8 +105,8 @@ class Krea2RegionalPromptingExtension:
             attention_mask[text_slice, text_slice] = True
 
             if image_mask is None:
-                attention_mask[text_slice, text_seq_len:] = background_mask
-                attention_mask[text_seq_len:, text_slice] = background_mask[:, None]
+                attention_mask[text_slice, text_seq_len:] = unmasked_conditioning_mask
+                attention_mask[text_seq_len:, text_slice] = unmasked_conditioning_mask[:, None]
                 continue
 
             region_mask = image_mask.reshape(-1) > 0.5

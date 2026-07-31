@@ -425,7 +425,9 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             negative_text_seq_len=neg_prompt_embeds.shape[1] if neg_prompt_embeds is not None else None,
             do_cfg=do_cfg,
             num_loras=len(self.transformer.loras),
-            regional_attention_mask_bytes=self._regional_attention_mask_bytes(pos_extension, neg_extension),
+            regional_attention_mask_bytes=self._regional_attention_mask_bytes(
+                pos_extension, neg_extension, inference_dtype
+            ),
         )
 
         with ExitStack() as exit_stack:
@@ -521,12 +523,16 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     def _regional_attention_mask_bytes(
         pos_extension: Krea2RegionalPromptingExtension,
         neg_extension: Krea2RegionalPromptingExtension | None,
+        attention_dtype: torch.dtype,
     ) -> int:
-        """Return final mask storage plus the peak scratch needed to construct either mask."""
+        """Return final masks plus peak construction scratch and SDPA's transient additive bias."""
         extensions = [pos_extension] if neg_extension is None else [pos_extension, neg_extension]
         final_mask_bytes = sum(extension.attention_mask_numel for extension in extensions)
         peak_build_scratch_bytes = max(extension.attention_mask_build_scratch_numel for extension in extensions)
-        return final_mask_bytes + peak_build_scratch_bytes
+        attention_dtype_bytes = torch.empty((), dtype=attention_dtype).element_size()
+        peak_attention_bias_bytes = max(extension.attention_mask_numel for extension in extensions)
+        peak_attention_bias_bytes *= attention_dtype_bytes
+        return final_mask_bytes + peak_build_scratch_bytes + peak_attention_bias_bytes
 
     def _estimate_working_memory(
         self,
@@ -539,12 +545,13 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     ) -> int:
         """Estimate peak transformer activation memory (bytes) so the model cache reserves enough headroom.
 
-        Krea-2's attention runs through diffusers' ``dispatch_attention_fn`` (SDPA / flash), so attention
-        scores are never materialized and the activation footprint scales ~linearly with the image token
-        count with a *small* per-token constant. The previous ~2.6 MiB/token figure assumed materialized
-        O(seq^2) scores and massively over-estimated: at 2560x1440 (14400 tokens) it demanded ~36 GB, which
-        exceeds a 24 GB card, so the cache offloaded the *transformer itself* to RAM and the forward pass ran
-        from system memory over PCIe — no OOM, but effectively hung (no step in minutes).
+        Without regional prompting, Krea-2's attention runs through SDPA / flash without materializing
+        attention scores, so the baseline activation footprint scales ~linearly with the image token count
+        with a *small* per-token constant. Regional bool masks and SDPA's dtype-sized additive bias are added
+        separately through ``regional_attention_mask_bytes``. The previous ~2.6 MiB/token baseline assumed
+        materialized O(seq^2) scores and massively over-estimated: at 2560x1440 (14400 tokens) it demanded
+        ~36 GB, which exceeds a 24 GB card, so the cache offloaded the *transformer itself* to RAM and the
+        forward pass ran from system memory over PCIe — no OOM, but effectively hung (no step in minutes).
 
         The per-token constant below is a safe upper bound on the measured SDPA activation footprint of the
         Krea-2-Turbo MMDiT in bf16 (residual stream + one block's attention/SwiGLU intermediates), leaving

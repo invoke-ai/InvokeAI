@@ -76,6 +76,29 @@ def test_fully_covered_disjoint_regions_cannot_attend_across_regions() -> None:
     assert not mask[2, 3] and not mask[3, 2]
 
 
+def test_global_conditioning_applies_image_wide_when_regions_cover_the_full_image() -> None:
+    left_mask = torch.tensor([[[1.0, 0.0]]])
+    right_mask = torch.tensor([[[0.0, 1.0]]])
+    extension = Krea2RegionalPromptingExtension.from_text_conditionings(
+        [
+            _conditioning(1, 1.0),
+            _conditioning(1, 2.0, left_mask),
+            _conditioning(1, 3.0, right_mask),
+        ],
+        image_seq_len=2,
+    )
+
+    mask = extension.get_attention_mask()
+    assert mask is not None
+    # With no uncovered background, the unmasked/global conditioning falls back to the full image.
+    assert bool(mask[0, 3:].all())
+    assert bool(mask[3:, 0].all())
+    # Regional text and image self-attention remain isolated.
+    assert mask[1, 3] and not mask[1, 4]
+    assert mask[2, 4] and not mask[2, 3]
+    assert not mask[3, 4] and not mask[4, 3]
+
+
 def test_preprocess_mask_resizes_thresholds_and_flattens() -> None:
     raw_mask = torch.tensor(
         [
