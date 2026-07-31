@@ -27,7 +27,7 @@ import { useGalleryWidget } from './GalleryWidgetContext';
 
 const ACCEPTED_UPLOAD_EXTENSIONS = 'image/png,image/jpeg,image/webp,video/mp4,.png,.jpg,.jpeg,.webp,.mp4';
 const galleryViewTabs = [
-  { labelKey: 'common.images', value: 'images' },
+  { labelKey: 'common.media', value: 'images' },
   { labelKey: 'common.assets', value: 'assets' },
 ] satisfies { labelKey: string; value: GalleryView }[];
 

@@ -65,7 +65,7 @@ vi.mock('react-i18next', () => ({
         'widgets.gallery.uploadDateBoardUnavailable': 'Uploads are unavailable for date boards.',
         'widgets.gallery.uploadFailed': `No files uploaded. ${String(values?.failed)} failed.`,
         'widgets.gallery.uploadPartialTitle': `Uploaded ${String(values?.succeeded)} of ${String(values?.total)} files`,
-        'widgets.gallery.uploadSplit': 'Images appear in Assets; videos appear in Images.',
+        'widgets.gallery.uploadSplit': 'Images appear in Assets; videos appear in Media.',
         'widgets.gallery.uploadSummary': `${String(values?.images)} and ${String(values?.videos)} uploaded to ${String(
           values?.board
         )}. ${String(values?.failed)} failed.`,
@@ -404,7 +404,7 @@ describe('mixed gallery upload', () => {
     expect(mocks.notificationsAdd).toHaveBeenCalledOnce();
     expect(mocks.notificationsAdd).toHaveBeenCalledWith({
       kind: 'success',
-      message: '2 images and 2 videos uploaded to Board 1. 1 failed. Images appear in Assets; videos appear in Images.',
+      message: '2 images and 2 videos uploaded to Board 1. 1 failed. Images appear in Assets; videos appear in Media.',
       title: 'Uploaded 4 of 5 files',
     });
   });
