@@ -135,25 +135,38 @@ class CustomLinear(torch.nn.Linear, CustomModuleMixin):
         # Partial loading may leave the weight on the CPU; _scaled_mm needs both operands co-located.
         return self.weight.device == input.device
 
+    def _maybe_fp8_forward(self, input: torch.Tensor) -> torch.Tensor | None:
+        """Run the fp8 matmul if this module and input allow it, else None so callers fall back."""
+        if not self._can_use_fp8_matmul(input):
+            return None
+        return scaled_mm_linear(
+            input,
+            self.weight,
+            self._fp8_weight_scale(input.device),
+            cast_to_device(self.bias, input.device),
+            input_scale=cast_to_device(getattr(self, "input_scale", None), input.device),
+        )
+
     def _autocast_forward_with_patches(self, input: torch.Tensor) -> torch.Tensor:
         return autocast_linear_forward_sidecar_patches(self, input, self._patches_and_weights)
 
     def _autocast_forward(self, input: torch.Tensor) -> torch.Tensor:
-        if self._can_use_fp8_matmul(input):
-            return scaled_mm_linear(
-                input,
-                self.weight,
-                self._fp8_weight_scale(input.device),
-                cast_to_device(self.bias, input.device),
-                input_scale=cast_to_device(getattr(self, "input_scale", None), input.device),
-            )
+        out = self._maybe_fp8_forward(input)
+        if out is not None:
+            return out
         weight, bias = self._cast_weight_bias_for_input(input)
         return torch.nn.functional.linear(input, weight, bias)
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
         if len(self._patches_and_weights) > 0:
             return self._autocast_forward_with_patches(input)
-        elif self._device_autocasting_enabled:
+        # Checked before the autocasting branch on purpose: `apply_custom_layers_to_model` leaves
+        # device autocasting *disabled* whenever the model is fully resident, so a check that only
+        # lived in `_autocast_forward` would silently never run in the common case.
+        fp8_out = self._maybe_fp8_forward(input)
+        if fp8_out is not None:
+            return fp8_out
+        if self._device_autocasting_enabled:
             return self._autocast_forward(input)
         elif input.is_floating_point() and (
             (self.weight.is_floating_point() and self.weight.dtype != input.dtype)

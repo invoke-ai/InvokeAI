@@ -196,7 +196,7 @@ class TestScaledMm:
 class TestCustomLinearIntegration:
     """The fp8 matmul must be opt-in and must degrade to the dequantized path, never raise."""
 
-    def _module(self, device: torch.device, in_f=64, out_f=128):
+    def _module(self, device: torch.device, in_f=64, out_f=128, device_autocasting: bool = False):
         from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
             apply_custom_layers_to_model,
         )
@@ -206,8 +206,41 @@ class TestCustomLinearIntegration:
         lin.weight = torch.nn.Parameter(q.to(device), requires_grad=False)
         lin.register_buffer("weight_scale", scale.to(device), persistent=False)
         model = torch.nn.Sequential(lin).to(device)
-        apply_custom_layers_to_model(model)
+        apply_custom_layers_to_model(model, device_autocasting_enabled=device_autocasting)
         return model
+
+    @cuda_fp8
+    @pytest.mark.parametrize("device_autocasting", [False, True])
+    def test_fp8_path_runs_regardless_of_device_autocasting(self, device_autocasting: bool):
+        """`apply_custom_layers_to_model` leaves autocasting off for fully-resident models.
+
+        A fp8 check that only lives in `_autocast_forward` is therefore skipped in the common case:
+        `forward` falls through to the dtype-mismatch branch and silently dequantizes instead. This
+        regression cost the entire speedup while every other test stayed green.
+        """
+        dev = torch.device("cuda")
+        model = self._module(dev, device_autocasting=device_autocasting)
+        x = torch.randn(32, 64, device=dev, dtype=torch.bfloat16)
+        custom = model[0]
+
+        calls = []
+        original = custom._maybe_fp8_forward
+        custom._maybe_fp8_forward = lambda inp: (calls.append(1), original(inp))[1]
+
+        set_fp8_matmul_enabled(True)
+        try:
+            out = model(x)
+        finally:
+            set_fp8_matmul_enabled(False)
+            custom._maybe_fp8_forward = original
+
+        assert calls, "the fp8 branch was never consulted"
+        assert out.shape == (32, 128)
+        # And it must actually have taken the fp8 path, not just been asked.
+        w_ref = dequantize_weight(custom.weight, custom.weight_scale, torch.bfloat16)
+        assert not torch.equal(out, torch.nn.functional.linear(x, w_ref)), (
+            "output is bit-identical to the dequantized path, so _scaled_mm did not run"
+        )
 
     def test_disabled_by_default_uses_scaled_dequant(self):
         """With the matmul off, the weight must still be dequantized *with* its scale."""
