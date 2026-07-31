@@ -332,6 +332,42 @@ class TestDbDerivedAuthorization:
         assert refreshed.is_admin is False
 
 
+class TestSystemUserIsProtected:
+    """The system user owns everything migrated from before multiuser support, so removing
+    it would strand that content rather than merely removing an account."""
+
+    def test_system_user_cannot_be_deleted(self, client: TestClient, admin_token: str) -> None:
+        r = client.delete("/api/v1/auth/users/system", headers=_auth(admin_token))
+
+        assert r.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_system_user_cannot_be_deactivated(self, client: TestClient, admin_token: str) -> None:
+        r = client.patch("/api/v1/auth/users/system", json={"is_active": False}, headers=_auth(admin_token))
+
+        assert r.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_system_user_survives_both_attempts(
+        self, client: TestClient, mock_invoker: Invoker, admin_token: str
+    ) -> None:
+        client.delete("/api/v1/auth/users/system", headers=_auth(admin_token))
+        client.patch("/api/v1/auth/users/system", json={"is_active": False}, headers=_auth(admin_token))
+
+        system = mock_invoker.services.users.get("system")
+        assert system is not None
+        assert system.is_active is True
+
+    def test_ordinary_user_deletion_still_works(
+        self, client: TestClient, mock_invoker: Invoker, admin_token: str
+    ) -> None:
+        """The guard must be specific to the system id, not a blanket block."""
+        user_id = _create_user(mock_invoker, "user@test.com", "User")
+
+        r = client.delete(f"/api/v1/auth/users/{user_id}", headers=_auth(admin_token))
+
+        assert r.status_code == status.HTTP_204_NO_CONTENT
+        assert mock_invoker.services.users.get(user_id) is None
+
+
 class TestTokenEpochRevocation:
     """A password change invalidates tokens issued before it.
 

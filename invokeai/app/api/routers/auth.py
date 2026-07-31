@@ -35,6 +35,11 @@ auth_router = APIRouter(prefix="/v1/auth", tags=["authentication"])
 TOKEN_EXPIRATION_NORMAL = 1  # 1 day for normal login
 TOKEN_EXPIRATION_REMEMBER_ME = 7  # 7 days for "remember me" login
 
+# Owner of everything that predates multiuser support (created by migration_27). Not a
+# login account: it has an empty password hash and is hidden from the user list.
+SYSTEM_USER_ID = "system"
+SYSTEM_USER_PROTECTED_DETAIL = "The system user cannot be deleted or deactivated"
+
 
 def _issue_replacement_token(http_request: Request, response: Response, user: UserDTO, remember_me: bool) -> None:
     """Hand the caller a token minted under the user's *current* revocation epoch.
@@ -482,7 +487,7 @@ async def list_users(
         List of all real users (system user excluded)
     """
     user_service = ApiDependencies.invoker.services.users
-    return [u for u in user_service.list_users() if u.user_id != "system"]
+    return [u for u in user_service.list_users() if u.user_id != SYSTEM_USER_ID]
 
 
 @auth_router.post("/users", response_model=UserDTO, status_code=status.HTTP_201_CREATED)
@@ -568,6 +573,16 @@ async def update_user(
     config = ApiDependencies.invoker.services.configuration
     before = user_service.get(user_id)
 
+    # The system user owns everything migrated from before multiuser support. Deactivating
+    # it would strand that content: its queue items stop at the dequeue gate, and reads and
+    # saves against system-owned media raise PermissionError. It is not a login account, so
+    # there is no reason to disable it.
+    if user_id == SYSTEM_USER_ID and request.is_active is False:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=SYSTEM_USER_PROTECTED_DETAIL,
+        )
+
     # Demoting or deactivating the last administrator is irreversible: authorization is
     # derived from the database on every request, so the caller loses admin access
     # immediately and no authenticated path back exists. It would also drop `has_admin()`
@@ -630,19 +645,29 @@ async def delete_user(
     """Delete a user. Requires admin privileges.
 
     Admins can delete any user including other admins, but cannot delete the last
-    remaining admin.
+    remaining admin, nor the internal system user.
 
     Args:
         user_id: The user ID
 
     Raises:
-        HTTPException: 400 if attempting to delete the last admin
+        HTTPException: 400 if attempting to delete the last admin or the system user
         HTTPException: 404 if user not found
     """
     user_service = ApiDependencies.invoker.services.users
     user = user_service.get(user_id)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    # The system user owns every board, image, and workflow migrated from before multiuser
+    # support. Deleting it orphans all of that content: reads and saves against it raise
+    # PermissionError and its queued items are rejected at dequeue. The last-admin guard
+    # below does not cover it — the system row is deliberately not an admin.
+    if user_id == SYSTEM_USER_ID:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=SYSTEM_USER_PROTECTED_DETAIL,
+        )
 
     # Prevent deleting the last active admin
     if user.is_admin and user.is_active and user_service.count_admins() <= 1:

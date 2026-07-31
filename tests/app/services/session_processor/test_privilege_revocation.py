@@ -5,7 +5,8 @@ Policy (see queue_owner_is_active):
 - Pending items are rejected (canceled) at dequeue, before any invocation runs.
 - Running items are stopped at the next node boundary; canceling also sets the
   processor's cancel event, which stops step-callback nodes mid-node.
-- Single-user mode and the ``system`` user are exempt.
+- Single-user mode is exempt. The ``system`` user is not special-cased: it has a real,
+  active database row and passes on its own merits.
 """
 
 from threading import Event as ThreadEvent
@@ -49,9 +50,19 @@ class TestQueueOwnerIsActive:
         services = _services(multiuser=False)
         assert queue_owner_is_active(services, _queue_item(user_id="anyone")) is True
 
-    def test_system_user_is_always_active(self) -> None:
-        services = _services(multiuser=True)
+    def test_system_user_passes_on_its_own_row(self) -> None:
+        """migration_27 creates an active `system` row, so no exemption is needed."""
+        services = _services(users_by_id={"system": _active("system")})
         assert queue_owner_is_active(services, _queue_item(user_id="system")) is True
+
+    def test_system_user_without_a_row_is_rejected(self) -> None:
+        """Agrees with the `invocation_context` save gates, which have no exemption either.
+
+        Exempting `system` here would let the item consume GPU time and then fail at its
+        first save; rejecting it at dequeue is the coherent outcome.
+        """
+        services = _services(users_by_id={})
+        assert queue_owner_is_active(services, _queue_item(user_id="system")) is False
 
     def test_active_user(self) -> None:
         services = _services(users_by_id={"user-1": _active("user-1")})
@@ -98,7 +109,7 @@ class TestDequeueRejection:
         services.session_queue.cancel_queue_item.assert_not_called()
 
     def test_system_item_is_executed(self) -> None:
-        services = _services(multiuser=True)
+        services = _services(users_by_id={"system": _active("system")})
         processor = self._processor(services)
 
         assert processor._cancel_queue_item_if_owner_inactive(_queue_item(user_id="system")) is False

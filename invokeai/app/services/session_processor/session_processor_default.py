@@ -53,9 +53,15 @@ def queue_owner_is_active(services: InvocationServices, queue_item: SessionQueue
     the next node boundary (and immediately mid-node for nodes with step callbacks,
     via the cancel event set when the item is canceled).
 
-    The ``system`` user represents single-user mode and has no database record, so
-    it is always considered active. The check is skipped entirely when multiuser
-    mode is disabled.
+    The check is skipped entirely when multiuser mode is disabled.
+
+    The ``system`` user — which owns everything migrated from before multiuser support
+    (see migration_27) — is deliberately NOT special-cased. It has a real, active
+    database row, so it passes on its own merits. Exempting it here would only change
+    behaviour when the row is missing or inactive, and that is precisely the case where
+    this gate would then disagree with the save gates in `invocation_context`, which
+    have no such exemption: the item would burn GPU time and then fail at the first
+    `context.images.save()`. Better to reject it at dequeue.
 
     A failed lookup is treated as active. This runs between nodes on a path with no
     exception handling of its own, so letting a transient error (e.g. a busy-timeout
@@ -65,8 +71,6 @@ def queue_owner_is_active(services: InvocationServices, queue_item: SessionQueue
     node boundary re-checks, and the dequeue gate catches the item on its next run.
     """
     if not services.configuration.multiuser:
-        return True
-    if queue_item.user_id == "system":
         return True
     try:
         user = services.users.get(queue_item.user_id)

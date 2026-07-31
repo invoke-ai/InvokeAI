@@ -301,13 +301,13 @@ export type paths = {
          * @description Delete a user. Requires admin privileges.
          *
          *     Admins can delete any user including other admins, but cannot delete the last
-         *     remaining admin.
+         *     remaining admin, nor the internal system user.
          *
          *     Args:
          *         user_id: The user ID
          *
          *     Raises:
-         *         HTTPException: 400 if attempting to delete the last admin
+         *         HTTPException: 400 if attempting to delete the last admin or the system user
          *         HTTPException: 404 if user not found
          */
         delete: operations["delete_user_api_v1_auth_users__user_id__delete"];

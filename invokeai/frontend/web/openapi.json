@@ -432,7 +432,7 @@
       "delete": {
         "tags": ["authentication"],
         "summary": "Delete User",
-        "description": "Delete a user. Requires admin privileges.\n\nAdmins can delete any user including other admins, but cannot delete the last\nremaining admin.\n\nArgs:\n    user_id: The user ID\n\nRaises:\n    HTTPException: 400 if attempting to delete the last admin\n    HTTPException: 404 if user not found",
+        "description": "Delete a user. Requires admin privileges.\n\nAdmins can delete any user including other admins, but cannot delete the last\nremaining admin, nor the internal system user.\n\nArgs:\n    user_id: The user ID\n\nRaises:\n    HTTPException: 400 if attempting to delete the last admin or the system user\n    HTTPException: 404 if user not found",
         "operationId": "delete_user_api_v1_auth_users__user_id__delete",
         "security": [
           {
