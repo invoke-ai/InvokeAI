@@ -197,6 +197,25 @@ describe('LayerListItem accessibility', () => {
     expect(rect.height).toBeGreaterThanOrEqual(24);
   });
 
+  it('sits the visibility dot on the same centre line as the other row controls', async () => {
+    // The dot lives in a wrapper Box that exists only to catch pointer events.
+    // As a block box that wrapper laid the button out on a text baseline, so
+    // descender space below it pushed the dot 3px above its siblings.
+    await renderHarness();
+
+    const centreY = (selector: string): number => {
+      const element = host!.querySelector<HTMLElement>(selector);
+      expect(element).not.toBeNull();
+      const rect = element!.getBoundingClientRect();
+      return rect.top + rect.height / 2;
+    };
+
+    const visibility = centreY('button[aria-label="Toggle visibility"]');
+    const lock = centreY('button[aria-label="Toggle lock"]');
+
+    expect(visibility).toBeCloseTo(lock, 1);
+  });
+
   it('selects a layer with a pointer without requiring the drag handle', async () => {
     await renderHarness();
 

@@ -345,7 +345,13 @@ export const LayerListItem = ({
             ) : (
               <Box boxSize="6" />
             )}
-            <Box flexShrink="0" onClick={stopPropagation} onPointerDown={stopPropagation}>
+            {/*
+              `display="flex"` is load bearing, not cosmetic: as a block box this
+              wrapper lays its button out on a text baseline, and the descender
+              space below made it 30px tall and pushed the control 3px above the
+              centre line its sibling icon buttons sit on.
+            */}
+            <Box display="flex" flexShrink="0" onClick={stopPropagation} onPointerDown={stopPropagation}>
               <ToggleDot
                 _before={layer.isEnabled ? VISIBILITY_DOT_CHECKED : VISIBILITY_DOT_UNCHECKED}
                 _focusVisible={ROW_SELECTION_FOCUS}
@@ -374,10 +380,10 @@ export const LayerListItem = ({
             >
               {layer.isLocked ? <LockIcon /> : <LockOpenIcon />}
             </IconButton>
-            <Box flexShrink="0" onClick={stopPropagation} onPointerDown={stopPropagation}>
+            <Box display="flex" flexShrink="0" onClick={stopPropagation} onPointerDown={stopPropagation}>
               <LayerPropertiesPopover dispatch={dispatch} engine={engine} layer={layer} />
             </Box>
-            <Box flexShrink="0" onPointerDown={stopPropagation}>
+            <Box display="flex" flexShrink="0" onPointerDown={stopPropagation}>
               <LayerContextMenu dispatch={dispatch} engine={engine} index={index} layer={layer} layers={layers} />
             </Box>
           </HStack>
