@@ -367,6 +367,27 @@ describe('paramsSliceConfig persisted state migration', () => {
     expect(result.seed).toBe(99);
   });
 
+  it('preserves Wan values already present in a dev-build v3 blob', () => {
+    expect(migrate).toBeDefined();
+
+    const initial = getInitialParamsState();
+    const wanVae = { key: 'wan-vae', hash: 'h', name: 'Wan VAE', base: 'wan', type: 'vae' };
+    // v3 blobs written by dev builds after the Wan merge already carry the keys, possibly with
+    // real values — the conditional seeds must not clobber them.
+    const v3State: Record<string, unknown> = {
+      ...initial,
+      _version: 3,
+      wanVaeModel: wanVae,
+      wanGuidanceScaleLowNoise: 3.5,
+    };
+
+    const result = migrate?.(v3State) as ReturnType<typeof getInitialParamsState>;
+
+    expect(result._version).toBe(5);
+    expect((result.wanVaeModel as { key: string } | null)?.key).toBe('wan-vae');
+    expect(result.wanGuidanceScaleLowNoise).toBe(3.5);
+  });
+
   it('migrates old positive prompt history entries to prompt pairs', () => {
     expect(migrate).toBeDefined();
 
