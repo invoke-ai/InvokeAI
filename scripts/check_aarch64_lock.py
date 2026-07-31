@@ -16,10 +16,11 @@ import sys
 import tomllib
 from pathlib import Path
 from typing import Any
+from urllib.parse import unquote
 
 from packaging.markers import Marker
 from packaging.specifiers import SpecifierSet
-from packaging.utils import parse_wheel_filename
+from packaging.utils import InvalidWheelFilename, parse_wheel_filename
 
 # A linux/aarch64 interpreter, for evaluating the lockfile's environment markers. `python_version` is
 # filled in per supported minor version below.
@@ -60,10 +61,16 @@ def has_aarch64_wheel(package: dict[str, Any], python_version: str) -> bool:
     minor = int(python_version.split(".")[1])
     accepted = {f"cp3{minor}", "py3", f"py3{minor}"}
     for wheel in package.get("wheels", []):
-        filename = wheel.get("url", wheel.get("path", "")).rsplit("/", 1)[-1]
+        # The PyTorch WHL indexes percent-encode the `+` of local versions in wheel URLs (`torch-2.7.1%2Bcpu-...`).
+        filename = unquote(wheel.get("url", wheel.get("path", "")).rsplit("/", 1)[-1])
         if not filename.endswith(".whl"):
             continue
-        for tag in parse_wheel_filename(filename)[3]:
+        try:
+            tags = parse_wheel_filename(filename)[3]
+        except InvalidWheelFilename as e:
+            # The exception message names the offending filename.
+            sys.exit(f"unparseable wheel filename in uv.lock ({e}) -- update scripts/check_aarch64_lock.py")
+        for tag in tags:
             if "aarch64" not in tag.platform:
                 continue
             if tag.interpreter in accepted:
@@ -133,18 +140,27 @@ def main() -> int:
                 if not resolved:
                     problems.append(f"  [{extra}] py{python_version}: no {name} resolves on linux/aarch64")
                     continue
-                dep = resolved[0]
-                package = packages.get((dep["name"], dep.get("version"), str(dep.get("source"))))
-                registry = (dep.get("source") or {}).get("registry", "?")
-                if package is None:
-                    problems.append(f"  [{extra}] py{python_version}: {name}=={dep.get('version')} not in uv.lock")
-                elif not has_aarch64_wheel(package, python_version):
-                    problems.append(
-                        f"  [{extra}] py{python_version}: {name}=={dep.get('version')} from {registry}"
-                        " has no linux/aarch64 wheel"
-                    )
-                else:
-                    print(f"  [{extra}] py{python_version}: {name}=={dep.get('version')} from {registry}")
+                # uv shouldn't emit overlapping markers, but if it ever does, check every match.
+                for dep in resolved:
+                    if dep.get("version") is not None:
+                        package = packages.get((name, dep["version"], str(dep.get("source"))))
+                    else:
+                        # uv omits version/source from a dependency entry when the package resolves to a
+                        # single version across the whole lockfile.
+                        candidates = [p for p in lock["package"] if p["name"] == name]
+                        package = candidates[0] if len(candidates) == 1 else None
+                    version = dep.get("version") or (package or {}).get("version")
+                    source = dep.get("source") or (package or {}).get("source") or {}
+                    registry = source.get("registry", "?")
+                    if package is None:
+                        problems.append(f"  [{extra}] py{python_version}: {name}=={version} not in uv.lock")
+                    elif not has_aarch64_wheel(package, python_version):
+                        problems.append(
+                            f"  [{extra}] py{python_version}: {name}=={version} from {registry}"
+                            " has no linux/aarch64 wheel"
+                        )
+                    else:
+                        print(f"  [{extra}] py{python_version}: {name}=={version} from {registry}")
 
     if problems:
         print("\nuv.lock does not give linux/aarch64 an installable torch/torchvision:")

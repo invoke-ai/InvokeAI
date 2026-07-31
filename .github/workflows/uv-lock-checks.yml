@@ -79,6 +79,7 @@ jobs:
         # indexes, which have no aarch64 torchvision wheel. Several things in pyproject.toml have to hold
         # for that, and breaking most of them leaves a lockfile with no torch at all on aarch64 while
         # `uv lock --locked` above still passes. See the script's docstring.
-        # `--no-project` keeps `uv run` from syncing the whole project just to run this.
-        run: uv run --no-project --with packaging --python 3.12 scripts/check_aarch64_lock.py ./uv.lock
+        # `--no-project` keeps `uv run` from syncing the whole project just to run this. `packaging` is
+        # capped so a future release tightening wheel-filename parsing can't change the verdict on its own.
+        run: uv run --no-project --with 'packaging<26' --python 3.12 scripts/check_aarch64_lock.py ./uv.lock
         shell: bash
