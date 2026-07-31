@@ -1812,6 +1812,7 @@
         "scaledHeight": "Scaled H",
         "scaledWidth": "Scaled W",
         "scheduler": "Scheduler",
+        "ernieImagePromptEnhancer": "Prompt Enhancer",
         "dypePreset": "DyPE",
         "dypeScale": "DyPE λs",
         "dypeExponent": "DyPE λt",

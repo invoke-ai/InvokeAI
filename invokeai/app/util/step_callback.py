@@ -349,6 +349,14 @@ def diffusion_step_callback(
         # Anima uses Wan 2.1 VAE with 16 latent channels
         latent_rgb_factors = ANIMA_LATENT_RGB_FACTORS
         latent_rgb_bias = ANIMA_LATENT_RGB_BIAS
+    elif base_model == BaseModelType.ErnieImage:
+        # ERNIE-Image uses AutoencoderKLFlux2 (same as FLUX.2) with 32 latent channels, and the
+        # denoise loop unpatches before previewing, so the shapes line up. The values do not:
+        # ERNIE denoises in BN-normalized latent space (denormalized only at VAE decode) and the
+        # BN stats live on the VAE, which isn't loaded here. Previews are therefore approximate
+        # in color/contrast.
+        latent_rgb_factors = FLUX2_LATENT_RGB_FACTORS
+        latent_rgb_bias = FLUX2_LATENT_RGB_BIAS
     elif base_model == BaseModelType.Wan:
         # A14B (16-ch standard Wan VAE, 8x spatial) vs TI2V-5B (48-ch Wan2.2-VAE,
         # 16x spatial). The latent channel count uniquely identifies the variant.
