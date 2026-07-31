@@ -77,6 +77,8 @@ class MainModelDefaultSettings(BaseModel):
         | ZImageVariantType
         | Krea2VariantType
         | None = None,
+        name: str | None = None,
+        path: str | None = None,
     ) -> Self | None:
         match base:
             case BaseModelType.StableDiffusion1:
@@ -94,6 +96,19 @@ class MainModelDefaultSettings(BaseModel):
                 else:
                     # Turbo (distilled) uses fewer steps, no CFG
                     return cls(steps=9, cfg_scale=1.0, width=1024, height=1024)
+            case BaseModelType.ErnieImage:
+                # ERNIE-Image-Turbo (distilled) uses fewer steps and CFG=1.0. The two checkpoints
+                # share an architecture and config, so there is nothing on disk to discriminate on
+                # and no Turbo variant is modeled. Fall back to the name, and also the install
+                # directory's own name so that renaming the model in the install dialog doesn't lose
+                # the Turbo defaults. Only the leaf name is matched: an in-place install records an
+                # absolute path, and an unrelated ancestor directory (e.g. /mnt/turbo-nvme/models/)
+                # must not silently give the base model Turbo's 8 steps and CFG 1.0.
+                path_name = Path(path).name if path else None
+                haystack = " ".join(part for part in (name, path_name) if part).lower()
+                if "turbo" in haystack:
+                    return cls(steps=8, cfg_scale=1.0, width=1024, height=1024)
+                return cls(steps=50, cfg_scale=4.0, width=1024, height=1024)
             case BaseModelType.Anima:
                 return cls(steps=35, cfg_scale=4.5, width=1024, height=1024)
             case BaseModelType.Ideogram4:
@@ -2638,3 +2653,33 @@ class Main_SDNQ_Diffusers_FLUX_Config(Main_Config_Base, Config_Base):
                     pass
 
         return submodels
+
+
+class Main_Diffusers_ErnieImage_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for ERNIE-Image diffusers models (ERNIE-Image, ERNIE-Image-Turbo)."""
+
+    base: Literal[BaseModelType.ErnieImage] = Field(BaseModelType.ErnieImage)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        raise_for_class_name(
+            common_config_paths(mod.path),
+            {"ErnieImagePipeline"},
+        )
+
+        repo_variant = override_fields.get("repo_variant") or cls._get_repo_variant_or_raise(mod)
+
+        return cls(
+            **override_fields,
+            repo_variant=repo_variant,
+        )
+
+
+# NOTE: There is deliberately no `Main_Checkpoint_ErnieImage_Config`. Single-file ERNIE-Image
+# checkpoints cannot be loaded yet (only the full diffusers pipeline layout is supported), and a
+# config that matches on install but raises on first generate would leave a permanently broken
+# entry in the Model Manager. Add it together with the checkpoint loader.

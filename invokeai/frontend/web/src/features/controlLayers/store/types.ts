@@ -10,6 +10,7 @@ import {
   zParameterCLIPGEmbedModel,
   zParameterCLIPLEmbedModel,
   zParameterControlLoRAModel,
+  zParameterErnieImageScheduler,
   zParameterFluxDypeExponent,
   zParameterFluxDypePreset,
   zParameterFluxDypeScale,
@@ -840,6 +841,8 @@ export const zParamsState = z.object({
   zImageScheduler: zParameterZImageScheduler,
   zImageShift: z.number().min(0).max(3).nullable(),
   // Defaults make these resilient to rehydration of persisted state saved before the fields existed.
+  ernieImageScheduler: zParameterErnieImageScheduler.default('euler'),
+  ernieImageUsePromptEnhancer: z.boolean().default(true),
   ideogram4SamplerPreset: zParameterIdeogram4SamplerPreset.default('V4_QUALITY_48'),
   // Optional advanced overrides of the Ideogram 4 sampler preset (null = use the preset's value).
   // Backend requires steps >= 2 (a polish and a main step). `.catch(null)` normalizes a stale/invalid
@@ -966,6 +969,8 @@ export const getInitialParamsState = (): ParamsState => ({
   fluxDypeExponent: 2.0,
   zImageScheduler: 'euler',
   zImageShift: null,
+  ernieImageScheduler: 'euler',
+  ernieImageUsePromptEnhancer: true,
   ideogram4SamplerPreset: 'V4_QUALITY_48',
   ideogram4Steps: null,
   ideogram4GuidanceScale: null,

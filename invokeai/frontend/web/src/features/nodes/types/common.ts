@@ -26,6 +26,10 @@ export const zStylePresetField = z.object({
   style_preset_id: z.string().trim().min(1),
 });
 
+export const zSystemPromptField = z.object({
+  system_prompt_id: z.string().trim().min(1),
+});
+
 export const zColorField = z.object({
   r: z.number().int().min(0).max(255),
   g: z.number().int().min(0).max(255),
@@ -81,6 +85,8 @@ export const zZImageSchedulerField = z.enum(['euler', 'heun', 'lcm']);
 // Anima scheduler options (same flow-matching schedulers, defined separately to avoid coupling)
 export const zAnimaSchedulerField = z.enum(['euler', 'heun', 'dpmpp_2m', 'dpmpp_2m_sde', 'er_sde', 'lcm']);
 
+// ERNIE-Image scheduler options (Flow Matching schedulers, same as Flux/Z-Image)
+export const zErnieImageSchedulerField = z.enum(['euler', 'heun', 'lcm']);
 // Ideogram 4 sampler presets. Each bundles step count, the per-step guidance schedule (with a polish
 // tail), and the logit-normal schedule mean/std. V4_QUALITY_48 is the reference default.
 export const zIdeogram4SamplerPresetField = z.enum(['V4_QUALITY_48', 'V4_DEFAULT_20', 'V4_TURBO_12']);
@@ -108,6 +114,7 @@ export const zBaseModelType = z.enum([
   'cogview4',
   'qwen-image',
   'z-image',
+  'ernie-image',
   'krea-2',
   'ideogram-4',
   'external',
@@ -126,6 +133,7 @@ export const zMainModelBase = z.enum([
   'cogview4',
   'qwen-image',
   'z-image',
+  'ernie-image',
   'krea-2',
   'ideogram-4',
   'anima',
@@ -156,6 +164,7 @@ export const zModelType = z.enum([
   'clip_embed',
   'siglip',
   'flux_redux',
+  'prompt_enhancer',
   'external_image_generator',
   'pid_decoder',
   'unknown',
@@ -171,6 +180,8 @@ export const zSubModelType = z.enum([
   'tokenizer',
   'tokenizer_2',
   'tokenizer_3',
+  'pe',
+  'pe_tokenizer',
   'vae',
   'vae_decoder',
   'vae_encoder',

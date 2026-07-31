@@ -10,6 +10,7 @@ import {
 import type {
   DenoiseLatentsNodes,
   ImageOutputNodes,
+  ImageToLatentsNodes,
   MainModelLoaderNodes,
   VaeSourceNodes,
 } from 'features/nodes/util/graph/types';
@@ -23,17 +24,7 @@ type AddImageToImageArg = {
   // Only the `.image` output is consumed downstream, so any image-producing node works here (e.g. a PiD decode
   // chain substituted for the regular VAE decode).
   l2i: Invocation<ImageOutputNodes>;
-  i2l: Invocation<
-    | 'i2l'
-    | 'flux_vae_encode'
-    | 'flux2_vae_encode'
-    | 'sd3_i2l'
-    | 'cogview4_i2l'
-    | 'qwen_image_i2l'
-    | 'z_image_i2l'
-    | 'anima_i2l'
-    | 'wan_i2l'
-  >;
+  i2l: Invocation<ImageToLatentsNodes>;
   noise?: Invocation<'noise'>;
   denoise: Invocation<DenoiseLatentsNodes>;
   vaeSource: Invocation<VaeSourceNodes | MainModelLoaderNodes>;
@@ -62,6 +53,7 @@ export const addImageToImage = async ({
     denoise.type === 'flux2_denoise' ||
     denoise.type === 'sd3_denoise' ||
     denoise.type === 'z_image_denoise' ||
+    denoise.type === 'ernie_image_denoise' ||
     denoise.type === 'krea2_denoise' ||
     denoise.type === 'anima_denoise' ||
     denoise.type === 'wan_denoise'

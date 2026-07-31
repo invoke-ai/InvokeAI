@@ -80,6 +80,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_SDXLRefiner_Config,
     Main_Checkpoint_ZImage_Config,
     Main_Diffusers_CogView4_Config,
+    Main_Diffusers_ErnieImage_Config,
     Main_Diffusers_Flux2_Config,
     Main_Diffusers_FLUX_Config,
     Main_Diffusers_Ideogram4_Config,
@@ -267,6 +268,7 @@ AnyModelConfig = Annotated[
         Annotated[Main_Diffusers_QwenImage_Config, Main_Diffusers_QwenImage_Config.get_tag()],
         Annotated[Main_Diffusers_Wan_Config, Main_Diffusers_Wan_Config.get_tag()],
         Annotated[Main_Diffusers_ZImage_Config, Main_Diffusers_ZImage_Config.get_tag()],
+        Annotated[Main_Diffusers_ErnieImage_Config, Main_Diffusers_ErnieImage_Config.get_tag()],
         Annotated[Main_Diffusers_Ideogram4_Config, Main_Diffusers_Ideogram4_Config.get_tag()],
         Annotated[Main_Diffusers_Krea2_Config, Main_Diffusers_Krea2_Config.get_tag()],
         # Main (Pipeline) - checkpoint format
@@ -704,9 +706,12 @@ class ModelConfigFactory:
         # Now do any post-processing needed for specific model types/bases/etc.
         match config.type:
             case ModelType.Main:
-                # Pass variant if available (e.g., for Flux2 models)
+                # Pass variant if available (e.g., for Flux2 models). Name and path are used to
+                # detect ERNIE-Image-Turbo, which has no distinct variant on the config.
                 variant = getattr(config, "variant", None)
-                config.default_settings = MainModelDefaultSettings.from_base(config.base, variant)
+                config.default_settings = MainModelDefaultSettings.from_base(
+                    config.base, variant, config.name, config.path
+                )
             case ModelType.ControlNet | ModelType.T2IAdapter | ModelType.ControlLoRa:
                 config.default_settings = ControlAdapterDefaultSettings.from_model_name(config.name)
             case ModelType.LoRA:

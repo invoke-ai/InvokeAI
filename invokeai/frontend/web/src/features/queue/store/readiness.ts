@@ -356,6 +356,39 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     }
   }
 
+  if (model?.base === 'flux2' && params.pidMode !== 'off') {
+    // PiD decode (any FLUX.2 format) needs both a PiD decoder and the Gemma-2 caption encoder.
+    if (!params.pidDecoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+    }
+    if (!params.gemma2EncoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
+    }
+  }
+
+  if (model?.base === 'sd-3' && params.pidMode !== 'off') {
+    // PiD decode needs both a PiD decoder and the Gemma-2 caption encoder.
+    if (!params.pidDecoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+    }
+    if (!params.gemma2EncoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
+    }
+  }
+
+  if (model?.base === 'sdxl' && params.pidMode !== 'off') {
+    // PiD decode needs the decoder + Gemma-2 encoder, and is not compatible with the SDXL Refiner.
+    if (!params.pidDecoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+    }
+    if (!params.gemma2EncoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
+    }
+    if (params.refinerModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.pidIncompatibleWithRefiner') });
+    }
+  }
+
   if (model?.base === 'qwen-image' && model.format === 'gguf_quantized') {
     // GGUF needs sources for VAE + encoder. Each can come from either a standalone
     // model or the Component Source (Diffusers).
@@ -409,6 +442,15 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
       const hasQwen3Source = params.zImageQwen3EncoderModel !== null || params.zImageQwen3SourceModel !== null;
       if (!hasQwen3Source) {
         reasons.push({ content: i18n.t('parameters.invoke.noZImageQwen3EncoderSourceSelected') });
+      }
+    }
+    // PiD decode (Z-Image reuses the FLUX decoder) needs both a PiD decoder and the Gemma-2 caption encoder.
+    if (params.pidMode !== 'off') {
+      if (!params.pidDecoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+      }
+      if (!params.gemma2EncoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
       }
     }
     // PiD decode (Z-Image reuses the FLUX decoder) needs both a PiD decoder and the Gemma-2 caption encoder.
@@ -1007,6 +1049,52 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     }
   }
 
+  if (model?.base === 'ernie-image') {
+    // ERNIE-Image requires bbox dimensions that are multiples of 16 (enforced by ernie_image_denoise).
+    const { bbox } = canvas;
+    const gridSize = getGridSize('ernie-image');
+
+    if (bbox.scaleMethod === 'none') {
+      if (bbox.rect.width % gridSize !== 0) {
+        reasons.push({
+          content: i18n.t('parameters.invoke.modelIncompatibleBboxWidth', {
+            model: 'ERNIE-Image',
+            width: bbox.rect.width,
+            multiple: gridSize,
+          }),
+        });
+      }
+      if (bbox.rect.height % gridSize !== 0) {
+        reasons.push({
+          content: i18n.t('parameters.invoke.modelIncompatibleBboxHeight', {
+            model: 'ERNIE-Image',
+            height: bbox.rect.height,
+            multiple: gridSize,
+          }),
+        });
+      }
+    } else {
+      if (bbox.scaledSize.width % gridSize !== 0) {
+        reasons.push({
+          content: i18n.t('parameters.invoke.modelIncompatibleScaledBboxWidth', {
+            model: 'ERNIE-Image',
+            width: bbox.scaledSize.width,
+            multiple: gridSize,
+          }),
+        });
+      }
+      if (bbox.scaledSize.height % gridSize !== 0) {
+        reasons.push({
+          content: i18n.t('parameters.invoke.modelIncompatibleScaledBboxHeight', {
+            model: 'ERNIE-Image',
+            height: bbox.scaledSize.height,
+            multiple: gridSize,
+          }),
+        });
+      }
+    }
+  }
+
   if (model?.base === 'ideogram-4') {
     // Ideogram 4 requires bbox dimensions that are multiples of 16 (enforced by ideogram4_denoise).
     const { bbox } = canvas;
@@ -1096,6 +1184,39 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
       const hasQwen3Source = params.zImageQwen3EncoderModel !== null || params.zImageQwen3SourceModel !== null;
       if (!hasQwen3Source) {
         reasons.push({ content: i18n.t('parameters.invoke.noZImageQwen3EncoderSourceSelected') });
+      }
+    }
+    // PiD decode on the Canvas: decoder + Gemma-2 encoder required, and "Scale Before Processing" must be off.
+    if (params.pidMode !== 'off') {
+      if (!params.pidDecoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+      }
+      if (!params.gemma2EncoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
+      }
+      if (canvas.bbox.scaleMethod !== 'none') {
+        reasons.push({ content: i18n.t('parameters.invoke.pidScaleBeforeProcessingMustBeOff') });
+      }
+      // Native mode generates at bbox/4, so the bbox must be a multiple of the PiD-scaled grid (grid*4) for
+      // bbox/4 to land on the grid; without this a 1040px bbox silently becomes a 256px generation.
+      const gridSize = getGridSize('z-image', getPidScale(params.pidMode));
+      if (canvas.bbox.rect.width % gridSize !== 0) {
+        reasons.push({
+          content: i18n.t('parameters.invoke.modelIncompatibleBboxWidth', {
+            model: 'Z-Image',
+            width: canvas.bbox.rect.width,
+            multiple: gridSize,
+          }),
+        });
+      }
+      if (canvas.bbox.rect.height % gridSize !== 0) {
+        reasons.push({
+          content: i18n.t('parameters.invoke.modelIncompatibleBboxHeight', {
+            model: 'Z-Image',
+            height: canvas.bbox.rect.height,
+            multiple: gridSize,
+          }),
+        });
       }
     }
     // PiD decode on the Canvas: decoder + Gemma-2 encoder required, and "Scale Before Processing" must be off.
