@@ -10,13 +10,25 @@ import { PREVIEW_COMPARE_DROP_DATA, PREVIEW_COMPARE_DROP_ID } from './previewCom
  * A quiet drop ring over the preview frame, visible only while an all-image gallery-item
  * drag is in flight. Dropping arms the dragged image for comparison (resolved
  * by the widget shell's dnd monitor).
+ *
+ * The image already on screen is refused wherever it was dragged from — the
+ * frame itself, the filmstrip, or the gallery grid — because comparing an image
+ * with itself does nothing but pause live-follow. Only `items[0]` is tested,
+ * since that is the item `resolvePreviewCompareDrop` would arm.
  */
-export const PreviewCompareDropZone = () => {
+export const PreviewCompareDropZone = ({ currentImageName }: { currentImageName: string | null }) => {
   const { t } = useTranslation();
   const { active } = useDndContext();
-  const { isOver, setNodeRef } = useDroppable({ data: PREVIEW_COMPARE_DROP_DATA, id: PREVIEW_COMPARE_DROP_ID });
+  const activeData = active?.data.current;
+  const isCompatible = isGalleryImageDragData(activeData);
+  const isSelfCompare = isCompatible && activeData.items[0]?.name === currentImageName;
+  const { isOver, setNodeRef } = useDroppable({
+    data: PREVIEW_COMPARE_DROP_DATA,
+    disabled: !isCompatible || isSelfCompare,
+    id: PREVIEW_COMPARE_DROP_ID,
+  });
 
-  if (!isGalleryImageDragData(active?.data.current)) {
+  if (!isCompatible || isSelfCompare) {
     return null;
   }
 

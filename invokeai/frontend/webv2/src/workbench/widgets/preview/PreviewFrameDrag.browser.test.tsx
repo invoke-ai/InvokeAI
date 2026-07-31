@@ -152,4 +152,23 @@ describe('PreviewFrame image drag', () => {
       kind: 'gallery-item',
     });
   });
+
+  it('does not offer its own compare target to the image it is showing', async () => {
+    // Dropping the previewed image back on the frame used to arm a comparison
+    // of the image with itself: invisible, because compare mode requires the
+    // two to differ, but it still paused live-follow and left a comparison
+    // primed to spring open on the next selection.
+    const onDrop = await renderHarness();
+    const image = host!.querySelector<HTMLImageElement>('img[alt="preview.png"]')!;
+
+    await interact(() => pointer('pointerdown', image, 140, 140));
+    await interact(() => pointer('pointermove', image.ownerDocument, 170, 140));
+
+    expect(document.body.textContent).not.toContain('Drop to compare');
+
+    await interact(() => pointer('pointermove', image.ownerDocument, 150, 150));
+    await interact(() => pointer('pointerup', image.ownerDocument, 150, 150));
+
+    expect(onDrop.mock.calls[0]?.[0]?.overId).toBeNull();
+  });
 });

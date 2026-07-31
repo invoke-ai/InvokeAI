@@ -699,7 +699,13 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
         return;
       }
 
-      const resolution = resolvePreviewCompareDrop(event.active.data.current, event.over?.data.current ?? null);
+      // The image on screen is refused, so this can never resolve to the
+      // selection itself.
+      const resolution = resolvePreviewCompareDrop(
+        event.active.data.current,
+        event.over?.data.current ?? null,
+        selectedItem.name
+      );
 
       if (!resolution) {
         return;
@@ -707,9 +713,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
 
       // Prefer images we already hold (board context includes fresh local
       // generations that would 404 on a backend by-name fetch).
-      const localImageItem =
-        boardItems.find((item) => item.kind === 'image' && item.name === resolution.imageName) ??
-        (selectedItem.name === resolution.imageName ? selectedItem : null);
+      const localImageItem = boardItems.find((item) => item.kind === 'image' && item.name === resolution.imageName);
 
       if (localImageItem?.kind === 'image') {
         gallery.setCompareItem(localImageItem);

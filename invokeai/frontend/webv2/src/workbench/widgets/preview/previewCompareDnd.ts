@@ -17,13 +17,26 @@ export const PREVIEW_COMPARE_DROP_DATA: PreviewCompareDropData = { kind: 'previe
 export const isPreviewCompareDropData = (value: unknown): value is PreviewCompareDropData =>
   typeof value === 'object' && value !== null && (value as PreviewCompareDropData).kind === 'preview-compare-target';
 
-/** The image to arm for comparison, or null when the drag/drop pair is not ours. */
-export const resolvePreviewCompareDrop = (activeData: unknown, overData: unknown): { imageName: string } | null => {
+/**
+ * The image to arm for comparison, or null when the drag/drop pair is not ours
+ * — or when the drop would compare the previewed image with itself. That is not
+ * merely a no-op: arming a comparison pauses live-follow, so a self-drop would
+ * quietly switch off in-progress images and leave a comparison that springs
+ * open on the next selection.
+ *
+ * `currentImageName` is required rather than optional so every caller has to
+ * say what is on screen; a caller with nothing selected passes null.
+ */
+export const resolvePreviewCompareDrop = (
+  activeData: unknown,
+  overData: unknown,
+  currentImageName: string | null
+): { imageName: string } | null => {
   if (!isGalleryImageDragData(activeData) || !isPreviewCompareDropData(overData)) {
     return null;
   }
 
   const imageName = activeData.items[0]?.name;
 
-  return imageName ? { imageName } : null;
+  return imageName && imageName !== currentImageName ? { imageName } : null;
 };

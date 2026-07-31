@@ -243,7 +243,7 @@ const PreviewImageFrame = ({
       w="full"
       {...loupe.stageProps}
     >
-      <PreviewCompareDropZone />
+      <PreviewCompareDropZone currentImageName={dragItem?.kind === 'image' ? dragItem.name : null} />
       <Box
         ref={setContentRef}
         {...listeners}
