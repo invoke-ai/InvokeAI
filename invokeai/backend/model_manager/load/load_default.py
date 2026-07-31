@@ -58,6 +58,32 @@ _FP8_DEFAULT_SKIP_PATTERNS: tuple[str, ...] = (
     r"^proj_out$",
 )
 
+# Model formats whose weights are already quantized. FP8 storage is meaningless for them (the
+# payload is packed integers, not values we may re-encode) and actively harmful — see
+# `_should_use_fp8`. Declared as strings to keep this module free of a taxonomy import at module
+# scope; compared against `config.format`, which is a `ModelFormat` str-enum.
+_QUANTIZED_MODEL_FORMATS: frozenset[str] = frozenset(
+    {
+        "gguf_quantized",
+        "bnb_quantized_nf4b",
+        "bnb_quantized_int8b",
+    }
+)
+
+
+def _is_quantized_param(param: torch.nn.Parameter) -> bool:
+    """Whether `param` holds a quantized payload that must not be re-encoded as FP8.
+
+    Two signals, both observed in practice:
+
+    - Not floating point. bnb's NF4/INT8 weights are packed `uint8` (and `bnb.nn.LinearNF4`
+      subclasses `nn.Linear`, so a class check alone does not catch them). Casting those to float8
+      succeeds silently and the layer then returns finite garbage.
+    - A `torch.Tensor` *subclass*, e.g. `GGMLTensor`, which keeps its quantized payload plus
+      metadata and rejects dtype changes outright.
+    """
+    return not param.data.is_floating_point() or type(param.data) is not torch.Tensor
+
 
 # The construction path is not thread-safe on its own; it monkey-patches process-global torch state
 # (see MODEL_LOAD_LOCK). Concurrent callers must hold the MODEL_LOAD_LOCK write lock (see
@@ -236,6 +262,16 @@ class ModelLoader(ModelLoaderBase):
 
         from invokeai.backend.model_manager.taxonomy import ModelType
 
+        # Already-quantized models are excluded. Their weights are packed integer payloads, not
+        # values we may re-encode, and every quantized-format loader reaches this helper. Casting
+        # them is not a no-op:
+        #   - GGUF raises `Operation changed the dtype of GGMLTensor unexpectedly` at load time.
+        #   - bnb NF4 corrupts *silently* — `bnb.nn.LinearNF4` subclasses `nn.Linear`, so the packed
+        #     uint8 payload is cast to float8, inference still returns finite numbers, and the model
+        #     just produces garbage.
+        if hasattr(config, "format") and config.format in _QUANTIZED_MODEL_FORMATS:
+            return False
+
         # VAEs are excluded — fp8 storage causes noticeable quality degradation in decode.
         if hasattr(config, "type") and config.type == ModelType.VAE:
             return False
@@ -347,6 +383,11 @@ class ModelLoader(ModelLoaderBase):
         `extra_skip_patterns` carries the model's own declared exclusions (diffusers'
         `_skip_layerwise_casting_patterns`), which are model-specific and cannot be inferred from
         layer types or generic name patterns.
+
+        Modules holding already-quantized weights are skipped regardless of their class. This is a
+        backstop behind the format check in `_should_use_fp8`, which cannot see quantization that
+        is not reflected in the model's format (e.g. a `diffusers`-format checkpoint whose weights
+        were quantized by an external tool).
         """
         skip_patterns = _FP8_DEFAULT_SKIP_PATTERNS + tuple(extra_skip_patterns)
         for module_name, module in model.named_modules():
@@ -356,6 +397,8 @@ class ModelLoader(ModelLoaderBase):
                 continue
             params = list(module.parameters(recurse=False))
             if not params:
+                continue
+            if any(_is_quantized_param(p) for p in params):
                 continue
 
             for param in params:

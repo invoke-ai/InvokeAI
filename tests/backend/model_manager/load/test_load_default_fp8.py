@@ -360,6 +360,56 @@ def test_anima_transformer_declares_t_embedder_skip():
     assert model.blocks.weight.dtype == torch.float16
 
 
+@pytest.mark.parametrize("fmt", ["gguf_quantized", "bnb_quantized_nf4b", "bnb_quantized_int8b"])
+def test_should_use_fp8_excludes_quantized_formats(fmt: str):
+    """Already-quantized weights must never be re-encoded as FP8.
+
+    Every quantized-format loader reaches `_apply_fp8_layerwise_casting`, and casting there is not
+    a no-op: GGUF raises `Operation changed the dtype of GGMLTensor unexpectedly` at load time, and
+    bnb NF4 corrupts silently (`bnb.nn.LinearNF4` subclasses `nn.Linear`, so its packed uint8
+    payload is cast to float8 and inference then returns finite garbage).
+    """
+    loader = _make_loader(device="cuda")
+    config = _make_config(ModelType.Main, fp8=True)
+    config.format = fmt
+    assert loader._should_use_fp8(config) is False
+
+
+def test_apply_fp8_skips_quantized_params_regardless_of_format():
+    """Backstop behind the format check, for quantization the model's format does not reveal
+    (e.g. a `diffusers`-format checkpoint quantized by an external tool).
+
+    Both signals are covered: a non-floating-point payload (bnb's packed uint8) and a
+    `torch.Tensor` subclass (GGUF's `GGMLTensor`).
+    """
+
+    class _FakeQuantTensor(torch.Tensor):
+        """Stands in for GGMLTensor: a Tensor subclass carrying a quantized payload."""
+
+    class _Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.packed = torch.nn.Linear(4, 4, bias=False)  # bnb-style uint8 payload
+            self.subclassed = torch.nn.Linear(4, 4, bias=False)  # GGUF-style tensor subclass
+            # NB: not `normal` — that would be caught by the `norm` skip pattern.
+            self.attn = torch.nn.Linear(4, 4, bias=False)
+
+    model = _Model().to(torch.bfloat16)
+    model.packed.weight = torch.nn.Parameter(torch.zeros(8, 1, dtype=torch.uint8), requires_grad=False)
+    model.subclassed.weight = torch.nn.Parameter(
+        torch.zeros(4, 4, dtype=torch.bfloat16).as_subclass(_FakeQuantTensor), requires_grad=False
+    )
+
+    ModelLoader._apply_fp8_to_nn_module(model, torch.float8_e4m3fn, torch.bfloat16)
+
+    assert model.packed.weight.dtype == torch.uint8
+    assert not model.packed._forward_pre_hooks, "a quantized layer must not get cast hooks either"
+    assert model.subclassed.weight.dtype == torch.bfloat16
+    assert not model.subclassed._forward_pre_hooks
+    # Control: an ordinary layer in the same model is still cast.
+    assert model.attn.weight.dtype == torch.float8_e4m3fn
+
+
 def test_should_use_fp8_allows_z_image():
     """Z-Image was excluded while we used diffusers' `enable_layerwise_casting()` with the global
     torch dtype (fp16) as compute dtype, which clashed with the model's bf16 weights. The compute
