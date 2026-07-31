@@ -268,6 +268,63 @@ describe('ImageContextMenu deletion confirmation', () => {
   });
 });
 
+describe('ImageContextMenu starred state', () => {
+  const starIconFill = (label: string): string =>
+    getComputedStyle(document.querySelector<HTMLElement>(`[aria-label="${label}"] svg`)!).fill;
+
+  it('fills the star for a starred item and leaves it outlined otherwise', async () => {
+    // Lucide is stroke-only, so an unfilled star was the *only* thing shown for
+    // both states — the text label was carrying all of the meaning.
+    const unstarred = item('image', 'plain.png');
+    await renderItemMenu(createActions(vi.fn()), {
+      itemRefs: [{ kind: 'image', name: unstarred.name }],
+      items: [unstarred],
+      x: 20,
+      y: 20,
+    });
+
+    expect(starIconFill('Star image')).toBe('none');
+
+    await interact(() => root?.unmount());
+    host?.remove();
+
+    const starred = { ...item('image', 'fave.png'), starred: true };
+    await renderItemMenu(createActions(vi.fn()), {
+      itemRefs: [{ kind: 'image', name: starred.name }],
+      items: [starred],
+      x: 20,
+      y: 20,
+    });
+
+    expect(starIconFill('Unstar image')).not.toBe('none');
+  });
+
+  it('fills the bulk star only once every selected item is starred', async () => {
+    const mixed = [item('image', 'a.png'), { ...item('image', 'b.png'), starred: true }];
+    await renderItemMenu(createActions(vi.fn()), {
+      itemRefs: mixed.map((entry) => ({ kind: 'image' as const, name: entry.name })),
+      items: mixed,
+      x: 20,
+      y: 20,
+    });
+
+    expect(getComputedStyle(getMenuItem('Star All').querySelector('svg')!).fill).toBe('none');
+
+    await interact(() => root?.unmount());
+    host?.remove();
+
+    const allStarred = mixed.map((entry) => ({ ...entry, starred: true }));
+    await renderItemMenu(createActions(vi.fn()), {
+      itemRefs: allStarred.map((entry) => ({ kind: 'image' as const, name: entry.name })),
+      items: allStarred,
+      x: 20,
+      y: 20,
+    });
+
+    expect(getComputedStyle(getMenuItem('Unstar All').querySelector('svg')!).fill).not.toBe('none');
+  });
+});
+
 describe('ImageContextMenu mixed-media action visibility', () => {
   it('shows common actions for a single video and hides every image-only action', async () => {
     const video = item('video', 'clip.mp4');

@@ -379,6 +379,7 @@ const SingleItemMenuItems = ({
         <QuickMenuItem icon={EyeIcon} label="Open in preview" value="open-in-preview" onClick={handleOpenPreview} />
         <QuickMenuItem
           icon={StarIcon}
+          iconFill={item.starred ? 'currentColor' : 'none'}
           label={`${item.starred ? 'Unstar' : 'Star'} ${mediaLabel}`}
           value="toggle-starred"
           onClick={handleToggleStarred}
@@ -471,6 +472,7 @@ const BulkItemMenuItems = ({
       <Menu.Separator borderColor="border.subtle" />
       <ContextMenuItem
         icon={StarIcon}
+        iconFill={allStarred ? 'currentColor' : 'none'}
         label={allStarred ? 'Unstar All' : 'Star All'}
         value="toggle-starred-all"
         onClick={handleToggleStarred}
@@ -793,6 +795,7 @@ const ToggleStarQuickMenuItem = ({ actions, image }: { actions: ImageActions; im
   return (
     <QuickMenuItem
       icon={StarIcon}
+      iconFill={image.starred ? 'currentColor' : 'none'}
       label={image.starred ? 'Unstar image' : 'Star image'}
       value="toggle-starred"
       onClick={handleClick}
@@ -833,6 +836,7 @@ const BulkMenuItems = ({
       <Menu.Separator borderColor="border.subtle" />
       <ContextMenuItem
         icon={StarIcon}
+        iconFill={allStarred ? 'currentColor' : 'none'}
         label={allStarred ? 'Unstar All' : 'Star All'}
         value="toggle-starred-all"
         onClick={handleToggleStarred}
@@ -999,11 +1003,14 @@ const ContextSubMenu = ({
 
 const QuickMenuItem = ({
   icon,
+  iconFill,
   label,
   value,
   onClick,
 }: {
   icon: LucideIcon;
+  /** Lucide icons are stroke-only, so `'currentColor'` is how an on state reads. */
+  iconFill?: string;
   label: string;
   value: string;
   onClick: () => void;
@@ -1016,7 +1023,7 @@ const QuickMenuItem = ({
     positioning={QUICK_MENU_TOOLTIP_POSITIONING_PROPS}
   >
     <Menu.Item aria-label={label} flex="1" justifyContent="center" value={value} onClick={onClick}>
-      <Icon as={icon} boxSize="4" color="fg" />
+      <Icon as={icon} boxSize="4" color="fg" fill={iconFill} />
     </Menu.Item>
   </Tooltip>
 );
@@ -1025,6 +1032,7 @@ const ContextMenuItem = ({
   color,
   disabled,
   icon,
+  iconFill,
   label,
   value,
   onClick,
@@ -1032,13 +1040,15 @@ const ContextMenuItem = ({
   color?: string;
   disabled?: boolean;
   icon: LucideIcon;
+  /** Lucide icons are stroke-only, so `'currentColor'` is how an on state reads. */
+  iconFill?: string;
   label: string;
   value: string;
   onClick?: () => void;
 }) => (
   <Menu.Item color={color} disabled={disabled} value={value} onClick={onClick}>
     <HStack gap="2" minW="0" w="full">
-      <Icon as={icon} boxSize="3.5" color={color ?? 'fg.subtle'} flexShrink={0} />
+      <Icon as={icon} boxSize="3.5" color={color ?? 'fg.subtle'} fill={iconFill} flexShrink={0} />
       <Text flex="1" fontSize="xs">
         {label}
       </Text>
