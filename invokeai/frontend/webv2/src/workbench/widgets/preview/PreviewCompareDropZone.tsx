@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { PREVIEW_COMPARE_DROP_DATA, PREVIEW_COMPARE_DROP_ID } from './previewCompareDnd';
 
 /**
- * A quiet drop ring over the preview frame, visible only while a gallery-image
+ * A quiet drop ring over the preview frame, visible only while an all-image gallery-item
  * drag is in flight. Dropping arms the dragged image for comparison (resolved
  * by the widget shell's dnd monitor).
  */

@@ -9,7 +9,7 @@ import {
   useSensors,
   type DragEndEvent,
 } from '@dnd-kit/core';
-import { getGalleryImageDragData, getGalleryImageDragId } from '@features/gallery/utility';
+import { getGalleryItemDragData, getGalleryItemDragId } from '@features/gallery/utility';
 import { system } from '@theme/system';
 import { widgetCollisionDetection } from '@workbench/widgetDnd';
 import { createInstance } from 'i18next';
@@ -45,8 +45,8 @@ const interact = (action: () => void): Promise<void> =>
 
 const DraggableThumb = () => {
   const { listeners, setNodeRef } = useDraggable({
-    data: getGalleryImageDragData([{ boardId: 'none', imageName: 'dragged.png' }]),
-    id: getGalleryImageDragId('dragged.png'),
+    data: getGalleryItemDragData([{ kind: 'image', name: 'dragged.png' }]),
+    id: getGalleryItemDragId({ kind: 'image', name: 'dragged.png' }, 'gallery-grid'),
   });
 
   return (
@@ -114,7 +114,7 @@ const pointer = (type: string, target: EventTarget, clientX: number, clientY: nu
 };
 
 describe('PreviewCompareDropZone', () => {
-  it('shows the drop ring during a gallery-image drag and resolves the drop', async () => {
+  it('shows the drop ring during an all-image gallery-item drag and resolves the drop', async () => {
     const { onDrop } = await renderHarness();
     const thumb = document.querySelector<HTMLElement>('[data-testid="thumb"]')!;
 

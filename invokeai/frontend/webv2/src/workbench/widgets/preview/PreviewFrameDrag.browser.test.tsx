@@ -87,13 +87,13 @@ const renderHarness = async () => {
         <DragMonitor onDrop={onDrop} />
         <div style={{ display: 'flex', height: 220, left: 40, position: 'fixed', top: 40, width: 220 }}>
           <PreviewFrame
-            dragImage={{ boardId: 'board-1', imageName: 'preview.png' }}
+            dragItem={{ kind: 'image', name: 'preview.png' }}
             frameHeight={128}
             frameWidth={128}
             isLive={false}
             liveBadgeLabel="Generating"
             shouldAntialiasLiveImage
-            source={source}
+            source={{ itemKey: 'image:preview.png', kind: 'image', source }}
             variant="framed"
           />
         </div>
@@ -133,7 +133,7 @@ afterEach(async () => {
 });
 
 describe('PreviewFrame image drag', () => {
-  it('emits the shared single-gallery-image payload accepted by image drop surfaces', async () => {
+  it('emits the shared qualified single-image item payload accepted by image drop surfaces', async () => {
     const onDrop = await renderHarness();
     const image = host!.querySelector<HTMLImageElement>('img[alt="preview.png"]')!;
 
@@ -148,8 +148,8 @@ describe('PreviewFrame image drag', () => {
     expect(result?.overId).toBe('test-image-drop');
     expect(isGalleryImageDragData(result?.activeData)).toBe(true);
     expect(result?.activeData).toEqual({
-      images: [{ boardId: 'board-1', imageName: 'preview.png' }],
-      kind: 'gallery-image',
+      items: [{ kind: 'image', name: 'preview.png' }],
+      kind: 'gallery-item',
     });
   });
 });

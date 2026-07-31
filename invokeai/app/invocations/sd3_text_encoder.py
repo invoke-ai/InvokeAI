@@ -15,9 +15,8 @@ from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField
 from invokeai.app.invocations.model import CLIPField, T5EncoderField
 from invokeai.app.invocations.primitives import SD3ConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.model_manager.load.model_cache.utils import get_effective_device
 from invokeai.backend.model_manager.taxonomy import ModelFormat
-from invokeai.backend.patches.layer_patcher import LayerPatcher
+from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_CLIP_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData, SD3ConditioningInfo
@@ -32,6 +31,7 @@ SD3_T5_MAX_SEQ_LEN = 256
     tags=["prompt", "conditioning", "sd3"],
     category="prompt",
     version="1.0.1",
+    idle_gpu_offloadable=True,
 )
 class Sd3TextEncoderInvocation(BaseInvocation):
     """Encodes and preps a prompt for a SD3 image."""
@@ -96,14 +96,17 @@ class Sd3TextEncoderInvocation(BaseInvocation):
         assert self.t5_encoder is not None
         prompt = [self.prompt]
 
+        t5_text_encoder_info = context.models.load(self.t5_encoder.text_encoder)
         with (
-            context.models.load(self.t5_encoder.text_encoder) as t5_text_encoder,
+            t5_text_encoder_info as t5_text_encoder,
             context.models.load(self.t5_encoder.tokenizer) as t5_tokenizer,
         ):
             context.util.signal_progress("Running T5 encoder")
             assert isinstance(t5_text_encoder, T5EncoderModel)
             assert isinstance(t5_tokenizer, T5Tokenizer)
-            t5_device = get_effective_device(t5_text_encoder)
+            # Use the encoder's intended compute device, not its current parameter residency: partial loading may
+            # have temporarily offloaded all weights to RAM, which would wrongly run the whole encode on the CPU.
+            t5_device = t5_text_encoder_info.compute_device
 
             text_inputs = t5_tokenizer(
                 prompt,
@@ -145,7 +148,9 @@ class Sd3TextEncoderInvocation(BaseInvocation):
             context.util.signal_progress("Running CLIP encoder")
             assert isinstance(clip_text_encoder, (CLIPTextModel, CLIPTextModelWithProjection))
             assert isinstance(clip_tokenizer, CLIPTokenizer)
-            clip_device = get_effective_device(clip_text_encoder)
+            # Use the encoder's intended compute device, not its current parameter residency: partial loading may
+            # have temporarily offloaded all weights to RAM, which would wrongly run the whole encode on the CPU.
+            clip_device = clip_text_encoder_info.compute_device
 
             clip_text_encoder_config = clip_text_encoder_info.config
             assert clip_text_encoder_config is not None
@@ -195,11 +200,8 @@ class Sd3TextEncoderInvocation(BaseInvocation):
 
             return prompt_embeds, pooled_prompt_embeds
 
-    def _clip_lora_iterator(
-        self, context: InvocationContext, clip_model: CLIPField
-    ) -> Iterator[Tuple[ModelPatchRaw, float]]:
+    def _clip_lora_iterator(self, context: InvocationContext, clip_model: CLIPField) -> Iterator[PatchSpec]:
         for lora in clip_model.loras:
             lora_info = context.models.load(lora.lora)
             assert isinstance(lora_info.model, ModelPatchRaw)
-            yield (lora_info.model, lora.weight)
-            del lora_info
+            yield (lora_info.model, lora.weight, lora_info.model_in_ram())

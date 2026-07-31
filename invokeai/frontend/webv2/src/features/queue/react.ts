@@ -1,7 +1,8 @@
 /** React-facing Queue read models, kept separate from widget registration. */
 export type { QueueItemProgress } from './core/types';
 export { QueueUiProvider, type QueueUiAdapter } from './ui/QueueUiContext';
-export { useActiveProgressTarget } from './data/activeProgressTargetStore';
+export { useActiveProgressTarget, useActiveProgressTargets } from './data/activeProgressTargetStore';
+export { type ItemProgress, useActiveProgressItemIds, useItemProgress } from './data/itemProgressStore';
 export {
   type LatestProgressImageSnapshot,
   useProgressImage,

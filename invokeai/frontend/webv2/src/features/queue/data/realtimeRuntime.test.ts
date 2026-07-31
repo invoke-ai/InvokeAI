@@ -85,6 +85,30 @@ describe('queue realtime runtime', () => {
     runtime.dispose();
   });
 
+  it('forwards the reporting GPU so concurrent sessions can be told apart', () => {
+    const runtime = createQueueRealtimeRuntime({ backend, invalidate, progress, refreshModelCache });
+
+    runtime.start();
+    vi.advanceTimersByTime(50);
+
+    // Multi-GPU emits one progress stream per running session, each tagged with its
+    // device. Without the tag the UI cannot label a tile or row with its GPU.
+    handlers.get('invocation_progress')?.({
+      device: 'cuda:1',
+      item_id: 42,
+      message: 'Denoising',
+      percentage: 0.5,
+    } as never);
+
+    expect(progress.set).toHaveBeenCalledWith(42, {
+      device: 'cuda:1',
+      image: undefined,
+      message: 'Denoising',
+      percentage: 0.5,
+    });
+    runtime.dispose();
+  });
+
   it('keeps completed previews until result hydration and clears failed previews immediately', () => {
     const runtime = createQueueRealtimeRuntime({ backend, invalidate, progress, refreshModelCache });
 

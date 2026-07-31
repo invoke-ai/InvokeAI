@@ -21,9 +21,9 @@ import {
   Switch,
   Text,
 } from '@chakra-ui/react';
-import { useDndMonitor, useDroppable } from '@dnd-kit/core';
+import { useDndMonitor } from '@dnd-kit/core';
 import { galleryImages, galleryTransfers } from '@features/gallery';
-import { galleryImageUrls, isGalleryImageDragData } from '@features/gallery/utility';
+import { galleryImageUrls, isGalleryImageDragData, useGalleryImageDroppable } from '@features/gallery/utility';
 import { GenerationSettingsSection, NegativePromptField, PositivePromptField } from '@features/generation/components';
 import {
   SCHEDULER_OPTIONS,
@@ -337,9 +337,13 @@ const UpscaleImageField = ({
   const { t } = useTranslation();
   const { reportError, touchGalleryImages } = useUpscaleUi();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const { isOver, setNodeRef } = useDroppable({ data: { kind: DROP_ID }, id: DROP_ID });
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const { isOver, setNodeRef } = useGalleryImageDroppable({
+    data: { kind: DROP_ID },
+    disabled: isLoading,
+    id: DROP_ID,
+  });
 
   const setGalleryImage = useCallback(
     async (imageName: string) => {
@@ -367,8 +371,8 @@ const UpscaleImageField = ({
     onDragEnd: (event) => {
       const data = event.active.data.current;
 
-      if (!isLoading && event.over?.id === DROP_ID && isGalleryImageDragData(data) && data.images.length === 1) {
-        const imageName = data.images[0]?.imageName;
+      if (!isLoading && event.over?.id === DROP_ID && isGalleryImageDragData(data) && data.items.length === 1) {
+        const imageName = data.items[0]?.name;
 
         if (imageName) {
           void setGalleryImage(imageName);

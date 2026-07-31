@@ -20,6 +20,7 @@ import {
 import { GenerateDimensionFields } from './GenerateDimensionFields';
 import { useRegisterGenerateDraftFlusher } from './generateDraftRegistry';
 import { getSettingsWithLatestPromptFields } from './generateFormViewModel';
+import { GenerateModelFamilyFields } from './GenerateModelFamilyFields';
 import { GenerateModelFields } from './GenerateModelFields';
 import { GeneratePromptFields } from './promptFields';
 import { GenerateReferenceImagesSection } from './reference-images/GenerateReferenceImagesSection';
@@ -268,6 +269,12 @@ export const GenerateSettingsForm = ({
       />
 
       <GenerateComponentsSection
+        selectedModel={selectedModel}
+        settings={draftSettings}
+        onCommit={commitPatchImmediately}
+      />
+
+      <GenerateModelFamilyFields
         selectedModel={selectedModel}
         settings={draftSettings}
         onCommit={commitPatchImmediately}

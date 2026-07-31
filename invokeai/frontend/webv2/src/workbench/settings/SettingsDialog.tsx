@@ -52,6 +52,7 @@ import {
 import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { GenerationDevicesSettings } from './GenerationDevicesSettings';
 import { HotkeysSettingsSection } from './HotkeysSettingsSection';
 import { setWorkbenchSettingsSection, settingsDialogStore } from './settingsDialogStore';
 import {
@@ -578,15 +579,23 @@ const QueueSection = () => {
   }, []);
 
   return (
-    <SettingsSection description="Choose which jobs the Queue widget includes in its counts and lists." title="Queue">
-      <SettingSelect
-        description="Show jobs from only the active project, or all queue jobs visible to you."
-        label="Show jobs from"
-        options={QUEUE_JOBS_SCOPE_OPTIONS}
-        value={queueJobsScope}
-        onChange={updateQueueJobsScope}
-      />
-    </SettingsSection>
+    <Stack gap="6">
+      <SettingsSection description="Choose which jobs the Queue widget includes in its counts and lists." title="Queue">
+        <SettingSelect
+          description="Show jobs from only the active project, or all queue jobs visible to you."
+          label="Show jobs from"
+          options={QUEUE_JOBS_SCOPE_OPTIONS}
+          value={queueJobsScope}
+          onChange={updateQueueJobsScope}
+        />
+      </SettingsSection>
+      <SettingsSection
+        description="GPUs used for generation. With more than one selected, InvokeAI runs a session on each at the same time. This is a server-wide setting."
+        title="Generation Devices"
+      >
+        <GenerationDevicesSettings />
+      </SettingsSection>
+    </Stack>
   );
 };
 

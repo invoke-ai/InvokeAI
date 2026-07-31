@@ -148,7 +148,17 @@ const fetchWithAuthToken = (path: string, init: RequestInit | undefined, token: 
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  return fetch(buildApiUrl(path), { ...init, headers });
+  // `credentials` is stated rather than left to the fetch default because the backend now
+  // authenticates media routes (`/images/i/{name}/full`, `/videos/i/{name}/full`) with the
+  // path-scoped HttpOnly cookie that login sets — `<img>`/`<video>` cannot send a bearer
+  // header. Losing the login `Set-Cookie` would blank every thumbnail in multiuser mode, so
+  // the cookie behavior is pinned here where it can be asserted.
+  //
+  // 'same-origin' covers the normal deployment and the dev Vite proxy. A cross-origin
+  // VITE_INVOKEAI_API_BASE_URL would additionally need 'include' here plus
+  // Access-Control-Allow-Credentials on the backend; requesting 'include' unconditionally
+  // would instead break those setups outright, so callers opt in via `init`.
+  return fetch(buildApiUrl(path), { credentials: 'same-origin', ...init, headers });
 };
 
 /** Authenticated fetch that leaves status handling to the caller. */

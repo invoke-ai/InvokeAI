@@ -41,8 +41,10 @@ export const addEdge = (
   return edge;
 };
 
-export const getActiveCompatibleLoras = (settings: GenerateSettings, model: GenerateModelConfig): GenerateLora[] =>
-  settings.loras.filter((lora) => lora.isEnabled && isLoraCompatibleWithModel(lora.model, model));
+export const getActiveCompatibleLoras = (
+  settings: Pick<GenerateSettings, 'loras'>,
+  model: GenerateModelConfig
+): GenerateLora[] => settings.loras.filter((lora) => lora.isEnabled && isLoraCompatibleWithModel(lora.model, model));
 
 export const toModelIdentifier = (
   model: { base: string; key: string; name: string; type: string } & Record<string, unknown>

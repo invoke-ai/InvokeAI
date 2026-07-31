@@ -1,8 +1,15 @@
-import type { GalleryBoard, GalleryImage } from '@features/gallery';
+import type { GalleryBoard, GalleryImage, GalleryItem, GalleryItemKey, GalleryItemRef } from '@features/gallery';
+import type { GalleryItemContextMenuTarget } from '@features/gallery/react';
 /* eslint-disable react/react-compiler */
 import type { GalleryCanvasImportDestination } from '@workbench/canvas-operations/api';
 
 import { HStack, Icon, Menu, Portal, ScrollArea, Text } from '@chakra-ui/react';
+import {
+  galleryImageItemToGalleryImage,
+  isGalleryImageItem,
+  legacyGeneratedImageToGalleryItem,
+  toGalleryItemKey,
+} from '@features/gallery';
 import { ConfirmDialog, MenuContent, Tooltip } from '@platform/ui';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
@@ -15,6 +22,7 @@ import {
   ExternalLinkIcon,
   EyeIcon,
   FileImageIcon,
+  FileJsonIcon,
   FolderIcon,
   ImageIcon,
   ImagesIcon,
@@ -38,11 +46,25 @@ import type { ImageActions } from './useImageActions';
 
 import { EMPTY_IMAGE_RECALL_CAPABILITIES, type ImageRecallCapabilities } from './imageRecall';
 
-export interface ImageContextMenuTarget {
+export interface LegacyImageContextMenuTarget {
   /** Right-clicked image first; more entries switch the menu into bulk mode. */
   images: GalleryImage[];
   x: number;
   y: number;
+}
+
+export type ImageContextMenuTarget = LegacyImageContextMenuTarget | GalleryItemContextMenuTarget;
+
+/**
+ * Extra actions owned by Preview's selected native video. Other hosts omit
+ * this port, so gallery/grid video menus retain their common-action-only
+ * contract and never gain a frame-copy item.
+ */
+export interface PreviewVideoContextActions {
+  isCopyCurrentFrameAvailable: boolean;
+  itemKey: GalleryItemKey;
+  onCopyCurrentFrame: () => void;
+  onOpenDetails: () => void;
 }
 
 /** Extras on top of the shared MenuContent surface styling. */
@@ -83,11 +105,42 @@ export const getGalleryCanvasImportMenuItems = (isBulk: boolean): GalleryCanvasI
   }));
 
 export const getImageContextMenuImages = (target: ImageContextMenuTarget | null): GalleryImage[] => {
+  if (target && 'itemRefs' in target) {
+    const loadedItemsByKey = new Map(target.items.map((item) => [toGalleryItemKey(item), item]));
+    const imageItems = target.itemRefs.flatMap((ref) => {
+      const item = loadedItemsByKey.get(toGalleryItemKey(ref));
+
+      return item && isGalleryImageItem(item) ? [item] : [];
+    });
+
+    return imageItems.length === target.itemRefs.length ? imageItems.map(galleryImageItemToGalleryImage) : [];
+  }
+
   if (!Array.isArray(target?.images)) {
     return [];
   }
 
   return target.images.filter(isUsableGalleryImage);
+};
+
+const toGalleryItemContextMenuTarget = (target: ImageContextMenuTarget | null): GalleryItemContextMenuTarget | null => {
+  if (!target) {
+    return null;
+  }
+
+  if ('itemRefs' in target) {
+    return target;
+  }
+
+  const images = getImageContextMenuImages(target);
+  const items = images.map(legacyGeneratedImageToGalleryItem);
+
+  return {
+    itemRefs: items.map(({ kind, name }) => ({ kind, name })),
+    items,
+    x: target.x,
+    y: target.y,
+  };
 };
 
 export const getImageContextMenuRecallRequestKey = (image: GalleryImage | null, isBulk: boolean): string | null => {
@@ -106,25 +159,33 @@ export const getImageContextMenuRecallRequestKey = (image: GalleryImage | null, 
 export const ImageContextMenu = ({
   actions,
   boards,
+  previewVideoActions,
   target,
   onClose,
 }: {
   actions: ImageActions;
   boards: GalleryBoard[];
+  previewVideoActions?: PreviewVideoContextActions;
   target: ImageContextMenuTarget | null;
   onClose: () => void;
 }) => {
   const confirmImageDeletion = useWorkbenchPreferenceSelector((preferences) => preferences.confirmImageDeletion);
-  const [pendingDeletion, setPendingDeletion] = useState<string[] | null>(null);
-  const images = getImageContextMenuImages(target);
-  const image = images[0] ?? null;
+  const [pendingDeletion, setPendingDeletion] = useState<GalleryItemRef[] | null>(null);
+  const itemTarget = toGalleryItemContextMenuTarget(target);
+  const images = getImageContextMenuImages(itemTarget);
+  const isCompleteImageTarget = Boolean(itemTarget && images.length === itemTarget.itemRefs.length);
+  const imageTarget = useMemo<LegacyImageContextMenuTarget | null>(
+    () => (itemTarget && isCompleteImageTarget ? { images, x: itemTarget.x, y: itemTarget.y } : null),
+    [images, isCompleteImageTarget, itemTarget]
+  );
+  const pendingDeletionIsImageOnly = pendingDeletion?.every((item) => item.kind === 'image') ?? false;
 
   const requestDeletion = useCallback(
-    (imageNames: string[]) => {
+    (itemRefs: GalleryItemRef[]) => {
       if (confirmImageDeletion) {
-        setPendingDeletion([...imageNames]);
+        setPendingDeletion([...itemRefs]);
       } else {
-        void actions.deleteImages(imageNames);
+        void actions.deleteItems(itemRefs);
       }
     },
     [actions, confirmImageDeletion]
@@ -135,32 +196,299 @@ export const ImageContextMenu = ({
       return;
     }
 
-    await actions.deleteImages(pendingDeletion);
+    await actions.deleteItems(pendingDeletion);
   }, [actions, pendingDeletion]);
+  const requestImageDeletion = useCallback(
+    (imageNames: string[]) => requestDeletion(imageNames.map((name) => ({ kind: 'image', name }))),
+    [requestDeletion]
+  );
 
   return (
     <>
-      {target && image && (
-        <ImageContextMenuContent
-          key={`${image.imageName}:${images.length}`}
-          actions={actions}
-          boards={boards}
-          image={image}
-          images={images}
-          target={target}
-          onClose={onClose}
-          onRequestDeletion={requestDeletion}
-        />
-      )}
+      {itemTarget &&
+        (imageTarget ? (
+          <ImageContextMenuContent
+            key={`${images[0]?.imageName ?? 'image'}:${images.length}`}
+            actions={actions}
+            boards={boards}
+            image={images[0] ?? null}
+            images={images}
+            target={imageTarget}
+            onClose={onClose}
+            onRequestDeletion={requestImageDeletion}
+          />
+        ) : (
+          <GalleryItemContextMenuContent
+            key={`${itemTarget.itemRefs[0] ? toGalleryItemKey(itemTarget.itemRefs[0]) : 'item'}:${itemTarget.itemRefs.length}`}
+            actions={actions}
+            boards={boards}
+            previewVideoActions={previewVideoActions}
+            target={itemTarget}
+            onClose={onClose}
+            onRequestDeletion={requestDeletion}
+          />
+        ))}
       <ConfirmDialog
-        body={`This permanently deletes ${pendingDeletion && pendingDeletion.length > 1 ? 'these images' : 'the image'} from every board and from disk. This cannot be undone. You can disable this confirmation in Settings.`}
+        body={`This permanently deletes ${
+          pendingDeletion && pendingDeletion.length > 1
+            ? pendingDeletionIsImageOnly
+              ? 'these images'
+              : 'these items'
+            : pendingDeletionIsImageOnly
+              ? 'the image'
+              : 'the item'
+        } from every board and from disk. This cannot be undone. You can disable this confirmation in Settings.`}
         confirmLabel="Delete"
         isOpen={pendingDeletion !== null}
         title={
-          pendingDeletion && pendingDeletion.length > 1 ? `Delete ${pendingDeletion.length} images?` : 'Delete image?'
+          pendingDeletion && pendingDeletion.length > 1
+            ? `Delete ${pendingDeletion.length} ${pendingDeletionIsImageOnly ? 'images' : 'items'}?`
+            : pendingDeletionIsImageOnly
+              ? 'Delete image?'
+              : 'Delete item?'
         }
         onClose={handleCancelDeletion}
         onConfirm={handleConfirmDeletion}
+      />
+    </>
+  );
+};
+
+const GalleryItemContextMenuContent = ({
+  actions,
+  boards,
+  previewVideoActions,
+  target,
+  onClose,
+  onRequestDeletion,
+}: {
+  actions: ImageActions;
+  boards: GalleryBoard[];
+  previewVideoActions?: PreviewVideoContextActions;
+  target: GalleryItemContextMenuTarget;
+  onClose: () => void;
+  onRequestDeletion: (itemRefs: GalleryItemRef[]) => void;
+}) => {
+  const targetRef = useRef(target);
+  const item = target.items[0] ?? null;
+  const itemRef = target.itemRefs[0] ?? null;
+  const isBulk = target.itemRefs.length > 1;
+
+  targetRef.current = target;
+
+  const positioning = useMemo(
+    () => ({
+      getAnchorRect: () => {
+        const currentTarget = targetRef.current;
+
+        return { height: 1, width: 1, x: currentTarget.x, y: currentTarget.y };
+      },
+      placement: 'bottom-start' as const,
+    }),
+    []
+  );
+  const handleOpenChange = useCallback(
+    (event: { open: boolean }) => {
+      if (!event.open) {
+        onClose();
+      }
+    },
+    [onClose]
+  );
+
+  if (!item || !itemRef) {
+    return null;
+  }
+
+  return (
+    <Menu.Root lazyMount open positioning={positioning} unmountOnExit onOpenChange={handleOpenChange}>
+      <Portal>
+        <Menu.Positioner>
+          <MenuContent {...MENU_CONTENT_PROPS} maxH="min(28rem, calc(100vh - 2rem))" minW="16rem" overflowY="auto">
+            {isBulk ? (
+              <BulkItemMenuItems
+                actions={actions}
+                boards={boards}
+                itemRefs={target.itemRefs}
+                loadedItems={target.items}
+                primaryItem={item}
+                onRequestDeletion={onRequestDeletion}
+              />
+            ) : (
+              <SingleItemMenuItems
+                actions={actions}
+                boards={boards}
+                item={item}
+                itemRef={itemRef}
+                previewVideoActions={previewVideoActions}
+                onRequestDeletion={onRequestDeletion}
+              />
+            )}
+          </MenuContent>
+        </Menu.Positioner>
+      </Portal>
+    </Menu.Root>
+  );
+};
+
+const SingleItemMenuItems = ({
+  actions,
+  boards,
+  item,
+  itemRef,
+  previewVideoActions,
+  onRequestDeletion,
+}: {
+  actions: ImageActions;
+  boards: GalleryBoard[];
+  item: GalleryItem;
+  itemRef: GalleryItemRef;
+  previewVideoActions?: PreviewVideoContextActions;
+  onRequestDeletion: (itemRefs: GalleryItemRef[]) => void;
+}) => {
+  const { t } = useTranslation();
+  const mediaLabel = item.kind === 'video' ? 'video' : 'item';
+  const handleOpenInNewTab = useCallback(() => actions.openItemInNewTab(item), [actions, item]);
+  const handleDownload = useCallback(() => void actions.downloadItem(item), [actions, item]);
+  const handleOpenPreview = useCallback(() => actions.openItemInPreview(item), [actions, item]);
+  const handleToggleStarred = useCallback(
+    () => void actions.setItemsStarred([itemRef], !item.starred),
+    [actions, item.starred, itemRef]
+  );
+  const handleMove = useCallback(
+    (boardId: string) => void actions.moveItemsToBoard([itemRef], boardId),
+    [actions, itemRef]
+  );
+  const handleDelete = useCallback(() => onRequestDeletion([itemRef]), [itemRef, onRequestDeletion]);
+
+  return (
+    <>
+      <HStack gap="1">
+        <QuickMenuItem
+          icon={ExternalLinkIcon}
+          label="Open in new tab"
+          value="open-in-new-tab"
+          onClick={handleOpenInNewTab}
+        />
+        <QuickMenuItem
+          icon={DownloadIcon}
+          label={`Download ${mediaLabel}`}
+          value="download-item"
+          onClick={handleDownload}
+        />
+        <QuickMenuItem icon={EyeIcon} label="Open in preview" value="open-in-preview" onClick={handleOpenPreview} />
+        <QuickMenuItem
+          icon={StarIcon}
+          label={`${item.starred ? 'Unstar' : 'Star'} ${mediaLabel}`}
+          value="toggle-starred"
+          onClick={handleToggleStarred}
+        />
+      </HStack>
+      <Menu.Separator borderColor="border.subtle" />
+      {item.kind === 'video' && previewVideoActions && previewVideoActions.itemKey === toGalleryItemKey(item) ? (
+        <>
+          <ContextMenuItem
+            disabled={!previewVideoActions.isCopyCurrentFrameAvailable}
+            icon={CopyIcon}
+            label={t('widgets.preview.copyCurrentFrame')}
+            value="copy-current-video-frame"
+            onClick={previewVideoActions.onCopyCurrentFrame}
+          />
+          <ContextMenuItem
+            icon={FileJsonIcon}
+            label={t('widgets.preview.videoDetails')}
+            value="open-video-details"
+            onClick={previewVideoActions.onOpenDetails}
+          />
+          <Menu.Separator borderColor="border.subtle" />
+        </>
+      ) : null}
+      <ChangeBoardSubMenu boards={boards} currentBoardId={item.boardId} onMove={handleMove} />
+      <Menu.Separator borderColor="border.subtle" />
+      <ContextMenuItem
+        color="fg.error"
+        icon={Trash2Icon}
+        label={item.kind === 'video' ? 'Delete Video' : 'Delete Item'}
+        value="delete-item"
+        onClick={handleDelete}
+      />
+    </>
+  );
+};
+
+const BulkItemMenuItems = ({
+  actions,
+  boards,
+  itemRefs,
+  loadedItems,
+  primaryItem,
+  onRequestDeletion,
+}: {
+  actions: ImageActions;
+  boards: GalleryBoard[];
+  itemRefs: GalleryItemRef[];
+  loadedItems: GalleryItem[];
+  primaryItem: GalleryItem;
+  onRequestDeletion: (itemRefs: GalleryItemRef[]) => void;
+}) => {
+  const allStarred = loadedItems.length === itemRefs.length && loadedItems.every((item) => item.starred);
+  const handleOpenInNewTab = useCallback(() => actions.openItemInNewTab(primaryItem), [actions, primaryItem]);
+  const handleOpenPreview = useCallback(() => actions.openItemInPreview(primaryItem), [actions, primaryItem]);
+  const handleToggleStarred = useCallback(
+    () => void actions.setItemsStarred(itemRefs, !allStarred),
+    [actions, allStarred, itemRefs]
+  );
+  const handleDownload = useCallback(
+    () => void actions.downloadItems(itemRefs, loadedItems),
+    [actions, itemRefs, loadedItems]
+  );
+  const handleMove = useCallback(
+    (boardId: string) => void actions.moveItemsToBoard(itemRefs, boardId),
+    [actions, itemRefs]
+  );
+  const handleDelete = useCallback(() => onRequestDeletion(itemRefs), [itemRefs, onRequestDeletion]);
+
+  return (
+    <>
+      <Text color="fg.subtle" fontSize="2xs" fontWeight="700" px="3" py="1.5" textTransform="uppercase">
+        {itemRefs.length} items selected
+      </Text>
+      <Menu.Separator borderColor="border.subtle" />
+      <HStack gap="1">
+        <QuickMenuItem
+          icon={ExternalLinkIcon}
+          label="Open in new tab"
+          value="open-primary-in-new-tab"
+          onClick={handleOpenInNewTab}
+        />
+        <QuickMenuItem
+          icon={EyeIcon}
+          label="Open in preview"
+          value="open-primary-in-preview"
+          onClick={handleOpenPreview}
+        />
+      </HStack>
+      <Menu.Separator borderColor="border.subtle" />
+      <ContextMenuItem
+        icon={StarIcon}
+        label={allStarred ? 'Unstar All' : 'Star All'}
+        value="toggle-starred-all"
+        onClick={handleToggleStarred}
+      />
+      <ContextMenuItem
+        icon={DownloadIcon}
+        label="Download Selection"
+        value="download-selection"
+        onClick={handleDownload}
+      />
+      <ChangeBoardSubMenu boards={boards} currentBoardId={null} onMove={handleMove} />
+      <Menu.Separator borderColor="border.subtle" />
+      <ContextMenuItem
+        color="fg.error"
+        icon={Trash2Icon}
+        label="Delete Selection"
+        value="delete-selection"
+        onClick={handleDelete}
       />
     </>
   );

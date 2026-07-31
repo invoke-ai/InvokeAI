@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from invokeai.app.api.auth_dependencies import AdminUserOrDefault, CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
-from invokeai.app.invocations.fields import ImageField
+from invokeai.app.invocations.fields import ImageField, VideoField
 from invokeai.app.services.session_processor.session_processor_common import SessionProcessorStatus
 from invokeai.app.services.session_queue.session_queue_common import (
     Batch,
@@ -29,6 +29,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
 )
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.video_records.video_records_common import VideoRecordNotFoundException
 
 session_queue_router = APIRouter(prefix="/v1/queue", tags=["queue"])
 
@@ -44,39 +45,63 @@ def _image_record_exists(image_name: str) -> bool:
     return ApiDependencies.invoker.services.image_records.exists(image_name)
 
 
-def strip_missing_image_results(
-    queue_item: SessionQueueItem, image_exists: Callable[[str], bool] | None = None
-) -> SessionQueueItem:
-    """Remove result outputs whose image records have been deleted.
+def _video_record_exists(video_name: str) -> bool:
+    # video_records has no exists() the way image_records does, and widening that ABC would add
+    # divergence from upstream for no gain here — get() already answers the question.
+    try:
+        ApiDependencies.invoker.services.video_records.get(video_name)
+    except VideoRecordNotFoundException:
+        return False
+    return True
 
-    Completed queue history can outlive its output images. API clients hydrate
-    images listed in `session.results`; returning stale names makes them loop on
-    404s. Keep the queue item/history, but do not advertise impossible outputs.
+
+def strip_missing_image_results(
+    queue_item: SessionQueueItem,
+    image_exists: Callable[[str], bool] | None = None,
+    video_exists: Callable[[str], bool] | None = None,
+) -> SessionQueueItem:
+    """Remove result outputs whose image or video records have been deleted.
+
+    Completed queue history can outlive its output media. API clients hydrate
+    images and videos listed in `session.results`; returning stale names makes them
+    loop on 404s. Keep the queue item/history, but do not advertise impossible outputs.
     """
     if not queue_item.session.results:
         return queue_item
 
     image_exists = image_exists or _image_record_exists
+    video_exists = video_exists or _video_record_exists
     filtered_results = {}
     did_filter = False
-    exists_cache: dict[str, bool] = {}
+    image_cache: dict[str, bool] = {}
+    video_cache: dict[str, bool] = {}
 
-    def cached_exists(image_name: str) -> bool:
-        if image_name not in exists_cache:
-            exists_cache[image_name] = image_exists(image_name)
-        return exists_cache[image_name]
+    def is_media_field(item: object) -> bool:
+        return isinstance(item, (ImageField, VideoField))
+
+    def cached_exists(field: ImageField | VideoField) -> bool:
+        if isinstance(field, VideoField):
+            if field.video_name not in video_cache:
+                video_cache[field.video_name] = video_exists(field.video_name)
+            return video_cache[field.video_name]
+        if field.image_name not in image_cache:
+            image_cache[field.image_name] = image_exists(field.image_name)
+        return image_cache[field.image_name]
 
     for node_id, output in queue_item.session.results.items():
         image = getattr(output, "image", None)
-        if isinstance(image, ImageField) and not cached_exists(image.image_name):
+        if isinstance(image, ImageField) and not cached_exists(image):
+            did_filter = True
+            continue
+
+        video = getattr(output, "video", None)
+        if isinstance(video, VideoField) and not cached_exists(video):
             did_filter = True
             continue
 
         collection = getattr(output, "collection", None)
-        if isinstance(collection, list) and any(isinstance(item, ImageField) for item in collection):
-            filtered_collection = [
-                item for item in collection if not isinstance(item, ImageField) or cached_exists(item.image_name)
-            ]
+        if isinstance(collection, list) and any(is_media_field(item) for item in collection):
+            filtered_collection = [item for item in collection if not is_media_field(item) or cached_exists(item)]
             if len(filtered_collection) != len(collection):
                 did_filter = True
                 if len(filtered_collection) == 0:
@@ -142,6 +167,9 @@ def sanitize_queue_item_for_user(
     sanitized_item.error_type = None
     sanitized_item.error_message = None
     sanitized_item.error_traceback = None
+    # Upstream's per-GPU field, redacted for the same reason as origin/destination/priority: a
+    # non-admin has no business knowing where another user's work is placed.
+    sanitized_item.device = None
     sanitized_item.session = GraphExecutionState(
         id="redacted",
         graph=Graph(),
@@ -446,20 +474,16 @@ async def clear(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
 ) -> ClearResult:
-    """Clears the queue entirely. Admin users clear all items; non-admin users only clear their own items. If there's a currently-executing item, users can only cancel it if they own it or are an admin."""
+    """Clears the queue. Admin users clear (and cancel) all items; non-admin users clear only their
+    own items — other users' queued and running items are untouched."""
     try:
-        queue_item = ApiDependencies.invoker.services.session_queue.get_current(queue_id)
-        if queue_item is not None:
-            # Check authorization for canceling the current item
-            if queue_item.user_id != current_user.user_id and not current_user.is_admin:
-                raise HTTPException(
-                    status_code=403, detail="You do not have permission to cancel the currently executing queue item"
-                )
-            ApiDependencies.invoker.services.session_queue.cancel_queue_item(queue_item.item_id)
-        # Admin users can clear all items, non-admin users can only clear their own
+        # The service cancels every in-progress item in scope itself (there can be several
+        # with multiple workers), so there is no per-item authorization to do here: a
+        # non-admin's scope is exactly their own items. The previous single get_current()
+        # check both 403'd users whose arbitrary selected row belonged to someone else and
+        # let a scoped clear interrupt another user's running generation.
         user_id = None if current_user.is_admin else current_user.user_id
-        clear_result = ApiDependencies.invoker.services.session_queue.clear(queue_id, user_id=user_id)
-        return clear_result
+        return ApiDependencies.invoker.services.session_queue.clear(queue_id, user_id=user_id)
     except HTTPException:
         raise
     except Exception as e:

@@ -1,16 +1,17 @@
+import type { GalleryItem } from '@features/gallery/core/items';
 import type { GallerySettings } from '@features/gallery/core/settings';
-import type { GalleryBoard, GalleryImage, GalleryView, GeneratedImageContract } from '@features/gallery/core/types';
+import type { GalleryBoard, GalleryView, GeneratedImageContract } from '@features/gallery/core/types';
 
-import { normalizeGalleryImage } from '@features/gallery/core/image';
+import { compareGalleryItems, legacyGeneratedImageToGalleryItem, toGalleryItemKey } from '@features/gallery/core/items';
 import { GALLERY_RECENT_IMAGE_LIMIT } from '@features/gallery/core/recentImages';
 import { ALL_READABLE_BOARDS_ID, isDateBoardId } from '@features/gallery/data/backend';
 import {
-  flattenGalleryImagesData,
+  flattenGalleryItemsData,
   GALLERY_MAX_ROWS,
   GALLERY_PAGE_SIZE,
   galleryBoardsOptions,
-  galleryImagesInfiniteOptions,
-  type GalleryImagesFilter,
+  galleryItemsInfiniteOptions,
+  type GalleryItemsFilter,
 } from '@features/gallery/data/queries';
 import { parseDateTokens } from '@platform/search/dateTokens';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
@@ -18,9 +19,9 @@ import { useCallback, useMemo } from 'react';
 
 export interface GalleryData {
   boards: GalleryBoard[];
+  filter: GalleryItemsFilter;
   hasMore: boolean;
-  images: GalleryImage[] | null;
-  isLoadingImages: boolean;
+  isLoadingItems: boolean;
   /**
    * True when the infinite window is full *and* the board holds more images
    * than it can reach. `hasMore` is false in that case exactly as it is at the
@@ -29,6 +30,7 @@ export interface GalleryData {
    * user an explanation.
    */
   isWindowTruncated: boolean;
+  items: GalleryItem[] | null;
   loadMore: () => void;
   total: number | null;
 }
@@ -46,7 +48,7 @@ const useGalleryBoards = ({ settings }: { settings: GallerySettings }) => {
   return { boards: query.data ?? [] };
 };
 
-const isRecentImageVisible = (image: GalleryImage, filter: GalleryImagesFilter): boolean => {
+const isRecentItemVisible = (item: GalleryItem, filter: GalleryItemsFilter): boolean => {
   if (
     filter.searchTerm !== '' ||
     filter.createdFrom !== undefined ||
@@ -56,50 +58,45 @@ const isRecentImageVisible = (image: GalleryImage, filter: GalleryImagesFilter):
     return false;
   }
 
-  const hasMatchingBoard = filter.boardId === ALL_READABLE_BOARDS_ID || filter.boardId === image.boardId;
+  const hasMatchingBoard = filter.boardId === ALL_READABLE_BOARDS_ID || filter.boardId === item.boardId;
   const hasMatchingCategory =
-    filter.galleryView === 'images' ? image.imageCategory === 'general' : image.imageCategory !== 'general';
+    filter.galleryView === 'images'
+      ? item.category === 'general'
+      : item.kind === 'image' && item.category !== 'general';
 
   return hasMatchingBoard && hasMatchingCategory;
 };
 
-const compareGalleryImages = (
-  a: GalleryImage,
-  b: GalleryImage,
-  { orderDir = 'DESC', starredFirst = false }: GalleryImagesFilter
-): number => {
-  if (starredFirst && a.starred !== b.starred) {
-    return a.starred ? -1 : 1;
-  }
-
-  const chronologicalOrder = a.queuedAt.localeCompare(b.queuedAt);
-
-  return orderDir === 'ASC' ? chronologicalOrder : -chronologicalOrder;
-};
-
-export const mergeGalleryImageWindow = ({
-  backendImages,
+export const mergeGalleryItemWindow = ({
+  backendItems,
   filter,
   maxRows,
   recentImages,
 }: {
-  backendImages: readonly GalleryImage[];
-  filter: GalleryImagesFilter;
+  backendItems: readonly GalleryItem[];
+  filter: GalleryItemsFilter;
   maxRows: number;
   recentImages: readonly GeneratedImageContract[];
-}): GalleryImage[] => {
-  const backendImageNames = new Set(backendImages.map((image) => image.imageName));
-  const missingRecentImages = recentImages
+}): GalleryItem[] => {
+  const backendItemKeys = new Set(backendItems.map(toGalleryItemKey));
+  const missingRecentItems = recentImages
     .slice(0, GALLERY_RECENT_IMAGE_LIMIT)
-    .map((image) => normalizeGalleryImage(image))
-    .filter((image) => !backendImageNames.has(image.imageName) && isRecentImageVisible(image, filter));
+    .map(legacyGeneratedImageToGalleryItem)
+    .filter((item) => !backendItemKeys.has(toGalleryItemKey(item)) && isRecentItemVisible(item, filter));
+  const seenItemKeys = new Set<string>();
 
-  if (missingRecentImages.length === 0) {
-    return backendImages.length <= maxRows ? (backendImages as GalleryImage[]) : backendImages.slice(0, maxRows);
-  }
+  return [...missingRecentItems, ...backendItems]
+    .filter((item) => {
+      const key = toGalleryItemKey(item);
 
-  return [...missingRecentImages, ...backendImages]
-    .sort((a, b) => compareGalleryImages(a, b, filter))
+      if (seenItemKeys.has(key)) {
+        return false;
+      }
+
+      seenItemKeys.add(key);
+      return true;
+    })
+    .sort((a, b) => compareGalleryItems(a, b, filter))
     .slice(0, maxRows);
 };
 
@@ -146,7 +143,7 @@ export const useGalleryData = ({
     boards.length === 0 || boards.some((board) => board.id === selectedBoardId) ? selectedBoardId : 'none';
   const isPaginated = settings.paginationMode === 'paginated';
   const dateParse = useMemo(() => parseDateTokens(searchTerm), [searchTerm]);
-  const filter = useMemo<GalleryImagesFilter>(
+  const filter = useMemo<GalleryItemsFilter>(
     () => ({
       boardId,
       createdFrom: dateParse.range?.from,
@@ -173,41 +170,41 @@ export const useGalleryData = ({
     isFetching,
     isFetchingNextPage,
   } = useInfiniteQuery(
-    galleryImagesInfiniteOptions(
+    galleryItemsInfiniteOptions(
       filter,
       isPaginated ? { kind: 'anchor', offset: page * GALLERY_PAGE_SIZE } : { kind: 'infinite' }
     )
   );
-  const backendImages = useMemo(() => {
+  const backendItems = useMemo(() => {
     if (!isPaginated) {
-      return flattenGalleryImagesData(queryData);
+      return flattenGalleryItemsData(queryData);
     }
 
     const pageOffset = page * GALLERY_PAGE_SIZE;
     const pageIndex = queryData?.pageParams.indexOf(pageOffset) ?? -1;
 
-    return pageIndex === -1 ? [] : (queryData?.pages[pageIndex]?.images ?? []).slice(0, GALLERY_PAGE_SIZE);
+    return pageIndex === -1 ? [] : (queryData?.pages[pageIndex]?.items ?? []).slice(0, GALLERY_PAGE_SIZE);
   }, [isPaginated, page, queryData]);
-  const shouldOverlayRecentImages = !isPaginated;
+  const shouldOverlayRecentItems = !isPaginated;
   const maxRows = isPaginated ? GALLERY_PAGE_SIZE : GALLERY_MAX_ROWS;
-  const images = useMemo(
+  const items = useMemo(
     () =>
-      queryData || (shouldOverlayRecentImages && recentImages.length > 0)
-        ? mergeGalleryImageWindow({
-            backendImages,
+      queryData || (shouldOverlayRecentItems && recentImages.length > 0)
+        ? mergeGalleryItemWindow({
+            backendItems,
             filter,
             maxRows,
-            recentImages: shouldOverlayRecentImages ? recentImages : [],
+            recentImages: shouldOverlayRecentItems ? recentImages : [],
           })
         : null,
-    [backendImages, filter, maxRows, queryData, recentImages, shouldOverlayRecentImages]
+    [backendItems, filter, maxRows, queryData, recentImages, shouldOverlayRecentItems]
   );
   const total = queryData?.pages[0]?.total ?? null;
   const hasMore = !isPaginated && Boolean(hasNextPage);
   const isWindowTruncated = isGalleryWindowTruncated({
     hasNextPage: Boolean(hasNextPage),
     isPaginated,
-    loadedRowCount: backendImages.length,
+    loadedRowCount: backendItems.length,
     maxRows,
     total,
   });
@@ -219,5 +216,5 @@ export const useGalleryData = ({
     void fetchNextPage();
   }, [fetchNextPage, hasMore, isFetchingNextPage]);
 
-  return { boards, hasMore, images, isLoadingImages: isFetching, isWindowTruncated, loadMore, total };
+  return { boards, filter, hasMore, isLoadingItems: isFetching, isWindowTruncated, items, loadMore, total };
 };

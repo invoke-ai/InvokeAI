@@ -63,7 +63,10 @@ export type KnownGenerationModelBase =
   | 'cogview4'
   | 'qwen-image'
   | 'z-image'
+  | 'ideogram-4'
+  | 'krea-2'
   | 'anima'
+  | 'wan'
   | 'external'
   | 'any'
   | 'unknown';

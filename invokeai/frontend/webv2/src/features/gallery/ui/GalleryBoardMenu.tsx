@@ -141,7 +141,7 @@ export const GalleryBoardMenu = ({
           <Menu.Positioner>
             {board && (
               <Menu.Content minW="12rem" py="1" px={MENU_CONTENT_PADDING_X}>
-                <BoardDownloadMenuItem boardId={board.id} />
+                <BoardDownloadMenuItem board={board} />
                 {isManagedBoard && (
                   <>
                     <BoardRenameMenuItem board={board} onRename={setRenameTarget} onRenameValue={setRenameValue} />
@@ -207,8 +207,9 @@ export const GalleryBoardMenu = ({
                   </Text>
                   <Text color="fg.subtle" fontSize="2xs">
                     {t('widgets.gallery.boardItemCounts', {
-                      assets: deleteTarget?.assetCount ?? 0,
-                      images: deleteTarget?.imageCount ?? 0,
+                      assets: t('widgets.gallery.assetCount', { count: deleteTarget?.assetCount ?? 0 }),
+                      images: t('widgets.gallery.imageCount', { count: deleteTarget?.imageCount ?? 0 }),
+                      videos: t('widgets.gallery.videoCount', { count: deleteTarget?.videoCount ?? 0 }),
                     })}
                   </Text>
                 </Stack>
@@ -221,7 +222,7 @@ export const GalleryBoardMenu = ({
                   {t('widgets.gallery.deleteBoardOnly')}
                 </Button>
                 <Button colorPalette="red" size="xs" onClick={handleDeleteBoardAndImages}>
-                  {t('widgets.gallery.deleteBoardAndImages')}
+                  {t('widgets.gallery.deleteBoardAndMedia')}
                 </Button>
               </Dialog.Footer>
             </Dialog.Content>
@@ -232,15 +233,15 @@ export const GalleryBoardMenu = ({
   );
 };
 
-const BoardDownloadMenuItem = ({ boardId }: { boardId: string }) => {
+const BoardDownloadMenuItem = ({ board }: { board: GalleryBoard }) => {
   const { t } = useTranslation();
   const { actions } = useGalleryWidget();
-  const handleClick = useCallback(() => void actions.downloadBoard(boardId), [actions, boardId]);
+  const handleClick = useCallback(() => void actions.downloadBoard(board.id), [actions, board.id]);
 
   return (
     <BoardMenuItem
       icon={DownloadIcon}
-      label={t('widgets.gallery.downloadBoard')}
+      label={t('widgets.gallery.downloadBoardWithOmission', { count: board.videoCount })}
       value="download-board"
       onClick={handleClick}
     />

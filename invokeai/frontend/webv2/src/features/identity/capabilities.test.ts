@@ -18,6 +18,7 @@ const session = (overrides: Partial<AuthSession>): AuthSession => ({
 describe('Identity route capabilities', () => {
   it.each(['unknown', 'unavailable'] as const)('grants nothing while auth mode is %s', (phase) => {
     expect(getCapabilities(session({ multiuserEnabled: false, phase }))).toEqual({
+      canManageAppConfig: false,
       canManageModels: false,
       canManageNodes: false,
       canManagePromptTemplates: false,
@@ -27,6 +28,7 @@ describe('Identity route capabilities', () => {
 
   it('allows all local management in single-user mode', () => {
     expect(getCapabilities(session({ multiuserEnabled: false }))).toEqual({
+      canManageAppConfig: true,
       canManageModels: true,
       canManageNodes: true,
       canManagePromptTemplates: true,
@@ -46,12 +48,14 @@ describe('Identity route capabilities', () => {
     };
 
     expect(getCapabilities(session({ user: { ...baseUser, is_admin: false } }))).toEqual({
+      canManageAppConfig: false,
       canManageModels: false,
       canManageNodes: false,
       canManagePromptTemplates: false,
       canManageUsers: false,
     });
     expect(getCapabilities(session({ user: { ...baseUser, is_admin: true } }))).toEqual({
+      canManageAppConfig: true,
       canManageModels: true,
       canManageNodes: true,
       canManagePromptTemplates: true,

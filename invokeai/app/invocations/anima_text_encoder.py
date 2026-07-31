@@ -14,7 +14,7 @@ Key differences from Z-Image text encoder:
 """
 
 from contextlib import ExitStack
-from typing import Iterator, Tuple
+from typing import Iterator
 
 import torch
 from transformers import PreTrainedModel, PreTrainedTokenizerBase
@@ -31,14 +31,14 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import Qwen3EncoderField
 from invokeai.app.invocations.primitives import AnimaConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.anima.t5_tokenizer import load_bundled_t5_tokenizer
-from invokeai.backend.patches.layer_patcher import LayerPatcher
+from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.anima_lora_constants import ANIMA_LORA_QWEN3_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     AnimaConditioningInfo,
     ConditioningFieldData,
 )
+from invokeai.backend.t5.t5_tokenizer import load_bundled_t5_tokenizer
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 
@@ -59,6 +59,7 @@ QWEN3_MAX_SEQ_LEN = 8192
     category="conditioning",
     version="1.4.0",
     classification=Classification.Prototype,
+    idle_gpu_offloadable=True,
 )
 class AnimaTextEncoderInvocation(BaseInvocation):
     """Encodes and preps a prompt for an Anima image.
@@ -125,7 +126,10 @@ class AnimaTextEncoderInvocation(BaseInvocation):
             (_, text_encoder) = exit_stack.enter_context(text_encoder_info.model_on_device())
             (_, tokenizer) = exit_stack.enter_context(tokenizer_info.model_on_device())
 
-            device = text_encoder.device
+            # Use the encoder's intended compute device, not its current parameter residency: partial loading may
+            # have temporarily offloaded all weights to RAM, which would wrongly run the whole encode on the CPU (see
+            # #9373). Qwen3 is fully autocast-capable, so nothing pins it to the compute device otherwise.
+            device = text_encoder_info.compute_device
 
             # Apply LoRA models to the text encoder
             lora_dtype = TorchDevice.choose_anima_inference_dtype(device)
@@ -203,7 +207,7 @@ class AnimaTextEncoderInvocation(BaseInvocation):
 
         return qwen3_embeds, t5xxl_ids, None
 
-    def _lora_iterator(self, context: InvocationContext) -> Iterator[Tuple[ModelPatchRaw, float]]:
+    def _lora_iterator(self, context: InvocationContext) -> Iterator[PatchSpec]:
         """Iterate over LoRA models to apply to the Qwen3 text encoder."""
         for lora in self.qwen3_encoder.loras:
             lora_info = context.models.load(lora.lora)
@@ -212,5 +216,4 @@ class AnimaTextEncoderInvocation(BaseInvocation):
                     f"Expected ModelPatchRaw for LoRA '{lora.lora.key}', got {type(lora_info.model).__name__}. "
                     "The LoRA model may be corrupted or incompatible."
                 )
-            yield (lora_info.model, lora.weight)
-            del lora_info
+            yield (lora_info.model, lora.weight, lora_info.model_in_ram())

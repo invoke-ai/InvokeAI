@@ -1,9 +1,11 @@
 import { getBoundedRecentImages } from '@features/gallery/core/recentImages';
 import { getGallerySettings } from '@features/gallery/core/settings';
-import { GALLERY_PAGE_SIZE } from '@features/gallery/data/queries';
+import { GALLERY_PAGE_SIZE, galleryItemNamesOptions } from '@features/gallery/data/queries';
 import { StatusWidgetChip } from '@platform/ui';
+import { useQueryClient } from '@tanstack/react-query';
 import { ImageIcon } from 'lucide-react';
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import type { GalleryStateView } from './galleryStateView';
 
@@ -18,8 +20,9 @@ import {
   getGalleryView,
 } from './galleryStateView';
 import {
-  useGalleryImageActions,
+  useGalleryItemActions,
   useGalleryUi,
+  type GalleryItemActionContext,
   type GalleryWidgetProps,
   type GalleryWidgetRuntime,
 } from './GalleryUiContext';
@@ -38,6 +41,18 @@ export const shouldPublishGalleryTotal = ({
 }): boolean =>
   typeof total === 'number' && Number.isFinite(total) && total !== knownTotalImages && total !== lastPublishedTotal;
 
+export const GalleryStatusChip = ({ count }: { count: number }) => {
+  const { t } = useTranslation();
+
+  return (
+    <StatusWidgetChip icon={ImageIcon}>
+      {t('widgets.gallery.statusChip', {
+        count,
+      })}
+    </StatusWidgetChip>
+  );
+};
+
 export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidgetProps) => {
   const {
     gallery: galleryCommands,
@@ -48,7 +63,7 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
     projectId,
     projectName,
     queueItems,
-    ImageActionsProvider,
+    ItemActionsProvider,
   } = useGalleryUi();
   const galleryView = getGalleryView(galleryValues);
   const searchTerm = getGallerySearchTerm(galleryValues);
@@ -56,6 +71,7 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
   const page = getGalleryPage(galleryValues);
   const knownTotalImages = getGalleryTotalImages(galleryValues);
   const settings = getGallerySettings(galleryValues);
+  const queryClient = useQueryClient();
   const data = useGalleryData({
     galleryView,
     page,
@@ -70,48 +86,49 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
   const gallery = getGalleryStateView(
     galleryValues,
     data.boards,
-    data.images,
-    data.isLoadingImages,
+    data.items,
+    data.isLoadingItems,
     queueItems,
     liveFollowEnabled,
     liveProgressTarget
   );
-
   const lastPublishedTotalRef = useRef<number | null>(null);
+  const itemActionFilterIdentity = useMemo(() => JSON.stringify(data.filter), [data.filter]);
+  const loadOrderedItemRefs = useCallback(
+    async (signal: AbortSignal) => {
+      signal.throwIfAborted();
+      const result = await queryClient.fetchQuery(galleryItemNamesOptions(data.filter));
 
-  // After a deletion that takes out the previewed image, move the selection to
-  // the image that now occupies the old index, else the one before it.
-  const onImagesDeleted = useCallback(
-    (imageNames: string[]) => {
-      const deletedNames = new Set(imageNames);
-      const images = gallery.images;
-      const anchorName = gallery.selectedImageName;
-
-      if (!anchorName || !deletedNames.has(anchorName)) {
-        return;
-      }
-
-      const anchorIndex = images.findIndex((image) => image.imageName === anchorName);
-
-      if (anchorIndex === -1) {
-        return;
-      }
-
-      const remaining = images.filter((image) => !deletedNames.has(image.imageName));
-      const remainingBeforeAnchor = images
-        .slice(0, anchorIndex)
-        .filter((image) => !deletedNames.has(image.imageName)).length;
-      const nextImage = remaining[remainingBeforeAnchor] ?? remaining[remainingBeforeAnchor - 1] ?? null;
-
-      if (nextImage) {
-        galleryCommands.selectImage(nextImage);
-      }
+      signal.throwIfAborted();
+      return result.items;
     },
-    [gallery.images, gallery.selectedImageName, galleryCommands]
+    [data.filter, queryClient]
   );
+  const itemActionContextRef = useRef<GalleryItemActionContext | null>(null);
+  const galleryLocationRef = useRef({ galleryView, selectedBoardId });
+
+  // This ref is a live read port for an in-flight deletion. An effect would
+  // leave a commit-sized stale window, while the action must compare against
+  // the exact filter and selection from the latest render.
+  // eslint-disable-next-line react/react-compiler
+  itemActionContextRef.current = {
+    filterIdentity: itemActionFilterIdentity,
+    items: gallery.items,
+    loadOrderedRefs: loadOrderedItemRefs,
+    selectedItemKey: gallery.selectedItemKey,
+  };
+  // This is the matching live read port for in-flight uploads. The upload
+  // target is captured at launch, while completion visibility must use the
+  // board and view from the latest render.
+  // eslint-disable-next-line react/react-compiler
+  galleryLocationRef.current = { galleryView, selectedBoardId };
+
+  const getItemActionContext = useCallback(() => itemActionContextRef.current, []);
+  const getCurrentGalleryLocation = useCallback(() => galleryLocationRef.current, []);
 
   const actions = useGalleryActions({
     boards: data.boards,
+    getCurrentGalleryLocation,
     loadMore,
     projectBoardId: getGalleryProjectBoardId(galleryValues),
     projectName,
@@ -161,15 +178,15 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
   }, [galleryCommands, page, settings.paginationMode, total]);
 
   if (region === 'bottom' && presentation !== 'expanded') {
-    return <StatusWidgetChip icon={ImageIcon}>Gallery: {total ?? gallery.images.length}</StatusWidgetChip>;
+    return <GalleryStatusChip count={total ?? gallery.items.length} />;
   }
 
   return (
-    <ImageActionsProvider
+    <ItemActionsProvider
       boards={data.boards}
       generateValues={generateValues}
+      getItemActionContext={getItemActionContext}
       projectId={projectId}
-      onImagesDeleted={onImagesDeleted}
     >
       <GalleryWidgetContent
         actions={actions}
@@ -179,7 +196,7 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
         projectName={projectName}
         runtime={runtime}
       />
-    </ImageActionsProvider>
+    </ItemActionsProvider>
   );
 };
 
@@ -198,10 +215,10 @@ const GalleryWidgetContent = ({
   projectName: string;
   runtime: GalleryWidgetRuntime;
 }) => {
-  const imageActions = useGalleryImageActions();
+  const itemActions = useGalleryItemActions();
   const contextValue = useMemo<GalleryWidgetContextValue>(
-    () => ({ actions, gallery, imageActions, isWindowTruncated, projectName, runtime }),
-    [actions, gallery, imageActions, isWindowTruncated, projectName, runtime]
+    () => ({ actions, gallery, isWindowTruncated, itemActions, projectName, runtime }),
+    [actions, gallery, isWindowTruncated, itemActions, projectName, runtime]
   );
 
   return (

@@ -34,7 +34,12 @@ const getComponentPolicyContext = (model: GenerateModelConfig, settings: Generat
     componentSourceModel: settings.componentSourceModel,
     qwen3EncoderModel: settings.qwen3EncoderModel,
     qwenVLEncoderModel: settings.qwenVLEncoderModel,
+    qwen3VLEncoderModel: settings.qwen3VLEncoderModel,
+    wanT5EncoderModel: settings.wanT5EncoderModel,
+    wanLowNoiseModel: settings.wanLowNoiseModel,
     t5EncoderModel: settings.t5EncoderModel,
+    pidDecoderModel: settings.pidDecoderModel,
+    gemma2EncoderModel: settings.gemma2EncoderModel,
     vae: settings.vae,
   },
 });

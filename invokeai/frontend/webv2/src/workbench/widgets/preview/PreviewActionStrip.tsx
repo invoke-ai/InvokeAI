@@ -1,10 +1,20 @@
-import type { GalleryImage } from '@features/gallery';
+import type { GalleryItem } from '@features/gallery';
 import type { ImageActions } from '@workbench/image-actions';
 
 import { HStack, Icon } from '@chakra-ui/react';
+import { galleryImageItemToGalleryImage, isGalleryImageItem, toGalleryItemRef } from '@features/gallery/contracts';
 import { IconButton, Tooltip } from '@platform/ui';
-import { CopyIcon, DownloadIcon, EllipsisVerticalIcon, ImagesIcon, StarIcon, type LucideIcon } from 'lucide-react';
+import {
+  CopyIcon,
+  DownloadIcon,
+  EllipsisVerticalIcon,
+  FileJsonIcon,
+  ImagesIcon,
+  StarIcon,
+  type LucideIcon,
+} from 'lucide-react';
 import { useCallback, type MouseEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import type { PreviewDensity } from './previewDensity';
 
@@ -18,22 +28,32 @@ import type { PreviewDensity } from './previewDensity';
 export const PreviewActionStrip = ({
   actions,
   density,
-  image,
+  isVideoFrameCopyAvailable = false,
+  item,
+  onCopyCurrentFrame,
+  onOpenDetails,
   onOpenMenu,
 }: {
   actions: ImageActions;
   density: PreviewDensity;
-  image: GalleryImage;
+  isVideoFrameCopyAvailable?: boolean;
+  item: GalleryItem;
+  onCopyCurrentFrame?: () => void;
+  onOpenDetails?: () => void;
   /** Opens the view's image context menu at viewport coordinates. */
   onOpenMenu: ((x: number, y: number) => void) | null;
 }) => {
+  const { t } = useTranslation();
+  const image = isGalleryImageItem(item) ? galleryImageItemToGalleryImage(item) : null;
   const toggleStar = useCallback(
-    () => void actions.setImagesStarred([image.imageName], !image.starred),
-    [actions, image.imageName, image.starred]
+    () => void actions.setItemsStarred([toGalleryItemRef(item)], !item.starred),
+    [actions, item]
   );
-  const selectForCompare = useCallback(() => actions.selectForCompare(image), [actions, image]);
-  const copyImage = useCallback(() => void actions.copyImage(image), [actions, image]);
-  const downloadImage = useCallback(() => void actions.downloadImage(image), [actions, image]);
+  const selectForCompare = useCallback(() => image && actions.selectForCompare(image), [actions, image]);
+  const copyImage = useCallback(() => image && void actions.copyImage(image), [actions, image]);
+  const copyCurrentFrame = useCallback(() => onCopyCurrentFrame?.(), [onCopyCurrentFrame]);
+  const openDetails = useCallback(() => onOpenDetails?.(), [onOpenDetails]);
+  const downloadItem = useCallback(() => void actions.downloadItem(item), [actions, item]);
   const openMenu = useCallback(
     (event: MouseEvent<HTMLButtonElement>) => {
       const rect = event.currentTarget.getBoundingClientRect();
@@ -42,11 +62,12 @@ export const PreviewActionStrip = ({
     },
     [onOpenMenu]
   );
-  const starLabel = image.starred ? 'Unstar image' : 'Star image';
+  const itemKindLabel = item.kind === 'video' ? 'video' : 'image';
+  const starLabel = `${item.starred ? 'Unstar' : 'Star'} ${itemKindLabel}`;
   const starButton = (
     <Tooltip content={starLabel}>
       <IconButton aria-label={starLabel} color="fg.muted" size="2xs" variant="ghost" onClick={toggleStar}>
-        <Icon as={StarIcon} boxSize="3.5" fill={image.starred ? 'currentColor' : 'none'} />
+        <Icon as={StarIcon} boxSize="3.5" fill={item.starred ? 'currentColor' : 'none'} />
       </IconButton>
     </Tooltip>
   );
@@ -70,17 +91,38 @@ export const PreviewActionStrip = ({
   return (
     <HStack flexShrink={0} gap="0.5">
       {starButton}
-      <StripIconButton icon={ImagesIcon} label="Select for Compare" onClick={selectForCompare} />
-      <StripIconButton icon={CopyIcon} label="Copy to clipboard" onClick={copyImage} />
-      <StripIconButton icon={DownloadIcon} label="Download image" onClick={downloadImage} />
+      {image ? <StripIconButton icon={ImagesIcon} label="Select for Compare" onClick={selectForCompare} /> : null}
+      {image ? <StripIconButton icon={CopyIcon} label="Copy to clipboard" onClick={copyImage} /> : null}
+      {item.kind === 'video' && onCopyCurrentFrame ? (
+        <StripIconButton
+          disabled={!isVideoFrameCopyAvailable}
+          icon={CopyIcon}
+          label={t('widgets.preview.copyCurrentFrame')}
+          onClick={copyCurrentFrame}
+        />
+      ) : null}
+      {item.kind === 'video' && onOpenDetails ? (
+        <StripIconButton icon={FileJsonIcon} label={t('widgets.preview.videoDetails')} onClick={openDetails} />
+      ) : null}
+      <StripIconButton icon={DownloadIcon} label={`Download ${itemKindLabel}`} onClick={downloadItem} />
       {menuButton}
     </HStack>
   );
 };
 
-const StripIconButton = ({ icon, label, onClick }: { icon: LucideIcon; label: string; onClick: () => void }) => (
+const StripIconButton = ({
+  disabled,
+  icon,
+  label,
+  onClick,
+}: {
+  disabled?: boolean;
+  icon: LucideIcon;
+  label: string;
+  onClick: () => void;
+}) => (
   <Tooltip content={label}>
-    <IconButton aria-label={label} color="fg.muted" size="2xs" variant="ghost" onClick={onClick}>
+    <IconButton aria-label={label} color="fg.muted" disabled={disabled} size="2xs" variant="ghost" onClick={onClick}>
       <Icon as={icon} boxSize="3.5" />
     </IconButton>
   </Tooltip>

@@ -1,5 +1,5 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
-import type { AnyModelDefaultSettings, ModelConfig, ModelTaxonomyType } from '@features/models/core/types';
+import type { ModelConfig } from '@features/models/core/types';
 
 import { DataList, HStack, Icon, Menu, Portal, Separator, Stack, Text } from '@chakra-ui/react';
 import { isConvertibleToDiffusers } from '@features/models/core/baseIdentity';
@@ -13,7 +13,7 @@ import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SiHuggingface } from 'react-icons/si';
 
-import { DefaultSettingsSection, supportsDefaultSettings } from './DefaultSettingsSection';
+import { DefaultSettingsSection, supportsDefaultSettings, type DefaultSettingsModel } from './DefaultSettingsSection';
 import { MissingFileBadge, ModelBaseBadge, ModelFormatBadge } from './ModelBadges';
 import { ModelEditForm } from './ModelEditForm';
 import { ModelImageUpload } from './ModelImageUpload';
@@ -27,7 +27,6 @@ const RELATED_MODEL_TYPES = new Set(['main', 'lora']);
 const EMPTY_TRIGGER_PHRASES: readonly string[] = [];
 
 type ModelDetailShellModel = Pick<ModelConfig, 'key' | 'type'>;
-type DefaultSettingsModel = { default_settings?: AnyModelDefaultSettings | null; key: string; type: ModelTaxonomyType };
 type TriggerPhrasesModel = Pick<ModelConfig, 'key' | 'trigger_phrases'>;
 type VaeCpuOnlyModel = Pick<ModelConfig, 'cpu_only' | 'key' | 'name' | 'type'>;
 type ModelIdentityModel = Pick<
@@ -83,7 +82,10 @@ const selectModelIdentity = (models: readonly ModelConfig[], modelKey: string): 
 const selectDefaultSettingsModel = (models: readonly ModelConfig[], modelKey: string): DefaultSettingsModel | null => {
   const model = findModel(models, modelKey);
 
-  return model ? { default_settings: model.default_settings, key: model.key, type: model.type } : null;
+  // `base` is projected too: the FP8 storage default is unavailable for Z-Image.
+  return model
+    ? { base: model.base, default_settings: model.default_settings, key: model.key, type: model.type }
+    : null;
 };
 
 const selectTriggerPhrasesModel = (models: readonly ModelConfig[], modelKey: string): TriggerPhrasesModel | null => {

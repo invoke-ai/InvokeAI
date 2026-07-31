@@ -72,6 +72,18 @@ export const login = (request: LoginRequest, signal?: AbortSignal): Promise<Logi
 export const logout = (): Promise<{ success: boolean }> =>
   apiFetchJson<{ success: boolean }>(`${AUTH_BASE}/logout`, { method: 'POST' });
 
+/**
+ * Re-issues the HttpOnly cookie that authenticates `<img>` / `<video>` media requests.
+ *
+ * Login sets the cookie, but a session restored from stored-token state has a valid JWT and
+ * no cookie — it may predate the cookie, or the cookie may have been cleared while the token
+ * survived. Media elements cannot send an Authorization header, so such a session loads every
+ * other API call fine while showing blank thumbnails. In single-user mode the backend returns
+ * success without setting anything, so this is a safe no-op there.
+ */
+export const refreshMediaCookie = (signal?: AbortSignal): Promise<{ success: boolean }> =>
+  apiFetchJson<{ success: boolean }>(`${AUTH_BASE}/media-cookie`, { method: 'POST', signal });
+
 export const getCurrentUser = (): Promise<UserDTO> => apiFetchJson<UserDTO>(`${AUTH_BASE}/me`);
 
 export const setupAdmin = (request: SetupRequest): Promise<{ success: boolean; user: UserDTO }> =>

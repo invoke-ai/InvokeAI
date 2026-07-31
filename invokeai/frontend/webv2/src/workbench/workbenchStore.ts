@@ -1,6 +1,11 @@
 import type { ProjectGraphAction } from '@features/workflow/utility';
 import type { Project, WorkbenchState } from '@workbench/projectContracts';
 
+import {
+  legacyGeneratedImageToGalleryItem,
+  type GalleryImage,
+  type GeneratedImageContract,
+} from '@features/gallery/contracts';
 import { createExternalStore } from '@platform/state/externalStore';
 
 import type { CanvasEditIntent } from './autoRoutePolicy';
@@ -79,45 +84,85 @@ const createCommands = (dispatch: WorkbenchDispatch, getState: () => WorkbenchSt
       appendStagingCandidate: command('appendCanvasStagingCandidate'),
     },
     gallery: {
-      patchImages: command(
-        'patchGalleryImages',
-        (imageNames: string[], changes: ActionPayload<'patchGalleryImages'>['changes']) => ({
+      patchItems: command(
+        'patchGalleryItems',
+        (
+          itemKeys: ActionPayload<'patchGalleryItems'>['itemKeys'],
+          changes: ActionPayload<'patchGalleryItems'>['changes']
+        ) => ({
           changes,
-          imageNames,
+          itemKeys,
         })
       ),
-      removeImages: command('removeGalleryImages', (imageNames: string[]) => ({ imageNames })),
-      reconcileDeletedBoard: command('reconcileDeletedGalleryBoard', (boardId: string, includeImages: boolean) => ({
-        boardId,
-        includeImages,
+      removeItems: command('removeGalleryItems', (itemKeys: ActionPayload<'removeGalleryItems'>['itemKeys']) => ({
+        itemKeys,
       })),
-      selectBoard: command('selectGalleryBoard', (boardId: string, projectId?: string) => ({ boardId, projectId })),
-      selectImage: command(
-        'selectGalleryImage',
+      reconcileDeletedBoardOutcome: command(
+        'reconcileDeletedGalleryBoard',
+        (outcome: ActionPayload<'reconcileDeletedGalleryBoard'>['outcome']) => ({ outcome })
+      ),
+      selectItem: command(
+        'selectGalleryItem',
         (
-          image: ActionPayload<'selectGalleryImage'>['image'],
+          item: ActionPayload<'selectGalleryItem'>['item'],
           projectId?: string,
           selectionPage?: number,
           preserveNavigationQuery?: boolean
         ) => ({
-          image,
+          item,
           preserveNavigationQuery,
           projectId,
           selectionPage,
         })
       ),
-      setCompareImage: command(
+      setCompareItem: command(
         'setGalleryCompareImage',
         (image: ActionPayload<'setGalleryCompareImage'>['image'], projectId?: string) => ({ image, projectId })
       ),
-      setMultiSelection: command(
+      setItemMultiSelection: command(
         'setGalleryMultiSelection',
         (
-          imageNames: string[],
-          primaryImage: ActionPayload<'setGalleryMultiSelection'>['primaryImage'],
+          itemKeys: ActionPayload<'setGalleryMultiSelection'>['itemKeys'],
+          primaryItem: ActionPayload<'setGalleryMultiSelection'>['primaryItem'],
           projectId?: string
-        ) => ({ imageNames, primaryImage, projectId })
+        ) => ({ itemKeys, primaryItem, projectId })
       ),
+      toggleItemSelection: command(
+        'toggleGalleryItemInSelection',
+        (
+          item: ActionPayload<'toggleGalleryItemInSelection'>['item'],
+          nextPrimaryItem: ActionPayload<'toggleGalleryItemInSelection'>['nextPrimaryItem'],
+          projectId?: string
+        ) => ({
+          item,
+          nextPrimaryItem,
+          projectId,
+        })
+      ),
+      /**
+       * TODO(Task 6/8): Remove after Gallery Grid, Preview, and the image
+       * command palette dispatch canonical items.
+       */
+      selectImage: (
+        image: GeneratedImageContract & Partial<GalleryImage>,
+        projectId?: string,
+        selectionPage?: number,
+        preserveNavigationQuery?: boolean
+      ): void =>
+        dispatch({
+          item: legacyGeneratedImageToGalleryItem(image),
+          preserveNavigationQuery,
+          projectId,
+          selectionPage,
+          type: 'selectGalleryItem',
+        }),
+      setCompareImage: (image: (GeneratedImageContract & Partial<GalleryImage>) | null, projectId?: string): void =>
+        dispatch({
+          image: image ? legacyGeneratedImageToGalleryItem(image) : null,
+          projectId,
+          type: 'setGalleryCompareImage',
+        }),
+      selectBoard: command('selectGalleryBoard', (boardId: string, projectId?: string) => ({ boardId, projectId })),
       setPage: command('setGalleryPage', (page: number, projectId?: string) => ({ page, projectId })),
       setPageInfo: command('setGalleryPageInfo', (totalImages: number, projectId?: string) => ({
         projectId,
@@ -135,13 +180,6 @@ const createCommands = (dispatch: WorkbenchDispatch, getState: () => WorkbenchSt
         'setGalleryView',
         (galleryView: ActionPayload<'setGalleryView'>['galleryView'], projectId?: string) => ({
           galleryView,
-          projectId,
-        })
-      ),
-      toggleImageSelection: command(
-        'toggleGalleryImageInSelection',
-        (image: ActionPayload<'toggleGalleryImageInSelection'>['image'], projectId?: string) => ({
-          image,
           projectId,
         })
       ),

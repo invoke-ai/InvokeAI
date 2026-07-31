@@ -3,9 +3,10 @@ import type { GenerateModelConfig, GenerateSettings } from '@features/generation
 
 import { Badge, createListCollection, HStack, Stack, Switch } from '@chakra-ui/react';
 import { getDefaultGenerateSettings, getGenerationUiPolicy } from '@features/generation/core/baseGenerationPolicies';
+import { isPidMode, MAX_PID_STEPS, MIN_PID_STEPS } from '@features/generation/core/pid';
 import { isVaeModelConfig } from '@features/generation/core/settings';
 import { Field, Select } from '@platform/ui';
-import { useId } from 'react';
+import { useId, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { GenerationModelSelect as ModelSelect } from './GenerationUiContext';
@@ -67,6 +68,23 @@ export const GenerateAdvancedFields = ({
   const modelBase = selectedModel?.base;
   const modelDefaults = selectedModel ? getDefaultGenerateSettings(selectedModel) : null;
   const policy = getGenerationUiPolicy(selectedModel, settings);
+  const pidHelpText =
+    settings.pidMode === 'fit'
+      ? t('widgets.generate.pidFitHelp')
+      : settings.pidMode === 'native'
+        ? t('widgets.generate.pidNativeHelp')
+        : t('widgets.generate.pidHelp');
+  const pidModeCollection = useMemo(
+    () =>
+      createListCollection({
+        items: [
+          { label: t('widgets.generate.pidOff'), value: 'off' },
+          { label: t('widgets.generate.pidFit'), value: 'fit' },
+          { label: t('widgets.generate.pidNative'), value: 'native' },
+        ],
+      }),
+    [t]
+  );
   const clipSkipMax = policy.clipSkipMax ?? 0;
 
   const updateNumber = (key: 'cfgRescaleMultiplier' | 'clipSkip', max: number) => (value: number) => {
@@ -211,6 +229,40 @@ export const GenerateAdvancedFields = ({
             </Switch.Control>
           </Switch.Root>
         </Field>
+      ) : null}
+
+      {policy.pidVisible ? (
+        <HStack alignItems="flex-start" gap="2" p="2">
+          <Field flex="2" label={t('widgets.generate.pid')} helpText={pidHelpText}>
+            <Select
+              aria-label={t('widgets.generate.pid')}
+              collection={pidModeCollection}
+              size="xs"
+              value={[settings.pidMode]}
+              onValueChange={({ value }) => {
+                const mode = value[0];
+
+                if (isPidMode(mode)) {
+                  // Committed immediately: switching to or from native changes the dimension
+                  // grid, and a debounced write would let a now-invalid size linger.
+                  onCommitImmediate({ pidMode: mode });
+                }
+              }}
+            />
+          </Field>
+          {settings.pidMode === 'off' ? null : (
+            <Field flex="1" label={t('widgets.generate.pidSteps')}>
+              <SliderNumberField
+                ariaLabel={t('widgets.generate.pidSteps')}
+                min={MIN_PID_STEPS}
+                max={MAX_PID_STEPS}
+                step={1}
+                value={settings.pidSteps}
+                onChange={(value) => onCommit({ pidSteps: value })}
+              />
+            </Field>
+          )}
+        </HStack>
       ) : null}
 
       {policy.seamlessVisible ? (

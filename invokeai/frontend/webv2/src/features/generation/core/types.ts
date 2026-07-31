@@ -206,9 +206,61 @@ export interface GenerateSettings {
   clipGEmbedModel: ComponentModelConfig | null;
   qwen3EncoderModel: ComponentModelConfig | null;
   qwenVLEncoderModel: ComponentModelConfig | null;
+  /** Krea-2's text encoder. Distinct from `qwenVLEncoderModel` (Qwen2.5-VL). */
+  qwen3VLEncoderModel: ComponentModelConfig | null;
+  /** Wan 2.2's UMT5-XXL text encoder. */
+  wanT5EncoderModel: ComponentModelConfig | null;
+  /**
+   * The low-noise expert of a Wan 2.2 A14B mixture-of-experts pair. Optional: without it the
+   * high-noise expert runs the whole schedule, which still produces an image at lower quality.
+   */
+  wanLowNoiseModel: MainModelConfig | null;
   /** Optional Diffusers main model used as a component source for split/quantized model families. */
   componentSourceModel: MainModelConfig | null;
+  /** Guidance for the low-noise half of a Wan A14B schedule; null reuses `cfgScale`. */
+  wanGuidanceScaleLowNoise: number | null;
+  ideogram4SamplerPreset: Ideogram4SamplerPreset;
+  /** Null lets the sampler preset decide. */
+  ideogram4Steps: number | null;
+  ideogram4GuidanceScale: number | null;
+  ideogram4Mu: number | null;
+  /** Free-text colour terms forwarded to the caption builder. */
+  ideogram4ColorPalette: string[];
+  /** Scales Krea-2 conditioning toward the prompt before denoise. Default off. */
+  krea2RebalanceEnabled: boolean;
+  krea2RebalanceMultiplier: number;
+  /** Comma-separated per-layer weights, forwarded verbatim to the backend parser. */
+  krea2RebalanceWeights: string;
+  /** Perturbs Krea-2 conditioning for variety between seeds. Default off. */
+  krea2SeedVarianceEnabled: boolean;
+  krea2SeedVarianceStrength: number;
+  krea2SeedVarianceRandomizePercent: number;
+  /**
+   * PiD (Pixel Diffusion Decoder) replaces the VAE decode with a caption-conditioned
+   * 4x super-resolution decode. Off by default; requires a PiD decoder and a Gemma-2
+   * caption encoder.
+   */
+  pidMode: PidMode;
+  /** PiD decoder checkpoint. Trained per backbone, so it must match the main model's base. */
+  pidDecoderModel: ComponentModelConfig | null;
+  /** The shared Gemma-2 caption encoder PiD conditions its decode on. */
+  gemma2EncoderModel: ComponentModelConfig | null;
+  pidSteps: number;
 }
+
+/**
+ * - `off`: ordinary VAE decode.
+ * - `fit`: generate at the requested size, decode 4x, downscale back to it.
+ * - `native`: the requested size IS the 4x target; generate at size / 4 and keep the
+ *   full 4x output.
+ */
+export type PidMode = 'off' | 'fit' | 'native';
+
+/**
+ * Ideogram 4 sampler presets. Each fixes a step count and guidance schedule; the explicit
+ * step / guidance / mu overrides are applied on top when set.
+ */
+export type Ideogram4SamplerPreset = 'V4_QUALITY_48' | 'V4_DEFAULT_20' | 'V4_TURBO_12';
 
 export interface GenerateWidgetValues extends GenerateSettings {
   model: GenerateModelConfig;

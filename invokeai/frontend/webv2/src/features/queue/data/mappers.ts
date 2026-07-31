@@ -54,6 +54,7 @@ export const mapQueueItemDTO = (dto: QueueServerItemDTO): QueueItemReadModel => 
   completedAt: dto.completed_at,
   createdAt: dto.created_at,
   destination: dto.destination,
+  device: dto.device,
   errorMessage: dto.error_message,
   errorTraceback: dto.error_traceback,
   errorType: dto.error_type,

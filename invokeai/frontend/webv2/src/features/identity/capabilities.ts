@@ -1,6 +1,8 @@
 import { useAuthSession, type AuthSession } from './session';
 
 export interface Capabilities {
+  /** Server-wide runtime config (e.g. which GPUs generate); `PATCH /app/runtime_config` is admin-only. */
+  canManageAppConfig: boolean;
   canManageModels: boolean;
   canManageNodes: boolean;
   /** Bulk import/export of prompt templates; the routes are admin-only. */
@@ -11,6 +13,7 @@ export interface Capabilities {
 export const getCapabilities = (session: AuthSession): Capabilities => {
   if (session.phase !== 'ready') {
     return {
+      canManageAppConfig: false,
       canManageModels: false,
       canManageNodes: false,
       canManagePromptTemplates: false,
@@ -22,6 +25,7 @@ export const getCapabilities = (session: AuthSession): Capabilities => {
   const isAdmin = isSingleUser || session.user?.is_admin === true;
 
   return {
+    canManageAppConfig: isAdmin,
     canManageModels: isAdmin,
     canManageNodes: isAdmin,
     // Matches the routers' `AdminUserOrDefault`: everyone qualifies in

@@ -1,30 +1,36 @@
-import type { GalleryImage, GalleryImagesPage } from '@features/gallery/core/types';
+import type {
+  GalleryItem,
+  GalleryItemKey,
+  GalleryItemMutationResult,
+  GalleryItemsPage,
+} from '@features/gallery/core/items';
 import type { AccountScope } from '@platform/state/accountLifecycle';
 import type { InfiniteData, QueryClient, QueryKey } from '@tanstack/react-query';
 
+import { toGalleryItemKey } from '@features/gallery/core/items';
 import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { hashKey } from '@tanstack/react-query';
 
 import { ALL_READABLE_BOARDS_ID, isDateBoardId } from './backend';
 import {
   galleryKeys,
-  getGalleryImageListQueries,
-  getGalleryImagesFilterFromKey,
-  type CanonicalGalleryImagesFilter,
+  getGalleryItemListQueries,
+  getGalleryItemsFilterFromKey,
+  type CanonicalGalleryItemsFilter,
 } from './queries';
 
-export type GalleryImageCachePatch =
-  | { imageNames: readonly string[]; kind: 'delete' }
-  | { boardId: string; imageNames: readonly string[]; kind: 'move' }
-  | { imageNames: readonly string[]; kind: 'star'; starred: boolean };
+export type GalleryItemCachePatch =
+  | { kind: 'delete'; result: GalleryItemMutationResult }
+  | { boardId: string; kind: 'move'; result: GalleryItemMutationResult }
+  | { kind: 'star'; result: GalleryItemMutationResult; starred: boolean };
 
-interface CacheRollbackEntry {
-  after: InfiniteData<GalleryImagesPage, number>;
-  before: InfiniteData<GalleryImagesPage, number>;
+interface ItemCacheRollbackEntry {
+  after: InfiniteData<GalleryItemsPage, number>;
+  before: InfiniteData<GalleryItemsPage, number>;
   queryKey: QueryKey;
 }
 
-const isGalleryImagesData = (value: unknown): value is InfiniteData<GalleryImagesPage, number> => {
+const isGalleryItemsData = (value: unknown): value is InfiniteData<GalleryItemsPage, number> => {
   if (!value || typeof value !== 'object' || !('pages' in value) || !('pageParams' in value)) {
     return false;
   }
@@ -34,22 +40,22 @@ const isGalleryImagesData = (value: unknown): value is InfiniteData<GalleryImage
   return Array.isArray(data.pages) && Array.isArray(data.pageParams);
 };
 
-const mapPageImages = (
-  page: GalleryImagesPage,
-  mapImage: (image: GalleryImage) => GalleryImage | null,
+const mapPageItems = (
+  page: GalleryItemsPage,
+  mapItem: (item: GalleryItem) => GalleryItem | null,
   totalDelta = 0
-): GalleryImagesPage => {
+): GalleryItemsPage => {
   let changed = false;
-  const images: GalleryImage[] = [];
+  const items: GalleryItem[] = [];
 
-  for (const image of page.images) {
-    const nextImage = mapImage(image);
+  for (const item of page.items) {
+    const nextItem = mapItem(item);
 
-    if (nextImage !== image) {
+    if (nextItem !== item) {
       changed = true;
     }
-    if (nextImage) {
-      images.push(nextImage);
+    if (nextItem) {
+      items.push(nextItem);
     }
   }
 
@@ -59,71 +65,73 @@ const mapPageImages = (
 
   return {
     ...page,
-    images: changed ? images : page.images,
+    items: changed ? items : page.items,
     total: Math.max(0, page.total - totalDelta),
   };
 };
 
-const patchPage = (
-  page: GalleryImagesPage,
-  filter: CanonicalGalleryImagesFilter,
-  patch: GalleryImageCachePatch,
-  imageNames: ReadonlySet<string>,
-  removedImageCount: number
-): GalleryImagesPage => {
+const patchItemPage = (
+  page: GalleryItemsPage,
+  filter: CanonicalGalleryItemsFilter,
+  patch: GalleryItemCachePatch,
+  itemKeys: ReadonlySet<GalleryItemKey>,
+  removedItemCount: number
+): GalleryItemsPage => {
   if (patch.kind === 'star') {
-    return mapPageImages(page, (image) => {
-      if (!imageNames.has(image.imageName) || image.starred === patch.starred) {
-        return image;
+    return mapPageItems(page, (item) => {
+      if (!itemKeys.has(toGalleryItemKey(item)) || item.starred === patch.starred) {
+        return item;
       }
 
-      return { ...image, starred: patch.starred };
+      return { ...item, starred: patch.starred };
     });
   }
 
   if (patch.kind === 'delete') {
-    return mapPageImages(page, (image) => (imageNames.has(image.imageName) ? null : image), removedImageCount);
+    return mapPageItems(page, (item) => (itemKeys.has(toGalleryItemKey(item)) ? null : item), removedItemCount);
   }
 
-  const keepsMovedImages =
+  const keepsMovedItems =
     filter.boardId === ALL_READABLE_BOARDS_ID || filter.boardId === patch.boardId || isDateBoardId(filter.boardId);
 
-  return mapPageImages(
+  return mapPageItems(
     page,
-    (image) => {
-      if (!imageNames.has(image.imageName)) {
-        return image;
+    (item) => {
+      if (!itemKeys.has(toGalleryItemKey(item))) {
+        return item;
       }
 
-      if (!keepsMovedImages) {
+      if (!keepsMovedItems) {
         return null;
       }
 
-      return image.boardId === patch.boardId ? image : { ...image, boardId: patch.boardId };
+      return item.boardId === patch.boardId ? item : { ...item, boardId: patch.boardId };
     },
-    keepsMovedImages ? 0 : removedImageCount
+    keepsMovedItems ? 0 : removedItemCount
   );
 };
 
-const patchInfiniteData = (
-  data: InfiniteData<GalleryImagesPage, number>,
-  filter: CanonicalGalleryImagesFilter,
-  patch: GalleryImageCachePatch
-): InfiniteData<GalleryImagesPage, number> => {
-  const imageNames = new Set(patch.imageNames);
-  const removesImages =
+const patchItemsInfiniteData = (
+  data: InfiniteData<GalleryItemsPage, number>,
+  filter: CanonicalGalleryItemsFilter,
+  patch: GalleryItemCachePatch,
+  itemKeys: ReadonlySet<GalleryItemKey>
+): InfiniteData<GalleryItemsPage, number> => {
+  const removesItems =
     patch.kind === 'delete' ||
     (patch.kind === 'move' &&
       filter.boardId !== ALL_READABLE_BOARDS_ID &&
       filter.boardId !== patch.boardId &&
       !isDateBoardId(filter.boardId));
-  const removedImageNames = new Set<string>();
+  const removedItemKeys = new Set<GalleryItemKey>();
 
-  if (removesImages) {
+  if (removesItems) {
     for (const page of data.pages) {
-      for (const image of page.images) {
-        if (imageNames.has(image.imageName)) {
-          removedImageNames.add(image.imageName);
+      for (const item of page.items) {
+        const key = toGalleryItemKey(item);
+
+        if (itemKeys.has(key)) {
+          removedItemKeys.add(key);
         }
       }
     }
@@ -131,7 +139,7 @@ const patchInfiniteData = (
 
   let changed = false;
   const pages = data.pages.map((page) => {
-    const nextPage = patchPage(page, filter, patch, imageNames, removedImageNames.size);
+    const nextPage = patchItemPage(page, filter, patch, itemKeys, removedItemKeys.size);
     changed ||= nextPage !== page;
 
     return nextPage;
@@ -141,39 +149,37 @@ const patchInfiniteData = (
 };
 
 /**
- * Applies a small mutation to every currently cached page for this account.
- * The returned rollback is concurrency-safe: it only restores an entry while
- * the optimistic value is still the current cache value.
+ * Applies only backend-confirmed successes. Failed refs are intentionally
+ * ignored, and kind-qualified keys prevent same-name images/videos colliding.
  */
-export const patchGalleryImageCaches = (client: QueryClient, patch: GalleryImageCachePatch): (() => void) => {
-  if (patch.imageNames.length === 0) {
+export const patchGalleryItemCaches = (client: QueryClient, patch: GalleryItemCachePatch): (() => void) => {
+  const itemKeys = new Set(patch.result.succeeded.map(toGalleryItemKey));
+
+  if (itemKeys.size === 0) {
     return () => undefined;
   }
 
-  const rollbackEntries: CacheRollbackEntry[] = [];
+  const rollbackEntries: ItemCacheRollbackEntry[] = [];
 
-  for (const query of getGalleryImageListQueries(client)) {
+  for (const query of getGalleryItemListQueries(client)) {
     const before = query.state.data;
-    const filter = getGalleryImagesFilterFromKey(query.queryKey);
+    const filter = getGalleryItemsFilterFromKey(query.queryKey);
 
-    if (!filter || !isGalleryImagesData(before)) {
+    if (!filter || !isGalleryItemsData(before)) {
       continue;
     }
 
-    // A starred-first query cannot be patched coherently in place: changing
-    // the flag may move an image across pages. Leave that cache untouched and
-    // let the post-mutation invalidation rebuild its server-defined order.
     if (patch.kind === 'star' && filter.starredFirst) {
       continue;
     }
 
-    const after = patchInfiniteData(before, filter, patch);
+    const after = patchItemsInfiniteData(before, filter, patch, itemKeys);
 
     if (after === before) {
       continue;
     }
 
-    const applied = client.setQueryData<InfiniteData<GalleryImagesPage, number>>(query.queryKey, after);
+    const applied = client.setQueryData<InfiniteData<GalleryItemsPage, number>>(query.queryKey, after);
 
     if (applied) {
       rollbackEntries.push({ after: applied, before, queryKey: query.queryKey });
@@ -194,22 +200,22 @@ const runGalleryInvalidation = async (
   owner: AccountScope,
   includeBoards: boolean
 ): Promise<void> => {
-  // Date-board page queries depend on the supporting names query. Mark that
-  // stale first so an active page refetch cannot observe the old name list.
-  await client.cancelQueries({ queryKey: galleryKeys.dateBoardNamesForAccount(owner) });
+  // Date-board pages and lazy range selection share these names. Mark them
+  // stale before active pages refetch so they cannot hydrate stale refs.
+  await client.cancelQueries({ queryKey: galleryKeys.itemNamesForAccount(owner) });
   await client.invalidateQueries({
-    queryKey: galleryKeys.dateBoardNamesForAccount(owner),
+    queryKey: galleryKeys.itemNamesForAccount(owner),
     refetchType: 'none',
   });
-  await client.cancelQueries({ queryKey: galleryKeys.imageListsForAccount(owner) });
+  await client.cancelQueries({ queryKey: galleryKeys.itemListsForAccount(owner) });
 
   // Refetching an infinite query replays every retained page. Collapse each
   // logical window to its pinned page first; users can explicitly load the
   // surrounding pages again, while a mutation costs one list request.
-  for (const query of getGalleryImageListQueries(client, owner)) {
+  for (const query of getGalleryItemListQueries(client, owner)) {
     const data = query.state.data;
 
-    if (!isGalleryImagesData(data) || data.pages.length <= 1) {
+    if (!isGalleryItemsData(data) || data.pages.length <= 1) {
       continue;
     }
 
@@ -217,13 +223,13 @@ const runGalleryInvalidation = async (
       query.queryKey[5] === 'anchor' && typeof query.queryKey[6] === 'number' ? query.queryKey[6] : 0;
     const anchorIndex = Math.max(0, data.pageParams.indexOf(anchorOffset));
 
-    client.setQueryData<InfiniteData<GalleryImagesPage, number>>(query.queryKey, {
+    client.setQueryData<InfiniteData<GalleryItemsPage, number>>(query.queryKey, {
       pageParams: [data.pageParams[anchorIndex] ?? anchorOffset],
       pages: [data.pages[anchorIndex] ?? data.pages[0]],
     });
   }
 
-  await client.invalidateQueries({ queryKey: galleryKeys.imageListsForAccount(owner) });
+  await client.invalidateQueries({ queryKey: galleryKeys.itemListsForAccount(owner) });
 
   if (includeBoards) {
     await client.invalidateQueries({ queryKey: galleryKeys.boardsForAccount(owner) });
@@ -248,9 +254,13 @@ const scheduleGalleryInvalidation = (
   owner: AccountScope,
   includeBoards: boolean
 ): Promise<void> => {
-  const ownerKey = hashKey(galleryKeys.imageListsForAccount(owner));
+  const ownerKey = hashKey(galleryKeys.itemListsForAccount(owner));
   const clientStates = galleryInvalidations.get(client) ?? new Map<string, GalleryInvalidationState>();
-  const state = clientStates.get(ownerKey) ?? { includeBoards: false, promise: null, requested: false };
+  const state = clientStates.get(ownerKey) ?? {
+    includeBoards: false,
+    promise: null,
+    requested: false,
+  };
 
   galleryInvalidations.set(client, clientStates);
   clientStates.set(ownerKey, state);
@@ -271,9 +281,6 @@ const scheduleGalleryInvalidation = (
           await runGalleryInvalidation(client, owner, shouldInvalidateBoards);
         }
       } finally {
-        // No await occurs between the final loop check and this cleanup, so a
-        // caller cannot observe a resolved runner while leaving requested work
-        // stranded behind it.
         state.promise = null;
         clientStates.delete(ownerKey);
       }
@@ -283,7 +290,7 @@ const scheduleGalleryInvalidation = (
   return state.promise;
 };
 
-export const invalidateGalleryImages = (
+export const invalidateGalleryItems = (
   client: QueryClient,
   owner: AccountScope = captureAccountScope()
 ): Promise<void> => scheduleGalleryInvalidation(client, owner, false);

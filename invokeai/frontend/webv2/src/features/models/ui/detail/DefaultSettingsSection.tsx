@@ -74,7 +74,7 @@ const PREPROCESSORS = [
   'tile',
 ];
 
-type DefaultSettingsModel = Pick<ModelConfig, 'default_settings' | 'key' | 'type'>;
+export type DefaultSettingsModel = Pick<ModelConfig, 'base' | 'default_settings' | 'key' | 'type'>;
 
 interface DefaultSettingsDraft {
   modelKey: string;
@@ -88,8 +88,11 @@ export const supportsDefaultSettings = (model: Pick<ModelConfig, 'type'>): boole
 interface FieldSpec {
   key: keyof AnyModelDefaultSettings;
   labelKey: string;
-  /** Render the control; disabled (showing the inherited value) until customized. */
-  control: (value: unknown, setValue: (value: unknown) => void, disabled: boolean, label: string) => ReactNode;
+  /**
+   * Render the control; disabled (showing the inherited value) until customized. Omitted for a
+   * boolean default, where the row's own enable switch already expresses both states.
+   */
+  control?: (value: unknown, setValue: (value: unknown) => void, disabled: boolean, label: string) => ReactNode;
   /** Value used when the toggle is switched on; also previewed while off. */
   defaultValue: unknown;
   /** Translation key for what applies while the toggle is off. */
@@ -171,6 +174,23 @@ const schedulerControl =
     />
   );
 
+/**
+ * Stores model weights as fp8 on the compute device, trading a little quality for VRAM.
+ *
+ * No body control: `_should_use_fp8` only acts on `fp8_storage is True`, so an explicit `false`
+ * and an absent value behave identically. The row's enable switch already covers the two states
+ * that differ, and a second switch inside the card would imply a distinction that does not exist.
+ *
+ * The backend gates availability in `_should_use_fp8`; `supportsFp8Storage` mirrors those
+ * exclusions so the toggle is never offered where it would be silently ignored.
+ */
+const FP8_STORAGE_FIELD: FieldSpec = {
+  defaultValue: true,
+  inheritLabelKey: 'models.defaultFieldInherited.fp8Storage',
+  key: 'fp8_storage',
+  labelKey: 'models.defaultFields.fp8Storage',
+};
+
 const MAIN_FIELDS: FieldSpec[] = [
   {
     control: schedulerControl(SCHEDULER_OPTIONS),
@@ -250,16 +270,33 @@ const CONTROL_ADAPTER_FIELDS: FieldSpec[] = [
   },
 ];
 
-const getFieldsForModel = (model: Pick<ModelConfig, 'type'>): FieldSpec[] => {
+/**
+ * Mirrors the backend's `_should_use_fp8` exclusions:
+ * - Z-Image: diffusers' layerwise casting hits a dtype mismatch on skipped modules.
+ * - LoRA / ControlLoRA: patched into a base model rather than run as their own forward pass, so
+ *   the casting hooks would never fire.
+ * VAEs are excluded too, but they have no default-settings section at all.
+ */
+export const supportsFp8Storage = (model: Pick<ModelConfig, 'base' | 'type'>): boolean => {
+  if (model.base === 'z-image') {
+    return false;
+  }
+
+  return model.type === 'main' || model.type === 'controlnet' || model.type === 't2i_adapter';
+};
+
+export const getFieldsForModel = (model: Pick<ModelConfig, 'base' | 'type'>): FieldSpec[] => {
+  const fp8Fields = supportsFp8Storage(model) ? [FP8_STORAGE_FIELD] : [];
+
   if (model.type === 'main') {
-    return MAIN_FIELDS;
+    return [...MAIN_FIELDS, ...fp8Fields];
   }
 
   if (model.type === 'lora') {
     return LORA_FIELDS;
   }
 
-  return CONTROL_ADAPTER_FIELDS;
+  return [...CONTROL_ADAPTER_FIELDS, ...fp8Fields];
 };
 
 const validateDefaults = (
@@ -408,7 +445,7 @@ export const DefaultSettingsSection = ({
                   <Switch.Label srOnly>{t('models.customizeDefaultField', { field: t(field.labelKey) })}</Switch.Label>
                 </Switch.Root>
               </HStack>
-              {field.control(
+              {field.control?.(
                 isEnabled ? value : field.defaultValue,
                 (nextValue) => setFieldValue(field.key, nextValue),
                 !isEnabled,

@@ -5,6 +5,7 @@ import process from 'node:process';
 import { chromium } from 'playwright';
 
 import { assertNoAxeViolations } from './accessibility/axe.mjs';
+import { MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME } from './mock-backend-fixtures.mjs';
 import { startMockBackend } from './mock-backend.mjs';
 
 const root = resolve(import.meta.dirname, '..');
@@ -13,6 +14,7 @@ const origin = `http://127.0.0.1:${String(port)}`;
 const backendPort = Number(process.env.INVOKEAI_ACCESSIBILITY_BACKEND_PORT ?? 4179);
 const backendOrigin = `http://127.0.0.1:${String(backendPort)}`;
 const representativeProjectPath = '/#/app?project=fixture-project-001';
+const requestedJourney = process.env.INVOKEAI_ACCESSIBILITY_JOURNEY;
 
 const waitForPreview = async () => {
   const deadline = Date.now() + 20_000;
@@ -59,11 +61,17 @@ const openRepresentativePage = async (browser, path) => {
   });
   const page = await context.newPage();
   const pageErrors = [];
+  const consoleErrors = [];
 
   page.on('pageerror', (error) => pageErrors.push(error));
+  page.on('console', (message) => {
+    if (message.type() === 'error') {
+      consoleErrors.push(message.text());
+    }
+  });
   await page.goto(`${origin}${path}`, { waitUntil: 'domcontentloaded' });
 
-  return { context, page, pageErrors };
+  return { consoleErrors, context, page, pageErrors };
 };
 
 const waitForProjects = async (page) => {
@@ -133,7 +141,7 @@ const surfaces = [
     ready: async (page) => {
       await waitForWorkbench(page);
       await selectLayoutPreset(page, 'Gallery');
-      await page.getByRole('list', { exact: true, name: 'Gallery images' }).waitFor();
+      await page.getByRole('list', { exact: true, name: 'Gallery items' }).waitFor();
     },
   },
   {
@@ -245,6 +253,67 @@ const runKeyboardJourney = async (browser) => {
   }
 };
 
+const runVideoPreviewJourney = async (browser) => {
+  const { consoleErrors, context, page, pageErrors } = await openRepresentativePage(browser, representativeProjectPath);
+  const id = 'workbench-video-preview-representative';
+
+  try {
+    await waitForWorkbench(page);
+    await selectLayoutPreset(page, 'Gallery');
+
+    const gallery = page.getByRole('list', { exact: true, name: 'Gallery items' });
+    const selectVideo = page.getByRole('button', {
+      exact: true,
+      name: `Select video ${MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME}, duration 0:01, for preview`,
+    });
+
+    try {
+      await gallery.waitFor();
+    } catch (error) {
+      const bodyText = (await page.locator('body').innerText()).slice(0, 4_000);
+      throw new Error(
+        `${error instanceof Error ? error.message : String(error)}\nPage errors: ${pageErrors.map(String).join('\n')}\nConsole errors: ${consoleErrors.join('\n')}\nBody:\n${bodyText}`
+      );
+    }
+    await selectVideo.waitFor();
+    await selectVideo.focus();
+    await expectFocused(selectVideo, 'The video gallery item must be keyboard focusable.');
+    assert.equal(await selectVideo.locator('xpath=..').locator('svg.lucide-play').getAttribute('aria-hidden'), 'true');
+    await selectVideo.press('Enter');
+
+    const video = page
+      .getByRole('complementary', { exact: true, name: 'right widget panel' })
+      .locator(`video[aria-label="Video ${MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME}"]`);
+
+    try {
+      await video.waitFor();
+    } catch (error) {
+      const bodyText = (await page.locator('body').innerText()).slice(0, 4_000);
+      throw new Error(
+        `${error instanceof Error ? error.message : String(error)}\nPage errors: ${pageErrors.map(String).join('\n')}\nConsole errors: ${consoleErrors.join('\n')}\nBody:\n${bodyText}`
+      );
+    }
+    assert.equal(await video.getAttribute('controls'), '');
+    assert.equal(await video.getAttribute('playsinline'), '');
+    assert.match((await video.getAttribute('poster')) ?? '', /fixture-video-001\.mp4\/thumbnail$/);
+    assert.equal(await video.getAttribute('draggable'), null);
+    await page.getByText(/Duration 0:01/).waitFor();
+    await waitForSettledDocument(page);
+
+    // Generated media has no caption track, so only this video-specific surface
+    // disables axe's caption rule. Every other release surface keeps it enabled.
+    await assertNoAxeViolations(page, id, { rules: { 'video-caption': { enabled: false } } });
+
+    if (pageErrors.length > 0) {
+      throw new AggregateError(pageErrors, `${id} raised uncaught browser errors.`);
+    }
+
+    return { id, status: 'passed' };
+  } finally {
+    await context.close();
+  }
+};
+
 const mockBackend = await startMockBackend(backendPort, { profile: 'representative' });
 const preview = spawn(
   'pnpm',
@@ -268,11 +337,19 @@ try {
   browser = await chromium.launch({ headless: true });
   const reports = [];
 
-  for (const surface of surfaces) {
+  for (const surface of surfaces.filter(({ id }) => !requestedJourney || id === requestedJourney)) {
     reports.push(await runAxeSurface(browser, surface));
   }
 
-  reports.push(await runKeyboardJourney(browser));
+  if (!requestedJourney || requestedJourney === 'keyboard-critical-journey') {
+    reports.push(await runKeyboardJourney(browser));
+  }
+  if (!requestedJourney || requestedJourney === 'workbench-video-preview-representative') {
+    reports.push(await runVideoPreviewJourney(browser));
+  }
+  if (reports.length === 0) {
+    throw new Error(`Unknown accessibility journey ${JSON.stringify(requestedJourney)}.`);
+  }
   process.stdout.write(`${JSON.stringify({ profile: 'representative', reports }, null, 2)}\n`);
 } catch (error) {
   throw new Error(

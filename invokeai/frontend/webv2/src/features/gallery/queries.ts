@@ -1,19 +1,20 @@
 export {
-  canonicalizeGalleryImagesFilter,
-  flattenGalleryImagesData,
+  canonicalizeGalleryItemsFilter,
+  flattenGalleryItemsData,
   GALLERY_MAX_INFINITE_PAGES,
   GALLERY_MAX_ROWS,
   GALLERY_PAGE_SIZE,
   galleryBoardsOptions,
-  galleryImagesInfiniteOptions,
+  galleryItemNamesOptions,
+  galleryItemsInfiniteOptions,
   galleryKeys,
 } from './data/queries';
 export type {
-  CanonicalGalleryImagesFilter,
+  CanonicalGalleryItemsFilter,
   GalleryBoardsQuery,
-  GalleryImagesFilter,
-  GalleryImagesListQueryKey,
-  GalleryImagesWindow,
+  GalleryItemsFilter,
+  GalleryItemsListQueryKey,
+  GalleryItemsWindow,
 } from './data/queries';
-export { invalidateGallery, invalidateGalleryImages, patchGalleryImageCaches } from './data/queryCache';
-export type { GalleryImageCachePatch } from './data/queryCache';
+export { invalidateGallery, invalidateGalleryItems, patchGalleryItemCaches } from './data/queryCache';
+export type { GalleryItemCachePatch } from './data/queryCache';

@@ -17,6 +17,8 @@ import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { lazy, useMemo } from 'react';
 
+export const getGenerationSelectedGalleryImage = getSelectedGalleryImageFromValues;
+
 const ModelSelect = lazy(() => import('@features/models/react').then((module) => ({ default: module.ModelSelect })));
 const GenerateCanvasCompositingSection = lazy(() =>
   import('@workbench/widgets/canvas/GenerateCanvasCompositingSection').then((module) => ({
@@ -37,7 +39,7 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
   }));
   const promptHistoryItems = useActiveProjectSelector((activeProject) => activeProject.promptHistory);
   const selectedGalleryImage = useActiveProjectSelector((activeProject) =>
-    getSelectedGalleryImageFromValues(getProjectWidgetValues(activeProject, 'gallery'))
+    getGenerationSelectedGalleryImage(getProjectWidgetValues(activeProject, 'gallery'))
   );
   const modelsCatalog = useModelsSelector((snapshot) => snapshot.models);
   const modelsError = useModelsSelector((snapshot) => snapshot.error);

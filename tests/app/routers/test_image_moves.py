@@ -10,6 +10,7 @@ from invokeai.app.api_app import app
 from invokeai.app.services.auth.token_service import set_jwt_secret
 from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
 from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
+from invokeai.app.services.board_video_records.board_video_records_sqlite import SqliteBoardVideoRecordStorage
 from invokeai.app.services.boards.boards_default import BoardService
 from invokeai.app.services.bulk_download.bulk_download_default import BulkDownloadService
 from invokeai.app.services.client_state_persistence.client_state_persistence_sqlite import ClientStatePersistenceSqlite
@@ -24,6 +25,7 @@ from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.project_records.project_records_sqlite import ProjectRecordsSqlite
 from invokeai.app.services.users.users_common import UserCreateRequest
 from invokeai.app.services.users.users_default import UserService
+from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
 from invokeai.app.services.wildcard_records.wildcard_records_sqlite import SqliteWildcardRecordsStorage
 from invokeai.app.services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
 from invokeai.backend.util.logging import InvokeAILogger
@@ -83,7 +85,13 @@ def mock_services() -> InvocationServices:
         project_records=ProjectRecordsSqlite(db=db),
         users=UserService(db),
         wildcard_records=SqliteWildcardRecordsStorage(db=db),
+        videos=None,  # type: ignore
+        video_files=None,  # type: ignore
+        video_records=SqliteVideoRecordStorage(db=db),
+        board_video_records=SqliteBoardVideoRecordStorage(db=db),
+        gallery=None,  # type: ignore
         image_moves=image_moves,
+        system_prompt_records=None,  # type: ignore
     )
 
 

@@ -1,14 +1,18 @@
-import type {
-  GalleryBoard,
-  GalleryImage,
-  GalleryOrderDir,
-  GalleryView,
-  GeneratedImageContract,
-} from '@features/gallery/core/types';
+import type { GalleryBoard, GalleryImage, GalleryOrderDir, GalleryView } from '@features/gallery/core/types';
 import type { QueueItem } from '@features/queue/contracts';
 
-import { normalizeGalleryImage } from '@features/gallery/core/image';
+import {
+  legacyGeneratedImageToGalleryItem,
+  toGalleryItemKey,
+  type GalleryItem,
+  type GalleryItemKey,
+} from '@features/gallery/core/items';
 import { getBoundedRecentImages } from '@features/gallery/core/recentImages';
+import {
+  getPersistedSelectedGalleryItemKeys,
+  getSelectedGalleryImageFromValues,
+  getSelectedGalleryItemFromValues,
+} from '@features/gallery/core/selection';
 import { getGallerySettings, type GallerySettings } from '@features/gallery/core/settings';
 import { getQueueItemSnapshotBatchCount, getQueueItemSnapshotDimensions } from '@features/queue/contracts';
 
@@ -19,6 +23,7 @@ const UNCATEGORIZED_BOARD: GalleryBoard = {
   imageCount: 0,
   kind: 'uncategorized',
   name: 'Uncategorized',
+  videoCount: 0,
 };
 
 /**
@@ -32,6 +37,13 @@ export interface GalleryQueuePlaceholder {
   itemIndex: number;
   width: number;
   height: number;
+  /**
+   * The backend queue item id, once the slot has been claimed by one — null while the
+   * submission is still local-only. Progress keyed by *local* id cannot distinguish
+   * two slots of the same batch running on two GPUs, so surfaces that need per-session
+   * facts (which GPU is rendering this tile) resolve them through this id.
+   */
+  backendItemId: number | null;
 }
 
 export interface GalleryLiveTarget {
@@ -45,23 +57,23 @@ export interface GalleryGenerationSequence {
 }
 
 export type GalleryCurrentItem =
-  | { kind: 'image'; imageName: string }
+  | { kind: 'item'; itemKey: GalleryItemKey }
   | { kind: 'placeholder'; placeholder: GalleryQueuePlaceholder }
   | null;
 
 export interface GalleryStateView {
   boards: GalleryBoard[];
-  compareImageName: string | null;
+  compareImageKey: GalleryItemKey | null;
   currentItem: GalleryCurrentItem;
   galleryView: GalleryView;
-  images: GalleryImage[];
+  items: GalleryItem[];
   isLoading: boolean;
   pendingPlaceholders: GalleryQueuePlaceholder[];
   projectBoardId: string | null;
   searchTerm: string;
   selectedBoardId: string;
-  selectedImageName: string | null;
-  selectedImageNames: string[];
+  selectedItemKey: GalleryItemKey | null;
+  selectedItemKeys: GalleryItemKey[];
   settings: GallerySettings;
 }
 
@@ -123,6 +135,7 @@ export const getGalleryGenerationSequence = (
       sortableSlots.push({
         backendItemId,
         placeholder: {
+          backendItemId,
           boardId,
           height,
           id: `${item.id}:${index}`,
@@ -165,22 +178,40 @@ export const getGalleryGenerationSequence = (
   return { chronologicalSlots, liveSlot };
 };
 
+/**
+ * The slots for every concurrently-running session, in chronological order.
+ *
+ * Multi-GPU runs one session per GPU, so more than one slot can be live at once.
+ * Ordering comes from `chronologicalSlots` (sorted by backend item id) rather than
+ * from the order the targets happened to start reporting, so tiles keep a stable
+ * left-to-right position for as long as they run.
+ */
+export const getGalleryLiveSlots = (
+  chronologicalSlots: GalleryQueuePlaceholder[],
+  liveTargets: readonly GalleryLiveTarget[]
+): GalleryQueuePlaceholder[] =>
+  liveTargets.length === 0
+    ? []
+    : chronologicalSlots.filter((slot) =>
+        liveTargets.some((target) => target.queueItemId === slot.queueItemId && target.itemIndex === slot.itemIndex)
+      );
+
 export const getGalleryCurrentItem = ({
   activePlaceholder,
   isComparisonActive,
   liveFollowEnabled,
-  selectedImageName,
+  selectedItemKey,
 }: {
   activePlaceholder: GalleryQueuePlaceholder | null;
   isComparisonActive: boolean;
   liveFollowEnabled: boolean;
-  selectedImageName: string | null;
+  selectedItemKey: GalleryItemKey | null;
 }): GalleryCurrentItem => {
   if (liveFollowEnabled && !isComparisonActive && activePlaceholder) {
     return { kind: 'placeholder', placeholder: activePlaceholder };
   }
 
-  return selectedImageName ? { imageName: selectedImageName, kind: 'image' } : null;
+  return selectedItemKey ? { itemKey: selectedItemKey, kind: 'item' } : null;
 };
 
 export const getGalleryView = (values: Record<string, unknown>): GalleryView =>
@@ -197,14 +228,6 @@ export const getGallerySelectedBoardId = (values: Record<string, unknown>, backe
   }
 
   return 'none';
-};
-
-export const getGallerySelectedImageNames = (values: Record<string, unknown>): string[] => {
-  if (Array.isArray(values.selectedImageNames)) {
-    return (values.selectedImageNames as unknown[]).filter((name): name is string => typeof name === 'string');
-  }
-
-  return typeof values.selectedImageName === 'string' ? [values.selectedImageName] : [];
 };
 
 export const getGalleryPage = (values: Record<string, unknown>): number =>
@@ -270,19 +293,12 @@ export const getGalleryTotalImages = (values: Record<string, unknown>): number |
 export const getGalleryProjectBoardId = (values: Record<string, unknown>): string | null =>
   typeof values.projectBoardId === 'string' ? values.projectBoardId : null;
 
-export const getGalleryCompareImage = (values: Record<string, unknown>): GeneratedImageContract | null => {
-  const compareImage = values.compareImage;
-
-  if (
-    compareImage &&
-    typeof compareImage === 'object' &&
-    typeof (compareImage as GeneratedImageContract).imageName === 'string'
-  ) {
-    return compareImage as GeneratedImageContract;
-  }
-
-  return null;
-};
+export const getGalleryCompareImage = (values: Record<string, unknown>): GalleryImage | null =>
+  getSelectedGalleryImageFromValues({
+    selectedBoardId: values.selectedBoardId,
+    selectedImage: values.compareImage,
+    selectedImageName: null,
+  });
 
 export const getGalleryQueuePlaceholders = (
   queueItems: QueueItem[],
@@ -322,28 +338,45 @@ const getVisibleGalleryQueuePlaceholders = (
 export const getGalleryStateView = (
   values: Record<string, unknown>,
   backendBoards: GalleryBoard[],
-  backendImages: GalleryImage[] | null,
+  backendItems: GalleryItem[] | null,
   isLoading: boolean,
   queueItems: QueueItem[] = [],
   liveFollowEnabled = false,
   liveTarget: GalleryLiveTarget | null = null
 ): GalleryStateView => {
-  const localImages = getBoundedRecentImages(values.recentImages).map((image) => normalizeGalleryImage(image));
-  const images = backendImages ?? (isLoading ? [] : localImages);
-  const selectedImageName = typeof values.selectedImageName === 'string' ? values.selectedImageName : null;
-  const visibleSelectedImageName = images.some((image) => image.imageName === selectedImageName)
-    ? selectedImageName
-    : null;
-  const selectedImageNames = getGallerySelectedImageNames(values);
+  const localItems = getBoundedRecentImages(values.recentImages).map(legacyGeneratedImageToGalleryItem);
+  const items = backendItems ?? (isLoading ? [] : localItems);
+  const selectedItem = getSelectedGalleryItemFromValues(values);
+  const persistedSelectedItemKey =
+    typeof values.selectedImageName === 'string'
+      ? (getPersistedSelectedGalleryItemKeys({ selectedImageName: values.selectedImageName })[0] ?? null)
+      : selectedItem
+        ? toGalleryItemKey(selectedItem)
+        : null;
+  const visibleSelectedItemKey =
+    persistedSelectedItemKey && items.some((item) => toGalleryItemKey(item) === persistedSelectedItemKey)
+      ? persistedSelectedItemKey
+      : null;
+  const selectedItemKeys = getPersistedSelectedGalleryItemKeys(values);
   const galleryView = getGalleryView(values);
   const settings = getGallerySettings(values);
   const searchTerm = getGallerySearchTerm(values);
-  const boards = backendBoards.length ? backendBoards : [{ ...UNCATEGORIZED_BOARD, imageCount: images.length }];
+  const boards = backendBoards.length
+    ? backendBoards
+    : [
+        {
+          ...UNCATEGORIZED_BOARD,
+          imageCount: items.filter((item) => item.kind === 'image' && item.category === 'general').length,
+          videoCount: items.filter((item) => item.kind === 'video').length,
+        },
+      ];
   const selectedBoardId = getGallerySelectedBoardId(values, backendBoards);
   const compareImage = getGalleryCompareImage(values);
-  const compareImageName = compareImage?.imageName ?? null;
+  const compareImageKey = compareImage ? toGalleryItemKey({ kind: 'image', name: compareImage.imageName }) : null;
   const isComparisonActive =
-    visibleSelectedImageName !== null && compareImageName !== null && compareImageName !== visibleSelectedImageName;
+    visibleSelectedItemKey?.startsWith('image:') === true &&
+    compareImageKey !== null &&
+    compareImageKey !== visibleSelectedItemKey;
   const generationSequence = getGalleryGenerationSequence(queueItems, liveTarget);
   const visibleActivePlaceholder =
     settings.showPendingItems && galleryView === 'images' && searchTerm.trim() === ''
@@ -355,15 +388,15 @@ export const getGalleryStateView = (
     activePlaceholder: visibleActivePlaceholder,
     isComparisonActive,
     liveFollowEnabled,
-    selectedImageName: visibleSelectedImageName,
+    selectedItemKey: visibleSelectedItemKey,
   });
 
   return {
     boards,
-    compareImageName,
+    compareImageKey,
     currentItem,
     galleryView,
-    images,
+    items,
     isLoading,
     pendingPlaceholders: settings.showPendingItems
       ? getVisibleGalleryQueuePlaceholders(generationSequence.chronologicalSlots, {
@@ -376,16 +409,19 @@ export const getGalleryStateView = (
     projectBoardId: getGalleryProjectBoardId(values),
     searchTerm,
     selectedBoardId,
-    selectedImageName: visibleSelectedImageName,
-    selectedImageNames:
-      visibleSelectedImageName && !selectedImageNames.includes(visibleSelectedImageName)
-        ? [visibleSelectedImageName, ...selectedImageNames]
-        : selectedImageNames,
+    selectedItemKey: visibleSelectedItemKey,
+    selectedItemKeys:
+      visibleSelectedItemKey && !selectedItemKeys.includes(visibleSelectedItemKey)
+        ? [visibleSelectedItemKey, ...selectedItemKeys]
+        : selectedItemKeys,
     settings,
   };
 };
 
-export const getBoardCounts = (board: GalleryBoard): { assetCount: number; imageCount: number } => ({
+export const getBoardCounts = (
+  board: GalleryBoard
+): { assetCount: number; imageCount: number; videoCount: number } => ({
   assetCount: board.assetCount,
   imageCount: board.imageCount,
+  videoCount: board.videoCount,
 });

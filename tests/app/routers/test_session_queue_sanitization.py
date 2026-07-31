@@ -6,8 +6,8 @@ import pytest
 
 from invokeai.app.api.routers.session_queue import sanitize_queue_item_for_user, strip_missing_image_results
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
-from invokeai.app.invocations.fields import ImageField, InputField, OutputField
-from invokeai.app.invocations.primitives import ImageCollectionOutput, ImageOutput
+from invokeai.app.invocations.fields import ImageField, InputField, OutputField, VideoField
+from invokeai.app.invocations.primitives import ImageCollectionOutput, ImageOutput, VideoOutput
 from invokeai.app.services.session_queue.session_queue_common import NodeFieldValue, SessionQueueItem
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -242,3 +242,73 @@ def test_strip_missing_image_results_filters_deleted_collection_items(sample_ses
         ImageField(image_name="missing.png"),
         ImageField(image_name="kept.png"),
     ]
+
+
+def test_sanitize_redacts_device_for_different_user(sample_session_queue_item):
+    """`device` is upstream's per-GPU execution field. It postdates the fork's redaction list, so
+    guard it explicitly: a non-admin must not learn where another user's work is placed."""
+    sample_session_queue_item.device = "cuda:1"
+
+    result = sanitize_queue_item_for_user(
+        queue_item=sample_session_queue_item,
+        current_user_id="different_user",
+        is_admin=False,
+    )
+
+    assert result.device is None
+
+
+def test_sanitize_preserves_device_for_owner_and_admin(sample_session_queue_item):
+    sample_session_queue_item.device = "cuda:1"
+
+    owner_view = sanitize_queue_item_for_user(
+        queue_item=sample_session_queue_item, current_user_id="user_123", is_admin=False
+    )
+    admin_view = sanitize_queue_item_for_user(
+        queue_item=sample_session_queue_item, current_user_id="someone_else", is_admin=True
+    )
+
+    assert owner_view.device == "cuda:1"
+    assert admin_view.device == "cuda:1"
+
+
+def test_strip_missing_image_results_removes_deleted_video_output(sample_session_queue_item):
+    """Video outputs go stale exactly like image outputs. Clients hydrate `session.results`, so a
+    deleted video advertised in completed history produces the same 404 loop this helper exists to
+    prevent."""
+    sample_session_queue_item.session.results = {
+        "missing_node": VideoOutput(
+            video=VideoField(video_name="missing.mp4"), width=64, height=64, num_frames=8, fps=8.0, duration=1.0
+        ),
+        "kept_node": VideoOutput(
+            video=VideoField(video_name="kept.mp4"), width=64, height=64, num_frames=8, fps=8.0, duration=1.0
+        ),
+    }
+
+    result = strip_missing_image_results(
+        sample_session_queue_item,
+        video_exists=lambda name: name == "kept.mp4",
+    )
+
+    assert "missing_node" not in result.session.results
+    assert "kept_node" in result.session.results
+    assert "missing_node" in sample_session_queue_item.session.results
+
+
+def test_strip_missing_image_results_checks_images_and_videos_independently(sample_session_queue_item):
+    """A video and an image may share a stem; each must be resolved against its own record store."""
+    sample_session_queue_item.session.results = {
+        "image_node": ImageOutput(image=ImageField(image_name="asset"), width=64, height=64),
+        "video_node": VideoOutput(
+            video=VideoField(video_name="asset"), width=64, height=64, num_frames=8, fps=8.0, duration=1.0
+        ),
+    }
+
+    result = strip_missing_image_results(
+        sample_session_queue_item,
+        image_exists=lambda name: True,
+        video_exists=lambda name: False,
+    )
+
+    assert "image_node" in result.session.results
+    assert "video_node" not in result.session.results

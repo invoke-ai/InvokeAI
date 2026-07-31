@@ -501,3 +501,415 @@ describe('generate seeds', () => {
     expect(generateSeedSequence(10, 4)).toEqual([10, 11, 12, 13]);
   });
 });
+
+describe('Krea-2, Ideogram 4 and Wan graphs', () => {
+  const krea2Diffusers: MainModelConfig = {
+    base: 'krea-2',
+    format: 'diffusers',
+    key: 'krea2-diffusers',
+    name: 'Krea-2 Turbo',
+    type: 'main',
+    variant: 'krea2_turbo',
+  };
+  const krea2Checkpoint: MainModelConfig = {
+    base: 'krea-2',
+    format: 'checkpoint',
+    key: 'krea2-checkpoint',
+    name: 'Krea-2 Raw',
+    type: 'main',
+    variant: 'krea2_base',
+  };
+  const ideogram4Model: MainModelConfig = {
+    base: 'ideogram-4',
+    format: 'diffusers',
+    key: 'ideogram4',
+    name: 'Ideogram 4',
+    type: 'main',
+  };
+  const wanDiffusers: MainModelConfig = {
+    base: 'wan',
+    format: 'diffusers',
+    key: 'wan-diffusers',
+    name: 'Wan 2.2 TI2V 5B',
+    type: 'main',
+    variant: 'ti2v_5b',
+  };
+  const krea2Vae: VaeModelConfig = { base: 'qwen-image', key: 'krea2-vae', name: 'Qwen VAE', type: 'vae' };
+  const qwen3VlEncoder: ComponentModelConfig = {
+    base: 'any',
+    key: 'qwen3-vl',
+    name: 'Qwen3-VL',
+    type: 'qwen3_vl_encoder',
+  };
+  const wanLowNoise: MainModelConfig = {
+    base: 'wan',
+    format: 'diffusers',
+    key: 'wan-low',
+    name: 'Wan low noise',
+    type: 'main',
+    variant: 'i2v_a14b',
+  };
+
+  it('decodes Krea-2 with the Qwen-Image VAE node it shares', () => {
+    const graph = compile(krea2Diffusers);
+
+    expect(graph.nodes.model_loader?.type).toBe('krea2_model_loader');
+    expect(graph.nodes.canvas_output?.type).toBe('qwen_image_l2i');
+    expect(graph.nodes.denoise_latents?.type).toBe('krea2_denoise');
+  });
+
+  it('omits Krea-2 negative conditioning while CFG is disabled, and adds it when enabled', () => {
+    // Krea-2-Turbo runs at cfg_scale 1 by default, where the model takes no negative input.
+    expect(compile(krea2Diffusers, { cfgScale: 1 }).nodes.neg_cond).toBeUndefined();
+
+    const withCfg = compile(krea2Diffusers, { cfgScale: 4.5 });
+
+    expect(withCfg.nodes.neg_cond?.type).toBe('krea2_text_encoder');
+    expect(getEdge(withCfg, 'denoise_latents', 'negative_conditioning')).toBeDefined();
+  });
+
+  it('passes standalone Krea-2 submodels to the loader for a non-diffusers transformer', () => {
+    const graph = compile(krea2Checkpoint, { qwen3VLEncoderModel: qwen3VlEncoder, vae: krea2Vae });
+
+    expect(graph.nodes.model_loader).toMatchObject({
+      qwen3_vl_encoder_model: qwen3VlEncoder,
+      vae_model: krea2Vae,
+    });
+  });
+
+  it('sends an anima-registered Qwen-Image VAE to the Krea-2 loader', () => {
+    // Regression: the builder filtered VAEs to base `qwen-image`, so a Qwen-Image VAE
+    // installed under the `anima` base was dropped and the loader got no VAE at all.
+    const animaRegisteredVae: VaeModelConfig = {
+      base: 'anima',
+      key: 'anima-qwen-vae',
+      name: 'Qwen VAE (installed for Anima)',
+      type: 'vae',
+    };
+    const graph = compile(krea2Checkpoint, {
+      qwen3VLEncoderModel: qwen3VlEncoder,
+      vae: animaRegisteredVae,
+    });
+
+    expect(graph.nodes.model_loader).toMatchObject({ vae_model: animaRegisteredVae });
+  });
+
+  it('refuses to compile a non-diffusers Krea-2 with a missing submodel', () => {
+    // Validation runs ahead of the builder, so the user-facing reason surfaces rather than the
+    // builder's internal guard. Both layers exist; this pins which one the user actually sees.
+    expect(() => compile(krea2Checkpoint, { qwen3VLEncoderModel: qwen3VlEncoder })).toThrow(
+      'Generate needs a VAE for non-Diffusers Krea-2 models.'
+    );
+    expect(() => compile(krea2Checkpoint, { vae: krea2Vae })).toThrow(
+      'Generate needs a Qwen3-VL Encoder for non-Diffusers Krea-2 models.'
+    );
+  });
+
+  it('leaves the Krea-2 conditioning path untouched while both enhancers are off', () => {
+    const graph = compile(krea2Diffusers);
+
+    expect(getNodeByType(graph, 'krea2_conditioning_rebalance')).toBeUndefined();
+    expect(getNodeByType(graph, 'krea2_seed_variance')).toBeUndefined();
+    expect(getEdge(graph, 'denoise_latents', 'positive_conditioning')?.source.node_id).toBe('pos_cond');
+  });
+
+  it('chains rebalance then seed variance between the Krea-2 encoder and denoise', () => {
+    const graph = compile(krea2Diffusers, {
+      krea2RebalanceEnabled: true,
+      krea2SeedVarianceEnabled: true,
+      krea2SeedVarianceStrength: 0.2,
+    });
+
+    expect(getEdge(graph, 'krea2_rebalance', 'conditioning')?.source.node_id).toBe('pos_cond');
+    expect(getEdge(graph, 'krea2_seed_variance', 'conditioning')?.source.node_id).toBe('krea2_rebalance');
+    expect(getEdge(graph, 'denoise_latents', 'positive_conditioning')?.source.node_id).toBe('krea2_seed_variance');
+    // Seed variance needs the seed to be reproducible run-to-run.
+    expect(getEdge(graph, 'krea2_seed_variance', 'variance_seed')?.source.node_id).toBe('seed');
+  });
+
+  it('skips Krea-2 seed variance at zero strength, which would be a no-op node', () => {
+    const graph = compile(krea2Diffusers, { krea2SeedVarianceEnabled: true, krea2SeedVarianceStrength: 0 });
+
+    expect(getNodeByType(graph, 'krea2_seed_variance')).toBeUndefined();
+  });
+
+  it('routes the Ideogram 4 prompt through the caption builder and omits negative conditioning', () => {
+    const graph = compile(ideogram4Model);
+
+    expect(getEdge(graph, 'caption_builder', 'prompt')?.source.node_id).toBe('positive_prompt');
+    expect(getEdge(graph, 'pos_cond', 'prompt')?.source.node_id).toBe('caption_builder');
+    // Ideogram 4's denoise node has no negative conditioning input at all.
+    expect(graph.nodes.neg_cond).toBeUndefined();
+    expect(getEdge(graph, 'denoise_latents', 'negative_conditioning')).toBeUndefined();
+  });
+
+  it('omits unset Ideogram 4 overrides so the sampler preset keeps deciding', () => {
+    const graph = compile(ideogram4Model);
+
+    expect(graph.nodes.denoise_latents).toMatchObject({ sampler_preset: 'V4_QUALITY_48' });
+    expect(graph.nodes.denoise_latents).not.toHaveProperty('steps');
+    expect(graph.nodes.denoise_latents).not.toHaveProperty('guidance_scale');
+    expect(graph.nodes.denoise_latents).not.toHaveProperty('mu');
+  });
+
+  it('sends Ideogram 4 overrides once set', () => {
+    const graph = compile(ideogram4Model, {
+      ideogram4GuidanceScale: 6,
+      ideogram4Mu: 1.5,
+      ideogram4SamplerPreset: 'V4_TURBO_12',
+      ideogram4Steps: 12,
+    });
+
+    expect(graph.nodes.denoise_latents).toMatchObject({
+      guidance_scale: 6,
+      mu: 1.5,
+      sampler_preset: 'V4_TURBO_12',
+      steps: 12,
+    });
+  });
+
+  it('forwards the Ideogram 4 color palette to the caption builder', () => {
+    const graph = compile(ideogram4Model, { ideogram4ColorPalette: ['teal', 'ochre'] });
+
+    expect(graph.nodes.caption_builder).toMatchObject({ color_palette: ['teal', 'ochre'] });
+  });
+
+  it('emits a single-frame image output for Wan, not a video', () => {
+    const graph = compile(wanDiffusers);
+
+    expect(graph.nodes.model_loader?.type).toBe('wan_model_loader');
+    expect(graph.nodes.canvas_output?.type).toBe('wan_l2i');
+    expect(getNodeByType(graph, 'wan_l2v')).toBeUndefined();
+  });
+
+  it('always gives Wan a negative prompt, which it supports unconditionally', () => {
+    const graph = compile(wanDiffusers, { cfgScale: 1 });
+
+    expect(graph.nodes.neg_cond?.type).toBe('wan_text_encoder');
+    expect(getEdge(graph, 'denoise_latents', 'negative_conditioning')?.source.node_id).toBe('neg_cond');
+  });
+
+  it('passes the optional Wan low-noise expert through and leaves it unset otherwise', () => {
+    // Unset optional model fields stay `undefined` here, matching every other builder; they
+    // drop out when the graph is serialized rather than reaching the backend as null.
+    expect(compile(wanDiffusers).nodes.model_loader?.transformer_low_noise_model).toBeUndefined();
+    expect(compile(wanDiffusers, { wanLowNoiseModel: wanLowNoise }).nodes.model_loader).toMatchObject({
+      transformer_low_noise_model: wanLowNoise,
+    });
+  });
+
+  it('omits the Wan low-noise guidance unless overridden, letting the backend reuse guidance_scale', () => {
+    expect(compile(wanDiffusers).nodes.denoise_latents).not.toHaveProperty('guidance_scale_low_noise');
+    expect(compile(wanDiffusers, { wanGuidanceScaleLowNoise: 2.5 }).nodes.denoise_latents).toMatchObject({
+      guidance_scale_low_noise: 2.5,
+    });
+  });
+
+  it('routes Wan LoRAs through the transformer only, leaving the text encoder unpatched', () => {
+    const a14bLora: LoraModelConfig = {
+      base: 'wan',
+      key: 'wan-lora',
+      name: '5B LoRA',
+      type: 'lora',
+      variant: '5b',
+    };
+    const graph = compile(wanDiffusers, { loras: [{ isEnabled: true, model: a14bLora, weight: 1 }] });
+    const loader = getNodeByType(graph, 'wan_lora_collection_loader');
+
+    expect(loader).toBeDefined();
+    expect(getEdge(graph, 'denoise_latents', 'transformer')?.source.node_id).toBe(loader?.id);
+    // The Wan encoder is fed straight from the model loader — Wan LoRAs do not touch it.
+    expect(getEdge(graph, 'pos_cond', 'wan_t5_encoder')?.source.node_id).toBe('model_loader');
+  });
+});
+
+describe('PiD decode', () => {
+  const pidDecoder = (base: string): ComponentModelConfig => ({
+    base,
+    key: `pid-${base}`,
+    name: `PiD ${base}`,
+    type: 'pid_decoder',
+  });
+  const gemma2: ComponentModelConfig = { base: 'any', key: 'gemma2', name: 'Gemma 2 2B', type: 'gemma2_encoder' };
+
+  const pidSettings = (base: string, overrides: Partial<GenerateSettings> = {}): Partial<GenerateSettings> => ({
+    gemma2EncoderModel: gemma2,
+    pidDecoderModel: pidDecoder(base),
+    pidMode: 'fit',
+    ...overrides,
+  });
+
+  it('keeps the ordinary VAE decode when PiD is off', () => {
+    const graph = compile(fluxModel, { clipEmbedModel: clipEmbed, t5EncoderModel: t5Encoder, vae: fluxVae });
+
+    expect(getNodeByType(graph, 'flux_vae_decode')).toBeDefined();
+    expect(getNodeByType(graph, 'flux_pid_decode')).toBeUndefined();
+  });
+
+  it('replaces the VAE decode with a PiD decode and downscales in fit mode', () => {
+    const graph = compile(fluxModel, {
+      clipEmbedModel: clipEmbed,
+      t5EncoderModel: t5Encoder,
+      vae: fluxVae,
+      ...pidSettings('flux'),
+      height: 1024,
+      width: 1024,
+    });
+
+    expect(getNodeByType(graph, 'flux_vae_decode')).toBeUndefined();
+    const decode = getNodeByType(graph, 'flux_pid_decode');
+    expect(decode).toBeDefined();
+    // The resize is the output, because the 4x decode must come back to the asked-for size.
+    const output = graph.nodes.canvas_output;
+    expect(output?.type).toBe('img_resize');
+    expect(output).toMatchObject({ height: 1024, width: 1024 });
+    expect(getEdge(graph, 'canvas_output', 'image')?.source.node_id).toBe(decode?.id);
+  });
+
+  it('generates at the full size in fit mode', () => {
+    const graph = compile(fluxModel, {
+      clipEmbedModel: clipEmbed,
+      t5EncoderModel: t5Encoder,
+      vae: fluxVae,
+      ...pidSettings('flux'),
+      height: 1024,
+      width: 1024,
+    });
+
+    expect(graph.nodes.denoise_latents).toMatchObject({ height: 1024, width: 1024 });
+  });
+
+  it('generates at a quarter size in native mode and makes the decode the output', () => {
+    const graph = compile(fluxModel, {
+      clipEmbedModel: clipEmbed,
+      t5EncoderModel: t5Encoder,
+      vae: fluxVae,
+      ...pidSettings('flux', { pidMode: 'native' }),
+      height: 2048,
+      width: 2048,
+    });
+
+    expect(graph.nodes.denoise_latents).toMatchObject({ height: 512, width: 512 });
+    // No downscale: PiD's 4x output IS the result.
+    expect(graph.nodes.canvas_output?.type).toBe('flux_pid_decode');
+    expect(getNodeByType(graph, 'img_resize')).toBeUndefined();
+  });
+
+  it('wires the prompt, seed and both loaders into the decode', () => {
+    const graph = compile(fluxModel, {
+      clipEmbedModel: clipEmbed,
+      t5EncoderModel: t5Encoder,
+      vae: fluxVae,
+      ...pidSettings('flux'),
+    });
+    const decode = getNodeByType(graph, 'flux_pid_decode');
+
+    expect(getEdge(graph, decode!.id, 'prompt')?.source.node_id).toBe('positive_prompt');
+    expect(getEdge(graph, decode!.id, 'seed')?.source.node_id).toBe('seed');
+    expect(getEdge(graph, decode!.id, 'latents')?.source.node_id).toBe('denoise_latents');
+    expect(getNodeByType(graph, 'pid_decoder_loader')).toMatchObject({ pid_decoder_model: pidDecoder('flux') });
+    expect(getNodeByType(graph, 'gemma2_encoder_loader')).toMatchObject({ gemma2_model: gemma2 });
+  });
+
+  it('does not wire a VAE into decoders that use fixed constants', () => {
+    const graph = compile(fluxModel, {
+      clipEmbedModel: clipEmbed,
+      t5EncoderModel: t5Encoder,
+      vae: fluxVae,
+      ...pidSettings('flux'),
+    });
+    const decode = getNodeByType(graph, 'flux_pid_decode');
+
+    // FLUX.1 and SD3 use fixed VAE constants and expose no `vae` input.
+    expect(getEdge(graph, decode!.id, 'vae')).toBeUndefined();
+  });
+
+  it('wires a VAE into decoders that read its constants at runtime', () => {
+    const graph = compile(qwenImageModel, { ...pidSettings('qwen-image') });
+    const decode = getNodeByType(graph, 'qwen_image_pid_decode');
+
+    expect(getEdge(graph, decode!.id, 'vae')?.source.node_id).toBe('model_loader');
+  });
+
+  it('uses a FLUX decoder for Z-Image, which shares its VAE', () => {
+    const graph = compile(zImageModel, { ...pidSettings('flux') });
+
+    expect(getNodeByType(graph, 'z_image_pid_decode')).toBeDefined();
+    expect(getNodeByType(graph, 'pid_decoder_loader')).toMatchObject({ pid_decoder_model: pidDecoder('flux') });
+  });
+
+  it('decodes through PiD for SDXL, sizing the noise node instead of the denoise node', () => {
+    const graph = compile(sdxlModel, { ...pidSettings('sdxl', { pidMode: 'native' }), height: 2048, width: 2048 });
+
+    // SDXL is sized via its noise node; its grid is 8, so 2048 / 4 = 512.
+    expect(graph.nodes.noise).toMatchObject({ height: 512, width: 512 });
+    expect(graph.nodes.canvas_output?.type).toBe('sdxl_pid_decode');
+  });
+
+  it('decodes through PiD for SD3', () => {
+    const graph = compile(sd3Model, { ...pidSettings('sd-3') });
+
+    expect(getNodeByType(graph, 'sd3_pid_decode')).toBeDefined();
+    expect(getNodeByType(graph, 'sd3_l2i')).toBeUndefined();
+  });
+
+  it('decodes through PiD for FLUX.2', () => {
+    const graph = compile(flux2Model, { ...pidSettings('flux2') });
+
+    expect(getNodeByType(graph, 'flux2_pid_decode')).toBeDefined();
+    expect(getNodeByType(graph, 'flux2_vae_decode')).toBeUndefined();
+  });
+
+  it('records the PiD settings in metadata', () => {
+    const graph = compile(fluxModel, {
+      clipEmbedModel: clipEmbed,
+      t5EncoderModel: t5Encoder,
+      vae: fluxVae,
+      ...pidSettings('flux'),
+    });
+    const metadata = getNodeByType(graph, 'core_metadata');
+
+    expect(metadata).toMatchObject({ pid_mode: 'fit', pid_steps: 4 });
+  });
+
+  it('refuses to compile PiD on an unsupported base rather than silently ignoring it', () => {
+    // CogView4 has no PiD decode node. Falling back to an ordinary decode would leave the
+    // user wondering why the output is not 4x.
+    expect(() => compile(cogView4Model, { pidMode: 'fit' })).toThrow(/PiD is not supported/);
+  });
+
+  it('requires both PiD models before compiling', () => {
+    expect(() =>
+      compile(fluxModel, {
+        clipEmbedModel: clipEmbed,
+        t5EncoderModel: t5Encoder,
+        vae: fluxVae,
+        pidMode: 'fit',
+        pidDecoderModel: pidDecoder('flux'),
+      })
+    ).toThrow(/Gemma-2 encoder/);
+    expect(() =>
+      compile(fluxModel, {
+        clipEmbedModel: clipEmbed,
+        t5EncoderModel: t5Encoder,
+        vae: fluxVae,
+        pidMode: 'fit',
+        gemma2EncoderModel: gemma2,
+      })
+    ).toThrow(/PiD decoder/);
+  });
+
+  it('enforces the 4x grid on the requested size in native mode', () => {
+    // FLUX's grid is 16, so native requires multiples of 64.
+    expect(() =>
+      compile(fluxModel, {
+        clipEmbedModel: clipEmbed,
+        t5EncoderModel: t5Encoder,
+        vae: fluxVae,
+        ...pidSettings('flux', { pidMode: 'native' }),
+        height: 2048,
+        width: 2032,
+      })
+    ).toThrow(/multiple of 64/);
+  });
+});

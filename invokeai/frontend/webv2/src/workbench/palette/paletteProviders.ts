@@ -5,7 +5,7 @@ import type { QueueReadModel } from '@features/queue/contracts';
 import type { PromptHistoryItem } from '@workbench/projectContracts';
 import type { TFunction } from 'i18next';
 
-import { ALL_READABLE_BOARDS_ID, listGalleryImages } from '@features/gallery/paletteSearch';
+import { ALL_READABLE_BOARDS_ID, listPaletteImages } from '@features/gallery/paletteSearch';
 import { galleryBoardsOptions } from '@features/gallery/queries';
 import { focusPositivePrompt } from '@features/generation/react';
 import { isSupportedGenerateModel } from '@features/generation/settings';
@@ -308,7 +308,7 @@ export const createImagesProvider = ({
       // Search the explicit all-readable scope. The endpoint excludes archived
       // and inaccessible boards; the active board list supplies display labels.
       const [page, boards] = await Promise.all([
-        listGalleryImages({
+        listPaletteImages({
           boardId: ALL_READABLE_BOARDS_ID,
           createdFrom: query.range?.from,
           createdTo: query.range?.to,

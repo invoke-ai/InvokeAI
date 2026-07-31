@@ -1,13 +1,21 @@
+import type { GalleryItemActionContext, GalleryItemActions } from '@features/gallery/react';
 import type { VaeModelConfig } from '@features/generation/contracts';
 
 import {
   galleryImages,
-  galleryOrganization,
+  galleryItemOrganization,
+  galleryItems,
   galleryTransfers,
+  toGalleryItemKey,
+  toGalleryItemRef,
   type GalleryBoard,
   type GalleryImage,
+  type GalleryImageMetadata,
+  type GalleryItem,
+  type GalleryItemMutationResult,
+  type GalleryItemRef,
 } from '@features/gallery';
-import { invalidateGallery, invalidateGalleryImages, patchGalleryImageCaches } from '@features/gallery/queries';
+import { invalidateGallery, patchGalleryItemCaches } from '@features/gallery/queries';
 import { setPendingPromptTemplateDraft } from '@features/generation/react';
 import { getMaxReferenceImages, isVaeModelConfig, isSupportedGenerateModel } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
@@ -47,14 +55,19 @@ import {
  * grid, preview, image context menus). Mutations patch the shared Gallery cache
  * when possible and explicitly invalidate the affected server state.
  */
-export interface ImageActions {
+export interface ImageActions extends GalleryItemActions {
   /** Whether the generate widget's current model can accept another reference image. */
   canUseAsReferenceImage: boolean;
   copyImage: (image: GalleryImage) => Promise<void>;
   deleteImages: (imageNames: string[]) => Promise<void>;
+  /** Derives recall availability from already-fetched metadata and the current generate/model state. */
+  deriveImageRecallCapabilities: (
+    image: GalleryImage,
+    metadata: GalleryImageMetadata | null
+  ) => ImageRecallCapabilities;
   downloadImage: (image: GalleryImage) => Promise<void>;
   downloadImages: (imageNames: string[]) => Promise<void>;
-  getImageRecallCapabilities: (image: GalleryImage) => Promise<ImageRecallCapabilities>;
+  getImageRecallCapabilities: (image: GalleryImage, signal?: AbortSignal) => Promise<ImageRecallCapabilities>;
   moveImagesToBoard: (imageNames: string[], boardId: string) => Promise<void>;
   openImageInPreview: (image: GalleryImage) => void;
   recallImageData: (image: GalleryImage, kind: ImageRecallKind) => Promise<void>;
@@ -87,11 +100,13 @@ const toPngBlob = async (blob: Blob): Promise<Blob> => {
 export const useImageActions = ({
   boards,
   generateValues,
+  getItemActionContext,
   onImagesDeleted,
   projectId,
 }: {
   boards: GalleryBoard[];
   generateValues: Record<string, unknown>;
+  getItemActionContext?: () => GalleryItemActionContext | null;
   projectId?: string;
   /** Called after a successful deletion so the host can select a neighboring image. */
   onImagesDeleted?: (imageNames: string[]) => void;
@@ -122,7 +137,8 @@ export const useImageActions = ({
         projectId,
       });
     const recordSuccess = (title: string, message?: string) => notifications.add({ kind: 'success', message, title });
-    const getBoardName = (boardId: string) => boards.find((board) => board.id === boardId)?.name ?? 'Uncategorized';
+    const getBoardName = (boardId: string) =>
+      boards.find((board) => board.id === boardId)?.name ?? t('widgets.gallery.uncategorized');
     const getLatestGenerateValues = () => {
       const snapshot = queries.getSnapshot();
       const project = projectId
@@ -131,8 +147,347 @@ export const useImageActions = ({
 
       return project ? getProjectWidgetValues(project, 'generate') : {};
     };
+    const reportMutationOutcome = (
+      action: 'delete' | 'move' | 'star' | 'unstar',
+      requestedCount: number,
+      result: GalleryItemMutationResult,
+      boardId?: string
+    ) => {
+      if (result.failed.length > 0) {
+        recordError(
+          new Error(
+            t(`widgets.gallery.itemActions.${action}.${result.succeeded.length > 0 ? 'partial' : 'failure'}`, {
+              board: boardId ? getBoardName(boardId) : undefined,
+              count: requestedCount,
+              failed: result.failed.length,
+              succeeded: result.succeeded.length,
+            })
+          )
+        );
+        return;
+      }
+
+      recordSuccess(
+        t(`widgets.gallery.itemActions.${action}.success`, {
+          board: boardId ? getBoardName(boardId) : undefined,
+          count: result.succeeded.length,
+        })
+      );
+    };
+    const runItemMutation = async ({
+      action,
+      applyConfirmed,
+      boardId,
+      mutate,
+      requested,
+    }: {
+      action: 'delete' | 'move' | 'star' | 'unstar';
+      applyConfirmed: (result: GalleryItemMutationResult, signal: AbortSignal) => Promise<void> | void;
+      boardId?: string;
+      mutate: (signal: AbortSignal) => Promise<GalleryItemMutationResult>;
+      requested: GalleryItemRef[];
+    }): Promise<void> => {
+      const owner = captureAccountScope();
+      let error: unknown = null;
+      let result: GalleryItemMutationResult | null = null;
+
+      try {
+        result = await mutate(owner.signal);
+
+        assertAccountScopeCurrent(owner);
+        await applyConfirmed(result, owner.signal);
+      } catch (caught: unknown) {
+        error = caught;
+      }
+
+      if (!isAccountScopeCurrent(owner)) {
+        return;
+      }
+
+      try {
+        await invalidateGallery(queryClient, owner);
+      } catch (caught: unknown) {
+        error ??= caught;
+      }
+
+      if (!isAccountScopeCurrent(owner)) {
+        return;
+      }
+
+      if (error || !result) {
+        recordError(error ?? new Error('Gallery item mutation did not return a result.'));
+        return;
+      }
+
+      reportMutationOutcome(action, requested.length, result, boardId);
+    };
+    const deleteItems = (items: GalleryItemRef[]): Promise<void> => {
+      let deletionContext: GalleryItemActionContext | null = null;
+      let orderedRefs: GalleryItemRef[] | null = null;
+      const isDeletionContextCurrent = (): boolean => {
+        if (!deletionContext || !getItemActionContext) {
+          return false;
+        }
+
+        const current = getItemActionContext();
+
+        return Boolean(
+          current &&
+          current.filterIdentity === deletionContext.filterIdentity &&
+          current.selectedItemKey === deletionContext.selectedItemKey
+        );
+      };
+
+      return runItemMutation({
+        action: 'delete',
+        applyConfirmed: async (result, signal) => {
+          if (result.succeeded.length === 0) {
+            return;
+          }
+
+          let successor: GalleryItem | null = null;
+          const primaryKey = deletionContext?.selectedItemKey ?? null;
+          const succeededKeys = new Set(result.succeeded.map(toGalleryItemKey));
+
+          if (deletionContext && primaryKey && succeededKeys.has(primaryKey) && isDeletionContextCurrent()) {
+            const refs = orderedRefs ?? deletionContext.items.map(toGalleryItemRef);
+            const primaryIndex = refs.findIndex((ref) => toGalleryItemKey(ref) === primaryKey);
+            const ineligibleKeys = new Set([
+              ...result.succeeded.map(toGalleryItemKey),
+              ...result.failed.map(toGalleryItemKey),
+            ]);
+            let successorRef: GalleryItemRef | null = null;
+
+            if (primaryIndex >= 0) {
+              for (let index = primaryIndex - 1; index >= 0; index -= 1) {
+                const candidate = refs[index];
+
+                if (candidate && !ineligibleKeys.has(toGalleryItemKey(candidate))) {
+                  successorRef = candidate;
+                  break;
+                }
+              }
+
+              if (!successorRef) {
+                for (let index = primaryIndex + 1; index < refs.length; index += 1) {
+                  const candidate = refs[index];
+
+                  if (candidate && !ineligibleKeys.has(toGalleryItemKey(candidate))) {
+                    successorRef = candidate;
+                    break;
+                  }
+                }
+              }
+            }
+
+            if (successorRef) {
+              successor =
+                deletionContext.items.find((item) => toGalleryItemKey(item) === toGalleryItemKey(successorRef)) ?? null;
+
+              if (!successor) {
+                try {
+                  successor = await galleryItems.resolve(successorRef, signal);
+                } catch {
+                  successor = null;
+                }
+              }
+
+              signal.throwIfAborted();
+
+              if (!isDeletionContextCurrent()) {
+                successor = null;
+              }
+            }
+          }
+
+          patchGalleryItemCaches(queryClient, { kind: 'delete', result });
+          gallery.removeItems(result.succeeded.map(toGalleryItemKey));
+          if (successor) {
+            const failedKeys = new Set(result.failed.map(toGalleryItemKey));
+            const retainedFailedKeys = items
+              .filter((item) => failedKeys.has(toGalleryItemKey(item)))
+              .map(toGalleryItemKey);
+
+            if (retainedFailedKeys.length > 0) {
+              gallery.setItemMultiSelection([...retainedFailedKeys, toGalleryItemKey(successor)], successor, projectId);
+            } else {
+              gallery.selectItem(successor, projectId);
+            }
+          }
+          onImagesDeleted?.(result.succeeded.filter((item) => item.kind === 'image').map((item) => item.name));
+        },
+        mutate: async (signal) => {
+          deletionContext = getItemActionContext?.() ?? null;
+
+          if (
+            deletionContext?.selectedItemKey &&
+            items.some((item) => toGalleryItemKey(item) === deletionContext?.selectedItemKey)
+          ) {
+            try {
+              orderedRefs = await deletionContext.loadOrderedRefs(signal);
+            } catch {
+              orderedRefs = deletionContext.items.map(toGalleryItemRef);
+            }
+          }
+
+          signal.throwIfAborted();
+          return galleryItemOrganization.delete(items, signal);
+        },
+        requested: items,
+      });
+    };
+    const moveItemsToBoard = (items: GalleryItemRef[], boardId: string): Promise<void> =>
+      runItemMutation({
+        action: 'move',
+        applyConfirmed: (result) => {
+          if (result.succeeded.length === 0) {
+            return;
+          }
+
+          patchGalleryItemCaches(queryClient, { boardId, kind: 'move', result });
+          gallery.patchItems(result.succeeded.map(toGalleryItemKey), { boardId });
+        },
+        boardId,
+        mutate: (signal) => galleryItemOrganization.moveToBoard(items, boardId, signal),
+        requested: items,
+      });
+    const setItemsStarred = (items: GalleryItemRef[], starred: boolean): Promise<void> =>
+      runItemMutation({
+        action: starred ? 'star' : 'unstar',
+        applyConfirmed: (result) => {
+          if (result.succeeded.length === 0) {
+            return;
+          }
+
+          patchGalleryItemCaches(queryClient, { kind: 'star', result, starred });
+          gallery.patchItems(result.succeeded.map(toGalleryItemKey), { starred });
+        },
+        mutate: (signal) => galleryItemOrganization.setStarred(items, starred, signal),
+        requested: items,
+      });
+    const fetchItemBlob = async (item: GalleryItem, signal: AbortSignal): Promise<Blob> => {
+      const response = await fetch(item.fullUrl, { signal });
+
+      if (!response.ok) {
+        throw new Error(`Download failed with status ${response.status}.`);
+      }
+
+      return response.blob();
+    };
+    const downloadItem = async (item: GalleryItem): Promise<void> => {
+      const owner = captureAccountScope();
+
+      try {
+        const blob = await fetchItemBlob(item, owner.signal);
+
+        assertAccountScopeCurrent(owner);
+        downloadBlob(blob, item.name);
+      } catch (error: unknown) {
+        if (isAccountScopeCurrent(owner)) {
+          recordError(error);
+        }
+      }
+    };
+    const downloadItems = async (items: GalleryItemRef[], loadedItems: GalleryItem[] = []): Promise<void> => {
+      const owner = captureAccountScope();
+      const loadedByKey = new Map(loadedItems.map((item) => [toGalleryItemKey(item), item]));
+      const imageNames = items.filter((item) => item.kind === 'image').map((item) => item.name);
+      const videoRefs = items.filter((item) => item.kind === 'video');
+      let failedCount = 0;
+      let succeededCount = 0;
+
+      if (imageNames.length > 0) {
+        try {
+          const { blob, fileName } = await galleryTransfers.downloadArchive({
+            imageNames,
+            signal: owner.signal,
+          });
+
+          assertAccountScopeCurrent(owner);
+          downloadBlob(blob, fileName);
+          succeededCount += imageNames.length;
+        } catch {
+          if (!isAccountScopeCurrent(owner)) {
+            return;
+          }
+
+          failedCount += imageNames.length;
+        }
+      }
+
+      for (const ref of videoRefs) {
+        try {
+          const loadedItem = loadedByKey.get(toGalleryItemKey(ref));
+          const item = loadedItem ?? (await galleryItems.resolve(ref, owner.signal));
+
+          assertAccountScopeCurrent(owner);
+          if (item.kind !== 'video') {
+            throw new Error(`Resolved ${ref.name} as the wrong media kind.`);
+          }
+
+          const blob = await fetchItemBlob(item, owner.signal);
+
+          assertAccountScopeCurrent(owner);
+          downloadBlob(blob, item.name);
+          succeededCount += 1;
+        } catch {
+          if (!isAccountScopeCurrent(owner)) {
+            return;
+          }
+
+          failedCount += 1;
+        }
+      }
+
+      if (failedCount > 0) {
+        recordError(
+          new Error(
+            t('widgets.gallery.itemActions.download.partial', {
+              count: items.length,
+              failed: failedCount,
+              succeeded: succeededCount,
+            })
+          )
+        );
+      } else {
+        recordSuccess(
+          t('widgets.gallery.itemActions.download.success', {
+            count: succeededCount,
+          })
+        );
+      }
+    };
+    const deriveImageRecallCapabilities = (
+      image: GalleryImage,
+      metadata: GalleryImageMetadata | null
+    ): ImageRecallCapabilities => {
+      if (!currentGenerateValues) {
+        return EMPTY_IMAGE_RECALL_CAPABILITIES;
+      }
+
+      return getImageRecallCapabilities({
+        currentValues: currentGenerateValues,
+        image,
+        metadata,
+        models,
+        supportedModels,
+        vaeModels,
+      });
+    };
 
     return {
+      deleteItems,
+      downloadItem,
+      downloadItems,
+      moveItemsToBoard,
+      openItemInNewTab: (item) => {
+        window.open(item.fullUrl, '_blank', 'noopener');
+      },
+      openItemInPreview: (item) => {
+        gallery.selectItem(item, projectId);
+        openWorkbenchWidget('preview', { preferredRegions: ['center'], requireCenterView: true });
+      },
+      setItemsStarred,
       copyImage: async (image) => {
         const owner = captureAccountScope();
 
@@ -155,26 +510,8 @@ export const useImageActions = ({
           recordError(error);
         }
       },
-      deleteImages: async (imageNames) => {
-        const owner = captureAccountScope();
-
-        try {
-          await galleryOrganization.deleteImages(imageNames, owner.signal);
-
-          assertAccountScopeCurrent(owner);
-          patchGalleryImageCaches(queryClient, { imageNames, kind: 'delete' });
-          gallery.removeImages(imageNames);
-          onImagesDeleted?.(imageNames);
-          recordSuccess(imageNames.length === 1 ? 'Deleted image' : `Deleted ${imageNames.length} images`);
-          void invalidateGallery(queryClient);
-        } catch (error: unknown) {
-          if (!isAccountScopeCurrent(owner)) {
-            return;
-          }
-
-          recordError(error);
-        }
-      },
+      deleteImages: (imageNames) => deleteItems(imageNames.map((name) => ({ kind: 'image', name }))),
+      deriveImageRecallCapabilities,
       downloadImage: async (image) => {
         const owner = captureAccountScope();
 
@@ -192,30 +529,8 @@ export const useImageActions = ({
           recordError(error);
         }
       },
-      downloadImages: async (imageNames) => {
-        const owner = captureAccountScope();
-
-        try {
-          notifications.add({
-            kind: 'info',
-            message: `Preparing an archive of ${imageNames.length} images.`,
-            title: 'Preparing download',
-          });
-
-          const { blob, fileName } = await galleryTransfers.downloadArchive({ imageNames, signal: owner.signal });
-
-          assertAccountScopeCurrent(owner);
-          downloadBlob(blob, fileName);
-          recordSuccess('Download ready');
-        } catch (error: unknown) {
-          if (!isAccountScopeCurrent(owner)) {
-            return;
-          }
-
-          recordError(error);
-        }
-      },
-      getImageRecallCapabilities: async (image) => {
+      downloadImages: (imageNames) => downloadItems(imageNames.map((name) => ({ kind: 'image', name }))),
+      getImageRecallCapabilities: async (image, signal) => {
         const owner = captureAccountScope();
 
         if (!currentGenerateValues) {
@@ -223,17 +538,11 @@ export const useImageActions = ({
         }
 
         try {
-          const metadata = await galleryImages.metadata(image.imageName, owner.signal);
+          const requestSignal = signal ? AbortSignal.any([signal, owner.signal]) : owner.signal;
+          const metadata = await galleryImages.metadata(image.imageName, requestSignal);
 
           assertAccountScopeCurrent(owner);
-          return getImageRecallCapabilities({
-            currentValues: currentGenerateValues,
-            image,
-            metadata,
-            models,
-            supportedModels,
-            vaeModels,
-          });
+          return deriveImageRecallCapabilities(image, metadata);
         } catch {
           if (!isAccountScopeCurrent(owner)) {
             return EMPTY_IMAGE_RECALL_CAPABILITIES;
@@ -273,33 +582,11 @@ export const useImageActions = ({
           recordError(error);
         }
       },
-      moveImagesToBoard: async (imageNames, boardId) => {
-        const owner = captureAccountScope();
-
-        try {
-          if (boardId === 'none') {
-            await galleryOrganization.removeFromBoard(imageNames, owner.signal);
-          } else {
-            await galleryOrganization.addToBoard(boardId, imageNames, owner.signal);
-          }
-
-          assertAccountScopeCurrent(owner);
-          patchGalleryImageCaches(queryClient, { boardId, imageNames, kind: 'move' });
-          gallery.patchImages(imageNames, { boardId });
-          recordSuccess(
-            imageNames.length === 1
-              ? `Moved image to ${getBoardName(boardId)}`
-              : `Moved ${imageNames.length} images to ${getBoardName(boardId)}`
-          );
-          void invalidateGallery(queryClient);
-        } catch (error: unknown) {
-          if (!isAccountScopeCurrent(owner)) {
-            return;
-          }
-
-          recordError(error);
-        }
-      },
+      moveImagesToBoard: (imageNames, boardId) =>
+        moveItemsToBoard(
+          imageNames.map((name) => ({ kind: 'image', name })),
+          boardId
+        ),
       openImageInPreview: (image) => {
         gallery.selectImage(image, projectId);
         openWorkbenchWidget('preview', { preferredRegions: ['center'], requireCenterView: true });
@@ -366,27 +653,11 @@ export const useImageActions = ({
           });
         }
       },
-      setImagesStarred: async (imageNames, starred) => {
-        const owner = captureAccountScope();
-        const rollback = patchGalleryImageCaches(queryClient, { imageNames, kind: 'star', starred });
-
-        try {
-          await galleryOrganization.setStarred(imageNames, starred, owner.signal);
-
-          assertAccountScopeCurrent(owner);
-          gallery.patchImages(imageNames, { starred });
-          void invalidateGalleryImages(queryClient);
-        } catch (error: unknown) {
-          rollback();
-
-          if (!isAccountScopeCurrent(owner)) {
-            return;
-          }
-
-          void invalidateGalleryImages(queryClient);
-          recordError(error);
-        }
-      },
+      setImagesStarred: (imageNames, starred) =>
+        setItemsStarred(
+          imageNames.map((name) => ({ kind: 'image', name })),
+          starred
+        ),
       canUseAsReferenceImage: Boolean(
         currentGenerateValues &&
         currentGenerateValues.referenceImages.length < getMaxReferenceImages(currentGenerateValues.model)
@@ -409,6 +680,7 @@ export const useImageActions = ({
     gallery,
     generateValues,
     generation,
+    getItemActionContext,
     models,
     notifications,
     onImagesDeleted,

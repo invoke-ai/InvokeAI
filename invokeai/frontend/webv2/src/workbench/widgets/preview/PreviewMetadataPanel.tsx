@@ -1,8 +1,12 @@
-import type { GalleryImage, GalleryImageMetadata } from '@features/gallery';
+import type { GalleryImage, GalleryImageMetadata, GalleryItem, GalleryItemKey } from '@features/gallery';
 
-import { Box, DataList, HStack, Icon, Stack, Text } from '@chakra-ui/react';
-import { galleryImages } from '@features/gallery';
+import { Box, DataList, HStack, Icon, Stack, Tabs, Text } from '@chakra-ui/react';
+import { galleryImages, galleryVideos } from '@features/gallery';
+import { toGalleryItemKey } from '@features/gallery/contracts';
+import { useAuthSession } from '@features/identity';
 import { IconButton, Tooltip } from '@platform/ui';
+import { JsonPreview } from '@platform/ui/JsonPreview';
+import { useQuery } from '@tanstack/react-query';
 import {
   EMPTY_IMAGE_RECALL_CAPABILITIES,
   RecallActionButtons,
@@ -11,7 +15,7 @@ import {
   type ImageRecallKind,
 } from '@workbench/image-actions';
 import { ChevronDownIcon, ChevronRightIcon, CopyIcon } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { parsePreviewMetadata, type PreviewMetadataEntry } from './previewMetadata';
@@ -19,9 +23,10 @@ import { parsePreviewMetadata, type PreviewMetadataEntry } from './previewMetada
 /**
  * The footer's collapsible "Details" section: how the image was made (prompt,
  * seed, model, sampler settings) as quiet label/value rows with per-row copy
- * and the recall verbs wired to the existing recall machinery. Metadata is
- * fetched only while expanded; the parent keys this component per image so
- * stale rows never survive a selection change.
+ * and the recall verbs wired to the existing recall machinery. Video Details
+ * expose the backend's raw metadata/workflow/graph payloads instead. The query
+ * child exists only while expanded and is keyed by account + qualified item
+ * identity, so closing or changing identity aborts supported transports.
  */
 
 const GROUP_HOVER_VISIBLE = { opacity: 1 };
@@ -30,73 +35,25 @@ export const PreviewMetadataPanel = ({
   actions,
   image,
   isOpen,
+  item,
   onToggle,
 }: {
   actions: ImageActions;
-  image: GalleryImage;
+  image: GalleryImage | null;
   isOpen: boolean;
+  item: GalleryItem;
   onToggle: () => void;
 }) => {
   const { t } = useTranslation();
-  const [loaded, setLoaded] = useState<{
-    capabilities: ImageRecallCapabilities;
-    imageName: string;
-    metadata: GalleryImageMetadata | null;
-  } | null>(null);
-  // Stale-while-loading: when the selection changes, the previous image's rows
-  // stay in place (slightly dimmed) until the new metadata arrives, so
-  // navigating never collapses the panel or shifts the layout.
-  const isCurrent = loaded?.imageName === image.imageName;
-  const isLoading = isOpen && loaded === null;
-
-  useEffect(() => {
-    if (!isOpen || loaded?.imageName === image.imageName) {
-      return;
-    }
-
-    let isStale = false;
-
-    Promise.all([galleryImages.metadata(image.imageName), actions.getImageRecallCapabilities(image)])
-      .then(([metadata, capabilities]) => {
-        if (!isStale) {
-          setLoaded({ capabilities, imageName: image.imageName, metadata });
-        }
-      })
-      .catch(() => {
-        if (!isStale) {
-          setLoaded({ capabilities: EMPTY_IMAGE_RECALL_CAPABILITIES, imageName: image.imageName, metadata: null });
-        }
-      });
-
-    return () => {
-      isStale = true;
-    };
-  }, [actions, image, isOpen, loaded?.imageName]);
-
-  // Source run is identity the status bar no longer shows; it reads as one
-  // more metadata fact here.
-  const entries = [
-    ...parsePreviewMetadata(loaded?.metadata ?? null),
-    { key: 'sourceRun', label: 'Source Run', value: image.sourceQueueItemId },
-  ];
-  const handleRecall = useCallback(
-    (kind: ImageRecallKind) => void actions.recallImageData(image, kind),
-    [actions, image]
-  );
-  // The recall row is part of the panel's fixed skeleton — never unmounted on
-  // navigation, so it can't cause layout shift. While the next image's
-  // capabilities load, the previous ones stay displayed (the panel dims to
-  // signal staleness); clicks remain safe because `recallImageData` targets
-  // the CURRENT image and re-validates against its fresh metadata. Only the
-  // first-ever load shows all verbs disabled.
-  const capabilities = loaded?.capabilities ?? EMPTY_IMAGE_RECALL_CAPABILITIES;
+  const accountEpoch = useAuthSession().accountEpoch;
+  const itemKey = toGalleryItemKey(item);
 
   return (
     <Stack gap="2">
       <HStack
         as="button"
         aria-expanded={isOpen}
-        color="fg.subtle"
+        color="fg.muted"
         cursor="pointer"
         gap="1"
         w="fit-content"
@@ -108,36 +65,203 @@ export const PreviewMetadataPanel = ({
         </Text>
       </HStack>
       {isOpen ? (
-        <Stack
-          gap="2"
-          maxH="40cqh"
-          opacity={isCurrent || loaded === null ? 1 : 0.6}
-          overflowY="auto"
-          pe="1"
-          transitionDuration="var(--wb-motion-duration-fast)"
-          transitionProperty="opacity"
-        >
-          {isLoading ? (
-            <Text color="fg.subtle" fontSize="2xs">
-              {t('widgets.preview.loadingMetadata')}
-            </Text>
-          ) : (
-            <DataList.Root gap="1.5" orientation="horizontal" size="sm">
-              {entries.map((entry) => (
-                <MetadataRow key={entry.key} entry={entry} />
-              ))}
-            </DataList.Root>
-          )}
-          <RecallActionButtons
-            capabilities={capabilities}
-            disabledReason={t('widgets.preview.recallNotAvailable')}
-            onRecall={handleRecall}
-          />
-        </Stack>
+        <PreviewDetailsQuery
+          key={`${accountEpoch}:${itemKey}`}
+          accountEpoch={accountEpoch}
+          actions={actions}
+          image={image}
+          item={item}
+          itemKey={itemKey}
+        />
       ) : null}
     </Stack>
   );
 };
+
+type PreviewDetailsData =
+  | {
+      kind: 'image';
+      metadata: GalleryImageMetadata | null;
+    }
+  | {
+      graph: string | null;
+      kind: 'video';
+      metadata: Record<string, unknown> | null;
+      workflow: string | null;
+    };
+
+const PreviewDetailsQuery = ({
+  accountEpoch,
+  actions,
+  image,
+  item,
+  itemKey,
+}: {
+  accountEpoch: number;
+  actions: ImageActions;
+  image: GalleryImage | null;
+  item: GalleryItem;
+  itemKey: GalleryItemKey;
+}) => {
+  const { t } = useTranslation();
+  const detailsQuery = useQuery({
+    queryFn: async ({ signal }): Promise<PreviewDetailsData> => {
+      if (item.kind === 'image') {
+        if (!image) {
+          return { kind: 'image', metadata: null };
+        }
+
+        const metadata = await galleryImages.metadata(item.name, signal);
+
+        return { kind: 'image', metadata };
+      }
+
+      const [metadata, workflow] = await Promise.all([
+        galleryVideos.metadata(item.name, signal),
+        galleryVideos.workflow(item.name, signal),
+      ]);
+
+      return { graph: workflow.graph, kind: 'video', metadata, workflow: workflow.workflow };
+    },
+    queryKey: ['preview', 'details', accountEpoch, itemKey],
+    retry: false,
+  });
+
+  if (item.kind === 'video') {
+    if (detailsQuery.isPending) {
+      return (
+        <Text color="fg.subtle" fontSize="2xs">
+          {t('widgets.preview.loadingMetadata')}
+        </Text>
+      );
+    }
+
+    const details = isVideoDetails(detailsQuery.data) ? detailsQuery.data : null;
+
+    return (
+      <VideoDetails
+        graph={details?.graph ?? null}
+        metadata={details?.metadata ?? null}
+        workflow={details?.workflow ?? null}
+      />
+    );
+  }
+
+  const details = isImageDetails(detailsQuery.data) ? detailsQuery.data : null;
+  const capabilities =
+    image && details ? actions.deriveImageRecallCapabilities(image, details.metadata) : EMPTY_IMAGE_RECALL_CAPABILITIES;
+
+  return (
+    <ImageDetails
+      actions={actions}
+      capabilities={capabilities}
+      image={image}
+      isLoading={detailsQuery.isPending}
+      metadata={details?.metadata ?? null}
+    />
+  );
+};
+
+const isVideoDetails = (
+  value: PreviewDetailsData | undefined
+): value is Extract<PreviewDetailsData, { kind: 'video' }> => value?.kind === 'video';
+
+const isImageDetails = (
+  value: PreviewDetailsData | undefined
+): value is Extract<PreviewDetailsData, { kind: 'image' }> => value?.kind === 'image';
+
+const ImageDetails = ({
+  actions,
+  capabilities,
+  image,
+  isLoading,
+  metadata,
+}: {
+  actions: ImageActions;
+  capabilities: ImageRecallCapabilities;
+  image: GalleryImage | null;
+  isLoading: boolean;
+  metadata: GalleryImageMetadata | null;
+}) => {
+  const { t } = useTranslation();
+  const entries = [
+    ...parsePreviewMetadata(metadata),
+    ...(image ? [{ key: 'sourceRun', label: 'Source Run', value: image.sourceQueueItemId }] : []),
+  ];
+  const handleRecall = useCallback(
+    (kind: ImageRecallKind) => {
+      if (image) {
+        void actions.recallImageData(image, kind);
+      }
+    },
+    [actions, image]
+  );
+
+  return (
+    <Stack gap="2" maxH="40cqh" overflowY="auto" pe="1">
+      {isLoading ? (
+        <Text color="fg.subtle" fontSize="2xs">
+          {t('widgets.preview.loadingMetadata')}
+        </Text>
+      ) : (
+        <DataList.Root gap="1.5" orientation="horizontal" size="sm">
+          {entries.map((entry) => (
+            <MetadataRow key={entry.key} entry={entry} />
+          ))}
+        </DataList.Root>
+      )}
+      <RecallActionButtons
+        capabilities={capabilities}
+        disabledReason={t('widgets.preview.recallNotAvailable')}
+        onRecall={handleRecall}
+      />
+    </Stack>
+  );
+};
+
+const VideoDetails = ({
+  graph,
+  metadata,
+  workflow,
+}: {
+  graph: string | null;
+  metadata: Record<string, unknown> | null;
+  workflow: string | null;
+}) => {
+  const { t } = useTranslation();
+
+  return (
+    <Tabs.Root defaultValue="metadata" lazyMount size="sm" unmountOnExit variant="outline">
+      <Tabs.List>
+        <Tabs.Trigger fontSize="2xs" value="metadata">
+          {t('widgets.preview.metadata')}
+        </Tabs.Trigger>
+        <Tabs.Trigger fontSize="2xs" value="workflow">
+          {t('widgets.preview.workflow')}
+        </Tabs.Trigger>
+        <Tabs.Trigger fontSize="2xs" value="graph">
+          {t('widgets.preview.graph')}
+        </Tabs.Trigger>
+      </Tabs.List>
+      <Tabs.Content value="metadata">
+        <JsonPreview label={t('widgets.preview.metadataJsonLabel')} maxH="40cqh" value={metadata} />
+      </Tabs.Content>
+      <Tabs.Content value="workflow">
+        <RawJsonPreview label={t('widgets.preview.workflowJsonLabel')} text={workflow} />
+      </Tabs.Content>
+      <Tabs.Content value="graph">
+        <RawJsonPreview label={t('widgets.preview.graphJsonLabel')} text={graph} />
+      </Tabs.Content>
+    </Tabs.Root>
+  );
+};
+
+const RawJsonPreview = ({ label, text }: { label: string; text: string | null }) =>
+  text === null ? (
+    <JsonPreview label={label} maxH="40cqh" value={null} />
+  ) : (
+    <JsonPreview label={label} maxH="40cqh" text={text} />
+  );
 
 /** A DataList item extended with a hover-revealed copy button on the value. */
 const MetadataRow = ({ entry }: { entry: PreviewMetadataEntry }) => {

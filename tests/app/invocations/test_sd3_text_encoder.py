@@ -71,9 +71,14 @@ class FakeT5Tokenizer:
 
 
 class FakeLoadedModel:
-    def __init__(self, model, config=None):
+    def __init__(self, model, config=None, compute_device=torch.device("cpu")):
         self._model = model
         self.config = config
+        self._compute_device = compute_device
+
+    @property
+    def compute_device(self) -> torch.device:
+        return self._compute_device
 
     @contextmanager
     def model_on_device(self):
@@ -86,10 +91,12 @@ class FakeLoadedModel:
         return False
 
 
-def test_sd3_clip_encode_uses_effective_device(monkeypatch):
+def test_sd3_clip_encode_uses_compute_device(monkeypatch):
+    # Regression test for #9373: the encoder's weights are offloaded to CPU, but its intended compute device is the
+    # accelerator. The encode must run on the intended compute device, not the current residency.
     module_path = "invokeai.app.invocations.sd3_text_encoder"
-    effective_device = torch.device("meta")
-    text_encoder = FakeSd3ClipTextEncoder(effective_device)
+    compute_device = torch.device("meta")
+    text_encoder = FakeSd3ClipTextEncoder(effective_device=torch.device("cpu"))
     tokenizer = FakeClipTokenizer()
 
     def forward(input_ids: torch.Tensor, output_hidden_states: bool = False):
@@ -102,7 +109,9 @@ def test_sd3_clip_encode_uses_effective_device(monkeypatch):
 
     mock_context = MagicMock()
     mock_context.models.load.side_effect = [
-        FakeLoadedModel(text_encoder, config=SimpleNamespace(format=ModelFormat.Diffusers)),
+        FakeLoadedModel(
+            text_encoder, config=SimpleNamespace(format=ModelFormat.Diffusers), compute_device=compute_device
+        ),
         FakeLoadedModel(tokenizer),
     ]
     mock_context.util.signal_progress = MagicMock()
@@ -124,17 +133,21 @@ def test_sd3_clip_encode_uses_effective_device(monkeypatch):
         clip_model=SimpleNamespace(text_encoder=SimpleNamespace(), tokenizer=SimpleNamespace(), loras=[]),
     )
 
-    assert text_encoder.forward_input_device == effective_device
+    assert text_encoder.forward_input_device == compute_device
 
 
-def test_sd3_t5_encode_uses_effective_device(monkeypatch):
+def test_sd3_t5_encode_uses_compute_device(monkeypatch):
+    # Regression test for #9373: same as the CLIP case, for the T5 encode path.
     module_path = "invokeai.app.invocations.sd3_text_encoder"
-    effective_device = torch.device("meta")
-    text_encoder = FakeSd3T5Encoder(effective_device)
+    compute_device = torch.device("meta")
+    text_encoder = FakeSd3T5Encoder(effective_device=torch.device("cpu"))
     tokenizer = FakeT5Tokenizer()
 
     mock_context = MagicMock()
-    mock_context.models.load.side_effect = [FakeLoadedModel(text_encoder), FakeLoadedModel(tokenizer)]
+    mock_context.models.load.side_effect = [
+        FakeLoadedModel(text_encoder, compute_device=compute_device),
+        FakeLoadedModel(tokenizer),
+    ]
     mock_context.util.signal_progress = MagicMock()
     mock_context.logger.warning = MagicMock()
 
@@ -150,4 +163,4 @@ def test_sd3_t5_encode_uses_effective_device(monkeypatch):
 
     invocation._t5_encode(mock_context, max_seq_len=16)
 
-    assert text_encoder.forward_input_device == effective_device
+    assert text_encoder.forward_input_device == compute_device

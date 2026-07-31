@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 
 import { formatDuration } from './formatDuration';
 import { useQueueUi } from './QueueUiContext';
+import { useDeviceLabel } from './useDeviceLabel';
 
 const DetailRow = ({ label, children }: { label: string; children: ReactNode }) => (
   <DataList.Item key={label} alignItems="start">
@@ -25,6 +26,7 @@ export const QueueItemDetails = ({ item }: { item: QueueItemReadModel }) => {
   const { ItemActions } = useQueueUi();
   const meta = extractGenerationMeta(item);
   const duration = formatDuration(item.startedAt, item.completedAt);
+  const deviceLabel = useDeviceLabel(item.device);
 
   return (
     <DataList.Root gap="1.5" orientation="horizontal" size="sm">
@@ -50,6 +52,7 @@ export const QueueItemDetails = ({ item }: { item: QueueItemReadModel }) => {
       {item.userDisplayName || item.userEmail ? (
         <DetailRow label={t('users.user')}>{item.userDisplayName ?? item.userEmail}</DetailRow>
       ) : null}
+      {deviceLabel ? <DetailRow label={t('widgets.queue.device.label')}>{deviceLabel.name}</DetailRow> : null}
       {item.errorMessage ? (
         <DetailRow label={t('common.error')}>
           <Text as="span" color="fg.error">

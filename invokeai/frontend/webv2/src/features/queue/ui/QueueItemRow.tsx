@@ -18,6 +18,7 @@ import { QueueStepProgress } from './QueueStepProgress';
 import { useQueueUi } from './QueueUiContext';
 import { clearPendingQueueItemReveal, type QueueItemRevealRequest } from './queueUiStore';
 import { getStatusMeta } from './statusMeta';
+import { useDeviceLabel } from './useDeviceLabel';
 
 const CHEVRON_OPEN = { transform: 'rotate(90deg)' } as const;
 
@@ -70,6 +71,9 @@ export const QueueItemRow = memo(
     const liveImage = progress?.image ?? null;
     const resultImageName = getResultImageName(item);
     const statusLabel = t(getStatusMeta(item.status).labelKey);
+    // A running item's device arrives on the progress event before the row's DTO is
+    // refetched, so prefer the live value and fall back to the persisted one.
+    const deviceLabel = useDeviceLabel(progress?.device ?? item.device);
 
     const showBorder = expanded || isFailed;
     const borderColor = showBorder ? (isFailed ? 'fg.error' : 'border') : 'transparent';
@@ -90,8 +94,20 @@ export const QueueItemRow = memo(
               </Text>
               <HStack gap="1.5" minW="0">
                 <QueueStatusDot status={item.status} />
-                <Text color="fg.muted" fontSize="2xs" fontVariantNumeric="tabular-nums" truncate>
-                  {[statusLabel, ageLabel].filter(Boolean).join(' · ')}
+                <Text
+                  color="fg.muted"
+                  fontSize="2xs"
+                  fontVariantNumeric="tabular-nums"
+                  title={deviceLabel ? t('widgets.queue.device.tooltip', { name: deviceLabel.name }) : undefined}
+                  truncate
+                >
+                  {[
+                    statusLabel,
+                    ageLabel,
+                    deviceLabel ? t('widgets.queue.device.shortLabel', { index: deviceLabel.index }) : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
                 </Text>
               </HStack>
             </Stack>

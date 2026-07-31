@@ -1,10 +1,11 @@
+import type { GalleryImageItem, GalleryItem, GalleryItemRef } from '@features/gallery/contracts';
 import type { GallerySettings } from '@features/gallery/core/settings';
-import type { GalleryImage, GalleryView } from '@features/gallery/core/types';
+import type { GalleryView } from '@features/gallery/core/types';
 
 import { createContext, use } from 'react';
 
 import type { GalleryStateView } from './galleryStateView';
-import type { GalleryImageActions, GalleryWidgetRuntime } from './GalleryUiContext';
+import type { GalleryItemActions, GalleryWidgetRuntime } from './GalleryUiContext';
 
 /**
  * Gallery-widget intents. The provider (GalleryWidgetView) is the only place
@@ -21,12 +22,13 @@ export interface GalleryActions {
   refresh: () => void;
   renameBoard: (boardId: string, boardName: string) => Promise<void>;
   selectBoard: (boardId: string) => void;
-  selectImage: (image: GalleryImage) => void;
-  selectImageRange: (imageNames: string[], primaryImage: GalleryImage) => void;
+  selectItem: (item: GalleryItem) => void;
+  selectItemRange: (items: GalleryItemRef[], primaryItem: GalleryItem) => void;
   selectProjectBoard: () => Promise<void>;
+  setCompareItem: (image: GalleryImageItem | null) => void;
   setSearchTerm: (searchTerm: string) => void;
   setView: (galleryView: GalleryView) => void;
-  toggleImageInSelection: (image: GalleryImage) => void;
+  toggleItemInSelection: (item: GalleryItem, nextPrimaryItem: GalleryItem | null) => void;
   updateSettings: (settings: Partial<GallerySettings>) => void;
   uploadFiles: (files: File[]) => Promise<void>;
 }
@@ -34,7 +36,7 @@ export interface GalleryActions {
 export interface GalleryWidgetContextValue {
   gallery: GalleryStateView;
   actions: GalleryActions;
-  imageActions: GalleryImageActions;
+  itemActions: GalleryItemActions;
   /** The infinite window is full and the board holds images it cannot reach. */
   isWindowTruncated: boolean;
   projectName: string;

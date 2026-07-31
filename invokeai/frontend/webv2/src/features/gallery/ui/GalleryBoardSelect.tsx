@@ -1,3 +1,4 @@
+import type { GalleryItem, GalleryItemKey, GalleryItemRef } from '@features/gallery/core/items';
 import type { GalleryBoard } from '@features/gallery/core/types';
 
 import {
@@ -15,7 +16,8 @@ import {
   Text,
 } from '@chakra-ui/react';
 import { useDndContext, useDndMonitor, useDroppable, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core';
-import { Button, CloseButton, IconButton } from '@platform/ui';
+import { toGalleryItemKey } from '@features/gallery/core/items';
+import { Button, CloseButton, IconButton, Tooltip } from '@platform/ui';
 import {
   ArchiveIcon,
   ArrowDownAZIcon,
@@ -25,6 +27,7 @@ import {
   ImageIcon,
   MoreVerticalIcon,
   PinIcon,
+  PlayIcon,
   PlusIcon,
   type LucideIcon,
   SearchIcon,
@@ -46,23 +49,47 @@ import { GalleryBoardMenu, type GalleryBoardMenuTarget } from './GalleryBoardMen
 import {
   getGalleryBoardDropData,
   getGalleryBoardDropId,
-  getGalleryImageNamesOutsideBoard,
-  isGalleryBoardDropData,
-  isGalleryImageDragData,
+  isGalleryItemDragData,
+  resolveGalleryBoardDrop,
 } from './galleryDnd';
 import { getBoardCounts } from './galleryStateView';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
+export const forwardGalleryBoardDrop = ({
+  activeData,
+  loadedItems,
+  moveItemsToBoard,
+  overData,
+}: {
+  activeData: unknown;
+  loadedItems: readonly GalleryItem[];
+  moveItemsToBoard: (items: GalleryItemRef[], boardId: string) => void;
+  overData: unknown;
+}): boolean => {
+  const resolution = resolveGalleryBoardDrop(activeData, overData, loadedItems);
+
+  if (!resolution) {
+    return false;
+  }
+
+  moveItemsToBoard(resolution.items, resolution.boardId);
+  return true;
+};
+
 export const GalleryBoardSelect = () => {
   const { t } = useTranslation();
-  const { actions, gallery, imageActions, projectName } = useGalleryWidget();
+  const { actions, gallery, itemActions, projectName } = useGalleryWidget();
   const { active } = useDndContext();
   const [isOpen, setIsOpen] = useState(false);
   const [boardSearchTerm, setBoardSearchTerm] = useState('');
   const [boardMenuTarget, setBoardMenuTarget] = useState<GalleryBoardMenuTarget | null>(null);
   const boardMenuActiveRef = useRef(false);
   const dragOpenedMenuRef = useRef(false);
-  const isGalleryImageDragActive = isGalleryImageDragData(active?.data.current);
+  const isGalleryItemDragActive = isGalleryItemDragData(active?.data.current);
+  const loadedItemBoardIds = useMemo(
+    () => new Map<GalleryItemKey, string>(gallery.items.map((item) => [toGalleryItemKey(item), item.boardId])),
+    [gallery.items]
+  );
   const trimmedSearchTerm = boardSearchTerm.trim();
   const normalizedSearchTerm = trimmedSearchTerm.toLowerCase();
   const matchesSearch = useCallback(
@@ -98,20 +125,19 @@ export const GalleryBoardSelect = () => {
       const dragData = event.active.data.current;
       const dropData = event.over?.data.current;
 
-      if (isGalleryImageDragData(dragData) && isGalleryBoardDropData(dropData) && dropData.boardKind === 'board') {
-        const imageNames = getGalleryImageNamesOutsideBoard(dragData, dropData.boardId);
-
-        if (imageNames.length > 0) {
-          void imageActions.moveImagesToBoard(imageNames, dropData.boardId);
-        }
-      }
+      forwardGalleryBoardDrop({
+        activeData: dragData,
+        loadedItems: gallery.items,
+        moveItemsToBoard: (items, boardId) => void itemActions.moveItemsToBoard(items, boardId),
+        overData: dropData,
+      });
 
       if (dragOpenedMenuRef.current) {
         dragOpenedMenuRef.current = false;
         closeAndReset();
       }
     },
-    [closeAndReset, imageActions]
+    [closeAndReset, gallery.items, itemActions]
   );
 
   const handleDragCancel = useCallback(() => {
@@ -122,7 +148,7 @@ export const GalleryBoardSelect = () => {
   }, [closeAndReset]);
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
-    if (!isGalleryImageDragData(event.active.data.current)) {
+    if (!isGalleryItemDragData(event.active.data.current)) {
       return;
     }
 
@@ -175,13 +201,13 @@ export const GalleryBoardSelect = () => {
         return;
       }
 
-      if (boardMenuActiveRef.current || isGalleryImageDragActive) {
+      if (boardMenuActiveRef.current || isGalleryItemDragActive) {
         return;
       }
 
       closeAndReset();
     },
-    [closeAndReset, isGalleryImageDragActive]
+    [closeAndReset, isGalleryItemDragActive]
   );
 
   const handleSearchChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
@@ -263,6 +289,7 @@ export const GalleryBoardSelect = () => {
                           badgeColor="blue"
                           board={projectBoard}
                           isSelected={projectBoard.id === gallery.selectedBoardId}
+                          loadedItemBoardIds={loadedItemBoardIds}
                           onOpenMenu={openBoardMenu}
                           onSelectBoard={actions.selectBoard}
                           onSelectComplete={closeAndReset}
@@ -284,6 +311,7 @@ export const GalleryBoardSelect = () => {
                       <BoardRow
                         board={uncategorizedBoard}
                         isSelected={uncategorizedBoard.id === gallery.selectedBoardId}
+                        loadedItemBoardIds={loadedItemBoardIds}
                         onOpenMenu={openBoardMenu}
                         onSelectBoard={actions.selectBoard}
                         onSelectComplete={closeAndReset}
@@ -297,6 +325,7 @@ export const GalleryBoardSelect = () => {
                             key={board.id}
                             board={board}
                             isSelected={board.id === gallery.selectedBoardId}
+                            loadedItemBoardIds={loadedItemBoardIds}
                             onSelectBoard={actions.selectBoard}
                             onSelectComplete={closeAndReset}
                           />
@@ -313,6 +342,7 @@ export const GalleryBoardSelect = () => {
                         badgeColor="gray"
                         board={board}
                         isSelected={board.id === gallery.selectedBoardId}
+                        loadedItemBoardIds={loadedItemBoardIds}
                         onOpenMenu={openBoardMenu}
                         onSelectBoard={actions.selectBoard}
                         onSelectComplete={closeAndReset}
@@ -434,6 +464,7 @@ const BoardRow = ({
   badgeColor,
   board,
   isSelected,
+  loadedItemBoardIds,
   onOpenMenu,
   onSelectBoard,
   onSelectComplete,
@@ -442,6 +473,7 @@ const BoardRow = ({
   badgeColor?: 'blue' | 'gray';
   board: GalleryBoard;
   isSelected: boolean;
+  loadedItemBoardIds: ReadonlyMap<GalleryItemKey, string>;
   onOpenMenu?: (board: GalleryBoard, x: number, y: number) => void;
   onSelectBoard: (boardId: string) => void;
   onSelectComplete: () => void;
@@ -450,14 +482,14 @@ const BoardRow = ({
   const { active } = useDndContext();
   const dragData = active?.data.current;
 
-  const canDropImages =
+  const canDropItems =
     board.kind === 'board' &&
-    isGalleryImageDragData(dragData) &&
-    getGalleryImageNamesOutsideBoard(dragData, board.id).length > 0;
+    isGalleryItemDragData(dragData) &&
+    dragData.items.some((ref) => loadedItemBoardIds.get(toGalleryItemKey(ref)) !== board.id);
 
   const { isOver, setNodeRef } = useDroppable({
     data: getGalleryBoardDropData(board.id, board.kind),
-    disabled: !canDropImages,
+    disabled: !canDropItems,
     id: getGalleryBoardDropId(board.id),
   });
 
@@ -508,8 +540,8 @@ const BoardRow = ({
       // DropZone tokens without the DropZone component: an outline (not a border) so the drop affordance never shifts menu layout.
       bg={isOver ? 'accent.muted' : undefined}
       css={hoverCss}
-      outline={canDropImages ? '1px dashed' : undefined}
-      outlineColor={canDropImages ? 'accent.solid' : undefined}
+      outline={canDropItems ? '1px dashed' : undefined}
+      outlineColor={canDropItems ? 'accent.solid' : undefined}
       value={board.id}
       onClick={handleSelect}
       onContextMenu={onOpenMenu ? handleContextMenu : undefined}
@@ -535,7 +567,7 @@ const BoardRow = ({
   );
 };
 
-const BoardOptionContent = ({
+export const BoardOptionContent = ({
   badge,
   badgeColor = 'gray',
   board,
@@ -549,7 +581,12 @@ const BoardOptionContent = ({
   /** Render the owner line (admins on multi-user backends); off in the compact trigger. */
   showOwner?: boolean;
 }) => {
+  const { t } = useTranslation();
   const counts = getBoardCounts(board);
+  const mediaCountBreakdown = t('widgets.gallery.boardMediaCountBreakdown', {
+    images: t('widgets.gallery.imageCount', { count: counts.imageCount }),
+    videos: t('widgets.gallery.videoCount', { count: counts.videoCount }),
+  });
 
   return (
     <HStack gap="2" minW="0" w="full">
@@ -570,9 +607,17 @@ const BoardOptionContent = ({
             {badge}
           </Badge>
         )}
-        <Badge flexShrink={0} size="xs" variant={isSelected ? 'solid' : 'subtle'}>
-          {counts.imageCount} | {counts.assetCount}
-        </Badge>
+        <Tooltip content={mediaCountBreakdown}>
+          <Badge
+            aria-label={mediaCountBreakdown}
+            flexShrink={0}
+            fontVariantNumeric="tabular-nums"
+            size="xs"
+            variant={isSelected ? 'solid' : 'subtle'}
+          >
+            {counts.imageCount + counts.videoCount} | {counts.assetCount}
+          </Badge>
+        </Tooltip>
       </Flex>
     </HStack>
   );
@@ -594,20 +639,37 @@ const BoardCoverIcon = ({ icon }: { icon: LucideIcon }) => (
   </Flex>
 );
 
-const BoardCover = ({ board }: { board: GalleryBoard }) => {
+export const BoardCover = ({ board }: { board: GalleryBoard }) => {
   if (board.coverThumbnailUrl) {
     return (
-      <Image
-        alt=""
-        bg="bg.emphasized"
-        borderWidth="1px"
-        borderColor="border.subtle"
-        boxSize="7"
-        flexShrink={0}
-        objectFit="cover"
-        rounded="md"
-        src={board.coverThumbnailUrl}
-      />
+      <Flex boxSize="7" flexShrink={0} position="relative">
+        <Image
+          alt=""
+          bg="bg.emphasized"
+          borderWidth="1px"
+          borderColor="border.subtle"
+          boxSize="7"
+          objectFit="cover"
+          rounded="md"
+          src={board.coverThumbnailUrl}
+        />
+        {board.coverVideoName ? (
+          <Flex
+            align="center"
+            aria-hidden="true"
+            bg="blackAlpha.700"
+            bottom="0.5"
+            boxSize="3"
+            color="white"
+            justify="center"
+            position="absolute"
+            right="0.5"
+            rounded="full"
+          >
+            <Icon as={PlayIcon} boxSize="2" fill="currentColor" />
+          </Flex>
+        ) : null}
+      </Flex>
     );
   }
 

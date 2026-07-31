@@ -67,10 +67,26 @@ export const MODEL_BASES = {
     label: 'Z-Image',
     colorPalette: 'orange',
   },
+  'ideogram-4': {
+    base: 'ideogram-4',
+    label: 'Ideogram 4',
+    colorPalette: 'pink',
+  },
+  'krea-2': {
+    base: 'krea-2',
+    label: 'Krea-2',
+    colorPalette: 'pink',
+  },
   anima: {
     base: 'anima',
     label: 'Anima',
     colorPalette: 'pink',
+  },
+  wan: {
+    base: 'wan',
+    label: 'Wan 2.2',
+    colorPalette: 'cyan',
+    description: 'Video architecture used for image generation at a single frame.',
   },
   any: {
     base: 'any',

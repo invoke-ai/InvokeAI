@@ -1,40 +1,60 @@
 import type { QueueItem } from '@features/queue/contracts';
 import type { WidgetViewProps } from '@workbench/widgetContracts';
 
-import { Box, Stack, Text } from '@chakra-ui/react';
+import { Box, SimpleGrid, Stack, Text } from '@chakra-ui/react';
 import { useDndMonitor, type DragEndEvent } from '@dnd-kit/core';
 import {
   galleryImages,
   type GalleryBoard,
   type GalleryImage,
+  type GalleryImageItem,
+  type GalleryItem,
+  type GalleryItemKey,
+  type GalleryItemRef,
   type GalleryView,
-  type GeneratedImageContract,
 } from '@features/gallery';
 import {
   getGalleryCompareImage,
   getGalleryGenerationSequence,
+  getGalleryLiveSlots,
   getGallerySelectedImageQuery,
   getGallerySettings,
+  getSelectedGalleryItemFromValues,
   getBoundedRecentImages,
+  compareGalleryItems,
+  galleryImageItemToGalleryImage,
+  isGalleryImageItem,
+  legacyGeneratedImageToGalleryItem,
   normalizeGalleryImage,
+  toGalleryItemKey,
+  toGalleryItemRef,
+  type GalleryItemsPage,
   type GalleryQueuePlaceholder,
 } from '@features/gallery/contracts';
 import {
-  flattenGalleryImagesData,
+  flattenGalleryItemsData,
   GALLERY_MAX_ROWS,
   GALLERY_PAGE_SIZE,
   galleryBoardsOptions,
-  galleryImagesInfiniteOptions,
+  galleryItemsInfiniteOptions,
 } from '@features/gallery/queries';
 import { createGenerateFormValuesSelector } from '@features/generation/react';
-import { useActiveProgressTarget, useProgressImage, type LatestProgressImageSnapshot } from '@features/queue/react';
+import { useDeviceLabel } from '@features/queue/devices';
+import {
+  useActiveProgressTarget,
+  useActiveProgressTargets,
+  useItemProgress,
+  useProgressImage,
+  useQueueItemProgressImage,
+  type LatestProgressImageSnapshot,
+} from '@features/queue/react';
 import { parseDateTokens } from '@platform/search/dateTokens';
 import {
   imageUrlToStreamingSource,
   progressImageToStreamingSource,
 } from '@platform/ui/streaming-image/streamingImageSource';
 import { useStreamingImageSource } from '@platform/ui/streaming-image/useStreamingImageSource';
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery, type InfiniteData } from '@tanstack/react-query';
 import {
   ImageContextMenu,
   useImageActions,
@@ -47,6 +67,7 @@ import {
   useActiveProjectSelector,
   useWidgetValuesSelector,
   useWorkbenchCommands,
+  useWorkbenchQueries,
 } from '@workbench/WorkbenchContext';
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, type KeyboardEvent, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -58,7 +79,12 @@ import { resolvePreviewCompareDrop } from './previewCompareDnd';
 import { usePreviewDensity, type PreviewDensity } from './previewDensity';
 import { PreviewFilmstrip } from './PreviewFilmstrip';
 import { PreviewFooter } from './PreviewFooter';
-import { PreviewFrame } from './PreviewFrame';
+import {
+  PreviewFrame,
+  type PreviewMediaSource,
+  type PreviewVideoFrameController,
+  type PreviewVideoFrameCopyResult,
+} from './PreviewFrame';
 import { previewHeaderStore } from './previewHeaderStore';
 import {
   getPreviewNavigationCursor,
@@ -72,102 +98,115 @@ import {
   type PreviewComparisonMode,
 } from './previewSettings';
 
-type PreviewImage = GeneratedImageContract & Partial<Pick<GalleryImage, 'boardId' | 'imageCategory' | 'starred'>>;
-const EMPTY_PREVIEW_IMAGES: PreviewImage[] = [];
+const EMPTY_PREVIEW_ITEMS: GalleryItem[] = [];
+
+const VIDEO_FRAME_COPY_FAILURE_KEYS = {
+  'clipboard-failed': 'widgets.preview.copyCurrentFrameWriteFailed',
+  'draw-failed': 'widgets.preview.copyCurrentFrameDrawFailed',
+  'encode-failed': 'widgets.preview.copyCurrentFrameEncodeFailed',
+  'not-ready': 'widgets.preview.copyCurrentFrameNotReady',
+  stale: 'widgets.preview.copyCurrentFrameStale',
+  unsupported: 'widgets.preview.copyCurrentFrameUnsupported',
+} as const;
+
+export const getVideoFrameCopyNotice = (
+  result: PreviewVideoFrameCopyResult,
+  translate: (key: string) => string
+): { kind: 'error' | 'success'; title: string } =>
+  result.ok
+    ? { kind: 'success', title: translate('widgets.preview.copyCurrentFrameSuccess') }
+    : { kind: 'error', title: translate(VIDEO_FRAME_COPY_FAILURE_KEYS[result.reason]) };
 
 const fallbackBoards: GalleryBoard[] = [
-  { archived: false, assetCount: 0, id: 'none', imageCount: 0, kind: 'uncategorized', name: 'Uncategorized' },
+  {
+    archived: false,
+    assetCount: 0,
+    id: 'none',
+    imageCount: 0,
+    kind: 'uncategorized',
+    name: 'Uncategorized',
+    videoCount: 0,
+  },
 ];
 
-const getGalleryImages = (values: Record<string, unknown>, queueItems: QueueItem[]): PreviewImage[] => {
+const getLocalGalleryItems = (values: Record<string, unknown>, queueItems: QueueItem[]): GalleryImageItem[] => {
   const queueBoardIds = new Map(queueItems.map((item) => [item.id, item.snapshot.galleryBoardId ?? 'none'] as const));
 
   return getBoundedRecentImages(values.recentImages).map((image) =>
-    normalizeGalleryImage(image, queueBoardIds.get(image.sourceQueueItemId))
+    legacyGeneratedImageToGalleryItem(normalizeGalleryImage(image, queueBoardIds.get(image.sourceQueueItemId)))
   );
 };
 
-const getSelectedImage = (values: Record<string, unknown>, localImages: PreviewImage[]): PreviewImage | null => {
-  const selectedImage = values.selectedImage;
-  const selectedImageName = typeof values.selectedImageName === 'string' ? values.selectedImageName : null;
+const getSelectedItem = (values: Record<string, unknown>, localItems: GalleryImageItem[]): GalleryItem | null => {
+  const selectedItem = getSelectedGalleryItemFromValues(values);
 
-  if (
-    selectedImage &&
-    typeof selectedImage === 'object' &&
-    typeof (selectedImage as GeneratedImageContract).imageName === 'string'
-  ) {
-    const image = selectedImage as PreviewImage;
-
-    return typeof image.boardId === 'string'
-      ? image
-      : (localImages.find((candidate) => candidate.imageName === image.imageName) ?? image);
+  if (selectedItem) {
+    const selectedItemKey = toGalleryItemKey(selectedItem);
+    return localItems.find((candidate) => toGalleryItemKey(candidate) === selectedItemKey) ?? selectedItem;
   }
 
-  return localImages.find((image) => image.imageName === selectedImageName) ?? localImages[0] ?? null;
+  return localItems[0] ?? null;
 };
 
-const getOrderedPreviewImages = (
-  images: PreviewImage[],
+const flattenPreviewItems = (data: InfiniteData<GalleryItemsPage, number> | undefined): GalleryItem[] =>
+  flattenGalleryItemsData(data);
+
+const getOrderedPreviewItems = (
+  items: GalleryItem[],
   imageOrderDir: 'ASC' | 'DESC',
   starredFirst: boolean,
   inputOrder: 'display' | 'newest-first'
-): PreviewImage[] =>
-  images
-    .map((image, index) => ({ image, index }))
+): GalleryItem[] =>
+  items
+    .map((item, index) => ({ index, item }))
     .sort((a, b) => {
-      if (starredFirst && Boolean(a.image.starred) !== Boolean(b.image.starred)) {
-        return a.image.starred ? -1 : 1;
-      }
+      const canonicalOrder = compareGalleryItems(a.item, b.item, { orderDir: imageOrderDir, starredFirst });
 
-      const chronological = a.image.queuedAt.localeCompare(b.image.queuedAt);
-
-      if (chronological !== 0) {
-        return imageOrderDir === 'DESC' ? -chronological : chronological;
+      if (canonicalOrder !== 0) {
+        return canonicalOrder;
       }
 
       return inputOrder === 'newest-first' && imageOrderDir === 'ASC' ? b.index - a.index : a.index - b.index;
     })
-    .map(({ image }) => image);
+    .map(({ item }) => item);
 
-const getOrderedLocalImages = ({
+const getOrderedLocalItems = ({
   boardId,
   galleryView,
-  images,
+  items,
   imageOrderDir,
   starredFirst,
 }: {
   boardId: string;
   galleryView: GalleryView;
-  images: PreviewImage[];
+  items: GalleryItem[];
   imageOrderDir: 'ASC' | 'DESC';
   starredFirst: boolean;
-}): PreviewImage[] =>
-  getOrderedPreviewImages(
-    images.filter((image) => getImageBoardId(image) === boardId && getImageGalleryView(image) === galleryView),
+}): GalleryItem[] =>
+  getOrderedPreviewItems(
+    items.filter((item) => item.boardId === boardId && getItemGalleryView(item) === galleryView),
     imageOrderDir,
     starredFirst,
     'newest-first'
   );
 
-export const mergePreviewBoardImages = (
-  backendImages: PreviewImage[],
-  localImages: PreviewImage[],
+export const mergePreviewBoardItems = (
+  backendItems: GalleryItem[],
+  localItems: GalleryItem[],
   imageOrderDir: 'ASC' | 'DESC',
   starredFirst: boolean
-): PreviewImage[] => {
-  const backendNames = new Set(backendImages.map((image) => image.imageName));
-  const missingLocalImages = localImages.filter((image) => !backendNames.has(image.imageName));
+): GalleryItem[] => {
+  const backendKeys = new Set(backendItems.map(toGalleryItemKey));
+  const missingLocalItems = localItems.filter((item) => !backendKeys.has(toGalleryItemKey(item)));
 
-  if (missingLocalImages.length === 0) {
-    return backendImages.slice(0, GALLERY_MAX_ROWS);
+  if (missingLocalItems.length === 0) {
+    return backendItems.slice(0, GALLERY_MAX_ROWS);
   }
 
-  return getOrderedPreviewImages(
-    [...backendImages, ...missingLocalImages],
-    imageOrderDir,
-    starredFirst,
-    'display'
-  ).slice(0, GALLERY_MAX_ROWS);
+  return getOrderedPreviewItems([...backendItems, ...missingLocalItems], imageOrderDir, starredFirst, 'display').slice(
+    0,
+    GALLERY_MAX_ROWS
+  );
 };
 
 /**
@@ -176,24 +215,12 @@ export const mergePreviewBoardImages = (
  * the board list sort must not reshuffle the preview. Freshly generated local
  * images (no boardId yet) fall back to the gallery selection for display only.
  */
-const getImageBoardId = (image: PreviewImage): string => (typeof image.boardId === 'string' ? image.boardId : 'none');
-
 /**
- * Which gallery tab an image belongs to. Mirrors the category split the
+ * Which gallery tab an item belongs to. Mirrors the category split the
  * gallery filters on: `general` is a gallery image, everything else (canvas
- * pixels, control layers, uploads) is an asset. A freshly generated local
- * image carries no category yet and is a gallery image by default.
+ * pixels, control layers, uploads) is an asset.
  */
-const getImageGalleryView = (image: PreviewImage): GalleryView =>
-  (image.imageCategory ?? 'general') === 'general' ? 'images' : 'assets';
-
-const getDisplayBoardId = (image: PreviewImage, values: Record<string, unknown>): string => {
-  if (typeof image.boardId === 'string') {
-    return image.boardId;
-  }
-
-  return typeof values.selectedBoardId === 'string' ? values.selectedBoardId : 'none';
-};
+const getItemGalleryView = (item: GalleryItem): GalleryView => (item.category === 'general' ? 'images' : 'assets');
 
 const getBoardName = (
   boards: GalleryBoard[],
@@ -231,27 +258,38 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   );
   const progressImage = useProgressImage();
   const activeProgressTarget = useActiveProgressTarget();
+  const activeProgressTargets = useActiveProgressTargets();
   const { account, gallery, notifications, widgets } = useWorkbenchCommands();
+  const queries = useWorkbenchQueries();
   const { density, rootRef } = usePreviewDensity(region);
   const recentImages = galleryValues.recentImages;
-  const localImages = useMemo(() => getGalleryImages({ recentImages }, queueItems), [queueItems, recentImages]);
-  const selectedImage = useMemo(() => getSelectedImage(galleryValues, localImages), [galleryValues, localImages]);
+  const localItems = useMemo(() => getLocalGalleryItems({ recentImages }, queueItems), [queueItems, recentImages]);
+  const selectedItem = useMemo(() => getSelectedItem(galleryValues, localItems), [galleryValues, localItems]);
   const compareImage = getGalleryCompareImage(galleryValues);
   const comparisonMode = getPreviewComparisonMode(previewValues);
-  const displayBoardId = selectedImage ? getDisplayBoardId(selectedImage, galleryValues) : 'none';
-  const hasSelectedImage = selectedImage !== null;
+  const displayBoardId = selectedItem?.boardId ?? 'none';
+  const hasSelectedItem = selectedItem !== null;
   const { imageOrderDir, starredFirst } = getGallerySettings(galleryValues);
   const selectedImageQuery = getGallerySelectedImageQuery(galleryValues);
   const selectedImageSearch = useMemo(
     () => parseDateTokens(selectedImageQuery.searchTerm),
     [selectedImageQuery.searchTerm]
   );
-  const selectedImageName = selectedImage?.imageName ?? null;
+  const selectedItemKey = selectedItem ? toGalleryItemKey(selectedItem) : null;
   const isComparing =
-    selectedImage !== null && compareImage !== null && compareImage.imageName !== selectedImage.imageName;
-  const activeGalleryPlaceholder = useMemo(
-    () => getGalleryGenerationSequence(queueItems, activeProgressTarget).liveSlot,
+    selectedItem?.kind === 'image' &&
+    compareImage !== null &&
+    toGalleryItemKey({ kind: 'image', name: compareImage.imageName }) !== selectedItemKey;
+  const generationSequence = useMemo(
+    () => getGalleryGenerationSequence(queueItems, activeProgressTarget),
     [activeProgressTarget, queueItems]
+  );
+  const activeGalleryPlaceholder = generationSequence.liveSlot;
+  // Multi-GPU runs one session per GPU, so several slots can be live at once. One
+  // live slot keeps the existing single-frame preview; two or more are tiled.
+  const liveGalleryPlaceholders = useMemo(
+    () => getGalleryLiveSlots(generationSequence.chronologicalSlots, activeProgressTargets),
+    [activeProgressTargets, generationSequence.chronologicalSlots]
   );
   const matchingProgressImage = getMatchingProgressImage(progressImage, activeGalleryPlaceholder);
   const shouldFollowLive = showProgressImagesInViewer && activeGalleryPlaceholder !== null && !isComparing;
@@ -259,10 +297,12 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   const navigationGalleryView = shouldFollowLive ? 'images' : selectedImageQuery.galleryView;
   const navigationOrderDir = shouldFollowLive ? imageOrderDir : selectedImageQuery.imageOrderDir;
   const navigationStarredFirst = shouldFollowLive ? starredFirst : selectedImageQuery.starredFirst;
-  const hasNavigationContext = shouldFollowLive || hasSelectedImage;
+  const hasNavigationContext = shouldFollowLive || hasSelectedItem;
   const { t } = useTranslation();
   const loupeControlsRef = useRef<PreviewLoupeControls | null>(null);
-  const navigationContextKey = `${shouldFollowLive}:${selectedImageName ?? ''}:${navigationBoardId}:${navigationGalleryView}:${navigationOrderDir}:${navigationStarredFirst}:${selectedImageQuery.paginationMode}:${selectedImageQuery.page}:${selectedImageQuery.searchTerm}`;
+  const videoControllerRef = useRef<PreviewVideoFrameController | null>(null);
+  const [copyAvailableItemKey, setCopyAvailableItemKey] = useState<GalleryItemKey | null>(null);
+  const navigationContextKey = `${shouldFollowLive}:${selectedItemKey ?? ''}:${navigationBoardId}:${navigationGalleryView}:${navigationOrderDir}:${navigationStarredFirst}:${selectedImageQuery.paginationMode}:${selectedImageQuery.page}:${selectedImageQuery.searchTerm}`;
   const navigationQueryKey = `${shouldFollowLive}:${navigationBoardId}:${navigationGalleryView}:${navigationOrderDir}:${navigationStarredFirst}:${selectedImageQuery.paginationMode}:${selectedImageQuery.searchTerm}`;
 
   // Lets a boundary fetch that resolves after the user has moved on compare the
@@ -293,19 +333,19 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
 
   const boardsQuery = useQuery({
     ...galleryBoardsOptions(),
-    enabled: hasSelectedImage,
+    enabled: hasSelectedItem,
   });
   const {
-    data: boardImagesData,
-    fetchNextPage: fetchNextBoardImagesPage,
-    fetchPreviousPage: fetchPreviousBoardImagesPage,
-    hasNextPage: hasNextBoardImagesPage,
-    hasPreviousPage: hasPreviousBoardImagesPage,
-    isFetching: isFetchingBoardImages,
-    isFetchingNextPage: isFetchingNextBoardImagesPage,
-    isFetchingPreviousPage: isFetchingPreviousBoardImagesPage,
+    data: boardItemsData,
+    fetchNextPage: fetchNextBoardItemsPage,
+    fetchPreviousPage: fetchPreviousBoardItemsPage,
+    hasNextPage: hasNextBoardItemsPage,
+    hasPreviousPage: hasPreviousBoardItemsPage,
+    isFetching: isFetchingBoardItems,
+    isFetchingNextPage: isFetchingNextBoardItemsPage,
+    isFetchingPreviousPage: isFetchingPreviousBoardItemsPage,
   } = useInfiniteQuery({
-    ...galleryImagesInfiniteOptions(
+    ...galleryItemsInfiniteOptions(
       {
         boardId: navigationBoardId,
         createdFrom: shouldFollowLive ? undefined : selectedImageSearch.range?.from,
@@ -321,18 +361,19 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     ),
     enabled: hasNavigationContext,
   });
-  const selectPreviewImage = useCallback(
-    (image: GeneratedImageContract) => {
-      const pageIndex = boardImagesData?.pages.findIndex((page) =>
-        page.images.some((candidate) => candidate.imageName === image.imageName)
+  const selectPreviewItem = useCallback(
+    (item: GalleryItem) => {
+      const itemKey = toGalleryItemKey(item);
+      const pageIndex = boardItemsData?.pages.findIndex((page) =>
+        page.items.some((candidate) => toGalleryItemKey(candidate) === itemKey)
       );
-      const pageParam = pageIndex === undefined || pageIndex < 0 ? undefined : boardImagesData?.pageParams[pageIndex];
+      const pageParam = pageIndex === undefined || pageIndex < 0 ? undefined : boardItemsData?.pageParams[pageIndex];
       const selectionPage =
         typeof pageParam === 'number' ? Math.floor(pageParam / GALLERY_PAGE_SIZE) : selectedImageQuery.page;
 
-      gallery.selectImage(image, undefined, selectionPage, true);
+      gallery.selectItem(item, undefined, selectionPage, true);
     },
-    [boardImagesData, gallery, selectedImageQuery.page]
+    [boardItemsData, gallery, selectedImageQuery.page]
   );
   const boards = boardsQuery.data ?? fallbackBoards;
   const optimisticQueueItemIds = useMemo(
@@ -342,51 +383,49 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
       ),
     [queueItems]
   );
-  const navigationLocalImages = useMemo(() => {
+  const navigationLocalItems = useMemo(() => {
     const refreshingSelectedSourceId =
-      !shouldFollowLive && isFetchingBoardImages ? selectedImage?.sourceQueueItemId : null;
+      !shouldFollowLive && isFetchingBoardItems && selectedItem?.kind === 'image'
+        ? selectedItem.sourceQueueItemId
+        : null;
 
-    return localImages.filter(
-      (image) =>
-        optimisticQueueItemIds.has(image.sourceQueueItemId) || image.sourceQueueItemId === refreshingSelectedSourceId
+    return localItems.filter(
+      (item) =>
+        (item.sourceQueueItemId !== undefined && optimisticQueueItemIds.has(item.sourceQueueItemId)) ||
+        item.sourceQueueItemId === refreshingSelectedSourceId
     );
-  }, [isFetchingBoardImages, localImages, optimisticQueueItemIds, selectedImage?.sourceQueueItemId, shouldFollowLive]);
-  const localBoardImages = useMemo(
+  }, [isFetchingBoardItems, localItems, optimisticQueueItemIds, selectedItem, shouldFollowLive]);
+  const localBoardItems = useMemo(
     () =>
-      getOrderedLocalImages({
+      getOrderedLocalItems({
         boardId: navigationBoardId,
         galleryView: navigationGalleryView,
-        images: navigationLocalImages,
+        items: navigationLocalItems,
         imageOrderDir: navigationOrderDir,
         starredFirst: navigationStarredFirst,
       }),
-    [navigationBoardId, navigationGalleryView, navigationLocalImages, navigationOrderDir, navigationStarredFirst]
+    [navigationBoardId, navigationGalleryView, navigationLocalItems, navigationOrderDir, navigationStarredFirst]
   );
-  const previewLocalBoardImages = useMemo(() => {
+  const previewLocalBoardItems = useMemo(() => {
     if (
       shouldFollowLive ||
-      !selectedImage ||
-      localBoardImages.some((image) => image.imageName === selectedImage.imageName)
+      !selectedItem ||
+      localBoardItems.some((item) => toGalleryItemKey(item) === selectedItemKey)
     ) {
-      return localBoardImages;
+      return localBoardItems;
     }
 
-    return [selectedImage, ...localBoardImages];
-  }, [localBoardImages, selectedImage, shouldFollowLive]);
-  const backendBoardImages = useMemo(() => flattenGalleryImagesData(boardImagesData), [boardImagesData]);
-  const boardImages = useMemo(
+    return [selectedItem, ...localBoardItems];
+  }, [localBoardItems, selectedItem, selectedItemKey, shouldFollowLive]);
+  const backendBoardItems = useMemo(() => flattenPreviewItems(boardItemsData), [boardItemsData]);
+  const boardItems = useMemo(
     () =>
       !hasNavigationContext
-        ? EMPTY_PREVIEW_IMAGES
-        : mergePreviewBoardImages(
-            backendBoardImages,
-            previewLocalBoardImages,
-            navigationOrderDir,
-            navigationStarredFirst
-          ),
-    [backendBoardImages, hasNavigationContext, navigationOrderDir, navigationStarredFirst, previewLocalBoardImages]
+        ? EMPTY_PREVIEW_ITEMS
+        : mergePreviewBoardItems(backendBoardItems, previewLocalBoardItems, navigationOrderDir, navigationStarredFirst),
+    [backendBoardItems, hasNavigationContext, navigationOrderDir, navigationStarredFirst, previewLocalBoardItems]
   );
-  const isLoadingBoard = hasNavigationContext && isFetchingBoardImages;
+  const isLoadingBoard = hasNavigationContext && isFetchingBoardItems;
   const boardName = getBoardName(
     boards,
     displayBoardId,
@@ -398,14 +437,14 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
       getPreviewNavigationSequence({
         activePlaceholder: activeGalleryPlaceholder,
         boardId: navigationBoardId,
-        boardImages,
+        boardImages: boardItems,
         galleryView: navigationGalleryView,
         imageOrderDir: navigationOrderDir,
         starredFirst: navigationStarredFirst,
       }),
     [
       activeGalleryPlaceholder,
-      boardImages,
+      boardItems,
       navigationBoardId,
       navigationGalleryView,
       navigationOrderDir,
@@ -414,7 +453,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   );
   const navigationCursor = getPreviewNavigationCursor(navigationSequence, {
     isFollowingLive: shouldFollowLive,
-    selectedImageName,
+    selectedItemKey,
   });
 
   // One navigation action shared by the arrow keys and the footer buttons.
@@ -427,58 +466,62 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
 
       const target = getPreviewNavigationTarget(navigationSequence, navigationCursor, offset);
       const isAtLoadedBackendBoundary =
-        selectedImageName !== null &&
+        selectedItemKey !== null &&
         (offset === 1
-          ? backendBoardImages.at(-1)?.imageName === selectedImageName && hasNextBoardImagesPage
-          : backendBoardImages[0]?.imageName === selectedImageName && hasPreviousBoardImagesPage);
+          ? backendBoardItems.at(-1) !== undefined &&
+            toGalleryItemKey(backendBoardItems.at(-1)!) === selectedItemKey &&
+            hasNextBoardItemsPage
+          : backendBoardItems[0] !== undefined &&
+            toGalleryItemKey(backendBoardItems[0]) === selectedItemKey &&
+            hasPreviousBoardItemsPage);
 
       if (!isAtLoadedBackendBoundary) {
         if (!target) {
           return;
         }
 
-        if (target.kind === 'image') {
-          selectPreviewImage(target.image);
+        if (target.kind === 'item') {
+          selectPreviewItem(target.item);
         } else {
           account.updateProjectPreferences({ showProgressImagesInViewer: true });
         }
         return;
       }
 
-      if (offset === 1 ? isFetchingNextBoardImagesPage : isFetchingPreviousBoardImagesPage) {
+      if (offset === 1 ? isFetchingNextBoardItemsPage : isFetchingPreviousBoardItemsPage) {
         return;
       }
 
-      const fetchBoundaryPage = offset === 1 ? fetchNextBoardImagesPage : fetchPreviousBoardImagesPage;
+      const fetchBoundaryPage = offset === 1 ? fetchNextBoardItemsPage : fetchPreviousBoardItemsPage;
 
       void fetchBoundaryPage().then((result) => {
         if (result.isError || navigationContextKeyRef.current !== navigationContextKey) {
           return;
         }
 
-        const nextBackendBoardImages = flattenGalleryImagesData(result.data);
-        const nextBoardImages = mergePreviewBoardImages(
-          nextBackendBoardImages,
-          previewLocalBoardImages,
+        const nextBackendBoardItems = flattenPreviewItems(result.data);
+        const nextBoardItems = mergePreviewBoardItems(
+          nextBackendBoardItems,
+          previewLocalBoardItems,
           navigationOrderDir,
           navigationStarredFirst
         );
         const nextNavigationSequence = getPreviewNavigationSequence({
           activePlaceholder: activeGalleryPlaceholder,
           boardId: navigationBoardId,
-          boardImages: nextBoardImages,
+          boardImages: nextBoardItems,
           galleryView: navigationGalleryView,
           imageOrderDir: navigationOrderDir,
           starredFirst: navigationStarredFirst,
         });
         const nextNavigationCursor = getPreviewNavigationCursor(nextNavigationSequence, {
           isFollowingLive: shouldFollowLive,
-          selectedImageName,
+          selectedItemKey,
         });
         const nextTarget = getPreviewNavigationTarget(nextNavigationSequence, nextNavigationCursor, offset);
 
-        if (nextTarget?.kind === 'image') {
-          selectPreviewImage(nextTarget.image);
+        if (nextTarget?.kind === 'item') {
+          selectPreviewItem(nextTarget.item);
         } else if (nextTarget?.kind === 'placeholder') {
           account.updateProjectPreferences({ showProgressImagesInViewer: true });
         }
@@ -487,14 +530,14 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     [
       account,
       activeGalleryPlaceholder,
-      backendBoardImages,
-      fetchNextBoardImagesPage,
-      fetchPreviousBoardImagesPage,
-      hasNextBoardImagesPage,
-      hasPreviousBoardImagesPage,
+      backendBoardItems,
+      fetchNextBoardItemsPage,
+      fetchPreviousBoardItemsPage,
+      hasNextBoardItemsPage,
+      hasPreviousBoardItemsPage,
       isComparing,
-      isFetchingNextBoardImagesPage,
-      isFetchingPreviousBoardImagesPage,
+      isFetchingNextBoardItemsPage,
+      isFetchingPreviousBoardItemsPage,
       navigationBoardId,
       navigationContextKey,
       navigationCursor,
@@ -502,15 +545,19 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
       navigationOrderDir,
       navigationSequence,
       navigationStarredFirst,
-      previewLocalBoardImages,
-      selectedImageName,
-      selectPreviewImage,
+      previewLocalBoardItems,
+      selectedItemKey,
+      selectPreviewItem,
       shouldFollowLive,
     ]
   );
 
   const handleNavigationKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
+      if (event.target instanceof Element && event.target.closest('video')) {
+        return;
+      }
+
       if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') {
         return;
       }
@@ -529,62 +576,53 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   );
 
   const [contextMenuTarget, setContextMenuTarget] = useState<ImageContextMenuTarget | null>(null);
-  const onImagesDeleted = useCallback(
-    (imageNames: string[]) => {
-      const deletedNames = new Set(imageNames);
-      const images = boardImages;
-      const anchorName = selectedImage?.imageName ?? null;
-
-      if (!anchorName || !deletedNames.has(anchorName)) {
-        return;
-      }
-
-      const anchorIndex = images.findIndex((image) => image.imageName === anchorName);
-
-      if (anchorIndex === -1) {
-        return;
-      }
-
-      const remaining = images.filter((image) => !deletedNames.has(image.imageName));
-      const remainingBeforeAnchor = images
-        .slice(0, anchorIndex)
-        .filter((image) => !deletedNames.has(image.imageName)).length;
-      const nextImage = remaining[remainingBeforeAnchor] ?? remaining[remainingBeforeAnchor - 1] ?? null;
-
-      if (nextImage) {
-        selectPreviewImage(nextImage);
-      }
-    },
-    [boardImages, selectPreviewImage, selectedImage]
+  const getItemActionContext = useCallback(
+    () => ({
+      filterIdentity: navigationQueryKey,
+      items: boardItems,
+      loadOrderedRefs: (signal: AbortSignal) => {
+        signal.throwIfAborted();
+        return Promise.resolve(boardItems.map(toGalleryItemRef));
+      },
+      selectedItemKey,
+    }),
+    [boardItems, navigationQueryKey, selectedItemKey]
   );
   const projectId = useActiveProjectId();
   const imageActions = useImageActions({
     boards,
     generateValues,
-    onImagesDeleted,
+    getItemActionContext,
     projectId,
   });
-  const contextMenuImage = useMemo<GalleryImage | null>(() => {
-    if (!selectedImage) {
+  const contextMenuItem = useMemo<GalleryItem | null>(() => {
+    if (!selectedItem) {
       return null;
     }
 
-    const boardImage = boardImages.find((image) => image.imageName === selectedImage.imageName);
-
-    return {
-      ...selectedImage,
-      boardId: boardImage?.boardId ?? displayBoardId,
-      imageCategory: boardImage?.imageCategory ?? selectedImage.imageCategory ?? 'general',
-      starred: boardImage?.starred ?? selectedImage.starred ?? false,
-    };
-  }, [boardImages, displayBoardId, selectedImage]);
-  const exitCompare = useCallback(() => gallery.setCompareImage(null), [gallery]);
+    return boardItems.find((item) => toGalleryItemKey(item) === selectedItemKey) ?? selectedItem;
+  }, [boardItems, selectedItem, selectedItemKey]);
+  const actionImage = useMemo<GalleryImage | null>(
+    () =>
+      contextMenuItem && isGalleryImageItem(contextMenuItem) ? galleryImageItemToGalleryImage(contextMenuItem) : null,
+    [contextMenuItem]
+  );
+  const exitCompare = useCallback(() => gallery.setCompareItem(null), [gallery]);
   const swapCompareImages = useCallback(() => {
-    if (selectedImage && compareImage) {
-      selectPreviewImage(compareImage);
-      gallery.setCompareImage(selectedImage);
+    if (selectedItem?.kind === 'image' && compareImage) {
+      selectPreviewItem(legacyGeneratedImageToGalleryItem(compareImage));
+      gallery.setCompareItem(selectedItem);
     }
-  }, [compareImage, gallery, selectPreviewImage, selectedImage]);
+  }, [compareImage, gallery, selectPreviewItem, selectedItem]);
+  const isItemCurrent = useCallback(
+    (itemKey: GalleryItemKey) => {
+      const currentValues = getProjectWidgetValues(queries.getSnapshot().activeProject, 'gallery');
+      const currentItem = getSelectedGalleryItemFromValues(currentValues);
+
+      return currentItem !== null && toGalleryItemKey(currentItem) === itemKey;
+    },
+    [queries]
+  );
   const setComparisonMode = useCallback(
     (comparisonMode: PreviewComparisonMode) => widgets.patchValues('preview', { comparisonMode }),
     [widgets]
@@ -594,14 +632,59 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     () => widgets.patchValues('preview', { metadataOpen: !isMetadataOpen }),
     [isMetadataOpen, widgets]
   );
-  const isFilmstripVisible = getPreviewFilmstripVisible(previewValues);
-  const selectImage = selectPreviewImage;
+  const openVideoDetails = useCallback(() => widgets.patchValues('preview', { metadataOpen: true }), [widgets]);
+  const handleVideoCopyAvailabilityChange = useCallback((itemKey: GalleryItemKey, isAvailable: boolean) => {
+    setCopyAvailableItemKey((current) => (isAvailable ? itemKey : current === itemKey ? null : current));
+  }, []);
+  const isVideoFrameCopyAvailable =
+    contextMenuItem?.kind === 'video' && copyAvailableItemKey === toGalleryItemKey(contextMenuItem);
+  const copyCurrentVideoFrame = useCallback(() => {
+    const run = async (): Promise<void> => {
+      const controller = videoControllerRef.current;
+      let result: PreviewVideoFrameCopyResult;
 
-  // Drop-to-compare: any gallery-image drag dropped on the frame's drop zone
+      if (
+        contextMenuItem?.kind !== 'video' ||
+        !controller ||
+        controller.itemKey !== toGalleryItemKey(contextMenuItem)
+      ) {
+        result = { ok: false, reason: 'stale' };
+      } else {
+        try {
+          result = await controller.copyCurrentFrame();
+        } catch {
+          result = { ok: false, reason: 'clipboard-failed' };
+        }
+      }
+
+      notifications.add(getVideoFrameCopyNotice(result, t));
+    };
+
+    void run();
+  }, [contextMenuItem, notifications, t]);
+  const previewVideoContextActions = useMemo(
+    () =>
+      contextMenuItem?.kind === 'video'
+        ? {
+            isCopyCurrentFrameAvailable: isVideoFrameCopyAvailable,
+            itemKey: toGalleryItemKey(contextMenuItem),
+            onCopyCurrentFrame: copyCurrentVideoFrame,
+            onOpenDetails: openVideoDetails,
+          }
+        : undefined,
+    [contextMenuItem, copyCurrentVideoFrame, isVideoFrameCopyAvailable, openVideoDetails]
+  );
+  const isFilmstripVisible = getPreviewFilmstripVisible(previewValues);
+
+  // Drop-to-compare: any all-image gallery-item drag dropped on the frame's drop zone
   // arms that image for comparison. The drag payload only carries names, so
   // the full contract is fetched before dispatching.
   const handleCompareDrop = useCallback(
     (event: DragEndEvent) => {
+      if (selectedItem?.kind !== 'image') {
+        return;
+      }
+
       const resolution = resolvePreviewCompareDrop(event.active.data.current, event.over?.data.current ?? null);
 
       if (!resolution) {
@@ -610,12 +693,12 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
 
       // Prefer images we already hold (board context includes fresh local
       // generations that would 404 on a backend by-name fetch).
-      const localImage =
-        boardImages.find((image) => image.imageName === resolution.imageName) ??
-        (selectedImage?.imageName === resolution.imageName ? selectedImage : null);
+      const localImageItem =
+        boardItems.find((item) => item.kind === 'image' && item.name === resolution.imageName) ??
+        (selectedItem.name === resolution.imageName ? selectedItem : null);
 
-      if (localImage) {
-        gallery.setCompareImage(localImage);
+      if (localImageItem?.kind === 'image') {
+        gallery.setCompareItem(localImageItem);
         return;
       }
 
@@ -630,21 +713,26 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
           });
         });
     },
-    [boardImages, gallery, notifications, selectedImage]
+    [boardItems, gallery, notifications, selectedItem]
   );
   useDndMonitor({ onDragEnd: handleCompareDrop });
-  const openImageContextMenu = useCallback(
+  const openItemContextMenu = useCallback(
     (x: number, y: number) => {
-      if (contextMenuImage) {
-        setContextMenuTarget({ images: [contextMenuImage], x, y });
+      if (contextMenuItem) {
+        setContextMenuTarget({
+          itemRefs: [toGalleryItemRef(contextMenuItem)],
+          items: [contextMenuItem],
+          x,
+          y,
+        });
       }
     },
-    [contextMenuImage]
+    [contextMenuItem]
   );
-  const selectNextImage = useCallback(() => navigate(1), [navigate]);
-  const selectPreviousImage = useCallback(() => navigate(-1), [navigate]);
+  const selectNextItem = useCallback(() => navigate(1), [navigate]);
+  const selectPreviousItem = useCallback(() => navigate(-1), [navigate]);
   const closeContextMenu = useCallback(() => setContextMenuTarget(null), []);
-  const headerImageName = shouldFollowLive ? null : selectedImageName;
+  const headerItemName = shouldFollowLive ? null : (selectedItem?.name ?? null);
 
   // Publish the header chrome context (the "[board] / [image]" label and the
   // action strip's image + actions) for the widget frame; the chrome renders
@@ -652,13 +740,26 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   // unmount so stale chrome never outlives us.
   useEffect(() => {
     previewHeaderStore.set({
-      actionImage: shouldFollowLive ? null : contextMenuImage,
+      actionItem: shouldFollowLive ? null : contextMenuItem,
       actions: shouldFollowLive ? null : imageActions,
-      boardName: headerImageName === null ? null : boardName,
-      imageName: headerImageName,
-      openImageMenu: shouldFollowLive ? null : openImageContextMenu,
+      boardName: headerItemName === null ? null : boardName,
+      copyCurrentVideoFrame: !shouldFollowLive && contextMenuItem?.kind === 'video' ? copyCurrentVideoFrame : null,
+      isVideoFrameCopyAvailable: !shouldFollowLive && isVideoFrameCopyAvailable,
+      itemName: headerItemName,
+      openItemMenu: shouldFollowLive ? null : openItemContextMenu,
+      openVideoDetails: !shouldFollowLive && contextMenuItem?.kind === 'video' ? openVideoDetails : null,
     });
-  }, [boardName, contextMenuImage, headerImageName, imageActions, openImageContextMenu, shouldFollowLive]);
+  }, [
+    boardName,
+    contextMenuItem,
+    copyCurrentVideoFrame,
+    headerItemName,
+    imageActions,
+    isVideoFrameCopyAvailable,
+    openItemContextMenu,
+    openVideoDetails,
+    shouldFollowLive,
+  ]);
 
   useEffect(() => () => previewHeaderStore.clear(), []);
 
@@ -666,8 +767,10 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   // swaps without a decode flash.
   const previousNeighbor = navigationSequence[navigationCursor - 1];
   const nextNeighbor = navigationSequence[navigationCursor + 1];
-  const previousNeighborUrl = previousNeighbor?.kind === 'image' ? previousNeighbor.image.imageUrl : null;
-  const nextNeighborUrl = nextNeighbor?.kind === 'image' ? nextNeighbor.image.imageUrl : null;
+  const previousNeighborUrl =
+    previousNeighbor?.kind === 'item' && previousNeighbor.item.kind === 'image' ? previousNeighbor.item.fullUrl : null;
+  const nextNeighborUrl =
+    nextNeighbor?.kind === 'item' && nextNeighbor.item.kind === 'image' ? nextNeighbor.item.fullUrl : null;
 
   useEffect(() => {
     [previousNeighborUrl, nextNeighborUrl].forEach((url) => {
@@ -682,23 +785,23 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
       return;
     }
 
-    if (commandId === 'viewer.swapImages' && selectedImage && compareImage) {
-      selectPreviewImage(compareImage);
-      gallery.setCompareImage(selectedImage);
+    if (commandId === 'viewer.swapImages' && selectedItem?.kind === 'image' && compareImage) {
+      selectPreviewItem(legacyGeneratedImageToGalleryItem(compareImage));
+      gallery.setCompareItem(selectedItem);
       return;
     }
 
-    if (commandId === 'viewer.deleteImage' && selectedImage && !shouldFollowLive) {
-      void imageActions.deleteImages([selectedImage.imageName]);
+    if (commandId === 'viewer.deleteImage' && selectedItem && !shouldFollowLive) {
+      void imageActions.deleteItems([toGalleryItemRef(selectedItem)]);
       return;
     }
 
-    if (commandId === 'viewer.zoomToActual') {
+    if (commandId === 'viewer.zoomToActual' && selectedItem?.kind === 'image') {
       loupeControlsRef.current?.zoomToActual();
       return;
     }
 
-    if (commandId === 'viewer.zoomToFit') {
+    if (commandId === 'viewer.zoomToFit' && selectedItem?.kind === 'image') {
       loupeControlsRef.current?.reset();
       return;
     }
@@ -711,11 +814,15 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   useEffect(() => {
     const hotkeys = [
       ['viewer.toggleViewer', t('widgets.preview.commands.togglePreview'), ['z']],
-      ['viewer.swapImages', t('widgets.preview.commands.swapComparisonImages'), ['c']],
       ['viewer.deleteImage', t('widgets.preview.commands.deletePreviewImage'), ['delete', 'backspace']],
-      ['viewer.zoomToActual', t('widgets.preview.commands.zoomToActual'), ['1']],
-      ['viewer.zoomToFit', t('widgets.preview.commands.zoomToFit'), ['f']],
       ['viewer.toggleFilmstrip', t('widgets.preview.commands.toggleFilmstrip'), ['t']],
+      ...(selectedItem?.kind === 'image'
+        ? ([
+            ['viewer.swapImages', t('widgets.preview.commands.swapComparisonImages'), ['c']],
+            ['viewer.zoomToActual', t('widgets.preview.commands.zoomToActual'), ['1']],
+            ['viewer.zoomToFit', t('widgets.preview.commands.zoomToFit'), ['f']],
+          ] as const)
+        : []),
     ] as const;
     const disposers = hotkeys.flatMap(([id, title, defaultKeys]) => [
       runtime.commands.register({ handler: () => executeViewerHotkey(id), id, title }),
@@ -725,7 +832,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     return () => {
       disposers.forEach((dispose) => dispose());
     };
-  }, [runtime.commands, runtime.hotkeys, t]);
+  }, [runtime.commands, runtime.hotkeys, selectedItem?.kind, t]);
 
   return (
     <Box ref={rootRef} p="2" h="full">
@@ -743,17 +850,22 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
         w="full"
         onKeyDown={handleNavigationKeyDown}
       >
-        {shouldFollowLive && activeGalleryPlaceholder ? (
+        {shouldFollowLive && liveGalleryPlaceholders.length > 1 ? (
+          <LivePreviewTiles
+            placeholders={liveGalleryPlaceholders}
+            shouldAntialiasProgressImage={antialiasProgressImages}
+          />
+        ) : shouldFollowLive && activeGalleryPlaceholder ? (
           <LivePreview
             placeholder={activeGalleryPlaceholder}
             progressImage={matchingProgressImage}
             shouldAntialiasProgressImage={antialiasProgressImages}
           />
-        ) : selectedImage ? (
+        ) : selectedItem ? (
           <>
-            {isComparing && compareImage ? (
+            {isComparing && compareImage && selectedItem.kind === 'image' ? (
               <PreviewCompare
-                baseImage={selectedImage}
+                baseImage={galleryImageItemToGalleryImage(selectedItem)}
                 compareImage={compareImage}
                 mode={comparisonMode}
                 runtime={runtime}
@@ -761,28 +873,50 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
                 onModeChange={setComparisonMode}
                 onSwap={swapCompareImages}
               />
-            ) : (
+            ) : selectedItem.kind === 'image' ? (
               <SelectedImagePreview
-                actionImage={contextMenuImage}
+                actionImage={actionImage}
                 actions={imageActions}
-                filmstripImages={isFilmstripVisible && density !== 'minimal' ? boardImages : null}
-                loupeControlsRef={loupeControlsRef}
-                boardImageCount={navigationSequence.length}
+                boardItemCount={navigationSequence.length}
                 density={density}
-                image={selectedImage}
+                filmstripItems={isFilmstripVisible && density !== 'minimal' ? boardItems : null}
+                isItemCurrent={isItemCurrent}
                 isLoadingBoard={isLoadingBoard}
                 isMetadataOpen={isMetadataOpen}
+                item={selectedItem}
+                loupeControlsRef={loupeControlsRef}
                 selectedIndex={navigationCursor}
-                onContextMenu={openImageContextMenu}
-                onNext={selectNextImage}
-                onPrevious={selectPreviousImage}
-                onSelectImage={selectImage}
+                onContextMenu={openItemContextMenu}
+                onNext={selectNextItem}
+                onPrevious={selectPreviousItem}
+                onSelectItem={selectPreviewItem}
+                onToggleMetadata={toggleMetadata}
+              />
+            ) : (
+              <SelectedVideoPreview
+                actionImage={null}
+                actions={imageActions}
+                boardItemCount={navigationSequence.length}
+                density={density}
+                filmstripItems={isFilmstripVisible && density !== 'minimal' ? boardItems : null}
+                isItemCurrent={isItemCurrent}
+                isLoadingBoard={isLoadingBoard}
+                isMetadataOpen={isMetadataOpen}
+                item={selectedItem}
+                videoControllerRef={videoControllerRef}
+                selectedIndex={navigationCursor}
+                onContextMenu={openItemContextMenu}
+                onCopyAvailabilityChange={handleVideoCopyAvailabilityChange}
+                onNext={selectNextItem}
+                onPrevious={selectPreviousItem}
+                onSelectItem={selectPreviewItem}
                 onToggleMetadata={toggleMetadata}
               />
             )}
             <ImageContextMenu
               actions={imageActions}
               boards={boards}
+              previewVideoActions={previewVideoContextActions}
               target={contextMenuTarget}
               onClose={closeContextMenu}
             />
@@ -795,85 +929,138 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   );
 };
 
-const SelectedImagePreview = ({
-  actionImage,
-  actions,
-  boardImageCount,
-  density,
-  filmstripImages,
-  image,
-  isLoadingBoard,
-  isMetadataOpen,
-  loupeControlsRef,
-  selectedIndex,
-  onContextMenu,
-  onNext,
-  onPrevious,
-  onSelectImage,
-  onToggleMetadata,
-}: {
+const SelectedImagePreview = ({ item, ...props }: SelectedMediaPreviewProps & { item: GalleryImageItem }) => {
+  const previewImage = useStreamingImageSource({
+    fallbackImage: imageUrlToStreamingSource({
+      alt: item.name,
+      height: item.height,
+      kind: 'fallback',
+      src: item.fullUrl,
+      width: item.width,
+    }),
+  });
+  const source = useMemo<PreviewMediaSource | null>(
+    () => (previewImage ? { itemKey: toGalleryItemKey(item), kind: 'image', source: previewImage } : null),
+    [item, previewImage]
+  );
+
+  return (
+    <SelectedMediaPreview
+      {...props}
+      dragItem={toGalleryItemRef(item)}
+      frameHeight={previewImage?.height ?? item.height}
+      frameWidth={previewImage?.width ?? item.width}
+      item={item}
+      source={source}
+    />
+  );
+};
+
+const SelectedVideoPreview = ({
+  item,
+  ...props
+}: SelectedMediaPreviewProps & { item: Extract<GalleryItem, { kind: 'video' }> }) => {
+  const { t } = useTranslation();
+  const source = useMemo<PreviewMediaSource>(
+    () => ({
+      itemKey: toGalleryItemKey(item),
+      kind: 'video',
+      label: t('widgets.preview.videoLabel', { name: item.name }),
+      poster: item.thumbnailUrl,
+      src: item.fullUrl,
+    }),
+    [item, t]
+  );
+
+  return (
+    <SelectedMediaPreview {...props} frameHeight={item.height} frameWidth={item.width} item={item} source={source} />
+  );
+};
+
+interface SelectedMediaPreviewProps {
   actionImage: GalleryImage | null;
   actions: ImageActions;
-  boardImageCount: number;
+  boardItemCount: number;
   density: PreviewDensity;
   /** Board thumbnails for the filmstrip, or null when the strip is hidden. */
-  filmstripImages: PreviewImage[] | null;
-  image: GeneratedImageContract;
+  filmstripItems: GalleryItem[] | null;
+  isItemCurrent: (itemKey: GalleryItemKey) => boolean;
   isLoadingBoard: boolean;
   isMetadataOpen: boolean;
+  item: GalleryItem;
   loupeControlsRef?: Ref<PreviewLoupeControls>;
+  onCopyAvailabilityChange?: (itemKey: GalleryItemKey, isAvailable: boolean) => void;
   selectedIndex: number;
   onContextMenu: (x: number, y: number) => void;
   onNext: () => void;
   onPrevious: () => void;
-  onSelectImage: (image: GeneratedImageContract) => void;
+  onSelectItem: (item: GalleryItem) => void;
   onToggleMetadata: () => void;
+  videoControllerRef?: Ref<PreviewVideoFrameController>;
+}
+
+const SelectedMediaPreview = ({
+  actionImage,
+  actions,
+  boardItemCount,
+  density,
+  dragItem,
+  filmstripItems,
+  frameHeight,
+  frameWidth,
+  isItemCurrent,
+  isLoadingBoard,
+  isMetadataOpen,
+  item,
+  loupeControlsRef,
+  onCopyAvailabilityChange,
+  selectedIndex,
+  source,
+  onContextMenu,
+  onNext,
+  onPrevious,
+  onSelectItem,
+  onToggleMetadata,
+  videoControllerRef,
+}: SelectedMediaPreviewProps & {
+  dragItem?: GalleryItemRef;
+  frameHeight: number;
+  frameWidth: number;
+  source: Parameters<typeof PreviewFrame>[0]['source'];
 }) => {
   const { t } = useTranslation();
-  const previewImage = useStreamingImageSource({
-    fallbackImage: imageUrlToStreamingSource({
-      alt: image.imageName,
-      height: image.height,
-      kind: 'fallback',
-      src: image.imageUrl,
-      width: image.width,
-    }),
-  });
-  const previewWidth = previewImage?.width ?? image.width;
-  const previewHeight = previewImage?.height ?? image.height;
-  const dragImage = useMemo(
-    () => ({ boardId: actionImage?.boardId ?? 'none', imageName: image.imageName }),
-    [actionImage?.boardId, image.imageName]
-  );
+
   return (
     <Stack gap="2" h="full" minH="0" w="full">
       <PreviewFrame
-        dragImage={dragImage}
-        frameHeight={previewHeight}
-        frameWidth={previewWidth}
+        dragItem={dragItem}
+        frameHeight={frameHeight}
+        frameWidth={frameWidth}
+        isItemCurrent={isItemCurrent}
         isLive={false}
         liveBadgeLabel={t('common.generating')}
         loupeControlsRef={loupeControlsRef}
+        onVideoCopyAvailabilityChange={onCopyAvailabilityChange}
         padding={density === 'full' ? '6' : '3'}
         shouldAntialiasLiveImage
-        source={previewImage}
+        source={source}
         variant="framed"
+        videoControllerRef={videoControllerRef}
         onContextMenu={onContextMenu}
       />
-      {filmstripImages ? (
+      {filmstripItems ? (
         <PreviewFilmstrip
           density={density}
-          images={filmstripImages}
-          selectedImageName={image.imageName}
-          onSelect={onSelectImage}
+          items={filmstripItems}
+          selectedItemKey={toGalleryItemKey(item)}
+          onSelect={onSelectItem}
         />
       ) : null}
       <PreviewFooter
         actionImage={actionImage}
         actions={actions}
-        boardImageCount={boardImageCount}
-        image={image}
-        isLive={false}
+        boardItemCount={boardItemCount}
+        item={item}
         isLoadingBoard={isLoadingBoard}
         isMetadataOpen={isMetadataOpen}
         selectedIndex={selectedIndex}
@@ -898,6 +1085,17 @@ const LivePreview = ({
   const previewImage = useStreamingImageSource({
     liveImage: progressImageToStreamingSource(progressImage),
   });
+  const source = useMemo<PreviewMediaSource | null>(
+    () =>
+      previewImage
+        ? {
+            itemKey: `image:live:${placeholder.id}`,
+            kind: 'image',
+            source: previewImage,
+          }
+        : null,
+    [placeholder.id, previewImage]
+  );
 
   return (
     <PreviewFrame
@@ -907,11 +1105,86 @@ const LivePreview = ({
       liveBadgeLabel={t('common.generating')}
       liveQueueItemId={placeholder.queueItemId}
       shouldAntialiasLiveImage={shouldAntialiasProgressImage}
-      source={previewImage}
+      source={source}
       variant="inset"
     />
   );
 };
+
+/**
+ * One tile in the multi-session grid.
+ *
+ * Subscribes to its own slot's progress image rather than receiving it from the
+ * parent, so a frame from one GPU's session re-renders only that tile.
+ */
+const LivePreviewTile = ({
+  placeholder,
+  shouldAntialiasProgressImage,
+}: {
+  placeholder: GalleryQueuePlaceholder;
+  shouldAntialiasProgressImage: boolean;
+}) => {
+  const { t } = useTranslation();
+  const progressImage = useQueueItemProgressImage(placeholder.queueItemId, placeholder.itemIndex);
+  // Keyed by the backend item id, not the local one: two slots of the same batch can
+  // be running on two GPUs, and the local-keyed store holds one entry for both.
+  const itemProgress = useItemProgress(placeholder.backendItemId);
+  const deviceLabel = useDeviceLabel(itemProgress?.device);
+  const previewImage = useStreamingImageSource({
+    liveImage: progressImageToStreamingSource(progressImage),
+  });
+  const source = useMemo<PreviewMediaSource | null>(
+    () =>
+      previewImage
+        ? {
+            itemKey: `image:live:${placeholder.id}`,
+            kind: 'image',
+            source: previewImage,
+          }
+        : null,
+    [placeholder.id, previewImage]
+  );
+
+  return (
+    <PreviewFrame
+      frameHeight={previewImage?.height ?? placeholder.height}
+      frameWidth={previewImage?.width ?? placeholder.width}
+      isLive
+      liveBadgeLabel={
+        deviceLabel ? t('widgets.queue.device.shortLabel', { index: deviceLabel.index }) : t('common.generating')
+      }
+      liveQueueItemId={placeholder.queueItemId}
+      shouldAntialiasLiveImage={shouldAntialiasProgressImage}
+      source={source}
+      variant="inset"
+    />
+  );
+};
+
+/**
+ * Side-by-side previews for concurrent sessions (multi-GPU).
+ *
+ * Only mounted for two or more live slots; a single session keeps the full-size
+ * single-frame preview so nothing changes on a single-GPU install. The grid is a
+ * plain auto-fit so two GPUs sit side by side and four wrap to a 2×2.
+ */
+const LivePreviewTiles = ({
+  placeholders,
+  shouldAntialiasProgressImage,
+}: {
+  placeholders: GalleryQueuePlaceholder[];
+  shouldAntialiasProgressImage: boolean;
+}) => (
+  <SimpleGrid gap="2" h="full" minH="0" columns={placeholders.length > 2 ? 2 : placeholders.length}>
+    {placeholders.map((placeholder) => (
+      <LivePreviewTile
+        key={placeholder.id}
+        placeholder={placeholder}
+        shouldAntialiasProgressImage={shouldAntialiasProgressImage}
+      />
+    ))}
+  </SimpleGrid>
+);
 
 const EmptyPreview = () => {
   const { t } = useTranslation();

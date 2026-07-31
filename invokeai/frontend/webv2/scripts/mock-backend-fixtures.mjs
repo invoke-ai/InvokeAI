@@ -31,6 +31,7 @@ export const MOCK_BACKEND_PROFILE_COUNTS = Object.freeze({
 });
 
 export const MOCK_BACKEND_FIXED_EPOCH = '2026-01-15T12:00:00.000Z';
+export const MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME = 'fixture-video-001.mp4';
 
 const FIXED_EPOCH_MS = Date.parse(MOCK_BACKEND_FIXED_EPOCH);
 const range = (length, build) => Array.from({ length }, (_, index) => build(index));
@@ -70,20 +71,179 @@ const createImages = (count) =>
     };
   });
 
-const createBoards = (images) =>
+const createVideos = () => [
+  {
+    board_id: null,
+    created_at: timestampAt(2),
+    duration: 1,
+    fps: 10,
+    graph: '{"nodes":[{"id":"fixture-video-output","type":"wan_l2v"}]}',
+    height: 64,
+    is_intermediate: false,
+    metadata: { codec: 'h264', prompt: 'wan fixture' },
+    owner_user_id: 'fixture-user',
+    starred: true,
+    thumbnail_url: `/api/v1/videos/i/${MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME}/thumbnail`,
+    video_category: 'general',
+    video_name: MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME,
+    video_origin: 'external',
+    video_url: `/api/v1/videos/i/${MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME}/full`,
+    width: 64,
+    workflow: '{"name":"Fixture video workflow","nodes":[]}',
+  },
+  {
+    board_id: 'fixture-board-02',
+    created_at: timestampAt(0),
+    duration: 1,
+    fps: 10,
+    graph: null,
+    height: 64,
+    is_intermediate: false,
+    metadata: { prompt: 'board cover fixture' },
+    owner_user_id: 'fixture-user',
+    starred: true,
+    thumbnail_url: '/api/v1/videos/i/fixture-video-board.mp4/thumbnail',
+    video_category: 'control',
+    video_name: 'fixture-video-board.mp4',
+    video_origin: 'internal',
+    video_url: '/api/v1/videos/i/fixture-video-board.mp4/full',
+    width: 64,
+    workflow: null,
+  },
+  {
+    board_id: null,
+    created_at: timestampAt(11),
+    duration: 1,
+    fps: 10,
+    graph: null,
+    height: 64,
+    is_intermediate: false,
+    metadata: { prompt: 'same-name collision fixture' },
+    owner_user_id: 'fixture-user',
+    starred: true,
+    thumbnail_url: '/api/v1/videos/i/fixture-image-0012.png/thumbnail',
+    video_category: 'general',
+    video_name: 'fixture-image-0012.png',
+    video_origin: 'internal',
+    video_url: '/api/v1/videos/i/fixture-image-0012.png/full',
+    width: 64,
+    workflow: null,
+  },
+  {
+    board_id: 'fixture-board-03',
+    created_at: timestampAt(2),
+    duration: 1,
+    fps: 10,
+    graph: null,
+    height: 64,
+    is_intermediate: false,
+    metadata: { prompt: 'asset category fixture' },
+    owner_user_id: 'fixture-user',
+    starred: false,
+    thumbnail_url: '/api/v1/videos/i/fixture-video-asset.mp4/thumbnail',
+    video_category: 'control',
+    video_name: 'fixture-video-asset.mp4',
+    video_origin: 'internal',
+    video_url: '/api/v1/videos/i/fixture-video-asset.mp4/full',
+    width: 64,
+    workflow: null,
+  },
+  {
+    board_id: null,
+    created_at: timestampAt(3),
+    duration: 1,
+    fps: 10,
+    graph: null,
+    height: 64,
+    is_intermediate: true,
+    metadata: { prompt: 'intermediate fixture' },
+    owner_user_id: 'fixture-user',
+    starred: false,
+    thumbnail_url: '/api/v1/videos/i/fixture-video-intermediate.mp4/thumbnail',
+    video_category: 'general',
+    video_name: 'fixture-video-intermediate.mp4',
+    video_origin: 'internal',
+    video_url: '/api/v1/videos/i/fixture-video-intermediate.mp4/full',
+    width: 64,
+    workflow: null,
+  },
+  {
+    board_id: null,
+    created_at: timestampAt(4),
+    duration: 1,
+    fps: 10,
+    graph: null,
+    height: 64,
+    is_intermediate: false,
+    metadata: { prompt: 'foreign fixture' },
+    owner_user_id: 'other-user',
+    starred: false,
+    thumbnail_url: '/api/v1/videos/i/fixture-video-foreign.mp4/thumbnail',
+    video_category: 'general',
+    video_name: 'fixture-video-foreign.mp4',
+    video_origin: 'external',
+    video_url: '/api/v1/videos/i/fixture-video-foreign.mp4/full',
+    width: 64,
+    workflow: null,
+  },
+  {
+    board_id: null,
+    created_at: timestampAt(800),
+    duration: 1,
+    fps: 10,
+    graph: null,
+    height: 64,
+    is_intermediate: false,
+    metadata: { prompt: 'previous-day fixture' },
+    owner_user_id: 'fixture-user',
+    starred: false,
+    thumbnail_url: '/api/v1/videos/i/fixture-video-old.mp4/thumbnail',
+    video_category: 'general',
+    video_name: 'fixture-video-old.mp4',
+    video_origin: 'internal',
+    video_url: '/api/v1/videos/i/fixture-video-old.mp4/full',
+    width: 64,
+    workflow: null,
+  },
+];
+
+const createBoards = (images, videos) =>
   range(10, (index) => {
     const boardId = `fixture-board-${ordinal(index, 2)}`;
     const boardImages = images.filter((image) => image.board_id === boardId);
+    const boardVideos = videos.filter((video) => video.board_id === boardId);
+    const cover = [
+      ...boardImages.map((image) => ({
+        createdAt: image.created_at,
+        kind: 'image',
+        name: image.image_name,
+        starred: image.starred,
+      })),
+      ...boardVideos.map((video) => ({
+        createdAt: video.created_at,
+        kind: 'video',
+        name: video.video_name,
+        starred: video.starred,
+      })),
+    ].sort(
+      (left, right) =>
+        Number(right.starred) - Number(left.starred) ||
+        right.createdAt.localeCompare(left.createdAt) ||
+        right.kind.localeCompare(left.kind) ||
+        right.name.localeCompare(left.name)
+    )[0];
 
     return {
       archived: false,
       asset_count: boardImages.filter((image) => image.image_category !== 'general').length,
       board_id: boardId,
       board_name: `Fixture Board ${ordinal(index, 2)}`,
-      cover_image_name: boardImages[0]?.image_name ?? null,
+      cover_image_name: cover?.kind === 'image' ? cover.name : null,
+      cover_video_name: cover?.kind === 'video' ? cover.name : null,
       created_at: timestampAt(index * 10),
       image_count: boardImages.filter((image) => image.image_category === 'general').length,
       owner_username: null,
+      video_count: boardVideos.length,
     };
   });
 
@@ -405,15 +565,17 @@ const createEmptyFixture = () => ({
   profile: 'empty',
   projects: [],
   queueItems: [],
+  videos: [],
   workflows: [],
 });
 
 const createRepresentativeFixture = () => {
   const counts = MOCK_BACKEND_PROFILE_COUNTS.representative;
   const images = createImages(counts.images);
+  const videos = createVideos();
 
   return {
-    boards: createBoards(images),
+    boards: createBoards(images, videos),
     images,
     models: createModels(counts.models),
     nodeCatalog: {
@@ -424,6 +586,7 @@ const createRepresentativeFixture = () => {
     profile: 'representative',
     projects: createProjects(counts.projects, counts.workflowNodes, counts.layers),
     queueItems: createQueueItems(counts.queueItems),
+    videos,
     workflows: createWorkflows(100),
   };
 };
@@ -484,6 +647,7 @@ export const validateMockBackendFixture = (fixture) => {
     ['model keys', fixture.models.map((model) => model.key)],
     ['project ids', fixture.projects.map((project) => project.project_id)],
     ['queue item ids', fixture.queueItems.map((item) => item.item_id)],
+    ['video names', fixture.videos.map((video) => video.video_name)],
   ];
 
   for (const [label, values] of identities) {

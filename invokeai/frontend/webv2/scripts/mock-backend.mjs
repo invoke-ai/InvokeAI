@@ -1,4 +1,6 @@
+import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
+import { resolve } from 'node:path';
 
 import {
   assertMockBackendFixture,
@@ -22,6 +24,9 @@ const TINY_PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAF/gL+XcX1WQAAAABJRU5ErkJggg==',
   'base64'
 );
+const FIXTURE_VIDEO = readFileSync(resolve(import.meta.dirname, 'mock-assets/fixture-video.mp4'));
+const FIXTURE_VIDEO_POSTER = readFileSync(resolve(import.meta.dirname, 'mock-assets/fixture-video.webp'));
+const MOCK_USER_ID = 'fixture-user';
 
 const clone = (value) => structuredClone(value);
 
@@ -35,11 +40,13 @@ const createState = (profile) => {
     models: new Map(fixture.models.map((model) => [model.key, clone(model)])),
     mutationClock: 0,
     nextProjectNumber: fixture.projects.length + 1,
+    nextVideoNumber: fixture.videos.length + 1,
     nodeCatalog: clone(fixture.nodeCatalog),
     openApiDocument: clone(fixture.openApiDocument),
     profile,
     projects: new Map(fixture.projects.map((project) => [project.project_id, clone(project)])),
     queueItems: new Map(fixture.queueItems.map((item) => [item.item_id, clone(item)])),
+    videos: new Map(fixture.videos.map((video) => [video.video_name, clone(video)])),
     workflows: new Map(fixture.workflows.map((workflow) => [workflow.workflow_id, clone(workflow)])),
   };
 };
@@ -122,6 +129,244 @@ const getRequestedCategories = (url) => {
   return values.flatMap((value) => value.split(',')).filter(Boolean);
 };
 
+const getOptionalBoolean = (url, name) => {
+  const value = url.searchParams.get(name);
+
+  return value === null ? undefined : value === 'true';
+};
+
+const toVideoDto = (video) => ({
+  board_id: video.board_id,
+  created_at: video.created_at,
+  duration: video.duration,
+  fps: video.fps,
+  height: video.height,
+  is_intermediate: video.is_intermediate,
+  starred: video.starred,
+  thumbnail_url: video.thumbnail_url,
+  video_category: video.video_category,
+  video_name: video.video_name,
+  video_url: video.video_url,
+  width: video.width,
+});
+
+const toGalleryItem = (kind, value) =>
+  kind === 'image'
+    ? {
+        board_id: value.board_id,
+        category: value.image_category,
+        created_at: value.created_at,
+        full_url: value.image_url,
+        height: value.height,
+        is_intermediate: value.is_intermediate,
+        kind,
+        name: value.image_name,
+        starred: value.starred ?? false,
+        thumbnail_url: value.thumbnail_url,
+        width: value.width,
+      }
+    : {
+        board_id: value.board_id,
+        category: value.video_category,
+        created_at: value.created_at,
+        duration: value.duration,
+        fps: value.fps,
+        full_url: value.video_url,
+        height: value.height,
+        is_intermediate: value.is_intermediate,
+        kind,
+        name: value.video_name,
+        starred: value.starred,
+        thumbnail_url: value.thumbnail_url,
+        width: value.width,
+      };
+
+const getGalleryCandidates = (state) => [
+  ...[...state.images.values()].map((image) => ({ item: toGalleryItem('image', image), searchable: image.metadata })),
+  ...[...state.videos.values()]
+    .filter((video) => video.owner_user_id === MOCK_USER_ID)
+    .map((video) => ({ item: toGalleryItem('video', video), searchable: video.metadata })),
+];
+
+const compareGalleryItems = (left, right, orderDir, starredFirst) => {
+  if (starredFirst && left.starred !== right.starred) {
+    return left.starred ? -1 : 1;
+  }
+
+  const direction = orderDir === 'ASC' ? 1 : -1;
+
+  return (
+    direction * left.created_at.localeCompare(right.created_at) ||
+    direction * left.kind.localeCompare(right.kind) ||
+    direction * left.name.localeCompare(right.name)
+  );
+};
+
+const filterGalleryItems = (state, url, { createdDate } = {}) => {
+  const boardId = url.searchParams.get('board_id');
+  const categories = getRequestedCategories(url);
+  const createdFrom = url.searchParams.get('created_from');
+  const createdTo = url.searchParams.get('created_to');
+  const intermediate = getOptionalBoolean(url, 'is_intermediate');
+  const searchTerm = url.searchParams.get('search_term')?.trim().toLocaleLowerCase() ?? '';
+
+  return getGalleryCandidates(state)
+    .filter(({ item, searchable }) => {
+      if (boardId && (boardId === 'none' ? item.board_id !== null : item.board_id !== boardId)) {
+        return false;
+      }
+      if (categories.length > 0 && !categories.includes(item.category)) {
+        return false;
+      }
+      if (intermediate !== undefined && item.is_intermediate !== intermediate) {
+        return false;
+      }
+      if (createdDate && item.created_at.slice(0, 10) !== createdDate) {
+        return false;
+      }
+      if (createdFrom && item.created_at < createdFrom) {
+        return false;
+      }
+      if (createdTo && item.created_at >= `${createdTo}T24:00:00`) {
+        return false;
+      }
+      if (searchTerm) {
+        const document = `${JSON.stringify(searchable ?? {})} ${item.created_at}`.toLocaleLowerCase();
+
+        if (!document.includes(searchTerm)) {
+          return false;
+        }
+      }
+
+      return true;
+    })
+    .map(({ item }) => item)
+    .sort((left, right) =>
+      compareGalleryItems(
+        left,
+        right,
+        url.searchParams.get('order_dir')?.toUpperCase() === 'ASC' ? 'ASC' : 'DESC',
+        url.searchParams.get('starred_first') !== 'false'
+      )
+    );
+};
+
+const listGalleryItems = (state, url) => {
+  const offset = Math.max(0, Number(url.searchParams.get('offset') ?? 0) || 0);
+  const limit = Math.max(0, Number(url.searchParams.get('limit') ?? 10) || 0);
+  const filtered = filterGalleryItems(state, url);
+
+  return {
+    items: limit === 0 ? [] : filtered.slice(offset, offset + limit),
+    limit,
+    offset,
+    total: filtered.length,
+  };
+};
+
+const listGalleryItemNames = (state, url, options) => {
+  const items = filterGalleryItems(state, url, options);
+
+  return {
+    items: items.map(({ kind, name }) => ({ kind, name })),
+    starred_count: url.searchParams.get('starred_first') !== 'false' ? items.filter((item) => item.starred).length : 0,
+    total_count: items.length,
+  };
+};
+
+const listVideos = (state, url) => {
+  const boardId = url.searchParams.get('board_id');
+  const categories = getRequestedCategories(url);
+  const intermediate = getOptionalBoolean(url, 'is_intermediate');
+  const searchTerm = url.searchParams.get('search_term')?.trim().toLocaleLowerCase() ?? '';
+  const orderDir = url.searchParams.get('order_dir')?.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+  const starredFirst = url.searchParams.get('starred_first') !== 'false';
+  const offset = Math.max(0, Number(url.searchParams.get('offset') ?? 0) || 0);
+  const limit = Math.max(0, Number(url.searchParams.get('limit') ?? 10) || 0);
+  const filtered = [...state.videos.values()]
+    .filter((video) => {
+      if (video.owner_user_id !== MOCK_USER_ID) {
+        return false;
+      }
+      if (boardId && (boardId === 'none' ? video.board_id !== null : video.board_id !== boardId)) {
+        return false;
+      }
+      if (categories.length > 0 && !categories.includes(video.video_category)) {
+        return false;
+      }
+      if (intermediate !== undefined && video.is_intermediate !== intermediate) {
+        return false;
+      }
+
+      return (
+        !searchTerm ||
+        `${JSON.stringify(video.metadata ?? {})} ${video.created_at}`.toLocaleLowerCase().includes(searchTerm)
+      );
+    })
+    .map(toVideoDto)
+    .sort((left, right) =>
+      compareGalleryItems(
+        {
+          created_at: left.created_at,
+          kind: 'video',
+          name: left.video_name,
+          starred: left.starred,
+        },
+        {
+          created_at: right.created_at,
+          kind: 'video',
+          name: right.video_name,
+          starred: right.starred,
+        },
+        orderDir,
+        starredFirst
+      )
+    );
+
+  return {
+    items: limit === 0 ? [] : filtered.slice(offset, offset + limit),
+    limit,
+    offset,
+    total: filtered.length,
+  };
+};
+
+const boardDto = (state, board) => {
+  const images = [...state.images.values()].filter((image) => image.board_id === board.board_id);
+  const videos = [...state.videos.values()].filter(
+    (video) => video.board_id === board.board_id && video.owner_user_id === MOCK_USER_ID
+  );
+  const cover = [
+    ...images.map((image) => ({
+      createdAt: image.created_at,
+      kind: 'image',
+      name: image.image_name,
+      starred: image.starred,
+    })),
+    ...videos.map((video) => ({
+      createdAt: video.created_at,
+      kind: 'video',
+      name: video.video_name,
+      starred: video.starred,
+    })),
+  ].sort(
+    (left, right) =>
+      Number(right.starred) - Number(left.starred) ||
+      right.createdAt.localeCompare(left.createdAt) ||
+      right.kind.localeCompare(left.kind) ||
+      right.name.localeCompare(left.name)
+  )[0];
+
+  return {
+    ...board,
+    asset_count: images.filter((image) => image.image_category !== 'general').length,
+    cover_image_name: cover?.kind === 'image' ? cover.name : null,
+    cover_video_name: cover?.kind === 'video' ? cover.name : null,
+    image_count: images.filter((image) => image.image_category === 'general').length,
+    video_count: videos.length,
+  };
+};
+
 const listImages = (state, url) => {
   const boardId = url.searchParams.get('board_id');
   const categories = getRequestedCategories(url);
@@ -173,24 +418,34 @@ const listImages = (state, url) => {
 const listVirtualDateBoards = (state) => {
   const groups = new Map();
 
-  for (const image of state.images.values()) {
-    const date = image.created_at.slice(0, 10);
+  for (const item of getGalleryCandidates(state).map(({ item }) => item)) {
+    if (item.is_intermediate) {
+      continue;
+    }
+    const date = item.created_at.slice(0, 10);
     const group = groups.get(date) ?? [];
 
-    group.push(image);
+    group.push(item);
     groups.set(date, group);
   }
 
   return [...groups.entries()]
     .sort(([left], [right]) => right.localeCompare(left))
-    .map(([date, images]) => ({
-      asset_count: images.filter((image) => image.image_category !== 'general').length,
-      board_name: date,
-      cover_image_name: images[0]?.image_name ?? null,
-      date,
-      image_count: images.filter((image) => image.image_category === 'general').length,
-      virtual_board_id: `by_date:${date}`,
-    }));
+    .map(([date, items]) => {
+      const ordered = [...items].sort((left, right) => compareGalleryItems(left, right, 'DESC', false));
+      const cover = ordered[0];
+
+      return {
+        asset_count: items.filter((item) => item.kind === 'image' && item.category !== 'general').length,
+        board_name: date,
+        cover_image_name: cover?.kind === 'image' ? cover.name : null,
+        cover_video_name: cover?.kind === 'video' ? cover.name : null,
+        date,
+        image_count: items.filter((item) => item.kind === 'image' && item.category === 'general').length,
+        video_count: items.filter((item) => item.kind === 'video').length,
+        virtual_board_id: `by_date:${date}`,
+      };
+    });
 };
 
 const writeJson = (response, status, value) => {
@@ -211,6 +466,35 @@ const writePng = (response) => {
     'content-type': 'image/png',
   });
   response.end(TINY_PNG);
+};
+
+const writeBinary = (response, status, body, headers) => {
+  response.writeHead(status, {
+    'cache-control': 'public, max-age=3600',
+    'content-length': body.length,
+    ...headers,
+  });
+  response.end(body);
+};
+
+const parseByteRange = (value, size) => {
+  const match = /^bytes=(\d*)-(\d*)$/.exec(value.trim());
+
+  if (!match || size <= 0 || (!match[1] && !match[2])) {
+    return null;
+  }
+  if (!match[1]) {
+    const suffixLength = Number(match[2]);
+
+    return suffixLength > 0 ? [Math.max(size - suffixLength, 0), size - 1] : null;
+  }
+
+  const start = Number(match[1]);
+  const end = match[2] ? Number(match[2]) : size - 1;
+
+  return Number.isSafeInteger(start) && Number.isSafeInteger(end) && start <= end && start < size
+    ? [start, Math.min(end, size - 1)]
+    : null;
 };
 
 export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
@@ -470,11 +754,80 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
       }
 
       if (method === 'GET' && (path === '/api/v1/boards' || path === '/api/v1/boards/')) {
-        return json(200, [...state.boards.values()]);
+        return json(
+          200,
+          [...state.boards.values()].map((board) => boardDto(state, board))
+        );
+      }
+
+      const boardMatch = /^\/api\/v1\/boards\/([^/]+)$/.exec(path);
+      if (boardMatch) {
+        const boardId = decodeURIComponent(boardMatch[1]);
+        const board = state.boards.get(boardId);
+
+        if (!board) {
+          return json(404, { detail: 'Board not found' });
+        }
+        if (method === 'GET') {
+          return json(200, boardDto(state, board));
+        }
+        if (method === 'DELETE') {
+          const includeImages = url.searchParams.get('include_images') === 'true';
+          const boardImages = [...state.images.values()].filter((image) => image.board_id === boardId);
+          const boardVideos = [...state.videos.values()].filter(
+            (video) => video.board_id === boardId && video.owner_user_id === MOCK_USER_ID
+          );
+          const imageNames = boardImages.map((image) => image.image_name);
+          const videoNames = boardVideos.map((video) => video.video_name);
+
+          state.boards.delete(boardId);
+          if (includeImages) {
+            for (const imageName of imageNames) {
+              state.images.delete(imageName);
+            }
+            for (const videoName of videoNames) {
+              state.videos.delete(videoName);
+            }
+
+            return json(200, {
+              board_id: boardId,
+              deleted_board_images: [],
+              deleted_board_videos: [],
+              deleted_images: imageNames,
+              deleted_videos: videoNames,
+              failed_images: [],
+              failed_videos: [],
+            });
+          }
+
+          for (const image of boardImages) {
+            image.board_id = null;
+          }
+          for (const video of boardVideos) {
+            video.board_id = null;
+          }
+
+          return json(200, {
+            board_id: boardId,
+            deleted_board_images: imageNames,
+            deleted_board_videos: videoNames,
+            deleted_images: [],
+            deleted_videos: [],
+            failed_images: [],
+            failed_videos: [],
+          });
+        }
       }
 
       if (method === 'GET' && path === '/api/v1/virtual_boards/by_date') {
         return json(200, listVirtualDateBoards(state));
+      }
+
+      const virtualBoardItemNamesMatch = /^\/api\/v1\/virtual_boards\/by_date\/([^/]+)\/item_names$/.exec(path);
+      if (method === 'GET' && virtualBoardItemNamesMatch) {
+        const date = decodeURIComponent(virtualBoardItemNamesMatch[1]);
+
+        return json(200, listGalleryItemNames(state, url, { createdDate: date }));
       }
 
       const virtualBoardNamesMatch = /^\/api\/v1\/virtual_boards\/by_date\/([^/]+)\/image_names$/.exec(path);
@@ -501,6 +854,14 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         return json(200, listImages(state, url));
       }
 
+      if (method === 'GET' && path === '/api/v1/gallery/items/') {
+        return json(200, listGalleryItems(state, url));
+      }
+
+      if (method === 'GET' && path === '/api/v1/gallery/items/names') {
+        return json(200, listGalleryItemNames(state, url));
+      }
+
       const imageAssetMatch = /^\/api\/v1\/images\/i\/([^/]+)\/(full|thumbnail)$/.exec(path);
       if (method === 'GET' && imageAssetMatch) {
         const imageName = decodeURIComponent(imageAssetMatch[1]);
@@ -519,6 +880,199 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         const image = state.images.get(imageName);
 
         return image ? json(200, image) : json(404, { detail: 'Image not found' });
+      }
+
+      if (method === 'POST' && path === '/api/v1/videos/upload') {
+        const multipartBody = await readBody(request);
+        const requestedName = /filename="([^"]+)"/.exec(multipartBody)?.[1] ?? 'uploaded-fixture.mp4';
+        const suffix = String(state.nextVideoNumber).padStart(3, '0');
+        const videoName = `fixture-upload-${suffix}-${requestedName.replaceAll(/[^a-zA-Z0-9._-]/g, '-')}`;
+        const boardId = url.searchParams.get('board_id');
+        const video = {
+          board_id: boardId && state.boards.has(boardId) ? boardId : null,
+          created_at: timestamp(state),
+          duration: 1,
+          fps: 10,
+          graph: null,
+          height: 64,
+          is_intermediate: url.searchParams.get('is_intermediate') === 'true',
+          metadata: null,
+          owner_user_id: MOCK_USER_ID,
+          starred: false,
+          thumbnail_url: `/api/v1/videos/i/${videoName}/thumbnail`,
+          video_category: url.searchParams.get('video_category') ?? 'general',
+          video_name: videoName,
+          video_origin: 'external',
+          video_url: `/api/v1/videos/i/${videoName}/full`,
+          width: 64,
+          workflow: null,
+        };
+
+        state.nextVideoNumber += 1;
+        state.videos.set(videoName, video);
+        response.setHeader('location', video.video_url);
+        return json(201, toVideoDto(video));
+      }
+
+      if (method === 'GET' && (path === '/api/v1/videos' || path === '/api/v1/videos/')) {
+        return json(200, listVideos(state, url));
+      }
+
+      if (method === 'POST' && (path === '/api/v1/videos/star' || path === '/api/v1/videos/unstar')) {
+        const body = await readJsonBody(request);
+        const names = Array.isArray(body.video_names) ? [...new Set(body.video_names)] : [];
+        const succeeded = [];
+        const affectedBoards = [];
+        const starred = path.endsWith('/star');
+
+        for (const name of names) {
+          const video = state.videos.get(name);
+
+          if (!video || video.owner_user_id !== MOCK_USER_ID) {
+            continue;
+          }
+          video.starred = starred;
+          succeeded.push(name);
+          affectedBoards.push(video.board_id ?? 'none');
+        }
+
+        return json(200, {
+          affected_boards: [...new Set(affectedBoards)],
+          failed_videos: [],
+          [starred ? 'starred_videos' : 'unstarred_videos']: succeeded,
+        });
+      }
+
+      if (method === 'POST' && path === '/api/v1/videos/delete') {
+        const body = await readJsonBody(request);
+        const names = Array.isArray(body.video_names) ? [...new Set(body.video_names)] : [];
+        const deletedVideos = [];
+        const affectedBoards = [];
+
+        for (const name of names) {
+          const video = state.videos.get(name);
+
+          if (!video || video.owner_user_id !== MOCK_USER_ID) {
+            continue;
+          }
+          state.videos.delete(name);
+          deletedVideos.push(name);
+          affectedBoards.push(video.board_id ?? 'none');
+        }
+
+        return json(200, {
+          affected_boards: [...new Set(affectedBoards)],
+          deleted_videos: deletedVideos,
+          failed_videos: [],
+        });
+      }
+
+      if (path === '/api/v1/videos/board' && (method === 'POST' || method === 'DELETE')) {
+        const body = await readJsonBody(request);
+        const video = state.videos.get(body.video_name);
+
+        if (!video || video.owner_user_id !== MOCK_USER_ID) {
+          return json(404, { detail: 'Video not found' });
+        }
+
+        const oldBoardId = video.board_id ?? 'none';
+
+        if (method === 'POST') {
+          if (!body.board_id || !state.boards.has(body.board_id)) {
+            return json(404, { detail: 'Board not found' });
+          }
+          video.board_id = body.board_id;
+          return json(200, {
+            added_videos: [video.video_name],
+            affected_boards: [...new Set([oldBoardId, body.board_id])],
+          });
+        }
+
+        video.board_id = null;
+        return json(200, {
+          affected_boards: [...new Set([oldBoardId, 'none'])],
+          removed_videos: [video.video_name],
+        });
+      }
+
+      const videoMetadataMatch = /^\/api\/v1\/videos\/i\/([^/]+)\/metadata$/.exec(path);
+      if (method === 'GET' && videoMetadataMatch) {
+        const video = state.videos.get(decodeURIComponent(videoMetadataMatch[1]));
+
+        return video && video.owner_user_id === MOCK_USER_ID
+          ? json(200, video.metadata)
+          : json(404, { detail: 'Video not found' });
+      }
+
+      const videoWorkflowMatch = /^\/api\/v1\/videos\/i\/([^/]+)\/workflow$/.exec(path);
+      if (method === 'GET' && videoWorkflowMatch) {
+        const video = state.videos.get(decodeURIComponent(videoWorkflowMatch[1]));
+
+        return video && video.owner_user_id === MOCK_USER_ID
+          ? json(200, { graph: video.graph, workflow: video.workflow })
+          : json(404, { detail: 'Video not found' });
+      }
+
+      const videoThumbnailMatch = /^\/api\/v1\/videos\/i\/([^/]+)\/thumbnail$/.exec(path);
+      if (method === 'GET' && videoThumbnailMatch) {
+        const video = state.videos.get(decodeURIComponent(videoThumbnailMatch[1]));
+
+        return video && video.owner_user_id === MOCK_USER_ID
+          ? writeBinary(response, 200, FIXTURE_VIDEO_POSTER, { 'content-type': 'image/webp' })
+          : json(404, { detail: 'Video not found' });
+      }
+
+      const videoFullMatch = /^\/api\/v1\/videos\/i\/([^/]+)\/full$/.exec(path);
+      if ((method === 'GET' || method === 'HEAD') && videoFullMatch) {
+        const video = state.videos.get(decodeURIComponent(videoFullMatch[1]));
+
+        if (!video || video.owner_user_id !== MOCK_USER_ID) {
+          return json(404, { detail: 'Video not found' });
+        }
+
+        const commonHeaders = {
+          'accept-ranges': 'bytes',
+          'content-type': 'video/mp4',
+        };
+
+        if (method === 'HEAD') {
+          response.writeHead(200, { ...commonHeaders, 'content-length': FIXTURE_VIDEO.length });
+          return response.end();
+        }
+
+        const rangeHeader = request.headers.range;
+
+        if (!rangeHeader) {
+          return writeBinary(response, 200, FIXTURE_VIDEO, commonHeaders);
+        }
+
+        const range = parseByteRange(rangeHeader, FIXTURE_VIDEO.length);
+
+        if (!range) {
+          response.writeHead(416, {
+            ...commonHeaders,
+            'content-length': 0,
+            'content-range': `bytes */${String(FIXTURE_VIDEO.length)}`,
+          });
+          return response.end();
+        }
+
+        const [start, end] = range;
+        const body = FIXTURE_VIDEO.subarray(start, end + 1);
+
+        return writeBinary(response, 206, body, {
+          ...commonHeaders,
+          'content-range': `bytes ${String(start)}-${String(end)}/${String(FIXTURE_VIDEO.length)}`,
+        });
+      }
+
+      const videoMatch = /^\/api\/v1\/videos\/i\/([^/]+)$/.exec(path);
+      if (method === 'GET' && videoMatch) {
+        const video = state.videos.get(decodeURIComponent(videoMatch[1]));
+
+        return video && video.owner_user_id === MOCK_USER_ID
+          ? json(200, toVideoDto(video))
+          : json(404, { detail: 'Video not found' });
       }
 
       const workflowMatch = /^\/api\/v1\/workflows\/i\/([^/]+)(?:\/opened_at)?$/.exec(path);

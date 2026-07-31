@@ -22,5 +22,6 @@ export const createBrushTool = (): Tool =>
     id: 'brush',
     opacity: (ctx) => ctx.stores.brushOptions.get().opacity,
     size: (ctx) => ctx.stores.brushOptions.get().size,
-    thinning: (ctx) => (ctx.stores.brushOptions.get().pressureSensitivity ? PRESSURE_THINNING : 0),
+    pressureOpacity: (ctx) => ctx.stores.brushOptions.get().pressureAffectsOpacity,
+    thinning: (ctx) => (ctx.stores.brushOptions.get().pressureAffectsWidth ? PRESSURE_THINNING : 0),
   });

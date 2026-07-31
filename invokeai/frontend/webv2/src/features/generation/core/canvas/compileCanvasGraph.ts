@@ -30,6 +30,7 @@ import type { GenerateModelConfig, GenerateSettings } from '@features/generation
 import { getGenerationValidationReasons } from '@features/generation/core/baseGenerationPolicies';
 import { GRAPH_BUILDERS } from '@features/generation/core/graph';
 import { addEdge, addNode, toGraphContract } from '@features/generation/core/graphBuilder';
+import { getIsPidSupportedBase } from '@features/generation/core/pid';
 
 import type {
   CanvasCompositingSettings,
@@ -48,7 +49,7 @@ import { DEFAULT_CANVAS_COMPOSITING } from './types';
  * and the legacy per-base builders under
  * `features/nodes/util/graph/generation/`.
  */
-const CANVAS_I2L_NODE_TYPES: Record<SupportedGenerateBase, string> = {
+const CANVAS_I2L_NODE_TYPES: Partial<Record<SupportedGenerateBase, string>> = {
   'sd-1': 'i2l',
   'sd-2': 'i2l',
   sdxl: 'i2l',
@@ -58,7 +59,13 @@ const CANVAS_I2L_NODE_TYPES: Record<SupportedGenerateBase, string> = {
   cogview4: 'cogview4_i2l',
   'qwen-image': 'qwen_image_i2l',
   'z-image': 'z_image_i2l',
+  // Krea-2 shares the Qwen-Image VAE, so it encodes with that family's node too.
+  'krea-2': 'qwen_image_i2l',
   anima: 'anima_i2l',
+  wan: 'wan_i2l',
+  // Ideogram 4 is deliberately absent: it ships no image-to-latents node, so canvas
+  // img2img/inpaint is impossible. requireI2lType turns the missing entry into an
+  // actionable "Canvas generation is not supported" error.
 };
 
 /**
@@ -93,6 +100,14 @@ const getCanvasValidationReasons = (input: CompileCanvasGraphInput): string[] =>
   if (model.type === 'external_image_generator') {
     reasons.push(`${model.name} does not support canvas generation.`);
     return reasons;
+  }
+
+  // PiD is wired for text-to-image only. Canvas compilation finds the VAE by looking for
+  // a `canvas_output.vae` edge and renames that node when compositing back; a PiD chain
+  // has neither, so without this guard the user would get an internal
+  // "could not resolve a VAE source" error instead of an actionable one.
+  if (input.settings.pidMode !== 'off' && getIsPidSupportedBase(model.base)) {
+    reasons.push('PiD decoding is not supported on the canvas yet. Turn PiD off to generate here.');
   }
 
   if (!Number.isFinite(bbox.width) || !Number.isFinite(bbox.height) || bbox.width <= 0 || bbox.height <= 0) {

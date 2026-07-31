@@ -23,7 +23,8 @@ export const PreviewHeaderActions = ({ region }: WidgetViewProps) => {
   const { t } = useTranslation();
   const showProgressImagesInViewer = useActiveProjectSelector((project) => project.settings.showProgressImagesInViewer);
   const hasProgressImage = useProgressImage() !== null;
-  const { actionImage, actions, openImageMenu } = usePreviewHeaderContext();
+  const { actionItem, actions, copyCurrentVideoFrame, isVideoFrameCopyAvailable, openItemMenu, openVideoDetails } =
+    usePreviewHeaderContext();
   const isFilmstripVisible = useActiveProjectSelector((project) =>
     getPreviewFilmstripVisible(getProjectWidgetValues(project, 'preview'))
   );
@@ -43,13 +44,16 @@ export const PreviewHeaderActions = ({ region }: WidgetViewProps) => {
 
   return (
     <HStack gap="1">
-      {actionImage && actions ? (
+      {actionItem && actions ? (
         <>
           <PreviewActionStrip
             actions={actions}
             density={region === 'center' ? 'full' : 'compact'}
-            image={actionImage}
-            onOpenMenu={openImageMenu}
+            isVideoFrameCopyAvailable={isVideoFrameCopyAvailable}
+            item={actionItem}
+            onCopyCurrentFrame={copyCurrentVideoFrame ?? undefined}
+            onOpenDetails={openVideoDetails ?? undefined}
+            onOpenMenu={openItemMenu}
           />
           <Box bg="border.subtle" flexShrink={0} h="4" w="1px" />
         </>

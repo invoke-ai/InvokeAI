@@ -39,6 +39,7 @@ const api = vi.hoisted(() => ({
   getCurrentUser: vi.fn(),
   login: vi.fn(),
   logout: vi.fn(),
+  refreshMediaCookie: vi.fn(),
   setupAdmin: vi.fn(),
 }));
 
@@ -95,19 +96,21 @@ const createObservedLifecycle = (): {
     },
     name: 'test-account-cache',
   });
+  const port = {
+    activate: (accountId: string, storageSuffix?: string) => {
+      testState.events.push(`lifecycle.activate:${accountId}`);
+      return lifecycle.activate(accountId, storageSuffix);
+    },
+    capture: () => lifecycle.capture(),
+    invalidate: () => {
+      testState.events.push('lifecycle.invalidate');
+      return lifecycle.invalidate();
+    },
+  };
 
   return {
     lifecycle,
-    port: {
-      activate: (accountId, storageSuffix) => {
-        testState.events.push(`lifecycle.activate:${accountId}`);
-        return lifecycle.activate(accountId, storageSuffix);
-      },
-      invalidate: () => {
-        testState.events.push('lifecycle.invalidate');
-        return lifecycle.invalidate();
-      },
-    },
+    port,
   };
 };
 
@@ -128,7 +131,12 @@ beforeEach(async () => {
   api.getCurrentUser.mockReset();
   api.login.mockReset();
   api.logout.mockReset();
+  api.refreshMediaCookie.mockReset();
   api.setupAdmin.mockReset();
+  api.refreshMediaCookie.mockImplementation(() => {
+    testState.events.push('api.refreshMediaCookie');
+    return Promise.resolve({ success: true });
+  });
 
   api.getAuthStatus.mockResolvedValue({
     admin_email: 'admin@example.com',
@@ -265,6 +273,7 @@ describe('identity account transitions', () => {
     const { lifecycle } = createObservedLifecycle();
     session.configureIdentityAccountLifecycle({
       activate: (accountId, storageSuffix) => lifecycle.activate(accountId, storageSuffix),
+      capture: () => lifecycle.capture(),
       invalidate: () => lifecycle.invalidate(),
     });
 
@@ -419,5 +428,117 @@ describe('identity account transitions', () => {
     expect(await loginOutcome).toBeInstanceOf(session.LoginAttemptSupersededError);
     expect(session.getAuthSession()).toMatchObject({ sessionExpired: true, user: null });
     expect(testState.getToken()).toBeNull();
+  });
+});
+
+describe('media cookie recovery on restore', () => {
+  it('re-issues the media cookie when a stored token restores a session', async () => {
+    testState.tokenAdapter.set('stored-token');
+    api.getCurrentUser.mockResolvedValue(user);
+    const observed = createObservedLifecycle();
+    session.configureIdentityAccountLifecycle(observed.port);
+
+    await session.ensureAuthSession();
+
+    // A restored session has a valid JWT but no media cookie, so every <img> would 401
+    // without this call. Login needs no equivalent — the backend sets the cookie there.
+    expect(api.refreshMediaCookie).toHaveBeenCalledTimes(1);
+    expect(session.getAuthSession()).toMatchObject({ phase: 'ready', user });
+  });
+
+  it('still restores the session when the media cookie refresh fails', async () => {
+    testState.tokenAdapter.set('stored-token');
+    api.getCurrentUser.mockResolvedValue(user);
+    api.refreshMediaCookie.mockRejectedValue(new Error('network down'));
+    const observed = createObservedLifecycle();
+    session.configureIdentityAccountLifecycle(observed.port);
+
+    await session.ensureAuthSession();
+
+    // Broken media is a degraded gallery; it must not present the user as signed out.
+    expect(session.getAuthSession()).toMatchObject({ phase: 'ready', sessionExpired: false, user });
+  });
+
+  it('does not request a media cookie when there is no stored token to restore', async () => {
+    await resolveSignedOutMultiuserSession();
+
+    expect(api.refreshMediaCookie).not.toHaveBeenCalled();
+  });
+});
+
+describe('protected media cookie recovery', () => {
+  it('shares one in-flight refresh between concurrent callers in the same account epoch', async () => {
+    await resolveSignedOutMultiuserSession();
+    await session.loginWithCredentials(user.email, 'password', true);
+    const refresh = createDeferred<{ success: boolean }>();
+    api.refreshMediaCookie.mockReturnValueOnce(refresh.promise);
+
+    const first = session.refreshProtectedMediaCookie();
+    const second = session.refreshProtectedMediaCookie();
+
+    expect(api.refreshMediaCookie).toHaveBeenCalledTimes(1);
+
+    refresh.resolve({ success: true });
+
+    await expect(Promise.all([first, second])).resolves.toEqual([true, true]);
+  });
+
+  it('aborts the old cookie request before a new account transport starts and gives the new epoch a fresh flight', async () => {
+    await resolveSignedOutMultiuserSession();
+    await session.loginWithCredentials(user.email, 'password', true);
+    const oldRefresh = createDeferred<{ success: boolean }>();
+    const newRefresh = createDeferred<{ success: boolean }>();
+    let oldSignal: AbortSignal | undefined;
+    let newSignal: AbortSignal | undefined;
+    api.refreshMediaCookie
+      .mockImplementationOnce((signal?: AbortSignal) => {
+        oldSignal = signal;
+        signal?.addEventListener(
+          'abort',
+          () => {
+            testState.events.push('refresh.abort');
+          },
+          { once: true }
+        );
+        return oldRefresh.promise;
+      })
+      .mockImplementationOnce((signal?: AbortSignal) => {
+        newSignal = signal;
+        return newRefresh.promise;
+      });
+
+    const staleOutcome = session.refreshProtectedMediaCookie();
+    expect(oldSignal?.aborted).toBe(false);
+
+    testState.events.length = 0;
+    api.login.mockImplementationOnce(() => {
+      testState.events.push('api.login:new-account');
+      return Promise.resolve({ expires_in: 3600, token: 'token-b', user: userB });
+    });
+    await session.loginWithCredentials(userB.email, 'password', true);
+
+    expect(oldSignal?.aborted).toBe(true);
+    expect(testState.events.indexOf('refresh.abort')).toBeGreaterThanOrEqual(0);
+    expect(testState.events.indexOf('refresh.abort')).toBeLessThan(testState.events.indexOf('api.login:new-account'));
+
+    const currentOutcome = session.refreshProtectedMediaCookie();
+
+    expect(api.refreshMediaCookie).toHaveBeenCalledTimes(2);
+    expect(newSignal?.aborted).toBe(false);
+    expect(newSignal).not.toBe(oldSignal);
+
+    newRefresh.resolve({ success: true });
+    await expect(currentOutcome).resolves.toBe(true);
+
+    oldRefresh.resolve({ success: true });
+    await expect(staleOutcome).resolves.toBe(false);
+  });
+
+  it('returns false without throwing when the refresh request fails', async () => {
+    await resolveSignedOutMultiuserSession();
+    await session.loginWithCredentials(user.email, 'password', true);
+    api.refreshMediaCookie.mockRejectedValueOnce(new Error('network down'));
+
+    await expect(session.refreshProtectedMediaCookie()).resolves.toBe(false);
   });
 });

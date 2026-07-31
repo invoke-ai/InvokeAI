@@ -66,6 +66,7 @@ const runStroke = (opts: { withMask: boolean }) => {
     layerId: 'L',
     opacity: 1,
     size: 20,
+    pressureOpacity: false,
     thinning: 0,
     tool: 'brush',
   });
@@ -141,6 +142,7 @@ describe('strokeSession: bbox-clipped painting', () => {
       layerId: 'L',
       opacity: 1,
       size: 20,
+      pressureOpacity: false,
       thinning: 0,
       tool: 'brush',
     });
@@ -223,6 +225,7 @@ describe('strokeSession: content-sized cache growth', () => {
       layerId: 'L',
       opacity: 1,
       size: 20,
+      pressureOpacity: false,
       thinning: 0,
       tool: 'brush',
     });
@@ -344,6 +347,7 @@ describe('strokeSession: cache version bump (live adjusted-surface invalidation)
       layerId: 'L',
       opacity: 1,
       size: 20,
+      pressureOpacity: false,
       thinning: 0,
       tool: 'brush',
     });
@@ -395,6 +399,7 @@ describe('incremental "before" snapshot', () => {
       layerId: 'L',
       opacity: 1,
       size,
+      pressureOpacity: false,
       thinning: 0,
       tool: 'brush',
     });
@@ -448,5 +453,100 @@ describe('incremental "before" snapshot', () => {
     drag(session, 4000, 100);
     const resizes = surfaceOf(layers).callLog.filter((entry) => entry.op === 'resize').length;
     expect(resizes).toBeLessThan(4000 / 200);
+  });
+});
+
+describe('strokeSession: pressure-dependent opacity', () => {
+  const pointerAt = (x: number, y: number, pressure: number): PointerInput => ({
+    ...pointer(x, y),
+    pressure,
+  });
+
+  const runPressureStroke = (pressureOpacity: boolean, pressures: number[]) => {
+    const { backend, created } = createCapturingBackend();
+    const layers = createLayerCacheStore(backend);
+    layers.getOrCreate('L', 100, 100);
+    const ctx = {
+      backend,
+      createPath2D: () => {
+        const path = { closePath: () => {}, lineTo: () => {}, moveTo: () => {}, quadraticCurveTo: () => {} };
+        return path as unknown as Path2D;
+      },
+      emitStrokeCommitted: vi.fn(),
+      invalidate: vi.fn(),
+      layers,
+      notifyLayerPainted: vi.fn(),
+    } as unknown as ToolContext;
+
+    created.length = 0;
+    const session = createStrokeSession({
+      clipMask: null,
+      color: '#ff0000',
+      composite: 'source-over',
+      ctx,
+      layerId: 'L',
+      opacity: 1,
+      pressureOpacity,
+      size: 20,
+      thinning: 0,
+      tool: 'brush',
+    });
+    session.addPoints(pressures.map((pressure, index) => pointerAt(10 + index * 10, 10, pressure)));
+    const scratch = created[0]!;
+    // A session repaints on every batch and once more on commit. Measuring the whole gesture
+    // would couple these assertions to the batch count, so clear the log and let commit's
+    // single repaint be the one under test.
+    scratch.callLog.length = 0;
+    session.commit();
+
+    return scratch;
+  };
+
+  const alphaValues = (surface: StubRasterSurface): number[] =>
+    surface.callLog.filter((e) => e.op === 'set' && e.args[0] === 'globalAlpha').map((e) => e.args[1] as number);
+
+  it('fills the stroke once at full alpha when pressure opacity is off', () => {
+    const scratch = runPressureStroke(false, [0.25, 0.5, 1]);
+
+    // One fill for the whole outline: overlapping parts of the stroke union instead of
+    // compounding, which is the guarantee the single-composite design provides.
+    expect(scratch.callLog.filter((e) => e.op === 'fill')).toHaveLength(1);
+    expect(alphaValues(scratch).every((alpha) => alpha === 1)).toBe(true);
+  });
+
+  it('paints one punch-and-fill pair per pressure band when enabled', () => {
+    const scratch = runPressureStroke(true, [1, 0.5, 0.25]);
+
+    // Three distinct levels => three bands => two fills each (destination-out, then source-over).
+    expect(scratch.callLog.filter((e) => e.op === 'fill')).toHaveLength(6);
+    expect(compositeOps(scratch).filter((op) => op === 'destination-out')).toHaveLength(3);
+  });
+
+  it('replaces rather than blends each band, so overlaps cannot compound alpha', () => {
+    const scratch = runPressureStroke(true, [1, 0.5]);
+    const ops = scratch.callLog.filter(
+      (e) =>
+        e.op === 'fill' || (e.op === 'set' && (e.args[0] === 'globalCompositeOperation' || e.args[0] === 'globalAlpha'))
+    );
+    const signature = ops.map((e) => (e.op === 'fill' ? 'fill' : `${String(e.args[0])}=${String(e.args[1])}`));
+
+    // Every band punches its own footprint at alpha 1 before refilling at the band alpha.
+    // Without the destination-out the second band would blend into the first and darken it.
+    expect(signature.join(' ')).toContain(
+      'globalCompositeOperation=destination-out globalAlpha=1 fill globalCompositeOperation=source-over'
+    );
+  });
+
+  it('drives band alpha from pen pressure', () => {
+    const scratch = runPressureStroke(true, [1, 0.5]);
+
+    expect(alphaValues(scratch)).toContain(1);
+    expect(alphaValues(scratch)).toContain(0.5);
+  });
+
+  it('collapses a constant-pressure stroke to a single band', () => {
+    const scratch = runPressureStroke(true, [0.5, 0.5, 0.5]);
+
+    expect(scratch.callLog.filter((e) => e.op === 'fill')).toHaveLength(2);
   });
 });

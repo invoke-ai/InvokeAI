@@ -3,7 +3,16 @@ import { ApiError } from '@platform/transport/http';
 
 import { shouldExpireUnauthorizedSession } from './core/sessionPolicy';
 import { browserIdentityTokenAdapter } from './core/tokenStorage';
-import { getAuthStatus, getCurrentUser, login, logout, setupAdmin, type AuthStatus, type UserDTO } from './data/api';
+import {
+  getAuthStatus,
+  getCurrentUser,
+  login,
+  logout,
+  refreshMediaCookie,
+  setupAdmin,
+  type AuthStatus,
+  type UserDTO,
+} from './data/api';
 
 /**
  * Session-lived auth state shared by the router guards and shell chrome. When
@@ -37,6 +46,7 @@ const store = createExternalStore<AuthSession>({
 
 export interface IdentityAccountLifecycle {
   activate(accountId: string, storageSuffix?: string): { readonly epoch: number };
+  capture(): { readonly epoch: number; readonly signal: AbortSignal };
   invalidate(): { readonly epoch: number };
 }
 
@@ -192,6 +202,11 @@ const resolveSession = async (): Promise<AuthSession> => {
   if (status.multiuser_enabled && !status.setup_required && browserIdentityTokenAdapter.get()) {
     try {
       user = await getCurrentUser();
+      // This branch is the restore-from-stored-token path, the one case that holds a valid JWT
+      // without the media cookie login would have set. Re-issue it before anything renders an
+      // <img>, or every thumbnail 401s. Awaited (a small POST) so the first paint already has
+      // the cookie, but never fatal: failing here leaves media broken, not the session.
+      await refreshMediaCookie().catch(() => undefined);
     } catch (error) {
       if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
         browserIdentityTokenAdapter.clear();
@@ -239,6 +254,54 @@ export const ensureAuthSession = (): Promise<AuthSession> => {
   });
 
   return pendingResolve;
+};
+
+interface ProtectedMediaCookieRefresh {
+  scope: ReturnType<IdentityAccountLifecycle['capture']>;
+  promise: Promise<boolean>;
+}
+
+let pendingProtectedMediaCookieRefresh: ProtectedMediaCookieRefresh | null = null;
+
+/**
+ * Re-issue the cookie used by native media elements without leaking request
+ * failures or completions across authenticated account lifetimes.
+ */
+export const refreshProtectedMediaCookie = (): Promise<boolean> => {
+  const session = store.getSnapshot();
+
+  if (session.phase !== 'ready' || (session.multiuserEnabled && session.user === null)) {
+    return Promise.resolve(false);
+  }
+
+  const lifecycle = getAccountLifecycle();
+  const scope = lifecycle.capture();
+
+  if (scope.signal.aborted || scope.epoch !== session.accountEpoch) {
+    return Promise.resolve(false);
+  }
+
+  if (pendingProtectedMediaCookieRefresh?.scope === scope) {
+    return pendingProtectedMediaCookieRefresh.promise;
+  }
+
+  const promise = refreshMediaCookie(scope.signal)
+    .then(
+      (result) =>
+        result.success &&
+        !scope.signal.aborted &&
+        lifecycle.capture() === scope &&
+        store.getSnapshot().accountEpoch === scope.epoch
+    )
+    .catch(() => false)
+    .finally(() => {
+      if (pendingProtectedMediaCookieRefresh?.promise === promise) {
+        pendingProtectedMediaCookieRefresh = null;
+      }
+    });
+
+  pendingProtectedMediaCookieRefresh = { promise, scope };
+  return promise;
 };
 
 export type ReadyAuthSession = AuthSession & { phase: 'ready' };

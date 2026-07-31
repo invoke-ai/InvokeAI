@@ -1,8 +1,10 @@
 export {
   GalleryUiProvider,
-  GalleryImageActionsProvider,
-  type GalleryImageActions,
-  type GalleryImageActionsOptions,
-  type GalleryImageContextMenuProps,
+  GalleryItemActionsProvider,
+  type GalleryItemActionContext,
+  type GalleryItemActions,
+  type GalleryItemActionsOptions,
+  type GalleryItemContextMenuProps,
+  type GalleryItemContextMenuTarget,
   type GalleryUiAdapter,
 } from './ui/GalleryUiContext';

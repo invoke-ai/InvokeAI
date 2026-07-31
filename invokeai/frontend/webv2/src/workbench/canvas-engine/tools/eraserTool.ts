@@ -20,6 +20,9 @@ export const createEraserTool = (): Tool =>
     composite: 'destination-out',
     id: 'eraser',
     opacity: (ctx) => ctx.stores.eraserOptions.get().opacity,
+    // Upstream keeps eraser pressure width-only too; a pressure-faded erase reads as a
+    // failed erase rather than a soft one.
+    pressureOpacity: () => false,
     size: (ctx) => ctx.stores.eraserOptions.get().size,
     thinning: () => 0,
   });

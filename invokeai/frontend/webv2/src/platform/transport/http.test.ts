@@ -154,3 +154,30 @@ describe('request identity ownership', () => {
     await expect(oldRequest).rejects.toMatchObject({ name: 'HttpRequestIdentityExpiredError' });
   });
 });
+
+describe('media cookie credentials', () => {
+  beforeEach(() => {
+    // One stable identity for the whole request: a fresh object per call would read as a
+    // mid-request account rotation and reject before the assertion.
+    const identity = {};
+    configureHttpAuth({ getIdentity: () => identity, getToken: () => null, onUnauthorized: vi.fn() });
+  });
+
+  it('sends credentials so login can set the media cookie that authenticates <img> requests', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response('', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await apiFetch('/api/v1/auth/login', { method: 'POST' });
+
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ credentials: 'same-origin' });
+  });
+
+  it('lets a caller override credentials for a cross-origin API base', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response('', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await apiFetch('/api/v1/auth/media-cookie', { credentials: 'include', method: 'POST' });
+
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ credentials: 'include' });
+  });
+});

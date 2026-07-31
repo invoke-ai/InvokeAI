@@ -12,11 +12,13 @@ import pytest
 
 from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
 from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
+from invokeai.app.services.board_video_records.board_video_records_sqlite import SqliteBoardVideoRecordStorage
 from invokeai.app.services.boards.boards_default import BoardService
 from invokeai.app.services.bulk_download.bulk_download_default import BulkDownloadService
 from invokeai.app.services.client_state_persistence.client_state_persistence_sqlite import ClientStatePersistenceSqlite
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.external_generation.external_generation_default import ExternalGenerationService
+from invokeai.app.services.gallery.gallery_default import SqliteGalleryService
 from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
 from invokeai.app.services.images.images_default import ImageService
 from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
@@ -24,7 +26,11 @@ from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.invocation_stats.invocation_stats_default import InvocationStatsService
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.project_records.project_records_sqlite import ProjectRecordsSqlite
+from invokeai.app.services.system_prompt_records.system_prompt_records_sqlite import (
+    SqliteSystemPromptRecordsStorage,
+)
 from invokeai.app.services.users.users_default import UserService
+from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
 from invokeai.app.services.wildcard_records.wildcard_records_sqlite import SqliteWildcardRecordsStorage
 from invokeai.app.services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
 from invokeai.backend.util.logging import InvokeAILogger
@@ -67,6 +73,7 @@ def mock_services() -> InvocationServices:
         conditioning=None,  # type: ignore
         style_preset_records=None,  # type: ignore
         style_preset_image_files=None,  # type: ignore
+        system_prompt_records=SqliteSystemPromptRecordsStorage(db=db),
         workflow_thumbnails=None,  # type: ignore
         model_relationship_records=None,  # type: ignore
         model_relationships=None,  # type: ignore
@@ -74,6 +81,13 @@ def mock_services() -> InvocationServices:
         project_records=ProjectRecordsSqlite(db=db),
         users=UserService(db),
         wildcard_records=SqliteWildcardRecordsStorage(db=db),
+        videos=None,  # type: ignore
+        video_files=None,  # type: ignore
+        video_records=SqliteVideoRecordStorage(db=db),
+        board_video_records=SqliteBoardVideoRecordStorage(db=db),
+        # Real SQLite-backed gallery service: the virtual-boards router reads dates and
+        # per-date item names through it, and MagicMock cannot exercise the filter SQL.
+        gallery=SqliteGalleryService(db=db),
     )
 
 

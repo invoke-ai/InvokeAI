@@ -1,6 +1,7 @@
 # Copyright (c) 2023 Lincoln D. Stein
 """FastAPI route for model configuration records."""
 
+import asyncio
 import contextlib
 import io
 import pathlib
@@ -41,6 +42,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_SDXLRefiner_Config,
 )
 from invokeai.backend.model_manager.load.model_cache.cache_stats import CacheStats
+from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
 from invokeai.backend.model_manager.metadata.fetch.huggingface import HuggingFaceMetadataFetch
 from invokeai.backend.model_manager.metadata.metadata_base import ModelMetadataWithFiles, UnknownMetadataException
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
@@ -481,7 +483,19 @@ async def update_model_record(
         # nn.Module at load time, so toggling them on a cached model is otherwise silently a no-op until
         # the entry is evicted. Drop any unlocked cached entries for this model so the next load rebuilds.
         if _load_settings_changed(previous_config, config):
-            dropped = ApiDependencies.invoker.services.model_manager.load.ram_cache.drop_model(key)
+            # Drop the model from every per-device cache so the next load on any GPU rebuilds it.
+            # Hold the model-load write lock so no worker is mid-construction while we invalidate:
+            # a concurrent load could otherwise peek the old shared CPU weights before the drop and
+            # re-register them as canonical after it. Acquiring the lock can wait on an in-flight
+            # load/VRAM transfer, so do it off the event loop.
+            def _drop_from_all_caches() -> int:
+                with MODEL_LOAD_LOCK.write_lock():
+                    return sum(
+                        cache.drop_model(key)
+                        for cache in ApiDependencies.invoker.services.model_manager.load.ram_caches.values()
+                    )
+
+            dropped = await asyncio.to_thread(_drop_from_all_caches)
             if dropped:
                 logger.info(
                     f"Dropped {dropped} cached entr{'y' if dropped == 1 else 'ies'} for model {key} after settings change."
@@ -1335,9 +1349,42 @@ async def get_starter_models(current_admin: AdminUserOrDefault) -> StarterModelR
     summary="Get model manager RAM cache performance statistics.",
 )
 async def get_stats(current_admin: AdminUserOrDefault) -> Optional[CacheStats]:
-    """Return performance statistics on the model manager's RAM cache. Will return null if no models have been loaded."""
+    """Return performance statistics on the model manager's RAM cache. In multi-GPU mode there is
+    one cache per generation device; their statistics are aggregated. Will return null if no models
+    have been loaded."""
+    stats_list: list[CacheStats] = []
+    seen_cache_ids: set[int] = set()
+    # ram_caches can map several device keys to the same cache object; count each cache once.
+    for cache in ApiDependencies.invoker.services.model_manager.load.ram_caches.values():
+        if id(cache) in seen_cache_ids:
+            continue
+        seen_cache_ids.add(id(cache))
+        if cache.stats is not None:
+            stats_list.append(cache.stats)
 
-    return ApiDependencies.invoker.services.model_manager.load.ram_cache.stats
+    if not stats_list:
+        return None
+    if len(stats_list) == 1:
+        return stats_list[0]
+
+    aggregate = CacheStats()
+    for stats in stats_list:
+        # Per-cache event counters: sum across caches.
+        aggregate.hits += stats.hits
+        aggregate.misses += stats.misses
+        aggregate.in_cache += stats.in_cache
+        aggregate.cleared += stats.cleared
+        # cache_size, high_watermark and cache_used are already system-wide values: every per-device
+        # cache shares one global RamBudget, so each reports the same global capacity and observes
+        # the same global usage. Summing them would over-report an N-GPU system ~N times; take the
+        # max. cache_used must be carried through explicitly — it is this fork's field for *current*
+        # usage, and the Queue widget's gauge silently falls back to high_watermark (peak) when it
+        # is absent, which reads as a cache that never releases memory.
+        aggregate.high_watermark = max(aggregate.high_watermark, stats.high_watermark)
+        aggregate.cache_size = max(aggregate.cache_size, stats.cache_size)
+        aggregate.cache_used = max(aggregate.cache_used, stats.cache_used)
+        aggregate.loaded_model_sizes.update(stats.loaded_model_sizes)
+    return aggregate
 
 
 @model_manager_router.post(
@@ -1348,10 +1395,22 @@ async def get_stats(current_admin: AdminUserOrDefault) -> Optional[CacheStats]:
 )
 async def empty_model_cache(current_admin: AdminUserOrDefault) -> EmptyModelCacheResponse:
     """Drop all models from the model cache to free RAM/VRAM. 'Locked' models that are in active use will not be dropped."""
-    # Request 1000GB of room in order to force the cache to drop all models.
+    # Request 1000GB of room in order to force each per-device cache to drop all models.
     ApiDependencies.invoker.services.logger.info("Emptying model cache.")
-    result = ApiDependencies.invoker.services.model_manager.load.ram_cache.make_room(1000 * 2**30)
-    return EmptyModelCacheResponse(models_cleared=result.models_cleared, bytes_freed=result.bytes_freed)
+    models_cleared = 0
+    bytes_freed = 0
+    seen_cache_ids: set[int] = set()
+    # ram_caches can map several device keys to the same cache object; clearing one twice would
+    # report the second (empty) pass and double-count nothing, but the id() guard keeps the totals
+    # honest and matches get_stats above.
+    for cache in ApiDependencies.invoker.services.model_manager.load.ram_caches.values():
+        if id(cache) in seen_cache_ids:
+            continue
+        seen_cache_ids.add(id(cache))
+        result = cache.make_room(1000 * 2**30)
+        models_cleared += result.models_cleared
+        bytes_freed += result.bytes_freed
+    return EmptyModelCacheResponse(models_cleared=models_cleared, bytes_freed=bytes_freed)
 
 
 class HFTokenStatus(str, Enum):
