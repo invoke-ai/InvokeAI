@@ -195,6 +195,61 @@ export const WidgetPanelFrame = ({
   );
 };
 
+/**
+ * The trailing action cluster of a widget's chrome: the manifest's own
+ * `headerActions`, the settings gear, and the shared overflow menu. Panels
+ * render it inside {@link WidgetHeader}; the center region renders it on its
+ * own, floating over the work surface, so it lives apart from the header row.
+ */
+export const WidgetHeaderActionsGroup = ({
+  actions,
+  HeaderMenu,
+  instance,
+  manifest,
+  region,
+  runtime,
+}: {
+  actions?: ReactNode;
+  HeaderMenu?: WidgetHeaderMenu;
+  instance: WidgetInstanceRuntimeMeta;
+  manifest: WidgetManifest;
+  region: WorkbenchRegion;
+  runtime: WidgetRuntimeApi;
+}) => {
+  const { t } = useTranslation();
+  const label = resolveWidgetInstanceLabel(instance, manifest, t);
+  const handleSettingsClick = useCallback(
+    () => openWorkbenchSettings(manifest.settingsSection),
+    [manifest.settingsSection]
+  );
+
+  return (
+    <HStack flexShrink={0} gap="0.5">
+      {actions}
+      {manifest.settingsSection ? (
+        <Tooltip content={t('widgets.settingsLabel', { label })}>
+          <IconButton
+            aria-label={t('widgets.settingsLabel', { label })}
+            color="fg.muted"
+            size="2xs"
+            variant="ghost"
+            onClick={handleSettingsClick}
+          >
+            <Icon as={SettingsIcon} boxSize="3.5" />
+          </IconButton>
+        </Tooltip>
+      ) : null}
+      <WidgetActionsMenu
+        HeaderMenu={HeaderMenu}
+        instance={instance}
+        manifest={manifest}
+        region={region}
+        runtime={runtime}
+      />
+    </HStack>
+  );
+};
+
 export const WidgetHeader = ({
   actions,
   HeaderLabel,
@@ -216,10 +271,6 @@ export const WidgetHeader = ({
   // Manifests may provide a component label (e.g. Workflow's editable
   // `Workflow / [name]`); plain strings render as the standard title.
   const label = resolveWidgetInstanceLabel(instance, manifest, t);
-  const handleSettingsClick = useCallback(
-    () => openWorkbenchSettings(manifest.settingsSection),
-    [manifest.settingsSection]
-  );
 
   return (
     <HStack justify="space-between" borderBottomWidth={1} h={10} ps="3" pe="2">
@@ -233,29 +284,14 @@ export const WidgetHeader = ({
           </Text>
         )}
       </HStack>
-      <HStack flexShrink={0} gap="0.5">
-        {actions}
-        {manifest.settingsSection ? (
-          <Tooltip content={t('widgets.settingsLabel', { label })}>
-            <IconButton
-              aria-label={t('widgets.settingsLabel', { label })}
-              color="fg.muted"
-              size="2xs"
-              variant="ghost"
-              onClick={handleSettingsClick}
-            >
-              <Icon as={SettingsIcon} boxSize="3.5" />
-            </IconButton>
-          </Tooltip>
-        ) : null}
-        <WidgetActionsMenu
-          HeaderMenu={HeaderMenu}
-          instance={instance}
-          manifest={manifest}
-          region={region}
-          runtime={runtime}
-        />
-      </HStack>
+      <WidgetHeaderActionsGroup
+        HeaderMenu={HeaderMenu}
+        actions={actions}
+        instance={instance}
+        manifest={manifest}
+        region={region}
+        runtime={runtime}
+      />
     </HStack>
   );
 };

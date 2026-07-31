@@ -94,13 +94,15 @@ const waitForWorkbench = async (page) => {
   await page.getByRole('button', { name: /^Layout preset:/ }).waitFor();
 };
 
+const centerViewTrigger = (page, label) => page.getByRole('button', { exact: true, name: `Center view: ${label}` });
+
 const selectLayoutPreset = async (page, preset) => {
   const trigger = page.getByRole('button', { name: /^Layout preset:/ });
 
   await trigger.click();
   await page.getByRole('menuitem', { exact: true, name: preset }).click();
   await page.getByRole('button', { exact: true, name: `Layout preset: ${preset}` }).waitFor();
-  await page.getByRole('tab', { exact: true, name: preset }).waitFor();
+  await centerViewTrigger(page, preset).waitFor();
 };
 
 const surfaces = [
@@ -124,7 +126,7 @@ const surfaces = [
     path: representativeProjectPath,
     ready: async (page) => {
       await waitForWorkbench(page);
-      await page.getByRole('tab', { exact: true, name: 'Preview' }).waitFor();
+      await centerViewTrigger(page, 'Preview').waitFor();
     },
   },
   {
@@ -235,13 +237,27 @@ const runKeyboardJourney = async (browser) => {
     await projectLink.press('Enter');
     await waitForWorkbench(page);
 
-    const previewTab = page.getByRole('tab', { exact: true, name: 'Preview' });
-    const canvasTab = page.getByRole('tab', { exact: true, name: 'Canvas' });
+    // The center view selector is a menu button: it opens on the keyboard,
+    // exposes each view as a radio item, and restores focus to itself on close.
+    const previewTrigger = centerViewTrigger(page, 'Preview');
 
-    await previewTab.focus();
-    await previewTab.press('ArrowRight');
-    await expectFocused(canvasTab, 'ArrowRight should move focus to the next center view.');
-    assert.equal(await canvasTab.getAttribute('aria-selected'), 'true');
+    await previewTrigger.focus();
+    await previewTrigger.press('Enter');
+
+    const canvasItem = page.getByRole('menuitemradio', { exact: true, name: 'Canvas' });
+
+    await canvasItem.waitFor();
+    assert.equal(
+      await page.getByRole('menuitemradio', { exact: true, name: 'Preview' }).getAttribute('aria-checked'),
+      'true'
+    );
+
+    await canvasItem.click();
+    await centerViewTrigger(page, 'Canvas').waitFor();
+    await expectFocused(
+      centerViewTrigger(page, 'Canvas'),
+      'Selecting a center view should restore focus to the view selector.'
+    );
 
     if (pageErrors.length > 0) {
       throw new AggregateError(pageErrors, 'keyboard-critical-journey raised uncaught browser errors.');

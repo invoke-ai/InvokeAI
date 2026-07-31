@@ -107,10 +107,6 @@ export const WorkbenchShell = () => {
     () => getRegionDropState(placementProject, activeDrag, 'right', getWidgetById),
     [activeDrag, placementProject]
   );
-  const centerDropState = useMemo(
-    () => getRegionDropState(placementProject, activeDrag, 'center', getWidgetById),
-    [activeDrag, placementProject]
-  );
   const bottomDropState = useMemo(
     () => getRegionDropState(placementProject, activeDrag, 'bottom', getWidgetById),
     [activeDrag, placementProject]
@@ -254,7 +250,7 @@ export const WorkbenchShell = () => {
               {panels.isLeftOpen && !leftRegion.isCollapsed && canShowLeftPanel ? (
                 <LeftPanel instanceId={leftRegion.activeInstanceId} />
               ) : null}
-              <CenterArea dropState={centerDropState} />
+              <CenterArea />
               {panels.isRightOpen && !rightRegion.isCollapsed && canShowRightPanel ? (
                 <RightPanel instanceId={rightRegion.activeInstanceId} />
               ) : null}

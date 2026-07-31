@@ -18,7 +18,7 @@ import { memo, Suspense, use, useMemo } from 'react';
 
 import { useWidgetRuntime } from './createWidgetRuntime';
 import { WidgetFailureBoundary } from './WidgetFailureBoundary';
-import { WidgetHeader, WidgetPanelFrame, WidgetTooltipFrame } from './WidgetFrames';
+import { WidgetHeader, WidgetHeaderActionsGroup, WidgetPanelFrame, WidgetTooltipFrame } from './WidgetFrames';
 import { WidgetLoadingFallback } from './WidgetLoadingFallback';
 import { areProjectWidgetRenderInstancesEqual } from './widgetRenderInstance';
 
@@ -32,6 +32,15 @@ interface WidgetRendererByIdProps extends Omit<WidgetViewProps, 'instance' | 'ma
   widget: RegisteredWidget;
 }
 
+/** The chrome slots the center region hoists out of the widget frame. */
+type WidgetChromeSlotName = 'actions' | 'label';
+
+interface WidgetChromeSlotByIdProps {
+  instanceId: string;
+  slot: WidgetChromeSlotName;
+  widget: RegisteredWidget;
+}
+
 export const WidgetRendererById = ({ instanceId, widget, ...props }: WidgetRendererByIdProps) => {
   const selection = useActiveProjectSelector(
     (project) => ({ instance: project.widgetInstances[instanceId], projectId: project.id }),
@@ -39,6 +48,84 @@ export const WidgetRendererById = ({ instanceId, widget, ...props }: WidgetRende
   );
 
   return selection.instance ? <WidgetRenderer instance={selection.instance} widget={widget} {...props} /> : null;
+};
+
+/**
+ * Renders one chrome slot of a widget outside its own frame. The center region
+ * floats its chrome over the work surface, so the label and action slots are
+ * mounted by `CenterArea` rather than by the widget's frame — this resolves the
+ * same implementation and runtime the view would get.
+ *
+ * Suspends on first load of the implementation chunk; callers wrap it in their
+ * own `Suspense` so the rest of the chrome paints immediately.
+ */
+export const WidgetChromeSlotById = ({ instanceId, slot, widget }: WidgetChromeSlotByIdProps) => {
+  const selection = useActiveProjectSelector(
+    (project) => ({ instance: project.widgetInstances[instanceId], projectId: project.id }),
+    areProjectWidgetRenderInstancesEqual
+  );
+
+  return selection.instance ? <WidgetChromeSlot instance={selection.instance} slot={slot} widget={widget} /> : null;
+};
+
+const WidgetChromeSlot = ({
+  instance,
+  slot,
+  widget,
+}: {
+  instance: WidgetInstanceContract;
+  slot: WidgetChromeSlotName;
+  widget: RegisteredWidget;
+}) => {
+  const { getWidgetById, getWidgetsForRegion } = useWorkbenchWidgetRegistry();
+  const project = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
+  const implementation = use(widget.implementation.load());
+  const instanceMeta: WidgetInstanceRuntimeMeta = useMemo(
+    () => ({
+      createdAt: instance.createdAt,
+      id: instance.id,
+      title: instance.title,
+      typeId: instance.typeId,
+    }),
+    [instance.createdAt, instance.id, instance.title, instance.typeId]
+  );
+  const runtime = useWidgetRuntime({
+    getWidgetById,
+    getWidgetsForRegion,
+    instance: instanceMeta,
+    project,
+    region: 'center',
+  });
+  const HeaderActions = implementation.headerActions;
+  const HeaderLabel = implementation.headerLabel;
+  const actions = useMemo(
+    () =>
+      HeaderActions ? (
+        <HeaderActions instance={instanceMeta} manifest={widget.manifest} region="center" runtime={runtime} />
+      ) : null,
+    [HeaderActions, instanceMeta, runtime, widget.manifest]
+  );
+
+  if (widget.manifest.chrome?.header === 'hidden') {
+    return null;
+  }
+
+  // A widget-supplied label only replaces the standard title, which the center
+  // view selector already shows — a renamed instance keeps the selector's text.
+  if (slot === 'label') {
+    return HeaderLabel && !instanceMeta.title ? <HeaderLabel region="center" /> : null;
+  }
+
+  return (
+    <WidgetHeaderActionsGroup
+      HeaderMenu={implementation.headerMenu}
+      actions={actions}
+      instance={instanceMeta}
+      manifest={widget.manifest}
+      region="center"
+      runtime={runtime}
+    />
+  );
 };
 
 export const WidgetRenderer = ({ instance, presentation, region, widget }: WidgetRendererProps) => {
@@ -170,6 +257,8 @@ const WidgetShellFrame = ({
     );
   }
 
+  // The center region floats its chrome over the work surface, so the widget's
+  // header slots are mounted by `CenterArea` and the body runs full-bleed here.
   return (
     <Flex
       bg="bg.inset"
@@ -181,14 +270,6 @@ const WidgetShellFrame = ({
       minH="0"
       w="full"
     >
-      <HeaderSlot
-        implementation={implementation}
-        instance={instance}
-        presentation={presentation}
-        region={region}
-        runtime={runtime}
-        widget={widget}
-      />
       <Box flex="1" minH="0" overflow="hidden" position="relative">
         {safeContent}
       </Box>
@@ -265,10 +346,9 @@ const HeaderSlot = memo(function HeaderSlot({
   if (widget.manifest.chrome?.header === 'hidden') {
     return null;
   }
-  const bg = region === 'center' ? 'bg' : 'bg.subtle';
 
   return (
-    <Box bg={bg} flexShrink={0}>
+    <Box bg="bg.subtle" flexShrink={0}>
       <WidgetHeader
         HeaderLabel={implementation.headerLabel}
         HeaderMenu={implementation.headerMenu}

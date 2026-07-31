@@ -15,16 +15,8 @@ interface WidgetLoadingFallbackProps {
   widget: RegisteredWidget;
 }
 
-const WidgetLoadingHeader = ({
-  label,
-  region,
-  widget,
-}: {
-  label: string;
-  region: WidgetViewProps['region'];
-  widget: RegisteredWidget;
-}) => (
-  <Box bg={region === 'center' ? 'bg' : 'bg.subtle'} flexShrink="0">
+const WidgetLoadingHeader = ({ label, widget }: { label: string; widget: RegisteredWidget }) => (
+  <Box bg="bg.subtle" flexShrink="0">
     <HStack borderBottomWidth="1px" h="10" justify="space-between" pe="2" ps="3">
       <HStack flex="1" gap="1.5" minW="0">
         <WidgetIdentityIcon icon={widget.manifest.icon} isLoading />
@@ -144,14 +136,15 @@ export const WidgetLoadingFallback = ({ instance, presentation, region, widget }
   if (region === 'left' || region === 'right' || region === 'bottom') {
     return (
       <WidgetPanelFrame instanceId={instance.id} region={region} typeId={instance.typeId}>
-        {widget.manifest.chrome?.header === 'hidden' ? null : (
-          <WidgetLoadingHeader label={label} region={region} widget={widget} />
-        )}
+        {widget.manifest.chrome?.header === 'hidden' ? null : <WidgetLoadingHeader label={label} widget={widget} />}
         <WidgetLoadingSurface bg="bg.subtle" label={loadingLabel} />
       </WidgetPanelFrame>
     );
   }
 
+  // The center region's chrome floats above the work surface and is owned by
+  // `CenterArea`, so a loading center view is just the recessed surface — no
+  // header row to paint and then collapse when the implementation resolves.
   if (region === 'center') {
     return (
       <Flex
@@ -164,9 +157,6 @@ export const WidgetLoadingFallback = ({ instance, presentation, region, widget }
         minH="0"
         w="full"
       >
-        {widget.manifest.chrome?.header === 'hidden' ? null : (
-          <WidgetLoadingHeader label={label} region={region} widget={widget} />
-        )}
         <WidgetLoadingSurface label={loadingLabel} />
       </Flex>
     );

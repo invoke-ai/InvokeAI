@@ -67,11 +67,10 @@ export const WorkflowWidgetLabel = ({ region }: WorkflowWidgetLabelProps) => {
     );
   }
 
+  // In the center the region's view selector already names the widget, so the
+  // label slot contributes only the `/ [name]` continuation.
   return (
     <HStack flex="1" gap="1" minW="0">
-      <Text flexShrink={0} fontSize="xs" fontWeight="700">
-        {t('widgets.labels.workflow')}
-      </Text>
       <Text color="fg.subtle" flexShrink={0} fontSize="xs">
         /
       </Text>

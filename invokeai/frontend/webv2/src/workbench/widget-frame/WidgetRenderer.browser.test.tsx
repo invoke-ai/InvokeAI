@@ -205,9 +205,11 @@ afterEach(async () => {
 });
 
 describe('WidgetRenderer loading identity transitions', () => {
+  // The center region has no header row of its own — `CenterArea` floats that
+  // chrome above the work surface — so the identity slot lives in panel frames.
   it('swaps spinner for icon without moving a renamed standard header', async () => {
     const { resolve, widget } = createDeferredWidget();
-    await render(<WidgetRenderer instance={createInstance('Renamed widget')} region="center" widget={widget} />);
+    await render(<WidgetRenderer instance={createInstance('Renamed widget')} region="right" widget={widget} />);
 
     const loadingGeometry = getIdentityGeometry();
     expect(host?.textContent).toContain('Renamed widget');
@@ -223,7 +225,7 @@ describe('WidgetRenderer loading identity transitions', () => {
 
   it('keeps the identity slot aligned when a custom header label loads', async () => {
     const { resolve, widget } = createDeferredWidget();
-    await render(<WidgetRenderer instance={createInstance()} region="center" widget={widget} />);
+    await render(<WidgetRenderer instance={createInstance()} region="right" widget={widget} />);
 
     const loadingGeometry = getIdentityGeometry();
     await resolve({ headerLabel: CustomHeaderLabel, view: TestView });

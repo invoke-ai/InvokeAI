@@ -3,12 +3,33 @@ import type { NormalizedWidgetManifest, RegisteredWidget, WidgetInstanceContract
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
+import { FocusRegionProvider } from '@workbench/focusRegions';
 import { createWidgetImplementationResource } from '@workbench/widgetImplementationResource';
 import i18next from 'i18next';
 import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
+// Panel frames read the region's persisted size; the fallback under test only
+// needs a stable one, so the store is stubbed rather than booted.
+vi.mock('@workbench/WorkbenchContext', () => ({
+  shallowEqual: Object.is,
+  useActiveProjectSelector: (
+    selector: (project: {
+      widgetRegions: Record<string, { activeInstanceId: string; instanceIds: string[]; sizePx: number }>;
+    }) => unknown
+  ) =>
+    selector({
+      widgetRegions: {
+        bottom: { activeInstanceId: 'test-instance', instanceIds: ['test-instance'], sizePx: 240 },
+        center: { activeInstanceId: 'test-instance', instanceIds: ['test-instance'], sizePx: 240 },
+        left: { activeInstanceId: 'test-instance', instanceIds: ['test-instance'], sizePx: 240 },
+        right: { activeInstanceId: 'test-instance', instanceIds: ['test-instance'], sizePx: 240 },
+      },
+    }),
+  useWorkbenchCommands: () => ({ layout: { setRegionSize: () => {} } }),
+}));
 
 import { WidgetEnableMenu } from './WidgetEnableMenu';
 import { WidgetLoadingFallback } from './WidgetLoadingFallback';
@@ -80,7 +101,9 @@ const render = async (children: ReactNode) => {
   await interact(() => {
     root?.render(
       <I18nextProvider i18n={i18n}>
-        <ChakraProvider value={system}>{children}</ChakraProvider>
+        <ChakraProvider value={system}>
+          <FocusRegionProvider>{children}</FocusRegionProvider>
+        </ChakraProvider>
       </I18nextProvider>
     );
   });
@@ -95,7 +118,10 @@ afterEach(async () => {
 });
 
 describe('WidgetLoadingFallback', () => {
-  it('keeps center widget chrome and geometry stable while the implementation loads', async () => {
+  // `CenterArea` owns the center region's chrome and keeps it mounted across
+  // the load, so the fallback paints no header of its own — a header here would
+  // appear and then collapse the moment the implementation resolved.
+  it('fills the center region with announced, chrome-free surface while the implementation loads', async () => {
     const { widget } = createTestWidget();
     await render(<WidgetLoadingFallback instance={instance} region="center" widget={widget} />);
 
@@ -104,17 +130,17 @@ describe('WidgetLoadingFallback', () => {
 
     expect(frame?.getBoundingClientRect().width).toBe(480);
     expect(frame?.getBoundingClientRect().height).toBe(320);
-    expect(frame?.textContent).toBe('Test widget');
+    expect(frame?.textContent).toBe('');
+    expect(busySurface?.getBoundingClientRect().height).toBe(320);
     expect(busySurface?.getAttribute('aria-label')).toBe('Loading Test widget');
     expect(busySurface?.getAttribute('aria-live')).toBe('polite');
     expect(busySurface?.getAttribute('role')).toBe('status');
-    expect(host?.querySelector('.chakra-spinner')).not.toBeNull();
     expect(host?.textContent).not.toContain('Loading widget');
   });
 
   it('honors hidden chrome and uses the accessible loading label without visible loading copy', async () => {
     const { widget } = createTestWidget({ hiddenHeader: true });
-    await render(<WidgetLoadingFallback instance={instance} region="center" widget={widget} />);
+    await render(<WidgetLoadingFallback instance={instance} region="right" widget={widget} />);
 
     expect(host?.textContent).toBe('');
     expect(host?.querySelector('[aria-busy="true"]')?.getAttribute('aria-label')).toBe('Loading Test widget');
