@@ -165,9 +165,6 @@ const pointer = (type: string, target: EventTarget, clientX: number, clientY: nu
 const selectionButton = (name: string): HTMLButtonElement =>
   host!.querySelector<HTMLButtonElement>(`button[aria-label="Select ${name}"]`)!;
 
-const reorderButton = (name: string): HTMLButtonElement =>
-  host!.querySelector<HTMLButtonElement>(`button[aria-label="Reorder layer: ${name}"]`)!;
-
 const selectedLayer = (): string => host!.querySelector<HTMLOutputElement>('[data-testid="selected-layer"]')!.value;
 const layerOrder = (): string => host!.querySelector<HTMLOutputElement>('[data-testid="layer-order"]')!.value;
 
@@ -277,17 +274,18 @@ describe('LayerListItem accessibility', () => {
     expect(layerOrder()).toBe('second,first');
   });
 
-  it('sorts with Enter from the dedicated keyboard drag handle', async () => {
+  // With no grip there is no keyboard drag gesture to claim Enter, so the
+  // Enter/Arrow/Enter sequence that used to reorder now moves nothing. Enter
+  // still selects (covered above); keyboard reordering is the context menu's
+  // Move actions.
+  it('no longer starts a keyboard drag from a focused row', async () => {
     await renderHarness();
-    const handle = reorderButton('First layer');
-    handle.focus();
+    selectionButton('First layer').focus();
 
     await act(() => userEvent.keyboard('{Enter}'));
-    expect(handle).toHaveAttribute('aria-pressed', 'true');
     await act(() => userEvent.keyboard('{ArrowDown}'));
     await act(() => userEvent.keyboard('{Enter}'));
 
-    expect(layerOrder()).toBe('second,first');
-    expect(selectedLayer()).toBe('none');
+    expect(layerOrder()).toBe('first,second');
   });
 });
