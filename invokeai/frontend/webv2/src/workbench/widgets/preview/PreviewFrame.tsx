@@ -52,6 +52,25 @@ export const getFittedFrameCss = (width: number, height: number): SystemStyleObj
   width: `min(100cqw, calc(100cqh * ${width / height}))`,
 });
 
+/**
+ * Room for the centre region's floating chrome islands. `CenterArea` publishes
+ * the variable and nothing else does, so the `0px` fallback keeps the right
+ * panel — which reserves a real header row instead — unpadded.
+ */
+const CENTER_CHROME_INSET = 'var(--wb-center-chrome-inset, 0px)';
+
+/**
+ * Top padding for a media stage: its own padding plus room for the islands.
+ *
+ * It belongs on the stage rather than on the widget root so the dot grid still
+ * runs to every edge and passes *behind* the chrome — the same arrangement that
+ * lets `paddingBottom` pass it behind the filmstrip. Because the stage is a size
+ * container, `getFittedFrameCss` reads the shrunken content box and refits the
+ * media with no further change.
+ */
+const getStagePaddingTop = (padding: string | undefined): string =>
+  padding === undefined ? CENTER_CHROME_INSET : `calc(var(--chakra-spacing-${padding}) + ${CENTER_CHROME_INSET})`;
+
 export type PreviewMediaSource =
   | { itemKey: GalleryItemKey; kind: 'image'; source: StreamingImageSource }
   | { itemKey: GalleryItemKey; kind: 'video'; label: string; poster: string; src: string };
@@ -195,6 +214,10 @@ const PreviewImageFrame = ({
         css={previewGridCss}
         h="full"
         justify="center"
+        // Live tiles all reserve the inset, so in a multi-session grid the
+        // bottom row reserves room it does not need. Its own dot grid still
+        // fills the cell, so only the fitted frame sits a little lower.
+        pt={getStagePaddingTop(undefined)}
         w="full"
       >
         {source ? (
@@ -240,6 +263,7 @@ const PreviewImageFrame = ({
       p={padding}
       pb={paddingBottom}
       position="relative"
+      pt={getStagePaddingTop(padding)}
       w="full"
       {...loupe.stageProps}
     >
@@ -482,6 +506,7 @@ const PreviewVideo = ({
       p={padding}
       pb={paddingBottom}
       position="relative"
+      pt={getStagePaddingTop(padding)}
       w="full"
     >
       <Box
