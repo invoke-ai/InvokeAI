@@ -15,8 +15,9 @@ import {
 import { useCallback, useId, useMemo } from 'react';
 
 /**
- * The editor's single tool strip, docked to the left edge: interaction tools
- * on top (legacy-toolbar style), viewport actions and the node-opacity slider
+ * The editor's single tool strip, docked to the left edge and topped out
+ * directly beneath the region's floating chrome islands: interaction tools on
+ * top (legacy-toolbar style), viewport actions and the node-opacity slider
  * below.
  * - pan: dragging the pane moves the viewport (Shift-drag still box-selects)
  * - box-select: dragging the pane draws a selection rectangle (middle-mouse pans)
@@ -34,6 +35,13 @@ const TOOLS: { icon: typeof HandIcon; id: EditorTool; label: string }[] = [
 
 const POPOVER_POSITIONING = { placement: 'right' } as const;
 const TOOLTIP_POSITIONING = { placement: 'right-start' } as const;
+
+/**
+ * Clears the center region's floating chrome, whose inset already includes the
+ * gap below the islands. In the left and bottom panels the variable is
+ * undefined and the strip falls back to its own top margin.
+ */
+const EDITOR_TOOLBAR_TOP = 'var(--wb-center-chrome-inset, var(--chakra-spacing-2))';
 
 export const EditorToolbar = ({
   nodeOpacity,
@@ -61,7 +69,7 @@ export const EditorToolbar = ({
   );
 
   return (
-    <Box left="3" position="absolute" top="50%" transform="translateY(-50%)" zIndex="5">
+    <Box left="2" position="absolute" top={EDITOR_TOOLBAR_TOP} zIndex="5">
       <Toolbar>
         {TOOLS.map(({ icon, id, label }) => (
           <EditorToolButton
