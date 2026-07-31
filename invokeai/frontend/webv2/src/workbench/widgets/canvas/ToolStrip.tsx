@@ -11,8 +11,8 @@ import {
   MoveIcon,
   PaintBucketIcon,
   Rotate3dIcon,
+  ShapesIcon,
   SquareDashedIcon,
-  SquareIcon,
   TypeIcon,
 } from 'lucide-react';
 import { useCallback } from 'react';
@@ -111,7 +111,7 @@ const ToolStripRoot = ({
         />
         <ToolStripButton
           engine={engine}
-          icon={SquareIcon}
+          icon={ShapesIcon}
           isInteractionLocked={isInteractionLocked}
           label={t('widgets.canvas.tools.shape')}
           toolId="shape"
