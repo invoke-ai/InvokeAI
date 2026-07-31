@@ -3,6 +3,7 @@ Test abstract device class.
 """
 
 import threading
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -109,11 +110,12 @@ def test_get_generation_devices_auto_respects_pinned_legacy_device():
 
 
 def test_get_generation_devices_auto_without_cuda():
-    """`auto` falls back to the single best device when CUDA is unavailable."""
+    """`auto` falls back to the single best device when no accelerator is available."""
     config = get_config()
     config.device = "auto"
     with (
         patch("invokeai.backend.util.devices.torch.cuda.is_available", return_value=False),
+        patch("invokeai.backend.util.devices._xpu_is_available", return_value=False),
         patch("invokeai.backend.util.devices.torch.backends.mps.is_available", return_value=False),
     ):
         assert TorchDevice.get_generation_devices("auto") == [torch.device("cpu")]
@@ -345,3 +347,159 @@ def test_get_generation_devices_rejects_mps_when_unavailable(mock_mps):
 @patch("torch.backends.mps.is_available", return_value=True)
 def test_get_generation_devices_accepts_mps_when_available(mock_mps):
     assert [str(d) for d in TorchDevice.get_generation_devices(["mps"])] == ["mps"]
+
+
+# ===== XPU (Intel GPU) ======================================================
+
+device_types_xpu = [
+    ("cpu", torch.float32),
+    ("cuda:0", torch.float32),
+    ("mps", torch.float32),
+    ("xpu", torch.float16),
+    ("xpu:0", torch.float16),
+]
+
+
+@pytest.mark.parametrize("device_name", ["xpu:0", "xpu:1"])
+def test_device_choice_xpu(device_name):
+    """An explicit xpu:N device in the config is honored verbatim."""
+    config = get_config()
+    config.device = device_name
+    assert TorchDevice.choose_torch_device() == torch.device(device_name)
+
+
+def test_auto_device_prefers_xpu_over_cpu():
+    """With no CUDA/MPS and an XPU present, `auto` selects (and normalizes) xpu."""
+    with (
+        patch("torch.cuda.is_available", return_value=False),
+        patch("torch.backends.mps.is_available", return_value=False),
+        patch("invokeai.backend.util.devices._xpu_is_available", return_value=True),
+        patch("torch.xpu.current_device", return_value=0, create=True),
+    ):
+        config = get_config()
+        config.device = "auto"
+        assert TorchDevice.choose_torch_device() == torch.device("xpu", 0)
+
+
+def test_auto_device_prefers_cuda_over_xpu():
+    """CUDA outranks XPU in auto selection."""
+    with (
+        patch("torch.cuda.is_available", return_value=True),
+        patch("torch.cuda.current_device", return_value=0),
+        patch("invokeai.backend.util.devices._xpu_is_available", return_value=True),
+    ):
+        config = get_config()
+        config.device = "auto"
+        assert TorchDevice.choose_torch_device().type == "cuda"
+
+
+@pytest.mark.parametrize("device_dtype_pair", device_types_xpu)
+def test_device_dtype_xpu(device_dtype_pair):
+    with (
+        patch("torch.cuda.is_available", return_value=False),
+        patch("torch.backends.mps.is_available", return_value=False),
+        patch("invokeai.backend.util.devices._xpu_is_available", return_value=True),
+        patch("torch.xpu.current_device", return_value=0, create=True),
+    ):
+        device_name, dtype = device_dtype_pair
+        config = get_config()
+        config.device = device_name
+        config.precision = "auto"
+        assert TorchDevice.choose_torch_dtype() == dtype
+
+
+def test_normalize_xpu():
+    with (
+        patch("invokeai.backend.util.devices._xpu_is_available", return_value=True),
+        patch("torch.xpu.current_device", return_value=0, create=True),
+    ):
+        assert TorchDevice.normalize("xpu") == torch.device("xpu", 0)
+        assert TorchDevice.normalize("xpu:1") == torch.device("xpu", 1)
+    with patch("invokeai.backend.util.devices._xpu_is_available", return_value=False):
+        assert TorchDevice.normalize("xpu") == torch.device("xpu")
+
+
+# ===== TorchDevice.xpu_mem_get_info fallback ================================
+
+
+def test_xpu_mem_get_info_native():
+    """When torch.xpu.mem_get_info works, its result is passed through."""
+    with patch.object(torch.xpu, "mem_get_info", return_value=(5, 10), create=True):
+        assert TorchDevice.xpu_mem_get_info(torch.device("xpu")) == (5, 10)
+
+
+def test_xpu_mem_get_info_fallback_derives_from_properties():
+    """Missing SYCL free-memory aspect: derive free/total from total_memory and memory_reserved."""
+    gib = 1 << 30
+    with (
+        patch.object(torch.xpu, "mem_get_info", side_effect=RuntimeError("aspect missing"), create=True),
+        patch.object(
+            torch.xpu, "get_device_properties", return_value=SimpleNamespace(total_memory=32 * gib), create=True
+        ),
+        patch.object(torch.xpu, "memory_reserved", return_value=2 * gib, create=True),
+    ):
+        free, total = TorchDevice.xpu_mem_get_info(torch.device("xpu"))
+    assert total == 32 * gib
+    assert free == 30 * gib
+
+
+def test_xpu_mem_get_info_fallback_unknown_total():
+    """If even total_memory is unavailable, report (0, 0) rather than raising."""
+    with (
+        patch.object(torch.xpu, "mem_get_info", side_effect=RuntimeError(), create=True),
+        patch.object(torch.xpu, "get_device_properties", side_effect=RuntimeError(), create=True),
+        patch.object(torch.xpu, "memory_reserved", side_effect=RuntimeError(), create=True),
+    ):
+        assert TorchDevice.xpu_mem_get_info(torch.device("xpu")) == (0, 0)
+
+
+# ===== multi-GPU generation_devices on XPU ==================================
+
+
+def test_get_generation_devices_auto_expands_to_all_xpu():
+    """With no CUDA, `auto` enumerates every visible XPU device."""
+    config = get_config()
+    config.device = "auto"
+    with (
+        patch("invokeai.backend.util.devices.torch.cuda.is_available", return_value=False),
+        patch("invokeai.backend.util.devices._xpu_is_available", return_value=True),
+        patch("torch.xpu.device_count", return_value=2, create=True),
+    ):
+        assert TorchDevice.get_generation_devices("auto") == [torch.device("xpu:0"), torch.device("xpu:1")]
+
+
+def test_get_generation_devices_rejects_out_of_range_xpu():
+    with (
+        patch("invokeai.backend.util.devices._xpu_is_available", return_value=True),
+        patch("torch.xpu.device_count", return_value=2, create=True),
+    ):
+        with pytest.raises(ValueError, match="only 2 XPU"):
+            TorchDevice.get_generation_devices(["xpu:2"])
+
+
+def test_get_generation_devices_rejects_xpu_when_unavailable():
+    with patch("invokeai.backend.util.devices._xpu_is_available", return_value=False):
+        with pytest.raises(ValueError, match="no XPU"):
+            TorchDevice.get_generation_devices(["xpu:0"])
+
+
+def test_generation_devices_summary_xpu_pair():
+    """Two identically-named XPUs get stable #N suffixes, same as CUDA."""
+    with (
+        patch("invokeai.backend.util.devices.torch.cuda.is_available", return_value=False),
+        patch("invokeai.backend.util.devices._xpu_is_available", return_value=True),
+        patch("torch.xpu.device_count", return_value=2, create=True),
+        patch("torch.xpu.get_device_name", return_value="Intel Arc Pro B70", create=True),
+    ):
+        summary = TorchDevice.get_generation_devices_summary(["xpu:0", "xpu:1"])
+        assert summary == "[Intel Arc Pro B70 #1 (xpu:0), Intel Arc Pro B70 #2 (xpu:1)]"
+
+
+def test_session_device_index_on_xpu():
+    """Worker labels resolve the device index for XPU sessions too."""
+    try:
+        TorchDevice.set_session_device("xpu:1")
+        assert TorchDevice.get_session_device_index() == 1
+        assert TorchDevice.get_session_device_label() == " (#1)"
+    finally:
+        TorchDevice.clear_session_device()
