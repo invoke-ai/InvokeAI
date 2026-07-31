@@ -1,3 +1,4 @@
+import pytest
 import torch
 from diffusers.models.transformers.transformer_krea2 import Krea2Transformer2DModel
 
@@ -9,6 +10,7 @@ from invokeai.backend.krea2.regional_prompting import (
     Krea2RegionalPromptingExtension,
     Krea2TextConditioning,
 )
+from invokeai.backend.krea2.sampling_utils import prepare_position_ids
 
 
 def _conditioning(length: int, value: float, mask: torch.Tensor | None = None) -> Krea2TextConditioning:
@@ -121,6 +123,19 @@ def test_preprocess_mask_resizes_thresholds_and_flattens() -> None:
     assert torch.equal(mask.view(2, 2), torch.tensor([[1.0, 0.0], [1.0, 0.0]]))
 
 
+def test_preprocess_mask_rejects_an_unsupported_mask_rank() -> None:
+    # Workflow users can wire any tensor into the encoder's mask input; an unusable rank must be rejected
+    # with a clear error instead of silently reshaping into a wrong region.
+    with pytest.raises(ValueError, match="Unsupported mask shape"):
+        Krea2RegionalPromptingExtension.preprocess_regional_prompt_mask(
+            mask=torch.ones(1, 3, 4, 4),
+            grid_height=2,
+            grid_width=2,
+            dtype=torch.float32,
+            device=torch.device("cpu"),
+        )
+
+
 def _tiny_transformer() -> Krea2Transformer2DModel:
     return Krea2Transformer2DModel(
         in_channels=4,
@@ -153,6 +168,65 @@ def test_attention_processor_map_applies_regional_state_to_even_main_blocks_only
     assert processors["transformer_blocks.0.attn.processor"].regional_prompting_state is state
     assert processors["transformer_blocks.1.attn.processor"].regional_prompting_state is None
     assert processors["transformer_blocks.2.attn.processor"].regional_prompting_state is state
+
+
+def test_only_even_main_blocks_apply_the_regional_mask_during_a_forward() -> None:
+    # The processor map is only a wiring detail; this asserts the actual effect during a real forward pass.
+    # Every block's attention input is captured while the mask is installed, then each block's attention is
+    # re-run on that exact input with the mask cleared. Even blocks must change, odd blocks must not.
+    torch.manual_seed(0)
+    transformer = _tiny_transformer().eval()
+    state = Krea2RegionalPromptingState()
+    transformer.set_attn_processor(build_krea2_attention_processors(transformer, state))
+
+    grid_height = grid_width = 2
+    image_seq_len = grid_height * grid_width
+    region_mask = torch.tensor([[[1.0, 1.0, 0.0, 0.0]]])
+
+    # _tiny_transformer uses num_text_layers=2 / text_hidden_dim=16, so it needs its own embedding shape.
+    def _tiny_conditioning(mask: torch.Tensor | None) -> Krea2TextConditioning:
+        return Krea2TextConditioning(prompt_embeds=torch.randn(1, 2, 2, 16), mask=mask)
+
+    extension = Krea2RegionalPromptingExtension.from_text_conditionings(
+        [_tiny_conditioning(None), _tiny_conditioning(region_mask)], image_seq_len=image_seq_len
+    )
+    prompt_embeds = extension.regional_text_conditioning.prompt_embeds
+    state.set_attention_mask(extension.get_attention_mask())
+
+    captured: dict[int, tuple[torch.Tensor, dict, torch.Tensor]] = {}
+
+    def _make_hook(index: int):
+        def _hook(_module, args, kwargs, output):
+            captured[index] = (args[0].detach().clone(), kwargs, output.detach().clone())
+
+        return _hook
+
+    handles = [
+        block.attn.register_forward_hook(_make_hook(index), with_kwargs=True)
+        for index, block in enumerate(transformer.transformer_blocks)
+    ]
+    try:
+        with torch.no_grad():
+            transformer(
+                hidden_states=torch.randn(1, image_seq_len, 4),
+                encoder_hidden_states=prompt_embeds,
+                timestep=torch.tensor([0.5]),
+                position_ids=prepare_position_ids(prompt_embeds.shape[1], grid_height, grid_width, torch.device("cpu")),
+                return_dict=False,
+            )
+    finally:
+        for handle in handles:
+            handle.remove()
+
+    assert set(captured) == {0, 1, 2}
+    state.set_attention_mask(None)
+    for index, (attn_input, attn_kwargs, masked_output) in captured.items():
+        with torch.no_grad():
+            unmasked_output = transformer.transformer_blocks[index].attn(attn_input, **attn_kwargs)
+        if index % 2 == 0:
+            assert not torch.allclose(masked_output, unmasked_output), f"block {index} was not restricted"
+        else:
+            assert torch.equal(masked_output, unmasked_output), f"block {index} should be unrestricted"
 
 
 def test_regional_state_can_switch_between_positive_and_negative_masks() -> None:

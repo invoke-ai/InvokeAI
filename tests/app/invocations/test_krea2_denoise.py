@@ -308,6 +308,7 @@ class _Transformer:
     def __init__(self) -> None:
         self.conditioning_values: list[float] = []
         self.regional_attention_masks: list[torch.Tensor | None] = []
+        self.combined_sequence_lengths: list[int] = []
         self.attn_processors = {
             "text_fusion.layerwise_blocks.0.attn.processor": object(),
             "transformer_blocks.0.attn.processor": object(),
@@ -321,6 +322,9 @@ class _Transformer:
 
     def __call__(self, *, hidden_states, encoder_hidden_states, **_kwargs):
         self.conditioning_values.append(float(encoder_hidden_states.mean()))
+        # The real transformer concatenates [text, image] before attention, so this is the sequence length a
+        # regional mask has to match.
+        self.combined_sequence_lengths.append(encoder_hidden_states.shape[1] + hidden_states.shape[1])
         regional_processor = self.installed_processors["transformer_blocks.0.attn.processor"]
         attention_mask = regional_processor.regional_prompting_state.attention_mask
         self.regional_attention_masks.append(attention_mask.clone() if attention_mask is not None else None)
@@ -371,11 +375,11 @@ def _runtime_invocation(
     )
 
 
-def _runtime_context(tmp_path, transformer: _Transformer):
+def _runtime_context(tmp_path, transformer: _Transformer, *, negative_text_seq_len: int = 2):
     conditionings = {
         "positive": ConditioningFieldData(conditionings=[Krea2ConditioningInfo(prompt_embeds=torch.ones(1, 2, 12, 8))]),
         "negative": ConditioningFieldData(
-            conditionings=[Krea2ConditioningInfo(prompt_embeds=torch.zeros(1, 2, 12, 8))]
+            conditionings=[Krea2ConditioningInfo(prompt_embeds=torch.zeros(1, negative_text_seq_len, 12, 8))]
         ),
     }
     tensors = {
@@ -460,6 +464,30 @@ def test_run_diffusion_switches_regional_masks_between_equal_length_cfg_conditio
     assert torch.equal(negative_mask, negative_mask_second_step)
     regional_processor = transformer.installed_processors["transformer_blocks.0.attn.processor"]
     assert regional_processor.regional_prompting_state.attention_mask is None
+
+
+def test_run_diffusion_sizes_regional_masks_per_pass_when_cfg_lengths_differ(monkeypatch, tmp_path) -> None:
+    # The positive and negative prompts tokenize independently, so each pass needs a mask sized for its own
+    # text sequence. A mask carried over from the other pass would trip the processor's shape guard.
+    _patch_runtime(monkeypatch)
+    transformer = _Transformer()
+    invocation = _runtime_invocation(cfg_scale=2.0)
+    invocation.positive_conditioning = Krea2ConditioningField(
+        conditioning_name="positive", mask=TensorField(tensor_name="positive-region")
+    )
+    invocation.negative_conditioning = Krea2ConditioningField(
+        conditioning_name="negative", mask=TensorField(tensor_name="negative-region")
+    )
+
+    invocation._run_diffusion(_runtime_context(tmp_path, transformer, negative_text_seq_len=5))
+
+    # width=height=16 -> 2x2 latent -> a single 2x2 patch, so image_seq_len is 1.
+    assert transformer.combined_sequence_lengths == [3, 6, 3, 6]
+    assert [tuple(mask.shape) for mask in transformer.regional_attention_masks] == [(3, 3), (6, 6), (3, 3), (6, 6)]
+    for mask, sequence_length in zip(
+        transformer.regional_attention_masks, transformer.combined_sequence_lengths, strict=True
+    ):
+        assert mask.shape == (sequence_length, sequence_length)
 
 
 def test_run_diffusion_releases_regional_mask_when_transformer_raises(monkeypatch, tmp_path) -> None:
