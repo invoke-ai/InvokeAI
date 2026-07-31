@@ -10,6 +10,7 @@ import {
   TEXT_FONT_WEIGHTS,
 } from '@workbench/canvas-engine/api';
 import { useTextEditSession, useTextOptions } from '@workbench/widgets/canvas/engineStoreHooks';
+import { useColorSampler } from '@workbench/widgets/canvas/useColorSampler';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { AlignCenterIcon, AlignLeftIcon, AlignRightIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
@@ -87,6 +88,7 @@ const AlignButton = ({
 export const TextOptions = ({ engine }: ToolOptionsComponentProps) => {
   const { t } = useTranslation();
   const options = useTextOptions(engine);
+  const sampleColor = useColorSampler(engine);
   const session = useTextEditSession(engine);
 
   const selected = useActiveProjectSelector(
@@ -254,6 +256,7 @@ export const TextOptions = ({ engine }: ToolOptionsComponentProps) => {
       <ColorPicker
         aria-label={t('widgets.canvas.toolOptions.textColor')}
         value={color}
+        onSampleColor={sampleColor}
         onValueChange={onColorChange}
         onValueChangeEnd={onColorChangeEnd}
       />

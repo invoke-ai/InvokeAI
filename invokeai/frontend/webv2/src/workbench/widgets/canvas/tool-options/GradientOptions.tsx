@@ -4,6 +4,7 @@ import type { CanvasLayerSourceContract, GradientStop, GradientToolOptions } fro
 import { createListCollection, HStack, NumberInput, Text } from '@chakra-ui/react';
 import { ColorPicker, Select } from '@platform/ui';
 import { useGradientOptions } from '@workbench/widgets/canvas/engineStoreHooks';
+import { useColorSampler } from '@workbench/widgets/canvas/useColorSampler';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -21,35 +22,17 @@ interface SelectedGradient {
 const SELECT_POSITIONING = { placement: 'top-start', sameWidth: false } as const;
 const SELECT_TRIGGER_PROPS = { minW: '6rem' } as const;
 
-const clamp01 = (v: number): number => Math.min(1, Math.max(0, v));
-
-/** Splits a stop color into a `#rrggbb` part (for the picker) and an alpha in [0,1]. */
-const splitColor = (color: string): { rgb: string; alpha: number } => {
-  const match = /^#([0-9a-f]{6})([0-9a-f]{2})?$/i.exec(color.trim());
-  if (match) {
-    return { alpha: match[2] !== undefined ? parseInt(match[2], 16) / 255 : 1, rgb: `#${match[1]}` };
-  }
-  return { alpha: 1, rgb: '#000000' };
-};
-
-/** Recombines a `#rrggbb` and an alpha into an `#rrggbbaa` string. */
-const joinColor = (rgb: string, alpha: number): string => {
-  const a = Math.round(clamp01(alpha) * 255)
-    .toString(16)
-    .padStart(2, '0');
-  return `${rgb}${a}`;
-};
-
 /**
  * Gradient tool options: kind (linear/radial), angle (degrees), and a MINIMAL
- * two-stop editor — start/end color with per-stop opacity. Edits set defaults
- * for the next created gradient AND apply to a selected gradient layer (colors
- * commit one history entry on interaction end; discrete edits commit at once).
- * A full multi-stop editor is a follow-up.
+ * two-stop editor — start/end color, each carrying its own alpha. Edits set
+ * defaults for the next created gradient AND apply to a selected gradient layer
+ * (colors commit one history entry on interaction end; discrete edits commit at
+ * once). A full multi-stop editor is a follow-up.
  */
 export const GradientOptions = ({ engine }: ToolOptionsComponentProps) => {
   const { t } = useTranslation();
   const options = useGradientOptions(engine);
+  const sampleColor = useColorSampler(engine);
 
   const selected = useActiveProjectSelector(
     (project): SelectedGradient | null => {
@@ -70,8 +53,6 @@ export const GradientOptions = ({ engine }: ToolOptionsComponentProps) => {
   const stops = selected ? selected.source.stops : options.stops;
   const start = stops[0] ?? { color: '#000000ff', offset: 0 };
   const end = stops[stops.length - 1] ?? { color: '#ffffffff', offset: 1 };
-  const startParts = splitColor(start.color);
-  const endParts = splitColor(end.color);
 
   const kindCollection = useMemo(
     () =>
@@ -130,39 +111,14 @@ export const GradientOptions = ({ engine }: ToolOptionsComponentProps) => {
     [applyGradient, kind, stops]
   );
 
-  const onStartColorChange = useCallback(
-    (hex: string) => setStopColor(0, joinColor(hex, startParts.alpha), false),
-    [setStopColor, startParts.alpha]
-  );
-  const onStartColorEnd = useCallback(
-    (hex: string) => setStopColor(0, joinColor(hex, startParts.alpha), true),
-    [setStopColor, startParts.alpha]
-  );
-  const onStartOpacity = useCallback(
-    ({ valueAsNumber }: ChakraNumberInput.ValueChangeDetails) => {
-      if (Number.isFinite(valueAsNumber)) {
-        setStopColor(0, joinColor(startParts.rgb, clamp01(valueAsNumber / 100)), true);
-      }
-    },
-    [setStopColor, startParts.rgb]
-  );
+  const onStartColorChange = useCallback((color: string) => setStopColor(0, color, false), [setStopColor]);
+  const onStartColorEnd = useCallback((color: string) => setStopColor(0, color, true), [setStopColor]);
 
   const onEndColorChange = useCallback(
-    (hex: string) => setStopColor(lastIndex, joinColor(hex, endParts.alpha), false),
-    [endParts.alpha, lastIndex, setStopColor]
+    (color: string) => setStopColor(lastIndex, color, false),
+    [lastIndex, setStopColor]
   );
-  const onEndColorEnd = useCallback(
-    (hex: string) => setStopColor(lastIndex, joinColor(hex, endParts.alpha), true),
-    [endParts.alpha, lastIndex, setStopColor]
-  );
-  const onEndOpacity = useCallback(
-    ({ valueAsNumber }: ChakraNumberInput.ValueChangeDetails) => {
-      if (Number.isFinite(valueAsNumber)) {
-        setStopColor(lastIndex, joinColor(endParts.rgb, clamp01(valueAsNumber / 100)), true);
-      }
-    },
-    [endParts.rgb, lastIndex, setStopColor]
-  );
+  const onEndColorEnd = useCallback((color: string) => setStopColor(lastIndex, color, true), [lastIndex, setStopColor]);
 
   return (
     <HStack align="center" gap="3">
@@ -203,21 +159,12 @@ export const GradientOptions = ({ engine }: ToolOptionsComponentProps) => {
         </Text>
         <ColorPicker
           aria-label={t('widgets.canvas.toolOptions.gradientStart')}
-          value={startParts.rgb}
+          value={start.color}
+          withAlpha
+          onSampleColor={sampleColor}
           onValueChange={onStartColorChange}
           onValueChangeEnd={onStartColorEnd}
         />
-        <NumberInput.Root
-          max={100}
-          min={0}
-          size="xs"
-          value={String(Math.round(startParts.alpha * 100))}
-          w="4rem"
-          onValueChange={onStartOpacity}
-        >
-          <NumberInput.Control />
-          <NumberInput.Input aria-label={t('widgets.canvas.toolOptions.gradientStartOpacity')} fontSize="xs" />
-        </NumberInput.Root>
       </HStack>
 
       <HStack align="center" gap="1.5">
@@ -226,21 +173,12 @@ export const GradientOptions = ({ engine }: ToolOptionsComponentProps) => {
         </Text>
         <ColorPicker
           aria-label={t('widgets.canvas.toolOptions.gradientEnd')}
-          value={endParts.rgb}
+          value={end.color}
+          withAlpha
+          onSampleColor={sampleColor}
           onValueChange={onEndColorChange}
           onValueChangeEnd={onEndColorEnd}
         />
-        <NumberInput.Root
-          max={100}
-          min={0}
-          size="xs"
-          value={String(Math.round(endParts.alpha * 100))}
-          w="4rem"
-          onValueChange={onEndOpacity}
-        >
-          <NumberInput.Control />
-          <NumberInput.Input aria-label={t('widgets.canvas.toolOptions.gradientEndOpacity')} fontSize="xs" />
-        </NumberInput.Root>
       </HStack>
     </HStack>
   );

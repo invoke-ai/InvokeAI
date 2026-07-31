@@ -172,6 +172,12 @@
     "openSelector": "Open selector",
     "searchSchedulers": "Search schedulers…",
     "close": "Close",
+    "colorPicker": {
+      "format": "Color format",
+      "sampleFromCanvas": "Pick a color from the canvas",
+      "sampleFromScreen": "Pick a color from the screen",
+      "opacity": "Opacity (%)"
+    },
     "configure": "Configure",
     "copy": "Copy",
     "crop": "Crop",
@@ -838,6 +844,7 @@
       "components": "Components",
       "compositing": "Compositing",
       "compositingOptions": {
+        "infillColorValue": "Infill color",
         "infillMethod": "Infill method",
         "infillMethods": {
           "patchmatch": "PatchMatch",
@@ -1551,12 +1558,10 @@
         "gradientAngle": "Angle",
         "gradientEdit": "Edit gradient",
         "gradientEnd": "End",
-        "gradientEndOpacity": "End opacity",
         "gradientKind": "Gradient type",
         "gradientLinear": "Linear",
         "gradientRadial": "Radial",
         "gradientStart": "Start",
-        "gradientStartOpacity": "Start opacity",
         "invertSelection": "Invert",
         "lassoFreehand": "Freehand",
         "lassoHint": "Draw a shape to select. Shift adds, Alt subtracts.",

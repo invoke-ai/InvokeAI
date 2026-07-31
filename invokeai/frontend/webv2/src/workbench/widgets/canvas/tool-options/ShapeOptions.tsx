@@ -5,6 +5,7 @@ import { createListCollection, HStack, NumberInput, Text } from '@chakra-ui/reac
 import { ColorPicker, Select, ToggleIconButton } from '@platform/ui';
 import { MAX_SHAPE_STROKE_WIDTH } from '@workbench/canvas-engine/api';
 import { useShapeOptions } from '@workbench/widgets/canvas/engineStoreHooks';
+import { useColorSampler } from '@workbench/widgets/canvas/useColorSampler';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { PaintBucketIcon, SquareIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
@@ -36,6 +37,7 @@ const SELECT_TRIGGER_PROPS = { minW: '6rem' } as const;
 export const ShapeOptions = ({ engine }: ToolOptionsComponentProps) => {
   const { t } = useTranslation();
   const options = useShapeOptions(engine);
+  const sampleColor = useColorSampler(engine);
 
   const selected = useActiveProjectSelector(
     (project): SelectedShape | null => {
@@ -151,6 +153,7 @@ export const ShapeOptions = ({ engine }: ToolOptionsComponentProps) => {
           <ColorPicker
             aria-label={t('widgets.canvas.toolOptions.shapeFill')}
             value={fill}
+            onSampleColor={sampleColor}
             onValueChange={onFillChange}
             onValueChangeEnd={onFillChangeEnd}
           />
@@ -169,6 +172,7 @@ export const ShapeOptions = ({ engine }: ToolOptionsComponentProps) => {
             <ColorPicker
               aria-label={t('widgets.canvas.toolOptions.shapeStroke')}
               value={stroke}
+              onSampleColor={sampleColor}
               onValueChange={onStrokeChange}
               onValueChangeEnd={onStrokeChangeEnd}
             />

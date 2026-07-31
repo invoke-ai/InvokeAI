@@ -432,6 +432,98 @@ export const progressCircleSlotRecipe = defineSlotRecipe({
   },
 });
 
+/**
+ * Color picker chrome: the popover surface, area, sliders, swatches, and
+ * channel inputs, aligned with the rest of the workbench controls. This was the
+ * last built-in still rendering Chakra's stock chrome, so it was the only
+ * control that did not track the active theme.
+ *
+ * Extends the default rather than replacing it: the stock recipe folds
+ * `colorSwatchRecipe.base` into `swatch` and `inputRecipe.base` into
+ * `channelInput`, and its `size` variants are what define `--swatch-size`,
+ * `--slider-height`, and `--thumb-size`. Replacing wholesale renders every
+ * thumb and swatch at zero size — the same failure the tooltip recipe above
+ * documents for `--arrow-size`.
+ */
+export const colorPickerSlotRecipe = defineSlotRecipe({
+  ...chakraSlotRecipes.colorPicker,
+  base: {
+    ...chakraSlotRecipes.colorPicker.base,
+    content: {
+      ...chakraSlotRecipes.colorPicker.base?.content,
+      ...dropdownContent,
+      // Wide enough for a full ten-swatch row at its natural size; narrower and
+      // the swatches, the format button, and the channel inputs all crowd.
+      gap: '2',
+      p: '2',
+      width: '64',
+    },
+    area: {
+      ...chakraSlotRecipes.colorPicker.base?.area,
+      // Denser than the stock 180px, which dwarfs the workbench tool bars.
+      height: '140px',
+      // Hairline ring so the area does not float on the light theme's surface.
+      boxShadow: 'inset 0 0 0 1px {colors.border.subtle}',
+    },
+    areaThumb: {
+      ...chakraSlotRecipes.colorPicker.base?.areaThumb,
+      // The white ring alone disappears on light colors; the outer hairline
+      // keeps the thumb legible across the whole area.
+      boxShadow: '0 0 0 1px {colors.border.image}',
+    },
+    channelSliderThumb: {
+      ...chakraSlotRecipes.colorPicker.base?.channelSliderThumb,
+      boxShadow: '0 0 0 1px {colors.border.image}',
+    },
+    channelSliderTrack: {
+      ...chakraSlotRecipes.colorPicker.base?.channelSliderTrack,
+      // Stock hardcodes rgba(0,0,0,0.1), which vanishes on the dark ramps.
+      boxShadow: 'inset 0 0 0 1px {colors.border.subtle}',
+    },
+    swatch: {
+      ...chakraSlotRecipes.colorPicker.base?.swatch,
+      borderRadius: 'l1',
+      // Without a hairline, white and fully transparent swatches are invisible.
+      boxShadow: 'inset 0 0 0 1px {colors.border.image}',
+    },
+    swatchTrigger: {
+      ...chakraSlotRecipes.colorPicker.base?.swatchTrigger,
+      borderColor: 'transparent',
+      borderRadius: 'l1',
+      borderWidth: '1px',
+      transitionDuration: 'fast',
+      transitionProperty: 'border-color',
+      _hover: { borderColor: 'border.emphasized' },
+      _focusVisible: {
+        outline: '2px solid',
+        outlineColor: 'accent.solid',
+        outlineOffset: '1px',
+      },
+    },
+    channelInput: {
+      ...chakraSlotRecipes.colorPicker.base?.channelInput,
+      ...formControlInteraction,
+      fontVariantNumeric: 'tabular-nums',
+      px: '1',
+      textAlign: 'center',
+    },
+    channelText: {
+      ...chakraSlotRecipes.colorPicker.base?.channelText,
+      color: 'fg.subtle',
+      textStyle: '2xs',
+    },
+    transparencyGrid: {
+      ...chakraSlotRecipes.colorPicker.base?.transparencyGrid,
+      borderRadius: 'inherit',
+    },
+  },
+  defaultVariants: {
+    ...chakraSlotRecipes.colorPicker.defaultVariants,
+    // Workbench density — stock defaults to `md`.
+    size: 'xs',
+  },
+});
+
 /* -------------------------------------------------------------------------- *
  * Reusable UI recipes (consumed through Platform UI wrappers)
  * -------------------------------------------------------------------------- */

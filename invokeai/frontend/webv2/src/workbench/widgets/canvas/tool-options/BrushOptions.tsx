@@ -4,6 +4,7 @@ import { HStack, NumberInput } from '@chakra-ui/react';
 import { ColorPicker, Slider, ToggleIconButton } from '@platform/ui';
 import { MAX_BRUSH_SIZE, MIN_BRUSH_SIZE } from '@workbench/canvas-engine/api';
 import { useBrushOptions } from '@workbench/widgets/canvas/engineStoreHooks';
+import { useColorSampler } from '@workbench/widgets/canvas/useColorSampler';
 import { DropletIcon, PenLineIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -69,6 +70,7 @@ export const BrushOptions = ({ engine }: ToolOptionsComponentProps) => {
     (hex: string) => engine.interaction.set('brushOptions', { ...options, color: hex }),
     [engine, options]
   );
+  const sampleColor = useColorSampler(engine);
 
   const onPressureWidthToggle = useCallback(
     (checked: boolean) => engine.interaction.set('brushOptions', { ...options, pressureAffectsWidth: checked }),
@@ -85,6 +87,7 @@ export const BrushOptions = ({ engine }: ToolOptionsComponentProps) => {
       <ColorPicker
         aria-label={t('widgets.canvas.toolOptions.brushColor')}
         value={options.color}
+        onSampleColor={sampleColor}
         onValueChange={onColorChange}
       />
       <HStack align="center" gap="1.5">

@@ -1,6 +1,7 @@
 import { createSystem, defaultConfig, defineConfig } from '@chakra-ui/react';
 
 import {
+  colorPickerSlotRecipe,
   comboboxSlotRecipe,
   dialogSlotRecipe,
   inputRecipe,
@@ -281,6 +282,7 @@ const config = defineConfig({
       textarea: textareaRecipe,
     },
     slotRecipes: {
+      colorPicker: colorPickerSlotRecipe,
       combobox: comboboxSlotRecipe,
       dialog: dialogSlotRecipe,
       menu: menuSlotRecipe,

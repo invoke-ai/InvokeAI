@@ -342,6 +342,13 @@ export interface CanvasEngineToolCapability extends CanvasToolCapability {
   canTargetLayerFromContextMenu(): boolean;
   handleEscapePriority(options: { gestureWasActive: boolean }): void;
   onStrokeCommitted(listener: (event: StrokeCommittedEvent) => void): () => void;
+  /**
+   * Arms the eyedropper for a single sample of the composited document,
+   * resolving with the picked `#rrggbb` or `null` if the user cancels (Escape,
+   * another tool, or the engine going away). Restores the previously active
+   * tool either way. Backs the color picker's eyedropper button.
+   */
+  requestColorSample(): Promise<string | null>;
   setInteractionLocked(locked: boolean): void;
 }
 

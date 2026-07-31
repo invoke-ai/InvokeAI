@@ -30,7 +30,11 @@ const updateCursorRing = (ctx: ToolContext, input: PointerInput): void => {
   ctx.invalidate({ overlay: true });
 };
 
-/** Samples the composited color under `input` and writes it into the brush color option, if pickable. */
+/**
+ * Samples the composited color under `input`. A one-shot request made from
+ * outside the canvas (a color picker's eyedropper) claims the sample first;
+ * otherwise it lands in the brush color option as it always has.
+ */
 const pickColorAt = (ctx: ToolContext, input: PointerInput): void => {
   const doc = ctx.getDocument();
   if (!doc) {
@@ -41,6 +45,9 @@ const pickColorAt = (ctx: ToolContext, input: PointerInput): void => {
     return;
   }
   const hex = rgbaToHex(sample.r, sample.g, sample.b);
+  if (ctx.resolveColorSample?.(hex)) {
+    return;
+  }
   const opts = ctx.stores.brushOptions.get();
   if (hex !== opts.color) {
     ctx.stores.brushOptions.set({ ...opts, color: hex });

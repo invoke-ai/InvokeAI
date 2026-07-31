@@ -151,6 +151,14 @@ export interface ToolContext {
   /** Sets (or clears) the brush cursor ring drawn on the overlay. */
   setOverlayCursor(cursor: OverlayCursor | null): void;
   /**
+   * Hands a sampled color to a one-shot request made from outside the canvas
+   * (a color picker's eyedropper button), returning whether one was pending.
+   * The color-picker tool calls this before falling through to its default
+   * behavior of writing the brush color, so the alt-hold flow is unaffected.
+   * Absent in minimal test harnesses.
+   */
+  resolveColorSample?(hex: string): boolean;
+  /**
    * Re-evaluates the active tool's CSS cursor and applies it to the input
    * element. A tool calls this when its `cursor(ctx)` result changes off a plain
    * pointer-move (e.g. the bbox tool switching to a resize cursor while hovering a

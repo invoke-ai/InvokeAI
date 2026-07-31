@@ -1,4 +1,5 @@
 export * from './Button';
+export * from './color';
 export * from './ColorPicker';
 export * from './Combobox';
 export * from './ConfirmDialog';

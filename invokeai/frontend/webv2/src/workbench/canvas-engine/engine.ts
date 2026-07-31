@@ -866,6 +866,16 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     }
   }
 
+  /**
+   * A one-shot color sample requested from outside the canvas — the color
+   * picker's eyedropper button. While one is pending, the color-picker tool
+   * hands its next sample here instead of writing the brush color, and the tool
+   * that was active beforehand is restored. Cancelled (resolving `null`) by
+   * Escape, by any other tool switch, and by teardown, so the promise the
+   * caller is awaiting can never dangle.
+   */
+  let pendingColorSample: { previousToolId: ToolId; resolve: (hex: string | null) => void } | null = null;
+
   const toolContext: ToolContext = {
     applyTransform: () => applyTransform(),
     backend,
@@ -908,6 +918,13 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     getSamInteraction: () => stores.samInteraction.get(),
     openTextCreate: (docPoint) => openTextCreate(docPoint),
     openTextEdit: (layerId) => openTextEdit(layerId),
+    resolveColorSample: (hex) => {
+      if (!pendingColorSample) {
+        return false;
+      }
+      settleColorSample(hex, true);
+      return true;
+    },
     setLayerTransformOverride: (layerId, override) => {
       if (override) {
         transformOverrides.set(layerId, override);
@@ -1583,8 +1600,47 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     stepBrushSize: stepActiveBrushSize,
     updateCursor,
   });
-  const setTool = (toolId: ToolId, options?: { temporary?: boolean }): void =>
+  /**
+   * Settles a pending one-shot color sample. `restoreTool` puts the user back
+   * on whatever they were holding before reaching for the eyedropper; callers
+   * that are themselves switching tools skip it, so the switch they asked for
+   * wins rather than being immediately undone.
+   */
+  const settleColorSample = (hex: string | null, restoreTool: boolean): void => {
+    const pending = pendingColorSample;
+    if (!pending) {
+      return;
+    }
+    pendingColorSample = null;
+    pending.resolve(hex);
+    if (restoreTool) {
+      interactionController.setTool(pending.previousToolId);
+    }
+  };
+
+  const setTool = (toolId: ToolId, options?: { temporary?: boolean }): void => {
+    // Any move off the eyedropper abandons the sample the caller is awaiting.
+    if (toolId !== 'colorPicker') {
+      settleColorSample(null, false);
+    }
     interactionController.setTool(toolId, options);
+  };
+
+  /**
+   * Arms the eyedropper for one sample and resolves with the picked `#rrggbb`,
+   * or `null` if the user cancels. Backs the color picker's eyedropper button,
+   * which reads the composited document rather than the screen (and so works
+   * outside Chromium, and sees through the window chrome).
+   */
+  const requestColorSample = (): Promise<string | null> => {
+    // A second request supersedes the first; the earlier caller gets a cancel.
+    settleColorSample(null, false);
+
+    return new Promise<string | null>((resolve) => {
+      pendingColorSample = { previousToolId: interactionController.getActiveToolId(), resolve };
+      interactionController.setTool('colorPicker');
+    });
+  };
 
   /**
    * The engine's Escape priority ladder, run by the pointer pipeline AFTER it
@@ -1598,6 +1654,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
    * wiring and node tests (the real DOM keydown listener can't run in node-env).
    */
   const handleEscapePriority = ({ gestureWasActive }: { gestureWasActive: boolean }): void => {
+    // An armed eyedropper is the most recent thing the user opted into, so it
+    // is the first thing Escape takes back.
+    if (pendingColorSample) {
+      settleColorSample(null, true);
+      return;
+    }
     if (stores.textEditSession.get()) {
       cancelTextEdit();
       return;
@@ -2181,6 +2243,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     // Drop any guarded filter previews outright — the engine is going away, so
     // there's no render loop left to invalidate for them.
     cleanup.run(() => antsAnimator.stop());
+    // No render loop left to sample with; release any awaited eyedropper.
+    cleanup.run(() => settleColorSample(null, false));
     cleanup.run(() => activeTool()?.onDeactivate?.(toolContext));
     cleanup.run(unsubscribeViewport);
     cleanup.run(unsubscribeBrushOptions);
@@ -2537,6 +2601,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     canTargetLayerFromContextMenu,
     handleEscapePriority,
     onStrokeCommitted,
+    requestColorSample,
     setInteractionLocked,
   };
   const layersCapability: CanvasEngineLayerCapability = {

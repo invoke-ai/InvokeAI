@@ -12,7 +12,7 @@ import {
   registerAccountOwnedResource,
   type AccountScope,
 } from '@platform/state/accountLifecycle';
-import { Button, Combobox, ResizableTextarea, Select } from '@platform/ui';
+import { Button, ColorPicker, Combobox, formatHexColor, parseHexColor, ResizableTextarea, Select } from '@platform/ui';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ChangeEvent } from 'react';
 
 const ModelSelect = lazy(() => import('@features/models/react').then((module) => ({ default: module.ModelSelect })));
@@ -420,78 +420,41 @@ const ImageInput = ({ invalid, onChange, value }: WorkflowFieldInputProps) => {
   );
 };
 
-const COLOR_CHANNELS = ['r', 'g', 'b', 'a'] as const;
+/**
+ * Workflow `ColorField` values carry alpha as a `[0, 255]` integer, unlike
+ * every other color in the app (and unlike `RgbaColor`, whose alpha is a unit
+ * float). The scaling stays local to this adapter rather than pushing a second
+ * alpha convention into `@platform/ui`'s color helpers.
+ */
+const toColorFieldValue = (color: string): Record<string, number> => {
+  const { a, b, g, r } = parseHexColor(color);
 
-const ColorInput = ({ id, invalid, onChange, value }: WorkflowFieldInputProps) => {
-  const color = useMemo(
-    () => (typeof value === 'object' && value !== null ? value : {}) as Partial<Record<string, number>>,
-    [value]
-  );
+  return { a: Math.round(a * 255), b, g, r };
+};
 
-  return (
-    <HStack gap="1" w="full">
-      {COLOR_CHANNELS.map((channel) => (
-        <ColorChannelInput
-          key={channel}
-          channel={channel}
-          color={color}
-          id={id}
-          invalid={invalid}
-          onChange={onChange}
-        />
-      ))}
-    </HStack>
+const fromColorFieldValue = (value: unknown): string => {
+  const channels = (typeof value === 'object' && value !== null ? value : {}) as Partial<Record<string, number>>;
+
+  return formatHexColor(
+    {
+      a: (channels.a ?? 255) / 255,
+      b: channels.b ?? 0,
+      g: channels.g ?? 0,
+      r: channels.r ?? 0,
+    },
+    { alpha: true }
   );
 };
 
-const ColorChannelInput = ({
-  channel,
-  color,
-  id,
-  invalid,
-  onChange,
-}: {
-  channel: (typeof COLOR_CHANNELS)[number];
-  color: Partial<Record<string, number>>;
-  id?: string;
-  invalid?: boolean;
-  onChange: (value: unknown) => void;
-}) => {
-  const ariaLabel = useMemo(() => `Color ${channel.toUpperCase()}`, [channel]);
-  const placeholder = channel.toUpperCase();
-  const onInputChange = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => {
-      const parsed = toFiniteNumber(event.currentTarget.value);
-
-      if (parsed !== null) {
-        onChange({
-          a: 255,
-          b: 0,
-          g: 0,
-          r: 0,
-          ...color,
-          [channel]: Math.min(255, Math.max(0, Math.round(parsed))),
-        });
-      }
-    },
-    [channel, color, onChange]
-  );
+const ColorInput = ({ invalid, onChange, value }: WorkflowFieldInputProps) => {
+  const color = fromColorFieldValue(value);
+  const handleChange = useCallback((next: string) => onChange(toColorFieldValue(next)), [onChange]);
 
   return (
-    <Input
-      aria-label={ariaLabel}
-      className="nodrag"
-      id={id ? `${id}-color-${channel}-input` : undefined}
-      max="255"
-      min="0"
-      placeholder={placeholder}
-      size="xs"
-      type="number"
-      value={typeof color[channel] === 'number' ? color[channel] : ''}
-      w="full"
-      {...invalidProps(invalid)}
-      onChange={onInputChange}
-    />
+    // `nodrag` keeps a click on the swatch from panning the node canvas.
+    <HStack className="nodrag" gap="2" w="full" {...invalidProps(invalid)}>
+      <ColorPicker aria-label="Color" value={color} withAlpha withValueText onValueChange={handleChange} />
+    </HStack>
   );
 };
 
