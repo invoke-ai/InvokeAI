@@ -28,6 +28,7 @@ from invokeai.backend.model_manager.taxonomy import (
     SubModelType,
 )
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.fp8 import set_fp8_compute_dtype
 
 # Layer classes that benefit from FP8 storage. Mirrors diffusers'
 # `_GO_LC_SUPPORTED_PYTORCH_LAYERS` so the plain-nn.Module fallback path makes the same
@@ -313,6 +314,11 @@ class ModelLoader(ModelLoaderBase):
             self._apply_fp8_to_nn_module(model, storage_dtype=storage_dtype, compute_dtype=compute_dtype)
         else:
             return model
+
+        # Record the compute dtype so callers can recover it. After the cast, `model.dtype` reports
+        # the float8 storage dtype, which must never be used to create or cast tensors — torch has
+        # no arithmetic kernels for it (see `get_model_compute_dtype`).
+        set_fp8_compute_dtype(model, compute_dtype)
 
         param_bytes = sum(p.nelement() * p.element_size() for p in model.parameters())
         self._logger.info(
