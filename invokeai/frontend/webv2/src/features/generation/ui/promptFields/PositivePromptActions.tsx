@@ -41,6 +41,21 @@ import { useTranslation } from 'react-i18next';
 const POPOVER_POSITIONING_BOTTOM_END = { placement: 'bottom-end' } as const;
 const TEXT_LLM_MODEL_TYPES = ['text_llm'];
 const LLAVA_MODEL_TYPES = ['llava_onevision'];
+/**
+ * The way out of an empty state that needs a model installed. Availability is
+ * explained inside the popover rather than by disabling the trigger, so the
+ * dead end always has a door.
+ */
+const OpenModelManagerButton = () => {
+  const { t } = useTranslation();
+  const { openManager } = useGenerationUi().models;
+
+  return (
+    <Button alignSelf="start" px="0" size="xs" variant="plain" onClick={openManager}>
+      {t('widgets.generate.openModelManager')}
+    </Button>
+  );
+};
 
 /**
  * Everything the prompt actions know about the applied template, in one prop.
@@ -277,7 +292,10 @@ export const PromptTriggerPopover = ({
                 <Separator />
                 <Scrollable flex="1" label={t('widgets.generate.promptTriggerOptions')} minH="0">
                   {options.length === 0 ? (
-                    <PromptHistoryEmptyText>{t('widgets.generate.noPromptTriggersAvailable')}</PromptHistoryEmptyText>
+                    <Stack align="start" gap="1" px="2">
+                      <PromptHistoryEmptyText>{t('widgets.generate.noPromptTriggersAvailable')}</PromptHistoryEmptyText>
+                      <OpenModelManagerButton />
+                    </Stack>
                   ) : filteredOptions.length === 0 ? (
                     <PromptHistoryEmptyText>{t('widgets.generate.noMatchingTriggers')}</PromptHistoryEmptyText>
                   ) : (
@@ -427,7 +445,7 @@ const ExpandPromptButton = ({
         <Popover.Trigger asChild>
           <IconButton
             aria-label={t('widgets.generate.expandPrompt')}
-            disabled={isDisabled || isLoading || !positivePrompt.trim()}
+            disabled={isDisabled || isLoading}
             size="2xs"
             variant="ghost"
           >
@@ -444,9 +462,12 @@ const ExpandPromptButton = ({
                   {t('widgets.generate.expandPrompt')}
                 </Text>
                 {textLlmModels.length === 0 ? (
-                  <Text color="fg.subtle" fontSize="xs">
-                    {t('widgets.generate.installTextLlmToExpandPrompts')}
-                  </Text>
+                  <>
+                    <Text color="fg.subtle" fontSize="xs">
+                      {t('widgets.generate.installTextLlmToExpandPrompts')}
+                    </Text>
+                    <OpenModelManagerButton />
+                  </>
                 ) : (
                   <>
                     <ModelSelect
@@ -462,6 +483,11 @@ const ExpandPromptButton = ({
                       selectedId={effectiveSystemPromptId}
                       onSelect={setSelectedSystemPromptId}
                     />
+                    {positivePrompt.trim() ? null : (
+                      <Text color="fg.subtle" fontSize="xs">
+                        {t('widgets.generate.enterPromptToExpand')}
+                      </Text>
+                    )}
                     <Button
                       disabled={!selectedModel || !positivePrompt.trim()}
                       loading={isLoading}
@@ -577,9 +603,12 @@ const ImageToPromptButton = ({
                   {t('widgets.generate.imageToPrompt')}
                 </Text>
                 {llavaModels.length === 0 ? (
-                  <Text color="fg.subtle" fontSize="xs">
-                    {t('widgets.generate.installVisionModelToGeneratePrompts')}
-                  </Text>
+                  <>
+                    <Text color="fg.subtle" fontSize="xs">
+                      {t('widgets.generate.installVisionModelToGeneratePrompts')}
+                    </Text>
+                    <OpenModelManagerButton />
+                  </>
                 ) : (
                   <>
                     <ModelSelect

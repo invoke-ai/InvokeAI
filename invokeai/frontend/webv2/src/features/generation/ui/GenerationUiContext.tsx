@@ -52,6 +52,8 @@ export interface GenerationUiAdapter {
     error: string | null;
     getBaseColorPalette(base: string): string;
     getBaseLabel(base: string): string;
+    /** Navigates to the model manager, which opens on Add Models by default. */
+    openManager(): void;
     status: 'error' | 'idle' | 'loaded' | 'loading';
   };
   notifications: {
