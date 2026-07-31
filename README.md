@@ -74,10 +74,13 @@ Invoke features an organized gallery system for easily storing, accessing, and r
 - Z-Image Turbo
 - Z-Image Base
 - Krea 2 Turbo
+- Krea 2 Raw
 - Anima
 - Qwen Image
 - Qwen Image Edit
 - Ideogram 4
+- ERNIE-Image
+- ERNIE-Image-Turbo
 - Nano Banana (API Only)
 - GPT Image (API Only)
 - Wan (API Only)

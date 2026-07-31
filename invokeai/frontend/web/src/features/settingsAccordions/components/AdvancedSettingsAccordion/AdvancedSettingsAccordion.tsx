@@ -5,6 +5,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import {
   selectIsAnima,
+  selectIsErnieImage,
   selectIsExternal,
   selectIsFLUX,
   selectIsFlux2,
@@ -32,6 +33,7 @@ import ParamQwenImageQuantization from 'features/parameters/components/Advanced/
 import ParamT5EncoderModelSelect from 'features/parameters/components/Advanced/ParamT5EncoderModelSelect';
 import ParamWanModelSelects from 'features/parameters/components/Advanced/ParamWanModelSelects';
 import ParamZImageQwen3VaeModelSelect from 'features/parameters/components/Advanced/ParamZImageQwen3VaeModelSelect';
+import ParamErnieImagePromptEnhancer from 'features/parameters/components/Core/ParamErnieImagePromptEnhancer';
 import ParamIdeogram4ColorPalette from 'features/parameters/components/Core/ParamIdeogram4ColorPalette';
 import ParamIdeogram4GuidanceScale from 'features/parameters/components/Core/ParamIdeogram4GuidanceScale';
 import ParamIdeogram4Mu from 'features/parameters/components/Core/ParamIdeogram4Mu';
@@ -67,6 +69,7 @@ export const AdvancedSettingsAccordion = memo(() => {
   const isExternal = useAppSelector(selectIsExternal);
   const isQwenImage = useAppSelector(selectIsQwenImage);
   const isAnima = useAppSelector(selectIsAnima);
+  const isErnieImage = useAppSelector(selectIsErnieImage);
   const isKrea2 = useAppSelector(selectIsKrea2);
   const isWan = useAppSelector(selectIsWan);
 
@@ -127,7 +130,7 @@ export const AdvancedSettingsAccordion = memo(() => {
   return (
     <StandaloneAccordion label={t('accordions.advanced.title')} badges={badges} isOpen={isOpen} onToggle={onToggle}>
       <Flex gap={4} alignItems="center" p={4} flexDir="column" data-testid="advanced-settings-accordion">
-        {!isZImage && !isAnima && !isFlux2 && !isQwenImage && !isKrea2 && !isWan && !isIdeogram4 && (
+        {!isZImage && !isAnima && !isFlux2 && !isQwenImage && !isErnieImage && !isKrea2 && !isWan && !isIdeogram4 && (
           <Flex gap={4} w="full">
             {isFLUX ? <ParamFLUXVAEModelSelect /> : <ParamVAEModelSelect />}
             {!isFLUX && !isSD3 && <ParamVAEPrecision />}
@@ -139,6 +142,7 @@ export const AdvancedSettingsAccordion = memo(() => {
           !isZImage &&
           !isQwenImage &&
           !isAnima &&
+          !isErnieImage &&
           !isKrea2 &&
           !isWan &&
           !isIdeogram4 && (
@@ -197,6 +201,11 @@ export const AdvancedSettingsAccordion = memo(() => {
         {isAnima && (
           <FormControlGroup>
             <ParamAnimaModelSelect />
+          </FormControlGroup>
+        )}
+        {isErnieImage && (
+          <FormControlGroup formLabelProps={formLabelProps}>
+            <ParamErnieImagePromptEnhancer />
           </FormControlGroup>
         )}
         {isKrea2 && (

@@ -252,6 +252,10 @@ class ModelLoader(ModelLoaderBase):
             return False
 
         # Don't apply FP8 to text encoders, tokenizers, schedulers, VAEs, etc.
+        # The prompt enhancer is a causal LM run autoregressively (one full forward per generated
+        # token), so layerwise casting would pay the bf16<->fp8 round trip on every token — and its
+        # entire job is text quality, which fp8 rounding degrades. Its tokenizer is listed for
+        # symmetry (it is not an nn.Module, so casting is a no-op today only by accident).
         _excluded_submodel_types = {
             SubModelType.TextEncoder,
             SubModelType.TextEncoder2,
@@ -259,6 +263,8 @@ class ModelLoader(ModelLoaderBase):
             SubModelType.Tokenizer,
             SubModelType.Tokenizer2,
             SubModelType.Tokenizer3,
+            SubModelType.PromptEnhancer,
+            SubModelType.PromptEnhancerTokenizer,
             SubModelType.Scheduler,
             SubModelType.SafetyChecker,
             SubModelType.VAE,
