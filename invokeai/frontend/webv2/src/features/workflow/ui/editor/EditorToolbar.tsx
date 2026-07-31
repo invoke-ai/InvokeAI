@@ -89,11 +89,17 @@ export const EditorToolbar = ({
         <Popover.Root ids={opacityIds} positioning={POPOVER_POSITIONING}>
           <Tooltip content="Node opacity" ids={opacityIds} positioning={TOOLTIP_POSITIONING}>
             <Popover.Trigger asChild>
+              {/* Matches what `ToolbarButton` renders rather than being one:
+                  `Popover.Trigger asChild` would clone that component's Tooltip
+                  wrapper instead of the button. Size is load bearing — `Toolbar`
+                  is a column Stack, so it stretches every sibling to the widest
+                  child, and one `sm` button here squared off the whole strip at
+                  36px while the rest stayed 32px tall. */}
               <IconButton
                 aria-label="Node opacity"
-                color={nodeOpacity < 1 ? 'accent.solid' : undefined}
-                size="sm"
-                variant="ghost"
+                aria-pressed={nodeOpacity < 1}
+                size="xs"
+                variant={nodeOpacity < 1 ? 'solid' : 'ghost'}
               >
                 <Icon as={BlendIcon} boxSize="3.5" />
               </IconButton>
