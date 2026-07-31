@@ -3,6 +3,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
+import torch
 
 from invokeai.backend.hidiffusion.hidiffusion import (
     remove_hidiffusion as real_remove_hidiffusion,
@@ -29,6 +30,29 @@ class DummyUNet:
 
     def named_modules(self):
         return [("", self), ("layer", self.layer)]
+
+
+class ModelMixin(torch.nn.Module):
+    """Minimal diffusers-like UNet accepted by the vendored HiDiffusion type check."""
+
+    def __init__(self):
+        super().__init__()
+        self.num_upsamplers = 3
+
+
+def test_hidiffusion_patch_supports_bare_model_mixin_without_public_name_or_path():
+    model = ModelMixin()
+
+    assert not hasattr(model, "name_or_path")
+    assert not hasattr(model, "_name_or_path")
+
+    with hidiffusion_patch(model, name_or_path="runwayml/stable-diffusion-v1-5"):
+        assert model.info["pipeline"] is model
+        assert model.num_upsamplers == 15
+
+    assert model.num_upsamplers == 3
+    assert not hasattr(model, "_name_or_path")
+    assert model.info["hooks"] == []
 
 
 def test_hidiffusion_patch_restores_state_when_apply_hidiffusion_raises():

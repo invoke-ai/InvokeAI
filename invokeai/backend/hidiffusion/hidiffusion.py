@@ -2036,7 +2036,7 @@ def apply_hidiffusion(
     # Hack, avoid non-square problem. See unet_2d_condition.py in diffusers
     diffusion_model.num_upsamplers += 12
 
-    name_or_path = model.name_or_path
+    name_or_path = getattr(model, "name_or_path", None) or getattr(model, "_name_or_path", "")
     diffusion_model_module_key = []
     if name_or_path not in supported_official_model:
         for key, _module in diffusion_model.named_modules():
@@ -2136,7 +2136,7 @@ def apply_hidiffusion(
             module.info = diffusion_model.info
     else:
         raise Exception(
-            f"{model.name_or_path} is not a supported model. HiDiffusion now only supports runwayml/stable-diffusion-v1-5, stabilityai/stable-diffusion-2-1-base, stabilityai/stable-diffusion-xl-base-1.0, stabilityai/sdxl-turbo, diffusers/stable-diffusion-xl-1.0-inpainting-0.1 and their derivative models/pipelines."
+            f"{name_or_path} is not a supported model. HiDiffusion now only supports runwayml/stable-diffusion-v1-5, stabilityai/stable-diffusion-2-1-base, stabilityai/stable-diffusion-xl-base-1.0, stabilityai/sdxl-turbo, diffusers/stable-diffusion-xl-1.0-inpainting-0.1 and their derivative models/pipelines."
         )
     return model
 

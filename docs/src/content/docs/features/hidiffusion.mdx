@@ -22,20 +22,15 @@ Learn more: https://github.com/megvii-research/HiDiffusion
 
 ## What the switches do
 
-- **HiDiffusion**  
-  Enables the HiDiffusion patch for denoising. Use this for high‑resolution generations; the effect is subtle at lower sizes.
+- **HiDiffusion**: Enables the HiDiffusion patch for denoising. Use this for high‑resolution generations; the effect is subtle at lower sizes.
 
-- **HiDiffusion: RAU‑Net**  
-  Enables RAU‑Net blocks. This typically improves structure and mid‑frequency detail, especially at larger resolutions.
+- **HiDiffusion: RAU‑Net**: Enables RAU‑Net blocks. This typically improves structure and mid‑frequency detail, especially at larger resolutions.
 
-- **HiDiffusion: Window Attention**  
-  Enables windowed attention blocks. This can boost local texture/detail, but may slightly affect global coherence in some prompts.
+- **HiDiffusion: Window Attention**: Enables windowed attention blocks. This can boost local texture/detail, but may slightly affect global coherence in some prompts.
 
-- **HiDiffusion: T1 Ratio**  
-  Controls when HiDiffusion switches into its mid‑stage behavior. Lower values switch earlier; higher values preserve global structure longer.
+- **HiDiffusion: T1 Ratio**: Controls when HiDiffusion switches into its mid‑stage behavior. Lower values switch earlier; higher values preserve global structure longer.
 
-- **HiDiffusion: T2 Ratio**  
-  Controls when HiDiffusion switches into its late‑stage behavior. Higher values keep window attention active longer and can sharpen local detail.
+- **HiDiffusion: T2 Ratio**: Controls when HiDiffusion switches into its late‑stage behavior. Higher values keep window attention active longer and can sharpen local detail.
 
 ## Tips
 
