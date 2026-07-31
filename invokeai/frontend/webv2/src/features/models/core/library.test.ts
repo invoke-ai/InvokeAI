@@ -104,22 +104,49 @@ describe('getModelPickerGroups', () => {
     });
 
     expect(result.candidates.map((m) => m.key)).toEqual(['a', 'c']);
-    expect(result.groups.map((group) => group.type)).toEqual(['lora']);
+    expect(result.groups.map((group) => group.base)).toEqual(['sd-1']);
     expect(result.groups[0]?.models.map((m) => m.key)).toEqual(['c']);
   });
 
-  it('groups by (type, base) sorted by taxonomy rank, base display order, then name', () => {
+  // Type is not a grouping axis: a cross-type picker would otherwise repeat a
+  // "Main Models" header above every base section.
+  it('groups by base alone, in base display order', () => {
     const result = getModelPickerGroups(library, {
       modelTypes: ['main', 'lora', 'vae'],
       searchTerm: '',
     });
 
     expect(result.groups.map((group) => [group.key, group.models.map((m) => m.key)])).toEqual([
-      ['main:sdxl', ['a']],
-      ['main:flux', ['b']],
-      ['lora:sd-1', ['c']],
-      ['vae:any', ['d']],
+      ['sd-1', ['c']],
+      ['sdxl', ['a']],
+      ['flux', ['b']],
+      ['any', ['d']],
     ]);
+  });
+
+  it('keeps several types in one base group, ordered by taxonomy rank then name', () => {
+    const mixed = [
+      createModel({ base: 'sdxl', key: 'lora-1', name: 'Alpha LoRA', type: 'lora' }),
+      createModel({ base: 'sdxl', key: 'main-1', name: 'Zulu Main', type: 'main' }),
+    ];
+    const result = getModelPickerGroups(mixed, { modelTypes: ['main', 'lora'], searchTerm: '' });
+
+    expect(result.groups).toHaveLength(1);
+    expect(result.groups[0]?.models.map((m) => m.key)).toEqual(['main-1', 'lora-1']);
+  });
+
+  it('floats models related to the current selection to the top of their group', () => {
+    const related = [
+      createModel({ base: 'sdxl', key: 'aaa', name: 'Aaa', type: 'lora' }),
+      createModel({ base: 'sdxl', key: 'zzz', name: 'Zzz', type: 'lora' }),
+    ];
+    const result = getModelPickerGroups(related, {
+      modelTypes: ['lora'],
+      relatedKeys: new Set(['zzz']),
+      searchTerm: '',
+    });
+
+    expect(result.groups[0]?.models.map((m) => m.key)).toEqual(['zzz', 'aaa']);
   });
 
   it('filters visible models by the selected bases, empty set showing all', () => {
@@ -137,7 +164,8 @@ describe('getModelPickerGroups', () => {
       searchTerm: '',
     });
 
-    expect(all.groups.flatMap((group) => group.models.map((m) => m.key))).toEqual(['a', 'b', 'c', 'd']);
+    // Base display order, matching `availableBases`: sd-1, sdxl, flux, any.
+    expect(all.groups.flatMap((group) => group.models.map((m) => m.key))).toEqual(['c', 'a', 'b', 'd']);
   });
 
   it('exposes availableBases that stay stable across search and base filtering', () => {

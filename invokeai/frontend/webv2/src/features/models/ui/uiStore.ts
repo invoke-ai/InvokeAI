@@ -40,6 +40,8 @@ export interface ModelsUiSnapshot {
   queueExpanded: boolean;
   /** Scroll offsets per library-list instance, restored on remount. */
   libraryScrollOffsets: Record<string, number>;
+  /** Compact/full row density per picker id, remembered across opens. */
+  pickerCompactViews: Record<string, boolean>;
 }
 
 const createInitialModelsUiSnapshot = (): ModelsUiSnapshot => ({
@@ -48,6 +50,7 @@ const createInitialModelsUiSnapshot = (): ModelsUiSnapshot => ({
   filters: { ...DEFAULT_LIBRARY_FILTERS },
   hfLookup: null,
   libraryScrollOffsets: {},
+  pickerCompactViews: {},
   queueExpanded: false,
   scan: null,
   selectedKeys: new Set(),
@@ -118,6 +121,16 @@ export const saveLibraryScrollOffset = (instanceId: string, offset: number): voi
 
 export const getLibraryScrollOffset = (instanceId: string): number =>
   store.getSnapshot().libraryScrollOffsets[instanceId] ?? 0;
+
+/** Row density is a per-picker preference, so sibling pickers of a kind agree. */
+export const setPickerCompactView = (pickerId: string, isCompact: boolean): void => {
+  const snapshot = store.getSnapshot();
+
+  updateModelsUi({ pickerCompactViews: { ...snapshot.pickerCompactViews, [pickerId]: isCompact } });
+};
+
+export const getPickerCompactView = (pickerId: string): boolean =>
+  store.getSnapshot().pickerCompactViews[pickerId] ?? false;
 
 export const useModelsUiSelector = store.useSelector;
 
