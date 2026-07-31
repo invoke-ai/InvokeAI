@@ -49738,6 +49738,18 @@
             "description": "The name of conditioning tensor",
             "title": "Conditioning Name",
             "type": "string"
+          },
+          "mask": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TensorField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The mask associated with this conditioning tensor for regional prompting. Excluded regions should be set to False, included regions should be set to True."
           }
         },
         "required": ["conditioning_name"],
@@ -49845,7 +49857,7 @@
         "tags": ["conditioning", "krea2", "krea-2"],
         "title": "Conditioning Rebalance - Krea-2",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/Krea2ConditioningOutput"
         }
@@ -50124,7 +50136,7 @@
         "tags": ["image", "krea2", "krea-2"],
         "title": "Denoise - Krea-2",
         "type": "object",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -50615,7 +50627,7 @@
         "tags": ["conditioning", "krea2", "krea-2", "variance"],
         "title": "Seed Variance - Krea-2",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/Krea2ConditioningOutput"
         }
@@ -50668,6 +50680,22 @@
             "title": "Prompt",
             "ui_component": "textarea"
           },
+          "mask": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TensorField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A mask defining the image region that this conditioning prompt applies to.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
           "qwen3_vl_encoder": {
             "anyOf": [
               {
@@ -50696,7 +50724,7 @@
         "tags": ["prompt", "conditioning", "krea2", "krea-2"],
         "title": "Prompt - Krea-2",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/Krea2ConditioningOutput"
         }

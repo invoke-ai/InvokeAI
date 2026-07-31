@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 import torch
 
-from invokeai.app.invocations.fields import DenoiseMaskField, Krea2ConditioningField, LatentsField
+from invokeai.app.invocations.fields import DenoiseMaskField, Krea2ConditioningField, LatentsField, TensorField
 from invokeai.app.invocations.krea2_denoise import KREA2_LATENT_CHANNELS, Krea2DenoiseInvocation
 from invokeai.app.invocations.model import ModelIdentifierField, TransformerField
 from invokeai.backend.model_manager.taxonomy import BaseModelType, Krea2VariantType, ModelFormat, ModelType
@@ -189,23 +189,34 @@ def test_load_text_conditioning_concatenates_only_valid_tokens() -> None:
             conditionings=[Krea2ConditioningInfo(prompt_embeds=torch.full((1, 3, 12, 8), 2.0))]
         ),
     }
-    context = SimpleNamespace(conditioning=SimpleNamespace(load=lambda name: conditionings[name]))
+    regional_mask = torch.tensor([[1.0, 0.0], [1.0, 0.0]])
+    context = SimpleNamespace(
+        conditioning=SimpleNamespace(load=lambda name: conditionings[name]),
+        tensors=SimpleNamespace(load=lambda name: regional_mask if name == "region-mask" else None),
+    )
 
-    prompt_embeds, prompt_mask = invocation._load_text_conditioning(
+    extension = invocation._load_text_conditioning(
         context=context,
         conditioning_field=[
-            Krea2ConditioningField(conditioning_name="first"),
+            Krea2ConditioningField(conditioning_name="first", mask=TensorField(tensor_name="region-mask")),
             Krea2ConditioningField(conditioning_name="second"),
         ],
+        grid_height=1,
+        grid_width=2,
         dtype=torch.float32,
         device=torch.device("cpu"),
     )
+    prompt_embeds = extension.regional_text_conditioning.prompt_embeds
 
     assert prompt_embeds.shape == (1, 5, 12, 8)
     assert torch.equal(prompt_embeds[:, 0], torch.full((1, 12, 8), 1.0))
     assert torch.equal(prompt_embeds[:, 1], torch.full((1, 12, 8), 3.0))
     assert torch.equal(prompt_embeds[:, 2:], torch.full((1, 3, 12, 8), 2.0))
-    assert prompt_mask is None
+    assert torch.equal(
+        extension.regional_text_conditioning.image_masks[0],
+        torch.tensor([[[1.0, 0.0]]]),
+    )
+    assert extension.regional_text_conditioning.image_masks[1] is None
 
 
 def test_load_text_conditioning_compacts_a_single_masked_conditioning() -> None:
@@ -221,17 +232,23 @@ def test_load_text_conditioning_compacts_a_single_masked_conditioning() -> None:
             ]
         )
     }
-    context = SimpleNamespace(conditioning=SimpleNamespace(load=lambda name: conditionings[name]))
+    context = SimpleNamespace(
+        conditioning=SimpleNamespace(load=lambda name: conditionings[name]),
+        tensors=SimpleNamespace(load=lambda _name: None),
+    )
 
-    prompt_embeds, prompt_mask = invocation._load_text_conditioning(
+    extension = invocation._load_text_conditioning(
         context=context,
         conditioning_field=Krea2ConditioningField(conditioning_name="prompt"),
+        grid_height=1,
+        grid_width=1,
         dtype=torch.float32,
         device=torch.device("cpu"),
     )
+    prompt_embeds = extension.regional_text_conditioning.prompt_embeds
 
     assert torch.equal(prompt_embeds, embeds[:, [0, 2]])
-    assert prompt_mask is None
+    assert extension.get_attention_mask() is None
 
 
 def test_load_text_conditioning_preserves_none_when_all_masks_are_none() -> None:
@@ -240,20 +257,26 @@ def test_load_text_conditioning_preserves_none_when_all_masks_are_none() -> None
         "first": ConditioningFieldData(conditionings=[Krea2ConditioningInfo(prompt_embeds=torch.ones(1, 2, 12, 8))]),
         "second": ConditioningFieldData(conditionings=[Krea2ConditioningInfo(prompt_embeds=torch.ones(1, 3, 12, 8))]),
     }
-    context = SimpleNamespace(conditioning=SimpleNamespace(load=lambda name: conditionings[name]))
+    context = SimpleNamespace(
+        conditioning=SimpleNamespace(load=lambda name: conditionings[name]),
+        tensors=SimpleNamespace(load=lambda _name: None),
+    )
 
-    prompt_embeds, prompt_mask = invocation._load_text_conditioning(
+    extension = invocation._load_text_conditioning(
         context=context,
         conditioning_field=[
             Krea2ConditioningField(conditioning_name="first"),
             Krea2ConditioningField(conditioning_name="second"),
         ],
+        grid_height=1,
+        grid_width=1,
         dtype=torch.float32,
         device=torch.device("cpu"),
     )
 
+    prompt_embeds = extension.regional_text_conditioning.prompt_embeds
     assert prompt_embeds.shape == (1, 5, 12, 8)
-    assert prompt_mask is None
+    assert extension.get_attention_mask() is None
 
 
 def test_load_text_conditioning_rejects_an_empty_collection() -> None:
@@ -264,6 +287,8 @@ def test_load_text_conditioning_rejects_an_empty_collection() -> None:
         invocation._load_text_conditioning(
             context=context,
             conditioning_field=[],
+            grid_height=1,
+            grid_width=1,
             dtype=torch.float32,
             device=torch.device("cpu"),
         )
@@ -282,13 +307,27 @@ class _Scheduler:
 class _Transformer:
     def __init__(self) -> None:
         self.conditioning_values: list[float] = []
+        self.regional_attention_masks: list[torch.Tensor | None] = []
+        self.combined_sequence_lengths: list[int] = []
+        self.attn_processors = {
+            "text_fusion.layerwise_blocks.0.attn.processor": object(),
+            "transformer_blocks.0.attn.processor": object(),
+            "transformer_blocks.1.attn.processor": object(),
+        }
+        self.installed_processors = None
 
     def set_attn_processor(self, processor) -> None:
         # The real Krea2Transformer2DModel exposes this; denoise swaps in a memory-efficient attention processor.
-        pass
+        self.installed_processors = processor
 
     def __call__(self, *, hidden_states, encoder_hidden_states, **_kwargs):
         self.conditioning_values.append(float(encoder_hidden_states.mean()))
+        # The real transformer concatenates [text, image] before attention, so this is the sequence length a
+        # regional mask has to match.
+        self.combined_sequence_lengths.append(encoder_hidden_states.shape[1] + hidden_states.shape[1])
+        regional_processor = self.installed_processors["transformer_blocks.0.attn.processor"]
+        attention_mask = regional_processor.regional_prompting_state.attention_mask
+        self.regional_attention_masks.append(attention_mask.clone() if attention_mask is not None else None)
         return (torch.zeros_like(hidden_states),)
 
 
@@ -336,16 +375,18 @@ def _runtime_invocation(
     )
 
 
-def _runtime_context(tmp_path, transformer: _Transformer):
+def _runtime_context(tmp_path, transformer: _Transformer, *, negative_text_seq_len: int = 2):
     conditionings = {
         "positive": ConditioningFieldData(conditionings=[Krea2ConditioningInfo(prompt_embeds=torch.ones(1, 2, 12, 8))]),
         "negative": ConditioningFieldData(
-            conditionings=[Krea2ConditioningInfo(prompt_embeds=torch.zeros(1, 2, 12, 8))]
+            conditionings=[Krea2ConditioningInfo(prompt_embeds=torch.zeros(1, negative_text_seq_len, 12, 8))]
         ),
     }
     tensors = {
         "init": torch.zeros(1, KREA2_LATENT_CHANNELS, 2, 2),
         "mask": torch.zeros(1, 1, 16, 16),
+        "positive-region": torch.ones(1, 16, 16),
+        "negative-region": torch.zeros(1, 16, 16),
     }
     config = SimpleNamespace(format=ModelFormat.Checkpoint, variant=Krea2VariantType.Turbo)
     return SimpleNamespace(
@@ -400,6 +441,76 @@ def test_run_diffusion_treats_an_empty_negative_collection_as_absent(monkeypatch
     assert transformer.conditioning_values == [1.0, 1.0]
 
 
+def test_run_diffusion_switches_regional_masks_between_equal_length_cfg_conditionings(monkeypatch, tmp_path) -> None:
+    _patch_runtime(monkeypatch)
+    transformer = _Transformer()
+    invocation = _runtime_invocation(cfg_scale=2.0)
+    invocation.positive_conditioning = Krea2ConditioningField(
+        conditioning_name="positive", mask=TensorField(tensor_name="positive-region")
+    )
+    invocation.negative_conditioning = Krea2ConditioningField(
+        conditioning_name="negative", mask=TensorField(tensor_name="negative-region")
+    )
+
+    invocation._run_diffusion(_runtime_context(tmp_path, transformer))
+
+    positive_mask, negative_mask, positive_mask_second_step, negative_mask_second_step = (
+        transformer.regional_attention_masks
+    )
+    assert positive_mask is not None
+    assert negative_mask is not None
+    assert not torch.equal(positive_mask, negative_mask)
+    assert torch.equal(positive_mask, positive_mask_second_step)
+    assert torch.equal(negative_mask, negative_mask_second_step)
+    regional_processor = transformer.installed_processors["transformer_blocks.0.attn.processor"]
+    assert regional_processor.regional_prompting_state.attention_mask is None
+
+
+def test_run_diffusion_sizes_regional_masks_per_pass_when_cfg_lengths_differ(monkeypatch, tmp_path) -> None:
+    # The positive and negative prompts tokenize independently, so each pass needs a mask sized for its own
+    # text sequence. A mask carried over from the other pass would trip the processor's shape guard.
+    _patch_runtime(monkeypatch)
+    transformer = _Transformer()
+    invocation = _runtime_invocation(cfg_scale=2.0)
+    invocation.positive_conditioning = Krea2ConditioningField(
+        conditioning_name="positive", mask=TensorField(tensor_name="positive-region")
+    )
+    invocation.negative_conditioning = Krea2ConditioningField(
+        conditioning_name="negative", mask=TensorField(tensor_name="negative-region")
+    )
+
+    invocation._run_diffusion(_runtime_context(tmp_path, transformer, negative_text_seq_len=5))
+
+    # width=height=16 -> 2x2 latent -> a single 2x2 patch, so image_seq_len is 1.
+    assert transformer.combined_sequence_lengths == [3, 6, 3, 6]
+    assert [tuple(mask.shape) for mask in transformer.regional_attention_masks] == [(3, 3), (6, 6), (3, 3), (6, 6)]
+    for mask, sequence_length in zip(
+        transformer.regional_attention_masks, transformer.combined_sequence_lengths, strict=True
+    ):
+        assert mask.shape == (sequence_length, sequence_length)
+
+
+def test_run_diffusion_releases_regional_mask_when_transformer_raises(monkeypatch, tmp_path) -> None:
+    _patch_runtime(monkeypatch)
+
+    class _FailingTransformer(_Transformer):
+        def __call__(self, **kwargs):
+            super().__call__(**kwargs)
+            raise RuntimeError("transformer failure")
+
+    transformer = _FailingTransformer()
+    invocation = _runtime_invocation(cfg_scale=1.0)
+    invocation.positive_conditioning = Krea2ConditioningField(
+        conditioning_name="positive", mask=TensorField(tensor_name="positive-region")
+    )
+
+    with pytest.raises(RuntimeError, match="transformer failure"):
+        invocation._run_diffusion(_runtime_context(tmp_path, transformer))
+
+    regional_processor = transformer.installed_processors["transformer_blocks.0.attn.processor"]
+    assert regional_processor.regional_prompting_state.attention_mask is None
+
+
 def test_run_diffusion_reaches_masked_denoising_merge(monkeypatch, tmp_path) -> None:
     _patch_runtime(monkeypatch)
     transformer = _Transformer()
@@ -432,6 +543,8 @@ def test_run_diffusion_uses_per_prompt_position_ids_when_lengths_differ(monkeypa
     image_seq_len = 1  # width=height=16 -> 2x2 latent -> a single 2x2 patch
 
     class _PositionIdChecker:
+        attn_processors = {"transformer_blocks.0.attn.processor": object()}
+
         def set_attn_processor(self, processor) -> None:
             pass
 
@@ -617,3 +730,30 @@ def test_estimate_working_memory_accounts_for_the_longest_text_conditioning() ->
 
     assert long_positive > short_text
     assert long_negative == long_positive
+
+
+def test_estimate_working_memory_accounts_for_regional_attention_masks() -> None:
+    inv = Krea2DenoiseInvocation.model_construct(transformer=SimpleNamespace(loras=[]))
+
+    without_regional_masks = inv._estimate_working_memory(
+        image_seq_len=3600, positive_text_seq_len=64, negative_text_seq_len=32, do_cfg=True, num_loras=0
+    )
+    with_regional_masks = inv._estimate_working_memory(
+        image_seq_len=3600,
+        positive_text_seq_len=64,
+        negative_text_seq_len=32,
+        do_cfg=True,
+        num_loras=0,
+        regional_attention_mask_bytes=1234,
+    )
+
+    assert with_regional_masks == without_regional_masks + 1234
+
+
+def test_regional_attention_memory_includes_masks_build_scratch_and_dtype_sized_attention_bias() -> None:
+    positive = SimpleNamespace(attention_mask_numel=120, attention_mask_build_scratch_numel=40)
+    negative = SimpleNamespace(attention_mask_numel=100, attention_mask_build_scratch_numel=40)
+
+    assert Krea2DenoiseInvocation._regional_attention_mask_bytes(positive, negative, torch.bfloat16) == 500
+    assert Krea2DenoiseInvocation._regional_attention_mask_bytes(positive, negative, torch.float32) == 740
+    assert Krea2DenoiseInvocation._regional_attention_mask_bytes(positive, None, torch.bfloat16) == 400

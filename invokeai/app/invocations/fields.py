@@ -389,6 +389,11 @@ class Krea2ConditioningField(BaseModel):
     """A Krea-2 conditioning tensor primitive value"""
 
     conditioning_name: str = Field(description="The name of conditioning tensor")
+    mask: Optional[TensorField] = Field(
+        default=None,
+        description="The mask associated with this conditioning tensor for regional prompting. "
+        "Excluded regions should be set to False, included regions should be set to True.",
+    )
 
 
 class AnimaConditioningField(BaseModel):

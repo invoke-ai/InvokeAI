@@ -20,7 +20,7 @@ _NUM_TEXT_LAYERS = len(KREA2_SELECT_LAYERS)  # 12
     title="Conditioning Rebalance - Krea-2",
     tags=["conditioning", "krea2", "krea-2"],
     category="conditioning",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
 class Krea2ConditioningRebalanceInvocation(BaseInvocation):
@@ -76,4 +76,4 @@ class Krea2ConditioningRebalanceInvocation(BaseInvocation):
             ]
         )
         conditioning_name = context.conditioning.save(new_data)
-        return Krea2ConditioningOutput.build(conditioning_name)
+        return Krea2ConditioningOutput.build(conditioning_name, mask=self.conditioning.mask)
