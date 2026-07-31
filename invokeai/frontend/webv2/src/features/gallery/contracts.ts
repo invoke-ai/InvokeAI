@@ -54,4 +54,8 @@ export {
   type GalleryQueuePlaceholder,
   type GallerySelectedImageQuery,
 } from './ui/galleryStateView';
-export { getSelectedGalleryImageFromValues, getSelectedGalleryItemFromValues } from './core/selection';
+export {
+  getPersistedSelectedGalleryItemKeys,
+  getSelectedGalleryImageFromValues,
+  getSelectedGalleryItemFromValues,
+} from './core/selection';

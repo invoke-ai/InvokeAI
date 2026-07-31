@@ -31,14 +31,14 @@ const toErrorMessage = (error: unknown): string => (error instanceof Error ? err
 
 export const useGalleryActions = ({
   boards,
+  getCurrentGalleryLocation,
   loadMore,
-  galleryView,
   projectBoardId,
   projectName,
   selectedBoardId,
 }: {
   boards: GalleryBoard[];
-  galleryView: GalleryView;
+  getCurrentGalleryLocation: () => { galleryView: GalleryView; selectedBoardId: string };
   loadMore: () => void;
   projectBoardId: string | null;
   projectName: string;
@@ -253,6 +253,7 @@ export const useGalleryActions = ({
 
         try {
           const targetBoardId = getBoard(selectedBoardId)?.kind === 'board' ? selectedBoardId : 'none';
+          const targetBoardName = getBoardName(selectedBoardId);
           const imageUploads = accepted.filter((upload) => upload.kind === 'image');
           const videoUploads = accepted.filter((upload) => upload.kind === 'video');
           const imageResultsPromise = Promise.allSettled(
@@ -301,10 +302,11 @@ export const useGalleryActions = ({
             return;
           }
 
+          const currentGalleryLocation = getCurrentGalleryLocation();
           const visibleUploads = uploadedItems.filter(
             (item) =>
-              item.boardId === targetBoardId &&
-              (galleryView === 'images'
+              item.boardId === currentGalleryLocation.selectedBoardId &&
+              (currentGalleryLocation.galleryView === 'images'
                 ? item.category === 'general'
                 : item.category === 'control' || item.category === 'mask' || item.category === 'user')
           );
@@ -321,7 +323,7 @@ export const useGalleryActions = ({
           refresh();
 
           const summary = t('widgets.gallery.uploadSummary', {
-            board: getBoardName(selectedBoardId),
+            board: targetBoardName,
             failed: failedCount,
             images: formatImageCount(uploadedImages.length),
             videos: formatVideoCount(uploadedVideos.length),
@@ -349,7 +351,7 @@ export const useGalleryActions = ({
   }, [
     boards,
     gallery,
-    galleryView,
+    getCurrentGalleryLocation,
     loadMore,
     notifications,
     projectBoardId,

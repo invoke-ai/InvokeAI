@@ -5,7 +5,9 @@ import {
   isGalleryImageItem,
   legacyGeneratedImageToGalleryItem,
   parseGalleryItemKey,
+  toGalleryItemKey,
   type GalleryItem,
+  type GalleryItemKey,
 } from './items';
 
 const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === 'object';
@@ -73,4 +75,22 @@ export const getSelectedGalleryImageFromValues = (galleryValues: Record<string, 
   const item = getSelectedGalleryItemFromValues(galleryValues);
 
   return item && isGalleryImageItem(item) ? galleryImageItemToGalleryImage(item) : null;
+};
+
+const canonicalizePersistedItemKey = (key: string): GalleryItemKey => toGalleryItemKey(parseGalleryItemKey(key));
+
+export const getPersistedSelectedGalleryItemKeys = (galleryValues: Record<string, unknown>): GalleryItemKey[] => {
+  if (Array.isArray(galleryValues.selectedImageNames)) {
+    return (galleryValues.selectedImageNames as unknown[])
+      .filter((name): name is string => typeof name === 'string')
+      .map(canonicalizePersistedItemKey);
+  }
+
+  if (typeof galleryValues.selectedImageName === 'string') {
+    return [canonicalizePersistedItemKey(galleryValues.selectedImageName)];
+  }
+
+  const selectedItem = getSelectedGalleryItemFromValues(galleryValues);
+
+  return selectedItem ? [toGalleryItemKey(selectedItem)] : [];
 };

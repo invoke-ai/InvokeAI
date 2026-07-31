@@ -52,14 +52,12 @@ export interface GalleryCommandsPort {
   setCompareItem(image: GalleryImageItem | null): void;
   setCompareImage(image: GalleryImage | null): void;
   setItemMultiSelection(itemKeys: GalleryItemKey[], primaryItem: GalleryItem): void;
-  setMultiSelection(imageNames: string[], primaryImage: GalleryImage): void;
   setPage(page: number): void;
   setPageInfo(totalImages: number): void;
   setProjectBoard(boardId: string): void;
   setSearchTerm(searchTerm: string): void;
   setView(view: GalleryView): void;
   toggleItemSelection(item: GalleryItem, nextPrimaryItem: GalleryItem | null): void;
-  toggleImageSelection(image: GalleryImage, nextPrimaryItem: GalleryItem | null): void;
   updateSettings(settings: Partial<GallerySettings>): void;
 }
 

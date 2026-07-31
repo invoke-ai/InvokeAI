@@ -3,7 +3,7 @@ import type { GalleryUiAdapter } from '@features/gallery/react';
 import { GalleryUiProvider } from '@features/gallery/react';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, createRef, type Ref, type ReactNode, useImperativeHandle } from 'react';
+import { act, createRef, type Ref, type ReactNode, useCallback, useImperativeHandle, useRef } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -104,6 +104,12 @@ const Probe = ({
   ref: Ref<GalleryActions>;
   selectedBoardId: string;
 }) => {
+  const currentGalleryLocationRef = useRef({ galleryView, selectedBoardId });
+
+  // Match GalleryWidgetView's render-assigned live-read port.
+  // eslint-disable-next-line react/react-compiler
+  currentGalleryLocationRef.current = { galleryView, selectedBoardId };
+  const getCurrentGalleryLocation = useCallback(() => currentGalleryLocationRef.current, []);
   const actions = useGalleryActions({
     boards: [
       {
@@ -120,7 +126,7 @@ const Probe = ({
     projectBoardId: null,
     projectName: 'Project',
     selectedBoardId,
-    galleryView,
+    getCurrentGalleryLocation,
   });
 
   useImperativeHandle(ref, () => actions, [actions]);
@@ -144,13 +150,11 @@ const adapter: GalleryUiAdapter = {
     setCompareImage: noop,
     setCompareItem: noop,
     setItemMultiSelection,
-    setMultiSelection: noop,
     setPage: noop,
     setPageInfo: noop,
     setProjectBoard: noop,
     setSearchTerm: noop,
     setView: noop,
-    toggleImageSelection: noop,
     toggleItemSelection: noop,
     updateSettings: noop,
   },
@@ -425,6 +429,73 @@ describe('mixed gallery upload', () => {
     expect(selectItem).toHaveBeenCalledWith(
       expect.objectContaining({ kind: 'image', name: 'newer.png', category: 'user' })
     );
+  });
+
+  it('does not select an upload from the launch board after the active board changes in flight', async () => {
+    let resolveUpload: ((value: ReturnType<typeof imageUpload>) => void) | undefined;
+    mocks.uploadGalleryImage.mockReturnValueOnce(
+      new Promise<ReturnType<typeof imageUpload>>((resolve) => {
+        resolveUpload = resolve;
+      })
+    );
+
+    let upload: Promise<void> | undefined;
+    act(() => {
+      upload = actionsRef.current?.uploadFiles([new File(['image'], 'photo.png', { type: 'image/png' })]);
+    });
+
+    await vi.waitFor(() => {
+      expect(mocks.uploadGalleryImage).toHaveBeenCalledOnce();
+    });
+    expect(mocks.uploadGalleryImage).toHaveBeenCalledWith(
+      expect.any(File),
+      'board-1',
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
+
+    selectedBoardId = 'none';
+    await renderProbe();
+    resolveUpload?.(imageUpload('photo.png', '2026-07-30T12:00:04.000Z'));
+
+    await act(async () => {
+      await upload;
+    });
+
+    expect(selectItem).not.toHaveBeenCalled();
+    expect(mocks.invalidateGallery).toHaveBeenCalledOnce();
+    expect(mocks.notificationsAdd).toHaveBeenCalledOnce();
+  });
+
+  it('does not select an upload hidden by a view change while the upload is in flight', async () => {
+    galleryView = 'assets';
+    await renderProbe();
+    let resolveUpload: ((value: ReturnType<typeof imageUpload>) => void) | undefined;
+    mocks.uploadGalleryImage.mockReturnValueOnce(
+      new Promise<ReturnType<typeof imageUpload>>((resolve) => {
+        resolveUpload = resolve;
+      })
+    );
+
+    let upload: Promise<void> | undefined;
+    act(() => {
+      upload = actionsRef.current?.uploadFiles([new File(['image'], 'photo.png', { type: 'image/png' })]);
+    });
+
+    await vi.waitFor(() => {
+      expect(mocks.uploadGalleryImage).toHaveBeenCalledOnce();
+    });
+
+    galleryView = 'images';
+    await renderProbe();
+    resolveUpload?.(imageUpload('photo.png', '2026-07-30T12:00:04.000Z'));
+
+    await act(async () => {
+      await upload;
+    });
+
+    expect(selectItem).not.toHaveBeenCalled();
+    expect(mocks.invalidateGallery).toHaveBeenCalledOnce();
+    expect(mocks.notificationsAdd).toHaveBeenCalledOnce();
   });
 
   it('reports unsupported and rejected files once without aborting supported uploads', async () => {

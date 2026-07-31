@@ -42,6 +42,7 @@ import type {
 
 import {
   getBoundedRecentImages,
+  getPersistedSelectedGalleryItemKeys,
   getGallerySettings,
   getSelectedGalleryItemFromValues,
   legacyGeneratedImageToGalleryItem,
@@ -707,22 +708,6 @@ const getGalleryImages = (values: Record<string, unknown>): GeneratedImageContra
   getBoundedRecentImages(values.recentImages);
 
 const canonicalizeGalleryItemKey = (key: string): GalleryItemKey => toGalleryItemKey(parseGalleryItemKey(key));
-
-const getGallerySelectedItemKeys = (values: Record<string, unknown>): GalleryItemKey[] => {
-  if (Array.isArray(values.selectedImageNames)) {
-    return (values.selectedImageNames as unknown[])
-      .filter((name): name is string => typeof name === 'string')
-      .map(canonicalizeGalleryItemKey);
-  }
-
-  if (typeof values.selectedImageName === 'string') {
-    return [canonicalizeGalleryItemKey(values.selectedImageName)];
-  }
-
-  const selectedItem = getSelectedGalleryItemFromValues(values);
-
-  return selectedItem ? [toGalleryItemKey(selectedItem)] : [];
-};
 
 const getGalleryItemFromPersistedValue = (values: Record<string, unknown>, value: unknown): GalleryItem | null =>
   getSelectedGalleryItemFromValues({
@@ -1898,7 +1883,7 @@ const removeGalleryItemsFromAllProjects = (
       const compareImage = values.compareImage;
       const selectedImageName = typeof values.selectedImageName === 'string' ? values.selectedImageName : null;
       const recentImages = getGalleryImages(values);
-      const selectedItemKeys = getGallerySelectedItemKeys(values);
+      const selectedItemKeys = getPersistedSelectedGalleryItemKeys(values);
       const selectedItem = getGalleryItemFromPersistedValue(values, selectedImage);
       const compareItem = getGalleryItemFromPersistedValue(values, compareImage);
       const selectedImageKey = selectedItem ? toGalleryItemKey(selectedItem) : null;
@@ -2104,7 +2089,9 @@ const updateGalleryWithResultImages = (project: Project, images: GeneratedImageC
     recentImages: getBoundedRecentImages([...newImages, ...previousImages]),
     selectedImage: nextSelectedItem ?? galleryValues.selectedImage,
     selectedImageName: nextSelectedItemKey ?? galleryValues.selectedImageName,
-    selectedImageNames: nextSelectedItemKey ? [nextSelectedItemKey] : getGallerySelectedItemKeys(galleryValues),
+    selectedImageNames: nextSelectedItemKey
+      ? [nextSelectedItemKey]
+      : getPersistedSelectedGalleryItemKeys(galleryValues),
     ...(nextSelectedImage
       ? {
           selectedImagePage: 0,
@@ -3107,7 +3094,7 @@ export const __workbenchReducerInternal = (
         state,
         (values) => {
           const itemKey = toGalleryItemKey(action.item);
-          const selectedItemKeys = getGallerySelectedItemKeys(values);
+          const selectedItemKeys = getPersistedSelectedGalleryItemKeys(values);
 
           if (!selectedItemKeys.includes(itemKey)) {
             const settings = getGallerySettings(values);

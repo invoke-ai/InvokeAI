@@ -3,7 +3,6 @@ import type { Project, WorkbenchState } from '@workbench/projectContracts';
 
 import {
   legacyGeneratedImageToGalleryItem,
-  toGalleryItemKey,
   type GalleryImage,
   type GeneratedImageContract,
 } from '@features/gallery/contracts';
@@ -102,18 +101,6 @@ const createCommands = (dispatch: WorkbenchDispatch, getState: () => WorkbenchSt
         'reconcileDeletedGalleryBoard',
         (outcome: ActionPayload<'reconcileDeletedGalleryBoard'>['outcome']) => ({ outcome })
       ),
-      /** TODO(Task 7): Remove these image adapters with the mixed-media action port. */
-      patchImages: (imageNames: string[], changes: ActionPayload<'patchGalleryItems'>['changes']): void =>
-        dispatch({
-          changes,
-          itemKeys: imageNames.map((name) => toGalleryItemKey({ kind: 'image', name })),
-          type: 'patchGalleryItems',
-        }),
-      removeImages: (imageNames: string[]): void =>
-        dispatch({
-          itemKeys: imageNames.map((name) => toGalleryItemKey({ kind: 'image', name })),
-          type: 'removeGalleryItems',
-        }),
       selectItem: command(
         'selectGalleryItem',
         (
@@ -174,28 +161,6 @@ const createCommands = (dispatch: WorkbenchDispatch, getState: () => WorkbenchSt
           image: image ? legacyGeneratedImageToGalleryItem(image) : null,
           projectId,
           type: 'setGalleryCompareImage',
-        }),
-      setMultiSelection: (
-        imageNames: string[],
-        primaryImage: GeneratedImageContract & Partial<GalleryImage>,
-        projectId?: string
-      ): void =>
-        dispatch({
-          itemKeys: imageNames.map((name) => toGalleryItemKey({ kind: 'image', name })),
-          primaryItem: legacyGeneratedImageToGalleryItem(primaryImage),
-          projectId,
-          type: 'setGalleryMultiSelection',
-        }),
-      toggleImageSelection: (
-        image: GeneratedImageContract & Partial<GalleryImage>,
-        nextPrimaryItem: ActionPayload<'toggleGalleryItemInSelection'>['nextPrimaryItem'],
-        projectId?: string
-      ): void =>
-        dispatch({
-          item: legacyGeneratedImageToGalleryItem(image),
-          nextPrimaryItem,
-          projectId,
-          type: 'toggleGalleryItemInSelection',
         }),
       selectBoard: command('selectGalleryBoard', (boardId: string, projectId?: string) => ({ boardId, projectId })),
       setPage: command('setGalleryPage', (page: number, projectId?: string) => ({ page, projectId })),

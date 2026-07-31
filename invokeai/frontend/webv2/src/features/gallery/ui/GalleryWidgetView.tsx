@@ -105,6 +105,7 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
     [data.filter, queryClient]
   );
   const itemActionContextRef = useRef<GalleryItemActionContext | null>(null);
+  const galleryLocationRef = useRef({ galleryView, selectedBoardId });
 
   // This ref is a live read port for an in-flight deletion. An effect would
   // leave a commit-sized stale window, while the action must compare against
@@ -116,12 +117,18 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
     loadOrderedRefs: loadOrderedItemRefs,
     selectedItemKey: gallery.selectedItemKey,
   };
+  // This is the matching live read port for in-flight uploads. The upload
+  // target is captured at launch, while completion visibility must use the
+  // board and view from the latest render.
+  // eslint-disable-next-line react/react-compiler
+  galleryLocationRef.current = { galleryView, selectedBoardId };
 
   const getItemActionContext = useCallback(() => itemActionContextRef.current, []);
+  const getCurrentGalleryLocation = useCallback(() => galleryLocationRef.current, []);
 
   const actions = useGalleryActions({
     boards: data.boards,
-    galleryView,
+    getCurrentGalleryLocation,
     loadMore,
     projectBoardId: getGalleryProjectBoardId(galleryValues),
     projectName,

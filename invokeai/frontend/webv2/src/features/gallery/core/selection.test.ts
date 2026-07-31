@@ -46,11 +46,14 @@ const videoItem: GalleryVideoItem = {
 };
 
 type SelectionModule = typeof selection & {
+  getPersistedSelectedGalleryItemKeys?: (values: Record<string, unknown>) => string[];
   getSelectedGalleryItemFromValues?: (values: Record<string, unknown>) => GalleryItem | null;
 };
 
 const getSelectedGalleryItemFromValues = (values: Record<string, unknown>): GalleryItem | null | undefined =>
   (selection as SelectionModule).getSelectedGalleryItemFromValues?.(values);
+const getPersistedSelectedGalleryItemKeys = (values: Record<string, unknown>): string[] | undefined =>
+  (selection as SelectionModule).getPersistedSelectedGalleryItemKeys?.(values);
 
 describe('persisted Gallery selection readers', () => {
   it('returns a canonical selected image item unchanged', () => {
@@ -120,5 +123,23 @@ describe('persisted Gallery selection readers', () => {
       thumbnailUrl: imageItem.thumbnailUrl,
       width: imageItem.width,
     });
+  });
+
+  it('canonicalizes qualified and bare keys from a persisted multi-selection', () => {
+    expect(
+      getPersistedSelectedGalleryItemKeys({
+        selectedImageNames: ['video:clip.mp4', 'legacy.png', 'image:a:b.png', 42],
+        selectedImageName: 'ignored.png',
+        selectedImage: videoItem,
+      })
+    ).toEqual(['video:clip.mp4', 'image:legacy.png', 'image:a:b.png']);
+  });
+
+  it('falls back to the legacy singular persisted selection key', () => {
+    expect(getPersistedSelectedGalleryItemKeys({ selectedImageName: 'legacy.png' })).toEqual(['image:legacy.png']);
+  });
+
+  it('falls back to the canonical selected item object when persisted keys are absent', () => {
+    expect(getPersistedSelectedGalleryItemKeys({ selectedImage: videoItem })).toEqual(['video:shared']);
   });
 });

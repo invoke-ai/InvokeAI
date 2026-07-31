@@ -3,13 +3,16 @@ import type { QueueItem } from '@features/queue/contracts';
 
 import {
   legacyGeneratedImageToGalleryItem,
-  parseGalleryItemKey,
   toGalleryItemKey,
   type GalleryItem,
   type GalleryItemKey,
 } from '@features/gallery/core/items';
 import { getBoundedRecentImages } from '@features/gallery/core/recentImages';
-import { getSelectedGalleryImageFromValues, getSelectedGalleryItemFromValues } from '@features/gallery/core/selection';
+import {
+  getPersistedSelectedGalleryItemKeys,
+  getSelectedGalleryImageFromValues,
+  getSelectedGalleryItemFromValues,
+} from '@features/gallery/core/selection';
 import { getGallerySettings, type GallerySettings } from '@features/gallery/core/settings';
 import { getQueueItemSnapshotBatchCount, getQueueItemSnapshotDimensions } from '@features/queue/contracts';
 
@@ -227,24 +230,6 @@ export const getGallerySelectedBoardId = (values: Record<string, unknown>, backe
   return 'none';
 };
 
-const canonicalizePersistedItemKey = (key: string): GalleryItemKey => toGalleryItemKey(parseGalleryItemKey(key));
-
-export const getGallerySelectedItemKeys = (values: Record<string, unknown>): GalleryItemKey[] => {
-  if (Array.isArray(values.selectedImageNames)) {
-    return (values.selectedImageNames as unknown[])
-      .filter((name): name is string => typeof name === 'string')
-      .map(canonicalizePersistedItemKey);
-  }
-
-  if (typeof values.selectedImageName === 'string') {
-    return [canonicalizePersistedItemKey(values.selectedImageName)];
-  }
-
-  const selectedItem = getSelectedGalleryItemFromValues(values);
-
-  return selectedItem ? [toGalleryItemKey(selectedItem)] : [];
-};
-
 export const getGalleryPage = (values: Record<string, unknown>): number =>
   typeof values.galleryPage === 'number' && Number.isFinite(values.galleryPage)
     ? Math.max(0, Math.floor(values.galleryPage))
@@ -364,7 +349,7 @@ export const getGalleryStateView = (
   const selectedItem = getSelectedGalleryItemFromValues(values);
   const persistedSelectedItemKey =
     typeof values.selectedImageName === 'string'
-      ? canonicalizePersistedItemKey(values.selectedImageName)
+      ? (getPersistedSelectedGalleryItemKeys({ selectedImageName: values.selectedImageName })[0] ?? null)
       : selectedItem
         ? toGalleryItemKey(selectedItem)
         : null;
@@ -372,7 +357,7 @@ export const getGalleryStateView = (
     persistedSelectedItemKey && items.some((item) => toGalleryItemKey(item) === persistedSelectedItemKey)
       ? persistedSelectedItemKey
       : null;
-  const selectedItemKeys = getGallerySelectedItemKeys(values);
+  const selectedItemKeys = getPersistedSelectedGalleryItemKeys(values);
   const galleryView = getGalleryView(values);
   const settings = getGallerySettings(values);
   const searchTerm = getGallerySearchTerm(values);
