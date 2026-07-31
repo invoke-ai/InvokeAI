@@ -21,6 +21,11 @@ export interface QueueUiAdapter {
   isConnected: boolean;
   notify: QueueUiNotificationPort;
   openQueue(): void;
+  /**
+   * Warms the `ItemActions` chunk ahead of the first expand. Optional: an
+   * adapter that supplies `ItemActions` eagerly has nothing to preload.
+   */
+  preloadItemActions?(): void;
   queueJobsScope: 'active-project' | 'all';
 }
 
