@@ -15,7 +15,7 @@ from pydantic import (
 )
 from pydantic_core import to_jsonable_python
 
-from invokeai.app.invocations.fields import ImageField
+from invokeai.app.invocations.fields import ImageField, VideoField
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState, NodeNotFoundError
 from invokeai.app.services.workflow_records.workflow_records_common import (
     WorkflowWithoutID,
@@ -51,7 +51,7 @@ class SessionQueueItemNotFoundError(ValueError):
 
 # region Batch
 
-BatchScalarDataType = Union[StrictStr, float, int, ImageField]
+BatchScalarDataType = Union[StrictStr, float, int, ImageField, VideoField]
 BatchDataType = Union[BatchScalarDataType, list[BatchScalarDataType]]
 
 
@@ -262,6 +262,10 @@ class SessionQueueItem(BaseModel):
     )
     retried_from_item_id: Optional[int] = Field(
         default=None, description="The item_id of the queue item that this item was retried from"
+    )
+    device: Optional[str] = Field(
+        default=None,
+        description="The device that processed this queue item, e.g. 'cuda:1' (set only when running on a CUDA GPU)",
     )
     workflow_call_id: Optional[str] = Field(
         default=None, description="The active workflow-call relationship id when this queue item is a child execution."

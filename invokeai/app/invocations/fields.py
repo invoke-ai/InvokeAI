@@ -141,6 +141,7 @@ class UIComponent(str, Enum, metaclass=MetaEnum):
     None_ = "none"
     Textarea = "textarea"
     Slider = "slider"
+    VideoFrameIndex = "video-frame-index"
 
 
 class FieldDescriptions:
@@ -156,6 +157,7 @@ class FieldDescriptions:
     t5_encoder = "T5 tokenizer and text encoder"
     glm_encoder = "GLM (THUDM) tokenizer and text encoder"
     qwen3_encoder = "Qwen3 tokenizer and text encoder"
+    qwen3_vl_encoder = "Qwen3-VL tokenizer and text encoder"
     clip_embed_model = "CLIP Embed loader"
     clip_g_model = "CLIP-G Embed loader"
     unet = "UNet (scheduler, LoRAs)"
@@ -172,8 +174,12 @@ class FieldDescriptions:
     sd3_model = "SD3 model (MMDiTX) to load"
     cogview4_model = "CogView4 model (Transformer) to load"
     z_image_model = "Z-Image model (Transformer) to load"
+    krea2_model = "Krea-2 model (Transformer) to load"
     qwen_image_model = "Qwen Image Edit model (Transformer) to load"
     qwen_vl_encoder = "Qwen2.5-VL tokenizer, processor and text/vision encoder"
+    wan_model = "Wan 2.2 model (Transformer) to load"
+    wan_t5_encoder = "UMT5-XXL tokenizer and text encoder for Wan 2.2"
+    wan_ref_image = "Reference-image (VAE-latent) conditioning for Wan 2.2 I2V."
     sdxl_main_model = "SDXL Main model (UNet, VAE, CLIP1, CLIP2) to load"
     sdxl_refiner_model = "SDXL Refiner Main Modde (UNet, VAE, CLIP2) to load"
     onnx_main_model = "ONNX Main model (UNet, VAE, CLIP) to load"
@@ -247,6 +253,12 @@ class FileField(BaseModel):
     file_id: str = Field(description="The id of the managed file")
 
 
+class VideoField(BaseModel):
+    """A video primitive field"""
+
+    video_name: str = Field(description="The name of the video")
+
+
 class BoardField(BaseModel):
     """A board primitive field"""
 
@@ -257,6 +269,12 @@ class StylePresetField(BaseModel):
     """A style preset primitive field"""
 
     style_preset_id: str = Field(description="The id of the style preset")
+
+
+class SystemPromptField(BaseModel):
+    """A system prompt primitive field"""
+
+    system_prompt_id: str = Field(description="The id of the system prompt")
 
 
 class DenoiseMaskField(BaseModel):
@@ -350,8 +368,26 @@ class ZImageConditioningField(BaseModel):
     )
 
 
+class ErnieImageConditioningField(BaseModel):
+    """An ERNIE-Image conditioning tensor primitive value."""
+
+    conditioning_name: str = Field(description="The name of conditioning tensor")
+
+
+class Ideogram4ConditioningField(BaseModel):
+    """An Ideogram 4 conditioning tensor primitive value"""
+
+    conditioning_name: str = Field(description="The name of conditioning tensor")
+
+
 class QwenImageConditioningField(BaseModel):
     """A Qwen Image Edit conditioning tensor primitive value"""
+
+    conditioning_name: str = Field(description="The name of conditioning tensor")
+
+
+class Krea2ConditioningField(BaseModel):
+    """A Krea-2 conditioning tensor primitive value"""
 
     conditioning_name: str = Field(description="The name of conditioning tensor")
 
@@ -368,6 +404,39 @@ class AnimaConditioningField(BaseModel):
         default=None,
         description="The mask associated with this conditioning tensor for regional prompting. "
         "Excluded regions should be set to False, included regions should be set to True.",
+    )
+
+
+class WanConditioningField(BaseModel):
+    """A Wan 2.2 conditioning tensor primitive value.
+
+    Wan conditioning is the UMT5-XXL hidden state for the prompt plus an attention
+    mask marking valid (non-padding) tokens.
+    """
+
+    conditioning_name: str = Field(description="The name of conditioning tensor")
+
+
+class WanRefImageConditioningField(BaseModel):
+    """Reference-image conditioning for Wan 2.2 I2V.
+
+    Carries the 20-channel VAE-latent condition tensor (4-channel first-frame
+    mask + 16-channel ref-image latents). The denoise loop concatenates this
+    to the 16-channel noise latents along the channel dim each step, producing
+    the 36-channel input the I2V-A14B transformer expects.
+
+    Also carries the spatial dims and frame count used to encode the image so
+    the denoise node can sanity-check the user's width/height/num_frames — a
+    latent temporal-dim mismatch is hard to debug from the downstream error.
+    """
+
+    condition_tensor_name: str = Field(description="Name of the saved [1, 20, T_lat, H/8, W/8] condition tensor.")
+    width: int = Field(description="Image width used during VAE encoding (matches denoise width).")
+    height: int = Field(description="Image height used during VAE encoding (matches denoise height).")
+    num_frames: int = Field(
+        default=1,
+        description="Pixel-frame count the condition was built for. 1 for single-frame I2V "
+        "(image output), 81+ for video.",
     )
 
 

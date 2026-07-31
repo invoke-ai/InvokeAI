@@ -1,6 +1,7 @@
 # Copyright (c) 2023 Lincoln D. Stein
 """FastAPI route for model configuration records."""
 
+import asyncio
 import contextlib
 import io
 import pathlib
@@ -19,7 +20,7 @@ from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field
 from starlette.exceptions import HTTPException
 from typing_extensions import Annotated
 
-from invokeai.app.api.auth_dependencies import AdminUserOrDefault
+from invokeai.app.api.auth_dependencies import AdminUserOrDefault, CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.model_images.model_images_common import ModelImageFileNotFoundException
 from invokeai.app.services.model_install.model_install_common import ModelInstallJob
@@ -41,6 +42,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_SDXLRefiner_Config,
 )
 from invokeai.backend.model_manager.load.model_cache.cache_stats import CacheStats
+from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
 from invokeai.backend.model_manager.metadata.fetch.huggingface import HuggingFaceMetadataFetch
 from invokeai.backend.model_manager.metadata.metadata_base import ModelMetadataWithFiles, UnknownMetadataException
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
@@ -155,6 +157,7 @@ example_model_input = {
     operation_id="list_model_records",
 )
 async def list_model_records(
+    current_user: CurrentUserOrDefault,
     base_models: Optional[List[BaseModelType]] = Query(default=None, description="Base models to include"),
     model_type: Optional[ModelType] = Query(default=None, description="The type of model to get"),
     model_name: Optional[str] = Query(default=None, description="Exact match on the name of the model"),
@@ -199,11 +202,14 @@ async def list_model_records(
     operation_id="list_missing_models",
     responses={200: {"description": "List of models with missing files"}},
 )
-async def list_missing_models() -> ModelsList:
+async def list_missing_models(current_user: CurrentUserOrDefault) -> ModelsList:
     """Get models whose files are missing from disk.
 
     These are models that have database entries but their corresponding
     weight files have been deleted externally (not via Model Manager).
+
+    Available to any authenticated user, not just admins: the frontend's model hooks subtract this
+    set from the model list so unusable models are kept out of the generation dropdowns.
     """
     record_store = ApiDependencies.invoker.services.model_manager.store
     models_path = ApiDependencies.invoker.services.configuration.models_path
@@ -224,6 +230,7 @@ async def list_missing_models() -> ModelsList:
     response_model=AnyModelConfig,
 )
 async def get_model_records_by_attrs(
+    current_user: CurrentUserOrDefault,
     name: str = Query(description="The name of the model"),
     type: ModelType = Query(description="The type of the model"),
     base: BaseModelType = Query(description="The base model of the model"),
@@ -245,6 +252,7 @@ async def get_model_records_by_attrs(
     response_model=AnyModelConfig,
 )
 async def get_model_records_by_hash(
+    current_user: CurrentUserOrDefault,
     hash: str = Query(description="The hash of the model"),
 ) -> AnyModelConfig:
     """Gets a model by its hash. This is useful for recalling models that were deleted and reinstalled,
@@ -269,6 +277,7 @@ async def get_model_records_by_hash(
     },
 )
 async def get_model_record(
+    current_user: CurrentUserOrDefault,
     key: str = Path(description="Key of the model record to fetch."),
 ) -> AnyModelConfig:
     """Get a model record"""
@@ -341,14 +350,23 @@ class FoundModel(BaseModel):
     response_model=List[FoundModel],
 )
 async def scan_for_models(
+    current_admin: AdminUserOrDefault,
     scan_path: str = Query(description="Directory path to search for models", default=None),
 ) -> List[FoundModel]:
+    # A single generic error is used for every path-validation failure below, so that the response cannot be
+    # used as an existence/readability oracle for arbitrary filesystem paths.
+    scan_failed = HTTPException(
+        status_code=400,
+        detail=f"The search path '{scan_path}' could not be scanned",
+    )
+
+    # Guard before constructing a Path: the query param defaults to None and pathlib.Path(None) raises.
+    if not scan_path:
+        raise scan_failed
+
     path = pathlib.Path(scan_path)
-    if not scan_path or not path.is_dir():
-        raise HTTPException(
-            status_code=400,
-            detail=f"The search path '{scan_path}' does not exist or is not directory",
-        )
+    if not path.is_dir():
+        raise scan_failed
 
     search = ModelSearch()
     try:
@@ -372,11 +390,13 @@ async def scan_for_models(
             found_model = FoundModel(path=path, is_installed=is_installed)
             scan_results.append(found_model)
     except Exception as e:
-        error_type = type(e).__name__
-        raise HTTPException(
-            status_code=500,
-            detail=f"An error occurred while searching the directory: {error_type}",
+        ApiDependencies.invoker.services.logger.error(
+            f"Error scanning '{scan_path}' for models: {type(e).__name__}: {e}"
         )
+        # By this point is_dir() has already confirmed the path exists, so a distinct status leaks nothing
+        # new. Keeping 500 (with the details only in the server log) preserves the caller-error vs
+        # server-fault distinction for the admin and for retry logic.
+        raise HTTPException(status_code=500, detail=f"An error occurred while scanning '{scan_path}'")
     return scan_results
 
 
@@ -396,6 +416,7 @@ class HuggingFaceModels(BaseModel):
     response_model=HuggingFaceModels,
 )
 async def get_hugging_face_models(
+    current_admin: AdminUserOrDefault,
     hugging_face_repo: str = Query(description="Hugging face repo to search for models", default=None),
 ) -> HuggingFaceModels:
     try:
@@ -443,7 +464,19 @@ async def update_model_record(
         # nn.Module at load time, so toggling them on a cached model is otherwise silently a no-op until
         # the entry is evicted. Drop any unlocked cached entries for this model so the next load rebuilds.
         if _load_settings_changed(previous_config, config):
-            dropped = ApiDependencies.invoker.services.model_manager.load.ram_cache.drop_model(key)
+            # Drop the model from every per-device cache so the next load on any GPU rebuilds it.
+            # Hold the model-load write lock so no worker is mid-construction while we invalidate:
+            # a concurrent load could otherwise peek the old shared CPU weights before the drop and
+            # re-register them as canonical after it. Acquiring the lock can wait on an in-flight
+            # load/VRAM transfer, so do it off the event loop.
+            def _drop_from_all_caches() -> int:
+                with MODEL_LOAD_LOCK.write_lock():
+                    return sum(
+                        cache.drop_model(key)
+                        for cache in ApiDependencies.invoker.services.model_manager.load.ram_caches.values()
+                    )
+
+            dropped = await asyncio.to_thread(_drop_from_all_caches)
             if dropped:
                 logger.info(
                     f"Dropped {dropped} cached entr{'y' if dropped == 1 else 'ies'} for model {key} after settings change."
@@ -1258,7 +1291,7 @@ def get_is_installed(
 
 
 @model_manager_router.get("/starter_models", operation_id="get_starter_models", response_model=StarterModelResponse)
-async def get_starter_models() -> StarterModelResponse:
+async def get_starter_models(current_admin: AdminUserOrDefault) -> StarterModelResponse:
     installed_models = ApiDependencies.invoker.services.model_manager.store.search_by_attr()
     starter_models = deepcopy(STARTER_MODELS)
     starter_bundles = deepcopy(STARTER_BUNDLES)
@@ -1291,10 +1324,39 @@ async def get_starter_models() -> StarterModelResponse:
     response_model=Optional[CacheStats],
     summary="Get model manager RAM cache performance statistics.",
 )
-async def get_stats() -> Optional[CacheStats]:
-    """Return performance statistics on the model manager's RAM cache. Will return null if no models have been loaded."""
+async def get_stats(current_admin: AdminUserOrDefault) -> Optional[CacheStats]:
+    """Return performance statistics on the model manager's RAM cache. In multi-GPU mode there is
+    one cache per generation device; their statistics are aggregated. Will return null if no models
+    have been loaded."""
+    stats_list: list[CacheStats] = []
+    seen_cache_ids: set[int] = set()
+    # ram_caches can map several device keys to the same cache object; count each cache once.
+    for cache in ApiDependencies.invoker.services.model_manager.load.ram_caches.values():
+        if id(cache) in seen_cache_ids:
+            continue
+        seen_cache_ids.add(id(cache))
+        if cache.stats is not None:
+            stats_list.append(cache.stats)
 
-    return ApiDependencies.invoker.services.model_manager.load.ram_cache.stats
+    if not stats_list:
+        return None
+    if len(stats_list) == 1:
+        return stats_list[0]
+
+    aggregate = CacheStats()
+    for stats in stats_list:
+        # Per-cache event counters: sum across caches.
+        aggregate.hits += stats.hits
+        aggregate.misses += stats.misses
+        aggregate.in_cache += stats.in_cache
+        aggregate.cleared += stats.cleared
+        # cache_size and high_watermark are already system-wide values: every per-device cache
+        # shares one global RamBudget, so each reports the same global capacity and observes the
+        # same global usage. Summing them would over-report an N-GPU system ~N times; take the max.
+        aggregate.high_watermark = max(aggregate.high_watermark, stats.high_watermark)
+        aggregate.cache_size = max(aggregate.cache_size, stats.cache_size)
+        aggregate.loaded_model_sizes.update(stats.loaded_model_sizes)
+    return aggregate
 
 
 @model_manager_router.post(
@@ -1304,9 +1366,10 @@ async def get_stats() -> Optional[CacheStats]:
 )
 async def empty_model_cache(current_admin: AdminUserOrDefault) -> None:
     """Drop all models from the model cache to free RAM/VRAM. 'Locked' models that are in active use will not be dropped."""
-    # Request 1000GB of room in order to force the cache to drop all models.
+    # Request 1000GB of room in order to force each per-device cache to drop all models.
     ApiDependencies.invoker.services.logger.info("Emptying model cache.")
-    ApiDependencies.invoker.services.model_manager.load.ram_cache.make_room(1000 * 2**30)
+    for cache in ApiDependencies.invoker.services.model_manager.load.ram_caches.values():
+        cache.make_room(1000 * 2**30)
 
 
 class HFTokenStatus(str, Enum):
@@ -1341,7 +1404,7 @@ class HFTokenHelper:
 
 
 @model_manager_router.get("/hf_login", operation_id="get_hf_login_status", response_model=HFTokenStatus)
-async def get_hf_login_status() -> HFTokenStatus:
+async def get_hf_login_status(current_admin: AdminUserOrDefault) -> HFTokenStatus:
     token_status = HFTokenHelper.get_status()
 
     if token_status is HFTokenStatus.UNKNOWN:

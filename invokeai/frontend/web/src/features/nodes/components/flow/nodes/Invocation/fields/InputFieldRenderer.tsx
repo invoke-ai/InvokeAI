@@ -15,6 +15,7 @@ import { StringGeneratorFieldInputComponent } from 'features/nodes/components/fl
 import { IntegerFieldInput } from 'features/nodes/components/flow/nodes/Invocation/fields/IntegerField/IntegerFieldInput';
 import { IntegerFieldInputAndSlider } from 'features/nodes/components/flow/nodes/Invocation/fields/IntegerField/IntegerFieldInputAndSlider';
 import { IntegerFieldSlider } from 'features/nodes/components/flow/nodes/Invocation/fields/IntegerField/IntegerFieldSlider';
+import { VideoFrameIndexFieldInput } from 'features/nodes/components/flow/nodes/Invocation/fields/IntegerField/VideoFrameIndexFieldInput';
 import { StringFieldDropdown } from 'features/nodes/components/flow/nodes/Invocation/fields/StringField/StringFieldDropdown';
 import { StringFieldInput } from 'features/nodes/components/flow/nodes/Invocation/fields/StringField/StringFieldInput';
 import { StringFieldTextarea } from 'features/nodes/components/flow/nodes/Invocation/fields/StringField/StringFieldTextarea';
@@ -65,6 +66,10 @@ import {
   isStringGeneratorFieldInputTemplate,
   isStylePresetFieldInputInstance,
   isStylePresetFieldInputTemplate,
+  isSystemPromptFieldInputInstance,
+  isSystemPromptFieldInputTemplate,
+  isVideoFieldInputInstance,
+  isVideoFieldInputTemplate,
 } from 'features/nodes/types/field';
 import type { NodeFieldElement } from 'features/nodes/types/workflow';
 import { memo } from 'react';
@@ -79,6 +84,8 @@ import FileFieldInputComponent from './inputs/FileFieldInputComponent';
 import ImageFieldInputComponent from './inputs/ImageFieldInputComponent';
 import SchedulerFieldInputComponent from './inputs/SchedulerFieldInputComponent';
 import StylePresetFieldInputComponent from './inputs/StylePresetFieldInputComponent';
+import SystemPromptFieldInputComponent from './inputs/SystemPromptFieldInputComponent';
+import VideoFieldInputComponent from './inputs/VideoFieldInputComponent';
 
 type Props = {
   nodeId: string;
@@ -139,6 +146,13 @@ export const InputFieldRenderer = memo(({ nodeId, fieldName, settings }: Props) 
   if (isIntegerFieldInputTemplate(template)) {
     if (!isIntegerFieldInputInstance(field)) {
       return null;
+    }
+    // The ``video-frame-index`` ui_component bolts a frame thumbnail + scrubber slider
+    // onto the standard integer input. It's a per-field widget rather than a node-body
+    // widget so it works in both the workflow editor and the Form Builder (both of
+    // which dispatch through this same renderer).
+    if (template.ui_component === 'video-frame-index') {
+      return <VideoFrameIndexFieldInput nodeId={nodeId} field={field} fieldTemplate={template} />;
     }
     if (!settings || settings.type !== 'integer-field-config') {
       return <IntegerFieldInput nodeId={nodeId} field={field} fieldTemplate={template} />;
@@ -225,6 +239,13 @@ export const InputFieldRenderer = memo(({ nodeId, fieldName, settings }: Props) 
     return <FileFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
   }
 
+  if (isVideoFieldInputTemplate(template)) {
+    if (!isVideoFieldInputInstance(field)) {
+      return null;
+    }
+    return <VideoFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
+  }
+
   if (isBoardFieldInputTemplate(template)) {
     if (!isBoardFieldInputInstance(field)) {
       return null;
@@ -237,6 +258,13 @@ export const InputFieldRenderer = memo(({ nodeId, fieldName, settings }: Props) 
       return null;
     }
     return <StylePresetFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
+  }
+
+  if (isSystemPromptFieldInputTemplate(template)) {
+    if (!isSystemPromptFieldInputInstance(field)) {
+      return null;
+    }
+    return <SystemPromptFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
   }
 
   if (isModelIdentifierFieldInputTemplate(template)) {

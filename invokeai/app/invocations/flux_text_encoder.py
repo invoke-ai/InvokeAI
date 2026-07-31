@@ -1,5 +1,5 @@
 from contextlib import ExitStack
-from typing import Iterator, Literal, Optional, Tuple
+from typing import Iterator, Literal, Optional
 
 import torch
 from transformers import CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokenizer
@@ -18,7 +18,7 @@ from invokeai.app.invocations.primitives import FluxConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.modules.conditioner import HFEncoder
 from invokeai.backend.model_manager.taxonomy import ModelFormat
-from invokeai.backend.patches.layer_patcher import LayerPatcher
+from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_CLIP_PREFIX, FLUX_LORA_T5_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData, FLUXConditioningInfo
@@ -30,6 +30,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import Condit
     tags=["prompt", "conditioning", "flux"],
     category="prompt",
     version="1.1.2",
+    idle_gpu_offloadable=True,
 )
 class FluxTextEncoderInvocation(BaseInvocation):
     """Encodes and preps a prompt for a flux image."""
@@ -115,7 +116,9 @@ class FluxTextEncoderInvocation(BaseInvocation):
                 )
             )
 
-            t5_encoder = HFEncoder(t5_text_encoder, t5_tokenizer, False, self.t5_max_seq_len)
+            t5_encoder = HFEncoder(
+                t5_text_encoder, t5_tokenizer, False, self.t5_max_seq_len, device=t5_encoder_info.compute_device
+            )
 
             if context.config.get().log_tokenization:
                 self._log_t5_tokenization(context, t5_tokenizer)
@@ -158,7 +161,9 @@ class FluxTextEncoderInvocation(BaseInvocation):
                 # There are currently no supported CLIP quantized models. Add support here if needed.
                 raise ValueError(f"Unsupported model format: {clip_text_encoder_config.format}")
 
-            clip_encoder = HFEncoder(clip_text_encoder, clip_tokenizer, True, 77)
+            clip_encoder = HFEncoder(
+                clip_text_encoder, clip_tokenizer, True, 77, device=clip_text_encoder_info.compute_device
+            )
 
             if context.config.get().log_tokenization:
                 self._log_clip_tokenization(context, clip_tokenizer)
@@ -169,19 +174,17 @@ class FluxTextEncoderInvocation(BaseInvocation):
         assert isinstance(pooled_prompt_embeds, torch.Tensor)
         return pooled_prompt_embeds
 
-    def _clip_lora_iterator(self, context: InvocationContext) -> Iterator[Tuple[ModelPatchRaw, float]]:
+    def _clip_lora_iterator(self, context: InvocationContext) -> Iterator[PatchSpec]:
         for lora in self.clip.loras:
             lora_info = context.models.load(lora.lora)
             assert isinstance(lora_info.model, ModelPatchRaw)
-            yield (lora_info.model, lora.weight)
-            del lora_info
+            yield (lora_info.model, lora.weight, lora_info.model_in_ram())
 
-    def _t5_lora_iterator(self, context: InvocationContext) -> Iterator[Tuple[ModelPatchRaw, float]]:
+    def _t5_lora_iterator(self, context: InvocationContext) -> Iterator[PatchSpec]:
         for lora in self.t5_encoder.loras:
             lora_info = context.models.load(lora.lora)
             assert isinstance(lora_info.model, ModelPatchRaw)
-            yield (lora_info.model, lora.weight)
-            del lora_info
+            yield (lora_info.model, lora.weight, lora_info.model_in_ram())
 
     def _log_t5_tokenization(
         self,

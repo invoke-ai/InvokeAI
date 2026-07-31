@@ -515,6 +515,28 @@
     {
       "category": "DEVICE",
       "default": "auto",
+      "description": "Devices to use for parallel generation. `auto` (the default) uses every available GPU, running one generation session per GPU concurrently and distributing jobs fairly across users. Provide an explicit list (e.g. `[cuda:0, cuda:1]`) to use specific devices, or a single-device list (e.g. `[cuda:0]`) to run serially. On systems without a GPU, `auto` resolves to the single `cpu`/`mps` device.<br>Valid values: `auto`, or a list whose entries are each `cpu`, `cuda`, `mps`, or `cuda:N` (where N is a device number)",
+      "env_var": "INVOKEAI_GENERATION_DEVICES",
+      "literal_values": [],
+      "name": "generation_devices",
+      "required": false,
+      "type": "typing.Union[typing.Literal['auto'], list[str]]",
+      "validation": {}
+    },
+    {
+      "category": "DEVICE",
+      "default": true,
+      "description": "When running on multiple GPUs, load text encoders onto a currently-idle GPU instead of the one running the denoise pipeline. This avoids churning the denoise model in and out of VRAM to make room for the encoder, and lets a cached encoder be reused across generations. Has no effect unless at least two `generation_devices` are configured and a GPU is idle; under full load encoders run on the session's own GPU as before.",
+      "env_var": "INVOKEAI_OFFLOAD_TEXT_ENCODERS_TO_IDLE_GPUS",
+      "literal_values": [],
+      "name": "offload_text_encoders_to_idle_gpus",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "DEVICE",
+      "default": "auto",
       "description": "Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.",
       "env_var": "INVOKEAI_PRECISION",
       "literal_values": [
@@ -615,7 +637,7 @@
     {
       "category": "GENERATION",
       "default": "round_robin",
-      "description": "Session queue mode. Use 'FIFO' for traditional first-in-first-out, or 'round_robin' to serve each user's jobs in turn. In single-user mode, FIFO is always used regardless of this setting.",
+      "description": "Session queue mode. Use 'FIFO' for strict first-in-first-out, or 'round_robin' to serve each user's jobs in turn. In round-robin mode, priority orders each user's own jobs, but the user rotation takes precedence: one user's high-priority job does not preempt another user's turn. In single-user mode, jobs are served in submission order either way \u2014 except that on multi-GPU systems the default 'round_robin' allows same-priority jobs to be reordered slightly so a freed GPU prefers jobs whose models it already has loaded. Set 'FIFO' to disable that reordering and enforce strict submission order.",
       "env_var": "INVOKEAI_SESSION_QUEUE_MODE",
       "literal_values": [
         "FIFO",

@@ -1,5 +1,12 @@
 import type { ThunkDispatch, TypedStartListening, UnknownAction } from '@reduxjs/toolkit';
-import { addListener, combineReducers, configureStore, createAction, createListenerMiddleware } from '@reduxjs/toolkit';
+import {
+  addListener,
+  combineReducers,
+  configureStore,
+  createAction,
+  createListenerMiddleware,
+  isAnyOf,
+} from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import { errorHandler } from 'app/store/enhancers/reduxRemember/errors';
 import { addAdHocPostProcessingRequestedListener } from 'app/store/middleware/listenerMiddleware/listeners/addAdHocPostProcessingRequestedListener';
@@ -19,8 +26,14 @@ import { addSocketConnectedEventListener } from 'app/store/middleware/listenerMi
 import { deepClone } from 'common/util/deepClone';
 import { merge } from 'es-toolkit';
 import { omit, pick } from 'es-toolkit/compat';
-import { authSliceConfig } from 'features/auth/store/authSlice';
-import { changeBoardModalSliceConfig } from 'features/changeBoardModal/store/slice';
+import {
+  authSliceConfig,
+  externalTokenAdopted,
+  logout,
+  sessionExpiredLogout,
+  tokensBelongToSameUser,
+} from 'features/auth/store/authSlice';
+import { changeBoardModalSliceConfig, changeBoardReset } from 'features/changeBoardModal/store/slice';
 import { canvasSettingsSliceConfig } from 'features/controlLayers/store/canvasSettingsSlice';
 import { canvasSliceConfig } from 'features/controlLayers/store/canvasSlice';
 import { canvasSessionSliceConfig } from 'features/controlLayers/store/canvasStagingAreaSlice';
@@ -29,6 +42,7 @@ import { canvasWorkflowIntegrationSliceConfig } from 'features/controlLayers/sto
 import { lorasSliceConfig } from 'features/controlLayers/store/lorasSlice';
 import { paramsSliceConfig } from 'features/controlLayers/store/paramsSlice';
 import { refImagesSliceConfig } from 'features/controlLayers/store/refImagesSlice';
+import { cancelDeletion } from 'features/deleteVideoModal/store/state';
 import { dynamicPromptsSliceConfig } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { gallerySliceConfig } from 'features/gallery/store/gallerySlice';
 import { modelManagerSliceConfig } from 'features/modelManagerV2/store/modelManagerV2Slice';
@@ -36,6 +50,7 @@ import { nodesSliceConfig } from 'features/nodes/store/nodesSlice';
 import { workflowLibrarySliceConfig } from 'features/nodes/store/workflowLibrarySlice';
 import { workflowSettingsSliceConfig } from 'features/nodes/store/workflowSettingsSlice';
 import { upscaleSliceConfig } from 'features/parameters/store/upscaleSlice';
+import { expandPromptSliceConfig } from 'features/prompt/store/expandPromptSlice';
 import { queueSliceConfig } from 'features/queue/store/queueSlice';
 import { stylePresetSliceConfig } from 'features/stylePresets/store/stylePresetSlice';
 import { hotkeysSliceConfig } from 'features/system/store/hotkeysSlice';
@@ -56,6 +71,7 @@ import { stateSanitizer } from './middleware/devtools/stateSanitizer';
 import { addArchivedOrDeletedBoardListener } from './middleware/listenerMiddleware/listeners/addArchivedOrDeletedBoardListener';
 import { addPBRFilterListener } from './middleware/listenerMiddleware/listeners/addPBRFilterListener';
 import { addImageUploadedFulfilledListener } from './middleware/listenerMiddleware/listeners/imageUploaded';
+import { addVideoUploadedListeners } from './middleware/listenerMiddleware/listeners/videoUploaded';
 
 const listenerMiddleware = createListenerMiddleware();
 
@@ -71,6 +87,7 @@ const SLICE_CONFIGS = {
   [canvasWorkflowIntegrationSliceConfig.slice.reducerPath]: canvasWorkflowIntegrationSliceConfig,
   [changeBoardModalSliceConfig.slice.reducerPath]: changeBoardModalSliceConfig,
   [dynamicPromptsSliceConfig.slice.reducerPath]: dynamicPromptsSliceConfig,
+  [expandPromptSliceConfig.slice.reducerPath]: expandPromptSliceConfig,
   [gallerySliceConfig.slice.reducerPath]: gallerySliceConfig,
   [hotkeysSliceConfig.slice.reducerPath]: hotkeysSliceConfig,
   [lorasSliceConfig.slice.reducerPath]: lorasSliceConfig,
@@ -103,6 +120,7 @@ const ALL_REDUCERS = {
   [canvasWorkflowIntegrationSliceConfig.slice.reducerPath]: canvasWorkflowIntegrationSliceConfig.slice.reducer,
   [changeBoardModalSliceConfig.slice.reducerPath]: changeBoardModalSliceConfig.slice.reducer,
   [dynamicPromptsSliceConfig.slice.reducerPath]: dynamicPromptsSliceConfig.slice.reducer,
+  [expandPromptSliceConfig.slice.reducerPath]: expandPromptSliceConfig.slice.reducer,
   [gallerySliceConfig.slice.reducerPath]: gallerySliceConfig.slice.reducer,
   [hotkeysSliceConfig.slice.reducerPath]: hotkeysSliceConfig.slice.reducer,
   [lorasSliceConfig.slice.reducerPath]: lorasSliceConfig.slice.reducer,
@@ -125,7 +143,16 @@ const ALL_REDUCERS = {
 
 const rootReducer = combineReducers(ALL_REDUCERS);
 
-const rememberedRootReducer = rememberReducer(rootReducer);
+type RootReducerState = ReturnType<typeof rootReducer>;
+
+const accountAwareRootReducer = (state: RootReducerState | undefined, action: UnknownAction): RootReducerState => {
+  if (state && externalTokenAdopted.match(action) && !tokensBelongToSameUser(state.auth.token, action.payload)) {
+    state = rootReducer(state, logout());
+  }
+  return rootReducer(state, action);
+};
+
+const rememberedRootReducer = rememberReducer(accountAwareRootReducer);
 
 const unserialize: UnserializeFunction = (data, key) => {
   const sliceConfig = SLICE_CONFIGS[key as keyof typeof SLICE_CONFIGS];
@@ -256,7 +283,30 @@ export const addAppListener = addListener.withTypes<RootState, AppDispatch>();
 
 // To avoid circular dependencies, all listener middleware listeners are added here in the main store setup file.
 const startAppListening = listenerMiddleware.startListening as AppStartListening;
+
+startAppListening({
+  matcher: isAnyOf(logout, sessionExpiredLogout),
+  effect: (_action, { dispatch }) => {
+    dispatch(api.util.resetApiState());
+    dispatch(changeBoardReset());
+    cancelDeletion();
+  },
+});
+
+startAppListening({
+  actionCreator: externalTokenAdopted,
+  effect: (action, { dispatch, getOriginalState }) => {
+    if (tokensBelongToSameUser(getOriginalState().auth.token, action.payload)) {
+      return;
+    }
+    dispatch(api.util.resetApiState());
+    dispatch(changeBoardReset());
+    cancelDeletion();
+  },
+});
+
 addImageUploadedFulfilledListener(startAppListening);
+addVideoUploadedListeners(startAppListening);
 
 // Image deleted
 addDeleteBoardAndImagesFulfilledListener(startAppListening);

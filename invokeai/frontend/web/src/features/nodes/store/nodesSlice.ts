@@ -51,6 +51,8 @@ import type {
   StringFieldValue,
   StringGeneratorFieldValue,
   StylePresetFieldValue,
+  SystemPromptFieldValue,
+  VideoFieldValue,
 } from 'features/nodes/types/field';
 import {
   zBoardFieldValue,
@@ -75,6 +77,8 @@ import {
   zStringFieldValue,
   zStringGeneratorFieldValue,
   zStylePresetFieldValue,
+  zSystemPromptFieldValue,
+  zVideoFieldValue,
 } from 'features/nodes/types/field';
 import type { AnyEdge, AnyNode, ConnectorNode } from 'features/nodes/types/invocation';
 import { isConnectorNode, isInvocationNode, isNotesNode } from 'features/nodes/types/invocation';
@@ -582,6 +586,9 @@ const slice = createSlice({
     fieldStylePresetValueChanged: (state, action: FieldValueAction<StylePresetFieldValue>) => {
       fieldValueReducer(state, action, zStylePresetFieldValue);
     },
+    fieldSystemPromptValueChanged: (state, action: FieldValueAction<SystemPromptFieldValue>) => {
+      fieldValueReducer(state, action, zSystemPromptFieldValue);
+    },
     fieldImageValueChanged: (state, action: FieldValueAction<ImageFieldValue>) => {
       fieldValueReducer(state, action, zImageFieldValue);
     },
@@ -590,6 +597,9 @@ const slice = createSlice({
     },
     fieldImageCollectionValueChanged: (state, action: FieldValueAction<ImageFieldCollectionValue>) => {
       fieldValueReducer(state, action, zImageFieldCollectionValue);
+    },
+    fieldVideoValueChanged: (state, action: FieldValueAction<VideoFieldValue>) => {
+      fieldValueReducer(state, action, zVideoFieldValue);
     },
     fieldLoRACollectionValueChanged: (state, action: FieldValueAction<LoRAFieldCollectionValue>) => {
       fieldValueReducer(state, action, zLoRAFieldCollectionValue);
@@ -805,10 +815,12 @@ export const {
   fieldBooleanValueChanged,
   fieldColorValueChanged,
   fieldStylePresetValueChanged,
+  fieldSystemPromptValueChanged,
   fieldEnumModelValueChanged,
   fieldImageValueChanged,
   fieldFileValueChanged,
   fieldImageCollectionValueChanged,
+  fieldVideoValueChanged,
   fieldLabelChanged,
   fieldLoRACollectionValueChanged,
   fieldModelIdentifierValueChanged,

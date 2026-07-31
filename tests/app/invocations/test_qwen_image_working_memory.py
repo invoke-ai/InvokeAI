@@ -66,6 +66,9 @@ class TestQwenImageWorkingMemory:
         # Create mock vae_info with a model_on_device context manager yielding (None, vae)
         mock_vae_info = MagicMock()
         mock_vae_info.model = mock_vae
+        # Decode places latents on the VAE's intended compute device (see #9373); this must be a
+        # real torch.device so `latents.to(device=...)` works instead of raising TypeError.
+        mock_vae_info.compute_device = torch.device("cpu")
 
         mock_cm = MagicMock()
         mock_cm.__enter__ = MagicMock(return_value=(None, mock_vae))
@@ -111,6 +114,47 @@ class TestQwenImageWorkingMemory:
             mock_estimate.assert_called_once()
             assert mock_estimate.call_args.kwargs["operation"] == "decode"
             mock_vae_info.model_on_device.assert_called_once_with(working_mem_bytes=expected_memory)
+
+    def test_seamless_patch_is_applied_to_converted_anima_vae(self):
+        original_vae, mock_vae_info = self._mock_vae_info()
+        converted_vae = MagicMock(spec=AutoencoderKLQwenImage)
+        converted_vae.parameters.return_value = iter([torch.zeros(1)])
+        converted_vae.dtype = torch.float32
+        converted_vae.config.z_dim = 16
+        converted_vae.config.latents_mean = [0.0] * 16
+        converted_vae.config.latents_std = [1.0] * 16
+        converted_vae.decode.side_effect = RuntimeError("stop after seamless patch")
+        mock_context = MagicMock()
+        mock_context.models.load.return_value = mock_vae_info
+        mock_context.tensors.load.return_value = torch.zeros(1, 16, 1, 2, 2)
+
+        with (
+            patch(
+                "invokeai.app.invocations.qwen_image_latents_to_image.estimate_vae_working_memory_qwen_image",
+                return_value=1,
+            ),
+            patch(
+                "invokeai.app.invocations.qwen_image_latents_to_image.as_qwen_image_vae",
+                return_value=converted_vae,
+            ),
+            patch(
+                "invokeai.app.invocations.qwen_image_latents_to_image.SeamlessExt.static_patch_model",
+                return_value=nullcontext(),
+            ) as patch_seamless,
+            patch(
+                "invokeai.app.invocations.qwen_image_latents_to_image.TorchDevice.choose_torch_device",
+                return_value=torch.device("cpu"),
+            ),
+        ):
+            invocation = QwenImageLatentsToImageInvocation.model_construct(
+                latents=MagicMock(latents_name="test_latents"),
+                vae=MagicMock(vae=MagicMock(), seamless_axes=["x"]),
+            )
+            with pytest.raises(RuntimeError, match="stop after seamless patch"):
+                invocation.invoke(mock_context)
+
+        assert original_vae is not converted_vae
+        patch_seamless.assert_called_once_with(converted_vae, ["x"])
 
     def test_qwen_image_to_latents_requests_working_memory(self):
         """QwenImageImageToLatentsInvocation estimates encode memory and passes it to the cache."""

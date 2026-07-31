@@ -25,8 +25,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import Qwen3EncoderField
 from invokeai.app.invocations.primitives import FluxConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.model_manager.load.model_cache.utils import get_effective_device
-from invokeai.backend.patches.layer_patcher import LayerPatcher
+from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_T5_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData, FLUXConditioningInfo
@@ -48,6 +47,7 @@ KLEIN_MAX_SEQ_LEN = 512
     category="prompt",
     version="1.1.1",
     classification=Classification.Prototype,
+    idle_gpu_offloadable=True,
 )
 class Flux2KleinTextEncoderInvocation(BaseInvocation):
     """Encodes and preps a prompt for Flux2 Klein image generation.
@@ -79,6 +79,13 @@ class Flux2KleinTextEncoderInvocation(BaseInvocation):
             # Pass the locked stack down to the helper function
             qwen3_embeds, pooled_embeds = self._encode_prompt(context, exit_stack)
 
+            # Save the conditioning CPU-backed: this node is idle_gpu_offloadable, so the
+            # encode may have run on a BORROWED GPU whose pool lock is released the moment
+            # this node returns — tensors left on it would pin VRAM on a device another
+            # session may immediately start using. Mirrors flux_text_encoder / flux_redux.
+            qwen3_embeds = qwen3_embeds.detach().to("cpu")
+            pooled_embeds = pooled_embeds.detach().to("cpu")
+
             conditioning_data = ConditioningFieldData(
                 conditionings=[FLUXConditioningInfo(clip_embeds=pooled_embeds, t5_embeds=qwen3_embeds)]
             )
@@ -101,8 +108,11 @@ class Flux2KleinTextEncoderInvocation(BaseInvocation):
         tokenizer_info = context.models.load(self.qwen3_encoder.tokenizer)
         (_, tokenizer) = exit_stack.enter_context(tokenizer_info.model_on_device())
 
+        # Repair any required tensors left on the CPU by a previous interrupted run, then run on the encoder's
+        # intended compute device. Do NOT infer the device from current parameter residency: partial loading may
+        # have temporarily offloaded all weights to RAM, which would wrongly run the whole encode on the CPU.
         repaired_tensors = text_encoder_info.repair_required_tensors_on_device()
-        device = get_effective_device(text_encoder)
+        device = text_encoder_info.compute_device
         if repaired_tensors > 0:
             context.logger.warning(
                 f"Recovered {repaired_tensors} required Qwen3 tensor(s) onto {device} after a partial device mismatch."
@@ -187,7 +197,7 @@ class Flux2KleinTextEncoderInvocation(BaseInvocation):
 
         return prompt_embeds, pooled_embeds
 
-    def _lora_iterator(self, context: InvocationContext) -> Iterator[Tuple[ModelPatchRaw, float]]:
+    def _lora_iterator(self, context: InvocationContext) -> Iterator[PatchSpec]:
         """Iterate over LoRA models to apply to the Qwen3 text encoder."""
         for lora in self.qwen3_encoder.loras:
             lora_info = context.models.load(lora.lora)
@@ -196,5 +206,4 @@ class Flux2KleinTextEncoderInvocation(BaseInvocation):
                     f"Expected ModelPatchRaw for LoRA '{lora.lora.key}', got {type(lora_info.model).__name__}. "
                     "The LoRA model may be corrupted or incompatible."
                 )
-            yield (lora_info.model, lora.weight)
-            del lora_info
+            yield (lora_info.model, lora.weight, lora_info.model_in_ram())

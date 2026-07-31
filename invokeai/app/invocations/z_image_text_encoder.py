@@ -1,5 +1,5 @@
 from contextlib import ExitStack
-from typing import Iterator, Optional, Tuple
+from typing import Iterator, Optional
 
 import torch
 from transformers import PreTrainedModel, PreTrainedTokenizerBase
@@ -16,8 +16,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import Qwen3EncoderField
 from invokeai.app.invocations.primitives import ZImageConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.model_manager.load.model_cache.utils import get_effective_device
-from invokeai.backend.patches.layer_patcher import LayerPatcher
+from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.z_image_lora_constants import Z_IMAGE_LORA_QWEN3_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
@@ -37,6 +36,7 @@ Z_IMAGE_MAX_SEQ_LEN = 512
     category="prompt",
     version="1.1.0",
     classification=Classification.Prototype,
+    idle_gpu_offloadable=True,
 )
 class ZImageTextEncoderInvocation(BaseInvocation):
     """Encodes and preps a prompt for a Z-Image image.
@@ -80,10 +80,11 @@ class ZImageTextEncoderInvocation(BaseInvocation):
             (cached_weights, text_encoder) = exit_stack.enter_context(text_encoder_info.model_on_device())
             (_, tokenizer) = exit_stack.enter_context(tokenizer_info.model_on_device())
 
-            # Use the device that the text encoder is effectively executing on, and repair any required tensors left on
-            # the CPU by a previous interrupted run.
+            # Repair any required tensors left on the CPU by a previous interrupted run, then run on the encoder's
+            # intended compute device. Do NOT infer the device from current parameter residency: partial loading may
+            # have temporarily offloaded all weights to RAM, which would wrongly run the whole encode on the CPU.
             repaired_tensors = text_encoder_info.repair_required_tensors_on_device()
-            device = get_effective_device(text_encoder)
+            device = text_encoder_info.compute_device
             if repaired_tensors > 0:
                 context.logger.warning(
                     f"Recovered {repaired_tensors} required Qwen3 tensor(s) onto {device} after a partial device mismatch."
@@ -196,7 +197,7 @@ class ZImageTextEncoderInvocation(BaseInvocation):
             )
         return prompt_embeds
 
-    def _lora_iterator(self, context: InvocationContext) -> Iterator[Tuple[ModelPatchRaw, float]]:
+    def _lora_iterator(self, context: InvocationContext) -> Iterator[PatchSpec]:
         """Iterate over LoRA models to apply to the Qwen3 text encoder."""
         for lora in self.qwen3_encoder.loras:
             lora_info = context.models.load(lora.lora)
@@ -205,5 +206,4 @@ class ZImageTextEncoderInvocation(BaseInvocation):
                     f"Expected ModelPatchRaw for LoRA '{lora.lora.key}', got {type(lora_info.model).__name__}. "
                     "The LoRA model may be corrupted or incompatible."
                 )
-            yield (lora_info.model, lora.weight)
-            del lora_info
+            yield (lora_info.model, lora.weight, lora_info.model_in_ram())

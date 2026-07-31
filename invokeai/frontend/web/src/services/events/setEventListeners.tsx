@@ -51,7 +51,7 @@ import { createWorkflowExecutionCoordinator } from 'services/events/workflowExec
 import type { Socket } from 'socket.io-client';
 import type { JsonObject } from 'type-fest';
 
-import { $lastProgressEvent, $loadingModelsCount } from './stores';
+import { $lastProgressEvent, $loadingModelsCount, clearAllProgressEvents, setProgressEvent } from './stores';
 
 const log = logger('events');
 
@@ -99,6 +99,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     socket.emit('subscribe_queue', { queue_id: 'default' });
     socket.emit('subscribe_bulk_download', { bulk_download_id: 'default' });
     $lastProgressEvent.set(null);
+    clearAllProgressEvents();
     $loadingModelsCount.set(0);
   });
 
@@ -106,6 +107,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     log.debug('Connect error');
     setIsConnected(false);
     $lastProgressEvent.set(null);
+    clearAllProgressEvents();
     $loadingModelsCount.set(0);
     if (error && error.message) {
       const data: string | undefined = (error as unknown as { data: string | undefined }).data;
@@ -124,6 +126,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     log.debug('Disconnected');
     workflowExecutionCoordinator.cancelPendingWorkflowReconciliations();
     $lastProgressEvent.set(null);
+    clearAllProgressEvents();
     $loadingModelsCount.set(0);
     setIsConnected(false);
   });
@@ -235,6 +238,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     log.trace({ data } as JsonObject, _message);
 
     $lastProgressEvent.set(data);
+    setProgressEvent(data);
   });
 
   socket.on('invocation_error', (data) => {
@@ -475,15 +479,17 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   socket.on('queue_cleared', (data) => {
     log.debug({ data }, 'Queue cleared');
     // Clearing the queue deletes the in-progress item without emitting a per-item terminal status
-    // event, so the progress bar must be reset here — and the coordinator must mark the deleted
+    // event, so the progress bars must be reset here — and the coordinator must mark the deleted
     // tracked items terminal so a trailing invocation_progress event cannot repopulate the bar.
     // The coordinator scopes a user-scoped clear (multiuser mode) to that user's items — on an
     // admin client that may be a subset of the tracked items; on another user's client it is
     // none of them — and reports whether the clear applied to any tracked item, so the progress
-    // bar is only reset when the clear could have deleted the item behind it. The queue tags
-    // below always need refreshing.
+    // bars are only reset when the clear could have deleted the items behind them. Per-item bars
+    // for items the clear did not delete repopulate on their next invocation_progress event. The
+    // queue tags below always need refreshing.
     if (workflowExecutionCoordinator.onQueueCleared(data)) {
       $lastProgressEvent.set(null);
+      clearAllProgressEvents();
     }
     dispatch(
       queueApi.util.invalidateTags([

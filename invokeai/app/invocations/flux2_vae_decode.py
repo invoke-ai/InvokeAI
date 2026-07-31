@@ -20,7 +20,6 @@ from invokeai.app.invocations.model import VAEField
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.load.load_base import LoadedModel
-from invokeai.backend.model_manager.load.model_cache.utils import get_effective_device
 from invokeai.backend.util.devices import TorchDevice
 
 
@@ -52,8 +51,10 @@ class Flux2VaeDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
         """
         with vae_info.model_on_device() as (_, vae):
             vae_dtype = next(iter(vae.parameters())).dtype
-            # Use the VAE's actual device (may be CPU if the model is configured cpu_only).
-            device = get_effective_device(vae)
+            # Use the VAE's intended compute device (CUDA/MPS, or CPU if configured cpu_only). Do NOT infer it from
+            # current param residency: partial loading may have temporarily offloaded all weights to RAM, which would
+            # wrongly place the latents (and thus the whole decode) on the CPU (see #9373).
+            device = vae_info.compute_device
             latents = latents.to(device=device, dtype=vae_dtype)
 
             # Decode using diffusers API
