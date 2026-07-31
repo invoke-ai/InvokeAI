@@ -11,7 +11,13 @@ from invokeai.app.services.config.config_default import get_config
 TorchPrecisionNames = Literal["float32", "float16", "bfloat16"]
 CPU_DEVICE = torch.device("cpu")
 CUDA_DEVICE = torch.device("cuda")
+XPU_DEVICE = torch.device("xpu")
 MPS_DEVICE = torch.device("mps")
+
+
+def _xpu_is_available() -> bool:
+    """Return True if a torch XPU (Intel GPU) device is available."""
+    return hasattr(torch, "xpu") and torch.xpu.is_available()
 
 
 @deprecated("Use TorchDevice.choose_torch_dtype() instead.")  # type: ignore
@@ -46,6 +52,7 @@ class TorchDevice:
 
     CPU_DEVICE = torch.device("cpu")
     CUDA_DEVICE = torch.device("cuda")
+    XPU_DEVICE = torch.device("xpu")
     MPS_DEVICE = torch.device("mps")
 
     # Per-thread execution device. When set (by a session-processor worker thread bound to a
@@ -79,7 +86,7 @@ class TorchDevice:
         number so concurrent sessions can be told apart.
         """
         device = cls.get_session_device() or cls.choose_torch_device()
-        return device.index if device.type == "cuda" else None
+        return device.index if device.type in ("cuda", "xpu") else None
 
     @classmethod
     def get_session_device_label(cls) -> str:
@@ -99,6 +106,8 @@ class TorchDevice:
             device = torch.device(app_config.device)
         elif torch.cuda.is_available():
             device = CUDA_DEVICE
+        elif _xpu_is_available():
+            device = XPU_DEVICE
         elif torch.backends.mps.is_available():
             device = MPS_DEVICE
         else:
@@ -122,6 +131,14 @@ class TorchDevice:
                 # Use the user-defined precision
                 return cls._to_dtype(config.precision)
 
+        elif device.type == "xpu" and _xpu_is_available():
+            if config.precision == "auto":
+                # Default to float16 for XPU (Intel GPU) devices
+                return cls._to_dtype("float16")
+            else:
+                # Use the user-defined precision
+                return cls._to_dtype(config.precision)
+
         elif device.type == "mps" and torch.backends.mps.is_available():
             if config.precision == "auto":
                 # Default to float16 for MPS devices
@@ -135,7 +152,11 @@ class TorchDevice:
     @classmethod
     def get_device_name(cls, device: torch.device) -> str:
         """Return the human-readable name for a torch device (e.g. 'AMD Radeon PRO W7900', 'CPU')."""
-        return torch.cuda.get_device_name(device) if device.type == "cuda" else device.type.upper()
+        if device.type == "cuda":
+            return torch.cuda.get_device_name(device)
+        if device.type == "xpu":
+            return torch.xpu.get_device_name(device)
+        return device.type.upper()
 
     @classmethod
     def get_torch_device_name(cls) -> str:
@@ -191,11 +212,13 @@ class TorchDevice:
 
     @classmethod
     def _all_available_devices(cls) -> list[torch.device]:
-        """Every device generation could run on: all visible CUDA devices, or the single best
-        available device (mps/cpu) when CUDA is unavailable. Ignores configuration — used for
+        """Every device generation could run on: all visible CUDA (or XPU) devices, or the single
+        best available device (mps/cpu) when neither is available. Ignores configuration — used for
         enumeration/labeling, where filtered-out devices must still be listed."""
         if torch.cuda.is_available():
             return [torch.device(f"cuda:{index}") for index in range(torch.cuda.device_count())]
+        if _xpu_is_available():
+            return [torch.device(f"xpu:{index}") for index in range(torch.xpu.device_count())]
         return [cls.choose_torch_device()]
 
     @classmethod
@@ -236,6 +259,14 @@ class TorchDevice:
                         f"generation_devices requested '{device_str}', but only {torch.cuda.device_count()} "
                         f"CUDA device(s) are available (valid indices 0-{torch.cuda.device_count() - 1})."
                     )
+            elif device.type == "xpu":
+                if not _xpu_is_available():
+                    raise ValueError(f"generation_devices requested '{device_str}', but no XPU device is available.")
+                if device.index is not None and device.index >= torch.xpu.device_count():
+                    raise ValueError(
+                        f"generation_devices requested '{device_str}', but only {torch.xpu.device_count()} "
+                        f"XPU device(s) are available (valid indices 0-{torch.xpu.device_count() - 1})."
+                    )
             elif device.type == "mps" and not torch.backends.mps.is_available():
                 raise ValueError(f"generation_devices requested '{device_str}', but MPS is not available.")
             if str(device) not in seen:
@@ -245,10 +276,12 @@ class TorchDevice:
 
     @classmethod
     def normalize(cls, device: Union[str, torch.device]) -> torch.device:
-        """Add the device index to CUDA devices."""
+        """Add the device index to CUDA and XPU devices."""
         device = torch.device(device)
         if device.index is None and device.type == "cuda" and torch.cuda.is_available():
             device = torch.device(device.type, torch.cuda.current_device())
+        elif device.index is None and device.type == "xpu" and _xpu_is_available():
+            device = torch.device(device.type, torch.xpu.current_device())
         return device
 
     @classmethod
@@ -258,6 +291,33 @@ class TorchDevice:
             torch.mps.empty_cache()
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
+        if _xpu_is_available():
+            torch.xpu.empty_cache()
+
+    @classmethod
+    def xpu_mem_get_info(cls, device: torch.device) -> tuple[int, int]:
+        """Return ``(free, total)`` VRAM in bytes for an XPU (Intel GPU) device.
+
+        Uses ``torch.xpu.mem_get_info()`` when available. Setups missing the SYCL
+        ``ext_intel_free_memory`` aspect (notably GPU passthrough VMs) raise
+        ``RuntimeError`` instead; fall back to ``total_memory`` minus this process's
+        reserved bytes. The fallback is blind to other processes on a shared device,
+        so callers should treat it as a budget hint rather than a guarantee.
+        """
+        try:
+            return torch.xpu.mem_get_info(device)
+        except (RuntimeError, AttributeError):
+            # total_memory does not depend on the unavailable free-memory aspect.
+            try:
+                total_bytes = int(torch.xpu.get_device_properties(device).total_memory)
+            except (RuntimeError, AttributeError):
+                total_bytes = 0
+            try:
+                reserved_bytes = torch.xpu.memory_reserved(device)
+            except (RuntimeError, AttributeError):
+                reserved_bytes = 0
+            free_bytes = max(total_bytes - reserved_bytes, 0)
+            return (free_bytes, total_bytes)
 
     @classmethod
     def _to_dtype(cls, precision_name: TorchPrecisionNames) -> torch.dtype:

@@ -4,6 +4,7 @@
 import copy
 import itertools
 import re
+from functools import lru_cache
 from logging import Logger
 from pathlib import Path
 from typing import Optional
@@ -28,6 +29,26 @@ from invokeai.backend.model_manager.taxonomy import (
     SubModelType,
 )
 from invokeai.backend.util.devices import TorchDevice
+
+
+@lru_cache(maxsize=None)
+def _device_supports_fp8_storage(device_type: str) -> bool:
+    """Whether FP8 layerwise casting (float8 weight storage + upcast) is usable on this device.
+
+    The feature needs only float8 *storage* and casting to the compute dtype -- not native FP8
+    matmul -- so it holds on CUDA and, for current torch builds, on Intel XPU. XPU float8 support is
+    build/driver dependent ("emerging" on Xe2), so probe it once (cached) rather than assume.
+    """
+    if device_type == "cuda":
+        return True
+    if device_type != "xpu":
+        return False
+    try:
+        torch.zeros(2, device="xpu").to(torch.float8_e4m3fn).to(torch.float16)
+        return True
+    except Exception:
+        return False
+
 
 # Layer classes that benefit from FP8 storage. Mirrors diffusers'
 # `_GO_LC_SUPPORTED_PYTORCH_LAYERS` so the plain-nn.Module fallback path makes the same
@@ -230,8 +251,11 @@ class ModelLoader(ModelLoaderBase):
 
     def _should_use_fp8(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> bool:
         """Check if FP8 layerwise casting should be applied to a model."""
-        # FP8 storage only works on CUDA
-        if self._torch_device.type != "cuda":
+        # FP8 layerwise casting stores weights as float8 and upcasts to the compute dtype on the
+        # forward pass, so it only needs float8 storage + cast (not native FP8 matmul). This works on
+        # CUDA and on Intel XPU (verified: float8_e4m3fn store + upcast to fp16/bf16 on Arc), but XPU
+        # float8 support is build-dependent, so the helper probes it rather than assuming.
+        if not _device_supports_fp8_storage(self._torch_device.type):
             return False
 
         # Z-Image has dtype mismatch issues with diffusers' layerwise casting

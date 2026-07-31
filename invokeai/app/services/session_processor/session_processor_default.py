@@ -631,6 +631,9 @@ class DefaultSessionProcessor(SessionProcessorBase):
                 TorchDevice.set_session_device(worker.device)
                 if worker.device.type == "cuda":
                     torch.cuda.set_device(worker.device)
+                elif worker.device.type == "xpu":
+                    # XPU's current device is per-thread, same as CUDA.
+                    torch.xpu.set_device(worker.device)
 
             worker.cancel_event.clear()
 

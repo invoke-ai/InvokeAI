@@ -49,6 +49,8 @@ class MemorySnapshot:
 
         if torch.cuda.is_available():
             vram = torch.cuda.memory_allocated()
+        elif hasattr(torch, "xpu") and torch.xpu.is_available():
+            vram = torch.xpu.memory_allocated()
         else:
             # TODO: We could add support for mps.current_allocated_memory() as well. Leaving out for now until we have
             # time to test it properly.
