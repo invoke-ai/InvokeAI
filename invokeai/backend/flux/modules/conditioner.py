@@ -1,5 +1,6 @@
 # Initially pulled from https://github.com/black-forest-labs/flux
 
+import torch
 from torch import Tensor, nn
 from transformers import PreTrainedModel, PreTrainedTokenizer, PreTrainedTokenizerFast
 
@@ -13,6 +14,7 @@ class HFEncoder(nn.Module):
         tokenizer: PreTrainedTokenizer | PreTrainedTokenizerFast,
         is_clip: bool,
         max_length: int,
+        device: torch.device | None = None,
     ):
         super().__init__()
         self.max_length = max_length
@@ -21,6 +23,10 @@ class HFEncoder(nn.Module):
         self.tokenizer = tokenizer
         self.hf_module = encoder
         self.hf_module = self.hf_module.eval().requires_grad_(False)
+        # The intended compute device for the encoder. Prefer passing this explicitly (e.g. the loaded model's
+        # compute_device): with partial loading, inferring the device from current parameter residency can wrongly
+        # return CPU when all weights are temporarily offloaded to RAM, running the whole encode on the CPU (#9373).
+        self.device = device
 
     def forward(self, text: list[str]) -> Tensor:
         batch_encoding = self.tokenizer(
@@ -33,8 +39,9 @@ class HFEncoder(nn.Module):
             return_tensors="pt",
         )
 
-        # Move inputs to the same device as the model to support cpu_only models
-        model_device = get_effective_device(self.hf_module)
+        # Move inputs to the same device as the model to support cpu_only models. Fall back to inferring the device
+        # from parameter residency only when an explicit device was not provided.
+        model_device = self.device if self.device is not None else get_effective_device(self.hf_module)
 
         outputs = self.hf_module(
             input_ids=batch_encoding["input_ids"].to(model_device),

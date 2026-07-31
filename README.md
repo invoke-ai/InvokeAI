@@ -72,9 +72,14 @@ Invoke features an organized gallery system for easily storing, accessing, and r
 - Flux.2 Klein 9B
 - Z-Image Turbo
 - Z-Image Base
+- Krea 2 Turbo
+- Krea 2 Raw
 - Anima
 - Qwen Image
 - Qwen Image Edit
+- Ideogram 4
+- ERNIE-Image
+- ERNIE-Image-Turbo
 - Nano Banana (API Only)
 - GPT Image (API Only)
 - Wan (API Only)
@@ -111,6 +116,7 @@ We very much thank the following sponsors:
 ### Backers ($15/mo)
 
 * [apokolypsse](https://github.com/apokolypsse)
+* [Romeotechguy](https://github.com/Romeotechguy)
 
 ### Power Users ($50/mo)
 

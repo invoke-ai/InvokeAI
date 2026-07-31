@@ -18,7 +18,6 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import VAEField
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.model_manager.load.model_cache.utils import get_effective_device
 from invokeai.backend.stable_diffusion.extensions.seamless import SeamlessExt
 from invokeai.backend.stable_diffusion.vae_tiling import patch_vae_tiling_params
 from invokeai.backend.util.devices import TorchDevice
@@ -70,8 +69,10 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         ):
             context.util.signal_progress("Running VAE decoder")
             assert isinstance(vae, (AutoencoderKL, AutoencoderTiny))
-            # Use the VAE's actual device (may be CPU if the model is configured cpu_only).
-            device = get_effective_device(vae)
+            # Use the VAE's intended compute device (CUDA/MPS, or CPU if configured cpu_only). Do NOT infer it from
+            # current param residency: partial loading may have temporarily offloaded all weights to RAM, which would
+            # wrongly place the latents (and thus the whole decode) on the CPU (see #9373).
+            device = vae_info.compute_device
             latents = latents.to(device)
             # Force fp32 when running on CPU (e.g. when the VAE is configured cpu_only). fp16 conv does run on CPU with
             # the pinned torch, but it's much slower than fp32 there, and SD/SDXL VAE has known fp16 overflow issues

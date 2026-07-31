@@ -15,7 +15,12 @@ import { t } from 'i18next';
 import { useCallback } from 'react';
 import { serializeError } from 'serialize-error';
 import { workflowsApi } from 'services/api/endpoints/workflows';
-import { checkBoardAccess, checkImageAccess, checkModelAccess } from 'services/api/hooks/accessChecks';
+import {
+  checkBoardAccess,
+  checkImageAccess,
+  checkModelAccess,
+  checkVideoAccess,
+} from 'services/api/hooks/accessChecks';
 import { z } from 'zod';
 import { fromZodError } from 'zod-validation-error';
 
@@ -56,6 +61,7 @@ export const useValidateAndLoadWorkflow = () => {
           workflow: unvalidatedWorkflow,
           templates,
           checkImageAccess,
+          checkVideoAccess,
           checkBoardAccess,
           checkModelAccess,
           getWorkflow: (workflowId) =>
