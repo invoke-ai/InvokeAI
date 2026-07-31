@@ -120,6 +120,24 @@ def _dequantize_scaled_fp8(sd: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def _read_safetensors_metadata(path: Path, logger: Any = None) -> dict[str, str] | None:
+    """Read the safetensors header metadata, or None if it cannot be read.
+
+    Only used to enrich fp8 handling (per-layer ``full_precision_matrix_mult`` hints), so an
+    unreadable header must not fail the model load. It is warned about rather than swallowed: without
+    the hints, layers the quantizer marked as unsafe would silently be multiplied in fp8.
+    """
+    try:
+        from safetensors import safe_open
+
+        with safe_open(path, framework="pt") as f:
+            return f.metadata()
+    except Exception as e:
+        if logger is not None:
+            logger.warning(f"Could not read safetensors metadata from {path.name} ({e}); fp8 layer hints unavailable.")
+        return None
+
+
 def _remap_native_layer_paths(layer_names: Any) -> dict[str, str]:
     """Map native/ComfyUI layer paths to their diffusers equivalents.
 
@@ -364,11 +382,8 @@ class Krea2CheckpointModel(ModelLoader):
             raise TypeError(f"Expected Main_Checkpoint_Krea2_Config, got {type(config).__name__}.")
         model_path = Path(config.path)
 
-        from safetensors import safe_open
-
         sd = load_file(model_path)
-        with safe_open(model_path, framework="pt") as f:
-            metadata = f.metadata()
+        metadata = _read_safetensors_metadata(model_path, self._logger)
         sd = _strip_comfyui_prefix(sd)
         # Native/ComfyUI key naming → diffusers Krea2Transformer2DModel keys. Done *before* the fp8
         # scales are pulled out: the renames are substring-based on ".weight", so a sibling

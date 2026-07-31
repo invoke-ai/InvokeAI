@@ -270,6 +270,45 @@ class TestCustomLinearIntegration:
             set_fp8_matmul_enabled(False)
 
     @cuda_fp8
+    def test_sidecar_patched_fp8_layer_uses_the_fp8_matmul(self):
+        """LoRAs on fp8 weights are force-routed to sidecar patching (layer_patcher), and the
+        sidecar wrapper calls `_autocast_forward`. The fp8 branch must survive that route, and the
+        LoRA residual must still be added on top."""
+        from invokeai.backend.patches.layers.lora_layer import LoRALayer
+
+        dev = torch.device("cuda")
+        model = self._module(dev)
+        custom = model[0]
+        rank = 8
+        lora = LoRALayer(
+            up=torch.randn(custom.out_features, rank, device=dev, dtype=torch.bfloat16) * 0.05,
+            mid=None,
+            down=torch.randn(rank, custom.in_features, device=dev, dtype=torch.bfloat16) * 0.05,
+            alpha=float(rank),
+            bias=None,
+        )
+        custom.add_patch(lora, 1.0)
+        x = torch.randn(32, 64, device=dev, dtype=torch.bfloat16)
+
+        set_fp8_matmul_enabled(True)
+        try:
+            patched = model(x)
+        finally:
+            set_fp8_matmul_enabled(False)
+        unpatched_ref = torch.nn.functional.linear(
+            x, dequantize_weight(custom.weight, custom.weight_scale, torch.bfloat16)
+        )
+
+        assert patched.shape == (32, 128)
+        # The patch must actually change the output...
+        assert not torch.allclose(patched, unpatched_ref, atol=1e-2)
+        # ...and the base contribution must still be roughly the fp8 linear, not garbage.
+        residual = (lora.get_weight(1.0) * lora.scale()).to(torch.bfloat16)
+        expected = unpatched_ref + torch.nn.functional.linear(x, residual)
+        rel = ((patched.float() - expected.float()).norm() / expected.float().norm()).item()
+        assert rel < 0.1, f"sidecar-patched fp8 output diverges by {rel:.4f}"
+
+    @cuda_fp8
     def test_unaligned_features_fall_back(self):
         set_fp8_matmul_enabled(True)
         try:
