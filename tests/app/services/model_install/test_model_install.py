@@ -1125,6 +1125,56 @@ def test_deferred_restore_timeout_is_shared_across_markers_for_one_source(
     assert installer._install_jobs == []
 
 
+def test_deferred_restore_timeout_is_independent_per_source(
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_record_store,
+    mm2_download_queue,
+    mm2_session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    installer = ModelInstallService(
+        app_config=mm2_app_config,
+        record_store=mm2_record_store,
+        download_queue=mm2_download_queue,
+        event_bus=TestEventService(),
+        session=mm2_session,
+    )
+    source_a = URLModelSource(url=Url("https://www.test.foo/download/a.safetensors"))
+    source_b = URLModelSource(url=Url("https://www.test.foo/download/b.safetensors"))
+    _write_test_install_marker(mm2_app_config.models_path / f"{TMPDIR_PREFIX}a", str(source_a))
+    _write_test_install_marker(mm2_app_config.models_path / f"{TMPDIR_PREFIX}b", str(source_b))
+
+    with installer._lock:
+        installer._pending_sources.update({str(source_a), str(source_b)})
+
+    clock = 0.0
+    waits: list[float] = []
+
+    def _monotonic() -> float:
+        return clock
+
+    def _wait(timeout: Optional[float] = None) -> None:
+        nonlocal clock
+        assert timeout is not None
+        waits.append(timeout)
+        clock += timeout
+        source = source_a if len(waits) == 1 else source_b
+        installer._pending_sources.discard(str(source))
+
+    monkeypatch.setattr(model_install_default.time, "monotonic", _monotonic)
+    monkeypatch.setattr(installer._install_cond, "wait", _wait)
+    real_glob = Path.glob
+    monkeypatch.setattr(Path, "glob", lambda self, pattern: iter(sorted(real_glob(self, pattern))))
+    resumed: list[ModelInstallJob] = []
+    monkeypatch.setattr(installer, "_resume_remote_download", lambda job: resumed.append(job))
+
+    installer._restore_incomplete_installs()
+
+    assert waits == [model_install_default.DEFERRED_RESTORE_TIMEOUT] * 2
+    assert len(resumed) == 2
+    assert {str(job.source) for job in resumed} == {str(source_a), str(source_b)}
+
+
 def test_deferred_restore_remembers_registered_job_after_prune(
     mm2_app_config: InvokeAIAppConfig,
     mm2_record_store,
@@ -1216,6 +1266,135 @@ def test_deferred_restore_ignores_non_import_job_generation(
 
 
 @pytest.mark.timeout(timeout=20, method="thread")
+def test_restore_removes_stale_marker_when_active_source_has_multiple_markers(
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_record_store,
+    mm2_download_queue,
+    mm2_session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    installer = ModelInstallService(
+        app_config=mm2_app_config,
+        record_store=mm2_record_store,
+        download_queue=mm2_download_queue,
+        event_bus=TestEventService(),
+        session=mm2_session,
+    )
+    source = URLModelSource(url=Url("https://www.test.foo/download/test_embedding.safetensors"))
+    stale_dir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}0_stale"
+    active_dir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}1_active"
+    _write_test_install_marker(stale_dir, str(source))
+    _write_test_install_marker(active_dir, str(source))
+
+    active_job = ModelInstallJob(
+        id=installer._next_id(),
+        source=source,
+        config_in=ModelRecordChanges(),
+        local_path=active_dir,
+    )
+    active_job._install_tmpdir = active_dir
+    active_job.status = InstallStatus.DOWNLOADING
+    installer._install_jobs.append(active_job)
+    monkeypatch.setattr(installer, "_resume_remote_download", lambda job: None)
+
+    installer._restore_incomplete_installs()
+
+    assert active_dir.exists()
+    assert not stale_dir.exists()
+    assert installer._install_jobs == [active_job]
+
+
+def test_import_generation_tracking_is_bounded_to_active_restore(
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_record_store,
+    mm2_download_queue,
+    mm2_session,
+) -> None:
+    installer = ModelInstallService(
+        app_config=mm2_app_config,
+        record_store=mm2_record_store,
+        download_queue=mm2_download_queue,
+        event_bus=TestEventService(),
+        session=mm2_session,
+    )
+
+    for index in range(100):
+        source = URLModelSource(url=Url(f"https://www.test.foo/download/{index}.safetensors"))
+        job = ModelInstallJob(
+            id=installer._next_id(),
+            source=source,
+            config_in=ModelRecordChanges(),
+            local_path=mm2_app_config.models_path,
+        )
+        job.status = InstallStatus.COMPLETED
+        with installer._lock:
+            installer._append_install_job(job, from_import=True)
+
+    assert installer._source_import_generations == {}
+
+    installer._restore_completed_event.clear()
+    source = URLModelSource(url=Url("https://www.test.foo/download/during-restore.safetensors"))
+    job = ModelInstallJob(
+        id=installer._next_id(),
+        source=source,
+        config_in=ModelRecordChanges(),
+        local_path=mm2_app_config.models_path,
+    )
+    with installer._lock:
+        installer._pending_sources.add(str(source))
+        installer._append_install_job(job, from_import=True)
+
+    assert installer._source_import_generations == {str(source): 1}
+
+
+def test_deferred_restore_removes_stale_marker_after_import_registration(
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_record_store,
+    mm2_download_queue,
+    mm2_session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    installer = ModelInstallService(
+        app_config=mm2_app_config,
+        record_store=mm2_record_store,
+        download_queue=mm2_download_queue,
+        event_bus=TestEventService(),
+        session=mm2_session,
+    )
+    source = URLModelSource(url=Url("https://www.test.foo/download/test_embedding.safetensors"))
+    stale_dir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}0_stale"
+    active_dir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}1_active"
+    _write_test_install_marker(stale_dir, str(source))
+    _write_test_install_marker(active_dir, str(source))
+
+    imported_job = ModelInstallJob(
+        id=installer._next_id(),
+        source=source,
+        config_in=ModelRecordChanges(),
+        local_path=active_dir,
+    )
+    imported_job._install_tmpdir = active_dir
+    imported_job.status = InstallStatus.DOWNLOADING
+    installer._restore_completed_event.clear()
+    with installer._lock:
+        installer._pending_sources.add(str(source))
+
+    def _finish_import(timeout: Optional[float] = None) -> None:
+        installer._append_install_job(imported_job, from_import=True)
+        installer._pending_sources.discard(str(source))
+
+    real_glob = Path.glob
+    monkeypatch.setattr(Path, "glob", lambda self, pattern: iter(sorted(real_glob(self, pattern))))
+    monkeypatch.setattr(installer._install_cond, "wait", _finish_import)
+    monkeypatch.setattr(installer, "_resume_remote_download", lambda job: None)
+
+    installer._restore_incomplete_installs()
+
+    assert active_dir.exists()
+    assert not stale_dir.exists()
+    assert installer._install_jobs == [imported_job]
+
+
 def test_stop_cancels_deferred_restore_and_prevents_late_launch(
     mm2_app_config: InvokeAIAppConfig,
     mm2_record_store,
