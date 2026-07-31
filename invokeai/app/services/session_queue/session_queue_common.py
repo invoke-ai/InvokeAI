@@ -263,6 +263,10 @@ class SessionQueueItem(BaseModel):
     retried_from_item_id: Optional[int] = Field(
         default=None, description="The item_id of the queue item that this item was retried from"
     )
+    device: Optional[str] = Field(
+        default=None,
+        description="The device that processed this queue item, e.g. 'cuda:1' (set only when running on a CUDA GPU)",
+    )
     workflow_call_id: Optional[str] = Field(
         default=None, description="The active workflow-call relationship id when this queue item is a child execution."
     )

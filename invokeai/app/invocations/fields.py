@@ -157,6 +157,7 @@ class FieldDescriptions:
     t5_encoder = "T5 tokenizer and text encoder"
     glm_encoder = "GLM (THUDM) tokenizer and text encoder"
     qwen3_encoder = "Qwen3 tokenizer and text encoder"
+    qwen3_vl_encoder = "Qwen3-VL tokenizer and text encoder"
     clip_embed_model = "CLIP Embed loader"
     clip_g_model = "CLIP-G Embed loader"
     unet = "UNet (scheduler, LoRAs)"
@@ -173,6 +174,7 @@ class FieldDescriptions:
     sd3_model = "SD3 model (MMDiTX) to load"
     cogview4_model = "CogView4 model (Transformer) to load"
     z_image_model = "Z-Image model (Transformer) to load"
+    krea2_model = "Krea-2 model (Transformer) to load"
     qwen_image_model = "Qwen Image Edit model (Transformer) to load"
     qwen_vl_encoder = "Qwen2.5-VL tokenizer, processor and text/vision encoder"
     wan_model = "Wan 2.2 model (Transformer) to load"
@@ -261,6 +263,12 @@ class StylePresetField(BaseModel):
     """A style preset primitive field"""
 
     style_preset_id: str = Field(description="The id of the style preset")
+
+
+class SystemPromptField(BaseModel):
+    """A system prompt primitive field"""
+
+    system_prompt_id: str = Field(description="The id of the system prompt")
 
 
 class DenoiseMaskField(BaseModel):
@@ -354,6 +362,12 @@ class ZImageConditioningField(BaseModel):
     )
 
 
+class ErnieImageConditioningField(BaseModel):
+    """An ERNIE-Image conditioning tensor primitive value."""
+
+    conditioning_name: str = Field(description="The name of conditioning tensor")
+
+
 class Ideogram4ConditioningField(BaseModel):
     """An Ideogram 4 conditioning tensor primitive value"""
 
@@ -364,6 +378,17 @@ class QwenImageConditioningField(BaseModel):
     """A Qwen Image Edit conditioning tensor primitive value"""
 
     conditioning_name: str = Field(description="The name of conditioning tensor")
+
+
+class Krea2ConditioningField(BaseModel):
+    """A Krea-2 conditioning tensor primitive value"""
+
+    conditioning_name: str = Field(description="The name of conditioning tensor")
+    mask: Optional[TensorField] = Field(
+        default=None,
+        description="The mask associated with this conditioning tensor for regional prompting. "
+        "Excluded regions should be set to False, included regions should be set to True.",
+    )
 
 
 class AnimaConditioningField(BaseModel):
