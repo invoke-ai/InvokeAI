@@ -53,6 +53,7 @@ import {
   primeUserFontReadiness,
   syncUserFontFaces,
 } from 'features/controlLayers/text/textUserFonts';
+import { toast } from 'features/toast/toast';
 import type { FocusEvent, KeyboardEvent, MouseEvent } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -70,6 +71,8 @@ import { getBaseUrl } from 'services/api';
 import { useListUserFontsQuery } from 'services/api/endpoints/utilities';
 
 const formatSliderValue = (value: number) => String(value);
+const toastedUserFontLoadErrorIds = new Set<TextFontId>();
+
 const truncateLabel = (value: string, maxLength: number = 36): string => {
   if (value.length <= maxLength) {
     return value;
@@ -101,6 +104,7 @@ const FontSelect = () => {
   const userFontsLabel = t('controlLayers.text.customFonts');
   const builtInFontsLabel = t('controlLayers.text.builtInFonts');
   const missingFontLabel = t('controlLayers.text.missingFont');
+  const fontLoadFailedLabel = t('controlLayers.text.fontLoadFailed');
   const customFontStacks = useMemo(() => buildCustomTextFontStacks(userFonts ?? []), [userFonts]);
   const hasUserFontErrors = useMemo(() => {
     return (userFonts ?? []).some((font) => userFontReadyStates[font.id] === 'error');
@@ -191,12 +195,33 @@ const FontSelect = () => {
       window.removeEventListener('online', retry);
     };
   }, [hasUserFontErrors]);
+  useEffect(() => {
+    for (const font of userFonts ?? []) {
+      if (userFontReadyStates[font.id] !== 'error') {
+        toastedUserFontLoadErrorIds.delete(font.id);
+        continue;
+      }
+      if (toastedUserFontLoadErrorIds.has(font.id)) {
+        continue;
+      }
+      toastedUserFontLoadErrorIds.add(font.id);
+      toast({
+        id: `custom-font-load-failed:${font.id}`,
+        status: 'error',
+        title: t('toast.customFontLoadFailed'),
+        description: t('toast.customFontLoadFailedDesc', { fontName: font.label }),
+        withCount: false,
+      });
+    }
+  }, [t, userFontReadyStates, userFonts]);
 
   const options = useMemo(() => {
     const customOptions: ComboboxOption[] = (userFonts ?? []).map((font) => {
       return {
         value: font.id,
-        label: truncateLabel(font.label),
+        label: truncateLabel(
+          `${font.label}${userFontReadyStates[font.id] === 'error' ? ` (${fontLoadFailedLabel})` : ''}`
+        ),
         isDisabled: userFontReadyStates[font.id] !== 'ready',
       };
     });
@@ -218,7 +243,7 @@ const FontSelect = () => {
       },
       { label: builtInFontsLabel, options: builtInOptions },
     ] as GroupBase<ComboboxOption>[];
-  }, [builtInFontsLabel, userFontReadyStates, userFonts, userFontsLabel]);
+  }, [builtInFontsLabel, fontLoadFailedLabel, userFontReadyStates, userFonts, userFontsLabel]);
   const selectedOption = useMemo(() => {
     const firstOption = options[0];
     const flattened =

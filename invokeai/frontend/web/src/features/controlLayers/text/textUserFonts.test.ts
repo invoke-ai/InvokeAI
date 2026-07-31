@@ -171,11 +171,51 @@ describe('textUserFonts', () => {
     });
 
     await syncPromise;
-    await readyPromise;
+    await expect(readyPromise).resolves.toBe('ready');
 
     expect(isUserFontReady(font.id)).toBe(true);
   });
 
+  it('reports timeout while a custom font is still pending', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const loadedFontFaces = new Map<string, object>();
+      const fetchFn = vi.fn(
+        () =>
+          new Promise<{ ok: boolean; arrayBuffer: () => Promise<ArrayBuffer> }>(() => {
+            // Keep the font request pending so readiness must time out.
+          })
+      );
+      const fontFaceCtor = vi.fn(function () {
+        return {
+          load: () => Promise.resolve({ family: 'My Font' }),
+        };
+      });
+
+      void syncUserFontFaces({
+        fonts: [font],
+        token: null,
+        baseUrl: 'https://invoke.example.com',
+        loadedFontFaces,
+        fontFaceSet: {
+          add: () => undefined,
+          delete: () => true,
+        },
+        fontFaceCtor,
+        fetchFn,
+      });
+
+      await Promise.resolve();
+      const readinessPromise = awaitUserFontReady(font.id);
+      await vi.advanceTimersByTimeAsync(2000);
+
+      await expect(readinessPromise).resolves.toBe('timeout');
+      expect(isUserFontReady(font.id)).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it('allows a later sync to recover from an initial load failure', async () => {
     const loadedFontFaces = new Map<string, object>();
     const loadedFace = { family: 'My Font' };
@@ -209,6 +249,7 @@ describe('textUserFonts', () => {
     });
 
     expect(isUserFontReady(font.id)).toBe(false);
+    await expect(awaitUserFontReady(font.id)).resolves.toBe('error');
 
     await syncUserFontFaces({
       fonts: [font],

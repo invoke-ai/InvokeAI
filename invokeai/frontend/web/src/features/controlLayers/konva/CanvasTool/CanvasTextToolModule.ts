@@ -20,7 +20,9 @@ import {
 } from 'features/controlLayers/text/textRenderer';
 import { type TextSessionStatus, transitionTextSessionStatus } from 'features/controlLayers/text/textSessionMachine';
 import { awaitUserFontReady } from 'features/controlLayers/text/textUserFonts';
+import { toast } from 'features/toast/toast';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
+import { t } from 'i18next';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { atom } from 'nanostores';
@@ -362,7 +364,24 @@ export class CanvasTextToolModule extends CanvasModuleBase {
     textSettings: CanvasTextSettingsState,
     color: RgbaColor
   ) => {
-    await awaitUserFontReady(textSettings.fontId);
+    const fontReadiness = await awaitUserFontReady(textSettings.fontId);
+    if (fontReadiness !== 'ready') {
+      const currentSession = this.$session.get();
+      if (currentSession?.id === session.id) {
+        this.$session.set({ ...currentSession, status: 'editing' });
+      }
+      const isTimeout = fontReadiness === 'timeout';
+      toast({
+        id: isTimeout
+          ? `custom-font-still-loading:${textSettings.fontId}`
+          : `custom-font-load-failed:${textSettings.fontId}`,
+        status: 'error',
+        title: t(isTimeout ? 'toast.customFontStillLoading' : 'toast.customFontLoadFailed'),
+        description: t(isTimeout ? 'toast.customFontStillLoadingDesc' : 'toast.customFontUnavailableDesc'),
+        withCount: false,
+      });
+      return;
+    }
 
     if (typeof document !== 'undefined' && document.fonts?.load) {
       const fontSpec = buildFontDescriptor({

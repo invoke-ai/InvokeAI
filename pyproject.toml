@@ -64,7 +64,6 @@ dependencies = [
   # the last known-good version.
   "fastapi== 0.118.3",
   "huggingface-hub",
-  "networkx",
   "pydantic-settings",
   "pydantic",
   "python-socketio",

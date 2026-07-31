@@ -4,6 +4,7 @@ import type { UserFont, UserFontFace } from 'services/api/endpoints/utilities';
 
 type CustomTextFontStack = { id: TextFontId; label: string; stack: string };
 type UserFontReadyState = 'pending' | 'ready' | 'error';
+type UserFontReadinessResult = Exclude<UserFontReadyState, 'pending'> | 'timeout';
 
 type FetchResponseLike = {
   ok: boolean;
@@ -124,20 +125,23 @@ export const isUserFontReady = (fontId: TextFontId): boolean => {
   return !isCustomTextFontId(fontId) || $userFontReadyStates.get()[fontId] === 'ready';
 };
 
-export const awaitUserFontReady = async (fontId: TextFontId): Promise<void> => {
+export const awaitUserFontReady = async (fontId: TextFontId): Promise<UserFontReadinessResult> => {
   if (!isCustomTextFontId(fontId)) {
-    return;
+    return 'ready';
   }
   const state = $userFontReadyStates.get()[fontId];
   if (state === 'ready' || state === 'error') {
-    return;
+    return state;
   }
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   try {
-    await Promise.race([
-      ensureUserFontReadyPromise(fontId),
-      new Promise<void>((resolve) => {
-        timeoutId = setTimeout(resolve, USER_FONT_READY_TIMEOUT_MS);
+    return await Promise.race<UserFontReadinessResult>([
+      ensureUserFontReadyPromise(fontId).then(() => {
+        const settledState = $userFontReadyStates.get()[fontId];
+        return settledState === 'ready' || settledState === 'error' ? settledState : 'timeout';
+      }),
+      new Promise<'timeout'>((resolve) => {
+        timeoutId = setTimeout(() => resolve('timeout'), USER_FONT_READY_TIMEOUT_MS);
       }),
     ]);
   } finally {

@@ -280,12 +280,15 @@ def _resolve_font_request_path(font_path: str) -> Path:
 def list_user_fonts(_current_user: CurrentUserOrDefault) -> UserFontsResponse:
     fonts_dir = _get_fonts_dir()
     if not fonts_dir.exists() or not fonts_dir.is_dir() or fonts_dir.is_symlink():
+        if fonts_dir.is_symlink():
+            logger.warning("Skipping custom fonts directory %s: symlinks are not supported", fonts_dir)
         return UserFontsResponse(fonts=[])
 
     family_candidates: dict[str, list[tuple[Path, str, str, int, str]]] = {}
     # key -> [(font_file, relative, family, weight, style)]
     for font_file in sorted(fonts_dir.rglob("*")):
         if _path_has_symlink_component(font_file.absolute(), fonts_dir):
+            logger.warning("Skipping font path %s: symlinks are not supported", font_file)
             continue
         if not font_file.is_file() or font_file.suffix.lower() not in SUPPORTED_FONT_EXTENSIONS:
             continue
