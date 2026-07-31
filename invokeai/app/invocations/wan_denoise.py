@@ -24,7 +24,7 @@ The transformer call signature mirrors Diffusers' ``WanPipeline``:
 
 from contextlib import ExitStack
 from pathlib import Path
-from typing import Any, Callable, Iterable, Iterator, Optional, Tuple
+from typing import Any, Callable, Iterable, Iterator, Optional
 
 import torch
 import torchvision.transforms as tv_transforms
@@ -45,7 +45,7 @@ from invokeai.app.invocations.model import LoRAField, WanTransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, WanVariantType
-from invokeai.backend.patches.layer_patcher import LayerPatcher
+from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.wan_lora_constants import WAN_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
@@ -54,11 +54,11 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import WanCon
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.wan.sampling_utils import get_spatial_scale_factor, make_noise
 
-# Type alias: a factory that produces a fresh iterator of (LoRA patch, weight)
-# pairs each time it is called. We need fresh iterators because the patcher
+# Type alias: a factory that produces a fresh iterator of LoRA patch specs each time it is called.
+# We need fresh iterators because the patcher
 # consumes the iterator once per ``apply_smart_model_patches`` invocation, and
 # the expert may be swapped (and re-entered) multiple times in a render.
-LoRAIteratorFactory = Callable[[], Iterable[Tuple[ModelPatchRaw, float]]]
+LoRAIteratorFactory = Callable[[], Iterable[PatchSpec]]
 
 
 def _resolve_variant(context: InvocationContext, transformer_field: WanTransformerField) -> WanVariantType:
@@ -595,10 +595,10 @@ class WanDenoiseInvocation(BaseInvocation):
         high_is_quantized = high_config.format == ModelFormat.GGUFQuantized
         low_is_quantized = low_config.format == ModelFormat.GGUFQuantized if low_config is not None else False
 
-        def high_lora_factory() -> Iterable[Tuple[ModelPatchRaw, float]]:
+        def high_lora_factory() -> Iterable[PatchSpec]:
             return self._lora_iterator(context, high_loras)
 
-        def low_lora_factory() -> Iterable[Tuple[ModelPatchRaw, float]]:
+        def low_lora_factory() -> Iterable[PatchSpec]:
             return self._lora_iterator(context, low_loras)
 
         with ExitStack() as exit_stack:
@@ -759,10 +759,8 @@ class WanDenoiseInvocation(BaseInvocation):
 
         return step_callback
 
-    def _lora_iterator(
-        self, context: InvocationContext, loras: list[LoRAField]
-    ) -> Iterator[Tuple[ModelPatchRaw, float]]:
-        """Yield (ModelPatchRaw, weight) pairs for the given LoRA list.
+    def _lora_iterator(self, context: InvocationContext, loras: list[LoRAField]) -> Iterator[PatchSpec]:
+        """Yield patch specs for the given LoRA list.
 
         The caller passes either ``transformer.loras`` (high-noise expert) or
         ``transformer.loras_low_noise`` (low-noise expert) — the fallback to
@@ -773,5 +771,4 @@ class WanDenoiseInvocation(BaseInvocation):
             assert isinstance(lora_info.model, ModelPatchRaw), (
                 f"Wan LoRA model must be ModelPatchRaw, got {type(lora_info.model).__name__}"
             )
-            yield (lora_info.model, lora_field.weight)
-            del lora_info
+            yield (lora_info.model, lora_field.weight, lora_info.model_in_ram())

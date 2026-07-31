@@ -1,5 +1,6 @@
 import type { CircularProgressProps, SystemStyleObject } from '@invoke-ai/ui-library';
-import { CircularProgress, Tooltip } from '@invoke-ai/ui-library';
+import { CircularProgress, Text, Tooltip } from '@invoke-ai/ui-library';
+import { useProgressDeviceLabel } from 'common/hooks/useProgressDeviceLabel';
 import { getProgressMessage } from 'features/controlLayers/components/StagingArea/shared';
 import { memo } from 'react';
 import type { S } from 'services/api/types';
@@ -16,17 +17,34 @@ const circleStyles: SystemStyleObject = {
   right: 2,
 };
 
+// Centered GPU-number label drawn inside the ring (CircularProgressLabel isn't exported by the ui-library).
+const labelStyles: SystemStyleObject = {
+  position: 'absolute',
+  top: '50%',
+  left: '50%',
+  transform: 'translate(-50%, -50%)',
+  fontSize: '0.6rem',
+  lineHeight: 1,
+  fontWeight: 'bold',
+  color: 'invokeBlue.300',
+  textShadow: '0 0 3px var(--invoke-colors-base-900)',
+  pointerEvents: 'none',
+};
+
 type Props = { itemId: number; status: S['SessionQueueItem']['status'] } & CircularProgressProps;
 
 export const QueueItemCircularProgress = memo(({ itemId, status, ...rest }: Props) => {
   const { progressEvent } = useProgressDatum(itemId);
+  const deviceLabel = useProgressDeviceLabel(progressEvent?.device);
 
   if (status !== 'in_progress') {
     return null;
   }
 
+  const message = getProgressMessage(progressEvent);
+
   return (
-    <Tooltip label={getProgressMessage(progressEvent)}>
+    <Tooltip label={deviceLabel ? `${deviceLabel.name} — ${message}` : message}>
       <CircularProgress
         size="14px"
         color="invokeBlue.500"
@@ -35,7 +53,9 @@ export const QueueItemCircularProgress = memo(({ itemId, status, ...rest }: Prop
         value={progressEvent?.percentage ? progressEvent.percentage * 100 : undefined}
         sx={circleStyles}
         {...rest}
-      />
+      >
+        {deviceLabel && <Text sx={labelStyles}>{deviceLabel.index}</Text>}
+      </CircularProgress>
     </Tooltip>
   );
 });
