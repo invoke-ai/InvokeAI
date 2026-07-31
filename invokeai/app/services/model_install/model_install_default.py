@@ -142,6 +142,8 @@ class ModelInstallService(ModelInstallServiceBase):
         self._running = False
         self._session = session
         self._install_thread: Optional[threading.Thread] = None
+        self._restore_thread: Optional[threading.Thread] = None
+        self._restore_launch_lock = threading.Lock()
         self._next_job_id = 0
 
     def _marker_path(self, tmpdir: Path) -> Path:
@@ -238,8 +240,15 @@ class ModelInstallService(ModelInstallServiceBase):
         # it may still fail without registering a job, so markers for pending
         # sources are deferred and rechecked after the scan instead.
         with self._lock:
-            owned_sources = {str(j.source) for j in self._install_jobs if not j.in_terminal_state}
-            owned_sources |= {str(j.source) for j in self._download_cache.values() if not j.in_terminal_state}
+            owned_sources: set[str] = set()
+            owned_tmpdirs: dict[str, set[Path]] = {}
+            for active_job in [*self._install_jobs, *self._download_cache.values()]:
+                if active_job.in_terminal_state:
+                    continue
+                source_str = str(active_job.source)
+                owned_sources.add(source_str)
+                if active_job._install_tmpdir is not None:
+                    owned_tmpdirs.setdefault(source_str, set()).add(active_job._install_tmpdir)
         deferred: list[tuple[str, ModelInstallJob, Path, int]] = []
         for tmpdir in path.glob(f"{TMPDIR_PREFIX}*"):
             marker = self._read_install_marker(tmpdir)
@@ -295,11 +304,12 @@ class ModelInstallService(ModelInstallServiceBase):
                     )
                 )
                 if already_active:
-                    active_tmpdirs = {
+                    active_tmpdirs = set(owned_tmpdirs.get(source_str, set()))
+                    active_tmpdirs.update(
                         j._install_tmpdir
                         for j in self._install_jobs
                         if str(j.source) == source_str and not j.in_terminal_state and j._install_tmpdir is not None
-                    }
+                    )
                     active_tmpdirs.update(
                         j._install_tmpdir
                         for j in self._download_cache.values()
@@ -402,19 +412,20 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def _launch_restored_job(self, job: ModelInstallJob) -> None:
         """Kick off a job that _restore_incomplete_installs has just registered."""
-        if self._stop_event.is_set() or job.paused:
-            return
+        with self._restore_launch_lock:
+            if self._stop_event.is_set() or job.paused:
+                return
 
-        if job.status in [InstallStatus.DOWNLOADS_DONE, InstallStatus.RUNNING]:
-            job.status = InstallStatus.DOWNLOADS_DONE
-            self._put_in_queue(job)
-        else:
-            try:
-                self._resume_remote_download(job)
-            except Exception as e:
-                self._set_error(job, e)
-                if job._install_tmpdir is not None:
-                    self._safe_rmtree(job._install_tmpdir, self._logger)
+            if job.status in [InstallStatus.DOWNLOADS_DONE, InstallStatus.RUNNING]:
+                job.status = InstallStatus.DOWNLOADS_DONE
+                self._put_in_queue(job)
+            else:
+                try:
+                    self._resume_remote_download(job)
+                except Exception as e:
+                    self._set_error(job, e)
+                    if job._install_tmpdir is not None:
+                        self._safe_rmtree(job._install_tmpdir, self._logger)
 
     def _append_install_job(self, job: ModelInstallJob, *, from_import: bool = False) -> None:
         """Append a job. Caller must hold _lock."""
@@ -436,7 +447,8 @@ class ModelInstallService(ModelInstallServiceBase):
             finally:
                 self._restore_completed_event.set()
 
-        threading.Thread(target=_run, daemon=True).start()
+        self._restore_thread = threading.Thread(target=_run, daemon=True)
+        self._restore_thread.start()
 
     def _wait_for_restore_complete(self) -> None:
         self._restore_completed_event.wait()
@@ -508,10 +520,13 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def stop(self, invoker: Optional[Invoker] = None) -> None:
         """Stop the installer thread; after this the object can be deleted and garbage collected."""
-        if not self._running:
-            return
+        with self._lock:
+            if not self._running:
+                return
         self._logger.debug("calling stop_event.set()")
         self._stop_event.set()
+        with self._restore_launch_lock:
+            pass
         with self._install_cond:
             self._source_import_generations.clear()
             self._install_cond.notify_all()
@@ -519,6 +534,8 @@ class ModelInstallService(ModelInstallServiceBase):
         self._download_cache.clear()
         assert self._install_thread is not None
         self._install_thread.join()
+        if self._restore_thread is not None and self._restore_thread is not threading.current_thread():
+            self._restore_thread.join()
         self._running = False
 
     def _write_invoke_managed_models_dir_readme(self) -> None:
@@ -646,10 +663,14 @@ class ModelInstallService(ModelInstallServiceBase):
                 if self._stop_event.is_set():
                     raise RuntimeError("Model install service stopped")
                 self._install_cond.wait()
+            if self._stop_event.is_set():
+                raise RuntimeError("Model install service stopped")
             similar_jobs = [x for x in self.list_jobs() if x.source == source and not x.in_terminal_state]
             if similar_jobs:
                 self._logger.warning(f"There is already an active install job for {source}. Not enqueuing.")
                 return similar_jobs[0]
+            if self._stop_event.is_set():
+                raise RuntimeError("Model install service stopped")
             self._pending_sources.add(source_str)
 
         try:
@@ -794,8 +815,9 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def prune_jobs(self) -> None:
         """Prune all completed and errored jobs."""
-        unfinished_jobs = [x for x in self._install_jobs if not x.in_terminal_state]
-        self._install_jobs = unfinished_jobs
+        with self._lock:
+            unfinished_jobs = [x for x in self._install_jobs if not x.in_terminal_state]
+            self._install_jobs = unfinished_jobs
 
     def _migrate_yaml(self) -> None:
         db_models = self.record_store.all_models()
