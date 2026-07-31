@@ -177,28 +177,35 @@ class SocketIO:
                 # exists and is active — mirrors the REST auth check in
                 # auth_dependencies.py.  A deleted or deactivated user whose
                 # JWT has not yet expired must not be allowed to open a socket.
+                token_epoch = token_data.token_epoch
                 if self._is_multiuser_enabled():
                     try:
-                        from invokeai.app.api.dependencies import ApiDependencies
+                        from invokeai.app.api.auth_dependencies import resolve_authorized_user
 
-                        user = ApiDependencies.invoker.services.users.get(token_data.user_id)
-                        if user is None or not user.is_active:
-                            logger.warning(f"Rejecting socket {sid}: user {token_data.user_id} not found or inactive")
+                        user = resolve_authorized_user(token_data)
+                        if user is None:
+                            logger.warning(
+                                f"Rejecting socket {sid}: user {token_data.user_id} not found, inactive, or revoked"
+                            )
                             return False
                         # The token proves identity only — authorization comes from the
                         # database. A demoted admin reconnecting with an old token must
                         # not rejoin the admin room; a promoted user gets admin rooms
                         # without re-login.
                         is_admin = user.is_admin
+                        token_epoch = user.token_epoch
                     except Exception:
                         # If user service is unavailable, fail closed
                         logger.warning(f"Rejecting socket {sid}: unable to verify user record")
                         return False
 
-                # Store user_id and is_admin in socket users dict
+                # Store user_id, is_admin and the epoch this socket authenticated under.
+                # The epoch lets `_handle_user_access_changed` drop exactly the sockets
+                # whose token a later revocation invalidated.
                 self._socket_users[sid] = {
                     "user_id": token_data.user_id,
                     "is_admin": is_admin,
+                    "token_epoch": token_epoch,
                 }
                 logger.info(f"Socket {sid} connected with user_id: {token_data.user_id}, is_admin: {is_admin}")
                 await self._sio.enter_room(sid, f"user:{token_data.user_id}")
@@ -258,6 +265,12 @@ class SocketIO:
         - Deactivated/deleted: disconnect every socket belonging to the user. A
           reconnect attempt with the old token is rejected by ``_handle_connect``'s
           database check.
+        - Sessions revoked (password change): disconnect the sockets that authenticated
+          under a superseded token epoch. Without this the account stays active, so the
+          branch above does not fire and revoked sessions keep streaming events from an
+          already-open socket — HTTP would be locked out while the socket was not. The
+          session that performed the change reconnects with its replacement token; the
+          others fail ``_handle_connect`` and stay out.
         - Demoted: leave the admin room and update the cached ``is_admin`` so
           ``_handle_sub_queue`` cannot re-add it.
         - Promoted: join the admin room, matching the DB-derived REST behavior.
@@ -267,6 +280,10 @@ class SocketIO:
         for sid in affected_sids:
             if not event_data.is_active:
                 logger.info(f"Disconnecting socket {sid}: user {event_data.user_id} deactivated or deleted")
+                await self._sio.disconnect(sid)
+                continue
+            if self._socket_users[sid].get("token_epoch", 0) != event_data.token_epoch:
+                logger.info(f"Disconnecting socket {sid}: user {event_data.user_id} revoked its earlier sessions")
                 await self._sio.disconnect(sid)
                 continue
             self._socket_users[sid]["is_admin"] = event_data.is_admin

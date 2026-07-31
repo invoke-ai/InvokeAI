@@ -38,7 +38,7 @@ def _non_admin_user() -> Mock:
     stubbed user must carry concrete field values — a bare ``Mock`` fails
     ``TokenData`` validation.
     """
-    return Mock(user_id="user-1", email="user@example.com", is_admin=False, is_active=True)
+    return Mock(user_id="user-1", email="user@example.com", is_admin=False, is_active=True, token_epoch=0)
 
 
 def test_get_external_provider_statuses(monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:

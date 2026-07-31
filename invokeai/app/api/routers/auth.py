@@ -36,6 +36,31 @@ TOKEN_EXPIRATION_NORMAL = 1  # 1 day for normal login
 TOKEN_EXPIRATION_REMEMBER_ME = 7  # 7 days for "remember me" login
 
 
+def _issue_replacement_token(http_request: Request, response: Response, user: UserDTO, remember_me: bool) -> None:
+    """Hand the caller a token minted under the user's *current* revocation epoch.
+
+    A password change bumps the epoch, which kills every token issued before it —
+    including the one that authenticated the request making the change. Without a
+    replacement, changing a password would sign the caller out of their own session, and
+    the sliding-window middleware cannot fill the gap: it correctly refuses to refresh a
+    token whose epoch is already stale. It does leave an already-set header alone, so
+    what we write here survives.
+    """
+    expires_delta = timedelta(days=TOKEN_EXPIRATION_REMEMBER_ME if remember_me else TOKEN_EXPIRATION_NORMAL)
+    replacement = create_access_token(
+        TokenData(
+            user_id=user.user_id,
+            email=user.email,
+            is_admin=user.is_admin,
+            remember_me=remember_me,
+            token_epoch=user.token_epoch,
+        ),
+        expires_delta,
+    )
+    response.headers["X-Refreshed-Token"] = replacement
+    _set_media_cookie(http_request, response, replacement, int(expires_delta.total_seconds()))
+
+
 class LoginRequest(BaseModel):
     """Request body for user login."""
 
@@ -211,6 +236,7 @@ async def login(
         email=user.email,
         is_admin=user.is_admin,
         remember_me=login_request.remember_me,
+        token_epoch=user.token_epoch,
     )
     token = create_access_token(token_data, expires_delta)
     _set_media_cookie(request, response, token, int(expires_delta.total_seconds()))
@@ -517,8 +543,14 @@ async def update_user(
     user_id: Annotated[str, Path(description="User ID")],
     request: Annotated[AdminUserUpdateRequest, Body(description="User fields to update")],
     current_user: AdminUser,
+    http_request: Request,
+    response: Response,
 ) -> UserDTO:
     """Update a user. Requires admin privileges.
+
+    Resetting a password revokes the target's existing sessions. An admin resetting
+    their own password receives a replacement token in ``X-Refreshed-Token`` so they
+    are not signed out by their own action.
 
     Args:
         user_id: The user ID
@@ -566,11 +598,27 @@ async def update_user(
 
     # Authorization state changed — notify live connections (open sockets, the
     # session processor) so demotion/deactivation takes effect immediately
-    # instead of persisting until reconnect or token expiry.
-    if before is not None and (before.is_admin != updated.is_admin or before.is_active != updated.is_active):
+    # instead of persisting until reconnect or token expiry. A password reset bumps
+    # the epoch without touching is_admin/is_active, and must drop the target's open
+    # sockets too, so it is part of this condition.
+    if before is not None and (
+        before.is_admin != updated.is_admin
+        or before.is_active != updated.is_active
+        or before.token_epoch != updated.token_epoch
+    ):
         ApiDependencies.invoker.services.events.emit_user_access_changed(
-            user_id=updated.user_id, is_admin=updated.is_admin, is_active=updated.is_active
+            user_id=updated.user_id,
+            is_admin=updated.is_admin,
+            is_active=updated.is_active,
+            token_epoch=updated.token_epoch,
         )
+
+    # An admin resetting their *own* password would otherwise lock themselves out: the
+    # epoch bump kills the token that authenticated this request, and the sliding-window
+    # middleware correctly refuses to refresh a revoked one. Mirror what /auth/me does.
+    if request.password is not None and updated.user_id == current_user.user_id:
+        _issue_replacement_token(http_request, response, updated, current_user.remember_me)
+
     return updated
 
 
@@ -616,15 +664,24 @@ async def delete_user(
 async def update_current_user(
     request: Annotated[UserProfileUpdateRequest, Body(description="Profile fields to update")],
     current_user: CurrentUser,
+    http_request: Request,
+    response: Response,
 ) -> UserDTO:
     """Update the current user's own profile.
 
     To change the password, both ``current_password`` and ``new_password`` must
     be provided. The current password is verified before the change is applied.
 
+    A password change signs out the account's *other* sessions: it bumps the
+    revocation epoch, invalidating every previously issued token. This response
+    carries a replacement token in ``X-Refreshed-Token`` so the caller stays
+    signed in.
+
     Args:
         request: Profile fields to update
         current_user: The authenticated user
+        http_request: The HTTP request, used to scope the replacement media cookie
+        response: The HTTP response, used to return the replacement token
 
     Returns:
         The updated user
@@ -661,8 +718,23 @@ async def update_current_user(
             display_name=request.display_name,
             password=request.new_password,
         )
-        return user_service.update(
+        updated = user_service.update(
             current_user.user_id, changes, strict_password_checking=config.strict_password_checking
         )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+
+    if request.new_password is not None:
+        # Drop the account's other live sockets. They authenticated under the superseded
+        # epoch and would otherwise keep streaming this user's events even though every
+        # HTTP request from those sessions is now rejected. The account stays active, so
+        # the epoch — not is_active — is what marks them.
+        ApiDependencies.invoker.services.events.emit_user_access_changed(
+            user_id=updated.user_id,
+            is_admin=updated.is_admin,
+            is_active=updated.is_active,
+            token_epoch=updated.token_epoch,
+        )
+        _issue_replacement_token(http_request, response, updated, current_user.remember_me)
+
+    return updated

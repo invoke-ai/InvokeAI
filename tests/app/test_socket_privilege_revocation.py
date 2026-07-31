@@ -30,9 +30,11 @@ def _patch_multiuser_context(
     token_is_admin: bool,
     db_is_admin: bool,
     db_is_active: bool = True,
+    db_epoch: int = 0,
+    token_epoch: int = 0,
 ) -> None:
     """Multiuser context where the token's claims and the database record can differ."""
-    user = SimpleNamespace(user_id=user_id, is_active=db_is_active, is_admin=db_is_admin)
+    user = SimpleNamespace(user_id=user_id, is_active=db_is_active, is_admin=db_is_admin, token_epoch=db_epoch)
     invoker = SimpleNamespace(
         services=SimpleNamespace(
             configuration=SimpleNamespace(multiuser=True),
@@ -40,9 +42,15 @@ def _patch_multiuser_context(
         )
     )
     monkeypatch.setattr("invokeai.app.api.dependencies.ApiDependencies", SimpleNamespace(invoker=invoker))
+    # The connect handler resolves the record through `resolve_authorized_user`, which binds
+    # ApiDependencies at import time in auth_dependencies — patching the defining module alone
+    # would not reach it.
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", SimpleNamespace(invoker=invoker))
     monkeypatch.setattr(
         "invokeai.app.api.sockets.verify_token",
-        lambda token: SimpleNamespace(user_id=user_id, is_admin=token_is_admin) if token == "valid-token" else None,
+        lambda token: SimpleNamespace(user_id=user_id, is_admin=token_is_admin, token_epoch=token_epoch)
+        if token == "valid-token"
+        else None,
     )
 
 
@@ -115,10 +123,10 @@ class TestUserAccessChangedHandler:
         socketio._sio.leave_room = AsyncMock()
         socketio._sio.disconnect = AsyncMock()
         socketio._socket_users = {
-            "sid-admin": {"user_id": "admin-1", "is_admin": True},
-            "sid-user-a": {"user_id": "user-1", "is_admin": False},
-            "sid-user-b": {"user_id": "user-1", "is_admin": False},
-            "sid-other": {"user_id": "user-2", "is_admin": False},
+            "sid-admin": {"user_id": "admin-1", "is_admin": True, "token_epoch": 0},
+            "sid-user-a": {"user_id": "user-1", "is_admin": False, "token_epoch": 0},
+            "sid-user-b": {"user_id": "user-1", "is_admin": False, "token_epoch": 0},
+            "sid-other": {"user_id": "user-2", "is_admin": False, "token_epoch": 0},
         }
         return socketio
 
@@ -193,3 +201,59 @@ class TestUserAccessChangedHandler:
         assert "sid-other" not in disconnected
         socketio._sio.leave_room.assert_not_awaited()
         assert socketio._socket_users["sid-admin"]["is_admin"] is True
+
+
+class TestTokenEpochOnSockets:
+    """A revoked token must not open a socket, and must not keep an open one alive.
+
+    Sockets authenticate once, at connect. Without both halves of this, HTTP would be
+    locked out while an already-connected socket kept streaming the same user's events.
+    """
+
+    @pytest.mark.anyio
+    async def test_revoked_token_cannot_connect(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        socketio = SocketIO(FastAPI())
+        socketio._sio.enter_room = AsyncMock()
+        _patch_multiuser_context(
+            monkeypatch, user_id="user-1", token_is_admin=False, db_is_admin=False, db_epoch=1, token_epoch=0
+        )
+
+        accepted = await socketio._handle_connect("sid-1", {}, {"token": "valid-token"})
+
+        assert accepted is False
+        assert "sid-1" not in socketio._socket_users
+        socketio._sio.enter_room.assert_not_awaited()
+
+    @pytest.mark.anyio
+    async def test_current_token_still_connects(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """The epoch check must not reject an ordinary, current token."""
+        socketio = SocketIO(FastAPI())
+        socketio._sio.enter_room = AsyncMock()
+        _patch_multiuser_context(
+            monkeypatch, user_id="user-1", token_is_admin=False, db_is_admin=False, db_epoch=3, token_epoch=3
+        )
+
+        accepted = await socketio._handle_connect("sid-1", {}, {"token": "valid-token"})
+
+        assert accepted is True
+        assert socketio._socket_users["sid-1"]["token_epoch"] == 3
+
+    @pytest.mark.anyio
+    async def test_password_change_disconnects_superseded_sockets_only(self) -> None:
+        """The account stays active, so the deactivation branch does not fire — the epoch
+        is what identifies which of the user's sockets are now holding dead tokens."""
+        socketio = SocketIO(FastAPI())
+        socketio._sio.enter_room = AsyncMock()
+        socketio._sio.leave_room = AsyncMock()
+        socketio._sio.disconnect = AsyncMock()
+        socketio._socket_users = {
+            "sid-old": {"user_id": "user-1", "is_admin": False, "token_epoch": 0},
+            "sid-new": {"user_id": "user-1", "is_admin": False, "token_epoch": 1},
+            "sid-other": {"user_id": "user-2", "is_admin": False, "token_epoch": 0},
+        }
+        event = UserAccessChangedEvent.build(user_id="user-1", is_admin=False, is_active=True, token_epoch=1)
+
+        await socketio._handle_user_access_changed(("user_access_changed", event))
+
+        disconnected = {call.args[0] for call in socketio._sio.disconnect.await_args_list}
+        assert disconnected == {"sid-old"}

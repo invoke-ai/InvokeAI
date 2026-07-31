@@ -167,9 +167,16 @@ class EventServiceBase:
 
     # region User accounts
 
-    def emit_user_access_changed(self, user_id: str, is_admin: bool, is_active: bool) -> None:
-        """Emitted when a user's role or active status changes (server-internal; never sent to clients)."""
-        self.dispatch(UserAccessChangedEvent.build(user_id=user_id, is_admin=is_admin, is_active=is_active))
+    def emit_user_access_changed(self, user_id: str, is_admin: bool, is_active: bool, token_epoch: int = 0) -> None:
+        """Emitted when a user's role, active status, or token epoch changes.
+
+        Server-internal; never sent to clients.
+        """
+        self.dispatch(
+            UserAccessChangedEvent.build(
+                user_id=user_id, is_admin=is_admin, is_active=is_active, token_epoch=token_epoch
+            )
+        )
 
     # endregion
 

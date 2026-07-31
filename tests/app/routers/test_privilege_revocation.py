@@ -332,6 +332,164 @@ class TestDbDerivedAuthorization:
         assert refreshed.is_admin is False
 
 
+class TestTokenEpochRevocation:
+    """A password change invalidates tokens issued before it.
+
+    A JWT is self-contained, so nothing in the database can make an already-issued token
+    stop verifying. The epoch claim is the missing revocation primitive: rotating the
+    password bumps it, and every token carrying the old value is rejected.
+    """
+
+    def _change_own_password(self, client: TestClient, token: str, current: str, new: str) -> Any:
+        return client.patch(
+            "/api/v1/auth/me",
+            json={"current_password": current, "new_password": new},
+            headers=_auth(token),
+        )
+
+    def test_password_change_revokes_other_sessions(
+        self, client: TestClient, mock_invoker: Invoker, admin_token: str
+    ) -> None:
+        _create_user(mock_invoker, "user@test.com", "User")
+        session_a = _login(client, "user@test.com")
+        session_b = _login(client, "user@test.com")
+
+        r = self._change_own_password(client, session_a, "TestPass123", "BrandNewPass456")
+        assert r.status_code == 200
+
+        # The other session's token is dead even though the account is still active.
+        assert client.get("/api/v1/auth/me", headers=_auth(session_b)).status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_password_change_keeps_the_calling_session(
+        self, client: TestClient, mock_invoker: Invoker, admin_token: str
+    ) -> None:
+        """Changing your own password must not sign you out of the tab you did it from."""
+        _create_user(mock_invoker, "user@test.com", "User")
+        token = _login(client, "user@test.com")
+
+        r = self._change_own_password(client, token, "TestPass123", "BrandNewPass456")
+
+        assert r.status_code == 200
+        replacement = r.headers["X-Refreshed-Token"]
+        assert client.get("/api/v1/auth/me", headers=_auth(replacement)).status_code == 200
+
+    def test_admin_password_reset_revokes_the_targets_sessions(
+        self, client: TestClient, mock_invoker: Invoker, admin_token: str
+    ) -> None:
+        user_id = _create_user(mock_invoker, "user@test.com", "User")
+        victim_token = _login(client, "user@test.com")
+
+        r = client.patch(
+            f"/api/v1/auth/users/{user_id}", json={"password": "AdminReset789"}, headers=_auth(admin_token)
+        )
+        assert r.status_code == 200
+
+        assert client.get("/api/v1/auth/me", headers=_auth(victim_token)).status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_revoked_token_cannot_be_laundered_by_refresh(
+        self, client: TestClient, mock_invoker: Invoker, admin_token: str
+    ) -> None:
+        """The sliding window must not mint a fresh token from a revoked one.
+
+        The middleware runs after the route and refreshes on any 2xx mutation, so an
+        unauthenticated route would otherwise hand a stale-epoch bearer a valid token.
+        """
+        _create_user(mock_invoker, "user@test.com", "User")
+        stale = _login(client, "user@test.com")
+        _login(client, "user@test.com")
+        self._change_own_password(client, stale, "TestPass123", "BrandNewPass456")
+
+        # /auth/login requires no bearer and returns 200, but carries our stale header.
+        r = client.post(
+            "/api/v1/auth/login",
+            json={"email": "user@test.com", "password": "BrandNewPass456", "remember_me": False},
+            headers=_auth(stale),
+        )
+
+        assert r.status_code == 200
+        assert "X-Refreshed-Token" not in r.headers
+
+    def test_unrelated_profile_update_does_not_revoke(
+        self, client: TestClient, mock_invoker: Invoker, admin_token: str
+    ) -> None:
+        """Only a password change bumps the epoch — renaming must not sign anyone out."""
+        _create_user(mock_invoker, "user@test.com", "User")
+        token = _login(client, "user@test.com")
+
+        r = client.patch("/api/v1/auth/me", json={"display_name": "Renamed"}, headers=_auth(token))
+
+        assert r.status_code == 200
+        assert client.get("/api/v1/auth/me", headers=_auth(token)).status_code == 200
+
+    def test_revoked_token_is_rejected_on_ordinary_routes(
+        self, client: TestClient, mock_invoker: Invoker, admin_token: str
+    ) -> None:
+        """The revocation must cover the dependency almost every route actually uses.
+
+        `/auth/*` routes take `CurrentUser`; the rest of the API takes
+        `CurrentUserOrDefault`. Checking only the former leaves the check absent
+        everywhere it matters, which is indistinguishable from having no check at all.
+        """
+        _create_user(mock_invoker, "user@test.com", "User")
+        stale = _login(client, "user@test.com")
+        _save_image(mock_invoker, "victim.png", mock_invoker.services.users.get_by_email("user@test.com").user_id)
+        second = _login(client, "user@test.com")
+        self._change_own_password(client, second, "TestPass123", "BrandNewPass456")
+
+        # A CurrentUserOrDefault route, not an /auth/* one.
+        r = client.get("/api/v1/images/i/victim.png", headers=_auth(stale))
+
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_admin_resetting_own_password_is_not_locked_out(
+        self, client: TestClient, mock_invoker: Invoker, admin_token: str
+    ) -> None:
+        """The admin route bumps the epoch just like /auth/me, so it owes the caller a
+        replacement for the same reason — otherwise an admin who resets their own
+        password from the user-management screen locks themselves out."""
+        admin = mock_invoker.services.users.get_by_email("admin@test.com")
+        assert admin is not None
+
+        r = client.patch(
+            f"/api/v1/auth/users/{admin.user_id}",
+            json={"password": "AdminNewPass789"},
+            headers=_auth(admin_token),
+        )
+
+        assert r.status_code == 200
+        replacement = r.headers["X-Refreshed-Token"]
+        assert client.get("/api/v1/auth/me", headers=_auth(replacement)).status_code == 200
+        assert client.get("/api/v1/auth/me", headers=_auth(admin_token)).status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_password_change_emits_access_event_for_live_sockets(
+        self, client: TestClient, mock_invoker: Invoker, admin_token: str
+    ) -> None:
+        """HTTP revocation alone would leave already-open sockets streaming events."""
+        _create_user(mock_invoker, "user@test.com", "User")
+        token = _login(client, "user@test.com")
+
+        self._change_own_password(client, token, "TestPass123", "BrandNewPass456")
+
+        events = [e for e in mock_invoker.services.events.events if isinstance(e, UserAccessChangedEvent)]
+        assert len(events) == 1
+        assert events[0].is_active is True  # not a deactivation — the epoch is the signal
+        assert events[0].token_epoch == 1
+
+    def test_tokens_predating_the_claim_still_work(
+        self, client: TestClient, mock_invoker: Invoker, admin_token: str
+    ) -> None:
+        """Upgrading must not log everyone out: no epoch claim decodes to 0, matching an
+        un-bumped record."""
+        from invokeai.app.services.auth.token_service import TokenData, create_access_token
+
+        user_id = _create_user(mock_invoker, "user@test.com", "User")
+        legacy = create_access_token(
+            TokenData(user_id=user_id, email="user@test.com", is_admin=False, remember_me=False)
+        )
+
+        assert client.get("/api/v1/auth/me", headers=_auth(legacy)).status_code == 200
+
+
 class TestUserAccessChangedEmission:
     """Role/status changes emit the internal event that re-authorizes live connections."""
 

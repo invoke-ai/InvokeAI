@@ -15,7 +15,7 @@ def anyio_backend() -> str:
 def _patch_multiuser_context(monkeypatch: pytest.MonkeyPatch, *, user_id: str, is_admin: bool) -> None:
     # The connect handler derives is_admin from the database record, not the token,
     # so the mocked user record carries the role.
-    user = SimpleNamespace(user_id=user_id, is_active=True, is_admin=is_admin)
+    user = SimpleNamespace(user_id=user_id, is_active=True, is_admin=is_admin, token_epoch=0)
     invoker = SimpleNamespace(
         services=SimpleNamespace(
             configuration=SimpleNamespace(multiuser=True),
@@ -23,9 +23,14 @@ def _patch_multiuser_context(monkeypatch: pytest.MonkeyPatch, *, user_id: str, i
         )
     )
     monkeypatch.setattr("invokeai.app.api.dependencies.ApiDependencies", SimpleNamespace(invoker=invoker))
+    # Connect resolves the record via `resolve_authorized_user`, which binds
+    # ApiDependencies at import time in auth_dependencies.
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", SimpleNamespace(invoker=invoker))
     monkeypatch.setattr(
         "invokeai.app.api.sockets.verify_token",
-        lambda token: SimpleNamespace(user_id=user_id, is_admin=is_admin) if token == "valid-token" else None,
+        lambda token: SimpleNamespace(user_id=user_id, is_admin=is_admin, token_epoch=0)
+        if token == "valid-token"
+        else None,
     )
 
 

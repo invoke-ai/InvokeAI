@@ -17,6 +17,39 @@ logger = logging.getLogger(__name__)
 # HTTP Bearer token security scheme
 security = HTTPBearer(auto_error=False)
 MEDIA_TOKEN_COOKIE = "invokeai_media_token"
+# Deliberately indistinguishable from an ordinary expiry to a client: a token that fails
+# the epoch check is simply no longer valid, and saying *why* would tell a holder of a
+# stolen token that the account's password was just rotated.
+TOKEN_REVOKED_DETAIL = "Invalid or expired authentication token"
+
+
+def resolve_authorized_user(token_data: TokenData) -> "UserDTO | None":
+    """Return the account a verified token still grants access to, or None.
+
+    This is the single place that decides whether a syntactically valid token is still
+    honored, and every authenticated entry point must go through it: the REST
+    dependencies below, the Socket.IO handshake, and the video-upload ASGI gate. Keeping
+    the rules in one function is deliberate — they were previously repeated at each call
+    site, and a check added to some copies but not others is indistinguishable from no
+    check at all on the paths that were missed.
+
+    A token is honored when all three hold:
+
+    - the account still exists,
+    - it is active,
+    - and the token carries the account's current revocation epoch. Any mismatch counts
+      as revoked: the token was not issued from the record as it now stands. Tokens
+      predating the claim decode to 0 and so remain valid against a record that has never
+      been bumped, which is why upgrading logs nobody out.
+
+    Raises whatever the user service raises; callers that must fail closed should catch.
+    """
+    user = ApiDependencies.invoker.services.users.get(token_data.user_id)
+    if user is None or not user.is_active:
+        return None
+    if token_data.token_epoch != user.token_epoch:
+        return None
+    return user
 
 
 def _validate_token(token: str, invalid_detail: str) -> TokenData:
@@ -24,8 +57,8 @@ def _validate_token(token: str, invalid_detail: str) -> TokenData:
     if token_data is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=invalid_detail)
 
-    user = ApiDependencies.invoker.services.users.get(token_data.user_id)
-    if user is None or not user.is_active:
+    user = resolve_authorized_user(token_data)
+    if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive")
     return _db_derived_token_data(token_data, user)
 
@@ -38,12 +71,16 @@ def _db_derived_token_data(token_data: TokenData, user: "UserDTO") -> TokenData:
     keeps admin rights until their token expires — and sliding-window refresh
     would renew that stale claim indefinitely. A promoted user symmetrically
     gains admin rights on their next request without re-login.
+
+    The epoch is carried through from the record so a refreshed token stays valid
+    (callers only reach here once ``_token_epoch_is_current`` has passed).
     """
     return TokenData(
         user_id=user.user_id,
         email=user.email,
         is_admin=user.is_admin,
         remember_me=token_data.remember_me,
+        token_epoch=user.token_epoch,
     )
 
 
@@ -82,11 +119,10 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Verify user still exists and is active
-    user_service = ApiDependencies.invoker.services.users
-    user = user_service.get(token_data.user_id)
+    # Verify the token still grants access: user exists, is active, epoch is current.
+    user = resolve_authorized_user(token_data)
 
-    if user is None or not user.is_active:
+    if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User account is inactive or does not exist",
@@ -137,12 +173,11 @@ async def get_current_user_or_default(
         # Invalid token in multiuser mode - reject
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
 
-    # Verify user still exists and is active
-    user_service = ApiDependencies.invoker.services.users
-    user = user_service.get(token_data.user_id)
+    # Verify the token still grants access: user exists, is active, epoch is current.
+    user = resolve_authorized_user(token_data)
 
-    if user is None or not user.is_active:
-        # User doesn't exist or is inactive in multiuser mode - reject
+    if user is None:
+        # Missing, inactive, or revoked in multiuser mode - reject
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive")
 
     return _db_derived_token_data(token_data, user)

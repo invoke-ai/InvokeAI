@@ -82,6 +82,9 @@ class UserDTO(BaseModel):
     created_at: datetime = Field(description="When the user was created")
     updated_at: datetime = Field(description="When the user was last updated")
     last_login_at: datetime | None = Field(default=None, description="When user last logged in")
+    token_epoch: int = Field(
+        default=0, description="Revocation epoch; tokens minted before the current value are rejected"
+    )
 
     @field_validator("email")
     @classmethod

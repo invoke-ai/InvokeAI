@@ -60,7 +60,7 @@ class UserService(UserServiceBase):
         with self._db.transaction() as cursor:
             cursor.execute(
                 """
-                SELECT user_id, email, display_name, is_admin, is_active, created_at, updated_at, last_login_at
+                SELECT user_id, email, display_name, is_admin, is_active, created_at, updated_at, last_login_at, token_epoch
                 FROM users
                 WHERE user_id = ?
                 """,
@@ -80,6 +80,7 @@ class UserService(UserServiceBase):
             created_at=datetime.fromisoformat(row[5]),
             updated_at=datetime.fromisoformat(row[6]),
             last_login_at=datetime.fromisoformat(row[7]) if row[7] else None,
+            token_epoch=int(row[8]),
         )
 
     def get_by_email(self, email: str) -> UserDTO | None:
@@ -87,7 +88,7 @@ class UserService(UserServiceBase):
         with self._db.transaction() as cursor:
             cursor.execute(
                 """
-                SELECT user_id, email, display_name, is_admin, is_active, created_at, updated_at, last_login_at
+                SELECT user_id, email, display_name, is_admin, is_active, created_at, updated_at, last_login_at, token_epoch
                 FROM users
                 WHERE email = ?
                 """,
@@ -107,6 +108,7 @@ class UserService(UserServiceBase):
             created_at=datetime.fromisoformat(row[5]),
             updated_at=datetime.fromisoformat(row[6]),
             last_login_at=datetime.fromisoformat(row[7]) if row[7] else None,
+            token_epoch=int(row[8]),
         )
 
     def update(self, user_id: str, changes: UserUpdateRequest, strict_password_checking: bool = True) -> UserDTO:
@@ -136,6 +138,11 @@ class UserService(UserServiceBase):
         if changes.password is not None:
             updates.append("password_hash = ?")
             params.append(hash_password(changes.password))
+            # Rotating the password revokes every token issued under the old one. A JWT is
+            # self-contained, so without this a stolen token survives the password change
+            # meant to evict the thief — and sliding-window refresh renews it indefinitely.
+            # Computed in SQL so concurrent bumps can't read-modify-write over each other.
+            updates.append("token_epoch = token_epoch + 1")
 
         if changes.is_admin is not None:
             updates.append("is_admin = ?")
@@ -173,7 +180,7 @@ class UserService(UserServiceBase):
         with self._db.transaction() as cursor:
             cursor.execute(
                 """
-                SELECT user_id, email, display_name, password_hash, is_admin, is_active, created_at, updated_at, last_login_at
+                SELECT user_id, email, display_name, password_hash, is_admin, is_active, created_at, updated_at, last_login_at, token_epoch
                 FROM users
                 WHERE email = ?
                 """,
@@ -204,6 +211,8 @@ class UserService(UserServiceBase):
             created_at=datetime.fromisoformat(row[6]),
             updated_at=datetime.fromisoformat(row[7]),
             last_login_at=datetime.now(timezone.utc),
+            # password_hash occupies row[3] in this query, shifting the tail by one.
+            token_epoch=int(row[9]),
         )
 
     def has_admin(self) -> bool:
@@ -233,7 +242,7 @@ class UserService(UserServiceBase):
         with self._db.transaction() as cursor:
             cursor.execute(
                 """
-                SELECT user_id, email, display_name, is_admin, is_active, created_at, updated_at, last_login_at
+                SELECT user_id, email, display_name, is_admin, is_active, created_at, updated_at, last_login_at, token_epoch
                 FROM users
                 ORDER BY created_at DESC
                 LIMIT ? OFFSET ?
@@ -252,6 +261,7 @@ class UserService(UserServiceBase):
                 created_at=datetime.fromisoformat(row[5]),
                 updated_at=datetime.fromisoformat(row[6]),
                 last_login_at=datetime.fromisoformat(row[7]) if row[7] else None,
+                token_epoch=int(row[8]),
             )
             for row in rows
         ]

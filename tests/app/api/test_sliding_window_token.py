@@ -21,6 +21,7 @@ def _setup_jwt_secret(monkeypatch: pytest.MonkeyPatch):
         email="test@test.com",
         is_admin=False,
         is_active=True,
+        token_epoch=0,
     )
     users = SimpleNamespace(get=lambda user_id: user if user_id == user.user_id else None)
     monkeypatch.setattr(
@@ -348,7 +349,7 @@ class TestSlidingWindowMultiuserRevalidation:
 
         _patch_user_record(
             monkeypatch,
-            SimpleNamespace(user_id="test-user", email="test@test.com", is_admin=False, is_active=True),
+            SimpleNamespace(user_id="test-user", email="test@test.com", is_admin=False, is_active=True, token_epoch=0),
         )
         app = _create_test_app()
         client = TestClient(app)
@@ -370,7 +371,7 @@ class TestSlidingWindowMultiuserRevalidation:
 
         _patch_user_record(
             monkeypatch,
-            SimpleNamespace(user_id="test-user", email="test@test.com", is_admin=True, is_active=True),
+            SimpleNamespace(user_id="test-user", email="test@test.com", is_admin=True, is_active=True, token_epoch=0),
         )
         app = _create_test_app()
         client = TestClient(app)
@@ -390,7 +391,7 @@ class TestSlidingWindowMultiuserRevalidation:
 
         _patch_user_record(
             monkeypatch,
-            SimpleNamespace(user_id="test-user", email="test@test.com", is_admin=False, is_active=False),
+            SimpleNamespace(user_id="test-user", email="test@test.com", is_admin=False, is_active=False, token_epoch=0),
         )
         app = _create_test_app()
         client = TestClient(app)
@@ -421,7 +422,7 @@ class TestSlidingWindowMultiuserRevalidation:
 
         _patch_user_record(
             monkeypatch,
-            SimpleNamespace(user_id="test-user", email="test@test.com", is_admin=False, is_active=True),
+            SimpleNamespace(user_id="test-user", email="test@test.com", is_admin=False, is_active=True, token_epoch=0),
         )
         app = _create_test_app()
         client = TestClient(app)

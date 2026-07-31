@@ -897,7 +897,11 @@ class UserAccessChangedEvent(EventBase):
     user_id: str = Field(description="The ID of the affected user")
     is_admin: bool = Field(description="Whether the user currently has admin privileges")
     is_active: bool = Field(description="Whether the user account is currently active (False for deleted users)")
+    token_epoch: int = Field(
+        default=0,
+        description="The user's current token revocation epoch; sockets that authenticated under an older one are dropped",
+    )
 
     @classmethod
-    def build(cls, user_id: str, is_admin: bool, is_active: bool) -> "UserAccessChangedEvent":
-        return cls(user_id=user_id, is_admin=is_admin, is_active=is_active)
+    def build(cls, user_id: str, is_admin: bool, is_active: bool, token_epoch: int = 0) -> "UserAccessChangedEvent":
+        return cls(user_id=user_id, is_admin=is_admin, is_active=is_active, token_epoch=token_epoch)

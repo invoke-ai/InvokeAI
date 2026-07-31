@@ -157,9 +157,16 @@ export type paths = {
          *     To change the password, both ``current_password`` and ``new_password`` must
          *     be provided. The current password is verified before the change is applied.
          *
+         *     A password change signs out the account's *other* sessions: it bumps the
+         *     revocation epoch, invalidating every previously issued token. This response
+         *     carries a replacement token in ``X-Refreshed-Token`` so the caller stays
+         *     signed in.
+         *
          *     Args:
          *         request: Profile fields to update
          *         current_user: The authenticated user
+         *         http_request: The HTTP request, used to scope the replacement media cookie
+         *         response: The HTTP response, used to return the replacement token
          *
          *     Returns:
          *         The updated user
@@ -309,6 +316,10 @@ export type paths = {
         /**
          * Update User
          * @description Update a user. Requires admin privileges.
+         *
+         *     Resetting a password revokes the target's existing sessions. An admin resetting
+         *     their own password receives a replacement token in ``X-Refreshed-Token`` so they
+         *     are not signed out by their own action.
          *
          *     Args:
          *         user_id: The user ID
@@ -36324,6 +36335,12 @@ export type components = {
              * @description When user last logged in
              */
             last_login_at?: string | null;
+            /**
+             * Token Epoch
+             * @description Revocation epoch; tokens minted before the current value are rejected
+             * @default 0
+             */
+            token_epoch?: number;
         };
         /**
          * UserProfileUpdateRequest
