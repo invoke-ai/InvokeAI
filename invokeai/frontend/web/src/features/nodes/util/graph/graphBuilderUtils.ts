@@ -210,7 +210,8 @@ export const getInfill = (
 export const CANVAS_OUTPUT_PREFIX = 'canvas_output';
 
 // Only the classic SD/SDXL loaders expose a `unet` output; every other main-model loader (FLUX,
-// FLUX.2, SD3, CogView4, Qwen-Image, Z-Image, Krea-2, Anima) is transformer-based and has no `unet`.
+// FLUX.2, SD3, CogView4, Qwen-Image, Z-Image, ERNIE-Image, Krea-2, Anima, Wan) is transformer-based
+// and has no `unet`.
 // Defining the predicate by this small allow-list means any newly added transformer loader is treated
 // as unet-less automatically, and the negated branch narrows `modelLoader` to the unet-bearing loaders
 // so `addEdge(modelLoader, 'unet', ...)` type-checks.
