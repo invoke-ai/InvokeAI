@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 803542,
+        "brotliBytes": 803553,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 803372,
+        "gzipBytes": 803395,
         "imageRawBytes": 156376,
-        "initialRawBytes": 1845192,
+        "initialRawBytes": 1845221,
         "largestAssetRawBytes": 738008,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 57912,
+        "ownedRawBytes": 57941,
         "requestCount": 31,
         "scriptRequestCount": 15,
         "sourceOwners": [
@@ -241,15 +241,15 @@
         ]
       },
       "limits": {
-        "brotliBytes": 811578,
+        "brotliBytes": 811589,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 811406,
+        "gzipBytes": 811429,
         "imageRawBytes": 157940,
-        "initialRawBytes": 1863644,
+        "initialRawBytes": 1863674,
         "largestAssetRawBytes": 745389,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 57912,
+        "ownedRawBytes": 57941,
         "requestCount": 31,
         "scriptRequestCount": 15
       },
@@ -259,17 +259,17 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 992040,
+        "brotliBytes": 992202,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 990650,
+        "gzipBytes": 990803,
         "imageRawBytes": 156376,
-        "initialRawBytes": 2423127,
+        "initialRawBytes": 2423190,
         "largestAssetRawBytes": 738008,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 110881,
-        "requestCount": 72,
-        "scriptRequestCount": 56,
+        "ownedRawBytes": 110967,
+        "requestCount": 73,
+        "scriptRequestCount": 57,
         "sourceOwners": [
           "package:@ark-ui/react",
           "package:@chakra-ui/react",
@@ -749,17 +749,17 @@
         ]
       },
       "limits": {
-        "brotliBytes": 1001961,
+        "brotliBytes": 1002125,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 1000557,
+        "gzipBytes": 1000712,
         "imageRawBytes": 157940,
-        "initialRawBytes": 2447359,
+        "initialRawBytes": 2447422,
         "largestAssetRawBytes": 745389,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 110881,
-        "requestCount": 72,
-        "scriptRequestCount": 56
+        "ownedRawBytes": 110967,
+        "requestCount": 73,
+        "scriptRequestCount": 57
       },
       "owner": "workbench",
       "remediationTicket": "deepen-widget-registry-loading",

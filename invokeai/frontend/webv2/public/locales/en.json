@@ -875,6 +875,7 @@
       "dimensions": "Dimensions",
       "disableConcept": "Disable {{name}}",
       "disableReferenceImage": "Disable reference image",
+      "dropImageToPrompt": "Describe this image",
       "dynamicPrompts": {
         "title": "Dynamic Prompts",
         "showPrompts": "Show dynamic prompts",

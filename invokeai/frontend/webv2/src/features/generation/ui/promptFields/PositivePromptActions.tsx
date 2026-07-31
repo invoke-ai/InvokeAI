@@ -3,6 +3,7 @@ import type { GenerationModelCatalogItem as ModelConfig, PromptHistoryItem } fro
 import type { PromptTemplateSnapshot } from '@features/generation/core/promptTemplates';
 import type { GenerateLora, GenerateModelConfig } from '@features/generation/core/types';
 import type { DynamicPromptsFieldConfig } from '@features/generation/ui/promptFields/DynamicPromptsPanel';
+import type { DroppedPromptImage } from '@features/generation/ui/promptFields/usePromptImageDrop';
 import type { ChangeEvent, MouseEvent } from 'react';
 
 import { HStack, Icon, Image, Input, Popover, Portal, Separator, Stack, Text } from '@chakra-ui/react';
@@ -35,7 +36,7 @@ import {
   TrashIcon,
   Undo2Icon,
 } from 'lucide-react';
-import { useCallback, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const POPOVER_POSITIONING_BOTTOM_END = { placement: 'bottom-end' } as const;
@@ -81,6 +82,8 @@ export interface PromptTemplateState {
 
 interface PositivePromptActionsProps {
   batchCount: number;
+  /** An image dropped on the prompt box, for the image-to-prompt popover to open on. */
+  droppedImage: DroppedPromptImage;
   /** Absent on surfaces whose prompt is not batch-expanded (Upscale). */
   dynamicPrompts: DynamicPromptsFieldConfig | null;
   /** The authored prompt wrapped by the active template — what actually expands. */
@@ -100,6 +103,7 @@ interface PositivePromptActionsProps {
 
 export const PositivePromptActions = ({
   batchCount,
+  droppedImage,
   dynamicPrompts,
   effectivePositivePrompt,
   isPromptTriggerPickerOpen,
@@ -141,6 +145,7 @@ export const PositivePromptActions = ({
         onPositivePromptChange={onPositivePromptChangeImmediate}
       />
       <ImageToPromptButton
+        droppedImage={droppedImage}
         isDisabled={template.isViewMode}
         projectId={projectId}
         onPositivePromptChange={onPositivePromptChangeImmediate}
@@ -508,10 +513,12 @@ const ExpandPromptButton = ({
 };
 
 const ImageToPromptButton = ({
+  droppedImage,
   isDisabled,
   onPositivePromptChange,
   projectId,
 }: {
+  droppedImage: DroppedPromptImage;
   isDisabled: boolean;
   projectId: string;
   onPositivePromptChange: (prompt: string) => void;
@@ -530,6 +537,11 @@ const ImageToPromptButton = ({
   const [selectedModelKey, setSelectedModelKey] = useState<string | null>(null);
   const llavaModels = models.filter((model) => model.type === 'llava_onevision');
   const selectedModel = selectedModelKey ? llavaModels.find((model) => model.key === selectedModelKey) : null;
+  // A drop names the image outright, which is the whole point of dropping one:
+  // it is how you describe something other than what the gallery has selected.
+  const image = droppedImage.image ?? selectedImage;
+  const droppedImageName = droppedImage.image?.imageName ?? null;
+  const clearDroppedImage = droppedImage.onClear;
 
   activeProjectIdRef.current = activeProjectId;
 
@@ -537,21 +549,39 @@ const ImageToPromptButton = ({
     void ensureModelsLoaded();
   });
 
+  // Dropping onto the prompt box is the gesture that opens this popover. Keyed
+  // on the name rather than the object so a re-render cannot reopen a popover
+  // the user has just dismissed; closing clears the drop, so the same image
+  // dropped twice still reads as two separate gestures.
+  useEffect(() => {
+    if (droppedImageName !== null) {
+      setIsOpen(true);
+    }
+  }, [droppedImageName]);
+
+  // Closing hands the popover back to the gallery selection. Every close route
+  // goes through here, including the one after a successful run — a controlled
+  // `open` does not fire `onOpenChange` when it is the code that closes it.
+  const close = useCallback(() => {
+    setIsOpen(false);
+    clearDroppedImage();
+  }, [clearDroppedImage]);
+
   const runImageToPrompt = useCallback(async () => {
-    if (!selectedImage || !selectedModel) {
+    if (!image || !selectedModel) {
       return;
     }
 
     setIsLoading(true);
 
     try {
-      const result = await imageToPrompt({ image_name: selectedImage.imageName, model_key: selectedModel.key });
+      const result = await imageToPrompt({ image_name: image.imageName, model_key: selectedModel.key });
 
       if (result.prompt && activeProjectIdRef.current === projectId) {
         onPositivePromptChange(result.prompt);
       }
 
-      setIsOpen(false);
+      close();
     } catch (error) {
       notifications.reportError({
         area: 'image-to-prompt',
@@ -562,10 +592,10 @@ const ImageToPromptButton = ({
     } finally {
       setIsLoading(false);
     }
-  }, [notifications, onPositivePromptChange, projectId, selectedImage, selectedModel, t]);
+  }, [close, image, notifications, onPositivePromptChange, projectId, selectedModel, t]);
 
   const popoverIds = useMemo(() => ({ trigger: triggerId }), [triggerId]);
-  const handleOpenChange = useCallback((event: { open: boolean }) => setIsOpen(event.open), []);
+  const handleOpenChange = useCallback((event: { open: boolean }) => (event.open ? setIsOpen(true) : close()), [close]);
   const handleModelChange = useCallback((model: ModelConfig | null) => setSelectedModelKey(model?.key ?? null), []);
   const handleRunImageToPrompt = useCallback(() => void runImageToPrompt(), [runImageToPrompt]);
 
@@ -619,18 +649,18 @@ const ImageToPromptButton = ({
                       value={selectedModelKey}
                       onChange={handleModelChange}
                     />
-                    {selectedImage ? (
+                    {image ? (
                       <HStack gap="2">
                         <Image
-                          alt={selectedImage.imageName}
+                          alt={image.imageName}
                           boxSize="10"
                           flexShrink="0"
                           objectFit="cover"
                           rounded="md"
-                          src={selectedImage.thumbnailUrl || selectedImage.imageUrl}
+                          src={image.thumbnailUrl || image.imageUrl}
                         />
                         <Text color="fg.subtle" fontSize="xs" truncate>
-                          {selectedImage.imageName}
+                          {image.imageName}
                         </Text>
                       </HStack>
                     ) : (
@@ -639,7 +669,7 @@ const ImageToPromptButton = ({
                       </Text>
                     )}
                     <Button
-                      disabled={!selectedImage || !selectedModel}
+                      disabled={!image || !selectedModel}
                       loading={isLoading}
                       size="xs"
                       onClick={handleRunImageToPrompt}
