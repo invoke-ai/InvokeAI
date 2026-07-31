@@ -6,38 +6,19 @@
 
 import type { Rect, Vec2 } from '@workbench/canvas-engine/types';
 
-/** Zoom levels the viewport snaps to when close enough. Single source of truth for the HUD. */
-export const ZOOM_SNAP_CANDIDATES: readonly number[] = [0.25, 0.33, 0.5, 0.67, 0.75, 1, 1.25, 1.5, 2, 3, 4, 5];
-
-/** Relative tolerance (fraction of the candidate value) used by `snapZoom`. */
-export const ZOOM_SNAP_TOLERANCE = 0.03;
+/**
+ * The zoom levels the HUD dropdown offers. Presets only — wheel zoom is
+ * continuous and deliberately does NOT snap to these: a ~3% capture band around
+ * every level meant a slow scroll stalled at each one and had to be pushed out,
+ * which reads as the zoom sticking rather than as a helpful detent.
+ */
+export const ZOOM_PRESETS: readonly number[] = [0.25, 0.33, 0.5, 0.67, 0.75, 1, 1.25, 1.5, 2, 3, 4, 5];
 
 /** Minimum allowed zoom, used by `clampZoom`. */
 export const ZOOM_MIN = 0.1;
 
 /** Maximum allowed zoom, used by `clampZoom`. */
 export const ZOOM_MAX = 20;
-
-/**
- * Snaps `zoom` to the nearest of `candidates` if it's within a ~3% relative
- * tolerance of that candidate; otherwise returns `zoom` unchanged.
- */
-export const snapZoom = (zoom: number, candidates: readonly number[] = ZOOM_SNAP_CANDIDATES): number => {
-  let closest: number | null = null;
-  let closestDelta = Infinity;
-  for (const candidate of candidates) {
-    const delta = Math.abs(zoom - candidate);
-    if (delta < closestDelta) {
-      closestDelta = delta;
-      closest = candidate;
-    }
-  }
-  if (closest === null) {
-    return zoom;
-  }
-  const tolerance = closest * ZOOM_SNAP_TOLERANCE;
-  return closestDelta <= tolerance ? closest : zoom;
-};
 
 /** Clamps `zoom` to `[ZOOM_MIN, ZOOM_MAX]`. */
 export const clampZoom = (zoom: number): number => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom));

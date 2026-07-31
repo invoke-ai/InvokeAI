@@ -2,11 +2,11 @@
  * Pure zoom-menu helpers for the canvas HUD.
  *
  * The option set is derived from the engine's single source of truth for zoom
- * snap points (`ZOOM_SNAP_CANDIDATES`), so the HUD and the viewport's wheel
+ * snap points (`ZOOM_PRESETS`), so the HUD and the viewport's wheel
  * snapping always agree. No React, no side effects — unit-testable in node.
  */
 
-import { ZOOM_SNAP_CANDIDATES } from '@workbench/canvas-engine/api';
+import { ZOOM_PRESETS } from '@workbench/canvas-engine/api';
 
 /** Formats a zoom factor as a rounded whole-percent label (e.g. `1` → `"100%"`). */
 export const formatZoomPercent = (zoom: number): string => `${Math.round(zoom * 100)}%`;
@@ -19,4 +19,4 @@ export interface ZoomMenuOption {
 
 /** The selectable zoom levels for the HUD menu, largest first (matches snap points top-down). */
 export const zoomMenuOptions = (): ZoomMenuOption[] =>
-  [...ZOOM_SNAP_CANDIDATES].sort((a, b) => b - a).map((value) => ({ label: formatZoomPercent(value), value }));
+  [...ZOOM_PRESETS].sort((a, b) => b - a).map((value) => ({ label: formatZoomPercent(value), value }));

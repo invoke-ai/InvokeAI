@@ -466,7 +466,7 @@ export { canMergeVisibleRasters } from './document/mergeVisible';
 export { documentToExportLocalSamPoint } from './samCoordinates';
 export { bboxEquals, constrainBboxToRatio, roundBbox } from './tools/bboxHitTest';
 export { isEmpty, union } from './math/rect';
-export { ZOOM_SNAP_CANDIDATES } from './math/snapping';
+export { ZOOM_PRESETS } from './math/snapping';
 export { isLayerPixelEditEligible } from './editing/controlPixelEdit';
 export { type HideableLayer, isHideableLayer, isLayerHidden } from './document/sources';
 export {

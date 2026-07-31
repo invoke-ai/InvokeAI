@@ -8,42 +8,14 @@ import {
   snapMovedPoint,
   snapRectToGrid,
   snapToGrid,
-  snapZoom,
   ZOOM_MAX,
   ZOOM_MIN,
-  ZOOM_SNAP_CANDIDATES,
+  ZOOM_PRESETS,
 } from './snapping';
 
-describe('snapZoom', () => {
-  it('snaps to an exact candidate', () => {
-    expect(snapZoom(1)).toBe(1);
-    expect(snapZoom(0.25)).toBe(0.25);
-  });
-
-  it('snaps a value within tolerance of a candidate', () => {
-    expect(snapZoom(1.02)).toBe(1);
-    expect(snapZoom(0.98)).toBe(1);
-  });
-
-  it('passes through a value outside tolerance of any candidate', () => {
-    expect(snapZoom(1.2)).toBe(1.2);
-    expect(snapZoom(0.6)).toBe(0.6);
-  });
-
-  it('snaps at the tolerance boundary and passes through just beyond it', () => {
-    const candidate = 2;
-    const tolerance = candidate * 0.03;
-    expect(snapZoom(candidate + tolerance * 0.99)).toBe(candidate);
-    expect(snapZoom(candidate + tolerance * 1.5)).toBeCloseTo(candidate + tolerance * 1.5, 10);
-  });
-
-  it('supports custom candidates', () => {
-    expect(snapZoom(1.01, [1, 10])).toBe(1);
-    expect(snapZoom(5, [1, 10])).toBe(5);
-  });
-
+describe('ZOOM_PRESETS', () => {
   it('exports the default candidates as a stable list', () => {
-    expect(ZOOM_SNAP_CANDIDATES).toEqual([0.25, 0.33, 0.5, 0.67, 0.75, 1, 1.25, 1.5, 2, 3, 4, 5]);
+    expect(ZOOM_PRESETS).toEqual([0.25, 0.33, 0.5, 0.67, 0.75, 1, 1.25, 1.5, 2, 3, 4, 5]);
   });
 });
 

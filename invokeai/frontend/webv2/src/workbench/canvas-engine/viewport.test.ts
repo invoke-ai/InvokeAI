@@ -1,7 +1,7 @@
 import type { Vec2 } from '@workbench/canvas-engine/types';
 
 import { applyToPoint } from '@workbench/canvas-engine/math/mat2d';
-import { ZOOM_SNAP_CANDIDATES } from '@workbench/canvas-engine/math/snapping';
+import { ZOOM_PRESETS } from '@workbench/canvas-engine/math/snapping';
 import { describe, expect, it, vi } from 'vitest';
 
 import { createViewport } from './viewport';
@@ -42,13 +42,25 @@ describe('createViewport', () => {
     closeTo(vp.documentToScreen(docUnderAnchorBefore), anchor);
   });
 
-  it('wheelZoom snaps to a candidate when the exponential step lands near one', () => {
+  it('wheelZoom is continuous and does not snap to a preset', () => {
+    // Zoom used to be captured by a ~3% band around every preset, so a slow
+    // scroll stalled at each one; a small step must now actually move.
     const vp = createViewport({ pan: { x: 0, y: 0 }, zoom: 1 });
     const anchor: Vec2 = { x: 0, y: 0 };
-    // A tiny negative deltaY nudges zoom just above 1; it should snap back to 1.
+
     vp.wheelZoom(-1, anchor);
-    expect(vp.getZoom()).toBe(1);
-    expect(ZOOM_SNAP_CANDIDATES).toContain(vp.getZoom());
+    expect(vp.getZoom()).toBeGreaterThan(1);
+    expect(ZOOM_PRESETS).not.toContain(vp.getZoom());
+  });
+
+  it('wheelZoom crosses a preset instead of parking on it', () => {
+    // 0.99 sits inside the old ~3% capture band around 1, so a notch used to
+    // land exactly on the preset. It must now pass straight through.
+    const vp = createViewport({ pan: { x: 0, y: 0 }, zoom: 0.99 });
+
+    vp.wheelZoom(-100, { x: 0, y: 0 });
+
+    expect(vp.getZoom()).toBeGreaterThan(1);
   });
 
   it('wheelZoom zooms out on positive deltaY and in on negative deltaY', () => {
