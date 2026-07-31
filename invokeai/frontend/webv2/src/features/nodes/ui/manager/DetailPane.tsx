@@ -31,7 +31,7 @@ export const DetailPane = () => {
     >
       <Flex direction="column" flex="1" minH="0" minW="0">
         <Flex align="flex-end" borderBottomWidth={1} flexShrink={0} minH={HEADER_MIN_HEIGHT} px="2">
-          <Tabs.List h="full" mb="-1px">
+          <Tabs.List mb="-1px">
             <Tabs.Trigger fontSize="xs" value="details">
               <Icon as={BlocksIcon} boxSize="3" />
               <Text maxW="14rem" truncate>

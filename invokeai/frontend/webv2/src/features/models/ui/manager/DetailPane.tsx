@@ -37,7 +37,7 @@ export const DetailPane = () => {
         onValueChange={(event) => updateModelsUi({ activeTab: event.value as ModelManagerTab })}
       >
         <Flex align="flex-end" borderBottomWidth={1} flexShrink={0} minH={HEADER_MIN_HEIGHT} px="2">
-          <Tabs.List h="full" mb="-1px">
+          <Tabs.List mb="-1px">
             <Tabs.Trigger fontSize="xs" value="details">
               <Icon as={BoxIcon} boxSize="3" />
               <Text maxW="14rem" truncate>
