@@ -53,6 +53,7 @@ from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessi
 from invokeai.app.services.shared.sqlite.sqlite_util import init_db
 from invokeai.app.services.style_preset_images.style_preset_images_disk import StylePresetImageFileStorageDisk
 from invokeai.app.services.style_preset_records.style_preset_records_sqlite import SqliteStylePresetRecordsStorage
+from invokeai.app.services.system_prompt_records.system_prompt_records_sqlite import SqliteSystemPromptRecordsStorage
 from invokeai.app.services.urls.urls_default import LocalUrlService
 from invokeai.app.services.users.users_default import UserService
 from invokeai.app.services.video_files.video_files_disk import DiskVideoFileStorage
@@ -206,6 +207,7 @@ class ApiDependencies:
         style_preset_records = SqliteStylePresetRecordsStorage(db=db)
         wildcard_records = SqliteWildcardRecordsStorage(db=db)
         style_preset_image_files = StylePresetImageFileStorageDisk(style_presets_folder / "images")
+        system_prompt_records = SqliteSystemPromptRecordsStorage(db=db)
         workflow_thumbnails = WorkflowThumbnailFileStorageDisk(workflow_thumbnails_folder)
         client_state_persistence = ClientStatePersistenceSqlite(db=db)
         project_records = ProjectRecordsSqlite(db=db)
@@ -242,6 +244,7 @@ class ApiDependencies:
             style_preset_records=style_preset_records,
             wildcard_records=wildcard_records,
             style_preset_image_files=style_preset_image_files,
+            system_prompt_records=system_prompt_records,
             workflow_thumbnails=workflow_thumbnails,
             client_state_persistence=client_state_persistence,
             project_records=project_records,

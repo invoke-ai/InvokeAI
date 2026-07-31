@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from invokeai.app.services.object_serializer.object_serializer_base import ObjectSerializerBase
 from invokeai.app.services.style_preset_images.style_preset_images_base import StylePresetImageFileStorageBase
 from invokeai.app.services.style_preset_records.style_preset_records_base import StylePresetRecordsStorageBase
+from invokeai.app.services.system_prompt_records.system_prompt_records_base import SystemPromptRecordsStorageBase
 from invokeai.app.services.wildcard_records.wildcard_records_base import WildcardRecordsStorageBase
 
 if TYPE_CHECKING:
@@ -85,6 +86,7 @@ class InvocationServices:
         style_preset_records: "StylePresetRecordsStorageBase",
         wildcard_records: "WildcardRecordsStorageBase",
         style_preset_image_files: "StylePresetImageFileStorageBase",
+        system_prompt_records: "SystemPromptRecordsStorageBase",
         workflow_thumbnails: "WorkflowThumbnailServiceBase",
         client_state_persistence: "ClientStatePersistenceABC",
         project_records: "ProjectRecordsStorageBase",
@@ -126,6 +128,7 @@ class InvocationServices:
         self.style_preset_records = style_preset_records
         self.wildcard_records = wildcard_records
         self.style_preset_image_files = style_preset_image_files
+        self.system_prompt_records = system_prompt_records
         self.workflow_thumbnails = workflow_thumbnails
         self.client_state_persistence = client_state_persistence
         self.project_records = project_records

@@ -26,6 +26,9 @@ from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.invocation_stats.invocation_stats_default import InvocationStatsService
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.project_records.project_records_sqlite import ProjectRecordsSqlite
+from invokeai.app.services.system_prompt_records.system_prompt_records_sqlite import (
+    SqliteSystemPromptRecordsStorage,
+)
 from invokeai.app.services.users.users_default import UserService
 from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
 from invokeai.app.services.wildcard_records.wildcard_records_sqlite import SqliteWildcardRecordsStorage
@@ -70,6 +73,7 @@ def mock_services() -> InvocationServices:
         conditioning=None,  # type: ignore
         style_preset_records=None,  # type: ignore
         style_preset_image_files=None,  # type: ignore
+        system_prompt_records=SqliteSystemPromptRecordsStorage(db=db),
         workflow_thumbnails=None,  # type: ignore
         model_relationship_records=None,  # type: ignore
         model_relationships=None,  # type: ignore

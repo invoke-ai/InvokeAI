@@ -38,6 +38,7 @@ from invokeai.app.api.routers import (
     recall_parameters,
     session_queue,
     style_presets,
+    system_prompts,
     utilities,
     videos,
     virtual_boards,
@@ -423,6 +424,7 @@ app.include_router(session_queue.session_queue_router, prefix="/api")
 app.include_router(workflows.workflows_router, prefix="/api")
 app.include_router(style_presets.style_presets_router, prefix="/api")
 app.include_router(wildcards.wildcards_router, prefix="/api")
+app.include_router(system_prompts.system_prompts_router, prefix="/api")
 app.include_router(client_state.client_state_router, prefix="/api")
 app.include_router(projects.projects_router, prefix="/api")
 app.include_router(recall_parameters.recall_parameters_router, prefix="/api")

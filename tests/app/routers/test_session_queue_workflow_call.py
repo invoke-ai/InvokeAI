@@ -99,6 +99,7 @@ def mock_services() -> InvocationServices:
         users=UserService(db),
         wildcard_records=SqliteWildcardRecordsStorage(db=db),
         external_generation=None,  # type: ignore
+        system_prompt_records=None,  # type: ignore
         videos=None,  # type: ignore
         video_files=None,  # type: ignore
         video_records=SqliteVideoRecordStorage(db=db),
