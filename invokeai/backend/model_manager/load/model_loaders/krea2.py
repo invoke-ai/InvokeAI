@@ -24,6 +24,14 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelType,
     SubModelType,
 )
+from invokeai.backend.quantization.fp8_scaled import (
+    FP8_DTYPE,
+    attach_fp8_scales,
+    dequantize_fp8_scaled,
+    extract_fp8_scaled_layers,
+    is_fp8_matmul_enabled,
+    parse_quantization_metadata,
+)
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
 from invokeai.backend.util.devices import TorchDevice
 
@@ -110,6 +118,31 @@ def _dequantize_scaled_fp8(sd: dict[str, Any]) -> dict[str, Any]:
             out[weight_key] = weight * scale
         del out[scale_key]
     return out
+
+
+def _remap_native_layer_paths(layer_names: Any) -> dict[str, str]:
+    """Map native/ComfyUI layer paths to their diffusers equivalents.
+
+    ``_quantization_metadata`` names its layers in the checkpoint's own (native) scheme, but the
+    scales are extracted after the state dict has been renamed. Rather than restating the rename
+    rules - which would drift - each name is pushed through the real converter as a lone
+    ``<name>.weight`` entry and the resulting key is read back.
+    """
+    import torch
+
+    mapping: dict[str, str] = {}
+    for name in layer_names:
+        if not isinstance(name, str):
+            continue
+        try:
+            converted = _convert_krea2_native_to_diffusers({f"{name}.weight": torch.empty(0)})
+        except Exception:
+            continue
+        for key in converted:
+            if isinstance(key, str) and key.endswith(".weight"):
+                mapping[name] = key[: -len(".weight")]
+                break
+    return mapping
 
 
 def _convert_krea2_native_to_diffusers(sd: dict[str, Any]) -> dict[str, Any]:
@@ -331,27 +364,58 @@ class Krea2CheckpointModel(ModelLoader):
             raise TypeError(f"Expected Main_Checkpoint_Krea2_Config, got {type(config).__name__}.")
         model_path = Path(config.path)
 
+        from safetensors import safe_open
+
         sd = load_file(model_path)
+        with safe_open(model_path, framework="pt") as f:
+            metadata = f.metadata()
         sd = _strip_comfyui_prefix(sd)
-        # ComfyUI 'scaled fp8' checkpoints: fold the per-tensor weight_scale into the weights (→ float).
-        sd = _dequantize_scaled_fp8(sd)
-        # Native/ComfyUI key naming → diffusers Krea2Transformer2DModel keys.
+        # Native/ComfyUI key naming → diffusers Krea2Transformer2DModel keys. Done *before* the fp8
+        # scales are pulled out: the renames are substring-based on ".weight", so a sibling
+        # ".weight_scale" is carried to the same destination key automatically.
+        layer_hints = parse_quantization_metadata(metadata)
         if _is_native_krea2_format(sd):
             sd = _convert_krea2_native_to_diffusers(sd)
+            # The metadata still names layers natively; rename it the same way or its per-layer
+            # flags (notably full_precision_matrix_mult) match nothing.
+            path_map = _remap_native_layer_paths(layer_hints.keys())
+            layer_hints = {path_map.get(name, name): hints for name, hints in layer_hints.items()}
 
         target_device = TorchDevice.choose_torch_device()
         model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
 
+        # ComfyUI 'scaled fp8' checkpoints (fp8 weight + .weight_scale, optionally .input_scale).
+        fp8_layers = extract_fp8_scaled_layers(sd, layer_hints=layer_hints)
+        if fp8_layers and not is_fp8_matmul_enabled():
+            # Legacy behavior: fold the scales into the weights. Keeping them quantized without the
+            # fp8 matmul would halve VRAM but run slower, so both are tied to the same setting.
+            dequantize_fp8_scaled(sd, fp8_layers, model_dtype)
+            fp8_layers = {}
+
         with accelerate.init_empty_weights():
             model = Krea2Transformer2DModel(**KREA2_TRANSFORMER_CONFIG)
 
-        new_sd_size = sum(ten.nelement() * model_dtype.itemsize for ten in sd.values())
+        # fp8 weights keep their own (1-byte) footprint; everything else lands in model_dtype.
+        new_sd_size = sum(
+            ten.nelement() * (ten.element_size() if ten.dtype == FP8_DTYPE else model_dtype.itemsize)
+            for ten in sd.values()
+        )
         self._ram_cache.make_room(new_sd_size)
         for k in sd.keys():
-            sd[k] = sd[k].to(model_dtype)
+            if sd[k].dtype is not FP8_DTYPE:
+                sd[k] = sd[k].to(model_dtype)
 
         model.load_state_dict(sd, assign=True, strict=False)
         _reject_incomplete_load(model, what="Krea-2 single-file checkpoint")
+
+        if fp8_layers:
+            attached = attach_fp8_scales(model, fp8_layers)
+            self._logger.info(f"Krea-2: kept {attached} layer(s) in fp8 (scaled fp8 checkpoint, fp8_compute enabled)")
+            # The layerwise-casting path exists to *produce* fp8 weights from full-precision ones. The
+            # checkpoint already is fp8, and its hooks would cast back to the compute dtype without
+            # applying weight_scale, so it must not run here.
+            return model
+
         # Honor the fp8-storage setting (re-quantizes the dequantized weights to fp8-resident on CUDA).
         model = self._apply_fp8_layerwise_casting(model, config, SubModelType.Transformer)
         return model
