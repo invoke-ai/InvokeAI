@@ -30,6 +30,11 @@ import { usePreviewLoupe, type PreviewLoupeControls } from './usePreviewLoupe';
  * shadowed frame. Owns everything drawn over the image (live badge, and later
  * the loupe, progress hairline, and drop-to-compare affordance) so the widget
  * shell never grows frame-specific rendering.
+ *
+ * The backdrop is deliberately unframed — no border, no radius, no outer
+ * padding — so the dot grid reads as the widget's own floor and runs edge to
+ * edge. The only framed thing is the media itself; the filmstrip and details
+ * float above the grid rather than sitting in a second card.
  */
 
 export const previewGridCss = {
@@ -69,6 +74,8 @@ interface PreviewFrameProps {
   onContextMenu?: (x: number, y: number) => void;
   onVideoCopyAvailabilityChange?: (itemKey: GalleryItemKey, isAvailable: boolean) => void;
   padding?: string;
+  /** Extra bottom padding reserving room for the overlaid filmstrip and details. */
+  paddingBottom?: string;
   shouldAntialiasLiveImage: boolean;
   source: PreviewMediaSource | null;
   /** Preview-owned controller for the selected video's current frame. */
@@ -88,6 +95,7 @@ export const PreviewFrame = (props: PreviewFrameProps) => {
         onContextMenu={props.onContextMenu}
         onCopyAvailabilityChange={props.onVideoCopyAvailabilityChange}
         padding={props.padding}
+        paddingBottom={props.paddingBottom}
         source={props.source}
         videoControllerRef={props.videoControllerRef}
       />
@@ -108,6 +116,7 @@ const PreviewImageFrame = ({
   loupeControlsRef,
   onContextMenu,
   padding,
+  paddingBottom,
   shouldAntialiasLiveImage,
   source,
   variant,
@@ -219,8 +228,7 @@ const PreviewImageFrame = ({
     <Flex
       ref={loupe.stageRefCallback}
       align="center"
-      borderWidth="1px"
-      borderColor="border.subtle"
+      backgroundColor="bg.inset"
       color="fg.grid"
       containerType="size"
       css={previewGridCss}
@@ -230,8 +238,8 @@ const PreviewImageFrame = ({
       minH="0"
       overflow="hidden"
       p={padding}
+      pb={paddingBottom}
       position="relative"
-      rounded="lg"
       w="full"
       {...loupe.stageProps}
     >
@@ -292,6 +300,7 @@ const PreviewVideo = ({
   onContextMenu,
   onCopyAvailabilityChange,
   padding,
+  paddingBottom,
   source,
   videoControllerRef,
 }: {
@@ -301,6 +310,7 @@ const PreviewVideo = ({
   onContextMenu?: (x: number, y: number) => void;
   onCopyAvailabilityChange?: (itemKey: GalleryItemKey, isAvailable: boolean) => void;
   padding?: string;
+  paddingBottom?: string;
   source: Extract<PreviewMediaSource, { kind: 'video' }>;
   videoControllerRef?: Ref<PreviewVideoFrameController>;
 }) => {
@@ -461,8 +471,7 @@ const PreviewVideo = ({
   return (
     <Flex
       align="center"
-      borderWidth="1px"
-      borderColor="border.subtle"
+      backgroundColor="bg.inset"
       color="fg.grid"
       containerType="size"
       css={previewGridCss}
@@ -471,8 +480,8 @@ const PreviewVideo = ({
       minH="0"
       overflow="hidden"
       p={padding}
+      pb={paddingBottom}
       position="relative"
-      rounded="lg"
       w="full"
     >
       <Box
