@@ -8501,6 +8501,11 @@ export type components = {
              */
             qwen3_encoder?: components["schemas"]["ModelIdentifierField"] | null;
             /**
+             * @description The Mistral text encoder model used for FLUX.2 [dev] inference
+             * @default null
+             */
+            mistral_encoder?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
              * Ideogram4 Caption
              * @description The structured JSON caption encoded for Ideogram 4 inference
              * @default null

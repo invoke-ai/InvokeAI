@@ -22535,6 +22535,22 @@
             "orig_default": null,
             "orig_required": false
           },
+          "mistral_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The Mistral text encoder model used for FLUX.2 [dev] inference",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false
+          },
           "ideogram4_caption": {
             "anyOf": [
               {
@@ -22767,7 +22783,7 @@
         "tags": ["metadata"],
         "title": "Core Metadata",
         "type": "object",
-        "version": "2.1.0",
+        "version": "2.2.0",
         "output": {
           "$ref": "#/components/schemas/MetadataOutput"
         }
