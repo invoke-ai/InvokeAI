@@ -234,12 +234,7 @@ class ModelLoader(ModelLoaderBase):
         if self._torch_device.type != "cuda":
             return False
 
-        # Z-Image has dtype mismatch issues with diffusers' layerwise casting
-        # (skipped modules produce bf16, hooked modules expect fp16).
-        from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
-
-        if hasattr(config, "base") and config.base == BaseModelType.ZImage:
-            return False
+        from invokeai.backend.model_manager.taxonomy import ModelType
 
         # VAEs are excluded — fp8 storage causes noticeable quality degradation in decode.
         if hasattr(config, "type") and config.type == ModelType.VAE:
@@ -310,7 +305,19 @@ class ModelLoader(ModelLoaderBase):
         # `register_forward_hook` path fires around `nn.Module._call_impl` without replacing
         # `forward`, so `CustomLinear.forward` is still reached.
         if isinstance(model, torch.nn.Module):
-            self._apply_fp8_to_nn_module(model, storage_dtype=storage_dtype, compute_dtype=compute_dtype)
+            # Diffusers models declare their own precision-sensitive modules in
+            # `_skip_layerwise_casting_patterns`, and `enable_layerwise_casting()` honors them. Since
+            # we no longer call it, we have to apply that list ourselves — it is not cosmetic. Z-Image's
+            # `TimestepEmbedder.forward` reads `self.mlp[0].weight.dtype` and casts its *input* to it;
+            # with an fp8 weight the input becomes float8 before our pre-hook can restore the weight,
+            # and `F.linear` dies with `"addmm_cuda" not implemented for 'Float8_e4m3fn'`. Hence
+            # `['t_embedder', 'cap_embedder']` for that model.
+            self._apply_fp8_to_nn_module(
+                model,
+                storage_dtype=storage_dtype,
+                compute_dtype=compute_dtype,
+                extra_skip_patterns=tuple(getattr(model, "_skip_layerwise_casting_patterns", None) or ()),
+            )
         else:
             return model
 
@@ -323,7 +330,12 @@ class ModelLoader(ModelLoaderBase):
         return model
 
     @staticmethod
-    def _apply_fp8_to_nn_module(model: torch.nn.Module, storage_dtype: torch.dtype, compute_dtype: torch.dtype) -> None:
+    def _apply_fp8_to_nn_module(
+        model: torch.nn.Module,
+        storage_dtype: torch.dtype,
+        compute_dtype: torch.dtype,
+        extra_skip_patterns: tuple[str, ...] = (),
+    ) -> None:
         """Apply FP8 layerwise casting to a plain nn.Module.
 
         Mirrors diffusers' `apply_layerwise_casting` semantics: only the layer classes in
@@ -331,11 +343,16 @@ class ModelLoader(ModelLoaderBase):
         `_FP8_DEFAULT_SKIP_PATTERNS` (norm, pos_embed, patch_embed, proj_in/out) are skipped.
         Without the skip list, precision-sensitive tiny learned scalars (e.g. FLUX RMSNorm.scale)
         get crushed to FP8 and quality degrades noticeably.
+
+        `extra_skip_patterns` carries the model's own declared exclusions (diffusers'
+        `_skip_layerwise_casting_patterns`), which are model-specific and cannot be inferred from
+        layer types or generic name patterns.
         """
+        skip_patterns = _FP8_DEFAULT_SKIP_PATTERNS + tuple(extra_skip_patterns)
         for module_name, module in model.named_modules():
             if not isinstance(module, _FP8_SUPPORTED_PYTORCH_LAYERS):
                 continue
-            if any(re.search(pattern, module_name) for pattern in _FP8_DEFAULT_SKIP_PATTERNS):
+            if any(re.search(pattern, module_name) for pattern in skip_patterns):
                 continue
             params = list(module.parameters(recurse=False))
             if not params:
