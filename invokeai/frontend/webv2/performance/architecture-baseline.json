@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 798861,
+        "brotliBytes": 799495,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 798978,
+        "gzipBytes": 799588,
         "imageRawBytes": 156376,
-        "initialRawBytes": 1834021,
+        "initialRawBytes": 1835695,
         "largestAssetRawBytes": 737757,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 57857,
+        "ownedRawBytes": 57878,
         "requestCount": 31,
         "scriptRequestCount": 15,
         "sourceOwners": [
@@ -239,15 +239,15 @@
         ]
       },
       "limits": {
-        "brotliBytes": 806850,
+        "brotliBytes": 807490,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 806968,
+        "gzipBytes": 807584,
         "imageRawBytes": 157940,
-        "initialRawBytes": 1852362,
+        "initialRawBytes": 1854052,
         "largestAssetRawBytes": 745135,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 57857,
+        "ownedRawBytes": 57878,
         "requestCount": 31,
         "scriptRequestCount": 15
       },
@@ -257,15 +257,15 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 986211,
+        "brotliBytes": 987794,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 984908,
+        "gzipBytes": 986463,
         "imageRawBytes": 156376,
-        "initialRawBytes": 2408718,
+        "initialRawBytes": 2413642,
         "largestAssetRawBytes": 737757,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 108868,
+        "ownedRawBytes": 110895,
         "requestCount": 72,
         "scriptRequestCount": 56,
         "sourceOwners": [
@@ -745,15 +745,15 @@
         ]
       },
       "limits": {
-        "brotliBytes": 996074,
+        "brotliBytes": 997672,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 994758,
+        "gzipBytes": 996328,
         "imageRawBytes": 157940,
-        "initialRawBytes": 2432806,
+        "initialRawBytes": 2437779,
         "largestAssetRawBytes": 745135,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 108868,
+        "ownedRawBytes": 110895,
         "requestCount": 72,
         "scriptRequestCount": 56
       },
@@ -803,7 +803,9 @@
       "src/features/models/ui/ModelManagerView.tsx",
       "src/features/nodes/ui/NodeManagerView.tsx"
     ],
-    "editorForbiddenInitialChunkNames": ["ag-psd"],
+    "editorForbiddenInitialChunkNames": [
+      "ag-psd"
+    ],
     "inactiveWidgetGateOwner": "deepen-widget-registry-loading"
   }
 }

@@ -1,6 +1,6 @@
 /* eslint-disable react/react-compiler, react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-jsx-as-prop */
 import type { ModelConfig, ModelTaxonomyType } from '@features/models/core/types';
-import type { PickerGroup, PickerOptionState } from '@platform/ui';
+import type { PickerGroup, PickerOptionState } from '@platform/ui/Picker';
 
 import { Badge, Box, HStack, Icon, Image, Popover, Portal, Spacer, Stack, Text } from '@chakra-ui/react';
 import { getModelBaseColorPalette, getModelBaseLabel, getModelBaseLongLabel } from '@features/models/core/baseIdentity';
@@ -11,7 +11,8 @@ import { ensureModelsLoaded, useModelsSelector } from '@features/models/data/mod
 import { useModelsUi } from '@features/models/ui/ModelsUiContext';
 import { setPickerCompactView, useModelsUiSelector } from '@features/models/ui/uiStore';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import { Button, CloseButton, IconButton, Picker, Tooltip } from '@platform/ui';
+import { Button, CloseButton, IconButton, Tooltip } from '@platform/ui';
+import { Picker } from '@platform/ui/Picker';
 import { Link } from '@tanstack/react-router';
 import { dropdownContent } from '@theme/recipes';
 import {

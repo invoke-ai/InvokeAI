@@ -7,7 +7,6 @@ export * from './Field';
 export * from './JsonPreview';
 export * from './Menu';
 export * from './Panel';
-export * from './Picker';
 export * from './RenameDialog';
 export * from './ResizableTextarea';
 export * from './Row';
