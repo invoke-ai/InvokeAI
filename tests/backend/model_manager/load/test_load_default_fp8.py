@@ -329,6 +329,37 @@ def test_apply_fp8_layerwise_casting_passes_model_declared_skip_patterns():
     assert model.layers.weight.dtype == torch.float8_e4m3fn
 
 
+def test_anima_transformer_declares_t_embedder_skip():
+    """Regression guard for Anima + FP8 rendering a heavily dithered image.
+
+    `AnimaTransformer.t_embedder` produces the `adaln_lora` conditioning consumed by every block,
+    so casting it to FP8 corrupts every token of every block — verified against a bf16 run at the
+    same seed/steps/CFG. None of the generic `_FP8_DEFAULT_SKIP_PATTERNS` match it (this
+    architecture doesn't use diffusers' module names), so the model has to declare it itself.
+    """
+    from invokeai.backend.anima.anima_transformer import AnimaTransformer
+
+    assert "t_embedder" in AnimaTransformer._skip_layerwise_casting_patterns
+
+    # And the declared patterns actually reach the cast, matched against dotted module paths.
+    class _Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.t_embedder = torch.nn.Sequential(torch.nn.Linear(4, 4), torch.nn.Linear(4, 4))
+            self.blocks = torch.nn.Linear(4, 4)
+
+    model = _Model().to(torch.float32)
+    ModelLoader._apply_fp8_to_nn_module(
+        model,
+        storage_dtype=torch.float16,
+        compute_dtype=torch.float32,
+        extra_skip_patterns=tuple(AnimaTransformer._skip_layerwise_casting_patterns),
+    )
+
+    assert model.t_embedder[0].weight.dtype == torch.float32
+    assert model.blocks.weight.dtype == torch.float16
+
+
 def test_should_use_fp8_allows_z_image():
     """Z-Image was excluded while we used diffusers' `enable_layerwise_casting()` with the global
     torch dtype (fp16) as compute dtype, which clashed with the model's bf16 weights. The compute
