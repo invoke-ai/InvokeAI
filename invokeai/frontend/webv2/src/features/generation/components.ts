@@ -3,6 +3,12 @@
  * and the settings section shell shared with other widgets.
  * Curated, caller-driven export list — add a symbol only when a consumer needs it.
  */
+export {
+  AspectRatioLockButton,
+  AspectRatioSelect,
+  type AspectRatioLockButtonProps,
+  type AspectRatioSelectProps,
+} from './ui/shared/AspectRatioSelect';
 export { NegativePromptField } from './ui/promptFields/NegativePromptField';
 export { PositivePromptField } from './ui/promptFields/PositivePromptField';
 export { PromptTextarea } from './ui/promptFields/PromptTextarea';

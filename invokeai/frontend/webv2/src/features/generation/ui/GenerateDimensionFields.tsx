@@ -1,24 +1,22 @@
 /* eslint-disable react/react-compiler, react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-jsx-as-prop */
-import type { SelectValueChangeDetails } from '@chakra-ui/react';
 import type { AspectRatioId, GenerateModelConfig, GenerateSettings } from '@features/generation/core/types';
 
-import { Badge, Box, createListCollection, HStack, Icon, InputGroup, NumberInput, Stack, Text } from '@chakra-ui/react';
+import { Badge, Box, HStack, Icon, InputGroup, NumberInput, Stack } from '@chakra-ui/react';
 import { getDefaultGenerateSettings, getGenerationDimensions } from '@features/generation/core/baseGenerationPolicies';
 import {
   ASPECT_RATIO_MAP,
-  ASPECT_RATIO_OPTIONS,
   calculateNewSize,
   clampDimension,
-  isAspectRatioId,
   MAX_DIMENSION,
   MIN_DIMENSION,
 } from '@features/generation/core/settings';
-import { Field, IconButton, Select, Tooltip } from '@platform/ui';
-import { ArrowLeftRightIcon, LockIcon, LockOpenIcon, RulerDimensionLineIcon, ScalingIcon } from 'lucide-react';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Field, IconButton, Tooltip } from '@platform/ui';
+import { ArrowLeftRightIcon, LockIcon, RulerDimensionLineIcon, ScalingIcon } from 'lucide-react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AspectRatioPreview } from './shared/AspectRatioPreview';
+import { AspectRatioLockButton, AspectRatioSelect } from './shared/AspectRatioSelect';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
 import { ModelDefaultButton } from './shared/ModelDefaultButton';
 
@@ -30,7 +28,6 @@ interface GenerateDimensionFieldsProps {
 }
 
 type Dimensions = Pick<GenerateSettings, 'height' | 'width'>;
-type AspectRatioOption = { id: AspectRatioId; ratio: number };
 
 /** The ratio to enforce, preferring the stored value and falling back to the current dimensions. */
 const getActiveRatio = (settings: GenerateSettings): number =>
@@ -39,9 +36,6 @@ const getActiveRatio = (settings: GenerateSettings): number =>
     : settings.height > 0
       ? settings.width / settings.height
       : 1;
-
-const getAspectRatioOptionRatio = (id: AspectRatioId, fallbackRatio: number): number =>
-  id === 'Free' ? fallbackRatio : ASPECT_RATIO_MAP[id].ratio;
 
 export const GenerateDimensionFields = ({
   onCommit,
@@ -61,27 +55,6 @@ export const GenerateDimensionFields = ({
   const projectIdRef = useRef(projectId);
   const previousSettingsDimensionsRef = useRef<Dimensions>({ height: settings.height, width: settings.width });
   const dimensionRatio = displayDimensions.height > 0 ? displayDimensions.width / displayDimensions.height : 1;
-
-  const aspectRatioOptions = useMemo<AspectRatioOption[]>(
-    () =>
-      ASPECT_RATIO_OPTIONS.map((id) => ({
-        id,
-        ratio: getAspectRatioOptionRatio(id, dimensionRatio),
-      })),
-    [dimensionRatio]
-  );
-
-  const aspectRatioCollection = useMemo(
-    () =>
-      createListCollection({
-        itemToString: (item: AspectRatioOption) => item.id,
-        itemToValue: (item: AspectRatioOption) => item.id,
-        items: aspectRatioOptions,
-      }),
-    [aspectRatioOptions]
-  );
-
-  const activeAspectRatioPreviewRatio = getAspectRatioOptionRatio(settings.aspectRatioId, dimensionRatio);
 
   useEffect(() => {
     onCommitRef.current = onCommit;
@@ -194,13 +167,7 @@ export const GenerateDimensionFields = ({
     onCommit(patch);
   };
 
-  const setAspectRatioId = ({ value }: SelectValueChangeDetails<AspectRatioOption>) => {
-    const id = value[0];
-
-    if (!isAspectRatioId(id)) {
-      return;
-    }
-
+  const setAspectRatioId = (id: AspectRatioId) => {
     if (id === 'Free') {
       commitSettings({
         aspectRatioId: 'Free',
@@ -278,50 +245,12 @@ export const GenerateDimensionFields = ({
     >
       <Field label={t('widgets.generate.aspectRatio')} p="2">
         <HStack gap="1">
-          <Select
-            collection={aspectRatioCollection}
-            contentProps={{ maxH: '18rem' }}
-            flex="1"
-            renderItem={(option) => (
-              <HStack as="span" gap="2">
-                <AspectRatioPreview boxSize="6" ratio={option.ratio} />
-                <Text as="span" fontSize="xs">
-                  {option.id}
-                </Text>
-              </HStack>
-            )}
-            size="xs"
-            value={[settings.aspectRatioId]}
-            valueText={
-              <HStack as="span" gap="2" minW="0">
-                <AspectRatioPreview boxSize="5" ratio={activeAspectRatioPreviewRatio} />
-                <Text as="span" fontSize="xs" truncate>
-                  {settings.aspectRatioId}
-                </Text>
-              </HStack>
-            }
-            onValueChange={setAspectRatioId}
+          <AspectRatioSelect
+            fallbackRatio={dimensionRatio}
+            value={settings.aspectRatioId}
+            onChange={setAspectRatioId}
           />
-          <Tooltip
-            content={
-              settings.aspectRatioIsLocked
-                ? t('widgets.generate.unlockAspectRatio')
-                : t('widgets.generate.lockAspectRatio')
-            }
-          >
-            <IconButton
-              aria-label={
-                settings.aspectRatioIsLocked
-                  ? t('widgets.generate.unlockAspectRatio')
-                  : t('widgets.generate.lockAspectRatio')
-              }
-              size="xs"
-              variant={settings.aspectRatioIsLocked ? 'solid' : 'outline'}
-              onClick={toggleLock}
-            >
-              {settings.aspectRatioIsLocked ? <LockIcon /> : <LockOpenIcon />}
-            </IconButton>
-          </Tooltip>
+          <AspectRatioLockButton isLocked={settings.aspectRatioIsLocked} onToggle={toggleLock} />
           <Tooltip content={t('widgets.generate.swapWidthAndHeight')}>
             <IconButton
               aria-label={t('widgets.generate.swapWidthAndHeight')}
