@@ -8,6 +8,7 @@ import {
   selectBase,
   selectFluxDypePreset,
   selectIsAnima,
+  selectIsErnieImage,
   selectIsExternal,
   selectIsFLUX,
   selectIsFlux2,
@@ -24,6 +25,7 @@ import LoRASelect from 'features/lora/components/LoRASelect';
 import PidSettings from 'features/parameters/components/Advanced/PidSettings';
 import ParamAnimaScheduler from 'features/parameters/components/Core/ParamAnimaScheduler';
 import ParamCFGScale from 'features/parameters/components/Core/ParamCFGScale';
+import ParamErnieImageScheduler from 'features/parameters/components/Core/ParamErnieImageScheduler';
 import ParamFluxDypeExponent from 'features/parameters/components/Core/ParamFluxDypeExponent';
 import ParamFluxDypePreset from 'features/parameters/components/Core/ParamFluxDypePreset';
 import ParamFluxDypeScale from 'features/parameters/components/Core/ParamFluxDypeScale';
@@ -60,6 +62,7 @@ export const GenerationSettingsAccordion = memo(() => {
   const isFLUX = useAppSelector(selectIsFLUX);
   const isFlux2 = useAppSelector(selectIsFlux2);
   const isZImage = useAppSelector(selectIsZImage);
+  const isErnieImage = useAppSelector(selectIsErnieImage);
   const isIdeogram4 = useAppSelector(selectIsIdeogram4);
   const isExternal = useAppSelector(selectIsExternal);
   const isQwenImage = useAppSelector(selectIsQwenImage);
@@ -113,6 +116,7 @@ export const GenerationSettingsAccordion = memo(() => {
                 {shouldShowStandardScheduler(base) && <ParamScheduler />}
                 {!isExternal && (isFLUX || isFlux2) && <ParamFluxScheduler />}
                 {!isExternal && isZImage && <ParamZImageScheduler />}
+                {!isExternal && isErnieImage && <ParamErnieImageScheduler />}
                 {!isExternal && isIdeogram4 && <ParamIdeogram4SamplerPreset />}
                 {!isExternal && isAnima && <ParamAnimaScheduler />}
                 {modelSupportsSteps && <ParamSteps />}

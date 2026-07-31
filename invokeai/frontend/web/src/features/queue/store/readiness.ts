@@ -978,6 +978,52 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     }
   }
 
+  if (model?.base === 'ernie-image') {
+    // ERNIE-Image requires bbox dimensions that are multiples of 16 (enforced by ernie_image_denoise).
+    const { bbox } = canvas;
+    const gridSize = getGridSize('ernie-image');
+
+    if (bbox.scaleMethod === 'none') {
+      if (bbox.rect.width % gridSize !== 0) {
+        reasons.push({
+          content: i18n.t('parameters.invoke.modelIncompatibleBboxWidth', {
+            model: 'ERNIE-Image',
+            width: bbox.rect.width,
+            multiple: gridSize,
+          }),
+        });
+      }
+      if (bbox.rect.height % gridSize !== 0) {
+        reasons.push({
+          content: i18n.t('parameters.invoke.modelIncompatibleBboxHeight', {
+            model: 'ERNIE-Image',
+            height: bbox.rect.height,
+            multiple: gridSize,
+          }),
+        });
+      }
+    } else {
+      if (bbox.scaledSize.width % gridSize !== 0) {
+        reasons.push({
+          content: i18n.t('parameters.invoke.modelIncompatibleScaledBboxWidth', {
+            model: 'ERNIE-Image',
+            width: bbox.scaledSize.width,
+            multiple: gridSize,
+          }),
+        });
+      }
+      if (bbox.scaledSize.height % gridSize !== 0) {
+        reasons.push({
+          content: i18n.t('parameters.invoke.modelIncompatibleScaledBboxHeight', {
+            model: 'ERNIE-Image',
+            height: bbox.scaledSize.height,
+            multiple: gridSize,
+          }),
+        });
+      }
+    }
+  }
+
   if (model?.base === 'ideogram-4') {
     // Ideogram 4 requires bbox dimensions that are multiples of 16 (enforced by ideogram4_denoise).
     const { bbox } = canvas;
