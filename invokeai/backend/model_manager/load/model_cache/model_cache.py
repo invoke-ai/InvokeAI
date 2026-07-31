@@ -647,7 +647,6 @@ class ModelCache:
         # total (a non-shared model resident on N devices correctly counts N times).
         if self._ram_budget is not None and not wrapped_model.uses_shared_weights:
             self._ram_budget.add_non_shared(wrapped_model.total_bytes(), cache=self)
-        self._sync_current_stats()
         self._logger.debug(
             f"Added model {key} (Type: {model.__class__.__name__}, Wrap mode: {wrapped_model.__class__.__name__}, Model size: {size / MB:.2f}MB)"
         )
@@ -669,6 +668,11 @@ class ModelCache:
             # self here would be worse than useless: _make_room_internal already evicted
             # everything unlocked, so the only entry a self-reconcile could ever claim is the
             # model just admitted — evicting it out from under its own loader.)
+
+        # Synced last, not right after the model is counted: request_budget_reconcile() above can
+        # evict inline on a peer, and cache_used reads the shared budget's global usage, so syncing
+        # before that loop would report a pre-reconcile (too high) figure.
+        self._sync_current_stats()
 
     def cached_model_keys(self) -> set[str]:
         """Return the base model keys of every model currently resident in this cache.
@@ -1498,6 +1502,15 @@ class ModelCache:
                 )
                 self._delete_cache_entry(cache_entry)
                 models_cleared += 1
+            if models_cleared > 0:
+                # Peer eviction mutates residency just like make_room/unlock/drop_model, so it owes
+                # the same stat sync. Without it this cache reports a stale cache_used/in_cache
+                # until its device next runs a session — and because the /models/stats aggregate
+                # takes max(cache_used) across per-device caches, one stale idle cache pins the
+                # reported usage high for the whole system.
+                self._sync_current_stats()
+                if self.stats:
+                    self.stats.cleared = (self.stats.cleared or 0) + models_cleared
             return models_cleared
         finally:
             self._lock.release()
@@ -1571,6 +1584,13 @@ class ModelCache:
                     )
                     self._delete_cache_entry(cache_entry)
                     models_cleared += 1
+                if models_cleared > 0:
+                    # Same reasoning as evict_unlocked_for_peer: this path drops entries outside
+                    # the synchronized methods that normally re-sync, so it must do so itself
+                    # while the lock is still held.
+                    self._sync_current_stats()
+                    if self.stats:
+                        self.stats.cleared = (self.stats.cleared or 0) + models_cleared
             finally:
                 self._lock.release()
             if models_cleared > 0:

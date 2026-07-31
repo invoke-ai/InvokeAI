@@ -332,6 +332,84 @@ def test_cache_stats_reflect_shared_global_budget(mock_logger):
         # system high watermark is their max — not their sum.
         assert cache_a.stats.high_watermark == S
         assert cache_b.stats.high_watermark == S
+        # cache_used is system-wide for the same reason, and is the field the aggregate reports as
+        # *current* usage. Asserted here because it is the one the aggregate takes a max() over:
+        # a cache that stops syncing it silently pins the reported usage for the whole system.
+        assert cache_a.stats.cache_used == S
+        assert cache_b.stats.cache_used == S
+    finally:
+        cache_a.shutdown()
+        cache_b.shutdown()
+
+
+def test_peer_eviction_syncs_the_evicted_caches_stats(mock_logger):
+    """A cache evicted on behalf of a peer must re-sync its own stats.
+
+    evict_unlocked_for_peer() is reached from another device's make_room, not from one of this
+    cache's synchronized methods, so nothing else re-syncs it. If it does not sync, the evicted
+    cache keeps advertising its pre-eviction cache_used/in_cache until its device next runs a
+    session — and because /models/stats aggregates cache_used with max() across per-device caches,
+    a single stale idle cache reports peak usage for the entire system, which reads as a cache
+    that never releases memory."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=int(S * 10), shared_store=store)
+    cache_a = _make_cache(store, budget, mock_logger)
+    cache_b = _make_cache(store, budget, mock_logger)
+    try:
+        cache_a.stats = CacheStats()
+        cache_b.stats = CacheStats()
+        cache_a.put("a1", DummyModule())
+        cache_b.put("b1", DummyModule())
+        _use_and_release(cache_a, "a1")
+        _use_and_release(cache_b, "b1")
+        # Two distinct models resident across the two devices: global usage is 2S, and b holds one.
+        assert budget.total_in_use() == 2 * S
+        assert cache_b.stats.in_cache == 1
+        assert cache_b.stats.cache_used == 2 * S
+
+        # The multi-GPU path: a's own evictable entries are exhausted, so it asks b to shed.
+        # `is_satisfied` never returns True, so b drops every unlocked entry it has.
+        assert cache_b.evict_unlocked_for_peer(is_satisfied=lambda: False) == 1
+        assert "b1" not in cache_b._cached_models
+        assert budget.total_in_use() == S
+
+        assert cache_b.stats.in_cache == 0
+        assert cache_b.stats.cache_used == S
+        # Peer evictions are real evictions and must be counted; otherwise `cleared` only ever
+        # reflects the requesting cache and under-reports system-wide.
+        assert cache_b.stats.cleared == 1
+    finally:
+        cache_a.shutdown()
+        cache_b.shutdown()
+
+
+def test_budget_reconcile_syncs_the_reconciling_caches_stats(mock_logger):
+    """The deferred-reconcile path drops entries outside any synchronized method too, so it owes
+    the same stat sync as evict_unlocked_for_peer (same defect, second door)."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=int(S * 10), shared_store=store)
+    cache_a = _make_cache(store, budget, mock_logger)
+    cache_b = _make_cache(store, budget, mock_logger)
+    try:
+        cache_b.stats = CacheStats()
+        cache_a.put("a1", DummyModule())
+        cache_b.put("b1", DummyModule())
+        _use_and_release(cache_a, "a1")
+        _use_and_release(cache_b, "b1")
+        assert cache_b.stats.in_cache == 1
+        assert cache_b.stats.cache_used == 2 * S
+
+        # Drive the budget negative so a pending reconcile actually evicts, then ask b to honor it
+        # exactly as a peer's post-admission request would. The cap is lowered directly because
+        # RamBudget exposes max_bytes read-only; reaching this state through admissions would only
+        # add setup without exercising anything more.
+        budget._max_bytes = int(S * 0.5)
+        cache_b.request_budget_reconcile()
+
+        assert _wait_until(lambda: "b1" not in cache_b._cached_models)
+        assert cache_b.stats.in_cache == 0
+        assert cache_b.stats.cache_used == budget.total_in_use()
+        assert cache_b.stats.cleared == 1
     finally:
         cache_a.shutdown()
         cache_b.shutdown()
