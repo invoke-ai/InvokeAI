@@ -1216,6 +1216,30 @@ z_image_controlnet_tile = StarterModel(
 )
 # endregion
 
+# region ERNIE-Image
+ernie_image = StarterModel(
+    name="ERNIE-Image",
+    base=BaseModelType.ErnieImage,
+    source="baidu/ERNIE-Image",
+    description=(
+        "Baidu ERNIE-Image: 8B single-stream DiT with Mistral3 text encoder, AutoencoderKLFlux2 VAE, "
+        "and bundled Ministral3 prompt enhancer. Defaults to 50 steps with CFG 4.0."
+    ),
+    type=ModelType.Main,
+)
+
+ernie_image_turbo = StarterModel(
+    name="ERNIE-Image Turbo",
+    base=BaseModelType.ErnieImage,
+    source="baidu/ERNIE-Image-Turbo",
+    description=(
+        "ERNIE-Image-Turbo: distilled variant of ERNIE-Image. Same architecture as ERNIE-Image but "
+        "tuned for fast inference at 8 steps with CFG disabled (1.0)."
+    ),
+    type=ModelType.Main,
+)
+# endregion
+
 # region Krea-2
 # Standalone Qwen3-VL text encoder used by Krea-2 (distinct from the Qwen2.5-VL encoder above). Pair
 # with single-file / GGUF Krea-2 transformers, which ship only the transformer. The Qwen-Image VAE
@@ -2188,6 +2212,8 @@ STARTER_MODELS: list[StarterModel] = [
     z_image_qwen3_encoder_quantized,
     z_image_controlnet_union,
     z_image_controlnet_tile,
+    ernie_image,
+    ernie_image_turbo,
     krea2_turbo,
     krea2_raw,
     krea2_turbo_gguf_q4_k_m,
@@ -2316,6 +2342,12 @@ flux2_klein_bundle: list[StarterModel] = [
     flux2_klein_qwen3_4b_encoder,
 ]
 
+# Turbo only: both checkpoints are 8B and the full pipeline is a large download, so the bundle
+# ships the fast default. The undistilled `ernie_image` is still installable individually.
+ernie_image_bundle: list[StarterModel] = [
+    ernie_image_turbo,
+]
+
 qwen_image_bundle: list[StarterModel] = [
     qwen_image_vae,
     qwen_vl_encoder_fp8,
@@ -2384,6 +2416,7 @@ STARTER_BUNDLES: dict[str, StarterModelBundle] = {
     BaseModelType.Flux: StarterModelBundle(name="FLUX.1 dev", models=flux_bundle),
     BaseModelType.Flux2: StarterModelBundle(name="FLUX.2 Klein", models=flux2_klein_bundle),
     BaseModelType.ZImage: StarterModelBundle(name="Z-Image Turbo", models=zimage_bundle),
+    BaseModelType.ErnieImage: StarterModelBundle(name="ERNIE-Image", models=ernie_image_bundle),
     BaseModelType.QwenImage: StarterModelBundle(name="Qwen Image", models=qwen_image_bundle),
     BaseModelType.Anima: StarterModelBundle(name="Anima", models=anima_bundle),
     BaseModelType.Krea2: StarterModelBundle(name="Krea-2", models=krea2_bundle),

@@ -221,6 +221,29 @@ describe('paramsSliceConfig persisted state migration', () => {
     expect(result.dimensions).toMatchObject({ width: 640, height: 896 });
   });
 
+  it('backfills the ERNIE-Image fields from their zod defaults without a version bump', () => {
+    // The ERNIE-Image fields are additive with `.default()`, so there is no migration branch for
+    // them. A persisted state written before they existed must still parse -- if it throws, the
+    // caller's catch falls back to the initial state and the user loses every generation param.
+    expect(migrate).toBeDefined();
+
+    const initial = getInitialParamsState();
+    const persisted: Record<string, unknown> = {
+      ...initial,
+      positivePrompt: 'preserve this prompt',
+      seed: 99,
+    };
+    delete persisted.ernieImageScheduler;
+    delete persisted.ernieImageUsePromptEnhancer;
+
+    const result = migrate?.(persisted) as ReturnType<typeof getInitialParamsState>;
+
+    expect(result.ernieImageScheduler).toBe('euler');
+    expect(result.ernieImageUsePromptEnhancer).toBe(true);
+    expect(result.positivePrompt).toBe('preserve this prompt');
+    expect(result.seed).toBe(99);
+  });
+
   it('migrates old positive prompt history entries to prompt pairs', () => {
     expect(migrate).toBeDefined();
 
