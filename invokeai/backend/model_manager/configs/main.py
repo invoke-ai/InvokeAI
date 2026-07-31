@@ -27,12 +27,14 @@ from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     Flux2VariantType,
     FluxVariantType,
+    Krea2VariantType,
     ModelFormat,
     ModelType,
     ModelVariantType,
     QwenImageVariantType,
     SchedulerPredictionType,
     SubModelType,
+    WanVariantType,
     ZImageVariantType,
 )
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
@@ -65,7 +67,15 @@ class MainModelDefaultSettings(BaseModel):
     def from_base(
         cls,
         base: BaseModelType,
-        variant: Flux2VariantType | FluxVariantType | ModelVariantType | ZImageVariantType | None = None,
+        variant: Flux2VariantType
+        | FluxVariantType
+        | ModelVariantType
+        | WanVariantType
+        | ZImageVariantType
+        | Krea2VariantType
+        | None = None,
+        name: str | None = None,
+        path: str | None = None,
     ) -> Self | None:
         match base:
             case BaseModelType.StableDiffusion1:
@@ -83,6 +93,19 @@ class MainModelDefaultSettings(BaseModel):
                 else:
                     # Turbo (distilled) uses fewer steps, no CFG
                     return cls(steps=9, cfg_scale=1.0, width=1024, height=1024)
+            case BaseModelType.ErnieImage:
+                # ERNIE-Image-Turbo (distilled) uses fewer steps and CFG=1.0. The two checkpoints
+                # share an architecture and config, so there is nothing on disk to discriminate on
+                # and no Turbo variant is modeled. Fall back to the name, and also the install
+                # directory's own name so that renaming the model in the install dialog doesn't lose
+                # the Turbo defaults. Only the leaf name is matched: an in-place install records an
+                # absolute path, and an unrelated ancestor directory (e.g. /mnt/turbo-nvme/models/)
+                # must not silently give the base model Turbo's 8 steps and CFG 1.0.
+                path_name = Path(path).name if path else None
+                haystack = " ".join(part for part in (name, path_name) if part).lower()
+                if "turbo" in haystack:
+                    return cls(steps=8, cfg_scale=1.0, width=1024, height=1024)
+                return cls(steps=50, cfg_scale=4.0, width=1024, height=1024)
             case BaseModelType.Anima:
                 return cls(steps=35, cfg_scale=4.5, width=1024, height=1024)
             case BaseModelType.Ideogram4:
@@ -98,6 +121,20 @@ class MainModelDefaultSettings(BaseModel):
                     # Distilled models (Klein 4B, Klein 9B) use fewer steps
                     return cls(steps=4, cfg_scale=1.0, width=1024, height=1024)
             case BaseModelType.QwenImage:
+                return cls(steps=40, cfg_scale=4.0, width=1024, height=1024)
+            case BaseModelType.Krea2:
+                # Krea-2-Raw (Base, undistilled) needs more steps and CFG; Turbo (distilled) uses 8
+                # steps with CFG disabled. cfg_scale has a floor of 1 (ge=1); 1.0 means "no guidance".
+                if variant == Krea2VariantType.Base:
+                    # Diffusers' Krea-2 guidance 4.5 uses cond + 4.5 * (cond - uncond), which is
+                    # equivalent to InvokeAI's standard CFG convention at scale 5.5.
+                    return cls(steps=28, cfg_scale=5.5, width=1024, height=1024)
+                return cls(steps=8, cfg_scale=1.0, width=1024, height=1024)
+            case BaseModelType.Wan:
+                # Wan 2.2 recommended defaults differ by variant.
+                if variant == WanVariantType.TI2V_5B:
+                    return cls(steps=30, cfg_scale=5.0, width=1024, height=1024)
+                # Default to A14B settings (also used when variant is unknown).
                 return cls(steps=40, cfg_scale=4.0, width=1024, height=1024)
             case _:
                 # TODO(psyche): Do we want defaults for other base types?
@@ -192,6 +229,77 @@ def _has_z_image_keys(state_dict: dict[str | int, Any]) -> bool:
                 return True
 
     return False
+
+
+def _get_krea2_variant_from_name(name: str) -> Krea2VariantType:
+    """Guess the Krea-2 variant from a single-file/GGUF filename.
+
+    Turbo and Raw (Base) share the identical transformer architecture, so a single-file checkpoint
+    cannot be distinguished from its weights. Filenames with a "raw"/"base" token (e.g. "Krea-2-Raw",
+    "krea2_base_q4") indicate the undistilled Base model; everything else defaults to the distilled
+    Turbo. The user can override the variant in the model manager.
+    """
+    lowered = name.lower()
+    # "turbo" is a strong positive signal for the distilled checkpoint and wins outright, so a Turbo file
+    # whose name merely *contains* "base"/"raw" as a substring (e.g. "baseline", "database", "raw_export")
+    # is not misread as Base.
+    if "turbo" in lowered:
+        return Krea2VariantType.Turbo
+    # Otherwise match "raw"/"base" only as a whole token delimited by non-alphanumeric separators
+    # ("-", "_", ".") - not as an arbitrary substring.
+    tokens = re.split(r"[^a-z0-9]+", lowered)
+    if "raw" in tokens or "base" in tokens:
+        return Krea2VariantType.Base
+    return Krea2VariantType.Turbo
+
+
+def _has_krea2_keys(state_dict: dict[str | int, Any]) -> bool:
+    """Check if state dict contains Krea-2 (Krea2Transformer2DModel) transformer keys.
+
+    Krea-2's single-stream MMDiT has a distinctive text-fusion stage; the ``text_fusion.``
+    prefix (with ``layerwise_blocks`` / ``refiner_blocks`` / ``projector``) is unique to it.
+    Returns True only for Krea-2 main models, not LoRAs.
+    """
+    # The text-fusion stage is unique to Krea-2. Diffusers naming uses `text_fusion`/`time_mod_proj`;
+    # the native/ComfyUI GGUF conversion uses the compact `txtfusion`/`tproj` names instead.
+    krea2_specific_keys = {
+        "text_fusion",  # text-fusion stage (diffusers naming) - unique to Krea-2
+        "txtfusion",  # text-fusion stage (native/ComfyUI GGUF naming)
+        "time_mod_proj",  # timestep modulation projection (diffusers)
+    }
+    # Corroborating image-input signals: `img_in` (diffusers) / `first` (native), or the timestep
+    # modulation projection (`tproj` native).
+    krea2_corroborating_keys = {"img_in", "first", "tproj"}
+
+    lora_suffixes = (
+        ".lora_down.weight",
+        ".lora_up.weight",
+        ".lora_A.weight",
+        ".lora_B.weight",
+        ".dora_scale",
+        ".alpha",
+    )
+
+    # If any key has a LoRA suffix, this is a LoRA, not a main model.
+    for key in state_dict.keys():
+        if isinstance(key, int):
+            continue
+        if key.endswith(lora_suffixes):
+            return False
+
+    has_text_fusion = False
+    has_corroborator = False
+    for key in state_dict.keys():
+        if isinstance(key, int):
+            continue
+        # Handle both direct keys and ComfyUI-style (model.diffusion_model.*) keys.
+        key_parts = key.split(".")
+        if any(part in krea2_specific_keys for part in key_parts):
+            has_text_fusion = True
+        if any(part in krea2_corroborating_keys for part in key_parts):
+            has_corroborator = True
+    # Require the distinctive text-fusion stage; the image-input key is a corroborating signal.
+    return has_text_fusion and has_corroborator
 
 
 class Main_SD_Checkpoint_Config_Base(Checkpoint_Config_Base, Main_Config_Base):
@@ -1320,6 +1428,120 @@ class Main_Diffusers_Ideogram4_Config(Diffusers_Config_Base, Main_Config_Base, C
         )
 
 
+class Main_Diffusers_Krea2_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for Krea-2 diffusers models (Krea-2-Turbo)."""
+
+    base: Literal[BaseModelType.Krea2] = Field(BaseModelType.Krea2)
+    variant: Krea2VariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        # This check implies the base type - no further validation needed.
+        raise_for_class_name(
+            common_config_paths(mod.path),
+            {
+                "Krea2Pipeline",
+            },
+        )
+
+        variant = override_fields.pop("variant", None) or cls._get_variant(mod)
+
+        repo_variant = override_fields.pop("repo_variant", None) or cls._get_repo_variant_or_raise(mod)
+
+        return cls(
+            **override_fields,
+            variant=variant,
+            repo_variant=repo_variant,
+        )
+
+    @classmethod
+    def _get_variant(cls, mod: ModelOnDisk) -> Krea2VariantType:
+        """Determine the Krea-2 variant from the pipeline-level ``is_distilled`` flag.
+
+        Krea-2-Turbo sets ``is_distilled=true`` in model_index.json (distilled, 8 steps, CFG off);
+        Krea-2-Raw sets ``is_distilled=false`` (undistilled Base, more steps, CFG on). The transformer
+        architectures are identical, so this flag is the only reliable discriminator.
+        """
+        # model_index.json was already validated by the class-name check in from_model_on_disk, so a
+        # read/parse failure here is a genuine identification error and is allowed to propagate rather
+        # than being silently registered as Turbo (which would give a Raw model the wrong defaults).
+        config = get_config_dict_or_raise(mod.path / "model_index.json")
+        if config.get("is_distilled", False) is False:
+            return Krea2VariantType.Base
+        return Krea2VariantType.Turbo
+
+
+class Main_Checkpoint_Krea2_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for Krea-2 single-file checkpoint models (safetensors, etc)."""
+
+    base: Literal[BaseModelType.Krea2] = Field(default=BaseModelType.Krea2)
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+    variant: Krea2VariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        if mod.path.suffix.lower() != ".safetensors":
+            raise NotAMatchError(f"expected a .safetensors file, got {mod.path.suffix or '(no suffix)'}")
+
+        cls._validate_looks_like_krea2_model(mod)
+
+        cls._validate_does_not_look_like_gguf_quantized(mod)
+
+        variant = override_fields.pop("variant", None) or _get_krea2_variant_from_name(mod.path.name)
+
+        return cls(**override_fields, variant=variant)
+
+    @classmethod
+    def _validate_looks_like_krea2_model(cls, mod: ModelOnDisk) -> None:
+        if not _has_krea2_keys(mod.load_state_dict()):
+            raise NotAMatchError("state dict does not look like a Krea-2 model")
+
+    @classmethod
+    def _validate_does_not_look_like_gguf_quantized(cls, mod: ModelOnDisk) -> None:
+        if _has_ggml_tensors(mod.load_state_dict()):
+            raise NotAMatchError("state dict looks like GGUF quantized")
+
+
+class Main_GGUF_Krea2_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for GGUF-quantized Krea-2 transformer models (single-file)."""
+
+    base: Literal[BaseModelType.Krea2] = Field(default=BaseModelType.Krea2)
+    format: Literal[ModelFormat.GGUFQuantized] = Field(default=ModelFormat.GGUFQuantized)
+    variant: Krea2VariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        cls._validate_looks_like_krea2_model(mod)
+
+        cls._validate_looks_like_gguf_quantized(mod)
+
+        variant = override_fields.pop("variant", None) or _get_krea2_variant_from_name(mod.path.name)
+
+        return cls(**override_fields, variant=variant)
+
+    @classmethod
+    def _validate_looks_like_krea2_model(cls, mod: ModelOnDisk) -> None:
+        if not _has_krea2_keys(mod.load_state_dict()):
+            raise NotAMatchError("state dict does not look like a Krea-2 model")
+
+    @classmethod
+    def _validate_looks_like_gguf_quantized(cls, mod: ModelOnDisk) -> None:
+        if not _has_ggml_tensors(mod.load_state_dict()):
+            raise NotAMatchError("state dict does not look like GGUF quantized")
+
+
 class Main_Diffusers_QwenImage_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
     """Model config for Qwen Image diffusers models (both txt2img and edit)."""
 
@@ -1474,6 +1696,277 @@ class Main_GGUF_QwenImage_Config(Checkpoint_Config_Base, Main_Config_Base, Confi
         return cls(**override_fields, variant=explicit_variant)
 
 
+def _has_wan_keys(state_dict: dict[str | int, Any]) -> bool:
+    """Check if state dict contains Wan 2.2 transformer keys.
+
+    Two layouts are accepted:
+
+    * **Diffusers** (city96-style GGUF, Wan-AI/*-Diffusers safetensors): the text
+      projection is named ``condition_embedder.text_embedder.linear_1``.
+    * **Native upstream** (QuantStack-style GGUF, ComfyUI, Wan-AI's non-Diffusers
+      releases): the text projection is named ``text_embedding.0``.
+
+    Both layouts share ``patch_embedding.weight`` as the input conv. Combined with
+    the text-projection fingerprint, this won't collide with FLUX
+    (``double_blocks/single_blocks``), Qwen Image (``txt_in/img_in``), Z-Image
+    (``cap_embedder``), or Anima (``llm_adapter``).
+
+    Tolerates both bare keys and the ComfyUI ``model.diffusion_model.`` /
+    ``diffusion_model.`` prefixes.
+    """
+    text_proj_options = (
+        "condition_embedder.text_embedder.linear_1.weight",
+        "text_embedding.0.weight",
+    )
+    prefixes = ("", "model.diffusion_model.", "diffusion_model.")
+    keys = state_dict.keys()
+    if not any((p + "patch_embedding.weight") in keys for p in prefixes):
+        return False
+    return any((p + needle) in keys for p in prefixes for needle in text_proj_options)
+
+
+def _is_native_wan_layout(state_dict: dict[str | int, Any]) -> bool:
+    """True if the state dict uses the native upstream Wan key layout.
+
+    Native layout uses ``text_embedding.0/2``, ``self_attn``/``cross_attn``,
+    ``ffn.0/2``, ``head.head``, ``head.modulation``, etc. — what ComfyUI and
+    QuantStack ship. Diffusers layout uses ``condition_embedder.*``, ``attn1``/
+    ``attn2``, ``ffn.net.*``, ``proj_out``, ``scale_shift_table``.
+    """
+    prefixes = ("", "model.diffusion_model.", "diffusion_model.")
+    keys = state_dict.keys()
+    return any((p + "text_embedding.0.weight") in keys for p in prefixes)
+
+
+def _detect_wan_gguf_variant(state_dict: dict[str | int, Any]) -> WanVariantType | None:
+    """Determine A14B (T2V vs I2V) vs TI2V-5B from the GGUF state dict.
+
+    ``patch_embedding.weight`` has shape ``[inner_dim, in_channels, T, H, W]``;
+    ``in_channels`` uniquely identifies the Wan 2.2 variant:
+
+    - 16 → T2V-A14B (noise latents only).
+    - 36 → I2V-A14B (16 noise + 16 ref-image latents + 4 first-frame mask,
+      concatenated along the channel dim — see diffusers
+      ``WanImageToVideoPipeline.prepare_latents``).
+    - 48 → TI2V-5B (Wan2.2-VAE z_dim=48).
+
+    Returns None if the tensor is missing or the channel count is unrecognised.
+    """
+    candidates = (
+        "patch_embedding.weight",
+        "model.diffusion_model.patch_embedding.weight",
+        "diffusion_model.patch_embedding.weight",
+    )
+    for key in candidates:
+        if key in state_dict:
+            tensor = state_dict[key]
+            shape = getattr(tensor, "tensor_shape", None) or getattr(tensor, "shape", None)
+            if shape is None or len(shape) < 2:
+                return None
+            in_channels = int(shape[1])
+            if in_channels == 16:
+                return WanVariantType.T2V_A14B
+            if in_channels == 36:
+                return WanVariantType.I2V_A14B
+            if in_channels == 48:
+                return WanVariantType.TI2V_5B
+            return None
+    return None
+
+
+def _detect_wan_gguf_expert(filename: str) -> Literal["high", "low", "none"]:
+    """Filename heuristic for the A14B dual-expert MoE.
+
+    Community releases tag each expert in the filename — typically
+    ``high_noise`` / ``low_noise`` (or hyphenated/concatenated variants).
+    Returns 'none' when neither marker is present (single-expert model or
+    ambiguous filename).
+    """
+    name = filename.lower()
+    if any(s in name for s in ("high_noise", "high-noise", "highnoise")):
+        return "high"
+    if any(s in name for s in ("low_noise", "low-noise", "lownoise")):
+        return "low"
+    return "none"
+
+
+class Main_GGUF_Wan_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for GGUF-quantized Wan 2.2 transformer models.
+
+    A14B's MoE ships as two GGUF files (one per expert); ``expert`` records
+    which one this is so the model loader invocation can pair them. TI2V-5B
+    is a single-transformer model and stores ``expert='none'``.
+    """
+
+    base: Literal[BaseModelType.Wan] = Field(default=BaseModelType.Wan)
+    format: Literal[ModelFormat.GGUFQuantized] = Field(default=ModelFormat.GGUFQuantized)
+    variant: WanVariantType = Field()
+    expert: Literal["high", "low", "none"] = Field(
+        default="none",
+        description="For Wan 2.2 A14B's dual-expert MoE: 'high' for the high-noise expert, "
+        "'low' for the low-noise expert. 'none' for single-transformer models (TI2V-5B).",
+    )
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+        raise_for_override_fields(cls, override_fields)
+
+        sd = mod.load_state_dict()
+
+        if not _has_ggml_tensors(sd):
+            raise NotAMatchError("state dict does not look like GGUF quantized")
+        if not _has_wan_keys(sd):
+            raise NotAMatchError("state dict does not look like a Wan transformer")
+        gguf_name = mod.metadata().get("general.name", "")
+        normalized_identity = "".join(
+            character for character in f"{mod.path.stem} {gguf_name}".lower() if character.isalnum()
+        )
+        if "wan21" in normalized_identity:
+            raise NotAMatchError("Wan 2.1 GGUF models are not supported by the Wan 2.2 loader")
+
+        explicit_variant = override_fields.pop("variant", None)
+        variant = explicit_variant or _detect_wan_gguf_variant(sd)
+        if variant is None:
+            raise NotAMatchError("could not determine Wan variant from state dict")
+        if variant in (WanVariantType.T2V_A14B, WanVariantType.I2V_A14B) and "wan22" not in normalized_identity:
+            raise NotAMatchError("Wan A14B GGUF filename or metadata must identify the model as Wan 2.2")
+
+        explicit_expert = override_fields.pop("expert", None)
+        expert = explicit_expert or _detect_wan_gguf_expert(mod.path.stem)
+
+        return cls(**override_fields, variant=variant, expert=expert)
+
+
+class Main_Diffusers_Wan_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for Wan 2.2 diffusers models.
+
+    Covers both the dual-expert T2V-A14B family and the single-transformer TI2V-5B
+    family. Variant is detected from the on-disk transformer config (latent channel
+    count) plus the presence of a sibling ``transformer_2/`` directory.
+    """
+
+    base: Literal[BaseModelType.Wan] = Field(default=BaseModelType.Wan)
+    variant: WanVariantType = Field()
+    has_dual_expert: bool = Field(
+        default=False,
+        description="Whether this model ships two transformer experts (Wan 2.2 A14B MoE). False for TI2V-5B.",
+    )
+    boundary_ratio: float | None = Field(
+        default=None,
+        description="MoE expert switch point as a fraction of num_train_timesteps (typically 1000). "
+        "None for single-transformer models. Read from model_index.json by Diffusers' WanPipeline.",
+    )
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        # Wan repos ship with WanPipeline (T2V) or WanImageToVideoPipeline (I2V/TI2V).
+        # Either class name is sufficient to identify a Wan diffusers model.
+        raise_for_class_name(
+            common_config_paths(mod.path),
+            {
+                "WanPipeline",
+                "WanImageToVideoPipeline",
+            },
+        )
+
+        repo_variant = override_fields.pop("repo_variant", None) or cls._get_repo_variant_or_raise(mod)
+
+        explicit_variant = override_fields.pop("variant", None)
+        has_dual_expert = (mod.path / "transformer_2" / "config.json").exists()
+        variant = explicit_variant or cls._detect_wan_variant(mod, has_dual_expert)
+        boundary_ratio = override_fields.pop("boundary_ratio", None)
+        if boundary_ratio is None:
+            boundary_ratio = cls._read_boundary_ratio(mod)
+
+        return cls(
+            **override_fields,
+            repo_variant=repo_variant,
+            variant=variant,
+            has_dual_expert=has_dual_expert,
+            boundary_ratio=boundary_ratio,
+        )
+
+    @classmethod
+    def _read_boundary_ratio(cls, mod: ModelOnDisk) -> float | None:
+        """Pull ``boundary_ratio`` from ``model_index.json`` if present.
+
+        Diffusers' ``WanPipeline.__init__`` registers it via ``register_to_config``,
+        which persists it as a top-level key in the saved pipeline config.
+        """
+        try:
+            model_index = get_config_dict_or_raise(mod.path / "model_index.json")
+        except NotAMatchError:
+            return None
+        value = model_index.get("boundary_ratio")
+        if value is None:
+            return None
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    @classmethod
+    def _detect_wan_variant(cls, mod: ModelOnDisk, has_dual_expert: bool) -> WanVariantType:
+        """Detect Wan variant from transformer + VAE config.
+
+        - T2V-A14B: dual transformer experts, standard Wan VAE (z_dim=16),
+          transformer ``in_channels=16`` (text-only conditioning).
+        - I2V-A14B: dual transformer experts, standard Wan VAE,
+          transformer ``in_channels=36`` (text + VAE-encoded reference image
+          + first-frame mask concatenated along the channel dim).
+        - TI2V-5B: single transformer, Wan2.2-VAE (z_dim=48).
+        """
+        if has_dual_expert:
+            # Disambiguate T2V vs I2V via the transformer's input channel count.
+            # Wan 2.2 I2V uses VAE-latent concatenation: 16 noise + 16 ref-image
+            # latents + 4 first-frame mask = 36. (Wan 2.1 I2V used CLIP-vision
+            # via ``image_dim``; that mechanism is absent in Wan 2.2.)
+            in_channels = cls._transformer_in_channels(mod)
+            if in_channels == 36:
+                return WanVariantType.I2V_A14B
+            return WanVariantType.T2V_A14B
+
+        # Single-transformer model: distinguish TI2V-5B from any future single-expert
+        # A14B-derived release by inspecting the VAE latent dimension.
+        try:
+            vae_config = get_config_dict_or_raise(mod.path / "vae" / "config.json")
+            z_dim = vae_config.get("z_dim")
+            if z_dim is not None and int(z_dim) >= 32:
+                return WanVariantType.TI2V_5B
+        except NotAMatchError:
+            # No VAE config to inspect — fall through to the heuristic path below.
+            pass
+
+        # Filename / repo-name heuristic as a last resort.
+        name = mod.path.name.lower()
+        if "5b" in name or "ti2v" in name:
+            return WanVariantType.TI2V_5B
+        return WanVariantType.T2V_A14B
+
+    @staticmethod
+    def _transformer_in_channels(mod: ModelOnDisk) -> int | None:
+        """Read ``in_channels`` from ``transformer/config.json``.
+
+        For Wan 2.2 A14B, this is the canonical discriminator between T2V
+        (``in_channels=16``) and I2V (``in_channels=36``). Returns None if the
+        config can't be read.
+        """
+        try:
+            transformer_config = get_config_dict_or_raise(mod.path / "transformer" / "config.json")
+        except NotAMatchError:
+            return None
+        value = transformer_config.get("in_channels")
+        try:
+            return int(value) if value is not None else None
+        except (TypeError, ValueError):
+            return None
+
+
 class Main_Checkpoint_Anima_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
     """Model config for Anima single-file checkpoint models (safetensors).
 
@@ -1499,3 +1992,32 @@ class Main_Checkpoint_Anima_Config(Checkpoint_Config_Base, Main_Config_Base, Con
         has_anima_keys = _has_anima_keys(mod.load_state_dict())
         if not has_anima_keys:
             raise NotAMatchError("state dict does not look like an Anima model")
+
+
+class Main_Diffusers_ErnieImage_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for ERNIE-Image diffusers models (ERNIE-Image, ERNIE-Image-Turbo)."""
+
+    base: Literal[BaseModelType.ErnieImage] = Field(BaseModelType.ErnieImage)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+        raise_for_override_fields(cls, override_fields)
+
+        raise_for_class_name(
+            common_config_paths(mod.path),
+            {"ErnieImagePipeline"},
+        )
+
+        repo_variant = override_fields.get("repo_variant") or cls._get_repo_variant_or_raise(mod)
+
+        return cls(
+            **override_fields,
+            repo_variant=repo_variant,
+        )
+
+
+# NOTE: There is deliberately no `Main_Checkpoint_ErnieImage_Config`. Single-file ERNIE-Image
+# checkpoints cannot be loaded yet (only the full diffusers pipeline layout is supported), and a
+# config that matches on install but raises on first generate would leave a permanently broken
+# entry in the Model Manager. Add it together with the checkpoint loader.

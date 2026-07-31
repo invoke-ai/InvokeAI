@@ -10,6 +10,7 @@ from invokeai.app.services.auth.token_service import set_jwt_secret
 from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
 from invokeai.app.services.board_images.board_images_default import BoardImagesService
 from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
+from invokeai.app.services.board_video_records.board_video_records_sqlite import SqliteBoardVideoRecordStorage
 from invokeai.app.services.boards.boards_default import BoardService
 from invokeai.app.services.bulk_download.bulk_download_default import BulkDownloadService
 from invokeai.app.services.client_state_persistence.client_state_persistence_sqlite import ClientStatePersistenceSqlite
@@ -24,6 +25,7 @@ from invokeai.app.services.external_generation.providers import (
     SeedreamProvider,
 )
 from invokeai.app.services.external_generation.startup import sync_configured_external_starter_models
+from invokeai.app.services.gallery.gallery_default import SqliteGalleryService
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
 from invokeai.app.services.image_moves.image_moves_default import ImageMoveService
 from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
@@ -50,8 +52,12 @@ from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessi
 from invokeai.app.services.shared.sqlite.sqlite_util import init_db
 from invokeai.app.services.style_preset_images.style_preset_images_disk import StylePresetImageFileStorageDisk
 from invokeai.app.services.style_preset_records.style_preset_records_sqlite import SqliteStylePresetRecordsStorage
+from invokeai.app.services.system_prompt_records.system_prompt_records_sqlite import SqliteSystemPromptRecordsStorage
 from invokeai.app.services.urls.urls_default import LocalUrlService
 from invokeai.app.services.users.users_default import UserService
+from invokeai.app.services.video_files.video_files_disk import DiskVideoFileStorage
+from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
+from invokeai.app.services.videos.videos_default import VideoService
 from invokeai.app.services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
 from invokeai.app.services.workflow_thumbnails.workflow_thumbnails_disk import WorkflowThumbnailFileStorageDisk
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
@@ -59,11 +65,14 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     BasicConditioningInfo,
     CogView4ConditioningInfo,
     ConditioningFieldData,
+    ErnieImageConditioningInfo,
     FLUXConditioningInfo,
     Ideogram4ConditioningInfo,
+    Krea2ConditioningInfo,
     QwenImageConditioningInfo,
     SD3ConditioningInfo,
     SDXLConditioningInfo,
+    WanConditioningInfo,
     ZImageConditioningInfo,
 )
 from invokeai.backend.util.logging import InvokeAILogger
@@ -109,6 +118,7 @@ class ApiDependencies:
             raise ValueError("Output folder is not set")
 
         image_files = DiskImageFileStorage(f"{output_folder}/images")
+        video_files = DiskVideoFileStorage(f"{output_folder}/videos")
 
         model_images_folder = config.models_path
         style_presets_folder = config.style_presets_path
@@ -134,6 +144,10 @@ class ApiDependencies:
         image_records = SqliteImageRecordStorage(db=db)
         image_moves = ImageMoveService(db=db, image_files=image_files, config=configuration, logger=logger)
         images = ImageService()
+        video_records = SqliteVideoRecordStorage(db=db)
+        videos = VideoService()
+        board_video_records = SqliteBoardVideoRecordStorage(db=db)
+        gallery = SqliteGalleryService(db=db)
         invocation_cache = MemoryInvocationCache(max_cache_size=config.node_cache_size)
         tensors = ObjectSerializerForwardCache(
             ObjectSerializerDisk[torch.Tensor](
@@ -153,9 +167,12 @@ class ApiDependencies:
                     SD3ConditioningInfo,
                     CogView4ConditioningInfo,
                     ZImageConditioningInfo,
+                    ErnieImageConditioningInfo,
                     Ideogram4ConditioningInfo,
                     QwenImageConditioningInfo,
+                    Krea2ConditioningInfo,
                     AnimaConditioningInfo,
+                    WanConditioningInfo,
                 ],
                 ephemeral=True,
             ),
@@ -189,6 +206,7 @@ class ApiDependencies:
         workflow_records = SqliteWorkflowRecordsStorage(db=db)
         style_preset_records = SqliteStylePresetRecordsStorage(db=db)
         style_preset_image_files = StylePresetImageFileStorageDisk(style_presets_folder / "images")
+        system_prompt_records = SqliteSystemPromptRecordsStorage(db=db)
         workflow_thumbnails = WorkflowThumbnailFileStorageDisk(workflow_thumbnails_folder)
         client_state_persistence = ClientStatePersistenceSqlite(db=db)
         users = UserService(db=db)
@@ -223,9 +241,15 @@ class ApiDependencies:
             conditioning=conditioning,
             style_preset_records=style_preset_records,
             style_preset_image_files=style_preset_image_files,
+            system_prompt_records=system_prompt_records,
             workflow_thumbnails=workflow_thumbnails,
             client_state_persistence=client_state_persistence,
             users=users,
+            videos=videos,
+            video_files=video_files,
+            video_records=video_records,
+            board_video_records=board_video_records,
+            gallery=gallery,
         )
 
         ApiDependencies.invoker = Invoker(services)
