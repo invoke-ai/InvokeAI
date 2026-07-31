@@ -18,8 +18,9 @@ describe('TOOL_OPTIONS_COMPONENTS', () => {
     ]);
   });
 
-  it('has no entry for the view tool — the bar shows only the doc info for it', () => {
+  it('has no entry for the view tool — the bar is omitted entirely for it', () => {
     expect(TOOL_OPTIONS_COMPONENTS.view).toBeUndefined();
+    expect(resolveCanvasOptionsContent({ status: 'idle' }, 'view')).toBeNull();
   });
 
   it('has no entry for tools not yet implemented by the engine', () => {

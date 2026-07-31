@@ -41,14 +41,10 @@ export const CanvasBottomControlsPresentation = ({
 };
 
 export const CanvasBottomControls = ({
-  documentHeight,
-  documentWidth,
   engine,
   isExternalInteractionLocked,
   operation,
 }: {
-  documentHeight: number | null;
-  documentWidth: number | null;
   engine: CanvasToolOptionsEngine | null;
   isExternalInteractionLocked: boolean;
   operation: CanvasOperationState | null;
@@ -62,9 +58,7 @@ export const CanvasBottomControls = ({
   if (!engine) {
     return null;
   }
-  const regularContent = (
-    <ToolOptionsBar documentHeight={documentHeight} documentWidth={documentWidth} engine={engine} />
-  );
+  const regularContent = <ToolOptionsBar engine={engine} />;
   const renderOperation = (locked: boolean): ReactNode =>
     operation?.status === 'active' ? (
       <Box ref={consumeLayerPropertiesRef} display="contents">

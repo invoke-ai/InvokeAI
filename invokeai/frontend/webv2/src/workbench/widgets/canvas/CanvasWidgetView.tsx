@@ -517,8 +517,6 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
           ) : null}
           <CanvasBottomOverlay.Controls>
             <CanvasBottomControls
-              documentHeight={document.height}
-              documentWidth={document.width}
               engine={engine}
               isExternalInteractionLocked={isInteractionLocked}
               operation={operation}
