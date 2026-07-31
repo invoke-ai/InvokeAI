@@ -49,7 +49,7 @@ dependencies = [
   # Loosely pinned, will respect requirement of `diffusers[torch]`. Split by platform: linux/win allow
   # >=2.10 so the rocm extra can use torch 2.10.0+rocm7.1, while macOS stays on 2.7.x — newer macOS torch
   # wheels exercise MPS on CI runners (no usable Metal GPU) and fail with MPS OOM.
-  # Deliberately NOT capped below 2.12 here. torch 2.12.x+rocm7.1 breaks generation (#9328), but
+  # Deliberately NOT capped below 2.12 here. torch 2.12.x+rocm7.1 is reported to break generation (#9410), but
   # this range is what every backend-agnostic install resolves against — manual installs use
   # `--torch-backend=<x>` with no extra (see docs/start-here/manual), so a blanket cap would also
   # reject torch>=2.12 on Windows/Linux CUDA, CPU and ARM64, where 2.12 has no known problem.

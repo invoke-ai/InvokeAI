@@ -133,13 +133,14 @@ The following commands vary depending on the version of Invoke being installed a
               ```
 
               :::caution[ROCm and torch 2.12]
-                The `rocm7.1` index currently defaults to torch 2.12.x, which breaks generation on
-                ROCm ([#9328](https://github.com/invoke-ai/InvokeAI/issues/9328)). Until that is
-                resolved, also constrain torch when installing:
+                The `rocm7.1` index currently defaults to torch 2.12.x, which has been reported to
+                break generation on ROCm ([#9410](https://github.com/invoke-ai/InvokeAI/issues/9410)).
+                Until that issue is closed, also constrain torch when installing:
                 ```sh
                 uv pip install <PACKAGE_SPECIFIER>==<VERSION> "torch<2.12" --python 3.12 --python-preference only-managed --torch-backend=rocm7.1 --force-reinstall
                 ```
-                This affects ROCm only — other backends work fine with torch 2.12.
+                This workaround applies to the reported ROCm case only; it isn't needed for the other
+                torch backends.
               :::
             </TabItem>
             <TabItem label="All other cases">
