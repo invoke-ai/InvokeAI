@@ -21,6 +21,7 @@ from invokeai.app.invocations.model import (
     VAEField,
 )
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     Flux2VariantType,
@@ -150,7 +151,7 @@ class Flux2DevModelLoaderInvocation(BaseInvocation):
             tokenizer = self.model.model_copy(update={"submodel_type": SubModelType.Tokenizer})
             text_encoder = self.model.model_copy(update={"submodel_type": SubModelType.TextEncoder})
         elif self.mistral_source_model is not None:
-            self._validate_diffusers_format(context, self.mistral_source_model, "Mistral Source")
+            self._validate_encoder_source(context, self.mistral_source_model, "Mistral Source")
             tokenizer = self.mistral_source_model.model_copy(update={"submodel_type": SubModelType.Tokenizer})
             text_encoder = self.mistral_source_model.model_copy(update={"submodel_type": SubModelType.TextEncoder})
         else:
@@ -170,14 +171,28 @@ class Flux2DevModelLoaderInvocation(BaseInvocation):
 
     def _validate_diffusers_format(
         self, context: InvocationContext, model: ModelIdentifierField, model_name: str
-    ) -> None:
+    ) -> AnyModelConfig:
+        """Validate that a model is a Diffusers-format pipeline and return its config.
+
+        Deliberately format-only, because this also gates the VAE-extraction path: the 32-channel
+        ``AutoencoderKLFlux2`` is shared between Klein and [dev], and the linear UI relies on that
+        (``buildFLUXGraph`` falls back to *any* FLUX.2 diffusers pipeline when only the VAE is
+        needed). Variant gating belongs to the encoder path only — see ``_validate_encoder_source``.
+        """
         config = context.models.get_config(model)
         if config.format != ModelFormat.Diffusers:
             raise ValueError(
                 f"The {model_name} model must be a Diffusers format model. "
                 f"The selected model '{config.name}' is in {config.format.value} format."
             )
-        # The source's VAE/tokenizer/encoder are extracted and paired with the [dev] transformer.
+        return config
+
+    def _validate_encoder_source(
+        self, context: InvocationContext, model: ModelIdentifierField, model_name: str
+    ) -> None:
+        """Validate a Diffusers pipeline used as the *text encoder* source."""
+        config = self._validate_diffusers_format(context, model, model_name)
+        # The source's tokenizer/encoder are extracted and paired with the [dev] transformer.
         # A Klein pipeline's Qwen3 tokenizer + encoder silently pass the layer-count guard and
         # produce a wrong-width conditioning that only surfaces as an opaque matmul error deep in
         # denoise, so reject non-[dev] sources here where the user still gets a clear message.
@@ -186,5 +201,6 @@ class Flux2DevModelLoaderInvocation(BaseInvocation):
             raise ValueError(
                 f"The {model_name} model must be a FLUX.2 [dev] pipeline, "
                 f"but the selected model '{config.name}' is variant '{variant.value}'. "
-                "Its text encoder / VAE are incompatible with the [dev] transformer."
+                "Its text encoder is incompatible with the [dev] transformer. "
+                "(Its VAE is compatible - this only blocks encoder extraction.)"
             )

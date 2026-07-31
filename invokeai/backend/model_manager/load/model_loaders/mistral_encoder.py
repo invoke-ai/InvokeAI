@@ -608,12 +608,41 @@ def _try_load_embedded_tekken(model_path: Path, logger: Any) -> Optional[AnyMode
     return _TekkenRawTextAdapter(mistral_tok)
 
 
+# Loader classes to try, in order, whenever we probe a local directory for a tokenizer.
+#
+# `AutoProcessor` alone is not enough: transformers resolves a `config.json` with
+# `model_type: "mistral3"` — precisely the BFL-style standalone-encoder layout — to a *multimodal*
+# processor and raises `OSError: Can't load image processor ...` for the missing
+# `preprocessor_config.json`, before it ever looks at the tokenizer files sitting right there.
+# `AutoTokenizer` loads the same directory fine, so try both.
+_TOKENIZER_LOADER_CLASSES = (AutoProcessor, AutoTokenizer)
+
+# `KeyError` is in the tuple because `AutoTokenizer` raises `KeyError: 'special_tokens'` on a
+# directory that carries only `tekken.json`; without it that escapes as an opaque crash instead of
+# falling through to the next rung of the ladder.
+_TOKENIZER_LOAD_ERRORS = (OSError, EnvironmentError, ValueError, KeyError)
+
+
+def _try_load_tokenizer_from_dir(path: Path, description: str, logger: Any) -> AnyModel | None:
+    """Try both loader classes against a local directory. Returns None if neither works."""
+    for loader_cls in _TOKENIZER_LOADER_CLASSES:
+        try:
+            obj = loader_cls.from_pretrained(path, local_files_only=True)
+            logger.info(f"Loaded Mistral tokenizer from {description}: {type(obj).__name__}")
+            return obj
+        except _TOKENIZER_LOAD_ERRORS as e:
+            logger.debug(
+                f"{loader_cls.__name__} could not load a tokenizer from {description}: {type(e).__name__}: {e}"
+            )
+    return None
+
+
 def _load_tokenizer_from_hf(logger: Any) -> AnyModel:
     """Download / load the BFL canonical FLUX.2 tokenizer from HuggingFace."""
     source, subfolder = _TOKENIZER_FALLBACK_SOURCE
     attempts: list[str] = []
     for local_only in (True, False):
-        for loader_cls in (AutoProcessor, AutoTokenizer):
+        for loader_cls in _TOKENIZER_LOADER_CLASSES:
             try:
                 obj = loader_cls.from_pretrained(source, subfolder=subfolder, local_files_only=local_only)
                 logger.info(
@@ -621,7 +650,7 @@ def _load_tokenizer_from_hf(logger: Any) -> AnyModel:
                     f"{source}:{subfolder} (local_only={local_only})"
                 )
                 return obj
-            except (OSError, EnvironmentError, ValueError) as e:
+            except _TOKENIZER_LOAD_ERRORS as e:
                 attempts.append(f"{loader_cls.__name__}(local_only={local_only}): {type(e).__name__}")
 
     raise RuntimeError(
@@ -644,8 +673,9 @@ def _load_tokenizer_for_model(model_path: Path, logger: Any) -> AnyModel:
        the canonical Tekken JSON as a ``tekken_model`` U8 tensor; we extract it
        and wrap it via ``mistral_common``.
     2. **Sibling ``tokenizer/`` folder** — diffusers-style HuggingFace layouts.
-    3. **Root-directory processor files** — standalone downloads that ship the
-       processor files alongside the encoder weights at the folder root.
+    3. **Root-directory processor / tokenizer files** — standalone downloads that
+       ship them alongside the encoder weights at the folder root. BFL-style
+       ``model_type: "mistral3"`` layouts resolve only via ``AutoTokenizer``.
     4. **BFL HuggingFace fallback** — fetches the canonical tokenizer from
        ``black-forest-labs/FLUX.2-dev/tokenizer``.
     """
@@ -658,12 +688,9 @@ def _load_tokenizer_for_model(model_path: Path, logger: Any) -> AnyModel:
         # 2. Diffusers folder with sibling tokenizer/
         tokenizer_dir = model_path / "tokenizer"
         if tokenizer_dir.exists():
-            try:
-                obj = AutoProcessor.from_pretrained(tokenizer_dir, local_files_only=True)
-                logger.info(f"Loaded Mistral tokenizer from sibling tokenizer/: {type(obj).__name__}")
+            obj = _try_load_tokenizer_from_dir(tokenizer_dir, "sibling tokenizer/", logger)
+            if obj is not None:
                 return obj
-            except (OSError, EnvironmentError, ValueError):
-                pass
         # Some diffusers folders ship the encoder weights as text_encoder/*.safetensors
         # which may embed Tekken — probe each in turn.
         text_encoder_dir = model_path / "text_encoder"
@@ -672,13 +699,10 @@ def _load_tokenizer_for_model(model_path: Path, logger: Any) -> AnyModel:
                 embedded = _try_load_embedded_tekken(st, logger)
                 if embedded is not None:
                     return embedded
-        # 3. Processor files alongside the encoder weights at the folder root.
-        try:
-            obj = AutoProcessor.from_pretrained(model_path, local_files_only=True)
-            logger.info(f"Loaded Mistral tokenizer from model root: {type(obj).__name__}")
+        # 3. Processor / tokenizer files alongside the encoder weights at the folder root.
+        obj = _try_load_tokenizer_from_dir(model_path, "model root", logger)
+        if obj is not None:
             return obj
-        except (OSError, EnvironmentError, ValueError):
-            pass
 
     # 4. HF fallback
     return _load_tokenizer_from_hf(logger)
