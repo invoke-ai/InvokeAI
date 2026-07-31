@@ -784,6 +784,12 @@
   },
   "widgets": {
     "actionsLabel": "{{label}} actions",
+    "failure": {
+      "compactLabel": "{{label}} failed — select to retry",
+      "copyError": "Copy Error",
+      "retry": "Retry",
+      "title": "{{label}} failed"
+    },
     "loadingLabel": "Loading {{label}}",
     "removeWidget": "Remove {{label}}",
     "panelLabel": "{{region}} widget panel",

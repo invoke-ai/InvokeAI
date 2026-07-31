@@ -73,9 +73,14 @@ describe('widget implementation resource rendering', () => {
     const resource = createWidgetImplementationResource('test', loader);
 
     await renderResource(resource);
-    await expect.poll(() => host?.textContent).toContain('Widget failed: test');
+    // i18n is not initialized under test, so `t()` returns raw keys — assert on
+    // the fallback's structure rather than its copy.
+    await expect.poll(() => host?.querySelector('[data-testid="widget-failure"]')).not.toBeNull();
+    expect(host?.textContent).toContain('test');
 
-    const retry = [...(host?.querySelectorAll('button') ?? [])].find((button) => button.textContent === 'Retry');
+    const retry = [...(host?.querySelectorAll('button') ?? [])].find((button) =>
+      button.textContent?.includes('widgets.failure.retry')
+    );
     expect(retry).toBeDefined();
     await act(() => retry?.click());
 

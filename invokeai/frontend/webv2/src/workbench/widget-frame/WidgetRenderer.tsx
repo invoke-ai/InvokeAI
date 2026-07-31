@@ -57,7 +57,15 @@ export const WidgetRenderer = ({ instance, presentation, region, widget }: Widge
   }
 
   return (
-    <WidgetFailureBoundary resetKey={instance.id} widgetId={widget.manifest.id} onRetry={widget.implementation.retry}>
+    <WidgetFailureBoundary
+      instance={instance}
+      presentation={presentation}
+      region={region}
+      resetKey={instance.id}
+      widget={widget}
+      widgetId={widget.manifest.id}
+      onRetry={widget.implementation.retry}
+    >
       {content}
     </WidgetFailureBoundary>
   );
