@@ -980,6 +980,22 @@
       "promptHistory": "Prompt history",
       "promptHistoryEntries": "Prompt history entries",
       "promptHistoryKeyboardHelp": "Alt+Up/Down switches between prompts while focused.",
+      "systemPrompts": {
+        "title": "System prompt",
+        "manage": "Manage system prompts",
+        "new": "New",
+        "edit": "Edit system prompt",
+        "name": "Name",
+        "namePlaceholder": "Concise and literal",
+        "content": "Instructions",
+        "contentPlaceholder": "Describe how the model should rewrite the prompt.",
+        "none": "No system prompts",
+        "shared": "Shared",
+        "deleteTitle": "Delete system prompt",
+        "deleteBody": "“{{name}}” will be deleted. This cannot be undone.",
+        "couldNotSave": "Could not save this system prompt.",
+        "couldNotDelete": "Could not delete this system prompt."
+      },
       "promptTemplates": {
         "title": "Prompt templates",
         "newTemplate": "New template",

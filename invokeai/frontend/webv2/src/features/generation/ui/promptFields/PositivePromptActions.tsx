@@ -7,6 +7,7 @@ import type { ChangeEvent, MouseEvent } from 'react';
 
 import { HStack, Icon, Image, Input, Popover, Portal, Separator, Stack, Text } from '@chakra-ui/react';
 import { filterPromptHistory } from '@features/generation/core/promptHistory';
+import { resolveSelectedSystemPromptId } from '@features/generation/core/systemPrompts';
 import { expandPrompt, imageToPrompt } from '@features/generation/data/promptUtilities';
 import { GenerationModelSelect as ModelSelect, useGenerationUi } from '@features/generation/ui/GenerationUiContext';
 import { DynamicPromptsButton } from '@features/generation/ui/promptFields/DynamicPromptsButton';
@@ -19,6 +20,8 @@ import {
   type PromptTriggerKind,
   type PromptTriggerOption,
 } from '@features/generation/ui/promptFields/promptTriggerOptions';
+import { SystemPromptsField } from '@features/generation/ui/promptFields/SystemPromptsField';
+import { useSystemPrompts } from '@features/generation/ui/promptFields/useSystemPrompts';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, IconButton, Scrollable, Tooltip } from '@platform/ui';
@@ -355,8 +358,15 @@ const ExpandPromptButton = ({
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedModelKey, setSelectedModelKey] = useState<string | null>(null);
+  const [selectedSystemPromptId, setSelectedSystemPromptId] = useState<string | null>(null);
   const textLlmModels = models.filter((model) => model.type === 'text_llm');
   const selectedModel = selectedModelKey ? textLlmModels.find((model) => model.key === selectedModelKey) : null;
+  // The list is behind the popover, so a closed button has nothing to fetch.
+  const systemPrompts = useSystemPrompts({ isEnabled: isOpen });
+  // Resolved rather than stored: the id outlives the record it points at, and an unselected
+  // picker should still expand with the first available prompt rather than none at all.
+  const effectiveSystemPromptId = resolveSelectedSystemPromptId(systemPrompts.prompts, selectedSystemPromptId);
+  const selectedSystemPrompt = systemPrompts.prompts.find((prompt) => prompt.id === effectiveSystemPromptId);
 
   activeProjectIdRef.current = activeProjectId;
 
@@ -372,7 +382,11 @@ const ExpandPromptButton = ({
     setIsLoading(true);
 
     try {
-      const result = await expandPrompt({ model_key: selectedModel.key, prompt: positivePrompt });
+      const result = await expandPrompt({
+        model_key: selectedModel.key,
+        prompt: positivePrompt,
+        system_prompt: selectedSystemPrompt?.content ?? null,
+      });
 
       if (result.expanded_prompt && activeProjectIdRef.current === projectId) {
         onPositivePromptChange(result.expanded_prompt);
@@ -389,7 +403,7 @@ const ExpandPromptButton = ({
     } finally {
       setIsLoading(false);
     }
-  }, [notifications, onPositivePromptChange, positivePrompt, projectId, selectedModel, t]);
+  }, [notifications, onPositivePromptChange, positivePrompt, projectId, selectedModel, selectedSystemPrompt, t]);
 
   const popoverIds = useMemo(() => ({ trigger: triggerId }), [triggerId]);
   const handleOpenChange = useCallback((event: { open: boolean }) => setIsOpen(event.open), []);
@@ -442,6 +456,11 @@ const ExpandPromptButton = ({
                       size="xs"
                       value={selectedModelKey}
                       onChange={handleModelChange}
+                    />
+                    <SystemPromptsField
+                      catalog={systemPrompts}
+                      selectedId={effectiveSystemPromptId}
+                      onSelect={setSelectedSystemPromptId}
                     />
                     <Button
                       disabled={!selectedModel || !positivePrompt.trim()}
