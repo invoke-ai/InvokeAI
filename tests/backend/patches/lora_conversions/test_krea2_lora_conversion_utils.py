@@ -2,12 +2,16 @@ import pytest
 import torch
 
 from invokeai.backend.patches.layers.dora_layer import DoRALayer
+from invokeai.backend.patches.layers.lokr_layer import LoKRLayer
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
 from invokeai.backend.patches.lora_conversions.krea2_lora_constants import (
     KREA2_LORA_QWEN3VL_PREFIX,
     KREA2_LORA_TRANSFORMER_PREFIX,
 )
-from invokeai.backend.patches.lora_conversions.krea2_lora_conversion_utils import lora_model_from_krea2_state_dict
+from invokeai.backend.patches.lora_conversions.krea2_lora_conversion_utils import (
+    is_state_dict_likely_krea2_lora,
+    lora_model_from_krea2_state_dict,
+)
 
 
 def test_peft_layer_preserves_explicit_alpha() -> None:
@@ -250,3 +254,79 @@ def test_native_krea2_top_level_linear_keys_are_remapped() -> None:
         f"{KREA2_LORA_TRANSFORMER_PREFIX}{diffusers_module}" for diffusers_module in native_to_diffusers.values()
     }
     assert expected_keys < set(model.layers)
+
+
+def test_lokr_layer_produces_lokr_layer() -> None:
+    # LyCORIS LoKr adapters (e.g. those produced by ai-toolkit for Krea-2) carry Kronecker factors instead of
+    # a lora_A/lora_B pair. They must survive _group_by_layer intact so any_lora_layer_from_state_dict can
+    # route them to LoKRLayer.
+    state_dict = {
+        "transformer.text_fusion.0.attn.to_q.lokr_w1": torch.ones(2, 2),
+        "transformer.text_fusion.0.attn.to_q.lokr_w2": torch.ones(3, 4),
+        "transformer.text_fusion.0.attn.to_q.alpha": torch.tensor(1.0),
+    }
+
+    model = lora_model_from_krea2_state_dict(state_dict)
+
+    layer = model.layers[f"{KREA2_LORA_TRANSFORMER_PREFIX}text_fusion.0.attn.to_q"]
+    assert isinstance(layer, LoKRLayer)
+    assert layer._alpha == 1.0
+    # The reconstructed weight is the Kronecker product of the two factors.
+    assert layer.get_weight(torch.empty(6, 8)).shape == (6, 8)
+
+
+def test_factored_lokr_layer_produces_lokr_layer() -> None:
+    # LoKr may factor either Kronecker operand further into an `_a`/`_b` pair. Both spellings must be grouped
+    # onto the same layer.
+    state_dict = {
+        "transformer.text_fusion.0.attn.to_q.lokr_w1_a": torch.ones(2, 1),
+        "transformer.text_fusion.0.attn.to_q.lokr_w1_b": torch.ones(1, 2),
+        "transformer.text_fusion.0.attn.to_q.lokr_w2_a": torch.ones(3, 1),
+        "transformer.text_fusion.0.attn.to_q.lokr_w2_b": torch.ones(1, 4),
+    }
+
+    model = lora_model_from_krea2_state_dict(state_dict)
+
+    layer = model.layers[f"{KREA2_LORA_TRANSFORMER_PREFIX}text_fusion.0.attn.to_q"]
+    assert isinstance(layer, LoKRLayer)
+    assert layer.w1_a is not None and layer.w1_b is not None
+    assert layer.w2_a is not None and layer.w2_b is not None
+
+
+def test_native_lokr_keys_are_renamed_to_diffusers_layout() -> None:
+    # Native (ComfyUI / ai-toolkit) LoKr keys must go through the same native->diffusers renaming as LoRA
+    # keys: txtfusion -> text_fusion, attn.wq -> attn.to_q, mlp.down -> ff.down.
+    state_dict = {
+        "diffusion_model.txtfusion.layerwise_blocks.0.attn.wq.lokr_w1": torch.ones(2, 2),
+        "diffusion_model.txtfusion.layerwise_blocks.0.attn.wq.lokr_w2": torch.ones(3, 4),
+        "diffusion_model.txtfusion.refiner_blocks.1.mlp.down.lokr_w1": torch.ones(2, 2),
+        "diffusion_model.txtfusion.refiner_blocks.1.mlp.down.lokr_w2": torch.ones(3, 4),
+    }
+
+    model = lora_model_from_krea2_state_dict(state_dict)
+
+    assert set(model.layers) == {
+        f"{KREA2_LORA_TRANSFORMER_PREFIX}text_fusion.layerwise_blocks.0.attn.to_q",
+        f"{KREA2_LORA_TRANSFORMER_PREFIX}text_fusion.refiner_blocks.1.ff.down",
+    }
+    assert all(isinstance(layer, LoKRLayer) for layer in model.layers.values())
+
+
+def test_is_state_dict_likely_krea2_lora_accepts_lokr() -> None:
+    state_dict = {
+        "diffusion_model.txtfusion.layerwise_blocks.0.attn.wq.lokr_w1": torch.ones(2, 2),
+        "diffusion_model.txtfusion.layerwise_blocks.0.attn.wq.lokr_w2": torch.ones(3, 4),
+    }
+
+    assert is_state_dict_likely_krea2_lora(state_dict)
+
+
+def test_is_state_dict_likely_krea2_lora_rejects_lokr_without_krea2_modules() -> None:
+    # The Krea-2 signature modules are still required: a LoKr targeting only generic transformer blocks
+    # belongs to another base (e.g. Qwen-Image) and must not be claimed here.
+    state_dict = {
+        "transformer.transformer_blocks.0.attn.to_q.lokr_w1": torch.ones(2, 2),
+        "transformer.transformer_blocks.0.attn.to_q.lokr_w2": torch.ones(3, 4),
+    }
+
+    assert not is_state_dict_likely_krea2_lora(state_dict)
