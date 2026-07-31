@@ -117,7 +117,11 @@ export const PromptTemplatesButton = ({
             // Quiet states only: a dimmed icon when nothing is applied, the
             // template's name beside it when one is. No accent, no motion.
             opacity={activeTemplate ? undefined : 0.5}
-            px={activeTemplate ? '1' : undefined}
+            // Explicit `'0'`, not `undefined`: Chakra's IconButton spreads
+            // incoming props over its own `px: '0'`, so undefined clobbers it
+            // and the size recipe's `px: '2'` widened the icon-only button past
+            // the square neighbours it sits beside.
+            px={activeTemplate ? '1' : '0'}
             size="2xs"
             variant="ghost"
             w={activeTemplate ? 'auto' : undefined}
