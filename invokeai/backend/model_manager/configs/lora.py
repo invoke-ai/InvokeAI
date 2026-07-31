@@ -1,3 +1,4 @@
+import re
 from abc import ABC
 from pathlib import Path
 from typing import (
@@ -97,6 +98,52 @@ def _get_flux_lora_format(mod: ModelOnDisk) -> FluxLoRAFormat | None:
     state_dict = mod.load_state_dict()
     value = flux_format_from_state_dict(state_dict, mod.metadata())
     return value
+
+
+# Matches an SDXL UNet attention key, capturing the transformer_blocks index.
+#
+# Anchored on the `lora_unet_` prefix because that is exactly the key set
+# `convert_sdxl_keys_to_diffusers_format()` can convert at load time — keys outside it
+# (e.g. diffusers/PEFT `unet.….lora_A.weight`) would be identified as SDXL here only to
+# raise `ValueError: Unrecognized SDXL LoRA key prefix` mid-generation.
+#
+# Both kohya `sd-scripts` naming conventions are covered: Stability-AI block names
+# (`input_blocks_8_1`, `middle_block_1`, `output_blocks_0_1`) and diffusers block names
+# (`down_blocks_2_attentions_1`, `mid_block_attentions_0`). Requiring a UNet block name
+# in addition to the prefix keeps DiT-style transformers (FLUX/Qwen/Z-Image), which also
+# use `transformer_blocks`, from matching.
+_SDXL_UNET_ATTENTION_RE = re.compile(
+    r"^lora_unet_"
+    r"(?:(?:down_blocks|up_blocks)_\d+_attentions_\d+"
+    r"|mid_block_attentions_\d+"
+    r"|(?:input_blocks|output_blocks)_\d+_\d+"
+    r"|middle_block_\d+)"
+    r"_transformer_blocks_(\d+)_"
+)
+
+
+def _state_dict_looks_like_sdxl_unet_lora(state_dict: dict[str | int, Any]) -> bool:
+    """Detect an SDXL UNet LoRA from its block structure alone.
+
+    SDXL's UNet uses a deep transformer stack (up to 10 transformer blocks) in its
+    lower-resolution attention blocks, so `transformer_blocks` indices reach >= 2.
+    SD1.x/SD2.x UNets only ever have a single transformer block (index 0) per
+    attention. This lets us identify SDXL from UNet-only LoRAs that lack the
+    cross-attention / text-encoder keys `lora_token_vector_length()` relies on
+    (e.g. self-attention-only "slider" LoRAs).
+
+    Known limitation: the `>= 2` threshold is what separates SDXL from SD1.x/SD2.x, so an
+    SDXL LoRA confined to the 2-transformer-block attention blocks (`down_blocks_1` /
+    `up_blocks_1`, indices 0-1) is not detected. Such a LoRA is indistinguishable from
+    SD1/SD2 by block structure alone.
+    """
+    for key in state_dict:
+        if not isinstance(key, str):
+            continue
+        match = _SDXL_UNET_ATTENTION_RE.match(key)
+        if match is not None and int(match.group(1)) >= 2:
+            return True
+    return False
 
 
 # FLUX.2 Klein context_in_dim values: 3 * Qwen3 hidden_size
@@ -691,6 +738,11 @@ class LoRA_LyCORIS_Config_Base(LoRA_Config_Base):
             return BaseModelType.StableDiffusionXL  # recognizes format at https://civitai.com/models/224641
         elif token_vector_length == 2048:
             return BaseModelType.StableDiffusionXL
+        # Some SDXL LoRAs (e.g. self-attention-only "slider" LoRAs) target only the UNet
+        # and lack the cross-attention / text-encoder keys that lora_token_vector_length()
+        # needs. Fall back to detecting SDXL from the UNet's deep transformer-block structure.
+        elif _state_dict_looks_like_sdxl_unet_lora(state_dict):
+            return BaseModelType.StableDiffusionXL
         else:
             raise NotAMatchError(f"unrecognized token vector length {token_vector_length}")
 
@@ -1265,6 +1317,12 @@ class LoRA_Diffusers_Config_Base(LoRA_Config_Base):
             case 2048:
                 return BaseModelType.StableDiffusionXL
             case _:
+                # Some SDXL LoRAs (e.g. self-attention-only "slider" LoRAs) target only the
+                # UNet and lack the cross-attention / text-encoder keys that
+                # lora_token_vector_length() needs. Fall back to detecting SDXL from the
+                # UNet's deep transformer-block structure.
+                if _state_dict_looks_like_sdxl_unet_lora(state_dict):
+                    return BaseModelType.StableDiffusionXL
                 raise NotAMatchError(f"unrecognized token vector length {token_vector_length}")
 
     @classmethod
