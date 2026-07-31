@@ -1277,6 +1277,111 @@ def test_stop_cancels_deferred_restore_and_prevents_late_launch(
         installer.stop()
 
 
+def test_import_waiter_returns_registered_job(
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_record_store,
+    mm2_download_queue,
+    mm2_session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    installer = ModelInstallService(
+        app_config=mm2_app_config,
+        record_store=mm2_record_store,
+        download_queue=mm2_download_queue,
+        event_bus=TestEventService(),
+        session=mm2_session,
+    )
+    source = URLModelSource(url=Url("https://www.test.foo/download/test_embedding.safetensors"))
+    existing_job = ModelInstallJob(
+        id=installer._next_id(),
+        source=source,
+        config_in=ModelRecordChanges(),
+        local_path=mm2_app_config.models_path,
+    )
+    existing_job.status = InstallStatus.DOWNLOADING
+    with installer._lock:
+        installer._install_jobs.append(existing_job)
+        installer._pending_sources.add(str(source))
+
+    waiter_entered = threading.Event()
+    real_wait = installer._install_cond.wait
+
+    def _observing_wait(timeout: Optional[float] = None) -> bool:
+        waiter_entered.set()
+        return real_wait(timeout)
+
+    monkeypatch.setattr(installer._install_cond, "wait", _observing_wait)
+    result: list[ModelInstallJob] = []
+    errors: list[Exception] = []
+
+    def _wait_for_import() -> None:
+        try:
+            result.append(installer.import_model(source))
+        except Exception as exc:  # noqa: BLE001 - assertion target
+            errors.append(exc)
+
+    thread = threading.Thread(target=_wait_for_import)
+    thread.start()
+    assert waiter_entered.wait(timeout=5)
+    with installer._install_cond:
+        installer._pending_sources.discard(str(source))
+        installer._install_cond.notify_all()
+    thread.join(timeout=5)
+
+    assert not thread.is_alive()
+    assert errors == []
+    assert result == [existing_job]
+
+
+@pytest.mark.timeout(timeout=20, method="thread")
+def test_import_waiter_aborts_when_service_stops(
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_record_store,
+    mm2_download_queue,
+    mm2_session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    installer = ModelInstallService(
+        app_config=mm2_app_config,
+        record_store=mm2_record_store,
+        download_queue=mm2_download_queue,
+        event_bus=TestEventService(),
+        session=mm2_session,
+    )
+    source = URLModelSource(url=Url("https://www.test.foo/download/test_embedding.safetensors"))
+    installer.start()
+    installer._wait_for_restore_complete()
+    with installer._lock:
+        installer._pending_sources.add(str(source))
+
+    waiter_entered = threading.Event()
+    real_wait = installer._install_cond.wait
+
+    def _observing_wait(timeout: Optional[float] = None) -> bool:
+        waiter_entered.set()
+        return real_wait(timeout)
+
+    monkeypatch.setattr(installer._install_cond, "wait", _observing_wait)
+    monkeypatch.setattr(installer, "_import_from_url", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError()))
+    errors: list[Exception] = []
+
+    def _wait_for_import() -> None:
+        try:
+            installer.import_model(source)
+        except Exception as exc:  # noqa: BLE001 - assertion target
+            errors.append(exc)
+
+    thread = threading.Thread(target=_wait_for_import, daemon=True)
+    thread.start()
+    assert waiter_entered.wait(timeout=5)
+    installer.stop()
+    thread.join(timeout=5)
+
+    assert not thread.is_alive()
+    assert len(errors) == 1
+    assert str(errors[0]) == "Model install service stopped"
+
+
 def test_huggingface_blob_url_uses_resolve_download_url(mm2_installer: ModelInstallServiceBase) -> None:
     source = URLModelSource(
         url=Url("https://huggingface.co/h94/IP-Adapter/blob/main/sdxl_models/ip-adapter.safetensors")

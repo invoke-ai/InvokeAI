@@ -605,6 +605,8 @@ class ModelInstallService(ModelInstallServiceBase):
             while source_str in self._pending_sources:
                 # Another thread is importing this source. Wait for it to
                 # register its job (or fail), then re-run the duplicate check.
+                if self._stop_event.is_set():
+                    raise RuntimeError("Model install service stopped")
                 self._install_cond.wait()
             similar_jobs = [x for x in self.list_jobs() if x.source == source and not x.in_terminal_state]
             if similar_jobs:
