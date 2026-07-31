@@ -54,8 +54,19 @@ const CURVE_SVG_CSS = {
   borderRadius: 'l2',
   maxWidth: `${CURVE_SIZE}px`,
   touchAction: 'none',
+  userSelect: 'none',
   width: 'full',
 };
+
+/**
+ * Nothing in the editor is selectable text.
+ *
+ * Double-clicking to add a point is a word-select gesture as far as the browser
+ * is concerned, so it would latch onto the nearest text — the channel select's
+ * label. The next press on a handle then dragged *that* selection instead,
+ * trailing a floating "Red" across the screen and abandoning the point drag.
+ */
+const CURVE_EDITOR_CSS = { userSelect: 'none' };
 const CURVE_HANDLE_CSS = { cursor: 'grab', _active: { cursor: 'grabbing' } };
 
 const preventDefault = (event: { preventDefault: () => void }): void => event.preventDefault();
@@ -350,6 +361,9 @@ const CurvesEditor = ({ adjustments, onCancel, onCommit, onLive }: CurvesEditorP
   const handlePointDown = useCallback(
     (event: ReactPointerEvent<SVGCircleElement>) => {
       event.stopPropagation();
+      // Keeps the press from also starting a native selection/text drag, which
+      // would hijack the gesture a few pixels in.
+      event.preventDefault();
       event.currentTarget.setPointerCapture(event.pointerId);
       dragIndexRef.current = Number(event.currentTarget.dataset.index);
       dragTargetRef.current = event.currentTarget;
@@ -457,7 +471,7 @@ const CurvesEditor = ({ adjustments, onCancel, onCommit, onLive }: CurvesEditorP
   const channelValue = useMemo(() => [channel], [channel]);
 
   return (
-    <Stack gap="2">
+    <Stack css={CURVE_EDITOR_CSS} gap="2">
       <HStack justify="space-between">
         <Text fontSize="xs" fontWeight="medium">
           {t('widgets.layers.adjustments.curves')}

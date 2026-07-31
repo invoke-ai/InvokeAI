@@ -141,6 +141,18 @@ describe('curves editor', () => {
     expect(getComputedStyle(svg).backgroundColor).not.toBe('rgba(0, 0, 0, 0)');
   });
 
+  it('makes nothing in the editor selectable, so a drag cannot become a text drag', async () => {
+    // Double-clicking to add a point is a word-select gesture; without this it
+    // latched onto the channel select's label and the next handle press dragged
+    // that selection instead, trailing a floating "Red" across the screen.
+    const svg = await render();
+    const editor = svg.parentElement!;
+
+    expect(getComputedStyle(editor).userSelect).toBe('none');
+    expect(getComputedStyle(svg).userSelect).toBe('none');
+    expect(getComputedStyle(editor.querySelector('button')!).userSelect).toBe('none');
+  });
+
   it('keeps the drawing square so pointer coordinates map onto the viewBox', async () => {
     const svg = await render();
     const rect = svg.getBoundingClientRect();
