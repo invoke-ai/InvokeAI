@@ -26,6 +26,10 @@ export const zStylePresetField = z.object({
   style_preset_id: z.string().trim().min(1),
 });
 
+export const zSystemPromptField = z.object({
+  system_prompt_id: z.string().trim().min(1),
+});
+
 export const zColorField = z.object({
   r: z.number().int().min(0).max(255),
   g: z.number().int().min(0).max(255),
@@ -81,6 +85,8 @@ export const zZImageSchedulerField = z.enum(['euler', 'heun', 'lcm']);
 // Anima scheduler options (same flow-matching schedulers, defined separately to avoid coupling)
 export const zAnimaSchedulerField = z.enum(['euler', 'heun', 'dpmpp_2m', 'dpmpp_2m_sde', 'er_sde', 'lcm']);
 
+// ERNIE-Image scheduler options (Flow Matching schedulers, same as Flux/Z-Image)
+export const zErnieImageSchedulerField = z.enum(['euler', 'heun', 'lcm']);
 // Ideogram 4 sampler presets. Each bundles step count, the per-step guidance schedule (with a polish
 // tail), and the logit-normal schedule mean/std. V4_QUALITY_48 is the reference default.
 export const zIdeogram4SamplerPresetField = z.enum(['V4_QUALITY_48', 'V4_DEFAULT_20', 'V4_TURBO_12']);
@@ -108,6 +114,7 @@ export const zBaseModelType = z.enum([
   'cogview4',
   'qwen-image',
   'z-image',
+  'ernie-image',
   'krea-2',
   'ideogram-4',
   'external',
@@ -126,6 +133,7 @@ export const zMainModelBase = z.enum([
   'cogview4',
   'qwen-image',
   'z-image',
+  'ernie-image',
   'krea-2',
   'ideogram-4',
   'anima',
@@ -152,10 +160,13 @@ export const zModelType = z.enum([
   'qwen_vl_encoder',
   'qwen3_vl_encoder',
   'wan_t5_encoder',
+  'gemma2_encoder',
   'clip_embed',
   'siglip',
   'flux_redux',
+  'prompt_enhancer',
   'external_image_generator',
+  'pid_decoder',
   'unknown',
 ]);
 export type ModelType = z.infer<typeof zModelType>;
@@ -169,6 +180,8 @@ export const zSubModelType = z.enum([
   'tokenizer',
   'tokenizer_2',
   'tokenizer_3',
+  'pe',
+  'pe_tokenizer',
   'vae',
   'vae_decoder',
   'vae_encoder',
@@ -188,6 +201,7 @@ const zWanVariantType = z.enum(['t2v_a14b', 'i2v_a14b', 'ti2v_5b']);
  *  targets. A14B = inner_dim 5120 (both T2V and I2V), 5B = inner_dim 3072. */
 const zWanLoRAVariantType = z.enum(['a14b', '5b']);
 export const zQwen3VariantType = z.enum(['qwen3_4b', 'qwen3_8b', 'qwen3_06b']);
+const zPiDDecoderVariantType = z.enum(['res2k_sr4x', 'res2kto4k_sr4x']);
 export const zAnyModelVariant = z.union([
   zModelVariantType,
   zClipVariantType,
@@ -199,6 +213,7 @@ export const zAnyModelVariant = z.union([
   zWanVariantType,
   zWanLoRAVariantType,
   zQwen3VariantType,
+  zPiDDecoderVariantType,
 ]);
 export type AnyModelVariant = z.infer<typeof zAnyModelVariant>;
 export const zModelFormat = z.enum([
@@ -216,6 +231,7 @@ export const zModelFormat = z.enum([
   'qwen_vl_encoder',
   'qwen3_vl_encoder',
   'wan_t5_encoder',
+  'gemma2_encoder',
   'bnb_quantized_int8b',
   'bnb_quantized_nf4b',
   'gguf_quantized',

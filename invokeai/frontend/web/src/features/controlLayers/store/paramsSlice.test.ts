@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest';
 import {
   isValidKrea2RebalanceWeights,
   KREA2_REBALANCE_WEIGHT_COUNT,
+  modelChanged,
   paramsSliceConfig,
   parseKrea2RebalanceWeights,
   positivePromptAddedToHistory,
@@ -161,6 +162,8 @@ describe('paramsSliceConfig persisted state migration', () => {
 
     const result = migrate?.(v2State) as ReturnType<typeof getInitialParamsState>;
 
+    // v2 migrates all the way through the current chain (v2 -> v3 adds Qwen fields,
+    // v3 -> v4 adds Krea-2 and PiD fields).
     expect(result._version).toBe(4);
     expect(result.qwenImageVaeModel).toBeNull();
     expect(result.qwenImageQwenVLEncoderModel).toBeNull();
@@ -208,6 +211,29 @@ describe('paramsSliceConfig persisted state migration', () => {
     expect(result.dimensions).toMatchObject({ width: 640, height: 896 });
   });
 
+  it('backfills the ERNIE-Image fields from their zod defaults without a version bump', () => {
+    // The ERNIE-Image fields are additive with `.default()`, so there is no migration branch for
+    // them. A persisted state written before they existed must still parse -- if it throws, the
+    // caller's catch falls back to the initial state and the user loses every generation param.
+    expect(migrate).toBeDefined();
+
+    const initial = getInitialParamsState();
+    const persisted: Record<string, unknown> = {
+      ...initial,
+      positivePrompt: 'preserve this prompt',
+      seed: 99,
+    };
+    delete persisted.ernieImageScheduler;
+    delete persisted.ernieImageUsePromptEnhancer;
+
+    const result = migrate?.(persisted) as ReturnType<typeof getInitialParamsState>;
+
+    expect(result.ernieImageScheduler).toBe('euler');
+    expect(result.ernieImageUsePromptEnhancer).toBe(true);
+    expect(result.positivePrompt).toBe('preserve this prompt');
+    expect(result.seed).toBe(99);
+  });
+
   it('migrates old positive prompt history entries to prompt pairs', () => {
     expect(migrate).toBeDefined();
 
@@ -220,6 +246,50 @@ describe('paramsSliceConfig persisted state migration', () => {
     const result = migrate?.(v3State) as ReturnType<typeof getInitialParamsState>;
 
     expect(result.positivePromptHistory).toEqual([{ positivePrompt: 'a fluffy cat', negativePrompt: null }]);
+  });
+});
+
+describe('paramsSlice PiD state on base change (modelChanged)', () => {
+  const fluxModel = { key: 'flux', hash: 'h', name: 'FLUX', base: 'flux', type: 'main' };
+  const modelWithBase = (base: string) => ({ key: base, hash: 'h', name: base, base, type: 'main' });
+
+  const stateOnFluxWithNativePid = () =>
+    ({
+      ...getInitialParamsState(),
+      model: fluxModel,
+      pidMode: 'native',
+      pidDecoderModel: { key: 'd', name: 'flux decoder', base: 'flux' },
+    }) as ReturnType<typeof getInitialParamsState>;
+
+  it('clears an incompatible PiD decoder when switching to a different PiD base (FLUX -> SDXL)', () => {
+    const next = paramsSliceConfig.slice.reducer(
+      stateOnFluxWithNativePid(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      modelChanged({ model: modelWithBase('sdxl') as any, previousModel: fluxModel as any })
+    );
+    // The FLUX decoder is invalid for SDXL, so it is cleared; SDXL supports PiD so the mode is kept.
+    expect(next.pidDecoderModel).toBeNull();
+    expect(next.pidMode).toBe('native');
+  });
+
+  it('keeps the FLUX decoder when switching to Z-Image (which reuses the FLUX decoder)', () => {
+    const next = paramsSliceConfig.slice.reducer(
+      stateOnFluxWithNativePid(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      modelChanged({ model: modelWithBase('z-image') as any, previousModel: fluxModel as any })
+    );
+    expect(next.pidDecoderModel).not.toBeNull();
+    expect(next.pidMode).toBe('native');
+  });
+
+  it('turns PiD off (and clears the decoder) when switching to a non-PiD base (FLUX -> SD1)', () => {
+    const next = paramsSliceConfig.slice.reducer(
+      stateOnFluxWithNativePid(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      modelChanged({ model: modelWithBase('sd-1') as any, previousModel: fluxModel as any })
+    );
+    expect(next.pidMode).toBe('off');
+    expect(next.pidDecoderModel).toBeNull();
   });
 });
 

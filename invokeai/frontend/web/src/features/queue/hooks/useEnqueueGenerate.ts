@@ -13,6 +13,7 @@ import type { BaseModelType } from 'features/nodes/types/common';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildAnimaGraph } from 'features/nodes/util/graph/generation/buildAnimaGraph';
 import { buildCogView4Graph } from 'features/nodes/util/graph/generation/buildCogView4Graph';
+import { buildErnieImageGraph } from 'features/nodes/util/graph/generation/buildErnieImageGraph';
 import { buildExternalGraph } from 'features/nodes/util/graph/generation/buildExternalGraph';
 import { buildFLUXGraph } from 'features/nodes/util/graph/generation/buildFLUXGraph';
 import { buildIdeogram4Graph } from 'features/nodes/util/graph/generation/buildIdeogram4Graph';
@@ -65,6 +66,8 @@ const enqueueGenerate = async (store: AppStore, prepend: boolean) => {
         return await buildQwenImageGraph(graphBuilderArg);
       case 'z-image':
         return await buildZImageGraph(graphBuilderArg);
+      case 'ernie-image':
+        return await buildErnieImageGraph(graphBuilderArg);
       case 'krea-2':
         return await buildKrea2Graph(graphBuilderArg);
       case 'ideogram-4':
