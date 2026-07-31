@@ -83,9 +83,12 @@ class AnimaLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         memory would consume most of the device, otherwise a single-pass decode is
         faster (~0.65s vs ~1.05s at 1024x1024) and exact.
         """
-        if device.type != "cuda":
+        if device.type == "cuda":
+            total_vram = torch.cuda.get_device_properties(device).total_memory
+        elif device.type == "xpu":
+            total_vram = torch.xpu.get_device_properties(device).total_memory
+        else:
             return False
-        total_vram = torch.cuda.get_device_properties(device).total_memory
         return full_decode_working_memory > 0.7 * total_vram
 
     @torch.no_grad()

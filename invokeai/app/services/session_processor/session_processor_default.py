@@ -626,15 +626,17 @@ class DefaultSessionProcessor(SessionProcessorBase):
             self._thread_semaphore.acquire()
 
             # Pin this worker thread to its device so all device-selecting code (TorchDevice.choose_torch_device,
-            # which nodes and the model loader consult) resolves to this GPU. CUDA's current device is per-thread.
+            # which nodes and the model loader consult) resolves to this GPU. CUDA's and XPU's current
+            # device are both per-thread.
             if worker.device is not None:
                 TorchDevice.set_session_device(worker.device)
 
             # torch.cuda.set_device() initializes CUDA on the device, which can permanently reserve
             # VRAM in an otherwise idle process (#9413). Defer the CUDA-side pin until this worker
             # claims its first queue item; the pin is per-thread and this thread persists, so pinning
-            # once before the first item is equivalent to pinning here.
-            cuda_pin_needed = worker.device is not None and worker.device.type == "cuda"
+            # once before the first item is equivalent to pinning here. torch.xpu.set_device() brings
+            # up a SYCL context with the same effect, so XPU is deferred on the same terms.
+            device_pin_needed = worker.device is not None and worker.device.type in ("cuda", "xpu")
 
             worker.cancel_event.clear()
 
@@ -673,9 +675,13 @@ class DefaultSessionProcessor(SessionProcessorBase):
                         poll_now_event.wait(self._polling_interval)
                         continue
 
-                    if cuda_pin_needed:
-                        torch.cuda.set_device(worker.device)
-                        cuda_pin_needed = False
+                    if device_pin_needed:
+                        assert worker.device is not None
+                        if worker.device.type == "cuda":
+                            torch.cuda.set_device(worker.device)
+                        else:
+                            torch.xpu.set_device(worker.device)
+                        device_pin_needed = False
 
                     # A cancellation can race the claim: it may have marked the row terminal before
                     # this worker recorded `queue_item`, so _on_queue_item_status_changed couldn't set

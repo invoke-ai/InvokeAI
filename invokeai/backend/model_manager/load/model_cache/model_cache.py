@@ -599,14 +599,14 @@ class ModelCache:
         # Use the provided execution device, or fall back to the cache's default
         effective_execution_device = execution_device if execution_device is not None else self._execution_device
 
-        # Partial loading only makes sense on CUDA.
+        # Partial loading only makes sense on devices with dedicated VRAM (CUDA, XPU).
         # - When running on CPU, there is no 'loading' to do.
         # - When running on MPS, memory is shared with the CPU, so the default OS memory management already handles this
         #   well.
-        running_with_cuda = effective_execution_device.type == "cuda"
+        running_with_dedicated_vram = effective_execution_device.type in ("cuda", "xpu")
 
         # Wrap model.
-        if isinstance(model, torch.nn.Module) and running_with_cuda and self._enable_partial_loading:
+        if isinstance(model, torch.nn.Module) and running_with_dedicated_vram and self._enable_partial_loading:
             wrapped_model = CachedModelWithPartialLoad(
                 model,
                 effective_execution_device,
@@ -934,7 +934,7 @@ class ModelCache:
             self._logger.debug(
                 f"Finished locking model {cache_entry.key} (Type: {cache_entry.cached_model.model.__class__.__name__})"
             )
-        except torch.cuda.OutOfMemoryError:
+        except torch.OutOfMemoryError:
             self._logger.warning("Insufficient GPU memory to load model. Aborting")
             cache_entry.unlock()
             raise
@@ -1066,7 +1066,7 @@ class ModelCache:
             else:
                 raise ValueError(f"Unsupported cached model type: {type(cache_entry.cached_model)}")
         except Exception as e:
-            if isinstance(e, torch.cuda.OutOfMemoryError):
+            if isinstance(e, torch.OutOfMemoryError):
                 self._logger.warning("Insufficient GPU memory to load model. Aborting")
             # If an exception occurs, the model could be left in a bad state, so we delete it from the cache entirely.
             self._delete_cache_entry(cache_entry)
@@ -1107,6 +1107,10 @@ class ModelCache:
             vram_allocated = torch.cuda.memory_allocated(self._execution_device)
             vram_free, _vram_total = torch.cuda.mem_get_info(self._execution_device)
             vram_available_to_process = vram_free + vram_allocated
+        elif self._execution_device.type == "xpu":
+            vram_allocated = torch.xpu.memory_allocated(self._execution_device)
+            vram_free, _vram_total = TorchDevice.xpu_mem_get_info(self._execution_device)
+            vram_available_to_process = vram_free + vram_allocated
         elif self._execution_device.type == "mps":
             vram_reserved = torch.mps.driver_allocated_memory()
             # TODO(ryand): Is it accurate that MPS shares memory with the CPU?
@@ -1129,6 +1133,9 @@ class ModelCache:
             # (which adds vram_allocated(execution_device)), inflating "available" toward total VRAM
             # so the cache never offloads — causing VRAM OOMs that ignore device_working_mem_gb.
             return torch.cuda.memory_allocated(self._execution_device)
+        elif self._execution_device.type == "xpu":
+            # Same per-device requirement as CUDA above.
+            return torch.xpu.memory_allocated(self._execution_device)
         elif self._execution_device.type == "mps":
             return torch.mps.current_allocated_memory()
         else:
@@ -1163,14 +1170,21 @@ class ModelCache:
         #   hard for users to understand. It is better for users to see that their RAM is maxed out, and then override
         #   the default value if desired.
 
-        # Lookup the total VRAM size for the CUDA execution device.
+        # Lookup the total VRAM size for the CUDA or XPU execution device.
         # This runs at startup (one ModelCache is built per generation device before any request is
         # served), and torch.cuda.mem_get_info() would create a CUDA context that permanently holds
         # ~100-300 MiB of VRAM in an otherwise idle process. cudaGetDeviceProperties reports the same
-        # total without creating a context (#9413).
-        total_cuda_vram_bytes: int | None = None
+        # total without creating a context (#9413). torch.xpu.get_device_properties() is the XPU
+        # equivalent, and is also the one total that survives a missing SYCL free-memory aspect --
+        # so this deliberately does not go through TorchDevice.xpu_mem_get_info(), whose first tier
+        # is the context-creating mem_get_info() call.
+        total_vram_bytes: int | None = None
         if self._execution_device.type == "cuda":
-            total_cuda_vram_bytes = torch.cuda.get_device_properties(self._execution_device).total_memory
+            total_vram_bytes = torch.cuda.get_device_properties(self._execution_device).total_memory
+        elif self._execution_device.type == "xpu":
+            # A total of 0 means "unknown" (the device couldn't report total_memory). Treat it like
+            # the CPU case (None) so the RAM heuristic below doesn't compute a negative cache cap.
+            total_vram_bytes = int(torch.xpu.get_device_properties(self._execution_device).total_memory) or None
 
         # Apply heuristic 1.
         # ------------------
@@ -1185,11 +1199,11 @@ class ModelCache:
         # Apply heuristic 2.
         # ------------------
         max_ram_cache_size_bytes = 32 * GB
-        if total_cuda_vram_bytes is not None:
+        if total_vram_bytes is not None:
             if self._max_vram_cache_size_gb is not None:
                 max_ram_cache_size_bytes = int(self._max_vram_cache_size_gb * GB)
             else:
-                max_ram_cache_size_bytes = total_cuda_vram_bytes - int(self._execution_device_working_mem_gb * GB)
+                max_ram_cache_size_bytes = total_vram_bytes - int(self._execution_device_working_mem_gb * GB)
         if ram_available_to_model_cache > max_ram_cache_size_bytes:
             heuristics_applied.append(2)
             ram_available_to_model_cache = max_ram_cache_size_bytes
@@ -1335,6 +1349,11 @@ class ModelCache:
                 torch.cuda.memory_allocated(self._execution_device) if self._execution_device.type == "cuda" else 0
             )
             log += "  {:<30} {:.1f} MB\n".format("CUDA Memory Allocated:", allocated / MB)
+        elif hasattr(torch, "xpu") and torch.xpu.is_available():
+            allocated = (
+                torch.xpu.memory_allocated(self._execution_device) if self._execution_device.type == "xpu" else 0
+            )
+            log += "  {:<30} {:.1f} MB\n".format("XPU Memory Allocated:", allocated / MB)
         log += "  {:<30} {}\n".format("Total models:", len(self._cached_models))
 
         if include_entry_details and len(self._cached_models) > 0:
