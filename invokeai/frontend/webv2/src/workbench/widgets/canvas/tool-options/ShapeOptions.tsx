@@ -2,10 +2,11 @@ import type { NumberInput as ChakraNumberInput, SelectValueChangeDetails } from 
 import type { CanvasLayerSourceContract, ShapeToolOptions } from '@workbench/canvas-engine/api';
 
 import { createListCollection, HStack, NumberInput, Text } from '@chakra-ui/react';
-import { ColorPicker, Select, ToggleDot } from '@platform/ui';
+import { ColorPicker, Select, ToggleIconButton } from '@platform/ui';
 import { MAX_SHAPE_STROKE_WIDTH } from '@workbench/canvas-engine/api';
 import { useShapeOptions } from '@workbench/widgets/canvas/engineStoreHooks';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
+import { PaintBucketIcon, SquareIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -140,8 +141,9 @@ export const ShapeOptions = ({ engine }: ToolOptionsComponentProps) => {
       />
 
       <HStack align="center" gap="1.5">
-        <ToggleDot
+        <ToggleIconButton
           checked={fill !== null}
+          icon={PaintBucketIcon}
           label={t('widgets.canvas.toolOptions.shapeFill')}
           onCheckedChange={onFillToggle}
         />
@@ -156,8 +158,9 @@ export const ShapeOptions = ({ engine }: ToolOptionsComponentProps) => {
       </HStack>
 
       <HStack align="center" gap="1.5">
-        <ToggleDot
+        <ToggleIconButton
           checked={stroke !== null}
+          icon={SquareIcon}
           label={t('widgets.canvas.toolOptions.shapeStroke')}
           onCheckedChange={onStrokeToggle}
         />

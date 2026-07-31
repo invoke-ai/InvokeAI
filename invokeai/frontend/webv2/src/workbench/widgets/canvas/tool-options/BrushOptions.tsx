@@ -1,9 +1,10 @@
 import type { NumberInput as ChakraNumberInput, SliderValueChangeDetails } from '@chakra-ui/react';
 
 import { HStack, NumberInput } from '@chakra-ui/react';
-import { ColorPicker, Slider, ToggleDot } from '@platform/ui';
+import { ColorPicker, Slider, ToggleIconButton } from '@platform/ui';
 import { MAX_BRUSH_SIZE, MIN_BRUSH_SIZE } from '@workbench/canvas-engine/api';
 import { useBrushOptions } from '@workbench/widgets/canvas/engineStoreHooks';
+import { DropletIcon, PenLineIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -120,18 +121,20 @@ export const BrushOptions = ({ engine }: ToolOptionsComponentProps) => {
         onValueChange={onOpacityChange}
       />
       {/*
-        Two independent dots rather than one pressure switch: width and opacity are separate
+        Two independent toggles rather than one pressure switch: width and opacity are separate
         pressure responses, and opacity additionally costs a full scratch refill per frame.
-        Each ToggleDot is an aria-labelled button, so unlike sibling switches sharing a
+        Each is an aria-labelled button, so unlike sibling switches sharing a
         Field.Root they cannot collide on a hidden-input id.
       */}
-      <ToggleDot
+      <ToggleIconButton
         checked={options.pressureAffectsWidth}
+        icon={PenLineIcon}
         label={t('widgets.canvas.toolOptions.pressureAffectsWidth')}
         onCheckedChange={onPressureWidthToggle}
       />
-      <ToggleDot
+      <ToggleIconButton
         checked={options.pressureAffectsOpacity}
+        icon={DropletIcon}
         label={t('widgets.canvas.toolOptions.pressureAffectsOpacity')}
         onCheckedChange={onPressureOpacityToggle}
       />
