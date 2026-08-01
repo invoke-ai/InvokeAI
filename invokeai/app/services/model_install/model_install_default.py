@@ -88,6 +88,7 @@ INSTALL_MARKER_VERSION = 1
 # import_model call waiting on the startup barrier) behind an import whose
 # helpers hang, e.g. on a metadata request that never returns.
 DEFERRED_RESTORE_TIMEOUT = 30.0
+RESTORE_SHUTDOWN_TIMEOUT = 1.0
 
 
 class ModelInstallService(ModelInstallServiceBase):
@@ -113,10 +114,11 @@ class ModelInstallService(ModelInstallServiceBase):
         self._event_bus = event_bus
         self._logger = InvokeAILogger.get_logger(name=self.__class__.__name__)
         self._install_jobs: List[ModelInstallJob] = []
-        # Monotonic per-source generations let startup restoration observe that
-        # an import registered a job even if a concurrent prune removes that
-        # terminal job before the deferred recheck.
+        # Per-source registration history lets startup restoration observe the
+        # exact tmpdir registered by an import even if a concurrent prune removes
+        # that terminal job before the deferred recheck.
         self._source_import_generations: dict[str, int] = {}
+        self._source_import_tmpdirs: dict[str, list[Optional[Path]]] = {}
         self._install_queue: Queue[ModelInstallJob] = Queue()
         # Lock-order discipline: download-queue callbacks run on download queue
         # threads that already hold the download queue's lock, and they acquire
@@ -143,7 +145,7 @@ class ModelInstallService(ModelInstallServiceBase):
         self._session = session
         self._install_thread: Optional[threading.Thread] = None
         self._restore_thread: Optional[threading.Thread] = None
-        self._restore_launch_lock = threading.Lock()
+        self._job_launch_lock = threading.Lock()
         self._next_job_id = 0
 
     def _marker_path(self, tmpdir: Path) -> Path:
@@ -214,6 +216,8 @@ class ModelInstallService(ModelInstallServiceBase):
             marker = self._read_install_marker(tmpdir)
             if not marker:
                 continue
+            if self._stop_event.is_set():
+                return
             if marker.get("source") != source_str:
                 continue
             status = marker.get("status")
@@ -249,8 +253,10 @@ class ModelInstallService(ModelInstallServiceBase):
                 owned_sources.add(source_str)
                 if active_job._install_tmpdir is not None:
                     owned_tmpdirs.setdefault(source_str, set()).add(active_job._install_tmpdir)
-        deferred: list[tuple[str, ModelInstallJob, Path, int]] = []
+        deferred: dict[str, list[tuple[ModelInstallJob, Path, int]]] = {}
         for tmpdir in path.glob(f"{TMPDIR_PREFIX}*"):
+            if self._stop_event.is_set():
+                return
             marker = self._read_install_marker(tmpdir)
             if not marker:
                 continue
@@ -269,6 +275,8 @@ class ModelInstallService(ModelInstallServiceBase):
             except Exception as e:
                 self._logger.warning(f"Skipping install marker in {tmpdir}: {e}")
                 continue
+            if self._stop_event.is_set():
+                return
 
             config_in = ModelRecordChanges(**(marker.get("config_in") or {}))
             job = ModelInstallJob(
@@ -296,6 +304,8 @@ class ModelInstallService(ModelInstallServiceBase):
             duplicate_tmpdir = False
             stale_active_tmpdir = False
             with self._lock:
+                if self._stop_event.is_set():
+                    return
                 already_active = (
                     source_str in owned_sources
                     or any(str(j.source) == source_str for j in self._install_jobs if not j.in_terminal_state)
@@ -320,7 +330,7 @@ class ModelInstallService(ModelInstallServiceBase):
                     else:
                         self._logger.debug(f"Skipping restore for {source_str} - already being tracked")
                         continue
-                if stale_active_tmpdir:
+                if stale_active_tmpdir and source_str not in self._pending_sources:
                     pass
                 elif source_str in self._pending_sources:
                     # An in-flight import_model call has reserved this source
@@ -333,7 +343,7 @@ class ModelInstallService(ModelInstallServiceBase):
                     # that job reached a terminal state and was pruned.
                     self._logger.debug(f"Deferring restore for {source_str} - a pending import has reserved it")
                     known_generation = self._source_import_generations.get(source_str, 0)
-                    deferred.append((source_str, job, tmpdir, known_generation))
+                    deferred.setdefault(source_str, []).append((job, tmpdir, known_generation))
                     continue
                 elif source_str in seen_sources:
                     duplicate_tmpdir = True
@@ -341,10 +351,14 @@ class ModelInstallService(ModelInstallServiceBase):
                     seen_sources.add(source_str)
                     self._append_install_job(job)
             if stale_active_tmpdir:
+                if self._stop_event.is_set():
+                    return
                 self._logger.info(f"Removing stale temporary directory {tmpdir} for active source {source_str}")
                 self._safe_rmtree(tmpdir, self._logger)
                 continue
             if duplicate_tmpdir:
+                if self._stop_event.is_set():
+                    return
                 self._logger.info(f"Removing duplicate temporary directory {tmpdir}")
                 self._safe_rmtree(tmpdir, self._logger)
                 continue
@@ -362,10 +376,9 @@ class ModelInstallService(ModelInstallServiceBase):
         # helpers hang must not hold up restoration (and with it the startup
         # barrier every import_model call waits on) forever, so on timeout the
         # marker is left on disk for a later startup instead.
-        deadlines: dict[str, float] = {}
-        for source_str, job, tmpdir, known_generation in deferred:
-            duplicate_tmpdir = False
-            deadline = deadlines.setdefault(source_str, time.monotonic() + DEFERRED_RESTORE_TIMEOUT)
+        deadline = time.monotonic() + DEFERRED_RESTORE_TIMEOUT
+        for source_str, source_markers in deferred.items():
+            actions: list[tuple[str, ModelInstallJob, Path]] = []
             with self._install_cond:
                 while source_str in self._pending_sources and not self._stop_event.is_set():
                     remaining = deadline - time.monotonic()
@@ -375,64 +388,79 @@ class ModelInstallService(ModelInstallServiceBase):
                 if self._stop_event.is_set():
                     return
                 if source_str in self._pending_sources:
-                    self._logger.warning(
-                        f"An import of {source_str} has been pending for over {DEFERRED_RESTORE_TIMEOUT}s; "
-                        f"leaving {tmpdir} to be restored on a later startup"
-                    )
+                    for _, tmpdir, _ in source_markers:
+                        self._logger.warning(
+                            f"An import of {source_str} has been pending for over {DEFERRED_RESTORE_TIMEOUT}s; "
+                            f"leaving {tmpdir} to be restored on a later startup"
+                        )
                     continue
-                already_registered = self._source_import_generations.get(source_str, 0) > known_generation or any(
-                    str(j.source) == source_str for j in self._download_cache.values() if not j.in_terminal_state
-                )
-                if already_registered:
+
+                current_generation = self._source_import_generations.get(source_str, 0)
+                imported_tmpdirs = self._source_import_tmpdirs.get(source_str, [])
+                cached_tmpdirs = {
+                    j._install_tmpdir
+                    for j in self._download_cache.values()
+                    if str(j.source) == source_str and not j.in_terminal_state and j._install_tmpdir is not None
+                }
+                for job, tmpdir, known_generation in source_markers:
+                    import_registered = current_generation > known_generation
                     registered_tmpdirs = {
-                        j._install_tmpdir
-                        for j in self._install_jobs
-                        if str(j.source) == source_str and j._install_tmpdir is not None
+                        path for path in imported_tmpdirs[known_generation:current_generation] if path is not None
                     }
-                    if registered_tmpdirs and tmpdir not in registered_tmpdirs:
-                        duplicate_tmpdir = True
-                    else:
-                        self._logger.debug(f"Skipping restore for {source_str} - already being tracked")
-                        continue
-                if not duplicate_tmpdir:
-                    if source_str in seen_sources:
-                        duplicate_tmpdir = True
+                    registered_tmpdirs.update(cached_tmpdirs)
+                    if import_registered or cached_tmpdirs:
+                        if registered_tmpdirs and tmpdir not in registered_tmpdirs:
+                            actions.append(("delete", job, tmpdir))
+                        else:
+                            self._logger.debug(f"Skipping restore for {source_str} - already being tracked")
+                    elif source_str in seen_sources:
+                        actions.append(("delete", job, tmpdir))
                     else:
                         seen_sources.add(source_str)
                         self._append_install_job(job)
-            if duplicate_tmpdir:
-                self._logger.info(f"Removing duplicate temporary directory {tmpdir}")
-                self._safe_rmtree(tmpdir, self._logger)
-                continue
+                        actions.append(("launch", job, tmpdir))
 
-            self._launch_restored_job(job)
+            for action, job, tmpdir in actions:
+                if self._stop_event.is_set():
+                    return
+                if action == "delete":
+                    self._logger.info(f"Removing duplicate temporary directory {tmpdir}")
+                    self._safe_rmtree(tmpdir, self._logger)
+                else:
+                    self._launch_restored_job(job)
 
         with self._lock:
             self._source_import_generations.clear()
+            self._source_import_tmpdirs.clear()
 
     def _launch_restored_job(self, job: ModelInstallJob) -> None:
         """Kick off a job that _restore_incomplete_installs has just registered."""
-        with self._restore_launch_lock:
-            if self._stop_event.is_set() or job.paused:
-                return
+        if self._stop_event.is_set() or job.paused:
+            return
 
-            if job.status in [InstallStatus.DOWNLOADS_DONE, InstallStatus.RUNNING]:
+        if job.status in [InstallStatus.DOWNLOADS_DONE, InstallStatus.RUNNING]:
+            with self._job_launch_lock:
+                if self._stop_event.is_set():
+                    return
                 job.status = InstallStatus.DOWNLOADS_DONE
                 self._put_in_queue(job)
-            else:
-                try:
-                    self._resume_remote_download(job)
-                except Exception as e:
-                    self._set_error(job, e)
-                    if job._install_tmpdir is not None:
-                        self._safe_rmtree(job._install_tmpdir, self._logger)
+        else:
+            try:
+                self._resume_remote_download(job)
+            except Exception as e:
+                if self._stop_event.is_set():
+                    return
+                self._set_error(job, e)
+                if job._install_tmpdir is not None:
+                    self._safe_rmtree(job._install_tmpdir, self._logger)
 
     def _append_install_job(self, job: ModelInstallJob, *, from_import: bool = False) -> None:
         """Append a job. Caller must hold _lock."""
         self._install_jobs.append(job)
         source_str = str(job.source)
-        if from_import and source_str in self._pending_sources:
+        if from_import and source_str in self._pending_sources and not self._restore_completed_event.is_set():
             self._source_import_generations[source_str] = self._source_import_generations.get(source_str, 0) + 1
+            self._source_import_tmpdirs.setdefault(source_str, []).append(job._install_tmpdir)
 
     def _restore_incomplete_installs_async(self) -> None:
         self._restore_completed_event.clear()
@@ -525,17 +553,21 @@ class ModelInstallService(ModelInstallServiceBase):
                 return
         self._logger.debug("calling stop_event.set()")
         self._stop_event.set()
-        with self._restore_launch_lock:
+        with self._job_launch_lock:
             pass
         with self._install_cond:
             self._source_import_generations.clear()
+            self._source_import_tmpdirs.clear()
             self._install_cond.notify_all()
         self._clear_pending_jobs()
-        self._download_cache.clear()
+        with self._lock:
+            self._download_cache.clear()
         assert self._install_thread is not None
         self._install_thread.join()
         if self._restore_thread is not None and self._restore_thread is not threading.current_thread():
-            self._restore_thread.join()
+            self._restore_thread.join(timeout=RESTORE_SHUTDOWN_TIMEOUT)
+            if self._restore_thread.is_alive():
+                self._logger.warning("Model install restoration is still stopping in the background")
         self._running = False
 
     def _write_invoke_managed_models_dir_readme(self) -> None:
@@ -547,9 +579,14 @@ class ModelInstallService(ModelInstallServiceBase):
             )
 
     def _clear_pending_jobs(self) -> None:
-        for job in self.list_jobs():
+        with self._lock:
+            jobs = {id(job): job for job in [*self.list_jobs(), *self._download_cache.values()]}.values()
+        for job in jobs:
             if not job.in_terminal_state:
-                if job._multifile_job is not None:
+                has_resumable_marker = (
+                    job._install_tmpdir is not None and self._marker_path(job._install_tmpdir).exists()
+                )
+                if job._multifile_job is not None or has_resumable_marker:
                     self._logger.warning(f"Pausing job {job.id}")
                     self.pause_job(job)
                 else:
@@ -693,6 +730,10 @@ class ModelInstallService(ModelInstallServiceBase):
             raise
 
         with self._install_cond:
+            if self._stop_event.is_set():
+                self._pending_sources.discard(source_str)
+                self._install_cond.notify_all()
+                raise RuntimeError("Model install service stopped")
             self._append_install_job(install_job, from_import=True)
             self._pending_sources.discard(source_str)
             self._install_cond.notify_all()
@@ -1444,6 +1485,8 @@ class ModelInstallService(ModelInstallServiceBase):
         resume_metadata: Optional[dict] = None,
         clear_partials: bool = False,
     ) -> ModelInstallJob:
+        if self._stop_event.is_set():
+            raise RuntimeError("Model install service stopped")
         job.source_metadata = metadata
         job.local_path = destdir
         job._install_tmpdir = destdir
@@ -1485,14 +1528,21 @@ class ModelInstallService(ModelInstallServiceBase):
                 part.final_url = meta.get("final_url") or part.final_url
                 if meta.get("download_path"):
                     part.download_path = Path(meta.get("download_path"))
-        self._download_cache[multifile_job.id] = job
-        job._multifile_job = multifile_job
+        with self._job_launch_lock:
+            if self._stop_event.is_set():
+                raise RuntimeError("Model install service stopped")
+            self._download_cache[multifile_job.id] = job
+            job._multifile_job = multifile_job
 
-        self._write_install_marker(job, status=InstallStatus.WAITING)
-        files_string = "file" if len(remote_files) == 1 else "files"
-        self._logger.info(f"Queueing model install: {source} ({len(remote_files)} {files_string})")
-        self._logger.debug(f"remote_files={remote_files}")
-        self._download_queue.submit_multifile_download(multifile_job)
+            self._write_install_marker(job, status=InstallStatus.WAITING)
+            files_string = "file" if len(remote_files) == 1 else "files"
+            self._logger.info(f"Queueing model install: {source} ({len(remote_files)} {files_string})")
+            self._logger.debug(f"remote_files={remote_files}")
+            try:
+                self._download_queue.submit_multifile_download(multifile_job)
+            except Exception:
+                self._download_cache.pop(multifile_job.id, None)
+                raise
         return job
 
     def _stat_size(self, path: Path) -> int:
