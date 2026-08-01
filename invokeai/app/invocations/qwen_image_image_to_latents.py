@@ -26,7 +26,7 @@ from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory
     title="Image to Latents - Qwen Image",
     tags=["image", "latents", "vae", "i2l", "qwen_image"],
     category="image",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
 class QwenImageImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -34,6 +34,10 @@ class QwenImageImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard)
 
     image: ImageField = InputField(description="The image to encode.")
     vae: VAEField = InputField(description=FieldDescriptions.vae, input=Input.Connection)
+    tiled: bool = InputField(default=False, description=FieldDescriptions.tiled)
+    # NOTE: tile_size = 0 is a special value meaning "use the model's default", matching the
+    # SD/SDXL i2l node. `int | None` is avoided because the workflow UI does not handle it well.
+    tile_size: int = InputField(default=0, multiple_of=8, description=FieldDescriptions.vae_tile_size)
     width: int | None = InputField(
         default=None,
         description="Resize the image to this width before encoding. If not set, encodes at the image's original size.",
@@ -44,21 +48,39 @@ class QwenImageImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard)
     )
 
     @staticmethod
-    def vae_encode(vae_info: LoadedModel, image_tensor: torch.Tensor) -> torch.Tensor:
+    def vae_encode(
+        vae_info: LoadedModel, image_tensor: torch.Tensor, tiled: bool = False, tile_size: int = 0
+    ) -> torch.Tensor:
         # NOTE: vae_info.model may be an AutoencoderKLWan (a native-layout qwen_image_vae single file is
         # classified with the Anima base); it is reinterpreted as AutoencoderKLQwenImage inside the
         # model_on_device context below. The working-memory estimate only reads tensor shape + element
         # size, so it is safe to run on either class here.
+        # Resolve tile_size=0 ("model default") before estimating, so the reserved working memory
+        # matches the tiles the VAE will actually use.
+        effective_tile_size = None
+        if tiled:
+            effective_tile_size = tile_size if tile_size > 0 else getattr(vae_info.model, "tile_sample_min_height", 256)
+
         estimated_working_memory = estimate_vae_working_memory_qwen_image(
             operation="encode",
             image_tensor=image_tensor,
             vae=vae_info.model,
+            tile_size=effective_tile_size,
         )
         with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
             # Reinterpret an Anima-classified Wan VAE as AutoencoderKLQwenImage (identical weights).
             vae = as_qwen_image_vae(vae)
 
-            vae.disable_tiling()
+            # Tiling bounds the encode's peak memory to a single tile, which is what makes large
+            # inputs (e.g. a 2560x1440 upscale round-trip) encodable while a multi-GB transformer
+            # is still resident. Off by default: full-frame is faster and avoids tile blending.
+            if tiled:
+                if tile_size > 0:
+                    vae.enable_tiling(tile_sample_min_height=tile_size, tile_sample_min_width=tile_size)
+                else:
+                    vae.enable_tiling()
+            else:
+                vae.disable_tiling()
 
             image_tensor = image_tensor.to(device=TorchDevice.choose_torch_device(), dtype=vae.dtype)
             with torch.inference_mode():
@@ -102,7 +124,12 @@ class QwenImageImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard)
 
         vae_info = context.models.load(self.vae.vae)
 
-        latents = self.vae_encode(vae_info=vae_info, image_tensor=image_tensor)
+        latents = self.vae_encode(
+            vae_info=vae_info,
+            image_tensor=image_tensor,
+            tiled=self.tiled or context.config.get().force_tiled_decode,
+            tile_size=self.tile_size,
+        )
 
         latents = latents.to("cpu")
         name = context.tensors.save(tensor=latents)

@@ -165,14 +165,22 @@ def estimate_vae_working_memory_wan(
 
 
 def estimate_vae_working_memory_qwen_image(
-    operation: Literal["encode", "decode"], image_tensor: torch.Tensor, vae: AutoencoderKLQwenImage
+    operation: Literal["encode", "decode"],
+    image_tensor: torch.Tensor,
+    vae: AutoencoderKLQwenImage,
+    tile_size: int | None = None,
 ) -> int:
     """Estimate the working memory required by the invocation in bytes.
 
     The Qwen Image VAE is a video-style autoencoder that operates on 5D tensors of shape
-    (B, C, num_frames, H, W). Tiling is not used, so peak working memory scales with the full
-    spatial output. The two trailing dimensions are the spatial H/W in latent space (decode) or
-    pixel space (encode), matching the convention used by the other estimators here.
+    (B, C, num_frames, H, W). The two trailing dimensions are the spatial H/W in latent space
+    (decode) or pixel space (encode), matching the convention used by the other estimators here.
+
+    Without tiling, peak working memory scales with the full spatial extent. With tiling it is
+    bounded by a single tile instead, so the estimate must follow suit — otherwise the cache keeps
+    reserving the full-frame figure (~11.8 GB for a 2560x1440 encode on CUDA) and tiling buys
+    nothing. Mirrors ``estimate_vae_working_memory_wan``: one tile plus 25% for the tile overlap,
+    plus the full RGB image, which stays resident on the execution device either way.
     """
     latent_scale_factor_for_operation = LATENT_SCALE_FACTOR if operation == "decode" else 1
 
@@ -210,7 +218,13 @@ def estimate_vae_working_memory_qwen_image(
     else:  # encode
         scaling_constant = 6300 if is_rocm else 1600
 
-    working_memory = h * w * element_size * scaling_constant
+    if tile_size is not None and tile_size > 0:
+        # Bounded by one tile (plus overlap) rather than the full frame.
+        working_memory = tile_size * tile_size * element_size * scaling_constant * 1.25
+        # The full RGB image is the encode input / decode output and stays resident regardless.
+        working_memory += 3 * h * w * element_size
+    else:
+        working_memory = h * w * element_size * scaling_constant
 
     return int(working_memory)
 
