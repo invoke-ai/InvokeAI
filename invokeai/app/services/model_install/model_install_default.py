@@ -119,6 +119,8 @@ class ModelInstallService(ModelInstallServiceBase):
         # that terminal job before the deferred recheck.
         self._source_import_generations: dict[str, int] = {}
         self._source_import_tmpdirs: dict[str, list[Optional[Path]]] = {}
+        self._timed_out_restore_sources: set[str] = set()
+        self._restore_deleting_tmpdirs: set[Path] = set()
         self._install_queue: Queue[ModelInstallJob] = Queue()
         # Lock-order discipline: download-queue callbacks run on download queue
         # threads that already hold the download queue's lock, and they acquire
@@ -218,6 +220,9 @@ class ModelInstallService(ModelInstallServiceBase):
                 continue
             if self._stop_event.is_set():
                 return
+            with self._lock:
+                if tmpdir in self._restore_deleting_tmpdirs:
+                    continue
             if marker.get("source") != source_str:
                 continue
             status = marker.get("status")
@@ -331,7 +336,7 @@ class ModelInstallService(ModelInstallServiceBase):
                         self._logger.debug(f"Skipping restore for {source_str} - already being tracked")
                         continue
                 if stale_active_tmpdir and source_str not in self._pending_sources:
-                    pass
+                    self._restore_deleting_tmpdirs.add(tmpdir)
                 elif source_str in self._pending_sources:
                     # An in-flight import_model call has reserved this source
                     # but has not registered a job yet - and it may still fail
@@ -347,6 +352,7 @@ class ModelInstallService(ModelInstallServiceBase):
                     continue
                 elif source_str in seen_sources:
                     duplicate_tmpdir = True
+                    self._restore_deleting_tmpdirs.add(tmpdir)
                 else:
                     seen_sources.add(source_str)
                     self._append_install_job(job)
@@ -354,13 +360,13 @@ class ModelInstallService(ModelInstallServiceBase):
                 if self._stop_event.is_set():
                     return
                 self._logger.info(f"Removing stale temporary directory {tmpdir} for active source {source_str}")
-                self._safe_rmtree(tmpdir, self._logger)
+                self._delete_restore_tmpdir(tmpdir)
                 continue
             if duplicate_tmpdir:
                 if self._stop_event.is_set():
                     return
                 self._logger.info(f"Removing duplicate temporary directory {tmpdir}")
-                self._safe_rmtree(tmpdir, self._logger)
+                self._delete_restore_tmpdir(tmpdir)
                 continue
 
             self._launch_restored_job(job)
@@ -388,6 +394,7 @@ class ModelInstallService(ModelInstallServiceBase):
                 if self._stop_event.is_set():
                     return
                 if source_str in self._pending_sources:
+                    self._timed_out_restore_sources.add(source_str)
                     for _, tmpdir, _ in source_markers:
                         self._logger.warning(
                             f"An import of {source_str} has been pending for over {DEFERRED_RESTORE_TIMEOUT}s; "
@@ -411,10 +418,12 @@ class ModelInstallService(ModelInstallServiceBase):
                     if import_registered or cached_tmpdirs:
                         if registered_tmpdirs and tmpdir not in registered_tmpdirs:
                             actions.append(("delete", job, tmpdir))
+                            self._restore_deleting_tmpdirs.add(tmpdir)
                         else:
                             self._logger.debug(f"Skipping restore for {source_str} - already being tracked")
                     elif source_str in seen_sources:
                         actions.append(("delete", job, tmpdir))
+                        self._restore_deleting_tmpdirs.add(tmpdir)
                     else:
                         seen_sources.add(source_str)
                         self._append_install_job(job)
@@ -425,7 +434,7 @@ class ModelInstallService(ModelInstallServiceBase):
                     return
                 if action == "delete":
                     self._logger.info(f"Removing duplicate temporary directory {tmpdir}")
-                    self._safe_rmtree(tmpdir, self._logger)
+                    self._delete_restore_tmpdir(tmpdir)
                 else:
                     self._launch_restored_job(job)
 
@@ -453,6 +462,33 @@ class ModelInstallService(ModelInstallServiceBase):
                 self._set_error(job, e)
                 if job._install_tmpdir is not None:
                     self._safe_rmtree(job._install_tmpdir, self._logger)
+
+    def _delete_restore_tmpdir(self, tmpdir: Path) -> None:
+        try:
+            self._safe_rmtree(tmpdir, self._logger)
+        finally:
+            with self._lock:
+                self._restore_deleting_tmpdirs.discard(tmpdir)
+
+    def _cleanup_timed_out_import_markers(self, source: ModelSource, owned_tmpdir: Optional[Path]) -> None:
+        source_str = str(source)
+        with self._lock:
+            if source_str not in self._timed_out_restore_sources:
+                return
+            self._timed_out_restore_sources.discard(source_str)
+
+        for tmpdir in self._app_config.models_path.glob(f"{TMPDIR_PREFIX}*"):
+            if tmpdir == owned_tmpdir:
+                continue
+            marker = self._read_install_marker(tmpdir)
+            if marker is None or marker.get("source") != source_str:
+                continue
+            with self._lock:
+                if tmpdir in self._restore_deleting_tmpdirs:
+                    continue
+                self._restore_deleting_tmpdirs.add(tmpdir)
+            self._logger.info(f"Removing duplicate temporary directory {tmpdir}")
+            self._delete_restore_tmpdir(tmpdir)
 
     def _append_install_job(self, job: ModelInstallJob, *, from_import: bool = False) -> None:
         """Append a job. Caller must hold _lock."""
@@ -552,12 +588,13 @@ class ModelInstallService(ModelInstallServiceBase):
             if not self._running:
                 return
         self._logger.debug("calling stop_event.set()")
-        self._stop_event.set()
         with self._job_launch_lock:
-            pass
+            self._stop_event.set()
         with self._install_cond:
             self._source_import_generations.clear()
             self._source_import_tmpdirs.clear()
+            self._timed_out_restore_sources.clear()
+            self._restore_deleting_tmpdirs.clear()
             self._install_cond.notify_all()
         self._clear_pending_jobs()
         with self._lock:
@@ -737,6 +774,7 @@ class ModelInstallService(ModelInstallServiceBase):
             self._append_install_job(install_job, from_import=True)
             self._pending_sources.discard(source_str)
             self._install_cond.notify_all()
+        self._cleanup_timed_out_import_markers(source, install_job._install_tmpdir)
         return install_job
 
     def list_jobs(self) -> List[ModelInstallJob]:  # noqa D102
@@ -1442,6 +1480,7 @@ class ModelInstallService(ModelInstallServiceBase):
         if len(remote_files) == 0:
             raise ValueError(f"{source}: No downloadable files found")
         destdir = self._find_reusable_tmpdir(source)
+        created_tmpdir = destdir is None
         if destdir is None:
             destdir = Path(
                 mkdtemp(
@@ -1463,15 +1502,20 @@ class ModelInstallService(ModelInstallServiceBase):
 
         # Handle multiple subfolders for HFModelSource
         subfolders = source.subfolders if isinstance(source, HFModelSource) else []
-        return self._enqueue_remote_download(
-            job=install_job,
-            source=source,
-            remote_files=remote_files,
-            metadata=metadata,
-            destdir=destdir,
-            subfolder=source.subfolder if isinstance(source, HFModelSource) and len(subfolders) <= 1 else None,
-            subfolders=subfolders if len(subfolders) > 1 else None,
-        )
+        try:
+            return self._enqueue_remote_download(
+                job=install_job,
+                source=source,
+                remote_files=remote_files,
+                metadata=metadata,
+                destdir=destdir,
+                subfolder=source.subfolder if isinstance(source, HFModelSource) and len(subfolders) <= 1 else None,
+                subfolders=subfolders if len(subfolders) > 1 else None,
+            )
+        except Exception:
+            if created_tmpdir and self._stop_event.is_set():
+                self._safe_rmtree(destdir, self._logger)
+            raise
 
     def _enqueue_remote_download(
         self,
@@ -1492,45 +1536,45 @@ class ModelInstallService(ModelInstallServiceBase):
         job._install_tmpdir = destdir
         job.total_bytes = sum((x.size or 0) for x in remote_files)
 
-        multifile_job = self._multifile_download(
-            remote_files=remote_files,
-            dest=destdir,
-            subfolder=subfolder,
-            subfolders=subfolders,
-            access_token=source.access_token,
-            submit_job=False,  # Important! Don't submit the job until we have set our _download_cache dict
-        )
-        if clear_partials:
-            for part in multifile_job.download_parts:
-                target_path = part.dest
-                if target_path.exists():
-                    try:
-                        self._logger.info(f"Deleting partial file before restart: {target_path}")
-                        target_path.unlink()
-                    except Exception:
-                        pass
-                in_progress_path = target_path.with_name(target_path.name + ".downloading")
-                if in_progress_path.exists():
-                    try:
-                        self._logger.info(f"Deleting partial file before restart: {in_progress_path}")
-                        in_progress_path.unlink()
-                    except Exception:
-                        pass
-        if resume_metadata:
-            for part in multifile_job.download_parts:
-                meta = resume_metadata.get(str(part.source))
-                if not meta:
-                    continue
-                part.canonical_url = meta.get("canonical_url") or part.canonical_url
-                part.etag = meta.get("etag") or part.etag
-                part.last_modified = meta.get("last_modified") or part.last_modified
-                part.expected_total_bytes = meta.get("expected_total_bytes") or part.expected_total_bytes
-                part.final_url = meta.get("final_url") or part.final_url
-                if meta.get("download_path"):
-                    part.download_path = Path(meta.get("download_path"))
         with self._job_launch_lock:
             if self._stop_event.is_set():
                 raise RuntimeError("Model install service stopped")
+            multifile_job = self._multifile_download(
+                remote_files=remote_files,
+                dest=destdir,
+                subfolder=subfolder,
+                subfolders=subfolders,
+                access_token=source.access_token,
+                submit_job=False,  # Important! Don't submit the job until we have set our _download_cache dict
+            )
+            if clear_partials:
+                for part in multifile_job.download_parts:
+                    target_path = part.dest
+                    if target_path.exists():
+                        try:
+                            self._logger.info(f"Deleting partial file before restart: {target_path}")
+                            target_path.unlink()
+                        except Exception:
+                            pass
+                    in_progress_path = target_path.with_name(target_path.name + ".downloading")
+                    if in_progress_path.exists():
+                        try:
+                            self._logger.info(f"Deleting partial file before restart: {in_progress_path}")
+                            in_progress_path.unlink()
+                        except Exception:
+                            pass
+            if resume_metadata:
+                for part in multifile_job.download_parts:
+                    meta = resume_metadata.get(str(part.source))
+                    if not meta:
+                        continue
+                    part.canonical_url = meta.get("canonical_url") or part.canonical_url
+                    part.etag = meta.get("etag") or part.etag
+                    part.last_modified = meta.get("last_modified") or part.last_modified
+                    part.expected_total_bytes = meta.get("expected_total_bytes") or part.expected_total_bytes
+                    part.final_url = meta.get("final_url") or part.final_url
+                    if meta.get("download_path"):
+                        part.download_path = Path(meta.get("download_path"))
             self._download_cache[multifile_job.id] = job
             job._multifile_job = multifile_job
 

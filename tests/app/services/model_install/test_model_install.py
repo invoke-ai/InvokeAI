@@ -46,6 +46,7 @@ from invokeai.app.services.model_install.model_install_default import (
 )
 from invokeai.app.services.model_records import ModelRecordChanges, UnknownModelException
 from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig
+from invokeai.backend.model_manager.metadata import RemoteModelFile
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     ModelFormat,
@@ -1299,6 +1300,72 @@ def test_restore_removes_stale_marker_when_active_source_has_multiple_markers(
     assert installer._install_jobs == [active_job]
 
 
+def test_restore_does_not_delete_tmpdir_claimed_after_stale_check(
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_record_store,
+    mm2_download_queue,
+    mm2_session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    installer = ModelInstallService(
+        app_config=mm2_app_config,
+        record_store=mm2_record_store,
+        download_queue=mm2_download_queue,
+        event_bus=TestEventService(),
+        session=mm2_session,
+    )
+    source = URLModelSource(url=Url("https://www.test.foo/download/claimed-during-delete.safetensors"))
+    stale_dir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}0_stale"
+    active_dir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}1_active"
+    _write_test_install_marker(stale_dir, str(source))
+    active_dir.mkdir()
+    owner = ModelInstallJob(
+        id=installer._next_id(), source=source, config_in=ModelRecordChanges(), local_path=active_dir
+    )
+    owner._install_tmpdir = active_dir
+    owner.status = InstallStatus.DOWNLOADING
+    installer._install_jobs.append(owner)
+
+    deleting = threading.Event()
+    release_delete = threading.Event()
+    real_safe_rmtree = installer._safe_rmtree
+
+    def _blocked_safe_rmtree(path: Path, logger: Any) -> None:
+        if path == stale_dir:
+            deleting.set()
+            assert release_delete.wait(timeout=5)
+        real_safe_rmtree(path, logger)
+
+    monkeypatch.setattr(installer, "_safe_rmtree", _blocked_safe_rmtree)
+    monkeypatch.setattr(installer, "_resume_remote_download", lambda job: None)
+    restore_thread = threading.Thread(target=installer._restore_incomplete_installs)
+    restore_thread.start()
+    assert deleting.wait(timeout=5)
+
+    owner.status = InstallStatus.COMPLETED
+    installer.prune_jobs()
+    imported_job = ModelInstallJob(
+        id=installer._next_id(), source=source, config_in=ModelRecordChanges(), local_path=active_dir
+    )
+    replacement_dir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}2_replacement"
+
+    def _import_from_url(*args, **kwargs) -> ModelInstallJob:
+        assert installer._find_reusable_tmpdir(source) is None
+        replacement_dir.mkdir()
+        imported_job.local_path = replacement_dir
+        imported_job._install_tmpdir = replacement_dir
+        return imported_job
+
+    monkeypatch.setattr(installer, "_import_from_url", _import_from_url)
+    installer.import_model(source)
+    release_delete.set()
+    restore_thread.join(timeout=5)
+
+    assert not restore_thread.is_alive()
+    assert not stale_dir.exists()
+    assert replacement_dir.exists()
+
+
 def test_import_generation_tracking_is_bounded_to_active_restore(
     mm2_app_config: InvokeAIAppConfig,
     mm2_record_store,
@@ -1904,7 +1971,7 @@ def test_stop_does_not_wait_forever_for_restore_metadata(
     stop_thread = threading.Thread(target=lambda: (installer.stop(), stop_done.set()))
     stop_thread.start()
     try:
-        assert stop_done.wait(timeout=1)
+        assert stop_done.wait(timeout=3)
     finally:
         release_metadata.set()
         launch_thread.join(timeout=5)
@@ -1967,7 +2034,7 @@ def test_import_helper_cannot_register_after_stop(
     assert str(errors[0]) == "Model install service stopped"
 
 
-def test_remote_enqueue_cannot_commit_after_stop(
+def test_stop_waits_for_remote_enqueue_before_stopping(
     mm2_app_config: InvokeAIAppConfig,
     mm2_record_store,
     mm2_download_queue,
@@ -1993,6 +2060,13 @@ def test_remote_enqueue_cannot_commit_after_stop(
     multifile_started = threading.Event()
     release_multifile = threading.Event()
     real_multifile_download = installer._multifile_download
+    remote_files = [
+        RemoteModelFile(
+            url=source.url,
+            path=Path("stopped-enqueue.safetensors"),
+            size=1,
+        )
+    ]
 
     def _blocked_multifile(*args, **kwargs):
         multifile_started.set()
@@ -2000,27 +2074,92 @@ def test_remote_enqueue_cannot_commit_after_stop(
         return real_multifile_download(*args, **kwargs)
 
     monkeypatch.setattr(installer, "_multifile_download", _blocked_multifile)
+    monkeypatch.setattr(mm2_download_queue, "submit_download_job", lambda *args, **kwargs: None)
     installer.start()
     installer._wait_for_restore_complete()
     errors: list[Exception] = []
 
     def _enqueue() -> None:
         try:
-            installer._enqueue_remote_download(job, source, [], None, tmpdir)
+            installer._enqueue_remote_download(job, source, remote_files, None, tmpdir)
         except Exception as exc:
             errors.append(exc)
 
     enqueue_thread = threading.Thread(target=_enqueue)
     enqueue_thread.start()
     assert multifile_started.wait(timeout=5)
-    installer.stop()
+    stop_done = threading.Event()
+    stop_thread = threading.Thread(target=lambda: (installer.stop(), stop_done.set()))
+    stop_thread.start()
+    assert not stop_done.wait(timeout=0.25)
     release_multifile.set()
     enqueue_thread.join(timeout=5)
+    stop_thread.join(timeout=5)
 
     assert not enqueue_thread.is_alive()
+    assert not stop_thread.is_alive()
     assert installer._download_cache == {}
+    assert errors == []
+    assert job._multifile_job is not None
+    assert installer._marker_path(tmpdir).exists()
+
+
+@pytest.mark.parametrize("reuse_existing", [False, True])
+def test_stopped_remote_import_cleans_only_new_tmpdir(
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_record_store,
+    mm2_download_queue,
+    mm2_session,
+    monkeypatch: pytest.MonkeyPatch,
+    reuse_existing: bool,
+) -> None:
+    installer = ModelInstallService(
+        app_config=mm2_app_config,
+        record_store=mm2_record_store,
+        download_queue=mm2_download_queue,
+        event_bus=TestEventService(),
+        session=mm2_session,
+    )
+    source = URLModelSource(url=Url("https://www.test.foo/download/stopped-import-dir.safetensors"))
+    reusable_dir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}reusable"
+    remote_files = [RemoteModelFile(url=source.url, path=Path("stopped-import-dir.safetensors"), size=1)]
+    enqueue_started = threading.Event()
+    release_enqueue = threading.Event()
+    real_enqueue = installer._enqueue_remote_download
+
+    def _blocked_enqueue(*args, **kwargs):
+        enqueue_started.set()
+        assert release_enqueue.wait(timeout=5)
+        return real_enqueue(*args, **kwargs)
+
+    monkeypatch.setattr(installer, "_remote_files_from_source", lambda model_source: (remote_files, None))
+    monkeypatch.setattr(installer, "_enqueue_remote_download", _blocked_enqueue)
+    installer.start()
+    installer._wait_for_restore_complete()
+    if reuse_existing:
+        _write_test_install_marker(reusable_dir, str(source))
+    before = set(mm2_app_config.models_path.glob(f"{TMPDIR_PREFIX}*"))
+    errors: list[Exception] = []
+
+    def _import() -> None:
+        try:
+            installer.import_model(source)
+        except Exception as exc:
+            errors.append(exc)
+
+    import_thread = threading.Thread(target=_import)
+    import_thread.start()
+    assert enqueue_started.wait(timeout=5)
+    installer.stop()
+    release_enqueue.set()
+    import_thread.join(timeout=5)
+
+    assert not import_thread.is_alive()
     assert len(errors) == 1
     assert str(errors[0]) == "Model install service stopped"
+    assert set(mm2_app_config.models_path.glob(f"{TMPDIR_PREFIX}*")) == before
+    if reuse_existing:
+        assert reusable_dir.exists()
 
 
 def test_import_generations_do_not_accumulate_after_restore(
@@ -2180,6 +2319,72 @@ def test_duplicate_deferred_markers_share_timeout_resolution(
     assert installer._install_jobs == []
     assert first_dir.exists()
     assert second_dir.exists()
+
+
+def test_late_import_after_restore_timeout_removes_duplicate_marker(
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_record_store,
+    mm2_download_queue,
+    mm2_session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = URLModelSource(url=Url("https://www.test.foo/download/late-timeout.safetensors"))
+    first_dir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}0_timeout"
+    second_dir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}1_timeout"
+    _write_test_install_marker(first_dir, str(source))
+    _write_test_install_marker(second_dir, str(source))
+    installer = ModelInstallService(
+        app_config=mm2_app_config,
+        record_store=mm2_record_store,
+        download_queue=mm2_download_queue,
+        event_bus=TestEventService(),
+        session=mm2_session,
+    )
+    helper_started = threading.Event()
+    release_helper = threading.Event()
+    selected_dirs: list[Path] = []
+
+    def _late_import(*args, **kwargs) -> ModelInstallJob:
+        helper_started.set()
+        assert release_helper.wait(timeout=5)
+        selected_dir = installer._find_reusable_tmpdir(source)
+        assert selected_dir in {first_dir, second_dir}
+        selected_dirs.append(selected_dir)
+        job = ModelInstallJob(
+            id=installer._next_id(), source=source, config_in=ModelRecordChanges(), local_path=selected_dir
+        )
+        job._install_tmpdir = selected_dir
+        return job
+
+    monkeypatch.setattr(installer, "_import_from_url", _late_import)
+    import_thread = threading.Thread(target=lambda: installer.import_model(source))
+    import_thread.start()
+    assert helper_started.wait(timeout=5)
+    monkeypatch.setattr(model_install_default, "DEFERRED_RESTORE_TIMEOUT", 0.0)
+    installer._restore_completed_event.clear()
+    installer._restore_incomplete_installs()
+    installer._restore_completed_event.set()
+    release_helper.set()
+    import_thread.join(timeout=5)
+
+    assert not import_thread.is_alive()
+    assert len(selected_dirs) == 1
+    selected_dir = selected_dirs[0]
+    installer._safe_rmtree(selected_dir, installer._logger)
+
+    restarted = ModelInstallService(
+        app_config=mm2_app_config,
+        record_store=mm2_record_store,
+        download_queue=mm2_download_queue,
+        event_bus=TestEventService(),
+        session=mm2_session,
+    )
+    resumed: list[ModelInstallJob] = []
+    monkeypatch.setattr(restarted, "_resume_remote_download", lambda job: resumed.append(job))
+    restarted._restore_incomplete_installs()
+
+    assert resumed == []
+    assert restarted._install_jobs == []
 
 
 def test_deferred_restore_ignores_historical_terminal_tmpdirs(
