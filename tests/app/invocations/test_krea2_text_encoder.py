@@ -4,6 +4,7 @@ from types import SimpleNamespace
 import pytest
 import torch
 
+from invokeai.app.invocations.fields import TensorField
 from invokeai.app.invocations.krea2_text_encoder import Krea2TextEncoderInvocation
 from invokeai.app.invocations.model import LoRAField, ModelIdentifierField, Qwen3VLEncoderField
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, SubModelType
@@ -328,3 +329,19 @@ def test_encode_uses_reference_fixed_length_layout_and_position_ids(monkeypatch)
     assert captured["attention_mask"].dtype == torch.bool
     assert captured["position_ids"].shape == (3, 1, 546)
     assert captured["position_ids"][0, 0, -5:].tolist() == [4, 5, 6, 7, 8]
+
+
+def test_invoke_preserves_the_regional_mask_on_its_conditioning_output(monkeypatch) -> None:
+    regional_mask = TensorField(tensor_name="regional-mask")
+    invocation = _invocation().model_copy(update={"mask": regional_mask})
+    monkeypatch.setattr(
+        invocation,
+        "_encode",
+        lambda _context: (torch.zeros(1, 2, 12, 4), torch.ones(1, 2, dtype=torch.bool)),
+    )
+    context = SimpleNamespace(conditioning=SimpleNamespace(save=lambda _data: "conditioning-name"))
+
+    output = invocation.invoke(context)
+
+    assert output.conditioning.conditioning_name == "conditioning-name"
+    assert output.conditioning.mask == regional_mask

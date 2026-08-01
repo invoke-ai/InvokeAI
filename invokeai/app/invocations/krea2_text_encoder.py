@@ -8,6 +8,7 @@ from invokeai.app.invocations.fields import (
     FieldDescriptions,
     Input,
     InputField,
+    TensorField,
     UIComponent,
 )
 from invokeai.app.invocations.model import Qwen3VLEncoderField
@@ -44,7 +45,7 @@ _KREA2_SUFFIX = "<|im_end|>\n<|im_start|>assistant\n"
     title="Prompt - Krea-2",
     tags=["prompt", "conditioning", "krea2", "krea-2"],
     category="conditioning",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
 class Krea2TextEncoderInvocation(BaseInvocation):
@@ -55,6 +56,11 @@ class Krea2TextEncoderInvocation(BaseInvocation):
     """
 
     prompt: str = InputField(description="Text prompt describing the desired image.", ui_component=UIComponent.Textarea)
+    mask: TensorField | None = InputField(
+        default=None,
+        description="A mask defining the image region that this conditioning prompt applies to.",
+        input=Input.Connection,
+    )
     qwen3_vl_encoder: Qwen3VLEncoderField = InputField(
         title="Qwen3-VL Encoder",
         description=FieldDescriptions.qwen3_vl_encoder,
@@ -71,7 +77,7 @@ class Krea2TextEncoderInvocation(BaseInvocation):
             conditionings=[Krea2ConditioningInfo(prompt_embeds=prompt_embeds, prompt_embeds_mask=prompt_mask)]
         )
         conditioning_name = context.conditioning.save(conditioning_data)
-        return Krea2ConditioningOutput.build(conditioning_name)
+        return Krea2ConditioningOutput.build(conditioning_name, mask=self.mask)
 
     def _encode(self, context: InvocationContext) -> tuple[torch.Tensor, torch.Tensor | None]:
         tokenizer_info = context.models.load(self.qwen3_vl_encoder.tokenizer)
