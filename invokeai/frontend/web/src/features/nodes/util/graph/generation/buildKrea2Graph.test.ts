@@ -45,6 +45,10 @@ vi.mock('features/controlLayers/store/paramsSlice', () => ({
 
 vi.mock('features/controlLayers/store/selectors', () => ({
   selectCanvasMetadata: vi.fn(() => ({})),
+  selectCanvasSlice: vi.fn(() => ({
+    bbox: { rect: { x: 0, y: 0, width: 1024, height: 1024 } },
+    regionalGuidance: { entities: [] },
+  })),
 }));
 
 vi.mock('features/metadata/util/modelFetchingHelpers', () => ({
@@ -61,6 +65,10 @@ vi.mock('features/nodes/util/graph/generation/addInpaint', () => ({
 
 vi.mock('features/nodes/util/graph/generation/addOutpaint', () => ({
   addOutpaint: vi.fn(({ l2i }) => Promise.resolve(l2i)),
+}));
+
+vi.mock('features/nodes/util/graph/generation/addRegions', () => ({
+  addRegions: vi.fn(() => Promise.resolve([])),
 }));
 
 vi.mock('features/nodes/util/graph/generation/addKrea2LoRAs', () => ({
@@ -102,6 +110,7 @@ vi.mock('services/api/types', async () => {
 import { addImageToImage } from './addImageToImage';
 import { addInpaint } from './addInpaint';
 import { addOutpaint } from './addOutpaint';
+import { addRegions } from './addRegions';
 import { buildKrea2Graph } from './buildKrea2Graph';
 
 type BuiltGraph = Awaited<ReturnType<typeof buildKrea2Graph>>['g'];
@@ -130,6 +139,7 @@ const posConditioningEdge = (g: BuiltGraph) =>
 
 describe('buildKrea2Graph', () => {
   afterEach(() => {
+    vi.clearAllMocks();
     nextId = 0;
     params = { ...defaultParams };
     model = { ...baseModel };
@@ -153,6 +163,7 @@ describe('buildKrea2Graph', () => {
     const { g } = await buildCanvasMode(mode);
 
     expect(integration).toHaveBeenCalledOnce();
+    expect(addRegions).toHaveBeenCalledOnce();
     expect(nodeTypesOf(g)).toContain('qwen_image_i2l');
     expect((g.getMetadataNode() as unknown as Record<string, unknown>).generation_mode).toBe(`krea2_${mode}`);
   });
@@ -183,15 +194,23 @@ describe('buildKrea2Graph', () => {
   });
 
   describe('conditioning enhancers', () => {
-    it('inserts no enhancer nodes by default; positive conditioning flows straight to denoise', async () => {
+    it('inserts no enhancer nodes by default; positive conditioning flows through the regional collector', async () => {
       const { g } = await buildTxt2Img();
       const types = nodeTypesOf(g);
       expect(types).not.toContain('krea2_conditioning_rebalance');
       expect(types).not.toContain('krea2_seed_variance');
-      // The edge into denoise.positive_conditioning comes directly from the text encoder.
       const edge = posConditioningEdge(g);
       expect(edge).toBeDefined();
-      expect(edge!.source.node_id.startsWith('pos_prompt:')).toBe(true);
+      expect(edge!.source.node_id.startsWith('pos_cond_collect:')).toBe(true);
+      expect(
+        g
+          .getGraph()
+          .edges.some(
+            (candidate) =>
+              candidate.source.node_id.startsWith('pos_prompt:') &&
+              candidate.destination.node_id.startsWith('pos_cond_collect:')
+          )
+      ).toBe(true);
     });
 
     it('inserts the rebalance node and reroutes positive conditioning through it when enabled', async () => {
@@ -201,7 +220,16 @@ describe('buildKrea2Graph', () => {
       expect(types).toContain('krea2_conditioning_rebalance');
       expect(types).not.toContain('krea2_seed_variance');
       const edge = posConditioningEdge(g);
-      expect(edge!.source.node_id.startsWith('krea2_rebalance:')).toBe(true);
+      expect(edge!.source.node_id.startsWith('pos_cond_collect:')).toBe(true);
+      expect(
+        g
+          .getGraph()
+          .edges.some(
+            (candidate) =>
+              candidate.source.node_id.startsWith('krea2_rebalance:') &&
+              candidate.destination.node_id.startsWith('pos_cond_collect:')
+          )
+      ).toBe(true);
     });
 
     it('inserts the seed-variance node when enabled with strength > 0', async () => {
@@ -209,7 +237,7 @@ describe('buildKrea2Graph', () => {
       const { g } = await buildTxt2Img();
       expect(nodeTypesOf(g)).toContain('krea2_seed_variance');
       const edge = posConditioningEdge(g);
-      expect(edge!.source.node_id.startsWith('krea2_seed_variance:')).toBe(true);
+      expect(edge!.source.node_id.startsWith('pos_cond_collect:')).toBe(true);
     });
 
     it('does not insert the seed-variance node when strength is 0 (a no-op)', async () => {
@@ -236,9 +264,67 @@ describe('buildKrea2Graph', () => {
           e.source.node_id.startsWith('krea2_rebalance:') && e.destination.node_id.startsWith('krea2_seed_variance:')
       );
       expect(rebalanceToSeed).toBeDefined();
-      // seed_variance -> denoise.positive_conditioning
+      // seed_variance -> collector -> denoise.positive_conditioning
       const edge = posConditioningEdge(g);
-      expect(edge!.source.node_id.startsWith('krea2_seed_variance:')).toBe(true);
+      expect(edge!.source.node_id.startsWith('pos_cond_collect:')).toBe(true);
+      expect(
+        graph.edges.some(
+          (candidate) =>
+            candidate.source.node_id.startsWith('krea2_seed_variance:') &&
+            candidate.destination.node_id.startsWith('pos_cond_collect:')
+        )
+      ).toBe(true);
+    });
+
+    it('applies enabled enhancers to regional conditioning before collection', async () => {
+      params = {
+        ...defaultParams,
+        krea2RebalanceEnabled: true,
+        krea2SeedVarianceEnabled: true,
+        krea2SeedVarianceStrength: 0.5,
+      };
+      vi.mocked(addRegions).mockImplementationOnce((arg) => {
+        const regionalPosCond = arg.g.addNode({
+          type: 'krea2_text_encoder',
+          id: 'regional-positive',
+          prompt: 'regional prompt',
+        });
+        const transformRegionalPositiveConditioning = (
+          arg as typeof arg & {
+            transformRegionalPositiveConditioning?: (conditioning: typeof regionalPosCond) => {
+              id: string;
+              type: string;
+            };
+          }
+        ).transformRegionalPositiveConditioning;
+        const conditioningSource = transformRegionalPositiveConditioning?.(regionalPosCond) ?? regionalPosCond;
+        arg.g.addEdgeFromObj({
+          source: { node_id: conditioningSource.id, field: 'conditioning' },
+          destination: { node_id: arg.posCondCollect.id, field: 'item' },
+        });
+        return Promise.resolve([]);
+      });
+
+      const { g } = await buildCanvasMode('img2img');
+      const graph = g.getGraph();
+      const regionalRebalanceEdge = graph.edges.find(
+        (edge) =>
+          edge.source.node_id === 'regional-positive' &&
+          graph.nodes[edge.destination.node_id]?.type === 'krea2_conditioning_rebalance'
+      );
+      expect(regionalRebalanceEdge).toBeDefined();
+      const regionalSeedVarianceEdge = graph.edges.find(
+        (edge) =>
+          edge.source.node_id === regionalRebalanceEdge!.destination.node_id &&
+          graph.nodes[edge.destination.node_id]?.type === 'krea2_seed_variance'
+      );
+      expect(regionalSeedVarianceEdge).toBeDefined();
+      expect(graph.edges).toContainEqual(
+        expect.objectContaining({
+          source: { node_id: regionalSeedVarianceEdge!.destination.node_id, field: 'conditioning' },
+          destination: expect.objectContaining({ field: 'item' }),
+        })
+      );
     });
   });
 
