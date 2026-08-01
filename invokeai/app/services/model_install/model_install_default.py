@@ -115,6 +115,7 @@ class ModelInstallService(ModelInstallServiceBase):
         # Imports must not begin until startup restoration has completed. Leave this unset until
         # _restore_incomplete_installs_async() finishes so an import racing start() cannot pass the barrier early.
         self._restore_completed_event = threading.Event()
+        self._startup_error: Optional[Exception] = None
         self._download_queue = download_queue
         self._download_cache: Dict[int, ModelInstallJob] = {}
         # Per-source locks serializing download_and_cache_model() so parallel (multi-GPU) sessions
@@ -286,8 +287,22 @@ class ModelInstallService(ModelInstallServiceBase):
 
         threading.Thread(target=_run, daemon=True).start()
 
-    def _wait_for_restore_complete(self) -> None:
-        self._restore_completed_event.wait()
+    def _wait_for_restore_complete(self, timeout: Optional[float] = None) -> bool:
+        deadline = time.monotonic() + timeout if timeout is not None else None
+        if deadline is None:
+            self._lock.acquire()
+        elif not self._lock.acquire(timeout=max(0.0, deadline - time.monotonic())):
+            return False
+        try:
+            if not self._running and not self._restore_completed_event.is_set():
+                raise RuntimeError("Model install service is not running")
+            startup_error = self._startup_error
+        finally:
+            self._lock.release()
+        if startup_error is not None:
+            raise RuntimeError("Model install service failed to start") from startup_error
+        remaining = None if deadline is None else max(0.0, deadline - time.monotonic())
+        return self._restore_completed_event.wait(timeout=remaining)
 
     def _resume_remote_download(self, job: ModelInstallJob) -> None:
         job.status = InstallStatus.WAITING
@@ -336,23 +351,30 @@ class ModelInstallService(ModelInstallServiceBase):
         with self._lock:
             if self._running:
                 raise Exception("Attempt to start the installer service twice")
-            self._start_installer_thread()
-            self._remove_dangling_install_dirs()
-            self._migrate_yaml()
-            # In normal use, we do not want to scan the models directory - it should never have orphaned models.
-            # We should only do the scan when the flag is set (which should only be set when testing).
-            if self.app_config.scan_models_on_startup:
-                with catch_sigint():
-                    self._register_orphaned_models()
+            self._startup_error = None
+            self._restore_completed_event.clear()
+            try:
+                self._start_installer_thread()
+                self._remove_dangling_install_dirs()
+                self._migrate_yaml()
+                # In normal use, we do not want to scan the models directory - it should never have orphaned models.
+                # We should only do the scan when the flag is set (which should only be set when testing).
+                if self.app_config.scan_models_on_startup:
+                    with catch_sigint():
+                        self._register_orphaned_models()
 
-            # Check all models' paths and confirm they exist. A model could be missing if it was installed on a volume
-            # that isn't currently mounted. In this case, we don't want to delete the model from the database, but we do
-            # want to alert the user.
-            for model in self._scan_for_missing_models():
-                self._logger.warning(f"Missing model file: {model.name} at {model.path}")
+                # Check all models' paths and confirm they exist. A model could be missing if it was installed on a volume
+                # that isn't currently mounted. In this case, we don't want to delete the model from the database, but we do
+                # want to alert the user.
+                for model in self._scan_for_missing_models():
+                    self._logger.warning(f"Missing model file: {model.name} at {model.path}")
 
-            self._write_invoke_managed_models_dir_readme()
-            self._restore_incomplete_installs_async()
+                self._write_invoke_managed_models_dir_readme()
+                self._restore_incomplete_installs_async()
+            except Exception as error:
+                self._startup_error = error
+                self._restore_completed_event.set()
+                raise
 
     def stop(self, invoker: Optional[Invoker] = None) -> None:
         """Stop the installer thread; after this the object can be deleted and garbage collected."""
@@ -523,9 +545,11 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def wait_for_installs(self, timeout: int = 0) -> List[ModelInstallJob]:  # noqa D102
         """Block until all installation jobs are done."""
-        self._wait_for_restore_complete()
-
         start = time.time()
+        restore_timeout = timeout if timeout > 0 else None
+        if not self._wait_for_restore_complete(timeout=restore_timeout):
+            raise TimeoutError("Timeout exceeded")
+
         while len(self._download_cache) > 0:
             if self._downloads_changed_event.wait(timeout=0.25):  # in case we miss an event
                 self._downloads_changed_event.clear()

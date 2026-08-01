@@ -6,7 +6,6 @@ import gc
 import platform
 import shutil
 import threading
-import time
 import uuid
 from pathlib import Path
 from typing import Any, Dict
@@ -340,6 +339,7 @@ def test_import_waits_for_startup_restore(
     )
     restore_started = threading.Event()
     release_restore = threading.Event()
+    import_waiting = threading.Event()
     imported = threading.Event()
     imported_jobs: list[ModelInstallJob] = []
     source = URLModelSource(url=Url("https://www.test.foo/download/interrupted.safetensors"))
@@ -354,6 +354,7 @@ def test_import_waits_for_startup_restore(
     interrupted_job._install_tmpdir = tmpdir
     installer._write_install_marker(interrupted_job, status=InstallStatus.DOWNLOADING)
     restore = installer._restore_incomplete_installs
+    wait_for_restore = installer._wait_for_restore_complete
 
     def _blocked_restore() -> None:
         restore_started.set()
@@ -364,29 +365,88 @@ def test_import_waits_for_startup_restore(
         imported_jobs.append(installer.import_model(source))
         imported.set()
 
+    def _observed_wait_for_restore() -> bool:
+        import_waiting.set()
+        return wait_for_restore()
+
     monkeypatch.setattr(installer, "_restore_incomplete_installs", _blocked_restore)
     monkeypatch.setattr(installer, "_resume_remote_download", lambda job: None)
 
     try:
-        import_thread = threading.Thread(target=_import)
-        import_thread.start()
-
-        time.sleep(0.1)
-        imported_before_start = imported.is_set()
-
+        assert not installer._restore_completed_event.is_set()
         installer.start()
         assert restore_started.wait(timeout=5)
+        with pytest.raises(TimeoutError):
+            installer.wait_for_installs(timeout=0.1)
+
+        monkeypatch.setattr(installer, "_wait_for_restore_complete", _observed_wait_for_restore)
+        import_thread = threading.Thread(target=_import)
+        import_thread.start()
+        assert import_waiting.wait(timeout=5)
         assert not imported.is_set()
 
         release_restore.set()
         import_thread.join(timeout=5)
-        assert not imported_before_start
         assert imported.is_set()
         jobs = installer.get_job_by_source(source)
         assert len(jobs) == 1
         assert imported_jobs == jobs
     finally:
         release_restore.set()
+        installer.stop()
+
+
+@pytest.mark.timeout(timeout=5, method="thread")
+def test_import_and_wait_for_installs_fail_before_start(
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_record_store,
+    mm2_download_queue,
+    mm2_session,
+    embedding_file: Path,
+) -> None:
+    installer = ModelInstallService(
+        app_config=mm2_app_config,
+        record_store=mm2_record_store,
+        download_queue=mm2_download_queue,
+        event_bus=TestEventService(),
+        session=mm2_session,
+    )
+
+    with pytest.raises(RuntimeError, match="not running"):
+        installer.import_model(LocalModelSource(path=embedding_file))
+    with pytest.raises(RuntimeError, match="not running"):
+        installer.wait_for_installs(timeout=0.1)
+
+
+@pytest.mark.timeout(timeout=5, method="thread")
+def test_import_fails_after_startup_failure(
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_record_store,
+    mm2_download_queue,
+    mm2_session,
+    embedding_file: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    installer = ModelInstallService(
+        app_config=mm2_app_config,
+        record_store=mm2_record_store,
+        download_queue=mm2_download_queue,
+        event_bus=TestEventService(),
+        session=mm2_session,
+    )
+
+    def _fail_startup() -> None:
+        raise RuntimeError("startup failed")
+
+    monkeypatch.setattr(installer, "_migrate_yaml", _fail_startup)
+
+    try:
+        with pytest.raises(RuntimeError, match="startup failed"):
+            installer.start()
+
+        with pytest.raises(RuntimeError, match="Model install service failed to start"):
+            installer.import_model(LocalModelSource(path=embedding_file))
+    finally:
         installer.stop()
 
 
