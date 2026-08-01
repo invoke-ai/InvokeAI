@@ -1737,7 +1737,6 @@
         "template": "Template"
       },
       "library": "Workflow library",
-      "name": "Workflow name",
       "nodeData": "Node data",
       "nodeInspector": "Node Inspector",
       "nodeNotes": "Node notes",
@@ -1746,6 +1745,7 @@
       "notes": "Notes",
       "notesNode": "Notes node",
       "noTemplateKnown": "No template is known for \"{{type}}\" on this backend.",
+      "openLibrary": "Open workflow library. Current workflow: {{name}}",
       "pack": "Pack",
       "panelContent": "Workflow panel content",
       "resizeNodeInspector": "Resize node inspector",
