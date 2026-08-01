@@ -1,6 +1,7 @@
 import { Box, Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
+import { useMediaUrl } from 'features/auth/store/mediaCookieRefresh';
 import { CanvasAlertsInvocationProgress } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsInvocationProgress';
 import { DndImage } from 'features/dnd/DndImage';
 import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer/ImageMetadataViewer';
@@ -48,6 +49,20 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
   const previousRenderedImageNameRef = useRef<string | null>(null);
   const selectedImageRevealTimeoutId = useRef(0);
 
+  // The reveal gate below deliberately preloads the *thumbnail*, not the full-resolution image. The
+  // progress overlay covers this element until onLoadImage fires, so gating on the multi-megabyte
+  // `/full` response would hold a stale latent preview on screen for that entire download on a slow
+  // connection. The 256px thumbnail is roughly 100x smaller and is typically higher resolution than
+  // the preview it replaces; DndImage renders it via Chakra's `fallbackSrc` and swaps the full image
+  // in, in place, once that finishes loading.
+  //
+  // The URL must go through useMediaUrl so it is byte-identical to the one DndImage requests. The
+  // media cookie version is a query parameter, so a mismatch is a different key and the bytes are
+  // fetched twice (measured: 2 requests mismatched vs 1 matched). Note the reuse here is the
+  // document's list of available images, which is keyed by URL and is not the HTTP cache — it still
+  // holds in multiuser mode, where images are served `Cache-Control: private, no-store`.
+  const previewSrc = useMediaUrl(imageDTO?.thumbnail_url);
+
   useEffect(() => {
     if (!selectedImageName) {
       setImageToRender(null);
@@ -65,9 +80,13 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
         return;
       }
       setImageToRender(imageDTO);
+      // Resolve the progress overlay as soon as the thumbnail settles — on success *or* error.
+      // Relying on DndImage's onLoad alone leaves the overlay stuck whenever the image fails to
+      // load, because Chakra reports that as onError instead.
+      onLoadImage();
     };
 
-    if (typeof window === 'undefined') {
+    if (typeof window === 'undefined' || !previewSrc) {
       onReady();
       return;
     }
@@ -76,7 +95,7 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
 
     preloader.onload = onReady;
     preloader.onerror = onReady;
-    preloader.src = imageDTO.image_url;
+    preloader.src = previewSrc;
 
     if (preloader.complete) {
       onReady();
@@ -87,7 +106,7 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
       preloader.onload = null;
       preloader.onerror = null;
     };
-  }, [imageDTO, imageToRender?.image_name, selectedImageName]);
+  }, [imageDTO, imageToRender?.image_name, onLoadImage, previewSrc, selectedImageName]);
 
   const hasProgressImage = progressImage !== null;
 
