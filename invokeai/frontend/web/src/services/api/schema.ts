@@ -9027,6 +9027,11 @@ export type components = {
              */
             max_tokens?: number;
             /**
+             * Response Format
+             * @default null
+             */
+            response_format?: ("text" | "json_object") | null;
+            /**
              * type
              * @default deepseek_text_llm
              * @constant

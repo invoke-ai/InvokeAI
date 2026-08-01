@@ -5,6 +5,7 @@ import httpx
 
 from invokeai.app.services.external_generation.errors import ExternalProviderRequestError
 from invokeai.backend.text_llm_pipeline import DEFAULT_SYSTEM_PROMPT
+from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.invocation_api import (
     BaseInvocation,
     Classification,
@@ -18,6 +19,8 @@ from invokeai.invocation_api import (
 
 DEEPSEEK_API_BASE = "https://api.deepseek.com/"
 
+ResponseFormat = Literal["text", "json_object"]
+
 
 def _auth_header(app_config: InvokeAIAppConfig) -> dict[str, str]:
     """Construct the Authorization header based on configured API key."""
@@ -28,6 +31,23 @@ def _auth_header(app_config: InvokeAIAppConfig) -> dict[str, str]:
     }
 
 
+async def async_call_deepseek_llm(
+    app_config: InvokeAIAppConfig,
+    model_name: str,
+    prompt: str,
+    system_prompt: str,
+    max_tokens: int,
+    temperature: float = 1.0,
+    response_format: ResponseFormat = "text",
+) -> str:
+    # async method may be called by a fastapi handler without a new thread.
+    request = _build_request(app_config, model_name, prompt, system_prompt, max_tokens, temperature, response_format)
+    # httpx timeout default is 5s, too low for long responses. Increase read timeout while leaving other timeouts intact.
+    async with httpx.AsyncClient(timeout=httpx.Timeout(5, read=2 * max_tokens)) as client:
+        response = await client.send(request)
+    return _extract_response_content(response)
+
+
 def call_deepseek_llm(
     app_config: InvokeAIAppConfig,
     model_name: str,
@@ -35,7 +55,27 @@ def call_deepseek_llm(
     system_prompt: str,
     max_tokens: int,
     temperature: float = 1.0,
+    response_format: ResponseFormat = "text",
 ) -> str:
+    # Apparently there's not a great way of using an async function from a synchronous one
+    # https://discuss.python.org/t/calling-coroutines-from-sync-code-2/24093
+    # so we have two functions that use different client implementations.
+    request = _build_request(app_config, model_name, prompt, system_prompt, max_tokens, temperature, response_format)
+    # httpx timeout default is 5s, too low for long responses. Increase read timeout while leaving other timeouts intact.
+    with httpx.Client(timeout=httpx.Timeout(5, read=2 * max_tokens)) as client:
+        response = client.send(request)
+    return _extract_response_content(response)
+
+
+def _build_request(
+    app_config: InvokeAIAppConfig,
+    model_name: str,
+    prompt: str,
+    system_prompt: str,
+    max_tokens: int,
+    temperature: float = 1.0,
+    response_format: ResponseFormat = "text",
+) -> httpx.Request:
     url = urljoin(app_config.external_deepseek_base_url or DEEPSEEK_API_BASE, "/chat/completions")
 
     if not app_config.external_deepseek_api_key:
@@ -60,11 +100,26 @@ def call_deepseek_llm(
         "max_tokens": max_tokens,
         "temperature": temperature,  # range 0–2
         "top_p": 1,
+        "response_format": {"type": response_format},
     }
-    # httpx timeout default is 5s, too low for long responses. Increase read timeout while leaving other timeouts intact.
-    response = httpx.post(url, headers=headers, json=payload, timeout=httpx.Timeout(5, read=2 * max_tokens))
+    return httpx.Request("POST", url, headers=headers, json=payload)
+
+
+def _extract_response_content(response: httpx.Response) -> str:
     response.raise_for_status()
     completion = response.json()
+    if usage := completion.get("usage"):
+        logger = InvokeAILogger.get_logger("DeepSeek")
+        reasoning_tokens = (
+            usage["completion_tokens_details"]["reasoning_tokens"] if "completion_tokens_details" in usage else 0
+        )
+        logger.info(
+            "Prompt tokens: %d (%d cached). Response tokens: %d (%d reasoning).",
+            usage["prompt_tokens"],
+            usage["prompt_cache_hit_tokens"],
+            usage["completion_tokens"],
+            reasoning_tokens,
+        )
     return completion["choices"][0]["message"]["content"]
 
 
@@ -84,7 +139,7 @@ def list_deepseek_models(app_config: InvokeAIAppConfig) -> list[str]:
     title="DeepSeek Text LLM (external API)",
     tags=["external", "llm", "text", "prompt"],
     category="llm",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
 class DeepSeekTextApiInvocation(BaseInvocation):
@@ -105,9 +160,10 @@ class DeepSeekTextApiInvocation(BaseInvocation):
     max_tokens: int = InputField(
         default=300,
         ge=1,
-        le=2048,
+        le=10_000,
         description="Maximum number of tokens to generate.",
     )
+    response_format: ResponseFormat = InputField()
 
     def invoke(self, context: InvocationContext) -> StringOutput:
         output = call_deepseek_llm(

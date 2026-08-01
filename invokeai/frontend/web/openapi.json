@@ -23629,12 +23629,28 @@
             "description": "Maximum number of tokens to generate.",
             "field_kind": "input",
             "input": "any",
-            "maximum": 2048,
+            "maximum": 10000,
             "minimum": 1,
             "orig_default": 300,
             "orig_required": false,
             "title": "Max Tokens",
             "type": "integer"
+          },
+          "response_format": {
+            "anyOf": [
+              {
+                "enum": ["text", "json_object"],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "Response Format"
           },
           "type": {
             "const": "deepseek_text_llm",
@@ -23648,7 +23664,7 @@
         "tags": ["external", "llm", "text", "prompt"],
         "title": "DeepSeek Text LLM (external API)",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/StringOutput"
         }
