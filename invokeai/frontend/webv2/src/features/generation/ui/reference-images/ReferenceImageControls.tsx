@@ -85,7 +85,6 @@ const BEGIN_END_MARKS = [
   { label: '100%', value: 1 },
 ];
 
-const SEGMENT_CHECKED_STYLES = { color: 'accent.contrast' };
 const ADVANCED_TRIGGER_HOVER_STYLES = { color: 'fg' };
 const COLLAPSIBLE_INDICATOR_OPEN_STYLES = { transform: 'rotate(90deg)' };
 
@@ -251,15 +250,9 @@ export const IPAdapterControls = ({
       <Stack gap="1">
         <FieldHeader label={t('widgets.generate.mode')} />
         <SegmentGroup.Root disabled={disabled} size="xs" value={mode} w="full" onValueChange={handleModeChange}>
-          <SegmentGroup.Indicator bg="accent.solid" />
+          <SegmentGroup.Indicator />
           {MODE_SEGMENTS.map((segment) => (
-            <SegmentGroup.Item
-              key={segment.value}
-              flex="1"
-              justifyContent="center"
-              value={segment.value}
-              _checked={SEGMENT_CHECKED_STYLES}
-            >
+            <SegmentGroup.Item key={segment.value} flex="1" justifyContent="center" value={segment.value}>
               <SegmentGroup.ItemText fontSize="2xs">{t(segment.labelKey)}</SegmentGroup.ItemText>
               <SegmentGroup.ItemHiddenInput />
             </SegmentGroup.Item>

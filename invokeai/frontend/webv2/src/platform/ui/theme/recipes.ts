@@ -122,6 +122,90 @@ export const tabsSlotRecipe = defineSlotRecipe({
 });
 
 /**
+ * Segment control: a flat strip, not a recessed pill.
+ *
+ * Chakra's stock look — inset-shadowed `bg.muted` track, elevated white
+ * indicator, hairline dividers between every segment — is a light-UI form
+ * control, and it read as a foreign object among the workbench's flat toolbars.
+ * This version drops the track and the dividers entirely: selection is a filled
+ * `bg.emphasized` segment, exactly the fill the icon-button strips in the canvas
+ * and preview toolbars already use, so a segment control now reads as one of
+ * them rather than as a form field.
+ *
+ * Unselected segments sit at `fg.muted` and step to `fg` on hover, which is the
+ * only feedback they need — a hover fill on top of a selection fill would give
+ * the strip two competing highlights.
+ *
+ * A hairline stroke bounds the strip so it still reads as one control when
+ * nothing around it provides an edge. It is a real border rather than the
+ * `inset` box-shadow used elsewhere in this file: the indicator is a negative
+ * z-index child, so it paints over the root's own background and shadow layer
+ * and would punch a gap in an inset hairline wherever the active segment meets
+ * the edge. A border sits outside the padding box, so the indicator can never
+ * reach it. Root radius is one step above `--segment-radius` to absorb the
+ * border width, keeping the corners concentric.
+ */
+export const segmentGroupSlotRecipe = defineSlotRecipe({
+  ...chakraSlotRecipes.segmentGroup,
+  base: {
+    ...chakraSlotRecipes.segmentGroup.base,
+    root: {
+      ...chakraSlotRecipes.segmentGroup.base?.root,
+      '--segment-radius': 'radii.sm',
+      '--segment-indicator-bg': 'colors.bg.emphasized',
+      '--segment-indicator-shadow': 'none',
+      bg: 'transparent',
+      borderColor: 'border.subtle',
+      borderRadius: 'md',
+      borderWidth: '1px',
+      boxShadow: 'none',
+    },
+    item: {
+      ...chakraSlotRecipes.segmentGroup.base?.item,
+      color: 'fg.muted',
+      fontWeight: '500',
+      transitionDuration: 'faster',
+      transitionProperty: 'background, color',
+      // Stock draws a hairline between neighbouring segments. With a filled
+      // selection they only add noise, and they never line up with the
+      // indicator's rounded corners.
+      _before: { display: 'none' },
+      _checked: { color: 'fg' },
+      _hover: {
+        '&:not([data-state=checked])': { color: 'fg' },
+      },
+      // Pre-hydration fallback: without the measured indicator, the checked
+      // segment has to paint its own fill.
+      '&[data-state=checked][data-ssr]': {
+        bg: 'bg.emphasized',
+        shadow: 'none',
+      },
+    },
+    indicator: {
+      ...chakraSlotRecipes.segmentGroup.base?.indicator,
+      shadow: 'none',
+    },
+  },
+  variants: {
+    ...chakraSlotRecipes.segmentGroup.variants,
+    size: {
+      ...chakraSlotRecipes.segmentGroup.variants?.size,
+      xs: {
+        item: { ...chakraSlotRecipes.segmentGroup.variants?.size?.xs?.item, px: '2.5' },
+      },
+      sm: {
+        item: { ...chakraSlotRecipes.segmentGroup.variants?.size?.sm?.item, px: '3', textStyle: 'xs' },
+      },
+    },
+  } as unknown as typeof chakraSlotRecipes.segmentGroup.variants,
+  defaultVariants: {
+    ...chakraSlotRecipes.segmentGroup.defaultVariants,
+    // Workbench density — stock defaults to `md`.
+    size: 'xs',
+  },
+});
+
+/**
  * Shared interactive states for every bordered form control — text inputs,
  * textareas, number inputs, select/combobox triggers, and hand-rolled trigger
  * buttons (ModelSelect). Idle border is `border`; hover steps to
