@@ -71875,6 +71875,27 @@
             "input": "connection",
             "orig_required": true
           },
+          "tiled": {
+            "default": false,
+            "description": "Processing using overlapping tiles (reduce memory consumption)",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": false,
+            "orig_required": false,
+            "title": "Tiled",
+            "type": "boolean"
+          },
+          "tile_size": {
+            "default": 0,
+            "description": "The tile size for VAE tiling in pixels (image space). If set to 0, the default tile size for the model will be used. Larger tile sizes generally produce better results at the cost of higher memory usage.",
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 8,
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Tile Size",
+            "type": "integer"
+          },
           "type": {
             "const": "qwen_image_l2i",
             "default": "qwen_image_l2i",
@@ -71887,7 +71908,7 @@
         "tags": ["latents", "image", "vae", "l2i", "qwen_image"],
         "title": "Latents to Image - Qwen Image",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/ImageOutput"
         }

@@ -113,7 +113,12 @@ class QwenImageImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard)
 
         # If target dimensions are specified, resize the image BEFORE encoding
         # (matching the diffusers pipeline which resizes in pixel space, not latent space).
-        if self.width is not None and self.height is not None:
+        #
+        # `width`/`height` are `int | None`, but the workflow UI cannot represent None in a number
+        # input and sends 0 for "unset" — which `is not None`, so a naive check reached
+        # `resize((0, 0))` and raised "height and width must be > 0". Treat any non-positive value
+        # as unset, which is also how `tile_size` uses 0.
+        if self.width and self.height and self.width > 0 and self.height > 0:
             image = image.convert("RGB").resize((self.width, self.height), resample=PILImage.LANCZOS)
 
         # multiple_of=16 ensures the post-VAE latents (vae_scale_factor=8) have even
