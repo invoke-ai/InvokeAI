@@ -33,6 +33,7 @@ const QueueListHeader = () => {
         w={COLUMN_WIDTHS.statusBadge}
         alignItems="center"
       />
+      <QueueListHeaderColumn displayName={t('queue.gpu')} ps={0.5} w={COLUMN_WIDTHS.gpu} alignItems="center" />
 
       <QueueListHeaderColumn displayName={t('queue.time')} ps={0.5} w={COLUMN_WIDTHS.time} alignItems="center" />
       <QueueListHeaderColumn

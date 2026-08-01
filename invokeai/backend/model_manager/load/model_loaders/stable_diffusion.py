@@ -154,7 +154,11 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
                 continue
             if submodel := getattr(pipeline, subtype.value, None):
                 self._apply_fp8_layerwise_casting(submodel, config, subtype)
-                self._ram_cache.put(get_model_cache_key(config.key, subtype), model=submodel)
+                # prefetch: nothing will get()/lock() these submodels during this load, so they
+                # must be admitted without the post-admission grace — otherwise the never-used
+                # records would be skipped by budget reconciles until some later admission on
+                # this cache sweeps the stale flags.
+                self._ram_cache.put(get_model_cache_key(config.key, subtype), model=submodel, prefetch=True)
         result = getattr(pipeline, submodel_type.value)
         result = self._apply_fp8_layerwise_casting(result, config, submodel_type)
         return result

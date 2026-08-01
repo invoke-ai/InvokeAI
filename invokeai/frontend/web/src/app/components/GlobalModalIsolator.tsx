@@ -7,10 +7,12 @@ import { SaveCanvasProjectDialog } from 'features/controlLayers/components/SaveC
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { CropImageModal } from 'features/cropper/components/CropImageModal';
 import { DeleteImageModal } from 'features/deleteImageModal/components/DeleteImageModal';
+import { DeleteVideoModal } from 'features/deleteVideoModal/components/DeleteVideoModal';
 import { FullscreenDropzone } from 'features/dnd/FullscreenDropzone';
 import { DynamicPromptsModal } from 'features/dynamicPrompts/components/DynamicPromptsPreviewModal';
 import DeleteBoardModal from 'features/gallery/components/Boards/DeleteBoardModal';
 import { ImageContextMenu } from 'features/gallery/components/ContextMenu/ImageContextMenu';
+import { VideoContextMenu } from 'features/gallery/components/ContextMenu/VideoContextMenu';
 import { WorkflowLibraryModal } from 'features/nodes/components/sidePanel/workflow/WorkflowLibrary/WorkflowLibraryModal';
 import { CancelAllExceptCurrentQueueItemConfirmationAlertDialog } from 'features/queue/components/CancelAllExceptCurrentQueueItemConfirmationAlertDialog';
 import { ClearQueueConfirmationsAlertDialog } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
@@ -19,6 +21,8 @@ import { DeleteStylePresetDialog } from 'features/stylePresets/components/Delete
 import { StylePresetModal } from 'features/stylePresets/components/StylePresetForm/StylePresetModal';
 import RefreshAfterResetModal from 'features/system/components/SettingsModal/RefreshAfterResetModal';
 import { VideosModal } from 'features/system/components/VideosModal/VideosModal';
+import { DeleteSystemPromptDialog } from 'features/systemPrompts/components/DeleteSystemPromptDialog';
+import { SystemPromptsModal } from 'features/systemPrompts/components/SystemPromptsModal';
 import { DeleteWorkflowDialog } from 'features/workflowLibrary/components/DeleteLibraryWorkflowConfirmationAlertDialog';
 import { LoadWorkflowConfirmationAlertDialog } from 'features/workflowLibrary/components/LoadWorkflowConfirmationAlertDialog';
 import { LoadWorkflowFromGraphModal } from 'features/workflowLibrary/components/LoadWorkflowFromGraphModal/LoadWorkflowFromGraphModal';
@@ -34,6 +38,7 @@ export const GlobalModalIsolator = memo(() => {
   return (
     <>
       <DeleteImageModal />
+      <DeleteVideoModal />
       <ChangeBoardModal />
       <DynamicPromptsModal />
       <StylePresetModal />
@@ -44,11 +49,14 @@ export const GlobalModalIsolator = memo(() => {
       <NewWorkflowConfirmationAlertDialog />
       <LoadWorkflowConfirmationAlertDialog />
       <DeleteStylePresetDialog />
+      <SystemPromptsModal />
+      <DeleteSystemPromptDialog />
       <DeleteWorkflowDialog />
       <RefreshAfterResetModal />
       <DeleteBoardModal />
       <GlobalImageHotkeys />
       <ImageContextMenu />
+      <VideoContextMenu />
       <FullscreenDropzone />
       <VideosModal />
       <SaveWorkflowAsDialog />

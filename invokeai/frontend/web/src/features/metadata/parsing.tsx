@@ -14,8 +14,11 @@ import {
   geminiThinkingLevelChanged,
   heightChanged,
   imageSizeChanged,
+  isValidKrea2RebalanceWeights,
   kleinQwen3EncoderModelSelected,
   kleinVaeModelSelected,
+  krea2Qwen3VlEncoderModelSelected,
+  krea2VaeModelSelected,
   negativePromptChanged,
   openaiBackgroundChanged,
   openaiInputFidelityChanged,
@@ -39,7 +42,18 @@ import {
   setFluxDypeScale,
   setFluxScheduler,
   setGuidance,
+  setIdeogram4ColorPalette,
+  setIdeogram4GuidanceScale,
+  setIdeogram4Mu,
+  setIdeogram4SamplerPreset,
+  setIdeogram4Steps,
   setImg2imgStrength,
+  setKrea2RebalanceEnabled,
+  setKrea2RebalanceMultiplier,
+  setKrea2RebalanceWeights,
+  setKrea2SeedVarianceEnabled,
+  setKrea2SeedVarianceRandomizePercent,
+  setKrea2SeedVarianceStrength,
   setRefinerCFGScale,
   setRefinerNegativeAestheticScore,
   setRefinerPositiveAestheticScore,
@@ -56,7 +70,13 @@ import {
   setZImageSeedVarianceRandomizePercent,
   setZImageSeedVarianceStrength,
   setZImageShift,
+  t5EncoderModelSelected,
   vaeSelected,
+  wanComponentSourceSelected,
+  wanGuidanceScaleLowNoiseChanged,
+  wanT5EncoderModelSelected,
+  wanTransformerLowNoiseSelected,
+  wanVaeModelSelected,
   widthChanged,
   zImageQwen3EncoderModelSelected,
   zImageQwen3SourceModelSelected,
@@ -78,6 +98,7 @@ import type {
   ParameterFluxDypeScale,
   ParameterGuidance,
   ParameterHeight,
+  ParameterIdeogram4SamplerPreset,
   ParameterModel,
   ParameterNegativePrompt,
   ParameterPositivePrompt,
@@ -103,6 +124,7 @@ import {
   zParameterFluxDypePreset,
   zParameterFluxDypeScale,
   zParameterGuidance,
+  zParameterIdeogram4SamplerPreset,
   zParameterImageDimension,
   zParameterNegativePrompt,
   zParameterPositivePrompt,
@@ -149,6 +171,12 @@ const MetadataPrimitiveValue = ({ value }: { value: string | number | boolean | 
 
 const getProperty = (obj: unknown, path: string): unknown => {
   return get(obj, path) as unknown;
+};
+
+const assertMetadataModelBase = (metadata: unknown, expectedBase: string, handlerType: string): void => {
+  const rawModel = getProperty(metadata, 'model');
+  const modelBase = (rawModel as { base?: unknown } | undefined)?.base;
+  assert(modelBase === expectedBase, `${handlerType} handler only works with ${expectedBase} metadata`);
 };
 
 type UnparsedData = {
@@ -858,6 +886,133 @@ const QwenImageShift: SingleMetadataHandler<number | null> = {
 };
 //#endregion QwenImageShift
 
+//#region WanTransformerLowNoise
+const WanTransformerLowNoise: SingleMetadataHandler<ModelIdentifierField | null> = {
+  [SingleMetadataKey]: true,
+  type: 'WanTransformerLowNoise',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'wan_transformer_low_noise');
+    // Reject when the key is absent so the handler is not rendered for non-Wan images
+    if (raw === undefined) {
+      return Promise.reject();
+    }
+    if (raw === null) {
+      return Promise.resolve(null);
+    }
+    return Promise.resolve(zModelIdentifierField.parse(raw));
+  },
+  recall: (value, store) => {
+    store.dispatch(wanTransformerLowNoiseSelected(value));
+  },
+  i18nKey: 'modelManager.wanTransformerLowNoise',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField | null>) => (
+    <MetadataPrimitiveValue value={value ? value.name : 'None'} />
+  ),
+};
+//#endregion WanTransformerLowNoise
+
+//#region WanComponentSource
+const WanComponentSource: SingleMetadataHandler<ModelIdentifierField | null> = {
+  [SingleMetadataKey]: true,
+  type: 'WanComponentSource',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'wan_component_source');
+    if (raw === undefined) {
+      return Promise.reject();
+    }
+    if (raw === null) {
+      return Promise.resolve(null);
+    }
+    return Promise.resolve(zModelIdentifierField.parse(raw));
+  },
+  recall: (value, store) => {
+    store.dispatch(wanComponentSourceSelected(value));
+  },
+  i18nKey: 'modelManager.wanComponentSource',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField | null>) => (
+    <MetadataPrimitiveValue value={value ? value.name : 'None'} />
+  ),
+};
+//#endregion WanComponentSource
+
+//#region WanVaeModel
+const WanVaeModel: SingleMetadataHandler<ModelIdentifierField | null> = {
+  [SingleMetadataKey]: true,
+  type: 'WanVaeModel',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'wan_vae_model');
+    if (raw === undefined) {
+      return Promise.reject();
+    }
+    if (raw === null) {
+      return Promise.resolve(null);
+    }
+    return Promise.resolve(zModelIdentifierField.parse(raw));
+  },
+  recall: (value, store) => {
+    store.dispatch(wanVaeModelSelected(value));
+  },
+  i18nKey: 'modelManager.wanVae',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField | null>) => (
+    <MetadataPrimitiveValue value={value ? value.name : 'None'} />
+  ),
+};
+//#endregion WanVaeModel
+
+//#region WanT5EncoderModel
+const WanT5EncoderModel: SingleMetadataHandler<ModelIdentifierField | null> = {
+  [SingleMetadataKey]: true,
+  type: 'WanT5EncoderModel',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'wan_t5_encoder_model');
+    if (raw === undefined) {
+      return Promise.reject();
+    }
+    if (raw === null) {
+      return Promise.resolve(null);
+    }
+    return Promise.resolve(zModelIdentifierField.parse(raw));
+  },
+  recall: (value, store) => {
+    store.dispatch(wanT5EncoderModelSelected(value));
+  },
+  i18nKey: 'modelManager.wanT5Encoder',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField | null>) => (
+    <MetadataPrimitiveValue value={value ? value.name : 'None'} />
+  ),
+};
+//#endregion WanT5EncoderModel
+
+//#region WanGuidanceScaleLowNoise
+const WanGuidanceScaleLowNoise: SingleMetadataHandler<number | null> = {
+  [SingleMetadataKey]: true,
+  type: 'WanGuidanceScaleLowNoise',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'wan_guidance_scale_low_noise');
+    if (raw === undefined) {
+      return Promise.reject();
+    }
+    if (raw === null) {
+      return Promise.resolve(null);
+    }
+    const parsed = z.number().parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(wanGuidanceScaleLowNoiseChanged(value));
+  },
+  i18nKey: 'parameters.wanGuidanceScaleLowNoise',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<number | null>) => (
+    <MetadataPrimitiveValue value={value ?? 'Default'} />
+  ),
+};
+//#endregion WanGuidanceScaleLowNoise
+
 //#region ZImageShift
 const ZImageShift: SingleMetadataHandler<number | null> = {
   [SingleMetadataKey]: true,
@@ -886,11 +1041,178 @@ const ZImageShift: SingleMetadataHandler<number | null> = {
   },
   i18nKey: 'metadata.zImageShift',
   LabelComponent: MetadataLabel,
-  ValueComponent: ({ value }: SingleMetadataValueProps<number | null>) => (
-    <MetadataPrimitiveValue value={value ?? 'Auto'} />
-  ),
+  ValueComponent: ({ value }: SingleMetadataValueProps<number | null>) => {
+    const { t } = useTranslation();
+    return <MetadataPrimitiveValue value={value ?? t('common.auto')} />;
+  },
 };
 //#endregion ZImageShift
+
+//#region Ideogram4SamplerPreset
+const Ideogram4SamplerPreset: SingleMetadataHandler<ParameterIdeogram4SamplerPreset> = {
+  [SingleMetadataKey]: true,
+  type: 'Ideogram4SamplerPreset',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'ideogram4_sampler_preset');
+    const parsed = zParameterIdeogram4SamplerPreset.parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    // Only recall onto an Ideogram 4 model so we don't set this (otherwise hidden) field for other bases.
+    if (selectBase(store.getState()) !== 'ideogram-4') {
+      return;
+    }
+    store.dispatch(setIdeogram4SamplerPreset(value));
+  },
+  i18nKey: 'parameters.samplerPreset',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ParameterIdeogram4SamplerPreset>) => (
+    <MetadataPrimitiveValue value={value} />
+  ),
+};
+//#endregion Ideogram4SamplerPreset
+
+//#region Ideogram4Steps
+// Optional override of the preset step count. The graph writes 'auto' (sentinel) when unset; recall
+// maps that back to null (= use preset). Only recalled onto an Ideogram 4 model.
+const Ideogram4Steps: SingleMetadataHandler<number | null> = {
+  [SingleMetadataKey]: true,
+  type: 'Ideogram4Steps',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'ideogram4_steps');
+    if (raw === undefined) {
+      return Promise.reject();
+    }
+    if (raw === null || raw === 'auto') {
+      return Promise.resolve(null);
+    }
+    // Backend requires steps >= 2; refuse a stale/out-of-range recalled value instead of recalling it.
+    return Promise.resolve(z.number().int().min(2).max(100).parse(raw));
+  },
+  recall: (value, store) => {
+    if (selectBase(store.getState()) !== 'ideogram-4') {
+      return;
+    }
+    store.dispatch(setIdeogram4Steps(value));
+  },
+  i18nKey: 'parameters.steps',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<number | null>) => {
+    const { t } = useTranslation();
+    return <MetadataPrimitiveValue value={value ?? t('common.auto')} />;
+  },
+};
+//#endregion Ideogram4Steps
+
+//#region Ideogram4GuidanceScale
+const Ideogram4GuidanceScale: SingleMetadataHandler<number | null> = {
+  [SingleMetadataKey]: true,
+  type: 'Ideogram4GuidanceScale',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'ideogram4_guidance_scale');
+    if (raw === undefined) {
+      return Promise.reject();
+    }
+    if (raw === null || raw === 'auto') {
+      return Promise.resolve(null);
+    }
+    return Promise.resolve(z.number().min(1).max(20).parse(raw));
+  },
+  recall: (value, store) => {
+    if (selectBase(store.getState()) !== 'ideogram-4') {
+      return;
+    }
+    store.dispatch(setIdeogram4GuidanceScale(value));
+  },
+  i18nKey: 'parameters.guidance',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<number | null>) => {
+    const { t } = useTranslation();
+    return <MetadataPrimitiveValue value={value ?? t('common.auto')} />;
+  },
+};
+//#endregion Ideogram4GuidanceScale
+
+//#region Ideogram4Mu
+const Ideogram4Mu: SingleMetadataHandler<number | null> = {
+  [SingleMetadataKey]: true,
+  type: 'Ideogram4Mu',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'ideogram4_mu');
+    if (raw === undefined) {
+      return Promise.reject();
+    }
+    if (raw === null || raw === 'auto') {
+      return Promise.resolve(null);
+    }
+    return Promise.resolve(z.number().min(-4).max(4).parse(raw));
+  },
+  recall: (value, store) => {
+    if (selectBase(store.getState()) !== 'ideogram-4') {
+      return;
+    }
+    store.dispatch(setIdeogram4Mu(value));
+  },
+  i18nKey: 'parameters.shift',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<number | null>) => {
+    const { t } = useTranslation();
+    return <MetadataPrimitiveValue value={value ?? t('common.auto')} />;
+  },
+};
+//#endregion Ideogram4Mu
+
+//#region Ideogram4ColorPalette
+const Ideogram4ColorPalette: SingleMetadataHandler<string[]> = {
+  [SingleMetadataKey]: true,
+  type: 'Ideogram4ColorPalette',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'ideogram4_color_palette');
+    if (raw === undefined) {
+      return Promise.reject();
+    }
+    return Promise.resolve(z.array(z.string()).parse(raw));
+  },
+  recall: (value, store) => {
+    if (selectBase(store.getState()) !== 'ideogram-4') {
+      return;
+    }
+    store.dispatch(setIdeogram4ColorPalette(value));
+  },
+  i18nKey: 'parameters.colorPalette',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<string[]>) => (
+    <MetadataPrimitiveValue value={value.join(', ')} />
+  ),
+};
+//#endregion Ideogram4ColorPalette
+
+//#region Ideogram4Caption
+// For regional/structured prompts the value actually encoded by the model is this assembled JSON
+// caption, while `positive_prompt` holds the raw overall description (via the graph's decoy node).
+// Recalling it into the positive prompt round-trips: the graph builder detects a leading `{` and passes
+// the JSON through unchanged.
+const Ideogram4Caption: SingleMetadataHandler<string> = {
+  [SingleMetadataKey]: true,
+  type: 'Ideogram4Caption',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'ideogram4_caption');
+    if (raw === undefined) {
+      return Promise.reject();
+    }
+    return Promise.resolve(z.string().parse(raw));
+  },
+  recall: (value, store) => {
+    if (selectBase(store.getState()) !== 'ideogram-4') {
+      return;
+    }
+    store.dispatch(positivePromptChanged(value));
+  },
+  i18nKey: 'parameters.ideogram4Caption',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<string>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion Ideogram4Caption
 
 //#region RefinerModel
 const RefinerModel: SingleMetadataHandler<ParameterSDXLRefinerModel> = {
@@ -1059,9 +1381,12 @@ const VAEModel: SingleMetadataHandler<ParameterVAEModel> = {
     const parsed = await parseModelIdentifier(raw, store, 'vae');
     assert(parsed.type === 'vae');
     assert(isCompatibleWithMainModel(parsed, store));
-    // Z-Image and FLUX.2 Klein have dedicated VAE handlers; avoid rendering a duplicate row.
+    // Z-Image, FLUX.2 Klein and Krea-2 have dedicated VAE handlers; avoid rendering a duplicate row.
     const base = selectBase(store.getState());
-    assert(base !== 'z-image' && base !== 'flux2', 'VAEModel handler does not apply to Z-Image or FLUX.2 Klein');
+    assert(
+      base !== 'z-image' && base !== 'flux2' && base !== 'krea-2',
+      'VAEModel handler does not apply to Z-Image, FLUX.2 Klein or Krea-2'
+    );
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
@@ -1097,6 +1422,27 @@ const Qwen3EncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
   ),
 };
 //#endregion Qwen3EncoderModel
+
+//#region T5EncoderModel
+const T5EncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
+  [SingleMetadataKey]: true,
+  type: 'T5EncoderModel',
+  parse: async (metadata, store) => {
+    const raw = getProperty(metadata, 't5_encoder');
+    const parsed = await parseModelIdentifier(raw, store, 't5_encoder');
+    assert(parsed.type === 't5_encoder');
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(t5EncoderModelSelected(value));
+  },
+  i18nKey: 'metadata.t5Encoder',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField>) => (
+    <MetadataPrimitiveValue value={`${value.name} (${value.base.toUpperCase()})`} />
+  ),
+};
+//#endregion T5EncoderModel
 
 //#region ZImageVAEModel
 const ZImageVAEModel: SingleMetadataHandler<ModelIdentifierField> = {
@@ -1150,6 +1496,185 @@ const ZImageQwen3SourceModel: SingleMetadataHandler<ModelIdentifierField> = {
   ),
 };
 //#endregion ZImageQwen3SourceModel
+
+//#region Krea2VAEModel
+const Krea2VAEModel: SingleMetadataHandler<ModelIdentifierField> = {
+  [SingleMetadataKey]: true,
+  type: 'Krea2VAEModel',
+  parse: async (metadata, store) => {
+    assertMetadataModelBase(metadata, 'krea-2', 'Krea2VAEModel');
+    const raw = getProperty(metadata, 'vae');
+    const parsed = await parseModelIdentifier(raw, store, 'vae');
+    assert(parsed.type === 'vae');
+    assert(parsed.base === 'qwen-image' || parsed.base === 'anima', 'Krea2VAEModel requires a Qwen Image or Anima VAE');
+    // Only recall if the current main model is Krea-2 (its VAE dropdown differs from other bases).
+    const base = selectBase(store.getState());
+    assert(base === 'krea-2', 'Krea2VAEModel handler only works with Krea-2 models');
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(krea2VaeModelSelected(value));
+  },
+  i18nKey: 'metadata.vae',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField>) => (
+    <MetadataPrimitiveValue value={`${value.name} (${value.base.toUpperCase()})`} />
+  ),
+};
+//#endregion Krea2VAEModel
+
+//#region Krea2Qwen3VlEncoderModel
+const Krea2Qwen3VlEncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
+  [SingleMetadataKey]: true,
+  type: 'Krea2Qwen3VlEncoderModel',
+  parse: async (metadata, store) => {
+    assertMetadataModelBase(metadata, 'krea-2', 'Krea2Qwen3VlEncoderModel');
+    const raw = getProperty(metadata, 'qwen3_vl_encoder');
+    const parsed = await parseModelIdentifier(raw, store, 'qwen3_vl_encoder');
+    assert(parsed.type === 'qwen3_vl_encoder');
+    const base = selectBase(store.getState());
+    assert(base === 'krea-2', 'Krea2Qwen3VlEncoderModel handler only works with Krea-2 models');
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(krea2Qwen3VlEncoderModelSelected(value));
+  },
+  i18nKey: 'metadata.krea2Qwen3VlEncoder',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField>) => (
+    <MetadataPrimitiveValue value={`${value.name} (${value.base.toUpperCase()})`} />
+  ),
+};
+//#endregion Krea2Qwen3VlEncoderModel
+
+//#region Krea2SeedVarianceEnabled
+const Krea2SeedVarianceEnabled: SingleMetadataHandler<boolean> = {
+  [SingleMetadataKey]: true,
+  type: 'Krea2SeedVarianceEnabled',
+  parse: (metadata, store) => {
+    // Only applies to Krea-2 models, and only when the field is actually present — otherwise recalling
+    // an unrelated/older image would silently clear the user's current enhancer state. (A synchronous
+    // throw here is turned into a rejected promise by the parse runner, skipping the handler.)
+    assert(selectBase(store.getState()) === 'krea-2', 'Krea2SeedVarianceEnabled handler only applies to Krea-2 models');
+    assertMetadataModelBase(metadata, 'krea-2', 'Krea2SeedVarianceEnabled');
+    const raw = getProperty(metadata, 'krea2_seed_variance_enabled');
+    return Promise.resolve(z.boolean().parse(raw));
+  },
+  recall: (value, store) => {
+    store.dispatch(setKrea2SeedVarianceEnabled(value));
+  },
+  i18nKey: 'metadata.seedVarianceEnabled',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<boolean>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion Krea2SeedVarianceEnabled
+
+//#region Krea2SeedVarianceStrength
+const Krea2SeedVarianceStrength: SingleMetadataHandler<number> = {
+  [SingleMetadataKey]: true,
+  type: 'Krea2SeedVarianceStrength',
+  parse: (metadata, store) => {
+    assert(
+      selectBase(store.getState()) === 'krea-2',
+      'Krea2SeedVarianceStrength handler only applies to Krea-2 models'
+    );
+    assertMetadataModelBase(metadata, 'krea-2', 'Krea2SeedVarianceStrength');
+    const raw = getProperty(metadata, 'krea2_seed_variance_strength');
+    // Strength is a multiplier of the embedding std, capped at 2 (matches the invocation + param state).
+    return Promise.resolve(z.number().min(0).max(2).parse(raw));
+  },
+  recall: (value, store) => {
+    store.dispatch(setKrea2SeedVarianceStrength(value));
+  },
+  i18nKey: 'metadata.seedVarianceStrength',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<number>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion Krea2SeedVarianceStrength
+
+//#region Krea2SeedVarianceRandomizePercent
+const Krea2SeedVarianceRandomizePercent: SingleMetadataHandler<number> = {
+  [SingleMetadataKey]: true,
+  type: 'Krea2SeedVarianceRandomizePercent',
+  parse: (metadata, store) => {
+    assert(
+      selectBase(store.getState()) === 'krea-2',
+      'Krea2SeedVarianceRandomizePercent handler only applies to Krea-2 models'
+    );
+    assertMetadataModelBase(metadata, 'krea-2', 'Krea2SeedVarianceRandomizePercent');
+    const raw = getProperty(metadata, 'krea2_seed_variance_randomize_percent');
+    // 0 is the valid "disabled" value (matches the slider, param state, and invocation); reject negatives.
+    return Promise.resolve(z.number().min(0).max(100).parse(raw));
+  },
+  recall: (value, store) => {
+    store.dispatch(setKrea2SeedVarianceRandomizePercent(value));
+  },
+  i18nKey: 'metadata.seedVarianceRandomizePercent',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<number>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion Krea2SeedVarianceRandomizePercent
+
+//#region Krea2RebalanceEnabled
+const Krea2RebalanceEnabled: SingleMetadataHandler<boolean> = {
+  [SingleMetadataKey]: true,
+  type: 'Krea2RebalanceEnabled',
+  parse: (metadata, store) => {
+    assert(selectBase(store.getState()) === 'krea-2', 'Krea2RebalanceEnabled handler only applies to Krea-2 models');
+    assertMetadataModelBase(metadata, 'krea-2', 'Krea2RebalanceEnabled');
+    const raw = getProperty(metadata, 'krea2_rebalance_enabled');
+    return Promise.resolve(z.boolean().parse(raw));
+  },
+  recall: (value, store) => {
+    store.dispatch(setKrea2RebalanceEnabled(value));
+  },
+  i18nKey: 'metadata.krea2RebalanceEnabled',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<boolean>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion Krea2RebalanceEnabled
+
+//#region Krea2RebalanceMultiplier
+const Krea2RebalanceMultiplier: SingleMetadataHandler<number> = {
+  [SingleMetadataKey]: true,
+  type: 'Krea2RebalanceMultiplier',
+  parse: (metadata, store) => {
+    assert(selectBase(store.getState()) === 'krea-2', 'Krea2RebalanceMultiplier handler only applies to Krea-2 models');
+    assertMetadataModelBase(metadata, 'krea-2', 'Krea2RebalanceMultiplier');
+    const raw = getProperty(metadata, 'krea2_rebalance_multiplier');
+    return Promise.resolve(z.number().min(0).max(20).parse(raw));
+  },
+  recall: (value, store) => {
+    store.dispatch(setKrea2RebalanceMultiplier(value));
+  },
+  i18nKey: 'metadata.krea2RebalanceMultiplier',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<number>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion Krea2RebalanceMultiplier
+
+//#region Krea2RebalanceWeights
+const Krea2RebalanceWeights: SingleMetadataHandler<string> = {
+  [SingleMetadataKey]: true,
+  type: 'Krea2RebalanceWeights',
+  parse: (metadata, store) => {
+    assert(selectBase(store.getState()) === 'krea-2', 'Krea2RebalanceWeights handler only applies to Krea-2 models');
+    assertMetadataModelBase(metadata, 'krea-2', 'Krea2RebalanceWeights');
+    const raw = getProperty(metadata, 'krea2_rebalance_weights');
+    // Only recall a string the backend rebalance node would actually accept (exactly 12 finite numbers),
+    // so recalling stale/garbage metadata can't dispatch state that later fails at generation time.
+    return Promise.resolve(
+      z.string().refine(isValidKrea2RebalanceWeights, 'expected exactly 12 finite comma-separated numbers').parse(raw)
+    );
+  },
+  recall: (value, store) => {
+    store.dispatch(setKrea2RebalanceWeights(value));
+  },
+  i18nKey: 'metadata.krea2RebalanceWeights',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<string>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion Krea2RebalanceWeights
 
 //#region AnimaVAEModel
 const AnimaVAEModel: SingleMetadataHandler<ModelIdentifierField> = {
@@ -1640,6 +2165,7 @@ export const ImageMetadataHandlers = {
   Scheduler,
   VAEModel,
   Qwen3EncoderModel,
+  T5EncoderModel,
   ZImageVAEModel,
   ZImageQwen3SourceModel,
   AnimaVAEModel,
@@ -1649,12 +2175,31 @@ export const ImageMetadataHandlers = {
   ZImageSeedVarianceEnabled,
   ZImageSeedVarianceStrength,
   ZImageSeedVarianceRandomizePercent,
+  Krea2VAEModel,
+  Krea2Qwen3VlEncoderModel,
+  Krea2SeedVarianceEnabled,
+  Krea2SeedVarianceStrength,
+  Krea2SeedVarianceRandomizePercent,
+  Krea2RebalanceEnabled,
+  Krea2RebalanceMultiplier,
+  Krea2RebalanceWeights,
   QwenImageComponentSource,
   QwenImageVaeModel,
   QwenImageQwenVLEncoderModel,
   QwenImageQuantization,
   QwenImageShift,
+  WanTransformerLowNoise,
+  WanComponentSource,
+  WanVaeModel,
+  WanT5EncoderModel,
+  WanGuidanceScaleLowNoise,
   ZImageShift,
+  Ideogram4SamplerPreset,
+  Ideogram4Steps,
+  Ideogram4GuidanceScale,
+  Ideogram4Mu,
+  Ideogram4ColorPalette,
+  Ideogram4Caption,
   LoRAs,
   CanvasLayers,
   RefImages,
