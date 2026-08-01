@@ -61,7 +61,8 @@ def call_deepseek_llm(
         "temperature": temperature,  # range 0–2
         "top_p": 1,
     }
-    response = httpx.post(url, headers=headers, json=payload)
+    # httpx timeout default is 5s, too low for long responses. Increase read timeout while leaving other timeouts intact.
+    response = httpx.post(url, headers=headers, json=payload, timeout=httpx.Timeout(5, read=2 * max_tokens))
     response.raise_for_status()
     completion = response.json()
     return completion["choices"][0]["message"]["content"]
