@@ -34,6 +34,7 @@ PE_MAX_NEW_TOKENS = 1024
     category="conditioning",
     version="1.0.0",
     classification=Classification.Prototype,
+    idle_gpu_offloadable=True,
 )
 class ErnieImageTextEncoderInvocation(BaseInvocation):
     """Encodes a prompt for ERNIE-Image generation, optionally rewriting it via the
