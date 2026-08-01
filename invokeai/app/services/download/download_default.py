@@ -433,11 +433,14 @@ class DownloadQueueService(DownloadQueueServiceBase):
         )
         if resp.status_code == 416 and resume_from > 0:
             # Range not satisfiable - local partial is already complete
-            expected = job.expected_total_bytes or job.total_bytes or resume_from
-            if resume_from == expected:
+            match = re.fullmatch(r"bytes \*/(\d+)", resp.headers.get("Content-Range", ""), flags=re.IGNORECASE)
+            expected = int(match.group(1)) if match else None
+            if expected is not None and resume_from == expected:
                 job.total_bytes = expected
+                job.expected_total_bytes = expected
                 job.bytes = resume_from
                 job.download_path = job.download_path or job.dest
+                self._in_progress_path(job.download_path).rename(job.download_path)
                 self._signal_job_started(job)
                 self._signal_job_complete(job)
                 return
