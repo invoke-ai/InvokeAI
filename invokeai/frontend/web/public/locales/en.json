@@ -407,7 +407,9 @@
         "noTextLLMInstalledDescription": "Prompt expansion needs a Text LLM (causal language model). We recommend Qwen2.5-1.5B-Instruct (~3 GB) — small, fast, and available as a starter model.",
         "noVisionModelInstalledTitle": "No vision model installed",
         "noVisionModelInstalledDescription": "Image-to-prompt needs a vision-language model (e.g. LLaVA Onevision). The 0.5B starter (~1 GB) is the lightweight default.",
-        "openModelManager": "Open Model Manager"
+        "openModelManager": "Open Model Manager",
+        "llmTaskLoadingModel": "Loading model…",
+        "llmTaskGenerating": "Generating…"
     },
     "queue": {
         "queue": "Queue",
@@ -741,7 +743,7 @@
             },
             "selectBboxTool": {
                 "title": "Bbox Tool",
-                "desc": "Select the bounding box tool."
+                "desc": "Tap to select the bounding box tool, or hold to use it temporarily."
             },
             "decrementToolWidth": {
                 "title": "Decrement Tool Width",
@@ -1812,6 +1814,7 @@
         "scaledHeight": "Scaled H",
         "scaledWidth": "Scaled W",
         "scheduler": "Scheduler",
+        "ernieImagePromptEnhancer": "Prompt Enhancer",
         "dypePreset": "DyPE",
         "dypeScale": "DyPE λs",
         "dypeExponent": "DyPE λt",
@@ -3545,6 +3548,25 @@
         "togglePromptPreviews": "Toggle Prompt Previews",
         "selectPreset": "Select Style Preset",
         "noMatchingPresets": "No matching presets"
+    },
+    "systemPrompts": {
+        "systemPrompt": "System Prompt",
+        "selectSystemPrompt": "Select system prompt...",
+        "manageSystemPrompts": "Manage system prompts",
+        "newSystemPrompt": "New System Prompt",
+        "editSystemPrompt": "Edit System Prompt",
+        "name": "Name",
+        "content": "Content",
+        "contentPlaceholder": "Enter the system prompt that instructs the LLM how to expand the user's prompt...",
+        "deletePrompt": "Delete System Prompt",
+        "deletePromptConfirm": "Are you sure you want to delete this system prompt? This cannot be undone.",
+        "promptDeleted": "System prompt deleted",
+        "unableToDeletePrompt": "Unable to delete system prompt",
+        "unableToSavePrompt": "Unable to save system prompt",
+        "noPromptsYet": "No system prompts yet. Create one to get started.",
+        "systemBadge": "System",
+        "sharedBadge": "Shared",
+        "shareWithEveryone": "Share with everyone (visible to all users)"
     },
     "ui": {
         "tabs": {
