@@ -20,7 +20,7 @@ from unittest.mock import patch
 import pytest
 import torch
 
-from invokeai.backend.model_manager.load.load_default import ModelLoader
+from invokeai.backend.model_manager.load.load_default import ModelLoader, _device_supports_fp8_storage
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_linear import (
     CustomLinear,
 )
@@ -387,3 +387,45 @@ def test_apply_fp8_layerwise_casting_uses_hook_path_for_model_mixin():
 
     mock_to_nn.assert_called_once()
     mock_enable.assert_not_called()
+
+
+# ===== _device_supports_fp8_storage probe ===================================
+# The probe gates FP8 storage in two places: the generic layerwise-casting path and the
+# Krea 2 Qwen3-VL encoder. It must never regress CUDA, and must not claim support on CPU.
+
+
+def test_device_supports_fp8_storage_cuda_is_unconditional():
+    """CUDA is answered without probing, so the result holds on machines with no GPU."""
+    _device_supports_fp8_storage.cache_clear()
+    try:
+        assert _device_supports_fp8_storage("cuda") is True
+    finally:
+        _device_supports_fp8_storage.cache_clear()
+
+
+def test_device_supports_fp8_storage_rejects_cpu():
+    _device_supports_fp8_storage.cache_clear()
+    try:
+        assert _device_supports_fp8_storage("cpu") is False
+    finally:
+        _device_supports_fp8_storage.cache_clear()
+
+
+def test_device_supports_fp8_storage_xpu_probes_and_survives_failure():
+    """XPU float8 support is build/driver dependent, so a failing probe must return False
+    rather than propagate."""
+    _device_supports_fp8_storage.cache_clear()
+    try:
+        with patch("torch.zeros", side_effect=RuntimeError("no float8 on this build")):
+            assert _device_supports_fp8_storage("xpu") is False
+    finally:
+        _device_supports_fp8_storage.cache_clear()
+
+
+def test_device_supports_fp8_storage_xpu_true_when_probe_succeeds():
+    _device_supports_fp8_storage.cache_clear()
+    try:
+        with patch("torch.zeros", return_value=torch.zeros(2)):
+            assert _device_supports_fp8_storage("xpu") is True
+    finally:
+        _device_supports_fp8_storage.cache_clear()
