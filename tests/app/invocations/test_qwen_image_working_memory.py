@@ -178,3 +178,29 @@ class TestQwenImageWorkingMemory:
             mock_estimate.assert_called_once()
             assert mock_estimate.call_args.kwargs["operation"] == "encode"
             mock_vae_info.model_on_device.assert_called_once_with(working_mem_bytes=expected_memory)
+
+    def test_qwen_image_to_latents_passes_resolved_tile_size_to_the_estimate(self):
+        """Tiling only helps if the *estimate* shrinks with it.
+
+        The cache reserves whatever the estimator returns, so enabling tiling on the VAE without
+        telling the estimator would leave it reserving the full-frame figure (~11 GB at 2560x1440)
+        and evicting models to honour it: the encode would be bounded, but nothing else would fit.
+        tile_size=0 means "use the model default", which must be resolved before estimating.
+        """
+        _mock_vae, mock_vae_info = self._mock_vae_info()
+        mock_vae_info.model.tile_sample_min_height = 256
+        mock_image_tensor = torch.zeros(1, 3, 512, 512)
+
+        estimation_path = "invokeai.app.invocations.qwen_image_image_to_latents.estimate_vae_working_memory_qwen_image"
+
+        for tiled, tile_size, expected in ((False, 0, None), (True, 0, 256), (True, 512, 512)):
+            with patch(estimation_path) as mock_estimate:
+                mock_estimate.return_value = 1024
+                try:
+                    QwenImageImageToLatentsInvocation.vae_encode(
+                        mock_vae_info, mock_image_tensor, tiled=tiled, tile_size=tile_size
+                    )
+                except Exception:
+                    # Downstream encode math fails under mocking; only the estimate call matters.
+                    pass
+                assert mock_estimate.call_args.kwargs["tile_size"] == expected, f"tiled={tiled}, tile_size={tile_size}"
