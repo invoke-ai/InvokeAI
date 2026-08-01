@@ -24,6 +24,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     SessionQueueCountsByDestination,
     SessionQueueItem,
     SessionQueueItemNotFoundError,
+    SessionQueueItemSummary,
     SessionQueueStatus,
 )
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
@@ -93,6 +94,27 @@ def sanitize_queue_item_for_user(
         graph=Graph(),
     )
     return sanitized_item
+
+
+def sanitize_queue_item_summary_for_user(
+    queue_item: SessionQueueItemSummary, current_user_id: str, is_admin: bool
+) -> SessionQueueItemSummary:
+    """Remove queue-list metadata belonging to another user for non-admin callers."""
+    if is_admin or queue_item.user_id == current_user_id:
+        return queue_item
+
+    return queue_item.model_copy(
+        update={
+            "device": None,
+            "origin": None,
+            "destination": None,
+            "batch_id": "redacted",
+            "user_id": "redacted",
+            "user_display_name": None,
+            "user_email": None,
+            "field_values": None,
+        }
+    )
 
 
 @session_queue_router.post(
@@ -204,6 +226,31 @@ async def get_queue_items_by_item_ids(
         return queue_items
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to get queue items")
+
+
+@session_queue_router.post(
+    "/{queue_id}/item_summaries_by_ids",
+    operation_id="get_queue_item_summaries_by_ids",
+    responses={200: {"model": list[SessionQueueItemSummary]}},
+)
+def get_queue_item_summaries_by_ids(
+    current_user: CurrentUserOrDefault,
+    queue_id: str = Path(description="The queue id to perform this operation on"),
+    item_ids: list[int] = Body(
+        embed=True, description="Object containing list of queue item ids to fetch summaries for"
+    ),
+) -> list[SessionQueueItemSummary]:
+    """Gets lightweight queue item summaries for specified IDs in requested order."""
+    try:
+        summaries = ApiDependencies.invoker.services.session_queue.get_queue_item_summaries_by_ids(
+            queue_id=queue_id, item_ids=item_ids
+        )
+        return [
+            sanitize_queue_item_summary_for_user(item, current_user.user_id, current_user.is_admin)
+            for item in summaries
+        ]
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to get queue item summaries")
 
 
 @session_queue_router.put(

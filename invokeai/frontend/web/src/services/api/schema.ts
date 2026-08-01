@@ -2403,6 +2403,26 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/queue/{queue_id}/item_summaries_by_ids": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Get Queue Item Summaries By Ids
+         * @description Gets lightweight queue item summaries for specified IDs in requested order.
+         */
+        post: operations["get_queue_item_summaries_by_ids"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/queue/{queue_id}/processor/resume": {
         parameters: {
             query?: never;
@@ -4934,6 +4954,14 @@ export type components = {
              * @description Object containing list of image names to fetch DTOs for
              */
             image_names: string[];
+        };
+        /** Body_get_queue_item_summaries_by_ids */
+        Body_get_queue_item_summaries_by_ids: {
+            /**
+             * Item Ids
+             * @description Object containing list of queue item ids to fetch summaries for
+             */
+            item_ids: number[];
         };
         /** Body_get_queue_items_by_item_ids */
         Body_get_queue_items_by_item_ids: {
@@ -33348,6 +33376,78 @@ export type components = {
             /** @description The workflow associated with this queue item */
             workflow?: components["schemas"]["WorkflowWithoutID"] | null;
         };
+        /**
+         * SessionQueueItemSummary
+         * @description Queue item fields needed to render the queue list.
+         */
+        SessionQueueItemSummary: {
+            /**
+             * Item Id
+             * @description The identifier of the session queue item
+             */
+            item_id: number;
+            /**
+             * Created At
+             * @description When this queue item was created
+             */
+            created_at: string;
+            /**
+             * Status
+             * @description The status of this queue item
+             * @enum {string}
+             */
+            status: "pending" | "in_progress" | "waiting" | "completed" | "failed" | "canceled";
+            /**
+             * Device
+             * @description The device that processed this queue item, e.g. 'cuda:1'
+             */
+            device?: string | null;
+            /**
+             * Started At
+             * @description When this queue item was started
+             */
+            started_at: string | null;
+            /**
+             * Completed At
+             * @description When this queue item was completed
+             */
+            completed_at: string | null;
+            /**
+             * Origin
+             * @description The origin of this queue item
+             */
+            origin: string | null;
+            /**
+             * Destination
+             * @description The destination of this queue item
+             */
+            destination: string | null;
+            /**
+             * Batch Id
+             * @description The ID of the batch associated with this queue item
+             */
+            batch_id: string;
+            /**
+             * User Id
+             * @description The ID of the user who created this queue item
+             */
+            user_id: string;
+            /**
+             * User Display Name
+             * @description The display name of the user who created this queue item
+             */
+            user_display_name: string | null;
+            /**
+             * User Email
+             * @description The email of the user who created this queue item
+             */
+            user_email: string | null;
+            /**
+             * Field Values
+             * @description The batch field values used for this queue item
+             */
+            field_values: components["schemas"]["NodeFieldValue"][] | null;
+        };
         /** SessionQueueStatus */
         SessionQueueStatus: {
             /**
@@ -45508,6 +45608,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SessionQueueItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_queue_item_summaries_by_ids: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The queue id to perform this operation on */
+                queue_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Body_get_queue_item_summaries_by_ids"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionQueueItemSummary"][];
                 };
             };
             /** @description Validation Error */

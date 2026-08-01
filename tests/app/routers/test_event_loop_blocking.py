@@ -21,8 +21,9 @@ from httpx import ASGITransport, AsyncClient
 
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api_app import app
-from invokeai.app.services.gallery.gallery_common import GalleryItem, GalleryItemNamesResult
+from invokeai.app.services.gallery.gallery_common import GalleryItem, GalleryItemNames, GalleryItemNamesResult
 from invokeai.app.services.image_records.image_records_common import ImageNamesResult
+from invokeai.app.services.session_queue.session_queue_common import SessionQueueItemSummary
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 
 # Long enough that a blocked event loop is unmistakable, short enough to keep the suite fast.
@@ -62,22 +63,37 @@ def blocking_invoker(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
         time.sleep(BLOCKING_SECONDS)
         return OffsetPaginatedResults[GalleryItem](limit=10, offset=0, total=0, items=[])
 
+    def slow_get_item_names(**_: object) -> GalleryItemNames:
+        time.sleep(BLOCKING_SECONDS)
+        return GalleryItemNames(item_names=[], starred_count=0, total_count=0)
+
+    def slow_queue_item_summaries(**_: object) -> list[SessionQueueItemSummary]:
+        time.sleep(BLOCKING_SECONDS)
+        return []
+
     invoker.services.gallery.list_item_names.side_effect = slow_list_item_names
+    invoker.services.gallery.get_item_names.side_effect = slow_get_item_names
     invoker.services.gallery.list_items.side_effect = slow_list_items
     invoker.services.images.get_image_names.side_effect = slow_get_image_names
+    invoker.services.session_queue.get_queue_item_summaries_by_ids.side_effect = slow_queue_item_summaries
 
     monkeypatch.setattr(ApiDependencies, "invoker", invoker, raising=False)
     return invoker
 
 
-async def _probe_latency_while_busy(client: AsyncClient, slow_route: str, params: dict) -> tuple[float, asyncio.Task]:
+async def _probe_latency_while_busy(
+    client: AsyncClient, slow_route: str, params: dict, json_body: dict | None = None
+) -> tuple[float, asyncio.Task]:
     """Start `slow_route`, then time a probe request issued while it is still running.
 
     The clock starts before yielding to the slow request, so a blocked loop shows up as
     probe latency even though the probe itself never got a chance to be dispatched.
     """
     started = time.perf_counter()
-    slow_request = asyncio.create_task(client.get(slow_route, params=params))
+    if json_body is None:
+        slow_request = asyncio.create_task(client.get(slow_route, params=params))
+    else:
+        slow_request = asyncio.create_task(client.post(slow_route, params=params, json=json_body))
     # Hand control to the slow request so it reaches its route handler before we probe.
     for _ in range(10):
         await asyncio.sleep(0)
@@ -91,20 +107,22 @@ async def _probe_latency_while_busy(client: AsyncClient, slow_route: str, params
 
 @pytest.mark.anyio
 @pytest.mark.parametrize(
-    "slow_route,params",
+    "slow_route,params,json_body",
     [
-        ("/api/v1/gallery/items/names", {}),
-        ("/api/v1/gallery/items/names", {"search_term": "anything"}),
-        ("/api/v1/gallery/items/", {}),
-        ("/api/v1/images/names", {}),
+        ("/api/v1/gallery/items/names", {}, None),
+        ("/api/v1/gallery/items/names", {"search_term": "anything"}, None),
+        ("/api/v1/gallery/item_names", {}, None),
+        ("/api/v1/gallery/items/", {}, None),
+        ("/api/v1/images/names", {}, None),
+        ("/api/v1/queue/default/item_summaries_by_ids", {}, {"item_ids": [1, 2, 3]}),
     ],
 )
 async def test_slow_gallery_read_leaves_the_event_loop_free(
-    blocking_invoker: MagicMock, slow_route: str, params: dict
+    blocking_invoker: MagicMock, slow_route: str, params: dict, json_body: dict | None
 ) -> None:
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        elapsed, slow_request = await _probe_latency_while_busy(client, slow_route, params)
+        elapsed, slow_request = await _probe_latency_while_busy(client, slow_route, params, json_body)
 
         assert elapsed < BLOCKING_SECONDS / 2, (
             f"{PROBE_ROUTE} took {elapsed:.2f}s while {slow_route} was running. The slow route is "

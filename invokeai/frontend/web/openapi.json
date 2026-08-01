@@ -9558,6 +9558,68 @@
         }
       }
     },
+    "/api/v1/queue/{queue_id}/item_summaries_by_ids": {
+      "post": {
+        "tags": ["queue"],
+        "summary": "Get Queue Item Summaries By Ids",
+        "description": "Gets lightweight queue item summaries for specified IDs in requested order.",
+        "operationId": "get_queue_item_summaries_by_ids",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "queue_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The queue id to perform this operation on",
+              "title": "Queue Id"
+            },
+            "description": "The queue id to perform this operation on"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_get_queue_item_summaries_by_ids"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SessionQueueItemSummary"
+                  },
+                  "title": "Response 200 Get Queue Item Summaries By Ids"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/queue/{queue_id}/processor/resume": {
       "put": {
         "tags": ["queue"],
@@ -15996,6 +16058,21 @@
         "type": "object",
         "required": ["image_names"],
         "title": "Body_get_images_by_names"
+      },
+      "Body_get_queue_item_summaries_by_ids": {
+        "properties": {
+          "item_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Item Ids",
+            "description": "Object containing list of queue item ids to fetch summaries for"
+          }
+        },
+        "type": "object",
+        "required": ["item_ids"],
+        "title": "Body_get_queue_item_summaries_by_ids"
       },
       "Body_get_queue_items_by_item_ids": {
         "properties": {
@@ -77757,6 +77834,168 @@
         ],
         "title": "SessionQueueItem",
         "description": "Session queue item without the full graph. Used for serialization."
+      },
+      "SessionQueueItemSummary": {
+        "properties": {
+          "item_id": {
+            "type": "integer",
+            "title": "Item Id",
+            "description": "The identifier of the session queue item"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Created At",
+            "description": "When this queue item was created"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "in_progress", "waiting", "completed", "failed", "canceled"],
+            "title": "Status",
+            "description": "The status of this queue item"
+          },
+          "device": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device",
+            "description": "The device that processed this queue item, e.g. 'cuda:1'"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At",
+            "description": "When this queue item was started"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At",
+            "description": "When this queue item was completed"
+          },
+          "origin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin",
+            "description": "The origin of this queue item"
+          },
+          "destination": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination",
+            "description": "The destination of this queue item"
+          },
+          "batch_id": {
+            "type": "string",
+            "title": "Batch Id",
+            "description": "The ID of the batch associated with this queue item"
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id",
+            "description": "The ID of the user who created this queue item"
+          },
+          "user_display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Display Name",
+            "description": "The display name of the user who created this queue item"
+          },
+          "user_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Email",
+            "description": "The email of the user who created this queue item"
+          },
+          "field_values": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/NodeFieldValue"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field Values",
+            "description": "The batch field values used for this queue item"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item_id",
+          "created_at",
+          "status",
+          "started_at",
+          "completed_at",
+          "origin",
+          "destination",
+          "batch_id",
+          "user_id",
+          "user_display_name",
+          "user_email",
+          "field_values"
+        ],
+        "title": "SessionQueueItemSummary",
+        "description": "Queue item fields needed to render the queue list."
       },
       "SessionQueueStatus": {
         "properties": {
