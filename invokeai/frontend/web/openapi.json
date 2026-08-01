@@ -24136,7 +24136,7 @@
         "tags": ["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
         "title": "Denoise - SD1.5, SDXL",
         "type": "object",
-        "version": "1.5.4",
+        "version": "1.6.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -24549,7 +24549,7 @@
         "tags": ["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
         "title": "Denoise - SD1.5, SDXL + Metadata",
         "type": "object",
-        "version": "1.1.1",
+        "version": "1.2.0",
         "output": {
           "$ref": "#/components/schemas/LatentsMetaOutput"
         }
