@@ -4,7 +4,6 @@ import type { ChangeEvent } from 'react';
 import {
   createListCollection,
   Flex,
-  Group,
   HStack,
   IconButton,
   Input,
@@ -17,6 +16,7 @@ import {
   VisuallyHidden,
 } from '@chakra-ui/react';
 import { Button, MenuContent, Select, Tooltip } from '@platform/ui';
+import { Group } from '@platform/ui/Group';
 import {
   getCanvasOperations,
   isSamDocumentInputValid,

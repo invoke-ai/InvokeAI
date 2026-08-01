@@ -1,14 +1,37 @@
 import type {
   LayoutPreset,
+  LayoutPresetId,
   LayoutPresetSnapshot,
   LayoutPresetWidgetInstanceSnapshot,
   WidgetRegion,
   WidgetRegionState,
 } from '@workbench/layoutContracts';
-import type { Project } from '@workbench/projectContracts';
+import type { AccountState, Project } from '@workbench/projectContracts';
 import type { WidgetInstanceId } from '@workbench/widgetContracts';
 
+import { getLayoutPreset } from '@workbench/layoutPresets';
+
 const widgetRegions: WidgetRegion[] = ['left', 'right', 'bottom', 'center'];
+
+/**
+ * The preset as saved *for this account*: a custom preset, or a built-in with
+ * the account's saved edits layered over it. Everything that answers "what does
+ * this preset look like" — applying it, reverting to it, and the drift
+ * comparison behind the strip's dot — reads through here, or `Save changes`
+ * would appear to do nothing.
+ */
+export const resolveSavedLayoutPreset = (account: AccountState, presetId: LayoutPresetId): LayoutPreset => {
+  const customPreset = account.customLayoutPresets?.find((preset) => preset.id === presetId);
+
+  if (customPreset) {
+    return customPreset;
+  }
+
+  const builtInPreset = getLayoutPreset(presetId);
+  const override = account.layoutPresetOverrides?.[builtInPreset.id];
+
+  return override ? { ...builtInPreset, snapshot: override } : builtInPreset;
+};
 
 export const cloneLayoutPresetWidgetRegions = (
   widgetRegionState: Record<WidgetRegion, WidgetRegionState>

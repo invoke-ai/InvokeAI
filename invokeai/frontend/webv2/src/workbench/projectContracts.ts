@@ -7,6 +7,7 @@ import type { InvocationControllerState } from './invocationContracts';
 import type {
   LayoutPreset,
   LayoutPresetId,
+  LayoutPresetOverrides,
   ProjectLayoutState,
   WidgetRegion,
   WidgetRegionState,
@@ -128,4 +129,6 @@ export interface AutosaveState {
 export interface AccountState {
   activeLayoutPresetId: LayoutPresetId;
   customLayoutPresets?: LayoutPreset[];
+  /** Saved edits to a built-in preset's arrangement; see {@link LayoutPresetOverrides}. */
+  layoutPresetOverrides?: LayoutPresetOverrides;
 }

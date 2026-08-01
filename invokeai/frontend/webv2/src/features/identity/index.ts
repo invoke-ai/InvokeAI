@@ -33,6 +33,7 @@ export {
   type UserUpdateRequest,
 } from './data/api';
 export { AccountMenu } from './ui/AccountMenu';
+export { AccountMenuSection, useHasAccountSection } from './ui/AccountMenuSection';
 export { AuthUnavailableScreen } from './ui/AuthUnavailableScreen';
 export { LoginScreen } from './ui/LoginScreen';
 export { SetupScreen } from './ui/SetupScreen';

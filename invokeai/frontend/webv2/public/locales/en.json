@@ -305,6 +305,96 @@
     },
     "markRead": "Mark Read"
   },
+  "topbar": {
+    "appMenu": {
+      "documentation": "Documentation",
+      "manage": "Manage",
+      "open": "Open menu"
+    },
+    "invoke": {
+      "addToQueue": "Add to queue",
+      "addingImagesTo": "Adding images to {{destination}}",
+      "expandingPrompts": "Expanding prompts…",
+      "invoke": "Invoke",
+      "noNodes": "No nodes in graph",
+      "unavailable": "Invoke unavailable: {{reason}}",
+      "unrunnable": "route is not runnable",
+      "unableToQueue": "Unable to queue"
+    },
+    "iterations": {
+      "label": "Iterations",
+      "tooltip_one": "{{count}} iteration per invoke",
+      "tooltip_other": "{{count}} iterations per invoke"
+    },
+    "presets": {
+      "builtIn": "Built-in",
+      "custom": "Custom",
+      "customLayouts": "Custom layouts",
+      "delete": "Delete preset",
+      "deleteBody": "Delete “{{name}}”? This only removes the saved preset.",
+      "deleteNamed": "Delete {{name}}",
+      "deleteQuestion": "Delete layout preset?",
+      "deleteWithEllipsis": "Delete preset…",
+      "edit": "Edit layout preset",
+      "editNamed": "Edit {{name}}",
+      "editWithEllipsis": "Edit preset…",
+      "icon": "Icon",
+      "iconPicker": "Layout preset icon",
+      "layoutPreset": "Layout preset",
+      "manage": "Manage presets",
+      "more": "More layout presets",
+      "moreAvailable": "More layout presets, {{count}} available",
+      "name": "Preset name",
+      "none": "No custom presets yet. Arrange the dock, then choose Save as new preset.",
+      "restore": "Restore the shipped arrangement",
+      "restoreNamed": "Restore {{name}} default",
+      "revert": "Revert to saved layout",
+      "save": "Save preset",
+      "saveAs": "Save as new preset",
+      "saveAsTooltip": "Save this layout as a new preset",
+      "saveChanges": "Save changes",
+      "switch": "Switch to this layout",
+      "unsaved": "Unsaved changes"
+    },
+    "projectSwitcher": {
+      "trigger": "Switch project. Current project: {{name}}"
+    },
+    "queue": {
+      "actions": "Queue actions",
+      "backendBatch": "Backend batch {{id}}",
+      "backendItem": "backend item {{id}}",
+      "batchImage": "Batch image {{current}}/{{total}}",
+      "currentImageProgress": "Current image progress",
+      "idle": "Queue idle",
+      "imageProgress": "Image {{current}} of {{total}}",
+      "imageProgressPercent": "Image {{current}} of {{total}}, {{percent}} percent",
+      "loadingImage": "Loading image {{current}}/{{total}}",
+      "loadingModels": "Loading models",
+      "loadingModelsCount_one": "Loading {{count}} model",
+      "loadingModelsCount_other": "Loading {{count}} models",
+      "more": "{{count}} more…",
+      "noActiveBatches": "No active or pending generation batches.",
+      "queuedImages_one": "{{count}} image queued.",
+      "queuedImages_other": "{{count}} images queued.",
+      "queueItem": "Queue item {{id}}",
+      "remaining_one": "{{count}} image remaining. Open queue",
+      "remaining_other": "{{count}} images remaining. Open queue",
+      "route": "{{source}} to {{destination}} · {{graph}}",
+      "waitingForProgress": "Backend accepted batch; waiting for progress event.",
+      "waitingToStart": "Waiting to start"
+    },
+    "routing": {
+      "change": "Change routing",
+      "destination": "Destination",
+      "lockDestination": "Lock output destination",
+      "lockRouting": "Lock routing",
+      "lockSource": "Lock source",
+      "source": "Source",
+      "unlockDestination": "Unlock output destination",
+      "unlockRouting": "Unlock routing",
+      "unlockSource": "Unlock source"
+    }
+  },
   "projects": {
     "allSavedAlreadyOpen": "All saved projects are already open.",
     "closeProjectLabel": "Close {{name}}",

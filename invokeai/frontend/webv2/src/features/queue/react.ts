@@ -10,3 +10,4 @@ export {
 } from './data/progressImageStore';
 export { type QueueItemProgressSink, useQueueItemProgress } from './data/progressStore';
 export { getQueueItemAccess } from './ui/queueOwnership';
+export { useIsProcessorPaused } from './ui/queueDataStore';

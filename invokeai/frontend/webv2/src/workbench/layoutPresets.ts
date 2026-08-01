@@ -90,31 +90,63 @@ const createSnapshot = ({
   widgetRegions,
 });
 
-const createPreset = ({
+export interface BuiltInLayoutPresetDescriptor {
+  defaultKeys: readonly string[];
+  hotkeyId: string;
+  iconId: string;
+  preset: LayoutPreset;
+  tooltip: string;
+}
+
+const createPresetDescriptor = ({
   centerViewId,
+  defaultKeys,
+  hotkeyId,
   id,
+  iconId,
   label,
   panels,
+  tooltip,
   widgetRegions,
 }: {
   centerViewId: CenterViewId;
+  defaultKeys: readonly string[];
+  hotkeyId: string;
   id: BuiltInLayoutPresetId;
+  iconId: string;
   label: string;
   panels: PanelState;
+  tooltip: string;
   widgetRegions: Record<WidgetRegion, WidgetRegionState>;
-}): LayoutPreset => ({
-  id,
-  isBuiltIn: true,
-  label,
-  snapshot: createSnapshot({ centerViewId, panels, presetId: id, widgetRegions }),
+}): BuiltInLayoutPresetDescriptor => ({
+  defaultKeys,
+  hotkeyId,
+  iconId,
+  preset: {
+    id,
+    isBuiltIn: true,
+    label,
+    snapshot: createSnapshot({ centerViewId, panels, presetId: id, widgetRegions }),
+  },
+  tooltip,
 });
 
-export const layoutPresets: LayoutPreset[] = [
-  createPreset({
+/**
+ * The three shipped presets. Each is an arrangement, named for the work it
+ * supports rather than the widget it happens to open — several graph widgets
+ * are placed in every one of them, which is exactly why a preset can never
+ * imply an invocation source.
+ */
+export const builtInLayoutPresetDescriptors: BuiltInLayoutPresetDescriptor[] = [
+  createPresetDescriptor({
     centerViewId: 'preview',
-    id: 'canvas-default',
-    label: 'Default',
+    defaultKeys: ['alt+1'],
+    hotkeyId: 'selectComposePreset',
+    id: 'compose',
+    iconId: 'type',
+    label: 'Compose',
     panels: { isBottomOpen: false, isLeftOpen: true, isRightOpen: true },
+    tooltip: 'Text to image',
     widgetRegions: {
       bottom: createRegion({
         activeInstanceId: 'gallery:bottom',
@@ -139,40 +171,15 @@ export const layoutPresets: LayoutPreset[] = [
       }),
     },
   }),
-  createPreset({
-    centerViewId: 'workflow',
-    id: 'workflow',
-    label: 'Workflow',
-    panels: { isBottomOpen: false, isLeftOpen: true, isRightOpen: true },
-    widgetRegions: {
-      bottom: createRegion({
-        activeInstanceId: 'workflow:bottom',
-        instanceIds: defaultBottomInstanceIds,
-        isCollapsed: true,
-        sizePx: 180,
-      }),
-      center: createRegion({
-        activeInstanceId: 'workflow:center',
-        instanceIds: ['workflow:center', 'canvas', 'preview', 'gallery:center'],
-        sizePx: 0,
-      }),
-      left: createRegion({
-        activeInstanceId: 'workflow',
-        instanceIds: ['workflow', 'generate', 'upscale'],
-        sizePx: 450,
-      }),
-      right: createRegion({
-        activeInstanceId: 'queue',
-        instanceIds: ['queue', 'gallery', 'layers', 'preview', 'diagnostics', 'project'],
-        sizePx: 450,
-      }),
-    },
-  }),
-  createPreset({
+  createPresetDescriptor({
     centerViewId: 'canvas',
-    id: 'canvas',
-    label: 'Canvas',
+    defaultKeys: ['alt+2'],
+    hotkeyId: 'selectEditPreset',
+    id: 'edit',
+    iconId: 'layers',
+    label: 'Edit',
     panels: { isBottomOpen: false, isLeftOpen: true, isRightOpen: true },
+    tooltip: 'Canvas editing',
     widgetRegions: {
       bottom: createRegion({
         activeInstanceId: 'gallery:bottom',
@@ -197,39 +204,66 @@ export const layoutPresets: LayoutPreset[] = [
       }),
     },
   }),
-  createPreset({
-    centerViewId: 'gallery',
-    id: 'gallery',
-    label: 'Gallery',
+  createPresetDescriptor({
+    centerViewId: 'workflow',
+    defaultKeys: ['alt+3'],
+    hotkeyId: 'selectAutomatePreset',
+    id: 'automate',
+    iconId: 'workflow',
+    label: 'Automate',
     panels: { isBottomOpen: false, isLeftOpen: true, isRightOpen: true },
+    tooltip: 'Node workflows',
     widgetRegions: {
       bottom: createRegion({
-        activeInstanceId: 'gallery:bottom',
+        activeInstanceId: 'workflow:bottom',
         instanceIds: defaultBottomInstanceIds,
         isCollapsed: true,
         sizePx: 180,
       }),
       center: createRegion({
-        activeInstanceId: 'gallery:center',
-        instanceIds: ['gallery:center', 'preview', 'canvas', 'workflow:center'],
+        activeInstanceId: 'workflow:center',
+        instanceIds: ['workflow:center', 'canvas', 'preview', 'gallery:center'],
         sizePx: 0,
       }),
       left: createRegion({
-        activeInstanceId: 'generate',
-        instanceIds: ['generate', 'workflow', 'upscale', 'gallery'],
-        isCollapsed: true,
+        activeInstanceId: 'workflow',
+        instanceIds: ['workflow', 'generate', 'upscale'],
         sizePx: 450,
       }),
       right: createRegion({
-        activeInstanceId: 'preview',
-        instanceIds: ['preview', 'gallery', 'queue', 'layers', 'diagnostics', 'project'],
+        activeInstanceId: 'queue',
+        instanceIds: ['queue', 'gallery', 'layers', 'preview', 'diagnostics', 'project'],
         sizePx: 450,
       }),
     },
   }),
 ];
 
+export const layoutPresets: LayoutPreset[] = builtInLayoutPresetDescriptors.map(({ preset }) => preset);
+
 export const defaultLayoutPreset = layoutPresets[0];
 
+/**
+ * Preset ids persisted before the three-preset model. `gallery` had no successor
+ * arrangement of its own — it was Compose with the center view swapped — so it
+ * resolves there rather than becoming a fourth entry.
+ */
+const legacyLayoutPresetIds: Record<string, BuiltInLayoutPresetId> = {
+  canvas: 'edit',
+  'canvas-default': 'compose',
+  gallery: 'compose',
+  workflow: 'automate',
+};
+
+/**
+ * Rewrites a persisted preset id onto the current set. Custom preset ids pass
+ * through untouched — they are resolved against the account's own list, and only
+ * the built-in ids were ever renamed.
+ */
+export const resolveLayoutPresetId = (presetId: string): string => legacyLayoutPresetIds[presetId] ?? presetId;
+
 export const getLayoutPreset = (presetId: string) =>
-  layoutPresets.find((preset) => preset.id === presetId) ?? defaultLayoutPreset;
+  layoutPresets.find((preset) => preset.id === resolveLayoutPresetId(presetId)) ?? defaultLayoutPreset;
+
+export const isBuiltInLayoutPresetId = (presetId: string): presetId is BuiltInLayoutPresetId =>
+  layoutPresets.some((preset) => preset.id === presetId);

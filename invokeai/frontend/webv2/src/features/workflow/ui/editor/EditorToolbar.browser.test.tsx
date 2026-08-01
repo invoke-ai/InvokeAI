@@ -41,6 +41,24 @@ const render = async (nodeOpacity: number) => {
   });
 };
 
+/**
+ * The painted pixels, not the serialized colour string.
+ *
+ * One of these buttons resolves its fill straight from a token and the other
+ * through a `color-mix()`, so Chrome reports the same grey as `oklch(l 0 0)` for
+ * one and `oklab(l 0 0)` for the other. Rasterising both settles the question
+ * the assertion is actually asking: do they fill the same?
+ */
+const paintedFill = (element: Element): string => {
+  const canvas = document.createElement('canvas');
+  const context = canvas.getContext('2d', { willReadFrequently: true })!;
+
+  context.fillStyle = getComputedStyle(element).backgroundColor;
+  context.fillRect(0, 0, 1, 1);
+
+  return [...context.getImageData(0, 0, 1, 1).data].join(',');
+};
+
 const buttonBoxes = (): string[] =>
   [...host!.querySelectorAll('[role="toolbar"] button')].map((button) => {
     const rect = button.getBoundingClientRect();
@@ -77,7 +95,7 @@ describe('editor toolbar', () => {
     )!;
 
     expect(opacity.getAttribute('aria-pressed')).toBe('true');
-    expect(getComputedStyle(opacity).backgroundColor).toBe(getComputedStyle(activeTool).backgroundColor);
+    expect(paintedFill(opacity)).toBe(paintedFill(activeTool));
     expect(new Set(buttonBoxes())).toEqual(new Set(['32x32']));
   });
 });

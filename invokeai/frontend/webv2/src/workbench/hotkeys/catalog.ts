@@ -1,3 +1,5 @@
+import { builtInLayoutPresetDescriptors } from '@workbench/layoutPresets';
+
 import type { HotkeyCategory, HotkeyDefinition } from './types';
 
 const categoryScopes = {
@@ -15,12 +17,18 @@ const implemented = new Set([
   'app.focusPrompt',
   'app.invoke',
   'app.invokeFront',
+  'app.invokeToOtherDestination',
+  'app.openProjectSwitcher',
   'app.promptHistoryNext',
   'app.promptHistoryPrev',
   'app.promptWeightDown',
   'app.promptWeightUp',
   'app.resetPanelLayout',
+  'app.saveLayoutPreset',
+  'app.selectAutomatePreset',
   'app.selectCanvasTab',
+  'app.selectComposePreset',
+  'app.selectEditPreset',
   'app.selectGenerateTab',
   'app.selectModelsTab',
   'app.selectQueueTab',
@@ -68,10 +76,19 @@ const implemented = new Set([
   'workflows.undo',
 ]);
 
+/**
+ * Hotkeys that must fire with the caret inside a text field or numeric input.
+ *
+ * There is no second Invoke button anywhere in the application, so `app.invoke`
+ * and its variants are load-bearing: a prompt textarea that swallows ⌘↵ leaves
+ * the user with no way to submit at all.
+ */
 const editableAppHotkeys = new Set([
   'app.focusPrompt',
   'app.invoke',
   'app.invokeFront',
+  'app.invokeToOtherDestination',
+  'app.openProjectSwitcher',
   'app.promptHistoryNext',
   'app.promptHistoryPrev',
   'app.promptWeightDown',
@@ -121,7 +138,14 @@ export const OPEN_COMMAND_PALETTE_HOTKEY: HotkeyDefinition = {
 export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   OPEN_COMMAND_PALETTE_HOTKEY,
   hotkey('app', 'invoke', ['mod+enter']),
+  // "Just this once, send it to the gallery" is the single most common reason
+  // to open the routing menu; this makes it a keystroke instead of a round trip
+  // through a popover, and it does not change the saved destination.
+  hotkey('app', 'invokeToOtherDestination', ['alt+mod+enter']),
   hotkey('app', 'invokeFront', ['mod+shift+enter']),
+  hotkey('app', 'openProjectSwitcher', ['mod+p']),
+  hotkey('app', 'saveLayoutPreset', []),
+  ...builtInLayoutPresetDescriptors.map(({ defaultKeys, hotkeyId }) => hotkey('app', hotkeyId, [...defaultKeys])),
   hotkey('app', 'cancelQueueItem', ['shift+x']),
   hotkey('app', 'clearQueue', ['mod+shift+x']),
   hotkey('app', 'selectGenerateTab', ['1']),

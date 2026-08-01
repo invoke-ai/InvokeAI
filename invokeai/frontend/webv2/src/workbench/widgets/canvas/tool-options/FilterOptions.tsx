@@ -1,8 +1,9 @@
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
 
-import { Flex, Group, HStack, IconButton, Menu, Portal, Text, VisuallyHidden } from '@chakra-ui/react';
+import { Flex, HStack, IconButton, Menu, Portal, Text, VisuallyHidden } from '@chakra-ui/react';
 import { galleryDurability } from '@features/gallery';
 import { Button, MenuContent, Tooltip } from '@platform/ui';
+import { Group } from '@platform/ui/Group';
 import {
   buildFilterDefaults,
   getCanvasOperations,

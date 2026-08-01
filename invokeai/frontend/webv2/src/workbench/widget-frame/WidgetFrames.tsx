@@ -29,6 +29,7 @@ import { useTranslation } from 'react-i18next';
 
 import { WidgetActionsMenu } from './WidgetActionsMenu';
 import { WidgetIdentityIcon } from './WidgetIdentityIcon';
+import { WidgetSourceLockBadge } from './WidgetSourceLockBadge';
 
 const PANEL_SIZE_STEP_PX = 16;
 const MIN_PANEL_SIZE_PX = 180;
@@ -283,6 +284,7 @@ export const WidgetHeader = ({
             {label}
           </Text>
         )}
+        <WidgetSourceLockBadge typeId={manifest.id} />
       </HStack>
       <WidgetHeaderActionsGroup
         HeaderMenu={HeaderMenu}

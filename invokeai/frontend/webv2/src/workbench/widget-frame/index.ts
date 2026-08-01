@@ -6,6 +6,7 @@ export { FieldPlaceholder, WidgetHeader, WidgetHeaderActionsGroup, WidgetPanelFr
 export { StatusWidgetChip } from '@platform/ui';
 export { WidgetInstanceContextMenu, type WidgetInstanceContextMenuTarget } from './WidgetInstanceContextMenu';
 export { WidgetRegionDropOverlay } from './WidgetRegionDropOverlay';
+export { WidgetSourceLockBadge } from './WidgetSourceLockBadge';
 export { WidgetStrip } from './WidgetStrip';
 export { MissingWidgetFrame, WidgetChromeSlotById, WidgetRenderer, WidgetRendererById } from './WidgetRenderer';
 export { useWidgetIntentPreloadProps } from './useWidgetIntentPreload';

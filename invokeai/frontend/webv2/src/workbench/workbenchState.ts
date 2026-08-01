@@ -15,6 +15,7 @@ import type {
   CenterViewId,
   LayoutPreset,
   LayoutPresetId,
+  LayoutPresetOverrides,
   LayoutPresetSnapshot,
   ProjectLayoutState,
   WidgetRegion,
@@ -126,8 +127,12 @@ import {
   isInvocationSourceAvailable,
   resolveInvocationRoute,
 } from './invocation';
-import { defaultLayoutPreset, getLayoutPreset } from './layoutPresets';
-import { cloneLayoutPresetWidgetRegions, createLayoutPresetSnapshot } from './layoutPresetSnapshots';
+import { defaultLayoutPreset, isBuiltInLayoutPresetId, resolveLayoutPresetId } from './layoutPresets';
+import {
+  cloneLayoutPresetWidgetRegions,
+  createLayoutPresetSnapshot,
+  resolveSavedLayoutPreset,
+} from './layoutPresetSnapshots';
 import { normalizeWorkbenchQueueHistory } from './queueHistoryNormalization';
 import { normalizeProjectSettings } from './settings/store';
 
@@ -145,13 +150,17 @@ type WorkbenchReducerAction =
   | { type: 'switchProject'; projectId: string }
   | { type: 'setCenterView'; centerViewId: CenterViewId }
   | { type: 'applyPreset'; presetId: LayoutPresetId }
-  | { type: 'addLayoutPreset'; presetId: LayoutPresetId; label: string }
+  | { type: 'addLayoutPreset'; presetId: LayoutPresetId; label: string; iconId?: string }
+  | { type: 'setLayoutPresetIcon'; presetId: LayoutPresetId; iconId: string }
+  | { type: 'saveLayoutPreset'; presetId: LayoutPresetId }
+  | { type: 'restoreLayoutPresetDefault'; presetId: LayoutPresetId }
   | { type: 'renameLayoutPreset'; presetId: LayoutPresetId; label: string }
   | { type: 'deleteLayoutPreset'; presetId: LayoutPresetId }
   | { type: 'resetActiveLayout' }
   | { type: 'recoverShellLayout' }
   | { type: 'setInvocationSource'; sourceId: InvocationSourceId }
   | { type: 'setInvocationDestination'; destination: ResultDestination }
+  | { type: 'toggleRoutingLock' }
   | { type: 'toggleSourceLock' }
   | { type: 'toggleDestinationLock' }
   | {
@@ -1289,6 +1298,10 @@ export const normalizeWorkbenchProject = (project: Project): Project => {
     // canvas can still be v1-shaped, malformed, or missing — migrate before cloning.
     canvas,
     graphHistory: normalizeGraphHistory((project as Partial<Project>).graphHistory),
+    // Built-in preset ids were renamed for the three-preset model; a project
+    // saved under an old id must still resolve to the arrangement it names,
+    // otherwise every restored project reads as drifted from Compose.
+    layout: { ...project.layout, presetId: resolveLayoutPresetId(project.layout.presetId) },
     projectGraph: normalizeProjectGraph(project.projectGraph),
     promptHistory: normalizePromptHistory((project as Partial<Project>).promptHistory),
     queue: normalizeWorkbenchQueueHistory(project.queue, { canvas, widgetInstances }),
@@ -1491,6 +1504,7 @@ const normalizeCustomLayoutPresets = (presets: unknown): LayoutPreset[] => {
 
     return [
       {
+        ...(typeof record.iconId === 'string' ? { iconId: record.iconId } : {}),
         id: record.id,
         label: record.label,
         snapshot: cloneLayoutPresetSnapshot(record.snapshot),
@@ -1499,9 +1513,22 @@ const normalizeCustomLayoutPresets = (presets: unknown): LayoutPreset[] => {
   });
 };
 
+const normalizeLayoutPresetOverrides = (overrides: unknown): LayoutPresetOverrides => {
+  if (!overrides || typeof overrides !== 'object') {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(overrides as Record<string, unknown>).flatMap(([presetId, snapshot]) =>
+      isLayoutPresetSnapshot(snapshot) ? [[resolveLayoutPresetId(presetId), cloneLayoutPresetSnapshot(snapshot)]] : []
+    )
+  );
+};
+
 const normalizeAccount = (account: Partial<WorkbenchState['account']> | undefined): WorkbenchState['account'] => ({
-  activeLayoutPresetId: account?.activeLayoutPresetId ?? defaultLayoutPreset.id,
+  activeLayoutPresetId: resolveLayoutPresetId(account?.activeLayoutPresetId ?? defaultLayoutPreset.id),
   customLayoutPresets: normalizeCustomLayoutPresets(account?.customLayoutPresets),
+  layoutPresetOverrides: normalizeLayoutPresetOverrides(account?.layoutPresetOverrides),
 });
 
 const normalizeWorkbenchState = (state: WorkbenchState): WorkbenchState => ({
@@ -1537,7 +1564,7 @@ const updateActiveLayout = (
   });
 
 const getAvailableLayoutPreset = (state: WorkbenchState, presetId: LayoutPresetId): LayoutPreset =>
-  state.account.customLayoutPresets?.find((preset) => preset.id === presetId) ?? getLayoutPreset(presetId);
+  resolveSavedLayoutPreset(state.account, presetId);
 
 const applyLayoutPresetToProject = (project: Project, preset: LayoutPreset): Project => {
   const snapshot = preset.snapshot;
@@ -2463,6 +2490,7 @@ export const __workbenchReducerInternal = (
       }
 
       const preset: LayoutPreset = {
+        iconId: action.iconId,
         id: action.presetId,
         label: action.label.trim() || 'Custom layout',
         snapshot: createLayoutPresetSnapshot(normalizeWorkbenchProject(activeProject)),
@@ -2475,6 +2503,50 @@ export const __workbenchReducerInternal = (
       return {
         ...state,
         account: { ...state.account, activeLayoutPresetId: preset.id, customLayoutPresets },
+      };
+    }
+    case 'saveLayoutPreset': {
+      const activeProject = state.projects.find((project) => project.id === state.activeProjectId);
+
+      if (!activeProject) {
+        return state;
+      }
+
+      const snapshot = createLayoutPresetSnapshot(normalizeWorkbenchProject(activeProject));
+
+      // Built-in preset bodies are code, so their saved form lives in an
+      // override map; custom presets own their snapshot outright.
+      if (isBuiltInLayoutPresetId(action.presetId)) {
+        const layoutPresetOverrides: LayoutPresetOverrides = {
+          ...state.account.layoutPresetOverrides,
+          [action.presetId]: { ...snapshot, layout: { ...snapshot.layout, presetId: action.presetId } },
+        };
+
+        return { ...state, account: { ...state.account, layoutPresetOverrides } };
+      }
+
+      const customLayoutPresets = (state.account.customLayoutPresets ?? []).map((preset) =>
+        preset.id === action.presetId
+          ? { ...preset, snapshot: { ...snapshot, layout: { ...snapshot.layout, presetId: preset.id } } }
+          : preset
+      );
+
+      return { ...state, account: { ...state.account, customLayoutPresets } };
+    }
+    case 'restoreLayoutPresetDefault': {
+      const { [action.presetId]: removed, ...layoutPresetOverrides } = state.account.layoutPresetOverrides ?? {};
+
+      return removed ? { ...state, account: { ...state.account, layoutPresetOverrides } } : state;
+    }
+    case 'setLayoutPresetIcon': {
+      return {
+        ...state,
+        account: {
+          ...state.account,
+          customLayoutPresets: (state.account.customLayoutPresets ?? []).map((preset) =>
+            preset.id === action.presetId ? { ...preset, iconId: action.iconId } : preset
+          ),
+        },
       };
     }
     case 'renameLayoutPreset': {
@@ -2498,6 +2570,11 @@ export const __workbenchReducerInternal = (
       const customLayoutPresets = (state.account.customLayoutPresets ?? []).filter(
         (preset) => preset.id !== action.presetId
       );
+      const projects = state.projects.map((project) =>
+        project.layout.presetId === action.presetId
+          ? { ...project, layout: { ...project.layout, presetId: defaultLayoutPreset.id } }
+          : project
+      );
 
       return {
         ...state,
@@ -2509,6 +2586,7 @@ export const __workbenchReducerInternal = (
               : state.account.activeLayoutPresetId,
           customLayoutPresets,
         },
+        projects,
       };
     }
     case 'resetActiveLayout': {
@@ -2535,6 +2613,13 @@ export const __workbenchReducerInternal = (
     }
     case 'setInvocationDestination': {
       return updateActiveInvocation(state, (invocation) => ({ ...invocation, destination: action.destination }));
+    }
+    case 'toggleRoutingLock': {
+      return updateActiveInvocation(state, (invocation) => {
+        const isLocked = invocation.sourceLocked || invocation.destinationLocked;
+
+        return { ...invocation, destinationLocked: !isLocked, sourceLocked: !isLocked };
+      });
     }
     case 'toggleSourceLock': {
       return updateActiveInvocation(state, (invocation) => ({ ...invocation, sourceLocked: !invocation.sourceLocked }));

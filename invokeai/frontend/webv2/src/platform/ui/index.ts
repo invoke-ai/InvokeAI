@@ -5,6 +5,7 @@ export * from './Combobox';
 export * from './ConfirmDialog';
 export * from './DropZone';
 export * from './Field';
+export * from './Group';
 export * from './JsonPreview';
 export * from './Menu';
 export * from './Panel';

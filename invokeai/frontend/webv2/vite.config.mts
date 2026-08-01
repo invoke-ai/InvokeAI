@@ -30,6 +30,21 @@ export default defineConfig({
             return 'shared';
           }
 
+          // Shell modules that both route shells reach but no longer reach
+          // *through each other*. The two top bars used to share their whole
+          // control set, so these rode along inside one chunk; now that the
+          // workbench bar owns its own controls, each would otherwise be
+          // emitted as a separate request on both routes for no byte saving.
+          if (
+            id.endsWith('/platform/i18n/client.ts') ||
+            id.endsWith('/platform/react/useMountEffect.ts') ||
+            id.endsWith('/platform/ui/theme/system.ts') ||
+            id.endsWith('/workbench/hotkeys/resolve.ts') ||
+            id.endsWith('/workbench/settings/settingsDialogStore.ts')
+          ) {
+            return 'shell-shared';
+          }
+
           // Mixed-gallery item helpers cross the eager editor shell and its
           // lazy Gallery/Preview chunks. Keep them with the already-eager
           // gallery state projection instead of emitting one extra request.

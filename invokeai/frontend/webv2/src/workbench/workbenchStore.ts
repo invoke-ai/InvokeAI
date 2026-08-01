@@ -236,16 +236,22 @@ const createCommands = (dispatch: WorkbenchDispatch, getState: () => WorkbenchSt
       submitCanvas: command('submitCanvasInvocationSnapshot'),
       submitResolved: command('submitResolvedInvocationSnapshot'),
       toggleDestinationLock: command('toggleDestinationLock'),
+      toggleRoutingLock: command('toggleRoutingLock'),
       toggleSourceLock: command('toggleSourceLock'),
     },
     layout: {
       applyPreset: command('applyPreset', (presetId: ActionPayload<'applyPreset'>['presetId']) => ({ presetId })),
       createPreset: command(
         'addLayoutPreset',
-        (presetId: ActionPayload<'addLayoutPreset'>['presetId'], label: string) => ({
+        (presetId: ActionPayload<'addLayoutPreset'>['presetId'], label: string, iconId?: string) => ({
+          iconId,
           label,
           presetId,
         })
+      ),
+      setPresetIcon: command(
+        'setLayoutPresetIcon',
+        (presetId: ActionPayload<'setLayoutPresetIcon'>['presetId'], iconId: string) => ({ iconId, presetId })
       ),
       deletePreset: command('deleteLayoutPreset', (presetId: ActionPayload<'deleteLayoutPreset'>['presetId']) => ({
         presetId,
@@ -256,6 +262,15 @@ const createCommands = (dispatch: WorkbenchDispatch, getState: () => WorkbenchSt
         (presetId: ActionPayload<'renameLayoutPreset'>['presetId'], label: string) => ({ label, presetId })
       ),
       reset: command('resetActiveLayout'),
+      /** Writes the live arrangement back onto the named preset. */
+      savePreset: command('saveLayoutPreset', (presetId: ActionPayload<'saveLayoutPreset'>['presetId']) => ({
+        presetId,
+      })),
+      /** Drops saved edits to a built-in preset, restoring its shipped arrangement. */
+      restorePresetDefault: command(
+        'restoreLayoutPresetDefault',
+        (presetId: ActionPayload<'restoreLayoutPresetDefault'>['presetId']) => ({ presetId })
+      ),
       setCenterView: command('setCenterView', (centerViewId: ActionPayload<'setCenterView'>['centerViewId']) => ({
         centerViewId,
       })),

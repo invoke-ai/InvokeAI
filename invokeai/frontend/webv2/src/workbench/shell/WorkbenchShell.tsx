@@ -14,7 +14,7 @@ import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { FocusRegionProvider } from '@workbench/focusRegions';
 import { WidgetIcon } from '@workbench/iconResolver';
-import { getProjectTabId, PROJECT_CONTENT_PANEL_ID } from '@workbench/projects/projectTabsA11y';
+import { PROJECT_CONTENT_PANEL_ID } from '@workbench/projects/projectTabsA11y';
 import { WidgetBar } from '@workbench/widget-frame';
 import {
   getRegionDropState,
@@ -51,7 +51,6 @@ export const WorkbenchShell = () => {
   const { notifications, widgets } = useWorkbenchCommands();
   const { t } = useTranslation();
   const panels = useActiveProjectSelector((project) => project.layout.panels);
-  const projectId = useActiveProjectSelector((project) => project.id);
   const projectName = useActiveProjectSelector((project) => project.name);
   const leftRegion = useActiveProjectSelector((project) => project.widgetRegions.left);
   const rightRegion = useActiveProjectSelector((project) => project.widgetRegions.right);
@@ -229,13 +228,16 @@ export const WorkbenchShell = () => {
             <VisuallyHidden as="h1" id="workbench-project-heading">
               {projectName}
             </VisuallyHidden>
+            {/* Not a tab panel any more: the project tab strip became a
+                dropdown, so there is no tab list for this to belong to. It is
+                the project's content region, named by the heading above it. */}
             <Flex
-              aria-labelledby={getProjectTabId(projectId)}
+              aria-labelledby="workbench-project-heading"
               flex="1"
               id={PROJECT_CONTENT_PANEL_ID}
               minH="0"
               overflow="hidden"
-              role="tabpanel"
+              role="region"
             >
               <WidgetBar
                 activeId={panels.isLeftOpen && !leftRegion.isCollapsed ? leftRegion.activeInstanceId : null}

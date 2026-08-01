@@ -15,6 +15,7 @@ import { WidgetIcon } from '@workbench/iconResolver';
 import {
   WidgetChromeSlotById,
   WidgetRendererById,
+  WidgetSourceLockBadge,
   useWidgetIntentPreloadProps,
   type WidgetEnableMenuItem,
 } from '@workbench/widget-frame';
@@ -29,7 +30,7 @@ import {
 import { getWidgetById, getWidgetsForRegion } from '@workbench/widgetRegistry';
 import { useActiveProjectSelector, useWorkbenchCommands, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { CheckIcon, ChevronDownIcon, XIcon } from 'lucide-react';
-import { Suspense, useCallback, useMemo, type ReactNode } from 'react';
+import { Suspense, useCallback, useMemo, useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 type CenterWidgetItem = PlacedWidgetRegionItem<WidgetPlacementInstanceMeta>;
@@ -59,7 +60,6 @@ export const CenterArea = () => {
   const backendConnectionStatus = useWorkbenchSelector((snapshot) => snapshot.backendConnection.status);
   const modelLoads = useModelLoads();
   const { widgets } = useWorkbenchCommands();
-  const focusRegionProps = useFocusRegionProps('center');
   const getWidgetLabel = useCallback(
     (manifest: Parameters<typeof resolveWidgetLabel>[0]) => resolveWidgetLabel(manifest, t),
     [t]
@@ -94,6 +94,7 @@ export const CenterArea = () => {
     ? centerRegion.activeInstanceId
     : centerViewItems[0]?.id;
   const activeItem = centerViewItems.find((item) => item.id === activeCenterViewId);
+  const focusRegionProps = useFocusRegionProps('center');
 
   const openCenterWidget = useCallback(
     (item: WidgetEnableMenuItem) =>
@@ -201,9 +202,12 @@ export const CenterArea = () => {
               onSelect={selectCenterView}
             />
             {activeItem ? (
-              <Suspense fallback={null}>
-                <WidgetChromeSlotById instanceId={activeItem.id} slot="label" widget={activeItem.widget} />
-              </Suspense>
+              <>
+                <WidgetSourceLockBadge typeId={activeItem.typeId} />
+                <Suspense fallback={null}>
+                  <WidgetChromeSlotById instanceId={activeItem.id} slot="label" widget={activeItem.widget} />
+                </Suspense>
+              </>
             ) : null}
           </ChromeIsland>
 
@@ -276,11 +280,22 @@ const CenterViewMenu = ({
 }) => {
   const { t } = useTranslation();
   const label = activeItem?.label ?? t('widgets.centerViewEmpty');
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const selectAndRestoreFocus = useCallback(
+    (instanceId: string) => {
+      onSelect(instanceId);
+      requestAnimationFrame(() => {
+        triggerRef.current?.focus({ preventScroll: true });
+      });
+    },
+    [onSelect]
+  );
 
   return (
     <Menu.Root positioning={CENTER_MENU_POSITIONING}>
       <Menu.Trigger asChild>
         <IconButton
+          ref={triggerRef}
           aria-label={t('widgets.centerViewLabel', { label })}
           color="fg"
           minW="0"
@@ -312,7 +327,7 @@ const CenterViewMenu = ({
                   key={item.id}
                   isActive={item.id === activeItem?.id}
                   item={item}
-                  onSelect={onSelect}
+                  onSelect={selectAndRestoreFocus}
                 />
               ))}
             </Menu.ItemGroup>
