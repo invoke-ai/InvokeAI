@@ -331,7 +331,7 @@ export class CanvasTextToolModule extends CanvasModuleBase {
       return;
     }
     if (this.parent.$tool.get() !== 'text') {
-      this.parent.$tool.set('text');
+      this.parent.setBaseTool('text');
     }
   };
 
