@@ -740,7 +740,7 @@ async def get_bulk_download_item(
         raise HTTPException(status_code=404)
 
 
-@images_router.get("/names", operation_id="get_image_names")
+@images_router.get("/names", operation_id="get_image_names", deprecated=True)
 def get_image_names(
     current_user: CurrentUserOrDefault,
     image_origin: Optional[ResourceOrigin] = Query(default=None, description="The origin of images to list."),
@@ -754,7 +754,11 @@ def get_image_names(
     starred_first: bool = Query(default=True, description="Whether to sort by starred images first"),
     search_term: Optional[str] = Query(default=None, description="The term to search for"),
 ) -> ImageNamesResult:
-    """Gets ordered list of image names with metadata for optimistic updates"""
+    """Gets ordered list of image names with metadata for optimistic updates.
+
+    Deprecated: use `GET /v1/gallery/item_names`, which returns images and videos interleaved
+    in one ordered list. This image-only endpoint predates the polymorphic gallery.
+    """
 
     # Validate that the caller can read from this board before listing its images.
     if board_id is not None and board_id != "none":

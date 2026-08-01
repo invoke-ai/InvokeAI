@@ -745,7 +745,7 @@ def list_video_dtos(
     )
 
 
-@videos_router.get("/names", operation_id="get_video_names")
+@videos_router.get("/names", operation_id="get_video_names", deprecated=True)
 def get_video_names(
     current_user: CurrentUserOrDefault,
     video_origin: Optional[ResourceOrigin] = Query(default=None, description="The origin of videos to list."),
@@ -759,7 +759,11 @@ def get_video_names(
     starred_first: bool = Query(default=True, description="Whether to sort by starred videos first"),
     search_term: Optional[str] = Query(default=None, description="The term to search for"),
 ) -> VideoNamesResult:
-    """Gets ordered list of video names with metadata for optimistic updates."""
+    """Gets ordered list of video names with metadata for optimistic updates.
+
+    Deprecated: use `GET /v1/gallery/item_names`, which returns images and videos interleaved
+    in one ordered list. This video-only endpoint predates the polymorphic gallery.
+    """
     # Validate that the caller can read from this board. "none" is handled by the SQL layer.
     if board_id is not None and board_id != "none":
         _assert_board_read_access(board_id, current_user)

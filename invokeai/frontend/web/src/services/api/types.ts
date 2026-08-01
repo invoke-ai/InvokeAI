@@ -726,6 +726,6 @@ export type OffsetPaginatedResults_GalleryItem_ = S['OffsetPaginatedResults_Gall
 export type ListGalleryItemsArgs = NonNullable<paths['/api/v1/gallery/items/']['get']['parameters']['query']>;
 export type ListGalleryItemsResponse =
   paths['/api/v1/gallery/items/']['get']['responses']['200']['content']['application/json'];
-export type GetGalleryItemNamesArgs = NonNullable<paths['/api/v1/gallery/items/names']['get']['parameters']['query']>;
-export type GetGalleryItemNamesResult =
-  paths['/api/v1/gallery/items/names']['get']['responses']['200']['content']['application/json'];
+export type ListGalleryItemNamesArgs = NonNullable<paths['/api/v1/gallery/item_names']['get']['parameters']['query']>;
+export type ListGalleryItemNamesResult =
+  paths['/api/v1/gallery/item_names']['get']['responses']['200']['content']['application/json'];

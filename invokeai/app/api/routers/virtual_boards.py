@@ -33,6 +33,7 @@ async def list_virtual_boards_by_date(
     "/by_date/{date}/image_names",
     operation_id="list_virtual_board_image_names_by_date",
     response_model=ImageNamesResult,
+    deprecated=True,
 )
 def list_virtual_board_image_names_by_date(
     current_user: CurrentUserOrDefault,
@@ -42,8 +43,11 @@ def list_virtual_board_image_names_by_date(
     categories: list[ImageCategory] | None = Query(default=None, description="The categories of images to include"),
     search_term: str | None = Query(default=None, description="Search term to filter images"),
 ) -> ImageNamesResult:
-    """Gets ordered image names for a specific date. Image-only; kept for API compatibility —
-    the UI uses the polymorphic `/by_date/{date}/item_names` endpoint."""
+    """Gets ordered image names for a specific date. Image-only.
+
+    Deprecated: use `GET /v1/gallery/item_names?created_date=<date>`, which covers images and
+    videos in one ordered list.
+    """
     try:
         return ApiDependencies.invoker.services.image_records.get_image_names_by_date(
             date=date,
@@ -62,6 +66,7 @@ def list_virtual_board_image_names_by_date(
     "/by_date/{date}/item_names",
     operation_id="list_virtual_board_item_names_by_date",
     response_model=GalleryItemNamesResult,
+    deprecated=True,
 )
 def list_virtual_board_item_names_by_date(
     current_user: CurrentUserOrDefault,
@@ -71,7 +76,11 @@ def list_virtual_board_item_names_by_date(
     categories: list[ImageCategory] | None = Query(default=None, description="The categories of items to include"),
     search_term: str | None = Query(default=None, description="Search term to filter items"),
 ) -> GalleryItemNamesResult:
-    """Gets ordered polymorphic (image + video) item refs for a specific date."""
+    """Gets ordered polymorphic (image + video) item refs for a specific date.
+
+    Deprecated: use `GET /v1/gallery/item_names?created_date=<date>`, which returns the same
+    order as a flat name list instead of one model per item.
+    """
     try:
         return ApiDependencies.invoker.services.gallery.list_item_names(
             starred_first=starred_first,
