@@ -2694,7 +2694,7 @@
             "heading": "FP8 Storage",
             "paragraphs": [
                 "Stores model weights in FP8 format in VRAM, reducing memory usage by approximately 50% compared to FP16.",
-                "During inference, weights are cast layer-by-layer to the compute precision (FP16/BF16), so image quality is preserved. Works on all CUDA GPUs."
+                "During inference, weights are cast layer-by-layer to the compute precision (FP16/BF16), so image quality is preserved. Works on all CUDA GPUs, and on Intel GPUs that support FP8 storage."
             ]
         }
     },
