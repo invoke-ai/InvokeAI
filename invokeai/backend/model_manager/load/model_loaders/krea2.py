@@ -426,6 +426,15 @@ class Krea2CheckpointModel(ModelLoader):
         if fp8_layers:
             attached = attach_fp8_scales(model, fp8_layers)
             self._logger.info(f"Krea-2: kept {attached} layer(s) in fp8 (scaled fp8 checkpoint, fp8_compute enabled)")
+            # fp8_storage exists to *create* fp8 weights from full-precision ones; here they already
+            # are fp8, so it is bypassed entirely. Say so, otherwise a user who enabled it is left
+            # wondering whether it took effect.
+            default_settings = getattr(config, "default_settings", None)
+            if default_settings is not None and getattr(default_settings, "fp8_storage", None):
+                self._logger.info(
+                    "Krea-2: the model's fp8_storage setting is redundant here and was skipped - the "
+                    "checkpoint already ships fp8 weights."
+                )
             # The layerwise-casting path exists to *produce* fp8 weights from full-precision ones. The
             # checkpoint already is fp8, and its hooks would cast back to the compute dtype without
             # applying weight_scale, so it must not run here.
