@@ -2,7 +2,7 @@ import { Flex, HStack, Icon, Splitter } from '@chakra-ui/react';
 import { ensureInvocationTemplatesLoaded } from '@features/workflow/react';
 import { useWorkflowHostCommands, useWorkflowProjectSelector } from '@features/workflow/ui/WorkflowUiContext';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import { Button, Scrollable, Tabs } from '@platform/ui';
+import { Scrollable, Tabs } from '@platform/ui';
 import { EyeIcon, PencilIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -64,66 +64,33 @@ export const getWorkflowPanelState = (values: Record<string, unknown>): Workflow
 export const areWorkflowPanelStatesEqual = (left: WorkflowPanelState, right: WorkflowPanelState): boolean =>
   left.mode === right.mode && left.editTab === right.editTab && left.inspectorSizePct === right.inspectorSizePct;
 
-export const PanelModeToggle = ({
-  mode: currentMode,
-  onChange,
-}: {
-  mode: PanelMode;
-  onChange: (mode: PanelMode) => void;
-}) => {
+/**
+ * View / Edit selection. These swap the whole panel body, so they are tabs
+ * rather than a pressed-button pair: the tablist carries roving focus and
+ * arrow-key selection for free, which the hand-rolled `aria-pressed` group it
+ * replaced could not. Like the edit-tab strip below, it renders the list only —
+ * the panels are siblings, since edit mode drives its own splitter layout.
+ */
+export const PanelModeToggle = ({ mode, onChange }: { mode: PanelMode; onChange: (mode: PanelMode) => void }) => {
   const { t } = useTranslation();
-
-  return (
-    <HStack
-      aria-label="Workflow panel mode"
-      borderColor="border"
-      borderRadius="md"
-      borderWidth="1px"
-      gap="0"
-      overflow="hidden"
-      role="group"
-    >
-      {PANEL_MODES.map(({ labelKey, icon, mode: itemMode }) => (
-        <PanelModeButton
-          key={itemMode}
-          currentMode={currentMode}
-          icon={icon}
-          label={t(labelKey)}
-          mode={itemMode}
-          onChange={onChange}
-        />
-      ))}
-    </HStack>
+  const onValueChange = useCallback(
+    (event: { value: string }) => onChange(event.value === 'edit' ? 'edit' : 'view'),
+    [onChange]
   );
-};
-
-const PanelModeButton = ({
-  currentMode,
-  icon,
-  label,
-  mode,
-  onChange,
-}: {
-  currentMode: PanelMode;
-  icon: typeof EyeIcon;
-  label: string;
-  mode: PanelMode;
-  onChange: (mode: PanelMode) => void;
-}) => {
-  const onClick = useCallback(() => onChange(mode), [mode, onChange]);
 
   return (
-    <Button
-      aria-pressed={mode === currentMode}
-      borderRadius="0"
-      colorPalette={mode === currentMode ? 'accent' : 'bg'}
-      size="xs"
-      variant={mode === currentMode ? 'solid' : 'ghost'}
-      onClick={onClick}
-    >
-      <Icon as={icon} boxSize="3" />
-      {label}
-    </Button>
+    // `mb="-1"` tucks the active-tab indicator onto the header's own bottom
+    // rule, the same trick the edit tabs use.
+    <Tabs.Root mb="-1" size="sm" value={mode} variant="line" onValueChange={onValueChange}>
+      <Tabs.List aria-label={t('widgets.workflow.panelMode')}>
+        {PANEL_MODES.map(({ labelKey, icon, mode: itemMode }) => (
+          <Tabs.Trigger key={itemMode} value={itemMode}>
+            <Icon as={icon} boxSize="3" />
+            {t(labelKey)}
+          </Tabs.Trigger>
+        ))}
+      </Tabs.List>
+    </Tabs.Root>
   );
 };
 

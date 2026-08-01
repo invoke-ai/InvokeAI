@@ -1748,6 +1748,7 @@
       "openLibrary": "Open workflow library. Current workflow: {{name}}",
       "pack": "Pack",
       "panelContent": "Workflow panel content",
+      "panelMode": "Workflow panel mode",
       "resizeNodeInspector": "Resize node inspector",
       "runOutputsNotRecorded": "Run outputs are not recorded per node yet; results currently route to the Gallery or Canvas. This tab will show the node's outputs from its most recent run once run records land.",
       "newWorkflowWithEllipsis": "New workflow…",
