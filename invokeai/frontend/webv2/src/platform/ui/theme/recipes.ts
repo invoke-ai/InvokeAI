@@ -54,6 +54,10 @@ export const tooltipSlotRecipe = defineSlotRecipe({
  * Tabs: quick neutral hover feedback, with accent reserved for selection.
  * Restricting hover styles to unselected triggers keeps active tabs visually
  * stable without relying on condition ordering in the generated CSS.
+ *
+ * Trigger text follows the same rule as {@link buttonRecipe}: the label stops
+ * scaling below `lg`, so `sm` and `md` both sit at 12px with the rest of the
+ * workbench chrome. Only the row height still scales with the size.
  */
 export const tabsSlotRecipe = defineSlotRecipe({
   ...chakraSlotRecipes.tabs,
@@ -67,6 +71,17 @@ export const tabsSlotRecipe = defineSlotRecipe({
   },
   variants: {
     ...chakraSlotRecipes.tabs.variants,
+    size: {
+      ...chakraSlotRecipes.tabs.variants?.size,
+      sm: {
+        ...chakraSlotRecipes.tabs.variants?.size?.sm,
+        trigger: { ...chakraSlotRecipes.tabs.variants?.size?.sm?.trigger, textStyle: 'xs' },
+      },
+      md: {
+        ...chakraSlotRecipes.tabs.variants?.size?.md,
+        trigger: { ...chakraSlotRecipes.tabs.variants?.size?.md?.trigger, textStyle: 'xs' },
+      },
+    },
     variant: {
       ...chakraSlotRecipes.tabs.variants?.variant,
       line: {
@@ -118,7 +133,7 @@ export const tabsSlotRecipe = defineSlotRecipe({
         },
       },
     },
-  } as typeof chakraSlotRecipes.tabs.variants,
+  } as unknown as typeof chakraSlotRecipes.tabs.variants,
 });
 
 /**

@@ -38,17 +38,17 @@ export const DetailPane = () => {
       >
         <Flex align="flex-end" borderBottomWidth={1} flexShrink={0} minH={HEADER_MIN_HEIGHT} px="2">
           <Tabs.List mb="-1px">
-            <Tabs.Trigger fontSize="xs" value="details">
+            <Tabs.Trigger value="details">
               <Icon as={BoxIcon} boxSize="3" />
               <Text maxW="14rem" truncate>
                 {detailLabel}
               </Text>
             </Tabs.Trigger>
-            <Tabs.Trigger fontSize="xs" value="add">
+            <Tabs.Trigger value="add">
               <Icon as={PlusIcon} boxSize="3" />
               {t('models.addModels')}
             </Tabs.Trigger>
-            <Tabs.Trigger fontSize="xs" value="keys">
+            <Tabs.Trigger value="keys">
               <Icon as={KeyRoundIcon} boxSize="3" />
               {t('models.apiKeys')}
             </Tabs.Trigger>

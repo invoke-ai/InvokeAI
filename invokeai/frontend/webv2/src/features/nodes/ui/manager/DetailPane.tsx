@@ -32,13 +32,13 @@ export const DetailPane = () => {
       <Flex direction="column" flex="1" minH="0" minW="0">
         <Flex align="flex-end" borderBottomWidth={1} flexShrink={0} minH={HEADER_MIN_HEIGHT} px="2">
           <Tabs.List mb="-1px">
-            <Tabs.Trigger fontSize="xs" value="details">
+            <Tabs.Trigger value="details">
               <Icon as={BlocksIcon} boxSize="3" />
               <Text maxW="14rem" truncate>
                 {detailLabel}
               </Text>
             </Tabs.Trigger>
-            <Tabs.Trigger fontSize="xs" value="add">
+            <Tabs.Trigger value="add">
               <Icon as={PlusIcon} boxSize="3" />
               {t('nodes.addNodes')}
             </Tabs.Trigger>

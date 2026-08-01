@@ -32,11 +32,11 @@ export const AddNodesView = () => {
     <Tabs.Root asChild lazyMount size="sm" unmountOnExit value={addTab} onValueChange={handleValueChange}>
       <Stack gap="3" h="full" minH="0">
         <Tabs.List>
-          <Tabs.Trigger fontSize="xs" value="git">
+          <Tabs.Trigger value="git">
             <Icon as={GitBranchIcon} boxSize="3" />
             {t('nodes.gitUrl')}
           </Tabs.Trigger>
-          <Tabs.Trigger fontSize="xs" value="scan">
+          <Tabs.Trigger value="scan">
             <Icon as={FolderOpenIcon} boxSize="3" />
             {t('nodes.scanFolder')}
           </Tabs.Trigger>
