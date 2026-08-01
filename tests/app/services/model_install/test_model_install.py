@@ -2387,6 +2387,138 @@ def test_late_import_after_restore_timeout_removes_duplicate_marker(
     assert restarted._install_jobs == []
 
 
+def test_timed_out_marker_cleanup_keeps_source_reserved(
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_record_store,
+    mm2_download_queue,
+    mm2_session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    installer = ModelInstallService(
+        app_config=mm2_app_config,
+        record_store=mm2_record_store,
+        download_queue=mm2_download_queue,
+        event_bus=TestEventService(),
+        session=mm2_session,
+    )
+    source = URLModelSource(url=Url("https://www.test.foo/download/cleanup-reservation.safetensors"))
+    owned_dir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}0_owned"
+    sibling_dir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}1_sibling"
+    replacement_dir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}2_replacement"
+    _write_test_install_marker(owned_dir, str(source))
+    _write_test_install_marker(sibling_dir, str(source))
+    installer._timed_out_restore_sources.add(str(source))
+
+    cleanup_started = threading.Event()
+    release_cleanup = threading.Event()
+    real_cleanup = installer._cleanup_timed_out_import_markers
+    cleanup_calls = 0
+
+    def _blocked_cleanup(*args, **kwargs) -> None:
+        nonlocal cleanup_calls
+        cleanup_calls += 1
+        if cleanup_calls == 1:
+            cleanup_started.set()
+            assert release_cleanup.wait(timeout=5)
+            real_cleanup(*args, **kwargs)
+
+    helper_calls = 0
+    second_helper_started = threading.Event()
+
+    def _import_from_url(*args, **kwargs) -> ModelInstallJob:
+        nonlocal helper_calls
+        helper_calls += 1
+        if helper_calls == 1:
+            tmpdir = owned_dir
+            status = InstallStatus.COMPLETED
+        else:
+            second_helper_started.set()
+            assert installer._find_reusable_tmpdir(source) is None
+            replacement_dir.mkdir()
+            tmpdir = replacement_dir
+            status = InstallStatus.DOWNLOADING
+        job = ModelInstallJob(id=installer._next_id(), source=source, config_in=ModelRecordChanges(), local_path=tmpdir)
+        job._install_tmpdir = tmpdir
+        job.status = status
+        return job
+
+    monkeypatch.setattr(installer, "_cleanup_timed_out_import_markers", _blocked_cleanup)
+    monkeypatch.setattr(installer, "_import_from_url", _import_from_url)
+    first_thread = threading.Thread(target=lambda: installer.import_model(source))
+    first_thread.start()
+    assert cleanup_started.wait(timeout=5)
+    installer._safe_rmtree(owned_dir, installer._logger)
+    second_thread = threading.Thread(target=lambda: installer.import_model(source))
+    second_thread.start()
+    second_started_before_cleanup = second_helper_started.wait(timeout=0.25)
+    release_cleanup.set()
+    first_thread.join(timeout=5)
+    second_thread.join(timeout=5)
+
+    assert not second_started_before_cleanup
+    assert not first_thread.is_alive()
+    assert not second_thread.is_alive()
+    assert not sibling_dir.exists()
+    assert replacement_dir.exists()
+
+
+def test_stop_waits_for_timed_out_marker_cleanup(
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_record_store,
+    mm2_download_queue,
+    mm2_session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    installer = ModelInstallService(
+        app_config=mm2_app_config,
+        record_store=mm2_record_store,
+        download_queue=mm2_download_queue,
+        event_bus=TestEventService(),
+        session=mm2_session,
+    )
+    installer.start()
+    installer._wait_for_restore_complete()
+    assert installer._install_thread is not None
+    monkeypatch.setattr(installer._install_thread, "join", lambda: None)
+    source = URLModelSource(url=Url("https://www.test.foo/download/cleanup-shutdown.safetensors"))
+    owned_dir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}0_owned"
+    sibling_dir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}1_sibling"
+    _write_test_install_marker(owned_dir, str(source))
+    _write_test_install_marker(sibling_dir, str(source))
+    installer._timed_out_restore_sources.add(str(source))
+    imported_job = ModelInstallJob(
+        id=installer._next_id(), source=source, config_in=ModelRecordChanges(), local_path=owned_dir
+    )
+    imported_job._install_tmpdir = owned_dir
+    cleanup_started = threading.Event()
+    release_cleanup = threading.Event()
+    real_glob = Path.glob
+
+    def _blocked_glob(path: Path, pattern: str):
+        if path == mm2_app_config.models_path and pattern == f"{TMPDIR_PREFIX}*" and not cleanup_started.is_set():
+            cleanup_started.set()
+            assert release_cleanup.wait(timeout=5)
+        return real_glob(path, pattern)
+
+    monkeypatch.setattr(Path, "glob", _blocked_glob)
+    monkeypatch.setattr(installer, "_import_from_url", lambda *args, **kwargs: imported_job)
+    import_thread = threading.Thread(target=lambda: installer.import_model(source))
+    import_thread.start()
+    assert cleanup_started.wait(timeout=5)
+    stop_done = threading.Event()
+    stop_thread = threading.Thread(target=lambda: (installer.stop(), stop_done.set()))
+    stop_thread.start()
+    stopped_while_cleanup_blocked = stop_done.wait(timeout=0.25)
+    release_cleanup.set()
+    import_thread.join(timeout=5)
+    stop_thread.join(timeout=5)
+
+    assert not stopped_while_cleanup_blocked
+    assert not import_thread.is_alive()
+    assert not stop_thread.is_alive()
+    assert not sibling_dir.exists()
+
+
 def test_deferred_restore_ignores_historical_terminal_tmpdirs(
     mm2_app_config: InvokeAIAppConfig,
     mm2_record_store,

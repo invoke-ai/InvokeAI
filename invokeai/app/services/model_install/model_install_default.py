@@ -772,9 +772,20 @@ class ModelInstallService(ModelInstallServiceBase):
                 self._install_cond.notify_all()
                 raise RuntimeError("Model install service stopped")
             self._append_install_job(install_job, from_import=True)
-            self._pending_sources.discard(source_str)
-            self._install_cond.notify_all()
-        self._cleanup_timed_out_import_markers(source, install_job._install_tmpdir)
+            needs_marker_cleanup = source_str in self._timed_out_restore_sources
+            if not needs_marker_cleanup:
+                self._pending_sources.discard(source_str)
+                self._install_cond.notify_all()
+
+        if needs_marker_cleanup:
+            try:
+                with self._job_launch_lock:
+                    if not self._stop_event.is_set():
+                        self._cleanup_timed_out_import_markers(source, install_job._install_tmpdir)
+            finally:
+                with self._install_cond:
+                    self._pending_sources.discard(source_str)
+                    self._install_cond.notify_all()
         return install_job
 
     def list_jobs(self) -> List[ModelInstallJob]:  # noqa D102
