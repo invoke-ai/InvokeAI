@@ -45,7 +45,7 @@ class DynamicPromptsResponse(BaseModel):
         200: {"model": DynamicPromptsResponse},
     },
 )
-async def parse_dynamicprompts(
+def parse_dynamicprompts(
     current_user: CurrentUserOrDefault,
     prompt: str = Body(description="The prompt to parse with dynamicprompts"),
     max_prompts: int = Body(ge=1, le=10000, default=1000, description="The max number of prompts to generate"),

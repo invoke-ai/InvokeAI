@@ -16,7 +16,7 @@ virtual_boards_router = APIRouter(prefix="/v1/virtual_boards", tags=["virtual_bo
     operation_id="list_virtual_boards_by_date",
     response_model=list[VirtualSubBoardDTO],
 )
-async def list_virtual_boards_by_date(
+def list_virtual_boards_by_date(
     current_user: CurrentUserOrDefault,
 ) -> list[VirtualSubBoardDTO]:
     """Gets a list of virtual sub-boards grouped by date. Covers both images and videos."""

@@ -11,7 +11,6 @@ same fixture pattern as test_boards_multiuser. The storage-level user_id
 filter is covered separately in tests/app/services/video_records.
 """
 
-import asyncio
 import inspect
 from pathlib import Path
 from typing import Any
@@ -673,12 +672,13 @@ def test_get_video_thumbnail_closes_file_before_route_returns(
     mock_invoker.services.videos.get_path.return_value = str(thumbnail_path)
     current_user = MagicMock(is_admin=True)
 
-    async def get_thumbnail_after_delete() -> bytes:
-        response = await get_video_thumbnail(current_user=current_user, video_name="video.mp4")
-        thumbnail_path.unlink()
-        return bytes(response.body)
+    # The route is `def`, not `async def`, so that its synchronous file read runs in the
+    # threadpool instead of on the event loop. Deleting the file straight after it returns is
+    # what proves the handle was closed before the response was built.
+    response = get_video_thumbnail(current_user=current_user, video_name="video.mp4")
+    thumbnail_path.unlink()
 
-    assert asyncio.run(get_thumbnail_after_delete()) == b"thumbnail-data"
+    assert bytes(response.body) == b"thumbnail-data"
 
 
 @pytest.mark.parametrize(

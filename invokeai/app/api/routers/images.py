@@ -187,7 +187,7 @@ class ImageUploadEntry(BaseModel):
 
 
 @images_router.post("/", operation_id="create_image_upload_entry")
-async def create_image_upload_entry(
+def create_image_upload_entry(
     _: CurrentUserOrDefault,
     width: int = Body(description="The width of the image"),
     height: int = Body(description="The height of the image"),
@@ -199,7 +199,7 @@ async def create_image_upload_entry(
 
 
 @images_router.delete("/i/{image_name}", operation_id="delete_image", response_model=DeleteImagesResult)
-async def delete_image(
+def delete_image(
     current_user: CurrentUserOrDefault,
     image_name: str = Path(description="The name of the image to delete"),
 ) -> DeleteImagesResult:
@@ -227,7 +227,7 @@ async def delete_image(
 
 
 @images_router.delete("/intermediates", operation_id="clear_intermediates")
-async def clear_intermediates(
+def clear_intermediates(
     current_user: CurrentUserOrDefault,
 ) -> int:
     """Clears all intermediates. Requires admin."""
@@ -243,7 +243,7 @@ async def clear_intermediates(
 
 
 @images_router.get("/intermediates", operation_id="get_intermediates_count")
-async def get_intermediates_count(
+def get_intermediates_count(
     current_user: CurrentUserOrDefault,
 ) -> int:
     """Gets the count of intermediate images. Non-admin users only see their own intermediates."""
@@ -260,7 +260,7 @@ async def get_intermediates_count(
     operation_id="update_image",
     response_model=ImageDTO,
 )
-async def update_image(
+def update_image(
     current_user: CurrentUserOrDefault,
     image_name: str = Path(description="The name of the image to update"),
     image_changes: ImageRecordChanges = Body(description="The changes to apply to the image"),
@@ -280,7 +280,7 @@ async def update_image(
     operation_id="get_image_dto",
     response_model=ImageDTO,
 )
-async def get_image_dto(
+def get_image_dto(
     current_user: CurrentUserOrDefault,
     image_name: str = Path(description="The name of image to get"),
 ) -> ImageDTO:
@@ -298,7 +298,7 @@ async def get_image_dto(
     operation_id="get_image_metadata",
     response_model=Optional[MetadataField],
 )
-async def get_image_metadata(
+def get_image_metadata(
     current_user: CurrentUserOrDefault,
     image_name: str = Path(description="The name of image to get"),
 ) -> Optional[MetadataField]:
@@ -319,7 +319,7 @@ class WorkflowAndGraphResponse(BaseModel):
 @images_router.get(
     "/i/{image_name}/workflow", operation_id="get_image_workflow", response_model=WorkflowAndGraphResponse
 )
-async def get_image_workflow(
+def get_image_workflow(
     current_user: CurrentUserOrDefault,
     image_name: str = Path(description="The name of image whose workflow to get"),
 ) -> WorkflowAndGraphResponse:
@@ -358,7 +358,7 @@ async def get_image_workflow(
         404: {"description": "Image not found"},
     },
 )
-async def get_image_full(
+def get_image_full(
     current_user: CurrentMediaUserOrDefault,
     image_name: str = Path(description="The name of full-resolution image file to get"),
 ) -> Response:
@@ -394,7 +394,7 @@ async def get_image_full(
         404: {"description": "Image not found"},
     },
 )
-async def get_image_thumbnail(
+def get_image_thumbnail(
     current_user: CurrentMediaUserOrDefault,
     image_name: str = Path(description="The name of thumbnail image file to get"),
 ) -> Response:
@@ -422,7 +422,7 @@ async def get_image_thumbnail(
     operation_id="get_image_urls",
     response_model=ImageUrlsDTO,
 )
-async def get_image_urls(
+def get_image_urls(
     current_user: CurrentUserOrDefault,
     image_name: str = Path(description="The name of the image whose URL to get"),
 ) -> ImageUrlsDTO:
@@ -486,7 +486,7 @@ def list_image_dtos(
 
 
 @images_router.post("/delete", operation_id="delete_images_from_list", response_model=DeleteImagesResult)
-async def delete_images_from_list(
+def delete_images_from_list(
     current_user: CurrentUserOrDefault,
     image_names: list[str] = Body(description="The list of names of images to delete", embed=True),
 ) -> DeleteImagesResult:
@@ -534,7 +534,7 @@ async def delete_images_from_list(
 
 
 @images_router.delete("/uncategorized", operation_id="delete_uncategorized_images", response_model=DeleteImagesResult)
-async def delete_uncategorized_images(
+def delete_uncategorized_images(
     current_user: CurrentUserOrDefault,
 ) -> DeleteImagesResult:
     """Deletes all uncategorized images owned by the current user (or all if admin)"""
@@ -573,7 +573,7 @@ class ImagesUpdatedFromListResult(BaseModel):
 
 
 @images_router.post("/star", operation_id="star_images_in_list", response_model=StarredImagesResult)
-async def star_images_in_list(
+def star_images_in_list(
     current_user: CurrentUserOrDefault,
     image_names: list[str] = Body(description="The list of names of images to star", embed=True),
 ) -> StarredImagesResult:
@@ -610,7 +610,7 @@ async def star_images_in_list(
 
 
 @images_router.post("/unstar", operation_id="unstar_images_in_list", response_model=UnstarredImagesResult)
-async def unstar_images_in_list(
+def unstar_images_in_list(
     current_user: CurrentUserOrDefault,
     image_names: list[str] = Body(description="The list of names of images to unstar", embed=True),
 ) -> UnstarredImagesResult:
@@ -658,7 +658,7 @@ class ImagesDownloaded(BaseModel):
 @images_router.post(
     "/download", operation_id="download_images_from_list", response_model=ImagesDownloaded, status_code=202
 )
-async def download_images_from_list(
+def download_images_from_list(
     current_user: CurrentUserOrDefault,
     background_tasks: BackgroundTasks,
     image_names: Optional[list[str]] = Body(
@@ -707,7 +707,7 @@ async def download_images_from_list(
         404: {"description": "Image not found"},
     },
 )
-async def get_bulk_download_item(
+def get_bulk_download_item(
     current_user: CurrentUserOrDefault,
     background_tasks: BackgroundTasks,
     bulk_download_item_name: str = Path(description="The bulk_download_item_name of the bulk download item to get"),
@@ -786,7 +786,7 @@ def get_image_names(
     operation_id="get_images_by_names",
     responses={200: {"model": list[ImageDTO]}},
 )
-async def get_images_by_names(
+def get_images_by_names(
     current_user: CurrentUserOrDefault,
     image_names: list[str] = Body(embed=True, description="Object containing list of image names to fetch DTOs for"),
 ) -> list[ImageDTO]:

@@ -156,7 +156,7 @@ example_model_input = {
     "/",
     operation_id="list_model_records",
 )
-async def list_model_records(
+def list_model_records(
     current_user: CurrentUserOrDefault,
     base_models: Optional[List[BaseModelType]] = Query(default=None, description="Base models to include"),
     model_type: Optional[ModelType] = Query(default=None, description="The type of model to get"),
@@ -202,7 +202,7 @@ async def list_model_records(
     operation_id="list_missing_models",
     responses={200: {"description": "List of models with missing files"}},
 )
-async def list_missing_models(current_user: CurrentUserOrDefault) -> ModelsList:
+def list_missing_models(current_user: CurrentUserOrDefault) -> ModelsList:
     """Get models whose files are missing from disk.
 
     These are models that have database entries but their corresponding
@@ -229,7 +229,7 @@ async def list_missing_models(current_user: CurrentUserOrDefault) -> ModelsList:
     operation_id="get_model_records_by_attrs",
     response_model=AnyModelConfig,
 )
-async def get_model_records_by_attrs(
+def get_model_records_by_attrs(
     current_user: CurrentUserOrDefault,
     name: str = Query(description="The name of the model"),
     type: ModelType = Query(description="The type of the model"),
@@ -251,7 +251,7 @@ async def get_model_records_by_attrs(
     operation_id="get_model_records_by_hash",
     response_model=AnyModelConfig,
 )
-async def get_model_records_by_hash(
+def get_model_records_by_hash(
     current_user: CurrentUserOrDefault,
     hash: str = Query(description="The hash of the model"),
 ) -> AnyModelConfig:
@@ -276,7 +276,7 @@ async def get_model_records_by_hash(
         404: {"description": "The model could not be found"},
     },
 )
-async def get_model_record(
+def get_model_record(
     current_user: CurrentUserOrDefault,
     key: str = Path(description="Key of the model record to fetch."),
 ) -> AnyModelConfig:
@@ -300,7 +300,7 @@ async def get_model_record(
         404: {"description": "The model could not be found"},
     },
 )
-async def reidentify_model(
+def reidentify_model(
     key: Annotated[str, Path(description="Key of the model to reidentify.")],
     current_admin: AdminUserOrDefault,
 ) -> AnyModelConfig:
@@ -349,7 +349,7 @@ class FoundModel(BaseModel):
     status_code=200,
     response_model=List[FoundModel],
 )
-async def scan_for_models(
+def scan_for_models(
     current_admin: AdminUserOrDefault,
     scan_path: str = Query(description="Directory path to search for models", default=None),
 ) -> List[FoundModel]:
@@ -415,7 +415,7 @@ class HuggingFaceModels(BaseModel):
     status_code=200,
     response_model=HuggingFaceModels,
 )
-async def get_hugging_face_models(
+def get_hugging_face_models(
     current_admin: AdminUserOrDefault,
     hugging_face_repo: str = Query(description="Hugging face repo to search for models", default=None),
 ) -> HuggingFaceModels:
@@ -523,7 +523,7 @@ def _load_settings_changed(previous: AnyModelConfig, updated: AnyModelConfig) ->
     },
     status_code=200,
 )
-async def get_model_image(
+def get_model_image(
     key: str = Path(description="The name of model image file to get"),
 ) -> FileResponse:
     """Gets an image file that previews the model"""
@@ -590,7 +590,7 @@ async def update_model_image(
     },
     status_code=204,
 )
-async def delete_model(
+def delete_model(
     current_admin: AdminUserOrDefault,
     key: str = Path(description="Unique key of model to remove from model registry."),
 ) -> Response:
@@ -646,7 +646,7 @@ class BulkReidentifyModelsResponse(BaseModel):
     },
     status_code=200,
 )
-async def bulk_delete_models(
+def bulk_delete_models(
     current_admin: AdminUserOrDefault,
     request: BulkDeleteModelsRequest = Body(description="List of model keys to delete"),
 ) -> BulkDeleteModelsResponse:
@@ -687,7 +687,7 @@ async def bulk_delete_models(
     },
     status_code=200,
 )
-async def bulk_reidentify_models(
+def bulk_reidentify_models(
     current_admin: AdminUserOrDefault,
     request: BulkReidentifyModelsRequest = Body(description="List of model keys to reidentify"),
 ) -> BulkReidentifyModelsResponse:
@@ -749,7 +749,7 @@ async def bulk_reidentify_models(
     },
     status_code=204,
 )
-async def delete_model_image(
+def delete_model_image(
     current_admin: AdminUserOrDefault,
     key: str = Path(description="Unique key of model image to remove from model_images directory."),
 ) -> None:
@@ -775,7 +775,7 @@ async def delete_model_image(
     },
     status_code=201,
 )
-async def install_model(
+def install_model(
     current_admin: AdminUserOrDefault,
     source: str = Query(description="Model source to install, can be a local path, repo_id, or remote URL"),
     inplace: Optional[bool] = Query(description="Whether or not to install a local model in place", default=False),
@@ -846,7 +846,7 @@ async def install_model(
     status_code=201,
     response_class=HTMLResponse,
 )
-async def install_hugging_face_model(
+def install_hugging_face_model(
     current_admin: AdminUserOrDefault,
     source: str = Query(description="HuggingFace repo_id to install"),
 ) -> HTMLResponse:
@@ -967,7 +967,7 @@ async def install_hugging_face_model(
     "/install",
     operation_id="list_model_installs",
 )
-async def list_model_installs(current_admin: AdminUserOrDefault) -> List[ModelInstallJob]:
+def list_model_installs(current_admin: AdminUserOrDefault) -> List[ModelInstallJob]:
     """Return the list of model install jobs.
 
     Install jobs have a numeric `id`, a `status`, and other fields that provide information on
@@ -999,7 +999,7 @@ async def list_model_installs(current_admin: AdminUserOrDefault) -> List[ModelIn
         404: {"description": "No such job"},
     },
 )
-async def get_model_install_job(
+def get_model_install_job(
     current_admin: AdminUserOrDefault, id: int = Path(description="Model install id")
 ) -> ModelInstallJob:
     """
@@ -1022,7 +1022,7 @@ async def get_model_install_job(
     },
     status_code=201,
 )
-async def cancel_model_install_job(
+def cancel_model_install_job(
     current_admin: AdminUserOrDefault,
     id: int = Path(description="Model install job ID"),
 ) -> None:
@@ -1044,7 +1044,7 @@ async def cancel_model_install_job(
     },
     status_code=201,
 )
-async def pause_model_install_job(
+def pause_model_install_job(
     current_admin: AdminUserOrDefault, id: int = Path(description="Model install job ID")
 ) -> ModelInstallJob:
     """Pause the model install job corresponding to the given job ID."""
@@ -1066,7 +1066,7 @@ async def pause_model_install_job(
     },
     status_code=201,
 )
-async def resume_model_install_job(
+def resume_model_install_job(
     current_admin: AdminUserOrDefault, id: int = Path(description="Model install job ID")
 ) -> ModelInstallJob:
     """Resume a paused model install job corresponding to the given job ID."""
@@ -1088,7 +1088,7 @@ async def resume_model_install_job(
     },
     status_code=201,
 )
-async def restart_failed_model_install_job(
+def restart_failed_model_install_job(
     current_admin: AdminUserOrDefault, id: int = Path(description="Model install job ID")
 ) -> ModelInstallJob:
     """Restart failed or non-resumable file downloads for the given job."""
@@ -1110,7 +1110,7 @@ async def restart_failed_model_install_job(
     },
     status_code=201,
 )
-async def restart_model_install_file(
+def restart_model_install_file(
     current_admin: AdminUserOrDefault,
     id: int = Path(description="Model install job ID"),
     file_source: AnyHttpUrl = Body(description="File download URL to restart"),
@@ -1133,7 +1133,7 @@ async def restart_model_install_file(
         400: {"description": "Bad request"},
     },
 )
-async def prune_model_install_jobs(current_admin: AdminUserOrDefault) -> Response:
+def prune_model_install_jobs(current_admin: AdminUserOrDefault) -> Response:
     """Prune all completed and errored jobs from the install job list."""
     ApiDependencies.invoker.services.model_manager.install.prune_jobs()
     return Response(status_code=204)
@@ -1152,7 +1152,7 @@ async def prune_model_install_jobs(current_admin: AdminUserOrDefault) -> Respons
         409: {"description": "There is already a model registered at this location"},
     },
 )
-async def convert_model(
+def convert_model(
     current_admin: AdminUserOrDefault,
     key: str = Path(description="Unique key of the safetensors main model to convert to diffusers format."),
 ) -> AnyModelConfig:
@@ -1291,7 +1291,7 @@ def get_is_installed(
 
 
 @model_manager_router.get("/starter_models", operation_id="get_starter_models", response_model=StarterModelResponse)
-async def get_starter_models(current_admin: AdminUserOrDefault) -> StarterModelResponse:
+def get_starter_models(current_admin: AdminUserOrDefault) -> StarterModelResponse:
     installed_models = ApiDependencies.invoker.services.model_manager.store.search_by_attr()
     starter_models = deepcopy(STARTER_MODELS)
     starter_bundles = deepcopy(STARTER_BUNDLES)
@@ -1324,7 +1324,7 @@ async def get_starter_models(current_admin: AdminUserOrDefault) -> StarterModelR
     response_model=Optional[CacheStats],
     summary="Get model manager RAM cache performance statistics.",
 )
-async def get_stats(current_admin: AdminUserOrDefault) -> Optional[CacheStats]:
+def get_stats(current_admin: AdminUserOrDefault) -> Optional[CacheStats]:
     """Return performance statistics on the model manager's RAM cache. In multi-GPU mode there is
     one cache per generation device; their statistics are aggregated. Will return null if no models
     have been loaded."""
@@ -1364,7 +1364,7 @@ async def get_stats(current_admin: AdminUserOrDefault) -> Optional[CacheStats]:
     operation_id="empty_model_cache",
     status_code=200,
 )
-async def empty_model_cache(current_admin: AdminUserOrDefault) -> None:
+def empty_model_cache(current_admin: AdminUserOrDefault) -> None:
     """Drop all models from the model cache to free RAM/VRAM. 'Locked' models that are in active use will not be dropped."""
     # Request 1000GB of room in order to force each per-device cache to drop all models.
     ApiDependencies.invoker.services.logger.info("Emptying model cache.")
@@ -1404,7 +1404,7 @@ class HFTokenHelper:
 
 
 @model_manager_router.get("/hf_login", operation_id="get_hf_login_status", response_model=HFTokenStatus)
-async def get_hf_login_status(current_admin: AdminUserOrDefault) -> HFTokenStatus:
+def get_hf_login_status(current_admin: AdminUserOrDefault) -> HFTokenStatus:
     token_status = HFTokenHelper.get_status()
 
     if token_status is HFTokenStatus.UNKNOWN:
@@ -1414,7 +1414,7 @@ async def get_hf_login_status(current_admin: AdminUserOrDefault) -> HFTokenStatu
 
 
 @model_manager_router.post("/hf_login", operation_id="do_hf_login", response_model=HFTokenStatus)
-async def do_hf_login(
+def do_hf_login(
     current_admin: AdminUserOrDefault,
     token: str = Body(description="Hugging Face token to use for login", embed=True),
 ) -> HFTokenStatus:
@@ -1428,7 +1428,7 @@ async def do_hf_login(
 
 
 @model_manager_router.delete("/hf_login", operation_id="reset_hf_token", response_model=HFTokenStatus)
-async def reset_hf_token(current_admin: AdminUserOrDefault) -> HFTokenStatus:
+def reset_hf_token(current_admin: AdminUserOrDefault) -> HFTokenStatus:
     return HFTokenHelper.reset_token()
 
 
@@ -1453,7 +1453,7 @@ class DeleteOrphanedModelsResponse(BaseModel):
     operation_id="get_orphaned_models",
     response_model=list[OrphanedModelInfo],
 )
-async def get_orphaned_models(_: AdminUserOrDefault) -> list[OrphanedModelInfo]:
+def get_orphaned_models(_: AdminUserOrDefault) -> list[OrphanedModelInfo]:
     """Find orphaned model directories.
 
     Orphaned models are directories in the models folder that contain model files
@@ -1480,9 +1480,7 @@ async def get_orphaned_models(_: AdminUserOrDefault) -> list[OrphanedModelInfo]:
     operation_id="delete_orphaned_models",
     response_model=DeleteOrphanedModelsResponse,
 )
-async def delete_orphaned_models(
-    request: DeleteOrphanedModelsRequest, _: AdminUserOrDefault
-) -> DeleteOrphanedModelsResponse:
+def delete_orphaned_models(request: DeleteOrphanedModelsRequest, _: AdminUserOrDefault) -> DeleteOrphanedModelsResponse:
     """Delete specified orphaned model directories.
 
     Args:

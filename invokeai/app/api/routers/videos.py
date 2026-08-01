@@ -347,7 +347,7 @@ async def upload_video(
 
 
 @videos_router.delete("/i/{video_name}", operation_id="delete_video", response_model=DeleteVideosResult)
-async def delete_video(
+def delete_video(
     current_user: CurrentUserOrDefault,
     video_name: str = PathParam(description="The name of the video to delete"),
 ) -> DeleteVideosResult:
@@ -452,7 +452,7 @@ def delete_uncategorized_videos(
 
 
 @videos_router.patch("/i/{video_name}", operation_id="update_video", response_model=VideoDTO)
-async def update_video(
+def update_video(
     current_user: CurrentUserOrDefault,
     video_name: str = PathParam(description="The name of the video to update"),
     video_changes: VideoRecordChanges = Body(description="The changes to apply to the video"),
@@ -465,7 +465,7 @@ async def update_video(
 
 
 @videos_router.get("/i/{video_name}", operation_id="get_video_dto", response_model=VideoDTO)
-async def get_video_dto(
+def get_video_dto(
     current_user: CurrentUserOrDefault,
     video_name: str = PathParam(description="The name of video to get"),
 ) -> VideoDTO:
@@ -479,7 +479,7 @@ async def get_video_dto(
 @videos_router.get(
     "/i/{video_name}/metadata", operation_id="get_video_metadata", response_model=Optional[MetadataField]
 )
-async def get_video_metadata(
+def get_video_metadata(
     current_user: CurrentUserOrDefault,
     video_name: str = PathParam(description="The name of video to get"),
 ) -> Optional[MetadataField]:
@@ -493,7 +493,7 @@ async def get_video_metadata(
 @videos_router.get(
     "/i/{video_name}/workflow", operation_id="get_video_workflow", response_model=WorkflowAndGraphResponse
 )
-async def get_video_workflow(
+def get_video_workflow(
     current_user: CurrentUserOrDefault,
     video_name: str = PathParam(description="The name of video whose workflow to get"),
 ) -> WorkflowAndGraphResponse:
@@ -567,7 +567,7 @@ def _parse_range_header(range_header: str, file_size: int) -> Optional[tuple[int
         404: {"description": "Video not found"},
     },
 )
-async def get_video_full(
+def get_video_full(
     request: Request,
     current_user: CurrentMediaUserOrDefault,
     video_name: str = PathParam(description="The name of video file to get"),
@@ -670,7 +670,7 @@ async def get_video_full(
         404: {"description": "Video not found"},
     },
 )
-async def get_video_thumbnail(
+def get_video_thumbnail(
     current_user: CurrentMediaUserOrDefault,
     video_name: str = PathParam(description="The name of thumbnail file to get"),
 ) -> Response:
@@ -694,7 +694,7 @@ async def get_video_thumbnail(
 
 
 @videos_router.get("/i/{video_name}/urls", operation_id="get_video_urls", response_model=VideoUrlsDTO)
-async def get_video_urls(
+def get_video_urls(
     current_user: CurrentUserOrDefault,
     video_name: str = PathParam(description="The name of the video whose URL to get"),
 ) -> VideoUrlsDTO:
@@ -853,7 +853,7 @@ class VideoBoardArg(BaseModel):
     operation_id="add_video_to_board",
     response_model=AddVideosToBoardResult,
 )
-async def add_video_to_board(
+def add_video_to_board(
     current_user: CurrentUserOrDefault,
     arg: VideoBoardArg = Body(),
 ) -> AddVideosToBoardResult:
@@ -881,7 +881,7 @@ async def add_video_to_board(
     operation_id="remove_video_from_board",
     response_model=RemoveVideosFromBoardResult,
 )
-async def remove_video_from_board(
+def remove_video_from_board(
     current_user: CurrentUserOrDefault,
     video_name: str = Body(description="The name of the video to remove from its board", embed=True),
 ) -> RemoveVideosFromBoardResult:
