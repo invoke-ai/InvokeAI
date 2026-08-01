@@ -40,6 +40,35 @@ class ModelMixin(torch.nn.Module):
         self.num_upsamplers = 3
 
 
+class WindowMeanAttention(torch.nn.Module):
+    def forward(self, hidden_states: torch.Tensor, **_kwargs):
+        return hidden_states.mean(dim=1, keepdim=True).expand_as(hidden_states)
+
+
+class WindowAttentionBlock(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.use_ada_layer_norm = False
+        self.use_ada_layer_norm_zero = False
+        self.use_layer_norm = True
+        self.use_ada_layer_norm_continuous = False
+        self.use_ada_layer_norm_single = False
+        self.pos_embed = None
+        self.norm1 = torch.nn.Identity()
+        self.attn1 = WindowMeanAttention()
+        self.only_cross_attention = False
+        self.attn2 = None
+        self.norm3 = torch.nn.Identity()
+        self.ff = torch.nn.Identity()
+        self._chunk_size = None
+
+
+class WindowAttentionModelMixin(ModelMixin):
+    def __init__(self):
+        super().__init__()
+        self.transformer = WindowAttentionBlock()
+
+
 def test_hidiffusion_patch_supports_bare_model_mixin_without_public_name_or_path():
     model = ModelMixin()
 
@@ -53,6 +82,40 @@ def test_hidiffusion_patch_supports_bare_model_mixin_without_public_name_or_path
     assert model.num_upsamplers == 3
     assert not hasattr(model, "_name_or_path")
     assert model.info["hooks"] == []
+
+
+def test_hidiffusion_window_attention_uses_seeded_generator_instead_of_global_rng():
+    module_keys = {
+        "down_module_key": [],
+        "down_module_key_extra": [],
+        "up_module_key": [],
+        "up_module_key_extra": [],
+        "windown_attn_module_key": ["transformer"],
+    }
+    hidden_states = torch.arange(64, dtype=torch.float32).reshape(1, 64, 1)
+
+    def run_with_global_seed(global_seed: int) -> torch.Tensor:
+        torch.manual_seed(global_seed)
+        model = WindowAttentionModelMixin()
+        generator = torch.Generator(device="cpu").manual_seed(1234)
+
+        with (
+            patch("invokeai.backend.hidiffusion.hidiffusion.sd15_hidiffusion_key", return_value=module_keys),
+            hidiffusion_patch(
+                model,
+                name_or_path="runwayml/stable-diffusion-v1-5",
+                apply_raunet=False,
+                apply_window_attn=True,
+                generator=generator,
+            ),
+        ):
+            model.info["size"] = (8, 8)
+            return model.transformer(hidden_states).clone()
+
+    first = run_with_global_seed(0)
+    second = run_with_global_seed(1)
+
+    torch.testing.assert_close(first, second)
 
 
 def test_hidiffusion_patch_restores_state_when_apply_hidiffusion_raises():

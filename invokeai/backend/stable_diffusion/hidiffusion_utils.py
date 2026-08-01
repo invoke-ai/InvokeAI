@@ -5,6 +5,8 @@ import sys
 from contextlib import contextmanager
 from typing import Any, Optional
 
+import torch
+
 from invokeai.backend.hidiffusion.hidiffusion import (
     switching_threshold_ratio_dict as _switching_threshold_ratio_dict,
 )
@@ -21,6 +23,7 @@ def hidiffusion_patch(
     apply_window_attn: bool = True,
     t1_ratio: Optional[float] = None,
     t2_ratio: Optional[float] = None,
+    generator: torch.Generator | None = None,
 ):
     """Context manager that applies HiDiffusion and restores the model on exit."""
     from invokeai.backend.hidiffusion.hidiffusion import apply_hidiffusion, remove_hidiffusion
@@ -111,7 +114,12 @@ def hidiffusion_patch(
             _apply_ratio_overrides(ratio_dicts[0])
             _apply_ratio_overrides(ratio_dicts[1])
 
-        apply_hidiffusion(model, apply_raunet=apply_raunet, apply_window_attn=apply_window_attn)
+        apply_hidiffusion(
+            model,
+            apply_raunet=apply_raunet,
+            apply_window_attn=apply_window_attn,
+            generator=generator,
+        )
         yield
     finally:
         had_active_exception = sys.exc_info()[0] is not None

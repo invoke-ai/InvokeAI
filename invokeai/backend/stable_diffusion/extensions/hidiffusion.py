@@ -3,6 +3,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from typing import Optional
 
+import torch
 from diffusers import UNet2DConditionModel
 
 from invokeai.backend.stable_diffusion.extensions.base import ExtensionBase
@@ -18,6 +19,7 @@ class HiDiffusionExt(ExtensionBase):
         apply_window_attn: bool = True,
         t1_ratio: Optional[float] = None,
         t2_ratio: Optional[float] = None,
+        generator: torch.Generator | None = None,
     ):
         super().__init__()
         self._name_or_path = name_or_path
@@ -25,6 +27,7 @@ class HiDiffusionExt(ExtensionBase):
         self._apply_window_attn = apply_window_attn
         self._t1_ratio = t1_ratio
         self._t2_ratio = t2_ratio
+        self._generator = generator
 
     @contextmanager
     def patch_unet(self, unet: UNet2DConditionModel, original_weights: OriginalWeightsStorage):
@@ -35,5 +38,6 @@ class HiDiffusionExt(ExtensionBase):
             apply_window_attn=self._apply_window_attn,
             t1_ratio=self._t1_ratio,
             t2_ratio=self._t2_ratio,
+            generator=self._generator,
         ):
             yield None

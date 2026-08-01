@@ -922,6 +922,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     apply_window_attn=self.hidiffusion_window_attn,
                     t1_ratio=self.hidiffusion_t1_ratio,
                     t2_ratio=self.hidiffusion_t2_ratio,
+                    generator=torch.Generator(device="cpu").manual_seed(seed),
                 )
             )
 
@@ -1147,6 +1148,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     apply_window_attn=self.hidiffusion_window_attn,
                     t1_ratio=self.hidiffusion_t1_ratio,
                     t2_ratio=self.hidiffusion_t2_ratio,
+                    generator=torch.Generator(device="cpu").manual_seed(seed),
                 )
                 if self.hidiffusion
                 else nullcontext()
