@@ -40,6 +40,10 @@ import torch
 
 from invokeai.backend.util.devices import TorchDevice
 
+# Device types that can lend/borrow for idle offload. MPS is excluded: it is always a single
+# shared device, so there is never another GPU to borrow.
+_OFFLOAD_DEVICE_TYPES = ("cuda", "xpu")
+
 
 class _GenerationDevicePool:
     """Arbitrates exclusive use of each generation device between native sessions and borrowers."""
@@ -55,13 +59,13 @@ class _GenerationDevicePool:
     def set_generation_devices(self, devices: list[torch.device]) -> None:
         """Register the full set of generation devices (called once at processor startup).
 
-        Only CUDA devices participate in idle-offload; others are ignored.
+        Only GPU devices participate in idle-offload; others are ignored.
         """
         with self._registry_lock:
             self._device_locks = {}
             self._order = []
             for device in devices:
-                if device.type != "cuda":
+                if device.type not in _OFFLOAD_DEVICE_TYPES:
                     continue
                 key = str(TorchDevice.normalize(device))
                 if key not in self._device_locks:
@@ -77,10 +81,10 @@ class _GenerationDevicePool:
         """Take exclusive use of ``device`` for a native generation session (blocking).
 
         Waits out any in-flight borrow that won the lock first, guaranteeing the session never runs
-        concurrently with a borrowed encoder on the same GPU. No-op for non-CUDA / unregistered
+        concurrently with a borrowed encoder on the same GPU. No-op for non-GPU / unregistered
         devices (e.g. legacy single-device mode).
         """
-        if device is None or device.type != "cuda":
+        if device is None or device.type not in _OFFLOAD_DEVICE_TYPES:
             return
         lock = self._get_lock(device)
         if lock is not None:
@@ -88,21 +92,21 @@ class _GenerationDevicePool:
 
     def release_session(self, device: Optional[torch.device]) -> None:
         """Release the exclusive use taken by :meth:`acquire_session`."""
-        if device is None or device.type != "cuda":
+        if device is None or device.type not in _OFFLOAD_DEVICE_TYPES:
             return
         lock = self._get_lock(device)
         if lock is not None:
             lock.release()
 
     def try_borrow(self, exclude: torch.device) -> Optional[torch.device]:
-        """Try to take exclusive use of an idle CUDA device other than ``exclude`` (non-blocking).
+        """Try to take exclusive use of an idle GPU other than ``exclude`` (non-blocking).
 
         Returns the borrowed device (whose lock the caller now holds and must release via
         :meth:`release_borrow`), or ``None`` if no other registered device is currently free.
         Selection is deterministic (lowest registration order) so repeated borrows reuse the same
         GPU and the encoder cached there.
         """
-        if exclude.type != "cuda":
+        if exclude.type not in _OFFLOAD_DEVICE_TYPES:
             return None
         exclude_key = str(TorchDevice.normalize(exclude))
         with self._registry_lock:

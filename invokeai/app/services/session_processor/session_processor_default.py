@@ -197,7 +197,7 @@ class DefaultSessionRunner(SessionRunnerBase):
         native_device = TorchDevice.get_session_device()
         if (
             native_device is None
-            or native_device.type != "cuda"
+            or native_device.type not in ("cuda", "xpu")
             or not invocation.idle_gpu_offloadable
             or not self._services.configuration.offload_text_encoders_to_idle_gpus
         ):

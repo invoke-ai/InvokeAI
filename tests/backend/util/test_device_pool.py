@@ -106,6 +106,24 @@ def test_empty_pool_returns_none():
     assert GENERATION_DEVICE_POOL.try_borrow(exclude=torch.device("cuda:0")) is None
 
 
+def test_xpu_devices_participate_in_offload():
+    """XPU devices register and lend like CUDA ones (multi-GPU Intel Arc setups)."""
+    GENERATION_DEVICE_POOL.set_generation_devices([torch.device("xpu:0"), torch.device("xpu:1")])
+    borrowed = GENERATION_DEVICE_POOL.try_borrow(exclude=torch.device("xpu:0"))
+    assert borrowed == torch.device("xpu:1")
+    GENERATION_DEVICE_POOL.release_borrow(borrowed)
+
+
+def test_xpu_session_lock_blocks_borrow():
+    GENERATION_DEVICE_POOL.set_generation_devices([torch.device("xpu:0"), torch.device("xpu:1")])
+    GENERATION_DEVICE_POOL.acquire_session(torch.device("xpu:1"))
+    try:
+        assert GENERATION_DEVICE_POOL.try_borrow(exclude=torch.device("xpu:0")) is None
+    finally:
+        GENERATION_DEVICE_POOL.release_session(torch.device("xpu:1"))
+    assert GENERATION_DEVICE_POOL.try_borrow(exclude=torch.device("xpu:0")) == torch.device("xpu:1")
+
+
 def test_concurrent_sessions_and_borrows_never_overlap_on_a_device():
     """Regression: a GPU must never be used by a native session and a borrowed encoder at the same
     time. That overlap is exactly what corrupted a shared encoder and produced garbled images. Here
