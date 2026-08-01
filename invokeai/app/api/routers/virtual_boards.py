@@ -34,7 +34,7 @@ async def list_virtual_boards_by_date(
     operation_id="list_virtual_board_image_names_by_date",
     response_model=ImageNamesResult,
 )
-async def list_virtual_board_image_names_by_date(
+def list_virtual_board_image_names_by_date(
     current_user: CurrentUserOrDefault,
     date: str = Path(description="The ISO date string, e.g. '2026-03-18'"),
     starred_first: bool = Query(default=True, description="Whether to sort starred images first"),
@@ -63,7 +63,7 @@ async def list_virtual_board_image_names_by_date(
     operation_id="list_virtual_board_item_names_by_date",
     response_model=GalleryItemNamesResult,
 )
-async def list_virtual_board_item_names_by_date(
+def list_virtual_board_item_names_by_date(
     current_user: CurrentUserOrDefault,
     date: str = Path(description="The ISO date string, e.g. '2026-03-18'"),
     starred_first: bool = Query(default=True, description="Whether to sort starred items first"),

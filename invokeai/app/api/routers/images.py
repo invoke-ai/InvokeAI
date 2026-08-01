@@ -446,7 +446,7 @@ async def get_image_urls(
     operation_id="list_image_dtos",
     response_model=OffsetPaginatedResults[ImageDTO],
 )
-async def list_image_dtos(
+def list_image_dtos(
     current_user: CurrentUserOrDefault,
     image_origin: Optional[ResourceOrigin] = Query(default=None, description="The origin of images to list."),
     categories: Optional[list[ImageCategory]] = Query(default=None, description="The categories of image to include."),
@@ -741,7 +741,7 @@ async def get_bulk_download_item(
 
 
 @images_router.get("/names", operation_id="get_image_names")
-async def get_image_names(
+def get_image_names(
     current_user: CurrentUserOrDefault,
     image_origin: Optional[ResourceOrigin] = Query(default=None, description="The origin of images to list."),
     categories: Optional[list[ImageCategory]] = Query(default=None, description="The categories of image to include."),

@@ -708,7 +708,7 @@ async def get_video_urls(
 
 
 @videos_router.get("/", operation_id="list_video_dtos", response_model=OffsetPaginatedResults[VideoDTO])
-async def list_video_dtos(
+def list_video_dtos(
     current_user: CurrentUserOrDefault,
     video_origin: Optional[ResourceOrigin] = Query(default=None, description="The origin of videos to list."),
     categories: Optional[list[ImageCategory]] = Query(default=None, description="The categories of video to include."),
@@ -746,7 +746,7 @@ async def list_video_dtos(
 
 
 @videos_router.get("/names", operation_id="get_video_names")
-async def get_video_names(
+def get_video_names(
     current_user: CurrentUserOrDefault,
     video_origin: Optional[ResourceOrigin] = Query(default=None, description="The origin of videos to list."),
     categories: Optional[list[ImageCategory]] = Query(default=None, description="The categories of video to include."),

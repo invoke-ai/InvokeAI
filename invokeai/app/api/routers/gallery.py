@@ -19,7 +19,7 @@ gallery_router = APIRouter(prefix="/v1/gallery", tags=["gallery"])
     operation_id="list_gallery_items",
     response_model=OffsetPaginatedResults[GalleryItem],
 )
-async def list_gallery_items(
+def list_gallery_items(
     current_user: CurrentUserOrDefault,
     origin: Optional[ResourceOrigin] = Query(default=None, description="The origin of items to list."),
     categories: Optional[list[ImageCategory]] = Query(
@@ -63,7 +63,7 @@ async def list_gallery_items(
     operation_id="get_gallery_item_names",
     response_model=GalleryItemNamesResult,
 )
-async def get_gallery_item_names(
+def get_gallery_item_names(
     current_user: CurrentUserOrDefault,
     origin: Optional[ResourceOrigin] = Query(default=None, description="The origin of items to list."),
     categories: Optional[list[ImageCategory]] = Query(
