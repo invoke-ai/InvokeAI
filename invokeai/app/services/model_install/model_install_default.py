@@ -115,7 +115,7 @@ class ModelInstallService(ModelInstallServiceBase):
         # Imports must not begin until startup restoration has completed. Leave this unset until
         # _restore_incomplete_installs_async() finishes so an import racing start() cannot pass the barrier early.
         self._restore_completed_event = threading.Event()
-        self._startup_error: Optional[Exception] = None
+        self._startup_error: Optional[BaseException] = None
         self._download_queue = download_queue
         self._download_cache: Dict[int, ModelInstallJob] = {}
         # Per-source locks serializing download_and_cache_model() so parallel (multi-GPU) sessions
@@ -123,6 +123,10 @@ class ModelInstallService(ModelInstallServiceBase):
         # the same cache directory. _download_cache_locks_guard protects the dict itself.
         self._download_cache_locks: Dict[str, threading.Lock] = {}
         self._download_cache_locks_guard = threading.Lock()
+        # Import helpers may call into the download queue, so they must run without _lock held. Reserve sources under
+        # this condition instead, preventing concurrent imports from creating jobs for the same source.
+        self._install_condition = threading.Condition(self._lock)
+        self._pending_sources: set[str] = set()
         self._running = False
         self._session = session
         self._install_thread: Optional[threading.Thread] = None
@@ -371,7 +375,7 @@ class ModelInstallService(ModelInstallServiceBase):
 
                 self._write_invoke_managed_models_dir_readme()
                 self._restore_incomplete_installs_async()
-            except Exception as error:
+            except BaseException as error:
                 self._startup_error = error
                 self._restore_completed_event.set()
                 raise
@@ -498,25 +502,46 @@ class ModelInstallService(ModelInstallServiceBase):
     def import_model(self, source: ModelSource, config: Optional[ModelRecordChanges] = None) -> ModelInstallJob:  # noqa D102
         self._wait_for_restore_complete()
 
-        similar_jobs = [x for x in self.list_jobs() if x.source == source and not x.in_terminal_state]
-        if similar_jobs:
-            self._logger.warning(f"There is already an active install job for {source}. Not enqueuing.")
-            return similar_jobs[0]
+        source_key = str(source)
+        with self._install_condition:
+            known_job_ids = {job.id for job in self._install_jobs if job.source == source}
+            while source_key in self._pending_sources:
+                self._install_condition.wait()
 
-        if isinstance(source, LocalModelSource):
-            install_job = self._import_local_model(source, config)
-            self._put_in_queue(install_job)  # synchronously install
-        elif isinstance(source, HFModelSource):
-            install_job = self._import_from_hf(source, config)
-        elif isinstance(source, URLModelSource):
-            install_job = self._import_from_url(source, config)
-        elif isinstance(source, ExternalModelSource):
-            install_job = self._import_external_model(source, config)
-            self._put_in_queue(install_job)
-        else:
-            raise ValueError(f"Unsupported model source: '{type(source)}'")
+            # A concurrent owner may have completed before waking us. Return its job even if it is already terminal.
+            new_jobs = [job for job in self._install_jobs if job.source == source and job.id not in known_job_ids]
+            if new_jobs:
+                return new_jobs[0]
 
-        self._install_jobs.append(install_job)
+            similar_jobs = [job for job in self._install_jobs if job.source == source and not job.in_terminal_state]
+            if similar_jobs:
+                self._logger.warning(f"There is already an active install job for {source}. Not enqueuing.")
+                return similar_jobs[0]
+            self._pending_sources.add(source_key)
+
+        try:
+            if isinstance(source, LocalModelSource):
+                install_job = self._import_local_model(source, config)
+                self._put_in_queue(install_job)  # synchronously install
+            elif isinstance(source, HFModelSource):
+                install_job = self._import_from_hf(source, config)
+            elif isinstance(source, URLModelSource):
+                install_job = self._import_from_url(source, config)
+            elif isinstance(source, ExternalModelSource):
+                install_job = self._import_external_model(source, config)
+                self._put_in_queue(install_job)
+            else:
+                raise ValueError(f"Unsupported model source: '{type(source)}'")
+        except BaseException:
+            with self._install_condition:
+                self._pending_sources.remove(source_key)
+                self._install_condition.notify_all()
+            raise
+
+        with self._install_condition:
+            self._install_jobs.append(install_job)
+            self._pending_sources.remove(source_key)
+            self._install_condition.notify_all()
         return install_job
 
     def list_jobs(self) -> List[ModelInstallJob]:  # noqa D102

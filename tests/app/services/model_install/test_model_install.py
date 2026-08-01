@@ -323,6 +323,7 @@ def test_simple_download(mm2_installer: ModelInstallServiceBase, mm2_app_config:
     assert isinstance(bus.events[4], ModelInstallCompleteEvent)  # install completed
 
 
+@pytest.mark.timeout(timeout=10, method="thread")
 def test_import_waits_for_startup_restore(
     mm2_app_config: InvokeAIAppConfig,
     mm2_record_store,
@@ -396,6 +397,110 @@ def test_import_waits_for_startup_restore(
         installer.stop()
 
 
+@pytest.mark.timeout(timeout=30, method="thread")
+def test_concurrent_imports_of_same_source_return_one_job(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = URLModelSource(url=Url("https://www.test.foo/download/test_embedding.safetensors"))
+    assert mm2_installer._restore_completed_event.wait(timeout=5)
+
+    # Both imports can reuse this interrupted install directory. Hold the first helper after its duplicate check so the
+    # second import can reach the same post-restore race window.
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}reusable"
+    tmpdir.mkdir()
+    interrupted_job = ModelInstallJob(
+        id=99998,
+        source=source,
+        config_in=ModelRecordChanges(),
+        local_path=tmpdir,
+    )
+    interrupted_job._install_tmpdir = tmpdir
+    mm2_installer._write_install_marker(interrupted_job, status=InstallStatus.DOWNLOADING)
+
+    first_import_ready = threading.Event()
+    second_helper_entered = threading.Event()
+    release_first_import = threading.Event()
+    helper_calls = 0
+    helper_calls_lock = threading.Lock()
+    import_from_url = mm2_installer._import_from_url
+    imported_jobs: list[ModelInstallJob] = []
+    import_errors: list[BaseException] = []
+
+    def _synchronized_import_from_url(
+        import_source: URLModelSource, config: ModelRecordChanges | None = None
+    ) -> ModelInstallJob:
+        nonlocal helper_calls
+        with helper_calls_lock:
+            helper_calls += 1
+            is_first_import = helper_calls == 1
+        if is_first_import:
+            first_import_ready.set()
+            assert release_first_import.wait(timeout=5)
+        else:
+            second_helper_entered.set()
+        return import_from_url(import_source, config)
+
+    def _import() -> None:
+        try:
+            imported_jobs.append(mm2_installer.import_model(source))
+        except BaseException as error:
+            import_errors.append(error)
+
+    monkeypatch.setattr(mm2_installer, "_import_from_url", _synchronized_import_from_url)
+
+    first_import_thread = threading.Thread(target=_import)
+    second_import_thread = threading.Thread(target=_import)
+    first_import_thread.start()
+    assert first_import_ready.wait(timeout=5)
+    second_import_thread.start()
+    second_helper_entered.wait(timeout=1)
+    release_first_import.set()
+
+    import_threads = [first_import_thread, second_import_thread]
+    for import_thread in import_threads:
+        import_thread.join(timeout=20)
+
+    assert all(not import_thread.is_alive() for import_thread in import_threads)
+    assert not import_errors
+    jobs = mm2_installer.get_job_by_source(source)
+    assert len(jobs) == 1
+    assert len(imported_jobs) == 2
+    assert imported_jobs[0] is imported_jobs[1] is jobs[0]
+
+
+@pytest.mark.timeout(timeout=10, method="thread")
+def test_failed_import_releases_source_reservation(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = URLModelSource(url=Url("https://www.test.foo/download/test_embedding.safetensors"))
+    import_attempts = 0
+
+    def _import_from_url(import_source: URLModelSource, config: ModelRecordChanges | None = None) -> ModelInstallJob:
+        nonlocal import_attempts
+        import_attempts += 1
+        if import_attempts == 1:
+            raise RuntimeError("metadata request failed")
+        return ModelInstallJob(
+            id=99997,
+            source=import_source,
+            config_in=config or ModelRecordChanges(),
+            local_path=mm2_app_config.models_path,
+        )
+
+    monkeypatch.setattr(mm2_installer, "_import_from_url", _import_from_url)
+
+    with pytest.raises(RuntimeError, match="metadata request failed"):
+        mm2_installer.import_model(source)
+
+    job = mm2_installer.import_model(source)
+    assert job.source == source
+    assert mm2_installer.get_job_by_source(source) == [job]
+
+
 @pytest.mark.timeout(timeout=5, method="thread")
 def test_import_and_wait_for_installs_fail_before_start(
     mm2_app_config: InvokeAIAppConfig,
@@ -444,6 +549,39 @@ def test_import_fails_after_startup_failure(
         with pytest.raises(RuntimeError, match="startup failed"):
             installer.start()
 
+        with pytest.raises(RuntimeError, match="Model install service failed to start"):
+            installer.import_model(LocalModelSource(path=embedding_file))
+    finally:
+        installer.stop()
+
+
+@pytest.mark.timeout(timeout=5, method="thread")
+def test_base_exception_during_startup_releases_import_waiters(
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_record_store,
+    mm2_download_queue,
+    mm2_session,
+    embedding_file: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    installer = ModelInstallService(
+        app_config=mm2_app_config,
+        record_store=mm2_record_store,
+        download_queue=mm2_download_queue,
+        event_bus=TestEventService(),
+        session=mm2_session,
+    )
+
+    def _interrupt_startup() -> None:
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(installer, "_migrate_yaml", _interrupt_startup)
+
+    try:
+        with pytest.raises(KeyboardInterrupt):
+            installer.start()
+
+        assert installer._restore_completed_event.is_set()
         with pytest.raises(RuntimeError, match="Model install service failed to start"):
             installer.import_model(LocalModelSource(path=embedding_file))
     finally:
