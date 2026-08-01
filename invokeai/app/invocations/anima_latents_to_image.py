@@ -42,16 +42,24 @@ ANIMA_VAE_TILE_STRIDE = 384
 
 
 def _is_oom_error(e: RuntimeError) -> bool:
-    """Return True if the error indicates a CUDA out-of-memory condition.
+    """Return True if the error indicates an out-of-memory condition.
 
     The caching allocator raises torch.cuda.OutOfMemoryError, but an OOM surfaced from inside a
     cuDNN/cuBLAS kernel (e.g. workspace allocation in the Wan VAE's convolutions) arrives as a
-    plain RuntimeError, which must be matched by message.
+    plain RuntimeError, which must be matched by message. XPU exhaustion likewise arrives as a
+    plain RuntimeError, naming the Level Zero/UR result code (`..._OUT_OF_DEVICE_MEMORY`) rather
+    than the words "out of memory" -- so it needs its own spelling to be matched here.
     """
     if isinstance(e, torch.cuda.OutOfMemoryError):
         return True
-    msg = str(e)
-    return "out of memory" in msg.lower() or "CUDNN_STATUS_ALLOC_FAILED" in msg or "CUBLAS_STATUS_ALLOC_FAILED" in msg
+    msg = str(e).lower()
+    return (
+        "out of memory" in msg
+        or "out_of_device_memory" in msg
+        or "out_of_host_memory" in msg
+        or "cudnn_status_alloc_failed" in msg
+        or "cublas_status_alloc_failed" in msg
+    )
 
 
 @invocation(
