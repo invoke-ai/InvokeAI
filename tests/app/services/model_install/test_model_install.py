@@ -36,6 +36,7 @@ from invokeai.app.services.model_install.model_install_common import (
     ModelInstallJob,
     URLModelSource,
 )
+from invokeai.app.services.model_install.model_install_default import TMPDIR_PREFIX
 from invokeai.app.services.model_records import ModelRecordChanges, UnknownModelException
 from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig
 from invokeai.backend.model_manager.taxonomy import (
@@ -328,7 +329,6 @@ def test_import_waits_for_startup_restore(
     mm2_record_store,
     mm2_download_queue,
     mm2_session,
-    embedding_file: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     installer = ModelInstallService(
@@ -341,32 +341,50 @@ def test_import_waits_for_startup_restore(
     restore_started = threading.Event()
     release_restore = threading.Event()
     imported = threading.Event()
+    imported_jobs: list[ModelInstallJob] = []
+    source = URLModelSource(url=Url("https://www.test.foo/download/interrupted.safetensors"))
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}interrupted"
+    tmpdir.mkdir()
+    interrupted_job = ModelInstallJob(
+        id=99999,
+        source=source,
+        config_in=ModelRecordChanges(),
+        local_path=tmpdir,
+    )
+    interrupted_job._install_tmpdir = tmpdir
+    installer._write_install_marker(interrupted_job, status=InstallStatus.DOWNLOADING)
+    restore = installer._restore_incomplete_installs
 
     def _blocked_restore() -> None:
         restore_started.set()
         assert release_restore.wait(timeout=5)
+        restore()
+
+    def _import() -> None:
+        imported_jobs.append(installer.import_model(source))
+        imported.set()
 
     monkeypatch.setattr(installer, "_restore_incomplete_installs", _blocked_restore)
+    monkeypatch.setattr(installer, "_resume_remote_download", lambda job: None)
 
     try:
-        installer.start()
-        assert restore_started.wait(timeout=5)
-
-        import_thread = threading.Thread(
-            target=lambda: (
-                installer.import_model(LocalModelSource(path=embedding_file)),
-                imported.set(),
-            )
-        )
+        import_thread = threading.Thread(target=_import)
         import_thread.start()
 
         time.sleep(0.1)
+        imported_before_start = imported.is_set()
+
+        installer.start()
+        assert restore_started.wait(timeout=5)
         assert not imported.is_set()
 
         release_restore.set()
         import_thread.join(timeout=5)
+        assert not imported_before_start
         assert imported.is_set()
-        installer.wait_for_installs(timeout=5)
+        jobs = installer.get_job_by_source(source)
+        assert len(jobs) == 1
+        assert imported_jobs == jobs
     finally:
         release_restore.set()
         installer.stop()

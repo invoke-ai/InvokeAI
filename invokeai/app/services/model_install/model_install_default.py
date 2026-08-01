@@ -112,8 +112,9 @@ class ModelInstallService(ModelInstallServiceBase):
         self._stop_event = threading.Event()
         self._downloads_changed_event = threading.Event()
         self._install_completed_event = threading.Event()
+        # Imports must not begin until startup restoration has completed. Leave this unset until
+        # _restore_incomplete_installs_async() finishes so an import racing start() cannot pass the barrier early.
         self._restore_completed_event = threading.Event()
-        self._restore_completed_event.set()
         self._download_queue = download_queue
         self._download_cache: Dict[int, ModelInstallJob] = {}
         # Per-source locks serializing download_and_cache_model() so parallel (multi-GPU) sessions
