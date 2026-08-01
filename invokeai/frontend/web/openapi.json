@@ -47712,7 +47712,7 @@
               }
             ],
             "default": null,
-            "description": "The device processing this session, e.g. 'cuda:1' (set only when running on a CUDA GPU)",
+            "description": "The device processing this session, e.g. 'cuda:1' (set only when running on a GPU)",
             "title": "Device"
           }
         },
@@ -79762,7 +79762,7 @@
               }
             ],
             "title": "Device",
-            "description": "The device that processed this queue item, e.g. 'cuda:1' (set only when running on a CUDA GPU)"
+            "description": "The device that processed this queue item, e.g. 'cuda:1' (set only when running on a GPU)"
           },
           "workflow_call_id": {
             "anyOf": [

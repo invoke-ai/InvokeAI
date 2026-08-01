@@ -18810,7 +18810,7 @@ export type components = {
             image: components["schemas"]["ProgressImage"] | null;
             /**
              * Device
-             * @description The device processing this session, e.g. 'cuda:1' (set only when running on a CUDA GPU)
+             * @description The device processing this session, e.g. 'cuda:1' (set only when running on a GPU)
              * @default null
              */
             device: string | null;
@@ -34308,7 +34308,7 @@ export type components = {
             retried_from_item_id?: number | null;
             /**
              * Device
-             * @description The device that processed this queue item, e.g. 'cuda:1' (set only when running on a CUDA GPU)
+             * @description The device that processed this queue item, e.g. 'cuda:1' (set only when running on a GPU)
              */
             device?: string | null;
             /**
