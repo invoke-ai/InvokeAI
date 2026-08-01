@@ -26,6 +26,10 @@ from invokeai.app.services.events.events_common import (
     InvocationErrorEvent,
     InvocationProgressEvent,
     InvocationStartedEvent,
+    LLMTaskCompleteEvent,
+    LLMTaskErrorEvent,
+    LLMTaskEventBase,
+    LLMTaskProgressEvent,
     ModelEventBase,
     ModelInstallCancelledEvent,
     ModelInstallCompleteEvent,
@@ -99,6 +103,8 @@ MODEL_EVENTS = {
 BULK_DOWNLOAD_EVENTS = {BulkDownloadStartedEvent, BulkDownloadCompleteEvent, BulkDownloadErrorEvent}
 WORKFLOW_EVENTS = {WorkflowCreatedEvent, WorkflowUpdatedEvent, WorkflowDeletedEvent}
 
+LLM_TASK_EVENTS = {LLMTaskProgressEvent, LLMTaskCompleteEvent, LLMTaskErrorEvent}
+
 
 class SocketIO:
     _sub_queue = "subscribe_queue"
@@ -134,6 +140,7 @@ class SocketIO:
         register_events(QUEUE_EVENTS, self._handle_queue_event)
         register_events(MODEL_EVENTS, self._handle_model_event)
         register_events(BULK_DOWNLOAD_EVENTS, self._handle_bulk_image_download_event)
+        register_events(LLM_TASK_EVENTS, self._handle_llm_task_event)
         register_events(WORKFLOW_EVENTS, self._handle_workflow_event)
 
     async def _handle_connect(self, sid: str, environ: dict, auth: dict | None) -> bool:
@@ -603,6 +610,18 @@ class SocketIO:
         # Model install / download events remain broadcast to all connected sockets - they feed
         # the model manager UI, which is not per-user.
         await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"))
+
+    async def _handle_llm_task_event(self, event: FastAPIEvent[LLMTaskEventBase]) -> None:
+        """Route LLM utility task events privately to the originating user + admins.
+
+        These events carry partial prompt content (via the task_id correlation) and
+        must not be broadcast to other users.
+        """
+        event_name, event_data = event
+        user_room = f"user:{event_data.user_id}"
+        payload = event_data.model_dump(mode="json")
+        await self._sio.emit(event=event_name, data=payload, room=user_room)
+        await self._sio.emit(event=event_name, data=payload, room="admin")
 
     async def _handle_bulk_image_download_event(self, event: FastAPIEvent[BulkDownloadEventBase]) -> None:
         event_name, event_data = event
