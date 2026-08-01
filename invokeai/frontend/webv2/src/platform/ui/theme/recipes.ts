@@ -122,6 +122,24 @@ export const tabsSlotRecipe = defineSlotRecipe({
 });
 
 /**
+ * Buttons: the text size stops scaling below `lg`. The workbench is dense, and
+ * a 14px label on a 40px `md` button reads as a marketing button next to the
+ * 12px chrome around it. `sm` moves with `md` — otherwise the smaller button
+ * would carry the larger label.
+ */
+export const buttonRecipe = defineRecipe({
+  ...chakraRecipes.button,
+  variants: {
+    ...chakraRecipes.button.variants,
+    size: {
+      ...chakraRecipes.button.variants?.size,
+      sm: { ...chakraRecipes.button.variants?.size?.sm, textStyle: 'xs' },
+      md: { ...chakraRecipes.button.variants?.size?.md, textStyle: 'xs' },
+    },
+  } as unknown as typeof chakraRecipes.button.variants,
+});
+
+/**
  * Segment control: a flat strip, not a recessed pill.
  *
  * Chakra's stock look — inset-shadowed `bg.muted` track, elevated white

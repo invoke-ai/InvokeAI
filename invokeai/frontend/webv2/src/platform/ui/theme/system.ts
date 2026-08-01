@@ -1,6 +1,7 @@
 import { createSystem, defaultConfig, defineConfig } from '@chakra-ui/react';
 
 import {
+  buttonRecipe,
   colorPickerSlotRecipe,
   comboboxSlotRecipe,
   dialogSlotRecipe,
@@ -279,6 +280,7 @@ const config = defineConfig({
     // Chrome-level overrides for Chakra's built-in components, so popover and
     // dialog surfaces are consistent everywhere without per-instance props.
     recipes: {
+      button: buttonRecipe,
       input: inputRecipe,
       textarea: textareaRecipe,
     },
