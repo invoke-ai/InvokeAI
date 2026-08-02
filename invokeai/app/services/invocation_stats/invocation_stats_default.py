@@ -95,7 +95,11 @@ class InvocationStatsService(InvocationStatsServiceBase):
         model_cache_stats_summary = self._get_model_cache_summary(graph_execution_state_id)
         # Note: We use memory_allocated() here (not memory_reserved()) because we want to show
         # the current actively-used VRAM, not the total reserved memory including PyTorch's cache.
-        vram_usage_gb = (_vram_allocated_bytes() / GB) if (torch.cuda.is_available() or (hasattr(torch, "xpu") and torch.xpu.is_available())) else None
+        vram_usage_gb = (
+            (_vram_allocated_bytes() / GB)
+            if (torch.cuda.is_available() or (hasattr(torch, "xpu") and torch.xpu.is_available()))
+            else None
+        )
 
         return InvocationStatsSummary(
             graph_stats=graph_stats_summary,
