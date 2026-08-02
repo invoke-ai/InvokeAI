@@ -133,13 +133,20 @@ dependencies = [
 # windows-amd64 on PyTorch's WHL index. Gate the +xpu pins to those platforms; the
 # Intel oneAPI runtime libs (intel-sycl-rt, etc.) come in automatically as deps of
 # torch+xpu.
+# Pinned ahead of the cpu/cuda extras (2.7.1), as the rocm extra already is. Intel's XPU
+# backend matured considerably after 2.7.1: torch.xpu.mem_get_info() works on driver/kernel
+# combinations where it previously raised, and the bundled oneAPI runtime ships with the wheel
+# (intel-sycl-rt), so upgrading torch upgrades the user-space runtime too.
 "xpu" = [
-  "torch==2.7.1+xpu; (sys_platform == 'linux' and platform_machine == 'x86_64') or sys_platform == 'win32'",
-  "torchvision==0.22.1+xpu; (sys_platform == 'linux' and platform_machine == 'x86_64') or sys_platform == 'win32'",
+  "torch==2.13.0+xpu; (sys_platform == 'linux' and platform_machine == 'x86_64') or sys_platform == 'win32'",
+  "torchvision==0.28.0+xpu; (sys_platform == 'linux' and platform_machine == 'x86_64') or sys_platform == 'win32'",
   # XPU triton (for torch.compile); the WHL index ships linux-x86_64 and win_amd64 wheels.
-  "pytorch-triton-xpu==3.3.1; (sys_platform == 'linux' and platform_machine == 'x86_64') or sys_platform == 'win32'",
+  # Renamed from pytorch-triton-xpu to triton-xpu upstream.
+  "triton-xpu==3.7.2; (sys_platform == 'linux' and platform_machine == 'x86_64') or sys_platform == 'win32'",
   # macOS / linux_aarch64 have no +xpu wheels: fall back to base torch so the extra's
-  # conflict-universe always contains a torch. See note under "cpu".
+  # conflict-universe always contains a torch. See note under "cpu". These stay on 2.7.1 to
+  # match the other extras and the project's `torch<2.8.0` constraint on darwin -- only the
+  # +xpu wheels above move.
   "torch==2.7.1; sys_platform == 'darwin' or (sys_platform == 'linux' and platform_machine == 'aarch64')",
   "torchvision==0.22.1; sys_platform == 'darwin' or (sys_platform == 'linux' and platform_machine == 'aarch64')",
 ]
@@ -197,7 +204,7 @@ torchvision = [
 triton-rocm = [
   { index = "torch-rocm", marker = "sys_platform == 'linux' and platform_machine != 'aarch64'" },
 ]
-pytorch-triton-xpu = [
+triton-xpu = [
   { index = "torch-xpu", marker = "(sys_platform == 'linux' and platform_machine == 'x86_64') or sys_platform == 'win32'" },
 ]
 
