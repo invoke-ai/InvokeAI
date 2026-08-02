@@ -69,6 +69,12 @@ class WindowAttentionModelMixin(ModelMixin):
         self.transformer = WindowAttentionBlock()
 
 
+class CachedHiDiffusionModelMixin(ModelMixin):
+    def __init__(self):
+        super().__init__()
+        self.block = torch.nn.Module()
+
+
 def test_hidiffusion_patch_supports_bare_model_mixin_without_public_name_or_path():
     model = ModelMixin()
 
@@ -116,6 +122,40 @@ def test_hidiffusion_window_attention_uses_seeded_generator_instead_of_global_rn
     second = run_with_global_seed(1)
 
     torch.testing.assert_close(first, second)
+
+
+def test_hidiffusion_patch_resets_cached_runtime_state_when_reenabled():
+    module_keys = {
+        "down_module_key": [],
+        "down_module_key_extra": ["block"],
+        "up_module_key": [],
+        "up_module_key_extra": [],
+        "windown_attn_module_key": [],
+    }
+    model = CachedHiDiffusionModelMixin()
+
+    with patch("invokeai.backend.hidiffusion.hidiffusion.sd15_hidiffusion_key", return_value=module_keys):
+        with hidiffusion_patch(model, name_or_path="runwayml/stable-diffusion-v1-5"):
+            model.block.timestep = 7
+            model.block.aggressive_raunet = True
+            model.block.T1_ratio = 0.9
+            model.block.T1 = 9
+            model.block.T1_start = 2
+            model.block.T1_end = 8
+            model.block.max_timestep = 99
+
+        # A normal generation while HiDiffusion is disabled reuses the cached
+        # module without exercising its dormant HiDiffusion attributes.
+        assert model.block.timestep == 7
+
+        with hidiffusion_patch(model, name_or_path="runwayml/stable-diffusion-v1-5"):
+            assert model.block.timestep == 0
+            assert model.block.aggressive_raunet is False
+            assert model.block.T1_ratio == 0
+            assert model.block.T1 == 0
+            assert model.block.T1_start == 0
+            assert model.block.T1_end == 0
+            assert model.block.max_timestep == 50
 
 
 def test_hidiffusion_patch_restores_state_when_apply_hidiffusion_raises():

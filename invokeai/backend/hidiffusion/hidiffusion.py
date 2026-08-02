@@ -1978,6 +1978,34 @@ def hook_diffusion_model(model: torch.nn.Module):
     model.info["hooks"].append(model.register_forward_pre_hook(hook))
 
 
+def _reset_hidiffusion_runtime_state(module: torch.nn.Module) -> None:
+    """Clear runtime state left on a cached module by a previous HiDiffusion patch."""
+    # The downsampler temporarily overrides these attributes while resizing. If its
+    # forward pass was interrupted, restore the originals before dropping the
+    # bookkeeping attributes.
+    for attribute, original_attribute in (
+        ("stride", "ori_stride"),
+        ("padding", "ori_padding"),
+        ("dilation", "ori_dilation"),
+    ):
+        if original_attribute in module.__dict__:
+            setattr(module, attribute, module.__dict__[original_attribute])
+
+    for attribute in (
+        "timestep",
+        "aggressive_raunet",
+        "T1_ratio",
+        "T1",
+        "T1_start",
+        "T1_end",
+        "max_timestep",
+        "ori_stride",
+        "ori_padding",
+        "ori_dilation",
+    ):
+        module.__dict__.pop(attribute, None)
+
+
 def apply_hidiffusion(
     model: torch.nn.Module,
     apply_raunet: bool = True,
@@ -2062,18 +2090,22 @@ def apply_hidiffusion(
         modified_key = sd15_hidiffusion_key()
         for key, module in diffusion_model.named_modules():
             if apply_raunet and key in modified_key["down_module_key"]:
+                _reset_hidiffusion_runtime_state(module)
                 make_block_fn = make_diffusers_downsampler_block
                 module.__class__ = make_block_fn(module.__class__)
                 module.switching_threshold_ratio = "T1_ratio"
             if apply_raunet and key in modified_key["down_module_key_extra"]:
+                _reset_hidiffusion_runtime_state(module)
                 make_block_fn = make_diffusers_cross_attn_down_block
                 module.__class__ = make_block_fn(module.__class__)
                 module.switching_threshold_ratio = "T2_ratio"
             if apply_raunet and key in modified_key["up_module_key"]:
+                _reset_hidiffusion_runtime_state(module)
                 make_block_fn = make_diffusers_upsampler_block
                 module.__class__ = make_block_fn(module.__class__)
                 module.switching_threshold_ratio = "T1_ratio"
             if apply_raunet and key in modified_key["up_module_key_extra"]:
+                _reset_hidiffusion_runtime_state(module)
                 make_block_fn = make_diffusers_cross_attn_up_block
                 module.__class__ = make_block_fn(module.__class__)
                 module.switching_threshold_ratio = "T2_ratio"
@@ -2090,21 +2122,25 @@ def apply_hidiffusion(
         modified_key = sdxl_hidiffusion_key()
         for key, module in diffusion_model.named_modules():
             if apply_raunet and key in modified_key["down_module_key"]:
+                _reset_hidiffusion_runtime_state(module)
                 make_block_fn = make_diffusers_cross_attn_down_block
                 module.__class__ = make_block_fn(module.__class__)
                 module.switching_threshold_ratio = "T1_ratio"
 
             if apply_raunet and key in modified_key["down_module_key_extra"]:
+                _reset_hidiffusion_runtime_state(module)
                 make_block_fn = make_diffusers_downsampler_block
                 module.__class__ = make_block_fn(module.__class__)
                 module.switching_threshold_ratio = "T2_ratio"
 
             if apply_raunet and key in modified_key["up_module_key"]:
+                _reset_hidiffusion_runtime_state(module)
                 make_block_fn = make_diffusers_cross_attn_up_block
                 module.__class__ = make_block_fn(module.__class__)
                 module.switching_threshold_ratio = "T1_ratio"
 
             if apply_raunet and key in modified_key["up_module_key_extra"]:
+                _reset_hidiffusion_runtime_state(module)
                 make_block_fn = make_diffusers_upsampler_block
                 module.__class__ = make_block_fn(module.__class__)
                 module.switching_threshold_ratio = "T2_ratio"
@@ -2119,11 +2155,13 @@ def apply_hidiffusion(
         modified_key = sdxl_turbo_hidiffusion_key()
         for key, module in diffusion_model.named_modules():
             if apply_raunet and key in modified_key["down_module_key"]:
+                _reset_hidiffusion_runtime_state(module)
                 make_block_fn = make_diffusers_cross_attn_down_block
                 module.__class__ = make_block_fn(module.__class__)
                 module.switching_threshold_ratio = "T1_ratio"
 
             if apply_raunet and key in modified_key["up_module_key"]:
+                _reset_hidiffusion_runtime_state(module)
                 make_block_fn = make_diffusers_cross_attn_up_block
                 module.__class__ = make_block_fn(module.__class__)
                 module.switching_threshold_ratio = "T1_ratio"
