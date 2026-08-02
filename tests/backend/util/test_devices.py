@@ -433,6 +433,7 @@ def test_xpu_mem_get_info_fallback_derives_from_properties():
     gib = 1 << 30
     with (
         patch.object(torch.xpu, "mem_get_info", side_effect=RuntimeError("aspect missing"), create=True),
+        patch("invokeai.backend.util.devices.xpu_memory_info", return_value=None),
         patch.object(
             torch.xpu, "get_device_properties", return_value=SimpleNamespace(total_memory=32 * gib), create=True
         ),
@@ -441,6 +442,36 @@ def test_xpu_mem_get_info_fallback_derives_from_properties():
         free, total = TorchDevice.xpu_mem_get_info(torch.device("xpu"))
     assert total == 32 * gib
     assert free == 30 * gib
+
+
+def test_xpu_mem_get_info_falls_back_to_sysman_before_estimating():
+    """Level Zero Sysman is driver-global like mem_get_info, so it must be preferred over the
+    process-local estimate, which is blind to VRAM held by other processes."""
+    gib = 1 << 30
+    with (
+        patch.object(torch.xpu, "mem_get_info", side_effect=RuntimeError("aspect missing"), create=True),
+        patch("invokeai.backend.util.devices.xpu_memory_info", return_value=(15 * gib, 32 * gib)) as mock_sysman,
+        patch.object(
+            torch.xpu, "get_device_properties", return_value=SimpleNamespace(total_memory=32 * gib), create=True
+        ),
+        patch.object(torch.xpu, "memory_reserved", return_value=0, create=True),
+    ):
+        # The blind estimate would say 32 GiB free here; Sysman's 15 GiB must win.
+        assert TorchDevice.xpu_mem_get_info(torch.device("xpu")) == (15 * gib, 32 * gib)
+    mock_sysman.assert_called_once()
+
+
+def test_xpu_mem_get_info_estimates_when_sysman_also_fails():
+    gib = 1 << 30
+    with (
+        patch.object(torch.xpu, "mem_get_info", side_effect=RuntimeError("aspect missing"), create=True),
+        patch("invokeai.backend.util.devices.xpu_memory_info", return_value=None),
+        patch.object(
+            torch.xpu, "get_device_properties", return_value=SimpleNamespace(total_memory=32 * gib), create=True
+        ),
+        patch.object(torch.xpu, "memory_reserved", return_value=2 * gib, create=True),
+    ):
+        assert TorchDevice.xpu_mem_get_info(torch.device("xpu")) == (30 * gib, 32 * gib)
 
 
 def test_xpu_mem_get_info_unknown_total_raises():
