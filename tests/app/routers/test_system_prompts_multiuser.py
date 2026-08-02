@@ -106,6 +106,7 @@ def mock_services() -> InvocationServices:
         video_records=None,  # type: ignore
         board_video_records=None,  # type: ignore
         gallery=None,  # type: ignore
+        image_index_records=None,  # type: ignore
     )
 
 

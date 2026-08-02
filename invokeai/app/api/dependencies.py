@@ -27,6 +27,7 @@ from invokeai.app.services.external_generation.providers import (
 from invokeai.app.services.external_generation.startup import sync_configured_external_starter_models
 from invokeai.app.services.gallery.gallery_default import SqliteGalleryService
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
+from invokeai.app.services.image_index.image_index_records_sqlite import ImageIndexRecordsSqlite
 from invokeai.app.services.image_moves.image_moves_default import ImageMoveService
 from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
 from invokeai.app.services.images.images_default import ImageService
@@ -214,6 +215,7 @@ class ApiDependencies:
         client_state_persistence = ClientStatePersistenceSqlite(db=db)
         project_records = ProjectRecordsSqlite(db=db)
         users = UserService(db=db)
+        image_index_records = ImageIndexRecordsSqlite(db=db)
 
         services = InvocationServices(
             board_image_records=board_image_records,
@@ -256,6 +258,7 @@ class ApiDependencies:
             video_records=video_records,
             board_video_records=board_video_records,
             gallery=gallery,
+            image_index_records=image_index_records,
         )
 
         ApiDependencies.invoker = Invoker(services)
