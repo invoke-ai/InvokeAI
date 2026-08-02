@@ -21,17 +21,25 @@ from invokeai.app.services.invocation_stats.invocation_stats_common import (
 )
 from invokeai.app.services.invoker import Invoker
 from invokeai.backend.model_manager.load.model_cache.cache_stats import CacheStats
+from invokeai.backend.util.devices import TorchDevice
 
 # Size of 1GB in bytes.
 GB = 2**30
 
 
 def _vram_allocated_bytes() -> float:
-    """Return the currently-allocated VRAM in bytes for the active accelerator (CUDA or XPU), else 0."""
-    if torch.cuda.is_available():
-        return torch.cuda.memory_allocated()
-    if hasattr(torch, "xpu") and torch.xpu.is_available():
-        return torch.xpu.memory_allocated()
+    """Return the currently-allocated VRAM in bytes for the device generation is running on, else 0.
+
+    Dispatches on the resolved execution device rather than on availability order: a box with both
+    an NVIDIA card and an Arc, configured onto xpu, would otherwise report CUDA's (empty)
+    allocation while the Arc is full -- and stats that always read 0.0 GB make XPU bug reports
+    impossible to act on.
+    """
+    device = TorchDevice.choose_torch_device()
+    if device.type == "cuda" and torch.cuda.is_available():
+        return torch.cuda.memory_allocated(device)
+    if device.type == "xpu" and hasattr(torch, "xpu") and torch.xpu.is_available():
+        return torch.xpu.memory_allocated(device)
     return 0.0
 
 
@@ -95,11 +103,8 @@ class InvocationStatsService(InvocationStatsServiceBase):
         model_cache_stats_summary = self._get_model_cache_summary(graph_execution_state_id)
         # Note: We use memory_allocated() here (not memory_reserved()) because we want to show
         # the current actively-used VRAM, not the total reserved memory including PyTorch's cache.
-        vram_usage_gb = (
-            (_vram_allocated_bytes() / GB)
-            if (torch.cuda.is_available() or (hasattr(torch, "xpu") and torch.xpu.is_available()))
-            else None
-        )
+        on_accelerator = TorchDevice.choose_torch_device().type in ("cuda", "xpu")
+        vram_usage_gb = (_vram_allocated_bytes() / GB) if on_accelerator else None
 
         return InvocationStatsSummary(
             graph_stats=graph_stats_summary,
