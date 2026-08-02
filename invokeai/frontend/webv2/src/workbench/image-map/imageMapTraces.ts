@@ -1,6 +1,7 @@
 import type { Layout } from 'plotly.js';
 
 import type { ImageMapPoint } from './api';
+import type { AxisRanges } from './imageMapViewport';
 
 import { getClusterColor } from './clusterPalette';
 
@@ -25,7 +26,7 @@ export interface ScatterTrace {
   mode: 'markers';
   type: 'scattergl';
   name: string;
-  hoverinfo: 'none' | 'text';
+  hoverinfo: 'none' | 'skip' | 'text';
   text?: string[];
   marker: {
     color: string | string[];
@@ -57,7 +58,9 @@ export const buildAllPointsTrace = (points: ImageMapPoint[]): ScatterTrace => ({
  */
 export const buildCurrentImageTrace = (): ScatterTrace => ({
   customdata: [],
-  hoverinfo: 'none',
+  // 'skip' (not 'none') excludes the marker from hit-testing entirely, so
+  // clicks and hovers land on the underlying data point it covers.
+  hoverinfo: 'skip',
   marker: {
     color: '#FFD700',
     line: { color: '#000000', width: 2 },
@@ -77,7 +80,7 @@ export const buildCurrentImageTrace = (): ScatterTrace => ({
 const GRID_LINE_COLOR = 'rgba(128, 128, 128, 0.16)';
 const GRID_ZERO_COLOR = 'rgba(128, 128, 128, 0.32)';
 
-export const buildMapLayout = (): Partial<Layout> => ({
+export const buildMapLayout = (initialRanges?: AxisRanges | null): Partial<Layout> => ({
   dragmode: 'pan',
   margin: { b: 0, l: 0, r: 0, t: 0 },
   paper_bgcolor: 'rgba(0,0,0,0)',
@@ -91,6 +94,7 @@ export const buildMapLayout = (): Partial<Layout> => ({
     // the rest of the map's fixed styling.
     gridcolor: GRID_LINE_COLOR,
     gridwidth: 1,
+    range: initialRanges?.x,
     scaleanchor: 'y',
     showgrid: true,
     showticklabels: false,
@@ -101,6 +105,7 @@ export const buildMapLayout = (): Partial<Layout> => ({
   yaxis: {
     gridcolor: GRID_LINE_COLOR,
     gridwidth: 1,
+    range: initialRanges?.y,
     showgrid: true,
     showticklabels: false,
     zeroline: true,
