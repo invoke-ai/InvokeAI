@@ -56,6 +56,42 @@ def _make_config(model_type: ModelType, fp8: bool, base: BaseModelType = BaseMod
     )
 
 
+@pytest.mark.parametrize(
+    "config,submodel",
+    [
+        (_make_config(ModelType.VAE, fp8=True), None),
+        (_make_config(ModelType.LoRA, fp8=True), None),
+        (_make_config(ModelType.Main, fp8=True, base=BaseModelType.ZImage), None),
+        (_make_config(ModelType.Main, fp8=True), SubModelType.Tokenizer),
+        (_make_config(ModelType.Main, fp8=False), None),
+    ],
+)
+def test_should_use_fp8_does_not_probe_the_device_for_excluded_models(config, submodel):
+    """The device probe must run only for a model that actually wants FP8.
+
+    It allocates on the GPU, so probing before the exclusions fires it on the very first load of
+    any kind -- a tokenizer, a VAE, a scheduler -- and on API/install threads it forces XPU lazy
+    SYCL init on a thread that never generates.
+    """
+    loader = _make_loader("xpu")
+    probe_path = "invokeai.backend.model_manager.load.load_default._device_supports_fp8_storage"
+    with patch(probe_path) as mock_probe:
+        assert loader._should_use_fp8(config, submodel) is False
+    mock_probe.assert_not_called()
+
+
+def test_should_use_fp8_probes_the_device_when_fp8_is_requested():
+    loader = _make_loader("xpu")
+    probe_path = "invokeai.backend.model_manager.load.load_default._device_supports_fp8_storage"
+    config = _make_config(ModelType.Main, fp8=True)
+    with patch(probe_path, return_value=True) as mock_probe:
+        assert loader._should_use_fp8(config, None) is True
+    mock_probe.assert_called_once()
+    # An unsupported device still vetoes, just without probing on every unrelated load.
+    with patch(probe_path, return_value=False):
+        assert loader._should_use_fp8(config, None) is False
+
+
 def test_should_use_fp8_excludes_control_lora():
     """ControlLoRA gets the FP8 toggle in the UI history but the LoRA loader never applies
     layerwise casting (the model isn't run as a standalone forward pass — it patches into a
