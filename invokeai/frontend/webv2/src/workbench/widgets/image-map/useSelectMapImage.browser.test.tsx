@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@features/gallery', () => ({
   galleryImages: { resolveMany: mocks.resolveMany },
   legacyGeneratedImageToGalleryItem: (image: { image_name: string }) => image,
+  toGalleryItemKey: (key: { kind: string; name: string }) => key,
 }));
 
 vi.mock('@workbench/WorkbenchContext', () => ({
@@ -19,7 +20,7 @@ vi.mock('@workbench/WorkbenchContext', () => ({
   }),
 }));
 
-import { useSelectMapImage } from './useSelectMapImage';
+import { useMapSelection } from './useSelectMapImage';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -30,11 +31,11 @@ let root: Root | null = null;
 const handle: { click: ((imageName: string) => void) | null } = { click: null };
 
 const Probe = () => {
-  const select = useSelectMapImage();
+  const { selectImage } = useMapSelection();
 
   useEffect(() => {
-    handle.click = select;
-  }, [select]);
+    handle.click = selectImage;
+  }, [selectImage]);
 
   return null;
 };
@@ -81,7 +82,7 @@ afterEach(async () => {
   mocks.selectItem.mockReset();
 });
 
-describe('useSelectMapImage', () => {
+describe('useMapSelection', () => {
   it('dispatches the selection for a click', async () => {
     mocks.resolveMany.mockResolvedValue([{ image_name: 'a.png' }]);
     await mount();

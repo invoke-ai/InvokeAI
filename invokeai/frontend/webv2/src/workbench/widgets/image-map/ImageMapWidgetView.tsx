@@ -2,6 +2,7 @@ import type { WidgetViewProps } from '@workbench/widgetContracts';
 
 import { Button, Center, Spinner, Stack, Text } from '@chakra-ui/react';
 import { ensureImageMapLoaded, imageMapStore, refreshImageMapPoints } from '@workbench/image-map/imageMapStore';
+import { useWidgetValuesSelector } from '@workbench/WorkbenchContext';
 import { lazy, Suspense, useEffect } from 'react';
 
 // Lazy so the plotly bundle (its own vite chunk, ~1.5MB) loads only when the
@@ -28,6 +29,7 @@ const plotLoadingFallback = (
  */
 export const ImageMapWidgetView = (_props: WidgetViewProps) => {
   const { data, error, loadState, renderError } = imageMapStore.useSnapshot();
+  const clickSelectsCluster = useWidgetValuesSelector('image-map', (values) => Boolean(values.clickSelectsCluster));
 
   useEffect(() => {
     ensureImageMapLoaded();
@@ -60,7 +62,7 @@ export const ImageMapWidgetView = (_props: WidgetViewProps) => {
     // mounted and the spinner where the plot will appear.
     return (
       <Suspense fallback={plotLoadingFallback}>
-        <ImageMapPlot />
+        <ImageMapPlot clickSelectsCluster={clickSelectsCluster} />
       </Suspense>
     );
   }
