@@ -212,7 +212,8 @@ class ContentTypeAwareGZipMiddleware(GZipMiddleware):
     repeatedly during a batch — exactly when the server can least afford to stall.
 
     Lowering `compresslevel` does not help here: on incompressible input, level 1 costs
-    essentially the same as level 9 because deflate still has to scan the data.
+    essentially the same as level 9 because deflate still has to scan the data. It does help a
+    great deal on the compressible path — see `configure_gzip`.
     """
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
@@ -228,6 +229,34 @@ class ContentTypeAwareGZipMiddleware(GZipMiddleware):
             responder = IdentityResponder(self.app, self.minimum_size)
 
         await responder(scope, receive, send)
+
+
+# Responses below this are not worth a compression pass; the gzip framing alone is ~20 bytes.
+GZIP_MINIMUM_SIZE = 1000
+
+
+def configure_gzip(app: FastAPI, compresslevel: int) -> None:
+    """Install response compression, unless it is turned off.
+
+    Compression runs on the event loop, so its cost is not paid by the requesting client alone —
+    it stalls every other request and every socket.io event for its duration. That makes the
+    level a real trade-off rather than a free win.
+
+    Measured on the flat name list of a 200k-image library (8.48 MB of JSON): level 1 takes
+    16.4ms and returns 6.1% of the input, level 9 takes 90.2ms and returns 5.7%. Level 9 costs
+    5.5x the event-loop time for 0.4 percentage points of bandwidth, which is a poor deal for a
+    locally-served app. The default stays at 9 so behavior is unchanged for existing installs;
+    users who feel the stall on a large library can lower it.
+
+    A `compresslevel` of 0 means "no compression". The middleware is then left out entirely
+    rather than installed at level 0, so responses skip the responder altogether instead of
+    being buffered and re-emitted as a stored-only gzip stream. Deployments behind a proxy that
+    already compresses (nginx, Caddy) want this, both to avoid the duplicated work and because
+    the proxy can compress off the event loop.
+    """
+    if compresslevel <= 0:
+        return
+    app.add_middleware(ContentTypeAwareGZipMiddleware, minimum_size=GZIP_MINIMUM_SIZE, compresslevel=compresslevel)
 
 
 class RedirectRootWithQueryStringMiddleware(BaseHTTPMiddleware):
@@ -471,7 +500,7 @@ app.add_middleware(
     expose_headers=["X-Refreshed-Token"],
 )
 
-app.add_middleware(ContentTypeAwareGZipMiddleware, minimum_size=1000)
+configure_gzip(app, app_config.gzip_compresslevel)
 
 
 # Include all routers
