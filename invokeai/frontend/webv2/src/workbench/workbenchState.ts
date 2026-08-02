@@ -14,6 +14,8 @@ import type { InvocationRoute, InvocationSourceId, ResultDestination } from '@wo
 import type {
   BuiltInLayoutPresetId,
   CenterViewId,
+  FloatingWidgetMode,
+  FloatingWidgetState,
   LayoutPreset,
   LayoutPresetId,
   LayoutPresetMetadataOverride,
@@ -127,6 +129,7 @@ import {
   getCanvasStagingSlots,
   getFirstCanvasPlaceholderSlotIndex,
 } from './canvasStagingView';
+import { cascadeDefaultGeometry, clampSizeToMinimum, nextStackOrder } from './floatingWindows';
 import {
   defaultInvocationRoute,
   isInvocationRouteValid,
@@ -211,6 +214,18 @@ type WorkbenchReducerAction =
     }
   | { type: 'setRegionWidgetCollapsed'; region: WidgetRegion; isCollapsed: boolean }
   | { type: 'setRegionWidgetSize'; region: WidgetRegion; sizePx: number }
+  | { type: 'floatWidget'; instanceId: WidgetInstanceId }
+  | { type: 'dockFloatingWidget'; instanceId: WidgetInstanceId }
+  | {
+      type: 'setFloatingWidgetGeometry';
+      instanceId: WidgetInstanceId;
+      x: number;
+      y: number;
+      widthPx: number;
+      heightPx: number;
+    }
+  | { type: 'setFloatingWidgetMode'; instanceId: WidgetInstanceId; mode: FloatingWidgetMode }
+  | { type: 'focusFloatingWidget'; instanceId: WidgetInstanceId }
   | { type: 'setGenerateSettings'; values: GenerateWidgetValues; projectId?: string; origin?: WorkbenchActionOrigin }
   | {
       type: 'patchGenerateSettings';
@@ -951,6 +966,7 @@ const createUndoSnapshot = (
   project: Project,
   projectGraph = cloneProjectGraph(project.projectGraph)
 ): ProjectUndoSnapshot => ({
+  floatingWidgets: project.floatingWidgets ? { ...project.floatingWidgets } : undefined,
   invocation: { ...project.invocation },
   layout: { ...project.layout, panels: { ...project.layout.panels } },
   projectGraph,
@@ -961,6 +977,9 @@ const createUndoSnapshot = (
 
 const restoreUndoSnapshot = (project: Project, snapshot: ProjectUndoSnapshot): Project => ({
   ...project,
+  // Restored WITH widgetRegions — they are one placement fact, and restoring
+  // one without the other can double-render or orphan a floated instance.
+  floatingWidgets: snapshot.floatingWidgets ? { ...snapshot.floatingWidgets } : undefined,
   invocation: { ...snapshot.invocation },
   layout: { ...snapshot.layout, panels: { ...snapshot.layout.panels } },
   projectGraph: cloneProjectGraph(normalizeProjectGraph(snapshot.projectGraph)),
@@ -1828,6 +1847,9 @@ const applyLayoutPresetToProject = (project: Project, preset: LayoutPreset): Pro
 
   return {
     ...project,
+    // A preset is a full placement reset: floating windows dock implicitly,
+    // otherwise an instance the preset places in a region would render twice.
+    floatingWidgets: undefined,
     layout: {
       ...snapshot.layout,
       panels: { ...snapshot.layout.panels },
@@ -3017,9 +3039,13 @@ export const __workbenchReducerInternal = (
               ...project.widgetInstances,
               [instanceId]: createWidgetInstance(action.widgetId, instanceId, action.initialValues),
             };
+        // Placing an instance into a region implicitly docks it: an instance
+        // must never render in a panel and a floating window at once.
+        const { [instanceId]: _floated, ...floatingWidgets } = project.floatingWidgets ?? {};
 
         return {
           ...project,
+          floatingWidgets,
           layout: openPanelForRegion(project.layout, action.region),
           widgetInstances,
           widgetRegions: {
@@ -3082,6 +3108,130 @@ export const __workbenchReducerInternal = (
           };
         })
       );
+    }
+    case 'floatWidget': {
+      return updateActiveProject(state, (project) => {
+        if (project.floatingWidgets?.[action.instanceId]) {
+          return project;
+        }
+
+        const hostEntry = (Object.entries(project.widgetRegions) as [WidgetRegion, WidgetRegionState][]).find(
+          ([, region]) => region.instanceIds.includes(action.instanceId)
+        );
+
+        if (!hostEntry || !project.widgetInstances[action.instanceId]) {
+          return project;
+        }
+
+        const [hostRegionId, hostRegion] = hostEntry;
+        const instanceIds = hostRegion.instanceIds.filter((instanceId) => instanceId !== action.instanceId);
+        const fallbackInstanceId = getNextInstanceId(hostRegion, action.instanceId);
+        const floating: FloatingWidgetState = {
+          ...cascadeDefaultGeometry(Object.keys(project.floatingWidgets ?? {}).length),
+          mode: 'windowed',
+          returnRegion: hostRegionId,
+          stackOrder: nextStackOrder(project.floatingWidgets),
+        };
+
+        return {
+          ...project,
+          floatingWidgets: { ...project.floatingWidgets, [action.instanceId]: floating },
+          widgetRegions: {
+            ...project.widgetRegions,
+            [hostRegionId]: {
+              ...hostRegion,
+              activeInstanceId:
+                hostRegion.activeInstanceId === action.instanceId && fallbackInstanceId
+                  ? fallbackInstanceId
+                  : hostRegion.activeInstanceId,
+              instanceIds,
+            },
+          },
+        };
+      });
+    }
+    case 'dockFloatingWidget': {
+      return updateActiveProject(state, (project) => {
+        const floating = project.floatingWidgets?.[action.instanceId];
+
+        if (!floating) {
+          return project;
+        }
+
+        const { [action.instanceId]: _docked, ...remaining } = project.floatingWidgets ?? {};
+        const region = project.widgetRegions[floating.returnRegion];
+        const instanceIds = region.instanceIds.includes(action.instanceId)
+          ? region.instanceIds
+          : [...region.instanceIds, action.instanceId];
+
+        return {
+          ...project,
+          floatingWidgets: remaining,
+          layout: openPanelForRegion(project.layout, floating.returnRegion),
+          widgetRegions: {
+            ...project.widgetRegions,
+            [floating.returnRegion]: {
+              ...region,
+              activeInstanceId: action.instanceId,
+              instanceIds,
+              isCollapsed: false,
+            },
+          },
+        };
+      });
+    }
+    case 'setFloatingWidgetGeometry': {
+      return updateActiveProject(state, (project) => {
+        const floating = project.floatingWidgets?.[action.instanceId];
+
+        if (!floating) {
+          return project;
+        }
+
+        const geometry = clampSizeToMinimum({
+          heightPx: action.heightPx,
+          widthPx: action.widthPx,
+          x: action.x,
+          y: action.y,
+        });
+
+        return {
+          ...project,
+          floatingWidgets: { ...project.floatingWidgets, [action.instanceId]: { ...floating, ...geometry } },
+        };
+      });
+    }
+    case 'setFloatingWidgetMode': {
+      return updateActiveProject(state, (project) => {
+        const floating = project.floatingWidgets?.[action.instanceId];
+
+        if (!floating || floating.mode === action.mode) {
+          return project;
+        }
+
+        return {
+          ...project,
+          floatingWidgets: { ...project.floatingWidgets, [action.instanceId]: { ...floating, mode: action.mode } },
+        };
+      });
+    }
+    case 'focusFloatingWidget': {
+      return updateActiveProject(state, (project) => {
+        const floating = project.floatingWidgets?.[action.instanceId];
+        const topOrder = nextStackOrder(project.floatingWidgets) - 1;
+
+        if (!floating || floating.stackOrder === topOrder) {
+          return project;
+        }
+
+        return {
+          ...project,
+          floatingWidgets: {
+            ...project.floatingWidgets,
+            [action.instanceId]: { ...floating, stackOrder: topOrder + 1 },
+          },
+        };
+      });
     }
     case 'moveWidgetInstance': {
       return updateActiveProject(state, (project) => {

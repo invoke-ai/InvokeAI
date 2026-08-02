@@ -21,6 +21,21 @@ export interface PanelState {
 
 export type WidgetRegion = 'left' | 'right' | 'bottom' | 'center';
 
+export type FloatingWidgetMode = 'windowed' | 'maximized' | 'shaded';
+
+/** Geometry + stacking for a widget instance detached into a floating window. */
+export interface FloatingWidgetState {
+  x: number;
+  y: number;
+  widthPx: number;
+  heightPx: number;
+  mode: FloatingWidgetMode;
+  /** The dockable region this window returns to when docked. */
+  returnRegion: WidgetRegion;
+  /** Z-order within the floating layer; higher renders on top. */
+  stackOrder: number;
+}
+
 export interface WidgetRegionState {
   activeInstanceId: WidgetInstanceId;
   instanceIds: WidgetInstanceId[];

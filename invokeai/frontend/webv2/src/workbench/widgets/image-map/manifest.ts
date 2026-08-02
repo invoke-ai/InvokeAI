@@ -3,6 +3,7 @@ import type { WidgetManifest } from '@workbench/widgetContracts';
 import { MapIcon } from 'lucide-react';
 
 export const imageMapWidgetManifest: WidgetManifest = {
+  allowFloating: true,
   allowMultiple: false,
   allowedRegions: ['left', 'right', 'center'],
   failurePolicy: { isolateRenderFailure: true, onRegistrationFailure: 'disable' },

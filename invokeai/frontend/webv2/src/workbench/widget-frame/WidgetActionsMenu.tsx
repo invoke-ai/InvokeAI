@@ -15,7 +15,7 @@ import { IconButton } from '@platform/ui';
 import { createGraphBearingSurface } from '@workbench/graphSurfaces';
 import { resolveWidgetLabel } from '@workbench/widgetLabels';
 import { shallowEqual, useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
-import { GitBranchIcon, MoreHorizontalIcon, TargetIcon } from 'lucide-react';
+import { GitBranchIcon, MoreHorizontalIcon, PictureInPicture2Icon, TargetIcon } from 'lucide-react';
 import { lazy, Suspense, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -118,6 +118,7 @@ export const WidgetActionsMenu = ({
     (project) => ({ projectGraph: project.projectGraph, widgetGraphs: project.widgetGraphs }),
     shallowEqual
   ) as Project;
+  const { widgets } = useWorkbenchCommands();
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewGraph, setPreviewGraph] = useState<GraphContract | null>(null);
   const label = resolveWidgetLabel(manifest, t);
@@ -126,6 +127,10 @@ export const WidgetActionsMenu = ({
       manifest.graphBearing?.surfaces.includes(region) ? createGraphBearingSurface(manifest, region, label) : null,
     [label, manifest, region]
   );
+  // Floating is offered only from dockable regions; the floating window's own
+  // chrome carries the dock control.
+  const canFloat = Boolean(manifest.allowFloating) && region !== 'floating';
+  const handleFloat = useCallback(() => widgets.float(instance.id), [instance.id, widgets]);
   const surfaceSourceId = surface?.sourceId;
   const handlePreview = useCallback(async () => {
     flushWorkbenchDrafts();
@@ -139,7 +144,7 @@ export const WidgetActionsMenu = ({
       ? Object.fromEntries(activeProject.projectGraph.nodes.map((node) => [node.id, node.position]))
       : undefined;
 
-  if (!surface && !HeaderMenu) {
+  if (!surface && !HeaderMenu && !canFloat) {
     return null;
   }
 
@@ -157,7 +162,14 @@ export const WidgetActionsMenu = ({
           <Menu.Positioner>
             <Menu.Content minW="13rem">
               {surface ? <GraphSurfaceMenuItems surface={surface} onPreview={handlePreview} /> : null}
-              {surface && HeaderMenu ? <Menu.Separator borderColor="border.subtle" /> : null}
+              {surface && (HeaderMenu || canFloat) ? <Menu.Separator borderColor="border.subtle" /> : null}
+              {canFloat ? (
+                <Menu.Item value="float-window" onClick={handleFloat}>
+                  <Icon as={PictureInPicture2Icon} boxSize="3.5" />
+                  <Menu.ItemText>{t('widgets.floating.floatWindow')}</Menu.ItemText>
+                </Menu.Item>
+              ) : null}
+              {canFloat && HeaderMenu ? <Menu.Separator borderColor="border.subtle" /> : null}
               {HeaderMenu ? (
                 <HeaderMenu instance={instance} manifest={manifest} region={region} runtime={runtime} />
               ) : null}

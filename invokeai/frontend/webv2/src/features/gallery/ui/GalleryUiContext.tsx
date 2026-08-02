@@ -76,7 +76,7 @@ export interface GalleryWidgetRuntime {
 
 export interface GalleryWidgetProps {
   presentation?: 'compact' | 'expanded' | 'tooltip';
-  region: 'bottom' | 'center' | 'dialog' | 'left' | 'popover' | 'right';
+  region: 'bottom' | 'center' | 'dialog' | 'floating' | 'left' | 'popover' | 'right';
   runtime: GalleryWidgetRuntime;
 }
 
