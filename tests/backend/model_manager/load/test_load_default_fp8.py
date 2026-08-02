@@ -21,6 +21,7 @@ import pytest
 import torch
 
 from invokeai.backend.model_manager.load.load_default import (
+    _FP8_PROBE_FAILURE_REPORTED,
     _FP8_STORAGE_SUPPORT,
     ModelLoader,
     _device_supports_fp8_storage,
@@ -437,8 +438,10 @@ def test_apply_fp8_layerwise_casting_uses_hook_path_for_model_mixin():
 @pytest.fixture(autouse=True)
 def _clear_fp8_probe_cache():
     _FP8_STORAGE_SUPPORT.clear()
+    _FP8_PROBE_FAILURE_REPORTED.clear()
     yield
     _FP8_STORAGE_SUPPORT.clear()
+    _FP8_PROBE_FAILURE_REPORTED.clear()
 
 
 def test_device_supports_fp8_storage_cuda_is_unconditional():

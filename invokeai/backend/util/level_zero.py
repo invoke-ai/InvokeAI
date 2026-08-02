@@ -92,13 +92,53 @@ class _ZeDeviceProperties(ctypes.Structure):
     ]
 
 
+def _configure_prototypes(lib: ctypes.CDLL) -> None:
+    """Declare argtypes for every entry point used here.
+
+    This is not optional tidiness. Handles come back from ``(c_void_p * n)()`` as plain Python
+    ints, and ctypes converts an undeclared int argument to a C ``int`` -- 32 bits. Any Level Zero
+    handle above 2**31 would be silently truncated and the call would segfault the process.
+    Declaring the pointer types makes ctypes convert them at full width.
+    """
+    u32 = ctypes.c_uint32
+    u32_p = ctypes.POINTER(ctypes.c_uint32)
+    handle = ctypes.c_void_p
+    handle_p = ctypes.POINTER(ctypes.c_void_p)
+
+    prototypes = {
+        "zeInit": ([u32], ctypes.c_int),
+        "zeDriverGet": ([u32_p, handle_p], ctypes.c_int),
+        "zeDeviceGet": ([handle, u32_p, handle_p], ctypes.c_int),
+        "zeDeviceGetProperties": ([handle, ctypes.c_void_p], ctypes.c_int),
+        "zesInit": ([u32], ctypes.c_int),
+        "zesDriverGet": ([u32_p, handle_p], ctypes.c_int),
+        "zesDeviceGet": ([handle, u32_p, handle_p], ctypes.c_int),
+        "zesDeviceEnumMemoryModules": ([handle, u32_p, handle_p], ctypes.c_int),
+        "zesMemoryGetState": ([handle, ctypes.c_void_p], ctypes.c_int),
+    }
+    for name, (argtypes, restype) in prototypes.items():
+        fn = getattr(lib, name, None)
+        if fn is None:
+            raise AttributeError(f"Level Zero loader is missing {name}")
+        fn.argtypes = argtypes
+        fn.restype = restype
+
+
 def _load_loader() -> Optional[ctypes.CDLL]:
     for name in _LOADER_NAMES:
         path = ctypes.util.find_library(name) or name
         try:
-            return ctypes.CDLL(path)
+            lib = ctypes.CDLL(path)
         except OSError:
             continue
+        try:
+            _configure_prototypes(lib)
+        except AttributeError as exc:
+            # An older loader without the Sysman entry points; treat as unavailable rather than
+            # calling into it with default (unsafe) conversions.
+            InvokeAILogger.get_logger(__name__).debug(f"Level Zero loader unusable: {exc}")
+            return None
+        return lib
     return None
 
 

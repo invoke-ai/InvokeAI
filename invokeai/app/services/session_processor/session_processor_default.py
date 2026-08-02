@@ -236,22 +236,30 @@ class DefaultSessionRunner(SessionRunnerBase):
         # cache's .stats still points at whatever session last ran on that device — possibly an
         # already-summarized one — so without this swap the encoder's cache hits/misses would be
         # lost to (or corrupt) another session's numbers.
-        load = self._services.model_manager.load
-        native_cache = load.ram_cache if load is not None else None
-        TorchDevice.set_session_device(borrowed_device)
-        _set_torch_current_device(borrowed_device)
-        borrowed_cache = load.ram_cache if load is not None else None
-        saved_borrowed_stats = borrowed_cache.stats if borrowed_cache is not None else None
-        if borrowed_cache is not None and native_cache is not None and borrowed_cache is not native_cache:
-            borrowed_cache.stats = native_cache.stats
+        # Everything after the borrow succeeds must be inside the try: if re-pinning or the stats
+        # swap raises, the borrow lock has to be released anyway, or this GPU stays locked for the
+        # life of the process and can never be borrowed again.
+        native_cache = None
+        borrowed_cache = None
+        saved_borrowed_stats = None
         try:
+            load = self._services.model_manager.load
+            native_cache = load.ram_cache if load is not None else None
+            TorchDevice.set_session_device(borrowed_device)
+            _set_torch_current_device(borrowed_device)
+            borrowed_cache = load.ram_cache if load is not None else None
+            saved_borrowed_stats = borrowed_cache.stats if borrowed_cache is not None else None
+            if borrowed_cache is not None and native_cache is not None and borrowed_cache is not native_cache:
+                borrowed_cache.stats = native_cache.stats
             yield
         finally:
-            if borrowed_cache is not None and borrowed_cache is not native_cache:
-                borrowed_cache.stats = saved_borrowed_stats
-            TorchDevice.set_session_device(native_device)
-            _set_torch_current_device(native_device)
-            GENERATION_DEVICE_POOL.release_borrow(borrowed_device)
+            try:
+                if borrowed_cache is not None and borrowed_cache is not native_cache:
+                    borrowed_cache.stats = saved_borrowed_stats
+                TorchDevice.set_session_device(native_device)
+                _set_torch_current_device(native_device)
+            finally:
+                GENERATION_DEVICE_POOL.release_borrow(borrowed_device)
 
     def _on_before_run_session(self, queue_item: SessionQueueItem) -> None:
         """Called before a session is run.
