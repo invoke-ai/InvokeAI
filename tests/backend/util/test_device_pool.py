@@ -114,6 +114,23 @@ def test_xpu_devices_participate_in_offload():
     GENERATION_DEVICE_POOL.release_borrow(borrowed)
 
 
+def test_borrow_never_crosses_device_types():
+    """A mixed pool must not lend a CUDA session an XPU device (or vice versa) -- the encoder
+    would land on a different backend than the session that needs its output."""
+    GENERATION_DEVICE_POOL.set_generation_devices([torch.device("cuda:0"), torch.device("xpu:0")])
+    assert GENERATION_DEVICE_POOL.try_borrow(exclude=torch.device("cuda:0")) is None
+    assert GENERATION_DEVICE_POOL.try_borrow(exclude=torch.device("xpu:0")) is None
+
+
+def test_borrow_picks_same_type_from_mixed_pool():
+    GENERATION_DEVICE_POOL.set_generation_devices(
+        [torch.device("cuda:0"), torch.device("xpu:0"), torch.device("cuda:1")]
+    )
+    borrowed = GENERATION_DEVICE_POOL.try_borrow(exclude=torch.device("cuda:0"))
+    assert borrowed == torch.device("cuda:1")
+    GENERATION_DEVICE_POOL.release_borrow(borrowed)
+
+
 def test_xpu_session_lock_blocks_borrow():
     GENERATION_DEVICE_POOL.set_generation_devices([torch.device("xpu:0"), torch.device("xpu:1")])
     GENERATION_DEVICE_POOL.acquire_session(torch.device("xpu:1"))

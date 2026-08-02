@@ -95,12 +95,21 @@ class _GenerationDevicePool:
         :meth:`release_borrow`), or ``None`` if no other registered device is currently free.
         Selection is deterministic (lowest registration order) so repeated borrows reuse the same
         GPU and the encoder cached there.
+
+        Candidates are restricted to the excluded device's own type. The pool can hold more than
+        one accelerator type (``generation_devices`` accepts e.g. ``["cuda:0", "xpu:0"]``), and
+        handing a CUDA session an XPU device would load the encoder onto a different backend
+        than the session it belongs to.
         """
         if exclude.type not in _OFFLOAD_DEVICE_TYPES:
             return None
         exclude_key = str(TorchDevice.normalize(exclude))
         with self._registry_lock:
-            candidates = [(key, self._device_locks[key]) for key in self._order if key != exclude_key]
+            candidates = [
+                (key, self._device_locks[key])
+                for key in self._order
+                if key != exclude_key and torch.device(key).type == exclude.type
+            ]
         for key, lock in candidates:
             if lock.acquire(blocking=False):
                 return torch.device(key)
