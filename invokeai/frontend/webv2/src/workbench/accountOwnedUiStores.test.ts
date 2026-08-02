@@ -19,6 +19,7 @@ describe('account-owned workbench UI stores', () => {
     // Partial stand-in: the snapshot only needs to be observably non-empty.
     imageMapStore.patchSnapshot({
       data: { pointCount: 1, state: 'ready' } as unknown as ImageMapPoints,
+      indexCounts: { embedded: 1, pending: 0, total: 1 },
       loadState: 'loaded',
     });
 
@@ -32,6 +33,7 @@ describe('account-owned workbench UI stores', () => {
     expect(imageMapSnapshot.data).toBeNull();
     expect(imageMapSnapshot.loadState).toBe('idle');
     expect(imageMapSnapshot.error).toBeNull();
+    expect(imageMapSnapshot.indexCounts).toBeNull();
     unregisterModal();
   });
 });

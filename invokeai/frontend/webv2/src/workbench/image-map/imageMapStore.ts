@@ -16,10 +16,18 @@ import { fetchImageMapPoints } from './api';
  * driven by user action now and by socket events in a later runtime.
  */
 
+export interface ImageIndexCounts {
+  total: number;
+  embedded: number;
+  pending: number;
+}
+
 export interface ImageMapSnapshot {
   data: ImageMapPoints | null;
   loadState: 'idle' | 'loading' | 'loaded' | 'error';
   error: string | null;
+  /** Embedding-index progress; only ever pushed to admins by the backend. */
+  indexCounts: ImageIndexCounts | null;
   /**
    * The plot canvas itself failed (WebGL unavailable). Distinct from `error`,
    * which means a fetch failed: with `error` the cached points are still worth
@@ -32,6 +40,7 @@ export interface ImageMapSnapshot {
 const EMPTY_IMAGE_MAP_SNAPSHOT: ImageMapSnapshot = {
   data: null,
   error: null,
+  indexCounts: null,
   loadState: 'idle',
   renderError: null,
 };
@@ -39,12 +48,14 @@ const EMPTY_IMAGE_MAP_SNAPSHOT: ImageMapSnapshot = {
 export const imageMapStore = createExternalStore<ImageMapSnapshot>(EMPTY_IMAGE_MAP_SNAPSHOT);
 
 let inflight: Promise<void> | null = null;
+let rerunRequested = false;
 
 // The projection is per-user server state: a login/logout must drop it before
 // the next account's widgets can observe it.
 registerAccountOwnedResource({
   clear: () => {
     inflight = null;
+    rerunRequested = false;
     imageMapStore.setSnapshot(EMPTY_IMAGE_MAP_SNAPSHOT);
   },
   name: 'image-map',
@@ -52,6 +63,11 @@ registerAccountOwnedResource({
 
 export const refreshImageMapPoints = (): Promise<void> => {
   if (inflight) {
+    // A refresh requested mid-flight (e.g. projection_ready arriving while
+    // the fetch that triggered the recompute is still running) must not be
+    // swallowed by the dedup: run once more when the current fetch settles.
+    rerunRequested = true;
+
     return inflight;
   }
 
@@ -87,6 +103,11 @@ export const refreshImageMapPoints = (): Promise<void> => {
       // `inflight` and may have let a fresh refresh start.
       if (inflight === refresh) {
         inflight = null;
+      }
+
+      if (rerunRequested) {
+        rerunRequested = false;
+        void refreshImageMapPoints();
       }
     });
 

@@ -18,9 +18,10 @@ import {
   fitRangesToAspect,
   rangesToKeepMarkerInView,
 } from '@workbench/image-map/imageMapViewport';
+import { getThumbnailUrl } from '@workbench/image-map/thumbnailCache';
 import { useWidgetValuesSelector } from '@workbench/WorkbenchContext';
 import Plotly from 'plotly.js-gl2d-dist-min';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { useSelectMapImage } from './useSelectMapImage';
 
@@ -30,11 +31,21 @@ const PINCH_CLICK_SUPPRESS_MS = 500;
 /** How long a map click may suppress the recenter its own selection causes. */
 const MAP_CLICK_SUPPRESS_MS = 5000;
 
+/** Dwell before a hover thumbnail appears (PhotoMapAI's delay). */
+const HOVER_DELAY_MS = 150;
+
 /** These plotly calls can reject on a plot whose WebGL init failed; the map
  * already shows the store's error state, so the rejection itself is noise. */
 const swallow = (promise: Promise<unknown>): void => {
   promise.catch(() => {});
 };
+
+interface HoverPreview {
+  imageName: string;
+  url: string;
+  clientX: number;
+  clientY: number;
+}
 
 interface PlotElement extends PlotlyHTMLElement {
   _fullLayout?: {
@@ -117,6 +128,20 @@ const ImageMapPlot = () => {
     pointsRef.current = points;
     selectedImageNameRef.current = selectedImageName;
   }, [points, selectedImageName]);
+  const [hoverPreview, setHoverPreview] = useState<HoverPreview | null>(null);
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Monotonic hover session: a resolution from a previous hover (even of the
+  // same point) must neither show early nor at stale coordinates.
+  const hoverSessionRef = useRef(0);
+
+  const clearHover = () => {
+    hoverSessionRef.current += 1;
+    if (hoverTimerRef.current !== null) {
+      clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+    setHoverPreview(null);
+  };
 
   useEffect(() => {
     const container = containerRef.current;
@@ -177,6 +202,30 @@ const ImageMapPlot = () => {
             selectImage(imageName);
           }
         });
+        plot.removeAllListeners?.('plotly_hover');
+        plot.on('plotly_hover', (event) => {
+          const imageName = event.points?.[0]?.customdata;
+          const mouse = (event as { event?: MouseEvent }).event;
+
+          if (typeof imageName !== 'string' || !mouse) {
+            return;
+          }
+
+          clearHover();
+          const session = hoverSessionRef.current;
+          const { clientX, clientY } = mouse;
+          hoverTimerRef.current = setTimeout(() => {
+            void getThumbnailUrl(imageName).then((url) => {
+              if (url && hoverSessionRef.current === session && !disposed) {
+                setHoverPreview({ clientX, clientY, imageName, url });
+              }
+            });
+          }, HOVER_DELAY_MS);
+        });
+        plot.removeAllListeners?.('plotly_unhover');
+        plot.on('plotly_unhover', () => {
+          clearHover();
+        });
       })
       .catch(() => {
         if (disposed) {
@@ -196,6 +245,7 @@ const ImageMapPlot = () => {
 
     return () => {
       disposed = true;
+      clearHover();
     };
   }, [points, selectImage]);
 
@@ -318,7 +368,33 @@ const ImageMapPlot = () => {
     };
   }, []);
 
-  return <Box ref={containerRef} h="full" minH="0" w="full" />;
+  return (
+    <Box h="full" minH="0" position="relative" w="full">
+      <Box ref={containerRef} h="full" w="full" />
+      {hoverPreview ? (
+        <Box
+          borderColor="border.emphasized"
+          borderWidth="1px"
+          left={`${hoverPreview.clientX + 14}px`}
+          maxH="40"
+          maxW="40"
+          overflow="hidden"
+          pointerEvents="none"
+          position="fixed"
+          rounded="md"
+          shadow="lg"
+          top={`${hoverPreview.clientY + 14}px`}
+          zIndex="tooltip"
+        >
+          <img
+            alt={hoverPreview.imageName}
+            src={hoverPreview.url}
+            style={{ display: 'block', maxHeight: '10rem', maxWidth: '10rem' }}
+          />
+        </Box>
+      ) : null}
+    </Box>
+  );
 };
 
 export default ImageMapPlot;
