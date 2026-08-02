@@ -42,6 +42,25 @@ from invokeai.backend.util.device_pool import GENERATION_DEVICE_POOL
 from invokeai.backend.util.devices import TorchDevice
 
 
+def _set_torch_current_device(device: torch.device) -> None:
+    """Mirror a session-device pin onto torch's per-thread current device.
+
+    CUDA and XPU both track a current device per thread, and index-less allocations
+    (e.g. ``torch.zeros(2, device="xpu")``) resolve through it. Setting only the
+    session device would leave such allocations on whichever GPU the thread was last
+    pinned to -- for a borrowed idle GPU, that is the busy denoise device the offload
+    exists to protect.
+
+    Availability is checked first, mirroring TorchDevice.normalize: generation devices
+    can be configured (or, in tests, faked) for a backend this process cannot actually
+    initialise, and set_device would then fail or block on backend init.
+    """
+    if device.type == "cuda" and torch.cuda.is_available():
+        torch.cuda.set_device(device)
+    elif device.type == "xpu" and hasattr(torch, "xpu") and torch.xpu.is_available():
+        torch.xpu.set_device(device)
+
+
 class DefaultSessionRunner(SessionRunnerBase):
     """Processes a single session's invocations."""
 
@@ -220,6 +239,7 @@ class DefaultSessionRunner(SessionRunnerBase):
         load = self._services.model_manager.load
         native_cache = load.ram_cache if load is not None else None
         TorchDevice.set_session_device(borrowed_device)
+        _set_torch_current_device(borrowed_device)
         borrowed_cache = load.ram_cache if load is not None else None
         saved_borrowed_stats = borrowed_cache.stats if borrowed_cache is not None else None
         if borrowed_cache is not None and native_cache is not None and borrowed_cache is not native_cache:
@@ -230,6 +250,7 @@ class DefaultSessionRunner(SessionRunnerBase):
             if borrowed_cache is not None and borrowed_cache is not native_cache:
                 borrowed_cache.stats = saved_borrowed_stats
             TorchDevice.set_session_device(native_device)
+            _set_torch_current_device(native_device)
             GENERATION_DEVICE_POOL.release_borrow(borrowed_device)
 
     def _on_before_run_session(self, queue_item: SessionQueueItem) -> None:
@@ -629,11 +650,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
             # which nodes and the model loader consult) resolves to this GPU. CUDA's current device is per-thread.
             if worker.device is not None:
                 TorchDevice.set_session_device(worker.device)
-                if worker.device.type == "cuda":
-                    torch.cuda.set_device(worker.device)
-                elif worker.device.type == "xpu":
-                    # XPU's current device is per-thread, same as CUDA.
-                    torch.xpu.set_device(worker.device)
+                _set_torch_current_device(worker.device)
 
             worker.cancel_event.clear()
 
