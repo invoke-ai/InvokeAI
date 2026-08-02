@@ -6,6 +6,7 @@ import torch
 from deprecated import deprecated
 
 from invokeai.app.services.config.config_default import get_config
+from invokeai.backend.util.logging import InvokeAILogger
 
 # legacy APIs
 TorchPrecisionNames = Literal["float32", "float16", "bfloat16"]
@@ -13,6 +14,10 @@ CPU_DEVICE = torch.device("cpu")
 CUDA_DEVICE = torch.device("cuda")
 XPU_DEVICE = torch.device("xpu")
 MPS_DEVICE = torch.device("mps")
+
+# Devices for which the blind free-VRAM estimate has already been reported, so the
+# warning is emitted once per device rather than on every cache query.
+_XPU_MEM_FALLBACK_WARNED: set[str] = set()
 
 
 def _xpu_is_available() -> bool:
@@ -299,25 +304,45 @@ class TorchDevice:
         """Return ``(free, total)`` VRAM in bytes for an XPU (Intel GPU) device.
 
         Uses ``torch.xpu.mem_get_info()`` when available. Setups missing the SYCL
-        ``ext_intel_free_memory`` aspect (notably GPU passthrough VMs) raise
-        ``RuntimeError`` instead; fall back to ``total_memory`` minus this process's
-        reserved bytes. The fallback is blind to other processes on a shared device,
-        so callers should treat it as a budget hint rather than a guarantee.
+        ``ext_intel_free_memory`` aspect (notably GPU passthrough VMs, and some
+        driver/kernel combinations) fail instead; fall back to ``total_memory``
+        minus this process's reserved bytes.
+
+        The failure type is torch-version dependent -- ``RuntimeError`` from the
+        missing aspect, ``AssertionError`` from ``torch.xpu._lazy_init()`` on a
+        build without XPU -- so the probe catches broadly rather than enumerating
+        types that move between releases.
+
+        The fallback is blind to VRAM held by other processes, so callers should
+        treat it as a budget hint rather than a guarantee. A failure to read
+        ``total_memory`` is deliberately *not* swallowed: a device whose properties
+        cannot be read is not usable as an execution device, and returning
+        ``(0, 0)`` would collapse the model cache's available-VRAM arithmetic to a
+        constant negative budget for the lifetime of the process.
         """
         try:
             return torch.xpu.mem_get_info(device)
-        except (RuntimeError, AttributeError):
-            # total_memory does not depend on the unavailable free-memory aspect.
-            try:
-                total_bytes = int(torch.xpu.get_device_properties(device).total_memory)
-            except (RuntimeError, AttributeError):
-                total_bytes = 0
-            try:
-                reserved_bytes = torch.xpu.memory_reserved(device)
-            except (RuntimeError, AttributeError):
-                reserved_bytes = 0
-            free_bytes = max(total_bytes - reserved_bytes, 0)
-            return (free_bytes, total_bytes)
+        except Exception:
+            pass
+
+        # total_memory does not depend on the unavailable free-memory aspect. Allowed to
+        # raise -- see the docstring.
+        total_bytes = int(torch.xpu.get_device_properties(device).total_memory)
+        try:
+            reserved_bytes = torch.xpu.memory_reserved(device)
+        except Exception:
+            reserved_bytes = 0
+
+        device_key = str(device)
+        if device_key not in _XPU_MEM_FALLBACK_WARNED:
+            _XPU_MEM_FALLBACK_WARNED.add(device_key)
+            InvokeAILogger.get_logger(__name__).warning(
+                f"torch.xpu.mem_get_info() is unavailable for {device}; estimating free VRAM as "
+                "total memory minus this process's reserved bytes. The estimate ignores VRAM held "
+                "by other processes, so the model cache may over-commit on a shared GPU."
+            )
+
+        return (max(total_bytes - reserved_bytes, 0), total_bytes)
 
     @classmethod
     def _to_dtype(cls, precision_name: TorchPrecisionNames) -> torch.dtype:
