@@ -1,5 +1,6 @@
 """Tests for the image index worker service, using an injected fake encoder (no models/GPU)."""
 
+import threading
 import time
 from types import SimpleNamespace
 from typing import Callable
@@ -906,3 +907,82 @@ def test_stop_joins_worker(
     service.stop()
 
     assert not service._worker.is_alive()
+
+
+# --- Projection jobs ---
+
+
+def test_projection_job_computes_and_caches(
+    image_records: SqliteImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+    service: ImageIndexService,
+) -> None:
+    from invokeai.app.services.events.events_common import ImageMapProjectionReadyEvent
+
+    # Three images stay on compute_umap's deterministic PCA fallback: the
+    # first real UMAP fit JIT-compiles numba, which blows CI timeouts on slow
+    # (Windows/macOS) runners. The worker pipeline under test is identical.
+    for i in range(3):
+        _save_image(image_records, f"img-{i}.png")
+    invoker = _make_invoker(images_service, index_records)
+    service.start(invoker)
+    _wait_until(lambda: not service._backfill_pending.is_set())
+
+    assert service.request_projection("system") is True
+
+    _wait_until(lambda: index_records.get_projection("system", MODEL_ID) is not None, timeout=30)
+    record = index_records.get_projection("system", MODEL_ID)
+    assert record is not None
+    assert record.point_count == 3
+    assert sorted(record.image_names) == [f"img-{i}.png" for i in range(3)]
+    assert record.coords.shape == (3, 2)
+    _wait_until(
+        lambda: any(
+            isinstance(e, ImageMapProjectionReadyEvent) and e.point_count == 3 for e in invoker.services.events.events
+        )
+    )
+
+
+def test_projection_failure_caches_empty_result_instead_of_looping(
+    image_records: SqliteImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+    service: ImageIndexService,
+    monkeypatch,
+) -> None:
+    from invokeai.app.services.image_index import image_index_default
+    from invokeai.app.services.image_index.projection import scope_hash
+
+    def broken_umap(embeddings, seed=42):
+        raise RuntimeError("synthetic UMAP failure")
+
+    monkeypatch.setattr(image_index_default, "compute_umap", broken_umap)
+    _save_image(image_records, "a.png")
+    service.start(_make_invoker(images_service, index_records))
+    _wait_until(lambda: not service._backfill_pending.is_set())
+
+    service.request_projection("system")
+
+    _wait_until(lambda: index_records.get_projection("system", MODEL_ID) is not None, timeout=15)
+    record = index_records.get_projection("system", MODEL_ID)
+    assert record is not None
+    assert record.point_count == 0
+    # The empty cache claims the scope it failed against, so it is NOT stale —
+    # clients see "empty" rather than re-enqueueing a doomed recompute forever.
+    accessible = index_records.list_accessible_embedded_images(None, MODEL_ID)
+    assert record.scope_hash == scope_hash(MODEL_ID, accessible)
+
+
+def test_projection_request_dedup_is_last_writer_wins(service: ImageIndexService) -> None:
+    # Not started: requests are refused outright.
+    assert service.request_projection("system") is False
+
+    # Simulate a running worker to exercise the dedup map directly.
+    service._model_id = MODEL_ID
+    service._worker = threading.Thread(target=lambda: time.sleep(0.2), daemon=True)
+    service._worker.start()
+
+    assert service.request_projection("system", all_images=True) is True
+    assert service.request_projection("system", all_images=False) is True
+    assert service._projection_requests == {"system": False}

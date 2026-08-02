@@ -9,6 +9,7 @@ from PIL import Image
 
 from invokeai.app.services.image_index.image_index_base import ImageIndexServiceBase
 from invokeai.app.services.image_index.image_index_common import EMBEDDING_DTYPE, ImageIndexStatus
+from invokeai.app.services.image_index.projection import compute_umap, projection_params, scope_hash
 from invokeai.app.services.image_records.image_records_common import ImageCategory
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.session_queue.session_queue_common import DEFAULT_QUEUE_ID
@@ -121,6 +122,11 @@ class ImageIndexService(ImageIndexServiceBase):
         # the index goes quiescent. Worker-thread only — no locking.
         self._pending_pokes: set[str] = set()
         self._worker: Optional[threading.Thread] = None
+        # user_id -> all_images. Deduplicates projection requests per user;
+        # a request arriving while that user's projection is being computed
+        # lands here again and is honored on the next pass.
+        self._projection_requests: dict[str, bool] = {}
+        self._projection_lock = threading.Lock()
 
         self._invoker: Optional["Invoker"] = None
         self._model_config: Optional["AnyModelConfig"] = None
@@ -139,6 +145,16 @@ class ImageIndexService(ImageIndexServiceBase):
             return None
         status = self._invoker.services.image_index_records.count_index_status(self._model_id)
         return status.model_copy(update={"failed": len(self._failed)})
+
+    def request_projection(self, user_id: str, all_images: bool = False) -> bool:
+        if self._model_id is None or self._worker is None or not self._worker.is_alive():
+            return False
+        with self._projection_lock:
+            # Last writer wins: the scope reflects the requester's most recent
+            # admin status, so a promotion/demotion between requests cannot
+            # pin a stale scope.
+            self._projection_requests[user_id] = all_images
+        return True
 
     def start(self, invoker: "Invoker") -> None:
         self._invoker = invoker
@@ -257,35 +273,42 @@ class ImageIndexService(ImageIndexServiceBase):
                         # mid-emit is never lost either.
                         self._status_dirty.set()
                         raise
-                if batch is None:
-                    if self._pending_pokes and not self._backfill_pending.is_set():
-                        # The index just went quiescent: poke each owner whose
-                        # images were embedded since the last flush. Deferred
-                        # to quiescence so a long backfill does not trigger a
-                        # refetch (and possibly a projection recompute) per
-                        # batch. Cleared only after all emits, so a raise
-                        # retries on the next pass (duplicate pokes are cheap).
-                        for user_id in sorted(self._pending_pokes):
-                            self._invoker.services.events.emit_image_index_updated(user_id=user_id)
-                        self._pending_pokes.clear()
+                if batch is not None:
+                    self._wait_for_idle_generation()
+                    if self._stop_event.is_set():
+                        break
+                    ok = self._process_batch(batch)
+                    self._emit_status()
+                    if not ok:
+                        # Re-sweep so queue-sourced images that failed
+                        # transiently are retried to _MAX_ATTEMPTS instead of
+                        # lingering unembedded until the next restart.
+                        self._backfill_pending.set()
+                        # Back off after a failed batch so a systemic failure
+                        # (broken model, OOM loop) cannot spin hot through the
+                        # backlog re-fetching the same names. The delay grows
+                        # with consecutive systemic failures: images are no
+                        # longer retired by an outage, so without this an
+                        # outage would retry the same batch at 1 Hz for as
+                        # long as it lasts.
+                        self._stop_event.wait(self._backoff_seconds())
                     continue
-                self._wait_for_idle_generation()
-                if self._stop_event.is_set():
-                    break
-                ok = self._process_batch(batch)
-                self._emit_status()
-                if not ok:
-                    # Re-sweep so queue-sourced images that failed
-                    # transiently are retried to _MAX_ATTEMPTS instead of
-                    # lingering unembedded until the next restart.
-                    self._backfill_pending.set()
-                    # Back off after a failed batch so a systemic failure
-                    # (broken model, OOM loop) cannot spin hot through the
-                    # backlog re-fetching the same names. The delay grows with
-                    # consecutive systemic failures: images are no longer
-                    # retired by an outage, so without this an outage would
-                    # retry the same batch at 1 Hz for as long as it lasts.
-                    self._stop_event.wait(self._backoff_seconds())
+                if self._pending_pokes and not self._backfill_pending.is_set():
+                    # The index just went quiescent: poke each owner whose
+                    # images were embedded since the last flush. Deferred to
+                    # quiescence so a long backfill does not trigger a
+                    # refetch (and possibly a projection recompute) per
+                    # batch. Cleared only after all emits, so a raise here
+                    # retries on the next pass (duplicate pokes are cheap).
+                    for user_id in sorted(self._pending_pokes):
+                        self._invoker.services.events.emit_image_index_updated(user_id=user_id)
+                    self._pending_pokes.clear()
+                    continue
+                # No embedding work right now — projections run when the
+                # index is quiescent so they cover the freshest state.
+                projection_job = self._next_projection_job()
+                if projection_job is not None:
+                    self._process_projection(*projection_job)
             except Exception:
                 logger.exception("Unexpected error in the image index worker")
                 # Whatever was in flight may have skipped its accounting, so
@@ -483,6 +506,50 @@ class ImageIndexService(ImageIndexServiceBase):
     def _forget_pending(self, image_names: list[str]) -> None:
         with self._pending_lock:
             self._pending.difference_update(image_names)
+
+    # --- Projections ---
+
+    def _next_projection_job(self) -> Optional[tuple[str, bool]]:
+        with self._projection_lock:
+            if not self._projection_requests:
+                return None
+            user_id = next(iter(self._projection_requests))
+            return user_id, self._projection_requests.pop(user_id)
+
+    def _process_projection(self, user_id: str, all_images: bool) -> None:
+        assert self._invoker is not None
+        assert self._model_id is not None
+        logger = self._invoker.services.logger
+        records = self._invoker.services.image_index_records
+
+        scope_user = None if all_images else user_id
+        names = records.list_accessible_embedded_images(scope_user, self._model_id)
+        found_names, matrix = records.get_embeddings(names, self._model_id)
+        try:
+            coords = compute_umap(matrix)
+            if coords.shape[0] != len(found_names):
+                raise RuntimeError(f"projection produced {coords.shape[0]} points for {len(found_names)} images")
+        except Exception:
+            logger.exception(f"Image map: UMAP projection failed for user '{user_id}' ({len(found_names)} points)")
+            # Cache an empty projection under the CURRENT scope hash. Serving
+            # "empty" is honest, and it stops the client from re-enqueueing a
+            # doomed recompute on every poll; the next gallery change flips
+            # the hash and retries naturally.
+            found_names = []
+            coords = np.empty((0, 2), dtype=EMBEDDING_DTYPE)
+
+        # Hash the scope the projection was computed against (on failure the
+        # empty cache still claims the current scope, so staleness detection —
+        # not client polling — decides when to retry).
+        records.set_projection(
+            user_id,
+            self._model_id,
+            scope_hash(self._model_id, names),
+            projection_params(n_points=len(found_names)),
+            found_names,
+            coords,
+        )
+        self._invoker.services.events.emit_image_map_projection_ready(user_id=user_id, point_count=len(found_names))
 
     def _wait_for_idle_generation(self) -> None:
         """Block until no generation is in progress, unless embedding on CPU.

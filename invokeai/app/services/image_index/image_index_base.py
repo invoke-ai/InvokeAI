@@ -22,3 +22,22 @@ class ImageIndexServiceBase(ABC):
     def get_status(self) -> ImageIndexStatus | None:
         """Get index progress counts, or None if the indexer is not running."""
         pass
+
+    @abstractmethod
+    def request_projection(self, user_id: str, all_images: bool = False) -> bool:
+        """Ask the worker to (re)compute a user's image map projection.
+
+        Requests are deduplicated per user; the projection runs after any
+        pending embedding work, and an `image_map_projection_ready` event is
+        emitted when the cache is updated.
+
+        Args:
+            user_id: The user whose projection cache to update.
+            all_images: Compute over every embedded image (admin scope)
+                rather than the user's accessible set.
+
+        Returns:
+            True if the request was accepted (or already pending); False if
+            the indexer is not running.
+        """
+        pass

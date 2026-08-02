@@ -1517,6 +1517,70 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/image_map/points": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Image Map Points
+         * @description Gets the current user's semantic image map.
+         *
+         *     Serves the cached UMAP projection (never blocks on a UMAP fit) and runs
+         *     DBSCAN per request, so `eps` is live-adjustable. If the cache is missing
+         *     or stale, a recompute is enqueued and reflected in `state`/`stale`.
+         */
+        get: operations["get_image_map_points"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/image_map/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh Image Map
+         * @description Requests a recompute of the current user's image map projection.
+         */
+        post: operations["refresh_image_map"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/image_map/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Image Map Status
+         * @description Gets embedding index progress and the user's projection cache status.
+         */
+        get: operations["get_image_map_status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/videos/upload": {
         parameters: {
             query?: never;
@@ -17041,6 +17105,28 @@ export type components = {
             type: "img_hue_adjust";
         };
         /**
+         * ImageIndexStatus
+         * @description Progress of the embedding index for one embedding model.
+         */
+        ImageIndexStatus: {
+            /**
+             * Total
+             * @description Number of gallery images eligible for indexing
+             */
+            total: number;
+            /**
+             * Embedded
+             * @description Number of eligible images that have an embedding
+             */
+            embedded: number;
+            /**
+             * Failed
+             * @description Eligible images that repeatedly failed to embed; excluded from pending so it can drain
+             * @default 0
+             */
+            failed?: number;
+        };
+        /**
          * ImageIndexStatusEvent
          * @description Event model for image_index_status
          */
@@ -17239,6 +17325,153 @@ export type components = {
              * @constant
              */
             type: "img_lerp";
+        };
+        /**
+         * ImageMapPoint
+         * @description One image's position on the 2D semantic map.
+         */
+        ImageMapPoint: {
+            /**
+             * X
+             * @description UMAP x coordinate
+             */
+            x: number;
+            /**
+             * Y
+             * @description UMAP y coordinate
+             */
+            y: number;
+            /**
+             * Image Name
+             * @description The image this point represents
+             */
+            image_name: string;
+            /**
+             * Cluster
+             * @description DBSCAN cluster label; -1 means unclustered
+             */
+            cluster: number;
+        };
+        /**
+         * ImageMapPointsResponse
+         * @description The current user's semantic map.
+         */
+        ImageMapPointsResponse: {
+            /**
+             * Points
+             * @description The projected points
+             */
+            points: components["schemas"]["ImageMapPoint"][];
+            /**
+             * State
+             * @description disabled: indexing is off; model_missing: indexing is enabled but the configured embedding model is not installed; empty: nothing to show; computing: a projection is being built; ready: points are served
+             * @enum {string}
+             */
+            state: "disabled" | "model_missing" | "empty" | "computing" | "ready";
+            /**
+             * Model Name
+             * @description The configured embedding model's name; only set when state is model_missing, so the client can tell the user which model to install
+             */
+            model_name?: string | null;
+            /**
+             * Stale
+             * @description True when the accessible image set has changed since this projection was computed; a refresh has been requested
+             */
+            stale: boolean;
+            /**
+             * Point Count
+             * @description Number of points returned
+             */
+            point_count: number;
+            /**
+             * Cluster Eps
+             * @description The effective DBSCAN eps used for these points (adaptive default resolved, clamps applied). Pass it back explicitly to get an identical clustering from a later request.
+             */
+            cluster_eps?: number | null;
+            /**
+             * Updated At
+             * @description When the served projection was computed
+             */
+            updated_at?: string | null;
+        };
+        /**
+         * ImageMapProjectionReadyEvent
+         * @description Event model for image_map_projection_ready
+         */
+        ImageMapProjectionReadyEvent: {
+            /**
+             * Timestamp
+             * @description The timestamp of the event
+             */
+            timestamp: number;
+            /**
+             * User Id
+             * @description The user whose image map projection was recomputed
+             */
+            user_id: string;
+            /**
+             * Point Count
+             * @description Number of points in the recomputed projection
+             */
+            point_count: number;
+        };
+        /**
+         * ImageMapProjectionStatus
+         * @description Status of the current user's cached projection.
+         */
+        ImageMapProjectionStatus: {
+            /**
+             * State
+             * @description Projection cache state
+             * @enum {string}
+             */
+            state: "disabled" | "model_missing" | "empty" | "computing" | "ready";
+            /**
+             * Stale
+             * @description Whether the cached projection lags the accessible image set
+             */
+            stale: boolean;
+            /**
+             * Point Count
+             * @description Points in the cached projection
+             */
+            point_count: number;
+            /**
+             * Updated At
+             * @description When the cached projection was computed
+             */
+            updated_at?: string | null;
+        };
+        /**
+         * ImageMapRefreshResponse
+         * @description Result of a projection refresh request.
+         */
+        ImageMapRefreshResponse: {
+            /**
+             * Enqueued
+             * @description True if the recompute was accepted (or already pending)
+             */
+            enqueued: boolean;
+        };
+        /**
+         * ImageMapStatusResponse
+         * @description Combined index + projection status for the current user.
+         */
+        ImageMapStatusResponse: {
+            /**
+             * Enabled
+             * @description Whether the embedding index is running
+             */
+            enabled: boolean;
+            /**
+             * Model Name
+             * @description The configured embedding model's name; only set when the projection state is model_missing
+             */
+            model_name?: string | null;
+            /** @description Embedding index progress counts. Admin-only: the counts aggregate over all users' images, so they are omitted for regular users. */
+            index?: components["schemas"]["ImageIndexStatus"] | null;
+            /** @description The user's projection cache status */
+            projection: components["schemas"]["ImageMapProjectionStatus"];
         };
         /**
          * Image Mask to Tensor
@@ -44878,6 +45111,80 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_image_map_points: {
+        parameters: {
+            query?: {
+                /** @description DBSCAN eps for clustering. Defaults to an adaptive value derived from the projection's k-distance distribution. Clamped server-side relative to the projection's coordinate span. */
+                eps?: number | null;
+                /** @description DBSCAN min_samples for clustering */
+                min_samples?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageMapPointsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_image_map: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageMapRefreshResponse"];
+                };
+            };
+        };
+    };
+    get_image_map_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageMapStatusResponse"];
                 };
             };
         };

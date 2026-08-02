@@ -25,6 +25,7 @@ from invokeai.app.services.events.events_common import (
     ImageIndexEventBase,
     ImageIndexStatusEvent,
     ImageIndexUpdatedEvent,
+    ImageMapProjectionReadyEvent,
     InvocationCompleteEvent,
     InvocationErrorEvent,
     InvocationProgressEvent,
@@ -108,7 +109,7 @@ MODEL_EVENTS = {
 BULK_DOWNLOAD_EVENTS = {BulkDownloadStartedEvent, BulkDownloadCompleteEvent, BulkDownloadErrorEvent}
 WORKFLOW_EVENTS = {WorkflowCreatedEvent, WorkflowUpdatedEvent, WorkflowDeletedEvent}
 
-IMAGE_INDEX_EVENTS = {ImageIndexStatusEvent, ImageIndexUpdatedEvent}
+IMAGE_INDEX_EVENTS = {ImageIndexStatusEvent, ImageIndexUpdatedEvent, ImageMapProjectionReadyEvent}
 
 MODEL_INSTALL_EVENTS = (
     ModelInstallDownloadStartedEvent,
@@ -653,6 +654,13 @@ class SocketIO:
             await self._sio.emit(
                 event=event_name, data=event_data.model_dump(mode="json"), room=f"user:{event_data.user_id}"
             )
+            return
+        # Projection-ready events go to the owning user's room plus admins.
+        if isinstance(event_data, ImageMapProjectionReadyEvent):
+            # Single emit with a room list: python-socketio dedupes, so an
+            # admin viewing their own map gets exactly one event.
+            rooms = [f"user:{event_data.user_id}", "admin"]
+            await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room=rooms)
             return
         # Index counts aggregate over ALL users' images; watching them tick is
         # a side channel on other users' generation activity, so they go to
