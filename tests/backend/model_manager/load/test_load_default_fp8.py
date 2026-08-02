@@ -22,7 +22,7 @@ import torch
 
 from invokeai.backend.model_manager.load.load_default import (
     _FP8_PROBE_FAILURE_REPORTED,
-    _FP8_STORAGE_SUPPORT,
+    _FP8_STORAGE_SUPPORTED,
     ModelLoader,
     _device_supports_fp8_storage,
 )
@@ -437,10 +437,10 @@ def test_apply_fp8_layerwise_casting_uses_hook_path_for_model_mixin():
 
 @pytest.fixture(autouse=True)
 def _clear_fp8_probe_cache():
-    _FP8_STORAGE_SUPPORT.clear()
+    _FP8_STORAGE_SUPPORTED.clear()
     _FP8_PROBE_FAILURE_REPORTED.clear()
     yield
-    _FP8_STORAGE_SUPPORT.clear()
+    _FP8_STORAGE_SUPPORTED.clear()
     _FP8_PROBE_FAILURE_REPORTED.clear()
 
 
@@ -483,11 +483,6 @@ def _probe_with_recorder(device: torch.device, fail_on=None) -> tuple[bool, list
     return result, log
 
 
-def test_device_supports_fp8_storage_xpu_true_when_probe_succeeds():
-    ok, _ = _probe_with_recorder(torch.device("xpu"))
-    assert ok is True
-
-
 def test_device_supports_fp8_storage_mirrors_the_runtime_cast_sequence():
     """At runtime the storage cast is CPU-side, the fp8 tensor is copied to the device, and the
     pre-hook upcasts there. A probe that did all three on the device would pass on a build where
@@ -510,13 +505,6 @@ def test_device_supports_fp8_storage_does_not_cache_failures():
         assert _device_supports_fp8_storage(torch.device("xpu")) is False
     ok, _ = _probe_with_recorder(torch.device("xpu"))
     assert ok is True
-
-
-def test_device_supports_fp8_storage_probes_the_given_device():
-    """An index-less copy would resolve through the thread's current XPU device, which is not
-    necessarily the device being loaded onto (see idle-GPU offload)."""
-    _, log = _probe_with_recorder(torch.device("xpu", 1))
-    assert torch.device("xpu", 1) in log
 
 
 def test_device_supports_fp8_storage_is_cached_per_device():

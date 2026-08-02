@@ -250,13 +250,12 @@ class TorchDevice:
         whose only GPU is integrated keeps it -- otherwise there would be nothing to generate on.
         An explicit `generation_devices` list is unaffected, so an iGPU can still be opted into.
         """
-        devices = cls._all_available_devices()
-        integrated = [device for device in devices if xpu_device_is_integrated(device) is True]
-        if not integrated:
-            return devices
-        remaining = [device for device in devices if device not in integrated]
-        if not remaining:
-            return devices
+        integrated: list[torch.device] = []
+        remaining: list[torch.device] = []
+        for device in cls._all_available_devices():
+            (integrated if xpu_device_is_integrated(device) is True else remaining).append(device)
+        if not integrated or not remaining:
+            return integrated + remaining
         InvokeAILogger.get_logger(__name__).info(
             f"Excluding integrated GPU(s) {[str(d) for d in integrated]} from `generation_devices: auto`. "
             "List them explicitly in `generation_devices` to use them for generation."

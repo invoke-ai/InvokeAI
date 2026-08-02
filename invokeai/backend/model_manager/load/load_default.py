@@ -34,7 +34,7 @@ from invokeai.backend.util.fp8 import FP8_COMPUTE_DTYPE_ATTR, set_fp8_compute_dt
 # dependent, so it is a per-device property: a discrete Arc may be paired with an integrated
 # GPU that answers differently, and keying on the device *type* would let whichever probed
 # first decide for both.
-_FP8_STORAGE_SUPPORT: dict[str, bool] = {}
+_FP8_STORAGE_SUPPORTED: set[str] = set()
 
 # Devices whose probe failure has already been reported. Deliberately separate from the result
 # cache above: the probe is retried on every request (a failure may be transient), but repeating
@@ -104,9 +104,8 @@ def _device_supports_fp8_storage(device: torch.device, logger: Optional[Logger] 
 
     device = TorchDevice.normalize(device)
     key = str(device)
-    cached = _FP8_STORAGE_SUPPORT.get(key)
-    if cached is not None:
-        return cached
+    if key in _FP8_STORAGE_SUPPORTED:
+        return True
 
     try:
         # 1. Storage cast, on CPU, as _apply_fp8_to_nn_module does.
@@ -124,7 +123,7 @@ def _device_supports_fp8_storage(device: torch.device, logger: Optional[Logger] 
             logger.warning(f"FP8 storage probe failed on {device} ({type(exc).__name__}: {exc}); not using FP8.")
         return False
 
-    _FP8_STORAGE_SUPPORT[key] = True
+    _FP8_STORAGE_SUPPORTED.add(key)
     return True
 
 
@@ -392,11 +391,6 @@ class ModelLoader(ModelLoaderBase):
                 # FP8 -- not on the first load of any tokenizer/VAE/scheduler, and not on API or
                 # install threads, where it would force XPU lazy SYCL init on a thread that never
                 # generates.
-                #
-                # FP8 layerwise casting stores weights as float8 and upcasts to the compute dtype on
-                # the forward pass, so it needs only float8 storage + cast, not native FP8 matmul.
-                # That holds on CUDA and on Intel XPU (float8_e4m3fn store + upcast to bf16/fp16 on
-                # Arc), but XPU float8 support is build-dependent, so probe rather than assume.
                 return _device_supports_fp8_storage(self._torch_device, self._logger)
 
         return False
