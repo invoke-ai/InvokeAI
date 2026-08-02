@@ -22,6 +22,7 @@ and callers must keep their existing behaviour when the answer is unknown.
 
 import ctypes
 import ctypes.util
+import functools
 import threading
 from typing import Optional
 
@@ -42,8 +43,9 @@ _integrated_by_index: Optional[dict[int, bool]] = None
 _probe_attempted = False
 
 _sysman_lock = threading.Lock()
-_sysman_lib: Optional[ctypes.CDLL] = None
-_sysman_modules: Optional[dict[int, list[ctypes.c_void_p]]] = None
+# The loader handle and each device's memory-module handles, or None if Sysman is unusable.
+# Both are only ever set together, so one nullable value models it exactly.
+_sysman: Optional[tuple[ctypes.CDLL, dict[int, list[ctypes.c_void_p]]]] = None
 _sysman_attempted = False
 
 
@@ -123,7 +125,14 @@ def _configure_prototypes(lib: ctypes.CDLL) -> None:
         fn.restype = restype
 
 
+@functools.lru_cache(maxsize=1)
 def _load_loader() -> Optional[ctypes.CDLL]:
+    """Open the Level Zero loader once per process.
+
+    Cached because both probes need it and ``ctypes.util.find_library`` is expensive on Linux
+    (it shells out to ``ldconfig``, falling back to the compiler), and because configuring the
+    prototypes twice would leave two handles whose argtypes have to be kept in step by hand.
+    """
     for name in _LOADER_NAMES:
         path = ctypes.util.find_library(name) or name
         try:
@@ -139,6 +148,20 @@ def _load_loader() -> Optional[ctypes.CDLL]:
             return None
         return lib
     return None
+
+
+def _enumerate_devices(lib: ctypes.CDLL, driver_get: str, device_get: str) -> Optional[list[ctypes.c_void_p]]:
+    """Enumerate every device across every driver, or None if the set is not comparable to torch's.
+
+    Level Zero's enumeration order is only meaningfully comparable to torch's ``xpu:N`` ordering
+    when both see the same set. If the counts disagree (``ZE_AFFINITY_MASK``, a flat/composite
+    tile hierarchy, a non-Intel Level Zero driver in the list), decline to answer rather than risk
+    mislabelling a device.
+    """
+    devices: list[ctypes.c_void_p] = []
+    for driver in _enumerate(lib, driver_get):
+        devices += _enumerate(lib, device_get, driver)
+    return devices if len(devices) == torch.xpu.device_count() else None
 
 
 def _enumerate(lib: ctypes.CDLL, fn_name: str, parent: Optional[ctypes.c_void_p] = None) -> list[ctypes.c_void_p]:
@@ -163,15 +186,8 @@ def _probe_integrated_flags() -> Optional[dict[int, bool]]:
     try:
         if lib.zeInit(0) != 0:
             return None
-        devices: list[ctypes.c_void_p] = []
-        for driver in _enumerate(lib, "zeDriverGet"):
-            devices += _enumerate(lib, "zeDeviceGet", driver)
-
-        # Level Zero's enumeration order is only meaningfully comparable to torch's xpu:N
-        # ordering when both see the same set. If the counts disagree (ZE_AFFINITY_MASK,
-        # a flat/composite tile hierarchy, a non-Intel L0 driver in the list), decline to
-        # answer rather than risk mislabelling a device.
-        if len(devices) != torch.xpu.device_count():
+        devices = _enumerate_devices(lib, "zeDriverGet", "zeDeviceGet")
+        if devices is None:
             return None
 
         flags: dict[int, bool] = {}
@@ -212,7 +228,7 @@ def xpu_device_is_integrated(device: torch.device) -> Optional[bool]:
     return flags.get(index)
 
 
-def _init_sysman() -> tuple[Optional[ctypes.CDLL], Optional[dict[int, list[ctypes.c_void_p]]]]:
+def _init_sysman() -> Optional[tuple[ctypes.CDLL, dict[int, list[ctypes.c_void_p]]]]:
     """Initialise Sysman and cache each device's memory-module handles.
 
     Handles stay valid for the life of the process, so only the per-call state query
@@ -220,7 +236,7 @@ def _init_sysman() -> tuple[Optional[ctypes.CDLL], Optional[dict[int, list[ctype
     """
     lib = _load_loader()
     if lib is None:
-        return None, None
+        return None
     try:
         # No ZES_ENABLE_SYSMAN here. That variable gates Sysman only on runtimes predating
         # zesInit, and it has to be set before Level Zero initialises -- by the time this runs
@@ -229,23 +245,20 @@ def _init_sysman() -> tuple[Optional[ctypes.CDLL], Optional[dict[int, list[ctype
         # zesInit either, and _configure_prototypes already declines those. Setting a process-wide
         # environment variable from a read-only query would leak into child processes for nothing.
         if lib.zesInit(0) != 0:
-            return None, None
-        devices: list[ctypes.c_void_p] = []
-        for driver in _enumerate(lib, "zesDriverGet"):
-            devices += _enumerate(lib, "zesDeviceGet", driver)
-        # Same ordering caveat as the integrated-flag probe: decline rather than mislabel.
-        if len(devices) != torch.xpu.device_count():
-            return None, None
+            return None
+        devices = _enumerate_devices(lib, "zesDriverGet", "zesDeviceGet")
+        if devices is None:
+            return None
         modules: dict[int, list[ctypes.c_void_p]] = {}
         for index, device in enumerate(devices):
             handles = _enumerate(lib, "zesDeviceEnumMemoryModules", device)
             if not handles:
-                return None, None
+                return None
             modules[index] = handles
         return lib, modules
     except Exception as exc:
         InvokeAILogger.get_logger(__name__).debug(f"Level Zero Sysman init failed: {exc}")
-        return None, None
+        return None
 
 
 def xpu_memory_info(device: torch.device) -> Optional[tuple[int, int]]:
@@ -254,7 +267,7 @@ def xpu_memory_info(device: torch.device) -> Optional[tuple[int, int]]:
     Unlike ``total_memory - memory_reserved()``, this accounts for VRAM held by other processes
     on the same device, which is what the model cache's budgeting arithmetic assumes.
     """
-    global _sysman_lib, _sysman_modules, _sysman_attempted
+    global _sysman, _sysman_attempted
 
     if device.type != "xpu":
         return None
@@ -272,11 +285,12 @@ def xpu_memory_info(device: torch.device) -> Optional[tuple[int, int]]:
     with _sysman_lock:
         if not _sysman_attempted:
             _sysman_attempted = True
-            _sysman_lib, _sysman_modules = _init_sysman()
-        lib, modules = _sysman_lib, _sysman_modules
+            _sysman = _init_sysman()
+        sysman = _sysman
 
-    if lib is None or modules is None:
+    if sysman is None:
         return None
+    lib, modules = sysman
     handles = modules.get(index)
     if not handles:
         return None
@@ -301,11 +315,11 @@ def xpu_memory_info(device: torch.device) -> Optional[tuple[int, int]]:
 
 def reset_cache() -> None:
     """Clear the memoised probe results (tests only)."""
-    global _integrated_by_index, _probe_attempted, _sysman_lib, _sysman_modules, _sysman_attempted
+    global _integrated_by_index, _probe_attempted, _sysman, _sysman_attempted
+    _load_loader.cache_clear()
     with _lock:
         _integrated_by_index = None
         _probe_attempted = False
     with _sysman_lock:
-        _sysman_lib = None
-        _sysman_modules = None
+        _sysman = None
         _sysman_attempted = False

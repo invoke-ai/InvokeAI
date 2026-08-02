@@ -13,7 +13,11 @@ export const getRandDeviceMetadata = (state: RootState, shouldUseCpuNoise: boole
   if (shouldUseCpuNoise) {
     return 'cpu';
   }
+  // Only answer when every generation device is the same accelerator. Under a mixed
+  // `generation_devices` list the client cannot know which one the session landed on, so
+  // guessing from the first entry would be no more truthful than the old hardcoded value.
   const devices = appInfoApi.endpoints.getGenerationDeviceOptions.select()(state).data;
-  const deviceType = devices?.[0]?.device.split(':')[0];
-  return deviceType && deviceType !== 'cpu' ? deviceType : 'cuda';
+  const types = new Set(devices?.map(({ device }) => device.split(':')[0]).filter((type) => type !== 'cpu'));
+  const [deviceType] = types;
+  return types.size === 1 && deviceType ? deviceType : 'cuda';
 };

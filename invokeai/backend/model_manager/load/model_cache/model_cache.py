@@ -1123,11 +1123,12 @@ class ModelCache:
         elif self._execution_device.type in ("mps", "xpu"):
             # Shared-memory devices: MPS, and Intel integrated GPUs, whose reported "VRAM" is
             # system RAM. Budget against actual free system memory instead of device totals.
-            if self._execution_device.type == "mps":
-                # TODO(ryand): Is it accurate that MPS shares memory with the CPU?
-                vram_reserved = torch.mps.driver_allocated_memory()
-            else:
-                vram_reserved = torch.xpu.memory_reserved(self._execution_device)
+            # TODO(ryand): Is it accurate that MPS shares memory with the CPU?
+            vram_reserved = (
+                torch.mps.driver_allocated_memory()
+                if self._execution_device.type == "mps"
+                else torch.xpu.memory_reserved(self._execution_device)
+            )
             vram_free = psutil.virtual_memory().available
             vram_available_to_process = vram_free + vram_reserved
         else:
