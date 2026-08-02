@@ -1877,9 +1877,7 @@ def make_diffusers_downsampler_block(block_class: Type[torch.nn.Module]) -> Type
                     )
                     return original_outputs + (scale * self.lora_layer(hidden_states))
             else:
-                hidden_states = F.conv2d(
-                    hidden_states, self.weight, self.bias, stride, padding, dilation, self.groups
-                )
+                hidden_states = F.conv2d(hidden_states, self.weight, self.bias, stride, padding, dilation, self.groups)
                 self.timestep += 1
                 if self.timestep == self.max_timestep:
                     self.timestep = 0
