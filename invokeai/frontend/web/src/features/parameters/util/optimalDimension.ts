@@ -85,7 +85,7 @@ export const isInSDXLTrainingDimensions = (width: number, height: number): boole
 /**
  * Gets the grid size for a given base model. For Flux, the grid size is 16, otherwise it is 8.
  * - sd-1, sd-2, sdxl, anima: 8
- * - flux, sd-3, qwen-image, z-image, wan: 16
+ * - flux, sd-3, qwen-image, z-image, ernie-image, wan: 16
  * - cogview4: 32
  * - default: 8
  *
@@ -113,6 +113,7 @@ export const getGridSize = (base?: BaseModelType | null, pidScale = 1): number =
     case 'qwen-image':
     case 'wan':
     case 'z-image':
+    case 'ernie-image':
     case 'krea-2':
     case 'ideogram-4':
       gridSize = 16;
