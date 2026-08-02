@@ -1,5 +1,6 @@
 import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
+import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
 import { deepClone } from 'common/util/deepClone';
@@ -62,6 +63,8 @@ import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/
 import type { AnyModelConfigWithExternal } from 'services/api/types';
 import { isExternalApiModelConfig, isNonRefinerMainModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
+
+const log = logger('system');
 
 const slice = createSlice({
   name: 'params',
@@ -971,6 +974,166 @@ export const {
   setAnimaScheduler,
 } = slice.actions;
 
+/**
+ * Last-resort repair for the persisted params slice, applied after the version steps have run.
+ *
+ * The `zParamsState.parse()` at the end of `migrate()` is all-or-nothing: a single missing required
+ * key throws, and the caller in `store.ts` catches it and falls back to the initial state — silently
+ * wiping every generation param the user had (prompts, prompt history, model selection, dimensions).
+ * That has happened whenever a key was added to the schema with neither a `.default()` nor a seed in
+ * the migration chain, which is what the Wan and post-v3 seeds above exist to undo.
+ *
+ * Backfilling those keys turns a forgotten seed into "one new field sits at its default" instead of
+ * "the user lost everything". Deliberately narrow:
+ *   - Only keys that are *absent*. A key that is present but holds an invalid value still throws;
+ *     this repairs omissions, not corruption.
+ *   - Only keys the schema cannot fill itself. Anything with `.default()` / `.catch()` / `.optional()`
+ *     is left to zod, so the schema's own default stays authoritative.
+ *
+ * This is a safety net, not a substitute for a migration step — it fills fields with *today's*
+ * initial value, which is only the right answer for genuinely new fields. `paramsSlice.test.ts`
+ * asserts the returned list is empty for real released blobs, so a forgotten seed still fails CI.
+ *
+ * Exported for that test.
+ */
+export const backfillMissingParamsKeys = (state: Record<string, unknown>): string[] => {
+  const initial = getInitialParamsState() as unknown as Record<string, unknown>;
+  const backfilled: string[] = [];
+
+  for (const [key, fieldSchema] of Object.entries(zParamsState.shape)) {
+    // `undefined` is the only value that counts as missing: persisted JSON can't hold it, and every
+    // nullable field in the schema uses `null` for "unset", so this never overwrites a real value.
+    if (state[key] !== undefined || fieldSchema.safeParse(undefined).success) {
+      continue;
+    }
+    state[key] = initial[key];
+    backfilled.push(key);
+  }
+
+  return backfilled;
+};
+
+/**
+ * Bring a persisted params blob up to the current `_version` in place.
+ *
+ * Every key added to `zParamsState` without a zod default must be seeded by the step for the version
+ * that predates it, or upgrading users lose the whole slice — see `backfillMissingParamsKeys`.
+ *
+ * Exported so the tests can assert the version steps alone are complete, without the safety net
+ * hiding a missing seed.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const applyParamsVersionMigrations = (state: any): void => {
+  if (!('_version' in state)) {
+    // v0 -> v1, add _version and remove x/y from dimensions, lifting width/height to top level
+    state._version = 1;
+    state.dimensions.width = state.dimensions.rect.width;
+    state.dimensions.height = state.dimensions.rect.height;
+  }
+
+  if (state._version === 1) {
+    // v1 -> v2, add positive prompt history
+    state._version = 2;
+    state.positivePromptHistory = [];
+  }
+
+  if (state._version === 2) {
+    // v2 -> v3, add standalone Qwen Image VAE and Qwen VL encoder fields
+    state._version = 3;
+    state.qwenImageVaeModel = null;
+    state.qwenImageQwenVLEncoderModel = null;
+
+    // Everything below was added to the schema after v3 was cut but without a version bump, so
+    // released builds that persist v2 blobs (v6.10.0 - v6.12.0) never wrote these keys. They
+    // have no zod default, which makes them required, so their absence fails the parse() below
+    // and silently wipes the whole slice on upgrade. Seed only when missing so that v2 blobs
+    // written by dev builds after each field landed keep the values they already hold.
+    state.fluxDypePreset = state.fluxDypePreset ?? 'off';
+    state.fluxDypeScale = state.fluxDypeScale ?? 2.0;
+    state.fluxDypeExponent = state.fluxDypeExponent ?? 2.0;
+    state.zImageShift = state.zImageShift ?? null;
+    state.zImageSeedVarianceEnabled = state.zImageSeedVarianceEnabled ?? false;
+    state.zImageSeedVarianceStrength = state.zImageSeedVarianceStrength ?? 0.1;
+    state.zImageSeedVarianceRandomizePercent = state.zImageSeedVarianceRandomizePercent ?? 50;
+    state.animaVaeModel = state.animaVaeModel ?? null;
+    state.animaQwen3EncoderModel = state.animaQwen3EncoderModel ?? null;
+    state.animaScheduler = state.animaScheduler ?? 'euler';
+    // No `kleinVaeModel` seed: the v4 -> v5 step below folds that slot into `flux2VaeModel` and
+    // deletes it, so it is no longer part of the schema and needs nothing here.
+    state.kleinQwen3EncoderModel = state.kleinQwen3EncoderModel ?? null;
+    state.qwenImageComponentSource = state.qwenImageComponentSource ?? null;
+    state.qwenImageQuantization = state.qwenImageQuantization ?? 'none';
+    state.qwenImageShift = state.qwenImageShift ?? null;
+  }
+
+  if (state._version === 3) {
+    // v3 -> v4, add Krea-2 standalone component and conditioning enhancer fields, and the
+    // PiD (Pixel Diffusion Decoder) fields. Also seed the Wan component fields — they were
+    // added to the schema without a version bump while releases were still writing v3 blobs,
+    // and they're nullable with no default, so a genuine released-build (v6.13.x) v3 blob
+    // without them fails zParamsState.parse() below, which wipes the whole slice on upgrade.
+    // Seed only when missing: dev-build v3 blobs written after the Wan merge already carry
+    // (possibly non-null) values.
+    state._version = 4;
+    state.krea2VaeModel = null;
+    state.krea2Qwen3VlEncoderModel = null;
+    state.krea2SeedVarianceEnabled = false;
+    state.krea2SeedVarianceStrength = 0.1;
+    state.krea2SeedVarianceRandomizePercent = 50;
+    state.krea2RebalanceEnabled = false;
+    state.krea2RebalanceMultiplier = 4;
+    state.krea2RebalanceWeights = '1.0,1.0,1.0,1.0,1.0,1.0,1.0,2.5,5.0,1.1,4.0,1.0';
+    state.pidMode = 'off';
+    state.pidDecoderModel = null;
+    state.gemma2EncoderModel = null;
+    state.pidSteps = 4;
+    state.wanTransformerLowNoise = state.wanTransformerLowNoise ?? null;
+    state.wanComponentSource = state.wanComponentSource ?? null;
+    state.wanVaeModel = state.wanVaeModel ?? null;
+    state.wanT5EncoderModel = state.wanT5EncoderModel ?? null;
+    state.wanGuidanceScaleLowNoise = state.wanGuidanceScaleLowNoise ?? null;
+  }
+
+  if (state._version === 4) {
+    // v4 -> v5, merge the separate Klein / [dev] FLUX.2 VAE slots into one shared
+    // flux2VaeModel (both drew from the same FLUX.2 VAE pool — keep whichever was set) and
+    // seed the new standalone [dev] Mistral encoder slot. Both parents of the FLUX.2 [dev]
+    // merge shipped incompatible schemas under _version 4 (main added the PiD fields; the
+    // [dev] branch added the flux2 fields), so a v4 blob may be missing either side's keys —
+    // every seed here is conditional, and the PiD keys are re-seeded for blobs written by
+    // pre-merge [dev] builds. All are nullable-with-no-default, so any missing key would
+    // fail zParamsState.parse() and wipe the whole slice.
+    state._version = 5;
+    state.flux2VaeModel = state.flux2VaeModel ?? state.kleinVaeModel ?? state.flux2DevVaeModel ?? null;
+    state.flux2DevMistralEncoderModel = state.flux2DevMistralEncoderModel ?? null;
+    delete state.kleinVaeModel;
+    delete state.flux2DevVaeModel;
+    state.pidMode = state.pidMode ?? 'off';
+    state.pidDecoderModel = state.pidDecoderModel ?? null;
+    state.gemma2EncoderModel = state.gemma2EncoderModel ?? null;
+    state.pidSteps = state.pidSteps ?? 4;
+  }
+
+  // The HiDiffusion fields were added to the schema without a version bump, so they can be missing
+  // from a blob of any version — seeded outside the version steps for that reason. They have no zod
+  // default, so an absent key would fail the parse() at the end of migrate() and wipe the slice.
+  if (!('hiDiffusionEnabled' in state)) {
+    state.hiDiffusionEnabled = false;
+  }
+  if (!('hiDiffusionRauNetEnabled' in state)) {
+    state.hiDiffusionRauNetEnabled = true;
+  }
+  if (!('hiDiffusionWindowAttnEnabled' in state)) {
+    state.hiDiffusionWindowAttnEnabled = true;
+  }
+  if (!('hiDiffusionT1Ratio' in state)) {
+    state.hiDiffusionT1Ratio = 0.4;
+  }
+  if (!('hiDiffusionT2Ratio' in state)) {
+    state.hiDiffusionT2Ratio = 0.0;
+  }
+};
+
 export const paramsSliceConfig: SliceConfig<typeof slice> = {
   slice,
   schema: zParamsState,
@@ -979,87 +1142,15 @@ export const paramsSliceConfig: SliceConfig<typeof slice> = {
     migrate: (state) => {
       assert(isPlainObject(state));
 
-      if (!('_version' in state)) {
-        // v0 -> v1, add _version and remove x/y from dimensions, lifting width/height to top level
-        state._version = 1;
-        state.dimensions.width = state.dimensions.rect.width;
-        state.dimensions.height = state.dimensions.rect.height;
-      }
+      applyParamsVersionMigrations(state);
 
-      if (state._version === 1) {
-        // v1 -> v2, add positive prompt history
-        state._version = 2;
-        state.positivePromptHistory = [];
-      }
-
-      if (state._version === 2) {
-        // v2 -> v3, add standalone Qwen Image VAE and Qwen VL encoder fields
-        state._version = 3;
-        state.qwenImageVaeModel = null;
-        state.qwenImageQwenVLEncoderModel = null;
-      }
-
-      if (state._version === 3) {
-        // v3 -> v4, add Krea-2 standalone component and conditioning enhancer fields and the
-        // PiD (Pixel Diffusion Decoder) fields. Also seed the Wan component fields — they were
-        // added to the schema without a version bump while releases were still writing v3 blobs,
-        // and they're nullable with no default, so a genuine released-build v3 blob without them
-        // fails zParamsState.parse() and wipes the whole slice. Seed only when missing: dev-build
-        // v3 blobs written after the Wan merge already carry (possibly non-null) values.
-        state._version = 4;
-        state.krea2VaeModel = null;
-        state.krea2Qwen3VlEncoderModel = null;
-        state.krea2SeedVarianceEnabled = false;
-        state.krea2SeedVarianceStrength = 0.1;
-        state.krea2SeedVarianceRandomizePercent = 50;
-        state.krea2RebalanceEnabled = false;
-        state.krea2RebalanceMultiplier = 4;
-        state.krea2RebalanceWeights = '1.0,1.0,1.0,1.0,1.0,1.0,1.0,2.5,5.0,1.1,4.0,1.0';
-        state.pidMode = 'off';
-        state.pidDecoderModel = null;
-        state.gemma2EncoderModel = null;
-        state.pidSteps = 4;
-        state.wanTransformerLowNoise = state.wanTransformerLowNoise ?? null;
-        state.wanComponentSource = state.wanComponentSource ?? null;
-        state.wanVaeModel = state.wanVaeModel ?? null;
-        state.wanT5EncoderModel = state.wanT5EncoderModel ?? null;
-        state.wanGuidanceScaleLowNoise = state.wanGuidanceScaleLowNoise ?? null;
-      }
-
-      if (state._version === 4) {
-        // v4 -> v5, merge the separate Klein / [dev] FLUX.2 VAE slots into one shared
-        // flux2VaeModel (both drew from the same FLUX.2 VAE pool — keep whichever was set) and
-        // seed the new standalone [dev] Mistral encoder slot. Both parents of the FLUX.2 [dev]
-        // merge shipped incompatible schemas under _version 4 (main added the PiD fields; the
-        // [dev] branch added the flux2 fields), so a v4 blob may be missing either side's keys —
-        // every seed here is conditional, and the PiD keys are re-seeded for blobs written by
-        // pre-merge [dev] builds. All are nullable-with-no-default, so any missing key would
-        // fail zParamsState.parse() and wipe the whole slice.
-        state._version = 5;
-        state.flux2VaeModel = state.flux2VaeModel ?? state.kleinVaeModel ?? state.flux2DevVaeModel ?? null;
-        state.flux2DevMistralEncoderModel = state.flux2DevMistralEncoderModel ?? null;
-        delete state.kleinVaeModel;
-        delete state.flux2DevVaeModel;
-        state.pidMode = state.pidMode ?? 'off';
-        state.pidDecoderModel = state.pidDecoderModel ?? null;
-        state.gemma2EncoderModel = state.gemma2EncoderModel ?? null;
-        state.pidSteps = state.pidSteps ?? 4;
-      }
-
-      if (!('hiDiffusionEnabled' in state)) {
-        state.hiDiffusionEnabled = false;
-      }
-      if (!('hiDiffusionRauNetEnabled' in state)) {
-        state.hiDiffusionRauNetEnabled = true;
-      }
-      if (!('hiDiffusionWindowAttnEnabled' in state)) {
-        state.hiDiffusionWindowAttnEnabled = true;
-      }
-      if (!('hiDiffusionT1Ratio' in state)) {
-        state.hiDiffusionT1Ratio = 0.4;
-      }
-      if (!('hiDiffusionT2Ratio' in state)) {
-        state.hiDiffusionT2Ratio = 0.0;
+      const backfilled = backfillMissingParamsKeys(state);
+      if (backfilled.length > 0) {
+        log.warn(
+          { backfilled },
+          `Backfilled ${backfilled.length} params key(s) missing from the persisted state: ${backfilled.join(', ')}. ` +
+            `These need a zod default or a seed in the migration chain.`
+        );
       }
 
       return zParamsState.parse(state);
