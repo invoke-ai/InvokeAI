@@ -39,7 +39,14 @@ describe('attachImageMapDataRuntime', () => {
     mocks.onConnectionChange.mockReset().mockReturnValue(() => {});
     mocks.refreshImageMapPoints.mockReset();
     mocks.getAuthSession.mockReset().mockReturnValue({ user: null });
-    imageMapStore.setSnapshot({ data: null, error: null, indexCounts: null, loadState: 'idle', renderError: null });
+    imageMapStore.setSnapshot({
+      clusterLabels: null,
+      data: null,
+      error: null,
+      indexCounts: null,
+      loadState: 'idle',
+      renderError: null,
+    });
   });
 
   it('refreshes on projection-ready only after the map has been loaded once', () => {

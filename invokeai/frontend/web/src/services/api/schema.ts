@@ -1591,6 +1591,35 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/image_map/cluster_labels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Image Map Cluster Labels
+         * @description Labels the user's visible clusters with the most similar vocabulary phrases.
+         *
+         *     Clustering mirrors `/points` (same eps semantics, computed over the
+         *     caller's currently-accessible points), so cluster ids line up with the
+         *     served map. Pass the `cluster_eps` reported by `/points` so both requests
+         *     cluster with the same eps; cluster ids can still differ if the accessible
+         *     set changes between the requests, so compare the two responses'
+         *     `visible_hash` (and `updated_at`) and discard labels on mismatch.
+         *     Requires the embedding model's text encoder; the first call per model
+         *     embeds the whole vocabulary and is slow.
+         */
+        get: operations["get_image_map_cluster_labels"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/image_map/refresh": {
         parameters: {
             query?: never;
@@ -17388,6 +17417,50 @@ export type components = {
             type: "img_lerp";
         };
         /**
+         * ImageMapClusterLabel
+         * @description The best vocabulary label for one cluster.
+         */
+        ImageMapClusterLabel: {
+            /**
+             * Label
+             * @description Best-matching vocabulary phrase
+             */
+            label: string;
+            /**
+             * Alternates
+             * @description Runner-up phrases
+             */
+            alternates: string[];
+            /**
+             * Score
+             * @description Cosine similarity of the best phrase to the cluster centroid
+             */
+            score: number;
+        };
+        /**
+         * ImageMapClusterLabelsResponse
+         * @description Automatic labels for the current user's visible clusters, keyed by cluster id.
+         */
+        ImageMapClusterLabelsResponse: {
+            /**
+             * Labels
+             * @description Cluster id -> label; noise (-1) is omitted
+             */
+            labels: {
+                [key: string]: components["schemas"]["ImageMapClusterLabel"];
+            };
+            /**
+             * Visible Hash
+             * @description Fingerprint of the visible image set these labels were clustered over; clients must discard labels whose visible_hash does not match their points response
+             */
+            visible_hash?: string | null;
+            /**
+             * Updated At
+             * @description The projection these labels were computed against; clients must discard labels whose projection does not match their points
+             */
+            updated_at?: string | null;
+        };
+        /**
          * ImageMapPoint
          * @description One image's position on the 2D semantic map.
          */
@@ -17449,6 +17522,11 @@ export type components = {
              * @description The effective DBSCAN eps used for these points (adaptive default resolved, clamps applied). Pass it back explicitly to get an identical clustering from a later request.
              */
             cluster_eps?: number | null;
+            /**
+             * Visible Hash
+             * @description Fingerprint of the visible image set these points were computed over; compare across image-map responses to detect accessible-set drift between requests.
+             */
+            visible_hash?: string | null;
             /**
              * Updated At
              * @description When the served projection was computed
@@ -46395,6 +46473,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ImageMapSearchResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_image_map_cluster_labels: {
+        parameters: {
+            query?: {
+                /** @description DBSCAN eps for clustering. Defaults to an adaptive value derived from the projection's k-distance distribution. Clamped server-side relative to the projection's coordinate span. */
+                eps?: number | null;
+                /** @description DBSCAN min_samples for clustering */
+                min_samples?: number;
+                /** @description Candidate labels per cluster */
+                top_k?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageMapClusterLabelsResponse"];
                 };
             };
             /** @description Validation Error */

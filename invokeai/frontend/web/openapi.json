@@ -6598,6 +6598,91 @@
         }
       }
     },
+    "/api/v1/image_map/cluster_labels": {
+      "get": {
+        "tags": ["image_map"],
+        "summary": "Get Image Map Cluster Labels",
+        "description": "Labels the user's visible clusters with the most similar vocabulary phrases.\n\nClustering mirrors `/points` (same eps semantics, computed over the\ncaller's currently-accessible points), so cluster ids line up with the\nserved map. Pass the `cluster_eps` reported by `/points` so both requests\ncluster with the same eps; cluster ids can still differ if the accessible\nset changes between the requests, so compare the two responses'\n`visible_hash` (and `updated_at`) and discard labels on mismatch.\nRequires the embedding model's text encoder; the first call per model\nembeds the whole vocabulary and is slow.",
+        "operationId": "get_image_map_cluster_labels",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "eps",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "maximum": 2.0,
+                  "minimum": 0.01
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "DBSCAN eps for clustering. Defaults to an adaptive value derived from the projection's k-distance distribution. Clamped server-side relative to the projection's coordinate span.",
+              "title": "Eps"
+            },
+            "description": "DBSCAN eps for clustering. Defaults to an adaptive value derived from the projection's k-distance distribution. Clamped server-side relative to the projection's coordinate span."
+          },
+          {
+            "name": "min_samples",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 2,
+              "description": "DBSCAN min_samples for clustering",
+              "default": 10,
+              "title": "Min Samples"
+            },
+            "description": "DBSCAN min_samples for clustering"
+          },
+          {
+            "name": "top_k",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10,
+              "minimum": 1,
+              "description": "Candidate labels per cluster",
+              "default": 3,
+              "title": "Top K"
+            },
+            "description": "Candidate labels per cluster"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageMapClusterLabelsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/image_map/refresh": {
       "post": {
         "tags": ["image_map"],
@@ -41684,6 +41769,72 @@
           "$ref": "#/components/schemas/ImageOutput"
         }
       },
+      "ImageMapClusterLabel": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "Best-matching vocabulary phrase"
+          },
+          "alternates": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Alternates",
+            "description": "Runner-up phrases"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score",
+            "description": "Cosine similarity of the best phrase to the cluster centroid"
+          }
+        },
+        "type": "object",
+        "required": ["label", "alternates", "score"],
+        "title": "ImageMapClusterLabel",
+        "description": "The best vocabulary label for one cluster."
+      },
+      "ImageMapClusterLabelsResponse": {
+        "properties": {
+          "labels": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ImageMapClusterLabel"
+            },
+            "type": "object",
+            "title": "Labels",
+            "description": "Cluster id -> label; noise (-1) is omitted"
+          },
+          "visible_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visible Hash",
+            "description": "Fingerprint of the visible image set these labels were clustered over; clients must discard labels whose visible_hash does not match their points response"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At",
+            "description": "The projection these labels were computed against; clients must discard labels whose projection does not match their points"
+          }
+        },
+        "type": "object",
+        "required": ["labels"],
+        "title": "ImageMapClusterLabelsResponse",
+        "description": "Automatic labels for the current user's visible clusters, keyed by cluster id."
+      },
       "ImageMapPoint": {
         "properties": {
           "x": {
@@ -41761,6 +41912,18 @@
             ],
             "title": "Cluster Eps",
             "description": "The effective DBSCAN eps used for these points (adaptive default resolved, clamps applied). Pass it back explicitly to get an identical clustering from a later request."
+          },
+          "visible_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visible Hash",
+            "description": "Fingerprint of the visible image set these points were computed over; compare across image-map responses to detect accessible-set drift between requests."
           },
           "updated_at": {
             "anyOf": [

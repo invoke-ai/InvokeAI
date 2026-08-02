@@ -1,7 +1,10 @@
 import type { WidgetViewProps } from '@workbench/widgetContracts';
 
 import { Button, Center, Spinner, Stack, Text } from '@chakra-ui/react';
-import { getImageMapClickSelectsCluster } from '@workbench/image-map/imageMapSettings';
+import {
+  getImageMapClickSelectsCluster,
+  getImageMapShowClusterLabels,
+} from '@workbench/image-map/imageMapSettings';
 import { ensureImageMapLoaded, imageMapStore, refreshImageMapPoints } from '@workbench/image-map/imageMapStore';
 import { useWidgetValuesSelector } from '@workbench/WorkbenchContext';
 import { lazy, Suspense, useEffect } from 'react';
@@ -31,6 +34,7 @@ const plotLoadingFallback = (
 export const ImageMapWidgetView = (_props: WidgetViewProps) => {
   const { data, error, loadState, renderError } = imageMapStore.useSnapshot();
   const clickSelectsCluster = useWidgetValuesSelector('image-map', getImageMapClickSelectsCluster);
+  const showClusterLabels = useWidgetValuesSelector('image-map', getImageMapShowClusterLabels);
 
   useEffect(() => {
     ensureImageMapLoaded();
@@ -63,7 +67,7 @@ export const ImageMapWidgetView = (_props: WidgetViewProps) => {
     // mounted and the spinner where the plot will appear.
     return (
       <Suspense fallback={plotLoadingFallback}>
-        <ImageMapPlot clickSelectsCluster={clickSelectsCluster} />
+        <ImageMapPlot clickSelectsCluster={clickSelectsCluster} showClusterLabels={showClusterLabels} />
       </Suspense>
     );
   }

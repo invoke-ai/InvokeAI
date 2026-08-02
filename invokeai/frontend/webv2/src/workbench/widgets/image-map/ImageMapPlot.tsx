@@ -13,6 +13,7 @@ import { collectClusterSelection } from '@workbench/image-map/clusterSelection';
 import { imageMapStore } from '@workbench/image-map/imageMapStore';
 import {
   buildAllPointsTrace,
+  buildClusterAnnotations,
   buildCurrentImageTrace,
   buildHighlightedPointsTrace,
   buildMapLayout,
@@ -117,9 +118,16 @@ const findTraceIndex = (plot: PlotElement, name: string): number =>
  * module is lazy-loaded so the plotly bundle stays out of the app's critical
  * path.
  */
-const ImageMapPlot = ({ clickSelectsCluster = false }: { clickSelectsCluster?: boolean }) => {
+const ImageMapPlot = ({
+  clickSelectsCluster = false,
+  showClusterLabels = true,
+}: {
+  clickSelectsCluster?: boolean;
+  showClusterLabels?: boolean;
+}) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const points = imageMapStore.useSelector((snapshot) => snapshot.data?.points ?? null);
+  const clusterLabels = imageMapStore.useSelector((snapshot) => snapshot.clusterLabels);
   const selectedImageName = useWidgetValuesSelector(
     'gallery',
     (values) => getSelectedGalleryImageFromValues(values)?.imageName ?? null
@@ -208,7 +216,12 @@ const ImageMapPlot = ({ clickSelectsCluster = false }: { clickSelectsCluster?: b
       }
     }
 
-    void Plotly.react(container, traces as Plotly.Data[], buildMapLayout(initialRanges), {
+    const layout = buildMapLayout(
+      initialRanges,
+      buildClusterAnnotations(points, showClusterLabels ? clusterLabels : null)
+    );
+
+    void Plotly.react(container, traces as Plotly.Data[], layout, {
       displayModeBar: false,
       // Custom wheel/pinch zoom below; plotly's own scrollZoom has
       // long-standing Safari issues.
@@ -296,7 +309,7 @@ const ImageMapPlot = ({ clickSelectsCluster = false }: { clickSelectsCluster?: b
     return () => {
       disposed = true;
     };
-  }, [points, selectCluster, selectImage]);
+  }, [clusterLabels, points, selectCluster, selectImage, showClusterLabels]);
 
   // Highlight overlay: the gallery's multi-selection, restyled in place.
   useEffect(() => {

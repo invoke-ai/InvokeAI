@@ -61,6 +61,11 @@ class ImageMapPointsResponse(BaseModel):
         description="The effective DBSCAN eps used for these points (adaptive default resolved, clamps applied). "
         "Pass it back explicitly to get an identical clustering from a later request.",
     )
+    visible_hash: Optional[str] = Field(
+        default=None,
+        description="Fingerprint of the visible image set these points were computed over; compare across "
+        "image-map responses to detect accessible-set drift between requests.",
+    )
     updated_at: Optional[str] = Field(default=None, description="When the served projection was computed")
 
 
@@ -239,7 +244,7 @@ async def get_image_map_points(
     # loop time per poll on a 500k-image gallery, stalling every other request
     # in the process; the retry decision is made below instead, from the one
     # fact it actually needs.
-    def build_points() -> tuple[list[ImageMapPoint], Optional[float], bool]:
+    def build_points() -> tuple[list[ImageMapPoint], Optional[float], bool, str]:
         accessible = set(current_names)
         visible_mask = np.fromiter(
             (name in accessible for name in record.image_names), dtype=bool, count=len(record.image_names)
@@ -269,6 +274,7 @@ async def get_image_map_points(
                 ],
                 resolved_eps,
                 True,
+                scope_hash(model_id, visible_names),
             )
 
         try:
@@ -304,9 +310,10 @@ async def get_image_map_points(
             ],
             resolved_eps,
             bool(visible_mask.any()),
+            scope_hash(model_id, visible_names),
         )
 
-    points, resolved_eps, any_visible = await asyncio.to_thread(build_points)
+    points, resolved_eps, any_visible, visible_hash = await asyncio.to_thread(build_points)
 
     retrying = False
     if not stale and current_names and not any_visible:
@@ -325,6 +332,7 @@ async def get_image_map_points(
         stale=stale,
         point_count=len(points),
         cluster_eps=resolved_eps,
+        visible_hash=visible_hash,
         updated_at=record.updated_at,
     )
 
@@ -616,6 +624,132 @@ async def search_image_map_by_image(
     results = await asyncio.to_thread(services.image_index.search_similar, scope_user, query_embedding, limit)
     return ImageMapSearchResponse(
         results=[ImageMapSearchResult(image_name=name, score=score) for name, score in results]
+    )
+
+
+class ImageMapClusterLabel(BaseModel):
+    """The best vocabulary label for one cluster."""
+
+    label: str = Field(description="Best-matching vocabulary phrase")
+    alternates: list[str] = Field(description="Runner-up phrases")
+    score: float = Field(description="Cosine similarity of the best phrase to the cluster centroid")
+
+
+class ImageMapClusterLabelsResponse(BaseModel):
+    """Automatic labels for the current user's visible clusters, keyed by cluster id."""
+
+    labels: dict[str, ImageMapClusterLabel] = Field(description="Cluster id -> label; noise (-1) is omitted")
+    visible_hash: Optional[str] = Field(
+        default=None,
+        description="Fingerprint of the visible image set these labels were clustered over; clients must discard "
+        "labels whose visible_hash does not match their points response",
+    )
+    updated_at: Optional[str] = Field(
+        default=None,
+        description="The projection these labels were computed against; clients must discard labels whose projection does not match their points",
+    )
+
+
+@image_map_router.get(
+    "/cluster_labels", operation_id="get_image_map_cluster_labels", response_model=ImageMapClusterLabelsResponse
+)
+async def get_image_map_cluster_labels(
+    current_user: CurrentUserOrDefault,
+    eps: Optional[float] = ClusterEpsQuery,
+    min_samples: int = ClusterMinSamplesQuery,
+    top_k: int = Query(default=3, ge=1, le=10, description="Candidate labels per cluster"),
+) -> ImageMapClusterLabelsResponse:
+    """Labels the user's visible clusters with the most similar vocabulary phrases.
+
+    Clustering mirrors `/points` (same eps semantics, computed over the
+    caller's currently-accessible points), so cluster ids line up with the
+    served map. Pass the `cluster_eps` reported by `/points` so both requests
+    cluster with the same eps; cluster ids can still differ if the accessible
+    set changes between the requests, so compare the two responses'
+    `visible_hash` (and `updated_at`) and discard labels on mismatch.
+    Requires the embedding model's text encoder; the first call per model
+    embeds the whole vocabulary and is slow.
+    """
+    from invokeai.app.services.image_index.cluster_labels import label_clusters
+
+    services = ApiDependencies.invoker.services
+    model_id = services.image_index.model_id
+    if model_id is None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="The image index is not enabled")
+
+    user_id, is_admin = _scope(current_user)
+    record = services.image_index_records.get_projection(user_id, model_id)
+    if record is None or record.point_count == 0:
+        return ImageMapClusterLabelsResponse(labels={})
+
+    try:
+        vocabulary, vocab_embeddings = await asyncio.to_thread(services.image_index.get_vocab_embeddings)
+    except TextSearchUnavailableError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+
+    current_names = services.image_index_records.list_accessible_embedded_images(
+        None if is_admin else user_id, model_id
+    )
+
+    def build() -> tuple[dict[int, dict], str]:
+        accessible = set(current_names)
+        mask = np.fromiter(
+            (name in accessible for name in record.image_names), dtype=bool, count=len(record.image_names)
+        )
+        # Exactly the mask /points applies, non-finite filter included. Without
+        # it this endpoint's visible_hash is computed over a different set of
+        # names than the one /points reports, so every response the client
+        # receives fails the hash comparison it is told to make and all labels
+        # are discarded — and the clustering below is handed a NaN, which
+        # sklearn raises on, 500ing this user until their gallery changes.
+        mask &= np.isfinite(record.coords).all(axis=1)
+        visible_names = [name for name, keep in zip(record.image_names, mask, strict=True) if keep]
+        visible_hash = scope_hash(model_id, visible_names)
+        if not visible_names:
+            return {}, visible_hash
+        visible_coords = record.coords[mask]
+        try:
+            if 0 < visible_coords.shape[0] <= MAX_CLUSTERED_POINTS:
+                # cluster_at_eps on a resolved eps, matching /points: passing an
+                # already-resolved eps to compute_clusters re-resolves it, so
+                # the labels here could come from a different eps than the
+                # cluster_eps /points reported and the client passed back.
+                cluster_ids = cluster_at_eps(
+                    visible_coords, resolve_cluster_eps(visible_coords, eps, min_samples), min_samples
+                )
+            else:
+                cluster_ids = compute_clusters(visible_coords, eps=eps, min_samples=min_samples)
+        except Exception:
+            # /points degrades to unclustered rather than 500ing; labels over no
+            # clusters is the same degradation, and the client already discards
+            # a label set whose visible_hash does not match its points.
+            services.logger.exception(f"Image map: clustering failed for user '{user_id}'; serving no labels")
+            return {}, visible_hash
+        cluster_by_name = dict(zip(visible_names, cluster_ids, strict=True))
+        # The accessible matrix comes from the same LRU the search endpoint
+        # uses — this endpoint fires after every points refresh, and a full
+        # BLOB read per request would not scale to large galleries.
+        accessible_names, accessible_matrix = services.image_index.get_accessible_embeddings(
+            None if is_admin else user_id
+        )
+        row_by_name = {name: index for index, name in enumerate(accessible_names)}
+        found_names = [name for name in visible_names if name in row_by_name]
+        if not found_names:
+            return {}, visible_hash
+        embeddings = accessible_matrix[[row_by_name[name] for name in found_names]]
+        aligned = np.fromiter((cluster_by_name[name] for name in found_names), dtype=np.int64, count=len(found_names))
+        return label_clusters(aligned, embeddings, vocabulary, vocab_embeddings, top_k=top_k), visible_hash
+
+    labels, visible_hash = await asyncio.to_thread(build)
+    return ImageMapClusterLabelsResponse(
+        labels={
+            str(cluster_id): ImageMapClusterLabel(
+                alternates=info["alternates"], label=info["label"], score=info["score"]
+            )
+            for cluster_id, info in labels.items()
+        },
+        visible_hash=visible_hash,
+        updated_at=record.updated_at,
     )
 
 
