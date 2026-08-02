@@ -443,14 +443,38 @@ def test_xpu_mem_get_info_fallback_derives_from_properties():
     assert free == 30 * gib
 
 
-def test_xpu_mem_get_info_fallback_unknown_total():
-    """If even total_memory is unavailable, report (0, 0) rather than raising."""
+def test_xpu_mem_get_info_unknown_total_raises():
+    """An unreadable total_memory propagates rather than being reported as (0, 0).
+
+    Returning (0, 0) would make ModelCache._get_vram_available collapse to a constant
+    -working_mem budget for the life of the process (the vram_allocated term cancels
+    against _get_vram_in_use), silently forcing per-layer autocast forever.
+    """
     with (
         patch.object(torch.xpu, "mem_get_info", side_effect=RuntimeError(), create=True),
-        patch.object(torch.xpu, "get_device_properties", side_effect=RuntimeError(), create=True),
+        patch.object(torch.xpu, "get_device_properties", side_effect=RuntimeError("unreadable"), create=True),
         patch.object(torch.xpu, "memory_reserved", side_effect=RuntimeError(), create=True),
     ):
-        assert TorchDevice.xpu_mem_get_info(torch.device("xpu")) == (0, 0)
+        with pytest.raises(RuntimeError, match="unreadable"):
+            TorchDevice.xpu_mem_get_info(torch.device("xpu"))
+
+
+def test_xpu_mem_get_info_fallback_catches_assertion_error():
+    """torch.xpu._lazy_init raises AssertionError on a build without XPU, not RuntimeError."""
+    gib = 1 << 30
+    with (
+        patch.object(
+            torch.xpu,
+            "mem_get_info",
+            side_effect=AssertionError("Torch not compiled with XPU enabled"),
+            create=True,
+        ),
+        patch.object(
+            torch.xpu, "get_device_properties", return_value=SimpleNamespace(total_memory=16 * gib), create=True
+        ),
+        patch.object(torch.xpu, "memory_reserved", return_value=gib, create=True),
+    ):
+        assert TorchDevice.xpu_mem_get_info(torch.device("xpu")) == (15 * gib, 16 * gib)
 
 
 # ===== multi-GPU generation_devices on XPU ==================================
