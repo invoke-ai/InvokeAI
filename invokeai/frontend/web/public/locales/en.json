@@ -743,7 +743,7 @@
             },
             "selectBboxTool": {
                 "title": "Bbox Tool",
-                "desc": "Select the bounding box tool."
+                "desc": "Tap to select the bounding box tool, or hold to use it temporarily."
             },
             "decrementToolWidth": {
                 "title": "Decrement Tool Width",
