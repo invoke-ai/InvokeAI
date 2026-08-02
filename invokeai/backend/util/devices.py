@@ -6,7 +6,7 @@ import torch
 from deprecated import deprecated
 
 from invokeai.app.services.config.config_default import get_config
-from invokeai.backend.util.level_zero import xpu_device_is_integrated
+from invokeai.backend.util.level_zero import xpu_device_is_integrated, xpu_memory_info
 from invokeai.backend.util.logging import InvokeAILogger
 
 # legacy APIs
@@ -330,27 +330,35 @@ class TorchDevice:
     def xpu_mem_get_info(cls, device: torch.device) -> tuple[int, int]:
         """Return ``(free, total)`` VRAM in bytes for an XPU (Intel GPU) device.
 
-        Uses ``torch.xpu.mem_get_info()`` when available. Setups missing the SYCL
-        ``ext_intel_free_memory`` aspect (notably GPU passthrough VMs, and some
-        driver/kernel combinations) fail instead; fall back to ``total_memory``
-        minus this process's reserved bytes.
+        Three sources are tried in order, most accurate first:
+
+        1. ``torch.xpu.mem_get_info()`` -- driver-global, but needs the SYCL
+           ``ext_intel_free_memory`` aspect, which is missing on some driver/kernel
+           combinations (notably GPU passthrough VMs and WSL2).
+        2. Level Zero Sysman ``zesMemoryGetState`` -- the same driver-global figure by
+           another route, frequently available when the SYCL aspect is not.
+        3. ``total_memory`` minus this process's reserved bytes -- a last-resort estimate.
 
         The failure type is torch-version dependent -- ``RuntimeError`` from the
         missing aspect, ``AssertionError`` from ``torch.xpu._lazy_init()`` on a
         build without XPU -- so the probe catches broadly rather than enumerating
         types that move between releases.
 
-        The fallback is blind to VRAM held by other processes, so callers should
-        treat it as a budget hint rather than a guarantee. A failure to read
-        ``total_memory`` is deliberately *not* swallowed: a device whose properties
-        cannot be read is not usable as an execution device, and returning
-        ``(0, 0)`` would collapse the model cache's available-VRAM arithmetic to a
-        constant negative budget for the lifetime of the process.
+        Only source 3 is blind to VRAM held by other processes; callers get a driver-global
+        answer whenever the platform can give one. A failure to read ``total_memory`` is
+        deliberately *not* swallowed: a device whose properties cannot be read is not usable
+        as an execution device, and returning ``(0, 0)`` would collapse the model cache's
+        available-VRAM arithmetic to a constant negative budget for the lifetime of the
+        process.
         """
         try:
             return torch.xpu.mem_get_info(device)
         except Exception:
             pass
+
+        sysman_info = xpu_memory_info(device)
+        if sysman_info is not None:
+            return sysman_info
 
         # total_memory does not depend on the unavailable free-memory aspect. Allowed to
         # raise -- see the docstring.
@@ -364,9 +372,10 @@ class TorchDevice:
         if device_key not in _XPU_MEM_FALLBACK_WARNED:
             _XPU_MEM_FALLBACK_WARNED.add(device_key)
             InvokeAILogger.get_logger(__name__).warning(
-                f"torch.xpu.mem_get_info() is unavailable for {device}; estimating free VRAM as "
-                "total memory minus this process's reserved bytes. The estimate ignores VRAM held "
-                "by other processes, so the model cache may over-commit on a shared GPU."
+                f"Neither torch.xpu.mem_get_info() nor Level Zero Sysman could report free VRAM "
+                f"for {device}; estimating it as total memory minus this process's reserved bytes. "
+                "The estimate ignores VRAM held by other processes, so the model cache may "
+                "over-commit on a shared GPU. Set max_cache_vram_gb explicitly if you hit OOMs."
             )
 
         return (max(total_bytes - reserved_bytes, 0), total_bytes)
