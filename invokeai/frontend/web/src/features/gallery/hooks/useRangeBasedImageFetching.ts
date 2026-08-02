@@ -1,3 +1,4 @@
+import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppStore } from 'app/store/storeHooks';
 import { isVideoName } from 'features/gallery/store/types';
 import { useCallback, useEffect, useState } from 'react';
@@ -51,7 +52,7 @@ export const useRangeBasedImageFetching = ({
   const store = useAppStore();
   const [getImageDTOsByNames] = useGetImageDTOsByNamesMutation();
   const [lastRange, setLastRange] = useState<ListRange | null>(null);
-  const [pendingRanges, setPendingRanges] = useState<ListRange[]>([]);
+  const [pendingRanges, setPendingRanges] = useState<ListRange[]>(EMPTY_ARRAY);
 
   const fetchItems = useCallback(
     (ranges: ListRange[], allNames: string[]) => {
@@ -64,7 +65,16 @@ export const useRangeBasedImageFetching = ({
       const cachedImageNames = imagesApi.util.selectCachedArgsForQuery(state, 'getImageDTO');
       const uncachedImageNames = getUncachedNames(allNames, cachedImageNames, ranges).filter((n) => !isVideoName(n));
       if (uncachedImageNames.length > 0) {
-        getImageDTOsByNames({ image_names: uncachedImageNames });
+        getImageDTOsByNames({ image_names: uncachedImageNames })
+          .unwrap()
+          .catch(() => {
+            // This bulk fetch is the ONLY fetcher for these rows: `ImageAtPosition` consumes the
+            // cache with `skip: isUninitialized`, so a row whose DTO never arrived does not fetch
+            // for itself, and images (unlike videos) have no retry affordance. Put the ranges back
+            // so the effect re-runs and tries again — otherwise a transient failure leaves grey
+            // placeholders until the user happens to scroll. The throttle bounds the retry rate.
+            setPendingRanges((prev) => (prev.length > 0 ? prev : ranges));
+          });
       }
 
       // Videos — fetch one at a time (no batch endpoint yet). Each `initiate()` is a no-op for
@@ -77,7 +87,13 @@ export const useRangeBasedImageFetching = ({
         store.dispatch(videosApi.endpoints.getVideoDTO.initiate(videoName, getVideoPrefetchOptions()));
       }
 
-      setPendingRanges([]);
+      // Clear with a stable reference. `pendingRanges` is a dependency of the effect that
+      // calls this function, so a fresh `[]` — a new identity every time — re-runs the
+      // effect, which re-arms the throttle, which calls this again: a self-sustaining
+      // render loop, running as fast as the throttle allows, for as long as the grid is
+      // mounted and with no user input. Setting state to the value it already holds makes
+      // React bail out instead.
+      setPendingRanges(EMPTY_ARRAY);
     },
     [enabled, getImageDTOsByNames, store]
   );
