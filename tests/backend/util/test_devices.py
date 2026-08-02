@@ -492,6 +492,51 @@ def test_get_generation_devices_auto_expands_to_all_xpu():
         assert TorchDevice.get_generation_devices("auto") == [torch.device("xpu:0"), torch.device("xpu:1")]
 
 
+def _auto_xpu_devices(integrated_map: dict[int, bool | None]):
+    """Resolve `auto` with N XPU devices whose integrated-ness is given per index."""
+    config = get_config()
+    config.device = "auto"
+
+    def fake_is_integrated(device: torch.device):
+        return integrated_map.get(device.index)
+
+    with (
+        patch("invokeai.backend.util.devices.torch.cuda.is_available", return_value=False),
+        patch("invokeai.backend.util.devices._xpu_is_available", return_value=True),
+        patch("torch.xpu.device_count", return_value=len(integrated_map), create=True),
+        patch("invokeai.backend.util.devices.xpu_device_is_integrated", side_effect=fake_is_integrated),
+    ):
+        return TorchDevice.get_generation_devices("auto")
+
+
+def test_auto_excludes_integrated_gpu_when_a_discrete_one_exists():
+    """The mainstream Arc config is iGPU + discrete card; `auto` must not dispatch to the iGPU."""
+    assert _auto_xpu_devices({0: True, 1: False}) == [torch.device("xpu:1")]
+
+
+def test_auto_keeps_integrated_gpu_when_it_is_the_only_device():
+    """Dropping the only GPU would leave nothing to generate on."""
+    assert _auto_xpu_devices({0: True}) == [torch.device("xpu:0")]
+
+
+def test_auto_keeps_devices_of_unknown_type():
+    """A None answer from the Level Zero probe must not narrow the device list on a guess."""
+    assert _auto_xpu_devices({0: None, 1: None}) == [torch.device("xpu:0"), torch.device("xpu:1")]
+
+
+def test_explicit_generation_devices_can_still_select_an_integrated_gpu():
+    """The exclusion applies to `auto` only; naming a device opts into it."""
+    config = get_config()
+    config.device = "auto"
+    with (
+        patch("invokeai.backend.util.devices.torch.cuda.is_available", return_value=False),
+        patch("invokeai.backend.util.devices._xpu_is_available", return_value=True),
+        patch("torch.xpu.device_count", return_value=2, create=True),
+        patch("invokeai.backend.util.devices.xpu_device_is_integrated", return_value=True),
+    ):
+        assert TorchDevice.get_generation_devices(["xpu:0"]) == [torch.device("xpu:0")]
+
+
 def test_get_generation_devices_rejects_out_of_range_xpu():
     with (
         patch("invokeai.backend.util.devices._xpu_is_available", return_value=True),
