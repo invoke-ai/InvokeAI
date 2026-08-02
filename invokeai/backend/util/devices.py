@@ -157,11 +157,21 @@ class TorchDevice:
 
     @classmethod
     def get_device_name(cls, device: torch.device) -> str:
-        """Return the human-readable name for a torch device (e.g. 'AMD Radeon PRO W7900', 'CPU')."""
-        if device.type == "cuda":
-            return torch.cuda.get_device_name(device)
-        if device.type == "xpu":
-            return torch.xpu.get_device_name(device)
+        """Return the human-readable name for a torch device (e.g. 'AMD Radeon PRO W7900', 'CPU').
+
+        Falls back to the device's own string form when the backend cannot name it. This is used
+        only for labelling and logging, so a backend that cannot answer must not take the caller
+        down with it -- notably an XPU device on a torch build without XPU, where ``_lazy_init``
+        raises ``AssertionError``. The raised type varies between torch releases, so the except is
+        deliberately broad rather than enumerating types that move.
+        """
+        try:
+            if device.type == "cuda":
+                return torch.cuda.get_device_name(device)
+            if device.type == "xpu":
+                return torch.xpu.get_device_name(device)
+        except Exception:
+            return str(device)
         return device.type.upper()
 
     @classmethod

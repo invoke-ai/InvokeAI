@@ -444,6 +444,24 @@ def test_xpu_mem_get_info_fallback_derives_from_properties():
     assert free == 30 * gib
 
 
+def test_get_device_name_degrades_instead_of_raising():
+    """Naming is for labels and logs only, so a backend that cannot answer must not take the
+    caller down. torch.xpu.get_device_name goes through _lazy_init, which raises AssertionError
+    (not RuntimeError) on a build without XPU."""
+    with patch.object(
+        torch.xpu, "get_device_name", side_effect=AssertionError("Torch not compiled with XPU enabled"), create=True
+    ):
+        assert TorchDevice.get_device_name(torch.device("xpu", 1)) == "xpu:1"
+    with patch.object(torch.cuda, "get_device_name", side_effect=RuntimeError("no driver")):
+        assert TorchDevice.get_device_name(torch.device("cuda", 0)) == "cuda:0"
+
+
+def test_get_device_name_returns_backend_name_when_available():
+    with patch.object(torch.xpu, "get_device_name", return_value="Intel(R) Arc(TM) Pro B70 Graphics", create=True):
+        assert TorchDevice.get_device_name(torch.device("xpu", 0)) == "Intel(R) Arc(TM) Pro B70 Graphics"
+    assert TorchDevice.get_device_name(torch.device("cpu")) == "CPU"
+
+
 def test_xpu_mem_get_info_falls_back_to_sysman_before_estimating():
     """Level Zero Sysman is driver-global like mem_get_info, so it must be preferred over the
     process-local estimate, which is blind to VRAM held by other processes."""
