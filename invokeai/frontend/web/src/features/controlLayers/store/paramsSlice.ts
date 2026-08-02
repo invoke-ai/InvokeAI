@@ -1001,6 +1001,12 @@ export const backfillMissingParamsKeys = (state: Record<string, unknown>): strin
   const backfilled: string[] = [];
 
   for (const [key, fieldSchema] of Object.entries(zParamsState.shape)) {
+    // Never touch `_version`. The version steps detect a v0 blob with `!('_version' in state)`, i.e.
+    // key presence, so filling it here on a value check would stamp a blob as current having run no
+    // migration step at all.
+    if (key === '_version') {
+      continue;
+    }
     // `undefined` is the only value that counts as missing: persisted JSON can't hold it, and every
     // nullable field in the schema uses `null` for "unset", so this never overwrites a real value.
     if (state[key] !== undefined || fieldSchema.safeParse(undefined).success) {
@@ -1024,11 +1030,19 @@ export const backfillMissingParamsKeys = (state: Record<string, unknown>): strin
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const applyParamsVersionMigrations = (state: any): void => {
-  if (!('_version' in state)) {
-    // v0 -> v1, add _version and remove x/y from dimensions, lifting width/height to top level
+  // Value check rather than `!('_version' in state)`, so that a blob carrying an explicit undefined
+  // is treated as v0 and walked through the chain. With a presence check it matches no branch at
+  // all, reaches the parse with `_version: undefined` and takes the whole slice down with it.
+  if (state._version === undefined) {
+    // v0 -> v1, add _version and remove x/y from dimensions, lifting width/height to top level.
+    // `dimensions.rect` is optional-chained: a truncated or hand-edited blob that lacks it would
+    // otherwise throw a TypeError out of migrate() and cost the user the whole slice. Leaving
+    // width/height undefined instead lets backfillMissingParamsKeys() repair `dimensions`.
     state._version = 1;
-    state.dimensions.width = state.dimensions.rect.width;
-    state.dimensions.height = state.dimensions.rect.height;
+    if (state.dimensions && state.dimensions.rect) {
+      state.dimensions.width = state.dimensions.rect.width;
+      state.dimensions.height = state.dimensions.rect.height;
+    }
   }
 
   if (state._version === 1) {
@@ -1043,11 +1057,20 @@ export const applyParamsVersionMigrations = (state: any): void => {
     state.qwenImageVaeModel = null;
     state.qwenImageQwenVLEncoderModel = null;
 
-    // Everything below was added to the schema after v3 was cut but without a version bump, so
-    // released builds that persist v2 blobs (v6.10.0 - v6.12.0) never wrote these keys. They
-    // have no zod default, which makes them required, so their absence fails the parse() below
-    // and silently wipes the whole slice on upgrade. Seed only when missing so that v2 blobs
-    // written by dev builds after each field landed keep the values they already hold.
+    // Everything below was added to the schema while releases were still persisting v2 blobs
+    // (v6.7.0 - v6.12.0), but without a version bump. None has a zod default, which makes them
+    // required, so their absence fails the parse() at the end of migrate() and silently wipes the
+    // whole slice on upgrade. Seed only when missing so that v2 blobs written by dev builds after
+    // each field landed keep the values they already hold.
+    //
+    // The oldest v2 releases (v6.7.0 - v6.9.0) are missing these six as well as everything below.
+    state.fluxScheduler = state.fluxScheduler ?? 'euler';
+    state.zImageScheduler = state.zImageScheduler ?? 'euler';
+    state.colorCompensation = state.colorCompensation ?? false;
+    state.zImageVaeModel = state.zImageVaeModel ?? null;
+    state.zImageQwen3EncoderModel = state.zImageQwen3EncoderModel ?? null;
+    state.zImageQwen3SourceModel = state.zImageQwen3SourceModel ?? null;
+    // Added by v6.10.0 - v6.12.0 and later.
     state.fluxDypePreset = state.fluxDypePreset ?? 'off';
     state.fluxDypeScale = state.fluxDypeScale ?? 2.0;
     state.fluxDypeExponent = state.fluxDypeExponent ?? 2.0;
