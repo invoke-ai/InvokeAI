@@ -22,7 +22,6 @@ and callers must keep their existing behaviour when the answer is unknown.
 
 import ctypes
 import ctypes.util
-import os
 import threading
 from typing import Optional
 
@@ -223,9 +222,12 @@ def _init_sysman() -> tuple[Optional[ctypes.CDLL], Optional[dict[int, list[ctype
     if lib is None:
         return None, None
     try:
-        # Older runtimes gate Sysman behind this; newer ones use zesInit and ignore it. Setting it
-        # only helps if Level Zero has not initialised yet, hence setdefault rather than assignment.
-        os.environ.setdefault("ZES_ENABLE_SYSMAN", "1")
+        # No ZES_ENABLE_SYSMAN here. That variable gates Sysman only on runtimes predating
+        # zesInit, and it has to be set before Level Zero initialises -- by the time this runs
+        # torch has already done so, making it a no-op. Verified on Arc Pro B70 / torch 2.13:
+        # zesInit succeeds with the variable unset. A runtime old enough to need it has no
+        # zesInit either, and _configure_prototypes already declines those. Setting a process-wide
+        # environment variable from a read-only query would leak into child processes for nothing.
         if lib.zesInit(0) != 0:
             return None, None
         devices: list[ctypes.c_void_p] = []
