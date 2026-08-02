@@ -30,6 +30,7 @@ const defaultInstanceTypes: Record<WidgetInstanceId, WidgetTypeId> = {
   'gallery:bottom': 'gallery',
   'gallery:center': 'gallery',
   generate: 'generate',
+  'image-map': 'image-map',
   upscale: 'upscale',
   layers: 'layers',
   notifications: 'notifications',
@@ -170,7 +171,7 @@ export const builtInLayoutPresetDescriptors: BuiltInLayoutPresetDescriptor[] = [
       }),
       right: createRegion({
         activeInstanceId: 'gallery',
-        instanceIds: ['gallery', 'preview', 'queue', 'layers', 'diagnostics', 'project'],
+        instanceIds: ['gallery', 'image-map', 'preview', 'queue', 'layers', 'diagnostics', 'project'],
         sizePx: 450,
       }),
     },
@@ -203,7 +204,7 @@ export const builtInLayoutPresetDescriptors: BuiltInLayoutPresetDescriptor[] = [
       }),
       right: createRegion({
         activeInstanceId: 'layers',
-        instanceIds: ['layers', 'gallery', 'queue', 'preview', 'diagnostics', 'project'],
+        instanceIds: ['layers', 'gallery', 'image-map', 'queue', 'preview', 'diagnostics', 'project'],
         sizePx: 450,
       }),
     },
@@ -236,7 +237,7 @@ export const builtInLayoutPresetDescriptors: BuiltInLayoutPresetDescriptor[] = [
       }),
       right: createRegion({
         activeInstanceId: 'queue',
-        instanceIds: ['queue', 'gallery', 'layers', 'preview', 'diagnostics', 'project'],
+        instanceIds: ['queue', 'gallery', 'image-map', 'layers', 'preview', 'diagnostics', 'project'],
         sizePx: 450,
       }),
     },

@@ -57,6 +57,7 @@
     "i18next-http-backend": "^4.0.1",
     "lucide-react": "^1.28.0",
     "perfect-freehand": "^1.2.3",
+    "plotly.js-gl2d-dist-min": "^3.7.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-hook-tanstack-virtual": "^0.0.4",
@@ -71,6 +72,7 @@
   "devDependencies": {
     "@rolldown/plugin-babel": "^0.2.3",
     "@types/node": "^26.1.2",
+    "@types/plotly.js": "^3.0.10",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@types/use-sync-external-store": "^1.5.0",
