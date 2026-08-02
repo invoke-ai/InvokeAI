@@ -20,6 +20,7 @@ import { addSeamless } from 'features/nodes/util/graph/generation/addSeamless';
 import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
+import { getRandDeviceMetadata } from 'features/nodes/util/graph/generation/randDeviceMetadata';
 import {
   getOriginalAndScaledSizesForOtherModes,
   getOriginalAndScaledSizesForTextToImage,
@@ -156,7 +157,7 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     cfg_rescale_multiplier,
     model: Graph.getModelMetadataField(model),
     steps,
-    rand_device: shouldUseCpuNoise ? 'cpu' : 'cuda',
+    rand_device: getRandDeviceMetadata(state, shouldUseCpuNoise),
     scheduler,
     vae: vae ?? undefined,
   });
