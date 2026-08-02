@@ -45,7 +45,7 @@ export const useEditImage = (imageDTO?: ImageDTO | null) => {
     navigationApi.focusPanel('canvas', WORKSPACE_PANEL_ID);
 
     if (canvasManager) {
-      canvasManager.tool.$tool.set('brush');
+      canvasManager.tool.setBaseTool('brush');
     }
 
     toast({
