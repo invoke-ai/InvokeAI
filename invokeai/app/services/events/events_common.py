@@ -140,7 +140,7 @@ class InvocationProgressEvent(InvocationEventBase):
     )
     device: str | None = Field(
         default=None,
-        description="The device processing this session, e.g. 'cuda:1' (set only when running on a CUDA GPU)",
+        description="The device processing this session, e.g. 'cuda:1' (set only when running on a GPU)",
     )
 
     @classmethod
