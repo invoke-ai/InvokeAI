@@ -5,6 +5,9 @@ Published LoRAs (e.g. krea/Krea-2-LoRA-*) are diffusers PEFT format: keys like
 ``transformer.<module>.lora_A.weight`` / ``lora_B.weight``. The distinctive Krea-2 module is the
 ``text_fusion`` stage, which we use to disambiguate from Qwen-Image / Z-Image LoRAs (which otherwise
 share the ``transformer.transformer_blocks.`` prefix).
+
+Two other key layouts are normalized onto that one before conversion: the native (ComfyUI) module naming,
+and the kohya / LyCORIS layout that additionally flattens the module path into ``lora_unet_<path>``.
 """
 
 import re
@@ -14,6 +17,11 @@ import torch
 
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
 from invokeai.backend.patches.layers.utils import any_lora_layer_from_state_dict
+from invokeai.backend.patches.lora_conversions.kohya_key_utils import (
+    INDEX_PLACEHOLDER,
+    ParsingTree,
+    insert_periods_into_kohya_key,
+)
 from invokeai.backend.patches.lora_conversions.krea2_lora_constants import (
     KREA2_LORA_QWEN3VL_PREFIX,
     KREA2_LORA_TRANSFORMER_PREFIX,
@@ -104,6 +112,97 @@ def _maybe_convert_native_krea2_state_dict(
     return converted_state_dict
 
 
+# --- Kohya / LyCORIS (flattened) -> native key mapping ---------------------------------------------------------
+# sd-scripts and LyCORIS flatten the module path (``path.replace(".", "_")``) and prefix it with
+# ``lora_unet_``, e.g. ``lora_unet_blocks_6_attn_wv.lora_down.weight``. Flattening is lossy — nothing in the key
+# records where a '_' used to be a '.' — so we reconstruct the dotted path against the native module vocabulary
+# below and accept it only if it lands on a leaf. A key we cannot reconstruct with certainty is left untouched
+# rather than rewritten into a plausible-looking key that matches no module.
+_KREA2_KOHYA_PREFIX = "lora_unet_"
+
+# Native Krea-2 transformer/text-fusion block leaves. Only the Linears are listed: the non-Linear natives
+# (``mod.lin``, ``prenorm``/``postnorm``, ``attn.qknorm.*``, ``last.norm``/``last.modulation``) have no Linear
+# counterpart in the diffusers layout — ``mod.lin`` for instance is folded into the ``scale_shift_table``
+# parameter — so an adapter targeting them cannot be applied, and renaming it anyway would turn "unsupported"
+# into a silent no-op.
+_NATIVE_KREA2_BLOCK_SUBTREE: ParsingTree = {
+    "attn": {"wq": {}, "wk": {}, "wv": {}, "wo": {}, "gate": {}},
+    "mlp": {"gate": {}, "up": {}, "down": {}},
+}
+
+# Parsing tree for the native (ComfyUI) Krea-2 module layout, i.e. the keys the renames above understand.
+# Walking it resolves the flattened form's only real ambiguity — ``layerwise_blocks`` / ``refiner_blocks`` are
+# the native components that themselves contain an underscore.
+_KREA2_NATIVE_KOHYA_PARSING_TREE: ParsingTree = {
+    "blocks": {INDEX_PLACEHOLDER: _NATIVE_KREA2_BLOCK_SUBTREE},
+    "txtfusion": {
+        "layerwise_blocks": {INDEX_PLACEHOLDER: _NATIVE_KREA2_BLOCK_SUBTREE},
+        "refiner_blocks": {INDEX_PLACEHOLDER: _NATIVE_KREA2_BLOCK_SUBTREE},
+        "projector": {},
+    },
+    "first": {},
+    "tmlp": {INDEX_PLACEHOLDER: {}},
+    "tproj": {INDEX_PLACEHOLDER: {}},
+    "txtmlp": {INDEX_PLACEHOLDER: {}},
+    "last": {"linear": {}},
+}
+
+
+def _kohya_module_path_is_leaf(module_path: str, parsing_tree: ParsingTree) -> bool:
+    """True if a dotted module path walks the tree all the way to a leaf.
+
+    ``insert_periods_into_kohya_key`` only rejects *leftover* tokens, so a prefix of a real path (e.g.
+    ``blocks.0.attn``) parses cleanly without naming a module. Requiring a leaf rejects those.
+    """
+    subtree = parsing_tree
+    for component in module_path.split("."):
+        component_key = INDEX_PLACEHOLDER if component.isnumeric() else component
+        if component_key not in subtree:
+            return False
+        subtree = subtree[component_key]
+    return not subtree
+
+
+def _unflatten_kohya_krea2_module_path(flat_path: str) -> str | None:
+    """Reconstruct a dotted native Krea-2 module path from its kohya-flattened form.
+
+    Returns ``None`` when the reconstruction is not a native module path this converter can map, in which case
+    the caller must leave the key alone.
+    """
+    try:
+        module_path = insert_periods_into_kohya_key(flat_path, _KREA2_NATIVE_KOHYA_PARSING_TREE)
+    except ValueError:
+        # Tokens left over: not a native Krea-2 module path.
+        return None
+    return module_path if _kohya_module_path_is_leaf(module_path, _KREA2_NATIVE_KOHYA_PARSING_TREE) else None
+
+
+def _maybe_convert_kohya_krea2_state_dict(
+    state_dict: Dict[str, torch.Tensor],
+) -> Dict[str, torch.Tensor]:
+    """Rewrite kohya/LyCORIS flattened Krea-2 keys to the dotted native layout, leaving all others untouched."""
+    converted_state_dict: Dict[str, torch.Tensor] = {}
+    source_keys: dict[str, str] = {}
+    for key, value in state_dict.items():
+        converted_key = key
+        if isinstance(key, str) and key.startswith(_KREA2_KOHYA_PREFIX):
+            # The flattened module path runs up to the first '.'; the weight suffix (``lora_down.weight``,
+            # ``alpha``, ...) follows it. Some writers emit a doubled separator after the prefix.
+            flat_path, dot, weight_suffix = key[len(_KREA2_KOHYA_PREFIX) :].lstrip("_").partition(".")
+            module_path = _unflatten_kohya_krea2_module_path(flat_path)
+            if module_path is not None:
+                converted_key = f"{module_path}{dot}{weight_suffix}"
+        if converted_key in converted_state_dict:
+            raise ValueError(
+                f"Krea-2 LoRA has conflicting layers that normalize to the same target '{converted_key}' "
+                f"(from '{source_keys[converted_key]}' and '{key}'). This mixed layout is unsupported - "
+                "refusing to silently drop one of the layers."
+            )
+        converted_state_dict[converted_key] = value
+        source_keys[converted_key] = str(key)
+    return converted_state_dict
+
+
 def is_state_dict_likely_krea2_lora(state_dict: dict[str | int, torch.Tensor]) -> bool:
     """Checks if the provided state dict is likely a Krea-2 LoRA.
 
@@ -125,7 +224,9 @@ def lora_model_from_krea2_state_dict(state_dict: Dict[str, torch.Tensor], alpha:
     as ``alpha=rank`` internally (the common diffusers default).
     """
     layers: dict[str, BaseLayerPatch] = {}
-    # Normalize native (ComfyUI) naming to the diffusers layout so the rest of the converter is layout-agnostic.
+    # Normalize the kohya/LyCORIS flattened naming (``lora_unet_blocks_6_attn_wv``) to the dotted native layout,
+    # then the native (ComfyUI) naming to the diffusers layout, so the rest of the converter is layout-agnostic.
+    state_dict = _maybe_convert_kohya_krea2_state_dict(state_dict)
     state_dict = _maybe_convert_native_krea2_state_dict(state_dict)
     grouped_state_dict = _group_by_layer(state_dict)
 
