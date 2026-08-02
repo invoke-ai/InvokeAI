@@ -70,10 +70,21 @@ and this is the point — keeping everything *else* responsive while it runs.
 
 ## Testing it
 
-`tests/app/routers/test_event_loop_blocking.py` pins this property down. It stubs a
-service method to block synchronously, issues a request against the route under test, and
-asserts that an unrelated trivial route still answers while that request is in flight.
+Two tests cover this, and they do different jobs.
 
-Note what is being measured: not the slow request's own duration, which the fix does not
-change, but the latency of other requests during it. A benchmark of the slow endpoint
+`tests/app/routers/test_no_blocking_async_routes.py` **enforces the rule**: it parses every
+router module and fails if any route handler is `async def` without awaiting anything. This
+is the one that catches a new route — a per-route test cannot, because the route does not
+exist when the test is written.
+
+`tests/app/routers/test_event_loop_blocking.py` **proves the effect** for a few
+representative routes. It stubs a service method to block synchronously, issues a request
+against the route under test, and asserts that an unrelated trivial route still answers
+while that request is in flight.
+
+Note what the second one measures: not the slow request's own duration, which the fix does
+not change, but the latency of other requests during it. A benchmark of the slow endpoint
 alone will show no improvement and is the wrong instrument here.
+
+If you call a route handler directly from a test, call it like the plain function it now is
+— no `await`, no `asyncio.run`.
