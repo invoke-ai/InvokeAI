@@ -2150,7 +2150,6 @@
                 "label": "Gắn Vào Lưới",
                 "off": "Tắt"
             },
-            "pressureSensitivity": "Độ Nhạy Áp Lực",
             "preserveMask": {
                 "label": "Bảo Vệ Vùng Bao Phủ",
                 "alert": "Đang Bảo Vệ Vùng Bao Phủ"
@@ -2380,7 +2379,6 @@
         "parametersNotSet": "Tham Số Không Được Gợi Lại",
         "errorCopied": "Lỗi Khi Sao Chép",
         "prunedQueue": "Cắt Bớt Hàng Đợi",
-        "imagesWillBeAddedTo": "Ảnh đã tải lên sẽ được thêm vào tài nguyên của bảng {{boardName}}.",
         "baseModelChangedCleared_other": "Cập nhật, dọn sạch hoặc tắt {{count}} model phụ không tương thích",
         "canceled": "Quá Trình Xử Lý Đã Huỷ",
         "baseModelChanged": "Model Cơ Sở Đã Đổi",
@@ -2709,7 +2707,6 @@
     "whatsNew": {
         "whatsNewInInvoke": "Có Gì Mới Ở Invoke",
         "readReleaseNotes": "Đọc Ghi Chú Phát Hành",
-        "watchRecentReleaseVideos": "Xem Video Phát Hành Mới Nhất",
         "items": [
             "Canvas: Chia tách màu nổi và màu nền - bật/tắt với 'x', khởi động lại về dạng đen trắng với 'd'",
             "LoRA: Đặt khối lượng mặc định cho LoRA trong Trình Quản Lý Model"
