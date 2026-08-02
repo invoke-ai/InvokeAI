@@ -47,6 +47,12 @@ def _device_supports_fp8_storage(device: torch.device, logger: Optional[Logger] 
     resolve through the thread's current XPU device -- not necessarily the device the caller is
     loading onto (see the idle-GPU encoder offload, which re-pins the session device).
 
+    The probe mirrors the runtime path rather than approximating it. At runtime the storage cast
+    happens on CPU (``_apply_fp8_to_nn_module`` runs while params are still CPU-resident), the fp8
+    tensor is then copied host->device, and the pre-hook upcasts fp8 -> compute_dtype on the
+    device. Probing all three steps on the device would pass on a build where the fp8 host->device
+    copy or a particular upcast fails, and then break at forward time.
+
     Only successes are cached. The probe runs during a model load, i.e. exactly when the device
     may be transiently out of memory, and a cached failure would silently disable FP8 for the
     lifetime of the process with no remedy short of a restart.
@@ -63,11 +69,15 @@ def _device_supports_fp8_storage(device: torch.device, logger: Optional[Logger] 
         return cached
 
     try:
-        # Exercise both upcast targets: compute_dtype is bfloat16 for several supported models
-        # (Krea-2, FLUX) and float16 for others, and a build can support one without the other.
-        probe = torch.zeros(2, device=device).to(torch.float8_e4m3fn)
-        probe.to(torch.bfloat16)
-        probe.to(torch.float16)
+        # 1. Storage cast, on CPU, as _apply_fp8_to_nn_module does.
+        stored = torch.zeros(2).to(torch.float8_e4m3fn)
+        # 2. fp8 host->device copy.
+        stored = stored.to(device)
+        # 3. Pre-hook upcast, on device. Both targets are exercised: compute_dtype is bfloat16 for
+        #    several supported models (Krea-2, FLUX) and float16 for others, and a build can
+        #    support one without the other.
+        stored.to(torch.bfloat16)
+        stored.to(torch.float16)
     except Exception as exc:
         if logger is not None:
             logger.warning(f"FP8 storage probe failed on {device} ({type(exc).__name__}: {exc}); not using FP8.")
