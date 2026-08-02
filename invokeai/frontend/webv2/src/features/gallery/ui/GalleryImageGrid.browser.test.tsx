@@ -218,6 +218,7 @@ const createGallery = (overrides: Partial<GalleryStateView> = {}): GalleryStateV
     selectedBoardId: board.id,
     selectedItemKey: 'image:first.png',
     selectedItemKeys: ['image:first.png'],
+    semanticImageQuery: null,
     settings: { ...DEFAULT_GALLERY_SETTINGS, imageDensityPercent: 0, paginationMode: 'paginated' },
     ...overrides,
   };

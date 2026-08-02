@@ -34,12 +34,17 @@ class MockApiDependencies(ApiDependencies):
 
 
 class FakeImageIndexService(ImageIndexServiceBase):
-    """Records projection requests instead of running a worker."""
+    """Records projection/search requests instead of running a worker."""
 
     def __init__(self, model_id: str | None = MODEL_ID) -> None:
         self._model_id = model_id
         self.projection_requests: list[tuple[str, bool]] = []
         self.spent_failed_scopes: dict[str, str] = {}
+        self.search_calls: list[tuple[str | None, int]] = []
+        self.search_results: list[tuple[str, float]] = []
+        self.text_unavailable = False
+        self.embedded_texts: list[str] = []
+        self.embedded_images: list = []
 
     @property
     def model_id(self) -> str | None:
@@ -49,6 +54,29 @@ class FakeImageIndexService(ImageIndexServiceBase):
         if self._model_id is None:
             return None
         return ImageIndexStatus(total=5, embedded=3)
+
+    def embed_text(self, text: str) -> np.ndarray:
+        from invokeai.app.services.image_index.image_index_base import TextSearchUnavailableError
+
+        if self.text_unavailable:
+            raise TextSearchUnavailableError("no text encoder installed")
+        self.embedded_texts.append(text)
+        vector = np.zeros(DIM, dtype=np.float32)
+        vector[0] = 1.0
+        return vector
+
+    def embed_image(self, image) -> np.ndarray:
+        self.embedded_images.append(image)
+        vector = np.zeros(DIM, dtype=np.float32)
+        vector[0] = 1.0
+        return vector
+
+    def get_accessible_embeddings(self, user_id: str | None) -> tuple[list[str], np.ndarray]:
+        return [], np.empty((0, 0), dtype=np.float32)
+
+    def search_similar(self, user_id: str | None, query_embedding: np.ndarray, limit: int) -> list[tuple[str, float]]:
+        self.search_calls.append((user_id, limit))
+        return self.search_results[:limit]
 
     def request_projection(
         self,
@@ -157,6 +185,7 @@ def client(monkeypatch, mock_invoker: Invoker) -> TestClient:
     monkeypatch.setattr("invokeai.app.api.routers.image_map.ApiDependencies", mock_deps)
     monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", mock_deps)
     monkeypatch.setattr("invokeai.app.api.routers.auth.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.routers._access.ApiDependencies", mock_deps)
     return TestClient(app)
 
 
@@ -177,6 +206,18 @@ def _seed_embedded_image(mock_invoker: Invoker, image_name: str, user_id: str = 
     rng = np.random.default_rng(abs(hash(image_name)) % (2**32))
     vec = rng.standard_normal(DIM).astype(np.float32)
     _records(mock_invoker).upsert_embedding(image_name, MODEL_ID, vec / np.linalg.norm(vec))
+
+
+def _save_unembedded_image(mock_invoker: Invoker, image_name: str, user_id: str = SYSTEM_USER_ID) -> None:
+    mock_invoker.services.image_records.save(
+        image_name=image_name,
+        image_origin=ResourceOrigin.INTERNAL,
+        image_category=ImageCategory.GENERAL,
+        width=16,
+        height=16,
+        has_workflow=False,
+        user_id=user_id,
+    )
 
 
 def _seed_projection(mock_invoker: Invoker, user_id: str, image_names: list[str], coords: np.ndarray) -> None:
@@ -650,3 +691,204 @@ def test_an_all_non_finite_projection_is_not_permanently_blank(
     assert body["points"] == []
     assert body["state"] == "computing", "a row with nothing servable must ask for a recompute"
     assert [user for user, _ in image_index_service.projection_requests] == [SYSTEM_USER_ID]
+
+
+# --- Semantic search ---
+
+
+def test_search_requires_exactly_one_query_kind(client: TestClient) -> None:
+    assert client.get("/api/v1/image_map/search").status_code == 422
+    assert client.get("/api/v1/image_map/search", params={"image_name": "a.png", "q": "cats"}).status_code == 422
+
+
+def test_search_disabled_index_conflicts(image_index_service: FakeImageIndexService, client: TestClient) -> None:
+    image_index_service._model_id = None
+    assert client.get("/api/v1/image_map/search", params={"q": "cats"}).status_code == 409
+
+
+def test_text_search_returns_ranked_results(image_index_service: FakeImageIndexService, client: TestClient) -> None:
+    image_index_service.search_results = [("a.png", 0.9), ("b.png", 0.5)]
+
+    body = client.get("/api/v1/image_map/search", params={"limit": 10, "q": "a red barn"}).json()
+
+    assert image_index_service.embedded_texts == ["a red barn"]
+    # System user is admin in single-user mode -> global (None) scope.
+    assert image_index_service.search_calls == [(None, 10)]
+    assert body["results"] == [
+        {"image_name": "a.png", "score": 0.9},
+        {"image_name": "b.png", "score": 0.5},
+    ]
+
+
+def test_text_search_unavailable_encoder_conflicts_with_message(
+    image_index_service: FakeImageIndexService, client: TestClient
+) -> None:
+    image_index_service.text_unavailable = True
+
+    response = client.get("/api/v1/image_map/search", params={"q": "cats"})
+
+    assert response.status_code == 409
+    assert "text encoder" in response.json()["detail"]
+
+
+def test_image_search_uses_stored_embedding(
+    mock_invoker: Invoker, image_index_service: FakeImageIndexService, client: TestClient
+) -> None:
+    _seed_embedded_image(mock_invoker, "ref.png")
+    image_index_service.search_results = [("ref.png", 1.0), ("close.png", 0.8)]
+
+    body = client.get("/api/v1/image_map/search", params={"image_name": "ref.png"}).json()
+
+    assert [r["image_name"] for r in body["results"]] == ["ref.png", "close.png"]
+    # No text was embedded; the stored image embedding was the query.
+    assert image_index_service.embedded_texts == []
+
+
+def test_image_search_embeds_unindexed_reference_on_demand(
+    monkeypatch, mock_invoker: Invoker, image_index_service: FakeImageIndexService, client: TestClient
+) -> None:
+    from PIL import Image
+
+    _save_unembedded_image(mock_invoker, "not-indexed.png")
+    monkeypatch.setattr(mock_invoker.services.images, "get_pil_image", lambda name: Image.new("RGB", (4, 4)))
+    image_index_service.search_results = [("a.png", 0.7)]
+
+    body = client.get("/api/v1/image_map/search", params={"image_name": "not-indexed.png"}).json()
+
+    # The reference had no stored embedding, so its file was embedded live.
+    assert len(image_index_service.embedded_images) == 1
+    assert [r["image_name"] for r in body["results"]] == ["a.png"]
+
+
+def test_image_search_unembeddable_reference_is_404(mock_invoker: Invoker, client: TestClient) -> None:
+    # No stored embedding AND the file cannot be loaded (mock file store).
+    _save_unembedded_image(mock_invoker, "not-indexed.png")
+    assert client.get("/api/v1/image_map/search", params={"image_name": "not-indexed.png"}).status_code == 404
+
+
+def test_search_by_image_upload_returns_ranked_results(
+    image_index_service: FakeImageIndexService, client: TestClient
+) -> None:
+    from io import BytesIO
+
+    from PIL import Image
+
+    buffer = BytesIO()
+    Image.new("RGB", (8, 8), color=(200, 30, 30)).save(buffer, format="PNG")
+    image_index_service.search_results = [("a.png", 0.9), ("b.png", 0.4)]
+
+    response = client.post(
+        "/api/v1/image_map/search_by_image",
+        params={"limit": 5},
+        files={"image": ("ref.png", buffer.getvalue(), "image/png")},
+    )
+
+    assert response.status_code == 200
+    assert len(image_index_service.embedded_images) == 1
+    assert image_index_service.search_calls == [(None, 5)]
+    assert [r["image_name"] for r in response.json()["results"]] == ["a.png", "b.png"]
+
+
+def test_search_by_image_requires_exactly_one_source(client: TestClient) -> None:
+    assert client.post("/api/v1/image_map/search_by_image").status_code == 422
+    assert (
+        client.post(
+            "/api/v1/image_map/search_by_image",
+            params={"image_url": "https://example.com/a.png"},
+            files={"image": ("ref.png", b"\x89PNG", "image/png")},
+        ).status_code
+        == 422
+    )
+
+
+def test_search_by_image_rejects_bad_inputs(client: TestClient) -> None:
+    # Bytes that are not a decodable image.
+    response = client.post(
+        "/api/v1/image_map/search_by_image", files={"image": ("ref.png", b"not an image", "image/png")}
+    )
+    assert response.status_code == 415
+
+    # Non-http(s) schemes and private/loopback hosts are refused outright —
+    # including hostname and non-canonical IP-literal spellings of loopback,
+    # which resolve via getaddrinfo rather than a strict literal parse.
+    for bad_url in (
+        "ftp://example.com/a.png",
+        "http://127.0.0.1/a.png",
+        "http://localhost/a.png",
+        "http://127.1/a.png",
+        "http://2130706433/a.png",
+    ):
+        assert client.post("/api/v1/image_map/search_by_image", params={"image_url": bad_url}).status_code == 422, (
+            bad_url
+        )
+
+
+def test_search_by_image_revalidates_redirect_targets(monkeypatch, client: TestClient) -> None:
+    # A public URL redirecting to a private address must be refused: requests'
+    # automatic redirect following is disabled and every hop is re-validated.
+    import requests
+
+    class FakeRedirect:
+        status_code = 302
+        is_redirect = True
+        headers = {"location": "http://127.0.0.1:9090/steal"}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    calls: list[str] = []
+
+    def fake_get(url, **kwargs):
+        calls.append(url)
+        assert kwargs.get("allow_redirects") is False
+        return FakeRedirect()
+
+    monkeypatch.setattr(requests, "get", fake_get)
+    monkeypatch.setattr(
+        "socket.getaddrinfo",
+        lambda host, port, **kw: [
+            (None, None, None, None, ("127.0.0.1" if host != "public.example" else "93.184.216.34", port))
+        ],
+    )
+
+    response = client.post("/api/v1/image_map/search_by_image", params={"image_url": "http://public.example/a.png"})
+
+    assert response.status_code == 422
+    # The first (public) hop was fetched; the redirect target failed
+    # validation before any second request was issued.
+    assert calls == ["http://public.example/a.png"]
+
+
+def test_multiuser_image_search_enforces_read_access_and_user_scope(
+    multiuser, mock_invoker: Invoker, image_index_service: FakeImageIndexService, client: TestClient
+) -> None:
+    _create_user(mock_invoker, "admin@test.com", is_admin=True)
+    user1_id = _create_user(mock_invoker, "user1@test.com")
+    user2_id = _create_user(mock_invoker, "user2@test.com")
+    user2_headers = _login(client, "user2@test.com")
+
+    # user1's private image: user2 cannot use it as a search reference.
+    _seed_embedded_image(mock_invoker, "private1.png", user_id=user1_id)
+    response = client.get("/api/v1/image_map/search", params={"image_name": "private1.png"}, headers=user2_headers)
+    assert response.status_code == 403
+
+    # A text search from a non-admin is scoped to their own user id.
+    client.get("/api/v1/image_map/search", params={"q": "boats"}, headers=user2_headers)
+    assert image_index_service.search_calls == [(user2_id, 100)]
+
+    # search_by_image must scope identically to /search.
+    from io import BytesIO
+
+    from PIL import Image
+
+    buffer = BytesIO()
+    Image.new("RGB", (4, 4)).save(buffer, format="PNG")
+    client.post(
+        "/api/v1/image_map/search_by_image",
+        files={"image": ("ref.png", buffer.getvalue(), "image/png")},
+        headers=user2_headers,
+    )
+    assert image_index_service.search_calls[-1] == (user2_id, 100)

@@ -1331,6 +1331,86 @@ def test_systemic_embedding_outage_does_not_starve_projections(
         service.stop()
 
 
+# --- Semantic search ---
+
+
+def test_search_similar_ranks_by_cosine_and_respects_scope(
+    image_records: SqliteImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+    service: ImageIndexService,
+) -> None:
+    service.start(_make_invoker(images_service, index_records))
+    _wait_until(lambda: not service._backfill_pending.is_set())
+
+    # Overwrite with hand-built vectors so the ranking is deterministic.
+    def unit(index: int, mix: float = 0.0) -> np.ndarray:
+        v = np.zeros(DIM, dtype=np.float32)
+        v[index] = 1.0
+        v[0] += mix
+        return v / np.linalg.norm(v)
+
+    for name, vec in [("a.png", unit(0)), ("close.png", unit(1, mix=0.9)), ("far.png", unit(2))]:
+        _save_image(image_records, name)
+        index_records.upsert_embedding(name, MODEL_ID, vec)
+
+    results = service.search_similar(None, unit(0), limit=2)
+
+    assert [name for name, _ in results] == ["a.png", "close.png"]
+    assert results[0][1] > results[1][1] > 0.0
+
+    # limit caps the result count; scores are descending.
+    assert len(service.search_similar(None, unit(0), limit=1)) == 1
+
+
+def test_embed_image_normalizes_and_requires_running_service(
+    images_service: ImageService, index_records: ImageIndexRecordsSqlite, service: ImageIndexService
+) -> None:
+    probe = Image.new("RGB", (4, 4))
+
+    with pytest.raises(RuntimeError):
+        service.embed_image(probe)  # not started yet
+
+    service.start(_make_invoker(images_service, index_records))
+    vector = service.embed_image(probe)
+
+    assert vector.shape == (DIM,)
+    assert np.isclose(float(np.linalg.norm(vector)), 1.0)
+
+
+def test_embed_image_retries_once_after_a_failed_encode(
+    images_service: ImageService, index_records: ImageIndexRecordsSqlite
+) -> None:
+    # A failed load evicts the model from the RAM cache so the next attempt
+    # rebuilds it from disk; embed_image must make that second attempt itself.
+    calls = {"count": 0}
+
+    def flaky_encode(images):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise RuntimeError("model cache entry was left in a bad state")
+        return _fake_encode(images)
+
+    service = ImageIndexService(encode_fn=flaky_encode, model_id=MODEL_ID)
+    service.start(_make_invoker(images_service, index_records))
+
+    vector = service.embed_image(Image.new("RGB", (4, 4)))
+
+    try:
+        assert calls["count"] == 2
+        assert vector.shape == (DIM,)
+
+        # A second consecutive failure propagates.
+        def always_failing(images):
+            raise RuntimeError("still broken")
+
+        service._encode_fn = always_failing
+        with pytest.raises(RuntimeError, match="still broken"):
+            service.embed_image(Image.new("RGB", (4, 4)))
+    finally:
+        service.stop()
+
+
 def test_projection_request_is_requeued_when_the_database_read_fails(
     image_records: SqliteImageRecordStorage,
     images_service: ImageService,
@@ -1455,3 +1535,86 @@ def test_projection_job_is_popped_before_running(service: ImageIndexService) -> 
     assert job == ("u1", False)
     assert service._projection_requests == {}, "the job must be removed when it is taken"
     assert service._next_projection_job() is None
+
+
+def test_embed_text_unavailable_without_model_config(
+    images_service: ImageService, index_records: ImageIndexRecordsSqlite, service: ImageIndexService
+) -> None:
+    from invokeai.app.services.image_index.image_index_base import TextSearchUnavailableError
+
+    service.start(_make_invoker(images_service, index_records))
+
+    # Test mode injects encode_fn without a real model config: the text tower
+    # cannot exist, and the error must be the typed one the router maps to 409.
+    with pytest.raises(TextSearchUnavailableError):
+        service.embed_text("a query")
+
+
+def test_embed_text_unavailable_when_tokenizer_files_missing(tmp_path) -> None:
+    # The InvokeAI-published CLIP model dir ships a full-CLIP config.json but no
+    # tokenizer files: AutoTokenizer resolves a tokenizer class from the config
+    # and then fails with TypeError (not OSError) on the absent vocab file. The
+    # failure must still surface as the typed error the router maps to 409.
+    import json
+
+    from invokeai.app.services.image_index.image_index_base import TextSearchUnavailableError
+    from invokeai.backend.model_manager.taxonomy import ModelType
+
+    (tmp_path / "config.json").write_text(
+        json.dumps({"model_type": "clip", "architectures": ["CLIPModel"], "text_config": {}, "vision_config": {}})
+    )
+    service = ImageIndexService(encode_fn=_fake_encode, model_id=MODEL_ID)
+    service._invoker = SimpleNamespace(services=SimpleNamespace(configuration=SimpleNamespace(models_path=tmp_path)))  # type: ignore[assignment]
+    service._model_config = SimpleNamespace(type=ModelType.CLIPVision, path=str(tmp_path))  # type: ignore[assignment]
+
+    with pytest.raises(TextSearchUnavailableError):
+        service.embed_text("a query")
+
+
+def test_search_similar_returns_empty_when_not_running(service: ImageIndexService) -> None:
+    assert service.search_similar(None, np.ones(DIM, dtype=np.float32), limit=5) == []
+
+
+def test_search_similar_scopes_to_the_requesting_user(
+    db: SqliteDatabase,
+    image_records: SqliteImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+    service: ImageIndexService,
+) -> None:
+    from invokeai.app.services.users.users_common import UserCreateRequest
+    from invokeai.app.services.users.users_default import UserService
+
+    other_user = UserService(db=db).create(
+        UserCreateRequest(email="scoped@example.com", display_name="Scoped", password="TestPass123", is_admin=False)
+    )
+    service.start(_make_invoker(images_service, index_records))
+    _wait_until(lambda: not service._backfill_pending.is_set())
+
+    def unit(index: int) -> np.ndarray:
+        v = np.zeros(DIM, dtype=np.float32)
+        v[index] = 1.0
+        return v
+
+    # system owns mine.png; the other user owns theirs.png (both unboarded).
+    _save_image(image_records, "mine.png")
+    index_records.upsert_embedding("mine.png", MODEL_ID, unit(0))
+    image_records.save(
+        image_name="theirs.png",
+        image_origin=ResourceOrigin.INTERNAL,
+        image_category=ImageCategory.GENERAL,
+        width=16,
+        height=16,
+        has_workflow=False,
+        user_id=other_user.user_id,
+    )
+    index_records.upsert_embedding("theirs.png", MODEL_ID, unit(0))
+
+    # The other user's scope must exclude the system user's private image
+    # even though it scores identically.
+    names = [name for name, _ in service.search_similar(other_user.user_id, unit(0), limit=10)]
+    assert names == ["theirs.png"]
+
+    # Admin scope (None) sees both.
+    admin_names = {name for name, _ in service.search_similar(None, unit(0), limit=10)}
+    assert admin_names == {"mine.png", "theirs.png"}

@@ -7,12 +7,13 @@ import numpy as np
 import torch
 from PIL import Image
 
-from invokeai.app.services.image_index.image_index_base import ImageIndexServiceBase
+from invokeai.app.services.image_index.image_index_base import ImageIndexServiceBase, TextSearchUnavailableError
 from invokeai.app.services.image_index.image_index_common import EMBEDDING_DTYPE, ImageIndexStatus
 from invokeai.app.services.image_index.projection import compute_umap, projection_params, scope_hash
 from invokeai.app.services.image_records.image_records_common import ImageCategory
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.session_queue.session_queue_common import DEFAULT_QUEUE_ID
+from invokeai.backend.model_manager.load.optimizations import skip_torch_weight_init
 from invokeai.backend.model_manager.taxonomy import ModelType
 from invokeai.backend.util.devices import TorchDevice
 
@@ -138,6 +139,16 @@ class ImageIndexService(ImageIndexServiceBase):
         # RAM-resident model used only in CPU mode; see _encode_with_model.
         self._cpu_model: Optional[Any] = None
         self._processor: Optional[Any] = None
+        # Lazily-loaded (tokenizer, text_model, is_siglip); None until first text search.
+        self._text_encoder: Optional[tuple[Any, Any, bool]] = None
+        self._text_encoder_lock = threading.Lock()
+        # Guards the lazy _processor/_cpu_model init: embed_image runs on
+        # request threads concurrently with the indexer worker.
+        self._vision_init_lock = threading.Lock()
+        # scope_hash -> (names, matrix): the accessible embedding matrix for
+        # similarity search, so repeated queries skip re-reading BLOBs.
+        self._search_cache: dict[str, tuple[list[str], np.ndarray]] = {}
+        self._search_cache_lock = threading.Lock()
 
     @property
     def model_id(self) -> str | None:
@@ -148,6 +159,121 @@ class ImageIndexService(ImageIndexServiceBase):
             return None
         status = self._invoker.services.image_index_records.count_index_status(self._model_id)
         return status.model_copy(update={"failed": len(self._failed)})
+
+    def embed_image(self, image: Image.Image) -> np.ndarray:
+        if self._encode_fn is None:
+            raise RuntimeError("The image index is not running")
+        rgb = image.convert("RGB")
+        try:
+            matrix = np.asarray(self._encode_fn([rgb]), dtype=EMBEDDING_DTYPE)
+        except Exception:
+            # The model cache deletes an entry whose load failed precisely so
+            # the next attempt rebuilds it from disk (e.g. an entry left in a
+            # bad state by VRAM contention with a concurrent generation).
+            # One retry is the cache's designed recovery; the worker gets the
+            # same effect from its batch retry loop.
+            if self._invoker is not None:
+                self._invoker.services.logger.warning(
+                    "Image embed failed; retrying with a fresh model load", exc_info=True
+                )
+            matrix = np.asarray(self._encode_fn([rgb]), dtype=EMBEDDING_DTYPE)
+        if matrix.ndim != 2 or matrix.shape[0] != 1:
+            raise RuntimeError(f"Encoder returned shape {matrix.shape}; expected (1, D)")
+        norm = float(np.linalg.norm(matrix[0]))
+        return matrix[0] / norm if norm > 0 else matrix[0]
+
+    def embed_text(self, text: str) -> np.ndarray:
+        if self._model_id is None:
+            raise TextSearchUnavailableError("The image index is not running")
+
+        tokenizer, model, is_siglip = self._get_text_encoder()
+        with torch.no_grad():
+            # SigLIP was trained with pad-to-max-length; pad-to-longest degrades
+            # its text embeddings. CLIP uses ordinary longest-padding.
+            inputs = tokenizer(
+                [text], padding="max_length" if is_siglip else True, return_tensors="pt", truncation=True
+            )
+            outputs = model(**inputs)
+            embedding = outputs.pooler_output[0] if is_siglip else outputs.text_embeds[0]
+            vector = embedding.float().cpu().numpy()
+        norm = np.linalg.norm(vector)
+        return vector / norm if norm > 0 else vector
+
+    def _get_text_encoder(self) -> tuple[Any, Any, bool]:
+        with self._text_encoder_lock:
+            if self._text_encoder is None:
+                if self._model_config is None:
+                    raise TextSearchUnavailableError("The image index has no embedding model loaded")
+
+                from transformers import AutoTokenizer, CLIPTextModelWithProjection, SiglipTextModel
+
+                model_path = str(self._model_abs_path())
+                is_siglip = self._model_config.type is ModelType.SigLIP
+                try:
+                    tokenizer = AutoTokenizer.from_pretrained(model_path, local_files_only=True)
+                    text_cls = SiglipTextModel if is_siglip else CLIPTextModelWithProjection
+                    # skip_torch_weight_init serializes torch module construction
+                    # process-wide; an unserialized from_pretrained racing another
+                    # thread's model load leaks meta-device parameters.
+                    with skip_torch_weight_init():
+                        model = text_cls.from_pretrained(model_path, local_files_only=True)
+                except Exception as e:
+                    # Vision-only or partial installs (e.g. the IP-Adapter image
+                    # encoder, or a full-CLIP checkpoint shipped without tokenizer
+                    # files) fail in assorted ways — transformers raises OSError,
+                    # TypeError, or ValueError depending on which file is missing.
+                    # Image-similarity search still works either way.
+                    raise TextSearchUnavailableError(
+                        "The configured embedding model's text encoder could not be loaded "
+                        f"({type(e).__name__}: {e}); install the full CLIP model, including its "
+                        "tokenizer files, to enable semantic text search"
+                    ) from e
+                model.eval()
+                self._text_encoder = (tokenizer, model, is_siglip)
+            return self._text_encoder
+
+    def get_accessible_embeddings(self, user_id: str | None) -> tuple[list[str], np.ndarray]:
+        if self._invoker is None or self._model_id is None:
+            return [], np.empty((0, 0), dtype=EMBEDDING_DTYPE)
+        records = self._invoker.services.image_index_records
+
+        names = records.list_accessible_embedded_images(user_id, self._model_id)
+        if not names:
+            return [], np.empty((0, 0), dtype=EMBEDDING_DTYPE)
+
+        # Memory math: one entry is N x dim float32 (~300 MB at 100k x 768),
+        # so the LRU holds two entries and evicts oldest-first rather than
+        # clearing wholesale. Keys self-invalidate: any change to the
+        # accessible set changes the scope hash.
+        cache_key = scope_hash(self._model_id, names)
+        with self._search_cache_lock:
+            cached = self._search_cache.get(cache_key)
+            if cached is not None:
+                # LRU touch.
+                del self._search_cache[cache_key]
+                self._search_cache[cache_key] = cached
+        if cached is None:
+            # Built outside the lock: a concurrent miss for the same scope
+            # transiently builds a duplicate, which beats serializing every
+            # search behind a multi-second BLOB read.
+            cached = records.get_embeddings(names, self._model_id)
+            with self._search_cache_lock:
+                while len(self._search_cache) >= 2:
+                    self._search_cache.pop(next(iter(self._search_cache)))
+                self._search_cache[cache_key] = cached
+
+        return cached
+
+    def search_similar(self, user_id: str | None, query_embedding: np.ndarray, limit: int) -> list[tuple[str, float]]:
+        found_names, matrix = self.get_accessible_embeddings(user_id)
+        if matrix.size == 0:
+            return []
+
+        scores = matrix @ query_embedding.astype(matrix.dtype)
+        top = min(limit, len(found_names))
+        order = np.argpartition(-scores, top - 1)[:top]
+        order = order[np.argsort(-scores[order])]
+        return [(found_names[index], float(scores[index])) for index in order]
 
     def request_projection(
         self,
@@ -895,19 +1021,24 @@ class ImageIndexService(ImageIndexServiceBase):
         return self._invoker.services.configuration.models_path / model_path
 
     def _get_processor(self) -> Any:
-        if self._processor is None:
-            from transformers import CLIPImageProcessor, SiglipImageProcessor
+        # embed_image runs on request threads concurrently with the worker,
+        # so the lazy init must be guarded (like _get_text_encoder).
+        with self._vision_init_lock:
+            if self._processor is None:
+                from transformers import CLIPImageProcessor, SiglipImageProcessor
 
-            assert self._model_config is not None
-            processor_cls = SiglipImageProcessor if self._model_config.type is ModelType.SigLIP else CLIPImageProcessor
-            try:
-                self._processor = processor_cls.from_pretrained(str(self._model_abs_path()), local_files_only=True)
-            except OSError:
-                # InvokeAI-published CLIP Vision model dirs ship no
-                # preprocessor_config.json; IP-Adapter and FLUX construct the
-                # processor with defaults for the same reason.
-                self._processor = processor_cls()
-        return self._processor
+                assert self._model_config is not None
+                processor_cls = (
+                    SiglipImageProcessor if self._model_config.type is ModelType.SigLIP else CLIPImageProcessor
+                )
+                try:
+                    self._processor = processor_cls.from_pretrained(str(self._model_abs_path()), local_files_only=True)
+                except OSError:
+                    # InvokeAI-published CLIP Vision model dirs ship no
+                    # preprocessor_config.json; IP-Adapter and FLUX construct the
+                    # processor with defaults for the same reason.
+                    self._processor = processor_cls()
+            return self._processor
 
     def _embed(self, model: Any, images: list[Image.Image], device: torch.device) -> np.ndarray:
         from transformers import CLIPVisionModelWithProjection, SiglipVisionModel
@@ -930,17 +1061,24 @@ class ImageIndexService(ImageIndexServiceBase):
 
         if self._cpu_mode():
             # CPU mode exists to avoid touching the model cache (and VRAM) at
-            # all, so it keeps its own RAM-resident copy of the model.
-            if self._cpu_model is None:
-                from transformers import CLIPVisionModelWithProjection, SiglipVisionModel
+            # all, so it keeps its own RAM-resident copy of the model. The
+            # lazy init is guarded: embed_image calls in from request threads.
+            with self._vision_init_lock:
+                if self._cpu_model is None:
+                    from transformers import CLIPVisionModelWithProjection, SiglipVisionModel
 
-                model_path = str(self._model_abs_path())
-                model_cls = (
-                    SiglipVisionModel if self._model_config.type is ModelType.SigLIP else CLIPVisionModelWithProjection
-                )
-                model = model_cls.from_pretrained(model_path, local_files_only=True)
-                model.eval()
-                self._cpu_model = model
+                    model_path = str(self._model_abs_path())
+                    model_cls = (
+                        SiglipVisionModel
+                        if self._model_config.type is ModelType.SigLIP
+                        else CLIPVisionModelWithProjection
+                    )
+                    # skip_torch_weight_init serializes torch module construction
+                    # process-wide (see _get_text_encoder).
+                    with skip_torch_weight_init():
+                        model = model_cls.from_pretrained(model_path, local_files_only=True)
+                    model.eval()
+                    self._cpu_model = model
             return self._embed(self._cpu_model, images, torch.device("cpu"))
 
         loaded = self._invoker.services.model_manager.load.load_model(self._model_config)
