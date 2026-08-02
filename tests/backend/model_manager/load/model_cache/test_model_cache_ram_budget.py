@@ -252,6 +252,7 @@ def test_get_vram_in_use_queries_this_caches_execution_device(mock_logger):
     mc = "invokeai.backend.model_manager.load.model_cache.model_cache"
     with (
         patch(f"{mc}.torch.cuda.mem_get_info", return_value=(10 * GB, 48 * GB)),
+        patch(f"{mc}.torch.cuda.get_device_properties", return_value=MagicMock(total_memory=48 * GB)),
         patch(f"{mc}.torch.cuda.memory_allocated", return_value=42) as mock_alloc,
     ):
         cache = ModelCache(
