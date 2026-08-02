@@ -1366,17 +1366,15 @@ class ModelCache:
                 vram_available_bytes_percent,
             )
 
-        if torch.cuda.is_available():
-            # Query this cache's execution device (not the process-current one) for correct
-            # per-device numbers in multi-GPU mode. See _get_vram_in_use.
-            allocated = (
-                torch.cuda.memory_allocated(self._execution_device) if self._execution_device.type == "cuda" else 0
-            )
+        # Dispatch on this cache's execution device, not on availability order: a box with both
+        # an NVIDIA card and an Arc would otherwise take the CUDA branch while running on XPU and
+        # report a constant 0.0 MB. Query the execution device for correct per-device numbers in
+        # multi-GPU mode -- see _get_vram_in_use.
+        if self._execution_device.type == "cuda" and torch.cuda.is_available():
+            allocated = torch.cuda.memory_allocated(self._execution_device)
             log += "  {:<30} {:.1f} MB\n".format("CUDA Memory Allocated:", allocated / MB)
-        elif hasattr(torch, "xpu") and torch.xpu.is_available():
-            allocated = (
-                torch.xpu.memory_allocated(self._execution_device) if self._execution_device.type == "xpu" else 0
-            )
+        elif self._execution_device.type == "xpu" and hasattr(torch, "xpu") and torch.xpu.is_available():
+            allocated = torch.xpu.memory_allocated(self._execution_device)
             log += "  {:<30} {:.1f} MB\n".format("XPU Memory Allocated:", allocated / MB)
         log += "  {:<30} {}\n".format("Total models:", len(self._cached_models))
 
