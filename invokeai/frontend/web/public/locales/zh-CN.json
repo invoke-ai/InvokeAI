@@ -1296,7 +1296,7 @@
 		"fluxRedux": "FLUX Redux",
 		"foundOrphanedModels_one": "发现 {{count}} 个孤立模型目录",
 		"foundOrphanedModels_other": "发现 {{count}} 个孤立模型目录",
-		"fp8Storage": "FP8 存储（节省显存）",
+		"fp8Storage": "FP8 Storage（节省显存）",
 		"hfTokenReset": "重置 HF 令牌",
 		"importSettings": "导入设置",
 		"installBundle": "安装捆绑包",
@@ -2572,10 +2572,10 @@
 			]
 		},
 		"fp8Storage": {
-			"heading": "FP8 存储",
+			"heading": "FP8 Storage",
 			"paragraphs": [
-				"以 FP8 格式存储模型权重到 VRAM，相比 FP16 减少约 50% 的显存使用。",
-				"推理期间，权重逐层转换为计算精度（FP16/BF16），因此图像质量不受影响。适用于所有 CUDA GPU。"
+				"以 FP8 格式在显存中存储模型权重，相比 FP16 可减少约 50% 的显存占用。",
+				"推理时权重逐层转换为计算精度（FP16/BF16），图像质量不受影响。适用于所有 CUDA GPU。"
 			]
 		},
 		"colorCompensation": {
