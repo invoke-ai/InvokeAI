@@ -87,7 +87,7 @@ def test_hidiffusion_patch_supports_bare_model_mixin_without_public_name_or_path
 
     assert model.num_upsamplers == 3
     assert not hasattr(model, "_name_or_path")
-    assert model.info["hooks"] == []
+    assert not hasattr(model, "info")
 
 
 def test_hidiffusion_window_attention_uses_seeded_generator_instead_of_global_rng():
@@ -144,9 +144,7 @@ def test_hidiffusion_patch_resets_cached_runtime_state_when_reenabled():
             model.block.T1_end = 8
             model.block.max_timestep = 99
 
-        # A normal generation while HiDiffusion is disabled reuses the cached
-        # module without exercising its dormant HiDiffusion attributes.
-        assert model.block.timestep == 7
+        assert "timestep" not in model.block.__dict__
 
         with hidiffusion_patch(model, name_or_path="runwayml/stable-diffusion-v1-5"):
             assert model.block.timestep == 0
@@ -156,6 +154,48 @@ def test_hidiffusion_patch_resets_cached_runtime_state_when_reenabled():
             assert model.block.T1_start == 0
             assert model.block.T1_end == 0
             assert model.block.max_timestep == 50
+
+
+def test_hidiffusion_teardown_restores_downsampler_geometry_after_forward_error():
+    module_keys = {
+        "down_module_key": ["block"],
+        "down_module_key_extra": [],
+        "up_module_key": [],
+        "up_module_key_extra": [],
+        "windown_attn_module_key": [],
+    }
+    model = ModelMixin()
+    model._num_timesteps = 10
+    model.block = torch.nn.Conv2d(1, 1, kernel_size=3, stride=2, padding=1)
+    original_stride = model.block.stride
+    original_padding = model.block.padding
+    original_dilation = model.block.dilation
+
+    with patch("invokeai.backend.hidiffusion.hidiffusion.sd15_hidiffusion_key", return_value=module_keys):
+        with hidiffusion_patch(
+            model,
+            name_or_path="runwayml/stable-diffusion-v1-5",
+            apply_window_attn=False,
+        ):
+            model.info["size"] = (64, 64)
+            with (
+                patch(
+                    "invokeai.backend.hidiffusion.hidiffusion.F.conv2d",
+                    side_effect=RuntimeError("injected convolution failure"),
+                ),
+                pytest.raises(RuntimeError, match="injected convolution failure"),
+            ):
+                model.block(torch.zeros(1, 1, 16, 16))
+
+            # Temporary geometry is passed directly to conv2d and never written
+            # to the cached module, even before teardown runs.
+            assert model.block.stride == original_stride
+            assert model.block.padding == original_padding
+            assert model.block.dilation == original_dilation
+
+    assert model.block.stride == original_stride
+    assert model.block.padding == original_padding
+    assert model.block.dilation == original_dilation
 
 
 def test_hidiffusion_patch_restores_state_when_apply_hidiffusion_raises():

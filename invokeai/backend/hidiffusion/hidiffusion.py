@@ -1852,43 +1852,34 @@ def make_diffusers_downsampler_block(block_class: Type[torch.nn.Module]) -> Type
                 self.T1 = int(aggressive_step / 50 * self.max_timestep)
             else:
                 self.T1 = int(self.max_timestep * self.T1_ratio)
+            stride = self.stride
+            padding = self.padding
+            dilation = self.dilation
             if self.timestep < self.T1:
-                self.ori_stride = self.stride
-                self.ori_padding = self.padding
-                self.ori_dilation = self.dilation
-
-                self.stride = (4, 4)
-                self.padding = (2, 2)
-                self.dilation = (2, 2)
+                stride = (4, 4)
+                padding = (2, 2)
+                dilation = (2, 2)
 
             if old_diffusers:
                 if self.lora_layer is None:
                     # make sure to the functional Conv2D function as otherwise torch.compile's graph will break
                     # see: https://github.com/huggingface/diffusers/pull/4315
                     hidden_states = F.conv2d(
-                        hidden_states, self.weight, self.bias, self.stride, self.padding, self.dilation, self.groups
+                        hidden_states, self.weight, self.bias, stride, padding, dilation, self.groups
                     )
-                    if self.timestep < self.T1:
-                        self.stride = self.ori_stride
-                        self.padding = self.ori_padding
-                        self.dilation = self.ori_dilation
                     self.timestep += 1
                     if self.timestep == self.max_timestep:
                         self.timestep = 0
                     return hidden_states
                 else:
                     original_outputs = F.conv2d(
-                        hidden_states, self.weight, self.bias, self.stride, self.padding, self.dilation, self.groups
+                        hidden_states, self.weight, self.bias, stride, padding, dilation, self.groups
                     )
                     return original_outputs + (scale * self.lora_layer(hidden_states))
             else:
                 hidden_states = F.conv2d(
-                    hidden_states, self.weight, self.bias, self.stride, self.padding, self.dilation, self.groups
+                    hidden_states, self.weight, self.bias, stride, padding, dilation, self.groups
                 )
-                if self.timestep < self.T1:
-                    self.stride = self.ori_stride
-                    self.padding = self.ori_padding
-                    self.dilation = self.ori_dilation
                 self.timestep += 1
                 if self.timestep == self.max_timestep:
                     self.timestep = 0
@@ -1978,11 +1969,42 @@ def hook_diffusion_model(model: torch.nn.Module):
     model.info["hooks"].append(model.register_forward_pre_hook(hook))
 
 
+_HIDIFFUSION_RUNTIME_ATTRIBUTES = (
+    "timestep",
+    "aggressive_raunet",
+    "T1_ratio",
+    "T1",
+    "T1_start",
+    "T1_end",
+    "max_timestep",
+    "ori_stride",
+    "ori_padding",
+    "ori_dilation",
+)
+_HIDIFFUSION_STATE_ATTRIBUTES = (
+    "stride",
+    "padding",
+    "dilation",
+    *_HIDIFFUSION_RUNTIME_ATTRIBUTES,
+    "switching_threshold_ratio",
+    "model",
+    "info",
+)
+_HIDIFFUSION_STATE_SNAPSHOT = "_hidiffusion_original_state"
+
+
+def _snapshot_hidiffusion_state(module: torch.nn.Module) -> None:
+    """Snapshot module state that HiDiffusion may mutate."""
+    if _HIDIFFUSION_STATE_SNAPSHOT in module.__dict__:
+        return
+    module.__dict__[_HIDIFFUSION_STATE_SNAPSHOT] = {
+        attribute: (attribute in module.__dict__, module.__dict__.get(attribute))
+        for attribute in _HIDIFFUSION_STATE_ATTRIBUTES
+    }
+
+
 def _reset_hidiffusion_runtime_state(module: torch.nn.Module) -> None:
     """Clear runtime state left on a cached module by a previous HiDiffusion patch."""
-    # The downsampler temporarily overrides these attributes while resizing. If its
-    # forward pass was interrupted, restore the originals before dropping the
-    # bookkeeping attributes.
     for attribute, original_attribute in (
         ("stride", "ori_stride"),
         ("padding", "ori_padding"),
@@ -1991,19 +2013,22 @@ def _reset_hidiffusion_runtime_state(module: torch.nn.Module) -> None:
         if original_attribute in module.__dict__:
             setattr(module, attribute, module.__dict__[original_attribute])
 
-    for attribute in (
-        "timestep",
-        "aggressive_raunet",
-        "T1_ratio",
-        "T1",
-        "T1_start",
-        "T1_end",
-        "max_timestep",
-        "ori_stride",
-        "ori_padding",
-        "ori_dilation",
-    ):
+    for attribute in _HIDIFFUSION_RUNTIME_ATTRIBUTES:
         module.__dict__.pop(attribute, None)
+
+
+def _restore_hidiffusion_state(module: torch.nn.Module) -> None:
+    """Restore the exact per-module state captured before HiDiffusion was applied."""
+    snapshot = module.__dict__.pop(_HIDIFFUSION_STATE_SNAPSHOT, None)
+    if snapshot is None:
+        _reset_hidiffusion_runtime_state(module)
+        return
+
+    for attribute, (was_present, value) in snapshot.items():
+        if was_present:
+            setattr(module, attribute, value)
+        else:
+            module.__dict__.pop(attribute, None)
 
 
 def apply_hidiffusion(
@@ -2060,6 +2085,9 @@ def apply_hidiffusion(
             model.unet.__class__ = make_block_fn(model.unet.__class__)
 
         diffusion_model = model.unet if hasattr(model, "unet") else model
+
+    for _, module in diffusion_model.named_modules():
+        _snapshot_hidiffusion_state(module)
 
     # Hack, avoid non-square problem. See unet_2d_condition.py in diffusers
     diffusion_model.num_upsamplers += 12
@@ -2190,7 +2218,13 @@ def remove_hidiffusion(model: torch.nn.Module):
                 hook.remove()
             module.info["hooks"].clear()
 
-        if hasattr(module, "_parent"):
+        is_patched = hasattr(module, "_parent")
+        if _HIDIFFUSION_STATE_SNAPSHOT in module.__dict__:
+            _restore_hidiffusion_state(module)
+        elif is_patched:
+            _reset_hidiffusion_runtime_state(module)
+
+        if is_patched:
             module.__class__ = module._parent
 
     return model
