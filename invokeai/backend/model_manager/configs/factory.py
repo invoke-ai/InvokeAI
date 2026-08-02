@@ -30,6 +30,10 @@ from invokeai.backend.model_manager.configs.controlnet import (
 )
 from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig
 from invokeai.backend.model_manager.configs.flux_redux import FLUXRedux_Checkpoint_Config
+from invokeai.backend.model_manager.configs.gemma2_encoder import (
+    Gemma2Encoder_Gemma2Encoder_Config,
+    Gemma2Encoder_GGUF_Config,
+)
 from invokeai.backend.model_manager.configs.identification_utils import NotAMatchError
 from invokeai.backend.model_manager.configs.ip_adapter import (
     IPAdapter_Checkpoint_FLUX_Config,
@@ -76,6 +80,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_SDXLRefiner_Config,
     Main_Checkpoint_ZImage_Config,
     Main_Diffusers_CogView4_Config,
+    Main_Diffusers_ErnieImage_Config,
     Main_Diffusers_Flux2_Config,
     Main_Diffusers_FLUX_Config,
     Main_Diffusers_Ideogram4_Config,
@@ -95,6 +100,13 @@ from invokeai.backend.model_manager.configs.main import (
     Main_GGUF_Wan_Config,
     Main_GGUF_ZImage_Config,
     MainModelDefaultSettings,
+)
+from invokeai.backend.model_manager.configs.pid_decoder import (
+    PiDDecoder_Checkpoint_Flux2_Config,
+    PiDDecoder_Checkpoint_FLUX_Config,
+    PiDDecoder_Checkpoint_QwenImage_Config,
+    PiDDecoder_Checkpoint_SD3_Config,
+    PiDDecoder_Checkpoint_SDXL_Config,
 )
 from invokeai.backend.model_manager.configs.qwen3_encoder import (
     Qwen3Encoder_Checkpoint_Config,
@@ -247,6 +259,7 @@ AnyModelConfig = Annotated[
         Annotated[Main_Diffusers_QwenImage_Config, Main_Diffusers_QwenImage_Config.get_tag()],
         Annotated[Main_Diffusers_Wan_Config, Main_Diffusers_Wan_Config.get_tag()],
         Annotated[Main_Diffusers_ZImage_Config, Main_Diffusers_ZImage_Config.get_tag()],
+        Annotated[Main_Diffusers_ErnieImage_Config, Main_Diffusers_ErnieImage_Config.get_tag()],
         Annotated[Main_Diffusers_Ideogram4_Config, Main_Diffusers_Ideogram4_Config.get_tag()],
         Annotated[Main_Diffusers_Krea2_Config, Main_Diffusers_Krea2_Config.get_tag()],
         # Main (Pipeline) - checkpoint format
@@ -290,6 +303,12 @@ AnyModelConfig = Annotated[
         Annotated[VAE_Diffusers_SDXL_Config, VAE_Diffusers_SDXL_Config.get_tag()],
         Annotated[VAE_Diffusers_Flux2_Config, VAE_Diffusers_Flux2_Config.get_tag()],
         Annotated[VAE_Diffusers_Wan_Config, VAE_Diffusers_Wan_Config.get_tag()],
+        # PiD Decoder - checkpoint format
+        Annotated[PiDDecoder_Checkpoint_FLUX_Config, PiDDecoder_Checkpoint_FLUX_Config.get_tag()],
+        Annotated[PiDDecoder_Checkpoint_Flux2_Config, PiDDecoder_Checkpoint_Flux2_Config.get_tag()],
+        Annotated[PiDDecoder_Checkpoint_SD3_Config, PiDDecoder_Checkpoint_SD3_Config.get_tag()],
+        Annotated[PiDDecoder_Checkpoint_SDXL_Config, PiDDecoder_Checkpoint_SDXL_Config.get_tag()],
+        Annotated[PiDDecoder_Checkpoint_QwenImage_Config, PiDDecoder_Checkpoint_QwenImage_Config.get_tag()],
         # ControlNet - checkpoint format
         Annotated[ControlNet_Checkpoint_SD1_Config, ControlNet_Checkpoint_SD1_Config.get_tag()],
         Annotated[ControlNet_Checkpoint_SD2_Config, ControlNet_Checkpoint_SD2_Config.get_tag()],
@@ -348,6 +367,9 @@ AnyModelConfig = Annotated[
         Annotated[Qwen3Encoder_Qwen3Encoder_Config, Qwen3Encoder_Qwen3Encoder_Config.get_tag()],
         Annotated[Qwen3Encoder_Checkpoint_Config, Qwen3Encoder_Checkpoint_Config.get_tag()],
         Annotated[Qwen3Encoder_GGUF_Config, Qwen3Encoder_GGUF_Config.get_tag()],
+        # Gemma 2 Encoder (used by PiD)
+        Annotated[Gemma2Encoder_Gemma2Encoder_Config, Gemma2Encoder_Gemma2Encoder_Config.get_tag()],
+        Annotated[Gemma2Encoder_GGUF_Config, Gemma2Encoder_GGUF_Config.get_tag()],
         # Qwen VL Encoder (Qwen2.5-VL multimodal encoder for Qwen Image)
         Annotated[QwenVLEncoder_Diffusers_Config, QwenVLEncoder_Diffusers_Config.get_tag()],
         Annotated[QwenVLEncoder_Checkpoint_Config, QwenVLEncoder_Checkpoint_Config.get_tag()],
@@ -662,9 +684,12 @@ class ModelConfigFactory:
         # Now do any post-processing needed for specific model types/bases/etc.
         match config.type:
             case ModelType.Main:
-                # Pass variant if available (e.g., for Flux2 models)
+                # Pass variant if available (e.g., for Flux2 models). Name and path are used to
+                # detect ERNIE-Image-Turbo, which has no distinct variant on the config.
                 variant = getattr(config, "variant", None)
-                config.default_settings = MainModelDefaultSettings.from_base(config.base, variant)
+                config.default_settings = MainModelDefaultSettings.from_base(
+                    config.base, variant, config.name, config.path
+                )
             case ModelType.ControlNet | ModelType.T2IAdapter | ModelType.ControlLoRa:
                 config.default_settings = ControlAdapterDefaultSettings.from_model_name(config.name)
             case ModelType.LoRA:

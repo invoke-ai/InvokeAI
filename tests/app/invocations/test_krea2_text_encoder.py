@@ -4,6 +4,7 @@ from types import SimpleNamespace
 import pytest
 import torch
 
+from invokeai.app.invocations.fields import TensorField
 from invokeai.app.invocations.krea2_text_encoder import Krea2TextEncoderInvocation
 from invokeai.app.invocations.model import LoRAField, ModelIdentifierField, Qwen3VLEncoderField
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, SubModelType
@@ -61,10 +62,31 @@ def _invocation() -> Krea2TextEncoderInvocation:
     return Krea2TextEncoderInvocation.model_construct(prompt="a prompt", qwen3_vl_encoder=field)
 
 
-def _context(lora_model) -> SimpleNamespace:
+class _LoRAInfo:
+    """Stands in for LoadedModel: the encoder pins the LoRA's cache record for the patch's lifetime."""
+
+    def __init__(self, model) -> None:
+        self.model = model
+        self.pin_depth = 0
+        self.pinned_at_least_once = False
+
+    @contextmanager
+    def model_in_ram(self):
+        self.pin_depth += 1
+        self.pinned_at_least_once = True
+        try:
+            yield self.model
+        finally:
+            self.pin_depth -= 1
+
+
+def _context(lora_model, lora_infos: list | None = None) -> SimpleNamespace:
     def load(identifier):
         if identifier.key == "lora":
-            return SimpleNamespace(model=lora_model)
+            info = _LoRAInfo(lora_model)
+            if lora_infos is not None:
+                lora_infos.append(info)
+            return info
         if identifier.submodel_type is SubModelType.Tokenizer:
             return _TokenizerInfo()
         return _TextEncoderInfo()
@@ -90,13 +112,22 @@ def test_encode_applies_qwen3_vl_lora_and_returns_selected_hidden_layers(monkeyp
         lambda _device: torch.float32,
     )
 
-    embeds, mask = _invocation()._encode(_context(ModelPatchRaw(layers={})))
+    lora_infos: list[_LoRAInfo] = []
+    embeds, mask = _invocation()._encode(_context(ModelPatchRaw(layers={}), lora_infos))
 
     assert embeds.shape == (1, 512, 12, 4)
     assert mask is not None
     assert mask.shape == (1, 512)
     assert captured["prefix"] == KREA2_LORA_QWEN3VL_PREFIX
     assert captured["patches"][0][1] == 0.5
+
+    # The patch spec must carry a cache pin so LayerPatcher can hold the LoRA's record in RAM for the
+    # lifetime of the patch. The patcher itself is stubbed out here, so the pin arrives un-entered.
+    assert len(captured["patches"][0]) == 3
+    assert lora_infos[0].pin_depth == 0
+    with captured["patches"][0][2]:
+        assert lora_infos[0].pin_depth == 1
+    assert lora_infos[0].pin_depth == 0
 
 
 def test_encode_rejects_a_loaded_non_patch_lora(monkeypatch) -> None:
@@ -298,3 +329,19 @@ def test_encode_uses_reference_fixed_length_layout_and_position_ids(monkeypatch)
     assert captured["attention_mask"].dtype == torch.bool
     assert captured["position_ids"].shape == (3, 1, 546)
     assert captured["position_ids"][0, 0, -5:].tolist() == [4, 5, 6, 7, 8]
+
+
+def test_invoke_preserves_the_regional_mask_on_its_conditioning_output(monkeypatch) -> None:
+    regional_mask = TensorField(tensor_name="regional-mask")
+    invocation = _invocation().model_copy(update={"mask": regional_mask})
+    monkeypatch.setattr(
+        invocation,
+        "_encode",
+        lambda _context: (torch.zeros(1, 2, 12, 4), torch.ones(1, 2, dtype=torch.bool)),
+    )
+    context = SimpleNamespace(conditioning=SimpleNamespace(save=lambda _data: "conditioning-name"))
+
+    output = invocation.invoke(context)
+
+    assert output.conditioning.conditioning_name == "conditioning-name"
+    assert output.conditioning.mask == regional_mask

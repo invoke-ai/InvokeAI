@@ -30,6 +30,7 @@ import type {
   StringFieldInputTemplate,
   StringGeneratorFieldInputTemplate,
   StylePresetFieldInputTemplate,
+  SystemPromptFieldInputTemplate,
   T2IAdapterMetadataFieldInputTemplate,
   VideoFieldInputTemplate,
 } from 'features/nodes/types/field';
@@ -305,6 +306,20 @@ const buildStylePresetFieldInputTemplate: FieldInputTemplateBuilder<StylePresetF
   fieldType,
 }) => {
   const template: StylePresetFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
+const buildSystemPromptFieldInputTemplate: FieldInputTemplateBuilder<SystemPromptFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: SystemPromptFieldInputTemplate = {
     ...baseField,
     type: fieldType,
     default: schemaObject.default ?? undefined,
@@ -597,6 +612,7 @@ const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputTemplate
   SavedWorkflowField: buildSavedWorkflowFieldInputTemplate,
   StringField: buildStringFieldInputTemplate,
   StylePresetField: buildStylePresetFieldInputTemplate,
+  SystemPromptField: buildSystemPromptFieldInputTemplate,
   FloatGeneratorField: buildFloatGeneratorFieldInputTemplate,
   IntegerGeneratorField: buildIntegerGeneratorFieldInputTemplate,
   StringGeneratorField: buildStringGeneratorFieldInputTemplate,

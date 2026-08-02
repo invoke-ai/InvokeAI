@@ -15,7 +15,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     title="Seed Variance - Krea-2",
     tags=["conditioning", "krea2", "krea-2", "variance"],
     category="conditioning",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
 class Krea2SeedVarianceInvocation(BaseInvocation):
@@ -60,7 +60,7 @@ class Krea2SeedVarianceInvocation(BaseInvocation):
 
         # No-op when the effect is disabled, so the node can stay wired in the graph without altering output.
         if self.strength == 0.0 or self.randomize_percent == 0.0:
-            return Krea2ConditioningOutput.build(self.conditioning.conditioning_name)
+            return Krea2ConditioningOutput.build(self.conditioning.conditioning_name, mask=self.conditioning.mask)
 
         # Auto-calibrate the noise magnitude to the embedding scale (same approach as the Z-Image enhancer).
         # This keeps the perceptual effect of `strength` stable across prompts and, crucially, whether or not
@@ -83,4 +83,4 @@ class Krea2SeedVarianceInvocation(BaseInvocation):
             ]
         )
         conditioning_name = context.conditioning.save(new_data)
-        return Krea2ConditioningOutput.build(conditioning_name)
+        return Krea2ConditioningOutput.build(conditioning_name, mask=self.conditioning.mask)
