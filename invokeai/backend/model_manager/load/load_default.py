@@ -4,7 +4,6 @@
 import copy
 import itertools
 import re
-from functools import lru_cache
 from logging import Logger
 from pathlib import Path
 from typing import Optional
@@ -30,24 +29,52 @@ from invokeai.backend.model_manager.taxonomy import (
 )
 from invokeai.backend.util.devices import TorchDevice
 
+# Probe results keyed by concrete device (e.g. "xpu:1"). float8 support is build/driver
+# dependent, so it is a per-device property: a discrete Arc may be paired with an integrated
+# GPU that answers differently, and keying on the device *type* would let whichever probed
+# first decide for both.
+_FP8_STORAGE_SUPPORT: dict[str, bool] = {}
 
-@lru_cache(maxsize=None)
-def _device_supports_fp8_storage(device_type: str) -> bool:
+
+def _device_supports_fp8_storage(device: torch.device, logger: Optional[Logger] = None) -> bool:
     """Whether FP8 layerwise casting (float8 weight storage + upcast) is usable on this device.
 
     The feature needs only float8 *storage* and casting to the compute dtype -- not native FP8
     matmul -- so it holds on CUDA and, for current torch builds, on Intel XPU. XPU float8 support is
-    build/driver dependent ("emerging" on Xe2), so probe it once (cached) rather than assume.
+    build/driver dependent ("emerging" on Xe2), so probe it rather than assume.
+
+    The probe allocates on the *given* device rather than an index-less ``"xpu"``, which would
+    resolve through the thread's current XPU device -- not necessarily the device the caller is
+    loading onto (see the idle-GPU encoder offload, which re-pins the session device).
+
+    Only successes are cached. The probe runs during a model load, i.e. exactly when the device
+    may be transiently out of memory, and a cached failure would silently disable FP8 for the
+    lifetime of the process with no remedy short of a restart.
     """
-    if device_type == "cuda":
+    if device.type == "cuda":
         return True
-    if device_type != "xpu":
+    if device.type != "xpu":
         return False
+
+    device = TorchDevice.normalize(device)
+    key = str(device)
+    cached = _FP8_STORAGE_SUPPORT.get(key)
+    if cached is not None:
+        return cached
+
     try:
-        torch.zeros(2, device="xpu").to(torch.float8_e4m3fn).to(torch.float16)
-        return True
-    except Exception:
+        # Exercise both upcast targets: compute_dtype is bfloat16 for several supported models
+        # (Krea-2, FLUX) and float16 for others, and a build can support one without the other.
+        probe = torch.zeros(2, device=device).to(torch.float8_e4m3fn)
+        probe.to(torch.bfloat16)
+        probe.to(torch.float16)
+    except Exception as exc:
+        if logger is not None:
+            logger.warning(f"FP8 storage probe failed on {device} ({type(exc).__name__}: {exc}); not using FP8.")
         return False
+
+    _FP8_STORAGE_SUPPORT[key] = True
+    return True
 
 
 # Layer classes that benefit from FP8 storage. Mirrors diffusers'
@@ -255,7 +282,7 @@ class ModelLoader(ModelLoaderBase):
         # forward pass, so it only needs float8 storage + cast (not native FP8 matmul). This works on
         # CUDA and on Intel XPU (verified: float8_e4m3fn store + upcast to fp16/bf16 on Arc), but XPU
         # float8 support is build-dependent, so the helper probes it rather than assuming.
-        if not _device_supports_fp8_storage(self._torch_device.type):
+        if not _device_supports_fp8_storage(self._torch_device, self._logger):
             return False
 
         # Z-Image has dtype mismatch issues with diffusers' layerwise casting

@@ -591,7 +591,7 @@ class Qwen3VLEncoderCheckpointLoader(ModelLoader):
         # excludes text encoders (and the config has no fp8_storage toggle), so apply the hook-based
         # casting directly here. This roughly halves the encoder's resident VRAM (~8.9GB bf16 ->
         # ~4.4GB), which avoids partial-load thrashing when it shares the GPU with a large transformer.
-        if source_is_fp8 and _device_supports_fp8_storage(self._torch_device.type):
+        if source_is_fp8 and _device_supports_fp8_storage(self._torch_device, self._logger):
             self._apply_fp8_to_nn_module(model, storage_dtype=torch.float8_e4m3fn, compute_dtype=model_dtype)
             self._logger.info(
                 f"FP8 layerwise casting enabled for Qwen3-VL encoder '{config.name}' "
