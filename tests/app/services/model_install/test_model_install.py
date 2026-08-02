@@ -421,6 +421,7 @@ def test_concurrent_imports_of_same_source_return_one_job(
     mm2_installer._write_install_marker(interrupted_job, status=InstallStatus.DOWNLOADING)
 
     first_import_ready = threading.Event()
+    second_import_waiting = threading.Event()
     second_helper_entered = threading.Event()
     release_first_import = threading.Event()
     helper_calls = 0
@@ -428,6 +429,11 @@ def test_concurrent_imports_of_same_source_return_one_job(
     import_from_url = mm2_installer._import_from_url
     imported_jobs: list[ModelInstallJob] = []
     import_errors: list[BaseException] = []
+    condition_wait = mm2_installer._install_condition.wait
+
+    def _observed_condition_wait(timeout: float | None = None) -> bool:
+        second_import_waiting.set()
+        return condition_wait(timeout)
 
     def _synchronized_import_from_url(
         import_source: URLModelSource, config: ModelRecordChanges | None = None
@@ -449,6 +455,7 @@ def test_concurrent_imports_of_same_source_return_one_job(
         except BaseException as error:
             import_errors.append(error)
 
+    monkeypatch.setattr(mm2_installer._install_condition, "wait", _observed_condition_wait)
     monkeypatch.setattr(mm2_installer, "_import_from_url", _synchronized_import_from_url)
 
     first_import_thread = threading.Thread(target=_import)
@@ -456,7 +463,8 @@ def test_concurrent_imports_of_same_source_return_one_job(
     first_import_thread.start()
     assert first_import_ready.wait(timeout=5)
     second_import_thread.start()
-    second_helper_entered.wait(timeout=1)
+    assert second_import_waiting.wait(timeout=5)
+    assert not second_helper_entered.is_set()
     release_first_import.set()
 
     import_threads = [first_import_thread, second_import_thread]
@@ -609,6 +617,101 @@ def test_prune_jobs_cannot_drop_a_concurrent_registration(
 
     assert not pruner.is_alive() and not importer.is_alive()
     assert imported and mm2_installer.get_job_by_source(source) == imported
+
+
+@pytest.mark.timeout(timeout=10, method="thread")
+def test_waiting_import_returns_its_new_terminal_job_when_no_live_job_exists(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = URLModelSource(url=Url("https://www.test.foo/download/test_embedding.safetensors"))
+    source_key = str(source)
+    condition = mm2_installer._install_condition
+    assert mm2_installer._restore_completed_event.wait(timeout=5)
+
+    with condition:
+        mm2_installer._pending_sources.add(source_key)
+
+    importer_waiting = threading.Event()
+    condition_wait = condition.wait
+
+    def _observed_condition_wait(timeout: float | None = None) -> bool:
+        importer_waiting.set()
+        return condition_wait(timeout)
+
+    monkeypatch.setattr(condition, "wait", _observed_condition_wait)
+    imported_jobs: list[ModelInstallJob] = []
+    importer = threading.Thread(target=lambda: imported_jobs.append(mm2_installer.import_model(source)))
+    importer.start()
+    assert importer_waiting.wait(timeout=5)
+
+    terminal_job = ModelInstallJob(
+        id=99001,
+        source=source,
+        config_in=ModelRecordChanges(),
+        local_path=mm2_app_config.models_path,
+    )
+    terminal_job.status = InstallStatus.ERROR
+    with condition:
+        mm2_installer._install_jobs.append(terminal_job)
+        mm2_installer._pending_sources.remove(source_key)
+        condition.notify_all()
+
+    importer.join(timeout=5)
+    assert not importer.is_alive()
+    assert imported_jobs == [terminal_job]
+
+
+def test_prune_jobs_rebind_preserves_existing_iterators(
+    mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig
+) -> None:
+    jobs = [
+        ModelInstallJob(
+            id=99002 + index,
+            source=URLModelSource(url=Url(f"https://www.test.foo/download/model-{index}.safetensors")),
+            config_in=ModelRecordChanges(),
+            local_path=mm2_app_config.models_path,
+            status=InstallStatus.COMPLETED,
+        )
+        for index in range(3)
+    ]
+    mm2_installer._install_jobs.extend(jobs)
+    existing_iterator = iter(mm2_installer.list_jobs())
+    assert next(existing_iterator) is jobs[0]
+
+    mm2_installer.prune_jobs()
+
+    assert list(existing_iterator) == jobs[1:]
+    assert all(job not in mm2_installer.list_jobs() for job in jobs)
+
+
+@pytest.mark.timeout(timeout=5, method="thread")
+def test_prune_jobs_waits_for_the_installer_lock(mm2_installer: ModelInstallServiceBase) -> None:
+    lock_held = threading.Event()
+    release_lock = threading.Event()
+    prune_completed = threading.Event()
+
+    def _hold_lock() -> None:
+        with mm2_installer._lock:
+            lock_held.set()
+            assert release_lock.wait(timeout=3)
+
+    lock_holder = threading.Thread(target=_hold_lock)
+    pruner = threading.Thread(target=lambda: (mm2_installer.prune_jobs(), prune_completed.set()))
+    try:
+        lock_holder.start()
+        assert lock_held.wait(timeout=3)
+        pruner.start()
+        assert not prune_completed.wait(timeout=0.25)
+    finally:
+        release_lock.set()
+        for thread in (lock_holder, pruner):
+            if thread.ident is not None:
+                thread.join(timeout=3)
+
+    assert not lock_holder.is_alive() and not pruner.is_alive()
+    assert prune_completed.is_set()
 
 
 @pytest.mark.timeout(timeout=5, method="thread")
