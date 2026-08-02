@@ -214,8 +214,18 @@ def xpu_memory_info(device: torch.device) -> Optional[tuple[int, int]]:
     """
     global _sysman_lib, _sysman_modules, _sysman_attempted
 
-    if device.type != "xpu" or device.index is None:
+    if device.type != "xpu":
         return None
+    index = device.index
+    if index is None:
+        # Resolve an index-less device the same way TorchDevice.normalize does. Callers currently
+        # always pass a concrete device (tensor.device and the cache's execution device are both
+        # indexed), but silently returning None here would skip the driver-global query and drop
+        # straight to the blind estimate -- a quiet accuracy regression rather than a visible one.
+        try:
+            index = torch.xpu.current_device()
+        except Exception:
+            return None
 
     with _sysman_lock:
         if not _sysman_attempted:
@@ -225,7 +235,7 @@ def xpu_memory_info(device: torch.device) -> Optional[tuple[int, int]]:
 
     if lib is None or modules is None:
         return None
-    handles = modules.get(device.index)
+    handles = modules.get(index)
     if not handles:
         return None
 
