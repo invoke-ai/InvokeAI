@@ -983,63 +983,89 @@ export const {
  * That has happened whenever a key was added to the schema with neither a `.default()` nor a seed in
  * the migration chain, which is what the Wan and post-v3 seeds above exist to undo.
  *
- * Backfilling those keys turns a forgotten seed into "one new field sits at its default" instead of
- * "the user lost everything". Deliberately narrow:
- *   - Only keys that are *absent*. A key that is present but holds an invalid value still throws;
- *     this repairs omissions, not corruption.
- *   - Only keys the schema cannot fill itself. Anything with `.default()` / `.catch()` / `.optional()`
- *     is left to zod, so the schema's own default stays authoritative.
+ * Repairing the offending key turns that into "one field sits at its default" instead of "the user
+ * lost everything". Two kinds of damage are repaired, both per key:
+ *   - `backfilled`: the key is *absent* and the schema cannot fill it itself. Anything with
+ *     `.default()` / `.catch()` / `.optional()` is left to zod, so the schema's own default stays
+ *     authoritative.
+ *   - `reset`: the key is present but its value does not satisfy that field's schema. Whatever the
+ *     cause — a tightened field schema, a hand-edited blob, a half-applied migration — resetting the
+ *     one field is strictly better than the alternative, which is `store.ts` discarding all of them.
+ *     Note the granularity is one top-level key, so this is not always cheap: one malformed entry in
+ *     `positivePromptHistory` costs the whole history, and a `model` whose `base` has since been
+ *     removed from `zBaseModelType` (the external-API bases dropped in v6.9.0rc1, say) clears the
+ *     user's model selection. Both are still a single field rather than every field.
  *
  * This is a safety net, not a substitute for a migration step — it fills fields with *today's*
  * initial value, which is only the right answer for genuinely new fields. `paramsSlice.test.ts`
- * asserts the returned list is empty for real released blobs, so a forgotten seed still fails CI.
+ * asserts nothing needs repairing for real persisted blobs, so a forgotten seed still fails CI.
  *
  * Exported for that test.
  */
-export const backfillMissingParamsKeys = (state: Record<string, unknown>): string[] => {
+export const repairParamsState = (state: Record<string, unknown>): { backfilled: string[]; reset: string[] } => {
   const initial = getInitialParamsState() as unknown as Record<string, unknown>;
   const backfilled: string[] = [];
+  const reset: string[] = [];
 
   for (const [key, fieldSchema] of Object.entries(zParamsState.shape)) {
-    // Never touch `_version`. The version steps detect a v0 blob with `!('_version' in state)`, i.e.
-    // key presence, so filling it here on a value check would stamp a blob as current having run no
-    // migration step at all.
+    // Never touch `_version`: it is the input to the version steps, so repairing it would stamp a
+    // blob as current having run no step at all. A `_version` from the future (a downgrade) is
+    // deliberately still fatal — that slice really was written by a newer schema.
     if (key === '_version') {
       continue;
     }
-    // `undefined` is the only value that counts as missing: persisted JSON can't hold it, and every
-    // nullable field in the schema uses `null` for "unset", so this never overwrites a real value.
-    if (state[key] !== undefined || fieldSchema.safeParse(undefined).success) {
+
+    if (state[key] === undefined) {
+      // `undefined` is the only value that counts as missing: persisted JSON can't hold it, and
+      // every nullable field in the schema uses `null` for "unset".
+      if (!fieldSchema.safeParse(undefined).success) {
+        state[key] = initial[key];
+        backfilled.push(key);
+      }
       continue;
     }
-    state[key] = initial[key];
-    backfilled.push(key);
+
+    if (!fieldSchema.safeParse(state[key]).success) {
+      state[key] = initial[key];
+      reset.push(key);
+    }
   }
 
-  return backfilled;
+  return { backfilled, reset };
 };
 
 /**
  * Bring a persisted params blob up to the current `_version` in place.
  *
  * Every key added to `zParamsState` without a zod default must be seeded by the step for the version
- * that predates it, or upgrading users lose the whole slice — see `backfillMissingParamsKeys`.
+ * that predates it, or upgrading users lose the whole slice — see `repairParamsState`. Note that
+ * the *current* version has no step by definition, so a key added after the last bump needs a zod
+ * default (as the ERNIE-Image and PiD fields have) rather than a seed.
  *
  * Exported so the tests can assert the version steps alone are complete, without the safety net
  * hiding a missing seed.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const applyParamsVersionMigrations = (state: any): void => {
-  // Value check rather than `!('_version' in state)`, so that a blob carrying an explicit undefined
-  // is treated as v0 and walked through the chain. With a presence check it matches no branch at
-  // all, reaches the parse with `_version: undefined` and takes the whole slice down with it.
+  // Value check rather than `!('_version' in state)`. The two are equivalent on real input, since
+  // the only production caller feeds this `JSON.parse` output, which cannot produce an explicit
+  // `undefined` — but a value check is what the rest of this file uses, and with a presence check a
+  // blob carrying `_version: undefined` would match no branch at all, reach the parse and take the
+  // whole slice down.
   if (state._version === undefined) {
     // v0 -> v1, add _version and remove x/y from dimensions, lifting width/height to top level.
-    // `dimensions.rect` is optional-chained: a truncated or hand-edited blob that lacks it would
-    // otherwise throw a TypeError out of migrate() and cost the user the whole slice. Leaving
-    // width/height undefined instead lets backfillMissingParamsKeys() repair `dimensions`.
+    // `dimensions.rect` is guarded: a truncated or hand-edited blob that lacks it would otherwise
+    // throw a TypeError out of migrate() and cost the user the whole slice. What that leaves behind
+    // — a `dimensions` object with no width/height — fails its own field schema, so
+    // repairParamsState() swaps in the initial dimensions instead of letting the parse wipe
+    // everything else along with it.
     state._version = 1;
-    if (state.dimensions && state.dimensions.rect) {
+    if (state.dimensions === undefined) {
+      // The oldest v0 builds (v6.0.0a1 - v6.0.0rc3) had no `dimensions` key at all; it arrives in
+      // v6.0.0rc4. Seeding it here rather than leaving it to the repair pass is what keeps the
+      // version steps self-sufficient for the v0 tier.
+      state.dimensions = getInitialParamsState().dimensions;
+    } else if (state.dimensions && state.dimensions.rect) {
       state.dimensions.width = state.dimensions.rect.width;
       state.dimensions.height = state.dimensions.rect.height;
     }
@@ -1167,12 +1193,18 @@ export const paramsSliceConfig: SliceConfig<typeof slice> = {
 
       applyParamsVersionMigrations(state);
 
-      const backfilled = backfillMissingParamsKeys(state);
+      const { backfilled, reset } = repairParamsState(state);
       if (backfilled.length > 0) {
         log.warn(
           { backfilled },
           `Backfilled ${backfilled.length} params key(s) missing from the persisted state: ${backfilled.join(', ')}. ` +
             `These need a zod default or a seed in the migration chain.`
+        );
+      }
+      if (reset.length > 0) {
+        log.warn(
+          { reset },
+          `Reset ${reset.length} params key(s) whose persisted value no longer satisfies the schema: ${reset.join(', ')}.`
         );
       }
 

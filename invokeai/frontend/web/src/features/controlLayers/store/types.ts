@@ -908,10 +908,16 @@ export const zParamsState = z.object({
   // - 'off':    regular VAE decode
   // - 'fit':    PiD decodes 4x internally, then downscales back to the bbox (compositing-safe; works in canvas/inpaint)
   // - 'native': PiD's full 4x output IS the result; the user-facing dimensions are the target, generation runs at target / 4
-  pidMode: zPidMode,
-  pidDecoderModel: zModelIdentifierField.nullable(), // PiD decoder checkpoint (matched to the main model's base)
-  gemma2EncoderModel: zModelIdentifierField.nullable(), // Gemma-2 caption encoder required by PiD
-  pidSteps: z.number().int().min(1).max(4), // PiD distill steps: student schedule has only 4 transitions, so 1-4
+  // These four landed *after* the `_version` 3 -> 4 bump, so for as long as 4 was the current
+  // version no migration step could reach them: a blob already at v4 (dev builds from that window)
+  // matched no branch in the chain. They carry zod defaults for the same reason the ERNIE-Image
+  // fields above do — without one they would be required, and their absence would fail the parse in
+  // `migrate()` and wipe the whole slice. That is the rule for any field added after the last bump,
+  // which is why it still applies now that the v4 -> v5 step also seeds these.
+  pidMode: zPidMode.default('off'),
+  pidDecoderModel: zModelIdentifierField.nullable().default(null), // PiD decoder checkpoint (matched to the main model's base)
+  gemma2EncoderModel: zModelIdentifierField.nullable().default(null), // Gemma-2 caption encoder required by PiD
+  pidSteps: z.number().int().min(1).max(4).default(4), // PiD distill steps: student schedule has only 4 transitions, so 1-4
   // Qwen Image Edit model components - GGUF transformer needs a Diffusers source for VAE/encoder
   qwenImageComponentSource: zParameterModel.nullable(), // Diffusers model providing VAE + text encoder
   qwenImageVaeModel: zParameterVAEModel.nullable(), // Optional: Standalone Qwen Image VAE checkpoint

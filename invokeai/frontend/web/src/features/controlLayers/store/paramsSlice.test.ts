@@ -9,7 +9,6 @@ import { describe, expect, it } from 'vitest';
 
 import {
   applyParamsVersionMigrations,
-  backfillMissingParamsKeys,
   isValidKrea2RebalanceWeights,
   KREA2_REBALANCE_WEIGHT_COUNT,
   modelChanged,
@@ -17,6 +16,7 @@ import {
   parseKrea2RebalanceWeights,
   positivePromptAddedToHistory,
   promptRemovedFromHistory,
+  repairParamsState,
   selectModelSupportsDimensions,
   selectModelSupportsGuidance,
   selectModelSupportsNegativePrompt,
@@ -152,22 +152,133 @@ describe('paramsSlice selectors for external models', () => {
  * newly added key that the migration chain forgets to seed. That is precisely what masked the Wan
  * regression these tests exist to catch.
  *
- * One entry per persisted `_version` still in the wild, each picked as the *narrowest* key set among
- * the releases writing that version, so it is a subset of every real blob of that version:
- *   - v1: v6.6.0 only. Identical to the v6.7.0 set below minus `positivePromptHistory`, which the
- *     v1 -> v2 step seeds.
- *   - v2: v6.7.0 - v6.12.0. v6.7.0 is the narrowest and a strict subset of the rest; note v6.7.0 -
- *     v6.9.0 (46 keys) are considerably narrower than v6.10.0 (52) and v6.11.0 - v6.12.0 (60), so
- *     testing only the newest v2 release would miss six keys.
- *   - v3: v6.13.0 - v6.13.7. v6.13.7 is the narrowest (v6.13.0 additionally had `animaT5EncoderModel`,
- *     since removed from the schema; unknown keys are stripped by the non-strict object parse).
- * v4 blobs are written by v6.14.0-rc1 onward; the v4 -> v5 step is covered by its own tests below.
- *
- * Not covered here: v6.2.0a1 - v6.5.1 persist a blob with no `_version` at all (the v0 path). Those
- * also predate the current `dimensions` shape, so a faithful fixture cannot be built by filtering
- * `getInitialParamsState()` the way `buildReleaseBlob` does.
+ * What matters per version is the *intersection* of every build that wrote it, not the newest or even
+ * the smallest single one: if any build omitted a key, the chain has to cope with that key's absence.
+ * The ranges below come from reading `_version` and the key set out of all 66 `v6.*` tags. Do not
+ * survey them with a glob like `v6.1*` — that matches v6.10 - v6.14 and silently drops v6.7 - v6.9.
+ *   - v0: v6.0.0a1 - v6.6.0rc2, which persist a blob with no `_version` at all. Two entries, because
+ *     no single v0 build has the intersecting key set (43 keys):
+ *       - `v6.0.0a1` (46 keys) is the intersection once the three keys since removed from the schema
+ *         are dropped — `positivePrompt2` / `negativePrompt2` / `shouldConcatPrompts`, which
+ *         `buildReleaseBlob` filters out and the non-strict parse would strip anyway. Critically it
+ *         has no `dimensions` key at all; that arrives in v6.0.0rc4.
+ *       - `v6.5.1` (44 keys) is the widest-coverage v0 shape that *does* carry `dimensions`, in the
+ *         pre-flattening form, which is the only way to exercise the v0 -> v1 lift.
+ *   - v1: v6.6.0 and v6.7.0rc1, whose key sets are identical (45).
+ *   - v2: v6.7.0 - v6.13.0.rc1. v6.7.0 is the intersection (46) and a strict subset of the rest; note
+ *     v6.7.0 - v6.9.0 (46 keys) are considerably narrower than v6.10.0 (52), v6.11.0 - v6.12.0 (60)
+ *     and v6.13.0.rc1 (73), so testing only the newest v2 build would miss six keys.
+ *   - v3: v6.13.0 - v6.13.7. v6.13.7 is the intersection (77); v6.13.0 additionally had
+ *     `animaT5EncoderModel`, since removed from the schema.
+ *   - v4: the narrowest v4 blob is not a release at all — it is the one written by the build that did
+ *     the bump, `1aeb05bbf0` (97 keys). Releases writing v4 start at v6.14.0-rc1.
+ *   - v5: the current version, reached by the FLUX.2 [dev] merge `f10d2a4f5a`, which is also the
+ *     build that wrote the narrowest v5 blob. Pinning the fixture at the bump commit is what keeps
+ *     the invariant below meaningful for the current tier: the version steps can never cover it (a
+ *     v5 blob matches no branch), so every key added since the bump has to carry a zod default, and
+ *     this entry is what proves it does.
  */
 const RELEASE_PARAMS_KEYS = {
+  'v6.0.0a1': {
+    version: 0,
+    keys: [
+      'canvasCoherenceEdgeSize',
+      'canvasCoherenceMinDenoise',
+      'canvasCoherenceMode',
+      'cfgRescaleMultiplier',
+      'cfgScale',
+      'clipEmbedModel',
+      'clipGEmbedModel',
+      'clipLEmbedModel',
+      'clipSkip',
+      'controlLora',
+      'fluxVAE',
+      'guidance',
+      'img2imgStrength',
+      'infillColorValue',
+      'infillMethod',
+      'infillPatchmatchDownscaleSize',
+      'infillTileSize',
+      'iterations',
+      'maskBlur',
+      'maskBlurMethod',
+      'model',
+      'negativePrompt',
+      'negativePrompt2',
+      'optimizedDenoisingEnabled',
+      'positivePrompt',
+      'positivePrompt2',
+      'refinerCFGScale',
+      'refinerModel',
+      'refinerNegativeAestheticScore',
+      'refinerPositiveAestheticScore',
+      'refinerScheduler',
+      'refinerStart',
+      'refinerSteps',
+      'scheduler',
+      'seamlessXAxis',
+      'seamlessYAxis',
+      'seed',
+      'shouldConcatPrompts',
+      'shouldRandomizeSeed',
+      'shouldUseCpuNoise',
+      'steps',
+      't5EncoderModel',
+      'upscaleCfgScale',
+      'upscaleScheduler',
+      'vae',
+      'vaePrecision',
+    ],
+  },
+  'v6.5.1': {
+    version: 0,
+    keys: [
+      'canvasCoherenceEdgeSize',
+      'canvasCoherenceMinDenoise',
+      'canvasCoherenceMode',
+      'cfgRescaleMultiplier',
+      'cfgScale',
+      'clipEmbedModel',
+      'clipGEmbedModel',
+      'clipLEmbedModel',
+      'clipSkip',
+      'controlLora',
+      'dimensions',
+      'fluxVAE',
+      'guidance',
+      'img2imgStrength',
+      'infillColorValue',
+      'infillMethod',
+      'infillPatchmatchDownscaleSize',
+      'infillTileSize',
+      'iterations',
+      'maskBlur',
+      'maskBlurMethod',
+      'model',
+      'negativePrompt',
+      'optimizedDenoisingEnabled',
+      'positivePrompt',
+      'refinerCFGScale',
+      'refinerModel',
+      'refinerNegativeAestheticScore',
+      'refinerPositiveAestheticScore',
+      'refinerScheduler',
+      'refinerStart',
+      'refinerSteps',
+      'scheduler',
+      'seamlessXAxis',
+      'seamlessYAxis',
+      'seed',
+      'shouldRandomizeSeed',
+      'shouldUseCpuNoise',
+      'steps',
+      't5EncoderModel',
+      'upscaleCfgScale',
+      'upscaleScheduler',
+      'vae',
+      'vaePrecision',
+    ],
+  },
   'v6.6.0': {
     version: 1,
     keys: [
@@ -408,11 +519,227 @@ const RELEASE_PARAMS_KEYS = {
       'zImageVaeModel',
     ],
   },
+  '1aeb05bbf0': {
+    version: 4,
+    keys: [
+      '_version',
+      'animaLLLiteModel',
+      'animaLLLiteWeight',
+      'animaQwen3EncoderModel',
+      'animaScheduler',
+      'animaVaeModel',
+      'canvasCoherenceEdgeSize',
+      'canvasCoherenceMinDenoise',
+      'canvasCoherenceMode',
+      'cfgRescaleMultiplier',
+      'cfgScale',
+      'clipEmbedModel',
+      'clipGEmbedModel',
+      'clipLEmbedModel',
+      'clipSkip',
+      'colorCompensation',
+      'controlLora',
+      'dimensions',
+      'fluxDypeExponent',
+      'fluxDypePreset',
+      'fluxDypeScale',
+      'fluxScheduler',
+      'fluxVAE',
+      'geminiTemperature',
+      'geminiThinkingLevel',
+      'guidance',
+      'ideogram4ColorPalette',
+      'ideogram4GuidanceScale',
+      'ideogram4Mu',
+      'ideogram4SamplerPreset',
+      'ideogram4Steps',
+      'imageSize',
+      'img2imgStrength',
+      'infillColorValue',
+      'infillMethod',
+      'infillPatchmatchDownscaleSize',
+      'infillTileSize',
+      'iterations',
+      'kleinQwen3EncoderModel',
+      'kleinVaeModel',
+      'krea2Qwen3VlEncoderModel',
+      'krea2RebalanceEnabled',
+      'krea2RebalanceMultiplier',
+      'krea2RebalanceWeights',
+      'krea2SeedVarianceEnabled',
+      'krea2SeedVarianceRandomizePercent',
+      'krea2SeedVarianceStrength',
+      'krea2VaeModel',
+      'maskBlur',
+      'maskBlurMethod',
+      'model',
+      'negativePrompt',
+      'openaiBackground',
+      'openaiInputFidelity',
+      'openaiQuality',
+      'optimizedDenoisingEnabled',
+      'positivePrompt',
+      'positivePromptHistory',
+      'qwenImageComponentSource',
+      'qwenImageQuantization',
+      'qwenImageQwenVLEncoderModel',
+      'qwenImageShift',
+      'qwenImageVaeModel',
+      'refinerCFGScale',
+      'refinerModel',
+      'refinerNegativeAestheticScore',
+      'refinerPositiveAestheticScore',
+      'refinerScheduler',
+      'refinerStart',
+      'refinerSteps',
+      'scheduler',
+      'seamlessXAxis',
+      'seamlessYAxis',
+      'seed',
+      'seedreamOptimizePrompt',
+      'seedreamWatermark',
+      'shouldRandomizeSeed',
+      'shouldUseCpuNoise',
+      'steps',
+      't5EncoderModel',
+      'upscaleCfgScale',
+      'upscaleScheduler',
+      'vae',
+      'vaePrecision',
+      'wanComponentSource',
+      'wanGuidanceScaleLowNoise',
+      'wanT5EncoderModel',
+      'wanTransformerLowNoise',
+      'wanVaeModel',
+      'zImageQwen3EncoderModel',
+      'zImageQwen3SourceModel',
+      'zImageScheduler',
+      'zImageSeedVarianceEnabled',
+      'zImageSeedVarianceRandomizePercent',
+      'zImageSeedVarianceStrength',
+      'zImageShift',
+      'zImageVaeModel',
+    ],
+  },
+  'f10d2a4f5a': {
+    version: 5,
+    keys: [
+      'animaLLLiteModel',
+      'animaLLLiteWeight',
+      'animaQwen3EncoderModel',
+      'animaScheduler',
+      'animaVaeModel',
+      'canvasCoherenceEdgeSize',
+      'canvasCoherenceMinDenoise',
+      'canvasCoherenceMode',
+      'cfgRescaleMultiplier',
+      'cfgScale',
+      'clipEmbedModel',
+      'clipGEmbedModel',
+      'clipLEmbedModel',
+      'clipSkip',
+      'colorCompensation',
+      'controlLora',
+      'dimensions',
+      'ernieImageScheduler',
+      'ernieImageUsePromptEnhancer',
+      'flux2DevMistralEncoderModel',
+      'flux2VaeModel',
+      'fluxDypeExponent',
+      'fluxDypePreset',
+      'fluxDypeScale',
+      'fluxScheduler',
+      'fluxVAE',
+      'geminiTemperature',
+      'geminiThinkingLevel',
+      'gemma2EncoderModel',
+      'guidance',
+      'hiDiffusionEnabled',
+      'hiDiffusionRauNetEnabled',
+      'hiDiffusionT1Ratio',
+      'hiDiffusionT2Ratio',
+      'hiDiffusionWindowAttnEnabled',
+      'ideogram4ColorPalette',
+      'ideogram4GuidanceScale',
+      'ideogram4Mu',
+      'ideogram4SamplerPreset',
+      'ideogram4Steps',
+      'imageSize',
+      'img2imgStrength',
+      'infillColorValue',
+      'infillMethod',
+      'infillPatchmatchDownscaleSize',
+      'infillTileSize',
+      'iterations',
+      'kleinQwen3EncoderModel',
+      'krea2Qwen3VlEncoderModel',
+      'krea2RebalanceEnabled',
+      'krea2RebalanceMultiplier',
+      'krea2RebalanceWeights',
+      'krea2SeedVarianceEnabled',
+      'krea2SeedVarianceRandomizePercent',
+      'krea2SeedVarianceStrength',
+      'krea2VaeModel',
+      'maskBlur',
+      'maskBlurMethod',
+      'model',
+      'negativePrompt',
+      'openaiBackground',
+      'openaiInputFidelity',
+      'openaiQuality',
+      'optimizedDenoisingEnabled',
+      'pidDecoderModel',
+      'pidMode',
+      'pidSteps',
+      'positivePrompt',
+      'positivePromptHistory',
+      'qwenImageComponentSource',
+      'qwenImageQuantization',
+      'qwenImageQwenVLEncoderModel',
+      'qwenImageShift',
+      'qwenImageVaeModel',
+      'refinerCFGScale',
+      'refinerModel',
+      'refinerNegativeAestheticScore',
+      'refinerPositiveAestheticScore',
+      'refinerScheduler',
+      'refinerStart',
+      'refinerSteps',
+      'scheduler',
+      'seamlessXAxis',
+      'seamlessYAxis',
+      'seed',
+      'seedreamOptimizePrompt',
+      'seedreamWatermark',
+      'shouldRandomizeSeed',
+      'shouldUseCpuNoise',
+      'steps',
+      't5EncoderModel',
+      'upscaleCfgScale',
+      'upscaleScheduler',
+      'vae',
+      'vaePrecision',
+      '_version',
+      'wanComponentSource',
+      'wanGuidanceScaleLowNoise',
+      'wanT5EncoderModel',
+      'wanTransformerLowNoise',
+      'wanVaeModel',
+      'zImageQwen3EncoderModel',
+      'zImageQwen3SourceModel',
+      'zImageScheduler',
+      'zImageSeedVarianceEnabled',
+      'zImageSeedVarianceRandomizePercent',
+      'zImageSeedVarianceStrength',
+      'zImageShift',
+      'zImageVaeModel',
+    ],
+  },
 } as const satisfies Record<string, { version: number; keys: readonly string[] }>;
 
 /**
- * Build a blob shaped exactly like the one the given release persisted: current initial values, but
- * restricted to the keys that release's schema actually had.
+ * Build a blob shaped exactly like the one the given build persisted: current initial values, but
+ * restricted to the keys that build's schema actually had.
  */
 const buildReleaseBlob = (release: keyof typeof RELEASE_PARAMS_KEYS, overrides: Record<string, unknown> = {}) => {
   const { version, keys } = RELEASE_PARAMS_KEYS[release];
@@ -423,8 +750,29 @@ const buildReleaseBlob = (release: keyof typeof RELEASE_PARAMS_KEYS, overrides: 
       blob[key] = initial[key];
     }
   }
-  blob._version = version;
+  if (version === 0) {
+    // v0 blobs carry no `_version` at all, and where they have `dimensions` it is the pre-flattening
+    // shape — the one field `keys` alone cannot reproduce, since filtering the current initial state
+    // would hand back the flat shape. `v6.0.0a1` has no `dimensions` key at all and must not gain
+    // one here, or it stops testing the v0 seed.
+    if ((keys as readonly string[]).includes('dimensions')) {
+      blob.dimensions = buildReleaseDimensions(release, 512, 512);
+    }
+  } else {
+    blob._version = version;
+  }
   return { ...blob, ...overrides };
+};
+
+/**
+ * `dimensions` in the shape the given build persisted it: `{ rect: { x, y, width, height },
+ * aspectRatio }` before the v0 -> v1 flattening, `{ width, height, aspectRatio }` after.
+ */
+const buildReleaseDimensions = (release: keyof typeof RELEASE_PARAMS_KEYS, width: number, height: number) => {
+  const { aspectRatio } = getInitialParamsState().dimensions;
+  return RELEASE_PARAMS_KEYS[release].version === 0
+    ? { rect: { x: 0, y: 0, width, height }, aspectRatio }
+    : { width, height, aspectRatio };
 };
 
 describe('paramsSliceConfig persisted state migration', () => {
@@ -622,7 +970,7 @@ describe('paramsSliceConfig persisted state migration', () => {
     expect(result.seed).toBe(99);
   });
 
-  it.each(['v6.6.0', 'v6.7.0', 'v6.10.0', 'v6.13.7'] as const)(
+  it.each(['v6.0.0a1', 'v6.5.1', 'v6.6.0', 'v6.7.0', 'v6.10.0', 'v6.13.7', '1aeb05bbf0', 'f10d2a4f5a'] as const)(
     'migrates a genuine %s blob without losing the user params',
     (release) => {
       expect(migrate).toBeDefined();
@@ -631,10 +979,17 @@ describe('paramsSliceConfig persisted state migration', () => {
       // since that has neither a zod default nor a migration seed fails the parse() at the end of
       // migrate(), and the caller in store.ts swallows the throw and falls back to the initial
       // state — silently wiping the user's prompts, model selection and dimensions on upgrade.
+      const hasDimensions = (RELEASE_PARAMS_KEYS[release].keys as readonly string[]).includes('dimensions');
       const blob = buildReleaseBlob(release, {
         positivePrompt: 'a fluffy cat',
         seed: 42,
         shouldRandomizeSeed: false,
+        // Every value here is non-default on purpose. The initial state is what a wiped slice looks
+        // like, so a fixture carrying initial values cannot tell "migrated correctly" apart from
+        // "silently reset" — `getInitialParamsState().model` is null, which is exactly why nothing
+        // used to notice the repair pass clearing a model whose base has left the schema.
+        model: { key: 'm1', hash: 'h1', name: 'Some SDXL Model', base: 'sdxl', type: 'main' },
+        ...(hasDimensions ? { dimensions: buildReleaseDimensions(release, 768, 1024) } : {}),
       });
 
       const result = migrate?.(blob) as ReturnType<typeof getInitialParamsState>;
@@ -643,10 +998,18 @@ describe('paramsSliceConfig persisted state migration', () => {
       expect(result.positivePrompt).toBe('a fluffy cat');
       expect(result.seed).toBe(42);
       expect(result.shouldRandomizeSeed).toBe(false);
+      expect(result.model).toMatchObject({ key: 'm1', base: 'sdxl' });
+      if (hasDimensions) {
+        expect(result.dimensions.width).toBe(768);
+        expect(result.dimensions.height).toBe(1024);
+      } else {
+        // v6.0.0a1 - v6.0.0rc3 had no `dimensions` key; the v0 step seeds it.
+        expect(result.dimensions).toEqual(getInitialParamsState().dimensions);
+      }
     }
   );
 
-  it('seeds every key of the current schema in the version steps themselves, for each released blob version', () => {
+  it('seeds every key of the current schema in the version steps themselves, for each persisted blob version', () => {
     // The general form of the defect this suite guards against: a key is added to zParamsState with
     // no `.default()`/`.optional()`/`.catch()` (so zod treats it as required) and no seed in the
     // migration chain. Every such key is a whole-slice wipe for anyone upgrading from a release
@@ -654,20 +1017,26 @@ describe('paramsSliceConfig persisted state migration', () => {
     // schema, so the next occurrence fails here instead of shipping.
     //
     // This deliberately runs the version steps *without* going through migrate(), because
-    // backfillMissingParamsKeys() would otherwise repair the omission and hide it. The safety net
-    // is there to protect users from a forgotten seed; this test is what stops one being merged.
+    // repairParamsState() would otherwise repair the omission and hide it. The safety net is there
+    // to protect users from a forgotten seed; this test is what stops one being merged.
     for (const release of Object.keys(RELEASE_PARAMS_KEYS) as (keyof typeof RELEASE_PARAMS_KEYS)[]) {
+      const { version } = RELEASE_PARAMS_KEYS[release];
       const blob = buildReleaseBlob(release);
 
       applyParamsVersionMigrations(blob);
-      const unseeded = backfillMissingParamsKeys(blob);
+      const { backfilled } = repairParamsState(blob);
 
       expect(
-        unseeded,
-        `Keys missing from a genuine ${release} blob that neither carry a zod default nor get seeded by ` +
-          `the migration chain. Upgrading from ${release} would throw in zParamsState.parse() and wipe the ` +
-          `user's whole params slice. Give each key a zod default, or seed it in the _version ` +
-          `${RELEASE_PARAMS_KEYS[release].version} migration step.`
+        backfilled,
+        version === getInitialParamsState()._version
+          ? `Keys missing from a blob written at ${release}, the commit that bumped _version to ${version}. ` +
+              `A blob already at the current version matches no branch in the migration chain, so no step can ` +
+              `seed these — each needs a zod default, or upgrading throws in zParamsState.parse() and wipes ` +
+              `the user's whole params slice.`
+          : `Keys missing from a genuine ${release} blob that neither carry a zod default nor get seeded by ` +
+              `the migration chain. Upgrading from ${release} would throw in zParamsState.parse() and wipe the ` +
+              `user's whole params slice. Give each key a zod default, or seed it in the _version ` +
+              `${version} migration step.`
       ).toEqual([]);
     }
   });
@@ -680,59 +1049,120 @@ describe('paramsSliceConfig persisted state migration', () => {
     // caller in store.ts an excuse to reset the slice.
     const blob = buildReleaseBlob('v6.13.7', { positivePrompt: 'a fluffy cat', seed: 42 });
     applyParamsVersionMigrations(blob);
-    delete blob.pidSteps;
+    delete blob.krea2VaeModel;
 
-    const backfilled = backfillMissingParamsKeys(blob);
+    const { backfilled } = repairParamsState(blob);
 
-    expect(backfilled).toEqual(['pidSteps']);
-    expect(blob.pidSteps).toBe(4);
+    expect(backfilled).toEqual(['krea2VaeModel']);
+    expect(blob.krea2VaeModel).toBeNull();
     expect(() => zParamsState.parse(blob)).not.toThrow();
     expect(blob.positivePrompt).toBe('a fluffy cat');
   });
 
-  it('does not backfill over a key the persisted state already holds', () => {
-    // The net must only fill omissions — never overwrite a real persisted value, and never mask a
-    // present-but-invalid one (that still throws, same as before).
+  it('does not repair over a key the persisted state already holds', () => {
+    // The net must never overwrite a real persisted value — only fill omissions and replace values
+    // the field's own schema rejects.
     const blob = buildReleaseBlob('v6.13.7');
     applyParamsVersionMigrations(blob);
     blob.pidSteps = 2;
     blob.positivePrompt = 'a fluffy cat';
 
-    expect(backfillMissingParamsKeys(blob)).toEqual([]);
+    expect(repairParamsState(blob)).toEqual({ backfilled: [], reset: [] });
     expect(blob.pidSteps).toBe(2);
     expect(blob.positivePrompt).toBe('a fluffy cat');
   });
 
   it('leaves a defaulted key to zod rather than backfilling it from the initial state', () => {
     // The net must not pre-empt a field the schema can fill itself, or the schema's `.default()`
-    // stops being authoritative the moment it diverges from getInitialParamsState(). `pidSteps`
-    // (required) must be filled; `ernieImageScheduler` (`.default('euler')`) must not be.
+    // stops being authoritative the moment it diverges from getInitialParamsState().
+    // `krea2VaeModel` (required) must be filled; `ernieImageScheduler` (`.default('euler')`) must not.
     const blob = buildReleaseBlob('v6.13.7');
     applyParamsVersionMigrations(blob);
     delete blob.ernieImageScheduler;
-    delete blob.pidSteps;
+    delete blob.krea2VaeModel;
 
-    expect(backfillMissingParamsKeys(blob)).toEqual(['pidSteps']);
+    expect(repairParamsState(blob).backfilled).toEqual(['krea2VaeModel']);
     expect(blob.ernieImageScheduler).toBeUndefined();
     expect(zParamsState.parse(blob).ernieImageScheduler).toBe('euler');
   });
 
-  it('never backfills _version, so version detection cannot be bypassed', () => {
+  it('resets a present-but-invalid key instead of wiping the slice', () => {
+    // The other half of the net: a value that no longer satisfies its field's schema costs the user
+    // that one field, not every generation param they have. Without this, the parse at the end of
+    // migrate() throws and store.ts falls back to the initial state wholesale.
     expect(migrate).toBeDefined();
 
-    // The v0 branch keys off `!('_version' in state)` (presence) while the net keys off `undefined`
-    // (value). If the net filled `_version`, a blob carrying an explicit undefined would be stamped
-    // as current having run no migration step at all.
+    const blob = buildReleaseBlob('v6.13.7', { positivePrompt: 'a fluffy cat', seed: 42 });
+    applyParamsVersionMigrations(blob);
+    blob.pidSteps = 99; // out of the schema's 1-4 range
+    blob.scheduler = 'not_a_scheduler';
+
+    const { backfilled, reset } = repairParamsState(blob);
+
+    expect(backfilled).toEqual([]);
+    // Sorted: the net walks `zParamsState.shape`, so the raw order tracks field declaration order.
+    expect([...reset].sort()).toEqual(['pidSteps', 'scheduler']);
+    expect(blob.pidSteps).toBe(4);
+    expect(blob.scheduler).toBe(getInitialParamsState().scheduler);
+    expect(blob.positivePrompt).toBe('a fluffy cat');
+    expect(blob.seed).toBe(42);
+  });
+
+  it.each([
+    ['a dimensions object left without width/height', { rect: { x: 0, y: 0 }, aspectRatio: undefined }],
+    ['a null dimensions', null],
+  ])('repairs %s on a v0 blob rather than wiping the slice', (_label, dimensions) => {
+    // The v0 step's `state.dimensions && state.dimensions.rect` guard only stops a TypeError; what
+    // it leaves behind is a `dimensions` that the schema rejects. The net has to replace it, or the
+    // guard buys nothing and the user still loses the slice — just via ZodError instead.
+    expect(migrate).toBeDefined();
+
+    const blob = buildReleaseBlob('v6.5.1', { dimensions, positivePrompt: 'a fluffy cat', seed: 7 });
+
+    const result = migrate?.(blob) as ReturnType<typeof getInitialParamsState>;
+
+    expect(result._version).toBe(5);
+    expect(result.dimensions).toEqual(getInitialParamsState().dimensions);
+    expect(result.positivePrompt).toBe('a fluffy cat');
+    expect(result.seed).toBe(7);
+  });
+
+  it('treats a blob whose _version has no value as v0 and walks the whole chain', () => {
+    expect(migrate).toBeDefined();
+
+    // The v0 branch keys off the *value*, not `'_version' in state`. With a presence check this blob
+    // matches no branch at all, reaches the parse still at `_version: undefined` and takes the whole
+    // slice down. (A real persisted blob comes from JSON.parse and so can never hold an explicit
+    // `undefined` — this pins the invariant, not a reachable input.)
     const blob = buildReleaseBlob('v6.7.0', { _version: undefined, positivePrompt: 'a fluffy cat' });
 
     const result = migrate?.(blob) as ReturnType<typeof getInitialParamsState>;
 
-    // It is treated as a v0 blob and walked through the whole chain, not stamped v5 in place.
     expect(result._version).toBe(5);
     expect(result.positivePromptHistory).toEqual([]);
     expect(result.qwenImageVaeModel).toBeNull();
     expect(result.wanVaeModel).toBeNull();
     expect(result.positivePrompt).toBe('a fluffy cat');
+  });
+
+  it('never repairs _version, so version detection cannot be bypassed', () => {
+    // `_version` is the input to the version steps, so the net must leave it alone. If it repaired
+    // it, any blob whose version is not the current literal — including one written by a *newer*
+    // build — would be silently stamped v5 having run no step, and its stale field values would be
+    // accepted as current. Deliberately not routed through migrate(): the version steps normalise
+    // `_version` before the net ever sees it, so only calling the net directly tests the guard.
+    // The blob is otherwise complete (the current tier's key set), so `_version` is the only thing
+    // the parse below can object to.
+    const blob = buildReleaseBlob('f10d2a4f5a', { _version: 6, positivePrompt: 'a fluffy cat' });
+
+    const { backfilled, reset } = repairParamsState(blob);
+
+    expect(backfilled).toEqual([]);
+    expect(reset).toEqual([]);
+    expect(blob._version).toBe(6);
+    // Still fatal, which is the correct outcome for a downgrade: that slice really was written by a
+    // schema this build does not know.
+    expect(() => zParamsState.parse(blob)).toThrow();
   });
 
   it('does not throw on a v0 blob whose dimensions are missing', () => {
@@ -851,6 +1281,55 @@ describe('paramsSliceConfig persisted state migration', () => {
     expect(result._version).toBe(5);
     expect((result.wanVaeModel as { key: string } | null)?.key).toBe('wan-vae');
     expect(result.wanGuidanceScaleLowNoise).toBe(3.5);
+  });
+
+  it('fills the PiD fields on a v4 blob written before they existed, without the repair pass', () => {
+    expect(migrate).toBeDefined();
+
+    // The PiD fields landed a day *after* the _version 3 -> 4 bump (1aeb05bbf0 on 2026-07-29,
+    // 3f5588f21f on 2026-07-30), so dev builds from that window persist v4 blobs without them. For
+    // as long as 4 was the current version no branch in the chain could reach those blobs, and the
+    // zod defaults were the only thing standing between those users and a wiped slice. main's
+    // v4 -> v5 step now seeds them as well; the defaults are what covers the same gap on the
+    // current tier, which by definition still has no step.
+    const blob = buildReleaseBlob('1aeb05bbf0', { positivePrompt: 'a fluffy cat', seed: 42 });
+    expect('pidMode' in blob).toBe(false);
+
+    applyParamsVersionMigrations(blob);
+    expect(blob._version).toBe(5);
+
+    // Deliberately parsed directly rather than through migrate(). The repair pass would backfill
+    // these four from getInitialParamsState() to the very same values, so going through migrate()
+    // cannot tell the version steps and the zod defaults apart from the safety net catching their
+    // absence — the assertions would hold with both reverted.
+    const result = zParamsState.parse(blob);
+
+    expect(result.pidMode).toBe('off');
+    expect(result.pidDecoderModel).toBeNull();
+    expect(result.gemma2EncoderModel).toBeNull();
+    expect(result.pidSteps).toBe(4);
+    expect(result.positivePrompt).toBe('a fluffy cat');
+    expect(result.seed).toBe(42);
+  });
+
+  it('clears only the model when its base has since been removed from the schema', () => {
+    expect(migrate).toBeDefined();
+
+    // `zBaseModelType` dropped the external-API bases ('chatgpt-4o', 'imagen3', 'veo3', ...) in
+    // v6.9.0rc1, so a genuine v6.5.1 - v6.8.1 blob can hold a `model` the current schema rejects.
+    // Before the repair pass that failed zParamsState.parse() and cost the user every param; now it
+    // costs them the model selection alone.
+    const blob = buildReleaseBlob('v6.7.0', {
+      model: { key: 'm1', hash: 'h1', name: 'GPT Image', base: 'chatgpt-4o', type: 'main' },
+      positivePrompt: 'a fluffy cat',
+      seed: 42,
+    });
+
+    const result = migrate?.(blob) as ReturnType<typeof getInitialParamsState>;
+
+    expect(result.model).toBeNull();
+    expect(result.positivePrompt).toBe('a fluffy cat');
+    expect(result.seed).toBe(42);
   });
 
   it('migrates old positive prompt history entries to prompt pairs', () => {
