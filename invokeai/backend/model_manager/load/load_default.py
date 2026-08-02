@@ -328,13 +328,6 @@ class ModelLoader(ModelLoaderBase):
 
     def _should_use_fp8(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> bool:
         """Check if FP8 layerwise casting should be applied to a model."""
-        # FP8 layerwise casting stores weights as float8 and upcasts to the compute dtype on the
-        # forward pass, so it only needs float8 storage + cast (not native FP8 matmul). This works on
-        # CUDA and on Intel XPU (verified: float8_e4m3fn store + upcast to fp16/bf16 on Arc), but XPU
-        # float8 support is build-dependent, so the helper probes it rather than assuming.
-        if not _device_supports_fp8_storage(self._torch_device, self._logger):
-            return False
-
         # Z-Image has dtype mismatch issues with diffusers' layerwise casting
         # (skipped modules produce bf16, hooked modules expect fp16).
         from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
@@ -378,7 +371,16 @@ class ModelLoader(ModelLoaderBase):
         # Check default_settings.fp8_storage (Main models, ControlNet)
         if hasattr(config, "default_settings") and config.default_settings is not None:
             if hasattr(config.default_settings, "fp8_storage") and config.default_settings.fp8_storage is True:
-                return True
+                # Device support is probed last, so it runs only for a model that actually wants
+                # FP8 -- not on the first load of any tokenizer/VAE/scheduler, and not on API or
+                # install threads, where it would force XPU lazy SYCL init on a thread that never
+                # generates.
+                #
+                # FP8 layerwise casting stores weights as float8 and upcasts to the compute dtype on
+                # the forward pass, so it needs only float8 storage + cast, not native FP8 matmul.
+                # That holds on CUDA and on Intel XPU (float8_e4m3fn store + upcast to bf16/fp16 on
+                # Arc), but XPU float8 support is build-dependent, so probe rather than assume.
+                return _device_supports_fp8_storage(self._torch_device, self._logger)
 
         return False
 
