@@ -508,15 +508,19 @@ class ModelInstallService(ModelInstallServiceBase):
             while source_key in self._pending_sources:
                 self._install_condition.wait()
 
-            # A concurrent owner may have completed before waking us. Return its job even if it is already terminal.
-            new_jobs = [job for job in self._install_jobs if job.source == source and job.id not in known_job_ids]
-            if new_jobs:
-                return new_jobs[0]
-
+            # Prefer a live job. Waiting can leave this source with both a job that was registered while we waited
+            # and has since gone terminal, and a live one; returning the dead one would report a failure for a
+            # source that is actively installing.
             similar_jobs = [job for job in self._install_jobs if job.source == source and not job.in_terminal_state]
             if similar_jobs:
                 self._logger.warning(f"There is already an active install job for {source}. Not enqueuing.")
                 return similar_jobs[0]
+
+            # No live job, but a concurrent owner may have registered one for us while we waited. Return it even if
+            # it is already terminal - we asked at the same time it did, so we get the same answer.
+            new_jobs = [job for job in self._install_jobs if job.source == source and job.id not in known_job_ids]
+            if new_jobs:
+                return new_jobs[0]
             self._pending_sources.add(source_key)
 
         try:
@@ -663,8 +667,11 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def prune_jobs(self) -> None:
         """Prune all completed and errored jobs."""
-        unfinished_jobs = [x for x in self._install_jobs if not x.in_terminal_state]
-        self._install_jobs = unfinished_jobs
+        # Filter and rebind under the condition. Unlocked, a registration made by a concurrent import_model()
+        # between the two would be dropped, leaving a live install invisible to the duplicate check. Rebind rather
+        # than mutating in place so that readers already iterating the old list are not silently truncated.
+        with self._install_condition:
+            self._install_jobs = [x for x in self._install_jobs if not x.in_terminal_state]
 
     def _migrate_yaml(self) -> None:
         db_models = self.record_store.all_models()

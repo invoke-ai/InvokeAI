@@ -6,6 +6,7 @@ import gc
 import platform
 import shutil
 import threading
+import time
 import uuid
 from pathlib import Path
 from typing import Any, Dict
@@ -499,6 +500,115 @@ def test_failed_import_releases_source_reservation(
     job = mm2_installer.import_model(source)
     assert job.source == source
     assert mm2_installer.get_job_by_source(source) == [job]
+
+
+@pytest.mark.timeout(timeout=30, method="thread")
+def test_waiting_import_prefers_a_live_job_over_a_terminal_one(
+    mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig
+) -> None:
+    """A waiter can be released into a state where the source has BOTH a terminal job registered while it
+    waited and a live one. It must return the live job, not the dead one."""
+    source = URLModelSource(url=Url("https://www.test.foo/download/test_embedding.safetensors"))
+    source_key = str(source)
+    condition = mm2_installer._install_condition
+    assert mm2_installer._restore_completed_event.wait(timeout=10)
+
+    terminal_job = ModelInstallJob(
+        id=88001, source=source, config_in=ModelRecordChanges(), local_path=mm2_app_config.models_path
+    )
+    terminal_job.status = InstallStatus.ERROR
+    live_job = ModelInstallJob(
+        id=88002, source=source, config_in=ModelRecordChanges(), local_path=mm2_app_config.models_path
+    )
+    live_job.status = InstallStatus.DOWNLOADING
+
+    # Stand in for an owner that has reserved the source but not yet registered its job.
+    with condition:
+        mm2_installer._pending_sources.add(source_key)
+
+    waiter_result: list[ModelInstallJob] = []
+    waiter = threading.Thread(target=lambda: waiter_result.append(mm2_installer.import_model(source)))
+    waiter.start()
+
+    # Wait until the importer is actually parked on the condition rather than sleeping a fixed interval.
+    deadline = time.time() + 10
+    while not condition._waiters and time.time() < deadline:
+        time.sleep(0.01)
+    assert condition._waiters, "importer never parked on the install condition"
+
+    # Everything the waiter can observe happens in one critical section: an earlier attempt that ended in ERROR
+    # and a later one that is still downloading. The waiter must not see an intermediate state.
+    with condition:
+        mm2_installer._install_jobs.append(terminal_job)
+        mm2_installer._install_jobs.append(live_job)
+        mm2_installer._pending_sources.discard(source_key)
+        condition.notify_all()
+
+    waiter.join(timeout=10)
+    assert not waiter.is_alive()
+    assert waiter_result and waiter_result[0] is live_job
+
+
+@pytest.mark.timeout(timeout=30, method="thread")
+def test_prune_jobs_cannot_drop_a_concurrent_registration(
+    mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig
+) -> None:
+    """prune_jobs() filters and reassigns _install_jobs. Unlocked, an import_model() registration landing between
+    the two is dropped, leaving a live install invisible to the duplicate check."""
+    source = URLModelSource(url=Url("https://www.test.foo/download/test_embedding.safetensors"))
+    assert mm2_installer._restore_completed_event.wait(timeout=10)
+
+    entered = threading.Event()
+    release = threading.Event()
+
+    class _BlockingJob:
+        """prune_jobs() only reads .in_terminal_state; block there to suspend it mid-prune."""
+
+        id = -1
+        source = "blocking"
+
+        @property
+        def in_terminal_state(self) -> bool:
+            entered.set()
+            assert release.wait(timeout=20)
+            return True
+
+    blocking_job = _BlockingJob()
+    mm2_installer._install_jobs.append(blocking_job)  # type: ignore[arg-type]
+    importer_done = threading.Event()
+    imported: list[ModelInstallJob] = []
+
+    def _import() -> None:
+        imported.append(mm2_installer.import_model(source))
+        importer_done.set()
+
+    pruner = threading.Thread(target=mm2_installer.prune_jobs)
+    importer = threading.Thread(target=_import)
+
+    try:
+        pruner.start()
+        assert entered.wait(timeout=10)
+
+        # prune_jobs() must hold the installer lock across the whole filter-and-reassign, so no registration can
+        # land in between. Assert that directly rather than inferring it from the importer's timing.
+        lock_was_free = mm2_installer._lock.acquire(timeout=0.5)
+        if lock_was_free:
+            mm2_installer._lock.release()
+        assert not lock_was_free, "prune_jobs() ran its filter without holding the lock"
+
+        importer.start()
+        assert not importer_done.wait(timeout=1), "import_model registered a job while prune_jobs was mid-prune"
+    finally:
+        # Always release, or _BlockingJob survives in _install_jobs and blocks fixture teardown too.
+        release.set()
+        for thread in (pruner, importer):
+            if thread.ident is not None:  # an early assertion may have fired before importer.start()
+                thread.join(timeout=10)
+        if blocking_job in mm2_installer._install_jobs:
+            mm2_installer._install_jobs.remove(blocking_job)  # type: ignore[arg-type]
+
+    assert not pruner.is_alive() and not importer.is_alive()
+    assert imported and mm2_installer.get_job_by_source(source) == imported
 
 
 @pytest.mark.timeout(timeout=5, method="thread")
