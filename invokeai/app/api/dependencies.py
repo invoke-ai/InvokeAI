@@ -27,6 +27,7 @@ from invokeai.app.services.external_generation.providers import (
 from invokeai.app.services.external_generation.startup import sync_configured_external_starter_models
 from invokeai.app.services.gallery.gallery_default import SqliteGalleryService
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
+from invokeai.app.services.image_index.image_index_default import ImageIndexService, warm_up_attention
 from invokeai.app.services.image_index.image_index_records_sqlite import ImageIndexRecordsSqlite
 from invokeai.app.services.image_moves.image_moves_default import ImageMoveService
 from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
@@ -216,6 +217,7 @@ class ApiDependencies:
         project_records = ProjectRecordsSqlite(db=db)
         users = UserService(db=db)
         image_index_records = ImageIndexRecordsSqlite(db=db)
+        image_index = ImageIndexService()
 
         services = InvocationServices(
             board_image_records=board_image_records,
@@ -259,7 +261,14 @@ class ApiDependencies:
             board_video_records=board_video_records,
             gallery=gallery,
             image_index_records=image_index_records,
+            image_index=image_index,
         )
+
+        # Constructing the Invoker starts every service, including the session
+        # processor thread (which may immediately resume queue items that were
+        # pending at shutdown). Trigger torch attention's lazy, non-thread-safe
+        # kernel init while the process is still single-threaded.
+        warm_up_attention(config, logger)
 
         ApiDependencies.invoker = Invoker(services)
         configured_external_providers = {

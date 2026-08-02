@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from invokeai.app.services.external_generation.external_generation_base import ExternalGenerationServiceBase
     from invokeai.app.services.gallery.gallery_base import GalleryServiceABC
     from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
+    from invokeai.app.services.image_index.image_index_base import ImageIndexServiceBase
     from invokeai.app.services.image_index.image_index_records_base import ImageIndexRecordsBase
     from invokeai.app.services.image_moves.image_moves_default import ImageMoveService
     from invokeai.app.services.image_records.image_records_base import ImageRecordStorageBase
@@ -98,6 +99,7 @@ class InvocationServices:
         board_video_records: "BoardVideoRecordStorageBase",
         gallery: "GalleryServiceABC",
         image_index_records: "ImageIndexRecordsBase",
+        image_index: "ImageIndexServiceBase",
         image_moves: "ImageMoveService | None" = None,
     ):
         self.board_images = board_images
@@ -141,3 +143,4 @@ class InvocationServices:
         self.board_video_records = board_video_records
         self.gallery = gallery
         self.image_index_records = image_index_records
+        self.image_index = image_index

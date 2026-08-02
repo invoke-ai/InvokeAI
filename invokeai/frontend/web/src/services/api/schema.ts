@@ -17041,6 +17041,54 @@ export type components = {
             type: "img_hue_adjust";
         };
         /**
+         * ImageIndexStatusEvent
+         * @description Event model for image_index_status
+         */
+        ImageIndexStatusEvent: {
+            /**
+             * Timestamp
+             * @description The timestamp of the event
+             */
+            timestamp: number;
+            /**
+             * Total
+             * @description Number of gallery images eligible for embedding
+             */
+            total: number;
+            /**
+             * Embedded
+             * @description Number of eligible images that have an embedding
+             */
+            embedded: number;
+            /**
+             * Pending
+             * @description Number of eligible images awaiting embedding
+             */
+            pending: number;
+        };
+        /**
+         * ImageIndexUpdatedEvent
+         * @description Event model for image_index_updated.
+         *
+         *     A counts-free poke to one user whose images were just (re)embedded, so
+         *     their client can refresh views built on the index. Kept separate from
+         *     ImageIndexStatusEvent because the counts aggregate every user's images
+         *     and are therefore admin-only, while this event is safe to route to the
+         *     owning user's room.
+         */
+        ImageIndexUpdatedEvent: {
+            /**
+             * Timestamp
+             * @description The timestamp of the event
+             */
+            timestamp: number;
+            /**
+             * User Id
+             * @description The user whose images were embedded
+             */
+            user_id: string;
+        };
+        /**
          * Inverse Lerp Image
          * @description Inverse linear interpolation of all pixels of an image
          */
@@ -19267,6 +19315,10 @@ export type components = {
          *         allow_unknown_models: Allow installation of models that we are unable to identify. If enabled, models will be marked as `unknown` in the database, and will not have any metadata associated with them. If disabled, unknown models will be rejected during installation.
          *         multiuser: Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.
          *         strict_password_checking: Enforce strict password requirements. When True, passwords must contain uppercase, lowercase, and numbers. When False (default), any password is accepted but its strength (weak/moderate/strong) is reported to the user.
+         *         image_index_enabled: Maintain a semantic embedding index of gallery images, used by the image map and semantic search features.
+         *         image_index_model: Name of the installed CLIP Vision or SigLIP model used to embed gallery images. Changing the model discards embeddings computed by the previous model.
+         *         image_index_device: Set to `cpu` to compute image embeddings on the CPU with a service-local copy of the model - avoids VRAM use and lets indexing run during generations. Any other value is ignored: embeddings otherwise run on the model cache's device, pausing while generations are in progress.
+         *         image_index_batch_size: Number of images embedded per batch by the image index worker.
          *         external_alibabacloud_api_key: API key for Alibaba Cloud DashScope image generation.
          *         external_alibabacloud_base_url: Base URL override for Alibaba Cloud DashScope image generation.
          *         external_gemini_api_key: API key for Gemini image generation.
@@ -19698,6 +19750,29 @@ export type components = {
              * @default false
              */
             strict_password_checking?: boolean;
+            /**
+             * Image Index Enabled
+             * @description Maintain a semantic embedding index of gallery images, used by the image map and semantic search features.
+             * @default false
+             */
+            image_index_enabled?: boolean;
+            /**
+             * Image Index Model
+             * @description Name of the installed CLIP Vision or SigLIP model used to embed gallery images. Changing the model discards embeddings computed by the previous model.
+             * @default clip-vit-large-patch14
+             */
+            image_index_model?: string;
+            /**
+             * Image Index Device
+             * @description Set to `cpu` to compute image embeddings on the CPU with a service-local copy of the model - avoids VRAM use and lets indexing run during generations. Any other value is ignored: embeddings otherwise run on the model cache's device, pausing while generations are in progress.
+             */
+            image_index_device?: string | null;
+            /**
+             * Image Index Batch Size
+             * @description Number of images embedded per batch by the image index worker.
+             * @default 8
+             */
+            image_index_batch_size?: number;
             /**
              * External Alibabacloud Api Key
              * @description API key for Alibaba Cloud DashScope image generation.

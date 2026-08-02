@@ -2312,6 +2312,7 @@ STARTER_MODELS: list[StarterModel] = [
     t5_gguf_q3_k_s_encoder,
     t5_gguf_q6_k_encoder,
     clip_l_encoder,
+    clip_vit_l_image_encoder,
     siglip,
     flux_redux,
     llava_onevision,

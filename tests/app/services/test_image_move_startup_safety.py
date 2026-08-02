@@ -46,6 +46,7 @@ def _services(**overrides):
         "board_video_records": object(),
         "gallery": object(),
         "image_index_records": object(),
+        "image_index": object(),
         "image_moves": None,
         "system_prompt_records": object(),
     }

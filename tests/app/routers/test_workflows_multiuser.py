@@ -123,6 +123,7 @@ def mock_services() -> InvocationServices:
         board_video_records=SqliteBoardVideoRecordStorage(db=db),
         gallery=None,  # type: ignore
         image_index_records=None,  # type: ignore
+        image_index=None,  # type: ignore
     )
 
 

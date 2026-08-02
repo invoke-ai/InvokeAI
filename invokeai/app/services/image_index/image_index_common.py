@@ -11,10 +11,17 @@ class ImageIndexStatus(BaseModel):
 
     total: int = Field(description="Number of gallery images eligible for indexing")
     embedded: int = Field(description="Number of eligible images that have an embedding")
+    failed: int = Field(
+        default=0,
+        description="Eligible images that repeatedly failed to embed; excluded from pending so it can drain",
+    )
 
     @property
     def pending(self) -> int:
-        return max(0, self.total - self.embedded)
+        # Excluding failures matters: consumers treat pending == 0 as "the
+        # index is settled", and a count that can never drain would wedge
+        # them (and show an indexing spinner forever).
+        return max(0, self.total - self.embedded - self.failed)
 
 
 class ProjectionRecord(BaseModel):

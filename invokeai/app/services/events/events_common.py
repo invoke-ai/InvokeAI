@@ -869,3 +869,42 @@ class RecallParametersUpdatedEvent(QueueEventBase):
     @classmethod
     def build(cls, queue_id: str, user_id: str, parameters: dict[str, Any]) -> "RecallParametersUpdatedEvent":
         return cls(queue_id=queue_id, user_id=user_id, parameters=parameters)
+
+
+class ImageIndexEventBase(EventBase):
+    """Base class for image index events"""
+
+
+@payload_schema.register
+class ImageIndexStatusEvent(ImageIndexEventBase):
+    """Event model for image_index_status"""
+
+    __event_name__ = "image_index_status"
+
+    total: int = Field(description="Number of gallery images eligible for embedding")
+    embedded: int = Field(description="Number of eligible images that have an embedding")
+    pending: int = Field(description="Number of eligible images awaiting embedding")
+
+    @classmethod
+    def build(cls, total: int, embedded: int, pending: int) -> "ImageIndexStatusEvent":
+        return cls(total=total, embedded=embedded, pending=pending)
+
+
+@payload_schema.register
+class ImageIndexUpdatedEvent(ImageIndexEventBase):
+    """Event model for image_index_updated.
+
+    A counts-free poke to one user whose images were just (re)embedded, so
+    their client can refresh views built on the index. Kept separate from
+    ImageIndexStatusEvent because the counts aggregate every user's images
+    and are therefore admin-only, while this event is safe to route to the
+    owning user's room.
+    """
+
+    __event_name__ = "image_index_updated"
+
+    user_id: str = Field(description="The user whose images were embedded")
+
+    @classmethod
+    def build(cls, user_id: str) -> "ImageIndexUpdatedEvent":
+        return cls(user_id=user_id)
