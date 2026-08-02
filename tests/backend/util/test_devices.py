@@ -2,6 +2,7 @@
 Test abstract device class.
 """
 
+import ctypes
 import threading
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -442,6 +443,45 @@ def test_xpu_mem_get_info_fallback_derives_from_properties():
         free, total = TorchDevice.xpu_mem_get_info(torch.device("xpu"))
     assert total == 32 * gib
     assert free == 30 * gib
+
+
+def _install_fake_sysman(free: int, size: int, indices=(0,)):
+    """Point the Sysman cache at a stub that reports fixed figures for the given device indices."""
+    import invokeai.backend.util.level_zero as level_zero
+
+    def fake_get_state(_handle, state_ref):
+        state = state_ref._obj
+        state.free = free
+        state.size = size
+        return 0
+
+    lib = SimpleNamespace(zesMemoryGetState=fake_get_state)
+    level_zero._sysman_attempted = True
+    level_zero._sysman_lib = lib
+    level_zero._sysman_modules = {i: [ctypes.c_void_p(1)] for i in indices}
+    return level_zero
+
+
+def test_xpu_memory_info_resolves_an_index_less_device():
+    """An index-less device must resolve to the current device rather than returning None.
+
+    Returning None would silently skip the driver-global query and drop to the blind estimate --
+    an accuracy regression with no visible symptom.
+    """
+    from invokeai.backend.util.level_zero import reset_cache, xpu_memory_info
+
+    gib = 1 << 30
+    level_zero = _install_fake_sysman(free=5 * gib, size=8 * gib, indices=(0,))
+    try:
+        with patch.object(torch.xpu, "current_device", return_value=0, create=True):
+            assert xpu_memory_info(torch.device("xpu")) == (5 * gib, 8 * gib)
+        assert xpu_memory_info(torch.device("xpu", 0)) == (5 * gib, 8 * gib)
+        # A device Sysman has no module for yields None rather than another device's numbers.
+        assert xpu_memory_info(torch.device("xpu", 3)) is None
+        assert xpu_memory_info(torch.device("cpu")) is None
+    finally:
+        reset_cache()
+        assert level_zero._sysman_lib is None
 
 
 def test_get_device_name_degrades_instead_of_raising():
