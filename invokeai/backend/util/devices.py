@@ -6,6 +6,7 @@ import torch
 from deprecated import deprecated
 
 from invokeai.app.services.config.config_default import get_config
+from invokeai.backend.util.level_zero import xpu_device_is_integrated
 from invokeai.backend.util.logging import InvokeAILogger
 
 # legacy APIs
@@ -227,6 +228,32 @@ class TorchDevice:
         return [cls.choose_torch_device()]
 
     @classmethod
+    def _auto_generation_devices(cls) -> list[torch.device]:
+        """The device list `generation_devices: auto` expands to.
+
+        Unlike CUDA, Level Zero enumerates the CPU's integrated GPU alongside any discrete card,
+        so on the mainstream Arc configuration (iGPU + discrete Arc) `auto` would dispatch half
+        the queue to the iGPU and make it a text-encoder borrow target. Drop integrated GPUs here.
+
+        Two deliberate limits: a device whose type cannot be determined is kept (the Level Zero
+        probe returns None, and narrowing on a guess is worse than the status quo), and a machine
+        whose only GPU is integrated keeps it -- otherwise there would be nothing to generate on.
+        An explicit `generation_devices` list is unaffected, so an iGPU can still be opted into.
+        """
+        devices = cls._all_available_devices()
+        integrated = [device for device in devices if xpu_device_is_integrated(device) is True]
+        if not integrated:
+            return devices
+        remaining = [device for device in devices if device not in integrated]
+        if not remaining:
+            return devices
+        InvokeAILogger.get_logger(__name__).info(
+            f"Excluding integrated GPU(s) {[str(d) for d in integrated]} from `generation_devices: auto`. "
+            "List them explicitly in `generation_devices` to use them for generation."
+        )
+        return remaining
+
+    @classmethod
     def get_generation_devices(cls, generation_devices: Union[str, list[str], None]) -> list[torch.device]:
         """Resolve the configured `generation_devices` into a concrete, deduplicated device list.
 
@@ -243,7 +270,7 @@ class TorchDevice:
             if legacy_device != "auto":
                 device_strs: list[str] = [legacy_device]
             else:
-                device_strs = [str(device) for device in cls._all_available_devices()]
+                device_strs = [str(device) for device in cls._auto_generation_devices()]
         elif not generation_devices:
             return []
         else:
