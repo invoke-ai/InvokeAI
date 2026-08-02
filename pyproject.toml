@@ -96,6 +96,13 @@ dependencies = [
   "requests",
   "semver~=3.0.1",
   "PyWavelets",
+
+  # Semantic image index (image map / semantic search).
+  # numba is a umap-learn transitive; guard its range because numba releases
+  # tighten numpy bounds and this project pins numpy<2.0.
+  "umap-learn~=0.5.7",
+  "scikit-learn~=1.5",
+  "numba>=0.59,<0.62",
 ]
 
 [project.optional-dependencies]
