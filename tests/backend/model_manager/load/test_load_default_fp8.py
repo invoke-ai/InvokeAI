@@ -457,9 +457,47 @@ def test_device_supports_fp8_storage_xpu_probes_and_survives_failure():
         assert _device_supports_fp8_storage(torch.device("xpu")) is False
 
 
+class _RecordingTensor:
+    """Stands in for a tensor so the probe's cast sequence can be observed without a real GPU."""
+
+    def __init__(self, log: list, fail_on=None):
+        self._log = log
+        self._fail_on = fail_on
+
+    def to(self, target):
+        if self._fail_on is not None and target == self._fail_on:
+            raise RuntimeError(f"unsupported: {target}")
+        self._log.append(target)
+        return self
+
+
+def _probe_with_recorder(device: torch.device, fail_on=None) -> tuple[bool, list]:
+    log: list = []
+    with patch("torch.zeros", return_value=_RecordingTensor(log, fail_on)) as mock_zeros:
+        result = _device_supports_fp8_storage(device)
+    # The storage cast happens on CPU at runtime, so the probe must not allocate on the device.
+    assert mock_zeros.call_args.kwargs.get("device") is None
+    return result, log
+
+
 def test_device_supports_fp8_storage_xpu_true_when_probe_succeeds():
-    with patch("torch.zeros", return_value=torch.zeros(2)):
-        assert _device_supports_fp8_storage(torch.device("xpu")) is True
+    ok, _ = _probe_with_recorder(torch.device("xpu"))
+    assert ok is True
+
+
+def test_device_supports_fp8_storage_mirrors_the_runtime_cast_sequence():
+    """At runtime the storage cast is CPU-side, the fp8 tensor is copied to the device, and the
+    pre-hook upcasts there. A probe that did all three on the device would pass on a build where
+    the fp8 host->device copy or one upcast target fails, then break at forward time."""
+    ok, log = _probe_with_recorder(torch.device("xpu", 1))
+    assert ok is True
+    assert log == [torch.float8_e4m3fn, torch.device("xpu", 1), torch.bfloat16, torch.float16]
+
+
+def test_device_supports_fp8_storage_rejects_a_build_missing_bf16_upcast():
+    """compute_dtype is bf16 for Krea-2/FLUX; fp16-only support must not report True."""
+    ok, _ = _probe_with_recorder(torch.device("xpu"), fail_on=torch.bfloat16)
+    assert ok is False
 
 
 def test_device_supports_fp8_storage_does_not_cache_failures():
@@ -467,22 +505,21 @@ def test_device_supports_fp8_storage_does_not_cache_failures():
     momentarily full) must not disable FP8 for the lifetime of the process."""
     with patch("torch.zeros", side_effect=torch.OutOfMemoryError("transient")):
         assert _device_supports_fp8_storage(torch.device("xpu")) is False
-    with patch("torch.zeros", return_value=torch.zeros(2)):
-        assert _device_supports_fp8_storage(torch.device("xpu")) is True
+    ok, _ = _probe_with_recorder(torch.device("xpu"))
+    assert ok is True
 
 
 def test_device_supports_fp8_storage_probes_the_given_device():
-    """An index-less allocation would resolve through the thread's current XPU device,
-    which is not necessarily the device being loaded onto (see idle-GPU offload)."""
-    with patch("torch.zeros", return_value=torch.zeros(2)) as mock_zeros:
-        assert _device_supports_fp8_storage(torch.device("xpu", 1)) is True
-    assert mock_zeros.call_args.kwargs["device"] == torch.device("xpu", 1)
+    """An index-less copy would resolve through the thread's current XPU device, which is not
+    necessarily the device being loaded onto (see idle-GPU offload)."""
+    _, log = _probe_with_recorder(torch.device("xpu", 1))
+    assert torch.device("xpu", 1) in log
 
 
 def test_device_supports_fp8_storage_is_cached_per_device():
     """float8 support is a per-device property; one device's answer must not decide for another."""
-    with patch("torch.zeros", return_value=torch.zeros(2)):
-        assert _device_supports_fp8_storage(torch.device("xpu", 0)) is True
+    ok, _ = _probe_with_recorder(torch.device("xpu", 0))
+    assert ok is True
     # xpu:1 has not been probed, so a failing probe there must be observed, not short-circuited.
     with patch("torch.zeros", side_effect=RuntimeError("no float8 on this device")):
         assert _device_supports_fp8_storage(torch.device("xpu", 1)) is False
