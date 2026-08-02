@@ -49,6 +49,13 @@ def _is_oom_error(e: RuntimeError) -> bool:
     plain RuntimeError, which must be matched by message. XPU exhaustion likewise arrives as a
     plain RuntimeError, naming the Level Zero/UR result code (`..._OUT_OF_DEVICE_MEMORY`) rather
     than the words "out of memory" -- so it needs its own spelling to be matched here.
+
+    `out_of_host_memory` is knowingly over-broad: Level Zero returns it for driver-side resource
+    failures generally (kernel compilation, handle exhaustion), not only host allocation. Matching
+    it means a genuinely broken decode costs one wasted tiled retry before the error re-raises
+    unchanged. That is preferred over the alternative -- a real host-memory exhaustion that skips
+    the retry -- because the retry is bounded and non-destructive, while a missed OOM fails a
+    generation that would have succeeded tiled.
     """
     if isinstance(e, torch.cuda.OutOfMemoryError):
         return True
