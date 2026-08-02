@@ -35,6 +35,11 @@ from invokeai.backend.util.devices import TorchDevice
 # first decide for both.
 _FP8_STORAGE_SUPPORT: dict[str, bool] = {}
 
+# Devices whose probe failure has already been reported. Deliberately separate from the result
+# cache above: the probe is retried on every request (a failure may be transient), but repeating
+# the warning on every model load would bury the log.
+_FP8_PROBE_FAILURE_REPORTED: set[str] = set()
+
 
 def _device_supports_fp8_storage(device: torch.device, logger: Optional[Logger] = None) -> bool:
     """Whether FP8 layerwise casting (float8 weight storage + upcast) is usable on this device.
@@ -79,7 +84,8 @@ def _device_supports_fp8_storage(device: torch.device, logger: Optional[Logger] 
         stored.to(torch.bfloat16)
         stored.to(torch.float16)
     except Exception as exc:
-        if logger is not None:
+        if logger is not None and key not in _FP8_PROBE_FAILURE_REPORTED:
+            _FP8_PROBE_FAILURE_REPORTED.add(key)
             logger.warning(f"FP8 storage probe failed on {device} ({type(exc).__name__}: {exc}); not using FP8.")
         return False
 
