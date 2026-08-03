@@ -13,6 +13,10 @@ is O(seq) in memory). Measured: the same 3600-token attention drops from ~5.7 GB
 The math is otherwise identical to ``Krea2AttnProcessor`` (q/k RMSNorm, rotary embeddings, sigmoid output gate).
 """
 
+import re
+from dataclasses import dataclass
+from typing import Protocol
+
 import torch
 import torch.nn.functional as F
 from diffusers.models.embeddings import apply_rotary_emb
@@ -22,8 +26,21 @@ from torch.nn.attention import SDPBackend, sdpa_kernel
 _KREA2_SDPA_BACKENDS = [SDPBackend.EFFICIENT_ATTENTION, SDPBackend.FLASH_ATTENTION, SDPBackend.MATH]
 
 
+@dataclass
+class Krea2RegionalPromptingState:
+    """Mutable per-forward regional attention state shared by Krea-2 transformer-block processors."""
+
+    attention_mask: torch.Tensor | None = None
+
+    def set_attention_mask(self, attention_mask: torch.Tensor | None) -> None:
+        self.attention_mask = attention_mask
+
+
 class Krea2MemoryEfficientAttnProcessor:
     """Drop-in replacement for ``Krea2AttnProcessor`` that avoids the ``enable_gqa`` math fallback."""
+
+    def __init__(self, regional_prompting_state: Krea2RegionalPromptingState | None = None) -> None:
+        self.regional_prompting_state = regional_prompting_state
 
     def __call__(
         self,
@@ -32,6 +49,17 @@ class Krea2MemoryEfficientAttnProcessor:
         attention_mask: torch.Tensor | None = None,
         image_rotary_emb: tuple[torch.Tensor, torch.Tensor] | None = None,
     ) -> torch.Tensor:
+        if self.regional_prompting_state is not None and self.regional_prompting_state.attention_mask is not None:
+            regional_attention_mask = self.regional_prompting_state.attention_mask
+            if regional_attention_mask.shape != (hidden_states.shape[1], hidden_states.shape[1]):
+                raise ValueError(
+                    f"Krea-2 regional attention mask shape {tuple(regional_attention_mask.shape)} does not match "
+                    f"the transformer sequence length {hidden_states.shape[1]}."
+                )
+            attention_mask = (
+                regional_attention_mask if attention_mask is None else attention_mask & regional_attention_mask
+            )
+
         query = attn.to_q(hidden_states).unflatten(-1, (attn.num_heads, attn.head_dim))
         key = attn.to_k(hidden_states).unflatten(-1, (attn.num_kv_heads, attn.head_dim))
         value = attn.to_v(hidden_states).unflatten(-1, (attn.num_kv_heads, attn.head_dim))
@@ -62,3 +90,23 @@ class Krea2MemoryEfficientAttnProcessor:
         hidden_states = hidden_states.transpose(1, 2).flatten(2, 3)
         hidden_states = hidden_states * torch.sigmoid(gate)
         return attn.to_out[0](hidden_states)
+
+
+class _Krea2AttentionProcessorContainer(Protocol):
+    @property
+    def attn_processors(self) -> dict[str, object]: ...
+
+
+def build_krea2_attention_processors(
+    transformer: _Krea2AttentionProcessorContainer,
+    regional_prompting_state: Krea2RegionalPromptingState,
+) -> dict[str, Krea2MemoryEfficientAttnProcessor]:
+    """Build processors that apply regional masks to alternating main transformer blocks only."""
+
+    processors: dict[str, Krea2MemoryEfficientAttnProcessor] = {}
+    for name in transformer.attn_processors:
+        match = re.fullmatch(r"transformer_blocks\.(\d+)\.attn\.processor", name)
+        block_index = int(match.group(1)) if match is not None else None
+        state = regional_prompting_state if block_index is not None and block_index % 2 == 0 else None
+        processors[name] = Krea2MemoryEfficientAttnProcessor(regional_prompting_state=state)
+    return processors

@@ -1,13 +1,14 @@
 import { logger } from 'app/logging/logger';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
-import { selectCanvasMetadata } from 'features/controlLayers/store/selectors';
+import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
 import { addKrea2LoRAs } from 'features/nodes/util/graph/generation/addKrea2LoRAs';
 import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
 import { addOutpaint } from 'features/nodes/util/graph/generation/addOutpaint';
+import { addRegions } from 'features/nodes/util/graph/generation/addRegions';
 import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
@@ -74,6 +75,14 @@ export const buildKrea2Graph = async (arg: GraphBuilderArg): Promise<GraphBuilde
     type: 'krea2_text_encoder',
     id: getPrefixedId('pos_prompt'),
   });
+  const posCondCollect = g.addNode({
+    type: 'collect',
+    id: getPrefixedId('pos_cond_collect'),
+  });
+  const ipAdapterCollect = g.addNode({
+    type: 'collect',
+    id: getPrefixedId('ip_adapter_collect'),
+  });
 
   // Krea-2 supports negative conditioning only when CFG is enabled (cfg_scale > 1).
   let negCond: Invocation<'krea2_text_encoder'> | null = null;
@@ -89,6 +98,36 @@ export const buildKrea2Graph = async (arg: GraphBuilderArg): Promise<GraphBuilde
     id: getPrefixedId('seed'),
     type: 'integer',
   });
+
+  type Krea2ConditioningSource = Invocation<
+    'krea2_text_encoder' | 'krea2_conditioning_rebalance' | 'krea2_seed_variance'
+  >;
+  const addConditioningEnhancers = (conditioning: Invocation<'krea2_text_encoder'>): Krea2ConditioningSource => {
+    let conditioningSource: Krea2ConditioningSource = conditioning;
+    if (krea2RebalanceEnabled) {
+      const rebalance = g.addNode({
+        type: 'krea2_conditioning_rebalance',
+        id: getPrefixedId('krea2_rebalance'),
+        multiplier: krea2RebalanceMultiplier,
+        per_layer_weights: krea2RebalanceWeights,
+      });
+      g.addEdge(conditioningSource, 'conditioning', rebalance, 'conditioning');
+      conditioningSource = rebalance;
+    }
+    if (krea2SeedVarianceEnabled && krea2SeedVarianceStrength > 0) {
+      const seedVariance = g.addNode({
+        type: 'krea2_seed_variance',
+        id: getPrefixedId('krea2_seed_variance'),
+        strength: krea2SeedVarianceStrength,
+        randomize_percent: krea2SeedVarianceRandomizePercent,
+      });
+      g.addEdge(conditioningSource, 'conditioning', seedVariance, 'conditioning');
+      g.addEdge(seed, 'value', seedVariance, 'variance_seed');
+      conditioningSource = seedVariance;
+    }
+    return conditioningSource;
+  };
+
   const denoise = g.addNode({
     type: 'krea2_denoise',
     id: getPrefixedId('denoise_latents'),
@@ -110,41 +149,9 @@ export const buildKrea2Graph = async (arg: GraphBuilderArg): Promise<GraphBuilde
   // Optional conditioning enhancers between the text encoder and denoise. Both default OFF (params), so
   // by default the conditioning flows straight through and stock Krea-2 behaviour is unchanged. Order:
   // rebalance (scale the signal toward the prompt) first, then seed variance (perturb for variety).
-  if (krea2RebalanceEnabled) {
-    const rebalance = g.addNode({
-      type: 'krea2_conditioning_rebalance',
-      id: getPrefixedId('krea2_rebalance'),
-      multiplier: krea2RebalanceMultiplier,
-      per_layer_weights: krea2RebalanceWeights,
-    });
-    g.addEdge(posCond, 'conditioning', rebalance, 'conditioning');
-
-    if (krea2SeedVarianceEnabled && krea2SeedVarianceStrength > 0) {
-      const seedVariance = g.addNode({
-        type: 'krea2_seed_variance',
-        id: getPrefixedId('krea2_seed_variance'),
-        strength: krea2SeedVarianceStrength,
-        randomize_percent: krea2SeedVarianceRandomizePercent,
-      });
-      g.addEdge(rebalance, 'conditioning', seedVariance, 'conditioning');
-      g.addEdge(seed, 'value', seedVariance, 'variance_seed');
-      g.addEdge(seedVariance, 'conditioning', denoise, 'positive_conditioning');
-    } else {
-      g.addEdge(rebalance, 'conditioning', denoise, 'positive_conditioning');
-    }
-  } else if (krea2SeedVarianceEnabled && krea2SeedVarianceStrength > 0) {
-    const seedVariance = g.addNode({
-      type: 'krea2_seed_variance',
-      id: getPrefixedId('krea2_seed_variance'),
-      strength: krea2SeedVarianceStrength,
-      randomize_percent: krea2SeedVarianceRandomizePercent,
-    });
-    g.addEdge(posCond, 'conditioning', seedVariance, 'conditioning');
-    g.addEdge(seed, 'value', seedVariance, 'variance_seed');
-    g.addEdge(seedVariance, 'conditioning', denoise, 'positive_conditioning');
-  } else {
-    g.addEdge(posCond, 'conditioning', denoise, 'positive_conditioning');
-  }
+  const positiveConditioningSource = addConditioningEnhancers(posCond);
+  g.addEdge(positiveConditioningSource, 'conditioning', posCondCollect, 'item');
+  g.addEdge(posCondCollect, 'collection', denoise, 'positive_conditioning');
 
   if (negCond !== null) {
     g.addEdge(modelLoader, 'qwen3_vl_encoder', negCond, 'qwen3_vl_encoder');
@@ -156,6 +163,29 @@ export const buildKrea2Graph = async (arg: GraphBuilderArg): Promise<GraphBuilde
 
   // Apply any enabled Krea-2 LoRAs (reroutes transformer + Qwen3-VL encoder through the collection loader).
   addKrea2LoRAs(state, g, denoise, modelLoader, posCond, negCond);
+
+  const canvas = selectCanvasSlice(state);
+  if (manager !== null) {
+    await addRegions({
+      manager,
+      regions: canvas.regionalGuidance.entities,
+      g,
+      bbox: canvas.bbox.rect,
+      model,
+      posCond,
+      negCond,
+      posCondCollect,
+      negCondCollect: null,
+      ipAdapterCollect,
+      fluxReduxCollect: null,
+      transformRegionalPositiveConditioning: (conditioning) => {
+        assert(conditioning.type === 'krea2_text_encoder');
+        return addConditioningEnhancers(conditioning);
+      },
+    });
+  }
+  // Krea-2 does not support regional reference-image adapters.
+  g.deleteNode(ipAdapterCollect.id);
 
   const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
   assert(modelConfig.base === 'krea-2');
