@@ -1,6 +1,4 @@
-import json
 from contextlib import ExitStack
-from typing import Optional
 
 import torch
 from transformers import PreTrainedModel, PreTrainedTokenizerBase
@@ -12,7 +10,7 @@ from invokeai.app.invocations.fields import (
     InputField,
     UIComponent,
 )
-from invokeai.app.invocations.model import Mistral3EncoderField, PromptEnhancerField
+from invokeai.app.invocations.model import Mistral3EncoderField
 from invokeai.app.invocations.primitives import ErnieImageConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
@@ -20,25 +18,23 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     ErnieImageConditioningInfo,
 )
 
-# Hard ceiling on the prompt-enhancer's generation length. Upstream drives `max_new_tokens` off the
-# PE tokenizer's `model_max_length`, but that is unreliable as a bound: if the tokenizer config omits
-# it, transformers substitutes a sentinel (int(1e30)), and a rewrite that never emits EOS would hang
-# the graph. A rewritten image prompt is a few hundred tokens at most, so cap it.
-PE_MAX_NEW_TOKENS = 1024
-
 
 @invocation(
     "ernie_image_text_encoder",
     title="Prompt - ERNIE-Image",
     tags=["prompt", "conditioning", "ernie-image"],
     category="conditioning",
-    version="1.0.0",
+    version="2.0.0",
     classification=Classification.Prototype,
     idle_gpu_offloadable=True,
 )
 class ErnieImageTextEncoderInvocation(BaseInvocation):
-    """Encodes a prompt for ERNIE-Image generation, optionally rewriting it via the
-    bundled prompt-enhancer (Ministral3ForCausalLM) before tokenization.
+    """Encodes a prompt for ERNIE-Image generation.
+
+    Rewriting a prompt with the pipeline's bundled prompt-enhancer is the separate
+    `ernie_image_prompt_enhancer` node; connect its output to `prompt` to enhance. Keeping the two
+    apart is what lets this node stay `idle_gpu_offloadable` — see that node's decorator for why the
+    enhancer must not be.
     """
 
     prompt: str = InputField(description="Text prompt to encode.", ui_component=UIComponent.Textarea)
@@ -49,32 +45,9 @@ class ErnieImageTextEncoderInvocation(BaseInvocation):
         input=Input.Connection,
     )
 
-    prompt_enhancer: Optional[PromptEnhancerField] = InputField(
-        default=None,
-        title="Prompt Enhancer",
-        description="If connected and `use_prompt_enhancer` is true, the PE model rewrites the prompt before encoding.",
-        input=Input.Connection,
-    )
-
-    use_prompt_enhancer: bool = InputField(
-        default=True,
-        description="Whether to run the prompt-enhancer (no-op if no PE field is connected).",
-        title="Use Prompt Enhancer",
-    )
-
-    pe_width: int = InputField(default=1024, description="Target width passed to the prompt enhancer.")
-    pe_height: int = InputField(default=1024, description="Target height passed to the prompt enhancer.")
-    pe_temperature: float = InputField(default=0.6, ge=0.0, le=2.0)
-    pe_top_p: float = InputField(default=0.95, ge=0.0, le=1.0)
-
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ErnieImageConditioningOutput:
-        prompt = self.prompt
-        if self.use_prompt_enhancer and self.prompt_enhancer is not None:
-            prompt = self._enhance_prompt(context, prompt)
-            context.logger.info(f"ERNIE-Image PE rewrote prompt -> {prompt!r}")
-
-        prompt_embeds = self._encode_prompt(context, prompt)
+        prompt_embeds = self._encode_prompt(context, self.prompt)
         prompt_embeds = prompt_embeds.detach().to("cpu")
         conditioning_data = ConditioningFieldData(
             conditionings=[ErnieImageConditioningInfo(prompt_embeds=prompt_embeds)]
@@ -83,43 +56,6 @@ class ErnieImageTextEncoderInvocation(BaseInvocation):
         return ErnieImageConditioningOutput(
             conditioning=ErnieImageConditioningField(conditioning_name=conditioning_name)
         )
-
-    def _enhance_prompt(self, context: InvocationContext, prompt: str) -> str:
-        assert self.prompt_enhancer is not None  # checked by caller
-
-        tokenizer_info = context.models.load(self.prompt_enhancer.tokenizer)
-        lm_info = context.models.load(self.prompt_enhancer.text_encoder)
-
-        with ExitStack() as exit_stack:
-            (_, tokenizer) = exit_stack.enter_context(tokenizer_info.model_on_device())
-            (_, lm) = exit_stack.enter_context(lm_info.model_on_device())
-
-            if not isinstance(tokenizer, PreTrainedTokenizerBase):
-                raise TypeError(f"Expected tokenizer, got {type(tokenizer).__name__}")
-            if not isinstance(lm, PreTrainedModel):
-                raise TypeError(f"Expected PreTrainedModel for PE, got {type(lm).__name__}")
-
-            user_content = json.dumps(
-                {"prompt": prompt, "width": self.pe_width, "height": self.pe_height},
-                ensure_ascii=False,
-            )
-            input_text = tokenizer.apply_chat_template(
-                [{"role": "user", "content": user_content}],
-                tokenize=False,
-                add_generation_prompt=False,
-            )
-            inputs = tokenizer(input_text, return_tensors="pt").to(lm.device)
-            output_ids = lm.generate(
-                **inputs,
-                max_new_tokens=min(tokenizer.model_max_length, PE_MAX_NEW_TOKENS),
-                do_sample=self.pe_temperature != 1.0 or self.pe_top_p != 1.0,
-                temperature=self.pe_temperature,
-                top_p=self.pe_top_p,
-                pad_token_id=tokenizer.pad_token_id,
-                eos_token_id=tokenizer.eos_token_id,
-            )
-            generated_ids = output_ids[0][inputs["input_ids"].shape[1] :]
-            return tokenizer.decode(generated_ids, skip_special_tokens=True).strip()
 
     def _encode_prompt(self, context: InvocationContext, prompt: str) -> torch.Tensor:
         text_encoder_info = context.models.load(self.text_encoder.text_encoder)

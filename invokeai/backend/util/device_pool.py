@@ -28,7 +28,9 @@ milliseconds. Subsequent borrows of the same GPU hit that cache (borrow selectio
 reason), so the stall amortizes. Keep that in mind before marking a node ``idle_gpu_offloadable``:
 the cost is bounded by how long the node runs, and a node that does substantial work *per execution*
 — an autoregressive ``generate()`` loop, say — makes the stall recur on every generation instead of
-amortizing away.
+amortizing away. When a node has both kinds of work, splitting it is the way out:
+``ernie_image_prompt_enhancer`` is a separate, deliberately un-offloadable node for this reason, so
+that ``ernie_image_text_encoder`` can stay offloadable.
 """
 
 import threading

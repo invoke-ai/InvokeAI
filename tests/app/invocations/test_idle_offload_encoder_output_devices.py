@@ -136,9 +136,7 @@ def test_ideogram4_conditioning_is_saved_on_cpu(monkeypatch):
 def test_ernie_image_conditioning_is_saved_on_cpu(monkeypatch):
     from invokeai.app.invocations.ernie_image_text_encoder import ErnieImageTextEncoderInvocation
 
-    invocation = ErnieImageTextEncoderInvocation.model_construct(
-        prompt="a prompt", text_encoder=MagicMock(), prompt_enhancer=None, use_prompt_enhancer=False
-    )
+    invocation = ErnieImageTextEncoderInvocation.model_construct(prompt="a prompt", text_encoder=MagicMock())
 
     cpu_embeds = MagicMock(spec=torch.Tensor)
     gpu_embeds = _gpu_tensor_yielding(cpu_embeds)
