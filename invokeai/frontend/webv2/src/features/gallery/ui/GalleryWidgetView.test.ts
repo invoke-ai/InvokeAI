@@ -39,12 +39,6 @@ describe('mixed-media gallery translations', () => {
 
     expect(instance.t('widgets.gallery.statusChip', { count: 12 })).toBe('Gallery: 12 items');
     expect(
-      instance.t('widgets.gallery.boardMediaCountBreakdown', {
-        images: instance.t('widgets.gallery.imageCount', { count: 2 }),
-        videos: instance.t('widgets.gallery.videoCount', { count: 3 }),
-      })
-    ).toBe('2 images · 3 videos');
-    expect(
       instance.t('widgets.gallery.boardItemCounts', {
         assets: instance.t('widgets.gallery.assetCount', { count: 4 }),
         images: instance.t('widgets.gallery.imageCount', { count: 2 }),

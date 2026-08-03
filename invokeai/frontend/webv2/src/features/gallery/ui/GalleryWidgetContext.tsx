@@ -1,11 +1,12 @@
 import type { GalleryImageItem, GalleryItem, GalleryItemRef } from '@features/gallery/contracts';
 import type { GallerySettings } from '@features/gallery/core/settings';
 import type { GalleryView } from '@features/gallery/core/types';
+import type { GalleryItemsFilter } from '@features/gallery/data/queries';
 
 import { createContext, use } from 'react';
 
 import type { GalleryStateView } from './galleryStateView';
-import type { GalleryItemActions, GalleryWidgetRuntime } from './GalleryUiContext';
+import type { GalleryItemActions, GalleryWidgetProps, GalleryWidgetRuntime } from './GalleryUiContext';
 
 /**
  * Gallery-widget intents. The provider (GalleryWidgetView) is the only place
@@ -36,10 +37,18 @@ export interface GalleryActions {
 export interface GalleryWidgetContextValue {
   gallery: GalleryStateView;
   actions: GalleryActions;
+  /**
+   * The query filter the visible items came from. Shared rather than re-derived
+   * so range selection and the item list can never disagree about which query
+   * they are operating on.
+   */
+  filter: GalleryItemsFilter;
   itemActions: GalleryItemActions;
   /** The infinite window is full and the board holds images it cannot reach. */
   isWindowTruncated: boolean;
   projectName: string;
+  /** Placement, used only to scope cached viewport measurements. */
+  region: GalleryWidgetProps['region'];
   runtime: GalleryWidgetRuntime;
 }
 

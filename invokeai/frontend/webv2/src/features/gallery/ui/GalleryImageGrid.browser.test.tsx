@@ -1,5 +1,6 @@
 /* oxlint-disable react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-object-as-prop */
 import type { GalleryItem, GalleryItemRef } from '@features/gallery/contracts';
+import type { GalleryItemsFilter } from '@features/gallery/data/queries';
 import type { StreamingImageSource } from '@platform/ui/streaming-image/streamingImageSource';
 
 import { ChakraProvider } from '@chakra-ui/react';
@@ -16,6 +17,7 @@ import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { DEFAULT_GALLERY_SETTINGS } from '@features/gallery/core/settings';
 import { GalleryUiProvider, type GalleryUiAdapter } from '@features/gallery/react';
 import { isGalleryImageDragData } from '@features/gallery/utility';
+import { parseDateTokens } from '@platform/search/dateTokens';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
@@ -113,11 +115,13 @@ void i18n.use(initReactI18next).init({
             itemsAriaLabel: 'Gallery items',
             loadingBackendGallery: 'Loading gallery',
             noImagesMatch: 'No items',
+            dropMediaToUploadToBoard: 'Drop media to {{name}}',
             selectImageForPreview: 'Select {{name}} for preview',
             selectVideoForPreview: 'Select video {{name}}, duration {{duration}}, for preview',
             selectedBoardFallback: 'selected board',
             starImage: 'Star {{name}}',
             unstarImage: 'Unstar {{name}}',
+            uncategorized: 'Uncategorized',
             windowLimit: 'Limited to {{count}}',
           },
           preview: {
@@ -172,6 +176,21 @@ const board = {
   name: 'Board A',
   videoCount: 1,
 } as const;
+
+/** Mirrors how `useGalleryData` derives the filter the widget publishes on context. */
+const createFilter = (gallery: GalleryStateView): GalleryItemsFilter => {
+  const parse = parseDateTokens(gallery.searchTerm);
+
+  return {
+    boardId: gallery.selectedBoardId,
+    ...(parse.range?.from ? { createdFrom: parse.range.from } : {}),
+    ...(parse.range?.to ? { createdTo: parse.range.to } : {}),
+    galleryView: gallery.galleryView,
+    orderDir: gallery.settings.imageOrderDir,
+    searchTerm: parse.text,
+    starredFirst: gallery.settings.starredFirst,
+  };
+};
 
 const createGallery = (overrides: Partial<GalleryStateView> = {}): GalleryStateView => {
   const items = overrides.items ?? [
@@ -334,10 +353,12 @@ const Harness = ({
   );
   const contextValue: GalleryWidgetContextValue = {
     actions: createActions(),
+    filter: createFilter(gallery),
     gallery,
     itemActions: imageActionMocks,
     isWindowTruncated: false,
     projectName: 'Project',
+    region: 'right',
     runtime,
   } as unknown as GalleryWidgetContextValue;
 
@@ -349,7 +370,7 @@ const Harness = ({
             <GalleryWidgetContext value={contextValue}>
               <DndContext sensors={sensors}>
                 <DragMonitor />
-                <GalleryImageGrid layout="wide" />
+                <GalleryImageGrid />
                 {coMountPreviewSources ? (
                   <>
                     <PreviewFrame
@@ -478,7 +499,7 @@ describe('GalleryImageGrid mixed item cells', () => {
 
     expect(onDragStart).toHaveBeenCalledWith({
       data: { items: [{ kind: 'video', name: 'shared' }], kind: 'gallery-item' },
-      id: 'gallery-grid:video:shared',
+      id: 'gallery-grid#right:video:shared',
     });
 
     // dnd-kit briefly suppresses the click following a completed drag. Let
@@ -526,7 +547,7 @@ describe('GalleryImageGrid mixed item cells', () => {
         ],
         kind: 'gallery-item',
       },
-      id: 'gallery-grid:image:loaded.png',
+      id: 'gallery-grid#right:image:loaded.png',
     });
     expect(isGalleryImageDragData(drag?.data)).toBe(false);
   });
@@ -760,6 +781,22 @@ describe('GalleryImageGrid range selection', () => {
   });
 });
 
+describe('GalleryImageGrid upload drop zone', () => {
+  it('uses the localized label for the Uncategorized upload target', async () => {
+    const uncategorizedBoard = { ...board, id: 'none', kind: 'uncategorized' as const, name: '' };
+
+    await renderGallery(createGallery({ boards: [uncategorizedBoard], selectedBoardId: 'none' }));
+
+    const gridRoot = host?.querySelector('[role="list"]')?.closest('[data-scope="scroll-area"]')?.parentElement;
+    const dataTransfer = new DataTransfer();
+    dataTransfer.items.add(new File(['image'], 'image.png', { type: 'image/png' }));
+
+    await interact(() => gridRoot?.dispatchEvent(new DragEvent('dragenter', { bubbles: true, dataTransfer })));
+
+    expect(host?.textContent).toContain('Drop media to Uncategorized');
+  });
+});
+
 describe('GalleryImageGrid virtualization', () => {
   it('keeps external-store option callbacks stable across equivalent renders', async () => {
     const gallery = createGallery({ items: [createItem('video', 'clip.mp4')] });
@@ -784,8 +821,15 @@ describe('GalleryImageGrid virtualization', () => {
     );
     await vi.waitFor(() => expect(actionMocks.loadMore).toHaveBeenCalled());
 
+    // Columns follow the measured viewport width now, so pinning a row count
+    // would just re-encode the harness width. The invariant that matters is
+    // that the rows the virtualizer is asked for cover every cell exactly once.
+    const renderedRows = host?.querySelectorAll('[role="list"] [role="presentation"]').length ?? 0;
+    const renderedCells = host?.querySelectorAll('[role="listitem"]').length ?? 0;
+
     const options = mocks.virtualizerOptions.at(-1);
-    expect(options?.count).toBe(7);
+    expect(options?.count).toBe(renderedRows);
+    expect(renderedCells).toBe(items.length);
     expect(options?.overscan).toBe(4);
     expect(options?.estimateSize()).toBe(options?.estimateSize());
     expect(host?.querySelector('[role="listitem"]')).toHaveStyle({ aspectRatio: '1 / 1' });

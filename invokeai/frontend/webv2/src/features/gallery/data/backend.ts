@@ -378,7 +378,9 @@ export const listGalleryBoards = async ({
       id: 'none',
       imageCount: uncategorizedImageCount,
       kind: 'uncategorized',
-      name: 'Uncategorized',
+      // Synthesized, not stored: `kind` is the durable fact and the UI resolves
+      // the label from it, so no untranslatable name crosses the transport.
+      name: '',
       videoCount: uncategorizedVideoCount,
     },
     ...boards.filter((board) => includeArchived || !board.archived).map(mapBoard),

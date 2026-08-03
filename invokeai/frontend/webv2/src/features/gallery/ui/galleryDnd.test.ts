@@ -1,8 +1,9 @@
 import type { GalleryItem } from '@features/gallery/contracts';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
+  forwardGalleryBoardDrop,
   getGalleryBoardDropData,
   getGalleryItemDragData,
   getGalleryItemDragId,
@@ -44,6 +45,17 @@ describe('galleryDnd', () => {
     expect(getGalleryItemDragId(refs[0], 'preview-frame')).toBe('preview-frame:image:shared');
     expect(getGalleryItemDragId(refs[0], 'preview-filmstrip')).toBe('preview-filmstrip:image:shared');
     expect(getGalleryItemDragId(refs[1], 'gallery-grid')).toBe('gallery-grid:video:shared');
+  });
+
+  it("separates the same item in two surfaces, so one gallery's drag is not the other's", () => {
+    const ref = { kind: 'image', name: 'shared' } as const;
+
+    expect(getGalleryItemDragId(ref, 'gallery-grid', 'center')).toBe('gallery-grid#center:image:shared');
+    expect(getGalleryItemDragId(ref, 'gallery-grid', 'right')).not.toBe(
+      getGalleryItemDragId(ref, 'gallery-grid', 'center')
+    );
+    // Unscoped callers (the preview surfaces) keep their original ids.
+    expect(getGalleryItemDragId(ref, 'preview-frame')).toBe('preview-frame:image:shared');
   });
 
   it('recognizes only non-empty, well-formed gallery item payloads', () => {
@@ -132,5 +144,53 @@ describe('galleryDnd', () => {
   it('recognizes gallery board drop data', () => {
     expect(isGalleryBoardDropData(getGalleryBoardDropData('board-a', 'board'))).toBe(true);
     expect(isGalleryBoardDropData({ boardId: 'board-a', boardKind: 'generated', kind: 'gallery-board' })).toBe(false);
+  });
+});
+
+describe('forwardGalleryBoardDrop', () => {
+  it('forwards the full ordered mixed resolution without stripping video refs', () => {
+    const moveItemsToBoard = vi.fn();
+    const dragData = getGalleryItemDragData([
+      { kind: 'video', name: 'shared' },
+      { kind: 'image', name: 'image.png' },
+      { kind: 'image', name: 'shared' },
+    ]);
+    const loadedItems = [
+      createItem('image', 'shared', 'board-b'),
+      createItem('video', 'shared', 'board-a'),
+      createItem('image', 'image.png', 'none'),
+    ];
+
+    expect(
+      forwardGalleryBoardDrop({
+        activeData: dragData,
+        loadedItems,
+        moveItemsToBoard,
+        overData: getGalleryBoardDropData('board-b', 'board'),
+      })
+    ).toBe(true);
+    expect(moveItemsToBoard).toHaveBeenCalledOnce();
+    expect(moveItemsToBoard).toHaveBeenCalledWith(
+      [
+        { kind: 'video', name: 'shared' },
+        { kind: 'image', name: 'image.png' },
+      ],
+      'board-b'
+    );
+  });
+
+  it('reports an unresolved drop without moving anything', () => {
+    const moveItemsToBoard = vi.fn();
+    const image = createItem('image', 'image.png', 'board-a');
+
+    expect(
+      forwardGalleryBoardDrop({
+        activeData: getGalleryItemDragData([{ kind: 'image', name: image.name }]),
+        loadedItems: [image],
+        moveItemsToBoard,
+        overData: getGalleryBoardDropData('by_date:2026-07-30', 'date'),
+      })
+    ).toBe(false);
+    expect(moveItemsToBoard).not.toHaveBeenCalled();
   });
 });

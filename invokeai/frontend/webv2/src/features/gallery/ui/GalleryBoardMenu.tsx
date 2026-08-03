@@ -2,14 +2,13 @@
 import type { GalleryBoard } from '@features/gallery/core/types';
 
 import { Dialog, HStack, Icon, Input, Menu, Portal, Stack, Text } from '@chakra-ui/react';
-import { Button } from '@platform/ui';
+import { Button } from '@platform/ui/Button';
+import { MenuContent } from '@platform/ui/Menu';
 import { ArchiveIcon, DownloadIcon, PencilIcon, Trash2Icon, type LucideIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useGalleryWidget } from './GalleryWidgetContext';
-
-const MENU_CONTENT_PADDING_X = '0';
 
 export interface GalleryBoardMenuTarget {
   board: GalleryBoard;
@@ -140,17 +139,17 @@ export const GalleryBoardMenu = ({
         <Portal>
           <Menu.Positioner>
             {board && (
-              <Menu.Content minW="12rem" py="1" px={MENU_CONTENT_PADDING_X}>
+              <MenuContent minW="12rem">
                 <BoardDownloadMenuItem board={board} />
                 {isManagedBoard && (
                   <>
                     <BoardRenameMenuItem board={board} onRename={setRenameTarget} onRenameValue={setRenameValue} />
                     <BoardArchiveMenuItem archived={board.archived} boardId={board.id} />
-                    <Menu.Separator borderColor="border.subtle" />
+                    <Menu.Separator />
                     <BoardDeleteMenuItem board={board} onDelete={setDeleteTarget} />
                   </>
                 )}
-              </Menu.Content>
+              </MenuContent>
             )}
           </Menu.Positioner>
         </Portal>

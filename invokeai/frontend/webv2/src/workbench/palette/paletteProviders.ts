@@ -1,10 +1,10 @@
-import type { GalleryBoard, GalleryImage } from '@features/gallery/contracts';
 import type { GenerateModelConfig } from '@features/generation/contracts';
 import type { ModelConfig } from '@features/models';
 import type { QueueReadModel } from '@features/queue/contracts';
 import type { PromptHistoryItem } from '@workbench/projectContracts';
 import type { TFunction } from 'i18next';
 
+import { getGalleryBoardLabel, type GalleryBoard, type GalleryImage } from '@features/gallery/contracts';
 import { ALL_READABLE_BOARDS_ID, listPaletteImages } from '@features/gallery/paletteSearch';
 import { galleryBoardsOptions } from '@features/gallery/queries';
 import { focusPositivePrompt } from '@features/generation/react';
@@ -106,7 +106,7 @@ export const createBoardsProvider = ({
     return boards
       .filter(
         (board: GalleryBoard) =>
-          matchesQuery(board.name) &&
+          matchesQuery(getGalleryBoardLabel(board, t)) &&
           // Boards without a creation date (uncategorized, date virtual
           // boards) are excluded only while a date range is active.
           (query.range === undefined || isTimestampInRange(board.createdAt ?? '', query.range))
@@ -121,7 +121,7 @@ export const createBoardsProvider = ({
           selectBoard(board.id);
         },
         subtitle: t('commandPalette.providers.boardSubtitle', { count: board.imageCount }),
-        title: board.name,
+        title: getGalleryBoardLabel(board, t),
       }));
   },
 });
@@ -319,7 +319,9 @@ export const createImagesProvider = ({
         }),
         loadActiveBoards(),
       ]);
-      const boardNames = new Map(boards.map((board: GalleryBoard) => [board.id, board.name]));
+      const boardNames = new Map(
+        boards.map((board: GalleryBoard) => [board.id, getGalleryBoardLabel(board, t)] as const)
+      );
       // Images carry no prompt, so the creation date+time is the title; the time
       // keeps same-day results (the common case for 20 recents) distinguishable.
       return page.images.map<PaletteEntry>((image) => {

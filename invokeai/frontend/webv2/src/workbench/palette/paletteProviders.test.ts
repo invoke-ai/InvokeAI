@@ -1,12 +1,15 @@
+import type { GalleryBoard, GalleryImage } from '@features/gallery/contracts';
 import type { GenerationModelCatalogItem } from '@features/generation/contracts';
 import type { ModelConfig } from '@features/models';
 import type { TFunction } from 'i18next';
 
 import { describe, expect, it, vi } from 'vitest';
 
-const { ensureModelsLoaded, getModelsSnapshot } = vi.hoisted(() => ({
+const { ensureModelsLoaded, fetchQuery, getModelsSnapshot, listPaletteImages } = vi.hoisted(() => ({
   ensureModelsLoaded: vi.fn(() => Promise.resolve()),
+  fetchQuery: vi.fn(),
   getModelsSnapshot: vi.fn(),
+  listPaletteImages: vi.fn(),
 }));
 
 vi.mock('@features/models', () => ({
@@ -16,13 +19,79 @@ vi.mock('@features/models', () => ({
 }));
 
 vi.mock('@features/generation/react', () => ({ focusPositivePrompt: vi.fn() }));
+vi.mock('@features/gallery/paletteSearch', () => ({
+  ALL_READABLE_BOARDS_ID: 'all',
+  listPaletteImages: (...args: unknown[]) => listPaletteImages(...args),
+}));
+vi.mock('@platform/query/client', () => ({ queryClient: { fetchQuery: (...args: unknown[]) => fetchQuery(...args) } }));
 
-import { createModelsProvider, createPromptHistoryProvider } from './paletteProviders';
+import {
+  createBoardsProvider,
+  createImagesProvider,
+  createModelsProvider,
+  createPromptHistoryProvider,
+} from './paletteProviders';
 
 const model = (key: string, base: string, type = 'main'): ModelConfig =>
   ({ base, key, name: key, type }) as unknown as ModelConfig;
 const t = ((key: string) => key) as TFunction;
 const searchContext = () => ({ signal: new AbortController().signal });
+
+const uncategorized: GalleryBoard = {
+  archived: false,
+  assetCount: 0,
+  id: 'none',
+  imageCount: 1,
+  kind: 'uncategorized',
+  name: '',
+  videoCount: 0,
+};
+const galleryT = ((key: string) => {
+  if (key === 'widgets.gallery.uncategorized' || key === 'commandPalette.providers.uncategorized') {
+    return 'Uncategorized';
+  }
+
+  return key;
+}) as TFunction;
+
+describe('localized gallery board labels', () => {
+  it('searches and displays the localized Uncategorized board name', async () => {
+    fetchQuery.mockResolvedValue([uncategorized]);
+    const provider = createBoardsProvider({ openGalleryWidget: vi.fn(), selectBoard: vi.fn(), t: galleryT });
+
+    const entries = await provider.search({ text: 'cat' }, searchContext());
+
+    expect(entries.map((entry) => entry.title)).toEqual(['Uncategorized']);
+  });
+
+  it('uses the localized board name in image-result subtitles', async () => {
+    const image = {
+      boardId: 'none',
+      height: 512,
+      imageCategory: 'general',
+      imageName: 'image.png',
+      imageUrl: '/full/image.png',
+      queuedAt: '2026-07-30T00:00:00.000Z',
+      starred: false,
+      thumbnailUrl: '/thumb/image.png',
+      width: 512,
+    } as GalleryImage;
+    fetchQuery.mockResolvedValue([uncategorized]);
+    listPaletteImages.mockResolvedValue({ images: [image], total: 1 });
+    const provider = createImagesProvider({
+      locale: 'en',
+      openGalleryWidget: vi.fn(),
+      openPreviewWidget: vi.fn(),
+      selectBoard: vi.fn(),
+      selectImage: vi.fn(),
+      t: galleryT,
+    });
+
+    const entries = await provider.search({ text: '' }, searchContext());
+
+    expect(entries[0]?.subtitle).toBe('Uncategorized · 512×512');
+  });
+});
 
 describe('createModelsProvider', () => {
   it('lists only supported Generate models and applies one before opening the widget', async () => {

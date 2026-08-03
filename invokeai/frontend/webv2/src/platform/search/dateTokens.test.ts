@@ -23,6 +23,14 @@ describe('parseDateTokens', () => {
     });
   });
 
+  it('treats a bare relative value as ordinary text', () => {
+    expect(parseDateTokens('7d', NOW)).toEqual({
+      invalidTokens: [],
+      range: undefined,
+      text: '7d',
+    });
+  });
+
   it('parses ISO from/to and strips the tokens from text', () => {
     const parse = parseDateTokens('sunset from:2026-07-01 to:2026-07-15 boulevard', NOW);
 
