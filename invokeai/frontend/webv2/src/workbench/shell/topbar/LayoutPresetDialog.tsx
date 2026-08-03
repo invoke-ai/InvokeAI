@@ -7,10 +7,27 @@ import { Tooltip } from '@platform/ui/Tooltip';
 import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { getNextIconId } from './layoutPresetDialogModel';
 import { DEFAULT_LAYOUT_PRESET_ICON_ID, layoutPresetIconGroups } from './layoutPresetIcons';
 
 const layoutPresetIconIds = layoutPresetIconGroups.flatMap((group) => group.options.map((option) => option.id));
+
+const getNextIconId = (currentIconId: string, key: string): string | null => {
+  if (key === 'Home') {
+    return layoutPresetIconIds[0] ?? null;
+  }
+  if (key === 'End') {
+    return layoutPresetIconIds.at(-1) ?? null;
+  }
+
+  const direction = key === 'ArrowRight' || key === 'ArrowDown' ? 1 : key === 'ArrowLeft' || key === 'ArrowUp' ? -1 : 0;
+  if (direction === 0) {
+    return null;
+  }
+
+  const currentIndex = layoutPresetIconIds.indexOf(currentIconId);
+  const nextIndex = (Math.max(currentIndex, 0) + direction + layoutPresetIconIds.length) % layoutPresetIconIds.length;
+  return layoutPresetIconIds[nextIndex] ?? null;
+};
 
 /**
  * Name and icon for a custom layout preset.
@@ -78,7 +95,7 @@ export const LayoutPresetDialog = ({
   );
   const handleIconKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
-      const nextIconId = getNextIconId(layoutPresetIconIds, iconId, event.key);
+      const nextIconId = getNextIconId(iconId, event.key);
 
       if (!nextIconId) {
         return;

@@ -37,7 +37,6 @@ import {
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { getProjectSwitcherSections } from './projectSwitcherModel';
 import { projectSwitcherStore, setProjectSwitcherOpen } from './projectSwitcherStore';
 import { HIDE_BELOW_PROJECT_NAME_WIDTH } from './topbarBreakpoints';
 
@@ -45,18 +44,6 @@ const MENU_POSITIONING = { placement: 'bottom-start' } as const;
 const DELETE_HOVER_PROPS = { bg: 'bg.error', color: 'fg.error' } as const;
 const RECENT_PROJECT_LIMIT = 5;
 
-/**
- * The project you are in, and the ones you would plausibly go to next.
- *
- * The old tab strip put a variable-width run of tabs in the middle of the bar,
- * so everything beside it moved whenever a project opened or closed. A single
- * fixed-shape trigger does not, which is what lets the preset strip stay
- * optically centred.
- *
- * Open session projects come first, followed by saved recents that are not
- * already open. This preserves document/session visibility without putting a
- * variable-width tab strip back into the topbar.
- */
 export const ProjectSwitcher = () => {
   const { t } = useTranslation();
   const activeProjectId = useActiveProjectSelector((project) => project.id);
@@ -78,7 +65,6 @@ export const ProjectSwitcher = () => {
     setProjectSwitcherOpen(event.open);
 
     if (event.open) {
-      // The recents list is only worth a request when someone opens the menu.
       void refreshProjectLibrary();
     }
   }, []);
@@ -121,7 +107,7 @@ export const ProjectSwitcher = () => {
     const project = getProject(activeProjectId);
 
     if (project) {
-      exportOpenProject(project);
+      void exportOpenProject(project);
     }
   }, [activeProjectId, getProject]);
   const closeActiveProject = useCallback(() => {
@@ -142,11 +128,11 @@ export const ProjectSwitcher = () => {
     [getProject, openProject]
   );
 
-  const { open: openProjectSummaries, recent: recentSummaries } = getProjectSwitcherSections(
-    openProjects,
-    librarySummaries,
-    RECENT_PROJECT_LIMIT
-  );
+  const openProjectIds = new Set(openProjects.map((project) => project.id));
+  const openProjectSummaries = openProjects;
+  const recentSummaries = librarySummaries
+    .filter((project) => !openProjectIds.has(project.id))
+    .slice(0, RECENT_PROJECT_LIMIT);
 
   return (
     <>
@@ -160,9 +146,6 @@ export const ProjectSwitcher = () => {
             size="sm"
             variant="ghost"
           >
-            {/* Only the name truncates. The selector glyph is what makes this
-                  legible as a switcher, so it holds its width all the way down
-                  to the narrowest breakpoint. */}
             <Text css={HIDE_BELOW_PROJECT_NAME_WIDTH} fontWeight="500" minW="0" truncate>
               {activeProjectName}
             </Text>
@@ -236,8 +219,6 @@ export const ProjectSwitcher = () => {
               ) : null}
 
               <Menu.Separator />
-              {/* The `+` and folder glyphs that used to sit loose in the top
-                  right; they belong with the projects they act on. */}
               <Menu.Item value="new-project" onClick={createProject}>
                 <Icon as={PlusIcon} boxSize="3.5" />
                 <Menu.ItemText>{t('projects.newProject')}</Menu.ItemText>
@@ -302,7 +283,6 @@ const OpenProjectRow = ({
   );
 };
 
-/** One recent project. Loaded or not, selecting it lands you in it. */
 const RecentProjectRow = ({
   onOpen,
   summary,

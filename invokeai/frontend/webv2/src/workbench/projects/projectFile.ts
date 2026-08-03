@@ -11,7 +11,6 @@ import {
 import { createProject as apiCreateProject, getProject as apiGetProject, type ProjectRecordDTO } from './api';
 import { createProjectId } from './ids';
 import { upsertProjectSummary } from './library';
-import { serializeProjectDocument } from './projectDocument';
 
 /**
  * The portable project file: a versioned envelope around the same document
@@ -82,7 +81,9 @@ export const exportLibraryProject = async (
 };
 
 /** Export an open project from its live in-memory document. */
-export const exportOpenProject = (project: Project): void => {
+export const exportOpenProject = async (project: Project): Promise<void> => {
+  const { serializeProjectDocument } = await import('./projectDocument');
+
   downloadProjectFile(project.name, serializeProjectDocument(project));
 };
 

@@ -16,8 +16,6 @@ import { useTranslation } from 'react-i18next';
 
 import type { InvocationState } from './useInvocationState';
 
-import { getRoutingRelationship } from './routingPresentation';
-
 const MENU_POSITIONING = { placement: 'bottom-end' } as const;
 
 const destinationWidgetTypeIds: Record<ResultDestination, 'canvas' | 'gallery'> = {
@@ -25,20 +23,6 @@ const destinationWidgetTypeIds: Record<ResultDestination, 'canvas' | 'gallery'> 
   gallery: 'gallery',
 };
 
-/**
- * Where the next Invoke reads from and writes to — always visible, never
- * collapsed, at any width.
- *
- * It is the only thing standing between a user pressing ⌘↵ and generating from
- * a widget they were not thinking about (contract §9.5), so it cannot be the
- * control that gives way when the bar gets tight. In the common auto case it is
- * two muted glyphs on the plain button surface: a permanently accented pill on
- * a bar people stare at for hours becomes noise, and noise is not information.
- *
- * The whole control is one target that opens the menu. Splitting it so that the
- * source glyph focused its widget made a small, ambiguous hit area out of what
- * should read as a single indicator.
- */
 export const RoutingControl = ({ state }: { state: InvocationState }) => {
   const { t } = useTranslation();
   const { generation } = useWorkbenchCommands();
@@ -46,7 +30,7 @@ export const RoutingControl = ({ state }: { state: InvocationState }) => {
   const triggerIds = useMemo(() => ({ trigger: triggerId }), [triggerId]);
   const { invocation, placedTypeIds, sources } = state;
   const isLocked = invocation.sourceLocked || invocation.destinationLocked;
-  const relationship = getRoutingRelationship(invocation);
+  const relationship = isLocked ? 'link' : 'arrow';
   const hasSource = placedTypeIds.has(getWidgetTypeIdForSourceId(invocation.sourceId));
   const sourceTypeId = getWidgetTypeIdForSourceId(invocation.sourceId);
   const destinationTypeId = destinationWidgetTypeIds[invocation.destination];
@@ -76,8 +60,6 @@ export const RoutingControl = ({ state }: { state: InvocationState }) => {
             {hasSource ? (
               <WidgetIcon boxSize="3.5" color={glyphColor} icon={getWidgetById(sourceTypeId)?.manifest.icon} />
             ) : (
-              // Empty source slot rather than a hidden control: the shape of the
-              // indicator must not change when nothing is open.
               <Box borderColor="border.emphasized" borderStyle="dashed" borderWidth="1px" boxSize="3.5" rounded="xs" />
             )}
             <Icon
@@ -139,7 +121,6 @@ const SourceRadioGroup = ({
   );
 };
 
-/** One graph source. Choosing it changes routing without changing the layout. */
 const SourceRow = ({ source }: { source: GraphWidgetSource }) => (
   <Menu.RadioItem value={source.sourceId}>
     <Menu.ItemIndicator />

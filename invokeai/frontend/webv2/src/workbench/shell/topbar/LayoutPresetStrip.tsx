@@ -29,30 +29,16 @@ import { useTranslation } from 'react-i18next';
 import { LayoutPresetDialog } from './LayoutPresetDialog';
 import { openLayoutPresetDelete, openLayoutPresetEdit, openLayoutPresetManager } from './layoutPresetManagerStore';
 import { getLayoutPresetPresentation } from './layoutPresetPresentation';
-import { getPresetAccessibleName, getTopbarPresetTabs } from './layoutPresetStripModel';
 import { HIDE_BELOW_PRESET_LABEL_WIDTH } from './topbarBreakpoints';
 import { useLayoutDrift } from './useLayoutDrift';
 import { useTopbarShortcut } from './useTopbarShortcut';
 
-/** Marks the chevron inside a tab, so the tab's own click handler can tell them apart. */
 const PRESET_MENU_ATTRIBUTE = 'data-preset-menu';
 const PRESET_SCROLL_CSS = { '&::-webkit-scrollbar': { display: 'none' }, scrollbarWidth: 'none' } as const;
 
 const createCustomPresetId = (): string =>
   `custom-layout-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
-/**
- * The centre of the top bar: the layout presets as a tab strip.
- *
- * Tabs rather than a segmented control because the active preset carries its own
- * menu, and a tab is a container we can put that chevron inside — so the menu
- * belongs to the preset visually as well as conceptually, instead of floating
- * beside the group.
- *
- * A preset is an arrangement, never a widget, which is why the strip carries no
- * source or routing marker, and why a customised layout is not a separate entry
- * but the active entry with unsaved changes.
- */
 export const LayoutPresetStrip = () => {
   const { t } = useTranslation();
   const { activePreset, hasDrifted } = useLayoutDrift();
@@ -61,7 +47,7 @@ export const LayoutPresetStrip = () => {
   const [menuTarget, setMenuTarget] = useState<{ anchor: DOMRect; preset: LayoutPreset } | null>(null);
 
   const customPresets = useWorkbenchSelector((snapshot) => snapshot.account.customLayoutPresets ?? []);
-  const presets = useMemo(() => getTopbarPresetTabs(customPresets), [customPresets]);
+  const presets = useMemo(() => [...layoutPresets, ...customPresets], [customPresets]);
   const activatePreset = useMemo(
     () => createLayoutPresetActivator({ apply: layout.applyPreset, load: loadLayoutPresetWidgets }),
     [layout.applyPreset]
@@ -131,8 +117,6 @@ export const LayoutPresetStrip = () => {
           </Tabs.Root>
         </Box>
 
-        {/* Saving the live arrangement as a new preset is the one preset action
-            frequent enough to earn a place in the bar itself. */}
         <Tooltip content={t('topbar.presets.saveAsTooltip')} showArrow>
           <IconButton
             aria-label={t('topbar.presets.saveAsTooltip')}
@@ -200,9 +184,6 @@ const PresetTab = ({
     [onOpenMenu, preset]
   );
 
-  // Right-click opens the same menu, on whichever preset was under the pointer —
-  // including inactive ones, so a custom preset can be renamed or deleted
-  // without first switching into it.
   const handleContextMenu = useCallback(
     (event: MouseEvent<HTMLButtonElement>) => {
       event.preventDefault();
@@ -214,8 +195,6 @@ const PresetTab = ({
     [onOpenMenu, preset]
   );
 
-  // Keyboard parity for the chevron. Left/Right already move between tabs, so
-  // Down is free and is the usual "open this control's menu" key.
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLButtonElement>) => {
       if (!isActive || event.key !== 'ArrowDown') {
@@ -231,7 +210,7 @@ const PresetTab = ({
   return (
     <Tooltip content={`${preset.label} — ${tooltip}`} showArrow>
       <Tabs.Trigger
-        aria-label={getPresetAccessibleName(preset, showDrift, t('topbar.presets.unsaved'))}
+        aria-label={showDrift ? `${preset.label}, ${t('topbar.presets.unsaved')}` : preset.label}
         aria-keyshortcuts={isActive ? 'ArrowDown' : undefined}
         gap="1.5"
         value={preset.id}
@@ -242,13 +221,9 @@ const PresetTab = ({
         onPointerEnter={handlePreload}
       >
         <Icon as={icon} boxSize="3.5" flexShrink={0} />
-        {/* The explicit aria-label above keeps the tab named when this visible
-            text is removed from the accessibility tree below 1280px. */}
         <Text as="span" css={HIDE_BELOW_PRESET_LABEL_WIDTH}>
           {preset.label}
         </Text>
-        {/* The dot is the whole signal that a layout has diverged, so it has to
-            reach screen readers too — as part of the tab's name. */}
         {showDrift ? <DriftDot /> : null}
         {isActive ? (
           <Box
@@ -273,7 +248,6 @@ const PresetTab = ({
 
 const MENU_AFFORDANCE_HOVER_PROPS = { bg: 'bg.emphasized', color: 'fg' } as const;
 
-/** Filled accent dot: this preset is loaded, but the live layout has moved on. */
 const DriftDot = () => <Box aria-hidden="true" bg="accent.solid" boxSize="1.5" flexShrink={0} rounded="full" />;
 
 const PresetMenu = ({
@@ -360,8 +334,6 @@ const PresetMenu = ({
               </HStack>
               <Menu.Separator />
 
-              {/* Right-clicking a preset you are not in should still offer the
-                  thing left-clicking it does, the way any list does. */}
               {isActive ? null : (
                 <Menu.Item value="apply-preset" onClick={apply}>
                   <Icon as={ArrowRightIcon} boxSize="3.5" />
@@ -369,8 +341,6 @@ const PresetMenu = ({
                 </Menu.Item>
               )}
 
-              {/* Revert and Save act on the *live* layout, so they only make
-                  sense for the preset you are currently in. */}
               {isActive ? (
                 <>
                   {showDrift ? (
@@ -391,8 +361,6 @@ const PresetMenu = ({
                 </>
               ) : null}
 
-              {/* Renaming, re-iconing, and deleting belong to the preset itself,
-                  so they work on any custom preset without switching into it. */}
               {isCustom ? (
                 <>
                   <Menu.Item value="edit-preset" onClick={edit}>

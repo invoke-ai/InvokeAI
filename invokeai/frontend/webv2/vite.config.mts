@@ -11,99 +11,127 @@ const BACKEND_URL = process.env.INVOKEAI_DEV_BACKEND ?? 'http://127.0.0.1:9090';
 const BACKEND_WS_URL = BACKEND_URL.replace(/^http/, 'ws');
 const PROJECT_ROOT = fileURLToPath(new URL('.', import.meta.url));
 
+const ROUTE_SHARED_MODULES = [
+  '/features/models/data/modelLoadStore.ts',
+  '/features/models/index.ts',
+  '/features/models/ui/ModelsPage.tsx',
+  '/features/nodes/data/nodeExecutionStore.ts',
+  '/features/nodes/index.ts',
+  '/features/nodes/ui/NodesPage.tsx',
+  '/platform/browser/downloadBlob.ts',
+  '/platform/query/client.ts',
+  '/platform/time/serverTimestamp.ts',
+  '/platform/transport/connectionStore.ts',
+  '/platform/transport/socketHub.ts',
+  '/platform/ui/theme/applyTheme.ts',
+  '/workbench/components/WorkbenchSplashScreen.tsx',
+  '/workbench/hotkeys/catalog.ts',
+  '/workbench/launchpad/formatRelativeTime.ts',
+  '/workbench/palette/settingsEntryDeps.ts',
+  '/workbench/projects/ids.ts',
+  '/workbench/projects/library.ts',
+  '/workbench/projects/projectFile.ts',
+  '/workbench/settings/SettingsDialogHost.tsx',
+] as const;
+
+const WORKBENCH_TOPBAR_MODULES = [
+  '/workbench/shell/topbar/LayoutPresetAdminDialogs.tsx',
+  '/workbench/shell/topbar/LayoutPresetStrip.tsx',
+  '/workbench/shell/topbar/ProjectSwitcher.tsx',
+] as const;
+
+const matchesAnySuffix = (id: string, suffixes: readonly string[]) => suffixes.some((suffix) => id.endsWith(suffix));
+
+const getLegacyChunkName = (id: string): string | null => {
+  if (
+    matchesAnySuffix(id, [
+      '/platform/state/selectors.ts',
+      '/workbench/palette/paletteStore.ts',
+      '/platform/search/dateTokens.ts',
+      '/platform/performance/semanticReady.ts',
+    ])
+  ) {
+    return 'shared';
+  }
+
+  if (
+    matchesAnySuffix(id, [
+      '/platform/i18n/client.ts',
+      '/platform/react/useMountEffect.ts',
+      '/platform/ui/theme/system.ts',
+      '/workbench/hotkeys/resolve.ts',
+      '/workbench/settings/settingsDialogStore.ts',
+    ])
+  ) {
+    return 'shell-shared';
+  }
+
+  if (matchesAnySuffix(id, ['/features/gallery/core/items.ts', '/features/gallery/ui/galleryStateView.ts'])) {
+    return 'gallery-state';
+  }
+
+  if (!id.includes('/node_modules/')) {
+    return null;
+  }
+
+  if (
+    id.includes('/node_modules/ag-psd/') ||
+    id.includes('/node_modules/pako/') ||
+    id.includes('/node_modules/base64-js/')
+  ) {
+    return 'ag-psd';
+  }
+
+  if (id.includes('/node_modules/yaml/')) {
+    return 'yaml';
+  }
+
+  if (id.includes('/node_modules/react-icons/')) {
+    return 'react-icons';
+  }
+
+  if (id.includes('/node_modules/@xyflow/') || /\/node_modules\/d3-[^/]+\//.test(id)) {
+    return 'workflow-vendor';
+  }
+
+  if (id.includes('/node_modules/perfect-freehand/') || id.includes('/node_modules/@dnd-kit/')) {
+    return 'editor-interactions';
+  }
+
+  if (id.includes('/node_modules/@chakra-ui/') || id.includes('/node_modules/@emotion/')) {
+    return 'chakra';
+  }
+
+  return 'vendor';
+};
+
 export default defineConfig({
   base: './',
   build: {
     manifest: true,
     rollupOptions: {
       output: {
-        manualChunks(id) {
-          // Tiny first-party modules imported by both the eager shell and lazy
-          // feature chunks (store selectors, the palette's open state, the
-          // date-token parser); one shared chunk instead of a file per module.
-          if (
-            id.endsWith('/platform/state/selectors.ts') ||
-            id.endsWith('/workbench/palette/paletteStore.ts') ||
-            id.endsWith('/platform/search/dateTokens.ts') ||
-            id.endsWith('/platform/performance/semanticReady.ts')
-          ) {
-            return 'shared';
-          }
-
-          // Shell modules that both route shells reach but no longer reach
-          // *through each other*. The two top bars used to share their whole
-          // control set, so these rode along inside one chunk; now that the
-          // workbench bar owns its own controls, each would otherwise be
-          // emitted as a separate request on both routes for no byte saving.
-          if (
-            id.endsWith('/platform/i18n/client.ts') ||
-            id.endsWith('/platform/react/useMountEffect.ts') ||
-            id.endsWith('/platform/ui/theme/system.ts') ||
-            id.endsWith('/workbench/hotkeys/resolve.ts') ||
-            id.endsWith('/workbench/settings/settingsDialogStore.ts')
-          ) {
-            return 'shell-shared';
-          }
-
-          // Mixed-gallery item helpers cross the eager editor shell and its
-          // lazy Gallery/Preview chunks. Keep them with the already-eager
-          // gallery state projection instead of emitting one extra request.
-          if (
-            id.endsWith('/features/gallery/core/items.ts') ||
-            id.endsWith('/features/gallery/ui/galleryStateView.ts')
-          ) {
-            return 'gallery-state';
-          }
-
-          if (!id.includes('/node_modules/')) {
-            return undefined;
-          }
-
-          // ag-psd (+ its only dependents pako/base64-js) is loaded LAZILY via a
-          // dynamic `import('ag-psd')` at PSD-export time. Keep it in its own chunk
-          // so it never lands in the eagerly-preloaded `vendor` bundle — otherwise
-          // the manualChunks catch-all below would pull it into the initial load.
-          if (
-            id.includes('/node_modules/ag-psd/') ||
-            id.includes('/node_modules/pako/') ||
-            id.includes('/node_modules/base64-js/')
-          ) {
-            return 'ag-psd';
-          }
-
-          // Same story as ag-psd: `yaml` is reached only through a dynamic
-          // `import('yaml')` in wildcard import/export, and the catch-all below
-          // would otherwise make a parser nobody has asked for part of the
-          // initial load.
-          if (id.includes('/node_modules/yaml/')) {
-            return 'yaml';
-          }
-
-          if (id.includes('/node_modules/react-icons/')) {
-            return 'react-icons';
-          }
-
-          // The Workflow editor's graph canvas. XYFlow and the d3 modules it
-          // pulls in are reachable only from the Workflow widget, which is
-          // lazy — but the `vendor` catch-all below made them launchpad-eager.
-          if (id.includes('/node_modules/@xyflow/') || /\/node_modules\/d3-[^/]+\//.test(id)) {
-            return 'workflow-vendor';
-          }
-
-          // Editor-only pointer and drag interaction libraries: perfect-freehand
-          // belongs to Canvas stroke geometry, dnd-kit to widget and tab
-          // reordering. Neither is reachable from the launchpad.
-          if (id.includes('/node_modules/perfect-freehand/') || id.includes('/node_modules/@dnd-kit/')) {
-            return 'editor-interactions';
-          }
-
-          if (id.includes('/node_modules/@chakra-ui/') || id.includes('/node_modules/@emotion/')) {
-            return 'chakra';
-          }
-
-          return 'vendor';
+        codeSplitting: {
+          groups: [
+            {
+              includeDependenciesRecursively: false,
+              name: 'route-shared',
+              priority: 30,
+              test: (id) => matchesAnySuffix(id, ROUTE_SHARED_MODULES),
+            },
+            {
+              includeDependenciesRecursively: false,
+              name: 'workbench-topbar',
+              priority: 30,
+              test: (id) => matchesAnySuffix(id, WORKBENCH_TOPBAR_MODULES),
+            },
+            {
+              name: getLegacyChunkName,
+            },
+          ],
         },
       },
+      preserveEntrySignatures: 'allow-extension',
     },
   },
   plugins: [

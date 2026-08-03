@@ -1,5 +1,3 @@
-import { builtInLayoutPresetDescriptors } from '@workbench/layoutPresets';
-
 import type { HotkeyCategory, HotkeyDefinition } from './types';
 
 const categoryScopes = {
@@ -145,7 +143,9 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('app', 'invokeFront', ['mod+shift+enter']),
   hotkey('app', 'openProjectSwitcher', ['mod+p']),
   hotkey('app', 'saveLayoutPreset', []),
-  ...builtInLayoutPresetDescriptors.map(({ defaultKeys, hotkeyId }) => hotkey('app', hotkeyId, [...defaultKeys])),
+  hotkey('app', 'selectComposePreset', ['alt+1']),
+  hotkey('app', 'selectEditPreset', ['alt+2']),
+  hotkey('app', 'selectAutomatePreset', ['alt+3']),
   hotkey('app', 'cancelQueueItem', ['shift+x']),
   hotkey('app', 'clearQueue', ['mod+shift+x']),
   hotkey('app', 'selectGenerateTab', ['1']),
