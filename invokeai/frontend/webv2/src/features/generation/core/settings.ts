@@ -68,6 +68,10 @@ export const DEFAULT_NEGATIVE_PROMPT_HEIGHT_PX = 56;
 export const MIN_POSITIVE_PROMPT_HEIGHT_PX = 96;
 export const MAX_POSITIVE_PROMPT_HEIGHT_PX = 360;
 export const DEFAULT_POSITIVE_PROMPT_HEIGHT_PX = 96;
+export const DEFAULT_HIDIFFUSION_T1_RATIO = 0.4;
+export const DEFAULT_HIDIFFUSION_T2_RATIO = 0;
+export const MIN_HIDIFFUSION_T1_RATIO = 0.1;
+export const MAX_HIDIFFUSION_RATIO = 1;
 
 export const DEFAULT_LORA_WEIGHT_CONFIG = {
   coarseStep: 0.05,
@@ -661,6 +665,25 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
     cfgScale: values.cfgScale as number,
     clipSkip: hasFiniteNumber(values, 'clipSkip') ? (values.clipSkip as number) : 0,
     colorCompensation: typeof values.colorCompensation === 'boolean' ? values.colorCompensation : false,
+    hiDiffusionEnabled: typeof values.hiDiffusionEnabled === 'boolean' ? values.hiDiffusionEnabled : false,
+    hiDiffusionRauNetEnabled:
+      typeof values.hiDiffusionRauNetEnabled === 'boolean' ? values.hiDiffusionRauNetEnabled : true,
+    hiDiffusionWindowAttentionEnabled:
+      typeof values.hiDiffusionWindowAttentionEnabled === 'boolean' ? values.hiDiffusionWindowAttentionEnabled : true,
+    hiDiffusionT1Ratio: getClampedNumber(
+      values,
+      'hiDiffusionT1Ratio',
+      MIN_HIDIFFUSION_T1_RATIO,
+      MAX_HIDIFFUSION_RATIO,
+      DEFAULT_HIDIFFUSION_T1_RATIO
+    ),
+    hiDiffusionT2Ratio: getClampedNumber(
+      values,
+      'hiDiffusionT2Ratio',
+      0,
+      MAX_HIDIFFUSION_RATIO,
+      DEFAULT_HIDIFFUSION_T2_RATIO
+    ),
     dynamicPromptsCombinatorial:
       typeof values.dynamicPromptsCombinatorial === 'boolean' ? values.dynamicPromptsCombinatorial : true,
     dynamicPromptsMaxPrompts: sanitizeMaxPrompts(values.dynamicPromptsMaxPrompts),
@@ -774,6 +797,15 @@ export const isGenerateSettings = (values: unknown): values is GenerateSettings 
     hasFiniteNumber(values, 'aspectRatioValue') &&
     hasFiniteNumber(values, 'clipSkip') &&
     typeof values.colorCompensation === 'boolean' &&
+    typeof values.hiDiffusionEnabled === 'boolean' &&
+    typeof values.hiDiffusionRauNetEnabled === 'boolean' &&
+    typeof values.hiDiffusionWindowAttentionEnabled === 'boolean' &&
+    hasFiniteNumber(values, 'hiDiffusionT1Ratio') &&
+    (values.hiDiffusionT1Ratio as number) >= MIN_HIDIFFUSION_T1_RATIO &&
+    (values.hiDiffusionT1Ratio as number) <= MAX_HIDIFFUSION_RATIO &&
+    hasFiniteNumber(values, 'hiDiffusionT2Ratio') &&
+    (values.hiDiffusionT2Ratio as number) >= 0 &&
+    (values.hiDiffusionT2Ratio as number) <= MAX_HIDIFFUSION_RATIO &&
     typeof values.negativePromptEnabled === 'boolean' &&
     hasFiniteNumber(values, 'negativePromptHeightPx') &&
     hasFiniteNumber(values, 'positivePromptHeightPx') &&

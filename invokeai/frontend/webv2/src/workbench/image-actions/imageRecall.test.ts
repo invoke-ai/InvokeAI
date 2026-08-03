@@ -45,6 +45,11 @@ const createValues = (overrides: Partial<GenerateWidgetValues> = {}): GenerateWi
   clipLEmbedModel: null,
   clipSkip: 0,
   colorCompensation: false,
+  hiDiffusionEnabled: false,
+  hiDiffusionRauNetEnabled: true,
+  hiDiffusionT1Ratio: 0.4,
+  hiDiffusionT2Ratio: 0,
+  hiDiffusionWindowAttentionEnabled: true,
   dynamicPromptsCombinatorial: true,
   dynamicPromptsMaxPrompts: 100,
   dynamicPromptsSampleSeed: 0,
@@ -426,6 +431,56 @@ describe('image recall', () => {
     expect(result?.values.shouldRandomizeSeed).toBe(false);
     expect(result?.values.positivePrompt).toBe('a recalled prompt');
     expect(result?.fields).not.toContain('seed');
+  });
+
+  it.each(['all', 'remix'] as const)('recalls valid HiDiffusion metadata for supported models with %s', (kind) => {
+    const result = buildImageRecallSettings({
+      currentValues: createValues(),
+      image,
+      kind,
+      metadata: {
+        hidiffusion: true,
+        hidiffusion_raunet: false,
+        hidiffusion_t1_ratio: 0.35,
+        hidiffusion_t2_ratio: 0.15,
+        hidiffusion_window_attn: true,
+        model: { key: sd1Model.key },
+      },
+      models: [sd1Model],
+      supportedModels: [sd1Model],
+      vaeModels: [],
+    });
+
+    expect(result?.values).toMatchObject({
+      hiDiffusionEnabled: true,
+      hiDiffusionRauNetEnabled: false,
+      hiDiffusionT1Ratio: 0.35,
+      hiDiffusionT2Ratio: 0.15,
+      hiDiffusionWindowAttentionEnabled: true,
+    });
+    expect(result?.fields).toContain('hiDiffusion');
+  });
+
+  it('ignores HiDiffusion metadata for unsupported models', () => {
+    const result = buildImageRecallSettings({
+      currentValues: createValues({ model: animaModel, modelKey: animaModel.key }),
+      image,
+      kind: 'all',
+      metadata: {
+        hidiffusion: true,
+        hidiffusion_raunet: false,
+        hidiffusion_t1_ratio: 0.35,
+        hidiffusion_t2_ratio: 0.15,
+        hidiffusion_window_attn: true,
+        positive_prompt: 'keep the recall non-empty',
+      },
+      models: [],
+      supportedModels: [animaModel],
+      vaeModels: [],
+    });
+
+    expect(result?.values.hiDiffusionEnabled).toBe(false);
+    expect(result?.fields).not.toContain('hiDiffusion');
   });
 
   it('uses actual image dimensions for Use Size', () => {

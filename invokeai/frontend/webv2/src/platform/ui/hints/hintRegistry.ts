@@ -35,6 +35,11 @@ export const FEATURE_HINTS = {
   creativity: {},
   guidance: {},
   height: {},
+  hidiffusion: { href: 'https://github.com/megvii-research/HiDiffusion' },
+  hidiffusionRauNet: { href: 'https://github.com/megvii-research/HiDiffusion' },
+  hidiffusionT1Ratio: { href: 'https://github.com/megvii-research/HiDiffusion' },
+  hidiffusionT2Ratio: { href: 'https://github.com/megvii-research/HiDiffusion' },
+  hidiffusionWindowAttn: { href: 'https://github.com/megvii-research/HiDiffusion' },
   imageInfluence: {
     href: 'https://support.invoke.ai/support/solutions/articles/151000094998-image-to-image',
   },

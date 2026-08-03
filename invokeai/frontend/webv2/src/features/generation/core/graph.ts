@@ -304,6 +304,7 @@ const buildSDGraph = (
   const activeLoras = getActiveCompatibleLoras(settings, model);
   const scheduler = coerceSchedulerForGraph(model, settings.scheduler);
   const colorCompensation = settings.colorCompensation ? 'SDXL' : 'None';
+  const supportsHiDiffusion = model.base === 'sd-1' || model.base === 'sdxl';
 
   const positivePrompt = addNode(graph, { id: 'positive_prompt', type: 'string' });
   const negativePrompt = addNode(graph, { id: 'negative_prompt', type: 'string' });
@@ -327,6 +328,19 @@ const buildSDGraph = (
     denoising_end: 1,
     denoising_start: 0,
     id: 'denoise_latents',
+    ...(supportsHiDiffusion
+      ? {
+          hidiffusion: settings.hiDiffusionEnabled,
+          hidiffusion_raunet: settings.hiDiffusionRauNetEnabled,
+          hidiffusion_window_attn: settings.hiDiffusionWindowAttentionEnabled,
+          ...(settings.hiDiffusionEnabled
+            ? {
+                hidiffusion_t1_ratio: settings.hiDiffusionT1Ratio,
+                hidiffusion_t2_ratio: settings.hiDiffusionT2Ratio,
+              }
+            : {}),
+        }
+      : {}),
     scheduler,
     steps: settings.steps,
     type: 'denoise_latents',
@@ -418,6 +432,15 @@ const buildSDGraph = (
   });
 
   addMetadata(graph, output, settings, model, model.base === 'sdxl' ? 'sdxl_txt2img' : 'txt2img', projectSettings, {
+    ...(supportsHiDiffusion
+      ? {
+          hidiffusion: settings.hiDiffusionEnabled,
+          hidiffusion_raunet: settings.hiDiffusionRauNetEnabled,
+          hidiffusion_t1_ratio: settings.hiDiffusionT1Ratio,
+          hidiffusion_t2_ratio: settings.hiDiffusionT2Ratio,
+          hidiffusion_window_attn: settings.hiDiffusionWindowAttentionEnabled,
+        }
+      : {}),
     scheduler,
   });
   addReferenceImageMetadata(graph, output, settings);

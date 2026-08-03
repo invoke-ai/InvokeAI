@@ -22,6 +22,8 @@ import {
   clampDimension,
   deriveAspectRatioId,
   normalizeReferenceImages,
+  MAX_HIDIFFUSION_RATIO,
+  MIN_HIDIFFUSION_T1_RATIO,
   SEED_MAX,
 } from '@features/generation/settings';
 
@@ -55,6 +57,7 @@ type RecalledField =
   | 'cfg'
   | 'scheduler'
   | 'seamless'
+  | 'hiDiffusion'
   | 'clipSkip'
   | 'components'
   | 'referenceImages';
@@ -179,6 +182,40 @@ const getClipSkip = (metadata: unknown): number | null => {
 
 const getClipSkipMax = (model: GenerateModelConfig): number | null =>
   getGenerationUiPolicy(model, { cfgScale: 1 }).clipSkipMax;
+
+const getHiDiffusionPatch = (
+  metadata: unknown,
+  model: GenerateModelConfig
+): Partial<
+  Pick<
+    GenerateWidgetValues,
+    | 'hiDiffusionEnabled'
+    | 'hiDiffusionRauNetEnabled'
+    | 'hiDiffusionT1Ratio'
+    | 'hiDiffusionT2Ratio'
+    | 'hiDiffusionWindowAttentionEnabled'
+  >
+> => {
+  if (!getGenerationUiPolicy(model, { cfgScale: 1 }).hiDiffusionVisible) {
+    return {};
+  }
+
+  const enabled = getBoolean(metadata, 'hidiffusion');
+  const rauNetEnabled = getBoolean(metadata, 'hidiffusion_raunet');
+  const windowAttentionEnabled = getBoolean(metadata, 'hidiffusion_window_attn');
+  const t1Ratio = getNumber(metadata, 'hidiffusion_t1_ratio');
+  const t2Ratio = getNumber(metadata, 'hidiffusion_t2_ratio');
+
+  return {
+    ...(enabled !== null ? { hiDiffusionEnabled: enabled } : {}),
+    ...(rauNetEnabled !== null ? { hiDiffusionRauNetEnabled: rauNetEnabled } : {}),
+    ...(windowAttentionEnabled !== null ? { hiDiffusionWindowAttentionEnabled: windowAttentionEnabled } : {}),
+    ...(t1Ratio !== null && t1Ratio >= MIN_HIDIFFUSION_T1_RATIO && t1Ratio <= MAX_HIDIFFUSION_RATIO
+      ? { hiDiffusionT1Ratio: t1Ratio }
+      : {}),
+    ...(t2Ratio !== null && t2Ratio >= 0 && t2Ratio <= MAX_HIDIFFUSION_RATIO ? { hiDiffusionT2Ratio: t2Ratio } : {}),
+  };
+};
 
 const getImageSize = (
   image: GalleryImage,
@@ -398,6 +435,7 @@ export const getImageRecallCapabilities = ({
   const clipSkipModel = supportedMetadataModel ?? currentValues.model;
   const hasVae = getMetadataVae(metadata, clipSkipModel, vaeModels) !== undefined;
   const hasClipSkip = getSupportedClipSkip(metadata, clipSkipModel) !== null;
+  const hasHiDiffusion = Object.keys(getHiDiffusionPatch(metadata, clipSkipModel)).length > 0;
   const hasSeed = getSeed(metadata) !== null;
   const hasPrompts = hasPrompt(metadata);
   const hasSize = hasMetadataSize(metadata, currentValues.model);
@@ -412,11 +450,20 @@ export const getImageRecallCapabilities = ({
     hasSeed ||
     hasSize ||
     hasSettings ||
+    hasHiDiffusion ||
     hasClipSkip ||
     hasComponents ||
     hasReferenceImages;
   const hasNonSeedMetadata =
-    hasModel || hasVae || hasPrompts || hasSize || hasSettings || hasClipSkip || hasComponents || hasReferenceImages;
+    hasModel ||
+    hasVae ||
+    hasPrompts ||
+    hasSize ||
+    hasSettings ||
+    hasHiDiffusion ||
+    hasClipSkip ||
+    hasComponents ||
+    hasReferenceImages;
 
   return {
     all: hasAnyMetadata,
@@ -567,6 +614,13 @@ export const buildImageRecallSettings = ({
         ...(seamlessYAxis !== null ? { seamlessYAxis } : {}),
       };
       fields.push('seamless');
+    }
+
+    const hiDiffusionPatch = getHiDiffusionPatch(metadata, values.model);
+
+    if (Object.keys(hiDiffusionPatch).length > 0) {
+      values = { ...values, ...hiDiffusionPatch };
+      fields.push('hiDiffusion');
     }
   }
 

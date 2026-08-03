@@ -39,6 +39,8 @@ import {
 } from './pid';
 import {
   clampDimension,
+  DEFAULT_HIDIFFUSION_T1_RATIO,
+  DEFAULT_HIDIFFUSION_T2_RATIO,
   DEFAULT_IDEOGRAM4_SAMPLER_PRESET,
   DEFAULT_KREA2_REBALANCE_MULTIPLIER,
   DEFAULT_KREA2_REBALANCE_WEIGHTS,
@@ -352,6 +354,7 @@ export interface GenerationModelPolicy {
     clipSkipMax: number | null;
     cfgRescaleVisible: boolean;
     colorCompensationVisible: boolean;
+    hiDiffusionVisible: boolean;
     seamlessVisible: boolean;
     sdVaeVisible: boolean;
     vaePrecisionVisible: boolean;
@@ -525,6 +528,7 @@ export const getGenerationUiPolicy = (
     clipSkipMax: config.ui.clipSkipMax ?? null,
     cfgRescaleVisible: config.ui.cfgRescale,
     colorCompensationVisible: config.ui.colorCompensation,
+    hiDiffusionVisible: model?.type === 'main' && (model.base === 'sd-1' || model.base === 'sdxl'),
     seamlessVisible: config.ui.seamless,
     sdVaeVisible: config.ui.sdVaeOverride,
     vaePrecisionVisible: config.ui.vaePrecision,
@@ -620,6 +624,11 @@ export const getDefaultGenerateSettings = (model?: GenerateModelConfig): Generat
     cfgScale: defaults.cfgScale,
     clipSkip: 0,
     colorCompensation: false,
+    hiDiffusionEnabled: false,
+    hiDiffusionRauNetEnabled: true,
+    hiDiffusionWindowAttentionEnabled: true,
+    hiDiffusionT1Ratio: DEFAULT_HIDIFFUSION_T1_RATIO,
+    hiDiffusionT2Ratio: DEFAULT_HIDIFFUSION_T2_RATIO,
     dynamicPromptsCombinatorial: true,
     dynamicPromptsMaxPrompts: DYNAMIC_PROMPTS_DEFAULT_MAX_PROMPTS,
     dynamicPromptsSampleSeed: 0,
@@ -1460,6 +1469,11 @@ const getSettingsWithCompatibleModelSelections = (
   if (!uiPolicy.colorCompensationVisible && nextSettings.colorCompensation) {
     nextSettings.colorCompensation = false;
     addClearedLabel(clearedLabels, 'Color compensation');
+  }
+
+  if (!uiPolicy.hiDiffusionVisible && nextSettings.hiDiffusionEnabled) {
+    nextSettings.hiDiffusionEnabled = false;
+    addClearedLabel(clearedLabels, 'HiDiffusion');
   }
 
   if (!uiPolicy.seamlessVisible && (nextSettings.seamlessXAxis || nextSettings.seamlessYAxis)) {

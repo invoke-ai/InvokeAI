@@ -191,6 +191,12 @@ export interface GenerateSettings {
   scheduler: string;
   clipSkip: number;
   colorCompensation: boolean;
+  /** Enables HiDiffusion high-resolution denoising for supported SD models. */
+  hiDiffusionEnabled: boolean;
+  hiDiffusionRauNetEnabled: boolean;
+  hiDiffusionWindowAttentionEnabled: boolean;
+  hiDiffusionT1Ratio: number;
+  hiDiffusionT2Ratio: number;
   seed: number;
   shouldRandomizeSeed: boolean;
   seamlessXAxis: boolean;
