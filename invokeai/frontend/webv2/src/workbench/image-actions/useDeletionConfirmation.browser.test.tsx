@@ -142,7 +142,11 @@ describe('useDeletionConfirmation', () => {
     await act(() => {
       request = confirmationRef.current!.requestDeletionConfirmation(imageRefs, executeDeletion);
     });
-    await vi.waitFor(() => expect(document.querySelector('[role="alertdialog"][data-state="open"]')).not.toBeNull());
+    await vi.waitFor(() =>
+      expect(document.querySelector('[role="alertdialog"][data-state="open"]')?.contains(document.activeElement)).toBe(
+        true
+      )
+    );
     await act(() => userEvent.keyboard('{Escape}'));
     await vi.waitFor(() => expect(document.querySelector('[role="alertdialog"][data-state="open"]')).toBeNull());
     await request;
