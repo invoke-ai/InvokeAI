@@ -20,6 +20,7 @@ from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.image_files.image_files_common import ImageFileNotFoundException
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
 from invokeai.app.util.dynamicprompts import find_missing_wildcards
+from invokeai.app.util.misc import get_random_seed
 from invokeai.backend.llava_onevision_pipeline import LlavaOnevisionPipeline
 from invokeai.backend.model_manager.taxonomy import ModelType
 from invokeai.backend.text_llm_pipeline import DEFAULT_SYSTEM_PROMPT, ProgressCallback, TextLLMPipeline
@@ -166,6 +167,7 @@ def _run_expand_prompt(
             prompt=prompt,
             system_prompt=system_prompt or DEFAULT_SYSTEM_PROMPT,
             max_new_tokens=max_tokens,
+            seed=get_random_seed(),
             device=model_device,
             dtype=TorchDevice.choose_torch_dtype(),
             progress_callback=progress_callback,

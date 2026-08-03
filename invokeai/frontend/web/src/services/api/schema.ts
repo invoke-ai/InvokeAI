@@ -36228,6 +36228,12 @@ export type components = {
              */
             max_tokens?: number;
             /**
+             * Seed
+             * @description Seed for random number generation
+             * @default 0
+             */
+            seed?: number;
+            /**
              * type
              * @default text_llm
              * @constant
@@ -36288,6 +36294,12 @@ export type components = {
              * @default 300
              */
             max_tokens?: number;
+            /**
+             * Seed
+             * @description Seed for random number generation
+             * @default 0
+             */
+            seed?: number;
             /**
              * type
              * @default text_llm_with_preset

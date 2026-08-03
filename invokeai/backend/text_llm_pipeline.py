@@ -4,6 +4,7 @@ import time
 from typing import Callable
 
 import torch
+from torch.overrides import TorchFunctionMode
 from transformers import PreTrainedModel, PreTrainedTokenizerBase, TextIteratorStreamer
 
 DEFAULT_SYSTEM_PROMPT = (
@@ -29,6 +30,37 @@ STREAM_TIMEOUT = 120.0
 PROGRESS_EMIT_INTERVAL = 0.1
 
 
+class _SeededMultinomialMode(TorchFunctionMode):
+    """Use invocation-local generators for multinomial sampling in this thread."""
+
+    def __init__(self, seed: int):
+        self._seed = seed
+        self._generators: dict[torch.device, torch.Generator] = {}
+
+    def _get_generator(self, device: torch.device) -> torch.Generator:
+        generator_device = torch.device("cpu") if device.type == "mps" else device
+        if generator_device not in self._generators:
+            self._generators[generator_device] = torch.Generator(device=generator_device).manual_seed(self._seed)
+        return self._generators[generator_device]
+
+    def __torch_function__(self, func, types, args=(), kwargs=None):
+        kwargs = dict(kwargs or {})
+        if func is not torch.multinomial or kwargs.get("generator") is not None:
+            return func(*args, **kwargs)
+
+        probabilities = args[0] if args else kwargs["input"]
+        generator = self._get_generator(probabilities.device)
+        kwargs["generator"] = generator
+        if probabilities.device.type != "mps":
+            return func(*args, **kwargs)
+
+        if args:
+            args = (probabilities.cpu(), *args[1:])
+        else:
+            kwargs["input"] = probabilities.cpu()
+        return func(*args, **kwargs).to(probabilities.device)
+
+
 class TextLLMPipeline:
     """A wrapper for a causal language model + tokenizer for text generation."""
 
@@ -41,6 +73,7 @@ class TextLLMPipeline:
         prompt: str,
         system_prompt: str = DEFAULT_SYSTEM_PROMPT,
         max_new_tokens: int = 300,
+        seed: int = 0,
         device: torch.device = torch.device("cpu"),
         dtype: torch.dtype = torch.float16,
         progress_callback: ProgressCallback | None = None,
@@ -91,7 +124,8 @@ class TextLLMPipeline:
 
         def _generate() -> None:
             try:
-                self._model.generate(**generation_kwargs)
+                with _SeededMultinomialMode(seed):
+                    self._model.generate(**generation_kwargs)
             except BaseException as e:
                 generation_error.append(e)
                 # transformers only calls streamer.end() on the normal exit of the

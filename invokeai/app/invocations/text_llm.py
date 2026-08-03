@@ -10,6 +10,7 @@ from invokeai.app.services.system_prompt_records.system_prompt_records_common im
     SystemPromptNotFoundError,
     SystemPromptRecordDTO,
 )
+from invokeai.app.util.misc import SEED_MAX
 from invokeai.backend.model_manager.taxonomy import ModelType
 from invokeai.backend.text_llm_pipeline import DEFAULT_SYSTEM_PROMPT, TextLLMPipeline
 from invokeai.backend.util.devices import TorchDevice
@@ -21,6 +22,7 @@ def _run_text_llm(
     prompt: str,
     system_prompt: str,
     max_tokens: int,
+    seed: int,
 ) -> str:
     """Shared LLM invocation body used by every text-LLM node in this module."""
     model_config = context.models.get_config(text_llm_model)
@@ -35,6 +37,7 @@ def _run_text_llm(
             prompt=prompt,
             system_prompt=system_prompt,
             max_new_tokens=max_tokens,
+            seed=seed,
             device=model_device,
             dtype=TorchDevice.choose_torch_dtype(),
         )
@@ -45,7 +48,7 @@ def _run_text_llm(
     title="Text LLM",
     tags=["llm", "text", "prompt"],
     category="llm",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Beta,
 )
 class TextLLMInvocation(BaseInvocation):
@@ -72,6 +75,7 @@ class TextLLMInvocation(BaseInvocation):
         le=2048,
         description="Maximum number of tokens to generate.",
     )
+    seed: int = InputField(default=0, ge=0, le=SEED_MAX, description=FieldDescriptions.seed)
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> StringOutput:
@@ -81,6 +85,7 @@ class TextLLMInvocation(BaseInvocation):
             prompt=self.prompt,
             system_prompt=self.system_prompt,
             max_tokens=self.max_tokens,
+            seed=self.seed,
         )
         return StringOutput(value=output)
 
@@ -90,7 +95,7 @@ class TextLLMInvocation(BaseInvocation):
     title="Text LLM (with System Prompt Preset)",
     tags=["llm", "text", "prompt", "preset", "template"],
     category="llm",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Beta,
 )
 class TextLLMWithPresetInvocation(BaseInvocation):
@@ -125,6 +130,7 @@ class TextLLMWithPresetInvocation(BaseInvocation):
         le=2048,
         description="Maximum number of tokens to generate.",
     )
+    seed: int = InputField(default=0, ge=0, le=SEED_MAX, description=FieldDescriptions.seed)
 
     def _resolve_system_prompt(self, context: InvocationContext) -> SystemPromptRecordDTO:
         """Resolve the referenced preset, enforcing the same access rules as the REST API.
@@ -169,5 +175,6 @@ class TextLLMWithPresetInvocation(BaseInvocation):
             prompt=self.prompt,
             system_prompt=record.content,
             max_tokens=self.max_tokens,
+            seed=self.seed,
         )
         return StringOutput(value=output)

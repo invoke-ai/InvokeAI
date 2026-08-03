@@ -26,6 +26,7 @@ def _make_invocation(prompt_id: str = "test-id") -> TextLLMWithPresetInvocation:
         system_prompt=SystemPromptField(system_prompt_id=prompt_id),
         text_llm_model=ModelIdentifierField(key="dummy", hash="x", name="dummy", base="any", type="text_llm"),
         max_tokens=50,
+        seed=123,
     )
 
 
@@ -70,6 +71,7 @@ def test_preset_node_loads_content_from_db_and_passes_to_llm() -> None:
     assert kwargs["system_prompt"] == "custom system instruction"
     assert kwargs["prompt"] == "a cat"
     assert kwargs["max_tokens"] == 50
+    assert kwargs["seed"] == 123
 
     assert result.value == "expanded"
 
