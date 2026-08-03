@@ -14,6 +14,9 @@ LoRA patch weights) must use `get_model_compute_dtype()` instead of `model.dtype
 import torch
 
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.logging import InvokeAILogger
+
+logger = InvokeAILogger.get_logger(__name__)
 
 # Storage-only float8 dtypes. Weights may be held in these, but no math may be done in them.
 FP8_STORAGE_DTYPES: tuple[torch.dtype, ...] = (torch.float8_e4m3fn, torch.float8_e5m2)
@@ -26,6 +29,16 @@ FP8_COMPUTE_DTYPE_ATTR = "_invokeai_fp8_compute_dtype"
 
 def set_fp8_compute_dtype(model: torch.nn.Module, compute_dtype: torch.dtype) -> None:
     """Record the dtype that `model`'s fp8-cast layers compute in."""
+    if compute_dtype in FP8_STORAGE_DTYPES:
+        # A float8 compute dtype is never valid, and recording one would silently reintroduce the
+        # very crash this module exists to prevent: `get_model_compute_dtype` trusts the marker, so
+        # every downstream tensor would be built in a dtype torch has no arithmetic kernels for.
+        # The realistic way to get here is deriving the compute dtype from a model that is already
+        # cast (i.e. casting twice) — fail loudly at the source instead.
+        raise ValueError(
+            f"Refusing to record {compute_dtype} as an FP8 compute dtype; it is a storage-only dtype. "
+            "This usually means the compute dtype was derived from an already-fp8-cast model."
+        )
     setattr(model, FP8_COMPUTE_DTYPE_ATTR, compute_dtype)
 
 
@@ -51,4 +64,11 @@ def get_model_compute_dtype(model: torch.nn.Module) -> torch.dtype:
     for param in model.parameters():
         if param.is_floating_point() and param.dtype not in FP8_STORAGE_DTYPES:
             return param.dtype
-    return TorchDevice.choose_torch_dtype()
+
+    fallback = TorchDevice.choose_torch_dtype()
+    logger.warning(
+        f"{type(model).__name__} is in FP8 storage but carries no compute-dtype marker and has no non-fp8 float "
+        f"parameter to infer one from; falling back to {fallback}. If the model computes in a different dtype, "
+        "expect a dtype mismatch during the forward pass."
+    )
+    return fallback

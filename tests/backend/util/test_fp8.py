@@ -84,11 +84,60 @@ def test_returns_compute_dtype_after_real_fp8_cast():
 
 @pytest.mark.skipif(not _fp8_supported(), reason="torch.float8_e4m3fn not available")
 def test_falls_back_to_scan_when_marker_missing():
-    """A model that reached us without the marker (e.g. an older cache entry) must still resolve:
-    the fp8 cast skips norm layers, so their dtype reveals the compute dtype."""
+    """A model that reached us without the marker (e.g. an older cache entry, cast before the
+    marker existed) must still resolve: the fp8 cast skips norm layers, so their dtype reveals the
+    compute dtype."""
     model = _MiniUNet().to(torch.bfloat16)
     ModelLoader._apply_fp8_to_nn_module(model, storage_dtype=torch.float8_e4m3fn, compute_dtype=torch.bfloat16)
-    assert not hasattr(model, FP8_COMPUTE_DTYPE_ATTR)
+    # Simulate the legacy, marker-less model.
+    delattr(model, FP8_COMPUTE_DTYPE_ATTR)
 
     assert model.dtype == torch.float8_e4m3fn
     assert get_model_compute_dtype(model) == torch.bfloat16
+
+
+@pytest.mark.skipif(not _fp8_supported(), reason="torch.float8_e4m3fn not available")
+def test_cast_records_the_marker_itself():
+    """The marker must be set by the cast itself, not by its callers — a caller that forgets it
+    would fall through to the scan, and a caller that derives the dtype from an already-cast model
+    would record float8."""
+    model = _MiniUNet().to(torch.bfloat16)
+    ModelLoader._apply_fp8_to_nn_module(model, storage_dtype=torch.float8_e4m3fn, compute_dtype=torch.bfloat16)
+
+    assert getattr(model, FP8_COMPUTE_DTYPE_ATTR) == torch.bfloat16
+
+
+@pytest.mark.parametrize("storage_dtype", [torch.float8_e4m3fn, torch.float8_e5m2])
+def test_rejects_float8_as_compute_dtype(storage_dtype: torch.dtype):
+    """A float8 compute dtype would be handed straight back by `get_model_compute_dtype`, silently
+    reintroducing the crash. Recording one must fail loudly instead."""
+    model = _MiniUNet().to(torch.float16)
+    with pytest.raises(ValueError, match="storage-only dtype"):
+        set_fp8_compute_dtype(model, storage_dtype)
+
+    assert not hasattr(model, FP8_COMPUTE_DTYPE_ATTR)
+
+
+@pytest.mark.skipif(not _fp8_supported(), reason="torch.float8_e4m3fn not available")
+def test_double_cast_is_a_noop():
+    """The cast is not idempotent: a second pass would derive the compute dtype from the already-fp8
+    first parameter. An already-marked model must be left alone."""
+    loader = ModelLoader.__new__(ModelLoader)
+    loader._torch_device = torch.device("cuda")
+    loader._torch_dtype = torch.float16
+    loader._logger = getLogger("test")
+    config = SimpleNamespace(
+        type=ModelType.Main,
+        base=BaseModelType.StableDiffusionXL,
+        name="test",
+        default_settings=SimpleNamespace(fp8_storage=True),
+    )
+
+    model = loader._apply_fp8_layerwise_casting(_MiniUNet().to(torch.bfloat16), config)
+    model = loader._apply_fp8_layerwise_casting(model, config)
+
+    assert get_model_compute_dtype(model) == torch.bfloat16
+    # The skipped norm layer is still in the compute dtype — a second cast would have taken it and
+    # the hooks would have been registered twice.
+    assert model.norm1.weight.dtype == torch.bfloat16
+    assert len(model.linear._forward_pre_hooks) == 1

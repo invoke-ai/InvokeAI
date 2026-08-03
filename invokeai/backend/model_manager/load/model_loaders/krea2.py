@@ -26,7 +26,6 @@ from invokeai.backend.model_manager.taxonomy import (
 )
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
 from invokeai.backend.util.devices import TorchDevice
-from invokeai.backend.util.fp8 import set_fp8_compute_dtype
 
 
 def _normalize_qwen3vl_rope_config(config: Any) -> Any:
@@ -593,10 +592,9 @@ class Qwen3VLEncoderCheckpointLoader(ModelLoader):
         # halves the encoder's resident VRAM (~8.9GB bf16 -> ~4.4GB), which avoids partial-load thrashing
         # when it shares the GPU with a large transformer.
         if source_is_fp8 and self._torch_device.type == "cuda":
+            # `model.dtype` now reports the float8 storage dtype; `_apply_fp8_to_nn_module` records
+            # the real compute dtype so callers can recover it via `get_model_compute_dtype`.
             self._apply_fp8_to_nn_module(model, storage_dtype=torch.float8_e4m3fn, compute_dtype=model_dtype)
-            # `model.dtype` now reports the float8 storage dtype; record the real compute dtype so
-            # callers can recover it via `get_model_compute_dtype`.
-            set_fp8_compute_dtype(model, model_dtype)
             self._logger.info(
                 f"FP8 layerwise casting enabled for Qwen3-VL encoder '{config.name}' "
                 f"(storage=float8_e4m3fn, compute={model_dtype})."
