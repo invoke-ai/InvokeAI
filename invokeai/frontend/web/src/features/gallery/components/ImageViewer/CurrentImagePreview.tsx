@@ -7,6 +7,7 @@ import { DndImage } from 'features/dnd/DndImage';
 import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer/ImageMetadataViewer';
 import NextPrevItemButtons from 'features/gallery/components/NextPrevItemButtons';
 import { useNextPrevItemNavigation } from 'features/gallery/components/useNextPrevItemNavigation';
+import { autoSwitchedImages } from 'features/gallery/store/autoSwitchedImages';
 import { selectLastSelectedItem } from 'features/gallery/store/gallerySelectors';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
@@ -115,6 +116,14 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
     const previousRenderedImageName = previousRenderedImageNameRef.current;
     previousRenderedImageNameRef.current = renderedImageName;
 
+    // Consume on every change of the rendered image, not only when the reveal conditions below
+    // hold — in the common case the auto-switched image renders with no progress showing, and an
+    // entry left behind would suppress a genuine user selection of the same image later.
+    const wasAutoSwitchedTo =
+      renderedImageName !== null &&
+      renderedImageName !== previousRenderedImageName &&
+      autoSwitchedImages.consume(renderedImageName);
+
     window.clearTimeout(selectedImageRevealTimeoutId.current);
 
     if (
@@ -129,6 +138,16 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
     }
 
     if (previousRenderedImageName === null || previousRenderedImageName === renderedImageName) {
+      return;
+    }
+
+    // The reveal exists to make a mid-generation *user* selection visible. An auto-switch to a
+    // just-finished image can land here late — after the next generation's first progress event
+    // has already reset $isProgressImageResolving — and must not flash the previous result over
+    // the live preview. The set(false) is required: the clearTimeout above already cancelled any
+    // running reveal's timer, so returning with the atom still true would wedge the reveal on.
+    if (wasAutoSwitchedTo) {
+      $isTemporarilyShowingSelectedImage.set(false);
       return;
     }
 
