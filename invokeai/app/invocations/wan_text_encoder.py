@@ -31,6 +31,7 @@ WAN_T5_MAX_SEQ_LEN = 512
     category="conditioning",
     version="1.0.0",
     classification=Classification.Prototype,
+    idle_gpu_offloadable=True,
 )
 class WanTextEncoderInvocation(BaseInvocation):
     """Encodes a text prompt for Wan 2.2 using the UMT5-XXL encoder.
