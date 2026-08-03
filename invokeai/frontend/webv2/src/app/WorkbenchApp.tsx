@@ -1,5 +1,6 @@
 import type { WorkbenchSearch } from '@workbench/projects/session';
 
+import { LLMTaskProgressRuntime } from '@features/generation/ui/LLMTaskProgressRuntime';
 import { useSearch } from '@tanstack/react-router';
 import { WorkbenchHotkeyRuntime } from '@workbench/hotkeys/WorkbenchHotkeyRuntime';
 import { WorkbenchCommandPalette } from '@workbench/palette/WorkbenchCommandPalette';
@@ -37,6 +38,7 @@ export const WorkbenchApp = () => {
     <WorkbenchProvider loadOptions={loadOptions}>
       <WorkbenchWidgetRegistryProvider getWidgetById={getWidgetById} getWidgetsForRegion={getWidgetsForRegion}>
         <GenerateWidgetSyncRuntime />
+        <LLMTaskProgressRuntime />
         <WorkbenchUiPorts>
           <WorkbenchHotkeyRuntime />
           <WorkbenchCommandPalette />

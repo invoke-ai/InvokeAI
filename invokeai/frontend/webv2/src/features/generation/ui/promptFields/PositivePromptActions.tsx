@@ -9,9 +9,11 @@ import type { ChangeEvent, MouseEvent } from 'react';
 import { HStack, Icon, Image, Input, Popover, Portal, Separator, Stack, Text } from '@chakra-ui/react';
 import { filterPromptHistory } from '@features/generation/core/promptHistory';
 import { resolveSelectedSystemPromptId } from '@features/generation/core/systemPrompts';
+import { llmTaskProgressStore } from '@features/generation/data/llmTaskProgress';
 import { expandPrompt, imageToPrompt } from '@features/generation/data/promptUtilities';
 import { GenerationModelSelect as ModelSelect, useGenerationUi } from '@features/generation/ui/GenerationUiContext';
 import { DynamicPromptsButton } from '@features/generation/ui/promptFields/DynamicPromptsButton';
+import { LLMTaskProgressDisplay } from '@features/generation/ui/promptFields/LLMTaskProgressDisplay';
 import { PromptTemplatesButton } from '@features/generation/ui/promptFields/PromptTemplatesButton';
 import {
   filterPromptTriggerOptions,
@@ -380,6 +382,7 @@ const ExpandPromptButton = ({
   const triggerId = useId();
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [taskId, setTaskId] = useState<string | null>(null);
   const [selectedModelKey, setSelectedModelKey] = useState<string | null>(null);
   const [selectedSystemPromptId, setSelectedSystemPromptId] = useState<string | null>(null);
   const textLlmModels = models.filter((model) => model.type === 'text_llm');
@@ -402,6 +405,8 @@ const ExpandPromptButton = ({
       return;
     }
 
+    const nextTaskId = crypto.randomUUID();
+    setTaskId(nextTaskId);
     setIsLoading(true);
 
     try {
@@ -409,6 +414,7 @@ const ExpandPromptButton = ({
         model_key: selectedModel.key,
         prompt: positivePrompt,
         system_prompt: selectedSystemPrompt?.content ?? null,
+        task_id: nextTaskId,
       });
 
       if (result.expanded_prompt && activeProjectIdRef.current === projectId) {
@@ -424,6 +430,8 @@ const ExpandPromptButton = ({
         projectId,
       });
     } finally {
+      llmTaskProgressStore.delete(nextTaskId);
+      setTaskId(null);
       setIsLoading(false);
     }
   }, [notifications, onPositivePromptChange, positivePrompt, projectId, selectedModel, selectedSystemPrompt, t]);
@@ -488,6 +496,7 @@ const ExpandPromptButton = ({
                       selectedId={effectiveSystemPromptId}
                       onSelect={setSelectedSystemPromptId}
                     />
+                    <LLMTaskProgressDisplay taskId={taskId} />
                     {positivePrompt.trim() ? null : (
                       <Text color="fg.subtle" fontSize="xs">
                         {t('widgets.generate.enterPromptToExpand')}
@@ -534,6 +543,7 @@ const ImageToPromptButton = ({
   const triggerId = useId();
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [taskId, setTaskId] = useState<string | null>(null);
   const [selectedModelKey, setSelectedModelKey] = useState<string | null>(null);
   const llavaModels = models.filter((model) => model.type === 'llava_onevision');
   const selectedModel = selectedModelKey ? llavaModels.find((model) => model.key === selectedModelKey) : null;
@@ -572,10 +582,16 @@ const ImageToPromptButton = ({
       return;
     }
 
+    const nextTaskId = crypto.randomUUID();
+    setTaskId(nextTaskId);
     setIsLoading(true);
 
     try {
-      const result = await imageToPrompt({ image_name: image.imageName, model_key: selectedModel.key });
+      const result = await imageToPrompt({
+        image_name: image.imageName,
+        model_key: selectedModel.key,
+        task_id: nextTaskId,
+      });
 
       if (result.prompt && activeProjectIdRef.current === projectId) {
         onPositivePromptChange(result.prompt);
@@ -590,6 +606,8 @@ const ImageToPromptButton = ({
         projectId,
       });
     } finally {
+      llmTaskProgressStore.delete(nextTaskId);
+      setTaskId(null);
       setIsLoading(false);
     }
   }, [close, image, notifications, onPositivePromptChange, projectId, selectedModel, t]);
@@ -668,6 +686,7 @@ const ImageToPromptButton = ({
                         {t('widgets.generate.selectImageFirst')}
                       </Text>
                     )}
+                    <LLMTaskProgressDisplay taskId={taskId} />
                     <Button
                       disabled={!image || !selectedModel}
                       loading={isLoading}

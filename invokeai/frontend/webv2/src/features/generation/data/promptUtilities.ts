@@ -3,6 +3,7 @@ import { apiFetchJson } from '@platform/transport/http';
 export interface ExpandPromptRequest {
   prompt: string;
   model_key: string;
+  task_id: string;
   max_tokens?: number;
   system_prompt?: string | null;
 }
@@ -15,6 +16,7 @@ export interface ExpandPromptResponse {
 export interface ImageToPromptRequest {
   image_name: string;
   model_key: string;
+  task_id: string;
   instruction?: string;
 }
 
