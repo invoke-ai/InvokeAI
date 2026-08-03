@@ -313,33 +313,24 @@ const runSample = async (browser, fixture, sample) => {
 
     let activatedResourcePaths = new Set();
     let layoutSwitchMs = 0;
-    if (fixture.layoutPreset) {
-      const presetTrigger = page.getByRole('button', { name: /^Layout preset:/ });
-      await presetTrigger.waitFor({ timeout: 10_000 });
+    if (fixture.layoutPreset || fixture.centerView) {
+      const activationTrigger = fixture.layoutPreset
+        ? page.getByRole('tab', { exact: true, name: fixture.layoutPreset })
+        : page.getByRole('button', { name: /^Center view:/ });
+      await activationTrigger.waitFor({ timeout: 10_000 });
       const beforeActivation = await resourceCollector.settle();
       const beforePaths = new Set(beforeActivation.map((resource) => resource.path));
       const interactionMark = `invokeai:interaction:${fixture.id}:${fixture.stateProfile}:layout-switch`;
-
-      // Open the menu BEFORE starting the clock, and let the page stamp the
-      // interaction mark itself when the selection actually lands.
-      //
-      // Marking from the driver ahead of `presetTrigger.click()` folded two costs
-      // that are not the app's into the measurement: opening the menu, and
-      // Playwright's actionability wait before it will click a menu item. The
-      // second is not small — dispatching the same click in-page instead cut the
-      // gap from 272.9ms to 25.8ms, so roughly 40% of the recorded layout switch
-      // was the driver deciding the item was safe to click. A real click is still
-      // used here; only the waiting is excluded, by moving the start of the
-      // interval to the pointer event itself.
-      await presetTrigger.click();
-      const presetItem = page.getByRole('menuitem', { exact: true, name: fixture.layoutPreset });
-      await presetItem.waitFor({ timeout: 10_000 });
+      let activationTarget = activationTrigger;
+      if (fixture.centerView) {
+        await activationTrigger.click();
+        activationTarget = page.getByRole('menuitemradio', { exact: true, name: fixture.centerView });
+        await activationTarget.waitFor({ timeout: 10_000 });
+      }
       await page.evaluate(
         ({ interactionMarkName, readyMark }) => {
           performance.clearMarks(interactionMarkName);
           performance.clearMarks(readyMark);
-          // Capture-phase and document-level, so this cannot miss the way matching
-          // on a menu item's text could. The next pointerdown is the selection.
           document.addEventListener(
             'pointerdown',
             () => {
@@ -350,19 +341,22 @@ const runSample = async (browser, fixture, sample) => {
         },
         { interactionMarkName: interactionMark, readyMark: fixture.readyMark }
       );
-      await presetItem.click();
-      await page
-        .getByRole('button', { exact: true, name: `Layout preset: ${fixture.layoutPreset}` })
-        .waitFor({ timeout: 10_000 });
+      await activationTarget.click();
+      if (fixture.layoutPreset) {
+        const activationElement = await activationTarget.elementHandle();
+        await page.waitForFunction((element) => element?.getAttribute('aria-selected') === 'true', activationElement, {
+          timeout: 10_000,
+        });
+      } else {
+        await page
+          .getByRole('button', { exact: true, name: `Center view: ${fixture.centerView}` })
+          .waitFor({ timeout: 10_000 });
+      }
       await waitForSemanticMark(page, fixture.readyMark);
       layoutSwitchMs = await page.evaluate(
         ({ interactionMarkName, readyMark }) => {
           const start = performance.getEntriesByName(interactionMarkName, 'mark').at(-1);
           const end = performance.getEntriesByName(readyMark, 'mark').at(-1);
-
-          // A missing start mark used to read as 0 and silently turn the whole
-          // interval into "time since navigation", which looks like a plausible
-          // number rather than a broken one.
           return start && end ? Math.max(0, end.startTime - start.startTime) : null;
         },
         { interactionMarkName: interactionMark, readyMark: fixture.readyMark }
@@ -380,17 +374,26 @@ const runSample = async (browser, fixture, sample) => {
 
     let projectSwitchMs = 0;
     if (fixture.measureProjectSwitch) {
-      const projectTabs = page.getByRole('tab');
-      const originalProject = projectTabs.first();
-      await page.getByRole('button', { name: /new project/i }).click();
-      await projectTabs.nth(1).waitFor({ timeout: 10_000 });
+      const projectSwitcher = page.getByRole('button', { name: /^Switch project\. Current project:/ });
+      const originalProjectName = (await projectSwitcher.textContent())?.trim();
+      if (!originalProjectName) {
+        throw new Error(`${fixture.id}/${fixture.stateProfile} project switcher did not name the active project.`);
+      }
+
+      await projectSwitcher.click();
+      await page.getByRole('menuitem', { exact: true, name: /new project/i }).click();
+      await page.waitForFunction(
+        (name) => document.querySelector('button[aria-label^="Switch project."]')?.textContent?.trim() !== name,
+        originalProjectName
+      );
+      await projectSwitcher.click();
+      const originalProject = page.getByRole('menuitemradio').filter({ hasText: originalProjectName });
+      await originalProject.waitFor({ timeout: 10_000 });
       const projectSwitchStart = performance.now();
       await originalProject.click();
-      await originalProject.waitFor({ state: 'visible' });
-      await page.waitForFunction(
-        (projectTab) => projectTab instanceof HTMLElement && projectTab.getAttribute('aria-selected') === 'true',
-        await originalProject.elementHandle()
-      );
+      await page
+        .getByRole('button', { exact: true, name: `Switch project. Current project: ${originalProjectName}` })
+        .waitFor({ timeout: 10_000 });
       projectSwitchMs = performance.now() - projectSwitchStart;
     }
 

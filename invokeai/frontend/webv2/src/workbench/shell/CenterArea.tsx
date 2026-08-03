@@ -383,7 +383,9 @@ const CenterViewSlot = ({ item }: { item: CenterWidgetItem }) => {
     return <FallbackCenterView label="Center widget unavailable" />;
   }
 
-  return <WidgetRendererById instanceId={item.instance.id} widget={item.widget} region="center" />;
+  return (
+    <WidgetRendererById key={item.instance.id} instanceId={item.instance.id} widget={item.widget} region="center" />
+  );
 };
 
 const FallbackCenterView = ({ label }: { label: string }) => (
