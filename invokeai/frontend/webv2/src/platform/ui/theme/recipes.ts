@@ -27,6 +27,37 @@ export const tooltipSlotRecipe = defineSlotRecipe({
   },
 });
 
+/**
+ * Feature hint cards. Same raised surface as the tooltip so the two read as one
+ * family, one step wider for prose. Extends Chakra's default recipe: the arrow
+ * slots derive `--arrow-background` from `--hovercard-bg`, so replacing the base
+ * wholesale would render the arrow unfilled.
+ *
+ * The content owns its padding — cards must not add their own, or the two stack.
+ * Chakra's `md` default (20px) reads as a dialog rather than an annotation, so
+ * these default to `xs`.
+ */
+export const hoverCardSlotRecipe = defineSlotRecipe({
+  ...chakraSlotRecipes.hoverCard,
+  base: {
+    ...chakraSlotRecipes.hoverCard.base,
+    content: {
+      ...chakraSlotRecipes.hoverCard.base?.content,
+      '--hovercard-bg': 'colors.bg.muted',
+      borderColor: 'border.emphasized',
+      borderWidth: '1px',
+      boxShadow: 'lg',
+      color: 'fg',
+      maxWidth: '18rem',
+    },
+    arrowTip: {
+      ...chakraSlotRecipes.hoverCard.base?.arrowTip,
+      borderColor: 'border.emphasized',
+    },
+  },
+  defaultVariants: { size: 'xs' },
+});
+
 export const tabsSlotRecipe = defineSlotRecipe({
   ...chakraSlotRecipes.tabs,
   base: {
