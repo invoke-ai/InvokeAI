@@ -14,6 +14,8 @@ from invokeai.app.invocations.baseinvocation import (
 )
 from invokeai.app.invocations.math import AddInvocation
 from invokeai.app.invocations.primitives import (
+    BooleanInvocation,
+    BooleanOutput,
     ColorInvocation,
     FloatCollectionInvocation,
     FloatInvocation,
@@ -523,6 +525,52 @@ def test_graph_validates():
     g.add_edge(e1)
 
     assert g.is_valid() is True
+
+
+@pytest.mark.parametrize("field", ["use_cache", "is_intermediate"])
+def test_graph_validates_edges_into_node_attribute_fields(field: str):
+    # `use_cache` and `is_intermediate` are node attributes, but they are ordinary pydantic fields declaring
+    # `Input.Any`, so the workflow editor may drive them with an edge.
+    g = Graph()
+    n1 = BooleanInvocation(id="1", value=True)
+    n2 = ESRGANInvocation(id="2")
+    g.add_node(n1)
+    g.add_node(n2)
+    g.add_edge(create_edge("1", "value", "2", field))
+
+    assert g.is_valid() is True
+
+
+def test_graph_rejects_type_mismatched_edge_into_node_attribute_field():
+    g = Graph()
+    n1 = IntegerInvocation(id="1", value=1)
+    n2 = ESRGANInvocation(id="2")
+    g.add_node(n1)
+    g.add_node(n2)
+
+    with pytest.raises(InvalidEdgeError):
+        g.add_edge(create_edge("1", "value", "2", "use_cache"))
+
+
+def test_graph_execution_state_applies_node_attribute_edges_before_invoking():
+    # The cache is consulted inside `_invoke_internal`, which runs after `next()` has applied edge values, so a
+    # connected `use_cache` is resolved by the time it is read.
+    g = Graph()
+    n1 = BooleanInvocation(id="1", value=False)
+    n2 = ESRGANInvocation(id="2")
+    g.add_node(n1)
+    g.add_node(n2)
+    g.add_edge(create_edge("1", "value", "2", "use_cache"))
+
+    state = GraphExecutionState(graph=g)
+    source = state.next()
+    assert isinstance(source, BooleanInvocation)
+    state.complete(source.id, BooleanOutput(value=False))
+
+    prepared = state.next()
+    assert isinstance(prepared, ESRGANInvocation)
+    # The node's own default is True; the edge value won before the invocation was handed out
+    assert prepared.use_cache is False
 
 
 def test_graph_invalid_if_edges_reference_missing_nodes():

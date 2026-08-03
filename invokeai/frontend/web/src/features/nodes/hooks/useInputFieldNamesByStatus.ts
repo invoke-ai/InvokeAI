@@ -4,11 +4,14 @@ import { isNil } from 'es-toolkit/compat';
 import { useInvocationNodeContext } from 'features/nodes/components/flow/nodes/Invocation/context';
 import type { FieldInputTemplate } from 'features/nodes/types/field';
 import { isSingleOrCollection, isStatefulFieldType } from 'features/nodes/types/field';
+import { isNodeAttributeFieldName } from 'features/nodes/types/nodeAttributeFields';
 import { useMemo } from 'react';
 
 /**
  * Sort input fields: unordered fields first (preserving original order),
  * then explicitly ordered fields sorted by ui_order ascending.
+ *
+ * Node attribute fields are dropped - they live in the node footer, not in the input list.
  */
 const sortInputFields = (fields: FieldInputTemplate[]): string[] => {
   const visibleFields = fields.filter((field) => !field.ui_hidden);
@@ -21,7 +24,7 @@ const sortInputFields = (fields: FieldInputTemplate[]): string[] => {
   return unorderedFields
     .concat(orderedFields)
     .map((f) => f.name)
-    .filter((fieldName) => fieldName !== 'is_intermediate');
+    .filter((fieldName) => !isNodeAttributeFieldName(fieldName));
 };
 
 const isConnectionInputField = (field: FieldInputTemplate) => {

@@ -29,9 +29,11 @@ import { isCollectionFieldType, parseFieldType } from './parseFieldType';
 
 const log = logger('system');
 
-const RESERVED_INPUT_FIELD_NAMES = ['id', 'type', 'use_cache'];
+// `use_cache` and `is_intermediate` are deliberately absent here. They are node attributes, but they are still parsed
+// into the template so they can be connection targets - see `nodeAttributeFields.ts`. They never get a field instance
+// and are filtered out of the node's input list at render time.
+const RESERVED_INPUT_FIELD_NAMES = ['id', 'type'];
 const RESERVED_OUTPUT_FIELD_NAMES = ['type'];
-const RESERVED_FIELD_TYPES = ['IsIntermediate'];
 
 const invocationDenylist: string[] = ['graph', 'linear_ui_output'];
 
@@ -40,13 +42,6 @@ const isReservedInputField = (nodeType: string, fieldName: string) => {
     return true;
   }
   if (nodeType === 'iterate' && fieldName === 'index') {
-    return true;
-  }
-  return false;
-};
-
-const isReservedFieldType = (fieldType: string) => {
-  if (RESERVED_FIELD_TYPES.includes(fieldType)) {
     return true;
   }
   return false;
@@ -144,11 +139,6 @@ export const parseSchema = (
         const fieldType = fieldTypeOverride ?? originalFieldType;
         if (!fieldType) {
           log.trace({ node: type, field: propertyName, schema: parseify(property) }, 'Unable to parse field type');
-          return inputsAccumulator;
-        }
-
-        if (isReservedFieldType(fieldType.name)) {
-          log.trace({ node: type, field: propertyName, schema: parseify(property) }, 'Skipped reserved input field');
           return inputsAccumulator;
         }
 
