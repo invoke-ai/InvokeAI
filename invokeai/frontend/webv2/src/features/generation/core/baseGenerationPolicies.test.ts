@@ -194,14 +194,20 @@ describe('BASE_GENERATION', () => {
     expect(getGenerationModelPolicy(createModel('sd-1'), createSettings(createModel('sd-1'))).ui).toMatchObject({
       clipSkipMax: 12,
       cfgRescaleVisible: true,
+      hiDiffusionVisible: true,
       schedulerVisible: true,
     });
     expect(getGenerationModelPolicy(createModel('sd-2'), createSettings(createModel('sd-2'))).ui).toMatchObject({
       clipSkipMax: 24,
       cfgRescaleVisible: true,
+      hiDiffusionVisible: false,
+    });
+    expect(getGenerationModelPolicy(createModel('sdxl'), createSettings(createModel('sdxl'))).ui).toMatchObject({
+      hiDiffusionVisible: true,
     });
     expect(getGenerationModelPolicy(createModel('flux'), createSettings(createModel('flux'))).ui).toMatchObject({
       guidanceLabel: 'Guidance',
+      hiDiffusionVisible: false,
       schedulerVisible: true,
       clipSkipMax: null,
     });
@@ -450,6 +456,17 @@ describe('component policies', () => {
     expect(result.settings.cfgRescaleMultiplier).toBe(0);
     expect(result.settings.seamlessXAxis).toBe(true);
     expect(result.clearedLabels).toEqual(['LoRAs', 'T5 Encoder', 'CLIP skip', 'CFG rescale']);
+  });
+
+  it('turns HiDiffusion off when changing to an unsupported model family', () => {
+    const result = getGenerateModelSelectionResult({
+      currentValues: createSettings(createModel('sd-1'), { hiDiffusionEnabled: true }),
+      model: createModel('flux'),
+      models: [],
+    });
+
+    expect(result.settings.hiDiffusionEnabled).toBe(false);
+    expect(result.clearedLabels).toContain('HiDiffusion');
   });
 
   it('initializes empty and malformed values from the selected model defaults', () => {

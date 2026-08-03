@@ -43,6 +43,7 @@ import {
   toModelIdentifier,
   toGraphContract,
 } from './graphBuilder';
+import { addKrea2ConditioningEnhancers } from './krea2Conditioning';
 import { addPidDecode, getPidDenoiseSize, getPidMetadata, shouldUsePidDecode } from './pidGraph';
 import { getEffectiveReferenceImage } from './referenceImage';
 import { SEED_MAX } from './settings';
@@ -304,6 +305,7 @@ const buildSDGraph = (
   const activeLoras = getActiveCompatibleLoras(settings, model);
   const scheduler = coerceSchedulerForGraph(model, settings.scheduler);
   const colorCompensation = settings.colorCompensation ? 'SDXL' : 'None';
+  const supportsHiDiffusion = model.base === 'sd-1' || model.base === 'sdxl';
 
   const positivePrompt = addNode(graph, { id: 'positive_prompt', type: 'string' });
   const negativePrompt = addNode(graph, { id: 'negative_prompt', type: 'string' });
@@ -327,6 +329,19 @@ const buildSDGraph = (
     denoising_end: 1,
     denoising_start: 0,
     id: 'denoise_latents',
+    ...(supportsHiDiffusion
+      ? {
+          hidiffusion: settings.hiDiffusionEnabled,
+          hidiffusion_raunet: settings.hiDiffusionRauNetEnabled,
+          hidiffusion_window_attn: settings.hiDiffusionWindowAttentionEnabled,
+          ...(settings.hiDiffusionEnabled
+            ? {
+                hidiffusion_t1_ratio: settings.hiDiffusionT1Ratio,
+                hidiffusion_t2_ratio: settings.hiDiffusionT2Ratio,
+              }
+            : {}),
+        }
+      : {}),
     scheduler,
     steps: settings.steps,
     type: 'denoise_latents',
@@ -418,6 +433,15 @@ const buildSDGraph = (
   });
 
   addMetadata(graph, output, settings, model, model.base === 'sdxl' ? 'sdxl_txt2img' : 'txt2img', projectSettings, {
+    ...(supportsHiDiffusion
+      ? {
+          hidiffusion: settings.hiDiffusionEnabled,
+          hidiffusion_raunet: settings.hiDiffusionRauNetEnabled,
+          hidiffusion_t1_ratio: settings.hiDiffusionT1Ratio,
+          hidiffusion_t2_ratio: settings.hiDiffusionT2Ratio,
+          hidiffusion_window_attn: settings.hiDiffusionWindowAttentionEnabled,
+        }
+      : {}),
     scheduler,
   });
   addReferenceImageMetadata(graph, output, settings);
@@ -1100,6 +1124,7 @@ const buildKrea2Graph = (
       ])
     : modelLoader;
   const posCond = addNode(graph, { id: 'pos_cond', type: 'krea2_text_encoder' });
+  const posCondCollect = addNode(graph, { id: 'pos_cond_collect', type: 'collect' });
   const negCond = useCfg ? addNode(graph, { id: 'neg_cond', type: 'krea2_text_encoder' }) : null;
   const denoise = addNode(graph, {
     cfg_scale: settings.cfgScale,
@@ -1117,36 +1142,15 @@ const buildKrea2Graph = (
   addEdge(graph, modelLoader, 'vae', output, 'vae');
   addEdge(graph, positivePrompt, 'value', posCond, 'prompt');
 
-  // Optional conditioning enhancers, both default-off, chained between the encoder and denoise:
-  // rebalance first (scale the signal toward the prompt), then seed variance (perturb it).
-  let positiveConditioningSource = posCond;
-
-  if (settings.krea2RebalanceEnabled) {
-    const rebalance = addNode(graph, {
-      id: 'krea2_rebalance',
-      multiplier: settings.krea2RebalanceMultiplier,
-      per_layer_weights: settings.krea2RebalanceWeights,
-      type: 'krea2_conditioning_rebalance',
-    });
-
-    addEdge(graph, positiveConditioningSource, 'conditioning', rebalance, 'conditioning');
-    positiveConditioningSource = rebalance;
-  }
-
-  if (settings.krea2SeedVarianceEnabled && settings.krea2SeedVarianceStrength > 0) {
-    const seedVariance = addNode(graph, {
-      id: 'krea2_seed_variance',
-      randomize_percent: settings.krea2SeedVarianceRandomizePercent,
-      strength: settings.krea2SeedVarianceStrength,
-      type: 'krea2_seed_variance',
-    });
-
-    addEdge(graph, positiveConditioningSource, 'conditioning', seedVariance, 'conditioning');
-    addEdge(graph, seed, 'value', seedVariance, 'variance_seed');
-    positiveConditioningSource = seedVariance;
-  }
-
-  addEdge(graph, positiveConditioningSource, 'conditioning', denoise, 'positive_conditioning');
+  const positiveConditioningSource = addKrea2ConditioningEnhancers({
+    conditioning: posCond,
+    graph,
+    idPrefix: 'krea2',
+    seed,
+    settings,
+  });
+  addEdge(graph, positiveConditioningSource, 'conditioning', posCondCollect, 'item');
+  addEdge(graph, posCondCollect, 'collection', denoise, 'positive_conditioning');
 
   if (negCond) {
     addEdge(graph, loraSource, 'qwen3_vl_encoder', negCond, 'qwen3_vl_encoder');

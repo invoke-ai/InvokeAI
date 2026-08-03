@@ -30,6 +30,7 @@ import type { GenerateModelConfig, GenerateSettings } from '@features/generation
 import { getGenerationValidationReasons } from '@features/generation/core/baseGenerationPolicies';
 import { GRAPH_BUILDERS } from '@features/generation/core/graph';
 import { addEdge, addNode, toGraphContract } from '@features/generation/core/graphBuilder';
+import { addKrea2ConditioningEnhancers } from '@features/generation/core/krea2Conditioning';
 import { getIsPidSupportedBase } from '@features/generation/core/pid';
 
 import type {
@@ -547,9 +548,29 @@ export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanv
 
   // Regional guidance applies in every mode too. The executor already composited
   // + uploaded each region's mask and resolved its reference-image models; it
-  // passes only valid regions for a supported base (sd-1 / sdxl / flux).
+  // passes only valid regions for a supported base (SD1 / SDXL / FLUX / FLUX.2 / Krea-2).
   if (input.regionalGuidance && input.regionalGuidance.length > 0 && isRegionalGuidanceSupportedForBase(model.base)) {
-    addRegionalGuidance(backendGraph, { base: model.base, regions: input.regionalGuidance });
+    addRegionalGuidance(backendGraph, {
+      base: model.base,
+      regions: input.regionalGuidance,
+      ...(model.base === 'krea-2'
+        ? {
+            transformRegionalPositiveConditioning: (conditioning: BackendInvocationContract, regionId: string) => {
+              const seed = backendGraph.nodes.seed;
+              if (!seed) {
+                throw new Error('Krea-2 regional guidance requires the base graph seed node.');
+              }
+              return addKrea2ConditioningEnhancers({
+                conditioning,
+                graph: backendGraph,
+                idPrefix: `rg_krea2_${regionId}`,
+                seed,
+                settings,
+              });
+            },
+          }
+        : {}),
+    });
   }
 
   return {

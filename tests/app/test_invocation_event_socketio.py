@@ -179,3 +179,29 @@ async def test_generic_download_events_remain_broadcast() -> None:
     await socketio._handle_model_event(("download_started", event))
 
     socketio._sio.emit.assert_awaited_once_with(event="download_started", data={"id": 1})
+
+
+@pytest.mark.anyio
+async def test_llm_task_progress_is_emitted_once_to_owner_and_admin_rooms() -> None:
+    from invokeai.app.services.events.events_common import LLMTaskProgressEvent
+
+    socketio = SocketIO(FastAPI())
+    socketio._sio.emit = AsyncMock()
+
+    event = LLMTaskProgressEvent(
+        task_id="task-1",
+        user_id="owner-1",
+        phase="generating",
+        message="Generating",
+        percentage=0.5,
+        current_tokens=10,
+        total_tokens=20,
+    )
+
+    await socketio._handle_llm_task_event(("llm_task_progress", event))
+
+    socketio._sio.emit.assert_awaited_once_with(
+        event="llm_task_progress",
+        data=event.model_dump(mode="json"),
+        room=["user:owner-1", "admin"],
+    )

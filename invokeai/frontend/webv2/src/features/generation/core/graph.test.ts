@@ -13,6 +13,7 @@ import { getDefaultGenerateSettings, isSupportedGenerateModel } from './baseGene
 import { compileGenerateGraph, generateSeedSequence, resolveGenerateSeed } from './graph';
 
 const sd1Model: MainModelConfig = { base: 'sd-1', key: 'sd1-model', name: 'SD 1.5', type: 'main' };
+const sd2Model: MainModelConfig = { base: 'sd-2', key: 'sd2-model', name: 'SD 2', type: 'main' };
 const sdxlModel: MainModelConfig = { base: 'sdxl', key: 'sdxl-model', name: 'SDXL', type: 'main' };
 const sd3Model: MainModelConfig = { base: 'sd-3', key: 'sd3-model', name: 'SD3', type: 'main' };
 const fluxModel: MainModelConfig = { base: 'flux', key: 'flux-model', name: 'FLUX dev', type: 'main' };
@@ -172,6 +173,82 @@ describe('compileGenerateGraph', () => {
     const graph = compile(sd1Model, { clipSkip: 2 });
 
     expect(graph.nodes.clip_skip?.skipped_layers).toBe(2);
+  });
+
+  it.each([sd1Model, sdxlModel])('passes enabled HiDiffusion settings to $base denoise and metadata', (model) => {
+    const graph = compile(model, {
+      hiDiffusionEnabled: true,
+      hiDiffusionRauNetEnabled: false,
+      hiDiffusionT1Ratio: 0.35,
+      hiDiffusionT2Ratio: 0.15,
+      hiDiffusionWindowAttentionEnabled: true,
+    });
+    const denoise = graph.nodes.denoise_latents;
+    const metadata = getNodeByType(graph, 'core_metadata');
+
+    expect(denoise).toMatchObject({
+      hidiffusion: true,
+      hidiffusion_raunet: false,
+      hidiffusion_t1_ratio: 0.35,
+      hidiffusion_t2_ratio: 0.15,
+      hidiffusion_window_attn: true,
+    });
+    expect(metadata).toMatchObject({
+      hidiffusion: true,
+      hidiffusion_raunet: false,
+      hidiffusion_t1_ratio: 0.35,
+      hidiffusion_t2_ratio: 0.15,
+      hidiffusion_window_attn: true,
+    });
+  });
+
+  it('omits HiDiffusion ratios from denoise while disabled but records all metadata settings', () => {
+    const graph = compile(sd1Model, {
+      hiDiffusionEnabled: false,
+      hiDiffusionRauNetEnabled: false,
+      hiDiffusionT1Ratio: 0.6,
+      hiDiffusionT2Ratio: 0.2,
+      hiDiffusionWindowAttentionEnabled: true,
+    });
+    const denoise = graph.nodes.denoise_latents;
+    const metadata = getNodeByType(graph, 'core_metadata');
+
+    expect(denoise).toMatchObject({
+      hidiffusion: false,
+      hidiffusion_raunet: false,
+      hidiffusion_window_attn: true,
+    });
+    expect(denoise).not.toHaveProperty('hidiffusion_t1_ratio');
+    expect(denoise).not.toHaveProperty('hidiffusion_t2_ratio');
+    expect(metadata).toMatchObject({
+      hidiffusion: false,
+      hidiffusion_raunet: false,
+      hidiffusion_t1_ratio: 0.6,
+      hidiffusion_t2_ratio: 0.2,
+      hidiffusion_window_attn: true,
+    });
+  });
+
+  it('omits HiDiffusion inputs and metadata for unsupported SD2 models', () => {
+    const graph = compile(sd2Model, {
+      hiDiffusionEnabled: true,
+      hiDiffusionRauNetEnabled: true,
+      hiDiffusionT1Ratio: 0.4,
+      hiDiffusionT2Ratio: 0,
+      hiDiffusionWindowAttentionEnabled: true,
+    });
+    const metadata = getNodeByType(graph, 'core_metadata');
+
+    for (const key of [
+      'hidiffusion',
+      'hidiffusion_raunet',
+      'hidiffusion_t1_ratio',
+      'hidiffusion_t2_ratio',
+      'hidiffusion_window_attn',
+    ]) {
+      expect(graph.nodes.denoise_latents).not.toHaveProperty(key);
+      expect(metadata).not.toHaveProperty(key);
+    }
   });
 
   it('routes the UNet and VAE through the seamless node when tiling is enabled', () => {
@@ -610,7 +687,8 @@ describe('Krea-2, Ideogram 4 and Wan graphs', () => {
 
     expect(getNodeByType(graph, 'krea2_conditioning_rebalance')).toBeUndefined();
     expect(getNodeByType(graph, 'krea2_seed_variance')).toBeUndefined();
-    expect(getEdge(graph, 'denoise_latents', 'positive_conditioning')?.source.node_id).toBe('pos_cond');
+    expect(getEdge(graph, 'pos_cond_collect', 'item')?.source.node_id).toBe('pos_cond');
+    expect(getEdge(graph, 'denoise_latents', 'positive_conditioning')?.source.node_id).toBe('pos_cond_collect');
   });
 
   it('chains rebalance then seed variance between the Krea-2 encoder and denoise', () => {
@@ -622,7 +700,8 @@ describe('Krea-2, Ideogram 4 and Wan graphs', () => {
 
     expect(getEdge(graph, 'krea2_rebalance', 'conditioning')?.source.node_id).toBe('pos_cond');
     expect(getEdge(graph, 'krea2_seed_variance', 'conditioning')?.source.node_id).toBe('krea2_rebalance');
-    expect(getEdge(graph, 'denoise_latents', 'positive_conditioning')?.source.node_id).toBe('krea2_seed_variance');
+    expect(getEdge(graph, 'pos_cond_collect', 'item')?.source.node_id).toBe('krea2_seed_variance');
+    expect(getEdge(graph, 'denoise_latents', 'positive_conditioning')?.source.node_id).toBe('pos_cond_collect');
     // Seed variance needs the seed to be reproducible run-to-run.
     expect(getEdge(graph, 'krea2_seed_variance', 'variance_seed')?.source.node_id).toBe('seed');
   });

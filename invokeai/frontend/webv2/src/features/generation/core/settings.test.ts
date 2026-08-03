@@ -162,6 +162,11 @@ describe('normalizeGenerateSettings', () => {
     expect(normalized?.aspectRatioIsLocked).toBe(false);
     expect(normalized?.clipSkip).toBe(0);
     expect(normalized?.colorCompensation).toBe(false);
+    expect(normalized?.hiDiffusionEnabled).toBe(false);
+    expect(normalized?.hiDiffusionRauNetEnabled).toBe(true);
+    expect(normalized?.hiDiffusionWindowAttentionEnabled).toBe(true);
+    expect(normalized?.hiDiffusionT1Ratio).toBe(0.4);
+    expect(normalized?.hiDiffusionT2Ratio).toBe(0);
     expect(normalized?.loras).toEqual([]);
     expect(normalized?.negativePromptEnabled).toBe(true);
     expect(normalized?.negativePromptHeightPx).toBe(56);
@@ -190,12 +195,22 @@ describe('normalizeGenerateSettings', () => {
     const normalized = normalizeGenerateSettings({
       ...legacyStoredValues,
       aspectRatioId: 'bogus',
+      hiDiffusionEnabled: 'yes',
+      hiDiffusionRauNetEnabled: null,
+      hiDiffusionT1Ratio: Number.NaN,
+      hiDiffusionT2Ratio: 'late',
+      hiDiffusionWindowAttentionEnabled: 1,
       loras: [{ isEnabled: true, model: { key: 'k', name: 'n', type: 'main' }, weight: 1 }],
       vae: { key: 'k', name: 'n', type: 'main' },
       vaePrecision: 'fp64',
     });
 
     expect(normalized?.aspectRatioId).toBe('2:3');
+    expect(normalized?.hiDiffusionEnabled).toBe(false);
+    expect(normalized?.hiDiffusionRauNetEnabled).toBe(true);
+    expect(normalized?.hiDiffusionWindowAttentionEnabled).toBe(true);
+    expect(normalized?.hiDiffusionT1Ratio).toBe(0.4);
+    expect(normalized?.hiDiffusionT2Ratio).toBe(0);
     expect(normalized?.loras).toEqual([]);
     expect(normalized?.vae).toBeNull();
     expect(normalized?.vaePrecision).toBe('fp32');

@@ -582,6 +582,41 @@
         "When there are no raster layers with visible content, this setting is ignored."
       ]
     },
+    "hidiffusion": {
+      "heading": "HiDiffusion",
+      "paragraphs": [
+        "Enables HiDiffusion denoising for higher-resolution generation.",
+        "Try at 1536px or higher for the most visible effect."
+      ]
+    },
+    "hidiffusionRauNet": {
+      "heading": "HiDiffusion: RAU-Net",
+      "paragraphs": [
+        "Enables RAU-Net blocks used by HiDiffusion.",
+        "Can improve structure and detail at higher resolutions."
+      ]
+    },
+    "hidiffusionT1Ratio": {
+      "heading": "HiDiffusion: T1 Ratio",
+      "paragraphs": [
+        "Controls the early switch point for HiDiffusion (T1).",
+        "Lower values switch earlier; higher values preserve global structure longer."
+      ]
+    },
+    "hidiffusionT2Ratio": {
+      "heading": "HiDiffusion: T2 Ratio",
+      "paragraphs": [
+        "Controls the late switch point for HiDiffusion (T2).",
+        "Higher values keep window attention active longer."
+      ]
+    },
+    "hidiffusionWindowAttn": {
+      "heading": "HiDiffusion: Window Attention",
+      "paragraphs": [
+        "Enables windowed attention used by HiDiffusion.",
+        "Can boost local detail, but may affect global coherence."
+      ]
+    },
     "model": {
       "heading": "Model",
       "paragraphs": [
@@ -1241,6 +1276,11 @@
       "expandReferenceImage": "Expand reference image",
       "generatePrompt": "Generate Prompt",
       "height": "Height",
+      "hiDiffusion": "HiDiffusion",
+      "hiDiffusionRauNet": "HiDiffusion: RAU-Net",
+      "hiDiffusionT1Ratio": "HiDiffusion: T1 Ratio",
+      "hiDiffusionT2Ratio": "HiDiffusion: T2 Ratio",
+      "hiDiffusionWindowAttn": "HiDiffusion: Window Attention",
       "ideogram4ColorHelp": "Comma-separated color terms folded into the caption.",
       "ideogram4ColorPalette": "Color palette",
       "ideogram4GuidanceScale": "Guidance",
@@ -1267,6 +1307,9 @@
       "krea2SeedVarianceHelp": "Perturbs conditioning so nearby seeds diverge more.",
       "krea2SeedVarianceRandomize": "Randomized channels",
       "krea2SeedVarianceStrength": "Variance strength",
+      "llmTaskGenerating": "Generating",
+      "llmTaskLoadingModel": "Loading model",
+      "llmTaskProgress": "LLM task progress",
       "lockAspectRatio": "Lock aspect ratio",
       "mainModel": "Main model",
       "mode": "Mode",

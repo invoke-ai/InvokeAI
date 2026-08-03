@@ -1031,7 +1031,7 @@ describe('resolveRegionalReferenceImages', () => {
     expect(resolveRegionalReferenceImages({ referenceImages: [ipAdapterRef(null)] }, 'sd-1')).toEqual([]);
   });
 
-  it('keeps an IP-Adapter ref once an image is assigned (non-FLUX base)', () => {
+  it('keeps an IP-Adapter ref once an image is assigned for a supported SD base', () => {
     const inputs = resolveRegionalReferenceImages({ referenceImages: [ipAdapterRef(asset)] }, 'sd-1');
     expect(inputs).toHaveLength(1);
     expect(inputs[0]).toMatchObject({ id: 'ref-ipa', imageName: 'ref.png', type: 'ip_adapter' });
@@ -1039,6 +1039,10 @@ describe('resolveRegionalReferenceImages', () => {
 
   it('drops regional reference images for FLUX.2', () => {
     expect(resolveRegionalReferenceImages({ referenceImages: [ipAdapterRef(asset)] }, 'flux2')).toEqual([]);
+  });
+
+  it('drops regional reference images for Krea-2', () => {
+    expect(resolveRegionalReferenceImages({ referenceImages: [ipAdapterRef(asset)] }, 'krea-2')).toEqual([]);
   });
 
   it('drops a FLUX Redux ref with no image assigned', () => {

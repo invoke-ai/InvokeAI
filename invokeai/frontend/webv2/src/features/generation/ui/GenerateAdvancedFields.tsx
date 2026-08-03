@@ -4,7 +4,13 @@ import type { GenerateModelConfig, GenerateSettings } from '@features/generation
 import { Badge, createListCollection, HStack, Stack, Switch } from '@chakra-ui/react';
 import { getDefaultGenerateSettings, getGenerationUiPolicy } from '@features/generation/core/baseGenerationPolicies';
 import { isPidMode, MAX_PID_STEPS, MIN_PID_STEPS } from '@features/generation/core/pid';
-import { isVaeModelConfig } from '@features/generation/core/settings';
+import {
+  DEFAULT_HIDIFFUSION_T1_RATIO,
+  DEFAULT_HIDIFFUSION_T2_RATIO,
+  isVaeModelConfig,
+  MAX_HIDIFFUSION_RATIO,
+  MIN_HIDIFFUSION_T1_RATIO,
+} from '@features/generation/core/settings';
 import { Field, Select } from '@platform/ui';
 import { useId, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -58,6 +64,31 @@ const SeamlessSwitch = ({
   );
 };
 
+const AdvancedSwitch = ({
+  checked,
+  disabled = false,
+  label,
+  onCheckedChange,
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  label: string;
+  onCheckedChange: (checked: boolean) => void;
+}) => (
+  <Switch.Root
+    checked={checked}
+    disabled={disabled}
+    size="sm"
+    onCheckedChange={(event) => onCheckedChange(event.checked)}
+  >
+    <Switch.HiddenInput />
+    <Switch.Control _checked={{ bg: 'accent.solid' }}>
+      <Switch.Thumb />
+    </Switch.Control>
+    <Switch.Label srOnly>{label}</Switch.Label>
+  </Switch.Root>
+);
+
 export const GenerateAdvancedFields = ({
   onCommit,
   onCommitImmediate,
@@ -87,13 +118,19 @@ export const GenerateAdvancedFields = ({
   );
   const clipSkipMax = policy.clipSkipMax ?? 0;
 
-  const updateNumber = (key: 'cfgRescaleMultiplier' | 'clipSkip', max: number) => (value: number) => {
-    if (!Number.isFinite(value)) {
-      return;
-    }
+  const updateNumber =
+    (
+      key: 'cfgRescaleMultiplier' | 'clipSkip' | 'hiDiffusionT1Ratio' | 'hiDiffusionT2Ratio',
+      min: number,
+      max: number
+    ) =>
+    (value: number) => {
+      if (!Number.isFinite(value)) {
+        return;
+      }
 
-    onCommit({ [key]: Math.min(max, Math.max(0, value)) });
-  };
+      onCommit({ [key]: Math.min(max, Math.max(min, value)) });
+    };
 
   const customVae = policy.sdVaeVisible && Boolean(settings.vae?.key);
 
@@ -102,6 +139,7 @@ export const GenerateAdvancedFields = ({
     !policy.vaePrecisionVisible &&
     !policy.colorCompensationVisible &&
     !policy.seamlessVisible &&
+    !policy.hiDiffusionVisible &&
     !policy.clipSkipMax &&
     !policy.cfgRescaleVisible
   ) {
@@ -113,6 +151,7 @@ export const GenerateAdvancedFields = ({
       {settings.seamlessXAxis && <Badge size="xs">{t('widgets.generate.tileX')}</Badge>}
       {settings.seamlessYAxis && <Badge size="xs">{t('widgets.generate.tileY')}</Badge>}
       {settings.colorCompensation && <Badge size="xs">{t('widgets.generate.colorCompensation')}</Badge>}
+      {settings.hiDiffusionEnabled && <Badge size="xs">{t('widgets.generate.hiDiffusion')}</Badge>}
       {customVae && (
         <Badge maxW="32" size="xs" truncate>
           {settings.vae?.name}
@@ -196,7 +235,7 @@ export const GenerateAdvancedFields = ({
                 resetLabel={t('widgets.generate.useModelDefault')}
                 step={1}
                 value={settings.clipSkip}
-                onChange={updateNumber('clipSkip', clipSkipMax)}
+                onChange={updateNumber('clipSkip', 0, clipSkipMax)}
               />
             </Field>
           ) : null}
@@ -210,10 +249,66 @@ export const GenerateAdvancedFields = ({
                 resetLabel={t('widgets.generate.useModelDefaultCfgRescale')}
                 step={0.05}
                 value={settings.cfgRescaleMultiplier}
-                onChange={updateNumber('cfgRescaleMultiplier', 0.99)}
+                onChange={updateNumber('cfgRescaleMultiplier', 0, 0.99)}
               />
             </Field>
           ) : null}
+        </Stack>
+      ) : null}
+
+      {policy.hiDiffusionVisible ? (
+        <Stack gap="2" p="2">
+          <Field hint="hidiffusion" label={t('widgets.generate.hiDiffusion')}>
+            <AdvancedSwitch
+              checked={settings.hiDiffusionEnabled}
+              label={t('widgets.generate.hiDiffusion')}
+              onCheckedChange={(checked) => onCommit({ hiDiffusionEnabled: checked })}
+            />
+          </Field>
+          <HStack alignItems="flex-start" gap="2">
+            <Field flex="1" hint="hidiffusionRauNet" label={t('widgets.generate.hiDiffusionRauNet')}>
+              <AdvancedSwitch
+                checked={settings.hiDiffusionRauNetEnabled}
+                disabled={!settings.hiDiffusionEnabled}
+                label={t('widgets.generate.hiDiffusionRauNet')}
+                onCheckedChange={(checked) => onCommit({ hiDiffusionRauNetEnabled: checked })}
+              />
+            </Field>
+            <Field flex="1" hint="hidiffusionWindowAttn" label={t('widgets.generate.hiDiffusionWindowAttn')}>
+              <AdvancedSwitch
+                checked={settings.hiDiffusionWindowAttentionEnabled}
+                disabled={!settings.hiDiffusionEnabled}
+                label={t('widgets.generate.hiDiffusionWindowAttn')}
+                onCheckedChange={(checked) => onCommit({ hiDiffusionWindowAttentionEnabled: checked })}
+              />
+            </Field>
+          </HStack>
+          <Field hint="hidiffusionT1Ratio" label={t('widgets.generate.hiDiffusionT1Ratio')}>
+            <SliderNumberField
+              ariaLabel={t('widgets.generate.hiDiffusionT1Ratio')}
+              defaultValue={DEFAULT_HIDIFFUSION_T1_RATIO}
+              disabled={!settings.hiDiffusionEnabled}
+              max={MAX_HIDIFFUSION_RATIO}
+              min={MIN_HIDIFFUSION_T1_RATIO}
+              resetLabel={t('widgets.generate.useModelDefault')}
+              step={0.05}
+              value={settings.hiDiffusionT1Ratio}
+              onChange={updateNumber('hiDiffusionT1Ratio', MIN_HIDIFFUSION_T1_RATIO, MAX_HIDIFFUSION_RATIO)}
+            />
+          </Field>
+          <Field hint="hidiffusionT2Ratio" label={t('widgets.generate.hiDiffusionT2Ratio')}>
+            <SliderNumberField
+              ariaLabel={t('widgets.generate.hiDiffusionT2Ratio')}
+              defaultValue={DEFAULT_HIDIFFUSION_T2_RATIO}
+              disabled={!settings.hiDiffusionEnabled}
+              max={MAX_HIDIFFUSION_RATIO}
+              min={0}
+              resetLabel={t('widgets.generate.useModelDefault')}
+              step={0.05}
+              value={settings.hiDiffusionT2Ratio}
+              onChange={updateNumber('hiDiffusionT2Ratio', 0, MAX_HIDIFFUSION_RATIO)}
+            />
+          </Field>
         </Stack>
       ) : null}
 
