@@ -51,6 +51,15 @@ export interface GalleryItemMutationResult {
 
 export const toGalleryItemKey = ({ kind, name }: GalleryItemRef): GalleryItemKey => `${kind}:${name}`;
 
+export const shouldStarSelection = (items: readonly GalleryItem[], refs: readonly GalleryItemRef[]): boolean => {
+  if (refs.length === 0) {
+    return false;
+  }
+
+  const loadedItemsByKey = new Map(items.map((item) => [toGalleryItemKey(item), item]));
+  return refs.some((ref) => !loadedItemsByKey.get(toGalleryItemKey(ref))?.starred);
+};
+
 export const parseGalleryItemKey = (key: string): GalleryItemRef => {
   const separatorIndex = key.indexOf(':');
   const kind = key.slice(0, separatorIndex);

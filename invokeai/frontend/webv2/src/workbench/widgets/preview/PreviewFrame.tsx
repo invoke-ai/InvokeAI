@@ -25,13 +25,6 @@ import { PreviewCompareDropZone } from './PreviewCompareDropZone';
 import { PreviewLiveOverlay } from './PreviewLiveReadout';
 import { usePreviewLoupe, type PreviewLoupeControls } from './usePreviewLoupe';
 
-/**
- * The preview's image surface: a dot-grid backdrop with an aspect-fitted,
- * shadowed frame. Owns everything drawn over the image (live badge, and later
- * the loupe, progress hairline, and drop-to-compare affordance) so the widget
- * shell never grows frame-specific rendering.
- */
-
 export const previewGridCss = {
   backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1.5px)',
   backgroundPosition: 'center',
@@ -47,33 +40,46 @@ export const getFittedFrameCss = (width: number, height: number): SystemStyleObj
   width: `min(100cqw, calc(100cqh * ${width / height}))`,
 });
 
+/**
+ * Room for the centre region's floating chrome islands. `CenterArea` publishes
+ * the variable and nothing else does, so the `0px` fallback keeps the right
+ * panel — which reserves a real header row instead — unpadded.
+ */
+const CENTER_CHROME_INSET = 'var(--wb-center-chrome-inset, 0px)';
+
+/**
+ * Top padding for a media stage: its own padding plus room for the islands.
+ *
+ * It belongs on the stage rather than on the widget root so the dot grid still
+ * runs to every edge and passes *behind* the chrome — the same arrangement that
+ * lets `paddingBottom` pass it behind the filmstrip. Because the stage is a size
+ * container, `getFittedFrameCss` reads the shrunken content box and refits the
+ * media with no further change.
+ */
+const getStagePaddingTop = (padding: string | undefined): string =>
+  padding === undefined ? CENTER_CHROME_INSET : `calc(var(--chakra-spacing-${padding}) + ${CENTER_CHROME_INSET})`;
+
 export type PreviewMediaSource =
   | { itemKey: GalleryItemKey; kind: 'image'; source: StreamingImageSource }
   | { itemKey: GalleryItemKey; kind: 'video'; label: string; poster: string; src: string };
 
 interface PreviewFrameProps {
-  /** Rendered instead of the fitted frame when there is no image source (inset variant only). */
   children?: ReactNode;
-  /** Saved gallery image represented by this frame. Live progress frames are never draggable. */
   dragItem?: GalleryItemRef;
   frameHeight: number;
   frameWidth: number;
-  /** Live selected-key read used by protected-video retry guards. */
   isItemCurrent?: (itemKey: GalleryItemKey) => boolean;
   isLive: boolean;
   liveBadgeLabel: string;
-  /** When set, the static live badge is replaced by the live progress readout for this run. */
   liveQueueItemId?: string | null;
-  /** Imperative zoom controls, for hotkeys registered by the widget shell. */
   loupeControlsRef?: Ref<PreviewLoupeControls>;
   onContextMenu?: (x: number, y: number) => void;
   onVideoCopyAvailabilityChange?: (itemKey: GalleryItemKey, isAvailable: boolean) => void;
   padding?: string;
+  paddingBottom?: string;
   shouldAntialiasLiveImage: boolean;
   source: PreviewMediaSource | null;
-  /** Preview-owned controller for the selected video's current frame. */
   videoControllerRef?: Ref<PreviewVideoFrameController>;
-  /** `framed` = bordered surface for a selected item; `inset` = flush surface for the empty state. */
   variant: 'framed' | 'inset';
 }
 
@@ -88,6 +94,7 @@ export const PreviewFrame = (props: PreviewFrameProps) => {
         onContextMenu={props.onContextMenu}
         onCopyAvailabilityChange={props.onVideoCopyAvailabilityChange}
         padding={props.padding}
+        paddingBottom={props.paddingBottom}
         source={props.source}
         videoControllerRef={props.videoControllerRef}
       />
@@ -108,6 +115,7 @@ const PreviewImageFrame = ({
   loupeControlsRef,
   onContextMenu,
   padding,
+  paddingBottom,
   shouldAntialiasLiveImage,
   source,
   variant,
@@ -186,6 +194,10 @@ const PreviewImageFrame = ({
         css={previewGridCss}
         h="full"
         justify="center"
+        // Live tiles all reserve the inset, so in a multi-session grid the
+        // bottom row reserves room it does not need. Its own dot grid still
+        // fills the cell, so only the fitted frame sits a little lower.
+        pt={getStagePaddingTop(undefined)}
         w="full"
       >
         {source ? (
@@ -219,8 +231,7 @@ const PreviewImageFrame = ({
     <Flex
       ref={loupe.stageRefCallback}
       align="center"
-      borderWidth="1px"
-      borderColor="border.subtle"
+      backgroundColor="bg.inset"
       color="fg.grid"
       containerType="size"
       css={previewGridCss}
@@ -230,12 +241,13 @@ const PreviewImageFrame = ({
       minH="0"
       overflow="hidden"
       p={padding}
+      pb={paddingBottom}
       position="relative"
-      rounded="lg"
+      pt={getStagePaddingTop(padding)}
       w="full"
       {...loupe.stageProps}
     >
-      <PreviewCompareDropZone />
+      <PreviewCompareDropZone currentImageName={dragItem?.kind === 'image' ? dragItem.name : null} />
       <Box
         ref={setContentRef}
         {...listeners}
@@ -292,6 +304,7 @@ const PreviewVideo = ({
   onContextMenu,
   onCopyAvailabilityChange,
   padding,
+  paddingBottom,
   source,
   videoControllerRef,
 }: {
@@ -301,6 +314,7 @@ const PreviewVideo = ({
   onContextMenu?: (x: number, y: number) => void;
   onCopyAvailabilityChange?: (itemKey: GalleryItemKey, isAvailable: boolean) => void;
   padding?: string;
+  paddingBottom?: string;
   source: Extract<PreviewMediaSource, { kind: 'video' }>;
   videoControllerRef?: Ref<PreviewVideoFrameController>;
 }) => {
@@ -461,8 +475,7 @@ const PreviewVideo = ({
   return (
     <Flex
       align="center"
-      borderWidth="1px"
-      borderColor="border.subtle"
+      backgroundColor="bg.inset"
       color="fg.grid"
       containerType="size"
       css={previewGridCss}
@@ -471,8 +484,9 @@ const PreviewVideo = ({
       minH="0"
       overflow="hidden"
       p={padding}
+      pb={paddingBottom}
       position="relative"
-      rounded="lg"
+      pt={getStagePaddingTop(padding)}
       w="full"
     >
       <Box

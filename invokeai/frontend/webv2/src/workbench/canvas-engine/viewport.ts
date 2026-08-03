@@ -29,7 +29,7 @@
 
 import type { Mat2d, Rect, Vec2 } from '@workbench/canvas-engine/types';
 
-import { clampZoom, snapZoom } from '@workbench/canvas-engine/math/snapping';
+import { clampZoom } from '@workbench/canvas-engine/math/snapping';
 import {
   panBy as calculatePanBy,
   wheelZoomAtPoint as calculateWheelZoomAtPoint,
@@ -71,7 +71,7 @@ export interface Viewport {
   documentToScreen(p: Vec2): Vec2;
   /** Sets zoom while keeping the document point under `screenAnchor` fixed. */
   zoomAtPoint(newZoom: number, screenAnchor: Vec2): void;
-  /** Exponential wheel zoom about `screenAnchor`, snapping near common zoom levels. */
+  /** Exponential wheel zoom about `screenAnchor`. Continuous — never snaps to a preset. */
   wheelZoom(deltaY: number, screenAnchor: Vec2): void;
   /** Pans by a CSS-pixel screen delta. */
   panBy(screenDelta: Vec2): void;
@@ -122,10 +122,7 @@ export const createViewport = (initial?: Partial<ViewState>): Viewport => {
   };
 
   const wheelZoom = (deltaY: number, screenAnchor: Vec2): void => {
-    const next = calculateWheelZoomAtPoint({ pan, zoom }, deltaY, screenAnchor, {
-      constrainZoom: clampZoom,
-      snapZoom,
-    });
+    const next = calculateWheelZoomAtPoint({ pan, zoom }, deltaY, screenAnchor, { constrainZoom: clampZoom });
     zoom = next.zoom;
     pan = next.pan;
     emit();

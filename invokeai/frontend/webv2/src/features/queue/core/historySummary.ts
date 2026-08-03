@@ -5,6 +5,7 @@ import { getQueueItemSnapshotBatchCount } from '@features/queue/core/historySnap
 
 export interface QueueSummary {
   current: number;
+  remaining: number;
   runningQueueItemId: string | null;
   total: number;
 }
@@ -83,13 +84,13 @@ export const getQueueSummary = (items: QueueItem[], progress: QueueItemProgress 
   const total = openItems.reduce((sum, item) => sum + getQueueItemExpectedImageCount(item), 0);
 
   if (total === 0) {
-    return { current: 0, runningQueueItemId: null, total: 0 };
+    return { current: 0, remaining: 0, runningQueueItemId: null, total: 0 };
   }
 
   const runningItem = openItems.find((item) => item.status === 'running');
 
   if (!runningItem) {
-    return { current: 0, runningQueueItemId: null, total };
+    return { current: 0, remaining: total, runningQueueItemId: null, total };
   }
 
   let current = 0;
@@ -103,7 +104,11 @@ export const getQueueSummary = (items: QueueItem[], progress: QueueItemProgress 
     current += getQueueItemExpectedImageCount(item);
   }
 
-  return { current: Math.min(current, total), runningQueueItemId: runningItem.id, total };
+  current = Math.min(current, total);
+
+  // `current` is the one-based ordinal of the active image, so that image
+  // remains in the countdown until it completes.
+  return { current, remaining: Math.max(0, total - current + 1), runningQueueItemId: runningItem.id, total };
 };
 
 export const getProjectQueueIndicatorState = ({

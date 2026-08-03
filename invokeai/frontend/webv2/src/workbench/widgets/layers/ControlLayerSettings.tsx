@@ -335,7 +335,7 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
   const visibleValidationReason =
     validationReason && (hasContent || validationReason === 'missing_model') ? validationReason : null;
   return (
-    <Stack borderColor="border.subtle" borderWidth="1px" gap="2" p="2" rounded="md">
+    <Stack gap="2">
       <HStack gap="2">
         <Field flex="1" label={t('widgets.layers.control.kind')} minW="0">
           <Select

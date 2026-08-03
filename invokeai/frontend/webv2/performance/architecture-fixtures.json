@@ -71,7 +71,8 @@
       "path": "/#/app?new=true",
       "readyMark": "invokeai:ready:widget:center:canvas",
       "expectedScriptPattern": "WorkbenchApp-",
-      "layoutPreset": "Canvas",
+      "layoutPreset": "Edit",
+      "preActivationRequiredWidgetRequests": ["GalleryImageActionsBridge"],
       "requiredWidgetRequests": ["GalleryImageActionsBridge", "widget:canvas", "widget:layers"],
       "forbiddenWidgetRequests": ["widget:project", "widget:upscale"],
       "remediationTicket": "deepen-widget-registry-loading"
@@ -83,7 +84,8 @@
       "path": "/#/app?project=fixture-project-001",
       "readyMark": "invokeai:ready:widget:center:canvas",
       "expectedScriptPattern": "WorkbenchApp-",
-      "layoutPreset": "Canvas",
+      "layoutPreset": "Edit",
+      "preActivationRequiredWidgetRequests": ["GalleryImageActionsBridge"],
       "requiredWidgetRequests": ["GalleryImageActionsBridge", "widget:canvas", "widget:layers"],
       "forbiddenWidgetRequests": ["widget:project", "widget:upscale"],
       "remediationTicket": "deepen-widget-registry-loading"
@@ -95,7 +97,8 @@
       "path": "/#/app?new=true",
       "readyMark": "invokeai:ready:widget:center:workflow",
       "expectedScriptPattern": "WorkbenchApp-",
-      "layoutPreset": "Workflow",
+      "layoutPreset": "Automate",
+      "preActivationRequiredWidgetRequests": ["GalleryImageActionsBridge"],
       "requiredWidgetRequests": ["GalleryImageActionsBridge", "widget:workflow", "widget:queue"],
       "forbiddenWidgetRequests": ["widget:canvas", "widget:layers", "widget:project", "widget:upscale"],
       "remediationTicket": "deepen-widget-registry-loading"
@@ -107,7 +110,8 @@
       "path": "/#/app?project=fixture-project-001",
       "readyMark": "invokeai:ready:widget:center:workflow",
       "expectedScriptPattern": "WorkbenchApp-",
-      "layoutPreset": "Workflow",
+      "layoutPreset": "Automate",
+      "preActivationRequiredWidgetRequests": ["GalleryImageActionsBridge"],
       "requiredWidgetRequests": ["GalleryImageActionsBridge", "widget:workflow", "widget:queue"],
       "forbiddenWidgetRequests": ["widget:canvas", "widget:layers", "widget:project", "widget:upscale"],
       "remediationTicket": "deepen-widget-registry-loading"
@@ -119,7 +123,8 @@
       "path": "/#/app?new=true",
       "readyMark": "invokeai:ready:widget:center:gallery",
       "expectedScriptPattern": "WorkbenchApp-",
-      "layoutPreset": "Gallery",
+      "centerView": "Gallery",
+      "preActivationRequiredWidgetRequests": ["GalleryImageActionsBridge"],
       "requiredWidgetRequests": ["GalleryImageActionsBridge", "widget:gallery", "widget:preview"],
       "forbiddenWidgetRequests": ["widget:canvas", "widget:layers", "widget:project", "widget:upscale"],
       "remediationTicket": "deepen-widget-registry-loading"
@@ -131,7 +136,8 @@
       "path": "/#/app?project=fixture-project-001",
       "readyMark": "invokeai:ready:widget:center:gallery",
       "expectedScriptPattern": "WorkbenchApp-",
-      "layoutPreset": "Gallery",
+      "centerView": "Gallery",
+      "preActivationRequiredWidgetRequests": ["GalleryImageActionsBridge"],
       "requiredWidgetRequests": ["GalleryImageActionsBridge", "widget:gallery", "widget:preview"],
       "forbiddenWidgetRequests": ["widget:canvas", "widget:layers", "widget:project", "widget:upscale"],
       "remediationTicket": "deepen-widget-registry-loading"

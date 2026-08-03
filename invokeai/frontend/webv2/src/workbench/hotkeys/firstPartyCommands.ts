@@ -1,4 +1,5 @@
 import type { ImageRecallKind } from '@workbench/image-actions/imageRecall';
+import type { ResultDestination } from '@workbench/invocationContracts';
 
 import { invalidateGallery } from '@features/gallery/queries';
 import {
@@ -16,16 +17,24 @@ import {
   captureAccountScope,
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
-import { getConnectionStatus } from '@platform/transport/connectionStore';
 import { useQueryClient } from '@tanstack/react-query';
-import { isInvocationRouteValid, resolveInvocationRoute } from '@workbench/invocation';
-import { submitResolvedInvocation } from '@workbench/invocationSubmit';
+import { submitActiveInvocation } from '@workbench/activeInvocationSubmission';
+import { createLayoutPresetActivator, loadLayoutPresetWidgets } from '@workbench/layoutPresetActivation';
+import { builtInLayoutPresetDescriptors, getLayoutPreset } from '@workbench/layoutPresets';
 import { toggleCommandPalette } from '@workbench/palette/paletteStore';
+import { openProjectSwitcher } from '@workbench/shell/topbar/projectSwitcherStore';
 import { openWidgetPlacement } from '@workbench/widgetPlacementCommands';
 import { getWidgetsForRegion } from '@workbench/widgetRegistry';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useWorkbenchCommands, useWorkbenchExtensions, useWorkbenchQueries } from '@workbench/WorkbenchContext';
-import { useEffect, useEffectEvent } from 'react';
+import { useEffect, useEffectEvent, useMemo } from 'react';
+
+/** ⌥1 / ⌥2 / ⌥3 — the three shipped layout presets, in strip order. */
+const layoutPresetCommands = builtInLayoutPresetDescriptors.map(({ hotkeyId, preset }) => ({
+  id: `app.${hotkeyId}`,
+  presetId: preset.id,
+  title: `${preset.label} layout`,
+}));
 
 const imageRecallCommands: Record<string, ImageRecallKind> = {
   'gallery.remix': 'remix',
@@ -39,7 +48,11 @@ const imageRecallCommands: Record<string, ImageRecallKind> = {
 export const FIRST_PARTY_APP_COMMAND_IDS = [
   'app.invoke',
   'app.invokeFront',
+  'app.invokeToOtherDestination',
   'app.openCommandPalette',
+  'app.openProjectSwitcher',
+  'app.saveLayoutPreset',
+  ...layoutPresetCommands.map(({ id }) => id),
   'app.cancelQueueItem',
   'app.clearQueue',
   'app.selectGenerateTab',
@@ -73,48 +86,23 @@ export const useRegisterFirstPartyCommands = () => {
   const queries = useWorkbenchQueries();
   const queryClient = useQueryClient();
   const { layout, notifications, queue, widgets } = commands;
+  const activateLayoutPreset = useMemo(
+    () => createLayoutPresetActivator({ apply: layout.applyPreset, load: loadLayoutPresetWidgets }),
+    [layout.applyPreset]
+  );
   useInvocationTemplatesSelector((snapshot) => snapshot.status);
 
   useMountEffect(() => {
     void ensureModelsLoaded();
   });
 
-  const submitInvocation = useEffectEvent(async () => {
-    const owner = captureAccountScope();
-    flushGenerateDrafts();
-
-    try {
-      const { prepareCanvasInvocation } = await import('@workbench/widgets/canvas/invoke/prepareCanvasInvocation');
-
-      assertAccountScopeCurrent(owner);
-      const activeProject = queries.getSnapshot().activeProject;
-      const resolvedRoute = resolveInvocationRoute(
-        activeProject,
-        'global',
-        activeProject.invocation,
-        getAvailableModels()
-      );
-      const { status } = getConnectionStatus();
-
-      if (!isInvocationRouteValid(resolvedRoute) || status !== 'connected') {
-        return;
-      }
-
-      submitResolvedInvocation({
-        commands,
-        models: getAvailableModels(),
-        owner,
-        prepareCanvasInvocation,
-        project: activeProject,
-        route: resolvedRoute,
-      });
-    } catch (error) {
-      if (!isAccountScopeCurrent(owner)) {
-        return;
-      }
-
-      throw error;
-    }
+  /**
+   * Submits the active route. `destinationOverride` applies to this run only and
+   * is never written back to the project — "just this once, send it to the
+   * gallery" must not silently retarget every subsequent invoke.
+   */
+  const submitInvocation = useEffectEvent(async (destinationOverride?: ResultDestination) => {
+    await submitActiveInvocation({ commands, destinationOverride, getModels: getAvailableModels, queries });
   });
 
   const recallSelectedImage = useEffectEvent(async (kind: ImageRecallKind) => {
@@ -177,8 +165,30 @@ export const useRegisterFirstPartyCommands = () => {
 
   useEffect(() => {
     const disposers = [
-      commandApi.register({ handler: submitInvocation, id: 'app.invoke', title: 'Invoke' }),
-      commandApi.register({ handler: submitInvocation, id: 'app.invokeFront', title: 'Invoke front' }),
+      commandApi.register({ handler: () => submitInvocation(), id: 'app.invoke', title: 'Invoke' }),
+      commandApi.register({ handler: () => submitInvocation(), id: 'app.invokeFront', title: 'Invoke front' }),
+      commandApi.register({
+        handler: () => {
+          const { destination } = queries.getSnapshot().activeProject.invocation;
+
+          void submitInvocation(destination === 'canvas' ? 'gallery' : 'canvas');
+        },
+        id: 'app.invokeToOtherDestination',
+        title: 'Invoke to the other destination',
+      }),
+      commandApi.register({
+        handler: openProjectSwitcher,
+        id: 'app.openProjectSwitcher',
+        title: 'Open project switcher',
+      }),
+      commandApi.register({
+        handler: () => layout.savePreset(queries.getSnapshot().activeProject.layout.presetId),
+        id: 'app.saveLayoutPreset',
+        title: 'Save changes to the active layout preset',
+      }),
+      ...layoutPresetCommands.map(({ id, presetId, title }) =>
+        commandApi.register({ handler: () => void activateLayoutPreset(getLayoutPreset(presetId)), id, title })
+      ),
       commandApi.register({
         handler: () => {
           const owner = captureAccountScope();
@@ -357,5 +367,5 @@ export const useRegisterFirstPartyCommands = () => {
     return () => {
       disposers.forEach((dispose) => dispose());
     };
-  }, [commandApi, commands, layout, notifications, queries, queryClient, queue, widgets]);
+  }, [activateLayoutPreset, commandApi, commands, layout, notifications, queries, queryClient, queue, widgets]);
 };

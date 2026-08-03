@@ -19,6 +19,7 @@ const WidgetHostBoundary = ({ widget }: { widget: ReturnType<typeof getWidgetHos
   return widget.manifest.failurePolicy.isolateRenderFailure ? (
     <WidgetFailureBoundary
       resetKey={widget.manifest.id}
+      widget={widget}
       widgetId={widget.manifest.id}
       onRetry={widget.implementation.retry}
     >

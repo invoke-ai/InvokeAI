@@ -84,7 +84,11 @@ export const DynamicPromptsButton = ({
             aria-label={t('widgets.generate.dynamicPrompts.showPrompts')}
             color={expansion.isError ? 'fg.error' : undefined}
             opacity={expansion.isDynamic ? undefined : 0.5}
-            px={countLabel ? '1' : undefined}
+            // `undefined` is not "leave it alone": Chakra's IconButton spreads
+            // incoming props over its own `px: '0'`, so an explicit undefined
+            // clobbers it and the size recipe's `px: '2'` padded the icon-only
+            // button out to 32x24 beside its 24x24 neighbours.
+            px={countLabel ? '1' : '0'}
             size="2xs"
             variant="ghost"
             w={countLabel ? 'auto' : undefined}

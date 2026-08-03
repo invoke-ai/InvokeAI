@@ -3,11 +3,12 @@ import type { PromptTemplateSnapshot } from '@features/generation/core/promptTem
 import type { GenerateLora, GenerateModelConfig } from '@features/generation/core/types';
 import type { ChangeEvent, KeyboardEvent } from 'react';
 
+import { Box, Text } from '@chakra-ui/react';
 import { applyPromptTemplate, getPromptTemplateChunks } from '@features/generation/core/promptTemplates';
 import { useRegisterGenerateDraftFlusher } from '@features/generation/ui/generateDraftRegistry';
 import { useDebouncedDraftValue } from '@features/generation/ui/useDebouncedDraftValue';
 import { useWildcards } from '@features/generation/ui/useWildcards';
-import { Field } from '@platform/ui';
+import { DropZone, Field } from '@platform/ui';
 import { useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -18,6 +19,7 @@ import { PROMPT_ATTENTION_TARGET_PROPS } from './promptAttentionHotkeys';
 import { insertPromptText, registerPositivePromptElement } from './promptFocus';
 import { promptHistoryNavigation } from './promptHistoryNavigation';
 import { PromptTextarea } from './PromptTextarea';
+import { usePromptImageDrop } from './usePromptImageDrop';
 import { usePromptTriggerAutocomplete } from './usePromptTriggerAutocomplete';
 import { usePromptTriggerPicker } from './usePromptTriggerPicker';
 
@@ -109,6 +111,19 @@ export const PositivePromptField = ({
   // the user is still typing.
   const isViewingMerged = isTemplateViewMode && promptTemplate !== null;
 
+  // View mode hides the authored prompt, and the actions that would rewrite it
+  // are out of reach there — so is the drop that opens one of them.
+  //
+  // Destructured rather than kept whole: passing `imageDrop.setNodeRef` straight
+  // to `ref` makes the compiler read the object it came from as a ref too, and
+  // every other field of it then counts as a ref access during render.
+  const {
+    droppedImage,
+    isDragActive: isImageDragActive,
+    isOver: isImageDropOver,
+    setNodeRef: setImageDropRef,
+  } = usePromptImageDrop({ disabled: isViewingMerged });
+
   const autocomplete = usePromptTriggerAutocomplete({
     isDisabled: isViewingMerged,
     keys: POSITIVE_PROMPT_TRIGGER_KEYS,
@@ -193,6 +208,7 @@ export const PositivePromptField = ({
     () => (
       <PositivePromptActions
         batchCount={batchCount}
+        droppedImage={droppedImage}
         dynamicPrompts={dynamicPrompts}
         isPromptTriggerPickerOpen={triggerPicker.isOpen}
         showSyntaxHighlighting={showSyntaxHighlighting}
@@ -215,6 +231,7 @@ export const PositivePromptField = ({
       dynamicPrompts,
       effectivePositivePrompt,
       handleUsePrompt,
+      droppedImage,
       insertTextAtCaret,
       loras,
       projectId,
@@ -246,29 +263,52 @@ export const PositivePromptField = ({
 
   return (
     <Field label={t('common.prompt')} labelEnd={labelEnd}>
-      <PromptTextarea
-        {...PROMPT_ATTENTION_TARGET_PROPS}
-        {...autocomplete.comboboxProps}
-        aria-label={t('widgets.generate.positivePrompt')}
-        defaultHeightPx={heightPx}
-        minHeightPx={96}
-        resizeHandleAriaLabel={t('widgets.generate.resizePositivePrompt')}
-        size="xs"
-        fontFamily="mono"
-        highlightDynamicPrompts={dynamicPrompts !== null}
-        knownWildcards={knownWildcards}
-        readOnly={isViewingMerged}
-        showSyntaxHighlighting={showSyntaxHighlighting}
-        templateChunks={templateChunks}
-        textareaRef={handleTextareaRef}
-        title={isViewingMerged ? t('widgets.generate.promptTemplates.editAuthored') : undefined}
-        value={isViewingMerged ? effectivePositivePrompt : draftValue}
-        onBlur={autocomplete.close}
-        onChange={handlePromptChange}
-        onClick={isViewingMerged ? exitViewMode : handlePromptClick}
-        onKeyDown={handlePromptKeyDown}
-        onResizeEnd={onResizeEnd}
-      />
+      <Box ref={setImageDropRef} position="relative">
+        <PromptTextarea
+          {...PROMPT_ATTENTION_TARGET_PROPS}
+          {...autocomplete.comboboxProps}
+          aria-label={t('widgets.generate.positivePrompt')}
+          defaultHeightPx={heightPx}
+          minHeightPx={96}
+          resizeHandleAriaLabel={t('widgets.generate.resizePositivePrompt')}
+          size="xs"
+          fontFamily="mono"
+          highlightDynamicPrompts={dynamicPrompts !== null}
+          knownWildcards={knownWildcards}
+          readOnly={isViewingMerged}
+          showSyntaxHighlighting={showSyntaxHighlighting}
+          templateChunks={templateChunks}
+          textareaRef={handleTextareaRef}
+          title={isViewingMerged ? t('widgets.generate.promptTemplates.editAuthored') : undefined}
+          value={isViewingMerged ? effectivePositivePrompt : draftValue}
+          onBlur={autocomplete.close}
+          onChange={handlePromptChange}
+          onClick={isViewingMerged ? exitViewMode : handlePromptClick}
+          onKeyDown={handlePromptKeyDown}
+          onResizeEnd={onResizeEnd}
+        />
+        {/* Only while a compatible drag is in flight — a prompt box wearing a
+            permanent dashed border would read as an upload area, not a field.
+            `pointerEvents` stays off so the textarea underneath is unaffected;
+            dnd-kit hit-tests the wrapper's rect, not this overlay. */}
+        {isImageDragActive ? (
+          <DropZone
+            alignItems="center"
+            display="flex"
+            inset="0"
+            isOver={isImageDropOver}
+            justifyContent="center"
+            pointerEvents="none"
+            position="absolute"
+            variant="overlay"
+            zIndex="2"
+          >
+            <Text color="fg" fontSize="sm" fontWeight="700" textAlign="center">
+              {t('widgets.generate.dropImageToPrompt')}
+            </Text>
+          </DropZone>
+        ) : null}
+      </Box>
       {autocomplete.element}
       {triggerPicker.dismissElement}
       {triggerPicker.isOpen ? (

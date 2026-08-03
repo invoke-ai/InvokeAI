@@ -4,6 +4,7 @@
  * Curated, caller-driven export list — add a symbol only when a consumer needs it.
  */
 export {
+  ASPECT_RATIO_MAP,
   calculateNewSize,
   clampDimension,
   cloneGenerateWidgetValues,

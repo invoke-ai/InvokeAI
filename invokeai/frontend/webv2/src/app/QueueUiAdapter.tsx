@@ -6,9 +6,8 @@ import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { useActiveProjectSelector, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { lazy, useMemo, type ReactNode } from 'react';
 
-const QueueItemActions = lazy(() =>
-  import('@workbench/queue-integration/QueueItemActions').then((module) => ({ default: module.QueueItemActions }))
-);
+const importQueueItemActions = () => import('@workbench/queue-integration/QueueItemActions');
+const QueueItemActions = lazy(() => importQueueItemActions().then((module) => ({ default: module.QueueItemActions })));
 
 /**
  * Production binding of Queue's UI port: adapts the Workbench-owned concerns
@@ -38,6 +37,7 @@ export const QueueUiAdapterProvider = ({ children }: { children: ReactNode }) =>
       isConnected,
       notify,
       openQueue: () => openWorkbenchWidget('queue'),
+      preloadItemActions: () => void importQueueItemActions(),
       queueJobsScope,
     };
   }, [activeProjectId, canManageModels, isConnected, notify, openWorkbenchWidget, queueJobsScope, session]);

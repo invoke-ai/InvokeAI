@@ -7,7 +7,10 @@ export type ModelBaseColorPalette = 'blue' | 'cyan' | 'gray' | 'green' | 'orange
 
 export interface ModelBaseInfo {
   base: ModelBase;
+  /** Short form, for badges and filter chips. */
   label: string;
+  /** Spelled-out form for list group headers; falls back to `label`. */
+  longLabel?: string;
   colorPalette: ModelBaseColorPalette;
   description?: string;
   supportsDiffusersConversion?: boolean;
@@ -17,29 +20,34 @@ export const MODEL_BASES = {
   'sd-1': {
     base: 'sd-1',
     label: 'SD 1.x',
+    longLabel: 'Stable Diffusion 1.x',
     colorPalette: 'green',
     supportsDiffusersConversion: true,
   },
   'sd-2': {
     base: 'sd-2',
     label: 'SD 2.x',
+    longLabel: 'Stable Diffusion 2.x',
     colorPalette: 'teal',
     supportsDiffusersConversion: true,
   },
   sdxl: {
     base: 'sdxl',
     label: 'SDXL',
+    longLabel: 'Stable Diffusion XL',
     colorPalette: 'blue',
     supportsDiffusersConversion: true,
   },
   'sdxl-refiner': {
     base: 'sdxl-refiner',
     label: 'SDXL Refiner',
+    longLabel: 'Stable Diffusion XL Refiner',
     colorPalette: 'blue',
   },
   'sd-3': {
     base: 'sd-3',
     label: 'SD 3.x',
+    longLabel: 'Stable Diffusion 3.x',
     colorPalette: 'purple',
   },
   flux: {
@@ -121,6 +129,13 @@ export const getModelBaseInfo = (base: ModelBase): ModelBaseInfo =>
   };
 
 export const getModelBaseLabel = (base: ModelBase): string => getModelBaseInfo(base).label;
+
+/** Spelled-out base name for list group headers; short bases read the same either way. */
+export const getModelBaseLongLabel = (base: ModelBase): string => {
+  const info = getModelBaseInfo(base);
+
+  return info.longLabel ?? info.label;
+};
 
 export const getModelBaseColorPalette = (base: ModelBase): ModelBaseColorPalette => getModelBaseInfo(base).colorPalette;
 

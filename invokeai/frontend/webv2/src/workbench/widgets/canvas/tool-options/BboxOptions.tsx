@@ -1,105 +1,70 @@
-import type { SelectValueChangeDetails } from '@chakra-ui/react';
+import type { AspectRatioId } from '@features/generation/contracts';
 
-import { createListCollection, HStack } from '@chakra-ui/react';
-import { Select, ToggleDot } from '@platform/ui';
+import { HStack } from '@chakra-ui/react';
+import { AspectRatioLockButton, AspectRatioSelect } from '@features/generation/components';
+import { ASPECT_RATIO_MAP, deriveAspectRatioId } from '@features/generation/settings';
 import { constrainBboxToRatio } from '@workbench/canvas-engine/api';
-import { useCallback, useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useCallback } from 'react';
 
 import type { ToolOptionsComponentProps } from './ToolOptionsBar';
 
 import { useBboxEditor } from './useBboxEditor';
 
-/** Aspect-ratio presets offered in the options bar. `null` ratio = Free (unlocked). */
-interface AspectPreset {
-  id: string;
-  ratio: number | null;
-}
-
-const ASPECT_PRESETS: readonly AspectPreset[] = [
-  { id: 'Free', ratio: null },
-  { id: '1:1', ratio: 1 },
-  { id: '4:3', ratio: 4 / 3 },
-  { id: '3:4', ratio: 3 / 4 },
-  { id: '16:9', ratio: 16 / 9 },
-  { id: '9:16', ratio: 9 / 16 },
-];
-
-const ASPECT_TRIGGER_PROPS = { minW: '5.5rem' } as const;
-
-/** The preset id whose ratio matches `aspectRatio` (within tolerance), or `null`. */
-const matchingPresetId = (aspectRatio: number): string | null =>
-  ASPECT_PRESETS.find((preset) => preset.ratio !== null && Math.abs(preset.ratio - aspectRatio) < 1e-3)?.id ?? null;
+const ASPECT_TRIGGER_PROPS = { minW: '7.5rem' } as const;
 
 /**
- * Bbox tool options: aspect-ratio preset select and aspect lock toggle. Numeric
- * frame details live in the separate bbox details bar.
+ * Bbox tool options: aspect-ratio preset select and aspect lock, sharing the
+ * generate widget's controls so both surfaces offer the same presets — the two
+ * are already kept in sync by `canvasDimsSync`. Numeric frame details live in
+ * the separate bbox details bar.
  */
 export const BboxOptions = ({ engine }: ToolOptionsComponentProps) => {
-  const { t } = useTranslation();
   const { bbox, commitBbox, grid, options } = useBboxEditor(engine);
-
-  const collection = useMemo(
-    () =>
-      createListCollection({
-        itemToString: (item: AspectPreset) => item.id,
-        itemToValue: (item: AspectPreset) => item.id,
-        items: [...ASPECT_PRESETS],
-      }),
-    []
-  );
-
-  const selectValue = useMemo(
-    () => [options.aspectLocked ? (matchingPresetId(options.aspectRatio) ?? 'Free') : 'Free'],
-    [options.aspectLocked, options.aspectRatio]
-  );
+  const bboxRatio = bbox.height > 0 ? bbox.width / bbox.height : 1;
+  // Derived from the live frame rather than the stored ratio, so a lock captured
+  // from a hand-drawn bbox reports the preset it actually matches.
+  const selectedId: AspectRatioId = options.aspectLocked ? deriveAspectRatioId(bbox.width, bbox.height) : 'Free';
 
   const onAspectPresetChange = useCallback(
-    ({ value }: SelectValueChangeDetails) => {
-      const id = value[0];
-      const preset = ASPECT_PRESETS.find((entry) => entry.id === id);
-      if (!preset) {
-        return;
-      }
-      if (preset.ratio === null) {
+    (id: AspectRatioId) => {
+      if (id === 'Free') {
         engine.interaction.set('bboxOptions', { ...options, aspectLocked: false });
         return;
       }
-      engine.interaction.set('bboxOptions', { aspectLocked: true, aspectRatio: preset.ratio });
-      commitBbox(constrainBboxToRatio(bbox, preset.ratio, grid));
+
+      const ratio = ASPECT_RATIO_MAP[id].ratio;
+
+      engine.interaction.set('bboxOptions', { aspectLocked: true, aspectRatio: ratio });
+      // The bbox is a placed frame, so reshape it in place rather than
+      // re-deriving a free size from its pixel area.
+      commitBbox(constrainBboxToRatio(bbox, ratio, grid));
     },
     [bbox, commitBbox, engine, grid, options]
   );
 
-  const onLockToggle = useCallback(
-    (checked: boolean) => {
-      const aspectRatio =
-        checked && bbox.height > 0 && matchingPresetId(options.aspectRatio) === null
-          ? bbox.width / bbox.height
-          : options.aspectRatio > 0
-            ? options.aspectRatio
-            : 1;
-      engine.interaction.set('bboxOptions', { aspectLocked: checked, aspectRatio });
-    },
-    [bbox, engine, options.aspectRatio]
-  );
+  const onLockToggle = useCallback(() => {
+    const checked = !options.aspectLocked;
+    // Locking a frame that matches no preset captures its current ratio so
+    // further edits preserve it.
+    const aspectRatio =
+      checked && bbox.height > 0 && deriveAspectRatioId(bbox.width, bbox.height) === 'Free'
+        ? bboxRatio
+        : options.aspectRatio > 0
+          ? options.aspectRatio
+          : 1;
+
+    engine.interaction.set('bboxOptions', { aspectLocked: checked, aspectRatio });
+  }, [bbox, bboxRatio, engine, options.aspectLocked, options.aspectRatio]);
 
   return (
-    <HStack align="center" gap="3">
-      <Select
-        aria-label={t('widgets.canvas.toolOptions.aspectRatio')}
-        collection={collection}
-        size="xs"
+    <HStack align="center" gap="1">
+      <AspectRatioSelect
+        fallbackRatio={bboxRatio}
         triggerProps={ASPECT_TRIGGER_PROPS}
-        value={selectValue}
-        valueText={selectValue[0]}
-        onValueChange={onAspectPresetChange}
+        value={selectedId}
+        onChange={onAspectPresetChange}
       />
-      <ToggleDot
-        checked={options.aspectLocked}
-        label={t('widgets.canvas.toolOptions.lockAspect')}
-        onCheckedChange={onLockToggle}
-      />
+      <AspectRatioLockButton isLocked={options.aspectLocked} onToggle={onLockToggle} />
     </HStack>
   );
 };

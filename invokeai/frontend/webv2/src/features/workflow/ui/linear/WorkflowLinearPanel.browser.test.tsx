@@ -24,7 +24,7 @@ describe('Workflow Linear panel mode toggle', () => {
     host.remove();
   });
 
-  it('activates View and Edit with pointer and keyboard button semantics', async () => {
+  const renderToggle = async () => {
     const Harness = () => {
       const [mode, setMode] = useState<'view' | 'edit'>('view');
       return <PanelModeToggle mode={mode} onChange={setMode} />;
@@ -38,20 +38,31 @@ describe('Workflow Linear panel mode toggle', () => {
       );
     });
 
-    const buttons = host.querySelectorAll<HTMLButtonElement>('button[aria-pressed]');
-    expect([...buttons].map((button) => button.getAttribute('aria-pressed'))).toEqual(['true', 'false']);
+    return [...host.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+  };
 
-    await act(() => userEvent.click(buttons[1]!));
-    expect([...buttons].map((button) => button.getAttribute('aria-pressed'))).toEqual(['false', 'true']);
+  const selection = (tabs: HTMLButtonElement[]) => tabs.map((tab) => tab.getAttribute('aria-selected'));
 
-    buttons[0]?.focus();
-    await act(() => userEvent.keyboard('{Enter}'));
-    expect([...buttons].map((button) => button.getAttribute('aria-pressed'))).toEqual(['true', 'false']);
+  it('exposes View and Edit as a labelled tablist', async () => {
+    const tabs = await renderToggle();
 
-    await act(() => userEvent.tab());
-    expect(document.activeElement).toBe(buttons[1]);
+    expect(tabs).toHaveLength(2);
+    expect(host.querySelector('[role="tablist"]')?.getAttribute('aria-label')).toBeTruthy();
+    expect(selection(tabs)).toEqual(['true', 'false']);
+  });
 
-    await act(() => userEvent.keyboard(' '));
-    expect([...buttons].map((button) => button.getAttribute('aria-pressed'))).toEqual(['false', 'true']);
+  it('activates View and Edit with pointer and arrow keys', async () => {
+    const tabs = await renderToggle();
+
+    await act(() => userEvent.click(tabs[1]!));
+    expect(selection(tabs)).toEqual(['false', 'true']);
+
+    // Roving focus: the tablist is one tab stop and arrows move within it.
+    tabs[1]?.focus();
+    await act(() => userEvent.keyboard('{ArrowLeft}'));
+    expect(selection(tabs)).toEqual(['true', 'false']);
+
+    await act(() => userEvent.keyboard('{ArrowRight}'));
+    expect(selection(tabs)).toEqual(['false', 'true']);
   });
 });

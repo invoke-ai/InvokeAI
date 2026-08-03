@@ -28,18 +28,19 @@ describe('panZoom', () => {
     expect(next).toBe(atMaximum);
   });
 
-  it('applies wheel sensitivity and optional snapping through the same constrained transition', () => {
+  it('applies wheel sensitivity through the constrained transition', () => {
     const next = wheelZoomAtPoint(
       { pan: { x: 0, y: 0 }, zoom: 1 },
       -1,
       { x: 100, y: 50 },
       {
         constrainZoom: clamp(0.1, 20),
-        snapZoom: () => 1,
       }
     );
 
-    expect(next).toEqual({ pan: { x: 0, y: 0 }, zoom: 1 });
+    // A one-unit wheel delta is a small continuous step, not a jump to a preset.
+    expect(next.zoom).toBeGreaterThan(1);
+    expect(next.zoom).toBeLessThan(1.01);
   });
 
   it('pans in screen space without changing zoom', () => {

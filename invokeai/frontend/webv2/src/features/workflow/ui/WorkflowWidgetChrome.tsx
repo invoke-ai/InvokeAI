@@ -1,6 +1,6 @@
 import type { InvocationTemplate, XYPosition } from '@features/workflow/contracts';
 
-import { HStack, Icon, Input, Menu, Portal, Stack, Text } from '@chakra-ui/react';
+import { HStack, Icon, Menu, Portal, Stack, Text } from '@chakra-ui/react';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import {
   buildConnectorNode,
@@ -15,7 +15,7 @@ import {
   getCompatibleOutputTemplate,
   parseWorkflowJson,
 } from '@features/workflow/utility';
-import { IconButton, ConfirmDialog, Tooltip } from '@platform/ui';
+import { Button, IconButton, ConfirmDialog, Tooltip } from '@platform/ui';
 import { HistoryIcon, LibraryIcon, PlusIcon } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -42,22 +42,17 @@ import {
 } from './workflowUiStore';
 
 /**
- * The workflow widget's frame chrome. The label renders the editable
- * `Workflow / [name]` title; quick actions (add node, library, history) are
- * header icon buttons; everything else contributes to the shared widget
- * actions menu via the manifest's `headerMenu`. Dialogs live here (always
- * mounted) and are driven through `workflowUiStore`.
+ * The workflow widget's frame chrome. The label renders the `Workflow / [name]`
+ * title, where the name is the library trigger; quick actions (add node,
+ * library, history) are header icon buttons; everything else contributes to the
+ * shared widget actions menu via the manifest's `headerMenu`. Dialogs live here
+ * (always mounted) and are driven through `workflowUiStore`.
  */
 
 export const WorkflowWidgetLabel = ({ region }: WorkflowWidgetLabelProps) => {
   const { t } = useTranslation();
   const workflowName = useWorkflowProjectSelector((project) => project.projectGraph.name);
-  const { editGraph } = useProjectGraphCommands();
-  const changeWorkflowName = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) =>
-      editGraph({ patch: { name: event.currentTarget.value }, type: 'setMetadata' }),
-    [editGraph]
-  );
+  const openWorkflowLibrary = useCallback(() => setWorkflowLibraryOpen(true), []);
 
   if (region !== 'center') {
     return (
@@ -67,26 +62,33 @@ export const WorkflowWidgetLabel = ({ region }: WorkflowWidgetLabelProps) => {
     );
   }
 
+  // In the center the region's view selector already names the widget, so the
+  // label slot contributes only the `/ [name]` continuation. The name opens the
+  // library rather than editing in place: switching workflows is the thing
+  // reached for from a header, and renaming already lives in the details tab —
+  // an inline field here only invited stray keystrokes into the graph's name.
+  const displayName = workflowName || t('widgets.workflow.untitled');
+
   return (
     <HStack flex="1" gap="1" minW="0">
-      <Text flexShrink={0} fontSize="xs" fontWeight="700">
-        {t('widgets.labels.workflow')}
-      </Text>
       <Text color="fg.subtle" flexShrink={0} fontSize="xs">
         /
       </Text>
-      <Input
-        aria-label={t('widgets.workflow.name')}
-        fontSize="xs"
-        fontWeight="600"
-        h="6"
-        maxW="16rem"
-        placeholder={t('widgets.workflow.untitled')}
-        size="2xs"
-        value={workflowName}
-        variant="flushed"
-        onChange={changeWorkflowName}
-      />
+      <Tooltip content={t('widgets.workflow.library')}>
+        <Button
+          aria-label={t('widgets.workflow.openLibrary', { name: displayName })}
+          maxW="16rem"
+          minW="0"
+          size="2xs"
+          variant="ghost"
+          onClick={openWorkflowLibrary}
+        >
+          <Icon as={LibraryIcon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
+          <Text color={workflowName ? undefined : 'fg.subtle'} fontWeight="600" minW="0" truncate>
+            {displayName}
+          </Text>
+        </Button>
+      </Tooltip>
     </HStack>
   );
 };
@@ -168,17 +170,23 @@ export const WorkflowHeaderActions = ({ region }: WorkflowWidgetViewProps) => {
           </IconButton>
         </Tooltip>
       ) : null}
-      <Tooltip content={t('widgets.workflow.library')}>
-        <IconButton
-          aria-label={t('widgets.workflow.library')}
-          color="fg.muted"
-          size="2xs"
-          variant="ghost"
-          onClick={openWorkflowLibrary}
-        >
-          <Icon as={LibraryIcon} boxSize="3.5" />
-        </IconButton>
-      </Tooltip>
+      {/* Center already reaches the library through the header label, which
+          names the current workflow; a second identical trigger beside it would
+          be pure duplication. Other regions render a plain `Workflow` label, so
+          they still need this. */}
+      {region === 'center' ? null : (
+        <Tooltip content={t('widgets.workflow.library')}>
+          <IconButton
+            aria-label={t('widgets.workflow.library')}
+            color="fg.muted"
+            size="2xs"
+            variant="ghost"
+            onClick={openWorkflowLibrary}
+          >
+            <Icon as={LibraryIcon} boxSize="3.5" />
+          </IconButton>
+        </Tooltip>
+      )}
       <Menu.Root ids={historyIds} positioning={historyPositioning} onSelect={restoreHistoryEntry}>
         <Tooltip content={t('widgets.workflow.graphHistorySnapshots')} ids={historyIds}>
           <Menu.Trigger asChild>

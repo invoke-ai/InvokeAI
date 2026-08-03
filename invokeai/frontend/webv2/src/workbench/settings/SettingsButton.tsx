@@ -1,23 +1,17 @@
 import { IconButton } from '@platform/ui/Button';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { SettingsIcon } from 'lucide-react';
-import { lazy, Suspense, useCallback } from 'react';
+import { useCallback } from 'react';
 
-import { closeWorkbenchSettings, openWorkbenchSettings, settingsDialogStore } from './settingsDialogStore';
+import { SettingsDialogHost } from './SettingsDialogHost';
+import { openWorkbenchSettings } from './settingsDialogStore';
 
 /**
- * The top bar's settings entry point, kept deliberately thin.
- *
- * The dialog body reaches into workbench commands, the persistence service, and
- * every settings section, so importing it eagerly made the Launchpad pay for
- * the whole editor composition — aggregate project state included — before the
- * user had opened a project. The trigger owns nothing but the store
- * subscription; the body arrives on first open.
+ * The Launchpad's settings entry point, kept deliberately thin. The workbench
+ * shell opens settings from its app menu instead and mounts
+ * {@link SettingsDialogHost} on its own.
  */
-const LazySettingsDialog = lazy(() => import('./SettingsDialog'));
-
 export const SettingsButton = () => {
-  const isOpen = settingsDialogStore.useSelector((snapshot) => snapshot.isOpen);
   const handleOpen = useCallback(() => openWorkbenchSettings(), []);
 
   return (
@@ -27,11 +21,7 @@ export const SettingsButton = () => {
           <SettingsIcon />
         </IconButton>
       </Tooltip>
-      {isOpen ? (
-        <Suspense fallback={null}>
-          <LazySettingsDialog isOpen onClose={closeWorkbenchSettings} />
-        </Suspense>
-      ) : null}
+      <SettingsDialogHost />
     </>
   );
 };

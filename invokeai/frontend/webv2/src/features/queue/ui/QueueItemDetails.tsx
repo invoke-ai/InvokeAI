@@ -1,8 +1,9 @@
 import type { QueueItemReadModel } from '@features/queue/core/types';
 import type { ReactNode } from 'react';
 
-import { DataList, Separator, Text } from '@chakra-ui/react';
+import { Box, DataList, Separator, Text } from '@chakra-ui/react';
 import { extractGenerationMeta } from '@features/queue/core/generationMeta';
+import { Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatDuration } from './formatDuration';
@@ -19,6 +20,15 @@ const DetailRow = ({ label, children }: { label: string; children: ReactNode }) 
     </DataList.ItemValue>
   </DataList.Item>
 );
+
+/** Reserves the actions row's height so resolving the chunk doesn't shift the panel. */
+const ItemActionsPlaceholder = () => {
+  const { t } = useTranslation();
+
+  return <Box aria-busy="true" aria-label={t('widgets.queue.loading')} minH="6" role="status" w="full" />;
+};
+
+const ITEM_ACTIONS_PLACEHOLDER = <ItemActionsPlaceholder />;
 
 /** Expanded detail grid + actions for a RECENT queue item row. */
 export const QueueItemDetails = ({ item }: { item: QueueItemReadModel }) => {
@@ -62,7 +72,11 @@ export const QueueItemDetails = ({ item }: { item: QueueItemReadModel }) => {
       ) : null}
 
       <Separator borderColor="border.subtle" my="0.5" />
-      <ItemActions item={item} />
+      {/* ItemActions is a lazy chunk. Without this boundary the first expand
+          suspends against the widget root and blanks the whole queue panel. */}
+      <Suspense fallback={ITEM_ACTIONS_PLACEHOLDER}>
+        <ItemActions item={item} />
+      </Suspense>
     </DataList.Root>
   );
 };

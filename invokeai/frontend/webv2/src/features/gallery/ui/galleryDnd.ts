@@ -29,10 +29,17 @@ export interface GalleryBoardDropResolution {
 }
 
 export type GalleryItemDragSource = 'gallery-grid' | 'preview-filmstrip' | 'preview-frame';
-export type GalleryItemDragId = `${GalleryItemDragSource}:${GalleryItemKey}`;
+export type GalleryItemDragId = `${GalleryItemDragSource}${string}:${GalleryItemKey}`;
 
-export const getGalleryItemDragId = (item: GalleryItemRef, source: GalleryItemDragSource): GalleryItemDragId =>
-  `${source}:${toGalleryItemKey(item)}`;
+/**
+ * `scope` separates surfaces showing the same item: dnd-kit keys drag state by
+ * id, so two galleries sharing one both report as dragging.
+ */
+export const getGalleryItemDragId = (
+  item: GalleryItemRef,
+  source: GalleryItemDragSource,
+  scope?: string
+): GalleryItemDragId => `${source}${scope ? `#${scope}` : ''}:${toGalleryItemKey(item)}`;
 
 export const getGalleryBoardDropId = (boardId: string): string => `gallery-board:${boardId}`;
 
@@ -93,6 +100,28 @@ export const resolveGalleryBoardDrop = (
   const items = getGalleryItemRefsOutsideBoard(activeData, overData.boardId, loadedItems);
 
   return items.length > 0 ? { boardId: overData.boardId, items } : null;
+};
+
+/** Applies a board drop if the drag resolves to one, reporting whether it did. */
+export const forwardGalleryBoardDrop = ({
+  activeData,
+  loadedItems,
+  moveItemsToBoard,
+  overData,
+}: {
+  activeData: unknown;
+  loadedItems: readonly GalleryItem[];
+  moveItemsToBoard: (items: GalleryItemRef[], boardId: string) => void;
+  overData: unknown;
+}): boolean => {
+  const resolution = resolveGalleryBoardDrop(activeData, overData, loadedItems);
+
+  if (!resolution) {
+    return false;
+  }
+
+  moveItemsToBoard(resolution.items, resolution.boardId);
+  return true;
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;

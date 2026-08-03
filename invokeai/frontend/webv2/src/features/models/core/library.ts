@@ -45,17 +45,18 @@ export interface ModelPickerOptions {
   /** Extra predicate supplied by the owning form, e.g. base compatibility. */
   filter?: (model: ModelConfig) => boolean;
   modelTypes: ModelTaxonomyType[];
+  /** Models linked to the current selection, floated to the top of their group. */
+  relatedKeys?: ReadonlySet<string>;
   searchTerm: string;
 }
 
 /**
- * Picker list group: one per (type, base) pair so items never need a per-row
- * base badge — the header renders the base (and, for multi-type pickers, the
- * type label) from `base`/`type`.
+ * Picker list group: one per base. Type is deliberately NOT a grouping axis —
+ * a cross-type picker would otherwise repeat "Main Models" above every base
+ * section. Rows in a multi-type picker carry their own type badge instead.
  */
 export interface ModelPickerGroup {
   key: string;
-  type: ModelTaxonomyType;
   base: string;
   models: ModelConfig[];
 }
@@ -159,6 +160,9 @@ export const getModelPickerGroups = (models: ModelConfig[], options: ModelPicker
   // so the chip row stays stable while the user types or toggles chips.
   const availableBases = collectBasesForDisplay(candidates);
   const { baseFilter } = options;
+  const { relatedKeys } = options;
+  // Bases order the groups; within a group, related models lead, then category
+  // rank keeps main models above LoRAs in a cross-type picker, then name.
   const visibleModels = candidates
     .filter(
       (model) =>
@@ -167,9 +171,10 @@ export const getModelPickerGroups = (models: ModelConfig[], options: ModelPicker
     )
     .sort(
       (a, b) =>
-        getModelCategoryRank(a.type) - getModelCategoryRank(b.type) ||
         getBaseDisplayRank(String(a.base)) - getBaseDisplayRank(String(b.base)) ||
         String(a.base).localeCompare(String(b.base)) ||
+        Number(relatedKeys?.has(b.key) ?? false) - Number(relatedKeys?.has(a.key) ?? false) ||
+        getModelCategoryRank(a.type) - getModelCategoryRank(b.type) ||
         a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
     );
 
@@ -181,17 +186,16 @@ const groupModelsForPicker = (models: ModelConfig[]): ModelPickerGroup[] => {
 
   for (const model of models) {
     const base = String(model.base);
-    const key = `${model.type}:${base}`;
-    const existing = groups.get(key);
+    const existing = groups.get(base);
 
     if (existing) {
       existing.models.push(model);
     } else {
-      groups.set(key, { base, key, models: [model], type: model.type });
+      groups.set(base, { base, key: base, models: [model] });
     }
   }
 
-  // Insertion order already follows the sorted model list (category, base, name).
+  // Insertion order already follows the sorted model list (base, related, name).
   return [...groups.values()];
 };
 

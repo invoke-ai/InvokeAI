@@ -170,8 +170,6 @@ export const PreviewCompare = ({
       <Flex
         align="center"
         backgroundColor="bg.inset"
-        borderWidth="1px"
-        borderColor="border.subtle"
         color="fg.grid"
         containerType="size"
         css={previewGridCss}
@@ -180,7 +178,6 @@ export const PreviewCompare = ({
         minH="0"
         overflow="hidden"
         p="6"
-        rounded="lg"
         w="full"
       >
         {mode === 'slider' ? (

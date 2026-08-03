@@ -1,4 +1,4 @@
-import { ZOOM_SNAP_CANDIDATES } from '@workbench/canvas-engine/math/snapping';
+import { ZOOM_PRESETS } from '@workbench/canvas-engine/math/snapping';
 import { describe, expect, it } from 'vitest';
 
 import { formatZoomPercent, zoomMenuOptions } from './zoomOptions';
@@ -19,14 +19,14 @@ describe('formatZoomPercent', () => {
 describe('zoomMenuOptions', () => {
   it('covers every snap candidate', () => {
     const options = zoomMenuOptions();
-    expect(options).toHaveLength(ZOOM_SNAP_CANDIDATES.length);
-    expect(new Set(options.map((option) => option.value))).toEqual(new Set(ZOOM_SNAP_CANDIDATES));
+    expect(options).toHaveLength(ZOOM_PRESETS.length);
+    expect(new Set(options.map((option) => option.value))).toEqual(new Set(ZOOM_PRESETS));
   });
 
   it('is ordered from largest to smallest zoom', () => {
     const values = zoomMenuOptions().map((option) => option.value);
     expect(values).toEqual([...values].sort((a, b) => b - a));
-    expect(values[0]).toBe(Math.max(...ZOOM_SNAP_CANDIDATES));
+    expect(values[0]).toBe(Math.max(...ZOOM_PRESETS));
   });
 
   it('pairs each value with its formatted label', () => {

@@ -39,9 +39,11 @@ const QUEUE_ITEM_BUTTON_SX: SystemStyleObject = {
 export const QueueItemRow = memo(
   ({ item, revealRequest }: { item: QueueItemReadModel; revealRequest?: QueueItemRevealRequest | null }) => {
     const { t } = useTranslation();
-    const { canManageItem, canViewItemDetails } = useQueueUi();
+    const { canManageItem, canViewItemDetails, preloadItemActions } = useQueueUi();
     const [expanded, setExpanded] = useState(false);
     const toggle = useCallback(() => setExpanded((open) => !open), []);
+    // Warm the actions chunk on intent so the first expand has nothing to wait for.
+    const preload = useCallback(() => preloadItemActions?.(), [preloadItemActions]);
     const consumedRevealRequestIdRef = useRef<number | null>(null);
     const meta = extractGenerationMeta(item);
     const duration = formatDuration(item.startedAt, item.completedAt);
@@ -86,6 +88,8 @@ export const QueueItemRow = memo(
             as={canExpand ? 'button' : 'div'}
             css={QUEUE_ITEM_BUTTON_SX}
             onClick={canExpand ? toggle : undefined}
+            onFocus={canExpand ? preload : undefined}
+            onPointerEnter={canExpand ? preload : undefined}
           >
             <QueueItemThumbnail boxSize="8" imageName={resultImageName} liveImage={liveImage} />
             <Stack flex="1" gap="0.5" minW="0">

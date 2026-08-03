@@ -8,8 +8,8 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { IconButton, Row, ToggleDot } from '@platform/ui';
 import { isHideableLayer, isLayerHidden } from '@workbench/canvas-engine/api';
-import { EyeIcon, EyeOffIcon, GripVerticalIcon, LockIcon, LockOpenIcon } from 'lucide-react';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { EyeIcon, EyeOffIcon, LockIcon, LockOpenIcon } from 'lucide-react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { ControlLayerWarningIcon } from './ControlLayerWarningIcon';
@@ -19,7 +19,6 @@ import {
   LayerContextMenu,
   type LayerContextMenuEngine,
 } from './LayerContextMenu';
-import { shouldStartLayerKeyboardDrag } from './layerDndConfig';
 import { createLayerMenuTargetFromContextEvent } from './layerMenuState';
 import { applyStructural } from './layerOps';
 import { LayerPropertiesPopover, type LayerPropertiesEngine } from './LayerPropertiesPopover';
@@ -70,7 +69,6 @@ const VISIBILITY_DOT_UNCHECKED_HOVER = {
 
 export type LayerListItemEngine = LayerContextMenuEngine & LayerPropertiesEngine & Pick<CanvasEngineHandle, 'previews'>;
 
-/** i18n key for a layer's short type/source badge. */
 const layerBadgeKey = (layer: CanvasLayerContract): string => {
   if (layer.type === 'raster') {
     return layer.source.type === 'image' ? 'widgets.layers.types.image' : 'widgets.layers.types.paint';
@@ -96,14 +94,6 @@ export const getLayerListItemInteractionState = (editingLocked: boolean) => ({
   sortableDisabled: editingLocked,
 });
 
-/**
- * One layer row: thumbnail, name (double-click to rename), type badge,
- * visibility + lock toggles, a properties popover (blend mode + the layer's
- * type-specific settings), and an overflow/context menu. The whole row remains
- * the pointer drag target, while a dedicated reorder button owns keyboard
- * sorting. The pointer distance constraint keeps clicks, double-click rename,
- * and row buttons working; selected-layer opacity lives in the panel header.
- */
 export const LayerListItem = ({
   dispatch,
   editingLocked,
@@ -119,7 +109,6 @@ export const LayerListItem = ({
     disabled: interaction.sortableDisabled,
     id: layer.id,
   });
-  const rowRef = useRef<HTMLElement | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [draftName, setDraftName] = useState(layer.name);
   const [contextMenuTarget, setContextMenuTarget] = useState<CanvasLayerContextMenuTarget | null>(null);
@@ -161,12 +150,6 @@ export const LayerListItem = ({
     [layer.isEnabled, patchBase, t]
   );
 
-  /**
-   * Hide is a DISPLAY-only axis, orthogonal to enabled: a hidden control map or
-   * mask still conditions generation exactly as it would if visible. Only the
-   * three overlay types have it — for a raster layer, visibility and
-   * participation are the same fact.
-   */
   const handleToggleHidden = useCallback(
     (event: { stopPropagation: () => void }) => {
       event.stopPropagation();
@@ -236,44 +219,35 @@ export const LayerListItem = ({
 
   const closeContextMenu = useCallback(() => setContextMenuTarget(null), []);
 
-  // The row's own DOM node, so the drag activator can tell a keystroke made
-  // inside it from one that bubbled in through the React tree from a portal.
-  const setRowRef = useCallback(
-    (node: HTMLElement | null) => {
-      rowRef.current = node;
-      setNodeRef(node);
-    },
-    [setNodeRef]
-  );
-
   /**
-   * dnd-kit starts a drag on Enter and inspects only the key code, so the
-   * activator is gated here — see {@link shouldStartLayerKeyboardDrag}. Without
-   * it, `mod+Enter` (Invoke) with a row focused starts an invisible drag that
-   * leaves the row at drag opacity, reading as a disabled layer.
+   * Pointer listeners only. dnd-kit starts a keyboard drag on Enter and
+   * inspects nothing but the key code, so with no grip to own that gesture the
+   * activator is left unattached — Enter on a row belongs to selection, and
+   * `mod+Enter` (Invoke) can no longer begin an invisible drag that leaves the
+   * row at drag opacity. Keyboard reordering is the context menu's Move actions.
    */
-  const sortableListeners = useMemo(() => {
+  const sortableRowListeners = useMemo(() => {
     if (interaction.sortableDisabled || !listeners) {
-      return { handle: {}, row: {} };
+      return {};
     }
-    const { onKeyDown, ...rest } = listeners;
-    return {
-      handle: {
-        onKeyDown: (event: KeyboardEvent<HTMLElement>) => {
-          if (!shouldStartLayerKeyboardDrag(event, rowRef.current)) {
-            return;
-          }
-          onKeyDown?.(event);
-        },
-      },
-      row: rest,
-    };
+    const { onKeyDown: _onKeyDown, ...rest } = listeners;
+    return rest;
   }, [interaction.sortableDisabled, listeners]);
 
+  // The selection button carries them, and owns its own role, focus, and
+  // pressed state — dnd-kit's versions of those would overwrite it.
+  const sortableAttributes = useMemo(() => {
+    if (interaction.sortableDisabled) {
+      return {};
+    }
+    const { role: _role, tabIndex: _tabIndex, 'aria-pressed': _ariaPressed, ...rest } = attributes;
+    return rest;
+  }, [attributes, interaction.sortableDisabled]);
+
   return (
-    <Box ref={setRowRef} style={dndStyle}>
+    <Box ref={setNodeRef} style={dndStyle}>
       <Row
-        {...sortableListeners.row}
+        {...sortableRowListeners}
         active={isSelected ? 'muted' : undefined}
         cursor={isDragging ? 'grabbing' : 'default'}
         display="flex"
@@ -282,9 +256,20 @@ export const LayerListItem = ({
         position="relative"
         onContextMenu={handleContextMenu}
       >
+        {/*
+          No grip: the row itself is the pointer drag target, and the
+          row-covering selection button carries the sortable role description so
+          the affordance is still announced. dnd-kit's `role` / `tabIndex` /
+          `aria-pressed` are dropped so the button keeps its own selection
+          semantics — notably Enter, which selects rather than starting a drag.
+          Keyboard reordering is the context menu's Move actions.
+        */}
         <chakra.button
+          ref={setActivatorNodeRef}
+          {...sortableAttributes}
           aria-label={t('widgets.layers.actions.select', { name: layer.name })}
           aria-pressed={isSelected}
+          cursor={isDragging ? 'grabbing' : undefined}
           inset="0"
           position="absolute"
           rounded="sm"
@@ -294,19 +279,6 @@ export const LayerListItem = ({
           onDoubleClick={interaction.canRename ? startEditing : undefined}
         />
         <HStack css={ROW_INTERACTIVE_DESCENDANTS} gap="1.5" pointerEvents="none" position="relative" w="full">
-          <IconButton
-            ref={setActivatorNodeRef}
-            {...(interaction.sortableDisabled ? {} : attributes)}
-            {...sortableListeners.handle}
-            aria-label={`${t('widgets.layers.actions.reorder')}: ${layer.name}`}
-            color="fg.subtle"
-            cursor={isDragging ? 'grabbing' : 'grab'}
-            disabled={interaction.sortableDisabled}
-            size="2xs"
-            variant="ghost"
-          >
-            <GripVerticalIcon aria-hidden="true" />
-          </IconButton>
           <LayerThumbnail engine={engine} layer={layer} />
           <Stack flex="1" gap="0.5" minW="0">
             {isEditing ? (
@@ -333,55 +305,72 @@ export const LayerListItem = ({
               <ControlLayerWarningIcon layer={layer} />
             </HStack>
           </Stack>
-          {isHideableLayer(layer) ? (
+          {/*
+            One control cluster on the same 0.5 rhythm as the group header's, so
+            every row's trailing icons land in the same columns as each other and
+            as the header above. Raster layers have no display axis, so their
+            hide slot is held open rather than collapsed — otherwise their
+            remaining controls would shift out of column against masks.
+          */}
+          <HStack flexShrink="0" gap="0.5">
+            {isHideableLayer(layer) ? (
+              <IconButton
+                aria-label={t('widgets.layers.actions.toggleHidden')}
+                aria-pressed={!isLayerHidden(layer)}
+                color={isLayerHidden(layer) ? 'fg.subtle' : 'fg'}
+                disabled={!interaction.canToggleVisibility}
+                size="2xs"
+                variant="ghost"
+                onClick={handleToggleHidden}
+                onPointerDown={stopPropagation}
+              >
+                {isLayerHidden(layer) ? <EyeOffIcon /> : <EyeIcon />}
+              </IconButton>
+            ) : (
+              <Box boxSize="6" />
+            )}
+            {/*
+              `display="flex"` is load bearing, not cosmetic: as a block box this
+              wrapper lays its button out on a text baseline, and the descender
+              space below made it 30px tall and pushed the control 3px above the
+              centre line its sibling icon buttons sit on.
+            */}
+            <Box display="flex" flexShrink="0" onClick={stopPropagation} onPointerDown={stopPropagation}>
+              <ToggleDot
+                _before={layer.isEnabled ? VISIBILITY_DOT_CHECKED : VISIBILITY_DOT_UNCHECKED}
+                _focusVisible={ROW_SELECTION_FOCUS}
+                _hover={layer.isEnabled ? VISIBILITY_DOT_CHECKED_HOVER : VISIBILITY_DOT_UNCHECKED_HOVER}
+                bg="transparent"
+                borderWidth="0"
+                checked={layer.isEnabled}
+                cursor={interaction.canToggleVisibility ? 'pointer' : 'not-allowed'}
+                disabled={!interaction.canToggleVisibility}
+                h="6"
+                label={t('widgets.layers.actions.toggleVisibility')}
+                position="relative"
+                transition="none"
+                w="6"
+                onCheckedChange={handleToggleVisible}
+              />
+            </Box>
             <IconButton
-              aria-label={t('widgets.layers.actions.toggleHidden')}
-              aria-pressed={!isLayerHidden(layer)}
-              color={isLayerHidden(layer) ? 'fg.subtle' : 'fg'}
-              disabled={!interaction.canToggleVisibility}
+              aria-label={t('widgets.layers.actions.toggleLock')}
+              color={layer.isLocked ? 'fg' : 'fg.subtle'}
+              disabled={!interaction.canToggleLock}
               size="2xs"
               variant="ghost"
-              onClick={handleToggleHidden}
+              onClick={handleToggleLock}
               onPointerDown={stopPropagation}
             >
-              {isLayerHidden(layer) ? <EyeOffIcon /> : <EyeIcon />}
+              {layer.isLocked ? <LockIcon /> : <LockOpenIcon />}
             </IconButton>
-          ) : null}
-          <Box flexShrink="0" onClick={stopPropagation} onPointerDown={stopPropagation}>
-            <ToggleDot
-              _before={layer.isEnabled ? VISIBILITY_DOT_CHECKED : VISIBILITY_DOT_UNCHECKED}
-              _focusVisible={ROW_SELECTION_FOCUS}
-              _hover={layer.isEnabled ? VISIBILITY_DOT_CHECKED_HOVER : VISIBILITY_DOT_UNCHECKED_HOVER}
-              bg="transparent"
-              borderWidth="0"
-              checked={layer.isEnabled}
-              cursor={interaction.canToggleVisibility ? 'pointer' : 'not-allowed'}
-              disabled={!interaction.canToggleVisibility}
-              h="6"
-              label={t('widgets.layers.actions.toggleVisibility')}
-              position="relative"
-              transition="none"
-              w="6"
-              onCheckedChange={handleToggleVisible}
-            />
-          </Box>
-          <IconButton
-            aria-label={t('widgets.layers.actions.toggleLock')}
-            color={layer.isLocked ? 'fg' : 'fg.subtle'}
-            disabled={!interaction.canToggleLock}
-            size="2xs"
-            variant="ghost"
-            onClick={handleToggleLock}
-            onPointerDown={stopPropagation}
-          >
-            {layer.isLocked ? <LockIcon /> : <LockOpenIcon />}
-          </IconButton>
-          <Box flexShrink="0" onClick={stopPropagation} onPointerDown={stopPropagation}>
-            <LayerPropertiesPopover dispatch={dispatch} engine={engine} layer={layer} />
-          </Box>
-          <Box flexShrink="0" onPointerDown={stopPropagation}>
-            <LayerContextMenu dispatch={dispatch} engine={engine} index={index} layer={layer} layers={layers} />
-          </Box>
+            <Box display="flex" flexShrink="0" onClick={stopPropagation} onPointerDown={stopPropagation}>
+              <LayerPropertiesPopover dispatch={dispatch} engine={engine} layer={layer} />
+            </Box>
+            <Box display="flex" flexShrink="0" onPointerDown={stopPropagation}>
+              <LayerContextMenu dispatch={dispatch} engine={engine} index={index} layer={layer} layers={layers} />
+            </Box>
+          </HStack>
         </HStack>
       </Row>
       <CanvasLayerContextMenu

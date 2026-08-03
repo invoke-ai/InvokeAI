@@ -368,12 +368,8 @@ export const WorkflowLibraryDialog = ({
                         onValueChange={(event) => setCategory(event.value as WorkflowLibraryCategory)}
                       >
                         <Tabs.List>
-                          <Tabs.Trigger fontSize="xs" value="user">
-                            Yours
-                          </Tabs.Trigger>
-                          <Tabs.Trigger fontSize="xs" value="default">
-                            Defaults
-                          </Tabs.Trigger>
+                          <Tabs.Trigger value="user">Yours</Tabs.Trigger>
+                          <Tabs.Trigger value="default">Defaults</Tabs.Trigger>
                         </Tabs.List>
                       </Tabs.Root>
                       <Input

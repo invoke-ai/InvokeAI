@@ -1,8 +1,8 @@
 import type { WidgetViewProps } from '@workbench/widgetContracts';
 
-import { Box, HStack, Icon } from '@chakra-ui/react';
+import { Box, HStack } from '@chakra-ui/react';
 import { useProgressImage } from '@features/queue/react';
-import { IconButton } from '@platform/ui';
+import { ToggleIconButton } from '@platform/ui';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { GalleryThumbnailsIcon, HourglassIcon } from 'lucide-react';
@@ -58,27 +58,24 @@ export const PreviewHeaderActions = ({ region }: WidgetViewProps) => {
           <Box bg="border.subtle" flexShrink={0} h="4" w="1px" />
         </>
       ) : null}
-      <IconButton
-        aria-label={filmstripLabel}
-        color={isFilmstripVisible ? 'fg' : 'fg.muted'}
-        size="2xs"
-        title={filmstripLabel}
-        variant="ghost"
-        onClick={toggleFilmstrip}
-      >
-        <Icon as={GalleryThumbnailsIcon} boxSize="3.5" />
-      </IconButton>
-      <IconButton
-        aria-label={label}
-        colorPalette={showProgressImagesInViewer ? 'accent' : 'gray'}
+      {/* Both toggles go through `ToggleIconButton` so they read as one control
+          type: the filled variant carries "on", `aria-pressed` carries it for
+          assistive tech, and the label doubles as the tooltip. */}
+      <ToggleIconButton
+        checked={isFilmstripVisible}
+        icon={GalleryThumbnailsIcon}
+        label={filmstripLabel}
+        onCheckedChange={toggleFilmstrip}
+      />
+      <ToggleIconButton
+        checked={showProgressImagesInViewer}
+        icon={HourglassIcon}
+        label={label}
+        // Dimmed while there is nothing in flight to show. Spread after the
+        // primitive's own props, so it survives.
         opacity={hasProgressImage || showProgressImagesInViewer ? 1 : 0.7}
-        size="2xs"
-        title={label}
-        variant={showProgressImagesInViewer ? 'solid' : 'ghost'}
-        onClick={toggleProgressImages}
-      >
-        <Icon as={HourglassIcon} boxSize="3.5" />
-      </IconButton>
+        onCheckedChange={toggleProgressImages}
+      />
     </HStack>
   );
 };

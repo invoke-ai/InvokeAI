@@ -65,12 +65,13 @@ vi.mock('react-i18next', () => ({
         'widgets.gallery.uploadDateBoardUnavailable': 'Uploads are unavailable for date boards.',
         'widgets.gallery.uploadFailed': `No files uploaded. ${String(values?.failed)} failed.`,
         'widgets.gallery.uploadPartialTitle': `Uploaded ${String(values?.succeeded)} of ${String(values?.total)} files`,
-        'widgets.gallery.uploadSplit': 'Images appear in Assets; videos appear in Images.',
+        'widgets.gallery.uploadSplit': 'Images appear in Assets; videos appear in Media.',
         'widgets.gallery.uploadSummary': `${String(values?.images)} and ${String(values?.videos)} uploaded to ${String(
           values?.board
         )}. ${String(values?.failed)} failed.`,
         'widgets.gallery.uploadSuccessTitle': `Uploaded ${String(values?.count)} files`,
         'widgets.gallery.uploadUnsupported': 'No supported media files to upload (PNG, JPEG, WebP, or MP4).',
+        'widgets.gallery.uncategorized': 'Uncategorized',
         'widgets.gallery.videoCount': `${String(values?.count)} videos`,
       };
 
@@ -120,6 +121,15 @@ const Probe = ({
         kind: 'board',
         name: 'Board 1',
         videoCount: 1,
+      },
+      {
+        archived: false,
+        assetCount: 0,
+        id: 'none',
+        imageCount: 0,
+        kind: 'uncategorized',
+        name: '',
+        videoCount: 0,
       },
     ],
     loadMore: vi.fn(),
@@ -250,6 +260,22 @@ describe('deleteBoard', () => {
       kind: 'success',
       message: 'Deleted 2 images and 1 videos; 1 images and 1 videos failed.',
       title: 'Deleted board "Board 1" with partial media cleanup',
+    });
+  });
+});
+
+describe('localized board labels', () => {
+  it('uses the localized Uncategorized label in board notifications', async () => {
+    mocks.downloadGalleryArchive.mockResolvedValue({ blob: new Blob(['archive']), fileName: 'gallery.zip' });
+
+    await act(async () => {
+      await actionsRef.current?.downloadBoard('none');
+    });
+
+    expect(mocks.notificationsAdd).toHaveBeenCalledWith({
+      kind: 'info',
+      message: 'Preparing an image archive of "Uncategorized". 0 video will be omitted.',
+      title: 'Preparing download',
     });
   });
 });
@@ -404,7 +430,7 @@ describe('mixed gallery upload', () => {
     expect(mocks.notificationsAdd).toHaveBeenCalledOnce();
     expect(mocks.notificationsAdd).toHaveBeenCalledWith({
       kind: 'success',
-      message: '2 images and 2 videos uploaded to Board 1. 1 failed. Images appear in Assets; videos appear in Images.',
+      message: '2 images and 2 videos uploaded to Board 1. 1 failed. Images appear in Assets; videos appear in Media.',
       title: 'Uploaded 4 of 5 files',
     });
   });

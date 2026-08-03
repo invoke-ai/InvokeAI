@@ -30,6 +30,29 @@ const BUILD_SCHEMA_VERSION = 2;
 const BROWSER_SCHEMA_VERSION = 2;
 const CHUNK_SOURCE_SCHEMA_VERSION = 1;
 
+export const waitForRequiredRequests = async ({
+  context,
+  getRequested,
+  pollIntervalMs = 25,
+  requiredRequests,
+  timeoutMs = 10_000,
+}) => {
+  const required = new Set(requiredRequests);
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const requested = new Set(getRequested());
+    if ([...required].every((request) => requested.has(request))) {
+      return;
+    }
+    await new Promise((resolveWait) => {
+      setTimeout(resolveWait, pollIntervalMs);
+    });
+  }
+
+  throw new Error(`${context} did not request required widgets ${JSON.stringify([...required])}.`);
+};
+
 const isPlainObject = (value) => typeof value === 'object' && value !== null && !Array.isArray(value);
 
 const assertPlainObject = (value, path) => {

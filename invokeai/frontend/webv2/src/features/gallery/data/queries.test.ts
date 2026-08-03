@@ -97,7 +97,7 @@ describe('Gallery item query read model', () => {
 
   it('coalesces board readers through one query key and includes requested virtual boards', async () => {
     const queryClient = createQueryClient();
-    const board = { id: 'none', kind: 'uncategorized', name: 'Uncategorized' };
+    const board = { id: 'none', kind: 'uncategorized', name: '' };
     const dateBoard = { id: 'by_date:2026-07-18', kind: 'date', name: 'July 18' };
     const options = galleryBoardsOptions({ includeDateBoards: true, orderDir: 'DESC' });
 

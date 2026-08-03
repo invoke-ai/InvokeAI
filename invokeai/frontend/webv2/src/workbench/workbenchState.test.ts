@@ -594,10 +594,10 @@ describe('workbench widget state updates', () => {
 });
 
 describe('workbench layout presets', () => {
-  it('applies the Default preset as a full widget-region layout', () => {
+  it('applies the Compose preset as a full widget-region layout', () => {
     let state = createInitialWorkbenchState();
 
-    state = workbenchReducer(state, { presetId: 'canvas-default', type: 'applyPreset' });
+    state = workbenchReducer(state, { presetId: 'compose', type: 'applyPreset' });
 
     const project = getActiveProject(state);
 
@@ -673,10 +673,96 @@ describe('workbench layout presets', () => {
       presetId: 'custom-layout-1',
       type: 'renameLayoutPreset',
     });
-    state = workbenchReducer(state, { presetId: 'canvas-default', type: 'renameLayoutPreset', label: 'Nope' });
+    state = workbenchReducer(state, { presetId: 'compose', type: 'renameLayoutPreset', label: 'Nope' });
     state = workbenchReducer(state, { presetId: 'custom-layout-1', type: 'deleteLayoutPreset' });
 
     expect(state.account.customLayoutPresets).toEqual([]);
+  });
+
+  it('moves every project off a deleted custom layout preset', () => {
+    let state = createInitialWorkbenchState();
+    const firstProjectId = state.activeProjectId;
+
+    state = workbenchReducer(state, {
+      label: 'Shared custom layout',
+      presetId: 'custom-layout-1',
+      type: 'addLayoutPreset',
+    });
+    state = workbenchReducer(state, { presetId: 'custom-layout-1', type: 'applyPreset' });
+    state = workbenchReducer(state, { type: 'createProject' });
+    const secondProjectId = state.activeProjectId;
+    state = workbenchReducer(state, { presetId: 'custom-layout-1', type: 'applyPreset' });
+
+    state = workbenchReducer(state, { presetId: 'custom-layout-1', type: 'deleteLayoutPreset' });
+
+    expect(getProject(state, firstProjectId).layout.presetId).toBe('compose');
+    expect(getProject(state, secondProjectId).layout.presetId).toBe('compose');
+    expect(state.account.activeLayoutPresetId).toBe('compose');
+  });
+
+  // Contract §9.1 of the top-bar redesign. If switching presets loses work,
+  // users stop switching them and the whole centre strip becomes dead weight,
+  // so this is a correctness requirement rather than polish.
+  it('preserves widget state across a Compose to Edit to Compose round trip', () => {
+    let state = workbenchReducer(createInitialWorkbenchState(), { presetId: 'compose', type: 'applyPreset' });
+
+    state = workbenchReducer(state, {
+      type: 'patchGenerateSettings',
+      values: { positivePrompt: 'a lighthouse at dusk', steps: 42 },
+    });
+    state = workbenchReducer(state, {
+      instanceId: 'gallery',
+      type: 'patchWidgetInstanceValues',
+      values: { scrollOffset: 1280 },
+    });
+
+    state = workbenchReducer(state, { presetId: 'edit', type: 'applyPreset' });
+    state = workbenchReducer(state, { presetId: 'compose', type: 'applyPreset' });
+
+    const generateValues = getProjectWidgetValues(getActiveProject(state), 'generate');
+
+    expect(generateValues.positivePrompt).toBe('a lighthouse at dusk');
+    expect(generateValues.steps).toBe(42);
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').scrollOffset).toBe(1280);
+  });
+
+  it('saves the live arrangement onto a built-in preset and restores its shipped default', () => {
+    let state = workbenchReducer(createInitialWorkbenchState(), { presetId: 'compose', type: 'applyPreset' });
+
+    state = workbenchReducer(state, { region: 'right', sizePx: 320, type: 'setRegionWidgetSize' });
+    state = workbenchReducer(state, { presetId: 'compose', type: 'saveLayoutPreset' });
+
+    expect(state.account.layoutPresetOverrides?.compose?.widgetRegions.right.sizePx).toBe(320);
+
+    // Reverting now lands on the saved edit, not on the shipped arrangement.
+    state = workbenchReducer(state, { region: 'right', sizePx: 500, type: 'setRegionWidgetSize' });
+    state = workbenchReducer(state, { type: 'resetActiveLayout' });
+
+    expect(getActiveProject(state).widgetRegions.right.sizePx).toBe(320);
+
+    state = workbenchReducer(state, { presetId: 'compose', type: 'restoreLayoutPresetDefault' });
+    state = workbenchReducer(state, { type: 'resetActiveLayout' });
+
+    expect(state.account.layoutPresetOverrides?.compose).toBeUndefined();
+    expect(getActiveProject(state).widgetRegions.right.sizePx).toBe(450);
+  });
+
+  it('resolves retired built-in preset ids onto the three shipped presets', () => {
+    const initial = createInitialWorkbenchState();
+    const hydrated = workbenchReducer(initial, {
+      state: {
+        ...initial,
+        account: { activeLayoutPresetId: 'workflow' },
+        projects: initial.projects.map((project) => ({
+          ...project,
+          layout: { ...project.layout, presetId: 'canvas' },
+        })),
+      } as unknown as WorkbenchState,
+      type: 'hydrateWorkbench',
+    });
+
+    expect(hydrated.account.activeLayoutPresetId).toBe('automate');
+    expect(getActiveProject(hydrated).layout.presetId).toBe('edit');
   });
 });
 
@@ -2351,7 +2437,7 @@ describe('workbench account and project settings', () => {
   it('starts with the default layout preset and legacy-matching project settings', () => {
     const state = createInitialWorkbenchState();
 
-    expect(state.account).toEqual({ activeLayoutPresetId: 'canvas-default' });
+    expect(state.account).toEqual({ activeLayoutPresetId: 'compose' });
     expect(getActiveProject(state).settings).toEqual(DEFAULT_PROJECT_SETTINGS);
   });
 
@@ -2364,7 +2450,13 @@ describe('workbench account and project settings', () => {
 
     const state = workbenchReducer(initial, { state: legacy, type: 'hydrateWorkbench' });
 
-    expect(state.account).toEqual({ activeLayoutPresetId: 'gallery', customLayoutPresets: [] });
+    // `gallery` was retired with the three-preset model; it resolves to Compose,
+    // the arrangement it was a center-view variant of.
+    expect(state.account).toEqual({
+      activeLayoutPresetId: 'compose',
+      customLayoutPresets: [],
+      layoutPresetOverrides: {},
+    });
   });
 
   it('heals hydrated accounts that are missing a layout preset', () => {
@@ -2373,7 +2465,7 @@ describe('workbench account and project settings', () => {
 
     const state = workbenchReducer(initial, { state: legacy, type: 'hydrateWorkbench' });
 
-    expect(state.account.activeLayoutPresetId).toBe('canvas-default');
+    expect(state.account.activeLayoutPresetId).toBe('compose');
   });
 
   it('updates project settings on the active project only', () => {
@@ -4149,6 +4241,23 @@ describe('auto invocation route switching', () => {
     });
 
     expect(getRoute(destinationLockedState)).toMatchObject({ destination: 'canvas', sourceId: 'upscale' });
+  });
+
+  it('toggles both routing locks together and normalizes a mixed lock state', () => {
+    let unlockedState = createInitialWorkbenchState();
+
+    unlockedState = workbenchReducer(unlockedState, { type: 'toggleRoutingLock' });
+    expect(getRoute(unlockedState)).toMatchObject({ destinationLocked: true, sourceLocked: true });
+
+    unlockedState = workbenchReducer(unlockedState, { type: 'toggleRoutingLock' });
+    expect(getRoute(unlockedState)).toMatchObject({ destinationLocked: false, sourceLocked: false });
+
+    let mixedState = createInitialWorkbenchState();
+    mixedState = workbenchReducer(mixedState, { type: 'toggleSourceLock' });
+    expect(getRoute(mixedState)).toMatchObject({ destinationLocked: false, sourceLocked: true });
+
+    mixedState = workbenchReducer(mixedState, { type: 'toggleRoutingLock' });
+    expect(getRoute(mixedState)).toMatchObject({ destinationLocked: false, sourceLocked: false });
   });
 
   it('never remaps the destination on a manual source change or a same-source edit', () => {

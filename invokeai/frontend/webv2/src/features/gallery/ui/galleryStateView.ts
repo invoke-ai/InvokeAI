@@ -16,13 +16,18 @@ import {
 import { getGallerySettings, type GallerySettings } from '@features/gallery/core/settings';
 import { getQueueItemSnapshotBatchCount, getQueueItemSnapshotDimensions } from '@features/queue/contracts';
 
+/**
+ * Stand-in shown before any board has loaded. `name` is intentionally empty:
+ * the UI labels uncategorized boards from `kind` through `getGalleryBoardLabel`,
+ * so there is no English string to invent here.
+ */
 const UNCATEGORIZED_BOARD: GalleryBoard = {
   archived: false,
   assetCount: 0,
   id: 'none',
   imageCount: 0,
   kind: 'uncategorized',
-  name: 'Uncategorized',
+  name: '',
   videoCount: 0,
 };
 

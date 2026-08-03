@@ -1,3 +1,5 @@
+import type { GalleryItemsFilter } from '@features/gallery/data/queries';
+
 import { getBoundedRecentImages } from '@features/gallery/core/recentImages';
 import { getGallerySettings } from '@features/gallery/core/settings';
 import { GALLERY_PAGE_SIZE, galleryItemNamesOptions } from '@features/gallery/data/queries';
@@ -9,7 +11,8 @@ import { useTranslation } from 'react-i18next';
 
 import type { GalleryStateView } from './galleryStateView';
 
-import { GalleryPanelContent } from './GalleryPanelContent';
+import { GalleryBoardDragMonitor } from './GalleryBoardDragMonitor';
+import { GalleryLayout } from './GalleryLayout';
 import {
   getGalleryPage,
   getGalleryProjectBoardId,
@@ -135,8 +138,6 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
     selectedBoardId,
   });
 
-  const isWidePlacement = region === 'center' || (region === 'bottom' && presentation === 'expanded');
-
   // Publish the backend total into widget values so the manifest footer can
   // render page navigation without its own fetch, and clamp the page when the
   // query shrinks (e.g. after deletions).
@@ -190,10 +191,11 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
     >
       <GalleryWidgetContent
         actions={actions}
+        filter={data.filter}
         gallery={gallery}
         isWindowTruncated={data.isWindowTruncated}
-        layout={isWidePlacement ? 'wide' : 'stacked'}
         projectName={projectName}
+        region={region}
         runtime={runtime}
       />
     </ItemActionsProvider>
@@ -202,28 +204,31 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
 
 const GalleryWidgetContent = ({
   actions,
+  filter,
   gallery,
   isWindowTruncated,
-  layout,
   projectName,
+  region,
   runtime,
 }: {
   actions: GalleryActions;
+  filter: GalleryItemsFilter;
   gallery: GalleryStateView;
   isWindowTruncated: boolean;
-  layout: 'stacked' | 'wide';
   projectName: string;
+  region: GalleryWidgetProps['region'];
   runtime: GalleryWidgetRuntime;
 }) => {
   const itemActions = useGalleryItemActions();
   const contextValue = useMemo<GalleryWidgetContextValue>(
-    () => ({ actions, gallery, isWindowTruncated, itemActions, projectName, runtime }),
-    [actions, gallery, isWindowTruncated, itemActions, projectName, runtime]
+    () => ({ actions, filter, gallery, isWindowTruncated, itemActions, projectName, region, runtime }),
+    [actions, filter, gallery, isWindowTruncated, itemActions, projectName, region, runtime]
   );
 
   return (
     <GalleryWidgetContext value={contextValue}>
-      <GalleryPanelContent layout={layout} />
+      <GalleryBoardDragMonitor />
+      <GalleryLayout region={region} />
     </GalleryWidgetContext>
   );
 };

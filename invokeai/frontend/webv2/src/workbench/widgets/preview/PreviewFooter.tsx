@@ -14,6 +14,9 @@ import { PreviewMetadataPanel } from './PreviewMetadataPanel';
  * progress) on one quiet row with prev/next, plus the Details expander.
  * Identity (board / image name) lives in the widget header; image actions
  * live in the header's actions slot — never here.
+ *
+ * It floats over the dot-grid surface rather than partitioning it, so it
+ * carries its own opaque panel fill — the grid runs behind and past it.
  */
 export const PreviewFooter = ({
   actionImage,
@@ -51,7 +54,7 @@ export const PreviewFooter = ({
       : null;
 
   return (
-    <Stack borderWidth="1px" borderColor="border.subtle" gap="2" p="3" rounded="lg">
+    <Stack bg="bg.subtle" borderColor="border.subtle" borderWidth="1px" gap="2" minW="0" p="3" rounded="md" shadow="sm">
       <HStack align="center" justify="space-between">
         <HStack gap="1" minW="0">
           <Text color="fg.muted" fontSize="2xs" fontVariantNumeric="tabular-nums" truncate>

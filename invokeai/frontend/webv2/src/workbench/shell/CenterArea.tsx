@@ -1,28 +1,23 @@
-import type { WidgetRegionDropState } from '@workbench/widgetDnd';
 import type {
   PlacedWidgetRegionItem,
   WidgetPlacementInstanceMeta,
   WidgetRegionItem,
 } from '@workbench/widgetRegionViewModel';
 
-import { Box, Flex, Text } from '@chakra-ui/react';
-import { horizontalListSortingStrategy } from '@dnd-kit/sortable';
+import { Box, Flex, HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { useModelLoads } from '@features/models';
 import { getProjectQueueIndicatorState, type QueueProgressBarState } from '@features/queue/contracts';
 import { useQueueItemProgress } from '@features/queue/react';
-import { Tabs } from '@platform/ui';
+import { IconButton, MenuContent } from '@platform/ui';
 import { QueueTabBackgroundProgress } from '@workbench/components/QueueProgressIndicator';
 import { useFocusRegionProps } from '@workbench/focusRegions';
 import { WidgetIcon } from '@workbench/iconResolver';
 import {
-  WidgetEnableMenu,
-  WidgetInstanceContextMenu,
+  WidgetChromeSlotById,
   WidgetRendererById,
-  WidgetStrip,
+  WidgetSourceLockBadge,
   useWidgetIntentPreloadProps,
-  useWidgetSortable,
   type WidgetEnableMenuItem,
-  type WidgetInstanceContextMenuTarget,
 } from '@workbench/widget-frame';
 import { resolveWidgetLabel } from '@workbench/widgetLabels';
 import { closeWidgetPlacement, openWidgetPlacement, revealWidgetPlacement } from '@workbench/widgetPlacementCommands';
@@ -34,18 +29,18 @@ import {
 } from '@workbench/widgetRegionViewModel';
 import { getWidgetById, getWidgetsForRegion } from '@workbench/widgetRegistry';
 import { useActiveProjectSelector, useWorkbenchCommands, useWorkbenchSelector } from '@workbench/WorkbenchContext';
-import { type MouseEvent, useCallback, useMemo, useState } from 'react';
+import { CheckIcon, ChevronDownIcon, XIcon } from 'lucide-react';
+import { Suspense, useCallback, useMemo, useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 type CenterWidgetItem = PlacedWidgetRegionItem<WidgetPlacementInstanceMeta>;
 
-const CENTER_MENU_POSITIONING = { placement: 'bottom-end' } as const;
-const CENTER_MENU_TRIGGER = { kind: 'center' } as const;
+const CENTER_MENU_POSITIONING = { placement: 'bottom-start' } as const;
 const CENTER_PREFERRED_REGIONS = ['center'] as const;
-const getCenterViewPanelId = (instanceId: string): string => `center-view-panel-${instanceId}`;
 
-/** Center work area: the view tab strip plus the active registered center view. */
-export const CenterArea = ({ dropState }: { dropState: WidgetRegionDropState }) => {
+const CENTER_CHROME_INSET_STYLE = { '--wb-center-chrome-inset': '3rem' } as React.CSSProperties;
+
+export const CenterArea = () => {
   const { t } = useTranslation();
   const placementProject = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
   const centerRegion = useActiveProjectSelector((project) => project.widgetRegions.center);
@@ -54,12 +49,6 @@ export const CenterArea = ({ dropState }: { dropState: WidgetRegionDropState }) 
   const backendConnectionStatus = useWorkbenchSelector((snapshot) => snapshot.backendConnection.status);
   const modelLoads = useModelLoads();
   const { widgets } = useWorkbenchCommands();
-  const [enableMenuTarget, setEnableMenuTarget] = useState<{
-    x: number;
-    y: number;
-  } | null>(null);
-  const [instanceMenuTarget, setInstanceMenuTarget] = useState<WidgetInstanceContextMenuTarget | null>(null);
-  const focusRegionProps = useFocusRegionProps('center');
   const getWidgetLabel = useCallback(
     (manifest: Parameters<typeof resolveWidgetLabel>[0]) => resolveWidgetLabel(manifest, t),
     [t]
@@ -93,52 +82,27 @@ export const CenterArea = ({ dropState }: { dropState: WidgetRegionDropState }) 
   const activeCenterViewId = centerViewItems.some((item) => item.id === centerRegion.activeInstanceId)
     ? centerRegion.activeInstanceId
     : centerViewItems[0]?.id;
+  const activeItem = centerViewItems.find((item) => item.id === activeCenterViewId);
+  const focusRegionProps = useFocusRegionProps('center');
 
-  const centerSortableInstanceIds = useMemo(
-    () =>
-      centerRegionViewModel.sortableInstanceIds.filter((instanceId) =>
-        centerViewItems.some((item) => item.id === instanceId)
-      ),
-    [centerRegionViewModel.sortableInstanceIds, centerViewItems]
-  );
-
-  const openEnableMenu = useCallback((event: MouseEvent) => {
-    event.preventDefault();
-    setEnableMenuTarget({ x: event.clientX, y: event.clientY });
-  }, []);
-
-  const openInstanceMenu = useCallback((item: CenterWidgetItem, event: MouseEvent) => {
-    event.preventDefault();
-    event.stopPropagation();
-    setInstanceMenuTarget({ item, x: event.clientX, y: event.clientY });
-  }, []);
-
-  const toggleCenterWidget = useCallback(
+  const openCenterWidget = useCallback(
     (item: WidgetEnableMenuItem) =>
-      item.isEnabled
-        ? closeWidgetPlacement({
-            widgets,
-            getWidgetById,
-            instanceId: item.id,
-            project: placementProject,
-            region: 'center',
-          })
-        : openWidgetPlacement({
-            widgets,
-            getWidgetsForRegion,
-            options: {
-              createNew: item.allowMultiple,
-              preferredRegions: CENTER_PREFERRED_REGIONS,
-            },
-            typeId: item.typeId,
-          }),
-    [placementProject, widgets]
+      openWidgetPlacement({
+        widgets,
+        getWidgetsForRegion,
+        options: {
+          createNew: item.allowMultiple,
+          preferredRegions: CENTER_PREFERRED_REGIONS,
+        },
+        typeId: item.typeId,
+      }),
+    [widgets]
   );
 
-  const handleCenterTabChange = useCallback(
-    (event: { value: string }) =>
+  const selectCenterView = useCallback(
+    (instanceId: string) =>
       revealWidgetPlacement({
-        instanceId: event.value as CenterWidgetItem['id'],
+        instanceId: instanceId as CenterWidgetItem['id'],
         project: placementProject,
         region: 'center',
         widgets,
@@ -146,18 +110,25 @@ export const CenterArea = ({ dropState }: { dropState: WidgetRegionDropState }) 
     [placementProject, widgets]
   );
 
-  const handleContextClose = useCallback(() => setEnableMenuTarget(null), []);
-  const handleInstanceClose = useCallback(() => setInstanceMenuTarget(null), []);
+  const closeActiveCenterView = useCallback(() => {
+    if (activeCenterViewId) {
+      closeWidgetPlacement({
+        widgets,
+        getWidgetById,
+        instanceId: activeCenterViewId,
+        project: placementProject,
+        region: 'center',
+      });
+    }
+  }, [activeCenterViewId, placementProject, widgets]);
 
-  const getItemMeta = useCallback(
-    (item: WidgetEnableMenuItem) =>
-      isRequiredCenterView(item as WidgetRegionItem, centerViewItems.length) ? 'Required' : null,
-    [centerViewItems.length]
-  );
+  const isActiveViewRequired = activeItem
+    ? isRequiredCenterView(activeItem as WidgetRegionItem, centerViewItems.length)
+    : true;
 
-  const isItemDisabled = useCallback(
-    (item: WidgetEnableMenuItem) => isRequiredCenterView(item as WidgetRegionItem, centerViewItems.length),
-    [centerViewItems.length]
+  const availableCenterItems = useMemo(
+    () => centerWidgetMenuItems.filter((item) => !item.isEnabled && item.status !== 'disabled'),
+    [centerWidgetMenuItems]
   );
 
   const baseIndicatorState = getProjectQueueIndicatorState({
@@ -175,120 +146,235 @@ export const CenterArea = ({ dropState }: { dropState: WidgetRegionDropState }) 
     progress,
     queueItems,
   });
+  const showProgress = indicatorState.hasOpenQueueWork && activeItem?.typeId === invocation.sourceId;
 
   return (
-    <Tabs.Root asChild lazyMount unmountOnExit value={activeCenterViewId} onValueChange={handleCenterTabChange}>
-      <Flex as="section" bg="bg" direction="column" flex="1" minH="0" minW="0" {...focusRegionProps}>
-        <WidgetStrip
-          align="center"
-          bg="bg.subtle"
-          borderBottomWidth="1px"
-          borderColor="border.subtle"
-          dropState={dropState}
-          h="10"
-          px="1.5"
-          region="center"
-          sortableInstanceIds={centerSortableInstanceIds}
-          strategy={horizontalListSortingStrategy}
-          onContextMenu={openEnableMenu}
-        >
-          <Tabs.List>
-            {centerViewItems.map((item) => (
-              <SortableCenterTab
-                key={item.id}
-                item={item}
-                progressState={indicatorState.progressState}
-                showProgress={indicatorState.hasOpenQueueWork && item.typeId === invocation.sourceId}
-                onContextMenu={openInstanceMenu}
-              />
-            ))}
-          </Tabs.List>
-
-          {centerToolbarItems.map((item) => (
-            <Flex key={item.id} align="center" h="full">
-              <WidgetRendererById instanceId={item.id} widget={item.widget} presentation="compact" region="center" />
-            </Flex>
-          ))}
-
-          <WidgetEnableMenu
-            contextTarget={enableMenuTarget}
-            getItemMeta={getItemMeta}
-            groupLabel="Center Widgets"
-            isItemDisabled={isItemDisabled}
-            items={centerWidgetMenuItems}
-            positioning={CENTER_MENU_POSITIONING}
-            trigger={CENTER_MENU_TRIGGER}
-            triggerLabel="Center widget menu"
-            onContextClose={handleContextClose}
-            onToggle={toggleCenterWidget}
-          />
-
-          <WidgetInstanceContextMenu
-            isRemoveDisabled={isItemDisabled}
-            target={instanceMenuTarget}
-            onClose={handleInstanceClose}
-            onRemove={toggleCenterWidget}
-          />
-        </WidgetStrip>
-
-        <Box flex="1" minH="0" position="relative">
-          {activeCenterViewId ? (
-            centerViewItems.map((item) => (
-              <Tabs.Content key={item.id} h="full" id={getCenterViewPanelId(item.id)} p="0" value={item.id}>
-                <CenterViewSlot item={item} />
-              </Tabs.Content>
-            ))
-          ) : (
-            <FallbackCenterView label="Center widget unavailable" />
-          )}
+    <Flex
+      as="section"
+      bg="bg"
+      direction="column"
+      flex="1"
+      minH="0"
+      minW="0"
+      style={CENTER_CHROME_INSET_STYLE}
+      {...focusRegionProps}
+    >
+      <Box flex="1" minH="0" position="relative">
+        <Box aria-label={t('widgets.centerRegion')} h="full" role="region">
+          {activeItem ? <CenterViewSlot item={activeItem} /> : <FallbackCenterView label="Center widget unavailable" />}
         </Box>
-      </Flex>
-    </Tabs.Root>
+
+        <Flex
+          data-hotkey-widget-instance-id={activeItem?.id}
+          data-hotkey-widget-region="center"
+          data-hotkey-widget-type-id={activeItem?.typeId}
+          gap="2"
+          insetX="2"
+          justify="space-between"
+          pointerEvents="none"
+          position="absolute"
+          top="2"
+          zIndex="1"
+        >
+          <ChromeIsland>
+            <CenterViewMenu
+              activeItem={activeItem}
+              availableItems={availableCenterItems}
+              isCloseDisabled={isActiveViewRequired}
+              items={centerViewItems}
+              progressState={indicatorState.progressState}
+              showProgress={showProgress}
+              onClose={closeActiveCenterView}
+              onOpen={openCenterWidget}
+              onSelect={selectCenterView}
+            />
+            {activeItem ? (
+              <>
+                <WidgetSourceLockBadge typeId={activeItem.typeId} />
+                <Suspense fallback={null}>
+                  <WidgetChromeSlotById instanceId={activeItem.id} slot="label" widget={activeItem.widget} />
+                </Suspense>
+              </>
+            ) : null}
+          </ChromeIsland>
+
+          {activeItem && activeItem.widget.manifest.chrome?.header !== 'hidden' ? (
+            <ChromeIsland>
+              {centerToolbarItems.map((toolbarItem) => (
+                <WidgetRendererById
+                  key={toolbarItem.id}
+                  instanceId={toolbarItem.id}
+                  widget={toolbarItem.widget}
+                  presentation="compact"
+                  region="center"
+                />
+              ))}
+              <Suspense fallback={null}>
+                <WidgetChromeSlotById instanceId={activeItem.id} slot="actions" widget={activeItem.widget} />
+              </Suspense>
+            </ChromeIsland>
+          ) : null}
+        </Flex>
+      </Box>
+    </Flex>
   );
 };
 
-const SortableCenterTab = ({
-  item,
-  onContextMenu,
+const ChromeIsland = ({ children }: { children: ReactNode }) => (
+  <HStack
+    bg="bg.subtle"
+    borderColor="border.subtle"
+    borderWidth="1px"
+    gap="0.5"
+    h="8"
+    minW="0"
+    pointerEvents="auto"
+    position="relative"
+    px="1"
+    rounded="md"
+    shadow="sm"
+  >
+    {children}
+  </HStack>
+);
+
+const CenterViewMenu = ({
+  activeItem,
+  availableItems,
+  isCloseDisabled,
+  items,
+  onClose,
+  onOpen,
+  onSelect,
   progressState,
   showProgress,
 }: {
-  item: CenterWidgetItem;
-  onContextMenu: (item: CenterWidgetItem, event: MouseEvent) => void;
+  activeItem?: CenterWidgetItem;
+  availableItems: WidgetEnableMenuItem[];
+  isCloseDisabled: boolean;
+  items: CenterWidgetItem[];
+  onClose: () => void;
+  onOpen: (item: WidgetEnableMenuItem) => void;
+  onSelect: (instanceId: string) => void;
   progressState: QueueProgressBarState;
   showProgress: boolean;
 }) => {
-  const { semanticDragHandleProps, setNodeRef, style } = useWidgetSortable({
-    disabled: item.status === 'disabled',
-    instanceId: item.id,
-    region: 'center',
-    typeId: item.instance.typeId,
-  });
-  const handleContextMenu = useCallback((event: MouseEvent) => onContextMenu(item, event), [item, onContextMenu]);
+  const { t } = useTranslation();
+  const label = activeItem?.label ?? t('widgets.centerViewEmpty');
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const selectAndRestoreFocus = useCallback(
+    (instanceId: string) => {
+      onSelect(instanceId);
+      requestAnimationFrame(() => {
+        triggerRef.current?.focus({ preventScroll: true });
+      });
+    },
+    [onSelect]
+  );
+
+  return (
+    <Menu.Root positioning={CENTER_MENU_POSITIONING}>
+      <Menu.Trigger asChild>
+        <IconButton
+          ref={triggerRef}
+          aria-label={t('widgets.centerViewLabel', { label })}
+          color="fg"
+          minW="0"
+          overflow="hidden"
+          position="relative"
+          px="2"
+          size="2xs"
+          variant="ghost"
+        >
+          {showProgress ? <QueueTabBackgroundProgress state={progressState} zIndex="-1" /> : null}
+          <HStack gap="2" minW="0" position="relative" zIndex="1">
+            {activeItem ? <WidgetIcon icon={activeItem.widget.manifest.icon} boxSize="3.5" /> : null}
+            <Text fontSize="xs" fontWeight="700" truncate>
+              {label}
+            </Text>
+            <ChevronDownIcon size={12} />
+          </HStack>
+        </IconButton>
+      </Menu.Trigger>
+      <Portal>
+        <Menu.Positioner>
+          <MenuContent minW="14rem">
+            <Menu.ItemGroup>
+              <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+                {t('widgets.centerViews')}
+              </Menu.ItemGroupLabel>
+              {items.map((item) => (
+                <CenterViewMenuRow
+                  key={item.id}
+                  isActive={item.id === activeItem?.id}
+                  item={item}
+                  onSelect={selectAndRestoreFocus}
+                />
+              ))}
+            </Menu.ItemGroup>
+
+            {availableItems.length > 0 ? (
+              <>
+                <Menu.Separator borderColor="border.subtle" />
+                <Menu.ItemGroup>
+                  <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+                    {t('widgets.centerViewsAdd')}
+                  </Menu.ItemGroupLabel>
+                  {availableItems.map((item) => (
+                    <CenterViewMenuRow key={item.id} item={item} onOpen={onOpen} />
+                  ))}
+                </Menu.ItemGroup>
+              </>
+            ) : null}
+
+            {activeItem ? (
+              <>
+                <Menu.Separator borderColor="border.subtle" />
+                <Menu.Item disabled={isCloseDisabled} value="close-center-view" onClick={onClose}>
+                  <Icon as={XIcon} boxSize="3.5" color="fg.subtle" />
+                  <Menu.ItemText fontSize="xs">
+                    {t('widgets.centerViewClose', { label: activeItem.label })}
+                  </Menu.ItemText>
+                </Menu.Item>
+              </>
+            ) : null}
+          </MenuContent>
+        </Menu.Positioner>
+      </Portal>
+    </Menu.Root>
+  );
+};
+
+const CenterViewMenuRow = ({
+  isActive,
+  item,
+  onOpen,
+  onSelect,
+}: {
+  isActive?: boolean;
+  item: CenterWidgetItem | WidgetEnableMenuItem;
+  onOpen?: (item: WidgetEnableMenuItem) => void;
+  onSelect?: (instanceId: string) => void;
+}) => {
+  const handleClick = useCallback(
+    () => (onSelect ? onSelect(item.id) : onOpen?.(item as WidgetEnableMenuItem)),
+    [item, onOpen, onSelect]
+  );
   const intentPreloadProps = useWidgetIntentPreloadProps(item.widget, item.status === 'disabled');
 
   return (
-    <Tabs.Trigger
-      ref={setNodeRef}
-      aria-controls={getCenterViewPanelId(item.id)}
+    <Menu.Item
+      role={onSelect ? 'menuitemradio' : undefined}
+      aria-checked={onSelect ? isActive : undefined}
       value={item.id}
       disabled={item.status === 'disabled'}
-      fontSize="xs"
-      overflow="hidden"
-      position="relative"
-      px="3"
-      style={style}
-      {...semanticDragHandleProps}
       {...intentPreloadProps}
-      onContextMenu={handleContextMenu}
+      onClick={handleClick}
     >
-      {showProgress ? <QueueTabBackgroundProgress state={progressState} zIndex="-1" /> : null}
-
-      <Box alignItems="center" display="inline-flex" gap="2" position="relative" zIndex="1">
-        <WidgetIcon icon={item.widget.manifest.icon} boxSize="3.5" />
-        {item.label}
-      </Box>
-    </Tabs.Trigger>
+      <Icon as={CheckIcon} boxSize="3" opacity={isActive ? 1 : 0} />
+      <WidgetIcon icon={item.icon} boxSize="3.5" />
+      <Menu.ItemText fontSize="xs">{item.label}</Menu.ItemText>
+    </Menu.Item>
   );
 };
 
@@ -297,7 +383,9 @@ const CenterViewSlot = ({ item }: { item: CenterWidgetItem }) => {
     return <FallbackCenterView label="Center widget unavailable" />;
   }
 
-  return <WidgetRendererById instanceId={item.instance.id} widget={item.widget} region="center" />;
+  return (
+    <WidgetRendererById key={item.instance.id} instanceId={item.instance.id} widget={item.widget} region="center" />
+  );
 };
 
 const FallbackCenterView = ({ label }: { label: string }) => (

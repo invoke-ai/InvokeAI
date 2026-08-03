@@ -53,7 +53,7 @@ describe('getQueueSummary', () => {
       }),
     ]);
 
-    expect(summary).toEqual({ current: 1, runningQueueItemId: 'batch-1', total: 4 });
+    expect(summary).toEqual({ current: 1, remaining: 4, runningQueueItemId: 'batch-1', total: 4 });
   });
 
   it('keeps the running ordinal stable when newer work is queued', () => {
@@ -73,7 +73,7 @@ describe('getQueueSummary', () => {
       }),
     ]);
 
-    expect(summary).toEqual({ current: 1, runningQueueItemId: 'batch-1', total: 8 });
+    expect(summary).toEqual({ current: 1, remaining: 8, runningQueueItemId: 'batch-1', total: 8 });
   });
 
   it('uses live progress to advance within a batch', () => {
@@ -103,7 +103,7 @@ describe('getQueueSummary', () => {
       progress
     );
 
-    expect(summary).toEqual({ current: 2, runningQueueItemId: 'batch-1', total: 8 });
+    expect(summary).toEqual({ current: 2, remaining: 7, runningQueueItemId: 'batch-1', total: 8 });
   });
 
   it('returns zeroes when all batches are terminal', () => {
@@ -111,7 +111,7 @@ describe('getQueueSummary', () => {
       createQueueItem({ batchCount: 4, id: 'batch-1', status: 'completed', submittedAt: '2026-06-10T00:00:00.000Z' }),
     ]);
 
-    expect(summary).toEqual({ current: 0, runningQueueItemId: null, total: 0 });
+    expect(summary).toEqual({ current: 0, remaining: 0, runningQueueItemId: null, total: 0 });
   });
 
   it('uses the global batch count for workflow-sourced queue items', () => {
@@ -125,7 +125,7 @@ describe('getQueueSummary', () => {
       }),
     ]);
 
-    expect(summary).toEqual({ current: 0, runningQueueItemId: null, total: 2 });
+    expect(summary).toEqual({ current: 0, remaining: 2, runningQueueItemId: null, total: 2 });
   });
 
   it('does not cap oversized batch counts', () => {
@@ -138,7 +138,37 @@ describe('getQueueSummary', () => {
       }),
     ]);
 
-    expect(summary).toEqual({ current: 0, runningQueueItemId: null, total: 10_000 });
+    expect(summary).toEqual({ current: 0, remaining: 10_000, runningQueueItemId: null, total: 10_000 });
+  });
+
+  it('includes the active image and later batches in the countdown', () => {
+    const progress: QueueItemProgress = {
+      activeItemIndex: 4,
+      completedItemCount: 3,
+      message: '',
+      percentage: null,
+      totalItemCount: 4,
+    };
+    const summary = getQueueSummary(
+      [
+        createQueueItem({
+          backendItemIds: [1, 2, 3, 4],
+          batchCount: 4,
+          id: 'batch-1',
+          status: 'running',
+          submittedAt: '2026-06-10T00:00:00.000Z',
+        }),
+        createQueueItem({
+          batchCount: 4,
+          id: 'batch-2',
+          status: 'pending',
+          submittedAt: '2026-06-10T00:01:00.000Z',
+        }),
+      ],
+      progress
+    );
+
+    expect(summary.remaining).toBe(5);
   });
 });
 

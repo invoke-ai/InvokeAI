@@ -2,10 +2,12 @@ import type { NumberInput as ChakraNumberInput, SelectValueChangeDetails } from 
 import type { CanvasLayerSourceContract, ShapeToolOptions } from '@workbench/canvas-engine/api';
 
 import { createListCollection, HStack, NumberInput, Text } from '@chakra-ui/react';
-import { ColorPicker, Select, ToggleDot } from '@platform/ui';
+import { ColorPicker, Select, ToggleIconButton } from '@platform/ui';
 import { MAX_SHAPE_STROKE_WIDTH } from '@workbench/canvas-engine/api';
 import { useShapeOptions } from '@workbench/widgets/canvas/engineStoreHooks';
+import { useColorSampler } from '@workbench/widgets/canvas/useColorSampler';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
+import { PaintBucketIcon, SquareIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -35,6 +37,7 @@ const SELECT_TRIGGER_PROPS = { minW: '6rem' } as const;
 export const ShapeOptions = ({ engine }: ToolOptionsComponentProps) => {
   const { t } = useTranslation();
   const options = useShapeOptions(engine);
+  const sampleColor = useColorSampler(engine);
 
   const selected = useActiveProjectSelector(
     (project): SelectedShape | null => {
@@ -140,8 +143,9 @@ export const ShapeOptions = ({ engine }: ToolOptionsComponentProps) => {
       />
 
       <HStack align="center" gap="1.5">
-        <ToggleDot
+        <ToggleIconButton
           checked={fill !== null}
+          icon={PaintBucketIcon}
           label={t('widgets.canvas.toolOptions.shapeFill')}
           onCheckedChange={onFillToggle}
         />
@@ -149,6 +153,7 @@ export const ShapeOptions = ({ engine }: ToolOptionsComponentProps) => {
           <ColorPicker
             aria-label={t('widgets.canvas.toolOptions.shapeFill')}
             value={fill}
+            onSampleColor={sampleColor}
             onValueChange={onFillChange}
             onValueChangeEnd={onFillChangeEnd}
           />
@@ -156,8 +161,9 @@ export const ShapeOptions = ({ engine }: ToolOptionsComponentProps) => {
       </HStack>
 
       <HStack align="center" gap="1.5">
-        <ToggleDot
+        <ToggleIconButton
           checked={stroke !== null}
+          icon={SquareIcon}
           label={t('widgets.canvas.toolOptions.shapeStroke')}
           onCheckedChange={onStrokeToggle}
         />
@@ -166,6 +172,7 @@ export const ShapeOptions = ({ engine }: ToolOptionsComponentProps) => {
             <ColorPicker
               aria-label={t('widgets.canvas.toolOptions.shapeStroke')}
               value={stroke}
+              onSampleColor={sampleColor}
               onValueChange={onStrokeChange}
               onValueChangeEnd={onStrokeChangeEnd}
             />

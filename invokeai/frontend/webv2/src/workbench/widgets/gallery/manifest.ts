@@ -6,7 +6,6 @@ export const galleryWidgetManifest: WidgetManifest = {
   allowMultiple: false,
   allowedRegions: ['left', 'right', 'center', 'bottom'],
   bottomPanel: 'expandable',
-  chrome: { header: 'hidden' },
   failurePolicy: { isolateRenderFailure: true, onRegistrationFailure: 'disable' },
   icon: ImageIcon,
   id: 'gallery',
@@ -14,6 +13,8 @@ export const galleryWidgetManifest: WidgetManifest = {
   load: () =>
     import('@features/gallery/widget').then((module) => ({
       footer: module.GalleryWidgetFooter,
+      headerActions: module.GalleryWidgetHeaderActions,
+      headerLabel: module.GalleryWidgetLabel,
       view: module.GalleryWidgetView,
     })),
   version: 1,

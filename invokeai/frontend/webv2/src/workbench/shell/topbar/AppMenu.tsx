@@ -1,0 +1,221 @@
+import { Badge, Box, chakra, HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
+import { AccountMenuSection, useCapabilities, useHasAccountSection } from '@features/identity';
+import { getQueueSummary } from '@features/queue/contracts';
+import { APP_VERSION } from '@platform/runtime/appMetadata';
+import { IconButton } from '@platform/ui/Button';
+import { InvokeMark } from '@platform/ui/InvokeMark';
+import { MenuContent } from '@platform/ui/Menu';
+import { Tooltip } from '@platform/ui/Tooltip';
+import { useNavigate } from '@tanstack/react-router';
+import { OPEN_COMMAND_PALETTE_HOTKEY } from '@workbench/hotkeys/catalog';
+import { formatHotkeyForPlatform } from '@workbench/hotkeys/keys';
+import { applyCustomHotkeys } from '@workbench/hotkeys/resolve';
+import { openCommandPalette } from '@workbench/palette/paletteStore';
+import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
+import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
+import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
+import { useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
+import {
+  BookOpenTextIcon,
+  BlocksIcon,
+  BoxIcon,
+  ListOrderedIcon,
+  MenuIcon,
+  MessagesSquareIcon,
+  SearchIcon,
+  SettingsIcon,
+  type LucideIcon,
+} from 'lucide-react';
+import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+
+const MENU_POSITIONING = { placement: 'bottom-start' } as const;
+const DOCS_URL = 'https://invoke-ai.github.io/InvokeAI/';
+const DISCORD_URL = 'https://discord.gg/ZmtBAhwWhy';
+
+export const AppMenu = () => {
+  const { t } = useTranslation();
+  const { canManageModels, canManageNodes } = useCapabilities();
+  const hasAccount = useHasAccountSection();
+  const navigate = useNavigate();
+  const projectId = useActiveProjectId();
+  const openWorkbenchWidget = useOpenWorkbenchWidget();
+  const queuedCount = useActiveProjectSelector((project) => getQueueSummary(project.queue.items).total);
+
+  const openModels = useCallback(() => {
+    void navigate({ search: { project: projectId }, to: '/models' });
+  }, [navigate, projectId]);
+  const openNodes = useCallback(() => {
+    void navigate({ to: '/nodes' });
+  }, [navigate]);
+  const openQueue = useCallback(() => openWorkbenchWidget('queue'), [openWorkbenchWidget]);
+  const openSettings = useCallback(() => openWorkbenchSettings(), []);
+
+  return (
+    <Menu.Root positioning={MENU_POSITIONING}>
+      <Menu.Trigger asChild>
+        <IconButton aria-label={t('topbar.appMenu.open')} className="group" size="sm" variant="ghost">
+          <AppMenuGlyph />
+        </IconButton>
+      </Menu.Trigger>
+      <Portal>
+        <Menu.Positioner>
+          <MenuContent minW="15rem">
+            <HStack justify="space-between" px="3" py="2">
+              <Text fontSize="xs" fontWeight="800">
+                Invoke
+              </Text>
+              <Text color="fg.subtle" fontSize="2xs">
+                v{APP_VERSION}
+              </Text>
+            </HStack>
+            <Menu.Separator />
+            <Menu.ItemGroup>
+              <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+                {t('topbar.appMenu.manage')}
+              </Menu.ItemGroupLabel>
+              {canManageModels ? (
+                <Menu.Item value="models" onClick={openModels}>
+                  <Icon as={BoxIcon} boxSize="3.5" />
+                  <Menu.ItemText>{t('models.manager')}</Menu.ItemText>
+                </Menu.Item>
+              ) : null}
+              {canManageNodes ? (
+                <Menu.Item value="nodes" onClick={openNodes}>
+                  <Icon as={BlocksIcon} boxSize="3.5" />
+                  <Menu.ItemText>{t('nodes.manager')}</Menu.ItemText>
+                </Menu.Item>
+              ) : null}
+              <Menu.Item value="queue" onClick={openQueue}>
+                <Icon as={ListOrderedIcon} boxSize="3.5" />
+                <Menu.ItemText>{t('widgets.labels.queue')}</Menu.ItemText>
+                {queuedCount > 0 ? (
+                  <Badge colorPalette="accent" fontSize="2xs" ms="auto" variant="surface">
+                    {queuedCount}
+                  </Badge>
+                ) : null}
+              </Menu.Item>
+            </Menu.ItemGroup>
+            {hasAccount ? (
+              <>
+                <Menu.Separator />
+                <AccountMenuSection />
+              </>
+            ) : null}
+            <Menu.Separator />
+            <HStack gap="0.5" px="1" py="0.5">
+              <SearchMenuAction />
+              <AppMenuAction icon={SettingsIcon} label={t('common.settings')} value="settings" onClick={openSettings} />
+              <AppMenuLink
+                href={DOCS_URL}
+                icon={BookOpenTextIcon}
+                label={t('topbar.appMenu.documentation')}
+                value="documentation"
+              />
+              <AppMenuLink href={DISCORD_URL} icon={MessagesSquareIcon} label="Discord" value="discord" />
+            </HStack>
+          </MenuContent>
+        </Menu.Positioner>
+      </Portal>
+    </Menu.Root>
+  );
+};
+
+const MARK_SWAP_PROPS = { opacity: 0 } as const;
+const GLYPH_SWAP_PROPS = { opacity: 1 } as const;
+
+const AppMenuGlyph = () => (
+  <Box boxSize="4" position="relative" role="presentation">
+    <Box
+      alignItems="center"
+      display="flex"
+      inset="0"
+      justifyContent="center"
+      position="absolute"
+      transition="opacity var(--wb-motion-duration-fast) ease"
+      _groupHover={MARK_SWAP_PROPS}
+      _groupFocusVisible={MARK_SWAP_PROPS}
+      _groupExpanded={MARK_SWAP_PROPS}
+    >
+      <InvokeMark size={14} />
+    </Box>
+    <Box
+      alignItems="center"
+      display="flex"
+      inset="0"
+      justifyContent="center"
+      opacity="0"
+      position="absolute"
+      transition="opacity var(--wb-motion-duration-fast) ease"
+      _groupHover={GLYPH_SWAP_PROPS}
+      _groupFocusVisible={GLYPH_SWAP_PROPS}
+      _groupExpanded={GLYPH_SWAP_PROPS}
+    >
+      <Icon as={MenuIcon} boxSize="4" />
+    </Box>
+  </Box>
+);
+
+const SearchMenuAction = () => {
+  const { t } = useTranslation();
+  const customHotkeys = useWorkbenchPreferenceSelector((preferences) => preferences.customHotkeys);
+  const firstHotkey = applyCustomHotkeys(OPEN_COMMAND_PALETTE_HOTKEY, customHotkeys).keys[0];
+  const hotkeyLabel = firstHotkey ? formatHotkeyForPlatform(firstHotkey).join('+') : null;
+  const label = hotkeyLabel
+    ? t('commandPalette.buttonTooltip', { hotkey: hotkeyLabel })
+    : t('commandPalette.buttonLabel');
+
+  return <AppMenuAction icon={SearchIcon} label={label} value="command-palette" onClick={openCommandPalette} />;
+};
+
+const FOOTER_ITEM_PROPS = {
+  alignItems: 'center',
+  flex: '0 0 auto',
+  h: '8',
+  justifyContent: 'center',
+  minW: '8',
+  p: '0',
+  w: '8',
+} as const;
+
+const AppMenuAction = ({
+  icon,
+  label,
+  onClick,
+  value,
+}: {
+  icon: LucideIcon;
+  label: string;
+  onClick: () => void;
+  value: string;
+}) => (
+  <Menu.Item {...FOOTER_ITEM_PROPS} aria-label={label} value={value} onClick={onClick}>
+    <Tooltip content={label} showArrow>
+      <Box alignItems="center" display="flex" h="full" justifyContent="center" w="full">
+        <Icon as={icon} boxSize="3.5" />
+      </Box>
+    </Tooltip>
+  </Menu.Item>
+);
+
+const AppMenuLink = ({
+  href,
+  icon,
+  label,
+  value,
+}: {
+  href: string;
+  icon: LucideIcon;
+  label: string;
+  value: string;
+}) => (
+  <Menu.Item {...FOOTER_ITEM_PROPS} aria-label={label} asChild value={value}>
+    <chakra.a href={href} rel="noreferrer" target="_blank">
+      <Tooltip content={label} showArrow>
+        <Box alignItems="center" display="flex" h="full" justifyContent="center" w="full">
+          <Icon as={icon} boxSize="3.5" />
+        </Box>
+      </Tooltip>
+    </chakra.a>
+  </Menu.Item>
+);

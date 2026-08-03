@@ -113,7 +113,12 @@ export const LayerGroupSection = ({
 
   return (
     <Stack gap="1">
-      <HStack gap="1" px="1">
+      {/*
+        `px` matches a row's own content edge (the list's `px="1"` plus each
+        row's `p="1.5"`), so the header chevron and its action cluster sit in
+        the same columns as the rows below.
+      */}
+      <HStack gap="1" px="2.5">
         <IconButton
           aria-label={t(isCollapsed ? 'widgets.layers.groupActions.expand' : 'widgets.layers.groupActions.collapse')}
           color="fg.subtle"

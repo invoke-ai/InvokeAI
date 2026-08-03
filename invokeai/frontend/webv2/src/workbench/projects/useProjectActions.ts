@@ -1,6 +1,12 @@
 import type { Project } from '@workbench/projectContracts';
 
 import { flushGenerateDrafts } from '@features/generation/react';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
+import { getApiErrorMessage } from '@platform/transport/http';
 import { useNavigate } from '@tanstack/react-router';
 import { useNotify } from '@workbench/useNotify';
 import {
@@ -11,11 +17,15 @@ import {
 } from '@workbench/WorkbenchContext';
 import { useTranslation } from 'react-i18next';
 
-import { deleteLibraryProject } from './library';
+import { deleteLibraryProject, refreshProjectLibrary } from './library';
 
 /**
- * Close and delete for projects that are open in the editor, shared by the
- * tab bar and the Project panel so the semantics stay in one place:
+ * Open, close, and delete for projects, shared by the top bar and the Project
+ * panel so the semantics stay in one place:
+ *
+ * - Open switches to the project when the session already has it, and otherwise
+ *   hydrates it from the server first. Callers name a project; whether it is
+ *   already loaded is not their problem.
  *
  * - Close flushes the document, drops the tab, and keeps the project in the
  *   library. Closing the last tab persists the empty session and lands on
@@ -26,6 +36,7 @@ import { deleteLibraryProject } from './library';
 export const useProjectActions = (): {
   closeProject: (project: Project) => void;
   deleteProject: (project: Project) => Promise<void>;
+  openProject: (projectId: string, name: string) => Promise<void>;
 } => {
   const queries = useWorkbenchQueries();
   const persistence = useWorkbenchPersistenceAdapter();
@@ -45,6 +56,42 @@ export const useProjectActions = (): {
     void navigate({ to: '/' });
 
     return true;
+  };
+
+  const openProject = async (projectId: string, name: string): Promise<void> => {
+    const owner = captureAccountScope();
+
+    flushGenerateDrafts();
+
+    if (queries.getSnapshot().projects.some((project) => project.id === projectId)) {
+      commands.projects.switchTo(projectId);
+
+      return;
+    }
+
+    try {
+      const project = await persistenceService.hydrateProjectFromServer(projectId);
+
+      assertAccountScopeCurrent(owner);
+
+      if (!project) {
+        notify.error(t('projects.couldNotOpen'), t('projects.couldNotOpenDescription', { name }));
+        void refreshProjectLibrary();
+
+        return;
+      }
+
+      commands.projects.open(project);
+    } catch (error) {
+      if (!isAccountScopeCurrent(owner)) {
+        return;
+      }
+
+      notify.error(
+        t('projects.couldNotOpen'),
+        getApiErrorMessage(error, t('projects.couldNotOpenDescription', { name }))
+      );
+    }
   };
 
   const closeProject = (project: Project): void => {
@@ -85,5 +132,5 @@ export const useProjectActions = (): {
     commands.projects.close(project.id);
   };
 
-  return { closeProject, deleteProject };
+  return { closeProject, deleteProject, openProject };
 };

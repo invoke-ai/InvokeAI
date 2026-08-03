@@ -1,5 +1,6 @@
 /* oxlint-disable react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop */
 import { ChakraProvider } from '@chakra-ui/react';
+import { DndContext } from '@dnd-kit/core';
 import { PositivePromptField } from '@features/generation/ui/promptFields/PositivePromptField';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
@@ -49,18 +50,22 @@ const render = async (isTemplateViewMode = false) => {
     root?.render(
       <QueryClientProvider client={new QueryClient()}>
         <ChakraProvider value={system}>
-          <PositivePromptField
-            heightPx={TEXTAREA_HEIGHT_PX}
-            isTemplateViewMode={isTemplateViewMode}
-            loras={[]}
-            projectId="project-1"
-            selectedModel={SELECTED_MODEL as never}
-            showSyntaxHighlighting={false}
-            value=""
-            onChange={vi.fn()}
-            onResizeEnd={vi.fn()}
-            onUsePrompt={vi.fn()}
-          />
+          {/* The prompt box is a gallery-image drop target, so it lives inside
+              the shell's DndContext wherever it is really rendered. */}
+          <DndContext>
+            <PositivePromptField
+              heightPx={TEXTAREA_HEIGHT_PX}
+              isTemplateViewMode={isTemplateViewMode}
+              loras={[]}
+              projectId="project-1"
+              selectedModel={SELECTED_MODEL as never}
+              showSyntaxHighlighting={false}
+              value=""
+              onChange={vi.fn()}
+              onResizeEnd={vi.fn()}
+              onUsePrompt={vi.fn()}
+            />
+          </DndContext>
         </ChakraProvider>
       </QueryClientProvider>
     );

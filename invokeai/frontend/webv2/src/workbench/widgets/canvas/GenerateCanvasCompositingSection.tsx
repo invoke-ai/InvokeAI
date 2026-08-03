@@ -16,7 +16,7 @@ import type { CanvasCoherenceMode, CanvasInfillMethod } from '@workbench/widgets
 
 import { createListCollection, NumberInput, Stack } from '@chakra-ui/react';
 import { GenerationSettingsSection } from '@features/generation/components';
-import { Field, Select } from '@platform/ui';
+import { ColorPicker, Field, formatHexColor, parseHexColor, Select } from '@platform/ui';
 import {
   CANVAS_COHERENCE_EDGE_SIZE_MAX,
   CANVAS_COMPOSITING_KEYS,
@@ -121,6 +121,17 @@ export const GenerateCanvasCompositingSection = () => {
     [patch]
   );
 
+  // `infillColorValue` is already `{ r, g, b }` 0-255 plus a unit alpha, which
+  // is exactly the shape the platform color helpers speak.
+  const infillColor = formatHexColor(settings.infillColorValue, { alpha: true });
+
+  const handleInfillColorChange = useCallback(
+    (color: string) => {
+      patch({ [CANVAS_COMPOSITING_KEYS.infillColorValue]: parseHexColor(color) });
+    },
+    [patch]
+  );
+
   const opt = (key: string) => t(`widgets.generate.compositingOptions.${key}`);
 
   return (
@@ -137,6 +148,16 @@ export const GenerateCanvasCompositingSection = () => {
             onValueChange={handleInfillChange}
           />
         </Field>
+        {settings.infillMethod === 'color' ? (
+          <Field label={opt('infillColorValue')}>
+            <ColorPicker
+              aria-label={opt('infillColorValue')}
+              value={infillColor}
+              withAlpha
+              onValueChange={handleInfillColorChange}
+            />
+          </Field>
+        ) : null}
         <Field label={opt('coherenceMode')}>
           <Select
             aria-label={opt('coherenceMode')}

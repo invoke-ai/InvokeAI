@@ -402,19 +402,13 @@ const TemplateRow = ({
           <Stack align="start" flex="1" gap="0" minW="0">
             <Text
               as="span"
-              color={isActive ? 'accent.contrast' : 'fg.muted'}
+              color={isActive ? 'accent.contrast' : 'fg'}
               fontSize="xs"
               fontWeight={isActive ? '600' : '400'}
             >
               {template.name}
             </Text>
-            <Text
-              as="span"
-              color={isActive ? 'accent.contrast' : 'fg.subtle'}
-              fontFamily="mono"
-              fontSize="2xs"
-              truncate
-            >
+            <Text as="span" color={isActive ? 'accent.contrast' : 'fg.muted'} fontFamily="mono" fontSize="2xs" truncate>
               {summary}
             </Text>
           </Stack>

@@ -2,7 +2,6 @@ import type { ProjectGraphState, XYPosition } from '@features/workflow/contracts
 import type { WorkflowPerfSource, WorkflowRuntimeApi } from '@features/workflow/ui/contracts';
 
 import { Box, Flex, HStack, Spinner, Stack, Text } from '@chakra-ui/react';
-import { getProjectGraphReadiness } from '@features/workflow/graph';
 import '@xyflow/react/dist/style.css';
 import { ensureInvocationTemplatesLoaded, useInvocationTemplatesSelector } from '@features/workflow/react';
 import { FlowMiniMap, flowThemeCss, getFlowColorMode } from '@features/workflow/ui/graph-preview';
@@ -1106,51 +1105,8 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
   );
 };
 
-const ReadinessBanner = () => {
-  const projectGraph = useWorkflowProjectSelector((project) => project.projectGraph);
-  const templatesStatus = useInvocationTemplatesSelector((snapshot) => snapshot.status);
-  const templates = useInvocationTemplatesSelector((snapshot) => snapshot.templates);
-  const templatesSnapshot = useMemo(
-    () => ({ error: null, status: templatesStatus, templates }),
-    [templatesStatus, templates]
-  );
-  const readiness = useMemo(
-    () => getProjectGraphReadiness(projectGraph, templatesSnapshot),
-    [projectGraph, templatesSnapshot]
-  );
-
-  if (readiness.canInvoke || projectGraph.nodes.length === 0) {
-    return null;
-  }
-
-  return (
-    <Box
-      bg="bg.muted"
-      borderColor="border.subtle"
-      borderRadius="md"
-      borderWidth="1px"
-      left="3"
-      maxW="24rem"
-      p="2"
-      position="absolute"
-      top="3"
-      zIndex="1"
-    >
-      <Stack gap="0.5">
-        {readiness.reasons.slice(0, 4).map((reason, index) => (
-          <Text key={`${index}:${reason}`} color="fg.muted" fontSize="2xs">
-            {reason}
-          </Text>
-        ))}
-        {readiness.reasons.length > 4 ? (
-          <Text color="fg.subtle" fontSize="2xs">
-            +{readiness.reasons.length - 4} more
-          </Text>
-        ) : null}
-      </Stack>
-    </Box>
-  );
-};
+// Graph readiness is reported on the Invoke control, which is where the user
+// acts on it. A second floating copy over the canvas said the same thing twice.
 
 export const WorkflowEditorView = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
   const flowIdentity = useWorkflowProjectSelector(
@@ -1167,7 +1123,6 @@ export const WorkflowEditorView = ({ runtime }: { runtime: WorkflowRuntimeApi })
       <Flex direction="column" h="full" minH="0" w="full">
         <Box flex="1" minH="0" position="relative">
           <WorkflowFlow key={flowIdentity} runtime={runtime} />
-          <ReadinessBanner />
         </Box>
       </Flex>
     </ReactFlowProvider>

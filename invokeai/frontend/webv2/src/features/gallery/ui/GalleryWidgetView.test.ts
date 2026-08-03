@@ -39,12 +39,6 @@ describe('mixed-media gallery translations', () => {
 
     expect(instance.t('widgets.gallery.statusChip', { count: 12 })).toBe('Gallery: 12 items');
     expect(
-      instance.t('widgets.gallery.boardMediaCountBreakdown', {
-        images: instance.t('widgets.gallery.imageCount', { count: 2 }),
-        videos: instance.t('widgets.gallery.videoCount', { count: 3 }),
-      })
-    ).toBe('2 images · 3 videos');
-    expect(
       instance.t('widgets.gallery.boardItemCounts', {
         assets: instance.t('widgets.gallery.assetCount', { count: 4 }),
         images: instance.t('widgets.gallery.imageCount', { count: 2 }),
@@ -62,7 +56,7 @@ describe('mixed-media gallery translations', () => {
         videos: instance.t('widgets.gallery.videoCount', { count: 3 }),
       })
     ).toBe('2 images and 3 videos uploaded to Clips. 1 failed.');
-    expect(instance.t('widgets.gallery.uploadSplit')).toBe('Images appear in Assets; videos appear in Images.');
+    expect(instance.t('widgets.gallery.uploadSplit')).toBe('Images appear in Assets; videos appear in Media.');
     expect(
       instance.t('widgets.gallery.deleteBoardMediaOutcome', {
         failedImages: instance.t('widgets.gallery.imageCount', { count: 1 }),

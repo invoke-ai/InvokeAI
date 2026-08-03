@@ -48,7 +48,6 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
   const session = useAuthSession();
   const queryClient = useQueryClient();
   const notify = useNotify();
-
   const galleryGroup = useMemo<GenerationUiAdapter['gallery']>(
     () => ({
       selectedImage: selectedGalleryImage,
@@ -64,9 +63,16 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
       error: modelsError,
       getBaseColorPalette: getModelBaseColorPalette,
       getBaseLabel: getModelBaseLabel,
+      // Hash navigation, matching the app.selectModelsTab command. Going through
+      // useNavigate or the models UI store would pull either the router hooks or
+      // the store into the editor/launchpad initial bundles (architecture budget).
+      // The manager opens on Add Models by default, which is where this link wants to land.
+      openManager: () => {
+        window.location.hash = `#/models?project=${encodeURIComponent(project.activeProjectId)}`;
+      },
       status: modelsStatus,
     }),
-    [modelsCatalog, modelsError, modelsStatus]
+    [modelsCatalog, modelsError, modelsStatus, project.activeProjectId]
   );
   const notificationsGroup = useMemo<GenerationUiAdapter['notifications']>(
     () => ({ error: notify.error, info: notify.info, reportError: notifications.reportError }),

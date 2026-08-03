@@ -207,4 +207,43 @@ describe('color picker tool', () => {
     const tool = createColorPickerTool();
     expect(tool.cursor?.({} as ToolContext)).toBe('crosshair');
   });
+
+  describe('one-shot color sample requests', () => {
+    it('hands the sample to a pending request instead of the brush color', () => {
+      const h = createHarness(makeDoc());
+      const tool = createColorPickerTool();
+      const defaultColor = h.ctx.stores.brushOptions.get().color;
+      const resolveColorSample = vi.fn(() => true);
+      h.ctx.resolveColorSample = resolveColorSample;
+
+      down(tool, h.ctx, pointer(10, 10));
+
+      expect(resolveColorSample).toHaveBeenCalledWith('#0a141e');
+      expect(h.ctx.stores.brushOptions.get().color).toBe(defaultColor);
+    });
+
+    it('falls through to the brush color when no request is pending', () => {
+      // The alt-hold flow: `resolveColorSample` exists but reports nothing armed.
+      const h = createHarness(makeDoc());
+      const tool = createColorPickerTool();
+      const resolveColorSample = vi.fn(() => false);
+      h.ctx.resolveColorSample = resolveColorSample;
+
+      down(tool, h.ctx, pointer(10, 10));
+
+      expect(resolveColorSample).toHaveBeenCalledWith('#0a141e');
+      expect(h.ctx.stores.brushOptions.get().color).toBe('#0a141e');
+    });
+
+    it('does not consult a request when there is nothing to sample', () => {
+      const h = createHarness(null);
+      const tool = createColorPickerTool();
+      const resolveColorSample = vi.fn(() => true);
+      h.ctx.resolveColorSample = resolveColorSample;
+
+      down(tool, h.ctx, pointer(10, 10));
+
+      expect(resolveColorSample).not.toHaveBeenCalled();
+    });
+  });
 });

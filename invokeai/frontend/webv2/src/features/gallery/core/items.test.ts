@@ -9,10 +9,25 @@ import {
   isGalleryImageItem,
   legacyGeneratedImageToGalleryItem,
   parseGalleryItemKey,
+  shouldStarSelection,
   toGalleryItemKey,
   toGalleryItemRef,
   type GalleryImageItem,
 } from './items';
+
+const galleryItem = (name: string, starred: boolean): GalleryImageItem => ({
+  boardId: 'none',
+  category: 'general',
+  createdAt: '2026-07-30T12:00:00.000Z',
+  fullUrl: `/images/${name}/full`,
+  height: 512,
+  isIntermediate: false,
+  kind: 'image',
+  name,
+  starred,
+  thumbnailUrl: `/images/${name}/thumbnail`,
+  width: 768,
+});
 
 const generatedImage: GeneratedImageContract = {
   height: 512,
@@ -54,6 +69,43 @@ describe('gallery item keys', () => {
     expect(parseGalleryItemKey('image:')).toEqual({ kind: 'image', name: 'image:' });
     expect(parseGalleryItemKey('video:')).toEqual({ kind: 'image', name: 'video:' });
     expect(parseGalleryItemKey('bare.png')).toEqual({ kind: 'image', name: 'bare.png' });
+  });
+});
+
+describe('selection starring policy', () => {
+  const starred = galleryItem('starred.png', true);
+  const unstarred = galleryItem('unstarred.png', false);
+
+  it('does not star an empty selection', () => {
+    expect(shouldStarSelection([starred], [])).toBe(false);
+  });
+
+  it('unstars only when every selected item is loaded and starred', () => {
+    expect(shouldStarSelection([starred], [{ kind: 'image', name: starred.name }])).toBe(false);
+  });
+
+  it('stars when any selected item is loaded and unstarred', () => {
+    expect(
+      shouldStarSelection(
+        [starred, unstarred],
+        [
+          { kind: 'image', name: starred.name },
+          { kind: 'image', name: unstarred.name },
+        ]
+      )
+    ).toBe(true);
+  });
+
+  it('stars when any selected item has not been loaded', () => {
+    expect(
+      shouldStarSelection(
+        [starred],
+        [
+          { kind: 'image', name: starred.name },
+          { kind: 'video', name: 'not-loaded.mp4' },
+        ]
+      )
+    ).toBe(true);
   });
 });
 

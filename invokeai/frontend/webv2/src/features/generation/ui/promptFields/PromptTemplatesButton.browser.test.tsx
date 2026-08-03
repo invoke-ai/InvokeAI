@@ -112,6 +112,22 @@ describe('the prompt templates button', () => {
     expect(getComputedStyle(name!).opacity).toBe('0.5');
   });
 
+  it('stays square with nothing applied, and widens only to carry a name', async () => {
+    // `px={undefined}` looks like "leave the default" but is spread over
+    // Chakra's own `px: '0'`, clobbering it — the icon-only button used to be
+    // 8px wider than the square buttons beside it.
+    await render(null);
+    const bare = host!.querySelector('button')!.getBoundingClientRect();
+
+    expect(bare.width).toBeCloseTo(bare.height, 1);
+
+    await act(() => root?.unmount());
+    host?.remove();
+    await render(applied);
+
+    expect(host!.querySelector('button')!.getBoundingClientRect().width).toBeGreaterThan(bare.width);
+  });
+
   it('says nothing while the catalog is unread', async () => {
     usePromptTemplates.mockReturnValue({ ...catalog, isLoaded: false });
     await render(applied);

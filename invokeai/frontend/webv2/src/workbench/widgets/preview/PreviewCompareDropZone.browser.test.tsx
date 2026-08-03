@@ -59,26 +59,33 @@ const DraggableThumb = () => {
   );
 };
 
-const DropMonitor = ({ onDrop }: { onDrop: (resolution: { imageName: string } | null) => void }) => {
+const DropMonitor = ({
+  currentImageName,
+  onDrop,
+}: {
+  currentImageName: string | null;
+  onDrop: (resolution: { imageName: string } | null) => void;
+}) => {
   useDndMonitor({
     onDragEnd: (event: DragEndEvent) =>
-      onDrop(resolvePreviewCompareDrop(event.active.data.current, event.over?.data.current ?? null)),
+      onDrop(resolvePreviewCompareDrop(event.active.data.current, event.over?.data.current ?? null, currentImageName)),
   });
 
   return null;
 };
 
-const renderHarness = async () => {
+/** `currentImageName` is what the frame is showing; the thumb drags `dragged.png`. */
+const renderHarness = async (currentImageName: string | null = null) => {
   const onDrop = vi.fn();
   const Harness = () => {
     const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
     return (
       <DndContext collisionDetection={widgetCollisionDetection} sensors={sensors}>
-        <DropMonitor onDrop={onDrop} />
+        <DropMonitor currentImageName={currentImageName} onDrop={onDrop} />
         <DraggableThumb />
         <div data-testid="frame" style={{ height: 300, left: 200, position: 'fixed', top: 100, width: 300 }}>
-          <PreviewCompareDropZone />
+          <PreviewCompareDropZone currentImageName={currentImageName} />
         </div>
       </DndContext>
     );
@@ -143,5 +150,37 @@ describe('PreviewCompareDropZone', () => {
     await interact(() => pointer('pointerup', thumb.ownerDocument, 120, 400));
 
     expect(onDrop).toHaveBeenCalledWith(null);
+  });
+
+  it('offers no ring, and arms nothing, when the drag is the previewed image', async () => {
+    // Comparing an image with itself does nothing visible but still pauses
+    // live-follow, so the affordance has to be absent rather than merely inert.
+    const { onDrop } = await renderHarness('dragged.png');
+    const thumb = document.querySelector<HTMLElement>('[data-testid="thumb"]')!;
+
+    await interact(() => pointer('pointerdown', thumb, 30, 30));
+    await interact(() => pointer('pointermove', thumb.ownerDocument, 60, 60));
+
+    expect(document.body.textContent).not.toContain('Drop to compare');
+
+    await interact(() => pointer('pointermove', thumb.ownerDocument, 350, 250));
+    await interact(() => pointer('pointerup', thumb.ownerDocument, 350, 250));
+
+    expect(onDrop).toHaveBeenCalledWith(null);
+  });
+
+  it('still offers the ring for an image other than the previewed one', async () => {
+    const { onDrop } = await renderHarness('shown.png');
+    const thumb = document.querySelector<HTMLElement>('[data-testid="thumb"]')!;
+
+    await interact(() => pointer('pointerdown', thumb, 30, 30));
+    await interact(() => pointer('pointermove', thumb.ownerDocument, 60, 60));
+
+    expect(document.body.textContent).toContain('Drop to compare');
+
+    await interact(() => pointer('pointermove', thumb.ownerDocument, 350, 250));
+    await interact(() => pointer('pointerup', thumb.ownerDocument, 350, 250));
+
+    expect(onDrop).toHaveBeenCalledWith({ imageName: 'dragged.png' });
   });
 });

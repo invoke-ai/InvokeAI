@@ -55,19 +55,11 @@ export const wheelZoomAtPoint = (
   transform: PanZoomTransform,
   deltaY: number,
   screenAnchor: PanZoomPoint,
-  {
-    constrainZoom,
-    snapZoom = (zoom) => zoom,
-    step = WHEEL_ZOOM_STEP,
-  }: {
-    constrainZoom: ConstrainZoom;
-    snapZoom?: (zoom: number) => number;
-    step?: number;
-  }
+  { constrainZoom, step = WHEEL_ZOOM_STEP }: { constrainZoom: ConstrainZoom; step?: number }
 ): PanZoomTransform => {
   const target = constrainZoom(transform.zoom * Math.exp(-deltaY * step));
 
-  return zoomAtPoint(transform, snapZoom(target), screenAnchor, constrainZoom);
+  return zoomAtPoint(transform, target, screenAnchor, constrainZoom);
 };
 
 /** Pans by a screen-space delta. */

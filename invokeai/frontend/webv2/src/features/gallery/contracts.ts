@@ -10,6 +10,7 @@ export type {
   GalleryView,
   GeneratedImageContract,
 } from './core/types';
+export { getGalleryBoardLabel, type GalleryBoardTranslate } from './core/boardLabels';
 export { normalizeGalleryImage } from './core/image';
 export {
   assertNeverGalleryItem,
@@ -19,6 +20,7 @@ export {
   isGalleryImageItem,
   legacyGeneratedImageToGalleryItem,
   parseGalleryItemKey,
+  shouldStarSelection,
   toGalleryItemKey,
   toGalleryItemRef,
   type GalleryImageItem,

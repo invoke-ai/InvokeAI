@@ -9,6 +9,7 @@ import type {
 import { ChakraProvider, Stack, Text } from '@chakra-ui/react';
 import { StatusWidgetChip } from '@platform/ui';
 import { system } from '@theme/system';
+import { FocusRegionProvider } from '@workbench/focusRegions';
 import { createWidgetImplementationResource } from '@workbench/widgetImplementationResource';
 import i18next from 'i18next';
 import { CircleIcon } from 'lucide-react';
@@ -25,10 +26,10 @@ const workbenchMocks = vi.hoisted(() => ({
     widgetGraphs: {},
     widgetInstances: {},
     widgetRegions: {
-      bottom: { activeInstanceId: 'test-instance', instanceIds: ['test-instance'], isCollapsed: false },
-      center: { activeInstanceId: 'test-instance', instanceIds: ['test-instance'], isCollapsed: false },
-      left: { activeInstanceId: 'test-instance', instanceIds: ['test-instance'], isCollapsed: false },
-      right: { activeInstanceId: 'test-instance', instanceIds: ['test-instance'], isCollapsed: false },
+      bottom: { activeInstanceId: 'test-instance', instanceIds: ['test-instance'], isCollapsed: false, sizePx: 240 },
+      center: { activeInstanceId: 'test-instance', instanceIds: ['test-instance'], isCollapsed: false, sizePx: 240 },
+      left: { activeInstanceId: 'test-instance', instanceIds: ['test-instance'], isCollapsed: false, sizePx: 240 },
+      right: { activeInstanceId: 'test-instance', instanceIds: ['test-instance'], isCollapsed: false, sizePx: 240 },
     },
   },
   runtime: {},
@@ -38,7 +39,7 @@ vi.mock('@workbench/WorkbenchContext', () => ({
   shallowEqual: Object.is,
   useActiveProjectSelector: (selector: (project: typeof workbenchMocks.project) => unknown) =>
     selector(workbenchMocks.project),
-  useWorkbenchCommands: () => ({}),
+  useWorkbenchCommands: () => ({ layout: { setRegionSize: () => {} } }),
 }));
 
 vi.mock('@workbench/WorkbenchWidgetRegistryContext', () => ({
@@ -63,7 +64,14 @@ await i18n.use(initReactI18next).init({
       translation: {
         widgets: {
           actionsLabel: '{{label}} actions',
+          failure: {
+            compactLabel: '{{label}} failed — select to retry',
+            copyError: 'Copy Error',
+            retry: 'Retry',
+            title: '{{label}} failed',
+          },
           loadingLabel: 'Loading {{label}}',
+          panelLabel: '{{region}} widget panel',
         },
       },
     },
@@ -93,6 +101,10 @@ const CustomHeaderLabel = () => (
   </Text>
 );
 
+const ThrowingView = () => {
+  throw new Error('widget exploded');
+};
+
 const createDeferredWidget = () => {
   let resolveLoad: ((implementation: WidgetImplementation) => void) | undefined;
   const loader = vi.fn(
@@ -103,7 +115,7 @@ const createDeferredWidget = () => {
   );
   const manifest: NormalizedWidgetManifest = {
     allowMultiple: false,
-    allowedRegions: ['bottom', 'center'],
+    allowedRegions: ['bottom', 'center', 'right'],
     apiVersion: 1,
     failurePolicy: { isolateRenderFailure: true, onRegistrationFailure: 'disable' },
     icon: TestIcon,
@@ -151,7 +163,9 @@ const render = async (children: ReactNode) => {
   await act(async () => {
     root?.render(
       <I18nextProvider i18n={i18n}>
-        <ChakraProvider value={system}>{children}</ChakraProvider>
+        <ChakraProvider value={system}>
+          <FocusRegionProvider>{children}</FocusRegionProvider>
+        </ChakraProvider>
       </I18nextProvider>
     );
     await Promise.resolve();
@@ -191,9 +205,11 @@ afterEach(async () => {
 });
 
 describe('WidgetRenderer loading identity transitions', () => {
+  // The center region has no header row of its own — `CenterArea` floats that
+  // chrome above the work surface — so the identity slot lives in panel frames.
   it('swaps spinner for icon without moving a renamed standard header', async () => {
     const { resolve, widget } = createDeferredWidget();
-    await render(<WidgetRenderer instance={createInstance('Renamed widget')} region="center" widget={widget} />);
+    await render(<WidgetRenderer instance={createInstance('Renamed widget')} region="right" widget={widget} />);
 
     const loadingGeometry = getIdentityGeometry();
     expect(host?.textContent).toContain('Renamed widget');
@@ -209,7 +225,7 @@ describe('WidgetRenderer loading identity transitions', () => {
 
   it('keeps the identity slot aligned when a custom header label loads', async () => {
     const { resolve, widget } = createDeferredWidget();
-    await render(<WidgetRenderer instance={createInstance()} region="center" widget={widget} />);
+    await render(<WidgetRenderer instance={createInstance()} region="right" widget={widget} />);
 
     const loadingGeometry = getIdentityGeometry();
     await resolve({ headerLabel: CustomHeaderLabel, view: TestView });
@@ -241,5 +257,51 @@ describe('WidgetRenderer loading identity transitions', () => {
 
     expect(getIdentityGeometry()).toEqual(loadingGeometry);
     expect(host?.querySelector('.chakra-spinner')).toBeNull();
+  });
+});
+
+describe('WidgetRenderer failure containment', () => {
+  it('keeps a crashed compact widget inside the status bar strip', async () => {
+    const { resolve, widget } = createDeferredWidget();
+    // The status bar is a 24px-tall strip; a crashed widget must not outgrow it.
+    host = document.createElement('div');
+    host.style.cssText = 'align-items:center;display:flex;height:24px;width:480px;';
+    document.body.append(host);
+    root = createRoot(host);
+
+    await act(async () => {
+      root?.render(
+        <I18nextProvider i18n={i18n}>
+          <ChakraProvider value={system}>
+            <WidgetRenderer instance={createInstance()} presentation="compact" region="bottom" widget={widget} />
+          </ChakraProvider>
+        </I18nextProvider>
+      );
+      await Promise.resolve();
+    });
+
+    await resolve({ view: ThrowingView });
+    await expect.poll(() => host?.querySelector('[data-testid="widget-failure"]')).not.toBeNull();
+
+    const failure = host?.querySelector<HTMLElement>('[role="status"]');
+    expect(failure).not.toBeNull();
+    expect(failure?.getBoundingClientRect().height).toBeLessThanOrEqual(24);
+    // The label still identifies which widget died.
+    expect(host?.textContent).toContain('Test widget');
+  });
+
+  it('keeps a crashed panel widget framed and resizable', async () => {
+    const { resolve, widget } = createDeferredWidget();
+    await render(<WidgetRenderer instance={createInstance()} region="right" widget={widget} />);
+
+    await resolve({ view: ThrowingView });
+    await expect.poll(() => host?.querySelector('[data-testid="widget-failure"]')).not.toBeNull();
+
+    const panel = host?.querySelector<HTMLElement>('aside');
+    expect(panel).not.toBeNull();
+    // Panel width survives the crash, so the region does not collapse or overflow.
+    expect(panel?.getBoundingClientRect().width).toBe(240);
+    // And the drag handle is still there to resize with.
+    expect(panel?.querySelector('[role="separator"]')).not.toBeNull();
   });
 });

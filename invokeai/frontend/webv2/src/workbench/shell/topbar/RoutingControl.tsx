@@ -1,0 +1,163 @@
+import type { GraphWidgetSource } from '@workbench/graphWidgets';
+import type { InvocationSourceId, ResultDestination } from '@workbench/invocationContracts';
+
+import { Box, Icon, Menu, Portal, SegmentGroup, Stack, Text } from '@chakra-ui/react';
+import { Button } from '@platform/ui/Button';
+import { MenuContent } from '@platform/ui/Menu';
+import { Tooltip } from '@platform/ui/Tooltip';
+import { describeRoute, getWidgetTypeIdForSourceId } from '@workbench/graphWidgets';
+import { WidgetIcon } from '@workbench/iconResolver';
+import { getDestinationLabel, resultDestinations } from '@workbench/invocation';
+import { getWidgetById } from '@workbench/widgetRegistry';
+import { useWorkbenchCommands } from '@workbench/WorkbenchContext';
+import { ArrowRightIcon, Link2Icon, LockKeyholeIcon, UnlockKeyholeIcon } from 'lucide-react';
+import { useCallback, useId, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+
+import type { InvocationState } from './useInvocationState';
+
+const MENU_POSITIONING = { placement: 'bottom-end' } as const;
+
+const destinationWidgetTypeIds: Record<ResultDestination, 'canvas' | 'gallery'> = {
+  canvas: 'canvas',
+  gallery: 'gallery',
+};
+
+export const RoutingControl = ({ state }: { state: InvocationState }) => {
+  const { t } = useTranslation();
+  const { generation } = useWorkbenchCommands();
+  const triggerId = useId();
+  const triggerIds = useMemo(() => ({ trigger: triggerId }), [triggerId]);
+  const { invocation, placedTypeIds, sources } = state;
+  const isLocked = invocation.sourceLocked || invocation.destinationLocked;
+  const relationship = isLocked ? 'link' : 'arrow';
+  const hasSource = placedTypeIds.has(getWidgetTypeIdForSourceId(invocation.sourceId));
+  const sourceTypeId = getWidgetTypeIdForSourceId(invocation.sourceId);
+  const destinationTypeId = destinationWidgetTypeIds[invocation.destination];
+  const accessibleName = describeRoute({
+    destination: invocation.destination,
+    destinationLocked: invocation.destinationLocked,
+    hasSource,
+    sourceId: invocation.sourceId,
+    sourceLocked: invocation.sourceLocked,
+  });
+  const glyphColor = isLocked ? 'accent.fg' : 'fg.muted';
+  const lockActionLabel = t(isLocked ? 'topbar.routing.unlockRouting' : 'topbar.routing.lockRouting');
+
+  return (
+    <Menu.Root ids={triggerIds} positioning={MENU_POSITIONING}>
+      <Tooltip content={t('topbar.routing.change')} ids={triggerIds}>
+        <Menu.Trigger asChild>
+          <Button
+            aria-label={accessibleName}
+            colorPalette={isLocked ? 'accent' : undefined}
+            flexShrink={0}
+            px="2"
+            size="sm"
+            gap="1.5"
+            variant={isLocked ? 'subtle' : 'outline'}
+          >
+            {hasSource ? (
+              <WidgetIcon boxSize="3.5" color={glyphColor} icon={getWidgetById(sourceTypeId)?.manifest.icon} />
+            ) : (
+              <Box borderColor="border.emphasized" borderStyle="dashed" borderWidth="1px" boxSize="3.5" rounded="xs" />
+            )}
+            <Icon
+              as={relationship === 'link' ? Link2Icon : ArrowRightIcon}
+              boxSize="3"
+              color={isLocked ? 'accent.fg' : 'fg.subtle'}
+            />
+            <WidgetIcon boxSize="3.5" color={glyphColor} icon={getWidgetById(destinationTypeId)?.manifest.icon} />
+          </Button>
+        </Menu.Trigger>
+      </Tooltip>
+      <Portal>
+        <Menu.Positioner>
+          <MenuContent minW="17rem">
+            <RoutingSectionHeader label={t('topbar.routing.source')} />
+            <SourceRadioGroup sourceId={invocation.sourceId} sources={sources} />
+            <Menu.Separator />
+            <RoutingSectionHeader label={t('topbar.routing.destination')} />
+            <Stack px="3" pb="2">
+              <DestinationSegments destination={invocation.destination} />
+            </Stack>
+            <Menu.Separator />
+            <Menu.Item value={isLocked ? 'unlock-routing' : 'lock-routing'} onClick={generation.toggleRoutingLock}>
+              <Icon as={isLocked ? UnlockKeyholeIcon : LockKeyholeIcon} boxSize="3.5" color="fg.subtle" />
+              <Menu.ItemText>{lockActionLabel}</Menu.ItemText>
+            </Menu.Item>
+          </MenuContent>
+        </Menu.Positioner>
+      </Portal>
+    </Menu.Root>
+  );
+};
+
+const RoutingSectionHeader = ({ label }: { label: string }) => (
+  <Text color="fg.subtle" fontSize="2xs" fontWeight="700" px="3" pt="2" pb="1" textTransform="uppercase">
+    {label}
+  </Text>
+);
+
+const SourceRadioGroup = ({
+  sourceId,
+  sources,
+}: {
+  sourceId: InvocationSourceId;
+  sources: readonly GraphWidgetSource[];
+}) => {
+  const { generation } = useWorkbenchCommands();
+  const handleChange = useCallback(
+    (event: { value: string }) => generation.setSource(event.value as InvocationSourceId),
+    [generation]
+  );
+
+  return (
+    <Menu.RadioItemGroup value={sourceId} onValueChange={handleChange}>
+      {sources.map((source) => (
+        <SourceRow key={source.sourceId} source={source} />
+      ))}
+    </Menu.RadioItemGroup>
+  );
+};
+
+const SourceRow = ({ source }: { source: GraphWidgetSource }) => (
+  <Menu.RadioItem value={source.sourceId}>
+    <Menu.ItemIndicator />
+    <WidgetIcon boxSize="3.5" icon={getWidgetById(source.typeId)?.manifest.icon} />
+    <Menu.ItemText flex="1">{source.label}</Menu.ItemText>
+  </Menu.RadioItem>
+);
+
+const DestinationSegments = ({ destination }: { destination: ResultDestination }) => {
+  const { generation } = useWorkbenchCommands();
+  const { t } = useTranslation();
+  const handleChange = useCallback(
+    (event: { value: string | null }) => {
+      if (event.value) {
+        generation.setDestination(event.value as ResultDestination);
+      }
+    },
+    [generation]
+  );
+
+  return (
+    <SegmentGroup.Root
+      aria-label={t('topbar.routing.destination')}
+      size="xs"
+      value={destination}
+      onValueChange={handleChange}
+    >
+      <SegmentGroup.Indicator />
+      {resultDestinations.map((option) => (
+        <SegmentGroup.Item key={option.id} flex="1" justifyContent="center" value={option.id}>
+          <SegmentGroup.ItemHiddenInput />
+          <SegmentGroup.ItemText display="flex" alignItems="center" gap="1.5">
+            <WidgetIcon boxSize="3.5" icon={getWidgetById(destinationWidgetTypeIds[option.id])?.manifest.icon} />
+            {getDestinationLabel(option.id)}
+          </SegmentGroup.ItemText>
+        </SegmentGroup.Item>
+      ))}
+    </SegmentGroup.Root>
+  );
+};
