@@ -1,4 +1,4 @@
-import { Flex, HStack, Icon, Splitter } from '@chakra-ui/react';
+import { Flex, HStack, Icon, Splitter, VisuallyHidden } from '@chakra-ui/react';
 import { ensureInvocationTemplatesLoaded } from '@features/workflow/react';
 import { useWorkflowHostCommands, useWorkflowProjectSelector } from '@features/workflow/ui/WorkflowUiContext';
 import { useMountEffect } from '@platform/react/useMountEffect';
@@ -68,8 +68,9 @@ export const areWorkflowPanelStatesEqual = (left: WorkflowPanelState, right: Wor
  * View / Edit selection. These swap the whole panel body, so they are tabs
  * rather than a pressed-button pair: the tablist carries roving focus and
  * arrow-key selection for free, which the hand-rolled `aria-pressed` group it
- * replaced could not. Like the edit-tab strip below, it renders the list only —
- * the panels are siblings, since edit mode drives its own splitter layout.
+ * replaced could not. The visible panels remain siblings because edit mode
+ * drives its own splitter layout; hidden content nodes keep every generated
+ * `aria-controls` relationship valid and describe what selecting the tab did.
  */
 export const PanelModeToggle = ({ mode, onChange }: { mode: PanelMode; onChange: (mode: PanelMode) => void }) => {
   const { t } = useTranslation();
@@ -90,6 +91,11 @@ export const PanelModeToggle = ({ mode, onChange }: { mode: PanelMode; onChange:
           </Tabs.Trigger>
         ))}
       </Tabs.List>
+      {PANEL_MODES.map(({ labelKey, mode: itemMode }) => (
+        <Tabs.Content key={itemMode} value={itemMode} asChild>
+          <VisuallyHidden>{t(labelKey)}</VisuallyHidden>
+        </Tabs.Content>
+      ))}
     </Tabs.Root>
   );
 };
@@ -132,6 +138,15 @@ export const WorkflowLinearPanel = () => {
                 {t('common.json')}
               </Tabs.Trigger>
             </Tabs.List>
+            <Tabs.Content value="form" asChild>
+              <VisuallyHidden>{t('widgets.workflow.form')}</VisuallyHidden>
+            </Tabs.Content>
+            <Tabs.Content value="details" asChild>
+              <VisuallyHidden>{t('widgets.workflow.details')}</VisuallyHidden>
+            </Tabs.Content>
+            <Tabs.Content value="json" asChild>
+              <VisuallyHidden>{t('common.json')}</VisuallyHidden>
+            </Tabs.Content>
           </Tabs.Root>
         ) : null}
       </HStack>

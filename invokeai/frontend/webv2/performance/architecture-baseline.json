@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 810965,
+        "brotliBytes": 811013,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 810326,
+        "gzipBytes": 810387,
         "imageRawBytes": 156376,
-        "initialRawBytes": 1870361,
+        "initialRawBytes": 1870722,
         "largestAssetRawBytes": 746428,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 34460,
+        "ownedRawBytes": 34451,
         "requestCount": 32,
         "scriptRequestCount": 16,
         "sourceOwners": [
@@ -248,15 +248,15 @@
         ]
       },
       "limits": {
-        "brotliBytes": 819075,
+        "brotliBytes": 819124,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 818430,
+        "gzipBytes": 818491,
         "imageRawBytes": 157940,
-        "initialRawBytes": 1889065,
+        "initialRawBytes": 1889430,
         "largestAssetRawBytes": 753893,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 34460,
+        "ownedRawBytes": 34451,
         "requestCount": 32,
         "scriptRequestCount": 16
       },
@@ -266,15 +266,15 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1000028,
+        "brotliBytes": 1000894,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 997548,
+        "gzipBytes": 998453,
         "imageRawBytes": 156376,
-        "initialRawBytes": 2446043,
+        "initialRawBytes": 2449268,
         "largestAssetRawBytes": 746428,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 112617,
+        "ownedRawBytes": 112654,
         "requestCount": 75,
         "scriptRequestCount": 59,
         "sourceOwners": [
@@ -427,6 +427,7 @@
           "source:src/features/generation/core/dynamicPrompts.ts",
           "source:src/features/generation/core/graph.ts",
           "source:src/features/generation/core/graphBuilder.ts",
+          "source:src/features/generation/core/krea2Conditioning.ts",
           "source:src/features/generation/core/pid.ts",
           "source:src/features/generation/core/pidGraph.ts",
           "source:src/features/generation/core/projectPromptDraft.ts",
@@ -438,6 +439,7 @@
           "source:src/features/generation/core/resolveGenerateWidgetValues.ts",
           "source:src/features/generation/core/settings.ts",
           "source:src/features/generation/data/dynamicPromptsQueries.ts",
+          "source:src/features/generation/data/llmTaskProgress.ts",
           "source:src/features/generation/data/promptTemplates.ts",
           "source:src/features/generation/data/promptUtilities.ts",
           "source:src/features/generation/graph.ts",
@@ -447,6 +449,7 @@
           "source:src/features/generation/runtime.ts",
           "source:src/features/generation/settings.ts",
           "source:src/features/generation/ui/GenerationUiContext.tsx",
+          "source:src/features/generation/ui/LLMTaskProgressRuntime.tsx",
           "source:src/features/generation/ui/generateDraftRegistry.ts",
           "source:src/features/generation/ui/generateFormViewModel.ts",
           "source:src/features/generation/ui/promptFields/promptAttentionHotkeys.ts",
@@ -756,15 +759,15 @@
         ]
       },
       "limits": {
-        "brotliBytes": 1010029,
+        "brotliBytes": 1010903,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 1007524,
+        "gzipBytes": 1008438,
         "imageRawBytes": 157940,
-        "initialRawBytes": 2470504,
+        "initialRawBytes": 2473761,
         "largestAssetRawBytes": 753893,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 112617,
+        "ownedRawBytes": 112654,
         "requestCount": 75,
         "scriptRequestCount": 59
       },

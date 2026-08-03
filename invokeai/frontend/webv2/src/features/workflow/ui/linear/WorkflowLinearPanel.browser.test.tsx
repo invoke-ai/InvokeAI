@@ -49,6 +49,12 @@ describe('Workflow Linear panel mode toggle', () => {
     expect(tabs).toHaveLength(2);
     expect(host.querySelector('[role="tablist"]')?.getAttribute('aria-label')).toBeTruthy();
     expect(selection(tabs)).toEqual(['true', 'false']);
+    expect(
+      tabs
+        .map((tab) => tab.getAttribute('aria-controls'))
+        .filter((id): id is string => id !== null)
+        .map((id) => document.getElementById(id))
+    ).not.toContain(null);
   });
 
   it('activates View and Edit with pointer and arrow keys', async () => {
