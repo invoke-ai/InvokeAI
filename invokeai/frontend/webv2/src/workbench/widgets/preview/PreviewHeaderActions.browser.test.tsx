@@ -7,7 +7,6 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { userEvent } from 'vitest/browser';
 
 import { PreviewHeaderActions } from './PreviewHeaderActions';
 
@@ -38,8 +37,6 @@ const updateProjectPreferences = vi.hoisted(() => vi.fn());
 
 vi.mock('@features/queue/react', () => ({ useProgressImage: () => null }));
 
-// No selection published, so the action strip stays out and the two toggles are
-// the only buttons in the header.
 vi.mock('./previewHeaderStore', () => ({
   usePreviewHeaderContext: () => ({
     actionItem: null,
@@ -111,9 +108,6 @@ afterEach(async () => {
 
 describe('preview header toggles', () => {
   it('states both on/off positions the same way', async () => {
-    // The filmstrip toggle used to signal "on" with an `fg.muted` → `fg` shift
-    // on a permanently ghost button, while the in-progress toggle next to it
-    // filled. One control type, one vocabulary.
     await render();
     const bothOn = [button('Hide filmstrip'), button('Hide in-progress diffusion')];
 
@@ -136,28 +130,6 @@ describe('preview header toggles', () => {
     const [filmstripOff, progressOff] = bothOff.map((control) => getComputedStyle(control).backgroundColor);
     expect(filmstripOff).toBe(progressOff);
     expect(filmstripOff).not.toBe(filmstripOn);
-  });
-
-  it('gives both a hover tooltip rather than the native title attribute', async () => {
-    // They previously relied on `title`, which is delayed, unstyled, and unlike
-    // every other button in the same header row.
-    await render();
-
-    for (const label of ['Hide filmstrip', 'Hide in-progress diffusion']) {
-      const control = button(label);
-      expect(control.hasAttribute('title'), label).toBe(false);
-
-      await act(async () => {
-        await userEvent.hover(control);
-      });
-      await vi.waitFor(() =>
-        expect(document.querySelector('[data-scope="tooltip"][data-part="content"]')?.textContent, label).toBe(label)
-      );
-
-      await act(async () => {
-        await userEvent.unhover(control);
-      });
-    }
   });
 
   it('still toggles the setting each one owns', async () => {

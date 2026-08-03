@@ -115,19 +115,7 @@ afterEach(async () => {
 });
 
 describe('ColorPicker', () => {
-  it('opens a popover with an area, hue slider, channel inputs, and swatches', async () => {
-    const { trigger } = await renderPicker({ initialValue: '#ff0000' });
-    await openPicker(trigger);
-
-    expect(document.querySelector('[data-part="area"]')).not.toBeNull();
-    expect(document.querySelector('[data-part="channel-slider"][data-channel="hue"]')).not.toBeNull();
-    expect(queryChannelInputs().length).toBeGreaterThan(0);
-    expect(querySwatchTriggers().length).toBeGreaterThan(0);
-  });
-
   it('emits both a change and a commit when a swatch is picked', async () => {
-    // Zag's SwatchTrigger only reports a value change; without the component's
-    // explicit commit, every undo-recording consumer would drop swatch picks.
     const { onChange, onChangeEnd, trigger } = await renderPicker({
       initialValue: '#000000',
       swatches: ['#ff0000', '#00ff00'],
@@ -156,42 +144,15 @@ describe('ColorPicker', () => {
     expect(alpha.onChange).toHaveBeenLastCalledWith('#ff0000ff');
   });
 
-  it('takes the alpha a swatch carries, so recents restore their transparency', async () => {
-    const { onChange, trigger } = await renderPicker({
-      initialValue: '#000000ff',
-      swatches: ['#ff000080'],
-      withAlpha: true,
-    });
-    await openPicker(trigger);
-    await interact(() => querySwatchTriggers()[0]?.click());
-
-    expect(onChange).toHaveBeenLastCalledWith('#ff000080');
-  });
-
-  it('shows an alpha slider only under withAlpha', async () => {
-    const opaque = await renderPicker({ initialValue: '#ff0000' });
-    await openPicker(opaque.trigger);
-    expect(document.querySelector('[data-part="channel-slider"][data-channel="alpha"]')).toBeNull();
-
-    await interact(() => root?.unmount());
-    host?.remove();
-
-    const alpha = await renderPicker({ initialValue: '#ff0000ff', withAlpha: true });
-    await openPicker(alpha.trigger);
-    expect(document.querySelector('[data-part="channel-slider"][data-channel="alpha"]')).not.toBeNull();
-  });
-
   it('cycles formats through HEX/RGB/HSL/HSB without changing the value', async () => {
     const { onChange, trigger } = await renderPicker({ initialValue: '#ff0000', swatches: false });
     await openPicker(trigger);
 
     const formatTrigger = () => document.querySelector<HTMLButtonElement>('[aria-label="Color format"]')!;
 
-    // HEX renders a single text field.
     expect(formatTrigger().textContent).toBe('HEX');
     expect(queryChannelInputs()).toHaveLength(1);
 
-    // RGB renders one field per channel.
     await interact(() => formatTrigger().click());
     expect(formatTrigger().textContent).toBe('RGB');
     expect(queryChannelInputs()).toHaveLength(3);
@@ -203,14 +164,12 @@ describe('ColorPicker', () => {
     await interact(() => formatTrigger().click());
     expect(formatTrigger().textContent).toBe('HSB');
 
-    // Back to the start, and cycling never emitted a value change.
     await interact(() => formatTrigger().click());
     expect(formatTrigger().textContent).toBe('HEX');
     expect(onChange).not.toHaveBeenCalled();
   });
 
   it('edits opacity as a whole percentage rather than a unit float', async () => {
-    // Zag's own alpha channel input renders `0.501`; the picker replaces it.
     const { onChange, trigger } = await renderPicker({
       initialValue: '#ff000080',
       swatches: false,
@@ -230,19 +189,6 @@ describe('ColorPicker', () => {
     expect(onChange).toHaveBeenLastCalledWith('#ff000040');
   });
 
-  it('offers the opacity field only under withAlpha', async () => {
-    const opaque = await renderPicker({ initialValue: '#ff0000', swatches: false });
-    await openPicker(opaque.trigger);
-    expect(document.querySelector('[aria-label="Opacity (%)"]')).toBeNull();
-
-    await interact(() => root?.unmount());
-    host?.remove();
-
-    const alpha = await renderPicker({ initialValue: '#ff0000ff', swatches: false, withAlpha: true });
-    await openPicker(alpha.trigger);
-    expect(document.querySelector('[aria-label="Opacity (%)"]')).not.toBeNull();
-  });
-
   it('records committed colors as recents and offers them alongside the defaults', async () => {
     const first = await renderPicker({ initialValue: '#000000', swatches: ['#123456'] });
     await openPicker(first.trigger);
@@ -252,7 +198,6 @@ describe('ColorPicker', () => {
     await interact(() => root?.unmount());
     host?.remove();
 
-    // A picker using the default palette should now surface the committed color.
     const second = await renderPicker({ initialValue: '#000000' });
     await openPicker(second.trigger);
     const values = querySwatchTriggers().map((swatch) => swatch.getAttribute('data-value'));

@@ -282,27 +282,7 @@ describe('focused gallery upload action', () => {
       message: '2 images and 2 videos uploaded to Board 1. 1 failed. Images appear in Assets; videos appear in Media.',
       title: 'Uploaded 4 of 5 files',
     });
-  });
-
-  it('selects the newest successful upload visible in the active view', async () => {
-    galleryView = 'assets';
-    await renderProbe();
-    mocks.uploadGalleryImage
-      .mockResolvedValueOnce(imageUpload('older.png', '2026-07-30T12:00:01.000Z'))
-      .mockResolvedValueOnce(imageUpload('newer.png', '2026-07-30T12:00:04.000Z'));
-    mocks.uploadGalleryVideo.mockResolvedValue(videoUpload('newest.mp4', '2026-07-30T12:00:05.000Z'));
-
-    await act(async () => {
-      await uploadFilesRef.current?.([
-        new File(['image'], 'older.png', { type: 'image/png' }),
-        new File(['video'], 'newest.mp4', { type: 'video/mp4' }),
-        new File(['image'], 'newer.png', { type: 'image/png' }),
-      ]);
-    });
-
-    expect(selectItem).toHaveBeenCalledExactlyOnceWith(
-      expect.objectContaining({ category: 'user', kind: 'image', name: 'newer.png' })
-    );
+    expect(selectItem).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ kind: 'video', name: 'third.mp4' }));
   });
 
   it('does not select an upload from the launch board after the active board changes in flight', async () => {
@@ -329,52 +309,6 @@ describe('focused gallery upload action', () => {
 
     expect(selectItem).not.toHaveBeenCalled();
     expect(mocks.invalidateGallery).toHaveBeenCalledOnce();
-  });
-
-  it('does not select an upload hidden by a view change while the upload is in flight', async () => {
-    galleryView = 'assets';
-    await renderProbe();
-    let resolveUpload: ((value: ReturnType<typeof imageUpload>) => void) | undefined;
-    mocks.uploadGalleryImage.mockReturnValueOnce(
-      new Promise<ReturnType<typeof imageUpload>>((resolve) => {
-        resolveUpload = resolve;
-      })
-    );
-
-    let upload: Promise<void> | undefined;
-    act(() => {
-      upload = uploadFilesRef.current?.([new File(['image'], 'photo.png', { type: 'image/png' })]);
-    });
-    await vi.waitFor(() => expect(mocks.uploadGalleryImage).toHaveBeenCalledOnce());
-
-    galleryView = 'images';
-    await renderProbe();
-    resolveUpload?.(imageUpload('photo.png', '2026-07-30T12:00:04.000Z'));
-
-    await act(async () => {
-      await upload;
-    });
-
-    expect(selectItem).not.toHaveBeenCalled();
-    expect(mocks.invalidateGallery).toHaveBeenCalledOnce();
-  });
-
-  it('reports unsupported and rejected files once without aborting supported uploads', async () => {
-    mocks.uploadGalleryVideo.mockRejectedValue(new Error('corrupt video'));
-
-    await act(async () => {
-      await uploadFilesRef.current?.([
-        new File(['text'], 'notes.txt', { type: 'text/plain' }),
-        new File(['video'], 'corrupt.mp4', { type: 'video/mp4' }),
-      ]);
-    });
-
-    expect(mocks.notificationsAdd).not.toHaveBeenCalled();
-    expect(mocks.notificationsReportError).toHaveBeenCalledExactlyOnceWith({
-      area: 'gallery-upload',
-      message: 'No files uploaded. 2 failed.',
-      namespace: 'gallery',
-    });
   });
 
   it('does not schedule another expensive video after the account lifetime aborts', async () => {

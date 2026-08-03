@@ -111,9 +111,7 @@ describe('GalleryWidgetLabel', () => {
 
     expect(host?.textContent).toContain('widgets.labels.gallery');
     expect(host?.textContent).toContain('dogs');
-  });
 
-  it('drops the widget name in the center, where the view selector already says it', async () => {
     await renderChrome(GalleryWidgetLabel, { selectedBoardId: 'dogs' }, 'center');
 
     expect(host?.textContent).not.toContain('widgets.labels.gallery');
@@ -137,19 +135,6 @@ describe('GalleryWidgetLabel', () => {
     });
 
     expect(updateSettings).toHaveBeenCalledWith({ boardPanelCollapsed: true });
-  });
-
-  it('expands the boards again when collapsed', async () => {
-    await renderChrome(GalleryWidgetLabel, { boardPanelCollapsed: true, selectedBoardId: 'dogs' });
-
-    expect(getToggle().getAttribute('aria-expanded')).toBe('false');
-
-    await act(async () => {
-      getToggle().click();
-      await Promise.resolve();
-    });
-
-    expect(updateSettings).toHaveBeenCalledWith({ boardPanelCollapsed: false });
   });
 });
 

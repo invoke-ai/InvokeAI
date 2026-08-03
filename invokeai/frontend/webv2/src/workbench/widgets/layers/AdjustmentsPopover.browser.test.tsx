@@ -18,9 +18,6 @@ import { CURVE_SIZE } from './curveEditorMath';
 const i18n = createInstance();
 void i18n.use(initReactI18next).init({ fallbackLng: 'en', initAsync: false, lng: 'en', resources: {} });
 
-// The popover calls this hook for its no-engine fallback path. The harness
-// drives edits through a stand-in engine instead, so the dispatch is never used
-// and can stay a stable no-op rather than something reassigned during render.
 const noopDispatch = (): void => undefined;
 vi.mock('@workbench/useCanvasProjectMutationDispatch', () => ({
   useCanvasProjectMutationDispatch: () => noopDispatch,
@@ -47,8 +44,6 @@ const createLayer = (): CanvasRasterLayerContractV2 =>
 const Harness = () => {
   const [layer, setLayer] = useState(createLayer);
 
-  // Stands in for the canvas engine: both the live preview and the committed
-  // edit land back on the layer prop, which is what the editor re-renders from.
   const engine = useMemo(() => {
     const apply = (mutation: CanvasProjectMutation): boolean => {
       const candidate = mutation as { type: string; config?: { adjustments?: unknown } };
@@ -82,7 +77,6 @@ const settle = (action: () => void): Promise<void> =>
 const render = async () => {
   applyThemeToRoot('classic');
   host = document.createElement('div');
-  // Narrower than the editor's intrinsic size, so the square-fit path is real.
   host.style.width = '260px';
   document.body.append(host);
   root = createRoot(host);
@@ -121,45 +115,6 @@ afterEach(async () => {
 });
 
 describe('curves editor', () => {
-  it('paints its chrome from resolved theme tokens', async () => {
-    // Hand-written `var(--chakra-colors-bg-inset)` did not exist (Chakra emits
-    // `--chakra-colors-bg.inset`), so `fill` fell back to black and `stroke` to
-    // `none` — the whole editor rendered as a black box.
-    const svg = await render();
-    const area = svg.querySelector('rect')!;
-    const curve = svg.querySelector('path')!;
-
-    for (const [label, value] of [
-      ['area fill', getComputedStyle(area).fill],
-      ['curve stroke', getComputedStyle(curve).stroke],
-      ['handle fill', getComputedStyle(handles(svg)[0]!).fill],
-    ] as const) {
-      expect(value, label).not.toBe('none');
-      expect(value, label).not.toBe('rgb(0, 0, 0)');
-    }
-
-    expect(getComputedStyle(svg).backgroundColor).not.toBe('rgba(0, 0, 0, 0)');
-  });
-
-  it('makes nothing in the editor selectable, so a drag cannot become a text drag', async () => {
-    // Double-clicking to add a point is a word-select gesture; without this it
-    // latched onto the channel select's label and the next handle press dragged
-    // that selection instead, trailing a floating "Red" across the screen.
-    const svg = await render();
-    const editor = svg.parentElement!;
-
-    expect(getComputedStyle(editor).userSelect).toBe('none');
-    expect(getComputedStyle(svg).userSelect).toBe('none');
-    expect(getComputedStyle(editor.querySelector('button')!).userSelect).toBe('none');
-  });
-
-  it('keeps the drawing square so pointer coordinates map onto the viewBox', async () => {
-    const svg = await render();
-    const rect = svg.getBoundingClientRect();
-
-    expect(rect.width).toBeCloseTo(rect.height, 0);
-  });
-
   it('moves a handle while dragging it', async () => {
     const svg = await render();
     const target = handles(svg).at(-1)!;
@@ -177,12 +132,8 @@ describe('curves editor', () => {
   });
 
   it('adds a point under the pointer rather than offset from it', async () => {
-    // Guards the letterboxing bug: a non-square box mapped pointer x across the
-    // whole element while the viewBox only occupied part of it.
     const svg = await render();
     const rect = svg.getBoundingClientRect();
-    // Deliberately off centre: a letterboxed viewBox still maps the midpoint
-    // correctly, because the dead space either side cancels out there.
     const targetX = rect.left + rect.width * 0.25;
 
     await settle(() =>

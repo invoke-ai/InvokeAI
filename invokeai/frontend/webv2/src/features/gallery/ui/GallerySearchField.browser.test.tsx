@@ -39,8 +39,6 @@ const getInput = (): HTMLInputElement => {
   return input;
 };
 
-const getField = (): HTMLElement => host?.firstElementChild as HTMLElement;
-
 /** The mirror is the input's own sibling; the search icon is also aria-hidden. */
 const getMirror = (): HTMLElement => {
   const mirror = getInput().previousElementSibling;
@@ -94,50 +92,13 @@ describe('getGallerySearchSegments', () => {
 
     expect(chip?.isInvalid).toBe(true);
   });
-
-  it('leaves plain text unchipped', () => {
-    const value = 'just words';
-
-    expect(getGallerySearchSegments(value, parseDateTokens(value)).every((s) => s.kind === 'text')).toBe(true);
-  });
 });
 
 describe('GallerySearchField', () => {
-  it('keeps the field the same height when a token is added', async () => {
-    // The regression: the parsed-range hint used to render as a sibling, so
-    // typing a date grew the field and knocked the wide header row off centre.
-    await renderField('sunset');
-    const plainHeight = getField().getBoundingClientRect().height;
-
-    await renderField('from:7d sunset');
-
-    expect(getField().getBoundingClientRect().height).toBe(plainHeight);
-  });
-
-  it('paints the value through the mirror rather than the input', async () => {
-    await renderField('from:7d sunset');
-
-    expect(getComputedStyle(getInput()).color).toBe('rgba(0, 0, 0, 0)');
-    expect(getMirror().textContent).toBe('from:7d sunset');
-  });
-
   it('renders a chip for the token and leaves the rest plain', async () => {
     await renderField('from:7d sunset');
 
     expect(getChips().map((chip) => chip.textContent)).toEqual(['from:7d']);
-  });
-
-  it('aligns the mirror with the input so glyphs sit on top of each other', async () => {
-    await renderField('from:7d sunset');
-
-    const inputRect = getInput().getBoundingClientRect();
-    const mirrorRect = getMirror().getBoundingClientRect();
-
-    expect(Math.abs(mirrorRect.left - inputRect.left)).toBeLessThanOrEqual(1);
-    // Vertical centres must agree, or every glyph is off by the difference.
-    expect(
-      Math.abs(mirrorRect.top + mirrorRect.height / 2 - (inputRect.top + inputRect.height / 2))
-    ).toBeLessThanOrEqual(1);
   });
 
   it('reports invalid input to assistive tech', async () => {

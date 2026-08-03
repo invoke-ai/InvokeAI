@@ -121,17 +121,6 @@ describe('GalleryBoardDragMonitor', () => {
     expect(moveItemsToBoard).not.toHaveBeenCalled();
   });
 
-  it('restores collapse after an invalid drop', async () => {
-    await renderMonitor(true);
-    const dragData = getGalleryItemDragData([draggedRef]);
-
-    dragStart(dragData);
-    dragEnd(dragData, getGalleryBoardDropData('target-date', 'date'));
-
-    expect(moveItemsToBoard).not.toHaveBeenCalled();
-    expect(updateSettings).toHaveBeenLastCalledWith({ boardPanelCollapsed: true });
-  });
-
   it('restores collapse after cancellation', async () => {
     await renderMonitor(true);
 

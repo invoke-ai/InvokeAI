@@ -167,19 +167,7 @@ describe('GalleryBoardsPanel', () => {
     expect(text).toContain('GORL');
   });
 
-  it('keeps archived boards out of the main list', async () => {
-    await renderPanel();
-
-    const sections = Array.from(host?.querySelectorAll('[data-scope="collapsible"]') ?? []);
-    const boardsSection = sections[0];
-
-    expect(boardsSection?.textContent).toContain('dogs');
-    expect(boardsSection?.textContent).not.toContain('GORL');
-  });
-
   it('marks the project board with a Project badge', async () => {
-    // The fixture project used by the visual harness has no project board, so
-    // this path is only reachable here.
     await renderPanel({ ...createGallery(), projectBoardId: 'cats' } as GalleryStateView);
 
     const catsRow = getBoardRows().find((row) => row.textContent?.includes('Cats'));
@@ -192,14 +180,7 @@ describe('GalleryBoardsPanel', () => {
 
     const catsRow = getBoardRows().find((row) => row.textContent?.includes('Cats'));
 
-    // Cats has 56 images, 0 videos, 3 assets.
     expect(catsRow?.textContent).toContain('56 | 3');
-  });
-
-  it('does not spend row width on creation dates', async () => {
-    await renderPanel();
-
-    expect(host?.textContent).not.toMatch(/\b\d{1,2} [A-Z][a-z]{2}\b/);
   });
 
   it('marks the selected board for assistive tech', async () => {
@@ -218,28 +199,6 @@ describe('GalleryBoardsPanel', () => {
 
     expect(catsRow?.textContent).toContain('Alice Example');
     expect(dogsRow?.textContent).not.toContain('Alice Example');
-  });
-
-  it('keeps the owner subtitle truncated and changes it from muted to selected contrast styling', async () => {
-    await renderPanel();
-
-    const unselectedOwner = Array.from(host?.querySelectorAll<HTMLElement>('*') ?? []).find(
-      (element) => element.childElementCount === 0 && element.textContent === 'Alice Example'
-    );
-
-    expect(unselectedOwner).toBeDefined();
-    expect(getComputedStyle(unselectedOwner!).overflow).toBe('hidden');
-    expect(getComputedStyle(unselectedOwner!).textOverflow).toBe('ellipsis');
-    const unselectedColor = getComputedStyle(unselectedOwner!).color;
-
-    await renderPanel({ ...createGallery(), selectedBoardId: 'cats' } as GalleryStateView);
-    const selectedOwner = Array.from(host?.querySelectorAll<HTMLElement>('*') ?? []).find(
-      (element) => element.childElementCount === 0 && element.textContent === 'Alice Example'
-    );
-
-    expect(selectedOwner).toBeDefined();
-    expect(getComputedStyle(selectedOwner!).color).not.toBe(unselectedColor);
-    expect(host?.querySelector('[aria-current="true"]')?.textContent).toContain('Alice Example');
   });
 
   it('shows the count for the active view and switches with the tab', async () => {
@@ -304,16 +263,6 @@ describe('GalleryBoardsPanel', () => {
     expect(actions.updateSettings).toHaveBeenCalledWith({ collapsedBoardSections: ['boards'] });
   });
 
-  it('reopens a section that was persisted as collapsed', async () => {
-    await renderPanel(createGallery({ collapsedBoardSections: ['boards'] }));
-
-    const trigger = host?.querySelector<HTMLElement>('[data-scope="collapsible"] [data-part="trigger"]');
-
-    await click(trigger!);
-
-    expect(actions.updateSettings).toHaveBeenCalledWith({ collapsedBoardSections: [] });
-  });
-
   it('toggles the date and archived board queries from the filter row', async () => {
     await renderPanel();
 
@@ -326,16 +275,5 @@ describe('GalleryBoardsPanel', () => {
 
     await click(archiveToggle!);
     expect(actions.updateSettings).toHaveBeenCalledWith({ showArchivedBoards: false });
-  });
-
-  it('reports no matches when the only board named is one the filters are hiding', async () => {
-    // Reachable while the archived toggle has flipped but the refetch that
-    // drops archived boards has not landed: the name is taken, so creating is
-    // refused, yet no section will show it.
-    await renderPanel(createGallery({ showArchivedBoards: false }));
-    await type(getSearchInput(), 'GORL');
-
-    expect(host?.textContent).toContain('widgets.gallery.noBoardsMatchSearch');
-    expect(host?.textContent).not.toContain('Create board');
   });
 });

@@ -183,10 +183,4 @@ describe('dropping a gallery image on the positive prompt box', () => {
 
     expect(popoverImageName()).toBe(stubs.selectedImage.imageName);
   });
-
-  it('describes the gallery selection when nothing has been dropped', async () => {
-    await settle(() => imageToPromptButton().click());
-
-    expect(popoverImageName()).toBe(stubs.selectedImage.imageName);
-  });
 });

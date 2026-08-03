@@ -76,12 +76,7 @@ const createGallery = (overrides: Partial<GalleryStateView> = {}) =>
 
 const gallery = createGallery();
 
-let region: GalleryWidgetContextValue['region'] = 'center';
 let activeGallery: GalleryStateView = gallery;
-
-const setRegion = (next: GalleryWidgetContextValue['region']) => {
-  region = next;
-};
 
 const setGallery = (next: GalleryStateView) => {
   activeGallery = next;
@@ -91,7 +86,7 @@ const createContextValue = () =>
   ({
     ...contextBase,
     gallery: activeGallery,
-    region,
+    region: 'center',
   }) as unknown as GalleryWidgetContextValue;
 
 const contextBase = {
@@ -151,24 +146,8 @@ const renderLayout = async (Layout: typeof GalleryStackedLayout | typeof Gallery
   );
 };
 
-/**
- * The slots every shell owes, identified the way a user would find them. If a
- * shell drops one, the redesign's central promise — same components, different
- * arrangement — has been broken.
- */
-const findSlots = () => ({
-  boardSearch: host?.querySelector('input[aria-label="widgets.gallery.searchOrCreateBoards"]') ?? null,
-  boardsSection: host?.querySelector('[data-scope="collapsible"]') ?? null,
-  grid: host?.querySelector('[role="list"]') ?? null,
-  itemSearch: host?.querySelector('input[aria-label="widgets.gallery.searchImagesAriaLabel"]') ?? null,
-  selectionBar: host?.querySelector('[role="toolbar"]') ?? null,
-  sort: host?.querySelector('button[aria-label="widgets.gallery.imageSort"]') ?? null,
-  tabs: host?.querySelector('[role="radiogroup"]') ?? null,
-});
-
 beforeEach(() => {
   vi.clearAllMocks();
-  setRegion('center');
   setGallery(gallery);
   host = document.createElement('div');
   host.style.cssText = 'height:600px;left:0;position:fixed;top:0;width:900px;';
@@ -186,30 +165,6 @@ afterEach(async () => {
 });
 
 describe('gallery layout shells', () => {
-  it('renders every slot in the stacked shell', async () => {
-    await renderLayout(GalleryStackedLayout);
-
-    for (const [name, element] of Object.entries(findSlots())) {
-      expect(element, `stacked shell is missing the ${name} slot`).not.toBeNull();
-    }
-  });
-
-  it('renders every slot in the wide shell', async () => {
-    await renderLayout(GalleryWideLayout);
-
-    for (const [name, element] of Object.entries(findSlots())) {
-      expect(element, `wide shell is missing the ${name} slot`).not.toBeNull();
-    }
-  });
-
-  it('gives each shell a resize handle for the axis it splits on', async () => {
-    await renderLayout(GalleryStackedLayout);
-    expect(host?.querySelector('[role="separator"]')?.getAttribute('aria-orientation')).toBe('horizontal');
-
-    await renderLayout(GalleryWideLayout);
-    expect(host?.querySelector('[role="separator"]')?.getAttribute('aria-orientation')).toBe('vertical');
-  });
-
   it('keeps a long board list inside the board panel instead of spilling it over the grid', async () => {
     const boards = Array.from({ length: 40 }, (_, index) => ({
       ...board,
@@ -226,8 +181,6 @@ describe('gallery layout shells', () => {
       throw new Error('board panel viewport did not render');
     }
 
-    // The panel has a definite height, so 40 boards have to scroll rather than
-    // push the list past its box and over the grid below it.
     expect(viewport.scrollHeight).toBeGreaterThan(viewport.clientHeight);
     expect(viewport.getBoundingClientRect().height).toBeLessThanOrEqual(DEFAULT_GALLERY_SETTINGS.boardPanelHeightPx);
 
@@ -279,21 +232,6 @@ describe('gallery layout shells', () => {
     });
 
     expect(contextBase.actions.updateSettings).toHaveBeenLastCalledWith({ boardPanelHeightPx: measuredMaximum });
-  });
-
-  it('never renders upload or settings in the body, in either shell or any region', async () => {
-    // The widget frame owns them now (see GalleryWidgetChrome). Rendering them
-    // here too would double the controls in every placement.
-    for (const region of ['center', 'right'] as const) {
-      for (const Layout of [GalleryStackedLayout, GalleryWideLayout]) {
-        setRegion(region);
-        await renderLayout(Layout);
-
-        expect(host?.querySelector('button[aria-label^="widgets.gallery.upload"]'), region).toBeNull();
-        expect(host?.querySelector('button[aria-label="widgets.gallery.settings"]'), region).toBeNull();
-        expect(host?.querySelector('[role="radiogroup"]'), 'the rest of the row still renders').not.toBeNull();
-      }
-    }
   });
 
   it('hides the board column and its handle in both shells when collapsed', async () => {

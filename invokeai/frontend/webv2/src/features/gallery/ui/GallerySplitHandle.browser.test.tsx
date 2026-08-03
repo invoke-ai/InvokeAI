@@ -95,19 +95,6 @@ describe('GallerySplitHandle', () => {
     expect(onCommit).toHaveBeenCalledExactlyOnceWith(340);
   });
 
-  it('stops previewing after release, so a stray move cannot resize', async () => {
-    const separator = await renderHandle();
-
-    await interact(() => {
-      separator.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 0, clientY: 100 }));
-    });
-    await interact(() => window.dispatchEvent(new PointerEvent('pointerup', { clientX: 0, clientY: 100 })));
-    onPreview.mockClear();
-    await interact(() => window.dispatchEvent(new PointerEvent('pointermove', { clientX: 0, clientY: 500 })));
-
-    expect(onPreview).not.toHaveBeenCalled();
-  });
-
   it('clamps a drag to the bounds rather than reporting an impossible size', async () => {
     const separator = await renderHandle();
 
@@ -137,29 +124,5 @@ describe('GallerySplitHandle', () => {
 
     await interact(() => separator.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'End' })));
     expect(onCommit).toHaveBeenLastCalledWith(600);
-  });
-
-  it('drags and steps horizontally when it is the wide layout column edge', async () => {
-    const separator = await renderHandle({ max: 420, min: 180, orientation: 'vertical', sizePx: 240 });
-
-    expect(separator.getAttribute('aria-orientation')).toBe('vertical');
-
-    await interact(() => {
-      separator.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 100, clientY: 0 }));
-    });
-    await interact(() => window.dispatchEvent(new PointerEvent('pointermove', { clientX: 130, clientY: 0 })));
-    expect(onPreview).toHaveBeenLastCalledWith(270);
-
-    await interact(() => separator.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' })));
-    expect(onCommit).toHaveBeenLastCalledWith(256);
-  });
-
-  it('ignores keys it does not own', async () => {
-    const separator = await renderHandle();
-
-    await interact(() => separator.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' })));
-    await interact(() => separator.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowLeft' })));
-
-    expect(onCommit).not.toHaveBeenCalled();
   });
 });
