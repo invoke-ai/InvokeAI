@@ -11,8 +11,8 @@ logging.getLogger("xformers").addFilter(lambda record: "A matching Triton is not
 
 
 def main():
-    # Change working directory to the repo root
-    os.chdir(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+    # Let run_app set the working directory to the repo root if needed.
+    # Avoid global chdir to prevent unintended side effects on path resolution.
     run_app()
 
 
