@@ -148,17 +148,20 @@
         "unpin": "Sblocca",
         "openSlider": "Apri il cursore",
         "collapseAll": "Comprimi tutto",
-        "expandAll": "Espandi tutto"
+        "expandAll": "Espandi tutto",
+        "userGuideLabel": "Guida per l'utente",
+        "collapse": "Comprimi",
+        "expand": "Espandi"
     },
     "gallery": {
         "galleryImageSize": "Dimensione dell'immagine",
         "gallerySettings": "Impostazioni della galleria",
-        "autoSwitchNewImages": "Passaggio automatico a nuove immagini",
+        "autoSwitchNewImages": "Passaggio automatico a nuove immagini/video",
         "deleteImage_one": "Elimina l'immagine",
         "deleteImage_many": "Elimina {{count}} immagini",
         "deleteImage_other": "Elimina {{count}} immagini",
         "deleteImagePermanent": "Le immagini eliminate non possono essere ripristinate.",
-        "autoAssignBoardOnClick": "Assegna automaticamente la bacheca al clic",
+        "autoAssignBoardOnClick": "Assegna automaticamente la bacheca",
         "featuresWillReset": "Se elimini questa immagine, quelle funzionalità verranno immediatamente ripristinate.",
         "loading": "Caricamento in corso",
         "currentlyInUse": "Questa immagine è attualmente utilizzata nelle seguenti funzionalità:",
@@ -195,21 +198,21 @@
         "newestFirst": "Prima i più nuovi",
         "oldestFirst": "Prima i più vecchi",
         "sortDirection": "Direzione dell'ordinamento",
-        "showStarredImagesFirst": "Mostra prima le immagini contrassegnate",
+        "showStarredImagesFirst": "Mostra prima le immagini/i video contrassegnati",
         "showArchivedBoards": "Mostra le bacheche archiviate",
         "searchImages": "Ricerca per metadati",
         "displayBoardSearch": "Ricerca nella Bacheca",
-        "displaySearch": "Ricerca immagine",
+        "displaySearch": "Ricerca nella galleria",
         "selectAllOnPage": "Seleziona tutto nella pagina",
         "exitBoardSearch": "Esci da Ricerca bacheca",
-        "exitSearch": "Esci dalla ricerca immagini",
+        "exitSearch": "Esci dalla ricerca nella galleria",
         "go": "Vai",
         "move": "Sposta",
         "gallery": "Galleria",
-        "imagesTab": "Immagini create e salvate in Invoke.",
+        "imagesTab": "Immagini/video creati e salvati all'interno di Invoke.",
         "assetsTab": "File che hai caricato per usarli nei tuoi progetti.",
         "boardsSettings": "Impostazioni Bacheche",
-        "imagesSettings": "Impostazioni Immagini Galleria",
+        "imagesSettings": "Impostazioni Immagini/Video Galleria",
         "assets": "Risorse",
         "images": "Immagini",
         "useForPromptGeneration": "Usa per generare il prompt",
@@ -222,9 +225,29 @@
         "usePagedGalleryView": "Utilizza la visualizzazione Galleria a pagine",
         "loadingGallery": "Caricamento galleria in corso...",
         "loadingMetadata": "Caricamento dei metadati in corso...",
-        "noImagesFound": "Nessuna immagine trovata",
+        "noImagesFound": "Nessuna immagine/video trovata",
         "bulkDownloadReady": "Download pronto",
-        "clickToDownload": "Clicca qui per scaricare"
+        "clickToDownload": "Clicca qui per scaricare",
+        "starVideo_one": "Contrassegna Video",
+        "starVideo_many": "Contrassegna {{count}} video",
+        "starVideo_other": "Contrassegna {{count}} video",
+        "unstarVideo_one": "Rimuovi contrassegno video",
+        "unstarVideo_many": "Rimuovi {{count}} contrassegni video",
+        "unstarVideo_other": "Rimuovi {{count}} contrassegni video",
+        "downloadImage_one": "Scarica l'immagine",
+        "downloadImage_many": "Scarica {{count}} immagini",
+        "downloadImage_other": "Scarica {{count}} immagini",
+        "downloadVideo_one": "Scarica video",
+        "downloadVideo_many": "Scarica {{count}} video",
+        "downloadVideo_other": "Scarica {{count}} video",
+        "deleteVideo_one": "Elimina il video",
+        "deleteVideo_many": "Elimina {{count}} video",
+        "deleteVideo_other": "Elimina {{count}} video",
+        "deleteVideoPermanent": "I video eliminati non possono essere ripristinati.",
+        "playVideo": "Guarda il video",
+        "closeVideoPlayer": "Chiudi il lettore video",
+        "copyVideoFrame": "Copia il fotogramma",
+        "deleteMediaPermanent": "Le immagini/i video cancellati non possono essere ripristinati."
     },
     "hotkeys": {
         "searchHotkeys": "Cerca tasti di scelta rapida",
@@ -400,8 +423,8 @@
                 "desc": "Selezionare lo strumento gomma."
             },
             "selectRectTool": {
-                "title": "Strumento Rettangolo",
-                "desc": "Seleziona lo strumento rettangolo."
+                "title": "Strumento Forme",
+                "desc": "Seleziona lo strumento forme."
             },
             "selectViewTool": {
                 "title": "Strumento Visualizza",
@@ -562,7 +585,7 @@
         },
         "gallery": {
             "selectAllOnPage": {
-                "desc": "Seleziona tutte le immagini nella pagina corrente.",
+                "desc": "Seleziona tutte le immagini/video nella pagina corrente.",
                 "title": "Seleziona tutto nella pagina"
             },
             "galleryNavUp": {
@@ -579,7 +602,7 @@
             },
             "deleteSelection": {
                 "title": "Elimina",
-                "desc": "Elimina tutte le immagini selezionate. Per impostazione predefinita, ti verrà chiesto di confermare l'eliminazione. Se le immagini sono attualmente in uso nell'applicazione, verrai avvisato."
+                "desc": "Elimina tutte le immagini/i video selezionati. Di default, ti verrà chiesto di confermare l'eliminazione. Se le immagini/i video sono attualmente in uso nell'app, riceverai un avviso."
             },
             "clearSelection": {
                 "title": "Cancella selezione",
@@ -607,8 +630,8 @@
                 "title": "Naviga verso l'alto (Confronta immagine)"
             },
             "starImage": {
-                "desc": "Aggiungi/Rimuovi contrassegno all'immagine selezionata.",
-                "title": "Aggiungi / Rimuovi contrassegno immagine"
+                "desc": "Aggiungi/Rimuovi contrassegno all'immagine o al video selezionato.",
+                "title": "Aggiungi/Rimuovi contrassegno immagine/video"
             }
         },
         "editMode": "Modalità modifica",
@@ -850,12 +873,18 @@
         "orphanedModelsFound": "Modelli orfani trovati",
         "orphanedModelsDescription": "Le seguenti cartelle dei modelli non sono referenziate nel database e possono essere eliminate in sicurezza:",
         "foundOrphanedModels_one": "Trovata {{count}} cartella di modello orfana",
-        "foundOrphanedModels_many": "",
-        "foundOrphanedModels_other": "",
-        "filesCount": "{{count}} file",
-        "deleteSelected": "Elimina {{count}} selezionati",
+        "foundOrphanedModels_many": "Trovate {{count}} cartelle di modello orfane",
+        "foundOrphanedModels_other": "Trovate {{count}} cartelle di modello orfane",
+        "filesCount_one": "{{count}} file",
+        "filesCount_many": "{{count}} file",
+        "filesCount_other": "{{count}} file",
+        "deleteSelected_one": "Elimina {{count}} selezionato",
+        "deleteSelected_many": "Elimina {{count}} selezionati",
+        "deleteSelected_other": "Elimina {{count}} selezionati",
         "deselectAll": "Deseleziona tutto",
-        "orphanedModelsDeleted": "Eliminato con successo {{count}} modello orfano",
+        "orphanedModelsDeleted_one": "Eliminato con successo {{count}} modello orfano",
+        "orphanedModelsDeleted_many": "Eliminati con successo {{count}} modelli orfani",
+        "orphanedModelsDeleted_other": "Eliminati con successo {{count}} modelli orfani",
         "orphanedModelsDeleteErrors": "Alcuni modelli non possono essere eliminati",
         "orphanedModelsDeleteFailed": "Impossibile eliminare i modelli orfani",
         "errorLoadingOrphanedModels": "Errore durante il caricamento dei modelli orfani. Riprova.",
@@ -882,27 +911,38 @@
         "settingsImportIncompatible": "Il file delle impostazioni non contiene impostazioni compatibili per questo tipo di modello",
         "settingsImportInvalidFile": "File di impostazioni non valido",
         "reidentifyModels": "Re-identificare i modelli",
-        "reidentifyModelsConfirm": "Sei sicuro di voler re-identificare {{count}} modello(i)? Questa operazione eseguirà una nuova scansione dei relativi file dei pesi per determinarne il formato e le impostazioni corrette.",
+        "reidentifyModelsConfirm_one": "Sei sicuro di voler re-identificare {{count}} modello? Questa operazione eseguirà una nuova scansione dei relativi file dei pesi per determinarne il formato e le impostazioni corrette.",
+        "reidentifyModelsConfirm_many": "Sei sicuro di voler re-identificare {{count}} modelli? Questa operazione eseguirà una nuova scansione dei relativi file dei pesi per determinarne il formato e le impostazioni corrette.",
+        "reidentifyModelsConfirm_other": "Sei sicuro di voler re-identificare {{count}} modelli? Questa operazione eseguirà una nuova scansione dei relativi file dei pesi per determinarne il formato e le impostazioni corrette.",
         "reidentifyWarning": "Questa operazione ripristinerà tutte le impostazioni personalizzate che potresti aver applicato a questi modelli.",
-        "modelsReidentified": "{{count}} modello(i) re-identificato(i) con successo",
+        "modelsReidentified_one": "{{count}} modello re-identificato con successo",
+        "modelsReidentified_many": "{{count}} modelli re-identificati con successo",
+        "modelsReidentified_other": "{{count}} modelli re-identificati con successo",
         "modelsReidentifyFailed": "Impossibile re-identificare i modelli",
-        "someModelsFailedToReidentify": "Non è stato possibile re-identificare {{count}} modello(i)",
+        "someModelsFailedToReidentify_one": "Non è stato possibile re-identificare {{count}} modello",
+        "someModelsFailedToReidentify_many": "Non è stato possibile re-identificare {{count}} modelli",
+        "someModelsFailedToReidentify_other": "Non è stato possibile re-identificare {{count}} modelli",
         "modelsReidentifiedPartial": "Completato parzialmente",
         "someModelsReidentified": "{{succeeded}} re-identificato(i), {{failed}} fallito(i)",
         "modelsReidentifyError": "Errore nella re-identificazione dei modelli",
-        "deleteModelsConfirm": "Sei sicuro di voler eliminare {{count}} modello(i)? Questa azione non può essere annullata.",
+        "deleteModelsConfirm_one": "Sei sicuro di voler eliminare {{count}} modello? Questa azione non può essere annullata.",
+        "deleteModelsConfirm_many": "Sei sicuro di voler eliminare {{count}} modelloi? Questa azione non può essere annullata.",
+        "deleteModelsConfirm_other": "Sei sicuro di voler eliminare {{count}} modelloi? Questa azione non può essere annullata.",
         "deleteWarning": "I modelli presenti nella cartella dei modelli di Invoke verranno eliminati definitivamente dal disco.",
-        "modelsDeleted": "{{count}} modello(i) eliminato(i) con successo",
+        "modelsDeleted_one": "{{count}} modello eliminato con successo",
+        "modelsDeleted_many": "{{count}} modelloi eliminatoi con successo",
+        "modelsDeleted_other": "{{count}} modelloi eliminatoi con successo",
         "modelsDeleteFailed": "Impossibile eliminare i modelli",
-        "someModelsFailedToDelete": "Non è stato possibile eliminare {{count}} modello(i)",
+        "someModelsFailedToDelete_one": "Non è stato possibile eliminare {{count}} modello",
+        "someModelsFailedToDelete_many": "Non è stato possibile eliminare {{count}} modelloi",
+        "someModelsFailedToDelete_other": "Non è stato possibile eliminare {{count}} modelloi",
         "modelsDeletedPartial": "Parzialmente completato",
         "someModelsDeleted": "{{deleted}} eliminato(i), {{failed}} fallito(i)",
         "modelsDeleteError": "Errore durante l'eliminazione dei modelli",
         "queueEmpty": "La coda di installazione è vuota.",
         "animaVaePlaceholder": "Seleziona VAE compatibile con Anima",
         "animaQwen3EncoderPlaceholder": "Seleziona l'encoder Qwen3 0.6B",
-        "animaT5EncoderPlaceholder": "Seleziona l'encoder T5-XXL",
-        "qwenImageComponentSourcePlaceholder": "Necessario per i modelli GGUF",
+        "qwenImageComponentSourcePlaceholder": "I modelli GGUF lo richiedono a meno che non siano installati un VAE e un encoder autonomi",
         "qwenImageComponentSource": "VAE/Sorgente Encoder (Diffusori)",
         "qwenImageQuantization": "Quantizzazione dell'encoder",
         "qwenImageQuantizationNone": "Nessuna (bf16)",
@@ -919,7 +959,7 @@
         "externalApiKey": "Chiave API",
         "externalApiKeyPlaceholder": "Incolla la tua chiave API",
         "externalApiKeyPlaceholderSet": "Chiave API configurata",
-        "externalApiKeyHelper": "Memorizzato nel file di configurazione di InvokeAI.",
+        "externalApiKeyHelper": "Memorizzato nel file api_keys.yaml nella directory principale di InvokeAI.",
         "externalBaseUrl": "URL di base (facoltativo)",
         "externalBaseUrlHelper": "Se necessario, sovrascrivi l'URL di base predefinito dell'API.",
         "externalResetHelper": "Cancella la chiave API e l'URL di base.",
@@ -952,10 +992,28 @@
         "sourceUrl": "URL di origine",
         "fp8Storage": "Archiviazione FP8 (Risparmia VRAM)",
         "qwenImageVaePlaceholder": "Dalla sorgente VAE/Encoder",
-        "qwenImageQwenVLEncoderPlaceholder": "Dalla sorgente VAE/Encoder"
+        "qwenImageQwenVLEncoderPlaceholder": "Dalla sorgente VAE/Encoder",
+        "externalOverrideBaseUrl": "Sovrascrivi l'URL di base",
+        "externalProviderSaveFailed": "Impossibile salvare la configurazione del provider esterno.",
+        "externalProviderResetFailed": "Impossibile ripristinare la configurazione del provider esterno.",
+        "animaInpaintAdapter": "Adattatore Inpaint",
+        "animaInpaintAdapterPlaceholder": "Selezionare l'adattatore per Inpaint (opzionale)",
+        "animaInpaintAdapterHelper": "Da utilizzare esclusivamente per Inpaint o Outpaint su tela.",
+        "animaInpaintAdapterWeight": "Peso adattatore",
+        "runVaeOnCpu": "Eseguire il modello VAE solo sulla CPU",
+        "wanT5EncoderPlaceholder": "Dalla sorgente VAE/Encoder",
+        "wanVaePlaceholder": "Dalla sorgente VAE/Encoder",
+        "wanComponentSource": "Sorgente VAE/Encoder (Diffusori)",
+        "wanComponentSourcePlaceholder": "I modelli GGUF Wan richiedono una sorgente Diffusori Wan per VAE + UMT5-XXL",
+        "wanTransformerLowNoisePlaceholder": "Aggiungi per maggiori dettagli",
+        "wanTransformerLowNoise": "Trasformer (Basso rumore)",
+        "krea2Vae": "VAE (opzionale)",
+        "krea2VaePlaceholder": "Dal modello di diffusori Krea-2",
+        "krea2Qwen3VlEncoder": "Encoder Qwen3-VL (opzionale)",
+        "krea2Qwen3VlEncoderPlaceholder": "Dal modello di diffusori Krea-2"
     },
     "parameters": {
-        "images": "Immagini",
+        "images": "Immagini/Video",
         "steps": "Passi",
         "cfgScale": "Scala CFG",
         "width": "Larghezza",
@@ -999,7 +1057,7 @@
             "noNodesInGraph": "Nessun nodo nel grafico",
             "noModelSelected": "Nessun modello selezionato",
             "noPrompts": "Nessun prompt generato",
-            "addingImagesTo": "Aggiungi immagini a",
+            "addingImagesTo": "Aggiungi immagini/video a",
             "systemDisconnected": "Sistema disconnesso",
             "missingNodeTemplate": "Modello di nodo mancante",
             "missingInputForField": "ingresso mancante",
@@ -1046,11 +1104,14 @@
             "noQwen3EncoderModelSelected": "Nessun modello di encoder Qwen3 selezionato per la generazione Klein di FLUX2",
             "noAnimaVaeModelSelected": "Nessun modello VAE Anima selezionato",
             "noAnimaQwen3EncoderModelSelected": "Nessun modello di encoder Anima Qwen3 selezionato",
-            "noAnimaT5EncoderModelSelected": "Nessun modello di encoder Anima T5 selezionato",
             "noQwenImageComponentSourceSelected": "I modelli GGUF Qwen Image richiedono una sorgente componente diffusori per VAE/encoder",
             "boardNotWritable": "Non hai i permessi di scrittura per la bacheca \"{{boardName}}\". Seleziona una bacheca di tua proprietà oppure passa a Non categorizzata.",
             "noFlux2KleinVaeModelSelected": "Nessun VAE selezionato. I modelli FLUX.2 Klein senza diffusori richiedono un VAE autonomo",
-            "noFlux2KleinQwen3EncoderModelSelected": "Nessun encoder Qwen3 selezionato. I modelli Klein FLUX.2 senza diffusori richiedono un encoder Qwen3 autonomo"
+            "noFlux2KleinQwen3EncoderModelSelected": "Nessun encoder Qwen3 selezionato. I modelli Klein FLUX.2 senza diffusori richiedono un encoder Qwen3 autonomo",
+            "noWanComponentSourceSelected": "I modelli GGUF Wan 2.2 richiedono un componente Diffusers Source per VAE/encoder",
+            "noKrea2VaeModelSelected": "Krea-2 senza diffusori: selezionare un VAE nelle impostazioni avanzate",
+            "noKrea2Qwen3VlEncoderModelSelected": "Krea-2 senza diffusori: selezionare un VAE nelle impostazioni avanzate",
+            "krea2RebalanceWeightsInvalid": "I pesi di riequilibrio del condizionamento Krea-2 devono essere esattamente 12 numeri finiti separati da virgole"
         },
         "useCpuNoise": "Usa la CPU per generare rumore",
         "iterations": "Iterazioni",
@@ -1082,8 +1143,8 @@
         "useClipSkip": "Usa CLIP Skip",
         "duration": "Durata",
         "images_withCount_one": "Immagine",
-        "images_withCount_many": "Immagini",
-        "images_withCount_other": "Immagini",
+        "images_withCount_many": "Immagini/Video",
+        "images_withCount_other": "Immagini/Video",
         "resolution": "Risoluzione",
         "downloadImage": "Scarica l'immagine",
         "showOptionsPanel": "Mostra pannello laterale (O o T)",
@@ -1092,15 +1153,53 @@
         "seedVarianceEnabled": "Migliora varianza seme",
         "colorCompensation": "Compensazione Colore",
         "disabledNotSupported": "Non supportato dal modello",
-        "imageSize": "Dimensioni immagine"
+        "imageSize": "Dimensioni immagine",
+        "quality": "Qualità",
+        "qualityOptions": {
+            "high": "Alta",
+            "medium": "Media",
+            "low": "Bassa"
+        },
+        "background": "Sfondo",
+        "backgroundOptions": {
+            "transparent": "Trasparente",
+            "opaque": "Opaco"
+        },
+        "inputFidelity": "Fedeltà ingresso",
+        "inputFidelityOptions": {
+            "default": "Predefinita",
+            "low": "Bassa",
+            "high": "Alta"
+        },
+        "thinkingLevel": "Livello di ragionamento",
+        "temperature": "Temperatura",
+        "thinkingLevelOptions": {
+            "default": "Predefinito",
+            "minimal": "Minimale",
+            "high": "Alto"
+        },
+        "watermark": "Filigrana",
+        "optimizePrompt": "Ottimizza prompt",
+        "samplerPreset": "Preimpostazione campionatore",
+        "colorPalette": "Tavolozza colori",
+        "ideogram4Caption": "Didascalia strutturata",
+        "ideogram4SamplerPresets": {
+            "quality": "Qualità ({{steps}} passi)",
+            "default": "Predefinito ({{steps}} passi)",
+            "turbo": "Turbo ({{steps}} passi)"
+        },
+        "wanGuidanceScaleLowNoise": "CFG (Basso)",
+        "krea2RebalanceEnabled": "Riequilibrio del condizionamento",
+        "krea2RebalanceMultiplier": "Moltiplicatore di riequilibrio",
+        "krea2RebalanceWeights": "Pesi per livello (12)"
     },
     "settings": {
         "models": "Modelli",
         "displayInProgress": "Visualizza le immagini di avanzamento",
         "confirmOnDelete": "Conferma l'eliminazione",
         "resetWebUI": "Reimposta l'interfaccia utente Web",
-        "resetWebUIDesc1": "Il ripristino dell'interfaccia utente Web reimposta solo la cache locale del browser delle immagini e le impostazioni memorizzate. Non cancella alcuna immagine dal disco.",
-        "resetWebUIDesc2": "Se le immagini non vengono visualizzate nella galleria o qualcos'altro non funziona, prova a reimpostare prima di segnalare un problema su GitHub.",
+        "resetWebUIDesc1": "Il ripristino dell'interfaccia utente Web reimposta solo la cache locale del browser delle immagini/video e le impostazioni memorizzate. Non cancella alcuna immagine/video dal disco.",
+        "resetWebUIDesc2": "Se le immagini/video non vengono visualizzate nella galleria o qualcos'altro non funziona, prova a reimpostare prima di segnalare un problema su GitHub.",
         "resetComplete": "L'interfaccia utente Web è stata reimpostata.",
         "general": "Generale",
         "developer": "Sviluppatore",
@@ -1136,7 +1235,7 @@
         "preferAttentionStyleNumeric": "Preferisci lo stile di attenzione numerico",
         "maxQueueHistory": "Cronologia massima della coda",
         "maxQueueHistorySaveFailed": "Impossibile salvare la cronologia della coda massima",
-        "middleClickOpenInNewTab": "Utilizza il clic centrale del mouse per aprire le immagini in una nuova scheda",
+        "middleClickOpenInNewTab": "Utilizza il clic centrale del mouse per aprire le immagini/ i video in una nuova scheda",
         "externalProviders": "Fornitori esterni",
         "externalProviderConfigured": "Configurato",
         "externalProviderNotConfigured": "Chiave API necessaria",
@@ -1145,7 +1244,29 @@
         "imageSubfolderStrategyDate": "Data",
         "imageSubfolderStrategySaveFailed": "Impossibile salvare la strategia della sottocartella Immagine",
         "imageSubfolderStrategyType": "Tipo",
-        "imageSubfolderStrategyUnknown": "({{strategy}}) sconosciuta"
+        "imageSubfolderStrategyUnknown": "({{strategy}}) sconosciuta",
+        "imageSubfolderStrategyFlat": "Cartella unica",
+        "imageStorageMaintenance": "Manutenzione dell'archivio immagini",
+        "imageStorageMaintenanceOperationMove": "Sposta le immagini",
+        "imageStorageMaintenanceOperationNone": "Nessuno",
+        "imageStorageMaintenanceOperationRecovery": "Ripristino",
+        "imageStorageMaintenanceRecover": "Ripristina",
+        "imageStorageMaintenanceRecoveryFailed": "Impossibile avviare il ripristino della manutenzione dell'archivio immagini",
+        "imageStorageMaintenanceStart": "Inizia spostamento",
+        "imageStorageMaintenanceStartFailed": "Impossibile avviare la manutenzione dell'archivio immagini",
+        "imageStorageMaintenanceStateCommitted": "Assegnato",
+        "imageStorageMaintenanceStateError": "Errore",
+        "imageStorageMaintenanceStateMoved": "Spostato",
+        "imageStorageMaintenanceStateMoving": "Spostamento in corso",
+        "imageStorageMaintenanceStateNone": "Nessun lavoro",
+        "imageStorageMaintenanceStatePlanned": "Pianificato",
+        "imageStorageMaintenanceStatusIncomplete_one": "{{count}} immagine deve ancora essere spostata",
+        "imageStorageMaintenanceStatusIncomplete_many": "{{count}} immagini devono ancora essere spostate",
+        "imageStorageMaintenanceStatusIncomplete_other": "{{count}} immagini devono ancora essere spostate",
+        "imageStorageMaintenanceStatusIdle": "Stato: {{state}}",
+        "imageStorageMaintenanceStatusNeedsRecovery": "È necessario un intervento di ripristino per il lavoro {{jobId}}",
+        "imageStorageMaintenanceStatusRunning": "Esecuzione: {{operation}}",
+        "imageStorageMaintenanceStatusUnavailable": "Stato non disponibile"
     },
     "toast": {
         "uploadFailed": "Caricamento fallito",
@@ -1197,7 +1318,6 @@
         "layerCopiedToClipboard": "Livello copiato negli appunti",
         "linkCopied": "Collegamento copiato",
         "addedToUncategorized": "Aggiunto alle risorse della bacheca $t(boards.uncategorized)",
-        "imagesWillBeAddedTo": "Le immagini caricate verranno aggiunte alle risorse della bacheca {{boardName}}.",
         "outOfMemoryErrorDescLocal": "Segui la nostra <LinkComponent>guida per bassa VRAM</LinkComponent> per ridurre gli OOM.",
         "pasteFailed": "Incolla non riuscita",
         "pasteSuccess": "Incollato su {{destination}}",
@@ -1255,7 +1375,23 @@
         "modelDownloadResumed": "Ripresa del download",
         "modelDownloadRestartFailed": "Riavvia i download non riusciti",
         "modelDownloadRestartFile": "Riavvio del download del file",
-        "modelDownloadRestartedFromScratch": "Manca una parte del file. Riavviato il download dall'inizio."
+        "modelDownloadRestartedFromScratch": "Manca una parte del file. Riavviato il download dall'inizio.",
+        "modelDefaultsLoaded": "Impostazioni predefinite del modello caricate",
+        "videoDeletePartial": "Impossibile eliminare {{count}} video.",
+        "videosFailedToUpdate": "Impossibile aggiornare {{count}} video.",
+        "videosFailedToMove": "Impossibile spostare {{count}} video.",
+        "mediaDeleteFailed": "Impossibile eliminare i file multimediali",
+        "mediaDeleteFailedDesc": "La richiesta di eliminazione non è andata a buon fine. Alcuni file multimediali potrebbero non essere stati eliminati.",
+        "mediaDeletePartial": "Impossibile eliminare {{count}} elementi multimediali.",
+        "videoUploadFailed": "Caricamento video non riuscito",
+        "videoPlaybackFailed": "Impossibile riprodurre il video",
+        "videoPlaybackFailedDesc": "Il video potrebbe utilizzare un codec non supportato o potrebbe non essere più disponibile.",
+        "videoDeleteFailed": "Impossibile eliminare i video",
+        "videoDeleteFailedDesc": "La richiesta di eliminazione non è andata a buon fine; nessun video è stato eliminato.",
+        "videoUploaded": "Video caricato",
+        "problemDownloadingMedia": "Impossibile scaricare il file multimediale",
+        "itemsWillBeAddedTo": "Gli elementi caricati verranno aggiunti alle risorse della bacheca {{boardName}}.",
+        "uploadFailedInvalidMediaUploadDesc": "Devono essere immagini in formato PNG, JPEG o WEBP, oppure video in formato MP4."
     },
     "accessibility": {
         "invokeProgressBar": "Barra di avanzamento generazione",
@@ -1271,7 +1407,8 @@
         "submitSupportTicket": "Invia ticket di supporto",
         "toggleLeftPanel": "Attiva/disattiva il pannello sinistro (T)",
         "toggleRightPanel": "Attiva/disattiva il pannello destro (G)",
-        "uploadImages": "Carica immagine(i)"
+        "uploadImages": "Carica immagini",
+        "uploadMedia": "Carica file multimediali"
     },
     "nodes": {
         "zoomOutNodes": "Rimpicciolire",
@@ -1471,32 +1608,43 @@
         "groupNodesByCategory": "Raggruppa i nodi per categoria",
         "groupNodesByCategoryHelp": "Raggruppa i nodi per categoria nella finestra di dialogo \"Aggiungi nodo\"",
         "addConnector": "Aggiungi connettore",
-        "deleteConnector": "Elimina connettore"
+        "deleteConnector": "Elimina connettore",
+        "savedWorkflowChoose": "Scegli un flusso di lavoro",
+        "savedWorkflowDefaultBadge": "Predefinito",
+        "savedWorkflowMissing": "Flusso di lavoro mancante o inaccessibile",
+        "savedWorkflowUnsupported": "Non supportato",
+        "savedWorkflowSelectExposedFields": "Seleziona un flusso di lavoro con campi modulo esposti",
+        "savedWorkflowUpdating": "Aggiornamento...",
+        "extractVideoRange": {
+            "dropVideoPrompt": "Collega un video per visualizzare in anteprima il fotogramma selezionato.",
+            "missingFps": "Impossibile visualizzare l'anteprima dei fotogrammi: il video di input non contiene metadati relativi ai fotogrammi al secondo (fps)."
+        },
+        "videoAccessError": "Impossibile trovare il video {{video_name}}, ripristino delle impostazioni predefinite"
     },
     "boards": {
         "autoAddBoard": "Aggiungi automaticamente bacheca",
         "menuItemAutoAdd": "Aggiungi automaticamente a questa bacheca",
         "cancel": "Annulla",
         "addBoard": "Aggiungi Bacheca",
-        "bottomMessage": "L'eliminazione delle immagini reimposterà tutte le funzionalità che le stanno utilizzando.",
+        "bottomMessage": "L'eliminazione delle immagini/video reimposterà tutte le funzionalità che le stanno utilizzando.",
         "changeBoard": "Cambia Bacheca",
         "loading": "Caricamento in corso ...",
         "clearSearch": "Cancella Ricerca",
-        "topMessage": "Questa selezione contiene immagini utilizzate nelle seguenti funzionalità:",
+        "topMessage": "Questa selezione contiene immagini/video utilizzati nelle seguenti funzionalità:",
         "move": "Sposta",
         "myBoard": "Bacheca",
         "searchBoard": "Cerca bacheche ...",
         "noMatching": "Nessuna bacheca corrispondente",
         "selectBoard": "Seleziona una bacheca",
         "uncategorized": "Non categorizzato",
-        "downloadBoard": "Scarica la bacheca",
+        "downloadBoard": "Scarica le immagini della bacheca",
         "deleteBoardOnly": "solo la Bacheca",
         "deleteBoard": "Elimina Bacheca",
         "deleteBoardAndImages": "Bacheca e Immagini",
-        "deletedBoardsCannotbeRestored": "Le bacheche e le immagini eliminate non possono essere ripristinate. Selezionando \"Elimina solo bacheca\" le immagini verranno spostate in uno stato non categorizzato.",
-        "movingImagesToBoard_one": "Spostare {{count}} immagine nella bacheca:",
-        "movingImagesToBoard_many": "Spostare {{count}} immagini nella bacheca:",
-        "movingImagesToBoard_other": "Spostare {{count}} immagini nella bacheca:",
+        "deletedBoardsCannotbeRestored": "Le bacheche, le immagini e i video eliminati non possono essere ripristinati. Selezionando \"Elimina solo bacheca\", immagini e video verranno spostati in una categoria non categorizzata.",
+        "movingImagesToBoard_one": "Spostare {{count}} immagine/video nella bacheca:",
+        "movingImagesToBoard_many": "Spostare {{count}} immagini/video nella bacheca:",
+        "movingImagesToBoard_other": "Spostare {{count}} immagini/video nella bacheca:",
         "imagesWithCount_one": "{{count}} immagine",
         "imagesWithCount_many": "{{count}} immagini",
         "imagesWithCount_other": "{{count}} immagini",
@@ -1513,10 +1661,10 @@
         "shared": "Bacheche condivise",
         "addPrivateBoard": "Aggiungi una Bacheca Privata",
         "noBoards": "Nessuna bacheca {{boardType}}",
-        "deletedPrivateBoardsCannotbeRestored": "Le bacheche e le immagini eliminate non possono essere ripristinate. Selezionando \"Elimina solo bacheca\", le immagini verranno spostate in uno stato privato e non categorizzato per l'autore dell'immagine.",
+        "deletedPrivateBoardsCannotbeRestored": "Le bacheche, le immagini e i video eliminati non possono essere ripristinati. Selezionando \"Elimina solo bacheca\", immagini e video verranno spostati in una posizione privata non categorizzata, accessibile solo al creatore originale.",
         "updateBoardError": "Errore durante l'aggiornamento della bacheca",
-        "uncategorizedImages": "Immagini non categorizzate",
-        "deleteAllUncategorizedImages": "Elimina tutte le immagini non categorizzate",
+        "uncategorizedImages": "Immagini/video non categorizzati",
+        "deleteAllUncategorizedImages": "Elimina tutte le immagini/video non categorizzati",
         "locateInGalery": "Trova nella Galleria",
         "deletedImagesCannotBeRestored": "Le immagini eliminate non possono essere ripristinate.",
         "hideBoards": "Nascondi bacheche",
@@ -1536,7 +1684,18 @@
         "visibilityPublic": "Pubblica",
         "visibilityBadgeShared": "Bacheca condivisa",
         "visibilityBadgePublic": "Bacheca pubblica",
-        "updateBoardVisibilityError": "Errore durante l'aggiornamento della visibilità della bacheca"
+        "updateBoardVisibilityError": "Errore durante l'aggiornamento della visibilità della bacheca",
+        "byDate": "Per data",
+        "changeBoardImage_one": "Sposta l'immagine nella bacheca",
+        "changeBoardImage_many": "Sposta {{count}} immagini nella bacheca",
+        "changeBoardImage_other": "Sposta {{count}} immagini nella bacheca",
+        "changeBoardVideo_one": "Sposta il video nella bacheca",
+        "changeBoardVideo_many": "Sposta {{count}} video nella bacheca",
+        "changeBoardVideo_other": "Sposta {{count}} video nella bacheca",
+        "deleteBoardAndAssets": "Elimina bacheca, immagini e video",
+        "videosWithCount_one": "{{count}} video",
+        "videosWithCount_many": "{{count}} video",
+        "videosWithCount_other": "{{count}} video"
     },
     "queue": {
         "queueFront": "Aggiungi all'inizio della coda",
@@ -1636,7 +1795,8 @@
         "cannotViewDetails": "Non hai l'autorizzazione per visualizzare i dettagli di questo elemento della coda",
         "fieldValuesHidden": "<Nascosto>",
         "queueActionsMenu": "Menu azioni in coda",
-        "queueItem": "Elemento della coda"
+        "queueItem": "Elemento della coda",
+        "waiting": "In attesa del flusso di lavoro figlio"
     },
     "models": {
         "noMatchingModels": "Nessun modello corrispondente",
@@ -1826,7 +1986,7 @@
         },
         "paramDenoisingStrength": {
             "paragraphs": [
-                "Controlla la differenza tra l'immagine generata e il/i livello/i raster.",
+                "Controlla la differenza tra l'immagine generata e i livelli raster.",
                 "Una forza inferiore rimane più vicina ai livelli raster visibili combinati. Una forza superiore si basa maggiormente sul prompt globale.",
                 "Se non sono presenti livelli raster con contenuto visibile, questa impostazione viene ignorata."
             ],
@@ -2058,7 +2218,7 @@
         "fluxDevLicense": {
             "heading": "Licenza non commerciale",
             "paragraphs": [
-                "Questo modello è concesso in licenza esclusivamente per uso non commerciale. I modelli FLUX.1 [dev] utilizzano la licenza FLUX.1 [dev] Non-Commercial, mentre FLUX.2 Klein 9B utilizza la licenza FLUX.2 Non-Commercial."
+                "Questo modello è concesso in licenza solo per uso non commerciale. I modelli FLUX.1 [dev] utilizzano la licenza non commerciale FLUX.1 [dev], FLUX.2 Klein 9B utilizza la licenza non commerciale FLUX.2 e Ideogram 4 utilizza la licenza non commerciale Ideogram 4."
             ]
         },
         "optimizedDenoising": {
@@ -2187,6 +2347,55 @@
                 "Memorizza i pesi del modello in formato FP8 nella VRAM, riducendo l'utilizzo della memoria di circa il 50% rispetto a FP16.",
                 "Durante l'inferenza, i pesi vengono convertiti strato per strato alla precisione di calcolo (FP16/BF16), preservando così la qualità dell'immagine. Funziona su tutte le GPU CUDA."
             ]
+        },
+        "cpuOnlyVae": {
+            "heading": "Solo CPU",
+            "paragraphs": [
+                "Quando abilitato, il VAE verrà eseguito sulla CPU anziché sulla GPU.",
+                "Questo consente di risparmiare VRAM durante la decodifica, ma la decodifica VAE risulterà più lenta. L'immagine decodificata viene automaticamente spostata sul dispositivo corretto."
+            ]
+        },
+        "krea2ConditioningRebalance": {
+            "heading": "Riequilibrio del condizionamento",
+            "paragraphs": [
+                "Krea-2 sovrappone 12 livelli di codifica del testo per ogni token. Questo ripondera tali livelli e applica un moltiplicatore complessivo per spingere il modello maggiormente verso il prompt, contrastando la diluizione qualitativa del modello Turbo distillato.",
+                "Abilita questa opzione per migliorare l'aderenza al prompt quando il modello ignora parti del tuo prompt."
+            ]
+        },
+        "krea2RebalanceMultiplier": {
+            "heading": "Moltiplicatore di ribilanciamento",
+            "paragraphs": [
+                "Guadagno complessivo applicato al condizionamento dopo la ponderazione per strato. Valori più alti spingono maggiormente verso il prompt.",
+                "Il valore predefinito è 4.0. Valori molto elevati possono sovrasaturare o distorcere l'output."
+            ]
+        },
+        "krea2RebalanceWeights": {
+            "heading": "Pesi per livello",
+            "paragraphs": [
+                "Guadagni separati da virgole per i 12 strati dell'encoder a derivazioni (esattamente 12 valori). Gli strati successivi contengono maggiori dettagli semantici.",
+                "L'impostazione predefinita enfatizza specifici livelli (ad esempio 2.5, 5, 4) che si sono dimostrati in grado di migliorare l'aderenza al prompt."
+            ]
+        },
+        "krea2SeedVarianceEnhancer": {
+            "heading": "Miglioratore varianza del seme",
+            "paragraphs": [
+                "Modelli semplificati a pochi passaggi come Krea-2-Turbo possono produrre immagini quasi identiche utilizzando diversi semi. Questo aggiunge rumore basato sul seme agli incorporamenti del testo per aumentare la variabilità pur mantenendo la riproducibilità.",
+                "Abilita questa funzione per ottenere risultati più diversificati durante la ricerca di semi, a un certo costo per incentivare l'adesione."
+            ]
+        },
+        "krea2SeedVarianceStrength": {
+            "heading": "Forza della varianza",
+            "paragraphs": [
+                "L'intensità del rumore è calcolata come moltiplicatore della deviazione standard dell'incorporamento, quindi si comporta in modo coerente indipendentemente dalla scala dell'incorporamento (anche se Riequilibrio del condizionamento è attivo).",
+                "0 significa spento, 0,1 significa delicato, 0,5 significa intenso. Valori più alti offrono maggiore varietà ma si discostano maggiormente dall'impostazione predefinita."
+            ]
+        },
+        "krea2SeedVarianceRandomizePercent": {
+            "heading": "Percentuale di randomizzazione",
+            "paragraphs": [
+                "Percentuale di valori di incorporamento che ricevono rumore (0-100%); 0 disabilita.",
+                "Valori più bassi creano perturbazioni più selettive, mentre il 100% influisce su tutti i valori."
+            ]
         }
     },
     "sdxl": {
@@ -2249,7 +2458,10 @@
         "imageSize": "Dimensioni immagine",
         "openaiBackground": "OpenAI Sfondo",
         "seedreamWatermark": "Filigrana Seedream",
-        "seedreamOptimizePrompt": "Seedream Ottimizza Prompt"
+        "seedreamOptimizePrompt": "Seedream Ottimizza Prompt",
+        "krea2RebalanceEnabled": "Riequilibrio del condizionamento abilitato",
+        "krea2RebalanceMultiplier": "Moltiplicatore di riequilibrio",
+        "krea2RebalanceWeights": "Ribilancia i pesi per livello"
     },
     "hrf": {
         "metadata": {
@@ -2397,7 +2609,18 @@
         "openLibrary": "Apri libreria",
         "tags": "Etichette",
         "sharedWorkflows": "Flussi di lavoro condivisi",
-        "shareWorkflow": "Flusso di lavoro condiviso"
+        "shareWorkflow": "Flusso di lavoro condiviso",
+        "savedWorkflowCompatibility": {
+            "missingWorkflowReturn": "Il flusso di lavoro deve contenere un nodo di \"Ritorno del flusso di lavoro\".",
+            "multipleWorkflowReturn": "Il flusso di lavoro può contenere un solo nodo di \"Ritorno del flusso di lavoro\".",
+            "unsupportedNode": "Il flusso di lavoro contiene un nodo non supportato da \"Richiama flusso di lavoro salvato\".",
+            "unsupportedBatchInput": "Il flusso di lavoro contiene collegamenti per l'input batch non supportati da \"Richiama flusso di lavoro salvato\".",
+            "invalidGraph": "Il grafico del flusso di lavoro non è valido e non può essere richiamato.",
+            "invalidInputs": "Il flusso di lavoro presenta input esposti non validi e non può essere richiamato.",
+            "exceedsCapacity": "Il flusso di lavoro creerebbe un numero di esecuzioni secondarie superiore a quello attualmente consentito dalla coda.",
+            "unknown": "Al momento, il flusso di lavoro non può essere utilizzato da Call Saved Workflow."
+        },
+        "callable": "Richiamabile"
     },
     "accordions": {
         "compositing": {
@@ -2737,7 +2960,6 @@
                 "on": "Acceso",
                 "off": "Spento"
             },
-            "pressureSensitivity": "Sensibilità alla pressione",
             "preserveMask": {
                 "alert": "Preservare la regione mascherata",
                 "label": "Preserva la regione mascherata"
@@ -2747,7 +2969,9 @@
             "saveAllImagesToGallery": {
                 "alert": "Invia le nuove generazioni alla Galleria, bypassando la Tela",
                 "label": "Invia le nuove generazioni alla Galleria"
-            }
+            },
+            "pressureAffectsWidth": "La pressione influisce sulla larghezza",
+            "pressureAffectsBrushOpacity": "La pressione influisce sull'opacità"
         },
         "transform": {
             "reset": "Reimposta",
@@ -2874,7 +3098,9 @@
             "ipAdapterNoImageSelected": "nessuna immagine di riferimento selezionata",
             "rgAutoNegativeNotSupported": "Auto-Negativo non supportato per il modello base selezionato",
             "fluxFillIncompatibleWithControlLoRA": "Il controllo LoRA non è compatibile con FLUX Fill",
-            "bboxHidden": "Il riquadro di delimitazione è nascosto (Shift+o per attivarlo)"
+            "bboxHidden": "Il riquadro di delimitazione è nascosto (Shift+o per attivarlo)",
+            "controlAdapterDuplicateAnimaLLLiteModel": "Ogni modello di controllo Anima può essere utilizzato da un solo livello di controllo",
+            "ideogram4Txt2ImgOnly": "Ideogram 4 è solo per la conversione da testo a immagine; i livelli raster e le maschere di inpaint non sono supportati"
         },
         "pasteTo": "Incolla su",
         "pasteToBboxDesc": "Nuovo livello (nel riquadro di delimitazione)",
@@ -3300,29 +3526,28 @@
     },
     "newUserExperience": {
         "gettingStartedSeries": "Desideri maggiori informazioni? Consulta la nostra <LinkComponent>Getting Started Series</LinkComponent> per suggerimenti su come sfruttare appieno il potenziale di Invoke Studio.",
-        "toGetStarted": "Per iniziare, inserisci un prompt nella casella e fai clic su <StrongComponent>Invoke</StrongComponent> per generare la tua prima immagine. Seleziona un modello di prompt per migliorare i risultati. Puoi scegliere di salvare le tue immagini direttamente nella <StrongComponent>Galleria</StrongComponent> o modificarle nella <StrongComponent>Tela</StrongComponent>.",
+        "toGetStarted": "Per iniziare, inserisci un prompt nella casella e fai clic su <StrongComponent>Invoke</StrongComponent> per generare la tua prima immagine. Seleziona un modello di prompt per migliorare i risultati. Puoi scegliere di salvare le tue immagini/video direttamente nella <StrongComponent>Galleria</StrongComponent> o modificarle nella <StrongComponent>Tela</StrongComponent>.",
         "noModelsInstalled": "Sembra che non hai installato alcun modello! Puoi <DownloadStarterModelsButton>scaricare un pacchetto di modelli di avvio</DownloadStarterModelsButton> o <ImportModelsButton>importare modelli</ImportModelsButton>.",
-        "toGetStartedLocal": "Per iniziare, assicurati di scaricare o importare i modelli necessari per eseguire Invoke. Quindi, inserisci un prompt nella casella e fai clic su <StrongComponent>Invoke</StrongComponent> per generare la tua prima immagine. Seleziona un modello di prompt per migliorare i risultati. Puoi scegliere di salvare le tue immagini direttamente nella <StrongComponent>Galleria</StrongComponent> o modificarle nella <StrongComponent>Tela</StrongComponent>.",
+        "toGetStartedLocal": "Per iniziare, assicurati di scaricare o importare i modelli necessari per eseguire Invoke. Quindi, inserisci un prompt nella casella e fai clic su <StrongComponent>Invoke</StrongComponent> per generare la tua prima immagine. Seleziona un modello di prompt per migliorare i risultati. Puoi scegliere di salvare le tue immagini/video direttamente nella <StrongComponent>Galleria</StrongComponent> o modificarle nella <StrongComponent>Tela</StrongComponent>.",
         "lowVRAMMode": "Per prestazioni ottimali, segui la nostra <LinkComponent>guida per bassa VRAM</LinkComponent>.",
         "toGetStartedWorkflow": "Per iniziare, compila i campi a sinistra e premi <StrongComponent>Invoke</StrongComponent> per generare la tua immagine. Vuoi esplorare altri flussi di lavoro? Fai clic sull'<StrongComponent>icona della cartella</StrongComponent> accanto al titolo del flusso di lavoro per visualizzare un elenco di altri modelli che puoi provare.",
-        "toGetStartedNonAdmin": "Per iniziare, chiedi al tuo amministratore di InvokeAI (<AdminEmailLink />) di installare i modelli AI necessari per eseguire Invoke. Quindi, inserisci un prompt nella casella e fai clic su <StrongComponent>Invoke</StrongComponent> per generare la tua prima immagine. Seleziona un modello di prompt per migliorare i risultati. Puoi scegliere di salvare le immagini direttamente nella <StrongComponent>Galleria</StrongComponent> o modificarle nella <StrongComponent>Tela</StrongComponent>.",
+        "toGetStartedNonAdmin": "Per iniziare, chiedi al tuo amministratore di InvokeAI (<AdminEmailLink />) di installare i modelli AI necessari per eseguire Invoke. Quindi, inserisci un prompt nella casella e fai clic su <StrongComponent>Invoke</StrongComponent> per generare la tua prima immagine. Seleziona un modello di prompt per migliorare i risultati. Puoi scegliere di salvare le immagini/video direttamente nella <StrongComponent>Galleria</StrongComponent> o modificarle nella <StrongComponent>Tela</StrongComponent>.",
         "noModelsInstalledAskAdmin": "Chiedi al tuo amministratore di installarne alcuni."
     },
     "whatsNew": {
         "whatsNewInInvoke": "Novità in Invoke",
         "readReleaseNotes": "Leggi le note di rilascio",
-        "watchRecentReleaseVideos": "Guarda i video su questa versione",
         "items": [
-            "Strumenti di prompt LLM: utilizza modelli linguistici locali per espandere i prompt o generarli da immagini. Installa un modello LLM di testo (ad esempio Qwen2.5-1.5B-Instruct) per iniziare.",
-            "Supporto per FLUX.2 Klein: InvokeAI ora supporta i nuovi modelli FLUX.2 Klein (varianti 4B e 9B) nei formati GGUF, FP8 e Diffusers. Le funzionalità includono conversione da testo a immagine, da immagine a immagine, inpainting e outpainting. Consulta la sezione \"Modelli di base\" per iniziare.",
-            "Il supporto DyPE per i modelli FLUX migliora le immagini ad alta risoluzione (>1536 px fino a 4K). Vai alla sezione \"Opzioni avanzate\" per attivarlo.",
-            "Diversità di Z-Image Turbo: Attiva \"Migliora varianza seme\" in \"Opzioni avanzate\" per aumentare la diversità delle tue generazioni con ZiT.",
-            "La modalità multiutente supporta più utenti isolati sullo stesso server.",
-            "Supporto migliorato per i modelli Z-Image e FLUX.2.",
-            "Numerosi miglioramenti all'interfaccia utente e nuove funzionalità per la tela."
+            "Nuovi tipi di modello: Qwen Image, Qwen Image Edit, Anima.",
+            "Supporto per modelli ospitati: Gemini (Nano Banana), GPT Image, Qwen, Seedream, Wan",
+            "Bacheche di immagini private e condivise e flussi di lavoro in modalità multiutente",
+            "Strumento lazo per la selezione della tela, funzione di salvataggio/ripristino e possibilità di nascondere le fastidiose anteprime",
+            "Gestore di nodi personalizzato",
+            "Coda di download riprogettata"
         ],
         "watchUiUpdatesOverview": "Guarda la panoramica degli aggiornamenti dell'interfaccia utente",
-        "takeUserSurvey": "📣 Facci sapere cosa ne pensi di InvokeAI. Partecipa al nostro sondaggio sull'esperienza utente!"
+        "readTheDocs": "Leggi i documenti",
+        "readDocumentation": "Leggi la documentazione di Invoke"
     },
     "system": {
         "logLevel": {
@@ -3346,7 +3571,8 @@
             "system": "Sistema",
             "metadata": "Metadati",
             "logNamespaces": "Elementi del registro",
-            "dnd": "Trascina e rilascia"
+            "dnd": "Trascina e rilascia",
+            "canvas-workflow-integration": "Integrazione del flusso di lavoro Tela"
         },
         "enableLogging": "Abilita la registrazione"
     },
@@ -3375,7 +3601,12 @@
     },
     "lora": {
         "weight": "Peso",
-        "removeLoRA": "Rimuovi LoRA"
+        "removeLoRA": "Rimuovi LoRA",
+        "startingWeight": "Peso iniziale",
+        "weightMin": "Peso minimo",
+        "weightMax": "Peso massimo",
+        "weightMinMustBeLessThanMax": "Il peso minimo deve essere inferiore al peso massimo",
+        "weightOutOfRange": "Il peso iniziale deve rientrare nell'intervallo min/max"
     },
     "auth": {
         "login": {
@@ -3457,7 +3688,9 @@
             "weak": "Password debole",
             "moderate": "Password moderata",
             "strong": "Password forte"
-        }
+        },
+        "logoutFailed": "Disconnessione non riuscita",
+        "logoutFailedDesc": "Impossibile raggiungere il server per effettuare il logout. Rimani connesso."
     },
     "cropper": {
         "cropImage": "Ritaglia l'immagine",
