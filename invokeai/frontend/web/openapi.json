@@ -84069,6 +84069,18 @@
             "title": "Max Tokens",
             "type": "integer"
           },
+          "seed": {
+            "default": 0,
+            "description": "Seed for random number generation",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 4294967295,
+            "minimum": 0,
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Seed",
+            "type": "integer"
+          },
           "type": {
             "const": "text_llm",
             "default": "text_llm",
@@ -84081,7 +84093,7 @@
         "tags": ["llm", "text", "prompt"],
         "title": "Text LLM",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/StringOutput"
         }
@@ -84172,6 +84184,18 @@
             "title": "Max Tokens",
             "type": "integer"
           },
+          "seed": {
+            "default": 0,
+            "description": "Seed for random number generation",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 4294967295,
+            "minimum": 0,
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Seed",
+            "type": "integer"
+          },
           "type": {
             "const": "text_llm_with_preset",
             "default": "text_llm_with_preset",
@@ -84184,7 +84208,7 @@
         "tags": ["llm", "text", "prompt", "preset", "template"],
         "title": "Text LLM (with System Prompt Preset)",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/StringOutput"
         }

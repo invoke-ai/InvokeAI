@@ -3,9 +3,11 @@
 import threading
 from unittest.mock import MagicMock, patch
 
+import pytest
 import torch
 
-from invokeai.backend.text_llm_pipeline import DEFAULT_SYSTEM_PROMPT, TextLLMPipeline
+from invokeai.backend import text_llm_pipeline
+from invokeai.backend.text_llm_pipeline import DEFAULT_SYSTEM_PROMPT, TextLLMPipeline, _SeededMultinomialMode
 
 
 def _make_mock_tokenizer(has_chat_template: bool = True) -> MagicMock:
@@ -113,6 +115,93 @@ def test_pipeline_passes_generation_params():
     assert generate_kwargs["temperature"] == 0.7
     assert generate_kwargs["top_p"] == 0.9
     assert "streamer" in generate_kwargs
+
+
+def test_seeded_multinomial_is_repeatable_despite_concurrent_global_rng_use():
+    """Unrelated RNG use must not alter sampling for a controlled seed."""
+    probabilities = torch.ones(100)
+    global_rng_state = torch.random.get_rng_state()
+
+    with _SeededMultinomialMode(seed=42):
+        expected = torch.multinomial(probabilities, num_samples=10, replacement=True)
+
+    assert torch.equal(torch.random.get_rng_state(), global_rng_state)
+
+    interference_done = threading.Event()
+
+    def _interfere() -> None:
+        torch.multinomial(probabilities, num_samples=10, replacement=True)
+        interference_done.set()
+
+    with _SeededMultinomialMode(seed=42):
+        thread = threading.Thread(target=_interfere)
+        thread.start()
+        assert interference_done.wait(timeout=1)
+        actual = torch.multinomial(probabilities, num_samples=10, replacement=True)
+        thread.join()
+
+    assert torch.equal(actual, expected)
+
+
+def test_seeded_multinomial_contexts_are_isolated_when_interleaved_on_cpu():
+    """Concurrent seeded contexts must retain independent RNG sequences."""
+    probabilities = torch.arange(1, 101, dtype=torch.float32)
+    seeds = (42, 1234)
+    draw_count = 100
+
+    expected: dict[int, list[int]] = {}
+    for seed in seeds:
+        with _SeededMultinomialMode(seed=seed):
+            expected[seed] = [torch.multinomial(probabilities, num_samples=1).item() for _ in range(draw_count)]
+
+    barrier = threading.Barrier(len(seeds))
+    actual: dict[int, list[int]] = {}
+
+    def _sample(seed: int) -> None:
+        samples: list[int] = []
+        with _SeededMultinomialMode(seed=seed):
+            for _ in range(draw_count):
+                barrier.wait(timeout=5)
+                samples.append(torch.multinomial(probabilities, num_samples=1).item())
+        actual[seed] = samples
+
+    threads = [threading.Thread(target=_sample, args=(seed,), daemon=True) for seed in seeds]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=5)
+
+    assert all(not thread.is_alive() for thread in threads)
+    assert actual == expected
+
+
+def test_stalled_generation_does_not_block_later_generation(monkeypatch: pytest.MonkeyPatch):
+    """A timed-out worker must not own shared state needed by later runs."""
+    monkeypatch.setattr(text_llm_pipeline, "STREAM_TIMEOUT", 0.05)
+    stalled_model = MagicMock()
+    release_stalled_model = threading.Event()
+    stalled_model.generate.side_effect = lambda **kwargs: release_stalled_model.wait()
+
+    with pytest.raises(RuntimeError, match="Text generation stalled"):
+        TextLLMPipeline(stalled_model, _make_mock_tokenizer()).run("test", device=torch.device("cpu"))
+
+    healthy_model = MagicMock()
+
+    def _generate(**kwargs):
+        streamer = kwargs["streamer"]
+        streamer.put(torch.tensor([[1, 2, 3, 4, 5]]))
+        streamer.put(torch.tensor([6]))
+        streamer.end()
+
+    healthy_model.generate.side_effect = _generate
+    healthy_tokenizer = _make_mock_tokenizer()
+    healthy_tokenizer.decode.return_value = "ok"
+    try:
+        TextLLMPipeline(healthy_model, healthy_tokenizer).run("test", device=torch.device("cpu"))
+    finally:
+        release_stalled_model.set()
+
+    healthy_model.generate.assert_called_once()
 
 
 def test_pipeline_returns_joined_streamed_chunks():
