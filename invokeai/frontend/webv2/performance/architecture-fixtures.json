@@ -72,6 +72,7 @@
       "readyMark": "invokeai:ready:widget:center:canvas",
       "expectedScriptPattern": "WorkbenchApp-",
       "layoutPreset": "Edit",
+      "preActivationRequiredWidgetRequests": ["GalleryImageActionsBridge"],
       "requiredWidgetRequests": ["GalleryImageActionsBridge", "widget:canvas", "widget:layers"],
       "forbiddenWidgetRequests": ["widget:project", "widget:upscale"],
       "remediationTicket": "deepen-widget-registry-loading"
@@ -84,6 +85,7 @@
       "readyMark": "invokeai:ready:widget:center:canvas",
       "expectedScriptPattern": "WorkbenchApp-",
       "layoutPreset": "Edit",
+      "preActivationRequiredWidgetRequests": ["GalleryImageActionsBridge"],
       "requiredWidgetRequests": ["GalleryImageActionsBridge", "widget:canvas", "widget:layers"],
       "forbiddenWidgetRequests": ["widget:project", "widget:upscale"],
       "remediationTicket": "deepen-widget-registry-loading"
@@ -96,6 +98,7 @@
       "readyMark": "invokeai:ready:widget:center:workflow",
       "expectedScriptPattern": "WorkbenchApp-",
       "layoutPreset": "Automate",
+      "preActivationRequiredWidgetRequests": ["GalleryImageActionsBridge"],
       "requiredWidgetRequests": ["GalleryImageActionsBridge", "widget:workflow", "widget:queue"],
       "forbiddenWidgetRequests": ["widget:canvas", "widget:layers", "widget:project", "widget:upscale"],
       "remediationTicket": "deepen-widget-registry-loading"
@@ -108,6 +111,7 @@
       "readyMark": "invokeai:ready:widget:center:workflow",
       "expectedScriptPattern": "WorkbenchApp-",
       "layoutPreset": "Automate",
+      "preActivationRequiredWidgetRequests": ["GalleryImageActionsBridge"],
       "requiredWidgetRequests": ["GalleryImageActionsBridge", "widget:workflow", "widget:queue"],
       "forbiddenWidgetRequests": ["widget:canvas", "widget:layers", "widget:project", "widget:upscale"],
       "remediationTicket": "deepen-widget-registry-loading"
@@ -120,6 +124,7 @@
       "readyMark": "invokeai:ready:widget:center:gallery",
       "expectedScriptPattern": "WorkbenchApp-",
       "centerView": "Gallery",
+      "preActivationRequiredWidgetRequests": ["GalleryImageActionsBridge"],
       "requiredWidgetRequests": ["GalleryImageActionsBridge", "widget:gallery", "widget:preview"],
       "forbiddenWidgetRequests": ["widget:canvas", "widget:layers", "widget:project", "widget:upscale"],
       "remediationTicket": "deepen-widget-registry-loading"
@@ -132,6 +137,7 @@
       "readyMark": "invokeai:ready:widget:center:gallery",
       "expectedScriptPattern": "WorkbenchApp-",
       "centerView": "Gallery",
+      "preActivationRequiredWidgetRequests": ["GalleryImageActionsBridge"],
       "requiredWidgetRequests": ["GalleryImageActionsBridge", "widget:gallery", "widget:preview"],
       "forbiddenWidgetRequests": ["widget:canvas", "widget:layers", "widget:project", "widget:upscale"],
       "remediationTicket": "deepen-widget-registry-loading"

@@ -10,6 +10,7 @@ import {
   summarizeBrowserResources,
   validateArchitectureBaseline,
   validateBrowserBaseline,
+  waitForRequiredRequests,
 } from './performance-budgets.mjs';
 
 const PROJECT_ROOT = '/repo/webv2';
@@ -264,6 +265,27 @@ describe('chunk source ownership manifest', () => {
 });
 
 describe('browser performance sampling and policy', () => {
+  it('waits for required requests that begin after the initial render', async () => {
+    const requested = new Set();
+    let resolved = false;
+    const waiting = waitForRequiredRequests({
+      context: 'editor-canvas/empty',
+      getRequested: () => requested,
+      pollIntervalMs: 1,
+      requiredRequests: ['GalleryImageActionsBridge'],
+      timeoutMs: 1_000,
+    }).then(() => {
+      resolved = true;
+    });
+
+    await Promise.resolve();
+    assert.equal(resolved, false);
+
+    requested.add('GalleryImageActionsBridge');
+    await waiting;
+    assert.equal(resolved, true);
+  });
+
   it('keeps the trace sample disjoint from scored samples', () => {
     const plan = createBrowserSamplePlan({ scoredSamples: 3, traceSamples: 1, warmups: 2 });
 

@@ -12,6 +12,7 @@ import {
   summarizeBrowserResources,
   validateBrowserBaseline,
   validateChunkSourceManifest,
+  waitForRequiredRequests,
 } from './performance-budgets.mjs';
 import { getWidgetId } from './widget-sources.mjs';
 
@@ -79,28 +80,22 @@ const summarizeVariance = (values) => {
   };
 };
 
+const getRequestedScriptLabels = (scripts) =>
+  new Set([...scripts].map((request) => scriptLabelByPath.get(request) ?? request));
+
 const waitForWidgetRequests = async (fixture, scripts) => {
-  const required = new Set(fixture.requiredWidgetRequests ?? []);
-  const deadline = Date.now() + 10_000;
+  await waitForRequiredRequests({
+    context: `${fixture.id}/${fixture.stateProfile}`,
+    getRequested: () => getRequestedScriptLabels(scripts),
+    requiredRequests: fixture.requiredWidgetRequests ?? [],
+  });
 
-  while (Date.now() < deadline) {
-    const requested = new Set([...scripts].map((request) => scriptLabelByPath.get(request) ?? request));
-    if ([...required].every((request) => requested.has(request))) {
-      for (const forbidden of fixture.forbiddenWidgetRequests ?? []) {
-        if (requested.has(forbidden)) {
-          throw new Error(`${fixture.id}/${fixture.stateProfile} requested inactive ${forbidden}.`);
-        }
-      }
-      return;
+  const requested = getRequestedScriptLabels(scripts);
+  for (const forbidden of fixture.forbiddenWidgetRequests ?? []) {
+    if (requested.has(forbidden)) {
+      throw new Error(`${fixture.id}/${fixture.stateProfile} requested inactive ${forbidden}.`);
     }
-    await new Promise((resolveWait) => {
-      setTimeout(resolveWait, 25);
-    });
   }
-
-  throw new Error(
-    `${fixture.id}/${fixture.stateProfile} did not request required widgets ${JSON.stringify([...required])}.`
-  );
 };
 
 const waitForPreview = async () => {
@@ -314,6 +309,11 @@ const runSample = async (browser, fixture, sample) => {
     let activatedResourcePaths = new Set();
     let layoutSwitchMs = 0;
     if (fixture.layoutPreset || fixture.centerView) {
+      await waitForRequiredRequests({
+        context: `${fixture.id}/${fixture.stateProfile} before activation`,
+        getRequested: () => getRequestedScriptLabels(scripts),
+        requiredRequests: fixture.preActivationRequiredWidgetRequests ?? [],
+      });
       const activationTrigger = fixture.layoutPreset
         ? page.getByRole('tab', { exact: true, name: fixture.layoutPreset })
         : page.getByRole('button', { name: /^Center view:/ });
