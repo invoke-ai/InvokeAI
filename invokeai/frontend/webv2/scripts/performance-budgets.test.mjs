@@ -11,6 +11,7 @@ import {
   validateArchitectureBaseline,
   validateBrowserBaseline,
   waitForRequiredRequests,
+  waitForStableRequests,
 } from './performance-budgets.mjs';
 
 const PROJECT_ROOT = '/repo/webv2';
@@ -284,6 +285,31 @@ describe('browser performance sampling and policy', () => {
     requested.add('GalleryImageActionsBridge');
     await waiting;
     assert.equal(resolved, true);
+  });
+
+  it('waits for cascading requests to settle before measuring activation', async () => {
+    const requested = new Set(['GalleryImageActionsBridge']);
+    let elapsedMs = 0;
+    let polls = 0;
+
+    await waitForStableRequests({
+      context: 'editor-canvas/empty before activation',
+      getRequested: () => requested,
+      now: () => elapsedMs,
+      pollIntervalMs: 10,
+      stableForMs: 30,
+      timeoutMs: 1_000,
+      wait: (milliseconds) => {
+        elapsedMs += milliseconds;
+        polls += 1;
+        if (polls === 2) {
+          requested.add('GalleryImageActionsBridge dependency');
+        }
+      },
+    });
+
+    assert.equal(elapsedMs, 50);
+    assert.deepEqual([...requested], ['GalleryImageActionsBridge', 'GalleryImageActionsBridge dependency']);
   });
 
   it('keeps the trace sample disjoint from scored samples', () => {

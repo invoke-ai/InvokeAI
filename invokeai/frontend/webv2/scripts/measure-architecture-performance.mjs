@@ -13,6 +13,7 @@ import {
   validateBrowserBaseline,
   validateChunkSourceManifest,
   waitForRequiredRequests,
+  waitForStableRequests,
 } from './performance-budgets.mjs';
 import { getWidgetId } from './widget-sources.mjs';
 
@@ -313,6 +314,10 @@ const runSample = async (browser, fixture, sample) => {
         context: `${fixture.id}/${fixture.stateProfile} before activation`,
         getRequested: () => getRequestedScriptLabels(scripts),
         requiredRequests: fixture.preActivationRequiredWidgetRequests ?? [],
+      });
+      await waitForStableRequests({
+        context: `${fixture.id}/${fixture.stateProfile} before activation`,
+        getRequested: () => scripts,
       });
       const activationTrigger = fixture.layoutPreset
         ? page.getByRole('tab', { exact: true, name: fixture.layoutPreset })

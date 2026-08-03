@@ -53,6 +53,37 @@ export const waitForRequiredRequests = async ({
   throw new Error(`${context} did not request required widgets ${JSON.stringify([...required])}.`);
 };
 
+export const waitForStableRequests = async ({
+  context,
+  getRequested,
+  now = Date.now,
+  pollIntervalMs = 25,
+  stableForMs = 500,
+  timeoutMs = 10_000,
+  wait = (milliseconds) =>
+    new Promise((resolveWait) => {
+      setTimeout(resolveWait, milliseconds);
+    }),
+}) => {
+  const deadline = now() + timeoutMs;
+  let fingerprint;
+  let stableSince = now();
+
+  while (now() < deadline) {
+    const currentFingerprint = JSON.stringify([...getRequested()].sort());
+    if (currentFingerprint !== fingerprint) {
+      fingerprint = currentFingerprint;
+      stableSince = now();
+    }
+    if (now() - stableSince >= stableForMs) {
+      return;
+    }
+    await wait(pollIntervalMs);
+  }
+
+  throw new Error(`${context} request set did not remain stable for ${String(stableForMs)}ms.`);
+};
+
 const isPlainObject = (value) => typeof value === 'object' && value !== null && !Array.isArray(value);
 
 const assertPlainObject = (value, path) => {
