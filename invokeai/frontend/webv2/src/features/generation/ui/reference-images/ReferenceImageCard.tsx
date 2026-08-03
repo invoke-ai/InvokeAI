@@ -260,7 +260,7 @@ const ReferenceModelSelector = ({
 
   return (
     <Stack gap="1">
-      <FieldHeader label={t('widgets.generate.referenceImageModel')} />
+      <FieldHeader hint="referenceImage" label={t('widgets.generate.referenceImageModel')} />
       <HStack gap="2">
         <ModelSelect
           disabled={disabled}

@@ -109,6 +109,7 @@ export const GenerateConceptsSection = ({
     <GenerateCollapsibleSection label={t('widgets.generate.concepts')} defaultOpen badges={badges} sectionId="concepts">
       <Stack gap="2" p="2">
         <Field
+          hint="concepts"
           label={t('widgets.generate.addConcept')}
           helpText={selectedModel ? undefined : t('widgets.generate.selectMainModelBeforeConcepts')}
         >

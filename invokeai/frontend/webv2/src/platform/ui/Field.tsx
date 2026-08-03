@@ -1,6 +1,8 @@
+import type { FeatureHintId } from '@platform/ui/hints';
 import type { ReactNode } from 'react';
 
-import { Field as ChakraField, HStack, Stack, Text, useRecipe, type StackProps } from '@chakra-ui/react';
+import { chakra, Field as ChakraField, HStack, Stack, Text, useRecipe, type StackProps } from '@chakra-ui/react';
+import { FeatureHint } from '@platform/ui/hints';
 import { fieldLabelRecipe } from '@theme/recipes';
 import { useMemo } from 'react';
 
@@ -31,6 +33,8 @@ export interface FieldProps extends Omit<StackProps, 'disabled' | 'id' | 'readOn
   /** Validation error, shown in place of `helpText`; also marks the field invalid by default. */
   error?: string | null;
   helpText?: string;
+  /** Opens an informational hint card when the label is hovered. */
+  hint?: FeatureHintId;
   children: ReactNode;
 }
 
@@ -40,6 +44,7 @@ export const Field = ({
   disabled,
   error,
   helpText,
+  hint,
   id,
   invalid,
   label,
@@ -63,7 +68,23 @@ export const Field = ({
         : undefined,
     [id]
   );
-  const labelContent = <ChakraField.Label css={recipe()}>{label}</ChakraField.Label>;
+  // The hint wraps the label's *text*, never the `ChakraField.Label` itself:
+  // the hover-card trigger stamps its own `id` on whatever element it is given,
+  // which would clobber the id that every control's `aria-labelledby` points at
+  // and leave the control with no accessible name. A conditional render, not a
+  // conditional hook — `FeatureHint` owns the context read and returns its child
+  // untouched when hints are off.
+  const labelContent = (
+    <ChakraField.Label css={recipe()}>
+      {hint ? (
+        <FeatureHint hint={hint}>
+          <chakra.span>{label}</chakra.span>
+        </FeatureHint>
+      ) : (
+        label
+      )}
+    </ChakraField.Label>
+  );
   const message = error ? (
     <ChakraField.ErrorText color="fg.error" fontSize="2xs" role="alert">
       {error}

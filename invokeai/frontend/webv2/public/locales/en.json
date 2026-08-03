@@ -168,6 +168,8 @@
     "canceled": "Canceled",
     "clear": "Clear",
     "clearSearch": "Clear search",
+    "dontShowMeThese": "Don't show me these",
+    "learnMore": "Learn more",
     "noSchedulersFound": "No schedulers found",
     "openSelector": "Open selector",
     "searchSchedulers": "Search schedulers…",
@@ -511,6 +513,197 @@
     "searchPlaceholder": "Search hotkeys",
     "title": "Hotkeys"
   },
+  "hints": {
+    "aspectRatio": {
+      "heading": "Aspect Ratio",
+      "paragraphs": [
+        "The aspect ratio of the dimensions of the image generated.",
+        "An image size (in number of pixels) equivalent to 512x512 is recommended for SD1.5 models and a size equivalent to 1024x1024 is recommended for SDXL models."
+      ]
+    },
+    "batchCount": {
+      "heading": "Iterations",
+      "paragraphs": [
+        "The number of images to generate.",
+        "If Dynamic Prompts is enabled, each of the prompts will be generated this many times."
+      ]
+    },
+    "cfgRescale": {
+      "heading": "CFG Rescale Multiplier",
+      "paragraphs": [
+        "Rescale multiplier for CFG guidance, used for models trained using zero-terminal SNR (ztsnr).",
+        "Suggested value of 0.7 for these models."
+      ]
+    },
+    "cfgScale": {
+      "heading": "CFG Scale",
+      "paragraphs": [
+        "Controls how much the prompt influences the generation process.",
+        "High CFG Scale values can result in over-saturation and distorted generation results."
+      ]
+    },
+    "clipSkip": {
+      "heading": "CLIP Skip",
+      "paragraphs": [
+        "How many layers of the CLIP model to skip.",
+        "Certain models are better suited to be used with CLIP Skip."
+      ]
+    },
+    "colorCompensation": {
+      "heading": "Color Compensation",
+      "paragraphs": ["Adjust the input image to reduce color shifts during inpainting or img2img (SDXL Only)."]
+    },
+    "concepts": {
+      "heading": "LoRA",
+      "paragraphs": ["Lightweight models that are used in conjunction with base models."]
+    },
+    "creativity": {
+      "heading": "Creativity",
+      "paragraphs": [
+        "Creativity controls the amount of freedom granted to the model when adding details. Low creativity stays close to the original image, while high creativity allows for more change. When using a prompt, high creativity increases the influence of the prompt."
+      ]
+    },
+    "guidance": {
+      "heading": "Guidance",
+      "paragraphs": [
+        "Controls how much the prompt influences the generation process.",
+        "High guidance values can result in over-saturation and high or low guidance may result in distorted generation results. Guidance only applies to FLUX DEV models."
+      ]
+    },
+    "height": {
+      "heading": "Height",
+      "paragraphs": ["Height of the generated image. Must be a multiple of 8."]
+    },
+    "imageInfluence": {
+      "heading": "Denoising Strength",
+      "paragraphs": [
+        "Controls how much the generated image varies from the raster layers.",
+        "Lower strength stays closer to the combined visible raster layers. Higher strength relies more on the global prompt.",
+        "When there are no raster layers with visible content, this setting is ignored."
+      ]
+    },
+    "model": {
+      "heading": "Model",
+      "paragraphs": [
+        "Model used for generation. Different models are trained to specialize in producing different aesthetic results and content."
+      ]
+    },
+    "negativePrompt": {
+      "heading": "Negative Prompt",
+      "paragraphs": [
+        "The generation process avoids the concepts in the negative prompt. Use this to exclude qualities or objects from the output.",
+        "Supports Compel syntax and embeddings."
+      ]
+    },
+    "pidMode": {
+      "heading": "PiD Decode (Super-Resolution Decoder)",
+      "paragraphs": [
+        "PiD replaces the standard VAE decode with NVIDIA's Pixel Diffusion Decoder, a diffusion-based 4x super-resolution decoder. It requires a PiD decoder model and a Gemma-2 caption encoder.",
+        "Fit: generate at your chosen resolution, PiD decodes it 4x, then downscales back to that size - extra detail at the same output size, and it composites onto the canvas (works for Image to Image too).",
+        "Native (4x): your dimensions are the 4x target. Generation runs at a quarter of them (e.g. 512 -> 2048) and PiD's full 4x output is used directly. The PiD decoders are trained for 2K output (512px sources), with 2K-to-4K variants for 4K.",
+        "Because PiD's diffusion decode reconstructs detail, you can usually lower the generation Steps to save time. 'Scale Before Processing' must be set to None while PiD is enabled."
+      ]
+    },
+    "positivePrompt": {
+      "heading": "Positive Prompt",
+      "paragraphs": [
+        "Guides the generation process. You may use any words or phrases.",
+        "Compel and Dynamic Prompts syntaxes and embeddings."
+      ]
+    },
+    "referenceImage": {
+      "heading": "Global Reference Image",
+      "paragraphs": ["Applies a reference image to influence the entire generation."]
+    },
+    "referenceImageWeight": {
+      "heading": "Reference Image Weight",
+      "paragraphs": [
+        "How strongly this reference image steers the generation.",
+        "Lower weight treats it as a loose suggestion; higher weight holds the output closer to the reference."
+      ]
+    },
+    "scheduler": {
+      "heading": "Scheduler",
+      "paragraphs": [
+        "Scheduler used during the generation process.",
+        "Each scheduler defines how to iteratively add noise to an image or how to update a sample based on a model's output."
+      ]
+    },
+    "seamlessTiling": {
+      "heading": "Seamless Tiling",
+      "paragraphs": [
+        "Generates an image that tiles without visible seams.",
+        "Enable each axis independently to tile horizontally, vertically, or both."
+      ]
+    },
+    "seed": {
+      "heading": "Seed",
+      "paragraphs": [
+        "Controls the starting noise used for generation.",
+        "Disable the \"Random\" option to produce identical results with the same generation settings."
+      ]
+    },
+    "steps": {
+      "heading": "Steps",
+      "paragraphs": [
+        "Number of steps that will be performed in each generation.",
+        "Higher step counts will typically create better images but will require more generation time."
+      ]
+    },
+    "structure": {
+      "heading": "Structure",
+      "paragraphs": [
+        "Structure controls how closely the output image will keep to the layout of the original. Low structure allows major changes, while high structure strictly maintains the original composition and layout."
+      ]
+    },
+    "tileControlNet": {
+      "heading": "ControlNet",
+      "paragraphs": [
+        "ControlNets provide guidance to the generation process, helping create images with controlled composition, structure, or style, depending on the model selected."
+      ]
+    },
+    "tileOverlap": {
+      "heading": "Tile Overlap",
+      "paragraphs": [
+        "Controls the overlap between adjacent tiles during upscaling. Higher overlap values help reduce visible seams between tiles but use more memory.",
+        "The default value of 128 works well for most cases, but you can adjust based on your specific needs and memory constraints."
+      ]
+    },
+    "tileSize": {
+      "heading": "Tile Size",
+      "paragraphs": [
+        "Controls the size of tiles used during the upscaling process. Larger tiles use more memory but may produce better results.",
+        "SD1.5 models default to 768, while SDXL models default to 1024. Reduce tile size if you encounter memory issues."
+      ]
+    },
+    "upscaleModel": {
+      "heading": "Upscale Model",
+      "paragraphs": [
+        "The upscale model scales the image to the output size before details are added. Any supported upscale model may be used, but some are specialized for different kinds of images, like photos or line drawings."
+      ]
+    },
+    "upscaleScale": {
+      "heading": "Scale",
+      "paragraphs": [
+        "Scale controls the output image size, and is based on a multiple of the input image resolution. For example a 2x upscale on a 1024x1024 image would produce a 2048 x 2048 output."
+      ]
+    },
+    "vae": {
+      "heading": "VAE",
+      "paragraphs": ["Model used for translating AI output into the final image."]
+    },
+    "vaePrecision": {
+      "heading": "VAE Precision",
+      "paragraphs": [
+        "The precision used during VAE encoding and decoding.",
+        "Fp16/Half precision is more efficient, at the expense of minor image variations."
+      ]
+    },
+    "width": {
+      "heading": "Width",
+      "paragraphs": ["Width of the generated image. Must be a multiple of 8."]
+    }
+  },
   "models": {
     "accessToken": "Access Token",
     "accessTokenForDownload": "Access token for this download",
@@ -850,6 +1043,8 @@
     "sectionsLabel": "Launchpad sections"
   },
   "settings": {
+    "informationalPopoversDisabled": "Informational popovers disabled",
+    "informationalPopoversDisabledDesc": "Re-enable them under Settings, in the Behavior section.",
     "title": "Settings",
     "descriptionGlobal": "Global preferences for this single-user install. Project settings apply only to the active project.",
     "descriptionUser": "Preferences for the signed-in user. Project settings apply only to the active project.",

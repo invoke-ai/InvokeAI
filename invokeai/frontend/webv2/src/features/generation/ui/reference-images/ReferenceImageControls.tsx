@@ -5,6 +5,7 @@ import type {
   GenerateReferenceImageConfig,
   IPAdapterMethod,
 } from '@features/generation/core/types';
+import type { FeatureHintId } from '@platform/ui/hints';
 import type { KeyboardEvent, ReactNode } from 'react';
 
 import {
@@ -18,6 +19,7 @@ import {
   Text,
 } from '@chakra-ui/react';
 import { Field, Select, Slider } from '@platform/ui';
+import { FeatureHint } from '@platform/ui/hints';
 import { ChevronRightIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -89,14 +91,28 @@ const ADVANCED_TRIGGER_HOVER_STYLES = { color: 'fg' };
 const COLLAPSIBLE_INDICATOR_OPEN_STYLES = { transform: 'rotate(90deg)' };
 
 /** Tiny muted label row above a control, with optional right-aligned content. */
-export const FieldHeader = ({ children, label }: { children?: ReactNode; label: string }) => (
-  <HStack justify="space-between" minH="4">
+export const FieldHeader = ({
+  children,
+  hint,
+  label,
+}: {
+  children?: ReactNode;
+  hint?: FeatureHintId;
+  label: string;
+}) => {
+  const labelText = (
     <Text color="fg.muted" fontSize="2xs" fontWeight="medium">
       {label}
     </Text>
-    {children}
-  </HStack>
-);
+  );
+
+  return (
+    <HStack justify="space-between" minH="4">
+      {hint ? <FeatureHint hint={hint}>{labelText}</FeatureHint> : labelText}
+      {children}
+    </HStack>
+  );
+};
 
 /**
  * Controls for `ip_adapter` reference image configs. `children` renders inside
@@ -260,7 +276,14 @@ export const IPAdapterControls = ({
         </SegmentGroup.Root>
       </Stack>
 
-      <Field align="center" disabled={disabled} gap="3" label={t('widgets.generate.weight')} orientation="horizontal">
+      <Field
+        align="center"
+        disabled={disabled}
+        gap="3"
+        hint="referenceImageWeight"
+        label={t('widgets.generate.weight')}
+        orientation="horizontal"
+      >
         <Flex align="center" gap="3">
           <Slider
             aria-label={weightAriaLabel}
@@ -435,7 +458,7 @@ export const FluxReduxControls = <T extends { imageInfluence: FluxReduxImageInfl
   );
 
   return (
-    <Field disabled={disabled} label={t('widgets.generate.imageInfluence')}>
+    <Field disabled={disabled} hint="imageInfluence" label={t('widgets.generate.imageInfluence')}>
       <Select
         collection={FLUX_REDUX_IMAGE_INFLUENCE_COLLECTION}
         deselectable={false}

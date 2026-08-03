@@ -76,7 +76,7 @@ export const GenerateModelFields = ({
   return (
     <GenerateCollapsibleSection label={t('widgets.generate.model')} defaultOpen sectionId="model">
       <Stack gap="2" p="2">
-        <Field label={t('widgets.generate.model')}>
+        <Field hint="model" label={t('widgets.generate.model')}>
           <ModelSelect
             filter={(model) => isGenerateModelConfig(model) && isGenerateModelSelectable(model)}
             isClearable={false}
@@ -91,7 +91,7 @@ export const GenerateModelFields = ({
             }}
           />
         </Field>
-        <Field label={t('widgets.generate.steps')}>
+        <Field hint="steps" label={t('widgets.generate.steps')}>
           <SliderNumberField
             ariaLabel={t('widgets.generate.steps')}
             defaultValue={modelDefaults?.steps}
@@ -105,7 +105,7 @@ export const GenerateModelFields = ({
             onChange={(steps) => commitNumber('steps', steps)}
           />
         </Field>
-        <Field label={policy.ui.guidanceLabel}>
+        <Field hint="guidance" label={policy.ui.guidanceLabel}>
           <SliderNumberField
             ariaLabel={policy.ui.guidanceLabel}
             defaultValue={modelDefaults?.cfgScale}
@@ -119,7 +119,7 @@ export const GenerateModelFields = ({
           />
         </Field>
         {policy.ui.schedulerVisible ? (
-          <Field label={t('widgets.generate.scheduler')}>
+          <Field hint="scheduler" label={t('widgets.generate.scheduler')}>
             <HStack gap="1">
               <Combobox
                 aria-label={t('widgets.generate.scheduler')}
@@ -139,7 +139,7 @@ export const GenerateModelFields = ({
           </Field>
         ) : null}
         {policy.ui.seedVisible ? (
-          <Field label={t('common.seed')}>
+          <Field hint="seed" label={t('common.seed')}>
             <HStack gap="2">
               <NumberInput.Root
                 size="xs"
