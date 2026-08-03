@@ -6,20 +6,15 @@ import { ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
 import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { ImageActions } from './useImageActions';
 
 import { ImageContextMenu, type ImageContextMenuTarget } from './ImageContextMenu';
 import { EMPTY_IMAGE_RECALL_CAPABILITIES } from './imageRecall';
 
-const preferences = vi.hoisted(() => ({ confirmImageDeletion: true }));
 const NO_BOARDS: [] = [];
 
-vi.mock('@workbench/settings/store', () => ({
-  useWorkbenchPreferenceSelector: (selector: (value: { confirmImageDeletion: boolean }) => boolean): boolean =>
-    selector(preferences),
-}));
 vi.mock('@workbench/useOpenWorkbenchWidget', () => ({ useOpenWorkbenchWidget: () => vi.fn() }));
 vi.mock('@workbench/WorkbenchContext', () => ({
   useWorkbenchCommands: () => ({
@@ -78,18 +73,6 @@ const interact = (action: () => void): Promise<void> =>
       globalThis.setTimeout(resolve, 50);
     });
   });
-
-const getButton = (label: string): HTMLButtonElement => {
-  const button = Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find(
-    (candidate) => candidate.textContent?.trim() === label
-  );
-
-  if (!button) {
-    throw new Error(`Could not find button: ${label}`);
-  }
-
-  return button;
-};
 
 const getMenuItem = (label: string): HTMLElement => {
   const item = Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]')).find(
@@ -172,10 +155,6 @@ const renderItemMenu = async (
   });
 };
 
-beforeEach(() => {
-  preferences.confirmImageDeletion = true;
-});
-
 afterEach(async () => {
   await interact(() => root?.unmount());
   host?.remove();
@@ -183,87 +162,14 @@ afterEach(async () => {
   root = null;
 });
 
-describe('ImageContextMenu deletion confirmation', () => {
-  it('keeps single-image confirmation mounted after the host clears the menu target', async () => {
-    const deleteImages = vi.fn(() => Promise.resolve());
-    await renderMenu(createActions(deleteImages), [image('single.png')]);
+describe('ImageContextMenu deletion delegation', () => {
+  it('delegates deletion to the shared image actions adapter', async () => {
+    const deleteItems = vi.fn(() => Promise.resolve());
+    await renderMenu(createActions(deleteItems), [image('single.png')]);
 
     await interact(() => getMenuItem('Delete Image').click());
 
-    expect(getOpenAlertDialog()).not.toBeNull();
-    expect(document.body.textContent).toContain('Delete image?');
-    expect(deleteImages).not.toHaveBeenCalled();
-
-    await interact(() => getButton('Delete').click());
-
-    expect(deleteImages).toHaveBeenCalledOnce();
-    expect(deleteImages).toHaveBeenCalledWith([{ kind: 'image', name: 'single.png' }]);
-    expect(getOpenAlertDialog()).toBeNull();
-  });
-
-  it('cancels without deleting', async () => {
-    const deleteImages = vi.fn(() => Promise.resolve());
-    await renderMenu(createActions(deleteImages), [image('cancel.png')]);
-
-    await interact(() => getMenuItem('Delete Image').click());
-    await interact(() => getButton('Cancel').click());
-
-    expect(deleteImages).not.toHaveBeenCalled();
-    expect(getOpenAlertDialog()).toBeNull();
-  });
-
-  it('deletes immediately when confirmation is disabled', async () => {
-    preferences.confirmImageDeletion = false;
-    const deleteImages = vi.fn(() => Promise.resolve());
-    await renderMenu(createActions(deleteImages), [image('immediate.png')]);
-
-    await interact(() => getMenuItem('Delete Image').click());
-
-    expect(deleteImages).toHaveBeenCalledOnce();
-    expect(deleteImages).toHaveBeenCalledWith([{ kind: 'image', name: 'immediate.png' }]);
-    expect(getOpenAlertDialog()).toBeNull();
-  });
-
-  it('captures bulk names and cannot be dismissed or submitted twice while deletion is pending', async () => {
-    let resolveDeletion: (() => void) | undefined;
-    const deletion = new Promise<void>((resolve) => {
-      resolveDeletion = resolve;
-    });
-    const deleteImages = vi.fn(() => deletion);
-    await renderMenu(createActions(deleteImages), [image('first.png'), image('second.png')]);
-
-    await interact(() => getMenuItem('Delete Selection').click());
-
-    expect(document.body.textContent).toContain('Delete 2 images?');
-    expect(document.body.textContent).toContain('This permanently deletes these images');
-
-    await interact(() => getButton('Delete').click());
-
-    const cancelButton = getButton('Cancel');
-    const confirmButton = getButton('Delete');
-    const closeButton = document.querySelector<HTMLButtonElement>('button[aria-label="Close"]');
-    expect(deleteImages).toHaveBeenCalledOnce();
-    expect(deleteImages).toHaveBeenCalledWith([
-      { kind: 'image', name: 'first.png' },
-      { kind: 'image', name: 'second.png' },
-    ]);
-    expect(cancelButton.disabled).toBe(true);
-    expect(confirmButton.disabled).toBe(true);
-    expect(closeButton?.disabled).toBe(true);
-
-    await interact(() => {
-      confirmButton.click();
-      cancelButton.click();
-      closeButton?.click();
-      document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
-      document.querySelector<HTMLElement>('[data-scope="dialog"][data-part="backdrop"]')?.click();
-    });
-
-    expect(deleteImages).toHaveBeenCalledOnce();
-    expect(getOpenAlertDialog()).not.toBeNull();
-
-    await interact(() => resolveDeletion?.());
-
+    expect(deleteItems).toHaveBeenCalledExactlyOnceWith([{ kind: 'image', name: 'single.png' }]);
     expect(getOpenAlertDialog()).toBeNull();
   });
 });

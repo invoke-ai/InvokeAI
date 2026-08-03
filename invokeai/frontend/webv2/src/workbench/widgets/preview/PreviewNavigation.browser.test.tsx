@@ -189,6 +189,10 @@ vi.mock('@workbench/image-actions', () => ({
   getImageRecallTitle: () => '',
   getSelectedGalleryImage: () => null,
   getSelectedGalleryImageFromValues: () => null,
+  useDeletionConfirmation: () => ({
+    dialog: null,
+    requestDeletionConfirmation: (_itemRefs: unknown, executeDeletion: () => Promise<void>) => executeDeletion(),
+  }),
   useImageActions: (options: typeof mocks.imageActionOptions) => {
     mocks.imageActionOptions = options;
     return {};

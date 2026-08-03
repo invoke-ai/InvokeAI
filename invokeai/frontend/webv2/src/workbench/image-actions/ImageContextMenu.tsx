@@ -10,8 +10,7 @@ import {
   legacyGeneratedImageToGalleryItem,
   toGalleryItemKey,
 } from '@features/gallery';
-import { ConfirmDialog, MenuContent, Tooltip } from '@platform/ui';
-import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
+import { MenuContent, Tooltip } from '@platform/ui';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import {
@@ -169,8 +168,6 @@ export const ImageContextMenu = ({
   target: ImageContextMenuTarget | null;
   onClose: () => void;
 }) => {
-  const confirmImageDeletion = useWorkbenchPreferenceSelector((preferences) => preferences.confirmImageDeletion);
-  const [pendingDeletion, setPendingDeletion] = useState<GalleryItemRef[] | null>(null);
   const itemTarget = toGalleryItemContextMenuTarget(target);
   const images = getImageContextMenuImages(itemTarget);
   const isCompleteImageTarget = Boolean(itemTarget && images.length === itemTarget.itemRefs.length);
@@ -178,79 +175,37 @@ export const ImageContextMenu = ({
     () => (itemTarget && isCompleteImageTarget ? { images, x: itemTarget.x, y: itemTarget.y } : null),
     [images, isCompleteImageTarget, itemTarget]
   );
-  const pendingDeletionIsImageOnly = pendingDeletion?.every((item) => item.kind === 'image') ?? false;
-
-  const requestDeletion = useCallback(
-    (itemRefs: GalleryItemRef[]) => {
-      if (confirmImageDeletion) {
-        setPendingDeletion([...itemRefs]);
-      } else {
-        void actions.deleteItems(itemRefs);
-      }
-    },
-    [actions, confirmImageDeletion]
-  );
-  const handleCancelDeletion = useCallback(() => setPendingDeletion(null), []);
-  const handleConfirmDeletion = useCallback(async () => {
-    if (!pendingDeletion) {
-      return;
-    }
-
-    await actions.deleteItems(pendingDeletion);
-  }, [actions, pendingDeletion]);
+  const requestDeletion = useCallback((itemRefs: GalleryItemRef[]) => void actions.deleteItems(itemRefs), [actions]);
   const requestImageDeletion = useCallback(
     (imageNames: string[]) => requestDeletion(imageNames.map((name) => ({ kind: 'image', name }))),
     [requestDeletion]
   );
 
-  return (
-    <>
-      {itemTarget &&
-        (imageTarget ? (
-          <ImageContextMenuContent
-            key={`${images[0]?.imageName ?? 'image'}:${images.length}`}
-            actions={actions}
-            boards={boards}
-            image={images[0] ?? null}
-            images={images}
-            target={imageTarget}
-            onClose={onClose}
-            onRequestDeletion={requestImageDeletion}
-          />
-        ) : (
-          <GalleryItemContextMenuContent
-            key={`${itemTarget.itemRefs[0] ? toGalleryItemKey(itemTarget.itemRefs[0]) : 'item'}:${itemTarget.itemRefs.length}`}
-            actions={actions}
-            boards={boards}
-            previewVideoActions={previewVideoActions}
-            target={itemTarget}
-            onClose={onClose}
-            onRequestDeletion={requestDeletion}
-          />
-        ))}
-      <ConfirmDialog
-        body={`This permanently deletes ${
-          pendingDeletion && pendingDeletion.length > 1
-            ? pendingDeletionIsImageOnly
-              ? 'these images'
-              : 'these items'
-            : pendingDeletionIsImageOnly
-              ? 'the image'
-              : 'the item'
-        } from every board and from disk. This cannot be undone. You can disable this confirmation in Settings.`}
-        confirmLabel="Delete"
-        isOpen={pendingDeletion !== null}
-        title={
-          pendingDeletion && pendingDeletion.length > 1
-            ? `Delete ${pendingDeletion.length} ${pendingDeletionIsImageOnly ? 'images' : 'items'}?`
-            : pendingDeletionIsImageOnly
-              ? 'Delete image?'
-              : 'Delete item?'
-        }
-        onClose={handleCancelDeletion}
-        onConfirm={handleConfirmDeletion}
-      />
-    </>
+  if (!itemTarget) {
+    return null;
+  }
+
+  return imageTarget ? (
+    <ImageContextMenuContent
+      key={`${images[0]?.imageName ?? 'image'}:${images.length}`}
+      actions={actions}
+      boards={boards}
+      image={images[0] ?? null}
+      images={images}
+      target={imageTarget}
+      onClose={onClose}
+      onRequestDeletion={requestImageDeletion}
+    />
+  ) : (
+    <GalleryItemContextMenuContent
+      key={`${itemTarget.itemRefs[0] ? toGalleryItemKey(itemTarget.itemRefs[0]) : 'item'}:${itemTarget.itemRefs.length}`}
+      actions={actions}
+      boards={boards}
+      previewVideoActions={previewVideoActions}
+      target={itemTarget}
+      onClose={onClose}
+      onRequestDeletion={requestDeletion}
+    />
   );
 };
 

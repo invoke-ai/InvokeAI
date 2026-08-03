@@ -15,6 +15,7 @@ import {
   type GalleryItemMutationResult,
   type GalleryItemRef,
 } from '@features/gallery';
+import { getGalleryBoardLabel } from '@features/gallery/contracts';
 import { invalidateGallery, patchGalleryItemCaches } from '@features/gallery/queries';
 import { setPendingPromptTemplateDraft } from '@features/generation/react';
 import { getMaxReferenceImages, isVaeModelConfig, isSupportedGenerateModel } from '@features/generation/settings';
@@ -33,11 +34,14 @@ import {
   importGalleryImagesToCanvas,
   type GalleryCanvasImportDestination,
 } from '@workbench/canvas-operations/api';
+import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useWorkbenchCommands, useWorkbenchQueries } from '@workbench/WorkbenchContext';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import type { RequestDeletionConfirmation } from './useDeletionConfirmation';
 
 import { appendReferenceImage } from './appendReferenceImage';
 import { recordCanvasImportError } from './canvasImportError';
@@ -103,6 +107,7 @@ export const useImageActions = ({
   getItemActionContext,
   onImagesDeleted,
   projectId,
+  requestDeletionConfirmation,
 }: {
   boards: GalleryBoard[];
   generateValues: Record<string, unknown>;
@@ -110,6 +115,7 @@ export const useImageActions = ({
   projectId?: string;
   /** Called after a successful deletion so the host can select a neighboring image. */
   onImagesDeleted?: (imageNames: string[]) => void;
+  requestDeletionConfirmation: RequestDeletionConfirmation;
 }): ImageActions => {
   const openWorkbenchWidget = useOpenWorkbenchWidget();
   const commands = useWorkbenchCommands();
@@ -117,6 +123,7 @@ export const useImageActions = ({
   const queries = useWorkbenchQueries();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
+  const confirmImageDeletion = useWorkbenchPreferenceSelector((preferences) => preferences.confirmImageDeletion);
   const models = useModelsSelector((snapshot) => snapshot.models);
   const supportedModels = useMemo(() => models.filter(isSupportedGenerateModel), [models]);
   const vaeModels = useMemo(() => models.filter(isVaeModelConfig).map((model) => model as VaeModelConfig), [models]);
@@ -137,8 +144,11 @@ export const useImageActions = ({
         projectId,
       });
     const recordSuccess = (title: string, message?: string) => notifications.add({ kind: 'success', message, title });
-    const getBoardName = (boardId: string) =>
-      boards.find((board) => board.id === boardId)?.name ?? t('widgets.gallery.uncategorized');
+    const getBoardName = (boardId: string) => {
+      const board = boards.find((board) => board.id === boardId);
+
+      return board ? getGalleryBoardLabel(board, t) : t('widgets.gallery.uncategorized');
+    };
     const getLatestGenerateValues = () => {
       const snapshot = queries.getSnapshot();
       const project = projectId
@@ -221,7 +231,7 @@ export const useImageActions = ({
 
       reportMutationOutcome(action, requested.length, result, boardId);
     };
-    const deleteItems = (items: GalleryItemRef[]): Promise<void> => {
+    const deleteItemsConfirmed = (items: GalleryItemRef[]): Promise<void> => {
       let deletionContext: GalleryItemActionContext | null = null;
       let orderedRefs: GalleryItemRef[] | null = null;
       const isDeletionContextCurrent = (): boolean => {
@@ -336,6 +346,10 @@ export const useImageActions = ({
         requested: items,
       });
     };
+    const deleteItems = (items: GalleryItemRef[]): Promise<void> =>
+      confirmImageDeletion
+        ? requestDeletionConfirmation(items, () => deleteItemsConfirmed(items))
+        : deleteItemsConfirmed(items);
     const moveItemsToBoard = (items: GalleryItemRef[], boardId: string): Promise<void> =>
       runItemMutation({
         action: 'move',
@@ -675,6 +689,7 @@ export const useImageActions = ({
     };
   }, [
     boards,
+    confirmImageDeletion,
     currentGenerateValues,
     commands,
     gallery,
@@ -688,6 +703,7 @@ export const useImageActions = ({
     projectId,
     queryClient,
     queries,
+    requestDeletionConfirmation,
     supportedModels,
     t,
     vaeModels,

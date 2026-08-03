@@ -57,6 +57,7 @@ import { useStreamingImageSource } from '@platform/ui/streaming-image/useStreami
 import { useInfiniteQuery, useQuery, type InfiniteData } from '@tanstack/react-query';
 import {
   ImageContextMenu,
+  useDeletionConfirmation,
   useImageActions,
   type ImageActions,
   type ImageContextMenuTarget,
@@ -124,7 +125,7 @@ const fallbackBoards: GalleryBoard[] = [
     id: 'none',
     imageCount: 0,
     kind: 'uncategorized',
-    name: 'Uncategorized',
+    name: '',
     videoCount: 0,
   },
 ];
@@ -603,11 +604,13 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     [boardItems, navigationQueryKey, selectedItemKey]
   );
   const projectId = useActiveProjectId();
+  const { dialog: deletionConfirmationDialog, requestDeletionConfirmation } = useDeletionConfirmation();
   const imageActions = useImageActions({
     boards,
     generateValues,
     getItemActionContext,
     projectId,
+    requestDeletionConfirmation,
   });
   const contextMenuItem = useMemo<GalleryItem | null>(() => {
     if (!selectedItem) {
@@ -941,6 +944,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
               target={contextMenuTarget}
               onClose={closeContextMenu}
             />
+            {deletionConfirmationDialog}
           </>
         ) : (
           <EmptyPreview />

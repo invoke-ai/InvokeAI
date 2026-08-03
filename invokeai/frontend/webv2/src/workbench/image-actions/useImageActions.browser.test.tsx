@@ -30,9 +30,11 @@ const mocks = vi.hoisted(() => ({
   patchGalleryItemCaches: vi.fn((..._args: unknown[]) => vi.fn()),
   removeFromBoard: vi.fn(),
   reportError: vi.fn(),
+  requestDeletionConfirmation: vi.fn(),
   resolveItem: vi.fn(),
   setStarred: vi.fn(),
 }));
+const preferences = vi.hoisted(() => ({ confirmImageDeletion: false }));
 
 vi.mock('@features/gallery', () => ({
   galleryImages: { metadata: (...args: unknown[]) => mocks.imageMetadata(...args) },
@@ -84,6 +86,10 @@ vi.mock('@workbench/useOpenWorkbenchWidget', () => ({
   useOpenWorkbenchWidget: () => mocks.openWorkbenchWidget,
 }));
 
+vi.mock('@workbench/settings/store', () => ({
+  useWorkbenchPreferenceSelector: (selector: (value: typeof preferences) => boolean) => selector(preferences),
+}));
+
 vi.mock('@platform/browser/downloadBlob', () => ({
   downloadBlob: (...args: unknown[]) => mocks.downloadBlob(...args),
 }));
@@ -119,7 +125,18 @@ vi.mock('@workbench/WorkbenchContext', () => ({
 }));
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
+  useTranslation: () => ({
+    t: (key: string, values?: Record<string, unknown>) => {
+      if (key === 'widgets.gallery.uncategorized') {
+        return 'Uncategorized';
+      }
+      if (key === 'widgets.gallery.itemActions.move.success') {
+        return `Moved to ${String(values?.board)}`;
+      }
+
+      return key;
+    },
+  }),
 }));
 
 let host: HTMLDivElement | null = null;
@@ -136,10 +153,21 @@ let currentItemActionContext: ItemActionContext | null = null;
 
 const Probe = ({ modelKey = 'sd-1-model', ref }: { modelKey?: string; ref: Ref<ImageActions> }) => {
   const actions = useImageActions({
-    boards: [],
+    boards: [
+      {
+        archived: false,
+        assetCount: 0,
+        id: 'none',
+        imageCount: 0,
+        kind: 'uncategorized',
+        name: '',
+        videoCount: 0,
+      },
+    ],
     generateValues: { modelKey },
     getItemActionContext: () => currentItemActionContext,
     projectId: 'project-1',
+    requestDeletionConfirmation: mocks.requestDeletionConfirmation,
   });
 
   useImperativeHandle(ref, () => actions, [actions]);
@@ -149,6 +177,10 @@ const Probe = ({ modelKey = 'sd-1-model', ref }: { modelKey?: string; ref: Ref<I
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  preferences.confirmImageDeletion = false;
+  mocks.requestDeletionConfirmation.mockImplementation(
+    (_itemRefs: readonly GalleryItemRef[], executeDeletion: () => Promise<void>) => executeDeletion()
+  );
   mocks.invalidateGallery.mockResolvedValue(undefined);
   accountLifecycle.activate('user-a');
   currentItemActionContext = null;
@@ -312,6 +344,63 @@ type ExpectedItemActions = {
 const getItemActions = (): ExpectedItemActions => actionsRef.current as unknown as ExpectedItemActions;
 
 describe('mixed item mutation outcomes', () => {
+  it('gates deletion through confirmation when the preference is enabled', async () => {
+    const refs = [{ kind: 'image' as const, name: 'image.png' }];
+    const result = { affectedBoardIds: ['none'], failed: [], succeeded: refs };
+    let executeDeletion: (() => Promise<void>) | null = null;
+    preferences.confirmImageDeletion = true;
+    mocks.requestDeletionConfirmation.mockImplementation((_itemRefs, execute) => {
+      executeDeletion = execute;
+      return Promise.resolve();
+    });
+    mocks.itemDelete.mockResolvedValue(result);
+
+    await act(() => {
+      root?.render(
+        <QueryClientProvider client={new QueryClient()}>
+          <Probe ref={actionsRef} />
+        </QueryClientProvider>
+      );
+    });
+    await act(async () => {
+      await getItemActions().deleteItems(refs);
+    });
+
+    expect(mocks.requestDeletionConfirmation).toHaveBeenCalledWith(refs, expect.any(Function));
+    expect(mocks.itemDelete).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await executeDeletion?.();
+    });
+    expect(mocks.itemDelete).toHaveBeenCalledWith(refs, expect.any(AbortSignal));
+  });
+
+  it('deletes immediately without opening confirmation when the preference is disabled', async () => {
+    const refs = [{ kind: 'image' as const, name: 'image.png' }];
+    mocks.itemDelete.mockResolvedValue({ affectedBoardIds: ['none'], failed: [], succeeded: refs });
+
+    await act(async () => {
+      await getItemActions().deleteItems(refs);
+    });
+
+    expect(mocks.requestDeletionConfirmation).not.toHaveBeenCalled();
+    expect(mocks.itemDelete).toHaveBeenCalledWith(refs, expect.any(AbortSignal));
+  });
+
+  it('uses the localized Uncategorized label in move notifications', async () => {
+    const refs = [{ kind: 'image' as const, name: 'image.png' }];
+    mocks.itemMoveToBoard.mockResolvedValue({ affectedBoardIds: ['none'], failed: [], succeeded: refs });
+
+    await act(async () => {
+      await getItemActions().moveItemsToBoard(refs, 'none');
+    });
+
+    expect(mocks.notificationsAdd).toHaveBeenCalledWith({
+      kind: 'success',
+      title: 'Moved to Uncategorized',
+    });
+  });
+
   it('moves mixed refs through the common organization result and patches only confirmed qualified keys', async () => {
     const refs = [
       { kind: 'image' as const, name: 'shared' },

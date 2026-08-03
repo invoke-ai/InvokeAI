@@ -2,7 +2,12 @@ import type { GalleryItemActionsOptions, GalleryItemContextMenuProps } from '@fe
 import type { ReactNode } from 'react';
 
 import { GalleryItemActionsProvider } from '@features/gallery/react';
-import { ImageContextMenu, useImageActions, type ImageActions } from '@workbench/image-actions';
+import {
+  ImageContextMenu,
+  useDeletionConfirmation,
+  useImageActions,
+  type ImageActions,
+} from '@workbench/image-actions';
 import { createContext, use } from 'react';
 
 const GalleryAppActionsContext = createContext<ImageActions | null>(null);
@@ -24,12 +29,22 @@ const GalleryItemActionsAdapterComponent = ({
   getItemActionContext,
   projectId,
 }: GalleryItemActionsOptions & { children: ReactNode }) => {
-  const actions = useImageActions({ boards, generateValues, getItemActionContext, projectId });
+  const { dialog, requestDeletionConfirmation } = useDeletionConfirmation();
+  const actions = useImageActions({
+    boards,
+    generateValues,
+    getItemActionContext,
+    projectId,
+    requestDeletionConfirmation,
+  });
 
   return (
-    <GalleryAppActionsContext value={actions}>
-      <GalleryItemActionsProvider actions={actions}>{children}</GalleryItemActionsProvider>
-    </GalleryAppActionsContext>
+    <>
+      <GalleryAppActionsContext value={actions}>
+        <GalleryItemActionsProvider actions={actions}>{children}</GalleryItemActionsProvider>
+      </GalleryAppActionsContext>
+      {dialog}
+    </>
   );
 };
 

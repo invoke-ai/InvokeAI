@@ -12,6 +12,7 @@ import { GalleryImageContextMenu, GalleryItemActionsAdapter } from './GalleryIma
 
 const mocks = vi.hoisted(() => ({
   moveItemsToBoard: vi.fn(),
+  requestDeletionConfirmation: vi.fn(),
   useImageActions: vi.fn(),
 }));
 
@@ -32,6 +33,10 @@ vi.mock('@workbench/image-actions', () => ({
       )}
     </output>
   ),
+  useDeletionConfirmation: () => ({
+    dialog: <output data-testid="deletion-confirmation-dialog" />,
+    requestDeletionConfirmation: mocks.requestDeletionConfirmation,
+  }),
   useImageActions: (options: unknown) => {
     mocks.useImageActions(options);
     return {
@@ -102,6 +107,19 @@ afterEach(async () => {
 });
 
 describe('GalleryImageActionsBridge mixed selection boundaries', () => {
+  it('wires the shared deletion-confirmation gate into the actions adapter', async () => {
+    await render(
+      <GalleryItemActionsAdapter boards={[]} generateValues={{}} projectId="project-1">
+        <ActionsProbe ref={actionsRef} />
+      </GalleryItemActionsAdapter>
+    );
+
+    expect(host?.querySelector('[data-testid="deletion-confirmation-dialog"]')).not.toBeNull();
+    expect(mocks.useImageActions).toHaveBeenCalledWith(
+      expect.objectContaining({ requestDeletionConfirmation: mocks.requestDeletionConfirmation })
+    );
+  });
+
   it('forwards the complete canonical context target without narrowing a mixed selection', async () => {
     const target: GalleryItemContextMenuTarget = {
       itemRefs: mixedRefs,
