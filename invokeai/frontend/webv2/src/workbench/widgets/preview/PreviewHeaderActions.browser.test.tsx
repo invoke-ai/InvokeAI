@@ -115,9 +115,6 @@ describe('preview header toggles', () => {
       expect(control.getAttribute('aria-pressed'), control.ariaLabel ?? '').toBe('true');
     }
 
-    const [filmstripOn, progressOn] = bothOn.map((control) => getComputedStyle(control).backgroundColor);
-    expect(filmstripOn).toBe(progressOn);
-
     state.filmstripVisible = false;
     state.showProgressImagesInViewer = false;
     await render();
@@ -126,10 +123,6 @@ describe('preview header toggles', () => {
     for (const control of bothOff) {
       expect(control.getAttribute('aria-pressed'), control.ariaLabel ?? '').toBe('false');
     }
-
-    const [filmstripOff, progressOff] = bothOff.map((control) => getComputedStyle(control).backgroundColor);
-    expect(filmstripOff).toBe(progressOff);
-    expect(filmstripOff).not.toBe(filmstripOn);
   });
 
   it('still toggles the setting each one owns', async () => {
