@@ -43,6 +43,7 @@ import {
   toModelIdentifier,
   toGraphContract,
 } from './graphBuilder';
+import { addKrea2ConditioningEnhancers } from './krea2Conditioning';
 import { addPidDecode, getPidDenoiseSize, getPidMetadata, shouldUsePidDecode } from './pidGraph';
 import { getEffectiveReferenceImage } from './referenceImage';
 import { SEED_MAX } from './settings';
@@ -1123,6 +1124,7 @@ const buildKrea2Graph = (
       ])
     : modelLoader;
   const posCond = addNode(graph, { id: 'pos_cond', type: 'krea2_text_encoder' });
+  const posCondCollect = addNode(graph, { id: 'pos_cond_collect', type: 'collect' });
   const negCond = useCfg ? addNode(graph, { id: 'neg_cond', type: 'krea2_text_encoder' }) : null;
   const denoise = addNode(graph, {
     cfg_scale: settings.cfgScale,
@@ -1140,36 +1142,15 @@ const buildKrea2Graph = (
   addEdge(graph, modelLoader, 'vae', output, 'vae');
   addEdge(graph, positivePrompt, 'value', posCond, 'prompt');
 
-  // Optional conditioning enhancers, both default-off, chained between the encoder and denoise:
-  // rebalance first (scale the signal toward the prompt), then seed variance (perturb it).
-  let positiveConditioningSource = posCond;
-
-  if (settings.krea2RebalanceEnabled) {
-    const rebalance = addNode(graph, {
-      id: 'krea2_rebalance',
-      multiplier: settings.krea2RebalanceMultiplier,
-      per_layer_weights: settings.krea2RebalanceWeights,
-      type: 'krea2_conditioning_rebalance',
-    });
-
-    addEdge(graph, positiveConditioningSource, 'conditioning', rebalance, 'conditioning');
-    positiveConditioningSource = rebalance;
-  }
-
-  if (settings.krea2SeedVarianceEnabled && settings.krea2SeedVarianceStrength > 0) {
-    const seedVariance = addNode(graph, {
-      id: 'krea2_seed_variance',
-      randomize_percent: settings.krea2SeedVarianceRandomizePercent,
-      strength: settings.krea2SeedVarianceStrength,
-      type: 'krea2_seed_variance',
-    });
-
-    addEdge(graph, positiveConditioningSource, 'conditioning', seedVariance, 'conditioning');
-    addEdge(graph, seed, 'value', seedVariance, 'variance_seed');
-    positiveConditioningSource = seedVariance;
-  }
-
-  addEdge(graph, positiveConditioningSource, 'conditioning', denoise, 'positive_conditioning');
+  const positiveConditioningSource = addKrea2ConditioningEnhancers({
+    conditioning: posCond,
+    graph,
+    idPrefix: 'krea2',
+    seed,
+    settings,
+  });
+  addEdge(graph, positiveConditioningSource, 'conditioning', posCondCollect, 'item');
+  addEdge(graph, posCondCollect, 'collection', denoise, 'positive_conditioning');
 
   if (negCond) {
     addEdge(graph, loraSource, 'qwen3_vl_encoder', negCond, 'qwen3_vl_encoder');

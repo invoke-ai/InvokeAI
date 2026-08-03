@@ -45,6 +45,13 @@ const zImageModel: MainModelConfig = {
   type: 'main',
 };
 const animaModel: MainModelConfig = { base: 'anima', key: 'anima-model', name: 'Anima', type: 'main' };
+const krea2Model: MainModelConfig = {
+  base: 'krea-2',
+  format: 'diffusers',
+  key: 'krea2-model',
+  name: 'Krea-2',
+  type: 'main',
+};
 const externalModel: GenerateModelConfig = {
   base: 'external',
   capabilities: { modes: ['txt2img'], supports_seed: true },
@@ -769,5 +776,31 @@ describe('compileCanvasGraph — regional guidance', () => {
     expect(backendGraph.nodes.rg_pos_cond_r1).toMatchObject({ prompt: 'a cat', type: 'flux2_klein_text_encoder' });
     expect(getEdge(backendGraph, 'rg_pos_cond_r1', 'qwen3_encoder')?.source.node_id).toBe('model_loader');
     expect(getEdge(backendGraph, 'pos_cond_collect', 'item')?.source.node_id).toBe('pos_cond');
+  });
+
+  it('grafts Krea-2 regions through uniquely named conditioning enhancers into the shared collector', () => {
+    const { backendGraph } = compile(krea2Model, 'txt2img', {
+      regionalGuidance: [region('r1'), region('r2', { positivePrompt: 'a dog' })],
+      settings: {
+        krea2RebalanceEnabled: true,
+        krea2SeedVarianceEnabled: true,
+        krea2SeedVarianceStrength: 0.2,
+      },
+    });
+
+    expect(backendGraph.nodes.rg_pos_cond_r1).toMatchObject({ prompt: 'a cat', type: 'krea2_text_encoder' });
+    expect(backendGraph.nodes.rg_pos_cond_r2).toMatchObject({ prompt: 'a dog', type: 'krea2_text_encoder' });
+    expect(getEdge(backendGraph, 'rg_pos_cond_r1', 'qwen3_vl_encoder')?.source.node_id).toBe('model_loader');
+    expect(backendGraph.nodes.rg_krea2_r1_rebalance?.type).toBe('krea2_conditioning_rebalance');
+    expect(backendGraph.nodes.rg_krea2_r2_rebalance?.type).toBe('krea2_conditioning_rebalance');
+    expect(backendGraph.nodes.rg_krea2_r1_seed_variance?.type).toBe('krea2_seed_variance');
+    expect(backendGraph.nodes.rg_krea2_r2_seed_variance?.type).toBe('krea2_seed_variance');
+    expect(getEdge(backendGraph, 'rg_krea2_r1_seed_variance', 'variance_seed')?.source.node_id).toBe('seed');
+    expect(getEdge(backendGraph, 'denoise_latents', 'positive_conditioning')?.source.node_id).toBe('pos_cond_collect');
+
+    const collectedSources = backendGraph.edges
+      .filter((edge) => edge.destination.node_id === 'pos_cond_collect' && edge.destination.field === 'item')
+      .map((edge) => edge.source.node_id);
+    expect(collectedSources).toEqual(['krea2_seed_variance', 'rg_krea2_r1_seed_variance', 'rg_krea2_r2_seed_variance']);
   });
 });

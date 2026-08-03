@@ -687,7 +687,8 @@ describe('Krea-2, Ideogram 4 and Wan graphs', () => {
 
     expect(getNodeByType(graph, 'krea2_conditioning_rebalance')).toBeUndefined();
     expect(getNodeByType(graph, 'krea2_seed_variance')).toBeUndefined();
-    expect(getEdge(graph, 'denoise_latents', 'positive_conditioning')?.source.node_id).toBe('pos_cond');
+    expect(getEdge(graph, 'pos_cond_collect', 'item')?.source.node_id).toBe('pos_cond');
+    expect(getEdge(graph, 'denoise_latents', 'positive_conditioning')?.source.node_id).toBe('pos_cond_collect');
   });
 
   it('chains rebalance then seed variance between the Krea-2 encoder and denoise', () => {
@@ -699,7 +700,8 @@ describe('Krea-2, Ideogram 4 and Wan graphs', () => {
 
     expect(getEdge(graph, 'krea2_rebalance', 'conditioning')?.source.node_id).toBe('pos_cond');
     expect(getEdge(graph, 'krea2_seed_variance', 'conditioning')?.source.node_id).toBe('krea2_rebalance');
-    expect(getEdge(graph, 'denoise_latents', 'positive_conditioning')?.source.node_id).toBe('krea2_seed_variance');
+    expect(getEdge(graph, 'pos_cond_collect', 'item')?.source.node_id).toBe('krea2_seed_variance');
+    expect(getEdge(graph, 'denoise_latents', 'positive_conditioning')?.source.node_id).toBe('pos_cond_collect');
     // Seed variance needs the seed to be reproducible run-to-run.
     expect(getEdge(graph, 'krea2_seed_variance', 'variance_seed')?.source.node_id).toBe('seed');
   });

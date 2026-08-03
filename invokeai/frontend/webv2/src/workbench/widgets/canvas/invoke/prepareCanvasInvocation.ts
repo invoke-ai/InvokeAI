@@ -218,7 +218,7 @@ export const resolveRegionalReferenceImages = (
       continue;
     }
     const { config } = ref;
-    if (config.type === 'ip_adapter' && base !== 'flux' && base !== 'flux2') {
+    if (config.type === 'ip_adapter' && (base === 'sd-1' || base === 'sdxl')) {
       if (!config.image || !config.model || config.model.base !== base) {
         continue;
       }
