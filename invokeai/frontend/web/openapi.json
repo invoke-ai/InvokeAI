@@ -25720,11 +25720,135 @@
         "title": "ErnieImageModelLoaderOutput",
         "type": "object"
       },
+      "ErnieImagePromptEnhancerInvocation": {
+        "category": "conditioning",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Rewrites a prompt for ERNIE-Image generation using the pipeline's bundled prompt-enhancer\n(Ministral3ForCausalLM), sized for the intended output dimensions.\n\nIf no prompt-enhancer is connected \u2014 the pipeline may not ship one \u2014 the prompt is passed\nthrough unchanged.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Text prompt to rewrite.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "Prompt",
+            "ui_component": "textarea"
+          },
+          "prompt_enhancer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PromptEnhancerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The prompt-enhancer model. If not connected, the prompt is passed through unchanged.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Prompt Enhancer"
+          },
+          "width": {
+            "default": 1024,
+            "description": "Target width the prompt is rewritten for.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 1024,
+            "orig_required": false,
+            "title": "Width",
+            "type": "integer"
+          },
+          "height": {
+            "default": 1024,
+            "description": "Target height the prompt is rewritten for.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 1024,
+            "orig_required": false,
+            "title": "Height",
+            "type": "integer"
+          },
+          "temperature": {
+            "default": 0.6,
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 2.0,
+            "minimum": 0.0,
+            "orig_default": 0.6,
+            "orig_required": false,
+            "title": "Temperature",
+            "type": "number"
+          },
+          "top_p": {
+            "default": 0.95,
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "orig_default": 0.95,
+            "orig_required": false,
+            "title": "Top P",
+            "type": "number"
+          },
+          "type": {
+            "const": "ernie_image_prompt_enhancer",
+            "default": "ernie_image_prompt_enhancer",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["prompt", "ernie-image"],
+        "title": "Prompt Enhancer - ERNIE-Image",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/StringOutput"
+        }
+      },
       "ErnieImageTextEncoderInvocation": {
         "category": "conditioning",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Encodes a prompt for ERNIE-Image generation, optionally rewriting it via the\nbundled prompt-enhancer (Ministral3ForCausalLM) before tokenization.",
+        "description": "Encodes a prompt for ERNIE-Image generation.\n\nRewriting a prompt with the pipeline's bundled prompt-enhancer is the separate\n`ernie_image_prompt_enhancer` node; connect its output to `prompt` to enhance. Keeping the two\napart is what lets this node stay `idle_gpu_offloadable` \u2014 see that node's decorator for why the\nenhancer must not be.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -25784,75 +25908,6 @@
             "orig_required": true,
             "title": "Text Encoder"
           },
-          "prompt_enhancer": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/PromptEnhancerField"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "If connected and `use_prompt_enhancer` is true, the PE model rewrites the prompt before encoding.",
-            "field_kind": "input",
-            "input": "connection",
-            "orig_default": null,
-            "orig_required": false,
-            "title": "Prompt Enhancer"
-          },
-          "use_prompt_enhancer": {
-            "default": true,
-            "description": "Whether to run the prompt-enhancer (no-op if no PE field is connected).",
-            "field_kind": "input",
-            "input": "any",
-            "orig_default": true,
-            "orig_required": false,
-            "title": "Use Prompt Enhancer",
-            "type": "boolean"
-          },
-          "pe_width": {
-            "default": 1024,
-            "description": "Target width passed to the prompt enhancer.",
-            "field_kind": "input",
-            "input": "any",
-            "orig_default": 1024,
-            "orig_required": false,
-            "title": "Pe Width",
-            "type": "integer"
-          },
-          "pe_height": {
-            "default": 1024,
-            "description": "Target height passed to the prompt enhancer.",
-            "field_kind": "input",
-            "input": "any",
-            "orig_default": 1024,
-            "orig_required": false,
-            "title": "Pe Height",
-            "type": "integer"
-          },
-          "pe_temperature": {
-            "default": 0.6,
-            "field_kind": "input",
-            "input": "any",
-            "maximum": 2.0,
-            "minimum": 0.0,
-            "orig_default": 0.6,
-            "orig_required": false,
-            "title": "Pe Temperature",
-            "type": "number"
-          },
-          "pe_top_p": {
-            "default": 0.95,
-            "field_kind": "input",
-            "input": "any",
-            "maximum": 1.0,
-            "minimum": 0.0,
-            "orig_default": 0.95,
-            "orig_required": false,
-            "title": "Pe Top P",
-            "type": "number"
-          },
           "type": {
             "const": "ernie_image_text_encoder",
             "default": "ernie_image_text_encoder",
@@ -25865,7 +25920,7 @@
         "tags": ["prompt", "conditioning", "ernie-image"],
         "title": "Prompt - ERNIE-Image",
         "type": "object",
-        "version": "1.0.0",
+        "version": "2.0.0",
         "output": {
           "$ref": "#/components/schemas/ErnieImageConditioningOutput"
         }
@@ -33866,6 +33921,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/ErnieImageModelLoaderInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/ErnieImagePromptEnhancerInvocation"
                 },
                 {
                   "$ref": "#/components/schemas/ErnieImageTextEncoderInvocation"
@@ -42382,6 +42440,9 @@
                 "$ref": "#/components/schemas/ErnieImageModelLoaderInvocation"
               },
               {
+                "$ref": "#/components/schemas/ErnieImagePromptEnhancerInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/ErnieImageTextEncoderInvocation"
               },
               {
@@ -43709,6 +43770,9 @@
                 "$ref": "#/components/schemas/ErnieImageModelLoaderInvocation"
               },
               {
+                "$ref": "#/components/schemas/ErnieImagePromptEnhancerInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/ErnieImageTextEncoderInvocation"
               },
               {
@@ -44647,6 +44711,9 @@
           "ernie_image_model_loader": {
             "$ref": "#/components/schemas/ErnieImageModelLoaderOutput"
           },
+          "ernie_image_prompt_enhancer": {
+            "$ref": "#/components/schemas/StringOutput"
+          },
           "ernie_image_text_encoder": {
             "$ref": "#/components/schemas/ErnieImageConditioningOutput"
           },
@@ -45445,6 +45512,7 @@
           "dynamic_prompt",
           "ernie_image_denoise",
           "ernie_image_model_loader",
+          "ernie_image_prompt_enhancer",
           "ernie_image_text_encoder",
           "ernie_image_vae_decode",
           "esrgan",
@@ -45933,6 +46001,9 @@
               },
               {
                 "$ref": "#/components/schemas/ErnieImageModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/ErnieImagePromptEnhancerInvocation"
               },
               {
                 "$ref": "#/components/schemas/ErnieImageTextEncoderInvocation"
@@ -46975,6 +47046,9 @@
               },
               {
                 "$ref": "#/components/schemas/ErnieImageModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/ErnieImagePromptEnhancerInvocation"
               },
               {
                 "$ref": "#/components/schemas/ErnieImageTextEncoderInvocation"
