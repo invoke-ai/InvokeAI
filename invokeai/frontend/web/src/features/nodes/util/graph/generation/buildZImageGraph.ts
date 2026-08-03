@@ -40,7 +40,7 @@ import { UnsupportedGenerationModeError } from 'features/nodes/util/graph/types'
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { t } from 'i18next';
 import type { Invocation } from 'services/api/types';
-import { isNonRefinerMainModelConfig } from 'services/api/types';
+import { isNonRefinerMainModelConfig, isSelfContainedSDNQPipeline } from 'services/api/types';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
@@ -64,12 +64,10 @@ export const buildZImageGraph = async (arg: GraphBuilderArg): Promise<GraphBuild
   // encoder (text_encoder + tokenizer) as submodels of the main model. In that case the
   // z_image_model_loader falls back to the main model for those submodels, so no separate component
   // source is required. A truthy submodels dict is not enough — a partial pipeline may expose only
-  // some submodels — so require the specific ones the loader needs. Single-file / GGUF Z-Image
-  // models don't have submodels and still need a standalone VAE + Qwen3 (or Qwen3 Source).
-  const zImageSubmodels = (model as { submodels?: Record<string, unknown> }).submodels;
+  // some submodels — so require every one the loader needs. Single-file / GGUF Z-Image models don't
+  // have submodels and still need a standalone VAE + Qwen3 (or Qwen3 Source).
   const mainIsSelfContainedPipeline =
-    (model as { format?: unknown }).format === 'sdnq_quantized' &&
-    Boolean(zImageSubmodels?.vae && zImageSubmodels?.text_encoder && zImageSubmodels?.tokenizer);
+    (model as { format?: unknown }).format === 'sdnq_quantized' && isSelfContainedSDNQPipeline(model);
 
   // Validate that we have the required models
   const hasVaeSource = mainIsSelfContainedPipeline || zImageVaeModel !== null || zImageQwen3SourceModel !== null;

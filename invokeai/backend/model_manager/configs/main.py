@@ -2219,6 +2219,42 @@ _QWEN_TOKENIZER_CLASS_NAMES = {"Qwen2Tokenizer", "Qwen2TokenizerFast"}
 # complete even though the loader would fail, so discovery narrows to the loadable Qwen3 set.
 _SDNQ_PIPELINE_TEXT_ENCODER_CLASS_NAMES = _SDNQ_LOADABLE_QWEN_ARCHITECTURES
 
+# Files a pipeline component folder must actually ship to be loadable. Weight-bearing components
+# (transformer / text_encoder / vae) are loaded with a `from_pretrained`-style call that needs both a
+# config and at least one weight file; the tokenizer folder carries no weights, only its vocab/config.
+_COMPONENT_CONFIG_FILENAMES = ("config.json", "model_index.json")
+_COMPONENT_WEIGHT_SUFFIXES = (".safetensors", ".bin", ".pt", ".pth", ".ckpt", ".gguf")
+_TOKENIZER_FILENAMES = (
+    "tokenizer.json",
+    "tokenizer_config.json",
+    "tokenizer.model",
+    "vocab.json",
+    "merges.txt",
+    "spiece.model",
+)
+
+
+def _sdnq_component_dir_is_populated(component_path: Path, submodel_type: SubModelType) -> bool:
+    """True if `component_path` holds the files the component's loader needs.
+
+    An existing-but-empty folder is not enough: an interrupted download leaves the component
+    directories created but empty (or holding only a partial file), and recording such a component as
+    a submodel makes is_self_contained_sdnq_pipeline() report the pipeline as complete. Readiness then
+    permits generation and the invocations select the main model as the component source, and the
+    failure only surfaces when the loader tries to read the empty vae/ text_encoder/ tokenizer/ folder.
+    """
+    if not component_path.is_dir():
+        return False
+
+    if submodel_type is SubModelType.Tokenizer:
+        return any((component_path / name).is_file() for name in _TOKENIZER_FILENAMES)
+
+    has_config = any((component_path / name).is_file() for name in _COMPONENT_CONFIG_FILENAMES)
+    has_weights = any(
+        entry.is_file() and entry.suffix in _COMPONENT_WEIGHT_SUFFIXES for entry in component_path.iterdir()
+    )
+    return has_config and has_weights
+
 
 class Main_SDNQ_Diffusers_Flux2_Config(Main_Config_Base, Config_Base):
     """Model config for SDNQ-quantized FLUX.2 models in diffusers format
@@ -2325,41 +2361,33 @@ class Main_SDNQ_Diffusers_Flux2_Config(Main_Config_Base, Config_Base):
             if class_name is None:
                 continue
 
-            # model_index.json only advertises which components a pipeline *should* have; a partial
-            # download can retain the original index while missing component folders. Record a
-            # submodel only when its subfolder actually exists on disk, otherwise a partial pipeline
-            # is treated as self-contained (is_self_contained_sdnq_pipeline) and the loaders later
-            # request fixed vae/ text_encoder/ tokenizer/ subfolders that aren't there.
-            if not (mod.path / key).is_dir():
-                continue
-
             match class_name:
                 case "Flux2Transformer2DModel":
-                    submodels[SubModelType.Transformer] = SubmodelDefinition(
-                        path_or_prefix=(mod.path / key).resolve().as_posix(),
-                        model_type=ModelType.Main,
-                        variant=None,
-                    )
+                    submodel_type, model_type = SubModelType.Transformer, ModelType.Main
                 case name if name in _SDNQ_PIPELINE_TEXT_ENCODER_CLASS_NAMES:
-                    submodels[SubModelType.TextEncoder] = SubmodelDefinition(
-                        path_or_prefix=(mod.path / key).resolve().as_posix(),
-                        model_type=ModelType.Qwen3Encoder,
-                        variant=None,
-                    )
+                    submodel_type, model_type = SubModelType.TextEncoder, ModelType.Qwen3Encoder
                 case name if name in _QWEN_TOKENIZER_CLASS_NAMES:
-                    submodels[SubModelType.Tokenizer] = SubmodelDefinition(
-                        path_or_prefix=(mod.path / key).resolve().as_posix(),
-                        model_type=ModelType.Qwen3Encoder,
-                        variant=None,
-                    )
+                    submodel_type, model_type = SubModelType.Tokenizer, ModelType.Qwen3Encoder
                 case "AutoencoderKLFlux2" | "AutoencoderKL":
-                    submodels[SubModelType.VAE] = SubmodelDefinition(
-                        path_or_prefix=(mod.path / key).resolve().as_posix(),
-                        model_type=ModelType.VAE,
-                        variant=None,
-                    )
+                    submodel_type, model_type = SubModelType.VAE, ModelType.VAE
                 case _:
-                    pass
+                    continue
+
+            # model_index.json only advertises which components a pipeline *should* have; a partial or
+            # interrupted download can retain the original index while its component folders are
+            # missing or still empty. Record a submodel only when the folder actually holds the files
+            # its loader needs, otherwise a partial pipeline is treated as self-contained
+            # (is_self_contained_sdnq_pipeline) and the loaders later request fixed vae/ text_encoder/
+            # tokenizer/ subfolders that have nothing to load.
+            component_path = mod.path / key
+            if not _sdnq_component_dir_is_populated(component_path, submodel_type):
+                continue
+
+            submodels[submodel_type] = SubmodelDefinition(
+                path_or_prefix=component_path.resolve().as_posix(),
+                model_type=model_type,
+                variant=None,
+            )
 
         return submodels
 
@@ -2457,39 +2485,30 @@ class Main_SDNQ_Diffusers_ZImage_Config(Main_Config_Base, Config_Base):
             if class_name is None:
                 continue
 
-            # See the FLUX.2 _get_submodels note: only record a component the pipeline actually
-            # ships on disk, so a partial download with a complete model_index.json isn't
-            # mis-classified as a self-contained SDNQ pipeline.
-            if not (mod.path / key).is_dir():
-                continue
-
             match class_name:
                 case "ZImageTransformer2DModel":
-                    submodels[SubModelType.Transformer] = SubmodelDefinition(
-                        path_or_prefix=(mod.path / key).resolve().as_posix(),
-                        model_type=ModelType.Main,
-                        variant=None,
-                    )
+                    submodel_type, model_type = SubModelType.Transformer, ModelType.Main
                 case name if name in _SDNQ_PIPELINE_TEXT_ENCODER_CLASS_NAMES:
-                    submodels[SubModelType.TextEncoder] = SubmodelDefinition(
-                        path_or_prefix=(mod.path / key).resolve().as_posix(),
-                        model_type=ModelType.Qwen3Encoder,
-                        variant=None,
-                    )
+                    submodel_type, model_type = SubModelType.TextEncoder, ModelType.Qwen3Encoder
                 case name if name in _QWEN_TOKENIZER_CLASS_NAMES:
-                    submodels[SubModelType.Tokenizer] = SubmodelDefinition(
-                        path_or_prefix=(mod.path / key).resolve().as_posix(),
-                        model_type=ModelType.Qwen3Encoder,
-                        variant=None,
-                    )
+                    submodel_type, model_type = SubModelType.Tokenizer, ModelType.Qwen3Encoder
                 case "AutoencoderKL":
-                    submodels[SubModelType.VAE] = SubmodelDefinition(
-                        path_or_prefix=(mod.path / key).resolve().as_posix(),
-                        model_type=ModelType.VAE,
-                        variant=None,
-                    )
+                    submodel_type, model_type = SubModelType.VAE, ModelType.VAE
                 case _:
-                    pass
+                    continue
+
+            # See the FLUX.2 _get_submodels note: only record a component whose folder actually holds
+            # the files its loader needs, so a partial download with a complete model_index.json isn't
+            # mis-classified as a self-contained SDNQ pipeline.
+            component_path = mod.path / key
+            if not _sdnq_component_dir_is_populated(component_path, submodel_type):
+                continue
+
+            submodels[submodel_type] = SubmodelDefinition(
+                path_or_prefix=component_path.resolve().as_posix(),
+                model_type=model_type,
+                variant=None,
+            )
 
         return submodels
 

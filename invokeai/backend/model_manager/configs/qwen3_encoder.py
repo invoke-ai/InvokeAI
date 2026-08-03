@@ -597,19 +597,31 @@ class Qwen3Encoder_SDNQ_Folder_Config(Config_Base):
                 "(only Qwen3ForCausalLM is supported)"
             )
 
-        # Fallback for folders without a usable config.json architecture: check for Qwen3-specific
-        # state-dict keys (model.layers. / model.embed_tokens.weight). An SDNQ transformer/VAE folder
-        # has transformer_blocks. / decoder. keys instead and is correctly rejected. Loading the state
-        # dict can raise for sharded folders (multiple weight files), so treat that as "no usable
-        # signal" rather than letting it abort identification.
+        # Fallback for folders without a usable config.json architecture: check the state dict. The
+        # generic Qwen keys (model.layers. / model.embed_tokens.weight) are NOT enough — Qwen2 and
+        # Qwen2-VL folders carry exactly the same ones, and the loader reconstructs a text-only
+        # Qwen3ForCausalLM that fails on Qwen2's missing q/k-norm params and on Qwen-VL's visual
+        # tower. Mirror the single-file path: reject a bundled visual tower and require the
+        # Qwen3-only q/k-norm weights. An SDNQ transformer/VAE folder has transformer_blocks. /
+        # decoder. keys instead and is rejected by both checks. Loading the state dict can raise for
+        # sharded folders (multiple weight files), so treat that as "no usable signal" rather than
+        # letting it abort identification.
         try:
             state_dict = mod.load_state_dict()
         except Exception:
             state_dict = {}
-        if _has_qwen3_keys(state_dict):
+
+        if _has_qwen_vl_visual_tower(state_dict):
+            raise NotAMatchError(
+                "state dict bundles a Qwen-VL visual tower; this is a Qwen-VL encoder, not a text-only Qwen3 encoder"
+            )
+        if _has_qwen3_specific_keys(state_dict):
             return
 
-        raise NotAMatchError("directory does not look like a Qwen3 encoder (no Qwen3 config class or keys)")
+        raise NotAMatchError(
+            "directory does not look like a Qwen3 encoder (no Qwen3 config class, and no Qwen3-only "
+            "q_norm/k_norm keys in the state dict)"
+        )
 
     @classmethod
     def _get_variant_from_dir(cls, mod: ModelOnDisk) -> Qwen3VariantType:

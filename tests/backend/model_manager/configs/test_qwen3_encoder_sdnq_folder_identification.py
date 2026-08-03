@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 import torch
-from safetensors.torch import save_file
+from safetensors.torch import load_file, save_file
 
 from invokeai.backend.model_manager.configs.factory import ModelConfigFactory
 from invokeai.backend.model_manager.configs.identification_utils import NotAMatchError
@@ -118,6 +118,38 @@ def _make_sdnq_sharded_qwen2_encoder_folder(root: Path) -> Path:
     return root
 
 
+def _make_configless_sdnq_qwen2_encoder_folder(root: Path, include_visual: bool = False) -> Path:
+    """A configless Qwen2 or Qwen2-VL folder that shares generic Qwen state-dict keys."""
+    root.mkdir(parents=True, exist_ok=True)
+    _write_sdnq_marker(root)
+    weights = {
+        "model.embed_tokens.weight": torch.zeros(1000, 2560, dtype=torch.uint8),
+        "model.embed_tokens.scale": torch.zeros(1000, 1, dtype=torch.float32),
+        "model.layers.0.self_attn.q_proj.weight": torch.zeros(64, 32, dtype=torch.uint8),
+        "model.layers.0.self_attn.q_proj.scale": torch.zeros(64, 1, dtype=torch.float32),
+        "model.layers.0.self_attn.k_proj.weight": torch.zeros(64, 32, dtype=torch.uint8),
+        "model.layers.0.self_attn.k_proj.scale": torch.zeros(64, 1, dtype=torch.float32),
+        "model.layers.0.mlp.gate_proj.weight": torch.zeros(64, 32, dtype=torch.uint8),
+        "model.layers.0.mlp.gate_proj.scale": torch.zeros(64, 1, dtype=torch.float32),
+    }
+    if include_visual:
+        weights["visual.patch_embed.proj.weight"] = torch.zeros(64, 32, dtype=torch.uint8)
+        weights["visual.patch_embed.proj.scale"] = torch.zeros(64, 1, dtype=torch.float32)
+    save_file(weights, str(root / "model.safetensors"))
+    return root
+
+
+def _make_configless_sdnq_qwen3_encoder_folder(root: Path) -> Path:
+    """A configless Qwen3 folder: same generic Qwen keys as the Qwen2 folder above, plus the
+    Qwen3-only q/k-norm weights that tell the two apart."""
+    root = _make_configless_sdnq_qwen2_encoder_folder(root)
+    weights = load_file(str(root / "model.safetensors"))
+    weights["model.layers.0.self_attn.q_norm.weight"] = torch.zeros(128, dtype=torch.float32)
+    weights["model.layers.0.self_attn.k_norm.weight"] = torch.zeros(128, dtype=torch.float32)
+    save_file(weights, str(root / "model.safetensors"))
+    return root
+
+
 def _make_sdnq_causal_lm_folder(root: Path) -> Path:
     """An SDNQ complete causal LM (config.json + tokenizer files at root) — a TextLLM, not an
     encoder subfolder."""
@@ -182,6 +214,30 @@ class TestQwen3EncoderSDNQFolderIdentification:
 
         result = ModelConfigFactory.from_model_on_disk(root, allow_unknown=True)
         assert not isinstance(result.config, Qwen3Encoder_SDNQ_Folder_Config)
+
+    @pytest.mark.parametrize("include_visual", [False, True], ids=["qwen2", "qwen2-vl"])
+    def test_configless_qwen2_encoder_is_rejected(self, tmp_path: Path, include_visual: bool):
+        """Without a config.json the generic Qwen keys (model.layers.* / model.embed_tokens.weight)
+        are the only signal, and Qwen2 and Qwen2-VL folders carry exactly those. The loader builds a
+        text-only Qwen3ForCausalLM, so both must be rejected at identification time."""
+        root = _make_configless_sdnq_qwen2_encoder_folder(tmp_path / "sdnq-configless-qwen2", include_visual)
+        mod = ModelOnDisk(root)
+
+        with pytest.raises(NotAMatchError):
+            Qwen3Encoder_SDNQ_Folder_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS, "path": root.as_posix()})
+
+        result = ModelConfigFactory.from_model_on_disk(root, allow_unknown=True)
+        assert not isinstance(result.config, Qwen3Encoder_SDNQ_Folder_Config)
+
+    def test_configless_qwen3_encoder_is_still_accepted(self, tmp_path: Path):
+        """The counterpart to the rejections above: a configless folder carrying the Qwen3-only
+        q/k-norm weights is a genuine Qwen3 encoder and must still be accepted."""
+        root = _make_configless_sdnq_qwen3_encoder_folder(tmp_path / "sdnq-configless-qwen3")
+        mod = ModelOnDisk(root)
+
+        config = Qwen3Encoder_SDNQ_Folder_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS, "path": root.as_posix()})
+        assert config.type is ModelType.Qwen3Encoder
+        assert config.format.value == "sdnq_quantized"
 
     def test_factory_resolves_sdnq_qwen3_folder_deterministically(self, tmp_path: Path):
         """With the plain config rejecting SDNQ, the factory resolves the folder unambiguously to

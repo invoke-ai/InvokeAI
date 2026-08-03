@@ -46,7 +46,7 @@ import { atom, computed } from 'nanostores';
 import { useEffect } from 'react';
 import { selectFlux2DiffusersModels } from 'services/api/hooks/modelsByType';
 import type { MainOrExternalModelConfig } from 'services/api/types';
-import { isExternalApiModelConfig } from 'services/api/types';
+import { isExternalApiModelConfig, isSelfContainedSDNQPipeline } from 'services/api/types';
 import { $isConnected } from 'services/events/stores';
 
 /**
@@ -304,15 +304,13 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
   if (model?.base === 'flux2') {
     // A FLUX.2 Klein model is a self-sufficient source when its config exposes the diffusers-style
     // submodels (transformer/vae/text_encoder/tokenizer). Plain Diffusers pipelines always do; an
-    // SDNQ pipeline qualifies only when it ships the VAE + Qwen3 (text_encoder + tokenizer) submodels
-    // — a truthy submodels dict is not enough, since a partial pipeline may expose only the
-    // transformer and the backend would then request missing fixed subfolders. Single-file / GGUF
-    // Klein models have no submodels and need a standalone VAE + Qwen3 (or a diffusers source).
-    const flux2Submodels = (model as { submodels?: Record<string, unknown> }).submodels;
+    // SDNQ pipeline qualifies only when it ships all of them — a truthy submodels dict is not enough,
+    // since a partial pipeline may expose only the transformer and the backend would then request
+    // missing fixed subfolders. Single-file / GGUF Klein models have no submodels and need a
+    // standalone VAE + Qwen3 (or a diffusers source).
     const mainIsPipeline =
       model.format === 'diffusers' ||
-      ((model as { format?: unknown }).format === 'sdnq_quantized' &&
-        Boolean(flux2Submodels?.vae && flux2Submodels?.text_encoder && flux2Submodels?.tokenizer));
+      ((model as { format?: unknown }).format === 'sdnq_quantized' && isSelfContainedSDNQPipeline(model));
     if (!mainIsPipeline) {
       if (!params.kleinVaeModel && !hasFlux2DiffusersVaeSource) {
         reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinVaeModelSelected') });
@@ -426,12 +424,10 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     // An SDNQ-quantized Z-Image pipeline install is self-contained: it ships the VAE and Qwen3
     // encoder (text_encoder + tokenizer) as submodels of the main model, so no separate component
     // source is required. A truthy submodels dict is not enough — a partial pipeline may expose only
-    // some submodels — so require the specific ones the loader needs. Single-file / GGUF Z-Image
-    // models don't have submodels and still need a standalone VAE + Qwen3 (or a Qwen3 Source model).
-    const zImageSubmodels = (model as { submodels?: Record<string, unknown> }).submodels;
+    // some submodels — so require every one the loader needs. Single-file / GGUF Z-Image models
+    // don't have submodels and still need a standalone VAE + Qwen3 (or a Qwen3 Source model).
     const mainIsSelfContainedPipeline =
-      (model as { format?: unknown }).format === 'sdnq_quantized' &&
-      Boolean(zImageSubmodels?.vae && zImageSubmodels?.text_encoder && zImageSubmodels?.tokenizer);
+      (model as { format?: unknown }).format === 'sdnq_quantized' && isSelfContainedSDNQPipeline(model);
     if (!mainIsSelfContainedPipeline) {
       // Check if VAE source is available (either separate VAE or Qwen3 Source)
       const hasVaeSource = params.zImageVaeModel !== null || params.zImageQwen3SourceModel !== null;
@@ -794,14 +790,12 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   if (model?.base === 'flux2') {
     // A FLUX.2 Klein model is a self-sufficient source when its config exposes the diffusers-style
     // submodels. Plain Diffusers pipelines always do; an SDNQ pipeline qualifies only when it ships
-    // the VAE + Qwen3 (text_encoder + tokenizer) submodels — a truthy submodels dict is not enough,
-    // since a partial pipeline may expose only the transformer and the backend would then request
-    // missing fixed subfolders. Mirrors the generate-tab check so both tabs behave identically.
-    const flux2Submodels = (model as { submodels?: Record<string, unknown> }).submodels;
+    // all of them — a truthy submodels dict is not enough, since a partial pipeline may expose only
+    // the transformer and the backend would then request missing fixed subfolders. Mirrors the
+    // generate-tab check so both tabs behave identically.
     const mainIsPipeline =
       model.format === 'diffusers' ||
-      ((model as { format?: unknown }).format === 'sdnq_quantized' &&
-        Boolean(flux2Submodels?.vae && flux2Submodels?.text_encoder && flux2Submodels?.tokenizer));
+      ((model as { format?: unknown }).format === 'sdnq_quantized' && isSelfContainedSDNQPipeline(model));
     // VAE is shared across variants, but Qwen3 encoder requires a variant-matching diffusers model.
     if (!mainIsPipeline) {
       if (!params.kleinVaeModel && !hasFlux2DiffusersVaeSource) {
@@ -1168,12 +1162,10 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     // An SDNQ-quantized Z-Image pipeline install is self-contained: it ships the VAE and Qwen3
     // encoder (text_encoder + tokenizer) as submodels of the main model, so no separate component
     // source is required. A truthy submodels dict is not enough — a partial pipeline may expose only
-    // some submodels — so require the specific ones the loader needs. Single-file / GGUF Z-Image
-    // models don't have submodels and still need a standalone VAE + Qwen3 (or a Qwen3 Source model).
-    const zImageSubmodels = (model as { submodels?: Record<string, unknown> }).submodels;
+    // some submodels — so require every one the loader needs. Single-file / GGUF Z-Image models
+    // don't have submodels and still need a standalone VAE + Qwen3 (or a Qwen3 Source model).
     const mainIsSelfContainedPipeline =
-      (model as { format?: unknown }).format === 'sdnq_quantized' &&
-      Boolean(zImageSubmodels?.vae && zImageSubmodels?.text_encoder && zImageSubmodels?.tokenizer);
+      (model as { format?: unknown }).format === 'sdnq_quantized' && isSelfContainedSDNQPipeline(model);
     if (!mainIsSelfContainedPipeline) {
       // Check if VAE source is available (either separate VAE or Qwen3 Source)
       const hasVaeSource = params.zImageVaeModel !== null || params.zImageQwen3SourceModel !== null;

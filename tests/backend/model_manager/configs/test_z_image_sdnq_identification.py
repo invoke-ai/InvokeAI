@@ -16,6 +16,8 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+import torch
+from safetensors.torch import save_file
 
 from invokeai.backend.model_manager.configs.factory import ModelConfigFactory
 from invokeai.backend.model_manager.configs.identification_utils import NotAMatchError
@@ -61,6 +63,15 @@ def _make_sdnq_zimage_pipeline_folder(root: Path) -> Path:
     # The SDNQ marker: quant_method == "sdnq".
     (transformer_dir / "quantization_config.json").write_text(
         json.dumps({"quant_method": "sdnq", "weights_dtype": "uint4", "group_size": 128}), encoding="utf-8"
+    )
+    # Submodel discovery only records a component whose folder actually holds loadable files, so the
+    # transformer needs its weights alongside the config.
+    save_file(
+        {
+            "transformer_blocks.0.attn.to_q.weight": torch.zeros(64, 32, dtype=torch.uint8),
+            "transformer_blocks.0.attn.to_q.scale": torch.zeros(64, 1, dtype=torch.float32),
+        },
+        str(transformer_dir / "diffusion_pytorch_model.safetensors"),
     )
 
     scheduler_dir = root / "scheduler"

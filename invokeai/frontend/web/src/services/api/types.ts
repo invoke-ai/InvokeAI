@@ -526,6 +526,32 @@ export const isFluxFillMainModelModelConfig = (config: AnyModelConfig): config i
   return config.type === 'main' && config.base === 'flux' && config.variant === 'dev_fill';
 };
 
+/**
+ * The submodels an SDNQ pipeline install must expose before it can act as a component source.
+ * Mirrors `_REQUIRED_PIPELINE_SUBMODELS` / `is_self_contained_sdnq_pipeline()` in
+ * `invokeai/app/invocations/model.py` — the frontend and the backend must agree on what "complete"
+ * means, or the graph builders offer a source the invocation validation then rejects.
+ */
+const SDNQ_PIPELINE_REQUIRED_SUBMODELS = ['transformer', 'vae', 'text_encoder', 'tokenizer'] as const;
+
+/**
+ * True if an SDNQ pipeline config ships every component its loaders read from a fixed subfolder.
+ *
+ * A truthy `submodels` map is not enough: a partial pipeline can expose only the transformer, and a
+ * malformed model_index.json can expose the components while omitting the transformer. Either would
+ * otherwise be offered in the source pickers, auto-selected by the graph builders, and only rejected
+ * by the backend after graph construction.
+ */
+export const isSelfContainedSDNQPipeline = (config: AnyModelConfig): boolean => {
+  const submodels = (config as { submodels?: unknown }).submodels;
+  if (typeof submodels !== 'object' || submodels === null) {
+    return false;
+  }
+  return SDNQ_PIPELINE_REQUIRED_SUBMODELS.every((submodel) =>
+    Boolean((submodels as Record<string, unknown>)[submodel])
+  );
+};
+
 export const isZImageDiffusersMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   if (config.type !== 'main' || config.base !== 'z-image') {
     return false;
@@ -539,12 +565,11 @@ export const isZImageDiffusersMainModelConfig = (config: AnyModelConfig): config
   }
   // SDNQ-quantized ZImagePipeline folders carry the same submodels layout (transformer, vae,
   // text_encoder, ...) as a plain diffusers ZImagePipeline. Single-file SDNQ Z-Image
-  // checkpoints have no submodels and must not match here.
+  // checkpoints have no submodels and must not match here, and neither may a partial pipeline.
   if (format !== 'sdnq_quantized') {
     return false;
   }
-  const submodels = (config as { submodels?: unknown }).submodels;
-  return Boolean(submodels);
+  return isSelfContainedSDNQPipeline(config);
 };
 
 export const isFlux2DiffusersMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
@@ -560,8 +585,7 @@ export const isFlux2DiffusersMainModelConfig = (config: AnyModelConfig): config 
   if (format !== 'sdnq_quantized') {
     return false;
   }
-  const submodels = (config as { submodels?: unknown }).submodels;
-  return Boolean(submodels);
+  return isSelfContainedSDNQPipeline(config);
 };
 
 export const isQwenImageDiffusersMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
