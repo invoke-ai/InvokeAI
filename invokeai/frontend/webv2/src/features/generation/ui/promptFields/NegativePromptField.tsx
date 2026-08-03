@@ -178,7 +178,12 @@ export const NegativePromptField = ({
   const exitViewMode = useCallback(() => onTemplateViewModeChange?.(false), [onTemplateViewModeChange]);
 
   return (
-    <Field label={t('widgets.generate.negativePrompt')} labelEnd={labelEnd} helpText={isEnabled ? helpText : undefined}>
+    <Field
+      hint="negativePrompt"
+      label={t('widgets.generate.negativePrompt')}
+      labelEnd={labelEnd}
+      helpText={isEnabled ? helpText : undefined}
+    >
       {isEnabled ? (
         <>
           <PromptTextarea

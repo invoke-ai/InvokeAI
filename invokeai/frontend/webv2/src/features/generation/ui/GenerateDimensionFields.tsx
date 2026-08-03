@@ -243,7 +243,7 @@ export const GenerateDimensionFields = ({
       defaultOpen
       sectionId="dimensions"
     >
-      <Field label={t('widgets.generate.aspectRatio')} p="2">
+      <Field hint="aspectRatio" label={t('widgets.generate.aspectRatio')} p="2">
         <HStack gap="1">
           <AspectRatioSelect
             fallbackRatio={dimensionRatio}
@@ -276,6 +276,7 @@ export const GenerateDimensionFields = ({
       <HStack alignItems="flex-start" gap="2" p="2">
         <Stack w="full">
           <Field
+            hint="width"
             label={t('widgets.generate.width')}
             helpText={t('widgets.generate.multipleOf', { value: dimensionGrid })}
           >
@@ -312,6 +313,7 @@ export const GenerateDimensionFields = ({
             </NumberInput.Root>
           </Field>
           <Field
+            hint="height"
             label={t('widgets.generate.height')}
             helpText={t('widgets.generate.multipleOf', { value: dimensionGrid })}
           >

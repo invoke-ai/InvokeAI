@@ -408,7 +408,6 @@ const BehaviorSection = () => {
       />
       <SettingToggle
         checked={enableInformationalPopovers}
-        comingSoon
         description="Show educational popovers on controls that have extra guidance."
         label="Enable informational popovers"
         onChange={updateEnableInformationalPopovers}

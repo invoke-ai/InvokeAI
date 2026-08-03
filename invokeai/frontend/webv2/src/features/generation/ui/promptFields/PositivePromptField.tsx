@@ -262,7 +262,7 @@ export const PositivePromptField = ({
   const exitViewMode = useCallback(() => onTemplateViewModeChange?.(false), [onTemplateViewModeChange]);
 
   return (
-    <Field label={t('common.prompt')} labelEnd={labelEnd}>
+    <Field hint="positivePrompt" label={t('common.prompt')} labelEnd={labelEnd}>
       <Box ref={setImageDropRef} position="relative">
         <PromptTextarea
           {...PROMPT_ATTENTION_TARGET_PROPS}

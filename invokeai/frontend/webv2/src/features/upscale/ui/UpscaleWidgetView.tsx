@@ -3,6 +3,7 @@ import type { GenerateLora, MainModelConfig, PromptHistoryItem } from '@features
 import type { ProjectPromptDraft, ProjectPromptDraftPatch } from '@features/generation/settings';
 import type { ModelConfig } from '@features/models';
 import type { UpscaleWidgetValues } from '@features/upscale/core/types';
+import type { FeatureHintId } from '@platform/ui/hints';
 import type { ChangeEvent } from 'react';
 
 import {
@@ -265,6 +266,7 @@ const NumericSliderField = ({
   error,
   formatValue,
   helpText,
+  hint,
   label,
   marks,
   numberMax,
@@ -278,6 +280,7 @@ const NumericSliderField = ({
   error?: string;
   formatValue?: (value: number) => string;
   helpText?: string;
+  hint?: FeatureHintId;
   label: string;
   marks?: number[];
   numberMax: number;
@@ -288,7 +291,7 @@ const NumericSliderField = ({
   step: number;
   value: number;
 }) => (
-  <Field error={error} helpText={helpText} label={label}>
+  <Field error={error} helpText={helpText} hint={hint} label={label}>
     <HStack align="center" gap="3">
       <Slider
         aria-label={[label]}
@@ -640,6 +643,7 @@ export const UpscaleWidgetView = () => {
           <Field
             error={values.upscaleModel ? undefined : t('widgets.upscale.spandrelModelRequired')}
             helpText={values.upscaleModel ? t('widgets.upscale.spandrelModelHelp') : undefined}
+            hint="upscaleModel"
             label={t('widgets.upscale.spandrelModel')}
           >
             <ModelSelect
@@ -655,6 +659,7 @@ export const UpscaleWidgetView = () => {
             error={errors.scale}
             formatValue={(scale) => `${scale}×`}
             helpText={t('widgets.upscale.scaleHelp')}
+            hint="upscaleScale"
             label={t('widgets.upscale.scale')}
             marks={[1, 2, 4, 8, 16]}
             numberMax={UPSCALE_SCALE_MAX}
@@ -691,6 +696,7 @@ export const UpscaleWidgetView = () => {
           <NumericSliderField
             error={errors.creativity}
             helpText={t('widgets.upscale.creativityHelp')}
+            hint="creativity"
             label={t('widgets.upscale.creativity')}
             marks={[UPSCALE_CREATIVITY_MIN, 0, UPSCALE_CREATIVITY_MAX]}
             numberMax={UPSCALE_CREATIVITY_MAX}
@@ -702,6 +708,7 @@ export const UpscaleWidgetView = () => {
           <NumericSliderField
             error={errors.structure}
             helpText={t('widgets.upscale.structureHelp')}
+            hint="structure"
             label={t('widgets.upscale.structure')}
             marks={[UPSCALE_STRUCTURE_MIN, 0, UPSCALE_STRUCTURE_MAX]}
             numberMax={UPSCALE_STRUCTURE_MAX}
@@ -728,6 +735,7 @@ export const UpscaleWidgetView = () => {
         <Stack gap="3" p="2">
           <Field
             error={values.model ? undefined : t('widgets.upscale.mainModelRequired')}
+            hint="model"
             label={t('widgets.upscale.mainModel')}
           >
             <ModelSelect
@@ -741,7 +749,7 @@ export const UpscaleWidgetView = () => {
             />
           </Field>
           <SimpleGrid columns={{ base: 2, md: 3 }} gap="2">
-            <Field error={errors.steps} label={t('widgets.upscale.steps')}>
+            <Field error={errors.steps} hint="steps" label={t('widgets.upscale.steps')}>
               <NumberInput.Root
                 max={1000}
                 min={1}
@@ -753,7 +761,7 @@ export const UpscaleWidgetView = () => {
                 <NumberInput.Input fontVariantNumeric="tabular-nums" />
               </NumberInput.Root>
             </Field>
-            <Field error={errors.cfgScale} label={t('widgets.upscale.cfgScale')}>
+            <Field error={errors.cfgScale} hint="cfgScale" label={t('widgets.upscale.cfgScale')}>
               <NumberInput.Root
                 max={100}
                 min={0}
@@ -768,7 +776,7 @@ export const UpscaleWidgetView = () => {
                 <NumberInput.Input fontVariantNumeric="tabular-nums" />
               </NumberInput.Root>
             </Field>
-            <Field label={t('widgets.upscale.batchCount')}>
+            <Field hint="batchCount" label={t('widgets.upscale.batchCount')}>
               <NumberInput.Root
                 min={1}
                 size="xs"
@@ -782,7 +790,7 @@ export const UpscaleWidgetView = () => {
               </NumberInput.Root>
             </Field>
           </SimpleGrid>
-          <Field label={t('widgets.upscale.scheduler')}>
+          <Field hint="scheduler" label={t('widgets.upscale.scheduler')}>
             <Combobox
               aria-label={t('widgets.upscale.scheduler')}
               options={SCHEDULER_OPTIONS}
@@ -791,7 +799,11 @@ export const UpscaleWidgetView = () => {
               onValueChange={(scheduler) => patch({ scheduler })}
             />
           </Field>
-          <Field error={values.shouldRandomizeSeed ? undefined : errors.seed} label={t('widgets.upscale.seed')}>
+          <Field
+            error={values.shouldRandomizeSeed ? undefined : errors.seed}
+            hint="seed"
+            label={t('widgets.upscale.seed')}
+          >
             <HStack gap="2">
               <NumberInput.Root
                 disabled={values.shouldRandomizeSeed}
@@ -828,7 +840,7 @@ export const UpscaleWidgetView = () => {
               </Switch.Root>
             </HStack>
           </Field>
-          <Field label={t('widgets.upscale.addLora')}>
+          <Field hint="concepts" label={t('widgets.upscale.addLora')}>
             <ModelSelect
               excludeKeys={selectedLoraKeys}
               filter={(model) =>
@@ -890,6 +902,7 @@ export const UpscaleWidgetView = () => {
           <Field
             error={values.tileControlnetModel ? undefined : t('widgets.upscale.tileControlNetRequired')}
             helpText={values.tileControlnetModel ? t('widgets.upscale.tileControlNetHelp') : undefined}
+            hint="tileControlNet"
             label={t('widgets.upscale.tileControlNet')}
           >
             <ModelSelect
@@ -907,6 +920,7 @@ export const UpscaleWidgetView = () => {
           <NumericSliderField
             error={errors.tileSize}
             helpText={t('widgets.upscale.tileSizeHelp')}
+            hint="tileSize"
             label={t('widgets.upscale.tileSize')}
             marks={[UPSCALE_TILE_SIZE_MIN, 1024, UPSCALE_TILE_SIZE_MAX]}
             numberMax={UPSCALE_TILE_SIZE_MAX}
@@ -918,6 +932,7 @@ export const UpscaleWidgetView = () => {
           <NumericSliderField
             error={errors.tileOverlap}
             helpText={t('widgets.upscale.tileOverlapHelp')}
+            hint="tileOverlap"
             label={t('widgets.upscale.tileOverlap')}
             marks={[UPSCALE_TILE_OVERLAP_MIN, 128, 256, UPSCALE_TILE_OVERLAP_MAX]}
             numberMax={UPSCALE_TILE_OVERLAP_MAX}
@@ -927,7 +942,11 @@ export const UpscaleWidgetView = () => {
             onChange={(tileOverlap) => patch({ tileOverlap })}
           />
           <SimpleGrid columns={{ base: 1, md: 2 }} gap="2">
-            <Field label={t('widgets.upscale.vae')} helpText={values.vae ? undefined : t('widgets.upscale.bundledVae')}>
+            <Field
+              hint="vae"
+              label={t('widgets.upscale.vae')}
+              helpText={values.vae ? undefined : t('widgets.upscale.bundledVae')}
+            >
               <ModelSelect
                 filter={(model) => Boolean(values.model && model.base === values.model.base)}
                 isClearable
@@ -938,7 +957,7 @@ export const UpscaleWidgetView = () => {
                 onChange={(model) => patch({ vae: isVaeModelConfig(model) ? model : null })}
               />
             </Field>
-            <Field label={t('widgets.upscale.vaePrecision')}>
+            <Field hint="vaePrecision" label={t('widgets.upscale.vaePrecision')}>
               <Select
                 aria-label={t('widgets.upscale.vaePrecision')}
                 collection={VAE_PRECISION_COLLECTION}
@@ -955,7 +974,7 @@ export const UpscaleWidgetView = () => {
             </Field>
           </SimpleGrid>
           {values.model?.base === 'sd-1' ? (
-            <Field label={t('widgets.upscale.clipSkip')}>
+            <Field hint="clipSkip" label={t('widgets.upscale.clipSkip')}>
               <NumberInput.Root
                 max={12}
                 min={0}

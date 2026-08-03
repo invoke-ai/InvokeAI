@@ -133,6 +133,7 @@ export const GenerateAdvancedFields = ({
           {policy.sdVaeVisible ? (
             <Field
               flex="2"
+              hint="vae"
               label={t('widgets.generate.vae')}
               helpText={settings.vae ? undefined : t('widgets.generate.usingBundledVae')}
             >
@@ -155,7 +156,7 @@ export const GenerateAdvancedFields = ({
             </Field>
           ) : null}
           {policy.vaePrecisionVisible ? (
-            <Field flex="1" label={t('widgets.generate.vaePrecision')}>
+            <Field flex="1" hint="vaePrecision" label={t('widgets.generate.vaePrecision')}>
               <HStack gap="1">
                 <Select
                   aria-label={t('widgets.generate.vaePrecision')}
@@ -186,7 +187,7 @@ export const GenerateAdvancedFields = ({
       {policy.clipSkipMax || policy.cfgRescaleVisible ? (
         <Stack gap="2" p="2">
           {policy.clipSkipMax ? (
-            <Field label={t('widgets.generate.clipSkip')}>
+            <Field hint="clipSkip" label={t('widgets.generate.clipSkip')}>
               <SliderNumberField
                 ariaLabel={t('widgets.generate.clipSkip')}
                 defaultValue={modelDefaults?.clipSkip}
@@ -200,7 +201,7 @@ export const GenerateAdvancedFields = ({
             </Field>
           ) : null}
           {policy.cfgRescaleVisible ? (
-            <Field label={t('widgets.generate.cfgRescale')}>
+            <Field hint="cfgRescale" label={t('widgets.generate.cfgRescale')}>
               <SliderNumberField
                 ariaLabel={t('widgets.generate.cfgRescale')}
                 defaultValue={modelDefaults?.cfgRescaleMultiplier}
@@ -217,7 +218,7 @@ export const GenerateAdvancedFields = ({
       ) : null}
 
       {policy.colorCompensationVisible ? (
-        <Field label={t('widgets.generate.colorCompensation')} p="2">
+        <Field hint="colorCompensation" label={t('widgets.generate.colorCompensation')} p="2">
           <Switch.Root
             checked={settings.colorCompensation}
             size="sm"
@@ -233,7 +234,7 @@ export const GenerateAdvancedFields = ({
 
       {policy.pidVisible ? (
         <HStack alignItems="flex-start" gap="2" p="2">
-          <Field flex="2" label={t('widgets.generate.pid')} helpText={pidHelpText}>
+          <Field flex="2" hint="pidMode" label={t('widgets.generate.pid')} helpText={pidHelpText}>
             <Select
               aria-label={t('widgets.generate.pid')}
               collection={pidModeCollection}
@@ -266,7 +267,7 @@ export const GenerateAdvancedFields = ({
       ) : null}
 
       {policy.seamlessVisible ? (
-        <Field label={t('widgets.generate.seamlessTiling')} p="2">
+        <Field hint="seamlessTiling" label={t('widgets.generate.seamlessTiling')} p="2">
           <HStack gap="4">
             <SeamlessSwitch
               checked={settings.seamlessXAxis}
