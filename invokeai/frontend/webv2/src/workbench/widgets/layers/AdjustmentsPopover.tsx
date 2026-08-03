@@ -22,17 +22,6 @@ import { applyStructural, applyStructuralPreview } from './layerOps';
 
 const SELECT_POSITIONING = { placement: 'bottom-end', sameWidth: false } as const;
 
-/**
- * The curve editor's SVG goes through the Chakra factory so `fill`/`stroke` take
- * semantic tokens.
- *
- * Hand-written `var(--chakra-colors-bg-inset)` silently produced a solid black
- * box: Chakra emits these custom properties with the token path intact
- * (`--chakra-colors-bg.inset`, dot and all), so the hyphenated guess resolved to
- * nothing — and an unresolvable `fill` falls back to its initial value, black,
- * while `stroke` falls back to `none`. That took the grid, the border, the
- * diagonal, the curve, and the handle outlines with it.
- */
 const CurveSvg = chakra('svg');
 const CurveRect = chakra('rect');
 const CurveLine = chakra('line');
@@ -40,15 +29,6 @@ const CurveGroup = chakra('g');
 const CurvePath = chakra('path');
 const CurveHandle = chakra('circle');
 
-/**
- * Square, so the `0 0 180 180` viewBox maps 1:1 onto the element box.
- *
- * With a full-width box and a fixed height the default `preserveAspectRatio`
- * letterboxed the drawing — it rendered centred with dead space either side,
- * while `svgPointFromEvent` still mapped pointer x across the *whole* element.
- * Every horizontal hit test was therefore offset, so grabbing an interior point
- * missed it and dropping one landed at the wrong input level.
- */
 const CURVE_SVG_CSS = {
   aspectRatio: '1',
   borderRadius: 'l2',
@@ -58,14 +38,6 @@ const CURVE_SVG_CSS = {
   width: 'full',
 };
 
-/**
- * Nothing in the editor is selectable text.
- *
- * Double-clicking to add a point is a word-select gesture as far as the browser
- * is concerned, so it would latch onto the nearest text — the channel select's
- * label. The next press on a handle then dragged *that* selection instead,
- * trailing a floating "Red" across the screen and abandoning the point drag.
- */
 const CURVE_EDITOR_CSS = { userSelect: 'none' };
 const CURVE_HANDLE_CSS = { cursor: 'grab', _active: { cursor: 'grabbing' } };
 
@@ -74,7 +46,6 @@ const preventDefault = (event: { preventDefault: () => void }): void => event.pr
 type CurveChannel = 'r' | 'g' | 'b';
 const CURVE_CHANNELS: readonly CurveChannel[] = ['r', 'g', 'b'];
 
-/** The identity curve control points (diagonal). */
 const IDENTITY_CURVE: [number, number][] = [
   [0, 0],
   [255, 255],
@@ -101,19 +72,6 @@ interface AdjustmentsPopoverProps {
   layer: CanvasRasterLayerContractV2;
 }
 
-/**
- * Non-destructive raster-adjustment editor (plan §1.3): brightness / contrast /
- * saturation sliders plus a minimal per-channel curves editor and a reset. All
- * edits patch the layer's `adjustments` through the canvas undo stack
- * (`applyStructural` → `updateCanvasLayerConfig`); sliders use the same
- * draft/commit pattern as opacity (one history entry per drag). The curve math
- * lives in the pure `render/adjustments` module — this component only manages
- * control points and previews the LUT.
- *
- * Rendered inline inside the per-layer properties popover (round 3): a nested
- * popover would be an "outside interaction" for its parent and close it, so this
- * renders as a plain section rather than its own popover.
- */
 export const AdjustmentsPopover = ({ engine, layer }: AdjustmentsPopoverProps) => {
   const adjustments = layer.adjustments ?? DEFAULT_ADJUSTMENTS;
   return <AdjustmentsControls adjustments={adjustments} engine={engine} layer={layer} />;
@@ -171,7 +129,6 @@ const AdjustmentsControls = ({ adjustments, engine, layer }: AdjustmentsControls
     commit(t('widgets.layers.adjustments.reset'), { ...DEFAULT_ADJUSTMENTS }, adjustments);
   }, [adjustments, commit, t]);
 
-  // Live (render-only) during a curve-point drag: preview without pushing history.
   const handleCurveLive = useCallback(
     (channel: CurveChannel, points: [number, number][]) => {
       patchLive(withCurve(adjustments, channel, points));
@@ -181,10 +138,6 @@ const AdjustmentsControls = ({ adjustments, engine, layer }: AdjustmentsControls
 
   const handleCurveCancel = useCallback((before: CanvasAdjustmentsContract) => patchLive(before), [patchLive]);
 
-  // Single history entry per gesture (drag end, click-add, dbl-click-remove). The
-  // `before` snapshot is captured at gesture start by the editor (during a drag
-  // `adjustments` has already advanced via the live previews), so it undoes the
-  // WHOLE gesture rather than the last frame.
   const handleCurveCommit = useCallback(
     (current: CanvasAdjustmentsContract, before: CanvasAdjustmentsContract) => {
       commit(t('widgets.layers.adjustments.curves'), current, before);
@@ -236,7 +189,6 @@ interface AdjustmentSliderProps {
   onCommit: (label: string, key: ScalarKey, next: number, before: CanvasAdjustmentsContract) => void;
 }
 
-/** A single -1..1 adjustment slider owning its own draft/before (one history entry per drag). */
 const AdjustmentSlider = ({ adjustmentKey, adjustments, label, onCommit, onLive }: AdjustmentSliderProps) => {
   const beforeRef = useRef<CanvasAdjustmentsContract | null>(null);
   const value = adjustments[adjustmentKey] ?? 0;
@@ -290,24 +242,16 @@ const AdjustmentSlider = ({ adjustmentKey, adjustments, label, onCommit, onLive 
 
 interface CurvesEditorProps {
   adjustments: CanvasAdjustmentsContract;
-  /** Render-only preview during a point drag (no history entry). */
   onLive: (channel: CurveChannel, points: [number, number][]) => void;
-  /** Restores the pre-drag snapshot when the browser cancels a gesture. */
   onCancel: (before: CanvasAdjustmentsContract) => void;
-  /** Commits one history entry for a completed gesture, undoing to `before`. */
   onCommit: (current: CanvasAdjustmentsContract, before: CanvasAdjustmentsContract) => void;
 }
 
-/** A compact per-channel curves editor (SVG): drag points, click to add, double-click to remove. */
 const CurvesEditor = ({ adjustments, onCancel, onCommit, onLive }: CurvesEditorProps) => {
   const { t } = useTranslation();
   const [channel, setChannel] = useState<CurveChannel>('r');
   const dragIndexRef = useRef<number | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
-  // A point drag streams render-only previews; `beforeRef` snapshots the
-  // adjustments at drag start and `latestPointsRef` holds the last previewed
-  // points, so pointer-up commits the whole drag as ONE history entry (mirrors
-  // the scalar sliders' live/commit split — no per-frame undo-stack flooding).
   const beforeRef = useRef<CanvasAdjustmentsContract | null>(null);
   const latestPointsRef = useRef<[number, number][] | null>(null);
   const dragTargetRef = useRef<Element | null>(null);
@@ -325,8 +269,6 @@ const CurvesEditor = ({ adjustments, onCancel, onCommit, onLive }: CurvesEditorP
     [t]
   );
 
-  // Relies on the SVG being square (see CURVE_SVG_CSS): the viewBox then maps
-  // linearly onto the element box, so a plain ratio is the whole conversion.
   const svgPointFromEvent = useCallback((event: { clientX: number; clientY: number }): { px: number; py: number } => {
     const svg = svgRef.current;
     if (!svg) {
@@ -355,19 +297,13 @@ const CurvesEditor = ({ adjustments, onCancel, onCommit, onLive }: CurvesEditorP
     []
   );
 
-  // Handlers read their point index off the element rather than closing over it,
-  // so each handle gets one stable callback instead of a fresh closure per
-  // render (these sit on a `chakra()` component, which re-renders on new props).
   const handlePointDown = useCallback(
     (event: ReactPointerEvent<SVGCircleElement>) => {
       event.stopPropagation();
-      // Keeps the press from also starting a native selection/text drag, which
-      // would hijack the gesture a few pixels in.
       event.preventDefault();
       event.currentTarget.setPointerCapture(event.pointerId);
       dragIndexRef.current = Number(event.currentTarget.dataset.index);
       dragTargetRef.current = event.currentTarget;
-      // Snapshot the pre-drag state once, for a single whole-drag history entry.
       beforeRef.current = adjustments;
       latestPointsRef.current = null;
     },
@@ -387,10 +323,8 @@ const CurvesEditor = ({ adjustments, onCancel, onCommit, onLive }: CurvesEditorP
         if (i !== index) {
           return p;
         }
-        // Endpoints keep their x anchored (0 / 255); only y moves.
         return isEndpoint ? ([p[0], ny] as [number, number]) : ([nx, ny] as [number, number]);
       });
-      // Keep interior x within its neighbours to preserve monotonic ordering.
       if (!isEndpoint) {
         const lo = next[index - 1][0] + 1;
         const hi = next[index + 1][0] - 1;
@@ -411,8 +345,6 @@ const CurvesEditor = ({ adjustments, onCancel, onCommit, onLive }: CurvesEditorP
       }
       dragIndexRef.current = null;
       dragTargetRef.current = null;
-      // Commit the whole drag as one history entry (only if the point actually
-      // moved — a click with no move streams no previews and needs no commit).
       const before = beforeRef.current;
       const finalPoints = latestPointsRef.current;
       beforeRef.current = null;

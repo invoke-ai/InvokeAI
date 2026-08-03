@@ -2,29 +2,6 @@ import { defineRecipe, defineSlotRecipe } from '@chakra-ui/react';
 import { recipes as chakraRecipes, slotRecipes as chakraSlotRecipes } from '@chakra-ui/react/theme';
 
 /**
- * Reusable, theme-aware recipes for the workbench design system.
- *
- * Recipes reference semantic tokens only, so every variant automatically tracks
- * the active theme. Two kinds live here:
- *
- *   1. Overrides for Chakra's built-in component recipes (`tooltip`, `menu`,
- *      `select`, `combobox`, `dialog`) — registered in `system.ts` so every
- *      instance app-wide gets the workbench chrome with zero props at the call
- *      site.
- *   2. Workbench-specific recipes (`panel`, `row`, `chip`, `fieldLabel`,
- *      `themeCard`) — consumed via the wrappers in `platform/ui`
- *      with `useRecipe({ recipe })` / `useSlotRecipe({ recipe })`, which keeps
- *      them fully typed without the Chakra typegen step.
- *
- * Either way, this file is the single place where shared component styling is
- * edited.
- */
-
-/* -------------------------------------------------------------------------- *
- * Built-in component overrides (registered in system.ts)
- * -------------------------------------------------------------------------- */
-
-/**
  * Tooltip chrome: raised surface with a hairline stroke instead of inverted
  * fill. Extends Chakra's default recipe — replacing it wholesale would drop
  * the `arrow` slot's `--arrow-size`/`--arrow-background` vars, which renders
@@ -50,15 +27,6 @@ export const tooltipSlotRecipe = defineSlotRecipe({
   },
 });
 
-/**
- * Tabs: quick neutral hover feedback, with accent reserved for selection.
- * Restricting hover styles to unselected triggers keeps active tabs visually
- * stable without relying on condition ordering in the generated CSS.
- *
- * Trigger text follows the same rule as {@link buttonRecipe}: the label stops
- * scaling below `lg`, so `sm` and `md` both sit at 12px with the rest of the
- * workbench chrome. Only the row height still scales with the size.
- */
 export const tabsSlotRecipe = defineSlotRecipe({
   ...chakraSlotRecipes.tabs,
   base: {
@@ -136,12 +104,6 @@ export const tabsSlotRecipe = defineSlotRecipe({
   } as unknown as typeof chakraSlotRecipes.tabs.variants,
 });
 
-/**
- * Buttons: the text size stops scaling below `lg`. The workbench is dense, and
- * a 14px label on a 40px `md` button reads as a marketing button next to the
- * 12px chrome around it. `sm` moves with `md` — otherwise the smaller button
- * would carry the larger label.
- */
 export const buttonRecipe = defineRecipe({
   ...chakraRecipes.button,
   variants: {
@@ -154,30 +116,6 @@ export const buttonRecipe = defineRecipe({
   } as unknown as typeof chakraRecipes.button.variants,
 });
 
-/**
- * Segment control: a flat strip, not a recessed pill.
- *
- * Chakra's stock look — inset-shadowed `bg.muted` track, elevated white
- * indicator, hairline dividers between every segment — is a light-UI form
- * control, and it read as a foreign object among the workbench's flat toolbars.
- * This version drops the track and the dividers entirely: selection is a filled
- * `bg.emphasized` segment, exactly the fill the icon-button strips in the canvas
- * and preview toolbars already use, so a segment control now reads as one of
- * them rather than as a form field.
- *
- * Unselected segments sit at `fg.muted` and step to `fg` on hover, which is the
- * only feedback they need — a hover fill on top of a selection fill would give
- * the strip two competing highlights.
- *
- * A hairline stroke bounds the strip so it still reads as one control when
- * nothing around it provides an edge. It is a real border rather than the
- * `inset` box-shadow used elsewhere in this file: the indicator is a negative
- * z-index child, so it paints over the root's own background and shadow layer
- * and would punch a gap in an inset hairline wherever the active segment meets
- * the edge. A border sits outside the padding box, so the indicator can never
- * reach it. Root radius is one step above `--segment-radius` to absorb the
- * border width, keeping the corners concentric.
- */
 export const segmentGroupSlotRecipe = defineSlotRecipe({
   ...chakraSlotRecipes.segmentGroup,
   base: {
@@ -199,16 +137,11 @@ export const segmentGroupSlotRecipe = defineSlotRecipe({
       fontWeight: '500',
       transitionDuration: 'faster',
       transitionProperty: 'background, color',
-      // Stock draws a hairline between neighbouring segments. With a filled
-      // selection they only add noise, and they never line up with the
-      // indicator's rounded corners.
       _before: { display: 'none' },
       _checked: { color: 'fg' },
       _hover: {
         '&:not([data-state=checked])': { color: 'fg' },
       },
-      // Pre-hydration fallback: without the measured indicator, the checked
-      // segment has to paint its own fill.
       '&[data-state=checked][data-ssr]': {
         bg: 'bg.emphasized',
         shadow: 'none',
@@ -233,19 +166,10 @@ export const segmentGroupSlotRecipe = defineSlotRecipe({
   } as unknown as typeof chakraSlotRecipes.segmentGroup.variants,
   defaultVariants: {
     ...chakraSlotRecipes.segmentGroup.defaultVariants,
-    // Workbench density — stock defaults to `md`.
     size: 'xs',
   },
 });
 
-/**
- * Shared interactive states for every bordered form control — text inputs,
- * textareas, number inputs, select/combobox triggers, and hand-rolled trigger
- * buttons (ModelSelect). Idle border is `border`; hover steps to
- * `border.emphasized`; an open dropdown commits to `accent.solid` so hover and
- * open remain distinguishable. Focus uses the accent border without adding a
- * second ring around the control.
- */
 const formControlFocused = {
   '--focus-ring-color': 'var(--focus-color) !important',
   borderColor: 'accent.solid',
@@ -278,7 +202,6 @@ export const formControlInteraction = {
 
 const formControlOpen = { borderColor: 'accent.solid' };
 
-/** Text input: Chakra default plus the shared hover/transition treatment. */
 export const inputRecipe = defineRecipe({
   ...chakraRecipes.input,
   variants: {
@@ -295,7 +218,6 @@ export const inputRecipe = defineRecipe({
   },
 });
 
-/** Textarea: Chakra default plus the shared hover/transition treatment. */
 export const textareaRecipe = defineRecipe({
   ...chakraRecipes.textarea,
   variants: {
@@ -312,7 +234,6 @@ export const textareaRecipe = defineRecipe({
   },
 });
 
-/** Number input: the input slot gets the shared hover/transition treatment. */
 export const numberInputSlotRecipe = defineSlotRecipe({
   ...chakraSlotRecipes.numberInput,
   variants: {
@@ -344,7 +265,6 @@ export const numberInputSlotRecipe = defineSlotRecipe({
   },
 });
 
-/** Shared dropdown surface: one look for menu, select, combobox, and hand-rolled poppers (ModelSelect). */
 export const dropdownContent = {
   bg: 'bg.muted',
   borderColor: 'border.emphasized',
@@ -354,13 +274,6 @@ export const dropdownContent = {
   color: 'fg',
 };
 
-/**
- * Shared dropdown item treatment. The highlight sits on `bg.emphasized`: the
- * content surface is `bg.muted`, and on the dark ramps `bg.subtle` is darker
- * than the surface, which made the old highlight nearly invisible (classic
- * theme especially). `bg.emphasized` is one step away from the surface in
- * every theme, so the highlight reads everywhere.
- */
 export const dropdownItem = {
   _highlighted: { bg: 'bg.emphasized' },
   _hover: { bg: 'bg.emphasized' },
@@ -379,7 +292,6 @@ export const dropdownGroupLabel = {
   textTransform: 'uppercase',
 };
 
-/** Menu / context-menu chrome: popover surface with an emphasized stroke. */
 export const menuSlotRecipe = defineSlotRecipe({
   ...chakraSlotRecipes.menu,
   base: {
@@ -407,7 +319,6 @@ export const menuSlotRecipe = defineSlotRecipe({
   },
 });
 
-/** Select dropdown chrome: same surface and item treatment as menus. */
 export const selectSlotRecipe = defineSlotRecipe({
   ...chakraSlotRecipes.select,
   // The outline variant carries its own `_expanded` (border.emphasized) which
@@ -457,7 +368,6 @@ export const selectSlotRecipe = defineSlotRecipe({
   },
 });
 
-/** Combobox chrome: kept aligned with Select for future searchable fields. */
 export const comboboxSlotRecipe = defineSlotRecipe({
   ...chakraSlotRecipes.combobox,
   variants: {
@@ -502,7 +412,6 @@ export const comboboxSlotRecipe = defineSlotRecipe({
   },
 });
 
-/** Dialog chrome: panel surface with a hairline stroke. */
 export const dialogSlotRecipe = defineSlotRecipe({
   ...chakraSlotRecipes.dialog,
   base: {
@@ -515,7 +424,6 @@ export const dialogSlotRecipe = defineSlotRecipe({
   },
 });
 
-/** Slider marks: compact auxiliary labels for dense widget controls. */
 export const sliderSlotRecipe = defineSlotRecipe({
   ...chakraSlotRecipes.slider,
   base: {
@@ -529,7 +437,6 @@ export const sliderSlotRecipe = defineSlotRecipe({
   },
 });
 
-/** Progress circle: add a compact icon-sized variant for dense chrome like tabs. */
 export const progressCircleSlotRecipe = defineSlotRecipe({
   ...chakraSlotRecipes.progressCircle,
   variants: {
@@ -549,19 +456,7 @@ export const progressCircleSlotRecipe = defineSlotRecipe({
   },
 });
 
-/**
- * Color picker chrome: the popover surface, area, sliders, swatches, and
- * channel inputs, aligned with the rest of the workbench controls. This was the
- * last built-in still rendering Chakra's stock chrome, so it was the only
- * control that did not track the active theme.
- *
- * Extends the default rather than replacing it: the stock recipe folds
- * `colorSwatchRecipe.base` into `swatch` and `inputRecipe.base` into
- * `channelInput`, and its `size` variants are what define `--swatch-size`,
- * `--slider-height`, and `--thumb-size`. Replacing wholesale renders every
- * thumb and swatch at zero size — the same failure the tooltip recipe above
- * documents for `--arrow-size`.
- */
+// Extending the stock recipe preserves the CSS variables that size thumbs and swatches.
 export const colorPickerSlotRecipe = defineSlotRecipe({
   ...chakraSlotRecipes.colorPicker,
   base: {
@@ -569,23 +464,17 @@ export const colorPickerSlotRecipe = defineSlotRecipe({
     content: {
       ...chakraSlotRecipes.colorPicker.base?.content,
       ...dropdownContent,
-      // Wide enough for a full ten-swatch row at its natural size; narrower and
-      // the swatches, the format button, and the channel inputs all crowd.
       gap: '2',
       p: '2',
       width: '64',
     },
     area: {
       ...chakraSlotRecipes.colorPicker.base?.area,
-      // Denser than the stock 180px, which dwarfs the workbench tool bars.
       height: '140px',
-      // Hairline ring so the area does not float on the light theme's surface.
       boxShadow: 'inset 0 0 0 1px {colors.border.subtle}',
     },
     areaThumb: {
       ...chakraSlotRecipes.colorPicker.base?.areaThumb,
-      // The white ring alone disappears on light colors; the outer hairline
-      // keeps the thumb legible across the whole area.
       boxShadow: '0 0 0 1px {colors.border.image}',
     },
     channelSliderThumb: {
@@ -594,13 +483,11 @@ export const colorPickerSlotRecipe = defineSlotRecipe({
     },
     channelSliderTrack: {
       ...chakraSlotRecipes.colorPicker.base?.channelSliderTrack,
-      // Stock hardcodes rgba(0,0,0,0.1), which vanishes on the dark ramps.
       boxShadow: 'inset 0 0 0 1px {colors.border.subtle}',
     },
     swatch: {
       ...chakraSlotRecipes.colorPicker.base?.swatch,
       borderRadius: 'l1',
-      // Without a hairline, white and fully transparent swatches are invisible.
       boxShadow: 'inset 0 0 0 1px {colors.border.image}',
     },
     swatchTrigger: {
@@ -636,16 +523,10 @@ export const colorPickerSlotRecipe = defineSlotRecipe({
   },
   defaultVariants: {
     ...chakraSlotRecipes.colorPicker.defaultVariants,
-    // Workbench density — stock defaults to `md`.
     size: 'xs',
   },
 });
 
-/* -------------------------------------------------------------------------- *
- * Reusable UI recipes (consumed through Platform UI wrappers)
- * -------------------------------------------------------------------------- */
-
-/** Bordered surface container — panels, cards, wells. */
 export const panelRecipe = defineRecipe({
   base: {
     bg: 'bg.subtle',
@@ -673,7 +554,6 @@ export const panelRecipe = defineRecipe({
   defaultVariants: { tone: 'surface', density: 'none' },
 });
 
-/** Interactive list / table row with hover, focus, and active fills. */
 export const rowRecipe = defineRecipe({
   base: {
     alignItems: 'center',
@@ -711,7 +591,6 @@ export const rowRecipe = defineRecipe({
   defaultVariants: { active: 'none' },
 });
 
-/** Compact status chip with intent tones — queue counts, server state, versions. */
 export const chipRecipe = defineRecipe({
   base: {
     alignItems: 'center',
@@ -738,7 +617,6 @@ export const chipRecipe = defineRecipe({
   defaultVariants: { tone: 'neutral' },
 });
 
-/** Compact uppercase field label shared across widget forms and the settings modal. */
 export const fieldLabelRecipe = defineRecipe({
   base: {
     color: 'fg.muted',
@@ -748,7 +626,6 @@ export const fieldLabelRecipe = defineRecipe({
   },
 });
 
-/** Selectable theme swatch card used by the Settings appearance picker. */
 export const themeCardRecipe = defineSlotRecipe({
   slots: ['root', 'preview', 'swatch', 'body', 'name', 'description', 'indicator'],
   base: {

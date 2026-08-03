@@ -5,25 +5,10 @@ import type { WidgetTypeId } from '@workbench/widgetContracts';
 import { autoSwitchDestinations } from './autoRoutePolicy';
 import { getDestinationLabel, getSourceLabel, isInvocationSourceAvailable } from './invocation';
 
-/**
- * The invocation source model behind the topbar's routing control.
- *
- * A *graph widget* is a widget that can expose a generation graph and can
- * therefore act as a source. Which ones are open is a property of the live
- * layout, not of the layout preset — a preset routinely places two or three of
- * them at once, which is exactly why a preset can never determine the source.
- */
-
-/** Widget type ids that carry a graph, in the order the routing menu lists them. */
 const graphWidgetTypeIds = ['generate', 'canvas', 'upscale', 'workflow'] as const;
 
 export type GraphWidgetTypeId = (typeof graphWidgetTypeIds)[number];
 
-/**
- * Source id and widget type id are the same string for every graph widget today.
- * They are still distinct concepts — one names a route, the other names a
- * dockable surface — so the mapping is written out rather than assumed.
- */
 const sourceIdsByWidgetTypeId: Record<GraphWidgetTypeId, InvocationSourceId> = {
   canvas: 'canvas',
   generate: 'generate',
@@ -47,7 +32,6 @@ export const getSourceIdForWidgetTypeId = (typeId: WidgetTypeId): InvocationSour
 export const getWidgetTypeIdForSourceId = (sourceId: InvocationSourceId): GraphWidgetTypeId =>
   widgetTypeIdsBySourceId[sourceId];
 
-/** Where a source's output naturally lands when the destination is not locked. */
 export const getNaturalDestination = (sourceId: InvocationSourceId): ResultDestination =>
   autoSwitchDestinations[sourceId];
 
@@ -57,7 +41,6 @@ export interface GraphWidgetSource {
   label: string;
 }
 
-/** Every graph widget, in the order the routing menu lists them. */
 export const graphWidgetSources: GraphWidgetSource[] = graphWidgetTypeIds
   .map((typeId) => ({
     label: getSourceLabel(sourceIdsByWidgetTypeId[typeId]),
@@ -66,17 +49,7 @@ export const graphWidgetSources: GraphWidgetSource[] = graphWidgetTypeIds
   }))
   .filter((source) => isInvocationSourceAvailable(source.sourceId));
 
-/**
- * The widget type each region is currently showing.
- *
- * This is what "visible" means in the routing menu — a surface the current
- * layout is showing. It is deliberately *not* what the menu lists:
- * every source stays selectable, because being unable to pick Workflow just
- * because the centre happens to show Canvas is a dead end, not a safeguard.
- *
- * A collapsed region still counts. Collapsing a panel is a viewing choice, not
- * a statement about what should run.
- */
+// Collapsed regions still count as visible because disclosure does not change routing.
 export const getVisibleWidgetTypeIds = (project: Project): Set<WidgetTypeId> => {
   const typeIds = new Set<WidgetTypeId>();
 
@@ -91,7 +64,6 @@ export const getVisibleWidgetTypeIds = (project: Project): Set<WidgetTypeId> => 
   return typeIds;
 };
 
-/** Widget types placed anywhere in the project, whether or not they are showing. */
 export const getPlacedWidgetTypeIds = (project: Project): Set<WidgetTypeId> => {
   const typeIds = new Set<WidgetTypeId>();
 
@@ -108,10 +80,6 @@ export const getPlacedWidgetTypeIds = (project: Project): Set<WidgetTypeId> => {
   return typeIds;
 };
 
-/**
- * The routing indicator is icon-only, so it carries the whole route in its
- * accessible name — including whether the route is pinned or follows edits.
- */
 export const describeRoute = ({
   destination,
   destinationLocked,

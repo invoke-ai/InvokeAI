@@ -5,22 +5,10 @@ import { dropdownGroupLabel } from '@theme/recipes';
 import { SearchIcon } from 'lucide-react';
 import { useCallback, useDeferredValue, useMemo, useRef, useState } from 'react';
 
-/**
- * A searchable, grouped option list. Owns search, group filter chips, group
- * chrome (colour rail, sticky header, count), and keyboard navigation; callers
- * own what a row looks like and what matching means.
- *
- * Navigation is roving rather than focus-moving: DOM focus stays in the search
- * field and an `activeId` marks the highlighted row, so arrows cross group
- * boundaries and typing never has to reclaim focus. Rows are not tab stops.
- */
-
 export interface PickerGroup<T> {
   id: string;
-  /** Header text, e.g. "Stable Diffusion XL". */
   name: string;
   options: T[];
-  /** Chip text; falls back to `name`. */
   shortName?: string;
   colorPalette?: string;
   getCountLabel?: (count: number) => string;
@@ -53,7 +41,6 @@ export const Picker = <T,>({
   toolbarSlot,
   onSelect,
 }: {
-  /** Shown when there is nothing to pick from at all. */
   emptyMessage: ReactNode;
   getIsOptionDisabled?: (option: T) => boolean;
   getOptionId: (option: T) => string;
@@ -61,16 +48,12 @@ export const Picker = <T,>({
   isCompact?: boolean;
   isMatch: (option: T, searchTerm: string) => boolean;
   listLabel: string;
-  /** Shown when a search or filter excluded everything. */
   noMatchesMessage: ReactNode;
   renderOption: (option: T, state: PickerOptionState) => ReactNode;
   searchPlaceholder: string;
-  /** Controls beside the search field, e.g. a manager link or view toggle. */
   searchSlot?: ReactNode;
   selectedId: string | null;
-  /** Replaces the list entirely, e.g. while loading or after a load failure. */
   statusSlot?: ReactNode;
-  /** Extra row under the search field, e.g. filter chips. */
   toolbarSlot?: ReactNode;
   onSelect: (option: T) => void;
 }) => {

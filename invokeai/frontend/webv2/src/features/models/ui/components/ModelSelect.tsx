@@ -32,15 +32,6 @@ const EMPTY_KEYS: ReadonlySet<string> = new Set();
 
 const getOptionId = (model: ModelConfig): string => model.key;
 
-/**
- * Universal single-model picker: a button-triggered searchable list over the
- * installed library, built on the generic {@link Picker}.
- *
- * Scope it with `modelTypes` — one type for dedicated pickers (a LoRA picker, a
- * main-model picker) or several for cross-type pickers. Results group by BASE
- * only; a cross-type picker marks each row with its type rather than repeating
- * a type header above every base section.
- */
 export const ModelSelect = ({
   className,
   disabled,
@@ -58,21 +49,16 @@ export const ModelSelect = ({
 }: {
   className?: string;
   disabled?: boolean;
-  /** Hide specific models (e.g. the current model and already-linked ones). */
   excludeKeys?: ReadonlySet<string>;
-  /** Extra predicate, e.g. base-architecture compatibility. */
   filter?: (model: ModelConfig) => boolean;
   id?: string;
   invalid?: boolean;
   isClearable?: boolean;
-  /** The model types this instance searches. */
   modelTypes: ModelTaxonomyType[];
   onChange: (model: ModelConfig | null) => void;
   placeholder?: string;
-  /** Show the shortcut to the model manager. Hide it inside the manager itself. */
   showManagerButton?: boolean;
   size?: 'xs' | 'sm' | 'md';
-  /** Selected model key, or null. */
   value: string | null;
 }) => {
   const { enableModelDescriptions } = useModelsUi();
@@ -83,7 +69,6 @@ export const ModelSelect = ({
   const [selectedBases, setSelectedBases] = useState<ReadonlySet<string>>(EMPTY_BASES);
   const [lastDisabled, setLastDisabled] = useState(disabled);
 
-  // Sibling pickers of the same kind share one density preference.
   const pickerId = id ?? `models:${modelTypes.join('+')}`;
   const isCompact = useModelsUiSelector((snapshot) => snapshot.pickerCompactViews[pickerId] ?? false);
   const relatedKeys = useRelatedModelKeys(isOpen ? value : null);
@@ -110,7 +95,6 @@ export const ModelSelect = ({
             filter,
             modelTypes,
             relatedKeys,
-            // The generic Picker owns text search; this pass only scopes and groups.
             searchTerm: '',
           })
         : { availableBases: [], candidates: [], groups: [] },
@@ -118,9 +102,6 @@ export const ModelSelect = ({
   );
 
   const selectedModel = useMemo(() => models.find((model) => model.key === value) ?? null, [models, value]);
-  // Keyed off what is actually installed, not the declared scope: a picker
-  // scoped to main + external API models still lists only main models on most
-  // installs, and badging every row "Main Model" says nothing.
   const hasMixedTypes = useMemo(() => new Set(candidates.map((model) => model.type)).size > 1, [candidates]);
   const scopeLabel =
     modelTypes.length === 1 ? getModelTypePluralLabel(modelTypes[0] ?? 'main').toLowerCase() : 'models';
@@ -341,7 +322,6 @@ export const ModelSelect = ({
   );
 };
 
-/** Search over the facts a user actually types: name, base, type, description. */
 const matchesModel = (model: ModelConfig, searchTerm: string): boolean => {
   const terms = searchTerm.toLowerCase().split(/\s+/).filter(Boolean);
   const haystack = `${model.name} ${model.base} ${model.type} ${model.description ?? ''}`.toLowerCase();
@@ -349,11 +329,6 @@ const matchesModel = (model: ModelConfig, searchTerm: string): boolean => {
   return terms.every((term) => haystack.includes(term));
 };
 
-/**
- * Models linked to the current selection, so they can lead their group. The
- * backend exposes only a single-key lookup, so this is scoped to "related to
- * what is selected here" rather than to everything selected app-wide.
- */
 const useRelatedModelKeys = (modelKey: string | null): ReadonlySet<string> => {
   const [relatedKeys, setRelatedKeys] = useState<ReadonlySet<string>>(EMPTY_KEYS);
 
@@ -470,10 +445,6 @@ const ModelButtonContent = ({ model }: { model: ModelConfig }) => (
   </HStack>
 );
 
-/**
- * No base badge: the group header already carries it. The type badge appears
- * only in cross-type pickers, where two rows could otherwise look identical.
- */
 const ModelOptionContent = ({
   enableDescription,
   isRelated,

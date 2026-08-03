@@ -34,10 +34,6 @@ export type ColorPickerSize = NonNullable<ComponentProps<typeof ChakraColorPicke
 
 export type { ColorPickerFormat };
 
-/**
- * Machine formats behind each presented format. `hex` and `rgb` share `rgba`,
- * so switching between them changes only which inputs render — never the value.
- */
 const MACHINE_FORMAT: Record<ColorPickerFormat, 'rgba' | 'hsla' | 'hsba'> = {
   hex: 'rgba',
   hsb: 'hsba',
@@ -53,15 +49,6 @@ const MACHINE_FORMAT: Record<ColorPickerFormat, 'rgba' | 'hsla' | 'hsba'> = {
  */
 const TRANSPARENCY_CHECK_SIZE = '0.5rem';
 
-/**
- * Swatches wrap into as many even columns as the popover actually fits.
- *
- * `auto-fill` rather than a fixed `repeat(10, …)`: the swatch holds a fixed
- * `--swatch-size` from the size variant, so a fixed column count overflows the
- * popover the moment the swatch, the gap, or the content width changes — which
- * is exactly what happened at ten columns in a 224px popover. Deriving the
- * count from the available width instead makes that arithmetic unrepresentable.
- */
 const SWATCH_GROUP_CSS = {
   display: 'grid',
   gap: '1',
@@ -72,65 +59,22 @@ const CHANNEL_ROW_CSS = { '& input': { minW: '0' } };
 const SLIDER_STACK_CSS = { minW: '0' };
 
 export interface ColorPickerProps {
-  /** Accessible label for the swatch trigger button. */
   'aria-label': string;
   disabled?: boolean;
   size?: ColorPickerSize;
-  /**
-   * The swatch row: `true` (default) shows the workbench palette followed by
-   * recently committed colors, `false` hides it, and an array supplies an
-   * explicit palette instead.
-   */
   swatches?: boolean | readonly string[];
-  /** The current color, as a `#rrggbb` (or `#rrggbbaa` under `withAlpha`) string. */
   value: string;
-  /**
-   * Accept and emit `#rrggbbaa`, and show the alpha slider, alpha channel
-   * input, and a transparency checkerboard behind the trigger swatch.
-   */
   withAlpha?: boolean;
-  /**
-   * Offer the browser's screen eyedropper. Chromium-only — the trigger is
-   * omitted entirely where `EyeDropper` is unavailable rather than rendering a
-   * button that does nothing. Ignored when `onSampleColor` is supplied.
-   */
   withEyeDropper?: boolean;
-  /** Show the current value as text beside the trigger swatch. */
   withValueText?: boolean;
-  /** Called as the user drags the area/sliders or edits a channel input. */
   onValueChange: (value: string) => void;
-  /**
-   * Called with the final value when an interaction ends (pointer up on the
-   * area/slider, a channel input committing, or a swatch being picked).
-   * Consumers that record undo history use this to collapse a whole drag into
-   * one entry, mirroring the `Slider` `onValueChangeEnd` pattern.
-   */
   onValueChangeEnd?: (value: string) => void;
-  /**
-   * Sample a color from somewhere the picker cannot reach itself — the canvas
-   * passes a sampler backed by its own eyedropper tool, which reads the
-   * composited document rather than the screen. Replaces the browser
-   * eyedropper when present. Resolves `null` when the user cancels.
-   */
   onSampleColor?: () => Promise<string | null>;
 }
 
-/**
- * The colour channels a format exposes. Alpha is always dropped — it gets its
- * own percentage field ({@link AlphaInput}) rather than Zag's unit-float one,
- * and it belongs at the end of the row regardless of which format is showing.
- */
 const useChannels = (format: ColorPickerFormat) =>
   useMemo(() => getColorChannels(MACHINE_FORMAT[format]).filter((channel) => channel !== 'alpha'), [format]);
 
-/**
- * Cycles HEX → RGB → HSL → HSB.
- *
- * A dropdown would name all four up front, but it has to portal out of the
- * picker's own popover, and opening it reads as an outside interaction that
- * dismisses the picker. Ark's built-in `FormatTrigger` cycles for the same
- * reason; this keeps that behavior on workbench chrome.
- */
 const FormatTrigger = ({
   format,
   onFormatChange,
@@ -145,8 +89,6 @@ const FormatTrigger = ({
   }, [format, onFormatChange]);
 
   return (
-    // `subtle` rather than `ghost`: a bare label beside two filled inputs reads
-    // as a caption, not something you can click to change the units.
     <IconButton
       aria-label={t('common.colorPicker.format')}
       flexShrink="0"
@@ -162,16 +104,7 @@ const FormatTrigger = ({
   );
 };
 
-/**
- * A swatch that also reports a commit. Zag's `SwatchTrigger` sets the value and
- * fires `onValueChange`, but never `onValueChangeEnd` — without this, every
- * consumer that records undo history on commit (mask fills, shapes, gradients)
- * would silently drop swatch picks from their history.
- *
- * The commit is *armed* here rather than emitted: Zag's own value change runs
- * after this handler, so emitting directly would put the commit before the
- * change and leave undo entries recording the pre-swatch color.
- */
+// Zag does not emit onValueChangeEnd for swatches, and its value change runs after the click handler.
 const CommittingSwatch = ({ value, onArmCommit }: { value: string; onArmCommit: () => void }) => (
   <ChakraColorPicker.SwatchTrigger value={value} onClick={onArmCommit}>
     <ChakraColorPicker.Swatch value={value}>
@@ -180,14 +113,6 @@ const CommittingSwatch = ({ value, onArmCommit }: { value: string; onArmCommit: 
   </ChakraColorPicker.SwatchTrigger>
 );
 
-/**
- * Opacity as a whole percentage.
- *
- * Zag's own alpha `ChannelInput` renders the raw unit float — a field reading
- * `0.501` next to a hex triplet is noise, and nobody types opacity that way.
- * This edits the same channel in the units the rest of the app uses (layer
- * opacity, brush opacity) and commits on blur so a drag-free edit is one entry.
- */
 const AlphaInput = ({
   alpha,
   onAlphaChange,
@@ -230,19 +155,6 @@ const AlphaInput = ({
   );
 };
 
-/**
- * Workbench color picker: a compact swatch trigger that opens a popover with a
- * saturation/value area, hue and alpha sliders, an eyedropper, switchable
- * HEX/RGB/HSL/HSB channel inputs, and a swatch row of the workbench palette
- * plus recently committed colors. Composed from Chakra v3's `ColorPicker.*`
- * parts; chrome comes from the `colorPicker` slot-recipe override in
- * `theme/recipes.ts`.
- *
- * Internally, the picker's controlled value is kept as a full Chakra/Zag
- * `Color` (which preserves hue/saturation independent of RGB), not a hex
- * string — see `shouldSyncExternalColor` for why. The external API stays
- * string based; hex is only produced at the emit boundary.
- */
 export const ColorPicker = ({
   'aria-label': ariaLabel,
   disabled,
@@ -261,7 +173,6 @@ export const ColorPicker = ({
   const recents = useRecentColors();
   const channels = useChannels(format);
 
-  // Zag emits uppercase hex; the workbench stores and compares lowercase.
   const toEmitted = useCallback(
     (color: Color) => color.toString(withAlpha ? 'hexa' : 'hex').toLowerCase(),
     [withAlpha]
@@ -340,7 +251,6 @@ export const ColorPicker = ({
     if (!onSampleColor) {
       return;
     }
-    // Get out of the way so the user can see (and click) what they're sampling.
     setIsOpen(false);
     const sampled = await onSampleColor();
     if (sampled) {
@@ -361,8 +271,6 @@ export const ColorPicker = ({
     return [...DEFAULT_COLOR_SWATCHES, ...recents.filter((entry) => !seen.has(normalizeHex(entry)))];
   }, [recents, swatches]);
 
-  // The browser eyedropper is Chromium-only; omit the trigger where it would
-  // do nothing. A canvas-backed sampler always wins when one is supplied.
   const canUseScreenEyeDropper = withEyeDropper && typeof window !== 'undefined' && 'EyeDropper' in window;
 
   return (

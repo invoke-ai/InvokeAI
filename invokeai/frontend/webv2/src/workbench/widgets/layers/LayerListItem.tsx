@@ -69,7 +69,6 @@ const VISIBILITY_DOT_UNCHECKED_HOVER = {
 
 export type LayerListItemEngine = LayerContextMenuEngine & LayerPropertiesEngine & Pick<CanvasEngineHandle, 'previews'>;
 
-/** i18n key for a layer's short type/source badge. */
 const layerBadgeKey = (layer: CanvasLayerContract): string => {
   if (layer.type === 'raster') {
     return layer.source.type === 'image' ? 'widgets.layers.types.image' : 'widgets.layers.types.paint';
@@ -95,15 +94,6 @@ export const getLayerListItemInteractionState = (editingLocked: boolean) => ({
   sortableDisabled: editingLocked,
 });
 
-/**
- * One layer row: thumbnail, name (double-click to rename), type badge,
- * visibility + lock toggles, a properties popover (blend mode + the layer's
- * type-specific settings), and an overflow/context menu. The whole row is the
- * pointer drag target, so reordering costs no visible grip; by keyboard it is
- * the context menu's Move actions. The pointer distance constraint keeps
- * clicks, double-click rename, and row buttons working; selected-layer opacity
- * lives in the panel header.
- */
 export const LayerListItem = ({
   dispatch,
   editingLocked,
@@ -160,12 +150,6 @@ export const LayerListItem = ({
     [layer.isEnabled, patchBase, t]
   );
 
-  /**
-   * Hide is a DISPLAY-only axis, orthogonal to enabled: a hidden control map or
-   * mask still conditions generation exactly as it would if visible. Only the
-   * three overlay types have it — for a raster layer, visibility and
-   * participation are the same fact.
-   */
   const handleToggleHidden = useCallback(
     (event: { stopPropagation: () => void }) => {
       event.stopPropagation();

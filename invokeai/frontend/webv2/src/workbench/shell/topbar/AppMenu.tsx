@@ -33,14 +33,6 @@ const MENU_POSITIONING = { placement: 'bottom-start' } as const;
 const DOCS_URL = 'https://invoke-ai.github.io/InvokeAI/';
 const DISCORD_URL = 'https://discord.gg/ZmtBAhwWhy';
 
-/**
- * The application menu. The bar carries no wordmark any more, so the menu header
- * is the only place the product name and version now appear.
- *
- * It deliberately holds no widget navigation. Generate, Canvas, Upscale, and
- * Workflow are widgets, and every dock area already has its own widget picker —
- * listing them here would be a second, worse copy of a control that exists.
- */
 export const AppMenu = () => {
   const { t } = useTranslation();
   const { canManageModels, canManageNodes } = useCapabilities();
@@ -129,14 +121,6 @@ export const AppMenu = () => {
   );
 };
 
-/**
- * The mark at rest, a hamburger once you reach for it.
- *
- * The bar carries no other branding, so this slot does double duty: it is the
- * app's identity when idle, and admits to being a menu the moment a pointer or
- * keyboard focus arrives. Both glyphs occupy the same box, so nothing shifts on
- * the swap — only the crossfade reads as a change.
- */
 const MARK_SWAP_PROPS = { opacity: 0 } as const;
 const GLYPH_SWAP_PROPS = { opacity: 1 } as const;
 

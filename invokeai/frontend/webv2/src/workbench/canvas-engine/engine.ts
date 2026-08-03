@@ -1,30 +1,3 @@
-/**
- * `CanvasEngine`: the per-project imperative heart of the canvas.
- *
- * One engine instance exists per project (managed by `engineRegistry.ts`) and
- * shared by the canvas and layers widgets. It owns interaction, pixels, and
- * rendering; the reducer owns the document. The document flows in one way
- * through the {@link createDocumentMirror | document mirror}; the engine never
- * dispatches from pointer input except for the single gesture-start
- * `addCanvasLayer` a paint tool emits when auto-creating a layer.
- *
- * Responsibilities:
- * - Hold the {@link Viewport} (pan/zoom) and the transient {@link EngineStores}
- *   React subscribes to.
- * - `attach`/`detach` bind two stacked canvases (composited document + overlay)
- *   as render targets, wire pointer/wheel/key listeners, and drive the
- *   scheduler; `resize` sizes the backing stores to `css × min(dpr, 2)`.
- * - Route normalized pointer/wheel input to the active {@link Tool} via the
- *   pointer pipeline and wheel handler (middle-mouse pan, space/alt temp tools,
- *   plain-wheel zoom, ctrl+wheel brush-size step), and relay committed strokes
- *   to `onStrokeCommitted` subscribers.
- * - Orchestrate rasterization: ensure a raster cache per visible layer, compose
- *   the document, and draw the overlay each scheduled frame.
- *
- * DOM APIs are confined to `attach`/`detach`/`resize` and the DOM raster
- * backend, so importing this module stays node-safe. Zero React imports.
- */
-
 import type {
   CanvasHistoryCapability,
   CanvasDiagnosticsCapability,

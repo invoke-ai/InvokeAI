@@ -25,18 +25,6 @@ import { PreviewCompareDropZone } from './PreviewCompareDropZone';
 import { PreviewLiveOverlay } from './PreviewLiveReadout';
 import { usePreviewLoupe, type PreviewLoupeControls } from './usePreviewLoupe';
 
-/**
- * The preview's image surface: a dot-grid backdrop with an aspect-fitted,
- * shadowed frame. Owns everything drawn over the image (live badge, and later
- * the loupe, progress hairline, and drop-to-compare affordance) so the widget
- * shell never grows frame-specific rendering.
- *
- * The backdrop is deliberately unframed — no border, no radius, no outer
- * padding — so the dot grid reads as the widget's own floor and runs edge to
- * edge. The only framed thing is the media itself; the filmstrip and details
- * float above the grid rather than sitting in a second card.
- */
-
 export const previewGridCss = {
   backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1.5px)',
   backgroundPosition: 'center',
@@ -76,30 +64,22 @@ export type PreviewMediaSource =
   | { itemKey: GalleryItemKey; kind: 'video'; label: string; poster: string; src: string };
 
 interface PreviewFrameProps {
-  /** Rendered instead of the fitted frame when there is no image source (inset variant only). */
   children?: ReactNode;
-  /** Saved gallery image represented by this frame. Live progress frames are never draggable. */
   dragItem?: GalleryItemRef;
   frameHeight: number;
   frameWidth: number;
-  /** Live selected-key read used by protected-video retry guards. */
   isItemCurrent?: (itemKey: GalleryItemKey) => boolean;
   isLive: boolean;
   liveBadgeLabel: string;
-  /** When set, the static live badge is replaced by the live progress readout for this run. */
   liveQueueItemId?: string | null;
-  /** Imperative zoom controls, for hotkeys registered by the widget shell. */
   loupeControlsRef?: Ref<PreviewLoupeControls>;
   onContextMenu?: (x: number, y: number) => void;
   onVideoCopyAvailabilityChange?: (itemKey: GalleryItemKey, isAvailable: boolean) => void;
   padding?: string;
-  /** Extra bottom padding reserving room for the overlaid filmstrip and details. */
   paddingBottom?: string;
   shouldAntialiasLiveImage: boolean;
   source: PreviewMediaSource | null;
-  /** Preview-owned controller for the selected video's current frame. */
   videoControllerRef?: Ref<PreviewVideoFrameController>;
-  /** `framed` = bordered surface for a selected item; `inset` = flush surface for the empty state. */
   variant: 'framed' | 'inset';
 }
 

@@ -33,14 +33,6 @@ const tonePalettes: Record<QueueTone, string | undefined> = {
   running: 'accent',
 };
 
-/**
- * Everything about work already dispatched: the counter, a cancel control that
- * only exists when there is something to cancel, and the processor menu.
- *
- * This is where generation progress lives — deliberately not on the Invoke
- * button, which stays static so that queueing onto a running batch never looks
- * unavailable.
- */
 export const QueueCluster = () => {
   const { t } = useTranslation();
   const queueItems = useActiveProjectSelector((project) => project.queue.items);
@@ -69,8 +61,6 @@ export const QueueCluster = () => {
 
   return (
     <Menu.Root>
-      {/* The cancel button is simply absent when idle. Reserving its width left
-          a hole in the middle of the group that read as a broken control. */}
       <Group attached colorPalette={tonePalettes[tone]} flexShrink={0}>
         <QueueButtonTooltip
           current={current}
@@ -88,8 +78,6 @@ export const QueueCluster = () => {
             variant={tone === 'idle' ? 'outline' : 'subtle'}
             onClick={handleOpenQueue}
           >
-            {/* Progress fills behind the label rather than replacing it: the
-                counter is the thing people read, and it must stay readable. */}
             {tone === 'running' && progressValue !== null ? (
               <Box
                 aria-hidden="true"
@@ -104,9 +92,6 @@ export const QueueCluster = () => {
               />
             ) : null}
             <Icon as={isPaused ? PauseIcon : ListOrderedIcon} position="relative" zIndex="1" />
-            {/* Tabular figures and a reserved minimum: the counter is watched
-                continuously, and digits that change width would nudge the
-                controls beside it on every step of a run. */}
             <chakra.span fontVariantNumeric="tabular-nums" position="relative" textAlign="center" zIndex="1">
               {remaining}
             </chakra.span>
@@ -181,13 +166,7 @@ const QueueButtonTooltip = ({
   );
 };
 
-/**
- * Progress for screen readers, quantised to ten percent.
- *
- * A 30-step run emits progress continuously; announcing every event would make
- * the whole page unusable while generating, so the live region only changes
- * when the rounded decile does.
- */
+// Quantize screen-reader announcements so progress events do not flood the live region.
 const QueueProgressAnnouncement = ({
   current,
   progress,
@@ -310,8 +289,6 @@ const QueueTooltip = ({
             {t('topbar.queue.backendBatch', { id: item.backendBatchId })}
           </Text>
         ) : null}
-        {/* Queue items snapshot their route at enqueue time (contract §9.2), so
-            this reads the item's own snapshot, never the live route. */}
         <Text truncate>
           {t('topbar.queue.route', {
             destination: getDestinationLabel(item.snapshot.destination),

@@ -1,17 +1,5 @@
-/**
- * Shared state behind every {@link ColorPicker}: the default swatch palette, a
- * most-recently-used list of committed colors, and the preferred channel
- * format.
- *
- * Both persisted values are per browser rather than per account or project —
- * like the command palette's frecency record, a picker's muscle memory should
- * not reset when the user switches projects. Storage failures (quota, private
- * mode, blocked cookies) are non-fatal: the picker still works, it just forgets.
- */
-
 import { createExternalStore } from '@platform/state/externalStore';
 
-/** The channel layouts the picker can present. */
 export type ColorPickerFormat = 'hex' | 'rgb' | 'hsl' | 'hsb';
 
 export const COLOR_PICKER_FORMATS: readonly ColorPickerFormat[] = ['hex', 'rgb', 'hsl', 'hsb'];
@@ -108,11 +96,6 @@ const store = createExternalStore<ColorPickerSnapshot>({
   recents: parseRecents(readStored(RECENTS_STORAGE_KEY)),
 });
 
-/**
- * Promotes `color` to the front of the recents list. Callers record on commit
- * (`onValueChangeEnd`) only — recording every drag frame would fill the list
- * with the colors swept through on the way to the chosen one.
- */
 export const recordRecentColor = (color: string): void => {
   const normalized = color.toLowerCase();
   const { recents } = store.getSnapshot();

@@ -23,15 +23,8 @@ type GalleryChromeProps = { region: GalleryWidgetProps['region'] };
 
 const ACCEPTED_UPLOAD_EXTENSIONS = 'image/png,image/jpeg,image/webp,video/mp4,.png,.jpg,.jpeg,.webp,.mp4';
 const UPLOAD_INPUT_STYLE = { display: 'none' } as const;
-// Ghost buttons fill when expanded, and the boards start expanded — which left
-// the label looking pressed at rest. The chevron carries the state instead.
 const LABEL_EXPANDED_PROPS = { bg: 'transparent' } as const;
 
-/**
- * Frame chrome mounts outside `GalleryWidgetView` and so outside its context;
- * it reads the App-owned UI port directly. The boards query is the one the view
- * already caches.
- */
 const useGalleryChromeBoards = () => {
   const { gallery, galleryValues } = useGalleryUi();
   const settings = getGallerySettings(galleryValues);
@@ -54,7 +47,6 @@ const useGalleryChromeBoards = () => {
   };
 };
 
-/** Separate from the read-only hook so the label skips assembling upload actions. */
 const useGalleryChromeActions = () => {
   const { boards, galleryValues, selectedBoardId, ...rest } = useGalleryChromeBoards();
   const galleryView = getGalleryView(galleryValues);
@@ -68,10 +60,6 @@ const useGalleryChromeActions = () => {
   return { ...rest, boards, galleryValues, selectedBoardId, uploadFiles };
 };
 
-/**
- * `Gallery / [Board]`, where the board name expands and collapses the panel —
- * the shape the workflow widget uses for its library trigger.
- */
 export const GalleryWidgetLabel = ({ region }: GalleryChromeProps) => {
   const { t } = useTranslation();
   const { boards, gallery, selectedBoardId, settings } = useGalleryChromeBoards();
@@ -85,10 +73,7 @@ export const GalleryWidgetLabel = ({ region }: GalleryChromeProps) => {
   );
 
   return (
-    // End padding keeps the name off the frame's actions; the center floats
-    // this in its own island and is exempt.
     <HStack flex="1" gap="1" minW="0" pe={region === 'center' ? undefined : '2'}>
-      {/* The center's view selector already names the widget. */}
       {region === 'center' ? null : (
         <Text flexShrink={0} fontSize="xs" fontWeight="700">
           {t('widgets.labels.gallery')}
@@ -117,10 +102,6 @@ export const GalleryWidgetLabel = ({ region }: GalleryChromeProps) => {
   );
 };
 
-/**
- * Upload and grid settings, in every region. The frame owns these because the
- * center hoists header chrome into an island that would otherwise sit empty.
- */
 export const GalleryWidgetHeaderActions = (_props: GalleryChromeProps) => {
   const { boards, gallery, selectedBoardId, settings, uploadFiles } = useGalleryChromeActions();
 

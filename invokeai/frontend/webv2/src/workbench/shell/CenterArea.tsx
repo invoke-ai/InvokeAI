@@ -38,19 +38,8 @@ type CenterWidgetItem = PlacedWidgetRegionItem<WidgetPlacementInstanceMeta>;
 const CENTER_MENU_POSITIONING = { placement: 'bottom-start' } as const;
 const CENTER_PREFERRED_REGIONS = ['center'] as const;
 
-/**
- * The chrome floats over the work surface, so widgets whose own content is
- * top-anchored (the gallery toolbar) clear it with this inset instead of the
- * region reserving a row. Full-bleed surfaces — canvas, workflow, preview —
- * ignore it and run their content edge to edge beneath the islands.
- */
 const CENTER_CHROME_INSET_STYLE = { '--wb-center-chrome-inset': '3rem' } as React.CSSProperties;
 
-/**
- * Center work area: a full-bleed registered center view with two floating
- * chrome islands over it — the view selector (plus the active widget's own
- * label slot) at the start, the active widget's actions at the end.
- */
 export const CenterArea = () => {
   const { t } = useTranslation();
   const placementProject = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
@@ -137,8 +126,6 @@ export const CenterArea = () => {
     ? isRequiredCenterView(activeItem as WidgetRegionItem, centerViewItems.length)
     : true;
 
-  // Widgets that can be added: every center-capable type that has no instance
-  // placed here yet (`availableItems` already accounts for `allowMultiple`).
   const availableCenterItems = useMemo(
     () => centerWidgetMenuItems.filter((item) => !item.isEnabled && item.status !== 'disabled'),
     [centerWidgetMenuItems]
@@ -233,12 +220,6 @@ export const CenterArea = () => {
   );
 };
 
-/**
- * One floating chrome group. Islands carry the same `bg.subtle` surface as the
- * top bar, the widget rails, and the side panels, so the chrome reads as one
- * material wherever it appears. Pointer events are re-enabled per island so the
- * gap between them stays click-through.
- */
 const ChromeIsland = ({ children }: { children: ReactNode }) => (
   <HStack
     bg="bg.subtle"
@@ -364,11 +345,6 @@ const CenterViewMenu = ({
   );
 };
 
-/**
- * One row of the selector. Open views are radio items so the active one is
- * announced as checked; rows that would open a new view stay plain menu items,
- * since they are an action rather than a choice within the current set.
- */
 const CenterViewMenuRow = ({
   isActive,
   item,
