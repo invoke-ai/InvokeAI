@@ -1,6 +1,6 @@
 import type { WorkbenchSearch } from '@workbench/projects/session';
 
-import { LLMTaskProgressRuntime } from '@features/generation/ui/LLMTaskProgressRuntime';
+import { LLMTaskProgressRuntime } from '@features/generation/react';
 import { useSearch } from '@tanstack/react-router';
 import { WorkbenchHotkeyRuntime } from '@workbench/hotkeys/WorkbenchHotkeyRuntime';
 import { WorkbenchCommandPalette } from '@workbench/palette/WorkbenchCommandPalette';

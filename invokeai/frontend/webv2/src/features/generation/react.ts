@@ -13,3 +13,4 @@ export { adjustFocusedPromptAttention } from './ui/promptFields/promptAttentionH
 export { focusPositivePrompt } from './ui/promptFields/promptFocus';
 export { promptHistoryNavigation } from './ui/promptFields/promptHistoryNavigation';
 export { setPendingPromptTemplateDraft } from './ui/promptTemplateDraftStore';
+export { LLMTaskProgressRuntime } from './ui/LLMTaskProgressRuntime';
