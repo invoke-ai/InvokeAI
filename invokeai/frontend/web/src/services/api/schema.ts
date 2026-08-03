@@ -18515,7 +18515,7 @@ export type components = {
             image: components["schemas"]["ProgressImage"] | null;
             /**
              * Device
-             * @description The device processing this session, e.g. 'cuda:1' (set only when running on a CUDA GPU)
+             * @description The device processing this session, e.g. 'cuda:1' (set only when running on a GPU)
              * @default null
              */
             device: string | null;
@@ -18627,7 +18627,7 @@ export type components = {
          *         vram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_vram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.
          *         lazy_offload: DEPRECATED: This setting is no longer used. Lazy-offloading is enabled by default. This config setting will be removed once the new model cache behavior is stable.
          *         pytorch_cuda_alloc_conf: Configure the Torch CUDA memory allocator. This will impact peak reserved VRAM usage and performance. Setting to "backend:cudaMallocAsync" works well on many systems. The optimal configuration is highly dependent on the system configuration (device type, VRAM, CUDA driver version, etc.), so must be tuned experimentally.
-         *         device: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `mps`, `cuda:N` (where N is a device number)
+         *         device: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `mps`, `xpu`, `cuda:N`, `xpu:N` (where N is a device number)
          *         precision: Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.<br>Valid values: `auto`, `float16`, `bfloat16`, `float32`
          *         sequential_guidance: Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.
          *         attention_type: Attention type.<br>Valid values: `auto`, `normal`, `xformers`, `sliced`, `torch-sdp`
@@ -18942,13 +18942,13 @@ export type components = {
             pytorch_cuda_alloc_conf?: string | null;
             /**
              * Device
-             * @description Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `mps`, `cuda:N` (where N is a device number)
+             * @description Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `mps`, `xpu`, `cuda:N`, `xpu:N` (where N is a device number)
              * @default auto
              */
             device?: string;
             /**
              * Generation Devices
-             * @description Devices to use for parallel generation. `auto` (the default) uses every available GPU, running one generation session per GPU concurrently and distributing jobs fairly across users. Provide an explicit list (e.g. `[cuda:0, cuda:1]`) to use specific devices, or a single-device list (e.g. `[cuda:0]`) to run serially. On systems without a GPU, `auto` resolves to the single `cpu`/`mps` device.<br>Valid values: `auto`, or a list whose entries are each `cpu`, `cuda`, `mps`, or `cuda:N` (where N is a device number)
+             * @description Devices to use for parallel generation. `auto` (the default) uses every available GPU, running one generation session per GPU concurrently and distributing jobs fairly across users. Provide an explicit list (e.g. `[cuda:0, cuda:1]`) to use specific devices, or a single-device list (e.g. `[cuda:0]`) to run serially. On systems without a GPU, `auto` resolves to the single `cpu`/`mps` device.<br>Valid values: `auto`, or a list whose entries are each `cpu`, `cuda`, `mps`, `xpu`, `cuda:N`, or `xpu:N` (where N is a device number)
              * @default auto
              */
             generation_devices?: "auto" | string[];
@@ -33341,7 +33341,7 @@ export type components = {
             retried_from_item_id?: number | null;
             /**
              * Device
-             * @description The device that processed this queue item, e.g. 'cuda:1' (set only when running on a CUDA GPU)
+             * @description The device that processed this queue item, e.g. 'cuda:1' (set only when running on a GPU)
              */
             device?: string | null;
             /**

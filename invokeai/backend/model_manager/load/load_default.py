@@ -29,6 +29,69 @@ from invokeai.backend.model_manager.taxonomy import (
 )
 from invokeai.backend.util.devices import TorchDevice
 
+# Probe results keyed by concrete device (e.g. "xpu:1"). float8 support is build/driver
+# dependent, so it is a per-device property: a discrete Arc may be paired with an integrated
+# GPU that answers differently, and keying on the device *type* would let whichever probed
+# first decide for both.
+_FP8_STORAGE_SUPPORTED: set[str] = set()
+
+# Devices whose probe failure has already been reported. Deliberately separate from the result
+# cache above: the probe is retried on every request (a failure may be transient), but repeating
+# the warning on every model load would bury the log.
+_FP8_PROBE_FAILURE_REPORTED: set[str] = set()
+
+
+def _device_supports_fp8_storage(device: torch.device, logger: Optional[Logger] = None) -> bool:
+    """Whether FP8 layerwise casting (float8 weight storage + upcast) is usable on this device.
+
+    The feature needs only float8 *storage* and casting to the compute dtype -- not native FP8
+    matmul -- so it holds on CUDA and, for current torch builds, on Intel XPU. XPU float8 support is
+    build/driver dependent ("emerging" on Xe2), so probe it rather than assume.
+
+    The probe allocates on the *given* device rather than an index-less ``"xpu"``, which would
+    resolve through the thread's current XPU device -- not necessarily the device the caller is
+    loading onto (see the idle-GPU encoder offload, which re-pins the session device).
+
+    The probe mirrors the runtime path rather than approximating it. At runtime the storage cast
+    happens on CPU (``_apply_fp8_to_nn_module`` runs while params are still CPU-resident), the fp8
+    tensor is then copied host->device, and the pre-hook upcasts fp8 -> compute_dtype on the
+    device. Probing all three steps on the device would pass on a build where the fp8 host->device
+    copy or a particular upcast fails, and then break at forward time.
+
+    Only successes are cached. The probe runs during a model load, i.e. exactly when the device
+    may be transiently out of memory, and a cached failure would silently disable FP8 for the
+    lifetime of the process with no remedy short of a restart.
+    """
+    if device.type == "cuda":
+        return True
+    if device.type != "xpu":
+        return False
+
+    device = TorchDevice.normalize(device)
+    key = str(device)
+    if key in _FP8_STORAGE_SUPPORTED:
+        return True
+
+    try:
+        # 1. Storage cast, on CPU, as _apply_fp8_to_nn_module does.
+        stored = torch.zeros(2).to(torch.float8_e4m3fn)
+        # 2. fp8 host->device copy.
+        stored = stored.to(device)
+        # 3. Pre-hook upcast, on device. Both targets are exercised: compute_dtype is bfloat16 for
+        #    several supported models (Krea-2, FLUX) and float16 for others, and a build can
+        #    support one without the other.
+        stored.to(torch.bfloat16)
+        stored.to(torch.float16)
+    except Exception as exc:
+        if logger is not None and key not in _FP8_PROBE_FAILURE_REPORTED:
+            _FP8_PROBE_FAILURE_REPORTED.add(key)
+            logger.warning(f"FP8 storage probe failed on {device} ({type(exc).__name__}: {exc}); not using FP8.")
+        return False
+
+    _FP8_STORAGE_SUPPORTED.add(key)
+    return True
+
+
 # Layer classes that benefit from FP8 storage. Mirrors diffusers'
 # `_GO_LC_SUPPORTED_PYTORCH_LAYERS` so the plain-nn.Module fallback path makes the same
 # precision/quality trade-offs as the ModelMixin path. Notably excludes norm and embedding
@@ -230,10 +293,6 @@ class ModelLoader(ModelLoaderBase):
 
     def _should_use_fp8(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> bool:
         """Check if FP8 layerwise casting should be applied to a model."""
-        # FP8 storage only works on CUDA
-        if self._torch_device.type != "cuda":
-            return False
-
         # Z-Image has dtype mismatch issues with diffusers' layerwise casting
         # (skipped modules produce bf16, hooked modules expect fp16).
         from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
@@ -277,7 +336,11 @@ class ModelLoader(ModelLoaderBase):
         # Check default_settings.fp8_storage (Main models, ControlNet)
         if hasattr(config, "default_settings") and config.default_settings is not None:
             if hasattr(config.default_settings, "fp8_storage") and config.default_settings.fp8_storage is True:
-                return True
+                # Device support is probed last, so it runs only for a model that actually wants
+                # FP8 -- not on the first load of any tokenizer/VAE/scheduler, and not on API or
+                # install threads, where it would force XPU lazy SYCL init on a thread that never
+                # generates.
+                return _device_supports_fp8_storage(self._torch_device, self._logger)
 
         return False
 
