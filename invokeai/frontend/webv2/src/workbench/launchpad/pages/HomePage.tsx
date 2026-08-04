@@ -1,7 +1,6 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop */
-import type { ProjectSortId, ProjectsViewId } from '@workbench/launchpad/projects/projectLibraryView';
-
-import { Stack } from '@chakra-ui/react';
+import { Skeleton, Stack, Text } from '@chakra-ui/react';
+import { useAuthSession, useCapabilities } from '@features/identity';
 import { LAUNCHPAD_READY_MARK, markSemanticReady } from '@platform/performance/semanticReady';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import {
@@ -12,38 +11,41 @@ import {
 import { Button, toaster } from '@platform/ui';
 import { PageShell } from '@platform/ui/PageShell';
 import { Link, useNavigate } from '@tanstack/react-router';
+import { IntentTiles } from '@workbench/launchpad/home/IntentTiles';
+import { LivePanel } from '@workbench/launchpad/home/LivePanel';
+import { RecentProjectsRow } from '@workbench/launchpad/home/RecentProjectsRow';
+import { ResumeCard } from '@workbench/launchpad/home/ResumeCard';
 import { KnownBrowserIssuesAlert } from '@workbench/launchpad/KnownBrowserIssuesAlert';
 import { prunePinnedProjects, toggleProjectPinPreference } from '@workbench/launchpad/projects/projectPins';
-import { ProjectsBrowser } from '@workbench/launchpad/projects/ProjectsBrowser';
-import { ProjectsToolbar } from '@workbench/launchpad/projects/ProjectsToolbar';
-import { getProjectLibrary, refreshProjectLibrary } from '@workbench/projects/library';
+import { getProjectLibrary, refreshProjectLibrary, useProjectLibrarySelector } from '@workbench/projects/library';
 import { refreshOpenProjects } from '@workbench/projects/openProjects';
 import { importProjectFile, pickProjectFile } from '@workbench/projects/projectFile';
-import { patchWorkbenchPreferences, useWorkbenchPreferenceSelector } from '@workbench/settings/store';
+import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { FileUpIcon, PlusIcon } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /**
- * The Launchpad's project library.
+ * The Launchpad's landing section: resume what you were doing, or start
+ * something new.
  *
- * Sort, layout, and pins persist through workbench preferences, so they follow
- * the account rather than the browser. The search term deliberately does not —
- * a filter you did not set is a filter you cannot find your way out of.
+ * Home deliberately shows only a handful of recent projects — the full library
+ * is its own section. What it adds over a file list is the first move: intent
+ * tiles that open a draft already arranged for the kind of work you named.
  */
 
 const NEW_PROJECT_SEARCH = { new: true } as const;
+const RECENT_PROJECT_COUNT = 4;
+const BROWSER_ISSUES_BANNER = <KnownBrowserIssuesAlert />;
 
-export const ProjectsPage = () => {
+export const HomePage = () => {
+  const session = useAuthSession();
+  const { canManageModels } = useCapabilities();
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const [searchTerm, setSearchTerm] = useState('');
-  // Captured once per visit: the date buckets should reflect when the library
-  // was opened, and reading the clock each render would rebucket unstably.
-  const [now] = useState(() => Date.now());
 
-  const view = useWorkbenchPreferenceSelector((preferences) => preferences.launchpadProjectsView);
-  const sort = useWorkbenchPreferenceSelector((preferences) => preferences.launchpadProjectsSort);
+  const status = useProjectLibrarySelector((snapshot) => snapshot.status);
+  const summaries = useProjectLibrarySelector((snapshot) => snapshot.summaries);
   const pinnedIds = useWorkbenchPreferenceSelector((preferences) => preferences.launchpadPinnedProjectIds);
 
   useMountEffect(() => {
@@ -58,13 +60,10 @@ export const ProjectsPage = () => {
     });
   });
 
-  const handleViewChange = useCallback((next: ProjectsViewId) => {
-    void patchWorkbenchPreferences({ launchpadProjectsView: next });
-  }, []);
-  const handleSortChange = useCallback((next: ProjectSortId) => {
-    void patchWorkbenchPreferences({ launchpadProjectsSort: next });
-  }, []);
-  const handleClearSearch = useCallback(() => setSearchTerm(''), []);
+  const displayName = session.user?.display_name?.trim();
+  const greeting = displayName
+    ? t('launchpad.projectsGreetingWithName', { name: displayName })
+    : t('launchpad.projectsGreeting');
 
   const handleImport = useCallback(async () => {
     const owner = captureAccountScope();
@@ -94,6 +93,9 @@ export const ProjectsPage = () => {
   }, [navigate, t]);
   const handleImportClick = useCallback(() => void handleImport(), [handleImport]);
 
+  const isFirstLoad = summaries.length === 0 && (status === 'idle' || status === 'loading');
+  const [mostRecent, ...rest] = summaries;
+
   return (
     <PageShell
       actions={
@@ -110,32 +112,39 @@ export const ProjectsPage = () => {
           </Button>
         </>
       }
-      banner={
-        <Stack gap="4">
-          <KnownBrowserIssuesAlert />
-          <ProjectsToolbar
-            searchTerm={searchTerm}
-            sort={sort}
-            view={view}
-            onSearchTermChange={setSearchTerm}
-            onSortChange={handleSortChange}
-            onViewChange={handleViewChange}
-          />
-        </Stack>
-      }
-      description={t('projects.libraryDescription')}
-      scroll="content"
-      title={t('launchpad.sections.projects')}
+      banner={BROWSER_ISSUES_BANNER}
+      description={t('launchpad.projectsSubtitle')}
+      regionLabel={t('launchpad.sections.home')}
+      title={greeting}
     >
-      <ProjectsBrowser
-        now={now}
+      {/* Ordered by how much it should interrupt: a missing model blocks
+          everything, a running job is worth knowing about, the rest is
+          browsing. Each renders nothing when it has nothing to say.
+
+          The models panel is capability-gated rather than merely hidden: every
+          endpoint it touches — catalog, starters, install — is admin-only, so
+          mounting it for a non-admin would mean a burst of unauthorized
+          requests on every visit to Home, and a call to action they could not
+          complete. */}
+      {canManageModels ? <LivePanel panel="models" /> : null}
+      <LivePanel panel="queue" />
+
+      {isFirstLoad ? <Skeleton minH="24" rounded="lg" /> : mostRecent ? <ResumeCard summary={mostRecent} /> : null}
+
+      <Stack gap="3">
+        <Text fontSize="xs" fontWeight="700">
+          {t('launchpad.home.intents.heading')}
+        </Text>
+        <IntentTiles />
+      </Stack>
+
+      <RecentProjectsRow
         pinnedIds={pinnedIds}
-        searchTerm={searchTerm}
-        sort={sort}
-        view={view}
-        onClearSearch={handleClearSearch}
+        summaries={rest.slice(0, RECENT_PROJECT_COUNT)}
         onTogglePin={toggleProjectPinPreference}
       />
+
+      <LivePanel panel="outputs" />
     </PageShell>
   );
 };

@@ -37,6 +37,13 @@ export interface ProjectSummary {
   revision: number;
   createdAt: string;
   updatedAt: string;
+  /**
+   * Thumbnail for the library grid. Nothing populates this yet — covers land
+   * with the `.invk` project-file work. Consumers must already handle its
+   * absence, which is also the permanent state for a project that has produced
+   * no images.
+   */
+  coverUrl?: string;
 }
 
 export type ProjectLibraryStatus = 'idle' | 'loading' | 'ready' | 'error';
