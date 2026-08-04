@@ -15,6 +15,11 @@
  * `{ op: 'set', args: [prop, value] }` entry, so tests can assert that
  * opacity/blend/style state was applied in order. Extend the method table in
  * `createStubCtx` below as later tasks need more of the API surface.
+ *
+ * Readbacks are INVENTED, since the stub holds no pixels: `getImageData` returns a
+ * correctly-sized buffer whose alpha is {@link StubRasterBackendOptions.readbackAlpha}
+ * (transparent by default). Anything that infers content FROM pixels must therefore
+ * be tested either against a declared `readbackAlpha` or in the browser suite.
  */
 
 import type { RasterBackend, RasterSurface } from './raster';
@@ -35,8 +40,30 @@ export interface StubRasterBackend extends RasterBackend {
   createSurface(width: number, height: number): StubRasterSurface;
 }
 
-const createStubImageData = (width: number, height: number): ImageData => {
+/** Options for {@link createTestStubRasterBackend}. */
+export interface StubRasterBackendOptions {
+  /**
+   * The alpha every pixel of a synthetic readback reports (default `0`).
+   *
+   * The stub holds no pixels, so a `getImageData` result is invented — and a fully
+   * transparent readback now MEANS something: the paint-cache trim reads a layer's
+   * alpha to decide whether it still has visible content, and a layer with none is
+   * cleared rather than persisted. A test that drives paint or mask persistence
+   * through the engine's OWN bitmap store must therefore declare that its layer has
+   * pixels (`readbackAlpha: 255`), or the trim will correctly conclude it is empty
+   * and no upload will happen. Tests that inject their own bitmap store are
+   * unaffected.
+   */
+  readbackAlpha?: number;
+}
+
+const createStubImageData = (width: number, height: number, alpha = 0): ImageData => {
   const data = new Uint8ClampedArray(Math.max(0, width) * Math.max(0, height) * 4);
+  if (alpha !== 0) {
+    for (let index = 3; index < data.length; index += 4) {
+      data[index] = alpha;
+    }
+  }
   return { colorSpace: 'srgb', data, height, width } as unknown as ImageData;
 };
 
@@ -54,7 +81,10 @@ const fontSizeFromShorthand = (font: unknown): number => {
   return match ? parseFloat(match[1] ?? '10') : 10;
 };
 
-const createStubCtx = (callLog: RasterCallLogEntry[]): OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D => {
+const createStubCtx = (
+  callLog: RasterCallLogEntry[],
+  readbackAlpha: number
+): OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D => {
   const log = (op: string, args: unknown[]): void => {
     callLog.push({ args, op });
   };
@@ -103,7 +133,7 @@ const createStubCtx = (callLog: RasterCallLogEntry[]): OffscreenCanvasRenderingC
     createImageData: (...args: unknown[]) => {
       const [width, height] = args as [number, number];
       log('createImageData', [width, height]);
-      return createStubImageData(width, height);
+      return createStubImageData(width, height, readbackAlpha);
     },
     drawImage: (...args: unknown[]) => log('drawImage', args),
     ellipse: (...args: unknown[]) => log('ellipse', args),
@@ -112,7 +142,7 @@ const createStubCtx = (callLog: RasterCallLogEntry[]): OffscreenCanvasRenderingC
     getImageData: (...args: unknown[]) => {
       const [sx, sy, sw, sh] = args as [number, number, number, number];
       log('getImageData', [sx, sy, sw, sh]);
-      return createStubImageData(sw, sh);
+      return createStubImageData(sw, sh, readbackAlpha);
     },
     lineTo: (...args: unknown[]) => log('lineTo', args),
     moveTo: (...args: unknown[]) => log('moveTo', args),
@@ -152,11 +182,11 @@ class StubRasterSurfaceImpl implements StubRasterSurface {
   width: number;
   height: number;
 
-  constructor(width: number, height: number) {
+  constructor(width: number, height: number, readbackAlpha = 0) {
     this.width = width;
     this.height = height;
     this.canvas = { height, width } as unknown as OffscreenCanvas | HTMLCanvasElement;
-    this.ctx = createStubCtx(this.callLog);
+    this.ctx = createStubCtx(this.callLog, readbackAlpha);
   }
 
   resize(w: number, h: number): void {
@@ -182,12 +212,13 @@ class StubRasterSurfaceImpl implements StubRasterSurface {
  * Creates a `RasterBackend` whose surfaces are backed by a fake, node-safe
  * 2D context that records draw calls instead of executing them.
  */
-export const createTestStubRasterBackend = (): StubRasterBackend => ({
+export const createTestStubRasterBackend = (options: StubRasterBackendOptions = {}): StubRasterBackend => ({
   createImageBitmap: (source: ImageBitmapSource): Promise<ImageBitmap> => {
     void source;
     return Promise.resolve({ close: () => {}, height: 0, width: 0 } as unknown as ImageBitmap);
   },
-  createSurface: (width: number, height: number): StubRasterSurface => new StubRasterSurfaceImpl(width, height),
+  createSurface: (width: number, height: number): StubRasterSurface =>
+    new StubRasterSurfaceImpl(width, height, options.readbackAlpha ?? 0),
   // Deterministic fake blob keyed on the surface size, so encode calls are
   // reproducible in node without touching a real canvas.
   encodeSurface: (surface: RasterSurface, type = 'image/png'): Promise<Blob> =>

@@ -36,7 +36,7 @@ describe('createTestStubRasterBackend', () => {
     expect(surface.callLog[2]).toEqual({ op: 'setTransform', args: [1, 0, 0, 1, 5, 5] });
   });
 
-  it('getImageData returns a correctly-sized, zeroed buffer', () => {
+  it('getImageData returns a correctly-sized, zeroed buffer by default', () => {
     const backend = createTestStubRasterBackend();
     const surface = backend.createSurface(4, 3);
     const imageData = surface.ctx.getImageData(0, 0, 4, 3);
@@ -44,6 +44,23 @@ describe('createTestStubRasterBackend', () => {
     expect(imageData.height).toBe(3);
     expect(imageData.data.length).toBe(4 * 3 * 4);
     expect(Array.from(imageData.data).every((v) => v === 0)).toBe(true);
+  });
+
+  it('readbackAlpha fills the alpha channel only, leaving RGB zeroed', () => {
+    // The contract anything inferring content FROM pixels depends on: a stub
+    // surface reports pixels only when the test declares that it has them.
+    const backend = createTestStubRasterBackend({ readbackAlpha: 255 });
+    const imageData = backend.createSurface(2, 2).ctx.getImageData(0, 0, 2, 2);
+    const alphas = [...imageData.data].filter((_, index) => index % 4 === 3);
+    const colors = [...imageData.data].filter((_, index) => index % 4 !== 3);
+    expect(alphas).toEqual([255, 255, 255, 255]);
+    expect(colors.every((value) => value === 0)).toBe(true);
+  });
+
+  it('readbackAlpha also applies to createImageData', () => {
+    const backend = createTestStubRasterBackend({ readbackAlpha: 7 });
+    const imageData = backend.createSurface(1, 1).ctx.createImageData(1, 1);
+    expect(imageData.data[3]).toBe(7);
   });
 
   it('putImageData is recorded in the call log', () => {

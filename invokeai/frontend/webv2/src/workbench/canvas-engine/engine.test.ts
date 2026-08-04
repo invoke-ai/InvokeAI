@@ -12580,7 +12580,8 @@ describe('document mirror wiring: prop vs source change (paint-pixel survival)',
       .spyOn(canvasApplicationPort, 'uploadImage')
       .mockResolvedValue({ height: 40, imageName: 'persisted-before-mirror-refresh.png', width: 60 });
     const engine = createCanvasEngine({
-      backend: createTestStubRasterBackend(),
+      // The trim reads alpha to decide a layer still has content; declare it does.
+      backend: createTestStubRasterBackend({ readbackAlpha: 255 }),
       imageResolver: () => Promise.resolve(new Blob()),
       projectId: reducer.projectId,
       reportError,

@@ -14,7 +14,7 @@
 
 import type { Rect } from '@workbench/canvas-engine/types';
 
-import { union } from '@workbench/canvas-engine/math/rect';
+import { intersect, isEmpty, union } from '@workbench/canvas-engine/math/rect';
 
 import type { RasterBackend, RasterSurface } from './raster';
 
@@ -110,6 +110,28 @@ export interface LayerCacheStore {
    * when absent. Returns the entry.
    */
   growToRect(layerId: string, rect: Rect): LayerCacheEntry;
+  /**
+   * SHRINKS a layer's cache to `rect` in layer-local space — the mirror of
+   * {@link growToRect}. `rect` is INTERSECTED with the current extent, so this can
+   * never grow a cache. Pixels inside the retained rect are preserved at their new
+   * offset; everything outside is dropped. An EMPTY `rect` collapses the cache to a
+   * zero-rect surface, the extent a brand-new or fully-erased paint layer has.
+   *
+   * Bumps the version and notifies UNCONDITIONALLY, unlike `growToRect`, which does
+   * so only when the entry had published pixels. Growth preserves everything the old
+   * version described; a shrink DESTROYS pixels, so every version-keyed dependent
+   * must be invalidated — in particular an in-flight rasterization job, which drops
+   * itself when the entry's version has moved and would otherwise resize the trimmed
+   * surface back up and redraw over it.
+   *
+   * The entry is MUTATED, never deleted: `applyImagePatch` gates undo on the entry
+   * existing, so a collapsed cache must still be able to receive restored pixels
+   * through `growToRect`.
+   *
+   * A no-op returning the entry when `rect` already equals the current extent, and
+   * `undefined` when the layer has no cache.
+   */
+  shrinkToRect(layerId: string, rect: Rect): LayerCacheEntry | undefined;
   /** Clones `pixels` into a detached replacement without mutating the live cache. */
   prepareReplacement(layerId: string, rect: Rect, pixels: RasterSurface): PreparedLayerCacheReplacement;
   /** Publishes a detached replacement without allocating, resizing, or drawing. */
@@ -343,6 +365,45 @@ export const createLayerCacheStore = (
     return existing;
   };
 
+  const shrinkToRect = (layerId: string, rect: Rect): LayerCacheEntry | undefined => {
+    const existing = entries.get(layerId);
+    if (!existing) {
+      return undefined;
+    }
+    const cur = existing.rect;
+    const requested: Rect = {
+      height: Math.max(0, Math.round(rect.height)),
+      width: Math.max(0, Math.round(rect.width)),
+      x: Math.round(rect.x),
+      y: Math.round(rect.y),
+    };
+    // Intersect rather than adopt: a shrink must never be able to grow a cache, so
+    // a request reaching outside the current extent is clamped back into it.
+    const clamped = isEmpty(cur) || isEmpty(requested) ? null : intersect(cur, requested);
+    const newRect: Rect = clamped ?? { height: 0, width: 0, x: cur.x, y: cur.y };
+    if (newRect.x === cur.x && newRect.y === cur.y && newRect.width === cur.width && newRect.height === cur.height) {
+      touch(existing);
+      return existing;
+    }
+    // The surface origin moves with the trimmed rect, so every surface-local rect
+    // recorded so far is void — same reasoning as `growToRect`.
+    damageTrails.delete(layerId);
+    const surface = existing.surface;
+    if (isEmpty(newRect)) {
+      surface.resize(0, 0);
+    } else {
+      // A negative blit offset is exactly how a crop is expressed: `drawImage`
+      // clips whatever falls outside the smaller surface, so the retained window
+      // lands at the new origin in one GPU blit with no CPU round trip.
+      surface.resizePreserving(newRect.width, newRect.height, cur.x - newRect.x, cur.y - newRect.y);
+    }
+    existing.rect = newRect;
+    touch(existing);
+    existing.version += 1;
+    notifyVersionChange(layerId);
+    return existing;
+  };
+
   const prepareReplacement = (layerId: string, rect: Rect, pixels: RasterSurface): PreparedLayerCacheReplacement => {
     const normalizedRect: Rect = {
       height: Math.max(0, Math.round(rect.height)),
@@ -496,6 +557,7 @@ export const createLayerCacheStore = (
     peek,
     prepareReplacement,
     publishPixels,
+    shrinkToRect,
     version,
   };
 };
