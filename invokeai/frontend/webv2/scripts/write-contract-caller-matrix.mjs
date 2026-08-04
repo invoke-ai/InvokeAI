@@ -117,7 +117,9 @@ try {
       if (!target || !callerRecords.has(target)) {
         continue;
       }
-      allCallerRecords.get(target).add(path);
+      if (reference.symbols.length > 0) {
+        allCallerRecords.get(target).add(path);
+      }
       for (const symbol of reference.symbols) {
         if (symbol !== 'default' && symbol !== '*') {
           addCaller(target, symbol, path);
