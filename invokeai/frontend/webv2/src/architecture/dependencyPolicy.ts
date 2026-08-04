@@ -1,20 +1,5 @@
-import type { Node } from 'typescript/unstable/ast';
-
-import {
-  isCallExpression,
-  isExportDeclaration,
-  isImportDeclaration,
-  isImportTypeNode,
-  isLiteralTypeNode,
-  isNamedImports,
-  isNamespaceExport,
-  isNamespaceImport,
-  isStringLiteralLikeNode,
-  SyntaxKind,
-} from 'typescript/unstable/ast';
-
 import { FEATURE_PUBLIC_INTERFACES } from './featureInterfaces';
-import { parseSource, primeSources } from './tsSourceParser';
+import { analyzeSource, primeSourceAnalysis } from './tsSourceAnalysis';
 
 export type ModuleOwner = 'app' | 'platform' | 'workbench' | `feature:${string}`;
 
@@ -76,55 +61,20 @@ const normalizePath = (path: string): string => {
  * each later call is served from the already-loaded program.
  */
 export const primeImportSources = (entries: Iterable<readonly [string, string]>): void => {
-  primeSources(entries, { jsx: true });
+  primeSourceAnalysis(entries, { jsx: true });
 };
 
-export const collectImportReferences = (source: string, fileName = 'source.ts'): ImportReference[] => {
-  const sourceFile = parseSource(fileName, source, { jsx: true });
-  const references: ImportReference[] = [];
+export const collectImportReferences = (source: string, fileName = 'source.ts'): ImportReference[] =>
+  analyzeSource(fileName, source, { jsx: true }).moduleReferences.map((reference) => {
+    const exposesCanvasEngine =
+      (reference.form === 'import-declaration' &&
+        (reference.namespace || reference.symbols.includes('CanvasEngine'))) ||
+      (reference.form === 'export-declaration' &&
+        (reference.namespace || reference.symbols.includes('CanvasEngine'))) ||
+      (reference.form === 'import-type' && reference.qualifier?.includes('CanvasEngine') === true);
 
-  const pushLiteral = (kind: ImportReference['kind'], node: Node | undefined, exposesCanvasEngine = false): void => {
-    if (node && isStringLiteralLikeNode(node)) {
-      references.push({ exposesCanvasEngine, kind, specifier: node.text });
-    }
-  };
-
-  const visit = (node: Node): void => {
-    if (isImportDeclaration(node)) {
-      const bindings = node.importClause?.namedBindings;
-      const exposesCanvasEngine =
-        Boolean(bindings && isNamespaceImport(bindings)) ||
-        Boolean(
-          bindings &&
-          isNamedImports(bindings) &&
-          bindings.elements.some((element) => (element.propertyName ?? element.name).text === 'CanvasEngine')
-        );
-      // TypeScript 7 models `import type` as a phase modifier alongside
-      // `import defer`, which replaced the old `isTypeOnly` flag.
-      const isTypeOnly = node.importClause?.phaseModifier === SyntaxKind.TypeKeyword;
-      pushLiteral(isTypeOnly ? 'import-type' : 'import', node.moduleSpecifier, exposesCanvasEngine);
-    } else if (isExportDeclaration(node)) {
-      const exposesCanvasEngine =
-        !node.exportClause ||
-        isNamespaceExport(node.exportClause) ||
-        node.exportClause.elements.some((element) => (element.propertyName ?? element.name).text === 'CanvasEngine');
-      pushLiteral(
-        !node.exportClause || isNamespaceExport(node.exportClause) ? 'export-star' : 'export',
-        node.moduleSpecifier,
-        exposesCanvasEngine
-      );
-    } else if (isImportTypeNode(node) && isLiteralTypeNode(node.argument)) {
-      pushLiteral('import-type', node.argument.literal, node.qualifier?.getText(sourceFile).includes('CanvasEngine'));
-    } else if (isCallExpression(node) && node.expression.kind === SyntaxKind.ImportKeyword) {
-      pushLiteral('dynamic-import', node.arguments[0]);
-    }
-
-    node.forEachChild(visit);
-  };
-
-  visit(sourceFile);
-  return references;
-};
+    return { exposesCanvasEngine, kind: reference.kind, specifier: reference.specifier };
+  });
 
 export const resolveImportPath = (sourcePath: string, specifier: string): string | null => {
   if (specifier.startsWith('.')) {

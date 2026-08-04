@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 
 import {
   checkDependency,
@@ -12,6 +12,7 @@ import {
 } from './dependencyPolicy';
 import { FEATURE_PUBLIC_INTERFACES } from './featureInterfaces';
 import { migrationExceptions } from './migrationExceptions';
+import { closeSourceAnalysis } from './tsSourceAnalysis';
 
 const sources = import.meta.glob('../**/*.{ts,tsx}', {
   eager: true,
@@ -21,6 +22,8 @@ const sources = import.meta.glob('../**/*.{ts,tsx}', {
 
 const toSourcePath = (path: string): string => path.replace(/^\.\.\//, '');
 const isProduction = (path: string): boolean => !/\.(?:test|browser\.test)\.[^.]+$/.test(path);
+
+afterAll(closeSourceAnalysis);
 
 describe('dependency policy parser', () => {
   it('classifies every supported TypeScript import form', () => {

@@ -1,25 +1,7 @@
-import type { SourceFile, Statement } from 'typescript/unstable/ast';
-
-import {
-  isClassDeclaration,
-  isEmptyStatement,
-  isEnumDeclaration,
-  isExportAssignment,
-  isExportDeclaration,
-  isFunctionDeclaration,
-  isIdentifier,
-  isImportDeclaration,
-  isInterfaceDeclaration,
-  isNamedExports,
-  isTypeAliasDeclaration,
-  isVariableStatement,
-  ModifierFlags,
-  SyntaxKind,
-} from 'typescript/unstable/ast';
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 
 import { collectImportReferences, getModuleOwner, primeImportSources, resolveImportPath } from './dependencyPolicy';
-import { parseSource } from './tsSourceParser';
+import { analyzeSource, closeSourceAnalysis } from './tsSourceAnalysis';
 import { getWorkbenchTargetOwner, getWorkbenchTargetPath, workbenchOwnershipManifest } from './workbenchOwnership';
 
 const sources = import.meta.glob('../**/*.{ts,tsx}', {
@@ -53,66 +35,7 @@ const resolveSourceFile = (sourcePath: string, specifier: string): string | null
 const getTargetOwner = (path: string) =>
   path.startsWith('workbench/') ? getWorkbenchTargetOwner(path) : getModuleOwner(path);
 
-// TypeScript 7 folds the modifier list into `modifierFlags`, which only the
-// statement kinds that accept modifiers declare.
-const hasExportModifier = (statement: Statement): boolean => {
-  const { modifierFlags } = statement as { modifierFlags?: ModifierFlags };
-  return modifierFlags !== undefined && (modifierFlags & ModifierFlags.Export) !== 0;
-};
-
-const collectPublicExports = (sourceFile: SourceFile): string[] => {
-  const exports = new Set<string>();
-
-  for (const statement of sourceFile.statements) {
-    if (hasExportModifier(statement)) {
-      if (
-        (isClassDeclaration(statement) ||
-          isFunctionDeclaration(statement) ||
-          isInterfaceDeclaration(statement) ||
-          isTypeAliasDeclaration(statement) ||
-          isEnumDeclaration(statement)) &&
-        statement.name
-      ) {
-        exports.add(statement.name.text);
-      } else if (isVariableStatement(statement)) {
-        for (const declaration of statement.declarationList.declarations) {
-          if (isIdentifier(declaration.name)) {
-            exports.add(declaration.name.text);
-          }
-        }
-      }
-    }
-    if (isExportAssignment(statement)) {
-      exports.add('default');
-    }
-    if (isExportDeclaration(statement)) {
-      if (!statement.exportClause) {
-        exports.add('*');
-      } else if (isNamedExports(statement.exportClause)) {
-        for (const element of statement.exportClause.elements) {
-          exports.add(element.name.text);
-        }
-      }
-    }
-  }
-
-  return [...exports].sort();
-};
-
-const isTypeOnlyModule = (sourceFile: SourceFile): boolean => {
-  return sourceFile.statements.every((statement) => {
-    if (isInterfaceDeclaration(statement) || isTypeAliasDeclaration(statement)) {
-      return true;
-    }
-    if (isImportDeclaration(statement)) {
-      return statement.importClause?.phaseModifier === SyntaxKind.TypeKeyword;
-    }
-    if (isExportDeclaration(statement)) {
-      return statement.isTypeOnly;
-    }
-    return isEmptyStatement(statement);
-  });
-};
+afterAll(closeSourceAnalysis);
 
 const stronglyConnectedComponents = (graph: Map<string, Set<string>>): string[][] => {
   let nextIndex = 0;
@@ -218,7 +141,7 @@ describe('Workbench ownership manifest', () => {
     const records = workbenchSources.map(([path, source]) => {
       const targetOwner = getWorkbenchTargetOwner(path);
       expect(targetOwner, `Unclassified: ${path}`).not.toBeNull();
-      const sourceFile = parseSource(path, source, { jsx: true });
+      const analysis = analyzeSource(path, source, { jsx: true });
 
       const outboundOwners = new Set<string>();
       for (const reference of importReferencesByPath.get(path) ?? []) {
@@ -240,10 +163,10 @@ describe('Workbench ownership manifest', () => {
       return {
         currentOwner: 'workbench',
         inboundOwners: [] as string[],
-        moduleKind: isTypeOnlyModule(sourceFile) ? 'type-only' : 'runtime',
+        moduleKind: analysis.typeOnly ? 'type-only' : 'runtime',
         outboundOwners: [...outboundOwners].sort(),
         path,
-        publicExports: collectPublicExports(sourceFile),
+        publicExports: [...analysis.publicExports],
         targetOwner,
         targetPath: getWorkbenchTargetPath(path),
         testCompanions,
