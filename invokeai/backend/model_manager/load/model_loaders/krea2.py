@@ -28,7 +28,10 @@ from invokeai.backend.quantization.fp8_scaled import (
     FP8_DTYPE,
     attach_fp8_scales,
     dequantize_fp8_scaled,
+    device_supports_fp8_matmul,
+    extract_comfy_quant_hints,
     extract_fp8_scaled_layers,
+    full_precision_hints_respected,
     is_fp8_matmul_enabled,
     parse_quantization_metadata,
 )
@@ -388,7 +391,13 @@ class Krea2CheckpointModel(ModelLoader):
         # Native/ComfyUI key naming → diffusers Krea2Transformer2DModel keys. Done *before* the fp8
         # scales are pulled out: the renames are substring-based on ".weight", so a sibling
         # ".weight_scale" is carried to the same destination key automatically.
-        layer_hints = parse_quantization_metadata(metadata)
+        #
+        # Per-layer `.comfy_quant` markers are read first (they are popped out of `sd` here, before
+        # the key conversion, which only knows how to rename ".weight"-suffixed keys). Checkpoints
+        # ship the flags in either the header or these markers; without both, a checkpoint using
+        # only the per-tensor form has its full_precision_matrix_mult layers silently multiplied in
+        # fp8. The header wins on the rare checkpoint carrying both.
+        layer_hints = {**extract_comfy_quant_hints(sd), **parse_quantization_metadata(metadata)}
         if _is_native_krea2_format(sd):
             sd = _convert_krea2_native_to_diffusers(sd)
             # The metadata still names layers natively; rename it the same way or its per-layer
@@ -426,6 +435,23 @@ class Krea2CheckpointModel(ModelLoader):
         if fp8_layers:
             attached = attach_fp8_scales(model, fp8_layers)
             self._logger.info(f"Krea-2: kept {attached} layer(s) in fp8 (scaled fp8 checkpoint, fp8_compute enabled)")
+            # Marked layers dequantize on every forward instead of using the tensor cores, which is
+            # the single biggest lever on how much fp8_compute actually buys for a given checkpoint.
+            # Surface it: otherwise "fp8_compute is on but barely faster" has no visible cause.
+            marked = sum(1 for layer in fp8_layers.values() if layer.full_precision_matmul)
+            if marked:
+                if full_precision_hints_respected():
+                    self._logger.info(
+                        f"Krea-2: {marked} of {len(fp8_layers)} layer(s) are marked "
+                        "full_precision_matrix_mult and will dequantize per forward. Set "
+                        "fp8_compute_full_precision_hints=false to run them on the fp8 tensor cores "
+                        "instead (faster, but overrides the checkpoint producer's instruction)."
+                    )
+                else:
+                    self._logger.info(
+                        f"Krea-2: ignoring the full_precision_matrix_mult marker on {marked} layer(s) "
+                        "(fp8_compute_full_precision_hints=false)."
+                    )
             # fp8_storage exists to *create* fp8 weights from full-precision ones; here they already
             # are fp8, so it is bypassed entirely. Say so, otherwise a user who enabled it is left
             # wondering whether it took effect.
@@ -545,12 +571,26 @@ class Qwen3VLEncoderLoader(ModelLoader):
         )
 
 
-def _remap_qwen3vl_singlefile_keys(sd: dict[str, Any]) -> dict[str, Any]:
-    """Remap ComfyUI single-file Qwen3-VL keys to the transformers ``Qwen3VLModel`` layout.
+def _qwen3vl_target_key(key: str) -> str:
+    """Map one ComfyUI single-file Qwen3-VL key (or module path) to the transformers layout.
 
     ComfyUI/native layout uses a single ``model.`` prefix for both towers; transformers splits them:
     ``model.visual.*`` -> ``visual.*`` and ``model.<rest>`` (layers/embed_tokens/norm) -> ``language_model.<rest>``.
+
+    Shared by the state-dict remap and the fp8 layer-hint remap so the two cannot drift apart: a hint
+    keyed by a path the model does not have matches nothing and is silently ignored.
     """
+    # Strip a leading "model." (some checkpoints prefix everything with it), then route by tower.
+    key = key[len("model.") :] if key.startswith("model.") else key
+    if key.startswith("visual.") or key.startswith("language_model."):
+        # Already the transformers layout (e.g. "model.language_model.*" / "model.visual.*").
+        return key
+    # Bare language-model keys (layers.* / embed_tokens / norm) belong under language_model.
+    return "language_model." + key
+
+
+def _remap_qwen3vl_singlefile_keys(sd: dict[str, Any]) -> dict[str, Any]:
+    """Remap ComfyUI single-file Qwen3-VL keys to the transformers ``Qwen3VLModel`` layout."""
     out: dict[str, Any] = {}
     source_of: dict[Any, Any] = {}
     what = "Qwen3-VL encoder checkpoint"
@@ -558,14 +598,7 @@ def _remap_qwen3vl_singlefile_keys(sd: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(k, str):
             _put_unique_key(out, k, v, source=k, source_of=source_of, what=what)
             continue
-        # Strip a leading "model." (some checkpoints prefix everything with it), then route by tower.
-        key = k[len("model.") :] if k.startswith("model.") else k
-        if key.startswith("visual.") or key.startswith("language_model."):
-            # Already the transformers layout (e.g. "model.language_model.*" / "model.visual.*").
-            _put_unique_key(out, key, v, source=k, source_of=source_of, what=what)
-        else:
-            # Bare language-model keys (layers.* / embed_tokens / norm) belong under language_model.
-            _put_unique_key(out, "language_model." + key, v, source=k, source_of=source_of, what=what)
+        _put_unique_key(out, _qwen3vl_target_key(k), v, source=k, source_of=source_of, what=what)
     return out
 
 
@@ -649,30 +682,84 @@ class Qwen3VLEncoderCheckpointLoader(ModelLoader):
         model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
 
         sd = load_file(str(model_path))
-        # Detect an fp8 source (ComfyUI 'scaled fp8' weight_scale keys, or raw float8 weights) BEFORE
-        # dequantizing. An fp8-on-disk encoder is kept fp8-resident with layerwise upcasting below, so
-        # it occupies ~half the VRAM of the dequantized bf16 model (the whole point of shipping fp8).
-        source_is_fp8 = any(isinstance(k, str) and k.endswith(".weight_scale") for k in sd) or any(
+        metadata = _read_safetensors_metadata(model_path, self._logger)
+        # Per-layer markers must be read before extract_fp8_scaled_layers() drops them, and before
+        # the key remap, which would not carry a ".comfy_quant" suffix to a sensible destination.
+        layer_hints = {**extract_comfy_quant_hints(sd), **parse_quantization_metadata(metadata)}
+        # A legacy activation-scale marker this loader has never consumed.
+        for k in list(sd.keys()):
+            if isinstance(k, str) and "scale_input" in k:
+                del sd[k]
+
+        # Remap BEFORE pulling the scales out. The remap rewrites whole keys, so each
+        # ".weight_scale" travels with its ".weight" and the recovered layer paths already match the
+        # model's module paths — which is what attach_fp8_scales() resolves them against.
+        sd = _remap_qwen3vl_singlefile_keys(sd)
+        layer_hints = {_qwen3vl_target_key(path): hints for path, hints in layer_hints.items()}
+
+        # ComfyUI 'scaled fp8' (fp8 weight + .weight_scale). Only the language-model linears are
+        # quantized in the checkpoints seen so far; the visual tower stays bf16 either way.
+        fp8_layers = extract_fp8_scaled_layers(sd, layer_hints=layer_hints)
+        source_is_fp8 = bool(fp8_layers) or any(
             getattr(t, "dtype", None) in (torch.float8_e4m3fn, torch.float8_e5m2) for t in sd.values()
         )
-        # ComfyUI 'scaled fp8': fold weight_scale into the weights, then drop quantization metadata.
-        sd = _dequantize_scaled_fp8(sd)
-        for k in list(sd.keys()):
-            if isinstance(k, str) and (k.endswith(".comfy_quant") or "scale_input" in k):
-                del sd[k]
-        sd = _remap_qwen3vl_singlefile_keys(sd)
+        keep_fp8 = bool(fp8_layers) and is_fp8_matmul_enabled() and device_supports_fp8_matmul(target_device)
+        if fp8_layers and not keep_fp8:
+            # Legacy behavior: fold the scales into the weights. Without the fp8 matmul, staying
+            # quantized would save VRAM but cost speed, so the two are tied to the same setting.
+            dequantize_fp8_scaled(sd, fp8_layers, model_dtype)
+            fp8_layers = {}
 
         te_config = self._load_hf_config()
         with accelerate.init_empty_weights():
             model = Qwen3VLModel._from_config(te_config)
 
-        new_sd_size = sum(ten.nelement() * model_dtype.itemsize for ten in sd.values())
+        # fp8 weights keep their own (1-byte) footprint; everything else lands in model_dtype.
+        new_sd_size = sum(
+            ten.nelement() * (ten.element_size() if ten.dtype == FP8_DTYPE else model_dtype.itemsize)
+            for ten in sd.values()
+        )
         self._ram_cache.make_room(new_sd_size)
         for k in sd.keys():
-            sd[k] = sd[k].to(model_dtype)
+            if sd[k].dtype is not FP8_DTYPE:
+                sd[k] = sd[k].to(model_dtype)
 
         model.load_state_dict(sd, assign=True, strict=False)
         _reject_incomplete_load(model, what="Qwen3-VL encoder checkpoint")
+
+        if fp8_layers:
+            # Keep the weights quantized and let CustomLinear run their matmuls on the fp8 tensor
+            # cores. Same resident VRAM as the layerwise-casting path below, but without paying a
+            # fp8->bf16 round trip on every forward.
+            attached = attach_fp8_scales(model, fp8_layers)
+            # The checkpoint quantizes only the language-model linears; the visual tower ships bf16
+            # and would make the encoder ~0.4GB larger resident than the plain fp8_storage path. On a
+            # GPU already holding a ~12GB transformer that is enough to push the transformer into
+            # partial loading, so cast the rest to fp8 storage. Two exclusions:
+            #
+            #  - anything carrying a `weight_scale`: those keep their scale and go through
+            #    _scaled_mm; the cast hooks would upcast them without it, i.e. a wrong weight.
+            #  - `nn.Embedding`: the token embedding table is this model's *input* representation
+            #    and it is large (389M params). Measured on qwen3vl_4b_fp8_scaled, quantizing it
+            #    doubles the encoder's error against bf16 (relative L2 0.0079 -> 0.0163) to save
+            #    371MiB. That is a bad trade for a model whose entire job is text fidelity. (The
+            #    old fp8_storage path did cast it — this is strictly more accurate than before.)
+            self._apply_fp8_to_nn_module(
+                model,
+                storage_dtype=torch.float8_e4m3fn,
+                compute_dtype=model_dtype,
+                skip=lambda _name, module: getattr(module, "weight_scale", None) is not None
+                or isinstance(module, torch.nn.Embedding),
+            )
+            self._logger.info(
+                f"FP8 compute enabled for Qwen3-VL encoder '{config.name}': kept {attached} layer(s) "
+                f"quantized (storage=float8_e4m3fn, matmul=torch._scaled_mm, compute={model_dtype}); "
+                "remaining layers cast to fp8 storage."
+            )
+            # The layerwise-casting path below exists to *produce* fp8 weights from full-precision
+            # ones. These already are fp8, and its hooks would cast them to the compute dtype without
+            # applying weight_scale — a silently wrong weight. It must not run here.
+            return model
 
         # Keep an fp8 encoder running in fp8 (storage=float8_e4m3fn, per-layer upcast to the compute
         # dtype during forward) on CUDA. `_should_use_fp8` deliberately excludes text encoders (and the

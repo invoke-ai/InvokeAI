@@ -48057,6 +48057,12 @@
             "description": "Keep ComfyUI 'scaled fp8' checkpoints quantized instead of dequantizing them at load, and run their matmuls on the fp8 tensor cores (requires an Ada/SM 8.9 or newer NVIDIA GPU; falls back automatically otherwise). Roughly halves the transformer's VRAM and speeds up denoising, but quantizes activations as well, so images will differ from previous versions at the same seed.",
             "default": false
           },
+          "fp8_compute_full_precision_hints": {
+            "type": "boolean",
+            "title": "Fp8 Compute Full Precision Hints",
+            "description": "Honor the per-layer 'full_precision_matrix_mult' flags that some scaled-fp8 checkpoints ship. Those layers then dequantize on every forward instead of using the fp8 tensor cores, which can cost a large part of the fp8_compute speedup - on checkpoints that mark many layers, most of it. Set to false to run every quantized layer on the fp8 tensor cores, ignoring the producer's instruction; faster, but the marked layers were flagged as numerically sensitive, so quality may suffer. Only has an effect when fp8_compute is enabled.",
+            "default": true
+          },
           "ram": {
             "anyOf": [
               {

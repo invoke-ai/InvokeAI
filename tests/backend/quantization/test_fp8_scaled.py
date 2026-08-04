@@ -8,10 +8,12 @@ from invokeai.backend.quantization.fp8_scaled import (
     dequantize_fp8_scaled,
     dequantize_weight,
     device_supports_fp8_matmul,
+    extract_comfy_quant_hints,
     extract_fp8_scaled_layers,
     parse_quantization_metadata,
     scaled_mm_linear,
     set_fp8_matmul_enabled,
+    set_full_precision_hints_respected,
 )
 
 cuda_fp8 = pytest.mark.skipif(
@@ -92,6 +94,101 @@ class TestExtract:
         # Without the remap the flag silently matches nothing - the regression this guards against.
         layers = extract_fp8_scaled_layers(dict(sd), metadata=meta)
         assert layers["renamed.lin"].full_precision_matmul is False
+
+
+def _comfy_quant_blob(full_precision: bool):
+    """The per-layer marker some ComfyUI exports write instead of the header entry."""
+    payload = f'{{"format": "float8_e4m3fn", "full_precision_matrix_mult": {"true" if full_precision else "false"}}}'
+    return torch.tensor(list(payload.encode("utf-8")), dtype=torch.uint8)
+
+
+class TestComfyQuantHints:
+    def test_reads_per_layer_markers_and_pops_them(self):
+        sd = {
+            "blk.0.lin.weight": _fp8_weight(32, 16)[0],
+            "blk.0.lin.comfy_quant": _comfy_quant_blob(True),
+            "blk.1.lin.comfy_quant": _comfy_quant_blob(False),
+        }
+        hints = extract_comfy_quant_hints(sd)
+        assert hints["blk.0.lin"]["full_precision_matrix_mult"] is True
+        assert hints["blk.1.lin"]["full_precision_matrix_mult"] is False
+        assert not [k for k in sd if "comfy_quant" in k], "markers must not reach load_state_dict"
+
+    def test_full_precision_flag_reaches_the_layer(self):
+        """The regression this guards: a checkpoint carrying the flags *only* in per-layer markers
+        had them silently ignored, so layers the producer marked unsafe were multiplied in fp8."""
+        q, scale = _fp8_weight(32, 16)
+        sd = {"blk.0.lin.weight": q, "blk.0.lin.weight_scale": scale, "blk.0.lin.comfy_quant": _comfy_quant_blob(True)}
+        hints = extract_comfy_quant_hints(sd)
+        layers = extract_fp8_scaled_layers(sd, layer_hints=hints)
+        assert layers["blk.0.lin"].full_precision_matmul is True
+
+        # Reading only the header (no hints) is what used to happen - the flag matches nothing.
+        sd2 = {"blk.0.lin.weight": q, "blk.0.lin.weight_scale": scale, "blk.0.lin.comfy_quant": _comfy_quant_blob(True)}
+        assert extract_fp8_scaled_layers(sd2).get("blk.0.lin").full_precision_matmul is False
+
+    def test_nul_padded_and_malformed_blobs(self):
+        padded = torch.cat([_comfy_quant_blob(True), torch.zeros(8, dtype=torch.uint8)])
+        sd = {
+            "a.comfy_quant": padded,
+            "b.comfy_quant": torch.tensor(list(b"not json"), dtype=torch.uint8),
+        }
+        hints = extract_comfy_quant_hints(sd)
+        assert hints["a"]["full_precision_matrix_mult"] is True
+        # A malformed marker is a lost hint, never a failed load.
+        assert "b" not in hints
+        assert not sd
+
+
+class TestQwen3VLKeyRemap:
+    def test_scale_keys_and_hint_paths_land_on_the_same_module(self):
+        """attach_fp8_scales resolves hint paths against the *model*, so the state-dict remap and the
+        hint remap must agree - otherwise every recovered scale silently matches nothing."""
+        from invokeai.backend.model_manager.load.model_loaders.krea2 import (
+            _qwen3vl_target_key,
+            _remap_qwen3vl_singlefile_keys,
+        )
+
+        q, scale = _fp8_weight(32, 16)
+        sd = _remap_qwen3vl_singlefile_keys(
+            {
+                "model.layers.0.mlp.down_proj.weight": q,
+                "model.layers.0.mlp.down_proj.weight_scale": scale,
+                "model.visual.blocks.0.attn.qkv.weight": torch.zeros(16, 16),
+            }
+        )
+        assert "language_model.layers.0.mlp.down_proj.weight_scale" in sd
+        assert "visual.blocks.0.attn.qkv.weight" in sd
+
+        hints = {_qwen3vl_target_key("model.layers.0.mlp.down_proj"): {"full_precision_matrix_mult": True}}
+        layers = extract_fp8_scaled_layers(sd, layer_hints=hints)
+        assert set(layers) == {"language_model.layers.0.mlp.down_proj"}
+        assert layers["language_model.layers.0.mlp.down_proj"].full_precision_matmul is True
+
+
+class TestFullPrecisionHintToggle:
+    def test_marker_is_applied_by_default(self):
+        q, scale = _fp8_weight(32, 16)
+        module = torch.nn.Linear(16, 32, bias=False)
+        module.weight = torch.nn.Parameter(q, requires_grad=False)
+        model = torch.nn.Sequential()
+        model.add_module("lin", module)
+        attach_fp8_scales(model, {"lin": Fp8ScaledLayer(weight_scale=scale, full_precision_matmul=True)})
+        assert module._fp8_full_precision_matmul is True
+
+    def test_marker_suppressed_when_hints_are_off(self):
+        """Turning the hints off must reach the module flag CustomLinear reads, not just the parse."""
+        q, scale = _fp8_weight(32, 16)
+        module = torch.nn.Linear(16, 32, bias=False)
+        module.weight = torch.nn.Parameter(q, requires_grad=False)
+        model = torch.nn.Sequential()
+        model.add_module("lin", module)
+        set_full_precision_hints_respected(False)
+        try:
+            attach_fp8_scales(model, {"lin": Fp8ScaledLayer(weight_scale=scale, full_precision_matmul=True)})
+        finally:
+            set_full_precision_hints_respected(None)
+        assert module._fp8_full_precision_matmul is False
 
 
 class TestKrea2MetadataRemap:

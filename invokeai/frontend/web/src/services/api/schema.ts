@@ -18829,6 +18829,12 @@ export type components = {
              */
             fp8_compute?: boolean;
             /**
+             * Fp8 Compute Full Precision Hints
+             * @description Honor the per-layer 'full_precision_matrix_mult' flags that some scaled-fp8 checkpoints ship. Those layers then dequantize on every forward instead of using the fp8 tensor cores, which can cost a large part of the fp8_compute speedup - on checkpoints that mark many layers, most of it. Set to false to run every quantized layer on the fp8 tensor cores, ignoring the producer's instruction; faster, but the marked layers were flagged as numerically sensitive, so quality may suffer. Only has an effect when fp8_compute is enabled.
+             * @default true
+             */
+            fp8_compute_full_precision_hints?: boolean;
+            /**
              * Ram
              * @description DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_ram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.
              */

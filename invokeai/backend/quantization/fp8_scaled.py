@@ -29,6 +29,9 @@ INPUT_SCALE_SUFFIX = ".input_scale"
 
 QUANT_METADATA_KEY = "_quantization_metadata"
 
+# Per-layer marker tensor written by ComfyUI exports that do not use the header entry above.
+COMFY_QUANT_SUFFIX = ".comfy_quant"
+
 # Standalone marker keys some producers emit alongside the tensors. They carry no per-layer data.
 STRAY_METADATA_KEYS = ("scaled_fp8",)
 
@@ -74,6 +77,45 @@ def parse_quantization_metadata(metadata: Mapping[str, Any] | None) -> dict[str,
         return {}
     layers = raw.get("layers")
     return layers if isinstance(layers, dict) else {}
+
+
+def extract_comfy_quant_hints(sd: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Decode per-layer ``<path>.comfy_quant`` markers into the same mapping
+    :func:`parse_quantization_metadata` produces, popping them out of ``sd``.
+
+    ComfyUI writes the per-layer quantization flags in one of two places. Newer exports use the
+    safetensors *header* (``_quantization_metadata``); others store one uint8 JSON blob per
+    quantized layer as an ordinary tensor, e.g.::
+
+        model.layers.0.mlp.down_proj.comfy_quant
+            -> {"format": "float8_e4m3fn", "full_precision_matrix_mult": false}
+
+    Both forms carry ``full_precision_matrix_mult`` - the producer's instruction that a layer must
+    not be multiplied in fp8. A loader that reads only the header therefore *silently ignores that
+    instruction* on a checkpoint using the per-tensor form, and runs an fp8 matmul the producer
+    measured as unsafe. Checkpoints using the per-tensor form and marking layers this way exist in
+    the wild, so both forms must be read.
+
+    Malformed blobs are skipped rather than raised on: the marker is an optimization hint, and the
+    scales themselves remain the source of truth.
+    """
+    import json
+
+    hints: dict[str, dict[str, Any]] = {}
+    for key in list(sd.keys()):
+        if not isinstance(key, str) or not key.endswith(COMFY_QUANT_SUFFIX):
+            continue
+        raw = sd.pop(key)
+        path = key[: -len(COMFY_QUANT_SUFFIX)]
+        try:
+            # A uint8 tensor holding UTF-8 JSON, sometimes NUL-padded to a fixed width.
+            blob = bytes(raw.flatten().tolist()).decode("utf-8", errors="replace").rstrip("\x00")
+            parsed = json.loads(blob)
+        except Exception:
+            continue
+        if isinstance(parsed, dict):
+            hints[path] = parsed
+    return hints
 
 
 def _strip_scale_suffix(key: str) -> tuple[str, str] | None:
@@ -173,9 +215,14 @@ def attach_fp8_scales(
     ``_fp8_full_precision_matmul`` flag. The buffers are non-persistent: they must never end up in
     ``state_dict()`` output, or a re-save would produce a checkpoint that gets scaled twice.
 
+    The producer's ``full_precision_matrix_mult`` markers are applied here rather than dropped at
+    parse time, so the recovered metadata stays inspectable, and are suppressed when the user has
+    turned the hints off (see :func:`full_precision_hints_respected`).
+
     Returns the number of modules that were annotated.
     """
     wanted = set(module_paths) if module_paths is not None else None
+    respect_hints = full_precision_hints_respected()
     count = 0
     for path, layer in layers.items():
         if wanted is not None and path not in wanted:
@@ -190,7 +237,7 @@ def attach_fp8_scales(
         module.register_buffer("weight_scale", layer.weight_scale.to(weight.device), persistent=False)
         if layer.input_scale is not None:
             module.register_buffer("input_scale", layer.input_scale.to(weight.device), persistent=False)
-        module._fp8_full_precision_matmul = layer.full_precision_matmul
+        module._fp8_full_precision_matmul = layer.full_precision_matmul and respect_hints
         count += 1
     return count
 
@@ -230,6 +277,36 @@ def is_fp8_matmul_enabled() -> bool:
     except Exception:
         # Backend code may run outside a configured app (scripts, tests). Default to the safe path.
         return False
+
+
+_full_precision_hints_override: bool | None = None
+
+
+def set_full_precision_hints_respected(respected: bool | None) -> None:
+    """Override the configured setting process-wide. Pass ``None`` to revert to the config value."""
+    global _full_precision_hints_override
+    _full_precision_hints_override = respected
+
+
+def full_precision_hints_respected() -> bool:
+    """Whether ``full_precision_matrix_mult`` markers are obeyed.
+
+    Honoring a marker means that layer dequantizes on every forward instead of using the fp8 tensor
+    cores, and that is not cheap: on a checkpoint that marks the attention output, gate and FFN-down
+    projections (a common choice) the marked layers can be ~40% of the quantized weights, and
+    measurably erase most of the fp8_compute speedup. Whether that trade is worth it depends on how
+    much the producer's flags actually buy in a given checkpoint, so it is a user-facing setting
+    rather than a hard-coded policy.
+    """
+    if _full_precision_hints_override is not None:
+        return _full_precision_hints_override
+    try:
+        from invokeai.app.services.config.config_default import get_config
+
+        return bool(get_config().fp8_compute_full_precision_hints)
+    except Exception:
+        # Backend code may run outside a configured app (scripts, tests). Default to obeying them.
+        return True
 
 
 def device_supports_fp8_matmul(device: torch.device) -> bool:

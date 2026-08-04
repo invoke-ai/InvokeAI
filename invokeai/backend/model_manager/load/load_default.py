@@ -6,7 +6,7 @@ import itertools
 import re
 from logging import Logger
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 import torch
 
@@ -323,7 +323,12 @@ class ModelLoader(ModelLoaderBase):
         return model
 
     @staticmethod
-    def _apply_fp8_to_nn_module(model: torch.nn.Module, storage_dtype: torch.dtype, compute_dtype: torch.dtype) -> None:
+    def _apply_fp8_to_nn_module(
+        model: torch.nn.Module,
+        storage_dtype: torch.dtype,
+        compute_dtype: torch.dtype,
+        skip: Optional[Callable[[str, torch.nn.Module], bool]] = None,
+    ) -> None:
         """Apply FP8 layerwise casting to a plain nn.Module.
 
         Mirrors diffusers' `apply_layerwise_casting` semantics: only the layer classes in
@@ -331,11 +336,19 @@ class ModelLoader(ModelLoaderBase):
         `_FP8_DEFAULT_SKIP_PATTERNS` (norm, pos_embed, patch_embed, proj_in/out) are skipped.
         Without the skip list, precision-sensitive tiny learned scalars (e.g. FLUX RMSNorm.scale)
         get crushed to FP8 and quality degrades noticeably.
+
+        `skip` excludes further modules by (dotted name, module). Its one caller uses it to leave
+        scaled-fp8 layers alone: those already hold fp8 weights plus a `weight_scale`, and the cast
+        hooks installed here would upcast them *without* applying that scale — a silently wrong
+        weight. Casting only the remainder lets a partly-quantized checkpoint (fp8 language model,
+        bf16 visual tower) end up fully fp8-resident.
         """
         for module_name, module in model.named_modules():
             if not isinstance(module, _FP8_SUPPORTED_PYTORCH_LAYERS):
                 continue
             if any(re.search(pattern, module_name) for pattern in _FP8_DEFAULT_SKIP_PATTERNS):
+                continue
+            if skip is not None and skip(module_name, module):
                 continue
             params = list(module.parameters(recurse=False))
             if not params:
