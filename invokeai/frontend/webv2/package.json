@@ -3,6 +3,9 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
+  "imports": {
+    "#architecture/source-analysis": "./src/architecture/tsSourceAnalysis.ts"
+  },
   "scripts": {
     "architecture:check": "vitest run --config vitest.config.mts src/architecture/dependencyPolicy.test.ts src/architecture/workbenchOwnership.test.ts src/architecture/architectureWorkflow.test.ts src/architecture/tsSourceAnalysis.test.ts && node scripts/write-workbench-ownership-inventory.mjs && node scripts/write-contract-caller-matrix.mjs && node scripts/write-canvas-import-matrix.mjs",
     "build": "pnpm run lint && vite build",

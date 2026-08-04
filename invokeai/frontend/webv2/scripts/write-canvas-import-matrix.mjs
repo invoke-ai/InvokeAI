@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, extname, join, relative, resolve } from 'node:path';
 
-import { analyzeSource, closeSourceAnalysis, primeSourceAnalysis } from '../src/architecture/tsSourceAnalysis.ts';
+import { analyzeSource, closeSourceAnalysis, primeSourceAnalysis } from '#architecture/source-analysis';
 
 const packageRoot = process.cwd();
 const sourceRoot = resolve(packageRoot, 'src');

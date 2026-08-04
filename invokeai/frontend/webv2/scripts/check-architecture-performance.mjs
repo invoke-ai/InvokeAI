@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 
-import { analyzeSource, closeSourceAnalysis, primeSourceAnalysis } from '../src/architecture/tsSourceAnalysis.ts';
+import { analyzeSource, closeSourceAnalysis, primeSourceAnalysis } from '#architecture/source-analysis';
+
 import {
   BUILD_METRIC_KEYS,
   checkRouteBudget,
