@@ -1,13 +1,7 @@
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, extname, join, relative, resolve } from 'node:path';
-import {
-  isImportDeclaration,
-  isNamedImports,
-  isNamespaceImport,
-  isStringLiteralLikeNode,
-} from 'typescript/unstable/ast';
 
-import { parseSource, primeSources } from './parse-source.mjs';
+import { analyzeSource, closeSourceAnalysis, primeSourceAnalysis } from '../src/architecture/tsSourceAnalysis.ts';
 
 const packageRoot = process.cwd();
 const sourceRoot = resolve(packageRoot, 'src');
@@ -85,70 +79,54 @@ const callerIntent = (path) => {
   }
   return path.split('/').slice(0, 2).join('/');
 };
-const importedSymbols = (clause) => {
-  if (!clause) {
-    return ['side-effect'];
-  }
-  const symbols = [];
-  if (clause.name) {
-    symbols.push('default');
-  }
-  if (clause.namedBindings && isNamespaceImport(clause.namedBindings)) {
-    symbols.push('*');
-  }
-  if (clause.namedBindings && isNamedImports(clause.namedBindings)) {
-    for (const element of clause.namedBindings.elements) {
-      symbols.push((element.propertyName ?? element.name).text);
-    }
-  }
-  return symbols.sort();
-};
-
 const scanned = new Map(
   paths
     .filter((path) => isProduction(path) && !isCanvasOwned(path))
     .map((path) => [path, readFileSync(resolve(sourceRoot, path), 'utf8')])
 );
-// Load the whole tree in one snapshot; parsing file by file costs a round trip each.
-primeSources(scanned);
+try {
+  // Load the whole tree in one snapshot; parsing file by file costs a round trip each.
+  primeSourceAnalysis(scanned);
 
-const imports = [];
-for (const [source, text] of scanned) {
-  const file = parseSource(source, text);
-  for (const statement of file.statements) {
-    if (!isImportDeclaration(statement) || !isStringLiteralLikeNode(statement.moduleSpecifier)) {
-      continue;
+  const imports = [];
+  for (const [source, text] of scanned) {
+    for (const reference of analyzeSource(source, text).moduleReferences) {
+      if (reference.form !== 'import-declaration') {
+        continue;
+      }
+      const target = resolveImport(source, reference.specifier);
+      if (!target || !isCanvasTarget(target)) {
+        continue;
+      }
+      imports.push({
+        intent: callerIntent(source),
+        interface: target.startsWith('workbench/canvas-engine/') ? 'canvas-engine' : 'canvas-operations',
+        private: !isPublicTarget(target),
+        source,
+        symbols: [...reference.symbols].sort(),
+        target,
+      });
     }
-    const target = resolveImport(source, statement.moduleSpecifier.text);
-    if (!target || !isCanvasTarget(target)) {
-      continue;
-    }
-    imports.push({
-      intent: callerIntent(source),
-      interface: target.startsWith('workbench/canvas-engine/') ? 'canvas-engine' : 'canvas-operations',
-      private: !isPublicTarget(target),
-      source,
-      symbols: importedSymbols(statement.importClause),
-      target,
-    });
   }
+
+  const grouped = Object.entries(Object.groupBy(imports, ({ intent }) => intent))
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([intent, records]) => ({ intent, imports: records }));
+  const privateImports = imports.filter((record) => record.private);
+  const artifact = {
+    generatedBy: 'scripts/write-canvas-import-matrix.mjs',
+    groups: grouped,
+    summary: {
+      externalProductionCallerCount: new Set(imports.map(({ source }) => source)).size,
+      importDeclarationCount: imports.length,
+      privateCallerCount: new Set(privateImports.map(({ source }) => source)).size,
+      privateImportDeclarationCount: privateImports.length,
+    },
+  };
+
+  const artifactPath = resolve(packageRoot, 'artifacts/architecture/canvas-import-matrix.json');
+  mkdirSync(dirname(artifactPath), { recursive: true });
+  writeFileSync(artifactPath, `${JSON.stringify(artifact, null, 2)}\n`);
+} finally {
+  closeSourceAnalysis();
 }
-
-const grouped = Object.entries(Object.groupBy(imports, ({ intent }) => intent))
-  .sort(([left], [right]) => left.localeCompare(right))
-  .map(([intent, records]) => ({ intent, imports: records }));
-const privateImports = imports.filter((record) => record.private);
-const artifact = {
-  generatedBy: 'scripts/write-canvas-import-matrix.mjs',
-  groups: grouped,
-  summary: {
-    externalProductionCallerCount: new Set(imports.map(({ source }) => source)).size,
-    importDeclarationCount: imports.length,
-    privateCallerCount: new Set(privateImports.map(({ source }) => source)).size,
-    privateImportDeclarationCount: privateImports.length,
-  },
-};
-
-const artifactPath = resolve(packageRoot, 'artifacts/architecture/canvas-import-matrix.json');
-mkdirSync(dirname(artifactPath), { recursive: true });
-writeFileSync(artifactPath, `${JSON.stringify(artifact, null, 2)}\n`);

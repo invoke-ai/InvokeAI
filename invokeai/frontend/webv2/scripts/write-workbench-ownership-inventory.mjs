@@ -1,24 +1,7 @@
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, extname, join, relative, resolve } from 'node:path';
-import {
-  isCallExpression,
-  isEmptyStatement,
-  isExportAssignment,
-  isExportDeclaration,
-  isIdentifier,
-  isImportDeclaration,
-  isImportTypeNode,
-  isInterfaceDeclaration,
-  isLiteralTypeNode,
-  isNamedExports,
-  isStringLiteralLikeNode,
-  isTypeAliasDeclaration,
-  isVariableStatement,
-  ModifierFlags,
-  SyntaxKind,
-} from 'typescript/unstable/ast';
 
-import { parseSource, primeSources } from './parse-source.mjs';
+import { analyzeSource, closeSourceAnalysis, primeSourceAnalysis } from '../src/architecture/tsSourceAnalysis.ts';
 
 const packageRoot = process.cwd();
 const sourceRoot = resolve(packageRoot, 'src');
@@ -34,8 +17,6 @@ const paths = readdirSync(sourceRoot, { recursive: true, withFileTypes: true })
   .sort();
 const productionPaths = paths.filter((path) => !isTest(path));
 const sources = new Map(productionPaths.map((path) => [path, readFileSync(resolve(sourceRoot, path), 'utf8')]));
-// Load the whole tree in one snapshot; parsing file by file costs a round trip each.
-primeSources(sources, { jsx: true });
 const pathByStem = new Map(productionPaths.map((path) => [stripExtension(path), path]));
 
 const aliases = [
@@ -116,110 +97,6 @@ const targetRule = (path) => {
 };
 const targetOwner = (path) => (path.startsWith('workbench/') ? targetRule(path)?.targetOwner : currentOwner(path));
 
-const parse = (path, source) => parseSource(path, source, { jsx: true });
-const imports = (path, source) => {
-  const sourceFile = parse(path, source);
-  const specifiers = [];
-  const visit = (node) => {
-    if (
-      (isImportDeclaration(node) || isExportDeclaration(node)) &&
-      node.moduleSpecifier &&
-      isStringLiteralLikeNode(node.moduleSpecifier)
-    ) {
-      specifiers.push(node.moduleSpecifier.text);
-    } else if (
-      isImportTypeNode(node) &&
-      isLiteralTypeNode(node.argument) &&
-      isStringLiteralLikeNode(node.argument.literal)
-    ) {
-      specifiers.push(node.argument.literal.text);
-    } else if (isCallExpression(node) && node.expression.kind === SyntaxKind.ImportKeyword) {
-      const argument = node.arguments[0];
-      if (argument && isStringLiteralLikeNode(argument)) {
-        specifiers.push(argument.text);
-      }
-    }
-    node.forEachChild(visit);
-  };
-  visit(sourceFile);
-  return specifiers;
-};
-
-const publicExports = (path, source) => {
-  const names = new Set();
-  for (const statement of parse(path, source).statements) {
-    if ((statement.modifierFlags & ModifierFlags.Export) !== 0) {
-      if (statement.name && isIdentifier(statement.name)) {
-        names.add(statement.name.text);
-      }
-      if (isVariableStatement(statement)) {
-        for (const declaration of statement.declarationList.declarations) {
-          if (isIdentifier(declaration.name)) {
-            names.add(declaration.name.text);
-          }
-        }
-      }
-    }
-    if (isExportAssignment(statement)) {
-      names.add('default');
-    }
-    if (isExportDeclaration(statement)) {
-      if (!statement.exportClause) {
-        names.add('*');
-      } else if (isNamedExports(statement.exportClause)) {
-        for (const element of statement.exportClause.elements) {
-          names.add(element.name.text);
-        }
-      }
-    }
-  }
-  return [...names].sort();
-};
-
-const isTypeOnly = (path, source) =>
-  parse(path, source).statements.every((statement) => {
-    if (isInterfaceDeclaration(statement) || isTypeAliasDeclaration(statement)) {
-      return true;
-    }
-    if (isImportDeclaration(statement)) {
-      return statement.importClause?.phaseModifier === SyntaxKind.TypeKeyword;
-    }
-    if (isExportDeclaration(statement)) {
-      return statement.isTypeOnly;
-    }
-    return isEmptyStatement(statement);
-  });
-
-const inbound = new Map();
-const graph = new Map();
-const fileGraph = new Map();
-for (const [sourcePath, source] of sources) {
-  const sourceOwner = targetOwner(sourcePath);
-  if (!sourceOwner) {
-    throw new Error(`Unclassified source: ${sourcePath}`);
-  }
-  graph.set(sourceOwner, graph.get(sourceOwner) ?? new Set());
-  fileGraph.set(sourcePath, fileGraph.get(sourcePath) ?? new Set());
-  for (const specifier of imports(sourcePath, source)) {
-    const targetPath = resolveImport(sourcePath, specifier);
-    if (!targetPath) {
-      continue;
-    }
-    const owner = targetOwner(targetPath);
-    if (!owner) {
-      throw new Error(`Unclassified target: ${targetPath}`);
-    }
-    fileGraph.get(sourcePath).add(targetPath);
-    const inboundOwners = inbound.get(targetPath) ?? new Set();
-    inboundOwners.add(sourceOwner);
-    inbound.set(targetPath, inboundOwners);
-    graph.set(owner, graph.get(owner) ?? new Set());
-    if (owner !== sourceOwner) {
-      graph.get(sourceOwner).add(owner);
-    }
-  }
-}
-
 const components = (dependencyGraph) => {
   let index = 0;
   const indexes = new Map();
@@ -261,48 +138,86 @@ const components = (dependencyGraph) => {
   return result.sort((a, b) => a.join().localeCompare(b.join()));
 };
 
-const workbenchPaths = productionPaths.filter((path) => path.startsWith('workbench/'));
-const modules = workbenchPaths.map((path) => {
-  const source = sources.get(path);
-  const rule = targetRule(path);
-  if (!rule) {
-    throw new Error(`Unclassified Workbench module: ${path}`);
-  }
-  const outboundOwners = new Set(
-    imports(path, source)
-      .map((specifier) => resolveImport(path, specifier))
-      .filter(Boolean)
-      .map(targetOwner)
-      .filter(Boolean)
-  );
-  const stem = stripExtension(path);
-  return {
-    currentOwner: 'workbench',
-    inboundOwners: [...(inbound.get(path) ?? [])].sort(),
-    moduleKind: isTypeOnly(path, source) ? 'type-only' : 'runtime',
-    outboundOwners: [...outboundOwners].sort(),
-    path,
-    publicExports: publicExports(path, source),
-    targetOwner: rule.targetOwner,
-    targetPath: rule.targetPath,
-    testCompanions: paths.filter((candidate) => candidate.startsWith(`${stem}.`) && isTest(candidate)).sort(),
-  };
-});
+try {
+  // Load the whole tree in one snapshot; parsing file by file costs a round trip each.
+  primeSourceAnalysis(sources, { jsx: true });
+  const analyses = new Map([...sources].map(([path, source]) => [path, analyzeSource(path, source, { jsx: true })]));
 
-const artifact = {
-  counts: {
-    productionWorkbenchModules: modules.length,
-    runtimeModules: modules.filter((module) => module.moduleKind === 'runtime').length,
-    typeOnlyModules: modules.filter((module) => module.moduleKind === 'type-only').length,
-  },
-  generatedFromManifestVersion: manifest.version,
-  fileCycles: components(fileGraph),
-  modules,
-  targetDependencyGraph: Object.fromEntries(
-    [...graph].sort(([a], [b]) => a.localeCompare(b)).map(([owner, targets]) => [owner, [...targets].sort()])
-  ),
-  transitionalCycles: components(graph),
-};
-const artifactPath = resolve(packageRoot, 'artifacts/architecture/workbench-ownership-inventory.json');
-mkdirSync(dirname(artifactPath), { recursive: true });
-writeFileSync(artifactPath, `${JSON.stringify(artifact, null, 2)}\n`);
+  const inbound = new Map();
+  const graph = new Map();
+  const fileGraph = new Map();
+  for (const [sourcePath, analysis] of analyses) {
+    const sourceOwner = targetOwner(sourcePath);
+    if (!sourceOwner) {
+      throw new Error(`Unclassified source: ${sourcePath}`);
+    }
+    graph.set(sourceOwner, graph.get(sourceOwner) ?? new Set());
+    fileGraph.set(sourcePath, fileGraph.get(sourcePath) ?? new Set());
+    for (const specifier of analysis.moduleReferences.map(({ specifier }) => specifier)) {
+      const targetPath = resolveImport(sourcePath, specifier);
+      if (!targetPath) {
+        continue;
+      }
+      const owner = targetOwner(targetPath);
+      if (!owner) {
+        throw new Error(`Unclassified target: ${targetPath}`);
+      }
+      fileGraph.get(sourcePath).add(targetPath);
+      const inboundOwners = inbound.get(targetPath) ?? new Set();
+      inboundOwners.add(sourceOwner);
+      inbound.set(targetPath, inboundOwners);
+      graph.set(owner, graph.get(owner) ?? new Set());
+      if (owner !== sourceOwner) {
+        graph.get(sourceOwner).add(owner);
+      }
+    }
+  }
+
+  const workbenchPaths = productionPaths.filter((path) => path.startsWith('workbench/'));
+  const modules = workbenchPaths.map((path) => {
+    const analysis = analyses.get(path);
+    const rule = targetRule(path);
+    if (!rule) {
+      throw new Error(`Unclassified Workbench module: ${path}`);
+    }
+    const outboundOwners = new Set(
+      analysis.moduleReferences
+        .map(({ specifier }) => resolveImport(path, specifier))
+        .filter(Boolean)
+        .map(targetOwner)
+        .filter(Boolean)
+    );
+    const stem = stripExtension(path);
+    return {
+      currentOwner: 'workbench',
+      inboundOwners: [...(inbound.get(path) ?? [])].sort(),
+      moduleKind: analysis.typeOnly ? 'type-only' : 'runtime',
+      outboundOwners: [...outboundOwners].sort(),
+      path,
+      publicExports: analysis.publicExports,
+      targetOwner: rule.targetOwner,
+      targetPath: rule.targetPath,
+      testCompanions: paths.filter((candidate) => candidate.startsWith(`${stem}.`) && isTest(candidate)).sort(),
+    };
+  });
+
+  const artifact = {
+    counts: {
+      productionWorkbenchModules: modules.length,
+      runtimeModules: modules.filter((module) => module.moduleKind === 'runtime').length,
+      typeOnlyModules: modules.filter((module) => module.moduleKind === 'type-only').length,
+    },
+    generatedFromManifestVersion: manifest.version,
+    fileCycles: components(fileGraph),
+    modules,
+    targetDependencyGraph: Object.fromEntries(
+      [...graph].sort(([a], [b]) => a.localeCompare(b)).map(([owner, targets]) => [owner, [...targets].sort()])
+    ),
+    transitionalCycles: components(graph),
+  };
+  const artifactPath = resolve(packageRoot, 'artifacts/architecture/workbench-ownership-inventory.json');
+  mkdirSync(dirname(artifactPath), { recursive: true });
+  writeFileSync(artifactPath, `${JSON.stringify(artifact, null, 2)}\n`);
+} finally {
+  closeSourceAnalysis();
+}
