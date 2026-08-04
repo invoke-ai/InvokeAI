@@ -27,6 +27,7 @@ from invokeai.backend.model_manager.taxonomy import (
     Flux2VariantType,
     FluxVariantType,
     Krea2VariantType,
+    MiniMaxH3VariantType,
     ModelFormat,
     ModelSourceType,
     ModelType,
@@ -142,6 +143,7 @@ class ModelRecordChanges(BaseModelExcludeNull):
         | WanLoRAVariantType
         | Qwen3VariantType
         | Krea2VariantType
+        | MiniMaxH3VariantType
         | PiDDecoderVariantType
     ] = Field(description="The variant of the model.", default=None)
     prediction_type: Optional[SchedulerPredictionType] = Field(

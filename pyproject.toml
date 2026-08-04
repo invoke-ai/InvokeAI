@@ -301,6 +301,14 @@ ignore = [
 ]
 select = ["B", "C", "E", "F", "W", "I", "TID"]
 
+[tool.ruff.lint.per-file-ignores]
+# Vendored from the diffusers MiniMax-H3 branch (see invokeai/backend/minimax_h3/__init__.py);
+# kept as close to upstream as possible, so upstream's zip() style is tolerated.
+"invokeai/backend/minimax_h3/transformer_minimax_h3.py" = ["B905"]
+"invokeai/backend/minimax_h3/autoencoder_kl_minimax_h3.py" = ["B905"]
+"invokeai/backend/minimax_h3/autoencoder_kl_minimax_h3_audio.py" = ["B905"]
+"invokeai/backend/minimax_h3/scheduling_minimax_h3.py" = ["B905"]
+
 [tool.ruff.lint.flake8-tidy-imports]
 # Disallow all relative imports.
 ban-relative-imports = "all"

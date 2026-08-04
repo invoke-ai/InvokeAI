@@ -85,6 +85,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Diffusers_FLUX_Config,
     Main_Diffusers_Ideogram4_Config,
     Main_Diffusers_Krea2_Config,
+    Main_Diffusers_MiniMaxH3_Config,
     Main_Diffusers_QwenImage_Config,
     Main_Diffusers_SD1_Config,
     Main_Diffusers_SD2_Config,
@@ -183,6 +184,7 @@ _MODEL_EXTENSIONS = {
 # Known config file names for diffusers/transformers models
 _CONFIG_FILES = {
     "model_index.json",
+    "modular_model_index.json",
     "config.json",
 }
 
@@ -195,7 +197,15 @@ _MAX_SEARCH_DEPTH = 2
 # Classes introduced by the versions pinned by this checkout may not exist in the interpreter used by
 # lightweight config tests. Keep explicit markers only for those newly supported classes; established
 # classes are resolved from the installed Diffusers/Transformers exports below.
-_PINNED_MODEL_CLASS_MARKERS = {"Krea2Pipeline"}
+_PINNED_MODEL_CLASS_MARKERS = {
+    "Krea2Pipeline",
+    # MiniMax H3 classes exist only in an unreleased diffusers branch (vendored under
+    # invokeai/backend/minimax_h3); the installed diffusers cannot resolve them.
+    "MiniMaxH3ModularPipeline",
+    "MiniMaxH3Transformer3DModel",
+    "AutoencoderKLMiniMaxH3",
+    "AutoencoderKLMiniMaxH3Audio",
+}
 
 
 def _is_known_model_marker(config_name: str, config: Any) -> bool:
@@ -221,15 +231,16 @@ def _is_known_model_marker(config_name: str, config: Any) -> bool:
         except Exception:
             return False
 
-    if config_name == "model_index.json":
+    if config_name in ("model_index.json", "modular_model_index.json"):
         class_name = config.get("_class_name")
-        return class_name in _PINNED_MODEL_CLASS_MARKERS or has_model_export(
+        # Non-str _class_name (e.g. a list) must read as "not a marker", not TypeError on the set lookup.
+        return (isinstance(class_name, str) and class_name in _PINNED_MODEL_CLASS_MARKERS) or has_model_export(
             diffusers, class_name, (DiffusionPipeline,)
         )
 
     class_name = config.get("_class_name")
     if (
-        class_name in _PINNED_MODEL_CLASS_MARKERS
+        (isinstance(class_name, str) and class_name in _PINNED_MODEL_CLASS_MARKERS)
         or has_model_export(diffusers, class_name, (ModelMixin, DiffusionPipeline))
         or has_model_export(transformers, class_name, (PreTrainedModel, PretrainedConfig))
     ):
@@ -262,6 +273,7 @@ AnyModelConfig = Annotated[
         Annotated[Main_Diffusers_ErnieImage_Config, Main_Diffusers_ErnieImage_Config.get_tag()],
         Annotated[Main_Diffusers_Ideogram4_Config, Main_Diffusers_Ideogram4_Config.get_tag()],
         Annotated[Main_Diffusers_Krea2_Config, Main_Diffusers_Krea2_Config.get_tag()],
+        Annotated[Main_Diffusers_MiniMaxH3_Config, Main_Diffusers_MiniMaxH3_Config.get_tag()],
         # Main (Pipeline) - checkpoint format
         # IMPORTANT: FLUX.2 must be checked BEFORE FLUX.1 because FLUX.2 has specific validation
         # that will reject FLUX.1 models, but FLUX.1 validation may incorrectly match FLUX.2 models

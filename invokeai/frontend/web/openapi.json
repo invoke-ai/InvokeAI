@@ -883,6 +883,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_MiniMaxH3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
                     },
                     {
@@ -1278,6 +1281,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_MiniMaxH3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
                     },
                     {
@@ -1671,6 +1677,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Diffusers_MiniMaxH3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
@@ -2111,6 +2120,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Diffusers_MiniMaxH3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
@@ -2575,6 +2587,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Diffusers_MiniMaxH3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
@@ -3887,6 +3902,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Diffusers_MiniMaxH3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
@@ -14896,6 +14914,9 @@
             "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
           },
           {
+            "$ref": "#/components/schemas/Main_Diffusers_MiniMaxH3_Config"
+          },
+          {
             "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
           },
           {
@@ -15492,6 +15513,7 @@
           "anima",
           "krea-2",
           "wan",
+          "minimax-h3",
           "unknown"
         ],
         "title": "BaseModelType",
@@ -59230,6 +59252,167 @@
         "title": "Main_Diffusers_Krea2_Config",
         "description": "Model config for Krea-2 diffusers models (Krea-2-Turbo)."
       },
+      "Main_Diffusers_MiniMaxH3_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "format": {
+            "type": "string",
+            "const": "diffusers",
+            "title": "Format",
+            "default": "diffusers"
+          },
+          "repo_variant": {
+            "$ref": "#/components/schemas/ModelRepoVariant",
+            "default": ""
+          },
+          "base": {
+            "type": "string",
+            "const": "minimax-h3",
+            "title": "Base",
+            "default": "minimax-h3"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/MiniMaxH3VariantType"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "format",
+          "repo_variant",
+          "base",
+          "variant"
+        ],
+        "title": "Main_Diffusers_MiniMaxH3_Config",
+        "description": "Model config for MiniMax H3 (Hailuo 3.0) diffusers-format models."
+      },
       "Main_Diffusers_QwenImage_Config": {
         "properties": {
           "key": {
@@ -65109,6 +65292,12 @@
           "$ref": "#/components/schemas/VAEOutput"
         }
       },
+      "MiniMaxH3VariantType": {
+        "type": "string",
+        "enum": ["fl2va"],
+        "title": "MiniMaxH3VariantType",
+        "description": "MiniMax H3 model variants (task-specific transformer checkpoints sharing every other component)."
+      },
       "Mistral3EncoderField": {
         "description": "Field for Mistral3 text encoder used by ERNIE-Image models.",
         "properties": {
@@ -65427,6 +65616,9 @@
               },
               {
                 "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_Diffusers_MiniMaxH3_Config"
               },
               {
                 "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
@@ -66070,6 +66262,9 @@
                     "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/Main_Diffusers_MiniMaxH3_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
                   },
                   {
@@ -66596,6 +66791,9 @@
                 "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Diffusers_MiniMaxH3_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
               },
               {
@@ -66976,6 +67174,9 @@
               },
               {
                 "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_Diffusers_MiniMaxH3_Config"
               },
               {
                 "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
@@ -67615,6 +67816,9 @@
                 "$ref": "#/components/schemas/Krea2VariantType"
               },
               {
+                "$ref": "#/components/schemas/MiniMaxH3VariantType"
+              },
+              {
                 "$ref": "#/components/schemas/PiDDecoderVariantType"
               },
               {
@@ -67824,6 +68028,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/Main_Diffusers_MiniMaxH3_Config"
                 },
                 {
                   "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
@@ -79460,6 +79667,9 @@
                 "$ref": "#/components/schemas/Krea2VariantType"
               },
               {
+                "$ref": "#/components/schemas/MiniMaxH3VariantType"
+              },
+              {
                 "$ref": "#/components/schemas/PiDDecoderVariantType"
               },
               {
@@ -79630,6 +79840,9 @@
               },
               {
                 "$ref": "#/components/schemas/Krea2VariantType"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3VariantType"
               },
               {
                 "$ref": "#/components/schemas/PiDDecoderVariantType"
@@ -80526,11 +80739,13 @@
           "tokenizer",
           "tokenizer_2",
           "tokenizer_3",
+          "processor",
           "pe",
           "pe_tokenizer",
           "vae",
           "vae_decoder",
           "vae_encoder",
+          "audio_vae",
           "scheduler",
           "safety_checker"
         ],
@@ -80577,6 +80792,9 @@
               },
               {
                 "$ref": "#/components/schemas/Krea2VariantType"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3VariantType"
               },
               {
                 "$ref": "#/components/schemas/PiDDecoderVariantType"
