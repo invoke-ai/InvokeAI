@@ -32,15 +32,26 @@ enable_partial_loading: false
 
 ## Details and fine-tuning
 
-Low-VRAM mode involves 4 features, each of which can be configured or fine-tuned:
+Low-VRAM mode involves 6 features, each of which can be configured or fine-tuned:
 
 - Partial model loading (`enable_partial_loading`)
 - PyTorch CUDA allocator config (`pytorch_cuda_alloc_conf`)
 - Dynamic RAM and VRAM cache sizes (`max_cache_ram_gb`, `max_cache_vram_gb`)
 - Working memory (`device_working_mem_gb`)
 - Keeping a RAM weight copy (`keep_ram_copy_of_weights`)
+- Wan video memory optimization (`wan_memory_optimization`)
 
 Read on to learn about these features and understand how to fine-tune them for your system and use-cases.
+
+### Wan video memory optimization
+
+Wan video generation has an additional opt-in memory optimization:
+
+```yaml
+wan_memory_optimization: true
+```
+
+This chunks pointwise transformer activations, compacts TI2V per-token timestep conditioning, and streams untiled VAE decode chunks directly to MP4. It reduces peak VRAM during both denoise and decode, but generation is slower. Spatially tiled VAE decode continues to use its existing full-tile path.
 
 ### Partial model loading
 

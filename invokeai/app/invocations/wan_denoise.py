@@ -52,6 +52,7 @@ from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import Rec
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import WanConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.wan.memory_optimization import wan_memory_optimization
 from invokeai.backend.wan.sampling_utils import get_spatial_scale_factor, make_noise
 
 # Type alias: a factory that produces a fresh iterator of LoRA patch specs each time it is called.
@@ -613,6 +614,7 @@ class WanDenoiseInvocation(BaseInvocation):
                 low_is_quantized=low_is_quantized,
             )
             exit_stack.callback(swapper.close)
+            optimize_memory = context.config.get().wan_memory_optimization
 
             for step_idx, t in enumerate(tqdm(timesteps, desc="Denoising (Wan 2.2)", total=total_steps)):
                 timestep = t.expand(latents.shape[0])
@@ -641,25 +643,26 @@ class WanDenoiseInvocation(BaseInvocation):
                 if ref_condition is not None:
                     latent_model_input = torch.cat([latent_model_input, ref_condition], dim=1)
 
-                noise_pred_cond = transformer(
-                    hidden_states=latent_model_input,
-                    timestep=timestep,
-                    encoder_hidden_states=pos_cond.prompt_embeds.unsqueeze(0),
-                    attention_kwargs=None,
-                    return_dict=False,
-                )[0]
-
-                if neg_cond is not None and active_cfg != 1.0:
-                    noise_pred_uncond = transformer(
+                with wan_memory_optimization(transformer, enabled=optimize_memory):
+                    noise_pred_cond = transformer(
                         hidden_states=latent_model_input,
                         timestep=timestep,
-                        encoder_hidden_states=neg_cond.prompt_embeds.unsqueeze(0),
+                        encoder_hidden_states=pos_cond.prompt_embeds.unsqueeze(0),
                         attention_kwargs=None,
                         return_dict=False,
                     )[0]
-                    noise_pred = noise_pred_uncond + active_cfg * (noise_pred_cond - noise_pred_uncond)
-                else:
-                    noise_pred = noise_pred_cond
+
+                    if neg_cond is not None and active_cfg != 1.0:
+                        noise_pred_uncond = transformer(
+                            hidden_states=latent_model_input,
+                            timestep=timestep,
+                            encoder_hidden_states=neg_cond.prompt_embeds.unsqueeze(0),
+                            attention_kwargs=None,
+                            return_dict=False,
+                        )[0]
+                        noise_pred = noise_pred_uncond + active_cfg * (noise_pred_cond - noise_pred_uncond)
+                    else:
+                        noise_pred = noise_pred_cond
 
                 latents = scheduler.step(noise_pred, t, latents, return_dict=False)[0]
 

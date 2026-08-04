@@ -563,6 +563,17 @@
     },
     {
       "category": "GENERATION",
+      "default": false,
+      "description": "Enable experimental Wan memory optimizations at the cost of slower generation.",
+      "env_var": "INVOKEAI_WAN_MEMORY_OPTIMIZATION",
+      "literal_values": [],
+      "name": "wan_memory_optimization",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "GENERATION",
       "default": "auto",
       "description": "Attention type.",
       "env_var": "INVOKEAI_ATTENTION_TYPE",
