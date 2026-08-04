@@ -1,7 +1,7 @@
-import ts from 'typescript-legacy';
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 
-import { collectImportReferences, getModuleOwner, resolveImportPath } from './dependencyPolicy';
+import { collectImportReferences, getModuleOwner, primeImportSources, resolveImportPath } from './dependencyPolicy';
+import { analyzeSource, closeSourceAnalysis } from './tsSourceAnalysis';
 import { getWorkbenchTargetOwner, getWorkbenchTargetPath, workbenchOwnershipManifest } from './workbenchOwnership';
 
 const sources = import.meta.glob('../**/*.{ts,tsx}', {
@@ -35,60 +35,7 @@ const resolveSourceFile = (sourcePath: string, specifier: string): string | null
 const getTargetOwner = (path: string) =>
   path.startsWith('workbench/') ? getWorkbenchTargetOwner(path) : getModuleOwner(path);
 
-const collectPublicExports = (sourceFile: ts.SourceFile): string[] => {
-  const exports = new Set<string>();
-
-  for (const statement of sourceFile.statements) {
-    const modifiers = ts.canHaveModifiers(statement) ? ts.getModifiers(statement) : undefined;
-    if (modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)) {
-      if (
-        (ts.isClassDeclaration(statement) ||
-          ts.isFunctionDeclaration(statement) ||
-          ts.isInterfaceDeclaration(statement) ||
-          ts.isTypeAliasDeclaration(statement) ||
-          ts.isEnumDeclaration(statement)) &&
-        statement.name
-      ) {
-        exports.add(statement.name.text);
-      } else if (ts.isVariableStatement(statement)) {
-        for (const declaration of statement.declarationList.declarations) {
-          if (ts.isIdentifier(declaration.name)) {
-            exports.add(declaration.name.text);
-          }
-        }
-      }
-    }
-    if (ts.isExportAssignment(statement)) {
-      exports.add('default');
-    }
-    if (ts.isExportDeclaration(statement)) {
-      if (!statement.exportClause) {
-        exports.add('*');
-      } else if (ts.isNamedExports(statement.exportClause)) {
-        for (const element of statement.exportClause.elements) {
-          exports.add(element.name.text);
-        }
-      }
-    }
-  }
-
-  return [...exports].sort();
-};
-
-const isTypeOnlyModule = (sourceFile: ts.SourceFile): boolean => {
-  return sourceFile.statements.every((statement) => {
-    if (ts.isInterfaceDeclaration(statement) || ts.isTypeAliasDeclaration(statement)) {
-      return true;
-    }
-    if (ts.isImportDeclaration(statement)) {
-      return Boolean(statement.importClause?.isTypeOnly);
-    }
-    if (ts.isExportDeclaration(statement)) {
-      return statement.isTypeOnly;
-    }
-    return ts.isEmptyStatement(statement);
-  });
-};
+afterAll(closeSourceAnalysis);
 
 const stronglyConnectedComponents = (graph: Map<string, Set<string>>): string[][] => {
   let nextIndex = 0;
@@ -137,6 +84,7 @@ const stronglyConnectedComponents = (graph: Map<string, Set<string>>): string[][
 describe('Workbench ownership manifest', () => {
   it('classifies every production Workbench module exactly once and emits an inspectable inventory', () => {
     const workbenchSources = Object.entries(productionSources).filter(([path]) => path.startsWith('workbench/'));
+    primeImportSources(Object.entries(productionSources));
     const importReferencesByPath = new Map(
       Object.entries(productionSources).map(([path, source]) => [path, collectImportReferences(source, path)] as const)
     );
@@ -193,7 +141,7 @@ describe('Workbench ownership manifest', () => {
     const records = workbenchSources.map(([path, source]) => {
       const targetOwner = getWorkbenchTargetOwner(path);
       expect(targetOwner, `Unclassified: ${path}`).not.toBeNull();
-      const sourceFile = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+      const analysis = analyzeSource(path, source, { jsx: true });
 
       const outboundOwners = new Set<string>();
       for (const reference of importReferencesByPath.get(path) ?? []) {
@@ -215,10 +163,10 @@ describe('Workbench ownership manifest', () => {
       return {
         currentOwner: 'workbench',
         inboundOwners: [] as string[],
-        moduleKind: isTypeOnlyModule(sourceFile) ? 'type-only' : 'runtime',
+        moduleKind: analysis.typeOnly ? 'type-only' : 'runtime',
         outboundOwners: [...outboundOwners].sort(),
         path,
-        publicExports: collectPublicExports(sourceFile),
+        publicExports: [...analysis.publicExports],
         targetOwner,
         targetPath: getWorkbenchTargetPath(path),
         testCompanions,

@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
-import ts from 'typescript-legacy';
+
+import { analyzeSource, closeSourceAnalysis, primeSourceAnalysis } from '#architecture/source-analysis';
 
 import {
   BUILD_METRIC_KEYS,
@@ -175,57 +176,57 @@ const collectFiles = async (directory) => {
 };
 const productionFiles = await collectFiles(resolve(root, 'src'));
 const importerCounts = new Map(Object.values(baseline.developmentInvalidation).map((budget) => [budget.specifier, 0]));
-for (const path of productionFiles) {
-  const source = await readFile(path, 'utf8');
-  const sourceFile = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
-  const seen = new Set();
-  const visit = (node) => {
-    if (
-      (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
-      node.moduleSpecifier &&
-      ts.isStringLiteralLike(node.moduleSpecifier)
-    ) {
-      seen.add(node.moduleSpecifier.text);
+const productionSources = await Promise.all(productionFiles.map(async (path) => [path, await readFile(path, 'utf8')]));
+try {
+  // One snapshot for the whole tree keeps the sweep to a single round trip.
+  primeSourceAnalysis(productionSources, { jsx: true });
+
+  for (const [path, source] of productionSources) {
+    const seen = new Set();
+    for (const reference of analyzeSource(path, source, { jsx: true }).moduleReferences) {
+      if (reference.form === 'import-declaration' || reference.form === 'export-declaration') {
+        seen.add(reference.specifier);
+      }
     }
-    ts.forEachChild(node, visit);
-  };
-  visit(sourceFile);
-  for (const specifier of seen) {
-    if (importerCounts.has(specifier)) {
-      importerCounts.set(specifier, importerCounts.get(specifier) + 1);
+    for (const specifier of seen) {
+      if (importerCounts.has(specifier)) {
+        importerCounts.set(specifier, importerCounts.get(specifier) + 1);
+      }
     }
   }
-}
-for (const [metricId, budget] of Object.entries(baseline.developmentInvalidation)) {
-  const actual = importerCounts.get(budget.specifier) ?? 0;
-  if (actual > budget.maxDirectImporters) {
-    failures.push({
-      message: `${metricId} has ${actual} direct importers (budget ${budget.maxDirectImporters}).`,
-      owner: budget.owner,
-      remediationTicket: budget.remediationTicket,
-      routeId: 'development-invalidation',
-    });
+  for (const [metricId, budget] of Object.entries(baseline.developmentInvalidation)) {
+    const actual = importerCounts.get(budget.specifier) ?? 0;
+    if (actual > budget.maxDirectImporters) {
+      failures.push({
+        message: `${metricId} has ${actual} direct importers (budget ${budget.maxDirectImporters}).`,
+        owner: budget.owner,
+        remediationTicket: budget.remediationTicket,
+        routeId: 'development-invalidation',
+      });
+    }
   }
-}
 
-const reportPath = resolve(root, 'artifacts/architecture-performance/build-report.json');
-await mkdir(dirname(reportPath), { recursive: true });
-await writeFile(
-  reportPath,
-  `${JSON.stringify({ baselineCapturedAt: baseline.capturedAt, failures, importerCounts: Object.fromEntries(importerCounts), measurements }, null, 2)}\n`
-);
-
-if (failures.length > 0) {
-  throw new Error(
-    failures
-      .map(
-        (failure) =>
-          `${failure.message} Owner: ${failure.owner}. Remediation: ${failure.remediationTicket}. Route: ${failure.routeId}.`
-      )
-      .join('\n')
+  const reportPath = resolve(root, 'artifacts/architecture-performance/build-report.json');
+  await mkdir(dirname(reportPath), { recursive: true });
+  await writeFile(
+    reportPath,
+    `${JSON.stringify({ baselineCapturedAt: baseline.capturedAt, failures, importerCounts: Object.fromEntries(importerCounts), measurements }, null, 2)}\n`
   );
-}
 
-process.stdout.write(
-  `${JSON.stringify({ importerCounts: Object.fromEntries(importerCounts), measurements }, null, 2)}\n`
-);
+  if (failures.length > 0) {
+    throw new Error(
+      failures
+        .map(
+          (failure) =>
+            `${failure.message} Owner: ${failure.owner}. Remediation: ${failure.remediationTicket}. Route: ${failure.routeId}.`
+        )
+        .join('\n')
+    );
+  }
+
+  process.stdout.write(
+    `${JSON.stringify({ importerCounts: Object.fromEntries(importerCounts), measurements }, null, 2)}\n`
+  );
+} finally {
+  closeSourceAnalysis();
+}
