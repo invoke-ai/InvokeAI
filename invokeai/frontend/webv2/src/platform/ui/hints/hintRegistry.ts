@@ -32,6 +32,7 @@ export const FEATURE_HINTS = {
   clipSkip: { href: SUPPORT_ADVANCED_SETTINGS },
   colorCompensation: {},
   concepts: { href: SUPPORT_CONCEPTS },
+  conditioningRebalance: {},
   creativity: {},
   guidance: {},
   height: {},

@@ -15,6 +15,7 @@ import { DicesIcon } from 'lucide-react';
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { GenerateConditioningRebalanceField } from './GenerateConditioningRebalanceField';
 import { GenerationModelSelect as ModelSelect, useGenerationUi } from './GenerationUiContext';
 import { notifyGenerateModelSelectionCleared } from './modelSelectionNotice';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
@@ -28,12 +29,14 @@ interface GenerateModelFieldsProps {
   models: readonly ModelConfig[];
   selectedModel: GenerateModelConfig | undefined;
   onCommit: (patch: Partial<GenerateSettings>) => void;
+  onCommitImmediate: (patch: Partial<GenerateSettings>) => void;
   onCommitSettings: (nextSettings: GenerateSettings) => void;
 }
 
 export const GenerateModelFields = ({
   models,
   onCommit,
+  onCommitImmediate,
   onCommitSettings,
   selectedModel,
   settings,
@@ -118,6 +121,13 @@ export const GenerateModelFields = ({
             onChange={(cfgScale) => commitNumber('cfgScale', cfgScale)}
           />
         </Field>
+        {selectedModel?.base === 'krea-2' ? (
+          <GenerateConditioningRebalanceField
+            settings={settings}
+            onCommit={onCommit}
+            onCommitImmediate={onCommitImmediate}
+          />
+        ) : null}
         {policy.ui.schedulerVisible ? (
           <Field hint="scheduler" label={t('widgets.generate.scheduler')}>
             <HStack gap="1">

@@ -2,12 +2,7 @@
 import type { GenerateModelConfig, GenerateSettings, Ideogram4SamplerPreset } from '@features/generation/core/types';
 
 import { Badge, createListCollection, Input, Stack, Switch } from '@chakra-ui/react';
-import {
-  IDEOGRAM4_SAMPLER_PRESETS,
-  isValidKrea2RebalanceWeights,
-  KREA2_REBALANCE_WEIGHT_COUNT,
-  MAX_KREA2_SEED_VARIANCE_STRENGTH,
-} from '@features/generation/core/settings';
+import { IDEOGRAM4_SAMPLER_PRESETS, MAX_KREA2_SEED_VARIANCE_STRENGTH } from '@features/generation/core/settings';
 // Imported by subpath rather than from the `@platform/ui` barrel: the barrel is at its
 // direct-importer budget (a dev-invalidation limit), and depending on the two components
 // actually used means this module only rebuilds when those change.
@@ -166,48 +161,13 @@ const Ideogram4Fields = ({ onCommit, settings }: Omit<GenerateModelFamilyFieldsP
   );
 };
 
+// Conditioning rebalance used to live here; it now sits inline under Guidance in
+// `GenerateConditioningRebalanceField`, where its bar editor has room to work.
 const Krea2Fields = ({ onCommit, settings }: Omit<GenerateModelFamilyFieldsProps, 'selectedModel'>) => {
   const { t } = useTranslation();
-  const weightsValid = isValidKrea2RebalanceWeights(settings.krea2RebalanceWeights);
 
   return (
     <Stack gap="2" p="2">
-      <Field label={t('widgets.generate.krea2Rebalance')} helpText={t('widgets.generate.krea2RebalanceHelp')}>
-        <FamilySwitch
-          checked={settings.krea2RebalanceEnabled}
-          label={t('widgets.generate.enabled')}
-          onCheckedChange={(checked) => onCommit({ krea2RebalanceEnabled: checked })}
-        />
-      </Field>
-      {settings.krea2RebalanceEnabled ? (
-        <>
-          <Field label={t('widgets.generate.krea2RebalanceMultiplier')}>
-            <SliderNumberField
-              ariaLabel={t('widgets.generate.krea2RebalanceMultiplier')}
-              max={10}
-              min={0}
-              step={0.1}
-              value={settings.krea2RebalanceMultiplier}
-              onChange={(value) => onCommit({ krea2RebalanceMultiplier: value })}
-            />
-          </Field>
-          <Field
-            label={t('widgets.generate.krea2RebalanceWeights')}
-            helpText={t('widgets.generate.krea2RebalanceWeightsHelp', { count: KREA2_REBALANCE_WEIGHT_COUNT })}
-            error={
-              weightsValid
-                ? undefined
-                : t('widgets.generate.krea2RebalanceWeightsInvalid', { count: KREA2_REBALANCE_WEIGHT_COUNT })
-            }
-          >
-            <Input
-              size="xs"
-              value={settings.krea2RebalanceWeights}
-              onChange={(event) => onCommit({ krea2RebalanceWeights: event.target.value })}
-            />
-          </Field>
-        </>
-      ) : null}
       <Field label={t('widgets.generate.krea2SeedVariance')} helpText={t('widgets.generate.krea2SeedVarianceHelp')}>
         <FamilySwitch
           checked={settings.krea2SeedVarianceEnabled}
@@ -293,9 +253,6 @@ export const GenerateModelFamilyFields = ({ onCommit, selectedModel, settings }:
 
   const activeBadges = (
     <>
-      {base === 'krea-2' && settings.krea2RebalanceEnabled && (
-        <Badge size="xs">{t('widgets.generate.krea2Rebalance')}</Badge>
-      )}
       {base === 'krea-2' && settings.krea2SeedVarianceEnabled && (
         <Badge size="xs">{t('widgets.generate.krea2SeedVariance')}</Badge>
       )}
