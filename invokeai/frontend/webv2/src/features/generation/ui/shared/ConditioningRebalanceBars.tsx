@@ -1,5 +1,5 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop */
-import { Box, Flex } from '@chakra-ui/react';
+import { Box, Flex, type SystemStyleObject } from '@chakra-ui/react';
 import {
   adjustRebalanceWeight,
   barFillFraction,
@@ -23,13 +23,13 @@ export const REBALANCE_TRACK_HEIGHT_PX = 80;
  * every column — the separators visibly drift. Spacing the *fills* inside flush columns
  * puts every edge against the same background, so the bars read evenly at any width.
  */
-const TRACK_PROPS = {
-  bg: 'bg.inset',
+const TRACK_PROPS: SystemStyleObject = {
+  bg: 'bg.subtle',
   borderRadius: 'md',
+  borderWidth: 1,
   h: `${REBALANCE_TRACK_HEIGHT_PX}px`,
   overflow: 'hidden',
   position: 'relative',
-  px: '1px',
   touchAction: 'none',
   w: 'full',
 } as const;
@@ -37,20 +37,19 @@ const TRACK_PROPS = {
 /** Half the visual space between neighbouring bars; also insets the outermost pair. */
 const BAR_INSET = '1px';
 
-const COLUMN_HOVER_PROPS = { boxShadow: 'inset 0 0 0 1px {colors.border.emphasized}' } as const;
-const COLUMN_FOCUS_PROPS = {
+const COLUMN_HOVER_PROPS: SystemStyleObject = { boxShadow: 'inset 0 0 0 1px {colors.border.emphasized}' } as const;
+const COLUMN_FOCUS_PROPS: SystemStyleObject = {
   boxShadow: 'inset 0 0 0 1px {colors.accent.solid}',
   outline: 'none',
 } as const;
 
 /** The "no change" rule sits behind the bars and must never eat a pointer event. */
-const NEUTRAL_RULE_PROPS = {
-  bg: 'fg.grid',
-  h: '1px',
-  left: 0,
+const NEUTRAL_RULE_PROPS: SystemStyleObject = {
+  bg: 'border',
+  h: 0.5,
+  insetX: 0,
   pointerEvents: 'none',
   position: 'absolute',
-  right: 0,
   zIndex: 1,
 } as const;
 
@@ -233,6 +232,7 @@ export const ConditioningRebalanceBars = ({
       onPointerLeave={handleTrackPointerLeave}
     >
       <Box {...NEUTRAL_RULE_PROPS} bottom={`${barFillFraction(REBALANCE_NEUTRAL_WEIGHT, scale) * 100}%`} />
+
       {weights.map((weight, index) => {
         const tap = index + 1;
         const layer = KREA2_TAP_LAYERS[index] ?? 0;
@@ -268,6 +268,7 @@ export const ConditioningRebalanceBars = ({
             onFocus={() => onActiveIndexChange(index)}
             onKeyDown={(event: KeyboardEvent<HTMLDivElement>) => handleKeyDown(event, index)}
             onPointerEnter={() => onActiveIndexChange(index)}
+            borderRadius="sm"
           >
             <Box
               alignSelf="flex-end"
@@ -276,7 +277,7 @@ export const ConditioningRebalanceBars = ({
               // too close to the well to see at these heights, so the step is to
               // `emphasized`.
               bg={weight > REBALANCE_NEUTRAL_WEIGHT ? 'accent.solid' : 'accent.emphasized'}
-              borderRadius="1px"
+              borderRadius="xs"
               h={`${barFillFraction(weight, scale) * 100}%`}
               // A zero tap keeps a stub so every slot stays visible and hittable now that
               // the track no longer draws a well behind each one.
