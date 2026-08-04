@@ -2,7 +2,9 @@
 
 Vendored from huggingface/diffusers PR #14355 ("Add MiniMax-H3") at commit
 abc5e9bf71fd38f53cd471bc3acaa84bc5ecbfdc (branch `minimax-h3`), which is not yet
-in any tagged diffusers release. The only local changes are rewriting the
+in any tagged diffusers release: the four model/scheduler modules plus
+``packing.py`` (the packed-sequence geometry and checkpoint constants, from
+``modular_pipelines/minimax_h3``). The only local changes are rewriting the
 package-relative imports to absolute `diffusers.*` imports (all referenced
 symbols exist in the pinned diffusers==0.39.0) and ruff import sorting. Keep
 these files otherwise

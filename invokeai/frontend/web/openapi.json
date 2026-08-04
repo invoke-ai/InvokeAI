@@ -22764,7 +22764,10 @@
                   "wan_img2img",
                   "wan_inpaint",
                   "wan_outpaint",
-                  "wan_i2v"
+                  "wan_i2v",
+                  "minimax_h3_t2v",
+                  "minimax_h3_i2v",
+                  "minimax_h3_txt2img"
                 ],
                 "type": "string"
               },
@@ -35169,6 +35172,24 @@
                   "$ref": "#/components/schemas/MetadataToVAEInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/MiniMaxH3DenoiseInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/MiniMaxH3FrameConditioningInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/MiniMaxH3LatentsToImageInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/MiniMaxH3LatentsToVideoInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/MiniMaxH3ModelLoaderInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/MiniMaxH3TextEncoderInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/ModelIdentifierInvocation"
                 },
                 {
@@ -35734,6 +35755,18 @@
                 },
                 {
                   "$ref": "#/components/schemas/MetadataToSDXLModelOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/MiniMaxH3ConditioningOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/MiniMaxH3DenoiseOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/MiniMaxH3FrameConditioningOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/MiniMaxH3ModelLoaderOutput"
                 },
                 {
                   "$ref": "#/components/schemas/ModelIdentifierOutput"
@@ -43686,6 +43719,24 @@
                 "$ref": "#/components/schemas/MetadataToVAEInvocation"
               },
               {
+                "$ref": "#/components/schemas/MiniMaxH3DenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3FrameConditioningInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3LatentsToImageInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3LatentsToVideoInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3ModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3TextEncoderInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/ModelIdentifierInvocation"
               },
               {
@@ -44208,6 +44259,18 @@
               },
               {
                 "$ref": "#/components/schemas/MetadataToSDXLModelOutput"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3ConditioningOutput"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3DenoiseOutput"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3FrameConditioningOutput"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3ModelLoaderOutput"
               },
               {
                 "$ref": "#/components/schemas/ModelIdentifierOutput"
@@ -45014,6 +45077,24 @@
               },
               {
                 "$ref": "#/components/schemas/MetadataToVAEInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3DenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3FrameConditioningInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3LatentsToImageInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3LatentsToVideoInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3ModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3TextEncoderInvocation"
               },
               {
                 "$ref": "#/components/schemas/ModelIdentifierInvocation"
@@ -45969,6 +46050,24 @@
           "metadata_to_vae": {
             "$ref": "#/components/schemas/VAEOutput"
           },
+          "minimax_h3_denoise": {
+            "$ref": "#/components/schemas/MiniMaxH3DenoiseOutput"
+          },
+          "minimax_h3_frame_conditioning": {
+            "$ref": "#/components/schemas/MiniMaxH3FrameConditioningOutput"
+          },
+          "minimax_h3_latents_to_image": {
+            "$ref": "#/components/schemas/ImageOutput"
+          },
+          "minimax_h3_latents_to_video": {
+            "$ref": "#/components/schemas/VideoOutput"
+          },
+          "minimax_h3_model_loader": {
+            "$ref": "#/components/schemas/MiniMaxH3ModelLoaderOutput"
+          },
+          "minimax_h3_text_encoder": {
+            "$ref": "#/components/schemas/MiniMaxH3ConditioningOutput"
+          },
           "mlsd_detection": {
             "$ref": "#/components/schemas/ImageOutput"
           },
@@ -46474,6 +46573,12 @@
           "metadata_to_string_collection",
           "metadata_to_t2i_adapters",
           "metadata_to_vae",
+          "minimax_h3_denoise",
+          "minimax_h3_frame_conditioning",
+          "minimax_h3_latents_to_image",
+          "minimax_h3_latents_to_video",
+          "minimax_h3_model_loader",
+          "minimax_h3_text_encoder",
           "mlsd_detection",
           "model_identifier",
           "mul",
@@ -47247,6 +47352,24 @@
               },
               {
                 "$ref": "#/components/schemas/MetadataToVAEInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3DenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3FrameConditioningInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3LatentsToImageInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3LatentsToVideoInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3ModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3TextEncoderInvocation"
               },
               {
                 "$ref": "#/components/schemas/ModelIdentifierInvocation"
@@ -48292,6 +48415,24 @@
               },
               {
                 "$ref": "#/components/schemas/MetadataToVAEInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3DenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3FrameConditioningInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3LatentsToImageInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3LatentsToVideoInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3ModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3TextEncoderInvocation"
               },
               {
                 "$ref": "#/components/schemas/ModelIdentifierInvocation"
@@ -65291,6 +65432,952 @@
         "output": {
           "$ref": "#/components/schemas/VAEOutput"
         }
+      },
+      "MiniMaxH3ConditioningField": {
+        "description": "A MiniMax H3 conditioning primitive value.\n\nH3 conditioning is the layer-50 Qwen3-VL hidden state plus the per-row modality tags the\npacked-sequence layout is built from (vision-block rows are tagged as video).",
+        "properties": {
+          "conditioning_name": {
+            "description": "The name of conditioning tensor",
+            "title": "Conditioning Name",
+            "type": "string"
+          }
+        },
+        "required": ["conditioning_name"],
+        "title": "MiniMaxH3ConditioningField",
+        "type": "object"
+      },
+      "MiniMaxH3ConditioningOutput": {
+        "class": "output",
+        "description": "Base class for nodes that output a MiniMax H3 conditioning tensor.",
+        "properties": {
+          "conditioning": {
+            "$ref": "#/components/schemas/MiniMaxH3ConditioningField",
+            "description": "Conditioning tensor",
+            "field_kind": "output",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "minimax_h3_conditioning_output",
+            "default": "minimax_h3_conditioning_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "conditioning", "type", "type"],
+        "title": "MiniMaxH3ConditioningOutput",
+        "type": "object"
+      },
+      "MiniMaxH3DenoiseInvocation": {
+        "category": "latents",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Run the MiniMax H3 joint audio-video denoising loop.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MiniMaxH3TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "MiniMax H3 FL2VA transformer.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Transformer"
+          },
+          "positive_conditioning": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MiniMaxH3ConditioningField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Positive conditioning tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "frame_conditioning": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MiniMaxH3FrameConditioningField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "First/last-keyframe (VAE-latent) conditioning for MiniMax H3",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Frame Conditioning"
+          },
+          "width": {
+            "default": 1344,
+            "description": "Width of the generated video. H3's native canvas has a 768px short edge (max 768x1344).",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 32,
+            "orig_default": 1344,
+            "orig_required": false,
+            "title": "Width",
+            "type": "integer"
+          },
+          "height": {
+            "default": 768,
+            "description": "Height of the generated video.",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 32,
+            "orig_default": 768,
+            "orig_required": false,
+            "title": "Height",
+            "type": "integer"
+          },
+          "num_frames": {
+            "default": 124,
+            "description": "Number of output frames at the fixed 24 fps. Must be of the form 17n+5 (5, 22, ..., 124, ...); durations must stay within 5-15 s, except exactly 5 frames for a still image.",
+            "field_kind": "input",
+            "input": "any",
+            "minimum": 5,
+            "orig_default": 124,
+            "orig_required": false,
+            "title": "Number of Frames",
+            "type": "integer"
+          },
+          "steps": {
+            "default": 50,
+            "description": "Number of denoising steps (sigma grid points, terminal included: N steps = N-1 model evaluations).",
+            "field_kind": "input",
+            "input": "any",
+            "minimum": 2,
+            "orig_default": 50,
+            "orig_required": false,
+            "title": "Steps",
+            "type": "integer"
+          },
+          "seed": {
+            "default": 0,
+            "description": "Randomness seed for reproducibility.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Seed",
+            "type": "integer"
+          },
+          "type": {
+            "const": "minimax_h3_denoise",
+            "default": "minimax_h3_denoise",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["latents", "video", "audio", "minimax"],
+        "title": "Denoise - MiniMax H3",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/MiniMaxH3DenoiseOutput"
+        }
+      },
+      "MiniMaxH3DenoiseOutput": {
+        "class": "output",
+        "description": "Joint video + audio latents from one MiniMax H3 denoise run.",
+        "properties": {
+          "video_latents": {
+            "$ref": "#/components/schemas/LatentsField",
+            "description": "5D video latents [1, 24, T_lat, H/16, W/16].",
+            "field_kind": "output",
+            "ui_hidden": false
+          },
+          "audio_latents": {
+            "$ref": "#/components/schemas/LatentsField",
+            "description": "Audio latents [2, 32, T_audio] (one item per stereo channel).",
+            "field_kind": "output",
+            "ui_hidden": false
+          },
+          "width": {
+            "description": "Pixel width of the video latents.",
+            "field_kind": "output",
+            "title": "Width",
+            "type": "integer",
+            "ui_hidden": false
+          },
+          "height": {
+            "description": "Pixel height of the video latents.",
+            "field_kind": "output",
+            "title": "Height",
+            "type": "integer",
+            "ui_hidden": false
+          },
+          "num_frames": {
+            "description": "Pixel-frame count of the video latents.",
+            "field_kind": "output",
+            "title": "Num Frames",
+            "type": "integer",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "minimax_h3_denoise_output",
+            "default": "minimax_h3_denoise_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "video_latents", "audio_latents", "width", "height", "num_frames", "type", "type"],
+        "title": "MiniMaxH3DenoiseOutput",
+        "type": "object"
+      },
+      "MiniMaxH3FrameConditioningField": {
+        "description": "First/last-keyframe conditioning for MiniMax H3 (FL2VA).\n\nCarries the CLEAN (not yet noise-augmented) packed keyframe conditioning rows; the denoise\nnode noise-augments them to t=0.999 with the request seed's first draws. Width/height ride\nalong so the denoise node can reject a canvas mismatch instead of failing inside the\ntransformer.",
+        "properties": {
+          "condition_rows_name": {
+            "description": "Name of the saved (num_condition_rows, 96) rows tensor.",
+            "title": "Condition Rows Name",
+            "type": "string"
+          },
+          "keyframe_anchors": {
+            "description": "Which end each keyframe anchors, in packed order (\"first\" / \"last\").",
+            "items": {
+              "type": "string"
+            },
+            "title": "Keyframe Anchors",
+            "type": "array"
+          },
+          "width": {
+            "description": "Canvas width used during VAE encoding (matches denoise width).",
+            "title": "Width",
+            "type": "integer"
+          },
+          "height": {
+            "description": "Canvas height used during VAE encoding (matches denoise height).",
+            "title": "Height",
+            "type": "integer"
+          }
+        },
+        "required": ["condition_rows_name", "keyframe_anchors", "width", "height"],
+        "title": "MiniMaxH3FrameConditioningField",
+        "type": "object"
+      },
+      "MiniMaxH3FrameConditioningInvocation": {
+        "category": "conditioning",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "VAE-encodes first/last keyframes into MiniMax H3 conditioning rows.\n\nThe rows are clean (the denoise node noise-augments them with the request seed). The same\nimages and width/height must also be wired to the Prompt - MiniMax H3 node: the keyframes\nare part of both the packed sequence and the text conditioning.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "first_image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Keyframe the video starts from (stretched onto the canvas).",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "last_image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Keyframe the video ends on (cover-cropped onto the canvas).",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "vae": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VAEField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "VAE",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Video VAE"
+          },
+          "width": {
+            "default": 1344,
+            "description": "Target canvas width.",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 32,
+            "orig_default": 1344,
+            "orig_required": false,
+            "title": "Width",
+            "type": "integer"
+          },
+          "height": {
+            "default": 768,
+            "description": "Target canvas height.",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 32,
+            "orig_default": 768,
+            "orig_required": false,
+            "title": "Height",
+            "type": "integer"
+          },
+          "type": {
+            "const": "minimax_h3_frame_conditioning",
+            "default": "minimax_h3_frame_conditioning",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["conditioning", "minimax", "video", "i2v"],
+        "title": "Frame Conditioning - MiniMax H3",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/MiniMaxH3FrameConditioningOutput"
+        }
+      },
+      "MiniMaxH3FrameConditioningOutput": {
+        "class": "output",
+        "description": "Output of the MiniMax H3 keyframe VAE-encoder.",
+        "properties": {
+          "frame_conditioning": {
+            "$ref": "#/components/schemas/MiniMaxH3FrameConditioningField",
+            "description": "First/last-keyframe (VAE-latent) conditioning for MiniMax H3",
+            "field_kind": "output",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "minimax_h3_frame_conditioning_output",
+            "default": "minimax_h3_frame_conditioning_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "frame_conditioning", "type", "type"],
+        "title": "MiniMaxH3FrameConditioningOutput",
+        "type": "object"
+      },
+      "MiniMaxH3LatentsToImageInvocation": {
+        "category": "latents",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Decode MiniMax H3 video latents and save a single frame as an image.",
+        "node_pack": "invokeai",
+        "properties": {
+          "board": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The board to save the image to",
+            "field_kind": "internal",
+            "input": "direct",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "video_latents": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Latents tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "vae": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VAEField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "VAE",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Video VAE"
+          },
+          "frame_index": {
+            "default": 0,
+            "description": "Which decoded frame to save.",
+            "field_kind": "input",
+            "input": "any",
+            "minimum": 0,
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Frame Index",
+            "type": "integer"
+          },
+          "type": {
+            "const": "minimax_h3_latents_to_image",
+            "default": "minimax_h3_latents_to_image",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["latents", "image", "vae", "l2i", "minimax"],
+        "title": "Latents to Image - MiniMax H3",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/ImageOutput"
+        }
+      },
+      "MiniMaxH3LatentsToVideoInvocation": {
+        "category": "latents",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Decode MiniMax H3 video+audio latents and encode an MP4 with an AAC stereo track.",
+        "node_pack": "invokeai",
+        "properties": {
+          "board": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The board to save the image to",
+            "field_kind": "internal",
+            "input": "direct",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "video_latents": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Latents tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "audio_latents": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Audio latents [2, 32, T_audio] from the denoise node. Omit for a silent video.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "vae": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VAEField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "VAE",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Video VAE"
+          },
+          "audio_vae": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VAEField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Audio VAE (stereo, 32 kHz) for MiniMax H3",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Audio VAE"
+          },
+          "type": {
+            "const": "minimax_h3_latents_to_video",
+            "default": "minimax_h3_latents_to_video",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["latents", "video", "audio", "vae", "l2v", "minimax"],
+        "title": "Latents to Video - MiniMax H3",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/VideoOutput"
+        }
+      },
+      "MiniMaxH3ModelLoaderInvocation": {
+        "category": "model",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Loads a MiniMax H3 (FL2VA) model, outputting its submodels.\n\nAll six submodels (transformer, text encoder, tokenizer, processor, video VAE, audio VAE)\ncome from the one diffusers-layout install; there is no component mix-and-match yet.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "model": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "MiniMax H3 model (Transformer) to load",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Model",
+            "ui_model_base": ["minimax-h3"],
+            "ui_model_type": ["main"]
+          },
+          "type": {
+            "const": "minimax_h3_model_loader",
+            "default": "minimax_h3_model_loader",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["model", "type", "id"],
+        "tags": ["model", "minimax", "video"],
+        "title": "Main Model - MiniMax H3",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/MiniMaxH3ModelLoaderOutput"
+        }
+      },
+      "MiniMaxH3ModelLoaderOutput": {
+        "class": "output",
+        "description": "MiniMax H3 model loader output.",
+        "properties": {
+          "transformer": {
+            "$ref": "#/components/schemas/MiniMaxH3TransformerField",
+            "description": "MiniMax H3 FL2VA transformer",
+            "field_kind": "output",
+            "title": "Transformer",
+            "ui_hidden": false
+          },
+          "text_encoder": {
+            "$ref": "#/components/schemas/MiniMaxH3TextEncoderField",
+            "description": "Qwen3-VL-32B tokenizer, processor and text encoder for MiniMax H3",
+            "field_kind": "output",
+            "title": "Qwen3-VL Encoder",
+            "ui_hidden": false
+          },
+          "vae": {
+            "$ref": "#/components/schemas/VAEField",
+            "description": "VAE",
+            "field_kind": "output",
+            "title": "Video VAE",
+            "ui_hidden": false
+          },
+          "audio_vae": {
+            "$ref": "#/components/schemas/VAEField",
+            "description": "Audio VAE (stereo, 32 kHz) for MiniMax H3",
+            "field_kind": "output",
+            "title": "Audio VAE",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "minimax_h3_model_loader_output",
+            "default": "minimax_h3_model_loader_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "transformer", "text_encoder", "vae", "audio_vae", "type", "type"],
+        "title": "MiniMaxH3ModelLoaderOutput",
+        "type": "object"
+      },
+      "MiniMaxH3TextEncoderField": {
+        "description": "Field for the Qwen3-VL-32B conditioner used by MiniMax H3 models.\n\nUnlike :class:`Qwen3VLEncoderField`, H3 also needs the Qwen3VLProcessor \u2014 even for\ntext-only prompts (its multimodal token-type ids drive Qwen3-VL's 3D rotary layout), and\nfor feeding first/last keyframes to the conditioner as vision context.",
+        "properties": {
+          "tokenizer": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "Info to load tokenizer submodel"
+          },
+          "processor": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "Info to load processor submodel"
+          },
+          "text_encoder": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "Info to load text_encoder submodel"
+          }
+        },
+        "required": ["tokenizer", "processor", "text_encoder"],
+        "title": "MiniMaxH3TextEncoderField",
+        "type": "object"
+      },
+      "MiniMaxH3TextEncoderInvocation": {
+        "category": "conditioning",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Encodes a prompt (and optional first/last keyframes) for MiniMax H3.\n\nThe conditioning is Qwen3-VL-32B's *unnormalized* layer-50 hidden state. H3 is\nguidance-distilled: there is no negative prompt. For first/last-frame video, the keyframes\nare ALSO part of the text conditioning (a \"<Picture i>: \" label plus a vision block per\nkeyframe), so the same images must be wired here and to the Frame Conditioning node, with\nthe same width/height as the denoise node.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Text prompt for MiniMax H3.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "Prompt",
+            "ui_component": "textarea"
+          },
+          "text_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MiniMaxH3TextEncoderField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Qwen3-VL-32B tokenizer, processor and text encoder for MiniMax H3",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Qwen3-VL Encoder"
+          },
+          "first_image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional keyframe the video starts from (must match Frame Conditioning).",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "last_image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional keyframe the video ends on (must match Frame Conditioning).",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "width": {
+            "default": 1344,
+            "description": "Target canvas width.",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 32,
+            "orig_default": 1344,
+            "orig_required": false,
+            "title": "Width",
+            "type": "integer"
+          },
+          "height": {
+            "default": 768,
+            "description": "Target canvas height.",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 32,
+            "orig_default": 768,
+            "orig_required": false,
+            "title": "Height",
+            "type": "integer"
+          },
+          "type": {
+            "const": "minimax_h3_text_encoder",
+            "default": "minimax_h3_text_encoder",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["prompt", "conditioning", "minimax", "video"],
+        "title": "Prompt - MiniMax H3",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/MiniMaxH3ConditioningOutput"
+        }
+      },
+      "MiniMaxH3TransformerField": {
+        "description": "Transformer field for MiniMax H3 models (FL2VA).",
+        "properties": {
+          "transformer": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "Info to load Transformer submodel"
+          }
+        },
+        "required": ["transformer"],
+        "title": "MiniMaxH3TransformerField",
+        "type": "object"
       },
       "MiniMaxH3VariantType": {
         "type": "string",
