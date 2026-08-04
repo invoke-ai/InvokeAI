@@ -1,4 +1,5 @@
 import type { GenerationModelCatalogItem, PromptHistoryItem } from '@features/generation/contracts';
+import type { RebalancePreset } from '@features/generation/core/conditioningRebalance';
 import type { GenerateSettings } from '@features/generation/core/types';
 import type { ComponentType, ReactNode } from 'react';
 
@@ -71,6 +72,14 @@ export interface GenerationUiAdapter {
     items: readonly PromptHistoryItem[];
     clear(): void;
     remove(prompt: PromptHistoryItem): void;
+  };
+  rebalancePresets: {
+    /** User-saved conditioning rebalance curves; built-ins are not included. */
+    presets: readonly RebalancePreset[];
+    /** Adds a curve under a new id and returns it. */
+    save(label: string, weights: string, multiplier: number): RebalancePreset;
+    rename(presetId: string, label: string): void;
+    remove(presetId: string): void;
   };
   sectionPreferences: {
     /** Persisted per-user open/closed overrides for panel sections; absent = section default. */

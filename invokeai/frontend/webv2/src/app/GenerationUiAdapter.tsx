@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { getSelectedGalleryImageFromValues } from '@features/gallery/contracts';
 import { invalidateGallery } from '@features/gallery/queries';
 import { GenerationUiProvider } from '@features/generation/react';
+import { normalizeRebalancePresets } from '@features/generation/settings';
 import { useAuthSession, useCapabilities } from '@features/identity';
 import { ensureModelsLoaded, getModelBaseColorPalette, getModelBaseLabel, useModelsSelector } from '@features/models';
 import { useQueryClient } from '@tanstack/react-query';
@@ -102,6 +103,39 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
     }),
     [session.multiuserEnabled, session.user?.user_id]
   );
+  const krea2RebalancePresets = useWorkbenchPreferenceSelector((preferences) => preferences.krea2RebalancePresets);
+  const rebalancePresetsGroup = useMemo<GenerationUiAdapter['rebalancePresets']>(
+    () => ({
+      // Settings persists these shape-checked only; a curve whose weights no longer parse
+      // (hand-edited storage, a future backend tap count) is dropped here rather than
+      // handed to the picker.
+      presets: normalizeRebalancePresets(krea2RebalancePresets),
+      remove: (presetId) => {
+        void patchWorkbenchPreferences({
+          krea2RebalancePresets: getWorkbenchPreferences().krea2RebalancePresets.filter(
+            (preset) => preset.id !== presetId
+          ),
+        });
+      },
+      rename: (presetId, label) => {
+        void patchWorkbenchPreferences({
+          krea2RebalancePresets: getWorkbenchPreferences().krea2RebalancePresets.map((preset) =>
+            preset.id === presetId ? { ...preset, label } : preset
+          ),
+        });
+      },
+      save: (label, weights, multiplier) => {
+        const preset = { id: crypto.randomUUID(), label, multiplier, weights };
+
+        void patchWorkbenchPreferences({
+          krea2RebalancePresets: [...getWorkbenchPreferences().krea2RebalancePresets, preset],
+        });
+
+        return preset;
+      },
+    }),
+    [krea2RebalancePresets]
+  );
   const generateSectionsOpen = useWorkbenchPreferenceSelector((preferences) => preferences.generateSectionsOpen);
   const sectionPreferencesGroup = useMemo<GenerationUiAdapter['sectionPreferences']>(
     () => ({
@@ -125,6 +159,7 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
       notifications: notificationsGroup,
       project,
       promptHistory: promptHistoryGroup,
+      rebalancePresets: rebalancePresetsGroup,
       sectionPreferences: sectionPreferencesGroup,
       settings: settingsGroup,
     }),
@@ -136,6 +171,7 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
       notificationsGroup,
       project,
       promptHistoryGroup,
+      rebalancePresetsGroup,
       sectionPreferencesGroup,
       settingsGroup,
     ]

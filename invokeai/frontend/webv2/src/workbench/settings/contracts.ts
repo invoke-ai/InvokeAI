@@ -13,6 +13,22 @@ export interface ProjectSettings {
   showPromptSyntaxHighlighting: boolean;
 }
 
+/**
+ * A saved conditioning-rebalance curve as it is persisted.
+ *
+ * Structurally the feature's `RebalancePreset`, declared here rather than imported:
+ * these preferences load on the launchpad route, and a value import from
+ * `@features/generation` would pull that feature's whole core into the initial bundle.
+ * Settings stores the record; the generation feature owns what `weights` means and
+ * re-validates it on read.
+ */
+export interface StoredRebalancePreset {
+  id: string;
+  label: string;
+  weights: string;
+  multiplier: number;
+}
+
 /** User-tunable appearance + behavior preferences surfaced in the Settings modal. */
 export interface WorkbenchPreferences {
   themeId: WorkbenchThemeId;
@@ -41,4 +57,6 @@ export interface WorkbenchPreferences {
   customHotkeys: Record<string, string[]>;
   /** Generate panel section open/closed overrides keyed by section id; absent = section default. */
   generateSectionsOpen: Record<string, boolean>;
+  /** User-saved Krea-2 conditioning rebalance curves, in the order they were saved. */
+  krea2RebalancePresets: StoredRebalancePreset[];
 }
