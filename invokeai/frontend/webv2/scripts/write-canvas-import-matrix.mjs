@@ -7,7 +7,7 @@ import {
   isStringLiteralLikeNode,
 } from 'typescript/unstable/ast';
 
-import { parseSource } from './parse-source.mjs';
+import { parseSource, primeSources } from './parse-source.mjs';
 
 const packageRoot = process.cwd();
 const sourceRoot = resolve(packageRoot, 'src');
@@ -104,12 +104,16 @@ const importedSymbols = (clause) => {
   return symbols.sort();
 };
 
+const scanned = new Map(
+  paths
+    .filter((path) => isProduction(path) && !isCanvasOwned(path))
+    .map((path) => [path, readFileSync(resolve(sourceRoot, path), 'utf8')])
+);
+// Load the whole tree in one snapshot; parsing file by file costs a round trip each.
+primeSources(scanned);
+
 const imports = [];
-for (const source of paths.filter(isProduction)) {
-  if (isCanvasOwned(source)) {
-    continue;
-  }
-  const text = readFileSync(resolve(sourceRoot, source), 'utf8');
+for (const [source, text] of scanned) {
   const file = parseSource(source, text);
   for (const statement of file.statements) {
     if (!isImportDeclaration(statement) || !isStringLiteralLikeNode(statement.moduleSpecifier)) {

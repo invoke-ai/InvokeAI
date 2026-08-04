@@ -18,7 +18,7 @@ import {
   SyntaxKind,
 } from 'typescript/unstable/ast';
 
-import { parseSource } from './parse-source.mjs';
+import { parseSource, primeSources } from './parse-source.mjs';
 
 const packageRoot = process.cwd();
 const sourceRoot = resolve(packageRoot, 'src');
@@ -34,6 +34,8 @@ const paths = readdirSync(sourceRoot, { recursive: true, withFileTypes: true })
   .sort();
 const productionPaths = paths.filter((path) => !isTest(path));
 const sources = new Map(productionPaths.map((path) => [path, readFileSync(resolve(sourceRoot, path), 'utf8')]));
+// Load the whole tree in one snapshot; parsing file by file costs a round trip each.
+primeSources(sources, { jsx: true });
 const pathByStem = new Map(productionPaths.map((path) => [stripExtension(path), path]));
 
 const aliases = [
