@@ -1,5 +1,5 @@
 import type { DeveloperLogLevel, DeveloperLogNamespace } from '@workbench/diagnostics/contracts';
-import type { ProjectSettings, WorkbenchPreferences } from '@workbench/settings/contracts';
+import type { ProjectSettings, StoredRebalancePreset, WorkbenchPreferences } from '@workbench/settings/contracts';
 
 import { getUserStorageScope } from '@features/identity';
 import { normalizeWorkbenchLanguage } from '@platform/i18n/languages';
@@ -59,6 +59,7 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   enableInformationalPopovers: true,
   enableModelDescriptions: true,
   generateSectionsOpen: {},
+  krea2RebalancePresets: [],
   language: 'en',
   queueJobsScope: 'all',
   reduceMotion: false,
@@ -161,6 +162,47 @@ const normalizeGenerateSectionsOpen = (values: unknown): Record<string, boolean>
   );
 };
 
+/**
+ * Shape-only: settings keeps the saved records intact and readable, and the generation
+ * feature re-validates `weights` against the backend's grammar when it reads them
+ * (`normalizeRebalancePresets`). Parsing here would mean importing that feature into the
+ * launchpad bundle for no gain.
+ */
+const normalizeRebalancePresets = (values: unknown): StoredRebalancePreset[] => {
+  if (!Array.isArray(values)) {
+    return [];
+  }
+
+  const seen = new Set<string>();
+  const presets: StoredRebalancePreset[] = [];
+
+  for (const entry of values) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      continue;
+    }
+
+    const { id, label, multiplier, weights } = entry as Partial<StoredRebalancePreset>;
+
+    if (
+      typeof id !== 'string' ||
+      id.trim() === '' ||
+      seen.has(id) ||
+      typeof label !== 'string' ||
+      label.trim() === '' ||
+      typeof weights !== 'string' ||
+      typeof multiplier !== 'number' ||
+      !Number.isFinite(multiplier)
+    ) {
+      continue;
+    }
+
+    seen.add(id);
+    presets.push({ id, label: label.trim(), multiplier, weights });
+  }
+
+  return presets;
+};
+
 export const normalizeProjectSettings = (settings?: Partial<ProjectSettings>): ProjectSettings => ({
   antialiasProgressImages:
     typeof settings?.antialiasProgressImages === 'boolean'
@@ -221,6 +263,7 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
       ? preferences.enableModelDescriptions
       : DEFAULT_PREFERENCES.enableModelDescriptions,
   generateSectionsOpen: normalizeGenerateSectionsOpen(preferences?.generateSectionsOpen),
+  krea2RebalancePresets: normalizeRebalancePresets(preferences?.krea2RebalancePresets),
   language: normalizeWorkbenchLanguage(preferences?.language) ?? DEFAULT_PREFERENCES.language,
   queueJobsScope:
     preferences?.queueJobsScope === 'all-projects'

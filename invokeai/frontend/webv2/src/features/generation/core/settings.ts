@@ -17,6 +17,12 @@ import type {
 
 import { sanitizeBatchCount } from './batch';
 import { isVaeCompatibleWithGenerateModel } from './componentCompatibility';
+import {
+  DEFAULT_KREA2_REBALANCE_MULTIPLIER,
+  DEFAULT_KREA2_REBALANCE_WEIGHTS,
+  isValidKrea2RebalanceWeights,
+  KREA2_REBALANCE_WEIGHT_COUNT,
+} from './conditioningRebalance';
 import { isDynamicPromptsSeedBehaviour, sanitizeMaxPrompts, sanitizeSampleSeed } from './dynamicPrompts';
 import { clampPidSteps, DEFAULT_PID_STEPS, isPidMode } from './pid';
 import { isCanonicalPromptTemplateSnapshot, sanitizePromptTemplateSnapshot } from './promptTemplates';
@@ -169,9 +175,6 @@ const isVaePrecision = (value: unknown): value is VaePrecision => value === 'fp1
 /** Backend defaults from `Ideogram4DenoiseInvocation` / `Krea2*Invocation`. */
 export const IDEOGRAM4_SAMPLER_PRESETS: Ideogram4SamplerPreset[] = ['V4_QUALITY_48', 'V4_DEFAULT_20', 'V4_TURBO_12'];
 export const DEFAULT_IDEOGRAM4_SAMPLER_PRESET: Ideogram4SamplerPreset = 'V4_QUALITY_48';
-export const DEFAULT_KREA2_REBALANCE_MULTIPLIER = 4;
-export const DEFAULT_KREA2_REBALANCE_WEIGHTS = '1.0,1.0,1.0,1.0,1.0,1.0,1.0,2.5,5.0,1.1,4.0,1.0';
-export const KREA2_REBALANCE_WEIGHT_COUNT = 12;
 export const DEFAULT_KREA2_SEED_VARIANCE_STRENGTH = 0.1;
 export const MAX_KREA2_SEED_VARIANCE_STRENGTH = 2;
 export const DEFAULT_KREA2_SEED_VARIANCE_RANDOMIZE_PERCENT = 50;
@@ -185,23 +188,13 @@ const getOptionalNumber = (value: unknown): number | null =>
 const getStringArray = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : [];
 
-/**
- * Krea-2 rebalance weights are free text forwarded straight to the backend's `_parse_weights()`.
- * Validating here keeps an unparseable string (wrong count, non-numeric, NaN/Infinity) from
- * reaching a node that would fail mid-generation.
- */
-export const isValidKrea2RebalanceWeights = (value: string): boolean => {
-  const parts = value.split(',');
-
-  if (parts.length !== KREA2_REBALANCE_WEIGHT_COUNT) {
-    return false;
-  }
-
-  return parts.every((part) => {
-    const trimmed = part.trim();
-
-    return trimmed !== '' && Number.isFinite(Number(trimmed));
-  });
+// Re-exported so existing `core/settings` callers keep one import site; the rebalance
+// vector, its presets, and its geometry all live in `conditioningRebalance.ts`.
+export {
+  DEFAULT_KREA2_REBALANCE_MULTIPLIER,
+  DEFAULT_KREA2_REBALANCE_WEIGHTS,
+  isValidKrea2RebalanceWeights,
+  KREA2_REBALANCE_WEIGHT_COUNT,
 };
 
 const isGenerateLora = (value: unknown): value is GenerateLora =>

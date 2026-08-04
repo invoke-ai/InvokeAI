@@ -557,6 +557,14 @@
       "heading": "LoRA",
       "paragraphs": ["Lightweight models that are used in conjunction with base models."]
     },
+    "conditioningRebalance": {
+      "heading": "Conditioning rebalance",
+      "paragraphs": [
+        "Krea 2 reads your prompt through twelve tapped layers of its text encoder and stacks them together. Each bar sets how much one of those layers counts.",
+        "Shallow taps, on the left, track the prompt's literal wording. Deep taps, on the right, track its meaning and composition. Raising the deep taps pushes the model harder toward what you asked for; raising the shallow taps holds it closer to how you phrased it.",
+        "Gain scales the whole stack afterwards, which counteracts the quality dilution from distillation. Leave both at the defaults unless prompt adherence is the problem you are solving."
+      ]
+    },
     "creativity": {
       "heading": "Creativity",
       "paragraphs": [
@@ -1297,11 +1305,26 @@
       "incompatibleSettingsClearedDescription_other": "{{labels}} were not compatible with {{name}}.",
       "installTextLlmToExpandPrompts": "Install a Text LLM model to expand prompts.",
       "installVisionModelToGeneratePrompts": "Install a LLaVA OneVision model to generate prompts from images.",
-      "krea2Rebalance": "Rebalance",
+      "krea2Rebalance": "Conditioning rebalance",
+      "krea2RebalanceAxisDeep": "deep",
+      "krea2RebalanceAxisShallow": "shallow",
+      "krea2RebalanceGain": "Gain",
+      "krea2RebalanceGainReset": "Reset gain",
       "krea2RebalanceHelp": "Scales conditioning toward the prompt before denoising.",
-      "krea2RebalanceMultiplier": "Rebalance multiplier",
-      "krea2RebalanceWeights": "Per-layer weights",
-      "krea2RebalanceWeightsHelp": "{{count}} comma-separated numbers, one per layer.",
+      "krea2RebalancePreset": "Rebalance preset",
+      "krea2RebalancePresetActions": "Preset actions",
+      "krea2RebalancePresetCustom": "Custom",
+      "krea2RebalancePresetDelete": "Delete preset",
+      "krea2RebalancePresetDeleteBody": "Delete the saved preset \"{{name}}\"? This cannot be undone.",
+      "krea2RebalancePresetName": "Preset name",
+      "krea2RebalancePresetRename": "Rename preset",
+      "krea2RebalancePresetSave": "Save current as preset",
+      "krea2RebalancePresetSaveAction": "Save",
+      "krea2RebalanceReset": "Reset to default curve",
+      "krea2RebalanceTapLabel": "Tap {{tap}}, encoder layer {{layer}}",
+      "krea2RebalanceTapReadout": "tap {{tap}} · {{value}}",
+      "krea2RebalanceWeights": "Per-tap weights",
+      "krea2RebalanceWeightsHelp": "{{count}} comma-separated numbers, one per tap.",
       "krea2RebalanceWeightsInvalid": "Enter exactly {{count}} comma-separated numbers.",
       "krea2SeedVariance": "Seed variance",
       "krea2SeedVarianceHelp": "Perturbs conditioning so nearby seeds diverge more.",

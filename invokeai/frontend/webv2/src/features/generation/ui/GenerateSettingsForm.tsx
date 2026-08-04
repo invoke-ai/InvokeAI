@@ -256,6 +256,7 @@ export const GenerateSettingsForm = ({
         selectedModel={selectedModel}
         settings={draftSettings}
         onCommit={commit}
+        onCommitImmediate={commitPatchImmediately}
         onCommitSettings={commitSettingsImmediately}
       />
 

@@ -13,6 +13,7 @@ import { buildImageRecallSettings, getImageRecallCapabilities } from './imageRec
 const sdxlModel: MainModelConfig = { base: 'sdxl', key: 'sdxl-model', name: 'SDXL', type: 'main' };
 const sd1Model: MainModelConfig = { base: 'sd-1', key: 'sd1-model', name: 'SD 1.5', type: 'main' };
 const animaModel: MainModelConfig = { base: 'anima', key: 'anima-model', name: 'Anima', type: 'main' };
+const krea2Model: MainModelConfig = { base: 'krea-2', key: 'krea2-model', name: 'Krea 2', type: 'main' };
 const vaeModel: VaeModelConfig = { base: 'sd-1', key: 'vae-model', name: 'SD 1.5 VAE', type: 'vae' };
 const qwenImageVae: VaeModelConfig = { base: 'qwen-image', key: 'qwen-vae', name: 'Qwen VAE', type: 'vae' };
 const animaQwen3: ComponentModelConfig = {
@@ -581,5 +582,92 @@ describe('image recall', () => {
     expect(result?.values.qwen3EncoderModel).toBeNull();
     expect(result?.values.qwenVLEncoderModel).toBeNull();
     expect(result?.fields).toContain('components');
+  });
+
+  describe('krea-2 conditioning rebalance', () => {
+    const krea2Metadata = {
+      krea2_rebalance_enabled: true,
+      krea2_rebalance_multiplier: 6.5,
+      krea2_rebalance_weights: '1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0',
+      model: { key: krea2Model.key },
+    };
+
+    it('restores the curve and gain a Krea-2 image was generated with', () => {
+      const result = buildImageRecallSettings({
+        currentValues: createValues(),
+        image,
+        kind: 'all',
+        metadata: krea2Metadata,
+        models: [],
+        supportedModels: [krea2Model],
+        vaeModels: [],
+      });
+
+      expect(result?.values.krea2RebalanceEnabled).toBe(true);
+      expect(result?.values.krea2RebalanceMultiplier).toBe(6.5);
+      expect(result?.values.krea2RebalanceWeights).toBe('1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0');
+      expect(result?.fields).toContain('krea2Rebalance');
+    });
+
+    it('recalls the rebalance on a remix too', () => {
+      const result = buildImageRecallSettings({
+        currentValues: createValues(),
+        image,
+        kind: 'remix',
+        metadata: krea2Metadata,
+        models: [],
+        supportedModels: [krea2Model],
+        vaeModels: [],
+      });
+
+      expect(result?.fields).toContain('krea2Rebalance');
+    });
+
+    it('ignores the rebalance when the recalled model is not Krea-2', () => {
+      const result = buildImageRecallSettings({
+        currentValues: createValues(),
+        image,
+        kind: 'all',
+        metadata: { ...krea2Metadata, model: { key: sdxlModel.key } },
+        models: [],
+        supportedModels: [sdxlModel],
+        vaeModels: [],
+      });
+
+      expect(result?.values.krea2RebalanceEnabled).toBe(false);
+      expect(result?.fields).not.toContain('krea2Rebalance');
+    });
+
+    it('drops a weights string the backend would reject', () => {
+      // The string is forwarded to the node verbatim, so a malformed blob must not
+      // become a queued item that fails mid-generation.
+      const result = buildImageRecallSettings({
+        currentValues: createValues(),
+        image,
+        kind: 'all',
+        metadata: { ...krea2Metadata, krea2_rebalance_weights: '0x10,1,1,1,1,1,1,1,1,1,1,1' },
+        models: [],
+        supportedModels: [krea2Model],
+        vaeModels: [],
+      });
+
+      expect(result?.values.krea2RebalanceWeights).toBe(createValues().krea2RebalanceWeights);
+      // The enabled flag and gain are still sound on their own.
+      expect(result?.values.krea2RebalanceMultiplier).toBe(6.5);
+    });
+
+    it('offers recall for an image whose only recallable delta is the rebalance', () => {
+      const capabilities = getImageRecallCapabilities({
+        currentValues: createValues({ model: krea2Model }),
+        image,
+        metadata: { krea2_rebalance_enabled: true },
+        models: [],
+        supportedModels: [],
+        vaeModels: [],
+      });
+
+      expect(capabilities.all).toBe(true);
+      expect(capabilities.remix).toBe(true);
+    });
   });
 });

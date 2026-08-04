@@ -58,6 +58,11 @@ export {
   type ResolveGenerateWidgetValuesInput,
 } from './core/resolveGenerateWidgetValues';
 export { isVaeCompatibleWithGenerateModel } from './core/componentCompatibility';
+export {
+  isValidKrea2RebalanceWeights,
+  normalizeRebalancePresets,
+  type RebalancePreset,
+} from './core/conditioningRebalance';
 export { MIN_BATCH_COUNT, sanitizeBatchCount } from './core/batch';
 export {
   createDynamicPromptsSampleSeed,
