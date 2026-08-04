@@ -21,9 +21,10 @@ vi.mock('services/api/endpoints/videos', () => ({
   videosApi: {
     endpoints: {
       deleteVideos: {
-        initiate: vi.fn((arg: { video_names: string[] }) => ({
+        initiate: vi.fn((arg: { video_names: string[]; delete_starred: boolean }) => ({
           type: 'videosApi/deleteVideos',
           video_names: arg.video_names,
+          delete_starred: arg.delete_starred,
         })),
       },
     },
@@ -44,6 +45,7 @@ vi.mock('features/nodes/store/nodesSlice', () => ({
 
 vi.mock('features/system/store/systemSlice', () => ({
   selectSystemShouldConfirmOnDelete: vi.fn(() => false),
+  selectSystemShouldProtectStarredMedia: vi.fn(() => false),
 }));
 
 vi.mock('features/toast/toast', () => ({ toast: vi.fn() }));
@@ -59,7 +61,10 @@ import type { AppStore } from 'app/store/store';
 import { selectLastSelectedItem } from 'features/gallery/store/gallerySelectors';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { selectCachedGalleryItemNames } from 'features/gallery/store/selectCachedGalleryItemNames';
-import { selectSystemShouldConfirmOnDelete } from 'features/system/store/systemSlice';
+import {
+  selectSystemShouldConfirmOnDelete,
+  selectSystemShouldProtectStarredMedia,
+} from 'features/system/store/systemSlice';
 import { toast } from 'features/toast/toast';
 import { videosApi } from 'services/api/endpoints/videos';
 
@@ -75,20 +80,32 @@ const buildVideoFieldNode = (nodeId: string, videoName: string) => ({
   },
 });
 
-const buildStore = (selection: string[], failingNames: Set<string>, nodes: unknown[] = [], rejectAll = false) => {
+const buildStore = (
+  selection: string[],
+  failingNames: Set<string>,
+  nodes: unknown[] = [],
+  rejectAll = false,
+  protectedNames: Set<string> = new Set()
+) => {
   const dispatched: unknown[] = [];
   const dispatch = vi.fn((action: unknown) => {
     dispatched.push(action);
-    const typed = action as { type?: string; video_names?: string[] };
+    const typed = action as { type?: string; video_names?: string[]; delete_starred?: boolean };
     if (typed?.type === 'videosApi/deleteVideos') {
       return {
         unwrap: () =>
           rejectAll
             ? Promise.reject(new Error('delete failed'))
             : Promise.resolve({
-                deleted_videos: (typed.video_names ?? []).filter((name) => !failingNames.has(name)),
+                deleted_videos: (typed.video_names ?? []).filter(
+                  (name) => !failingNames.has(name) && (typed.delete_starred !== false || !protectedNames.has(name))
+                ),
                 failed_videos: (typed.video_names ?? []).filter((name) => failingNames.has(name)),
                 affected_boards: ['none'],
+                starred_skipped:
+                  typed.delete_starred === false
+                    ? (typed.video_names ?? []).filter((name) => protectedNames.has(name))
+                    : [],
               }),
       };
     }
@@ -110,6 +127,11 @@ const getVideoFieldChanges = (dispatched: unknown[]) =>
       !!action && typeof action === 'object' && (action as { type?: string }).type === 'nodes/fieldVideoValueChanged'
   );
 
+beforeEach(() => {
+  vi.mocked(selectSystemShouldConfirmOnDelete).mockReturnValue(false);
+  vi.mocked(selectSystemShouldProtectStarredMedia).mockReturnValue(false);
+});
+
 describe('handleDeletions batching', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -124,10 +146,24 @@ describe('handleDeletions batching', () => {
 
     expect(videosApi.endpoints.deleteVideos.initiate).toHaveBeenCalledTimes(1);
     expect(videosApi.endpoints.deleteVideos.initiate).toHaveBeenCalledWith(
-      { video_names: ['a.mp4', 'b.mp4'] },
+      { video_names: ['a.mp4', 'b.mp4'], delete_starred: true },
       { track: false }
     );
     expect(toast).not.toHaveBeenCalled();
+  });
+
+  it('passes protection to the backend and reports skipped starred videos', async () => {
+    vi.mocked(selectSystemShouldConfirmOnDelete).mockReturnValue(true);
+    vi.mocked(selectSystemShouldProtectStarredMedia).mockReturnValue(true);
+    const { store } = buildStore([], new Set(), [], false, new Set(['a.mp4']));
+
+    await handleDeletions(['a.mp4'], store);
+
+    expect(videosApi.endpoints.deleteVideos.initiate).toHaveBeenCalledWith(
+      { video_names: ['a.mp4'], delete_starred: false },
+      { track: false }
+    );
+    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ status: 'warning' }));
   });
 });
 

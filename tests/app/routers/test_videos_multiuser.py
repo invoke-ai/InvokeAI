@@ -237,9 +237,7 @@ def test_delete_videos_from_list_dedupes_repeated_names(client: TestClient, mock
     ownership bypass), landing the same name in BOTH deleted_videos and failed_videos and
     toasting a spurious partial-failure warning (JPPhoto non-merge-blocker, 2026-07-22).
     """
-    fake_dto = MagicMock()
-    fake_dto.board_id = None
-    mock_invoker.services.videos.get_dto.return_value = fake_dto
+    mock_invoker.services.board_video_records.get_board_for_video.return_value = None
 
     response = client.post(
         "/api/v1/videos/delete",
@@ -254,6 +252,51 @@ def test_delete_videos_from_list_dedupes_repeated_names(client: TestClient, mock
     # The service must have been asked to delete each unique name exactly once.
     delete_calls = [call.args[0] for call in mock_invoker.services.videos.delete.call_args_list]
     assert sorted(delete_calls) == ["dup.mp4", "other.mp4"]
+
+
+def test_delete_starred_video_is_skipped_when_protected(client: TestClient, mock_invoker: Invoker, admin_token: str):
+    mock_invoker.services.board_video_records.get_board_for_video.return_value = "board-id"
+    mock_invoker.services.videos.delete.return_value = False
+
+    response = client.delete(
+        "/api/v1/videos/i/starred.mp4?delete_starred=false",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json() == {
+        "deleted_videos": [],
+        "failed_videos": [],
+        "affected_boards": ["board-id"],
+        "starred_skipped": ["starred.mp4"],
+    }
+    mock_invoker.services.videos.delete.assert_called_once_with("starred.mp4", delete_starred=False)
+
+
+def test_bulk_delete_only_deletes_unstarred_videos_when_protected(
+    client: TestClient, mock_invoker: Invoker, admin_token: str
+):
+    mock_invoker.services.board_video_records.get_board_for_video.return_value = None
+    mock_invoker.services.videos.delete.side_effect = (
+        lambda video_name, delete_starred=True: delete_starred or video_name != "starred.mp4"
+    )
+
+    response = client.post(
+        "/api/v1/videos/delete",
+        json={
+            "video_names": ["starred.mp4", "normal.mp4"],
+            "delete_starred": False,
+        },
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json() == {
+        "deleted_videos": ["normal.mp4"],
+        "failed_videos": [],
+        "affected_boards": ["none"],
+        "starred_skipped": ["starred.mp4"],
+    }
 
 
 def test_video_batch_rejects_too_many_or_overlong_names() -> None:
@@ -292,9 +335,7 @@ def test_delete_videos_from_list_skips_foreign_items_and_returns_owned(
     # fallback path doesn't relax permissions for the foreign video.
     mock_invoker.services.board_video_records.get_board_for_video.return_value = None
 
-    fake_dto = MagicMock()
-    fake_dto.board_id = None
-    mock_invoker.services.videos.get_dto.return_value = fake_dto
+    mock_invoker.services.board_video_records.get_board_for_video.return_value = None
 
     response = client.post(
         "/api/v1/videos/delete",
@@ -911,6 +952,30 @@ def test_delete_uncategorized_videos_deletes_only_owned(client: TestClient, mock
     assert mock_invoker.services.videos.get_video_names.call_args.kwargs["user_id"] == user1.user_id
     delete_calls = {call.args[0] for call in mock_invoker.services.videos.delete.call_args_list}
     assert delete_calls == {"mine_a.mp4", "mine_b.mp4"}
+
+
+def test_delete_uncategorized_videos_preserves_starred_when_protected(
+    client: TestClient, mock_invoker: Invoker, admin_token: str
+):
+    names_result = MagicMock()
+    names_result.video_names = ["starred.mp4", "normal.mp4"]
+    mock_invoker.services.videos.get_video_names.return_value = names_result
+    mock_invoker.services.videos.delete.side_effect = (
+        lambda video_name, delete_starred=True: delete_starred or video_name != "starred.mp4"
+    )
+
+    response = client.delete(
+        "/api/v1/videos/uncategorized?delete_starred=false",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json() == {
+        "deleted_videos": ["normal.mp4"],
+        "failed_videos": [],
+        "affected_boards": ["none"],
+        "starred_skipped": ["starred.mp4"],
+    }
 
 
 def test_delete_uncategorized_videos_requires_auth(enable_multiuser_for_videos: Any, client: TestClient):
