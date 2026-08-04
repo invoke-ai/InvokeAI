@@ -131,6 +131,7 @@ const resolveTarget = (ctx: ToolContext): PaintTarget | null => {
   // fresh paint layer (inserted on top and selected by the reducer) and paint
   // into it. This is the single allowed gesture-start dispatch.
   const layerId = ctx.createLayerId();
+  const previousSelectedLayerId = doc.selectedLayerId;
   const layer: CanvasRasterLayerContractV2 = {
     blendMode: 'normal',
     id: layerId,
@@ -151,7 +152,23 @@ const resolveTarget = (ctx: ToolContext): PaintTarget | null => {
   const entry = ctx.layers.getOrCreateRect(layerId, { height: 0, width: 0, x: 0, y: 0 });
   entry.stale = false;
   return {
-    cancel: () => undefined,
+    // This dispatch happens at pointer-DOWN, before a single pixel exists, and it
+    // is deliberately outside history (the stroke's own composed entry owns the
+    // create+paint pair). So it needs a real transactional rollback, like the
+    // control branch above: a gesture that commits nothing must leave no trace.
+    // Reachable whenever `strokeSession.commit()` returns null — every stroke
+    // point clipped away by the generation frame or the pixel selection — and from
+    // pointercancel, a tool switch mid-drag, or a throwing session construction.
+    cancel: () => {
+      ctx.layers.delete(layerId);
+      ctx.dispatch({ ids: [layerId], type: 'removeCanvasLayers' });
+      // Removing the top layer would otherwise leave the reducer's generic
+      // "nearest remaining neighbour" fallback selecting whatever sits at the top,
+      // not the layer the user actually had selected when the gesture began.
+      if (previousSelectedLayerId !== null) {
+        ctx.dispatch({ id: previousSelectedLayerId, type: 'setCanvasSelectedLayer' });
+      }
+    },
     commit: (event) => ctx.emitStrokeCommitted(event),
     createdLayer: { index: 0, layer },
     layerId,

@@ -508,3 +508,116 @@ describe('mask strokes are forced opaque', () => {
     expect(lastGlobalAlpha(cacheSurface(h, 'paint1'))).toBe(0.5);
   });
 });
+
+describe('auto-created layer rollback (a gesture that commits nothing leaves no trace)', () => {
+  /**
+   * The auto-create dispatch happens at pointer-DOWN, before any pixel exists, and
+   * deliberately outside history — so a gesture that produces no dirty rect has to
+   * roll the layer back itself, or it strands a layer the user cannot undo.
+   */
+  const clipped = (doc: CanvasDocumentContractV2) => {
+    const h = createHarness(doc);
+    // Clip-to-bbox on, with the whole stroke outside the frame: every `paint()`
+    // call bails, so `commit()` returns null.
+    const ctx: ToolContext = { ...h.ctx, getStrokeClipRect: () => ({ height: 10, width: 10, x: 0, y: 0 }) };
+    return { ...h, ctx };
+  };
+
+  const kinds = (h: { dispatched: CanvasProjectMutation[] }): string[] => h.dispatched.map((action) => action.type);
+
+  it('removes the layer and restores the prior selection when the stroke is fully clipped away', () => {
+    const h = clipped(makeDoc([imageLayer('img1'), paintLayer('p1')], 'img1'));
+    const brush = createBrushTool();
+
+    down(brush, h.ctx, pointer(80, 80));
+    move(brush, h.ctx, pointer(90, 90), [pointer(90, 90)]);
+    up(brush, h.ctx, pointer(90, 90));
+
+    expect(h.strokes).toHaveLength(0);
+    expect(kinds(h)).toEqual(['addCanvasLayer', 'removeCanvasLayers', 'setCanvasSelectedLayer']);
+    const removal = h.dispatched[1]!;
+    expect(removal.type === 'removeCanvasLayers' && removal.ids).toEqual([h.createdIds[0]]);
+    // The reducer's nearest-neighbour fallback would have picked the top layer, not
+    // the image layer the user actually had selected.
+    const reselect = h.dispatched[2]!;
+    expect(reselect.type === 'setCanvasSelectedLayer' && reselect.id).toBe('img1');
+  });
+
+  it('drops the provisional cache entry too', () => {
+    const h = clipped(makeDoc([imageLayer('img1')], 'img1'));
+    const brush = createBrushTool();
+
+    down(brush, h.ctx, pointer(80, 80));
+    expect(h.layers.peek(h.createdIds[0]!)).toBeDefined();
+    up(brush, h.ctx, pointer(80, 80));
+
+    expect(h.layers.peek(h.createdIds[0]!)).toBeUndefined();
+  });
+
+  it('rolls back on pointercancel mid-drag', () => {
+    const h = createHarness(makeDoc([imageLayer('img1')], 'img1'));
+    const brush = createBrushTool();
+
+    down(brush, h.ctx, pointer(20, 20));
+    move(brush, h.ctx, pointer(30, 30), [pointer(30, 30)]);
+    cancel(brush, h.ctx);
+
+    expect(h.strokes).toHaveLength(0);
+    expect(kinds(h)).toEqual(['addCanvasLayer', 'removeCanvasLayers', 'setCanvasSelectedLayer']);
+    expect(h.layers.peek(h.createdIds[0]!)).toBeUndefined();
+  });
+
+  it('rolls back when the tool is switched away mid-drag', () => {
+    const h = createHarness(makeDoc([imageLayer('img1')], 'img1'));
+    const brush = createBrushTool();
+
+    down(brush, h.ctx, pointer(20, 20));
+    brush.onDeactivate?.(h.ctx, undefined);
+
+    expect(kinds(h)).toEqual(['addCanvasLayer', 'removeCanvasLayers', 'setCanvasSelectedLayer']);
+    expect(h.layers.peek(h.createdIds[0]!)).toBeUndefined();
+  });
+
+  it('does NOT roll back for a temporary tool switch (space/alt hold keeps the gesture)', () => {
+    const h = createHarness(makeDoc([imageLayer('img1')], 'img1'));
+    const brush = createBrushTool();
+
+    down(brush, h.ctx, pointer(20, 20));
+    brush.onDeactivate?.(h.ctx, { temporary: true });
+
+    expect(kinds(h)).toEqual(['addCanvasLayer']);
+    expect(h.layers.peek(h.createdIds[0]!)).toBeDefined();
+  });
+
+  it('omits the reselect when nothing was selected to begin with', () => {
+    const h = clipped(makeDoc([paintLayer('p1')], null));
+    const brush = createBrushTool();
+
+    down(brush, h.ctx, pointer(80, 80));
+    up(brush, h.ctx, pointer(80, 80));
+
+    expect(kinds(h)).toEqual(['addCanvasLayer', 'removeCanvasLayers']);
+  });
+
+  it('keeps the layer when the stroke DOES commit pixels', () => {
+    const h = createHarness(makeDoc([imageLayer('img1')], 'img1'));
+    const brush = createBrushTool();
+
+    down(brush, h.ctx, pointer(20, 20));
+    up(brush, h.ctx, pointer(20, 20));
+
+    expect(h.strokes).toHaveLength(1);
+    expect(kinds(h)).toEqual(['addCanvasLayer']);
+    expect(h.layers.peek(h.createdIds[0]!)).toBeDefined();
+  });
+
+  it('never rolls back a layer it did not create (an existing paint target)', () => {
+    const h = clipped(makeDoc([paintLayer('p1')], 'p1'));
+    const brush = createBrushTool();
+
+    down(brush, h.ctx, pointer(80, 80));
+    up(brush, h.ctx, pointer(80, 80));
+
+    expect(h.dispatched).toHaveLength(0);
+  });
+});
