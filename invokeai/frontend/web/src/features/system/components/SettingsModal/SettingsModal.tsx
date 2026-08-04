@@ -41,6 +41,7 @@ import {
   selectSystemShouldEnableHighlightFocusedRegions,
   selectSystemShouldEnableInformationalPopovers,
   selectSystemShouldEnableModelDescriptions,
+  selectSystemShouldProtectStarredMedia,
   selectSystemShouldShowInvocationProgressDetail,
   selectSystemShouldUseMiddleClickToOpenInNewTab,
   selectSystemShouldUseNSFWChecker,
@@ -50,6 +51,7 @@ import {
   setShouldEnableInformationalPopovers,
   setShouldEnableModelDescriptions,
   setShouldHighlightFocusedRegions,
+  setShouldProtectStarredMedia,
   setShouldShowInvocationProgressDetail,
   setShouldUseMiddleClickToOpenInNewTab,
   shouldAntialiasProgressImageChanged,
@@ -99,6 +101,7 @@ const SettingsModal = (props: { children: ReactElement<{ onClick?: () => void }>
   const prefersNumericAttentionWeights = useAppSelector(selectSystemPrefersNumericAttentionWeights);
   const shouldUseCpuNoise = useAppSelector(selectShouldUseCPUNoise);
   const shouldConfirmOnDelete = useAppSelector(selectSystemShouldConfirmOnDelete);
+  const shouldProtectStarredMedia = useAppSelector(selectSystemShouldProtectStarredMedia);
   const shouldShowProgressInViewer = useAppSelector(selectShouldShowProgressInViewer);
   const shouldAntialiasProgressImage = useAppSelector(selectSystemShouldAntialiasProgressImage);
   const shouldUseNSFWChecker = useAppSelector(selectSystemShouldUseNSFWChecker);
@@ -184,6 +187,12 @@ const SettingsModal = (props: { children: ReactElement<{ onClick?: () => void }>
   const handleChangeShouldConfirmOnDelete = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       dispatch(setShouldConfirmOnDelete(e.target.checked));
+    },
+    [dispatch]
+  );
+  const handleChangeShouldProtectStarredMedia = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      dispatch(setShouldProtectStarredMedia(e.target.checked));
     },
     [dispatch]
   );
@@ -297,6 +306,10 @@ const SettingsModal = (props: { children: ReactElement<{ onClick?: () => void }>
                     <FormControl>
                       <FormLabel>{t('settings.confirmOnDelete')}</FormLabel>
                       <Switch isChecked={shouldConfirmOnDelete} onChange={handleChangeShouldConfirmOnDelete} />
+                    </FormControl>
+                    <FormControl>
+                      <FormLabel>{t('settings.protectStarredMedia')}</FormLabel>
+                      <Switch isChecked={shouldProtectStarredMedia} onChange={handleChangeShouldProtectStarredMedia} />
                     </FormControl>
                     <FormControl>
                       <FormLabel>{t('settings.confirmOnNewSession')}</FormLabel>
