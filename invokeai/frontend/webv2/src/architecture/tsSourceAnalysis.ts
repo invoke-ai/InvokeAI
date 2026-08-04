@@ -10,9 +10,11 @@ import {
   isFunctionDeclaration,
   isIdentifier,
   isImportDeclaration,
+  isImportEqualsDeclaration,
   isImportTypeNode,
   isInterfaceDeclaration,
   isLiteralTypeNode,
+  isModuleDeclaration,
   isNamedExports,
   isNamedImports,
   isNamespaceExport,
@@ -141,8 +143,11 @@ const collectPublicExports = (sourceFile: SourceFile): string[] => {
           isFunctionDeclaration(statement) ||
           isInterfaceDeclaration(statement) ||
           isTypeAliasDeclaration(statement) ||
-          isEnumDeclaration(statement)) &&
-        statement.name
+          isEnumDeclaration(statement) ||
+          isModuleDeclaration(statement) ||
+          isImportEqualsDeclaration(statement)) &&
+        statement.name &&
+        isIdentifier(statement.name)
       ) {
         exports.add(statement.name.text);
       } else if (isVariableStatement(statement)) {

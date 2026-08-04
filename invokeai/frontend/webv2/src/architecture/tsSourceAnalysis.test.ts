@@ -105,6 +105,8 @@ describe('tsSourceAnalysis', () => {
         'exports.ts',
         `
           export class PublicClass {}
+          export namespace PublicNamespace {}
+          export import PublicAlias = require('dep');
           class PrivateClass {}
           export const publicValue = 1;
           const privateValue = 2;
@@ -113,7 +115,7 @@ describe('tsSourceAnalysis', () => {
           export * from 'external';
         `
       ).publicExports
-    ).toEqual(['*', 'PublicClass', 'Renamed', 'default', 'publicValue']);
+    ).toEqual(['*', 'PublicAlias', 'PublicClass', 'PublicNamespace', 'Renamed', 'default', 'publicValue']);
   });
 
   it('identifies type-only modules', () => {
