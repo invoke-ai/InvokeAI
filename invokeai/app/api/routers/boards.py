@@ -38,6 +38,14 @@ class DeleteBoardResult(BaseModel):
         default_factory=list,
         description="The names of videos that could not be deleted and became uncategorized.",
     )
+    starred_images_skipped: list[str] = Field(
+        default_factory=list,
+        description="The names of starred images that were protected and became uncategorized.",
+    )
+    starred_videos_skipped: list[str] = Field(
+        default_factory=list,
+        description="The names of starred videos that were protected and became uncategorized.",
+    )
 
 
 @boards_router.post(
@@ -125,6 +133,7 @@ def delete_board(
     include_images: Optional[bool] = Query(
         description="Permanently delete all images and videos on the board", default=False
     ),
+    delete_starred: bool = Query(default=True, description="Whether to allow deletion of starred media"),
 ) -> DeleteBoardResult:
     """Deletes a board (user must have access to it)"""
     try:
@@ -141,6 +150,10 @@ def delete_board(
     cascade_user_id: Optional[str] = None if current_user.is_admin else current_user.user_id
     deleted_images: list[str] = []
     deleted_videos: list[str] = []
+    failed_images: list[str] = []
+    failed_videos: list[str] = []
+    starred_images_skipped: list[str] = []
+    starred_videos_skipped: list[str] = []
 
     try:
         if include_images is True:
@@ -151,11 +164,19 @@ def delete_board(
             # truth — reconstructing failures by diffing a router-side board listing
             # against the deleted names would double the DB work and misreport items
             # moved or deleted concurrently between the two queries.
-            deleted_images, failed_images = ApiDependencies.invoker.services.images.delete_images_on_board(
-                board_id=board_id, user_id=cascade_user_id
+            (
+                deleted_images,
+                failed_images,
+                starred_images_skipped,
+            ) = ApiDependencies.invoker.services.images.delete_images_on_board(
+                board_id=board_id, user_id=cascade_user_id, delete_starred=delete_starred
             )
-            deleted_videos, failed_videos = ApiDependencies.invoker.services.videos.delete_videos_on_board(
-                board_id=board_id, user_id=cascade_user_id
+            (
+                deleted_videos,
+                failed_videos,
+                starred_videos_skipped,
+            ) = ApiDependencies.invoker.services.videos.delete_videos_on_board(
+                board_id=board_id, user_id=cascade_user_id, delete_starred=delete_starred
             )
             ApiDependencies.invoker.services.boards.delete(board_id=board_id)
             return DeleteBoardResult(
@@ -166,6 +187,8 @@ def delete_board(
                 deleted_videos=deleted_videos,
                 failed_images=failed_images,
                 failed_videos=failed_videos,
+                starred_images_skipped=starred_images_skipped,
+                starred_videos_skipped=starred_videos_skipped,
             )
         else:
             deleted_board_images = ApiDependencies.invoker.services.board_images.get_all_board_image_names_for_board(
@@ -198,6 +221,10 @@ def delete_board(
                     "message": "Failed to delete board after partially deleting media",
                     "deleted_images": deleted_images,
                     "deleted_videos": deleted_videos,
+                    "failed_images": failed_images,
+                    "failed_videos": failed_videos,
+                    "starred_images_skipped": starred_images_skipped,
+                    "starred_videos_skipped": starred_videos_skipped,
                     "board_deleted": False,
                 },
             )
