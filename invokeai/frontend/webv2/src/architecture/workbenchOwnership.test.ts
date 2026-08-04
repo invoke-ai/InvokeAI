@@ -1,7 +1,25 @@
-import ts from 'typescript-legacy';
+import type { SourceFile, Statement } from 'typescript/unstable/ast';
+
+import {
+  isClassDeclaration,
+  isEmptyStatement,
+  isEnumDeclaration,
+  isExportAssignment,
+  isExportDeclaration,
+  isFunctionDeclaration,
+  isIdentifier,
+  isImportDeclaration,
+  isInterfaceDeclaration,
+  isNamedExports,
+  isTypeAliasDeclaration,
+  isVariableStatement,
+  ModifierFlags,
+  SyntaxKind,
+} from 'typescript/unstable/ast';
 import { describe, expect, it } from 'vitest';
 
-import { collectImportReferences, getModuleOwner, resolveImportPath } from './dependencyPolicy';
+import { collectImportReferences, getModuleOwner, primeImportSources, resolveImportPath } from './dependencyPolicy';
+import { parseSource } from './tsSourceParser';
 import { getWorkbenchTargetOwner, getWorkbenchTargetPath, workbenchOwnershipManifest } from './workbenchOwnership';
 
 const sources = import.meta.glob('../**/*.{ts,tsx}', {
@@ -35,36 +53,42 @@ const resolveSourceFile = (sourcePath: string, specifier: string): string | null
 const getTargetOwner = (path: string) =>
   path.startsWith('workbench/') ? getWorkbenchTargetOwner(path) : getModuleOwner(path);
 
-const collectPublicExports = (sourceFile: ts.SourceFile): string[] => {
+// TypeScript 7 folds the modifier list into `modifierFlags`, which only the
+// statement kinds that accept modifiers declare.
+const hasExportModifier = (statement: Statement): boolean => {
+  const { modifierFlags } = statement as { modifierFlags?: ModifierFlags };
+  return modifierFlags !== undefined && (modifierFlags & ModifierFlags.Export) !== 0;
+};
+
+const collectPublicExports = (sourceFile: SourceFile): string[] => {
   const exports = new Set<string>();
 
   for (const statement of sourceFile.statements) {
-    const modifiers = ts.canHaveModifiers(statement) ? ts.getModifiers(statement) : undefined;
-    if (modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)) {
+    if (hasExportModifier(statement)) {
       if (
-        (ts.isClassDeclaration(statement) ||
-          ts.isFunctionDeclaration(statement) ||
-          ts.isInterfaceDeclaration(statement) ||
-          ts.isTypeAliasDeclaration(statement) ||
-          ts.isEnumDeclaration(statement)) &&
+        (isClassDeclaration(statement) ||
+          isFunctionDeclaration(statement) ||
+          isInterfaceDeclaration(statement) ||
+          isTypeAliasDeclaration(statement) ||
+          isEnumDeclaration(statement)) &&
         statement.name
       ) {
         exports.add(statement.name.text);
-      } else if (ts.isVariableStatement(statement)) {
+      } else if (isVariableStatement(statement)) {
         for (const declaration of statement.declarationList.declarations) {
-          if (ts.isIdentifier(declaration.name)) {
+          if (isIdentifier(declaration.name)) {
             exports.add(declaration.name.text);
           }
         }
       }
     }
-    if (ts.isExportAssignment(statement)) {
+    if (isExportAssignment(statement)) {
       exports.add('default');
     }
-    if (ts.isExportDeclaration(statement)) {
+    if (isExportDeclaration(statement)) {
       if (!statement.exportClause) {
         exports.add('*');
-      } else if (ts.isNamedExports(statement.exportClause)) {
+      } else if (isNamedExports(statement.exportClause)) {
         for (const element of statement.exportClause.elements) {
           exports.add(element.name.text);
         }
@@ -75,18 +99,18 @@ const collectPublicExports = (sourceFile: ts.SourceFile): string[] => {
   return [...exports].sort();
 };
 
-const isTypeOnlyModule = (sourceFile: ts.SourceFile): boolean => {
+const isTypeOnlyModule = (sourceFile: SourceFile): boolean => {
   return sourceFile.statements.every((statement) => {
-    if (ts.isInterfaceDeclaration(statement) || ts.isTypeAliasDeclaration(statement)) {
+    if (isInterfaceDeclaration(statement) || isTypeAliasDeclaration(statement)) {
       return true;
     }
-    if (ts.isImportDeclaration(statement)) {
-      return Boolean(statement.importClause?.isTypeOnly);
+    if (isImportDeclaration(statement)) {
+      return statement.importClause?.phaseModifier === SyntaxKind.TypeKeyword;
     }
-    if (ts.isExportDeclaration(statement)) {
+    if (isExportDeclaration(statement)) {
       return statement.isTypeOnly;
     }
-    return ts.isEmptyStatement(statement);
+    return isEmptyStatement(statement);
   });
 };
 
@@ -137,6 +161,7 @@ const stronglyConnectedComponents = (graph: Map<string, Set<string>>): string[][
 describe('Workbench ownership manifest', () => {
   it('classifies every production Workbench module exactly once and emits an inspectable inventory', () => {
     const workbenchSources = Object.entries(productionSources).filter(([path]) => path.startsWith('workbench/'));
+    primeImportSources(Object.entries(productionSources));
     const importReferencesByPath = new Map(
       Object.entries(productionSources).map(([path, source]) => [path, collectImportReferences(source, path)] as const)
     );
@@ -193,7 +218,7 @@ describe('Workbench ownership manifest', () => {
     const records = workbenchSources.map(([path, source]) => {
       const targetOwner = getWorkbenchTargetOwner(path);
       expect(targetOwner, `Unclassified: ${path}`).not.toBeNull();
-      const sourceFile = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+      const sourceFile = parseSource(path, source, { jsx: true });
 
       const outboundOwners = new Set<string>();
       for (const reference of importReferencesByPath.get(path) ?? []) {

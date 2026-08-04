@@ -1,6 +1,13 @@
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, extname, join, relative, resolve } from 'node:path';
-import ts from 'typescript-legacy';
+import {
+  isImportDeclaration,
+  isNamedImports,
+  isNamespaceImport,
+  isStringLiteralLikeNode,
+} from 'typescript/unstable/ast';
+
+import { parseSource } from './parse-source.mjs';
 
 const packageRoot = process.cwd();
 const sourceRoot = resolve(packageRoot, 'src');
@@ -86,10 +93,10 @@ const importedSymbols = (clause) => {
   if (clause.name) {
     symbols.push('default');
   }
-  if (clause.namedBindings && ts.isNamespaceImport(clause.namedBindings)) {
+  if (clause.namedBindings && isNamespaceImport(clause.namedBindings)) {
     symbols.push('*');
   }
-  if (clause.namedBindings && ts.isNamedImports(clause.namedBindings)) {
+  if (clause.namedBindings && isNamedImports(clause.namedBindings)) {
     for (const element of clause.namedBindings.elements) {
       symbols.push((element.propertyName ?? element.name).text);
     }
@@ -103,15 +110,9 @@ for (const source of paths.filter(isProduction)) {
     continue;
   }
   const text = readFileSync(resolve(sourceRoot, source), 'utf8');
-  const file = ts.createSourceFile(
-    source,
-    text,
-    ts.ScriptTarget.Latest,
-    true,
-    source.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS
-  );
+  const file = parseSource(source, text);
   for (const statement of file.statements) {
-    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteralLike(statement.moduleSpecifier)) {
+    if (!isImportDeclaration(statement) || !isStringLiteralLikeNode(statement.moduleSpecifier)) {
       continue;
     }
     const target = resolveImport(source, statement.moduleSpecifier.text);

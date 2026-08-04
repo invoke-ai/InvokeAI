@@ -1,6 +1,24 @@
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, extname, join, relative, resolve } from 'node:path';
-import ts from 'typescript-legacy';
+import {
+  isCallExpression,
+  isEmptyStatement,
+  isExportAssignment,
+  isExportDeclaration,
+  isIdentifier,
+  isImportDeclaration,
+  isImportTypeNode,
+  isInterfaceDeclaration,
+  isLiteralTypeNode,
+  isNamedExports,
+  isStringLiteralLikeNode,
+  isTypeAliasDeclaration,
+  isVariableStatement,
+  ModifierFlags,
+  SyntaxKind,
+} from 'typescript/unstable/ast';
+
+import { parseSource } from './parse-source.mjs';
 
 const packageRoot = process.cwd();
 const sourceRoot = resolve(packageRoot, 'src');
@@ -96,30 +114,30 @@ const targetRule = (path) => {
 };
 const targetOwner = (path) => (path.startsWith('workbench/') ? targetRule(path)?.targetOwner : currentOwner(path));
 
-const parse = (path, source) => ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+const parse = (path, source) => parseSource(path, source, { jsx: true });
 const imports = (path, source) => {
   const sourceFile = parse(path, source);
   const specifiers = [];
   const visit = (node) => {
     if (
-      (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
+      (isImportDeclaration(node) || isExportDeclaration(node)) &&
       node.moduleSpecifier &&
-      ts.isStringLiteralLike(node.moduleSpecifier)
+      isStringLiteralLikeNode(node.moduleSpecifier)
     ) {
       specifiers.push(node.moduleSpecifier.text);
     } else if (
-      ts.isImportTypeNode(node) &&
-      ts.isLiteralTypeNode(node.argument) &&
-      ts.isStringLiteralLike(node.argument.literal)
+      isImportTypeNode(node) &&
+      isLiteralTypeNode(node.argument) &&
+      isStringLiteralLikeNode(node.argument.literal)
     ) {
       specifiers.push(node.argument.literal.text);
-    } else if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
+    } else if (isCallExpression(node) && node.expression.kind === SyntaxKind.ImportKeyword) {
       const argument = node.arguments[0];
-      if (argument && ts.isStringLiteralLike(argument)) {
+      if (argument && isStringLiteralLikeNode(argument)) {
         specifiers.push(argument.text);
       }
     }
-    ts.forEachChild(node, visit);
+    node.forEachChild(visit);
   };
   visit(sourceFile);
   return specifiers;
@@ -128,26 +146,25 @@ const imports = (path, source) => {
 const publicExports = (path, source) => {
   const names = new Set();
   for (const statement of parse(path, source).statements) {
-    const modifiers = ts.canHaveModifiers(statement) ? ts.getModifiers(statement) : undefined;
-    if (modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)) {
-      if (statement.name && ts.isIdentifier(statement.name)) {
+    if ((statement.modifierFlags & ModifierFlags.Export) !== 0) {
+      if (statement.name && isIdentifier(statement.name)) {
         names.add(statement.name.text);
       }
-      if (ts.isVariableStatement(statement)) {
+      if (isVariableStatement(statement)) {
         for (const declaration of statement.declarationList.declarations) {
-          if (ts.isIdentifier(declaration.name)) {
+          if (isIdentifier(declaration.name)) {
             names.add(declaration.name.text);
           }
         }
       }
     }
-    if (ts.isExportAssignment(statement)) {
+    if (isExportAssignment(statement)) {
       names.add('default');
     }
-    if (ts.isExportDeclaration(statement)) {
+    if (isExportDeclaration(statement)) {
       if (!statement.exportClause) {
         names.add('*');
-      } else if (ts.isNamedExports(statement.exportClause)) {
+      } else if (isNamedExports(statement.exportClause)) {
         for (const element of statement.exportClause.elements) {
           names.add(element.name.text);
         }
@@ -159,16 +176,16 @@ const publicExports = (path, source) => {
 
 const isTypeOnly = (path, source) =>
   parse(path, source).statements.every((statement) => {
-    if (ts.isInterfaceDeclaration(statement) || ts.isTypeAliasDeclaration(statement)) {
+    if (isInterfaceDeclaration(statement) || isTypeAliasDeclaration(statement)) {
       return true;
     }
-    if (ts.isImportDeclaration(statement)) {
-      return Boolean(statement.importClause?.isTypeOnly);
+    if (isImportDeclaration(statement)) {
+      return statement.importClause?.phaseModifier === SyntaxKind.TypeKeyword;
     }
-    if (ts.isExportDeclaration(statement)) {
+    if (isExportDeclaration(statement)) {
       return statement.isTypeOnly;
     }
-    return ts.isEmptyStatement(statement);
+    return isEmptyStatement(statement);
   });
 
 const inbound = new Map();

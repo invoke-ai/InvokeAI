@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
-import ts from 'typescript-legacy';
+import { isExportDeclaration, isImportDeclaration, isStringLiteralLikeNode } from 'typescript/unstable/ast';
 
+import { parseSource, primeSources } from './parse-source.mjs';
 import {
   BUILD_METRIC_KEYS,
   checkRouteBudget,
@@ -175,19 +176,22 @@ const collectFiles = async (directory) => {
 };
 const productionFiles = await collectFiles(resolve(root, 'src'));
 const importerCounts = new Map(Object.values(baseline.developmentInvalidation).map((budget) => [budget.specifier, 0]));
-for (const path of productionFiles) {
-  const source = await readFile(path, 'utf8');
-  const sourceFile = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+const productionSources = await Promise.all(productionFiles.map(async (path) => [path, await readFile(path, 'utf8')]));
+// One snapshot for the whole tree keeps the sweep to a single round trip.
+primeSources(productionSources, { jsx: true });
+
+for (const [path, source] of productionSources) {
+  const sourceFile = parseSource(path, source, { jsx: true });
   const seen = new Set();
   const visit = (node) => {
     if (
-      (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
+      (isImportDeclaration(node) || isExportDeclaration(node)) &&
       node.moduleSpecifier &&
-      ts.isStringLiteralLike(node.moduleSpecifier)
+      isStringLiteralLikeNode(node.moduleSpecifier)
     ) {
       seen.add(node.moduleSpecifier.text);
     }
-    ts.forEachChild(node, visit);
+    node.forEachChild(visit);
   };
   visit(sourceFile);
   for (const specifier of seen) {

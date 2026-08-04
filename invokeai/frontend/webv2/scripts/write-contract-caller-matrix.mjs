@@ -1,6 +1,17 @@
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, extname, join, relative, resolve } from 'node:path';
-import ts from 'typescript-legacy';
+import {
+  isExportDeclaration,
+  isIdentifier,
+  isImportDeclaration,
+  isNamedExports,
+  isNamedImports,
+  isStringLiteralLikeNode,
+  isVariableStatement,
+  ModifierFlags,
+} from 'typescript/unstable/ast';
+
+import { parseSource } from './parse-source.mjs';
 
 const packageRoot = process.cwd();
 const sourceRoot = resolve(packageRoot, 'src');
@@ -94,32 +105,24 @@ const resolveImport = (sourcePath, specifier) => {
   return stem ? (pathByStem.get(stem) ?? pathByStem.get(`${stem}/index`) ?? null) : null;
 };
 
-const parse = (path) =>
-  ts.createSourceFile(
-    path,
-    sources.get(path),
-    ts.ScriptTarget.Latest,
-    true,
-    path.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS
-  );
+const parse = (path) => parseSource(path, sources.get(path));
 
 const exportedSymbols = (path) => {
   const symbols = new Set();
   for (const statement of parse(path).statements) {
-    const modifiers = ts.canHaveModifiers(statement) ? ts.getModifiers(statement) : undefined;
-    if (modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)) {
-      if (statement.name && ts.isIdentifier(statement.name)) {
+    if ((statement.modifierFlags & ModifierFlags.Export) !== 0) {
+      if (statement.name && isIdentifier(statement.name)) {
         symbols.add(statement.name.text);
       }
-      if (ts.isVariableStatement(statement)) {
+      if (isVariableStatement(statement)) {
         for (const declaration of statement.declarationList.declarations) {
-          if (ts.isIdentifier(declaration.name)) {
+          if (isIdentifier(declaration.name)) {
             symbols.add(declaration.name.text);
           }
         }
       }
     }
-    if (ts.isExportDeclaration(statement) && statement.exportClause && ts.isNamedExports(statement.exportClause)) {
+    if (isExportDeclaration(statement) && statement.exportClause && isNamedExports(statement.exportClause)) {
       for (const element of statement.exportClause.elements) {
         symbols.add(element.name.text);
       }
@@ -139,9 +142,9 @@ const addCaller = (hub, symbol, caller) => {
 for (const path of paths) {
   for (const statement of parse(path).statements) {
     if (
-      !ts.isImportDeclaration(statement) ||
+      !isImportDeclaration(statement) ||
       !statement.importClause ||
-      !ts.isStringLiteralLike(statement.moduleSpecifier)
+      !isStringLiteralLikeNode(statement.moduleSpecifier)
     ) {
       continue;
     }
@@ -150,7 +153,7 @@ for (const path of paths) {
       continue;
     }
     const bindings = statement.importClause.namedBindings;
-    if (bindings && ts.isNamedImports(bindings)) {
+    if (bindings && isNamedImports(bindings)) {
       for (const element of bindings.elements) {
         addCaller(target, (element.propertyName ?? element.name).text, path);
       }

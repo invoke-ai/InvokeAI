@@ -7,6 +7,7 @@ import {
   formatViolation,
   getModuleOwner,
   isExcepted,
+  primeImportSources,
   resolveImportPath,
 } from './dependencyPolicy';
 import { FEATURE_PUBLIC_INTERFACES } from './featureInterfaces';
@@ -211,6 +212,8 @@ describe('feature public-interface registry', () => {
 
 describe('production dependency graph', () => {
   it('classifies every production import and has no unowned violation', () => {
+    primeImportSources(Object.entries(sources).map(([path, source]) => [toSourcePath(path), source] as const));
+
     const violations = Object.entries(sources)
       .filter(([path]) => isProduction(path))
       .flatMap(([path, source]) => checkSource(toSourcePath(path), source))

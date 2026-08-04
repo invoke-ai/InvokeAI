@@ -1,6 +1,20 @@
-import ts from 'typescript-legacy';
+import type { Node } from 'typescript/unstable/ast';
+
+import {
+  isCallExpression,
+  isExportDeclaration,
+  isImportDeclaration,
+  isImportTypeNode,
+  isLiteralTypeNode,
+  isNamedImports,
+  isNamespaceExport,
+  isNamespaceImport,
+  isStringLiteralLikeNode,
+  SyntaxKind,
+} from 'typescript/unstable/ast';
 
 import { FEATURE_PUBLIC_INTERFACES } from './featureInterfaces';
+import { parseSource, primeSources } from './tsSourceParser';
 
 export type ModuleOwner = 'app' | 'platform' | 'workbench' | `feature:${string}`;
 
@@ -55,44 +69,57 @@ const normalizePath = (path: string): string => {
   return parts.join('/');
 };
 
+/**
+ * Loads a whole corpus into the parser in one round trip. Call this before
+ * sweeping a tree with {@link collectImportReferences} or {@link checkSource};
+ * the entries must be the same `[fileName, source]` pairs the sweep passes, so
+ * each later call is served from the already-loaded program.
+ */
+export const primeImportSources = (entries: Iterable<readonly [string, string]>): void => {
+  primeSources(entries, { jsx: true });
+};
+
 export const collectImportReferences = (source: string, fileName = 'source.ts'): ImportReference[] => {
-  const sourceFile = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const sourceFile = parseSource(fileName, source, { jsx: true });
   const references: ImportReference[] = [];
 
-  const pushLiteral = (kind: ImportReference['kind'], node: ts.Node | undefined, exposesCanvasEngine = false): void => {
-    if (node && ts.isStringLiteralLike(node)) {
+  const pushLiteral = (kind: ImportReference['kind'], node: Node | undefined, exposesCanvasEngine = false): void => {
+    if (node && isStringLiteralLikeNode(node)) {
       references.push({ exposesCanvasEngine, kind, specifier: node.text });
     }
   };
 
-  const visit = (node: ts.Node): void => {
-    if (ts.isImportDeclaration(node)) {
+  const visit = (node: Node): void => {
+    if (isImportDeclaration(node)) {
       const bindings = node.importClause?.namedBindings;
       const exposesCanvasEngine =
-        Boolean(bindings && ts.isNamespaceImport(bindings)) ||
+        Boolean(bindings && isNamespaceImport(bindings)) ||
         Boolean(
           bindings &&
-          ts.isNamedImports(bindings) &&
+          isNamedImports(bindings) &&
           bindings.elements.some((element) => (element.propertyName ?? element.name).text === 'CanvasEngine')
         );
-      pushLiteral(node.importClause?.isTypeOnly ? 'import-type' : 'import', node.moduleSpecifier, exposesCanvasEngine);
-    } else if (ts.isExportDeclaration(node)) {
+      // TypeScript 7 models `import type` as a phase modifier alongside
+      // `import defer`, which replaced the old `isTypeOnly` flag.
+      const isTypeOnly = node.importClause?.phaseModifier === SyntaxKind.TypeKeyword;
+      pushLiteral(isTypeOnly ? 'import-type' : 'import', node.moduleSpecifier, exposesCanvasEngine);
+    } else if (isExportDeclaration(node)) {
       const exposesCanvasEngine =
         !node.exportClause ||
-        ts.isNamespaceExport(node.exportClause) ||
+        isNamespaceExport(node.exportClause) ||
         node.exportClause.elements.some((element) => (element.propertyName ?? element.name).text === 'CanvasEngine');
       pushLiteral(
-        !node.exportClause || ts.isNamespaceExport(node.exportClause) ? 'export-star' : 'export',
+        !node.exportClause || isNamespaceExport(node.exportClause) ? 'export-star' : 'export',
         node.moduleSpecifier,
         exposesCanvasEngine
       );
-    } else if (ts.isImportTypeNode(node) && ts.isLiteralTypeNode(node.argument)) {
+    } else if (isImportTypeNode(node) && isLiteralTypeNode(node.argument)) {
       pushLiteral('import-type', node.argument.literal, node.qualifier?.getText(sourceFile).includes('CanvasEngine'));
-    } else if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
+    } else if (isCallExpression(node) && node.expression.kind === SyntaxKind.ImportKeyword) {
       pushLiteral('dynamic-import', node.arguments[0]);
     }
 
-    ts.forEachChild(node, visit);
+    node.forEachChild(visit);
   };
 
   visit(sourceFile);

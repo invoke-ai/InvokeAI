@@ -76,7 +76,6 @@
     "oxlint": "^1.77.0",
     "playwright": "1.62.1",
     "typescript": "^7.0.2",
-    "typescript-legacy": "npm:typescript@6.0.3",
     "vite": "^8.2.0",
     "vitest": "^4.1.10"
   },
