@@ -528,16 +528,10 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   };
 
   /**
-   * Clears a layer's persisted bitmap, for a layer the paint-cache trim found to
-   * hold no visible pixels. The counterpart to {@link dispatchLayerBitmap}, routed
-   * the same way per layer type — and the resulting source is byte-identical to the
-   * one a brand-new layer is created with, so an emptied layer is indistinguishable
-   * from a fresh one to everything downstream (content rect, move outline, transform
-   * eligibility, fit-to-content).
-   *
-   * Deliberately NOT recorded as a self-echo: the engine should invalidate and
-   * re-rasterize, because rasterizing a bitmap-less paint source is what collapses
-   * the cache to a zero rect.
+   * Clears a layer's persisted bitmap, for a layer the paint-cache trim found empty.
+   * The counterpart to {@link dispatchLayerBitmap}, routed the same way per layer
+   * type. The resulting source is byte-identical to a brand-new layer's, so an
+   * emptied layer is indistinguishable from a fresh one downstream.
    */
   const clearLayerBitmap = (layerId: string): boolean => {
     const doc = mirror.getDocument();
@@ -566,12 +560,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
 
   /**
    * True while something other than persistence owns or frames a layer's pixels, so
-   * the paint-cache trim must defer rather than move the extent underneath it.
-   *
-   * ANY new session kind that reads or frames a layer's cache rect must be added
-   * here. The transform session is the non-obvious one: its frame geometry and its
-   * bake are both expressed relative to this rect, so shrinking mid-session would
-   * make the frame jump and Apply would bake against a rect the user never framed.
+   * the paint-cache trim defers rather than moving the extent underneath it. ANY new
+   * session kind that reads a layer's cache rect belongs here — notably the transform
+   * session, whose frame and bake are both expressed relative to that rect.
    */
   const isLayerBusyForTrim = (layerId: string): boolean => {
     if (pipeline.isGestureActive()) {
@@ -603,10 +594,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       trimLayerPixels: (layerId) => {
         const result = trimPaintCacheToAlpha({ isLayerBusy: isLayerBusyForTrim, layers: layerCache }, layerId);
         if (result === 'emptied' || result === 'trimmed') {
-          // The adjusted/mask-fill surfaces are keyed on the old extent, and the
-          // thumbnail and composite both need the new one. Both are synchronous, so
-          // they land before the clear dispatch below — cache and contract are never
-          // inconsistent across a rendered frame.
+          // Derived surfaces are keyed on the old extent; both calls are synchronous,
+          // so they land before the clear dispatch and no frame sees a mismatch.
           deleteDerivedSurfaces(layerId);
           notifyLayerPainted(layerId);
         }

@@ -17,9 +17,7 @@
  * `createStubCtx` below as later tasks need more of the API surface.
  *
  * Readbacks are INVENTED, since the stub holds no pixels: `getImageData` returns a
- * correctly-sized buffer whose alpha is {@link StubRasterBackendOptions.readbackAlpha}
- * (transparent by default). Anything that infers content FROM pixels must therefore
- * be tested either against a declared `readbackAlpha` or in the browser suite.
+ * correctly-sized buffer whose alpha is {@link StubRasterBackendOptions.readbackAlpha}.
  */
 
 import type { RasterBackend, RasterSurface } from './raster';
@@ -45,14 +43,11 @@ export interface StubRasterBackendOptions {
   /**
    * The alpha every pixel of a synthetic readback reports (default `0`).
    *
-   * The stub holds no pixels, so a `getImageData` result is invented — and a fully
-   * transparent readback now MEANS something: the paint-cache trim reads a layer's
-   * alpha to decide whether it still has visible content, and a layer with none is
-   * cleared rather than persisted. A test that drives paint or mask persistence
-   * through the engine's OWN bitmap store must therefore declare that its layer has
-   * pixels (`readbackAlpha: 255`), or the trim will correctly conclude it is empty
-   * and no upload will happen. Tests that inject their own bitmap store are
-   * unaffected.
+   * A transparent readback MEANS something: the paint-cache trim reads alpha to
+   * decide whether a layer still has content, and clears one that has none. A test
+   * driving persistence through the engine's OWN bitmap store must therefore declare
+   * `readbackAlpha: 255`, or no upload will happen. Tests that inject their own
+   * bitmap store are unaffected.
    */
   readbackAlpha?: number;
 }

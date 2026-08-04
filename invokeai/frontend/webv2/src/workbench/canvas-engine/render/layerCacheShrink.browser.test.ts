@@ -5,14 +5,10 @@ import { createDomRasterBackend } from '@workbench/canvas-engine/render/raster';
 import { describe, expect, it } from 'vitest';
 
 /**
- * `shrinkToRect` crops a cache by blitting the surviving window to a new origin
- * with a NEGATIVE `resizePreserving` offset, relying on `drawImage` to clip
- * everything that falls outside the smaller surface. That is real GPU work with a
- * real offset: a sign slip would keep the wrong pixels, and a blit that silently
- * did nothing would lose the layer's content entirely.
- *
- * The node tests can only assert the arguments, because the stub surface holds no
- * pixels. These assert the pixels — the counterpart to `layerCacheGrowth.browser`.
+ * `shrinkToRect` crops by blitting the surviving window with a NEGATIVE
+ * `resizePreserving` offset, letting `drawImage` clip the rest. A sign slip would
+ * keep the wrong pixels; a no-op blit would lose the layer entirely. The node tests
+ * assert the arguments — these assert the pixels.
  */
 
 const START: Rect = { height: 200, width: 200, x: 100, y: 100 };

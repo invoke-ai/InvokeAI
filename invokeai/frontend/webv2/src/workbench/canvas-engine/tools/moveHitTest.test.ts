@@ -260,14 +260,11 @@ describe('live cache rect (freshly-painted, not-yet-flushed content)', () => {
 
 describe('a layer erased to nothing behaves exactly like a brand-new one', () => {
   /**
-   * The reported bug: a layer whose pixels had all been erased kept a full-size
-   * bitmap of transparent pixels, so it still drew a movable, transformable blue
-   * outline around an empty region.
-   *
-   * The paint-cache trim now clears such a layer to `{ bitmap: null }` — the same
-   * source a freshly-added layer is created with — so every affordance derived from
-   * `hittableLayerRect` disappears. These pin that equivalence, since it is the
-   * whole reason the fix works without touching the overlay or the tools.
+   * The reported bug: an erased layer kept a full-size transparent bitmap, so it still
+   * drew a movable, transformable outline around nothing. The paint-cache trim now
+   * clears it to `{ bitmap: null }` — a freshly-added layer's source — so every
+   * affordance derived from `hittableLayerRect` disappears. Pinning that equivalence
+   * is why the fix needs no change to the overlay or the tools.
    */
   it('reports no hittable extent once its bitmap has been cleared', () => {
     const erased = paintLayer('erased');
@@ -278,8 +275,6 @@ describe('a layer erased to nothing behaves exactly like a brand-new one', () =>
   });
 
   it('draws no move outline, even under a non-identity transform', () => {
-    // Scale and rotation are exactly where a phantom rect is most visible, so the
-    // suppression must not depend on the transform being trivial.
     const erased: CanvasLayerContract = {
       ...paintLayer('erased'),
       transform: { rotation: 0.6, scaleX: 2.5, scaleY: 1.75, x: 40, y: 25 },

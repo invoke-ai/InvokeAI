@@ -1165,7 +1165,7 @@ describe('truthful extent: trimming and clearing', () => {
     await vi.advanceTimersByTimeAsync(1500);
     await h.store.flushPendingUploads();
 
-    // A transparent PNG must never be encoded, hashed or uploaded.
+    // A transparent PNG must never be encoded or uploaded.
     expect(h.encodeSurface).not.toHaveBeenCalled();
     expect(h.uploadImage).not.toHaveBeenCalled();
     expect(h.dispatch).toHaveBeenCalledTimes(1);
@@ -1270,8 +1270,7 @@ describe('truthful extent: trimming and clearing', () => {
   });
 
   it('persists the POST-trim offset, proving the surface is re-read after trimming', async () => {
-    // The trim shrinks the cache, moving its origin; the flush must carry the new
-    // origin, not the one the cache had when the layer was marked dirty.
+    // The trim moves the cache origin; the flush must carry the new one.
     const h = createHarness({
       offset: { x: 10, y: 10 },
       trimLayerPixels: () => {
@@ -1298,8 +1297,7 @@ describe('truthful extent: trimming and clearing', () => {
     await vi.advanceTimersByTimeAsync(1500);
     await h.store.flushPendingUploads();
 
-    // Trimming a cache that now backs a parametric render would break the
-    // compositor's rect invariant, so the source guard must come first.
+    // Trimming a parametric-backed cache would break the compositor's rect invariant.
     expect(h.trimLayerPixels).not.toHaveBeenCalled();
     expect(h.dispatch).not.toHaveBeenCalled();
     h.store.dispose();

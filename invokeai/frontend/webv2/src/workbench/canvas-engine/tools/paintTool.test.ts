@@ -511,14 +511,12 @@ describe('mask strokes are forced opaque', () => {
 
 describe('auto-created layer rollback (a gesture that commits nothing leaves no trace)', () => {
   /**
-   * The auto-create dispatch happens at pointer-DOWN, before any pixel exists, and
-   * deliberately outside history — so a gesture that produces no dirty rect has to
-   * roll the layer back itself, or it strands a layer the user cannot undo.
+   * The auto-create dispatch happens at pointer-DOWN, outside history, so a gesture
+   * producing no dirty rect must roll the layer back itself or strand it un-undoably.
    */
   const clipped = (doc: CanvasDocumentContractV2) => {
     const h = createHarness(doc);
-    // Clip-to-bbox on, with the whole stroke outside the frame: every `paint()`
-    // call bails, so `commit()` returns null.
+    // Clip-to-bbox on with the stroke outside the frame, so `commit()` returns null.
     const ctx: ToolContext = { ...h.ctx, getStrokeClipRect: () => ({ height: 10, width: 10, x: 0, y: 0 }) };
     return { ...h, ctx };
   };
@@ -537,8 +535,7 @@ describe('auto-created layer rollback (a gesture that commits nothing leaves no 
     expect(kinds(h)).toEqual(['addCanvasLayer', 'removeCanvasLayers', 'setCanvasSelectedLayer']);
     const removal = h.dispatched[1]!;
     expect(removal.type === 'removeCanvasLayers' && removal.ids).toEqual([h.createdIds[0]]);
-    // The reducer's nearest-neighbour fallback would have picked the top layer, not
-    // the image layer the user actually had selected.
+    // The reducer's nearest-neighbour fallback would have picked the top layer.
     const reselect = h.dispatched[2]!;
     expect(reselect.type === 'setCanvasSelectedLayer' && reselect.id).toBe('img1');
   });

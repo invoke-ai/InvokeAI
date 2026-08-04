@@ -322,8 +322,7 @@ describe('shrinkToRect (paint caches trim back to their visible pixels)', () => 
     expect(trimmed).toBe(entry);
     expect(trimmed?.rect).toEqual({ height: 10, width: 10, x: 25, y: 30 });
     expect(trimmed?.surface).toBe(entry.surface);
-    // Old origin (10,10) minus new origin (25,30) = (-15,-20): `drawImage` clips
-    // everything outside the smaller surface, so the crop is one GPU blit.
+    // Old origin (10,10) minus new origin (25,30) = (-15,-20), in one GPU blit.
     const log = (entry.surface as StubRasterSurface).callLog;
     expect(log.filter((e) => e.op === 'resizePreserving').map((e) => e.args)).toEqual([[10, 10, -15, -20]]);
     expect(log.map((e) => e.op)).not.toContain('getImageData');
@@ -345,7 +344,6 @@ describe('shrinkToRect (paint caches trim back to their visible pixels)', () => 
     const { store } = published();
     store.shrinkToRect('L', { height: 0, width: 0, x: 0, y: 0 });
 
-    // `applyImagePatch` gates undo on the entry existing, not on it having extent.
     expect(store.peek('L')).toBeDefined();
     const regrown = store.growToRect('L', { height: 8, width: 8, x: 12, y: 14 });
     expect(regrown.rect).toEqual({ height: 8, width: 8, x: 12, y: 14 });
@@ -378,8 +376,7 @@ describe('shrinkToRect (paint caches trim back to their visible pixels)', () => 
   });
 
   it('bumps the version even when no pixels were ever published', () => {
-    // Unlike `growToRect`, which bumps only for published pixels: a shrink DESTROYS
-    // pixels, so an in-flight rasterization job must be invalidated regardless.
+    // A shrink destroys pixels, so an in-flight rasterization job must invalidate.
     const onVersionChange = vi.fn();
     const store = createLayerCacheStore(createTestStubRasterBackend(), { onVersionChange });
     const entry = store.getOrCreateRect('L', { height: 40, width: 40, x: 0, y: 0 });

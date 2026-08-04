@@ -6,10 +6,9 @@ import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/ras
 import { describe, expect, it, vi } from 'vitest';
 
 /**
- * A real cache store on the stub backend. The stub's `getImageData` invents a
- * ZEROED readback, so every published surface reads as fully transparent here —
- * which is exactly the `emptied` case, and makes this the natural home for the
- * guard matrix. Cropping to real pixel bounds is asserted in the browser suite.
+ * A real cache store on the stub backend, whose readback is zeroed — so every
+ * published surface reads as transparent, making this the home for the `emptied`
+ * case and the guard matrix. Real cropping is asserted in the browser suite.
  */
 const harness = (options: { busy?: boolean } = {}) => {
   const store = createLayerCacheStore(createTestStubRasterBackend());
@@ -41,8 +40,6 @@ describe('trimPaintCacheToAlpha', () => {
   });
 
   it('DEFERS while pixels have never been published — the pre-rasterize window', () => {
-    // The layer rasterizer sizes the entry from the persisted content rect before
-    // its async decode fills it. Scanning here would clear a valid bitmap on load.
     const { deps, store } = harness();
     const entry = store.getOrCreateRect('L', { height: 40, width: 40, x: 0, y: 0 });
     entry.stale = false;
@@ -90,7 +87,6 @@ describe('trimPaintCacheToAlpha', () => {
     publish(store);
 
     expect(trimPaintCacheToAlpha(deps, 'L')).toBe('emptied');
-    // `applyImagePatch` gates undo on the entry existing, not on it having extent.
     expect(store.peek('L')).toBeDefined();
   });
 
