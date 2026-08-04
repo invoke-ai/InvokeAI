@@ -1739,6 +1739,28 @@ wan_22_ti2v_5b_gguf_q8_0 = StarterModel(
 )
 # endregion
 
+# region MiniMax H3 (local)
+# TODO(minimax-h3): no starter entry yet — the installer cannot express a viable download.
+# MiniMax H3 FL2VA lives in huggingface.co/MiniMaxAI/MiniMax-H3 as a root-level Modular
+# Diffusers layout whose probe requires the root `modular_model_index.json`, but the repo also
+# carries the Ref2VA transformer (`transformer_ref/`) and the original remote-code checkpoints
+# (`FL2VA/`, `Ref2VA/`) as siblings:
+#   - a bare `MiniMaxAI/MiniMax-H3` source downloads ~498 GB (every subtree matches
+#     `filter_files`' weight patterns) for a ~42.5 GB working set;
+#   - a `::transformer+text_encoder+tokenizer+processor+vae+audio_vae` subfolder source skips
+#     the root `modular_model_index.json` (`filter_files` keeps only files INSIDE the listed
+#     subfolders), so identification fails and the install lands as an unknown model.
+# Unblocking this needs either (a) `filter_files` learning to include root config JSONs
+# alongside a subfolder set — an installer-wide behavior change that would also alter what
+# existing `::subfolder` sources (e.g. the Wan T5 encoder) download — or (b) an upstream
+# FL2VA-only diffusers repo. Until then, users install by pointing the Model Manager at a
+# locally assembled root-layout folder (see the "MiniMax H3" default workflows' notes).
+# Any future entry must keep "MiniMax H3" verbatim in its name/description (the MiniMax H3
+# Community License requires prominent attribution) and should note the license's territory
+# restrictions (excludes the US, EU, UK and South Korea, extending to outputs), which is why
+# this region is isolated in its own droppable commit.
+# endregion
+
 alibabacloud_wan26_t2i = StarterModel(
     name="Wan 2.6 Text-to-Image",
     base=BaseModelType.External,
