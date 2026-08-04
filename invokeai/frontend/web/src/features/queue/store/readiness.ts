@@ -1169,6 +1169,12 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     }
   }
 
+  if (model?.base === 'minimax-h3' && params.minimaxH3OutputMode === 'video') {
+    // Video output only exists on the Generate tab - the canvas compositing pipeline is
+    // image-based. The image output mode works on canvas like any other txt2img model.
+    reasons.push({ content: i18n.t('parameters.invoke.minimaxH3VideoOnGenerateTab') });
+  }
+
   if (model) {
     for (const lora of loras.filter(({ isEnabled }) => isEnabled === true)) {
       if (model.base !== lora.model.base) {

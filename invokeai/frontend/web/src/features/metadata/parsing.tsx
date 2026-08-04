@@ -19,6 +19,8 @@ import {
   kleinVaeModelSelected,
   krea2Qwen3VlEncoderModelSelected,
   krea2VaeModelSelected,
+  minimaxH3DurationSecondsChanged,
+  minimaxH3OutputModeChanged,
   negativePromptChanged,
   openaiBackgroundChanged,
   openaiInputFidelityChanged,
@@ -1107,6 +1109,49 @@ const WanGuidanceScaleLowNoise: SingleMetadataHandler<number | null> = {
   ),
 };
 //#endregion WanGuidanceScaleLowNoise
+
+//#region MiniMaxH3DurationSeconds
+const MiniMaxH3DurationSeconds: SingleMetadataHandler<number> = {
+  [SingleMetadataKey]: true,
+  type: 'MiniMaxH3DurationSeconds',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'minimax_h3_duration_seconds');
+    if (raw === undefined) {
+      // Reject when the key is absent so the handler is not rendered for non-H3 media.
+      return Promise.reject();
+    }
+    const parsed = z.number().int().min(5).max(14).parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(minimaxH3DurationSecondsChanged(value));
+  },
+  i18nKey: 'parameters.minimaxH3DurationSeconds',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<number>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion MiniMaxH3DurationSeconds
+
+//#region MiniMaxH3OutputMode
+const MiniMaxH3OutputMode: SingleMetadataHandler<'video' | 'image'> = {
+  [SingleMetadataKey]: true,
+  type: 'MiniMaxH3OutputMode',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'minimax_h3_output_mode');
+    if (raw === undefined) {
+      return Promise.reject();
+    }
+    const parsed = z.enum(['video', 'image']).parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(minimaxH3OutputModeChanged(value));
+  },
+  i18nKey: 'parameters.minimaxH3OutputMode',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<'video' | 'image'>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion MiniMaxH3OutputMode
 
 //#region ZImageShift
 const ZImageShift: SingleMetadataHandler<number | null> = {
@@ -2293,6 +2338,8 @@ export const ImageMetadataHandlers = {
   WanVaeModel,
   WanT5EncoderModel,
   WanGuidanceScaleLowNoise,
+  MiniMaxH3DurationSeconds,
+  MiniMaxH3OutputMode,
   ZImageShift,
   Ideogram4SamplerPreset,
   Ideogram4Steps,

@@ -29,6 +29,7 @@ import type {
   Flux2ReferenceImageConfig,
   FluxKontextReferenceImageConfig,
   IPAdapterConfig,
+  MiniMaxH3ReferenceImageConfig,
   QwenImageReferenceImageConfig,
   RegionalGuidanceIPAdapterConfig,
   T2IAdapterConfig,
@@ -39,6 +40,7 @@ import {
   initialFlux2ReferenceImage,
   initialFluxKontextReferenceImage,
   initialIPAdapter,
+  initialMiniMaxH3ReferenceImage,
   initialQwenImageReferenceImage,
   initialRegionalGuidanceIPAdapter,
   initialT2IAdapter,
@@ -87,7 +89,8 @@ export const getDefaultRefImageConfig = (
   | FluxKontextReferenceImageConfig
   | Flux2ReferenceImageConfig
   | QwenImageReferenceImageConfig
-  | WanReferenceImageConfig => {
+  | WanReferenceImageConfig
+  | MiniMaxH3ReferenceImageConfig => {
   const state = getState();
 
   const mainModelConfig = selectMainModelConfig(state);
@@ -108,6 +111,11 @@ export const getDefaultRefImageConfig = (
   // Wan 2.2 I2V uses the main model's own VAE - no adapter model needed
   if (base === 'wan') {
     return deepClone(initialWanReferenceImage);
+  }
+
+  // MiniMax H3 first-frame conditioning uses the main model's own VAE + vision context
+  if (base === 'minimax-h3') {
+    return deepClone(initialMiniMaxH3ReferenceImage);
   }
 
   if (base === 'flux' && mainModelConfig?.name?.toLowerCase().includes('kontext')) {

@@ -483,6 +483,20 @@ const slice = createSlice({
     wanGuidanceScaleLowNoiseChanged: (state, action: PayloadAction<number | null>) => {
       state.wanGuidanceScaleLowNoise = action.payload;
     },
+    minimaxH3DurationSecondsChanged: (state, action: PayloadAction<number>) => {
+      const result = zParamsState.shape.minimaxH3DurationSeconds.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.minimaxH3DurationSeconds = result.data;
+    },
+    minimaxH3OutputModeChanged: (state, action: PayloadAction<'video' | 'image'>) => {
+      const result = zParamsState.shape.minimaxH3OutputMode.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.minimaxH3OutputMode = result.data;
+    },
     vaePrecisionChanged: (state, action: PayloadAction<ParameterPrecision>) => {
       state.vaePrecision = action.payload;
     },
@@ -914,6 +928,8 @@ export const {
   wanVaeModelSelected,
   wanT5EncoderModelSelected,
   wanGuidanceScaleLowNoiseChanged,
+  minimaxH3DurationSecondsChanged,
+  minimaxH3OutputModeChanged,
   setClipSkip,
   shouldUseCpuNoiseChanged,
   setColorCompensation,
@@ -1005,6 +1021,13 @@ export const paramsSliceConfig: SliceConfig<typeof slice> = {
         state.pidSteps = 4;
       }
 
+      if (state._version === 4) {
+        // v4 -> v5, add the MiniMax H3 duration and output-mode fields
+        state._version = 5;
+        state.minimaxH3DurationSeconds = 5;
+        state.minimaxH3OutputMode = 'video';
+      }
+
       if (!('hiDiffusionEnabled' in state)) {
         state.hiDiffusionEnabled = false;
       }
@@ -1043,6 +1066,7 @@ export const selectIsExternal = createParamsSelector((params) => params.model?.b
 export const selectIsQwenImage = createParamsSelector((params) => params.model?.base === 'qwen-image');
 export const selectIsKrea2 = createParamsSelector((params) => params.model?.base === 'krea-2');
 export const selectIsWan = createParamsSelector((params) => params.model?.base === 'wan');
+export const selectIsMiniMaxH3 = createParamsSelector((params) => params.model?.base === 'minimax-h3');
 export const selectIsFluxKontext = createParamsSelector((params) => {
   if (params.model?.base === 'flux' && params.model?.name.toLowerCase().includes('kontext')) {
     return true;
@@ -1086,6 +1110,8 @@ export const selectWanComponentSource = createParamsSelector((params) => params.
 export const selectWanVaeModel = createParamsSelector((params) => params.wanVaeModel);
 export const selectWanT5EncoderModel = createParamsSelector((params) => params.wanT5EncoderModel);
 export const selectWanGuidanceScaleLowNoise = createParamsSelector((params) => params.wanGuidanceScaleLowNoise);
+export const selectMiniMaxH3DurationSeconds = createParamsSelector((params) => params.minimaxH3DurationSeconds);
+export const selectMiniMaxH3OutputMode = createParamsSelector((params) => params.minimaxH3OutputMode);
 
 export const selectCFGScale = createParamsSelector((params) => params.cfgScale);
 export const selectGuidance = createParamsSelector((params) => params.guidance);

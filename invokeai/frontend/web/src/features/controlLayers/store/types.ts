@@ -438,6 +438,15 @@ const zWanReferenceImageConfig = z.object({
 });
 export type WanReferenceImageConfig = z.infer<typeof zWanReferenceImageConfig>;
 
+// MiniMax H3 first-frame conditioning uses the model's own VAE + vision
+// context - no separate adapter model needed. Consumed only in video output
+// mode (the first enabled ref image becomes the video's first frame).
+const zMiniMaxH3ReferenceImageConfig = z.object({
+  type: z.literal('minimax_h3_reference_image'),
+  image: zCroppableImageWithDims.nullable(),
+});
+export type MiniMaxH3ReferenceImageConfig = z.infer<typeof zMiniMaxH3ReferenceImageConfig>;
+
 const zCanvasEntityBase = z.object({
   id: zId,
   name: zName,
@@ -455,6 +464,7 @@ export const zRefImageState = z.object({
     zFlux2ReferenceImageConfig,
     zQwenImageReferenceImageConfig,
     zWanReferenceImageConfig,
+    zMiniMaxH3ReferenceImageConfig,
   ]),
 });
 export type RefImageState = z.infer<typeof zRefImageState>;
@@ -478,6 +488,10 @@ export const isQwenImageReferenceImageConfig = (
 
 export const isWanReferenceImageConfig = (config: RefImageState['config']): config is WanReferenceImageConfig =>
   config.type === 'wan_reference_image';
+
+export const isMiniMaxH3ReferenceImageConfig = (
+  config: RefImageState['config']
+): config is MiniMaxH3ReferenceImageConfig => config.type === 'minimax_h3_reference_image';
 
 const zFillStyle = z.enum(['solid', 'grid', 'crosshatch', 'diagonal', 'horizontal', 'vertical']);
 export type FillStyle = z.infer<typeof zFillStyle>;
@@ -817,7 +831,7 @@ const zPidMode = z.enum(['off', 'fit', 'native']);
 export type PidMode = z.infer<typeof zPidMode>;
 
 export const zParamsState = z.object({
-  _version: z.literal(4),
+  _version: z.literal(5),
   maskBlur: z.number(),
   maskBlurMethod: zParameterMaskBlurMethod,
   canvasCoherenceMode: zParameterCanvasCoherenceMode,
@@ -921,6 +935,10 @@ export const zParamsState = z.object({
   wanVaeModel: zParameterVAEModel.nullable(), // Optional: Standalone Wan VAE checkpoint
   wanT5EncoderModel: zModelIdentifierField.nullable(), // Optional: Standalone UMT5-XXL encoder
   wanGuidanceScaleLowNoise: z.number().nullable(), // Optional: separate CFG for low-noise expert (A14B). null = same as primary
+  // MiniMax H3 joint audio-video generation (fixed 24 fps; frame counts snap to the 17n+5 grid,
+  // so the effective duration ceiling is 345 frames = 14.375 s).
+  minimaxH3DurationSeconds: z.number().int().min(5).max(14),
+  minimaxH3OutputMode: z.enum(['video', 'image']),
   // Z-Image Seed Variance Enhancer settings
   zImageSeedVarianceEnabled: z.boolean(),
   zImageSeedVarianceStrength: z.number().min(0).max(2),
@@ -951,7 +969,7 @@ export const zParamsState = z.object({
 });
 export type ParamsState = z.infer<typeof zParamsState>;
 export const getInitialParamsState = (): ParamsState => ({
-  _version: 4,
+  _version: 5,
   maskBlur: 16,
   maskBlurMethod: 'box',
   canvasCoherenceMode: 'Gaussian Blur',
@@ -1039,6 +1057,8 @@ export const getInitialParamsState = (): ParamsState => ({
   wanVaeModel: null,
   wanT5EncoderModel: null,
   wanGuidanceScaleLowNoise: null,
+  minimaxH3DurationSeconds: 5,
+  minimaxH3OutputMode: 'video',
   zImageSeedVarianceEnabled: false,
   zImageSeedVarianceStrength: 0.1,
   zImageSeedVarianceRandomizePercent: 50,

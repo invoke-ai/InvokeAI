@@ -40,6 +40,7 @@ import {
   getEntityIdentifier,
   isAspectRatioID,
   isFlux2ReferenceImageConfig,
+  isMiniMaxH3ReferenceImageConfig,
   isQwenImageReferenceImageConfig,
   isWanReferenceImageConfig,
 } from 'features/controlLayers/store/types';
@@ -48,6 +49,7 @@ import {
   initialFluxKontextReferenceImage,
   initialFLUXRedux,
   initialIPAdapter,
+  initialMiniMaxH3ReferenceImage,
   initialQwenImageReferenceImage,
   initialWanReferenceImage,
 } from 'features/controlLayers/store/util';
@@ -488,6 +490,21 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
               continue;
             }
 
+            if (newBase === 'minimax-h3') {
+              // Switching TO MiniMax H3 - convert any non-H3 configs to minimax_h3_reference_image.
+              // The H3 graph builder consumes the first enabled ref image as the video's first frame.
+              if (!isMiniMaxH3ReferenceImageConfig(entity.config)) {
+                dispatch(
+                  refImageConfigChanged({
+                    id: entity.id,
+                    config: { ...initialMiniMaxH3ReferenceImage },
+                  })
+                );
+                modelsUpdatedDisabledOrCleared += 1;
+              }
+              continue;
+            }
+
             if (isFlux2ReferenceImageConfig(entity.config)) {
               // Switching AWAY from FLUX.2 - convert flux2_reference_image to the appropriate config type
               let newConfig;
@@ -529,6 +546,29 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
                 }
               } else {
                 // No compatible model found - fall back to an empty IP adapter config
+                newConfig = { ...initialIPAdapter };
+              }
+              dispatch(refImageConfigChanged({ id: entity.id, config: newConfig }));
+              modelsUpdatedDisabledOrCleared += 1;
+              continue;
+            }
+
+            if (isMiniMaxH3ReferenceImageConfig(entity.config)) {
+              // Switching AWAY from MiniMax H3 - convert to the appropriate config type for the new base.
+              let newConfig;
+              if (newGlobalRefImageModel) {
+                const parsedModel = zModelIdentifierField.parse(newGlobalRefImageModel);
+                if (newModel.base === 'flux' && newModel.name.toLowerCase().includes('kontext')) {
+                  newConfig = { ...initialFluxKontextReferenceImage, model: parsedModel };
+                } else if (newGlobalRefImageModel.type === 'flux_redux') {
+                  newConfig = { ...initialFLUXRedux, model: parsedModel };
+                } else {
+                  newConfig = { ...initialIPAdapter, model: parsedModel };
+                  if (parsedModel.base === 'flux') {
+                    newConfig.clipVisionModel = 'ViT-L';
+                  }
+                }
+              } else {
                 newConfig = { ...initialIPAdapter };
               }
               dispatch(refImageConfigChanged({ id: entity.id, config: newConfig }));

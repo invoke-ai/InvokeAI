@@ -194,11 +194,12 @@ export const getGlobalReferenceImageWarnings = (
 
     const { config } = entity;
 
-    // FLUX.2, Qwen Image Edit and Wan reference images don't require a model - it's built-in
+    // FLUX.2, Qwen Image Edit, Wan and MiniMax H3 reference images don't require a model - it's built-in
     if (
       config.type !== 'flux2_reference_image' &&
       config.type !== 'qwen_image_reference_image' &&
-      config.type !== 'wan_reference_image'
+      config.type !== 'wan_reference_image' &&
+      config.type !== 'minimax_h3_reference_image'
     ) {
       if (!('model' in config) || !config.model) {
         // No model selected
@@ -210,10 +211,15 @@ export const getGlobalReferenceImageWarnings = (
     }
 
     if (!entity.config.image) {
-      // No image selected - for Qwen Image Edit and Wan, an image is optional at the
-      // entity level. Wan I2V *requires* one but enforcement happens at graph-build
-      // time so the warning doesn't fire on T2V/TI2V variants that ignore ref images.
-      if (config.type !== 'qwen_image_reference_image' && config.type !== 'wan_reference_image') {
+      // No image selected - for Qwen Image Edit, Wan and MiniMax H3, an image is optional
+      // at the entity level. Wan I2V *requires* one but enforcement happens at graph-build
+      // time so the warning doesn't fire on T2V/TI2V variants that ignore ref images. For
+      // MiniMax H3 an empty ref image simply means plain text-to-video.
+      if (
+        config.type !== 'qwen_image_reference_image' &&
+        config.type !== 'wan_reference_image' &&
+        config.type !== 'minimax_h3_reference_image'
+      ) {
         warnings.push(WARNINGS.IP_ADAPTER_NO_IMAGE_SELECTED);
       }
     }
