@@ -28,6 +28,8 @@ from torch import Tensor
 from invokeai.backend.model_manager.taxonomy import BaseModelType
 from invokeai.backend.pid._src.networks.pid_net import PidNet
 
+_PID_ACTIVATION_CHUNK_SIZE = 1024
+
 # ---------------------------------------------------------------------------
 # Network hyperparameters per backbone
 # ---------------------------------------------------------------------------
@@ -225,11 +227,14 @@ def _get_t_list(device: torch.device, *, num_steps: Optional[int] = None) -> Ten
     return t
 
 
-def _velocity_to_x0(x_t: Tensor, net_output: Tensor, t: Tensor) -> Tensor:
-    """Convert the network's velocity prediction back to x0 at time *t* using float32 intermediates."""
+def _velocity_to_x0(x_t: Tensor, net_output: Tensor, t: Tensor, *, pid_optimization: bool = False) -> Tensor:
+    """Convert the network's velocity prediction back to x0 at time *t*."""
     s = [x_t.shape[0]] + [1] * (x_t.ndim - 1)
-    t_shaped = t.float().view(*s)
-    return torch.addcmul(x_t.float(), net_output.float(), t_shaped, value=-1).to(x_t.dtype)
+    if pid_optimization:
+        t_shaped = t.float().view(*s)
+        return torch.addcmul(x_t.float(), net_output.float(), t_shaped, value=-1).to(x_t.dtype)
+    t_shaped = t.double().view(*s)
+    return (x_t.double() - t_shaped * net_output.double()).to(x_t.dtype)
 
 
 @torch.no_grad()
@@ -245,6 +250,7 @@ def _student_sample_loop(
     sample_type: str = "sde",
     autocast_dtype: Optional[torch.dtype] = None,
     generator: Optional[torch.Generator] = None,
+    pid_optimization: bool = False,
 ) -> Tensor:
     """Few-step distilled sampler.
 
@@ -279,9 +285,10 @@ def _student_sample_loop(
                 lq_video_or_image=None,
                 lq_latent=lq_latent,
                 degrade_sigma=degrade_sigma,
+                activation_chunk_size=_PID_ACTIVATION_CHUNK_SIZE if pid_optimization else None,
             )
         if t_next.item() > 0:
-            x0_pred = _velocity_to_x0(x, v_pred, t_cur_batch)
+            x0_pred = _velocity_to_x0(x, v_pred, t_cur_batch, pid_optimization=pid_optimization)
             eps_infer = torch.randn(
                 x0_pred.shape,
                 device=x0_pred.device,
@@ -297,7 +304,7 @@ def _student_sample_loop(
             else:
                 x = (1.0 - t_next_b) * x0_pred + t_next_b * eps_infer
         else:
-            x = _velocity_to_x0(x, v_pred, t_cur_batch)
+            x = _velocity_to_x0(x, v_pred, t_cur_batch, pid_optimization=pid_optimization)
     return x
 
 
@@ -322,6 +329,7 @@ class PiDDecodeConfig:
     # from_clean upscale path passes the LDM scheduler's per-step sigma here.
     degrade_sigma: float | list[float] | Tensor = 0.0
     seed: int = 0
+    pid_optimization: bool = False
     student_t_list: list[float] = field(default_factory=lambda: list(_STUDENT_T_LIST))
 
 
@@ -427,6 +435,7 @@ class PiDDecoder:
             sample_type=cfg.sample_type,
             autocast_dtype=autocast_dtype,
             generator=gen,
+            pid_optimization=cfg.pid_optimization,
         )
         return x0.clamp(-1, 1)
 

@@ -426,11 +426,8 @@ class PiTBlock(nn.Module):
         rope_mode: str = "original",
         rope_ref_grid_h: int = 32,
         rope_ref_grid_w: int = 32,
-        activation_chunk_size: Optional[int] = 1024,
     ):
         super().__init__()
-        if activation_chunk_size is not None and activation_chunk_size <= 0:
-            raise ValueError("activation_chunk_size must be positive when set")
         self.pixel_dim = int(pixel_hidden_size)
         self.context_dim = int(patch_hidden_size)
         self.patch_size = int(patch_size)
@@ -439,7 +436,6 @@ class PiTBlock(nn.Module):
         self.rope_mode = rope_mode
         self.rope_ref_grid_h = rope_ref_grid_h
         self.rope_ref_grid_w = rope_ref_grid_w
-        self.activation_chunk_size = activation_chunk_size
         assert self.attn_dim % self.num_heads == 0, "pixel attention hidden size must be divisible by pixel num_heads"
         p2 = self.patch_size * self.patch_size
         self.compress_to_attn = nn.Linear(p2 * self.pixel_dim, self.attn_dim, bias=True)
@@ -472,7 +468,14 @@ class PiTBlock(nn.Module):
         return pos
 
     def forward(
-        self, x: torch.Tensor, s_cond: torch.Tensor, image_height: int, image_width: int, patch_size: int, mask=None
+        self,
+        x: torch.Tensor,
+        s_cond: torch.Tensor,
+        image_height: int,
+        image_width: int,
+        patch_size: int,
+        mask=None,
+        activation_chunk_size: Optional[int] = None,
     ) -> torch.Tensor:
         # x: [B*L_local, P2, C]; under CP, L_local = (Hs*Ws)/cp_size. Without CP,
         # L_local == L_full. The reshape uses L_local for the (B, L_local, ...)
@@ -497,7 +500,9 @@ class PiTBlock(nn.Module):
         # Chunking bounds full-resolution AdaLN and MLP intermediates during inference. Attention remains global:
         # compressed tokens are assembled in original order before the unchanged attention call. Keep the original
         # path while gradients are enabled because copy-based output assembly is inference-only.
-        chunk_size = self.activation_chunk_size
+        if activation_chunk_size is not None and activation_chunk_size <= 0:
+            raise ValueError("activation_chunk_size must be positive when set")
+        chunk_size = activation_chunk_size
         if chunk_size is not None and BL > chunk_size and not torch.is_grad_enabled():
             return self._forward_chunked(x, s_cond, B, L_local, Hs, Ws, mask, chunk_size)
 

@@ -6,7 +6,13 @@ import pytest
 import torch
 
 from invokeai.backend.model_manager.taxonomy import BaseModelType
-from invokeai.backend.pid.decode import _get_t_list, _velocity_to_x0, assert_pid_decoder_matches_base
+from invokeai.backend.pid.decode import (
+    PiDDecodeConfig,
+    _get_t_list,
+    _student_sample_loop,
+    _velocity_to_x0,
+    assert_pid_decoder_matches_base,
+)
 
 _CPU = torch.device("cpu")
 
@@ -56,10 +62,50 @@ def test_velocity_to_x0_uses_float32_math_and_preserves_input_dtype(
     # A float64 intermediate doubles memory for each full-resolution sampler tensor. PiD already
     # predicts under bf16 autocast, so perform this update in float32 without calling Tensor.double().
     with patch.object(torch.Tensor, "double", side_effect=AssertionError("unexpected float64 conversion")):
-        actual = _velocity_to_x0(x_t, net_output, timestep)
+        actual = _velocity_to_x0(x_t, net_output, timestep, pid_optimization=True)
 
     assert actual.dtype == x_dtype
     torch.testing.assert_close(actual, expected, rtol=0, atol=0)
+
+
+def test_velocity_to_x0_uses_original_float64_math_when_optimization_is_disabled() -> None:
+    x_t = torch.tensor([[[[1.0, -2.0], [3.0, -4.0]]]], dtype=torch.bfloat16)
+    net_output = torch.tensor([[[[0.5, -0.25], [0.125, -0.0625]]]], dtype=torch.bfloat16)
+    timestep = torch.tensor([0.634], dtype=torch.float32)
+    expected = (x_t.double() - timestep.double().view(1, 1, 1, 1) * net_output.double()).to(x_t.dtype)
+
+    with patch("torch.addcmul", side_effect=AssertionError("unexpected optimized path")):
+        actual = _velocity_to_x0(x_t, net_output, timestep, pid_optimization=False)
+
+    torch.testing.assert_close(actual, expected, rtol=0, atol=0)
+
+
+@pytest.mark.parametrize(("pid_optimization", "expected_chunk_size"), [(False, None), (True, 1024)])
+def test_student_sample_loop_passes_per_call_activation_chunk_size(
+    pid_optimization: bool, expected_chunk_size: int | None
+) -> None:
+    activation_chunk_sizes: list[int | None] = []
+
+    def net(x: torch.Tensor, *args: object, **kwargs: object) -> torch.Tensor:
+        activation_chunk_sizes.append(kwargs.get("activation_chunk_size"))  # type: ignore[arg-type]
+        return torch.zeros_like(x)
+
+    _student_sample_loop(
+        net,  # type: ignore[arg-type]
+        noise=torch.zeros(1, 3, 2, 2),
+        t_list=torch.tensor([0.999, 0.0]),
+        caption_embs=torch.zeros(1, 1, 1),
+        caption_mask=None,
+        lq_latent=None,
+        degrade_sigma=torch.zeros(1),
+        pid_optimization=pid_optimization,
+    )
+
+    assert activation_chunk_sizes == [expected_chunk_size]
+
+
+def test_pid_optimization_defaults_to_disabled() -> None:
+    assert PiDDecodeConfig().pid_optimization is False
 
 
 def test_matching_decoder_base_is_accepted() -> None:
