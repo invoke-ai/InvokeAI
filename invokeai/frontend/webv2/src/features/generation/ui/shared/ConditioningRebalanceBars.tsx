@@ -223,11 +223,13 @@ export const ConditioningRebalanceBars = ({
     }
   }, [onActiveIndexChange]);
 
+  // The track takes `css` rather than a spread: SystemStyleObject carries the CSS
+  // `direction` property, which collides with Flex's flex-direction prop of that name.
   return (
     <Flex
       align="stretch"
+      css={TRACK_PROPS}
       ref={trackRef}
-      {...TRACK_PROPS}
       onPointerDown={handlePointerDown}
       onPointerLeave={handleTrackPointerLeave}
     >
