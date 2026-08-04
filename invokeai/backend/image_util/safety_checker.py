@@ -8,11 +8,13 @@ from pathlib import Path
 
 import numpy as np
 from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
+from huggingface_hub import snapshot_download
 from PIL import Image, ImageFilter
 from transformers import AutoImageProcessor
 
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config.config_default import get_config
+from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 
@@ -37,12 +39,20 @@ class SafetyChecker:
             model_path = get_config().models_path / CHECKER_PATH
             if model_path.exists():
                 cls.feature_extractor = AutoImageProcessor.from_pretrained(model_path)
-                cls.safety_checker = StableDiffusionSafetyChecker.from_pretrained(model_path)
+                # Torch module construction is not thread-safe process-wide (see
+                # _ModelLoadReadWriteLock); serialize with the model-load machinery.
+                with MODEL_LOAD_LOCK.write_lock():
+                    cls.safety_checker = StableDiffusionSafetyChecker.from_pretrained(model_path)
             else:
                 model_path.mkdir(parents=True, exist_ok=True)
-                cls.feature_extractor = AutoImageProcessor.from_pretrained(repo_id)
+                # Download before constructing: from_pretrained(repo_id) would
+                # otherwise hold the process-wide load lock across a multi-GB
+                # network transfer, stalling every other model load.
+                download_path = snapshot_download(repo_id)
+                cls.feature_extractor = AutoImageProcessor.from_pretrained(download_path)
                 cls.feature_extractor.save_pretrained(model_path)
-                cls.safety_checker = StableDiffusionSafetyChecker.from_pretrained(repo_id)
+                with MODEL_LOAD_LOCK.write_lock():
+                    cls.safety_checker = StableDiffusionSafetyChecker.from_pretrained(download_path)
                 cls.safety_checker.save_pretrained(model_path)
         except Exception as e:
             logger.warning(f"Could not load NSFW checker: {str(e)}")

@@ -14,6 +14,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import QwenVLEncoderField
 from invokeai.app.invocations.primitives import QwenImageConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     ConditioningFieldData,
     QwenImageConditioningInfo,
@@ -305,13 +306,16 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
         with warnings.catch_warnings():
             # BnB int8 internally casts bfloat16→float16; the warning is harmless
             warnings.filterwarnings("ignore", message="MatMul8bitLt.*cast.*float16")
-            text_encoder = Qwen2_5_VLForConditionalGeneration.from_pretrained(
-                str(encoder_path),
-                quantization_config=bnb_config,
-                device_map="auto",
-                torch_dtype=torch.bfloat16,
-                local_files_only=True,
-            )
+            # Torch module construction is not thread-safe process-wide (see
+            # _ModelLoadReadWriteLock); serialize with the model-load machinery.
+            with MODEL_LOAD_LOCK.write_lock():
+                text_encoder = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+                    str(encoder_path),
+                    quantization_config=bnb_config,
+                    device_map="auto",
+                    torch_dtype=torch.bfloat16,
+                    local_files_only=True,
+                )
 
         device = next(text_encoder.parameters()).device
 

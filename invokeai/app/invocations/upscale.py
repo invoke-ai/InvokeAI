@@ -12,6 +12,7 @@ from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.image_util.basicsr.rrdbnet_arch import RRDBNet
 from invokeai.backend.image_util.realesrgan.realesrgan import RealESRGAN
+from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
 
 # TODO: Populate this from disk?
 # TODO: Use model manager to load?
@@ -53,36 +54,41 @@ class ESRGANInvocation(BaseInvocation, WithMetadata, WithBoard):
             "ESRGAN_SRx4_DF2KOST_official-ff704c30.pth",
         ]:
             # x4 RRDBNet model
-            rrdbnet_model = RRDBNet(
-                num_in_ch=3,
-                num_out_ch=3,
-                num_feat=64,
-                num_block=23,
-                num_grow_ch=32,
-                scale=4,
-            )
+            # Torch module construction is not thread-safe process-wide (see
+            # _ModelLoadReadWriteLock); serialize with the model-load machinery.
+            with MODEL_LOAD_LOCK.write_lock():
+                rrdbnet_model = RRDBNet(
+                    num_in_ch=3,
+                    num_out_ch=3,
+                    num_feat=64,
+                    num_block=23,
+                    num_grow_ch=32,
+                    scale=4,
+                )
             netscale = 4
         elif self.model_name in ["RealESRGAN_x4plus_anime_6B.pth"]:
             # x4 RRDBNet model, 6 blocks
-            rrdbnet_model = RRDBNet(
-                num_in_ch=3,
-                num_out_ch=3,
-                num_feat=64,
-                num_block=6,  # 6 blocks
-                num_grow_ch=32,
-                scale=4,
-            )
+            with MODEL_LOAD_LOCK.write_lock():
+                rrdbnet_model = RRDBNet(
+                    num_in_ch=3,
+                    num_out_ch=3,
+                    num_feat=64,
+                    num_block=6,  # 6 blocks
+                    num_grow_ch=32,
+                    scale=4,
+                )
             netscale = 4
         elif self.model_name in ["RealESRGAN_x2plus.pth"]:
             # x2 RRDBNet model
-            rrdbnet_model = RRDBNet(
-                num_in_ch=3,
-                num_out_ch=3,
-                num_feat=64,
-                num_block=23,
-                num_grow_ch=32,
-                scale=2,
-            )
+            with MODEL_LOAD_LOCK.write_lock():
+                rrdbnet_model = RRDBNet(
+                    num_in_ch=3,
+                    num_out_ch=3,
+                    num_feat=64,
+                    num_block=23,
+                    num_grow_ch=32,
+                    scale=2,
+                )
             netscale = 2
         else:
             msg = f"Invalid RealESRGAN model: {self.model_name}"
