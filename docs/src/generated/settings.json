@@ -563,6 +563,17 @@
     },
     {
       "category": "GENERATION",
+      "default": false,
+      "description": "Enable experimental PiD decode memory optimizations at the cost of slower decoding.",
+      "env_var": "INVOKEAI_PID_OPTIMIZATION",
+      "literal_values": [],
+      "name": "pid_optimization",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "GENERATION",
       "default": "auto",
       "description": "Attention type.",
       "env_var": "INVOKEAI_ATTENTION_TYPE",

@@ -113,6 +113,7 @@ class InvokeAIAppConfig(BaseSettings):
         device: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `mps`, `cuda:N` (where N is a device number)
         precision: Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.<br>Valid values: `auto`, `float16`, `bfloat16`, `float32`
         sequential_guidance: Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.
+        pid_optimization: Enable experimental PiD decode memory optimizations at the cost of slower decoding.
         attention_type: Attention type.<br>Valid values: `auto`, `normal`, `xformers`, `sliced`, `torch-sdp`
         attention_slice_size: Slice size, valid when attention_type=="sliced".<br>Valid values: `auto`, `balanced`, `max`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`
         force_tiled_decode: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).
@@ -220,6 +221,7 @@ class InvokeAIAppConfig(BaseSettings):
 
     # GENERATION
     sequential_guidance:           bool = Field(default=False,              description="Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.")
+    pid_optimization:              bool = Field(default=False,              description="Enable experimental PiD decode memory optimizations at the cost of slower decoding.")
     attention_type:      ATTENTION_TYPE = Field(default="auto",             description="Attention type.")
     attention_slice_size: ATTENTION_SLICE_SIZE = Field(default="auto",      description='Slice size, valid when attention_type=="sliced".')
     force_tiled_decode:            bool = Field(default=False,              description="Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).")

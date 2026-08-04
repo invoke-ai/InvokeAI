@@ -149,7 +149,11 @@ class FluxPiDDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
                 latent=denorm_latent,
                 caption_embs=caption_embs,
                 caption_mask=caption_mask,
-                config=PiDDecodeConfig(num_inference_steps=self.num_inference_steps, seed=self.seed),
+                config=PiDDecodeConfig(
+                    num_inference_steps=self.num_inference_steps,
+                    seed=self.seed,
+                    pid_optimization=context.config.get().pid_optimization,
+                ),
             )
 
         TorchDevice.empty_cache()
