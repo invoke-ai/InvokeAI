@@ -107,8 +107,8 @@ export const detectKnownBrowserIssues = async (
   environment: BrowserIssueDetectionEnvironment = DEFAULT_DETECTION_ENVIRONMENT
 ): Promise<readonly KnownBrowserIssue[]> => {
   const results: (KnownBrowserIssue | null)[] = await Promise.all(
-    KNOWN_BROWSER_ISSUES.map(
-      async (issue): Promise<KnownBrowserIssue | null> => ((await issue.detect(environment)) ? issue : null)
+    KNOWN_BROWSER_ISSUES.map(async (issue): Promise<KnownBrowserIssue | null> =>
+      (await issue.detect(environment)) ? issue : null
     )
   );
 

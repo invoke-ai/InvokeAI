@@ -59,9 +59,8 @@ const createHarness = (options: HarnessOptions = {}) => {
   );
   const uploadImage =
     options.uploadImage ??
-    vi.fn(
-      (_blob: Blob): Promise<CanvasImageUploadResult> =>
-        Promise.resolve({ height: 10, imageName: `img-${uploadSeq++}`, width: 10 })
+    vi.fn((_blob: Blob): Promise<CanvasImageUploadResult> =>
+      Promise.resolve({ height: 10, imageName: `img-${uploadSeq++}`, width: 10 })
     );
   const dispatch = vi.fn((_action: CanvasProjectMutation) => true);
 
