@@ -226,10 +226,10 @@ def _get_t_list(device: torch.device, *, num_steps: Optional[int] = None) -> Ten
 
 
 def _velocity_to_x0(x_t: Tensor, net_output: Tensor, t: Tensor) -> Tensor:
-    """Convert the network's velocity prediction back to x0 at time *t*."""
+    """Convert the network's velocity prediction back to x0 at time *t* using float32 intermediates."""
     s = [x_t.shape[0]] + [1] * (x_t.ndim - 1)
-    t_shaped = t.double().view(*s)
-    return (x_t.double() - t_shaped * net_output.double()).to(x_t.dtype)
+    t_shaped = t.float().view(*s)
+    return torch.addcmul(x_t.float(), net_output.float(), t_shaped, value=-1).to(x_t.dtype)
 
 
 @torch.no_grad()

@@ -1,10 +1,12 @@
 """Regression tests for the PiD distill schedule and decoder/base validation."""
 
+from unittest.mock import patch
+
 import pytest
 import torch
 
 from invokeai.backend.model_manager.taxonomy import BaseModelType
-from invokeai.backend.pid.decode import _get_t_list, assert_pid_decoder_matches_base
+from invokeai.backend.pid.decode import _get_t_list, _velocity_to_x0, assert_pid_decoder_matches_base
 
 _CPU = torch.device("cpu")
 
@@ -33,6 +35,31 @@ def test_out_of_range_step_count_trips_the_safety_net() -> None:
     so it still fires under `python -O`, where assertions are stripped."""
     with pytest.raises(ValueError, match="strictly decreasing"):
         _get_t_list(_CPU, num_steps=5)
+
+
+@pytest.mark.parametrize(
+    ("x_dtype", "net_output_dtype"),
+    [
+        (torch.float32, torch.float32),
+        (torch.float32, torch.bfloat16),
+        (torch.bfloat16, torch.bfloat16),
+    ],
+)
+def test_velocity_to_x0_uses_float32_math_and_preserves_input_dtype(
+    x_dtype: torch.dtype, net_output_dtype: torch.dtype
+) -> None:
+    x_t = torch.tensor([[[[1.0, -2.0], [3.0, -4.0]]]], dtype=x_dtype)
+    net_output = torch.tensor([[[[0.5, -0.25], [0.125, -0.0625]]]], dtype=net_output_dtype)
+    timestep = torch.tensor([0.634], dtype=torch.float32)
+    expected = (x_t.float() - timestep.view(1, 1, 1, 1) * net_output.float()).to(x_dtype)
+
+    # A float64 intermediate doubles memory for each full-resolution sampler tensor. PiD already
+    # predicts under bf16 autocast, so perform this update in float32 without calling Tensor.double().
+    with patch.object(torch.Tensor, "double", side_effect=AssertionError("unexpected float64 conversion")):
+        actual = _velocity_to_x0(x_t, net_output, timestep)
+
+    assert actual.dtype == x_dtype
+    torch.testing.assert_close(actual, expected, rtol=0, atol=0)
 
 
 def test_matching_decoder_base_is_accepted() -> None:
