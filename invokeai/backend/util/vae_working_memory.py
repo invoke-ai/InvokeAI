@@ -132,6 +132,7 @@ def estimate_vae_working_memory_wan(
     pixel_width: int,
     pixel_frames: int,
     tile_size: int | None = None,
+    streaming: bool = False,
 ) -> int:
     """Estimate the working memory required to encode or decode with a Wan VAE.
 
@@ -154,12 +155,17 @@ def estimate_vae_working_memory_wan(
     else:
         per_frame = pixel_height * pixel_width * element_size * scaling_constant
 
-    # The full RGB clip stays on the execution device regardless of tiling (decode
-    # output / encode input). Decode accumulates frames with torch.cat, whose final
-    # iterations transiently hold both the accumulated clip and its copy — ~2x the
-    # clip bytes at peak. Encode consumes the input clip without duplicating it.
-    clip_copies = 2 if operation == "decode" else 1
-    clip_bytes = clip_copies * 3 * pixel_frames * pixel_height * pixel_width * element_size
+    # Streaming decode moves each causal decoder chunk to CPU immediately. Only one
+    # temporal-upscale chunk remains on the execution device, instead of the full RGB
+    # clip plus the transient copy created by torch.cat.
+    if operation == "decode" and streaming:
+        temporal_scale = int(getattr(vae.config, "scale_factor_temporal", None) or 4)
+        resident_frames = min(pixel_frames, temporal_scale)
+        clip_copies = 1
+    else:
+        resident_frames = pixel_frames
+        clip_copies = 2 if operation == "decode" else 1
+    clip_bytes = clip_copies * 3 * resident_frames * pixel_height * pixel_width * element_size
 
     return int(per_frame + clip_bytes)
 

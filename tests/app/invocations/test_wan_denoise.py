@@ -134,6 +134,7 @@ def _build_context(
     context.util.signal_progress = MagicMock()
     context.util.sd_step_callback = MagicMock()
     context.logger = MagicMock()
+    context.config.get.return_value.wan_memory_optimization = False
     return context
 
 
@@ -285,6 +286,38 @@ class TestWanDenoiseShapes:
         inv._run_diffusion(ctx)
         # 3 steps × 2 (cond + uncond) = 6 forward calls.
         assert len(transformer.calls) == 6
+
+    def test_memory_optimization_config_wraps_each_active_expert_step(self, fake_model_root, monkeypatch) -> None:
+        transformer = _ZeroTransformer()
+        ctx = _build_context(
+            transformer,
+            variant=WanVariantType.T2V_A14B,
+            model_root=fake_model_root,
+            pos_cond=_make_conditioning(),
+            neg_cond=None,
+        )
+        ctx.config.get.return_value.wan_memory_optimization = True
+        enabled_calls: list[bool] = []
+
+        @contextmanager
+        def record_memory_optimization(_transformer, *, enabled: bool):
+            enabled_calls.append(enabled)
+            yield
+
+        monkeypatch.setattr("invokeai.app.invocations.wan_denoise.wan_memory_optimization", record_memory_optimization)
+        inv = _make_invocation(
+            transformer_field=_wan_transformer_field(),
+            pos_field=WanConditioningField(conditioning_name="pos"),
+            neg_field=None,
+            width=64,
+            height=64,
+            steps=3,
+            guidance_scale=1.0,
+        )
+
+        inv._run_diffusion(ctx)
+
+        assert enabled_calls == [True, True, True]
 
     def test_ti2v_image_rejects_dimensions_not_divisible_by_32(self, fake_model_root: Path) -> None:
         context = _build_context(
