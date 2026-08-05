@@ -1,4 +1,4 @@
-import type { ComponentProps, ReactNode } from 'react';
+import type { ComponentProps, ReactNode, Ref } from 'react';
 
 import { ScrollArea } from '@chakra-ui/react';
 
@@ -14,6 +14,7 @@ export const Scrollable = ({
   children,
   contentProps,
   label,
+  viewportRef,
   ...rootProps
 }: ScrollAreaRootProps & {
   children: ReactNode;
@@ -21,9 +22,11 @@ export const Scrollable = ({
   contentProps?: ScrollAreaContentProps;
   /** Accessible name for the scroll viewport. */
   label?: string;
+  /** The scrolling element itself — what a virtualizer needs to observe. */
+  viewportRef?: Ref<HTMLDivElement>;
 }) => (
   <ScrollArea.Root size="xs" variant="hover" {...rootProps}>
-    <ScrollArea.Viewport aria-label={label} h="full" role={label ? 'region' : undefined} w="full">
+    <ScrollArea.Viewport aria-label={label} h="full" ref={viewportRef} role={label ? 'region' : undefined} w="full">
       <ScrollArea.Content w="full" {...contentProps}>
         {children}
       </ScrollArea.Content>

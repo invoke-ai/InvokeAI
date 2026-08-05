@@ -27,6 +27,10 @@ const ROUTE_SHARED_MODULES = [
   '/workbench/components/WorkbenchSplashScreen.tsx',
   '/workbench/hotkeys/catalog.ts',
   '/workbench/launchpad/formatRelativeTime.ts',
+  // The Launchpad writes `?intent=` and the editor's session controller reads
+  // it. Without this the editor pulls the whole Launchpad chunk for a lookup
+  // table — a 66 KB, one-extra-request regression on the editor route.
+  '/workbench/launchpad/intents.ts',
   '/workbench/palette/settingsEntryDeps.ts',
   '/workbench/projects/ids.ts',
   '/workbench/projects/library.ts',

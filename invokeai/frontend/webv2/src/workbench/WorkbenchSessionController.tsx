@@ -2,6 +2,7 @@ import { flushGenerateDrafts } from '@features/generation/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { areArraysEqual } from '@platform/state/selectors';
 import { useNavigate } from '@tanstack/react-router';
+import { resolveLaunchpadIntent } from '@workbench/launchpad/intents';
 
 import type { WorkbenchSearch } from './projects/session';
 
@@ -20,6 +21,15 @@ const HydratedSessionController = ({ search }: { search: WorkbenchSearch }) => {
 
   useMountEffect(() => {
     if (search.new === true) {
+      // Arrange the fresh draft before the search is stripped, so the intent
+      // applies exactly once and never survives into a later navigation.
+      const intent = resolveLaunchpadIntent(search.intent);
+
+      if (intent) {
+        commands.layout.applyPreset(intent.presetId);
+        commands.generation.setSource(intent.sourceId);
+      }
+
       void navigate({ replace: true, search: {}, to: '/app' });
       return;
     }
@@ -72,5 +82,10 @@ export const WorkbenchSessionController = ({ search }: { search: WorkbenchSearch
     return null;
   }
 
-  return <HydratedSessionController key={`${search.new === true}:${search.project ?? ''}`} search={search} />;
+  return (
+    <HydratedSessionController
+      key={`${search.new === true}:${search.project ?? ''}:${search.intent ?? ''}`}
+      search={search}
+    />
+  );
 };

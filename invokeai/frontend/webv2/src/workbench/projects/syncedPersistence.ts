@@ -789,7 +789,29 @@ export const createSyncedWorkbenchPersistence = (
 
           // A cache holding an empty session (last tab closed offline) cannot
           // hydrate the editor; boot a fresh draft instead.
-          return local && local.state.projects.length > 0 ? local : null;
+          if (!local || local.state.projects.length === 0) {
+            return null;
+          }
+
+          // `?new=true` means a fresh draft whether or not the backend answered.
+          // Returning the cache verbatim here used to hand the caller whichever
+          // project was last active, so an offline "New project" silently
+          // reopened — and then let the Launchpad's intent rearrange — existing
+          // work.
+          if (options?.createNew) {
+            const draft = createDraftProject(local.state.projects);
+
+            return {
+              ...local,
+              state: {
+                ...local.state,
+                activeProjectId: draft.id,
+                projects: [...local.state.projects, draft],
+              },
+            };
+          }
+
+          return local;
         }
       })();
 

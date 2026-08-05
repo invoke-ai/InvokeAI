@@ -34,7 +34,9 @@ export const SourceListItem = ({
         {badges}
       </HStack>
       {description ? (
-        <Text color="fg.subtle" fontSize="2xs" lineClamp={2}>
+        // `fg.subtle` at this size only reaches 3.56:1 on the panel surface,
+        // short of WCAG AA. `fg.muted` clears 4.5:1.
+        <Text color="fg.muted" fontSize="2xs" lineClamp={2}>
           {description}
         </Text>
       ) : null}
