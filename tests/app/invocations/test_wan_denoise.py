@@ -22,7 +22,11 @@ import torch.nn as nn
 
 from invokeai.app.invocations.fields import ImageField, LatentsField, WanConditioningField, WanRefImageConditioningField
 from invokeai.app.invocations.model import ModelIdentifierField, VAEField, WanTransformerField
-from invokeai.app.invocations.wan_denoise import WanDenoiseInvocation
+from invokeai.app.invocations.wan_denoise import (
+    WanDenoiseInvocation,
+    _ExpertSwapper,
+    _get_wan_transformer_working_mem_bytes,
+)
 from invokeai.app.invocations.wan_ref_image_encoder import WanRefImageEncoderInvocation
 from invokeai.app.invocations.wan_video_denoise import WanVideoDenoiseInvocation
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, WanVariantType
@@ -259,6 +263,51 @@ class TestWanDenoiseShapes:
 
         # Step callback invoked once per step.
         assert ctx.util.sd_step_callback.call_count == 4
+
+    def test_memory_optimization_reserves_vram_for_streamed_transformer_weights(self, monkeypatch) -> None:
+        total_vram = 24 * 2**30
+        monkeypatch.setattr(
+            torch.cuda,
+            "get_device_properties",
+            lambda _device: MagicMock(total_memory=total_vram),
+        )
+
+        working_mem_bytes = _get_wan_transformer_working_mem_bytes(torch.device("cuda"), enabled=True)
+
+        assert working_mem_bytes == 22 * 2**30
+
+    def test_memory_optimization_does_not_change_cpu_or_disabled_loading(self) -> None:
+        assert _get_wan_transformer_working_mem_bytes(torch.device("cpu"), enabled=True) is None
+        assert _get_wan_transformer_working_mem_bytes(torch.device("cuda"), enabled=False) is None
+
+    def test_expert_swapper_passes_aggressive_working_memory_to_model_cache(self) -> None:
+        transformer = _ZeroTransformer()
+        loaded = MagicMock()
+        cached_model = MagicMock()
+        cached_model.cur_vram_bytes.return_value = 5 * 2**30
+        loaded._cache_record.cached_model = cached_model
+        device_context = MagicMock()
+        device_context.__enter__.return_value = (None, transformer)
+        loaded.model_on_device.return_value = device_context
+        context = MagicMock()
+        context.models.load.return_value = loaded
+        working_mem_bytes = 22 * 2**30
+        swapper = _ExpertSwapper(
+            context=context,
+            high_model=MagicMock(),
+            low_model=None,
+            inference_dtype=torch.bfloat16,
+            working_mem_bytes=working_mem_bytes,
+            max_resident_model_bytes=2 * 2**30,
+        )
+
+        try:
+            assert swapper.get(_ExpertSwapper.HIGH) is transformer
+        finally:
+            swapper.close()
+
+        loaded.model_on_device.assert_called_once_with(working_mem_bytes=working_mem_bytes)
+        cached_model.partial_unload_from_vram.assert_called_once_with(3 * 2**30, keep_required_weights_in_vram=True)
 
     def test_cfg_doubles_transformer_calls(self, fake_model_root) -> None:
         """With cfg_scale != 1.0 and a negative prompt, each step runs the model twice."""

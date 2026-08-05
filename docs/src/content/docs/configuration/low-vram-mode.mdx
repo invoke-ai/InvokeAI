@@ -51,7 +51,7 @@ Wan video generation has an additional opt-in memory optimization:
 wan_memory_optimization: true
 ```
 
-This chunks pointwise transformer activations, compacts TI2V per-token timestep conditioning, and streams untiled VAE decode chunks directly to MP4. It reduces peak VRAM during both denoise and decode, but generation is slower. Spatially tiled VAE decode continues to use its existing full-tile path.
+This limits resident Wan transformer weights to about 2 GiB and streams remaining layers from RAM. It also chunks pointwise transformer activations, compacts TI2V per-token timestep conditioning, and streams untiled VAE decode chunks directly to MP4. It reduces peak VRAM during both denoise and decode, but generation can be substantially slower and requires enough system RAM for offloaded weights. Spatially tiled VAE decode continues to use its existing full-tile path.
 
 ### Partial model loading
 
