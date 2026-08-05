@@ -1,11 +1,17 @@
 import { mapWithConcurrency } from '@platform/core/concurrency';
-import { collectLiveAssetRefs, selectCoverImageName } from '@workbench/projects/projectAssets';
+import { collectLiveAssetRefs, selectCoverImageName, stripGallerySelection } from '@workbench/projects/projectAssets';
 
 import type { InvkArchiveEntry } from './archive';
 import type { FetchedThumbnail } from './assetTransport';
 
 import { binaryEntry, textEntry, writeArchive } from './archive';
-import { coverExtensionForMime, fetchImageBytes, fetchImageThumbnail, fetchVideoBytes } from './assetTransport';
+import {
+  coverExtensionForMime,
+  fetchImageBytes,
+  fetchImageThumbnail,
+  fetchVideoBytes,
+  isRequestCancellation,
+} from './assetTransport';
 import { INVK_DOCUMENT_ENTRY, INVK_IMAGES_PREFIX, INVK_MANIFEST_ENTRY, INVK_VIDEOS_PREFIX } from './format';
 import { buildInvkManifest, toInvkFileName } from './manifest';
 
@@ -25,6 +31,12 @@ import { buildInvkManifest, toInvkFileName } from './manifest';
  * fatal. Half a project's pixels beats none, and the reference survives in the
  * document either way — importing onto the machine that still has the image
  * resolves it.
+ *
+ * Cancellation is the one failure that is *not* a skip. An aborted signal makes
+ * every asset unservable at once, and skipping all of them would pack an archive
+ * of nothing and hand it to the browser as a finished download. So a cancelled
+ * request propagates, and the signal is checked once more before the archive is
+ * written — nothing reaches the disk after the export stopped being wanted.
  */
 
 /** Simultaneous asset fetches. Matches the previous frontend's limit. */
@@ -52,13 +64,18 @@ export const planInvkExport = (input: {
 }): InvkExportPlan => {
   const sourceProjectId = typeof input.projectDocument.id === 'string' ? input.projectDocument.id : undefined;
 
-  const refs = collectLiveAssetRefs(input.projectDocument);
+  // The selection is dropped here rather than left to the collector's skip
+  // list: not bundling a reference does not stop it travelling, it only stops
+  // it arriving with pixels. The planner is where "what belongs in a project
+  // file" is decided, so it is where the answer is applied.
+  const projectDocument = stripGallerySelection(input.projectDocument);
+  const refs = collectLiveAssetRefs(projectDocument);
 
   return {
-    coverImageName: selectCoverImageName(input.projectDocument),
+    coverImageName: selectCoverImageName(projectDocument),
     // Compact rather than indented: the document is machine-read, and the two
     // bytes per line would be the largest entry in the archive before deflate.
-    documentJson: JSON.stringify(input.projectDocument),
+    documentJson: JSON.stringify(projectDocument),
     fileName: toInvkFileName(input.name),
     imageNames: [...refs.images].sort(),
     manifestInput: {
@@ -105,8 +122,21 @@ export const executeInvkExport = async (plan: InvkExportPlan, deps: InvkExportDe
   let bundledVideoCount = 0;
   let completed = 0;
 
+  /** Unservable is `null`; cancelled rethrows. */
+  const skipUnservable = async <T>(read: () => Promise<T | null>): Promise<T | null> => {
+    try {
+      return await read();
+    } catch (error) {
+      if (isRequestCancellation(error)) {
+        throw error;
+      }
+
+      return null;
+    }
+  };
+
   const cover =
-    plan.coverImageName === null ? null : await readThumbnail(plan.coverImageName, deps.signal).catch(() => null);
+    plan.coverImageName === null ? null : await skipUnservable(() => readThumbnail(plan.coverImageName!, deps.signal));
   const coverEntryName = cover === null ? undefined : `cover.${coverExtensionForMime(cover.contentType)}`;
 
   // One queue over both kinds: the concurrency limit is there to be kind to the
@@ -117,8 +147,8 @@ export const executeInvkExport = async (plan: InvkExportPlan, deps: InvkExportDe
   ];
 
   await mapWithConcurrency(assets, ASSET_FETCH_CONCURRENCY, async ({ kind, name }) => {
-    const bytes = await (kind === 'image' ? readImage(name, deps.signal) : readVideo(name, deps.signal)).catch(
-      () => null
+    const bytes = await skipUnservable(() =>
+      kind === 'image' ? readImage(name, deps.signal) : readVideo(name, deps.signal)
     );
 
     completed += 1;
@@ -140,6 +170,11 @@ export const executeInvkExport = async (plan: InvkExportPlan, deps: InvkExportDe
     bundledVideoCount += 1;
     entries.set(`${INVK_VIDEOS_PREFIX}${name}`, binaryEntry(bytes));
   });
+
+  // The last fetch may have completed just as the export stopped being wanted;
+  // no fetch would have rejected in that window, and packing is the expensive
+  // step that precedes handing a file to the browser.
+  deps.signal?.throwIfAborted();
 
   deps.onProgress?.({ completed: assets.length, phase: 'packing', total: assets.length });
 

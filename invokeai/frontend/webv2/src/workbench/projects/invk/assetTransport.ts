@@ -1,5 +1,5 @@
 import { mapWithConcurrency } from '@platform/core/concurrency';
-import { apiFetch, apiFetchJson, apiFetchRaw } from '@platform/transport/http';
+import { apiFetch, apiFetchJson, apiFetchRaw, HttpRequestIdentityExpiredError } from '@platform/transport/http';
 
 /**
  * The asset half of a project file: pulling referenced bytes off the server on
@@ -32,6 +32,20 @@ import { apiFetch, apiFetchJson, apiFetchRaw } from '@platform/transport/http';
 
 const IMAGES_BASE = '/api/v1/images';
 const VIDEOS_BASE = '/api/v1/videos';
+
+/**
+ * Whether a failed request means "the work this belonged to is over" rather
+ * than "this one asset could not be served".
+ *
+ * Export treats an unservable asset as a skip, which is right — half a
+ * project's pixels beats none. But an aborted signal makes *every* asset
+ * unservable, and a skip-everything export writes an archive full of nothing
+ * and hands it to the browser as though it had succeeded. The two have to be
+ * told apart at the point the request fails, because by the time the archive is
+ * packed they look identical.
+ */
+export const isRequestCancellation = (error: unknown): boolean =>
+  error instanceof HttpRequestIdentityExpiredError || (error instanceof Error && error.name === 'AbortError');
 
 /**
  * Names per existence request. The endpoint answers any length, but a URL-free
@@ -219,21 +233,40 @@ const EXTENSION_BY_MIME: Readonly<Record<string, string>> = {
 export const coverExtensionForMime = (contentType: string): string =>
   EXTENSION_BY_MIME[contentType.split(';')[0]!.trim().toLowerCase()] ?? 'png';
 
-const MIME_BY_EXTENSION: Readonly<Record<string, string>> = {
+const IMAGE_MIME_BY_EXTENSION: Readonly<Record<string, string>> = {
   jpeg: 'image/jpeg',
   jpg: 'image/jpeg',
-  mkv: 'video/x-matroska',
-  mov: 'video/quicktime',
-  mp4: 'video/mp4',
   png: 'image/png',
-  webm: 'video/webm',
   webp: 'image/webp',
 };
 
 /**
- * Best guess at a bundled entry's MIME type, from its name. Only ever a hint for
- * the upload's multipart part — the entry's folder already decided its kind, so
- * an unrecognized extension falling back to PNG cannot misroute a video.
+ * Only MP4 survives the backend's upload path — it probes the container and
+ * 415s anything else (`_is_mp4_file` in `videos.py`) — so this is a table of
+ * what a bundled entry might be *named*, not of what will be accepted.
  */
-export const mimeForEntryName = (entryName: string): string =>
-  MIME_BY_EXTENSION[entryName.split('.').pop()?.toLowerCase() ?? ''] ?? 'image/png';
+const VIDEO_MIME_BY_EXTENSION: Readonly<Record<string, string>> = {
+  m4v: 'video/mp4',
+  mkv: 'video/x-matroska',
+  mov: 'video/quicktime',
+  mp4: 'video/mp4',
+  webm: 'video/webm',
+};
+
+/**
+ * Best guess at a bundled entry's MIME type, from its name and the folder it
+ * came out of. Only ever a hint for the upload's multipart part.
+ *
+ * The fallback is per kind because the receiving endpoint checks it. A video
+ * whose extension is not in the table falling back to `image/png` would be
+ * announced to `/videos/upload` as an image and refused before its bytes were
+ * ever read — the entry's folder already established what it is, so the guess
+ * should never contradict it.
+ */
+export const mimeForEntryName = (entryName: string, kind: 'image' | 'video' = 'image'): string => {
+  const extension = entryName.split('.').pop()?.toLowerCase() ?? '';
+
+  return kind === 'video'
+    ? (VIDEO_MIME_BY_EXTENSION[extension] ?? 'video/mp4')
+    : (IMAGE_MIME_BY_EXTENSION[extension] ?? 'image/png');
+};

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { collectLiveAssetRefs, remapAssetRefs, selectCoverImageName } from './projectAssets';
+import { collectLiveAssetRefs, remapAssetRefs, selectCoverImageName, stripGallerySelection } from './projectAssets';
 
 /**
  * The walker's contract, stated as documents rather than as paths: what an
@@ -199,6 +199,59 @@ describe('collectLiveAssetRefs', () => {
     );
 
     expect(images.has('selected.png')).toBe(false);
+  });
+});
+
+/**
+ * Not bundling the selection is only half of leaving it behind. A reference
+ * that is skipped by the collector but left in the document still travels —
+ * broken, and invisible to the restore pass that would otherwise report it as
+ * dangling.
+ */
+describe('stripGallerySelection', () => {
+  it('drops every selection key at any depth', () => {
+    const stripped = stripGallerySelection({
+      widgetInstances: {
+        'gallery-1': {
+          state: {
+            values: {
+              recentImages: [{ ...imageRef('recent.png'), imageUrl: '' }],
+              selectedImage: { imageName: 'selected.png', kind: 'image' },
+              selectedImageName: 'image:selected.png',
+              selectedImageNames: ['image:selected.png'],
+            },
+          },
+          typeId: 'gallery',
+        },
+        'preview-1': {
+          state: { values: { compareImage: { ...imageRef('compare.png'), imageUrl: '' } } },
+          typeId: 'preview',
+        },
+      },
+    });
+
+    expect(JSON.stringify(stripped)).not.toContain('selected.png');
+    expect(JSON.stringify(stripped)).not.toContain('compare.png');
+    // History is not selection: those references travel deliberately.
+    expect(JSON.stringify(stripped)).toContain('recent.png');
+  });
+
+  it('leaves a document with no selection identical', () => {
+    const document = { canvas: { document: { layers: [imageLayer('l1', 'a.png')] } }, id: 'p1' };
+
+    expect(stripGallerySelection(document)).toBe(document);
+  });
+
+  it('keeps the surrounding widget state intact', () => {
+    const stripped = stripGallerySelection({
+      widgetInstances: {
+        'gallery-1': { state: { values: { boardId: 'b1', selectedImageName: 'image:x.png' } }, typeId: 'gallery' },
+      },
+    });
+
+    expect(stripped).toEqual({
+      widgetInstances: { 'gallery-1': { state: { values: { boardId: 'b1' } }, typeId: 'gallery' } },
+    });
   });
 });
 

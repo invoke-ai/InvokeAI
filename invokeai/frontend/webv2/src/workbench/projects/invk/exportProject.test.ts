@@ -49,6 +49,31 @@ describe('planInvkExport', () => {
     expect(planInvkExport(planInput)).toEqual(planInvkExport(planInput));
   });
 
+  /**
+   * The selection was already excluded from bundling; this is the other half —
+   * it must not reach the archive at all, or the imported project opens
+   * pointing at images the receiving server has never had.
+   */
+  it('writes a document carrying no gallery selection', () => {
+    const plan = planInvkExport({
+      ...planInput,
+      projectDocument: {
+        ...projectDocument(),
+        widgetInstances: {
+          'gallery-1': {
+            state: { values: { selectedImageName: 'image:selected.png', selectedImageNames: ['image:selected.png'] } },
+            typeId: 'gallery',
+          },
+          'preview-1': { state: { values: { compareImage: imageRef('compare.png') } }, typeId: 'preview' },
+        },
+      },
+    });
+
+    expect(plan.documentJson).not.toContain('selected.png');
+    expect(plan.documentJson).not.toContain('compare.png');
+    expect(plan.imageNames).toEqual(['live-a.png', 'live-b.png']);
+  });
+
   it('omits the source project id when the document has none', () => {
     const plan = planInvkExport({ ...planInput, projectDocument: { canvas: {}, layout: {}, name: 'x' } });
 
@@ -183,6 +208,59 @@ describe('executeInvkExport', () => {
     });
 
     expect(result).toEqual({ bundledImageCount: 2, bundledVideoCount: 0, missingAssetNames: ['clip.mp4'] });
+  });
+
+  /**
+   * A cancelled export must not look like a successful one. Every fetch fails
+   * when the signal aborts, so treating those as "the server would not serve
+   * it" would pack an archive holding nothing and download it.
+   */
+  it('rejects rather than downloading an archive when the fetches are aborted', async () => {
+    const download = vi.fn();
+    const abort = () => Promise.reject(new DOMException('The operation was aborted.', 'AbortError'));
+
+    await expect(
+      executeInvkExport(planInvkExport(planInput), {
+        download,
+        fetchImageBytes: abort,
+        fetchImageThumbnail: abort,
+      })
+    ).rejects.toMatchObject({ name: 'AbortError' });
+
+    expect(download).not.toHaveBeenCalled();
+  });
+
+  it('rejects when the signal aborts after the last fetch but before packing', async () => {
+    const download = vi.fn();
+    const controller = new AbortController();
+
+    await expect(
+      executeInvkExport(planInvkExport(planInput), {
+        download,
+        fetchImageBytes: (imageName) => {
+          controller.abort();
+
+          return Promise.resolve(bytesFor(imageName));
+        },
+        fetchImageThumbnail: () => Promise.resolve(null),
+        signal: controller.signal,
+      })
+    ).rejects.toMatchObject({ name: 'AbortError' });
+
+    expect(download).not.toHaveBeenCalled();
+  });
+
+  it('still treats an unservable asset as a skip, not a cancellation', async () => {
+    const download = vi.fn();
+    const result = await executeInvkExport(planInvkExport(planInput), {
+      download,
+      fetchImageBytes: (imageName) =>
+        imageName === 'live-a.png' ? Promise.reject(new Error('500')) : Promise.resolve(bytesFor(imageName)),
+      fetchImageThumbnail: () => Promise.resolve(null),
+    });
+
+    expect(result.missingAssetNames).toEqual(['live-a.png']);
+    expect(download).toHaveBeenCalledTimes(1);
   });
 
   it('reports progress through bundling and packing', async () => {

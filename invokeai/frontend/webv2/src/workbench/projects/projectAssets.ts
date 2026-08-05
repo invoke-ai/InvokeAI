@@ -69,6 +69,13 @@ export const PROJECT_HISTORY_KEYS: ReadonlySet<string> = new Set(['recentImages'
  * that arrives on another machine should open with nothing selected, not drag a
  * stranger's gallery in behind it.
  *
+ * Skipping them during collection is only half of that. A reference that is not
+ * bundled and not stripped still travels — it simply travels broken, pointing at
+ * an image the receiving server has never had, and import cannot even report it
+ * as dangling because the same skip hides it from the restore pass.
+ * {@link stripGallerySelection} is the other half, and the export planner
+ * applies it before the document is serialized.
+ *
  * The two halves got here differently, which is why the skip is by key rather
  * than left to chance. `selectedImage` and the name keys were already missed,
  * but only because `GalleryItem` spells its name field `name` and no collector
@@ -144,6 +151,55 @@ export const collectLiveAssetRefs = (projectDocument: Record<string, unknown>): 
 
   return refs;
 };
+
+const stripNode = (node: unknown): unknown => {
+  if (Array.isArray(node)) {
+    let hasChanged = false;
+    const next = node.map((item) => {
+      const stripped = stripNode(item);
+
+      hasChanged ||= stripped !== item;
+
+      return stripped;
+    });
+
+    return hasChanged ? next : node;
+  }
+
+  if (!isRecord(node)) {
+    return node;
+  }
+
+  let hasChanged = false;
+  const next: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(node)) {
+    if (GALLERY_SELECTION_KEYS.has(key)) {
+      hasChanged = true;
+      continue;
+    }
+
+    const stripped = stripNode(value);
+
+    next[key] = stripped;
+    hasChanged ||= stripped !== value;
+  }
+
+  return hasChanged ? next : node;
+};
+
+/**
+ * Drop the gallery's selection keys at every depth, so an exported project
+ * opens with nothing selected rather than with pointers into the exporting
+ * install's gallery.
+ *
+ * Every reader of these values already tolerates their absence — selection is
+ * parsed with `typeof`/`Array.isArray` guards and falls back to nothing — so
+ * removing the key is the same as clearing it, without inventing a shape.
+ * Subtrees with nothing to drop keep their identity.
+ */
+export const stripGallerySelection = (projectDocument: Record<string, unknown>): Record<string, unknown> =>
+  stripNode(projectDocument) as Record<string, unknown>;
 
 export interface ProjectAssetMappings {
   images: ReadonlyMap<string, string>;
