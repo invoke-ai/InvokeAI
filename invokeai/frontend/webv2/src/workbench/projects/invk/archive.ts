@@ -110,6 +110,10 @@ export const writeArchive = async (entries: InvkArchiveEntries): Promise<Blob> =
     });
   });
 
+  if (packed.byteLength > INVK_MAX_ARCHIVE_BYTES) {
+    throw new InvkFormatError('too-large', `Project archive would be ${packed.byteLength} bytes.`);
+  }
+
   return new Blob([packed as BlobPart], { type: INVK_MIME_TYPE });
 };
 

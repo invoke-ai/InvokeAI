@@ -4,7 +4,7 @@ import { collectLiveAssetRefs, selectCoverImageName } from '@workbench/projects/
 import type { UploadedImage, UploadedVideo } from './assetTransport';
 import type { InvkManifest } from './manifest';
 
-import { readArchive, readEntryText } from './archive';
+import { INVK_MAX_ARCHIVE_BYTES, readArchive, readEntryText } from './archive';
 import {
   findExistingImageNames,
   findExistingVideoNames,
@@ -72,6 +72,10 @@ const parseDocumentEntry = (bytes: Uint8Array): Record<string, unknown> => {
 
 /** Unpack and validate an archive. Throws {@link InvkFormatError} and nothing else. */
 export const readInvkArchive = async (file: File): Promise<InvkArchiveContents> => {
+  if (file.size > INVK_MAX_ARCHIVE_BYTES) {
+    throw new InvkFormatError('too-large', `Project archive is ${file.size} bytes.`);
+  }
+
   const entries = await readArchive(new Uint8Array(await file.arrayBuffer()));
   const manifestEntry = entries.get(INVK_MANIFEST_ENTRY);
 

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { binaryEntry, textEntry, writeArchive } from './archive';
+import { binaryEntry, INVK_MAX_ARCHIVE_BYTES, textEntry, writeArchive } from './archive';
 import { InvkFormatError } from './format';
 import { readInvkArchive, restoreArchiveAssets } from './importProject';
 
@@ -44,6 +44,14 @@ const validArchive = (overrides: Record<string, string | Uint8Array> = {}) =>
   });
 
 describe('readInvkArchive', () => {
+  it('refuses an oversized file before allocating its bytes', async () => {
+    const arrayBuffer = vi.fn(() => Promise.resolve(new ArrayBuffer(0)));
+    const file = { arrayBuffer, size: INVK_MAX_ARCHIVE_BYTES + 1 } as unknown as File;
+
+    await expect(readInvkArchive(file)).rejects.toMatchObject({ reason: 'too-large' });
+    expect(arrayBuffer).not.toHaveBeenCalled();
+  });
+
   it('returns the manifest, document and bundled images', async () => {
     const contents = await readInvkArchive(await validArchive());
 
