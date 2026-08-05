@@ -59,7 +59,6 @@ export const buildErnieImageGraph = async (arg: GraphBuilderArg): Promise<GraphB
   const posCond = g.addNode({
     type: 'ernie_image_text_encoder',
     id: getPrefixedId('pos_prompt'),
-    use_prompt_enhancer: usePromptEnhancer,
   });
 
   let negCond: Invocation<'ernie_image_text_encoder'> | null = null;
@@ -68,8 +67,18 @@ export const buildErnieImageGraph = async (arg: GraphBuilderArg): Promise<GraphB
       type: 'ernie_image_text_encoder',
       id: getPrefixedId('neg_prompt'),
       prompt: prompts.negative ?? '',
-      // Negative prompt should not be PE-enhanced.
-      use_prompt_enhancer: false,
+    });
+  }
+
+  // The enhancer is its own node so that it stays on the session's GPU: it samples an
+  // autoregressive rewrite on every generation, which is far too long to hold a borrowed idle GPU
+  // for, whereas the encoders it feeds are `idle_gpu_offloadable`. Only the positive prompt goes
+  // through it -- the negative encoder takes its prompt as a literal field, unenhanced.
+  let promptEnhancer: Invocation<'ernie_image_prompt_enhancer'> | null = null;
+  if (usePromptEnhancer) {
+    promptEnhancer = g.addNode({
+      type: 'ernie_image_prompt_enhancer',
+      id: getPrefixedId('prompt_enhancer'),
     });
   }
 
@@ -96,12 +105,16 @@ export const buildErnieImageGraph = async (arg: GraphBuilderArg): Promise<GraphB
   g.addEdge(modelLoader, 'text_encoder', posCond, 'text_encoder');
   g.addEdge(modelLoader, 'vae', l2i, 'vae');
 
-  // Optional prompt-enhancer wiring (only if the loader emits one and the toggle is on)
-  if (usePromptEnhancer) {
-    g.addEdge(modelLoader, 'prompt_enhancer', posCond, 'prompt_enhancer');
+  // Optional prompt-enhancer wiring (only if the loader emits one and the toggle is on). The
+  // enhancer sits between the prompt node and the encoder; without it the prompt goes straight in.
+  if (promptEnhancer !== null) {
+    g.addEdge(modelLoader, 'prompt_enhancer', promptEnhancer, 'prompt_enhancer');
+    g.addEdge(positivePrompt, 'value', promptEnhancer, 'prompt');
+    g.addEdge(promptEnhancer, 'value', posCond, 'prompt');
+  } else {
+    g.addEdge(positivePrompt, 'value', posCond, 'prompt');
   }
 
-  g.addEdge(positivePrompt, 'value', posCond, 'prompt');
   g.addEdge(posCond, 'conditioning', denoise, 'positive_conditioning');
 
   if (negCond !== null) {
@@ -141,9 +154,11 @@ export const buildErnieImageGraph = async (arg: GraphBuilderArg): Promise<GraphB
   // ratio, so it needs the real dimensions rather than the node's 1024x1024 defaults. Use the
   // *original* size: with canvas scaling active the denoise node carries the intermediate render
   // size, but what the user ends up looking at is the original.
-  const { originalSize } = getOriginalAndScaledSizesForTextToImage(state);
-  posCond.pe_width = originalSize.width;
-  posCond.pe_height = originalSize.height;
+  if (promptEnhancer !== null) {
+    const { originalSize } = getOriginalAndScaledSizesForTextToImage(state);
+    promptEnhancer.width = originalSize.width;
+    promptEnhancer.height = originalSize.height;
+  }
 
   if (state.system.shouldUseNSFWChecker) {
     canvasOutput = addNSFWChecker(g, canvasOutput);

@@ -622,7 +622,7 @@ class LatentsMetaOutput(LatentsOutput, MetadataOutput):
     title=f"{DenoiseLatentsInvocation.UIConfig.title} + Metadata",
     tags=["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
     category="metadata",
-    version="1.1.1",
+    version="1.2.0",
 )
 class DenoiseLatentsMetaInvocation(DenoiseLatentsInvocation, WithMetadata):
     def invoke(self, context: InvocationContext) -> LatentsMetaOutput:
@@ -661,6 +661,11 @@ class DenoiseLatentsMetaInvocation(DenoiseLatentsInvocation, WithMetadata):
         md.update({"denoising_end": self.denoising_end})
         md.update({"scheduler": self.scheduler})
         md.update({"model": self.unet.unet})
+        md.update({"hidiffusion": self.hidiffusion})
+        md.update({"hidiffusion_raunet": self.hidiffusion_raunet})
+        md.update({"hidiffusion_window_attn": self.hidiffusion_window_attn})
+        md.update({"hidiffusion_t1_ratio": self.hidiffusion_t1_ratio})
+        md.update({"hidiffusion_t2_ratio": self.hidiffusion_t2_ratio})
         if isinstance(self.control, ControlField) or (isinstance(self.control, list) and len(self.control) > 0):
             md.update({"controlnets": _to_json(self.control)})
         if isinstance(self.ip_adapter, IPAdapterField) or (
