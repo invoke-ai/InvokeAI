@@ -18,6 +18,7 @@ describe('shouldShowStandardScheduler', () => {
     'cogview4',
     'z-image',
     'qwen-image',
+    'ernie-image',
     'anima',
     'krea-2',
     'ideogram-4',
