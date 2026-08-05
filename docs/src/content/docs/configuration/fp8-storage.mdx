@@ -1,5 +1,5 @@
 ---
-title: FP8 Storage
+title: FP8 Storage & Compute
 sidebar:
   order: 3
 ---
@@ -29,9 +29,9 @@ InvokeAI's FP8 path stores weights in FP8 and casts them back to BF16/FP16 on ea
 
 The toggle works as advertised: the UNet / transformer drops by roughly 50% on the GPU. Per-step latency is the same or marginally slower because every forward pass adds an FP8 → BF16 cast on entry and a BF16 → FP8 cast on exit. This is the **largest target group**: 3090 owners squeezing FLUX into 24 GB benefit the most.
 
-### RTX 40-series, RTX 50-series, and Hopper — VRAM win today, compute win possible later
+### RTX 40-series, RTX 50-series, and Hopper — VRAM win, plus a compute win via a separate setting
 
-These GPUs have native FP8 tensor cores. The toggle still buys you the same ~50% VRAM reduction today, because the forward pass still runs in BF16 — the hook casts weights back up to compute precision before each layer. If InvokeAI later wires up a true FP8 matmul path (e.g. via `torchao`), the same toggle will *also* unlock compute speedups on this hardware. Until then, treat the benefit as "VRAM only, same as Ampere".
+These GPUs have native FP8 tensor cores. FP8 *Storage* on its own still only buys the ~50% VRAM reduction, because the forward pass runs in BF16 — the hook casts weights back up to compute precision before each layer. To actually use the tensor cores you need the separate [FP8 Compute](#fp8-compute) setting, which applies to checkpoints that ship pre-quantized ("scaled fp8") rather than to full-precision ones.
 
 ### Older CUDA cards — still a VRAM win
 
@@ -90,9 +90,37 @@ If you see unexpected quality regressions, disable FP8 Storage on the affected m
 
 ## Combining with Low-VRAM mode
 
-**FP8 + partial loading**: fully supported. FP8 Storage shrinks the layers; partial loading streams them between RAM and VRAM as needed. Use both on tight VRAM budgets.
+**FP8 Storage + partial loading**: fully supported. FP8 Storage shrinks the layers; partial loading streams them between RAM and VRAM as needed. Use both on tight VRAM budgets.
+
+**FP8 Compute + partial loading** is a different story — it still works, but it costs both speed and reproducibility. See [FP8 Compute](#fp8-compute) below.
 
 (For why FP8 Storage doesn't stack on top of GGUF / NF4 / int8 checkpoints, see the callout at the top of this page.)
+
+## FP8 Compute
+
+Everything above describes FP8 *Storage*: a per-model toggle that changes how weights are **stored**, while the math still runs in BF16. `fp8_compute` is a separate, global setting in `invokeai.yaml` that changes how they are **multiplied** — ComfyUI "scaled fp8" checkpoints stay quantized and their matmuls run on the FP8 tensor cores via `torch._scaled_mm`, instead of being dequantized at load time.
+
+It needs an Ada (SM 8.9) or newer NVIDIA GPU and falls back to the dequantized path automatically on anything older. It applies to checkpoints that already ship quantized; FP8 Storage is the toggle for full-precision ones.
+
+:::danger[Reproducibility requires the model to be fully in VRAM]
+With `fp8_compute` enabled, **the same seed only reproduces the same image if the model is 100% resident in VRAM.**
+
+The FP8 matmul needs both operands on the same device, so a layer whose weights are still in RAM cannot use it and silently falls back to the dequantized BF16 path. That fallback is numerically different — and *which* layers it hits depends on how much of the model happened to fit at that moment, which shifts between runs as VRAM pressure changes.
+
+Measured on a 24 GB card with a ~12 GB transformer sitting at 88–95% residency: two runs with an identical seed and identical settings differed in **98.7% of all pixels**. With the model fully resident, repeated runs were **bit-identical**.
+
+A *constant* residency fraction would in principle be reproducible too, but nothing guarantees one in practice — other resident models, per-node working-memory reservations and allocator state all move the line between runs.
+
+To get repeatable output, check the model's load line in the log for `VRAM: … (100.0%)`. If it is below that, free up VRAM (lower resolution, fewer resident models, a smaller text encoder) or set `enable_partial_loading: false`.
+:::
+
+Keeping the model fully resident is worth it for speed as well: on the same 24 GB card, streaming the last 5–12% of the transformer over PCIe cost **+47% per step** (1.03 → 1.51 s/it at 1024², 8 steps).
+
+### Layers the checkpoint marks as full-precision
+
+Some scaled-fp8 checkpoints mark individual layers with `full_precision_matrix_mult`, meaning the producer measured them as unsafe to multiply in FP8. InvokeAI honors those markers by default, which means those layers dequantize on every forward instead of using the tensor cores. On checkpoints that mark many layers this can cost a large part of the FP8 Compute speedup.
+
+`fp8_compute_full_precision_hints: false` overrides the markers and runs every quantized layer on the tensor cores. It is faster, but you are deliberately going against the checkpoint author's instruction — the marked layers were flagged as numerically sensitive, so compare output before settling on it.
 
 ## Troubleshooting
 

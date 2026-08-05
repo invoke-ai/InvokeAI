@@ -48054,7 +48054,7 @@
           "fp8_compute": {
             "type": "boolean",
             "title": "Fp8 Compute",
-            "description": "Keep ComfyUI 'scaled fp8' checkpoints quantized instead of dequantizing them at load, and run their matmuls on the fp8 tensor cores (requires an Ada/SM 8.9 or newer NVIDIA GPU; falls back automatically otherwise). Roughly halves the transformer's VRAM and speeds up denoising, but quantizes activations as well, so images will differ from previous versions at the same seed.",
+            "description": "Keep ComfyUI 'scaled fp8' checkpoints quantized instead of dequantizing them at load, and run their matmuls on the fp8 tensor cores (requires an Ada/SM 8.9 or newer NVIDIA GPU; falls back automatically otherwise). Roughly halves the transformer's VRAM and speeds up denoising, but quantizes activations as well, so images will differ from previous versions at the same seed. Reproducibility also requires the model to be FULLY resident in VRAM: a layer whose weights are still in RAM falls back to the dequantized path, and since which layers are resident shifts from run to run, the same seed then yields visibly different images. For repeatable output, ensure the model loads at 100% (e.g. enable_partial_loading=false with enough free VRAM).",
             "default": false
           },
           "fp8_compute_full_precision_hints": {
