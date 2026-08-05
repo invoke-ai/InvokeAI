@@ -377,7 +377,7 @@ export const executeProjectFileJourney = async ({
         }
       );
     });
-  const acquire = async (label, create, dispose, assign) => {
+  const acquire = (label, create, dispose, assign) => {
     const acquisition = trackOperation(
       Promise.resolve()
         .then(() => create({ signal: controller.signal, timeoutMs: remainingMs() }))

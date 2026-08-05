@@ -21,7 +21,7 @@ const createPreview = () => {
 const createSuccessfulDependencies = (events, overrides = {}) => {
   const preview = createPreview();
   const dependencies = {
-    createTempDirectory: async () => {
+    createTempDirectory: () => {
       events.push('temp:create');
       return '/tmp/project-file-journey-test';
     },
@@ -29,23 +29,23 @@ const createSuccessfulDependencies = (events, overrides = {}) => {
       events.push(`preview:${signal}`);
       queueMicrotask(() => preview.emit('exit', 0, signal));
     },
-    launchBrowser: async () => ({
-      close: async () => {
+    launchBrowser: () => ({
+      close: () => {
         events.push('browser:close');
       },
     }),
     now: () => performance.now(),
-    removeTempDirectory: async () => {
+    removeTempDirectory: () => {
       events.push('temp:remove');
     },
-    runRoundTrip: async () => ({ projectId: 'imported-project' }),
+    runRoundTrip: () => ({ projectId: 'imported-project' }),
     spawnPreview: () => preview,
-    startBackend: async () => ({
-      close: async () => {
+    startBackend: () => ({
+      close: () => {
         events.push('backend:close');
       },
     }),
-    waitForPreview: async () => undefined,
+    waitForPreview: () => undefined,
     ...overrides,
   };
 
@@ -60,7 +60,7 @@ test('the deadline starts before setup and disposes a backend that resolves afte
       await delay(25);
 
       return {
-        close: async () => {
+        close: () => {
           events.push('backend:close');
         },
       };
@@ -87,26 +87,26 @@ test('teardown attempts every owned resource and preserves the primary failure',
         queueMicrotask(() => preview.emit('exit', 0, signal));
       }
     },
-    launchBrowser: async () => ({
-      close: async () => {
+    launchBrowser: () => ({
+      close: () => {
         events.push('browser:close');
         throw new Error('browser cleanup failed');
       },
     }),
-    removeTempDirectory: async () => {
+    removeTempDirectory: () => {
       events.push('temp:remove');
     },
-    runRoundTrip: async ({ contexts }) => {
+    runRoundTrip: ({ contexts }) => {
       contexts.add({
-        close: async () => {
+        close: () => {
           events.push('context:close');
           throw new Error('context cleanup failed');
         },
       });
       throw new Error('primary journey failure');
     },
-    startBackend: async () => ({
-      close: async () => {
+    startBackend: () => ({
+      close: () => {
         events.push('backend:close');
         throw new Error('backend cleanup failed');
       },
@@ -151,8 +151,8 @@ test('a preview process error fails the journey and still tears down owned resou
 test('a browser error raised during teardown prevents a success result', async () => {
   const events = [];
   const { dependencies } = createSuccessfulDependencies(events, {
-    launchBrowser: async ({ errors }) => ({
-      close: async () => {
+    launchBrowser: ({ errors }) => ({
+      close: () => {
         events.push('browser:close');
         errors.push(new Error('late browser error'));
       },
