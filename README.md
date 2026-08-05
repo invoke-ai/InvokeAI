@@ -122,6 +122,7 @@ We very much thank the following sponsors:
 ### Power Users ($50/mo)
 
 * [mickr777](https://github.com/mickr777)
+* [Astroburner](https://github.com/Astroburner)
 
 ## Thanks
 
