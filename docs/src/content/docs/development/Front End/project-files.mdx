@@ -32,13 +32,15 @@ Which ones is decided by `collectLiveAssetRefs()` in `projects/projectAssets.ts`
 
 **The gallery selection is excluded, of either kind.** `selectedImage`, `selectedImageName`, `selectedImageNames` and `compareImage` are pointers into per-install gallery content, not things the document renders; a project arriving on another machine should open with nothing selected rather than drag a stranger's gallery in behind it.
 
+Exclusion is two things, not one. The collector skips those keys so their pixels are never bundled, and `stripGallerySelection()` removes them from the document before `planInvkExport()` serializes it. Skipping alone would not be enough: an unbundled reference still travels, it just travels broken — and because import collects with the same skip list, the restore pass cannot even report it as dangling. Every reader of these values already parses them with `typeof`/`Array.isArray` guards and falls back to no selection, so removing the key is the same as clearing it.
+
 The skip is by key on purpose, because the members got there differently. `selectedImage` and the name keys were already missed — `GalleryItem` spells its name field `name`, which no collector key matches — but that is an accident of naming that a rename would have undone. `compareImage` is a `GeneratedImageContract` carrying `imageName`, so it was genuinely being bundled until the exclusion became explicit.
 
 **History is excluded.** The walker skips the `queue`, `graphHistory` and `events` roots, and the `snapshot`, `snapshots` and `recentImages` keys at any depth. Every queue entry embeds a full canvas snapshot and the gallery widget keeps up to sixty recent results, so bundling all of it would turn a working project into a multi-gigabyte archive. References into history survive in the document and resolve on any install that still has those images.
 
 ## Loading
 
-`readInvkArchive()` unpacks and validates; `restoreArchiveImages()` puts the pixels back.
+`readInvkArchive()` unpacks and validates; `restoreArchiveAssets()` puts the pixels back.
 
 Restoration checks which referenced assets the server already has, uploads only the missing ones out of `images/` and `videos/`, and returns an old-to-new mapping **per kind** — the namespaces are separate, so a single flat map would let an image rewrite a video that happened to share its name. `remapAssetRefs()` then rewrites the document — the whole document this time, including the history the export left behind, so nothing keeps pointing at a pre-import name.
 
@@ -50,11 +52,23 @@ An asset that is neither on the server nor in the archive is reported as danglin
 
 **Import never overwrites.** The document always lands under a freshly minted project id, never the one in the file, so exchanging a project cannot collide and re-importing your own export cannot replace the original.
 
+**Cancellation is not a skip.** An unservable asset is skipped, but an aborted signal makes every asset unservable at once — so a cancelled export would otherwise pack an archive of nothing and hand it to the browser as a finished download. `isRequestCancellation()` tells the two apart where the request fails, and the signal is checked again before the archive is written.
+
+## Reporting
+
+A project file is the one operation here whose duration is set by how much someone has drawn: a few hundred full-resolution layers is a few hundred round trips and hundreds of megabytes. Every entry point runs through `useProjectFileActions.ts`, which owns the scope capture, the picker, the try/catch, and one live toast per operation (`projectFileToasts.ts`). Keeping the sequence in one place is what stops the five surfaces drifting — they already had, with the import sites checking the account scope before showing an error and the export sites not, so cancelling an export by signing out produced a toast written for a developer.
+
+Both directions can half-succeed: export skips assets the server will not serve, import leaves references dangling. Both are correct, and both are things the person holding the file needs to know before handing it to someone else — so a lossy run finishes as a warning naming the count, and only a clean run finishes as a plain success. An operation cancelled by the account going away has no verdict to show and dismisses its toast instead.
+
 ## Covers
 
 `ProjectSummary.coverUrl` comes from a per-user index in the client-state KV (`projects/covers.ts`), not from the archive and not from the document. The library lists projects through `GET /projects`, which returns summaries with no document, so deriving a cover there would mean fetching every project's document to render a page of thumbnails.
 
-The index is written whenever a project is serialized for a save, and on import from the archive's uploaded cover. It is an index and not a truth: a project saved by an older build has no entry and shows the folder glyph, which is also what a project that has produced nothing shows.
+The index is written whenever a project is serialized for a save, and on import. It is an index and not a truth: a project saved by an older build has no entry and shows the folder glyph, which is also what a project that has produced nothing shows.
+
+On import the cover prefers an image the restore already put on this server — the archive's `cover` entry is a thumbnail of an image the document also references, and the cover URL asks for a thumbnail anyway, so reusing it is the same picture without a second copy. The bundled bytes are the fallback for a cover whose source image is dangling. Uploading the entry unconditionally left one orphan per import: covers go up under the canvas's private `'other'` category, which appears in no gallery view and no board count, so nobody could find or delete them.
+
+**The whole index is one value, so a write must not precede a read.** `setClientStateValue` replaces the blob outright, so recording a cover from a store that has not loaded would delete every entry but that one — and autosave reaches `recordProjectCover()` from the editor, which loads the index only when the project switcher or the Open dialog opens. Anyone who reloads straight into a project and generates hits exactly that ordering. Records made before the load are held and applied on top of the server's answer once it arrives. A read that *fails* is not a read: the store stays unloaded and the pending records wait, because merging onto a blank answer is the same destructive write by another route.
 
 ## Versions
 
@@ -68,7 +82,9 @@ Future format changes should add a new member to the union rather than widening 
 
 `archive.ts` is the only module that imports fflate, and it does so with `await import()` so the ZIP codec never enters an initial chunk — the architecture budget fails on a new package appearing in a route's source-owner set. Both directions are bounded by `INVK_MAX_ARCHIVE_BYTES` and `INVK_MAX_ENTRIES`, because an `.invk` is a file someone was handed.
 
-`INVK_MAX_ARCHIVE_BYTES` is 4 GB, a figure chosen when the only payload was layer bitmaps. A single video can be hundreds of megabytes, so hitting the ceiling has gone from theoretical to plausible. The guard fails cleanly into the `too-large` reason, which is the right behavior, but the constant now has a second and much heavier consumer.
+On the way in, the budget is enforced through fflate's entry filter (`createExpansionBudget()`), not over the result. `unzip` is fully buffered: by the time it returns a record of entries, every one has already been inflated, so a total measured there would describe an out-of-memory crash rather than prevent it. The filter is consulted per entry with the uncompressed size declared in the central directory, and refuses everything from the crossing point on. The refusal is raised after `unzip` settles rather than thrown from inside it, so `too-large` stays distinguishable from `not-a-project` — a throw inside fflate's walk arrives as a decode failure. An entry whose header understates its size is caught by fflate itself, which inflates into a buffer sized from that declaration and fails the decode when the stream overruns it.
+
+`INVK_MAX_ARCHIVE_BYTES` is 2 GiB — deliberately well under 4 GiB, where ZIP32's 32-bit sizes and offsets stop being able to describe the file. fflate reads zip64 records but `zip()` never writes them, so an archive at that boundary would be produced structurally invalid rather than refused. A single video can be hundreds of megabytes, so this ceiling is reachable in practice; it fails cleanly into the `too-large` reason.
 
 ## Compatibility notes
 
