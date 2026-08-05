@@ -457,7 +457,8 @@
       "label": "Sort by",
       "name": "Name"
     },
-    "unpin": "Unpin"
+    "unpin": "Unpin",
+    "viewLabel": "Project layout"
   },
   "users": {
     "accountCount_one": "{{count}} account in this workspace.",

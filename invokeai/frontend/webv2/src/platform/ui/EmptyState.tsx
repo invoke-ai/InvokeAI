@@ -6,17 +6,33 @@ export interface EmptyStateProps extends ChakraEmptyState.RootProps {
   description?: string | null;
   icon?: React.ReactNode;
   danger?: boolean;
+  /**
+   * Where the block sits on its own cross axis.
+   *
+   * `center` (the default) is right inside a dialog, a panel, or anywhere the
+   * empty state is the only thing on screen. `start` is right on a page whose
+   * heading, description and toolbar are all flush left: a centered block
+   * under a left-aligned page has no shared edge with anything above it, and
+   * reads as a different screen rather than as the page's own content.
+   *
+   * `start` also drops the recipe's horizontal padding, so the text lands
+   * exactly on the page's text column. Left-aligning but staying inset would
+   * be worse than centering — a near miss reads as a mistake, where a clean
+   * center reads as a choice.
+   */
+  align?: 'center' | 'start';
 }
 
 export const EmptyState = React.forwardRef<HTMLDivElement, EmptyStateProps>(function EmptyState(props, ref) {
-  const { title, description, icon, children, danger, ...rest } = props;
+  const { title, description, icon, children, danger, align = 'center', ...rest } = props;
   const fgColor = danger ? 'fg.error' : undefined;
+  const isStart = align === 'start';
   return (
-    <ChakraEmptyState.Root ref={ref} {...rest} size={props.size ?? 'sm'}>
-      <ChakraEmptyState.Content>
+    <ChakraEmptyState.Root ref={ref} {...rest} {...(isStart ? { px: '0' } : {})} size={props.size ?? 'sm'}>
+      <ChakraEmptyState.Content alignItems={isStart ? 'flex-start' : undefined}>
         {icon && <ChakraEmptyState.Indicator color={fgColor}>{icon}</ChakraEmptyState.Indicator>}
         {description ? (
-          <VStack textAlign="center" color={fgColor}>
+          <VStack align={isStart ? 'start' : 'center'} textAlign={isStart ? 'start' : 'center'} color={fgColor}>
             <ChakraEmptyState.Title>{title}</ChakraEmptyState.Title>
             <ChakraEmptyState.Description>{description}</ChakraEmptyState.Description>
           </VStack>
