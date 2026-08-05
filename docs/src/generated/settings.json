@@ -562,12 +562,12 @@
       "validation": {}
     },
     {
-      "category": "OTHER",
+      "category": "GENERATION",
       "default": false,
-      "description": "Enable experimental Wan memory optimizations at the cost of slower generation.",
-      "env_var": "INVOKEAI_WAN_MEMORY_OPTIMIZATION",
+      "description": "Enable experimental PiD decode memory optimizations at the cost of slower decoding.",
+      "env_var": "INVOKEAI_PID_MEMORY_OPTIMIZATION",
       "literal_values": [],
-      "name": "wan_memory_optimization",
+      "name": "pid_memory_optimization",
       "required": false,
       "type": "<class 'bool'>",
       "validation": {}
