@@ -431,6 +431,27 @@ const createCanvasLayers = (count) =>
     };
   });
 
+const createProjectFileWorkflowNodes = () => {
+  const [node] = createWorkflowNodes(1);
+
+  return [
+    {
+      ...node,
+      data: {
+        ...node.data,
+        inputs: {
+          ...node.data.inputs,
+          video: {
+            label: '',
+            name: 'video',
+            value: { video_name: MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME },
+          },
+        },
+      },
+    },
+  ];
+};
+
 const createProjectDocument = ({ index, layers = [], workflowNodes = [] }) => {
   const id = `fixture-project-${ordinal(index, 3)}`;
   const graphId = `${id}-graph`;
@@ -509,8 +530,9 @@ const createProjects = (count, workflowNodeCount, layerCount) =>
   range(count, (index) => {
     const data = createProjectDocument({
       index,
-      layers: index === 0 ? createCanvasLayers(layerCount) : [],
-      workflowNodes: index === 0 ? createWorkflowNodes(workflowNodeCount) : [],
+      layers: index === 0 ? createCanvasLayers(layerCount) : index === 1 ? createCanvasLayers(4) : [],
+      workflowNodes:
+        index === 0 ? createWorkflowNodes(workflowNodeCount) : index === 1 ? createProjectFileWorkflowNodes() : [],
     });
     const timestamp = timestampAt(index);
 

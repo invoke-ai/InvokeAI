@@ -65,6 +65,7 @@ const createState = (profile) => {
     images: new Map(fixture.images.map((image) => [image.image_name, clone(image)])),
     models: new Map(fixture.models.map((model) => [model.key, clone(model)])),
     mutationClock: 0,
+    nextImageNumber: fixture.images.length + 1,
     nextProjectNumber: fixture.projects.length + 1,
     nextVideoNumber: fixture.videos.length + 1,
     nodeCatalog: clone(fixture.nodeCatalog),
@@ -568,6 +569,14 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         return json(200, { version: 'fixture' });
       }
 
+      if (method === 'GET' && path === '/api/v1/app/generation_device_options') {
+        return json(200, [{ device: 'cpu', name: 'CPU' }]);
+      }
+
+      if (method === 'GET' && path === '/api/v1/app/runtime_config') {
+        return json(200, { config: { generation_devices: 'auto' }, set_fields: [] });
+      }
+
       if (path.startsWith('/api/v1/app/external_providers')) {
         return json(200, []);
       }
@@ -874,6 +883,39 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           200,
           names.flatMap((name) => (state.images.has(name) ? [state.images.get(name)] : []))
         );
+      }
+
+      if (method === 'POST' && path === '/api/v1/images/upload') {
+        const multipartBody = await readBody(request);
+        const requestedName = /filename="([^"]+)"/.exec(multipartBody)?.[1] ?? 'uploaded-fixture';
+        const suffix = String(state.nextImageNumber).padStart(3, '0');
+        const imageName = `fixture-upload-${suffix}-${requestedName.replaceAll(/[^a-zA-Z0-9._-]/g, '-')}.png`;
+        const boardId = url.searchParams.get('board_id');
+        const now = timestamp(state);
+        const image = {
+          board_id: boardId && state.boards.has(boardId) ? boardId : null,
+          created_at: now,
+          deleted_at: null,
+          has_workflow: false,
+          height: 1,
+          image_category: url.searchParams.get('image_category') ?? 'general',
+          image_name: imageName,
+          image_origin: 'external',
+          image_subfolder: '',
+          image_url: `/api/v1/images/i/${imageName}/full`,
+          is_intermediate: url.searchParams.get('is_intermediate') === 'true',
+          node_id: null,
+          session_id: null,
+          starred: false,
+          thumbnail_url: `/api/v1/images/i/${imageName}/thumbnail`,
+          updated_at: now,
+          width: 1,
+        };
+
+        state.nextImageNumber += 1;
+        state.images.set(imageName, image);
+        response.setHeader('location', image.image_url);
+        return json(201, image);
       }
 
       if (method === 'GET' && (path === '/api/v1/images' || path === '/api/v1/images/')) {

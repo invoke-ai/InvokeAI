@@ -8,6 +8,7 @@ import {
   getMockBackendFixtureCounts,
   MOCK_BACKEND_PROFILE_COUNTS,
   MOCK_BACKEND_PROFILE_NAMES,
+  MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME,
   validateMockBackendFixture,
 } from './mock-backend-fixtures.mjs';
 import { startMockBackend } from './mock-backend.mjs';
@@ -77,6 +78,24 @@ test('representative fixtures keep node discovery and heavy project data coheren
   assert.equal(new Set(project.data.canvas.document.layers.map((layer) => layer.id)).size, 64);
 });
 
+test('Fixture Project 002 carries the image and video references used by the project-file journey', () => {
+  const fixture = createMockBackendFixture('representative');
+  const project = fixture.projects[1];
+
+  assert.equal(project.project_id, 'fixture-project-002');
+  assert.deepEqual(
+    project.data.canvas.document.layers.map((layer) => layer.source.image.imageName),
+    ['fixture-image-0001.png', 'fixture-image-0002.png', 'fixture-image-0003.png', 'fixture-image-0004.png']
+  );
+  assert.equal(
+    project.data.canvas.document.layers.every((layer) => layer.type === 'raster'),
+    true
+  );
+  assert.deepEqual(project.data.projectGraph.nodes[0]?.data.inputs.video?.value, {
+    video_name: MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME,
+  });
+});
+
 test('the HTTP reset contract selects profiles explicitly and restores the startup profile by default', async () => {
   const backend = await startMockBackend(0, { profile: 'empty' });
 
@@ -101,15 +120,19 @@ test('the HTTP reset contract selects profiles explicitly and restores the start
       profile: 'representative',
     });
 
-    const [images, itemIds, models, nodeCatalog, openApi, projects] = await Promise.all([
-      readJson('/api/v1/images/?limit=17&offset=0'),
-      readJson('/api/v1/queue/default/item_ids'),
-      readJson('/api/v2/models/'),
-      readJson('/api/v2/custom_nodes/'),
-      readJson('/openapi.json'),
-      readJson('/api/v1/projects/'),
-    ]);
+    const [generationDevices, images, itemIds, models, nodeCatalog, openApi, projects, runtimeConfig] =
+      await Promise.all([
+        readJson('/api/v1/app/generation_device_options'),
+        readJson('/api/v1/images/?limit=17&offset=0'),
+        readJson('/api/v1/queue/default/item_ids'),
+        readJson('/api/v2/models/'),
+        readJson('/api/v2/custom_nodes/'),
+        readJson('/openapi.json'),
+        readJson('/api/v1/projects/'),
+        readJson('/api/v1/app/runtime_config'),
+      ]);
 
+    assert.deepEqual(generationDevices, [{ device: 'cpu', name: 'CPU' }]);
     assert.equal(images.items.length, 17);
     assert.equal(images.total, 1_000);
     assert.equal(itemIds.item_ids.length, 500);
@@ -120,6 +143,7 @@ test('the HTTP reset contract selects profiles explicitly and restores the start
       100
     );
     assert.equal(projects.length, 40);
+    assert.deepEqual(runtimeConfig, { config: { generation_devices: 'auto' }, set_fields: [] });
 
     assert.deepEqual(await readJson('/__reset', { method: 'POST' }), {
       counts: MOCK_BACKEND_PROFILE_COUNTS.empty,
@@ -317,6 +341,58 @@ test('video DTO, Details, poster, full media, HEAD, and Range routes use the che
       assert.equal(unsatisfiable.headers.get('accept-ranges'), 'bytes');
       assert.equal(unsatisfiable.headers.get('content-range'), `bytes */${String(length)}`);
       assert.equal((await unsatisfiable.arrayBuffer()).byteLength, 0);
+    }
+  });
+});
+
+test('image upload preserves restore metadata and is retrievable through every image route', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const form = new FormData();
+    form.append('file', new Blob(['fixture upload'], { type: 'image/webp' }), 'uploaded fixture.webp');
+    const response = await fetch(
+      `${backend.origin}/api/v1/images/upload?image_category=other&is_intermediate=false&board_id=fixture-board-02`,
+      { body: form, method: 'POST' }
+    );
+    const expectedName = 'fixture-upload-1001-uploaded-fixture.webp.png';
+    const expectedDto = {
+      board_id: 'fixture-board-02',
+      created_at: '2026-01-15T12:00:00.000Z',
+      deleted_at: null,
+      has_workflow: false,
+      height: 1,
+      image_category: 'other',
+      image_name: expectedName,
+      image_origin: 'external',
+      image_subfolder: '',
+      image_url: `/api/v1/images/i/${expectedName}/full`,
+      is_intermediate: false,
+      node_id: null,
+      session_id: null,
+      starred: false,
+      thumbnail_url: `/api/v1/images/i/${expectedName}/thumbnail`,
+      updated_at: '2026-01-15T12:00:00.000Z',
+      width: 1,
+    };
+
+    assert.equal(response.status, 201);
+    assert.equal(response.headers.get('location'), expectedDto.image_url);
+    assert.deepEqual(await response.json(), expectedDto);
+    assert.deepEqual(
+      await getJson(backend, '/api/v1/images/images_by_names', {
+        body: JSON.stringify({ image_names: [expectedName, 'missing.png'] }),
+        headers: { 'content-type': 'application/json' },
+        method: 'POST',
+      }),
+      [expectedDto]
+    );
+    assert.deepEqual(await getJson(backend, `/api/v1/images/i/${encodeURIComponent(expectedName)}`), expectedDto);
+
+    for (const variant of ['full', 'thumbnail']) {
+      const asset = await fetch(`${backend.origin}/api/v1/images/i/${encodeURIComponent(expectedName)}/${variant}`);
+
+      assert.equal(asset.status, 200);
+      assert.equal(asset.headers.get('content-type'), 'image/png');
+      assert.ok((await asset.arrayBuffer()).byteLength > 0);
     }
   });
 });
