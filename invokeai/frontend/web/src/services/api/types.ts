@@ -551,6 +551,13 @@ export const isWanGGUFLowNoiseMainModelConfig = (config: AnyModelConfig): config
   );
 };
 
+/** MiniMax H3 single-file transformer checkpoints (e.g. the pruned int8 repack). These serve
+ *  only the Transformer (single file) override slot of the MiniMax H3 advanced section; the
+ *  primary main dropdown shows only diffusers-format H3 installs. */
+export const isMiniMaxH3CheckpointMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return config.type === 'main' && config.base === 'minimax-h3' && config.format === 'checkpoint';
+};
+
 export const isWanLoRAModelConfig = (config: AnyModelConfig): config is WanLoRAModelConfig => {
   return config.type === 'lora' && config.base === 'wan';
 };

@@ -29,6 +29,7 @@ import {
   isLLaVAModelConfig,
   isLoRAModelConfig,
   isMainOrExternalModelConfig,
+  isMiniMaxH3CheckpointMainModelConfig,
   isPiDDecoderModelConfig,
   isQwen3EncoderModelConfig,
   isQwen3VLEncoderModelConfig,
@@ -125,6 +126,7 @@ export const useWanDiffusersModels = () => buildModelsHook(isWanDiffusersMainMod
 export const useWanGGUFLowNoiseModels = () => buildModelsHook(isWanGGUFLowNoiseMainModelConfig)();
 export const useWanVAEModels = () => buildModelsHook(isWanVAEModelConfig)();
 export const useWanT5EncoderModels = () => buildModelsHook(isWanT5EncoderModelConfig)();
+export const useMiniMaxH3CheckpointModels = () => buildModelsHook(isMiniMaxH3CheckpointMainModelConfig)();
 export const usePiDDecoderModels = buildModelsHook(isPiDDecoderModelConfig);
 export const useGemma2EncoderModels = () => buildModelsHook(isGemma2EncoderModelConfig)();
 export const useGlobalReferenceImageModels = buildModelsHook(

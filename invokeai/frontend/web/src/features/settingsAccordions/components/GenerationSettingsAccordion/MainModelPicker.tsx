@@ -33,6 +33,11 @@ export const MainModelPicker = memo(() => {
         ) {
           return false;
         }
+        // MiniMax H3 single-file transformers belong in the Transformer (single file) slot of
+        // the MiniMax H3 advanced section - they carry no text encoder or VAEs.
+        if (c.type === 'main' && c.base === 'minimax-h3' && c.format === 'checkpoint') {
+          return false;
+        }
         return true;
       }),
     [allModelConfigs]

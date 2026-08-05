@@ -21,6 +21,7 @@ import {
   krea2VaeModelSelected,
   minimaxH3DurationSecondsChanged,
   minimaxH3OutputModeChanged,
+  minimaxH3TransformerModelSelected,
   negativePromptChanged,
   openaiBackgroundChanged,
   openaiInputFidelityChanged,
@@ -1152,6 +1153,37 @@ const MiniMaxH3OutputMode: SingleMetadataHandler<'video' | 'image'> = {
   ValueComponent: ({ value }: SingleMetadataValueProps<'video' | 'image'>) => <MetadataPrimitiveValue value={value} />,
 };
 //#endregion MiniMaxH3OutputMode
+
+//#region MiniMaxH3TransformerModel
+const MiniMaxH3TransformerModel: SingleMetadataHandler<ModelIdentifierField | null> = {
+  [SingleMetadataKey]: true,
+  type: 'MiniMaxH3TransformerModel',
+  parse: async (metadata, store) => {
+    const raw = getProperty(metadata, 'minimax_h3_transformer_model');
+    if (raw === undefined) {
+      // The graph builder only writes this key when a single-file transformer override was
+      // used; reject when absent so the handler is not rendered (and recall-all skips it).
+      return Promise.reject();
+    }
+    if (raw === null) {
+      return Promise.resolve(null);
+    }
+    // Validate the single-file transformer is still installed - recall-all must skip silently
+    // (not clobber or error) when it has since been deleted.
+    const parsed = await parseModelIdentifier(raw, store, 'main');
+    assert(parsed.type === 'main' && parsed.base === 'minimax-h3');
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(minimaxH3TransformerModelSelected(value));
+  },
+  i18nKey: 'modelManager.minimaxH3TransformerModel',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField | null>) => (
+    <MetadataPrimitiveValue value={value ? value.name : 'None'} />
+  ),
+};
+//#endregion MiniMaxH3TransformerModel
 
 //#region ZImageShift
 const ZImageShift: SingleMetadataHandler<number | null> = {
@@ -2340,6 +2372,7 @@ export const ImageMetadataHandlers = {
   WanGuidanceScaleLowNoise,
   MiniMaxH3DurationSeconds,
   MiniMaxH3OutputMode,
+  MiniMaxH3TransformerModel,
   ZImageShift,
   Ideogram4SamplerPreset,
   Ideogram4Steps,
