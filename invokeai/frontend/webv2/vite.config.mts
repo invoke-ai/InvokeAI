@@ -40,9 +40,18 @@ const ROUTE_SHARED_MODULES = [
   // The schema, the ZIP codec and the archive itself stay behind lazy imports.
   '/workbench/projects/invk/format.ts',
   '/workbench/projects/library.ts',
+  // Editor-eager through `syncedPersistence` (cover selection on every save)
+  // and Launchpad-eager through the import workflow. Pulling it out of the
+  // shared chunk to spare the Launchpad ~1.5 KB cost the editor a whole extra
+  // request, because nothing else would then group it — a round trip is the
+  // worse end of that trade.
   '/workbench/projects/projectAssets.ts',
   '/workbench/projects/projectFile.ts',
   '/workbench/projects/projectFileErrors.ts',
+  // Both routes offer Import and Export, so both need the reporter and the
+  // hooks that drive it.
+  '/workbench/projects/projectFileToasts.ts',
+  '/workbench/projects/useProjectFileActions.ts',
   '/workbench/settings/SettingsDialogHost.tsx',
 ] as const;
 

@@ -42,7 +42,51 @@ import { remapAssetRefs } from './projectAssets';
  * with `await import()`. The Launchpad offers Import and Export on a route that
  * never mounts the editor, and it should not pay for either until someone
  * actually picks a file.
+ *
+ * ### Both directions report as they go, and report what they lost
+ *
+ * A project file is the one operation here whose duration is set by how much
+ * someone has drawn: a few hundred full-resolution layers is a few hundred
+ * round trips and hundreds of megabytes. Silence for that long reads as a
+ * broken button, so {@link ProjectFileProgress} is reported throughout.
+ *
+ * Both directions can also half-succeed. Export skips an asset the server will
+ * not serve; import leaves a reference dangling when the archive did not carry
+ * it and this server does not have it. Both were computed and discarded before,
+ * which made a project that lost forty layers indistinguishable from a clean
+ * round trip. They are returned now, and every call site says so.
  */
+
+/**
+ * How far along a project file is.
+ *
+ * `bundling` and `restoring` count assets; `packing` is the single ZIP write at
+ * the end, which has no unit worth counting and is reported so the caller can
+ * stop showing a number that has stopped moving.
+ */
+export interface ProjectFileProgress {
+  completed: number;
+  phase: 'bundling' | 'packing' | 'restoring';
+  total: number;
+}
+
+export interface ProjectFileOptions {
+  onProgress?: (progress: ProjectFileProgress) => void;
+  owner?: AccountScope;
+}
+
+export interface ProjectExportOutcome {
+  /** Assets the server would not serve. Their references still ship. */
+  missingAssetNames: string[];
+  /** The name the archive was downloaded under. */
+  fileName: string;
+}
+
+export interface ProjectImportOutcome {
+  /** Referenced assets neither the archive nor this server has. */
+  danglingAssetNames: string[];
+  record: ProjectRecordDTO;
+}
 
 const readProjectDocument = async (file: File) => {
   const { readInvkArchive } = await import('./invk/importProject');
@@ -53,9 +97,10 @@ const readProjectDocument = async (file: File) => {
 const exportProjectDocument = async (
   name: string,
   projectDocument: Record<string, unknown>,
-  owner: AccountScope
-): Promise<void> => {
+  options: Required<Pick<ProjectFileOptions, 'owner'>> & ProjectFileOptions
+): Promise<ProjectExportOutcome> => {
   const { executeInvkExport, planInvkExport } = await import('./invk/exportProject');
+  const { onProgress, owner } = options;
 
   assertAccountScopeCurrent(owner);
 
@@ -66,30 +111,41 @@ const exportProjectDocument = async (
     projectDocument,
   });
 
-  await executeInvkExport(plan, { download: downloadBlob, signal: owner.signal });
+  const result = await executeInvkExport(plan, {
+    download: downloadBlob,
+    signal: owner.signal,
+    ...(onProgress === undefined ? {} : { onProgress }),
+  });
+
   assertAccountScopeCurrent(owner);
+
+  return { fileName: plan.fileName, missingAssetNames: result.missingAssetNames };
 };
 
 /** Export a closed project straight from its server record. */
 export const exportLibraryProject = async (
   projectId: string,
-  owner: AccountScope = captureAccountScope()
-): Promise<void> => {
+  options: ProjectFileOptions = {}
+): Promise<ProjectExportOutcome> => {
+  const owner = options.owner ?? captureAccountScope();
   const record = await apiGetProject(projectId, owner.signal);
 
   assertAccountScopeCurrent(owner);
-  await exportProjectDocument(record.name, record.data, owner);
+
+  return exportProjectDocument(record.name, record.data, { ...options, owner });
 };
 
 /** Export an open project from its live in-memory document. */
 export const exportOpenProject = async (
   project: Project,
-  owner: AccountScope = captureAccountScope()
-): Promise<void> => {
+  options: ProjectFileOptions = {}
+): Promise<ProjectExportOutcome> => {
+  const owner = options.owner ?? captureAccountScope();
   const { serializeProjectDocument } = await import('./projectDocument');
 
   assertAccountScopeCurrent(owner);
-  await exportProjectDocument(project.name, serializeProjectDocument(project), owner);
+
+  return exportProjectDocument(project.name, serializeProjectDocument(project), { ...options, owner });
 };
 
 /**
@@ -100,14 +156,22 @@ export const exportOpenProject = async (
  */
 export const importProjectFile = async (
   file: File,
-  owner: AccountScope = captureAccountScope()
-): Promise<ProjectRecordDTO> => {
+  options: ProjectFileOptions = {}
+): Promise<ProjectImportOutcome> => {
+  const owner = options.owner ?? captureAccountScope();
   const contents = await readProjectDocument(file);
 
   assertAccountScopeCurrent(owner);
 
   const { restoreArchiveAssets } = await import('./invk/importProject');
-  const restored = await restoreArchiveAssets(contents, { signal: owner.signal });
+  const restored = await restoreArchiveAssets(contents, {
+    signal: owner.signal,
+    ...(options.onProgress === undefined
+      ? {}
+      : {
+          onProgress: ({ completed, total }) => options.onProgress?.({ completed, phase: 'restoring', total }),
+        }),
+  });
 
   assertAccountScopeCurrent(owner);
 
@@ -137,7 +201,7 @@ export const importProjectFile = async (
     recordProjectCover(record.project_id, restored.coverImageName, owner);
   }
 
-  return record;
+  return { danglingAssetNames: restored.danglingAssetNames, record };
 };
 
 /** Open the browser's file picker for a project file; null when dismissed. */

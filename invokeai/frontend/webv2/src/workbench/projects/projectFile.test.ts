@@ -23,9 +23,16 @@ const downloads = vi.hoisted(() => ({ downloadBlob: vi.fn(), downloadText: vi.fn
 
 const transport = vi.hoisted(() => ({
   coverExtensionForMime: () => 'webp',
-  fetchImageBytes: vi.fn((imageName: string) => Promise.resolve(new TextEncoder().encode(`bytes:${imageName}`))),
+  // `Uint8Array | null` up front: a fetcher that returns `null` is how the
+  // "server would not serve it" path is exercised, and inferring the narrower
+  // type here would make that untypeable at the call site.
+  fetchImageBytes: vi.fn((imageName: string): Promise<Uint8Array | null> =>
+    Promise.resolve(new TextEncoder().encode(`bytes:${imageName}`))
+  ),
   fetchImageThumbnail: vi.fn(() => Promise.resolve(null)),
-  fetchVideoBytes: vi.fn((videoName: string) => Promise.resolve(new TextEncoder().encode(`bytes:${videoName}`))),
+  fetchVideoBytes: vi.fn((videoName: string): Promise<Uint8Array | null> =>
+    Promise.resolve(new TextEncoder().encode(`bytes:${videoName}`))
+  ),
   findExistingImageNames: vi.fn((_names: readonly string[]) => Promise.resolve(new Set<string>())),
   findExistingVideoNames: vi.fn((_names: readonly string[]) => Promise.resolve(new Set<string>())),
   mimeForEntryName: () => 'image/png',
@@ -137,6 +144,87 @@ describe('exportLibraryProject', () => {
   });
 });
 
+/**
+ * Both directions can half-succeed, and both used to compute exactly what was
+ * lost and then discard it — so a project that shed forty layers looked like a
+ * clean round trip. These pin the reporting all the way out to the caller.
+ */
+describe('what a transfer reports', () => {
+  const projectWithImages = () => ({
+    ...createDraftProject([]),
+    canvas: {
+      document: {
+        layers: [
+          { id: 'l1', source: { image: { height: 1, imageName: 'a.png', width: 1 }, type: 'image' } },
+          { id: 'l2', source: { image: { height: 1, imageName: 'b.png', width: 1 }, type: 'image' } },
+        ],
+      },
+    },
+    name: 'Two layers',
+  });
+
+  it('counts every asset as it is bundled, then reports packing', async () => {
+    const document = { ...persistence.serializeProjectDocument(createDraftProject([])), ...projectWithImages() };
+    const onProgress = vi.fn();
+
+    api.getProject.mockResolvedValue({ data: document, name: 'Two layers', project_id: 'p1', revision: 1 });
+
+    await projectFile.exportLibraryProject('p1', { onProgress });
+
+    const phases = onProgress.mock.calls.map(([progress]) => progress.phase);
+
+    expect(phases.filter((phase: string) => phase === 'bundling')).toHaveLength(2);
+    expect(phases.at(-1)).toBe('packing');
+  });
+
+  it('names the assets the server would not serve', async () => {
+    const document = { ...persistence.serializeProjectDocument(createDraftProject([])), ...projectWithImages() };
+
+    api.getProject.mockResolvedValue({ data: document, name: 'Two layers', project_id: 'p1', revision: 1 });
+    transport.fetchImageBytes.mockImplementation((imageName: string) =>
+      Promise.resolve(imageName === 'b.png' ? null : new TextEncoder().encode('bytes'))
+    );
+
+    const outcome = await projectFile.exportLibraryProject('p1');
+
+    expect(outcome.missingAssetNames).toEqual(['b.png']);
+    expect(outcome.fileName).toBe('Two layers.invk');
+  });
+
+  it('reports nothing lost for a clean export', async () => {
+    const document = { ...persistence.serializeProjectDocument(createDraftProject([])), ...projectWithImages() };
+
+    api.getProject.mockResolvedValue({ data: document, name: 'Two layers', project_id: 'p1', revision: 1 });
+
+    const outcome = await projectFile.exportLibraryProject('p1');
+
+    expect(outcome.missingAssetNames).toEqual([]);
+  });
+
+  it('counts uploads on the way in, and names what stayed dangling', async () => {
+    const document = { ...persistence.serializeProjectDocument(createDraftProject([])), ...projectWithImages() };
+    const onProgress = vi.fn();
+
+    acceptCreate();
+    api.getProject.mockResolvedValue({ data: document, name: 'Two layers', project_id: 'p1', revision: 1 });
+    await projectFile.exportLibraryProject('p1');
+
+    const archive = capturedArchive();
+
+    // Neither image is on the receiving server, and one of them will not upload.
+    transport.uploadArchiveImage.mockImplementation((_bytes: Uint8Array, fileName: string) =>
+      fileName === 'b.png'
+        ? Promise.reject(new Error('rejected'))
+        : Promise.resolve({ height: 1, imageName: `server-${fileName}`, width: 1 })
+    );
+
+    const outcome = await projectFile.importProjectFile(archive, { onProgress });
+
+    expect(outcome.danglingAssetNames).toEqual(['b.png']);
+    expect(onProgress.mock.calls.map(([progress]) => progress.phase)).toContain('restoring');
+  });
+});
+
 describe('importProjectFile', () => {
   it('round-trips an exported project under a fresh id', async () => {
     const project = { ...createDraftProject([]), name: 'Exported project' };
@@ -144,7 +232,7 @@ describe('importProjectFile', () => {
     acceptCreate();
     await projectFile.exportOpenProject(project);
 
-    const record = await projectFile.importProjectFile(capturedArchive());
+    const { record } = await projectFile.importProjectFile(capturedArchive());
 
     expect(record.project_id).not.toBe(project.id);
     expect(record.name).toBe('Exported project');

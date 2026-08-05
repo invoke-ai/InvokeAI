@@ -14,10 +14,8 @@ import { QueueCircularProgress } from '@workbench/components/QueueProgressIndica
 import { formatRelativeTime } from '@workbench/launchpad/formatRelativeTime';
 import { OpenProjectDialog } from '@workbench/projects/components';
 import { refreshProjectLibrary, useProjectLibrarySelector } from '@workbench/projects/library';
-import { exportOpenProject } from '@workbench/projects/projectFile';
-import { describeProjectFileError } from '@workbench/projects/projectFileErrors';
 import { useProjectActions } from '@workbench/projects/useProjectActions';
-import { useNotify } from '@workbench/useNotify';
+import { useExportOpenProject } from '@workbench/projects/useProjectFileActions';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import {
   useActiveProjectSelector,
@@ -57,7 +55,7 @@ export const ProjectSwitcher = () => {
   const queries = useWorkbenchQueries();
   const { projects } = useWorkbenchCommands();
   const { closeProject, deleteProject, openProject } = useProjectActions();
-  const notify = useNotify();
+  const startExport = useExportOpenProject();
   const openWorkbenchWidget = useOpenWorkbenchWidget();
   const [renameTarget, setRenameTarget] = useState<{ id: string; name: string } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
@@ -113,13 +111,11 @@ export const ProjectSwitcher = () => {
       return;
     }
 
-    // Export bundles every image the project points at, so it can fail on a
-    // dropped connection or a project past the archive ceiling. Silence would
-    // read as "nothing happened" when the download never arrives.
-    void exportOpenProject(project).catch((error: unknown) => {
-      notify.error(t('projects.exportFailed'), describeProjectFileError(error, t));
-    });
-  }, [activeProjectId, getProject, notify, t]);
+    // Export bundles every image the project points at, so it runs for as long
+    // as the project is large and can fail on a dropped connection or a project
+    // past the archive ceiling. The reporter owns saying both.
+    startExport(project);
+  }, [activeProjectId, getProject, startExport]);
   const closeActiveProject = useCallback(() => {
     const project = getProject(activeProjectId);
 

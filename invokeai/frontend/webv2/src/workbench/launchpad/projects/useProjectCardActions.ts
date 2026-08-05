@@ -5,8 +5,7 @@ import {
   renameLibraryProject,
   type ProjectSummary,
 } from '@workbench/projects/library';
-import { exportLibraryProject } from '@workbench/projects/projectFile';
-import { describeProjectFileError } from '@workbench/projects/projectFileErrors';
+import { useExportLibraryProject } from '@workbench/projects/useProjectFileActions';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -20,12 +19,14 @@ import { dropProjectPin } from './projectPins';
 export interface ProjectCardActions {
   rename: (name: string) => Promise<void>;
   duplicate: () => Promise<void>;
-  export: () => Promise<void>;
+  /** Reports its own progress and result, so there is nothing to await here. */
+  export: () => void;
   delete: () => Promise<void>;
 }
 
 export const useProjectCardActions = (summary: ProjectSummary): ProjectCardActions => {
   const { t } = useTranslation();
+  const startExport = useExportLibraryProject();
 
   const rename = useCallback(
     async (name: string) => {
@@ -62,17 +63,9 @@ export const useProjectCardActions = (summary: ProjectSummary): ProjectCardActio
     }
   }, [summary.id, t]);
 
-  const exportProject = useCallback(async () => {
-    try {
-      await exportLibraryProject(summary.id);
-    } catch (error) {
-      toaster.create({
-        description: describeProjectFileError(error, t),
-        title: t('projects.exportFailed'),
-        type: 'error',
-      });
-    }
-  }, [summary.id, t]);
+  const exportProject = useCallback(() => {
+    startExport(summary.id, summary.name);
+  }, [startExport, summary.id, summary.name]);
 
   const deleteProject = useCallback(async () => {
     try {

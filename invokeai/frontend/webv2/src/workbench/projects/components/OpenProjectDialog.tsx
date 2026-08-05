@@ -1,3 +1,5 @@
+import type { ProjectRecordDTO } from '@workbench/projects/api';
+
 import { Dialog, Icon, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
 import { flushGenerateDrafts } from '@features/generation/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
@@ -10,8 +12,7 @@ import { areArraysEqual } from '@platform/state/selectors';
 import { Button, CloseButton, Row, Scrollable } from '@platform/ui';
 import { formatRelativeTime } from '@workbench/launchpad/formatRelativeTime';
 import { refreshProjectLibrary, useProjectLibrarySelector, type ProjectSummary } from '@workbench/projects/library';
-import { importProjectFile, pickProjectFile } from '@workbench/projects/projectFile';
-import { describeProjectFileError } from '@workbench/projects/projectFileErrors';
+import { useImportProjectFile } from '@workbench/projects/useProjectFileActions';
 import { useNotify } from '@workbench/useNotify';
 import {
   useWorkbenchCommands,
@@ -90,18 +91,8 @@ export const OpenProjectDialog = ({ isOpen, onClose }: { isOpen: boolean; onClos
     [notify, onClose, persistence, projects, t]
   );
 
-  const handleImport = useCallback(async () => {
-    const owner = captureAccountScope();
-    const file = await pickProjectFile(owner);
-
-    if (!file || !isAccountScopeCurrent(owner)) {
-      return;
-    }
-
-    try {
-      const record = await importProjectFile(file, owner);
-
-      assertAccountScopeCurrent(owner);
+  const openImportedProject = useCallback(
+    (record: ProjectRecordDTO) => {
       const project = persistence.adoptProjectRecord(record);
 
       if (project) {
@@ -109,14 +100,10 @@ export const OpenProjectDialog = ({ isOpen, onClose }: { isOpen: boolean; onClos
         projects.open(project);
         onClose();
       }
-    } catch (error) {
-      if (!isAccountScopeCurrent(owner)) {
-        return;
-      }
-
-      notify.error(t('projects.importFailed'), describeProjectFileError(error, t));
-    }
-  }, [notify, onClose, persistence, projects, t]);
+    },
+    [onClose, persistence, projects]
+  );
+  const handleImport = useImportProjectFile(openImportedProject);
 
   const handleOpenChange = useCallback(
     (event: { open: boolean }) => {
