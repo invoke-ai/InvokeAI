@@ -90,10 +90,12 @@ _CLAUSE_RE = re.compile(r"(==|!=|>=|<=|>|<)\s*([0-9]{1,4}(?:\.[0-9]{1,4}){0,2})\
 # "Programming Language :: Python :: 3.12" - a *whole* classifier naming exactly one
 # major.minor version. The required dot excludes "... :: 3" and "... :: 3 :: Only";
 # the anchor excludes "... :: 3.12 :: Only" and "... :: 3.1.4", neither of which
-# declares support for the version it appears to name. Digits are bounded like the two
-# patterns above so _parse_version's int() cannot hit CPython's str->int digit limit
-# and raise out of check_python, which promises never to raise.
-_CLASSIFIER_RE = re.compile(r"Programming Language :: Python :: ([0-9]{1,4}\.[0-9]{1,4})\Z")
+# declares support for the version it appears to name. Leading zeros are excluded for
+# the same reason as in _VERSION_RE: "... :: 3.012" is not a trove classifier, so
+# reading it as a declaration of 3.12 support would silence the advisory in exactly the
+# case it exists to name. Digits are bounded like the two patterns above, so a 4000-digit
+# "version" is not read as one and cannot end up quoted back in the advisory.
+_CLASSIFIER_RE = re.compile(r"Programming Language :: Python :: ((?:0|[1-9][0-9]{0,3})\.(?:0|[1-9][0-9]{0,3}))\Z")
 
 _SUPPORTED_OPERATORS = "==, !=, >=, <=, > and <"
 
@@ -156,7 +158,9 @@ def _classifier_versions(pyproject: dict) -> list[str]:
     """The major.minor versions project.classifiers claims support for, in declared order.
 
     Tolerates every malformed shape - a missing [project] table, a non-list value, non-string
-    entries - by returning nothing, so the caller reports it rather than raising.
+    entries - by returning nothing rather than raising. Nothing is a fine answer: classifiers
+    are optional, so their absence and their malformation mean the same thing here, which is
+    that there is no advisory to give.
     """
 
     project = pyproject.get("project")
@@ -233,8 +237,10 @@ def check_python_classifiers(pins: dict, pyproject: dict) -> list[str]:
     if not isinstance(pinned, str) or _VERSION_RE.match(pinned) is None:
         return []  # check_python already reports the shape
 
+    # A plain string comparison is enough: both patterns forbid leading zeros, so a version has
+    # exactly one spelling on either side and there is nothing left to normalize.
     supported = _classifier_versions(pyproject)
-    if not supported or _parse_version(pinned) in {_parse_version(entry) for entry in supported}:
+    if not supported or pinned in supported:
         return []
 
     return [
@@ -329,9 +335,6 @@ def main(repo_root: Path = REPO_ROOT) -> int:
 
     errors = check_pins(pins, pyproject)
 
-    for warning in check_python_classifiers(pins, pyproject):
-        print(f"warning: {warning}", file=sys.stderr)
-
     if errors:
         print("pins.json is out of sync with pyproject.toml:", file=sys.stderr)
         for error in errors:
@@ -341,6 +344,14 @@ def main(repo_root: Path = REPO_ROOT) -> int:
             "pyproject.toml (or vice versa).",
             file=sys.stderr,
         )
+
+    # Deliberately after the errors have already been printed: advice is worth less than a real
+    # problem, so computing it must not be able to come between one and its report. It is still
+    # printed on a failing run - a wrong pin and an unmentioned pin are usually the same edit.
+    for warning in check_python_classifiers(pins, pyproject):
+        print(f"warning: {warning}", file=sys.stderr)
+
+    if errors:
         return 1
 
     print("pins.json is consistent with pyproject.toml")
