@@ -171,7 +171,13 @@ describe('restoreArchiveAssets', () => {
     expect(result.uploadedCount).toBe(0);
   });
 
-  it('uploads the cover alongside and returns its server name', async () => {
+  /**
+   * The bundled cover is a thumbnail of an image the document also references,
+   * and the cover URL asks for a thumbnail anyway — so once that image is on
+   * the server, uploading the entry too would leave an orphan nobody can find:
+   * covers go up under the `'other'` category, which shows in no gallery view.
+   */
+  it('reuses the restored cover image instead of uploading a second copy', async () => {
     const withCover = await contents({ cover: { bytes: new Uint8Array([9]), entryName: 'cover.webp' } });
     const upload = vi.fn(() => Promise.resolve({ height: 1, imageName: 'server-cover.png', width: 1 }));
 
@@ -180,7 +186,39 @@ describe('restoreArchiveAssets', () => {
       uploadArchiveImage: upload,
     });
 
+    expect(result.coverImageName).toBe('a.png');
+    expect(upload).not.toHaveBeenCalled();
+  });
+
+  it('follows the rename when the cover image was uploaded under a new name', async () => {
+    const withCover = await contents({ cover: { bytes: new Uint8Array([9]), entryName: 'cover.webp' } });
+    const upload = vi.fn((_bytes: Uint8Array, fileName: string) =>
+      Promise.resolve({ height: 1, imageName: `server-${fileName}`, width: 1 })
+    );
+
+    const result = await restoreArchiveAssets(withCover, {
+      findExistingImageNames: () => Promise.resolve(new Set()),
+      uploadArchiveImage: upload,
+    });
+
+    expect(result.coverImageName).toBe('server-a.png');
+    // Once for the image itself, never again for the cover.
+    expect(upload).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to the bundled cover when its source image is dangling', async () => {
+    const withCover = await contents({ cover: { bytes: new Uint8Array([9]), entryName: 'cover.webp' } });
+
+    withCover.images.delete('a.png');
+
+    const upload = vi.fn(() => Promise.resolve({ height: 1, imageName: 'server-cover.png', width: 1 }));
+    const result = await restoreArchiveAssets(withCover, {
+      findExistingImageNames: () => Promise.resolve(new Set()),
+      uploadArchiveImage: upload,
+    });
+
     expect(result.coverImageName).toBe('server-cover.png');
+    expect(result.danglingAssetNames).toEqual(['a.png']);
     expect(upload).toHaveBeenCalledWith(new Uint8Array([9]), 'cover.webp', {
       contentType: 'image/webp',
       signal: undefined,
@@ -236,15 +274,45 @@ describe('restoreArchiveAssets', () => {
     expect(findVideos).not.toHaveBeenCalled();
   });
 
-  it('survives a cover that fails to upload', async () => {
+  it('survives a fallback cover that fails to upload', async () => {
     const withCover = await contents({ cover: { bytes: new Uint8Array([9]), entryName: 'cover.webp' } });
 
+    withCover.images.delete('a.png');
+
     const result = await restoreArchiveAssets(withCover, {
-      findExistingImageNames: () => Promise.resolve(new Set(['a.png'])),
+      findExistingImageNames: () => Promise.resolve(new Set()),
       uploadArchiveImage: () => Promise.reject(new Error('nope')),
     });
 
     expect(result.coverImageName).toBeNull();
-    expect(result.danglingAssetNames).toEqual([]);
+    expect(result.danglingAssetNames).toEqual(['a.png']);
+  });
+
+  it('announces a video entry as a video, whatever its extension', async () => {
+    const videoDocument = {
+      ...document(),
+      projectGraph: { nodes: [{ data: { inputs: { video: { video_name: 'clip.unknown' } } }, id: 'n' }] },
+    };
+    const withVideo = await readInvkArchive(
+      await archiveFile({
+        'manifest.json': JSON.stringify(manifest()),
+        'project.json': JSON.stringify(videoDocument),
+        'videos/clip.unknown': new Uint8Array([7]),
+      })
+    );
+    const uploadVideo = vi.fn(() => Promise.resolve({ videoName: 'server-clip.mp4' }));
+
+    await restoreArchiveAssets(withVideo, {
+      findExistingImageNames: () => Promise.resolve(new Set(['a.png'])),
+      findExistingVideoNames: () => Promise.resolve(new Set()),
+      uploadArchiveVideo: uploadVideo,
+    });
+
+    // `image/png` here would be announced to the video endpoint as an image and
+    // refused before the bytes were read.
+    expect(uploadVideo).toHaveBeenCalledWith(new Uint8Array([7]), 'clip.unknown', {
+      contentType: 'video/mp4',
+      signal: undefined,
+    });
   });
 });

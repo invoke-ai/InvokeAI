@@ -1,5 +1,5 @@
 import { mapWithConcurrency } from '@platform/core/concurrency';
-import { collectLiveAssetRefs } from '@workbench/projects/projectAssets';
+import { collectLiveAssetRefs, selectCoverImageName } from '@workbench/projects/projectAssets';
 
 import type { UploadedImage, UploadedVideo } from './assetTransport';
 import type { InvkManifest } from './manifest';
@@ -29,8 +29,8 @@ import { parseInvkManifest } from './manifest';
  * nothing, so a caller can read a file, discover it is a legacy canvas project,
  * and say so without having created anything.
  *
- * {@link restoreArchiveImages} is the part with consequences: ask the server
- * which referenced images it already has, upload the rest out of the archive,
+ * {@link restoreArchiveAssets} is the part with consequences: ask the server
+ * which referenced assets it already has, upload the rest out of the archive,
  * and report the old-to-new renames. It deliberately does *not* touch the
  * document — the caller applies the mapping, because the caller is also the one
  * assigning the new project id.
@@ -154,6 +154,57 @@ interface PendingUpload {
 }
 
 /**
+ * The cover, preferring an image the restore already put on this server.
+ *
+ * The archive's `cover` entry is a thumbnail of an image the document also
+ * references, and `getProjectCoverUrl` asks for a thumbnail anyway — so once
+ * that image is restored, pointing the index at it is the same picture without
+ * a second copy. Uploading the entry unconditionally instead left one orphan
+ * per import: covers go up under the canvas's private `'other'` category, which
+ * appears in no gallery view and no board count, so nobody could ever find or
+ * delete them.
+ *
+ * The bundled bytes are the fallback, for the case that made them worth
+ * carrying: a cover whose source image is dangling here.
+ */
+const resolveCoverImageName = async (input: {
+  contents: InvkArchiveContents;
+  mappings: { images: Map<string, string> };
+  restoredImageNames: ReadonlySet<string>;
+  signal?: AbortSignal;
+  uploadImage: NonNullable<RestoreAssetsDeps['uploadArchiveImage']>;
+}): Promise<string | null> => {
+  const documentCoverName = selectCoverImageName(input.contents.projectDocument);
+
+  if (documentCoverName !== null) {
+    const restoredName = input.mappings.images.get(documentCoverName) ?? documentCoverName;
+
+    if (input.restoredImageNames.has(restoredName)) {
+      return restoredName;
+    }
+  }
+
+  const { cover } = input.contents;
+
+  if (cover === null) {
+    return null;
+  }
+
+  try {
+    const uploaded = await input.uploadImage(cover.bytes, cover.entryName, {
+      contentType: mimeForEntryName(cover.entryName),
+      signal: input.signal,
+    });
+
+    return uploaded.imageName;
+  } catch {
+    // A project with no cover shows the folder glyph, which is a state the
+    // library already renders. Not worth failing an import over.
+    return null;
+  }
+};
+
+/**
  * Make the archive's assets available on this server. Only what is missing gets
  * uploaded; a referenced asset that is neither on the server nor in the archive
  * is reported as dangling and its reference is left exactly as it is, so the
@@ -206,37 +257,28 @@ export const restoreArchiveAssets = async (
 
   const mappings = { images: new Map<string, string>(), videos: new Map<string, string>() };
 
-  // The cover is not part of the document, so it is uploaded alongside rather
-  // than through the reference set.
-  const coverTotal = contents.cover === null ? 0 : 1;
-  const total = pending.length + coverTotal;
+  // The cover is not part of the document, so it does not come through the
+  // reference set; it is still counted here so progress spans the whole restore.
+  const total = pending.length + (contents.cover === null ? 0 : 1);
   let completed = 0;
   let uploadedCount = 0;
 
-  const coverImageName =
-    contents.cover === null
-      ? null
-      : await uploadImage(contents.cover.bytes, contents.cover.entryName, {
-          contentType: mimeForEntryName(contents.cover.entryName),
-          signal: deps.signal,
-        })
-          .then((uploaded) => uploaded.imageName)
-          .catch(() => null);
-
-  if (contents.cover !== null) {
-    completed += 1;
-    deps.onProgress?.({ completed, total });
-  }
+  /** Images this server can serve when the restore is done, under their final names. */
+  const restoredImageNames = new Set(referencedImages.filter((name) => existingImages.has(name)));
 
   await mapWithConcurrency(pending, ASSET_UPLOAD_CONCURRENCY, async ({ bytes, kind, name }) => {
     try {
-      const options = { contentType: mimeForEntryName(name), signal: deps.signal };
+      const options = { contentType: mimeForEntryName(name, kind), signal: deps.signal };
       const restoredName =
         kind === 'image'
           ? (await uploadImage(bytes, name, options)).imageName
           : (await uploadVideo(bytes, name, options)).videoName;
 
       uploadedCount += 1;
+
+      if (kind === 'image') {
+        restoredImageNames.add(restoredName);
+      }
 
       if (restoredName !== name) {
         mappings[kind === 'image' ? 'images' : 'videos'].set(name, restoredName);
@@ -250,6 +292,19 @@ export const restoreArchiveAssets = async (
     completed += 1;
     deps.onProgress?.({ completed, total });
   });
+
+  const coverImageName = await resolveCoverImageName({
+    contents,
+    mappings,
+    restoredImageNames,
+    signal: deps.signal,
+    uploadImage,
+  });
+
+  if (contents.cover !== null) {
+    completed += 1;
+    deps.onProgress?.({ completed, total });
+  }
 
   return { coverImageName, danglingAssetNames: danglingAssetNames.sort(), mappings, uploadedCount };
 };
