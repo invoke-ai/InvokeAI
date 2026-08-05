@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 
 import {
   checkDependency,
@@ -7,10 +7,12 @@ import {
   formatViolation,
   getModuleOwner,
   isExcepted,
+  primeImportSources,
   resolveImportPath,
 } from './dependencyPolicy';
 import { FEATURE_PUBLIC_INTERFACES } from './featureInterfaces';
 import { migrationExceptions } from './migrationExceptions';
+import { closeSourceAnalysis } from './tsSourceAnalysis';
 
 const sources = import.meta.glob('../**/*.{ts,tsx}', {
   eager: true,
@@ -20,6 +22,8 @@ const sources = import.meta.glob('../**/*.{ts,tsx}', {
 
 const toSourcePath = (path: string): string => path.replace(/^\.\.\//, '');
 const isProduction = (path: string): boolean => !/\.(?:test|browser\.test)\.[^.]+$/.test(path);
+
+afterAll(closeSourceAnalysis);
 
 describe('dependency policy parser', () => {
   it('classifies every supported TypeScript import form', () => {
@@ -211,6 +215,8 @@ describe('feature public-interface registry', () => {
 
 describe('production dependency graph', () => {
   it('classifies every production import and has no unowned violation', () => {
+    primeImportSources(Object.entries(sources).map(([path, source]) => [toSourcePath(path), source] as const));
+
     const violations = Object.entries(sources)
       .filter(([path]) => isProduction(path))
       .flatMap(([path, source]) => checkSource(toSourcePath(path), source))
