@@ -25,8 +25,9 @@ import {
 } from '@platform/state/accountLifecycle';
 import { Button, ColorPicker, DropZone, Field, Select, Slider } from '@platform/ui';
 import { useQueryClient } from '@tanstack/react-query';
+import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { useCanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
-import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
+import { useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { ImageIcon, PlusIcon, XIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -99,7 +100,9 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
   const queryClient = useQueryClient();
   const models = useModelsSelector((snapshot) => snapshot.models);
   const base = useSelectedModelBase();
-  const showSyntaxHighlighting = useActiveProjectSelector((project) => project.settings.showPromptSyntaxHighlighting);
+  const showSyntaxHighlighting = useWorkbenchPreferenceSelector(
+    (preferences) => preferences.showPromptSyntaxHighlighting
+  );
   const fillBeforeRef = useRef<CanvasMaskFillContract | null>(null);
   const [positivePrompt, setPositivePrompt] = useState(layer.positivePrompt ?? '');
   const [negativePrompt, setNegativePrompt] = useState(layer.negativePrompt ?? '');
