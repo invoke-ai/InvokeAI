@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import process from 'node:process';
+import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
 import { MOCK_BACKEND_PROFILE_COUNTS, MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME } from './mock-backend-fixtures.mjs';
@@ -19,6 +20,7 @@ const sourceProjectId = 'fixture-project-002';
 const sourceProjectName = 'Fixture Project 002';
 const sourceProjectPath = `/#/app?project=${sourceProjectId}`;
 const journeyTimeoutMs = 60_000;
+const cleanupTimeoutMs = 2_000;
 
 const delay = (durationMs) =>
   new Promise((resolveDelay) => {
@@ -259,6 +261,8 @@ const runRoundTrip = async ({ backend, browser, contexts, errors, tempDirectory 
   const coverImageName = await waitForProjectCover(summary.project_id, restoredImageNames);
 
   assert.ok(layerImageNames.includes(coverImageName));
+  await importContext.close();
+  contexts.delete(importContext);
   assertNoBrowserErrors(errors);
 
   return {
@@ -269,103 +273,331 @@ const runRoundTrip = async ({ backend, browser, contexts, errors, tempDirectory 
   };
 };
 
-const startedAt = performance.now();
-const tempDirectory = await mkdtemp(join(tmpdir(), 'invokeai-project-file-journey-'));
-const contexts = new Set();
-const browserErrors = [];
-let backend = null;
-let browser = null;
-let preview = null;
-let previewError = '';
-let previewExit = null;
-let timeoutId;
-let result;
-let failure;
+const toError = (error) => (error instanceof Error ? error : new Error(String(error)));
 
-try {
-  const journey = (async () => {
-    backend = await startMockBackend(backendPort, { profile: 'representative' });
-    preview = spawn(
-      'pnpm',
-      ['exec', 'vite', 'preview', '--host', '127.0.0.1', '--port', String(port), '--strictPort'],
-      {
-        cwd: root,
-        detached: true,
-        env: { ...process.env, INVOKEAI_DEV_BACKEND: backendOrigin },
-        stdio: ['ignore', 'ignore', 'pipe'],
+const withTimeout = async (run, durationMs, label) => {
+  let timer;
+
+  try {
+    return await Promise.race([
+      Promise.resolve().then(run),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} exceeded ${String(durationMs)} ms.`)), durationMs);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+const getDefaultDependencies = () => ({
+  createTempDirectory: () => mkdtemp(join(tmpdir(), 'invokeai-project-file-journey-')),
+  killProcessGroup: (pid, signal) => process.kill(-pid, signal),
+  launchBrowser: ({ timeoutMs }) => chromium.launch({ headless: true, timeout: timeoutMs }),
+  now: () => performance.now(),
+  removeTempDirectory: (directory) => rm(directory, { force: true, recursive: true }),
+  runRoundTrip,
+  spawnPreview: () =>
+    spawn('pnpm', ['exec', 'vite', 'preview', '--host', '127.0.0.1', '--port', String(port), '--strictPort'], {
+      cwd: root,
+      detached: true,
+      env: { ...process.env, INVOKEAI_DEV_BACKEND: backendOrigin },
+      stdio: ['ignore', 'ignore', 'pipe'],
+    }),
+  startBackend: () => startMockBackend(backendPort, { profile: 'representative' }),
+  waitForPreview: ({ getPreviewExit }) => waitForPreview(getPreviewExit),
+});
+
+/**
+ * Owns the complete journey deadline and every disposable resource. Dependencies
+ * are injectable so timeout and teardown behavior can be tested without
+ * launching a browser or binding a port.
+ */
+export const executeProjectFileJourney = async ({
+  cleanupTimeoutMs: teardownLimitMs = cleanupTimeoutMs,
+  dependencies: dependencyOverrides = {},
+  timeoutMs = journeyTimeoutMs,
+} = {}) => {
+  const dependencies = { ...getDefaultDependencies(), ...dependencyOverrides };
+  const startedAt = dependencies.now();
+  const deadlineAt = startedAt + timeoutMs;
+  const controller = new AbortController();
+  const contexts = new Set();
+  const browserErrors = [];
+  const cleanupErrors = [];
+  const pendingOperations = new Set();
+  let backend = null;
+  let browser = null;
+  let preview = null;
+  let previewError = '';
+  let previewExit = null;
+  let tempDirectory = null;
+  let primaryFailure = null;
+  let teardownPromise = null;
+  let isJourneyComplete = false;
+
+  const remainingMs = () => Math.max(1, Math.ceil(deadlineAt - dependencies.now()));
+  const recordCleanupError = (label, error) => {
+    cleanupErrors.push(new Error(`${label}: ${toError(error).message}`, { cause: error }));
+  };
+  const attemptCleanup = async (label, run) => {
+    try {
+      await withTimeout(run, teardownLimitMs, `${label} cleanup`);
+    } catch (error) {
+      recordCleanupError(label, error);
+    }
+  };
+  const trackOperation = (operation) => {
+    pendingOperations.add(operation);
+    void operation.then(
+      () => pendingOperations.delete(operation),
+      () => pendingOperations.delete(operation)
+    );
+
+    return operation;
+  };
+  const waitForAbort = (operation) =>
+    new Promise((resolve, reject) => {
+      const onAbort = () => reject(controller.signal.reason);
+
+      if (controller.signal.aborted) {
+        reject(controller.signal.reason);
+        return;
+      }
+
+      controller.signal.addEventListener('abort', onAbort, { once: true });
+      operation.then(
+        (value) => {
+          controller.signal.removeEventListener('abort', onAbort);
+          resolve(value);
+        },
+        (error) => {
+          controller.signal.removeEventListener('abort', onAbort);
+          reject(error);
+        }
+      );
+    });
+  const acquire = async (label, create, dispose, assign) => {
+    const acquisition = trackOperation(
+      Promise.resolve()
+        .then(() => create({ signal: controller.signal, timeoutMs: remainingMs() }))
+        .then(async (resource) => {
+          if (controller.signal.aborted || teardownPromise !== null) {
+            await attemptCleanup(`${label} created after teardown`, () => dispose(resource));
+            throw controller.signal.reason ?? new Error(`${label} completed after teardown.`);
+          }
+
+          assign(resource);
+          return resource;
+        })
+    );
+
+    return waitForAbort(acquisition);
+  };
+  const stopPreview = async () => {
+    if (!preview?.pid || previewExit !== null) {
+      return;
+    }
+
+    const exitGraceMs = Math.min(500, Math.max(1, Math.floor(teardownLimitMs / 3)));
+    const waitForExit = () =>
+      new Promise((resolveExit) => {
+        if (previewExit !== null) {
+          resolveExit(true);
+          return;
+        }
+
+        const onExit = () => {
+          clearTimeout(timer);
+          resolveExit(true);
+        };
+        const timer = setTimeout(() => {
+          preview.removeListener('exit', onExit);
+          resolveExit(false);
+        }, exitGraceMs);
+
+        preview.once('exit', onExit);
+      });
+
+    try {
+      dependencies.killProcessGroup(preview.pid, 'SIGTERM');
+    } catch (error) {
+      if (error?.code !== 'ESRCH') {
+        throw error;
+      }
+      return;
+    }
+
+    if (await waitForExit()) {
+      return;
+    }
+
+    try {
+      dependencies.killProcessGroup(preview.pid, 'SIGKILL');
+    } catch (error) {
+      if (error?.code !== 'ESRCH') {
+        throw error;
+      }
+      return;
+    }
+
+    if (!(await waitForExit())) {
+      throw new Error('Vite preview did not exit after SIGKILL.');
+    }
+  };
+  const teardown = () => {
+    if (teardownPromise !== null) {
+      return teardownPromise;
+    }
+
+    teardownPromise = (async () => {
+      if (!controller.signal.aborted) {
+        controller.abort(new Error('Project-file journey teardown started.'));
+      }
+
+      const resourceCleanups = [
+        ...[...contexts].map((context, index) =>
+          attemptCleanup(`browser context ${String(index + 1)}`, () => context.close())
+        ),
+        ...(browser === null ? [] : [attemptCleanup('browser', () => browser.close())]),
+        ...(preview === null ? [] : [attemptCleanup('Vite preview', stopPreview)]),
+        ...(backend === null ? [] : [attemptCleanup('mock backend', () => backend.close())]),
+      ];
+
+      await Promise.all(resourceCleanups);
+      contexts.clear();
+
+      const pending = [...pendingOperations];
+      if (pending.length > 0) {
+        await attemptCleanup('pending journey operations', () => Promise.allSettled(pending));
+      }
+
+      if (tempDirectory !== null) {
+        const ownedTempDirectory = tempDirectory;
+        tempDirectory = null;
+        await attemptCleanup('journey temp directory', () => dependencies.removeTempDirectory(ownedTempDirectory));
+      }
+    })();
+
+    return teardownPromise;
+  };
+  const fail = (error) => {
+    if (primaryFailure === null) {
+      primaryFailure = toError(error);
+    }
+    if (!controller.signal.aborted) {
+      controller.abort(primaryFailure);
+    }
+    void teardown();
+  };
+  const deadlineTimer = setTimeout(() => {
+    fail(new Error(`Project-file journey exceeded its ${String(timeoutMs / 1_000)}-second timeout.`));
+  }, timeoutMs);
+  let result;
+
+  try {
+    await acquire(
+      'journey temp directory',
+      () => dependencies.createTempDirectory(),
+      (directory) => dependencies.removeTempDirectory(directory),
+      (directory) => {
+        tempDirectory = directory;
       }
     );
-    preview.stderr.on('data', (chunk) => {
+    await acquire(
+      'mock backend',
+      ({ signal }) => dependencies.startBackend({ signal }),
+      (resource) => resource.close(),
+      (resource) => {
+        backend = resource;
+      }
+    );
+
+    preview = dependencies.spawnPreview({ signal: controller.signal });
+    preview.stderr?.on('data', (chunk) => {
       previewError += String(chunk);
     });
+    preview.on('error', (error) => fail(error));
     preview.on('exit', (code, signal) => {
       previewExit = signal ? `signal ${signal}` : `code ${String(code)}`;
+      if (teardownPromise === null && !isJourneyComplete) {
+        fail(new Error(`Vite preview exited during the journey (${previewExit}).`));
+      }
     });
 
-    await waitForPreview(() => previewExit);
-    browser = await chromium.launch({ headless: true });
+    await waitForAbort(
+      trackOperation(
+        Promise.resolve(
+          dependencies.waitForPreview({
+            getPreviewExit: () => previewExit,
+            signal: controller.signal,
+          })
+        )
+      )
+    );
+    await acquire(
+      'browser',
+      ({ signal, timeoutMs: setupTimeoutMs }) =>
+        dependencies.launchBrowser({ errors: browserErrors, signal, timeoutMs: setupTimeoutMs }),
+      (resource) => resource.close(),
+      (resource) => {
+        browser = resource;
+      }
+    );
 
-    return runRoundTrip({
-      backend,
-      browser,
-      contexts,
-      errors: browserErrors,
-      tempDirectory,
+    result = await waitForAbort(
+      trackOperation(
+        Promise.resolve(
+          dependencies.runRoundTrip({
+            backend,
+            browser,
+            contexts,
+            errors: browserErrors,
+            signal: controller.signal,
+            tempDirectory,
+          })
+        )
+      )
+    );
+    isJourneyComplete = true;
+  } catch (error) {
+    fail(error);
+  } finally {
+    clearTimeout(deadlineTimer);
+    await teardown();
+  }
+
+  const durationMs = Math.round(dependencies.now() - startedAt);
+  const failures = [...(primaryFailure === null ? [] : [primaryFailure]), ...cleanupErrors, ...browserErrors];
+
+  if (failures.length > 0) {
+    const detail = failures.map((error) => error.stack ?? error.message).join('\n');
+    const previewDetail = previewError ? `\nVite preview stderr:\n${previewError}` : '';
+
+    throw new Error(`${detail}${previewDetail}\nJourney duration: ${String(durationMs)} ms.`, {
+      cause: primaryFailure ?? failures[0],
     });
-  })();
-  const timeout = new Promise((_, reject) => {
-    timeoutId = setTimeout(() => {
-      reject(new Error(`Project-file journey exceeded its ${String(journeyTimeoutMs / 1_000)}-second timeout.`));
-    }, journeyTimeoutMs);
-  });
-
-  result = await Promise.race([journey, timeout]);
-} catch (error) {
-  failure = error;
-} finally {
-  clearTimeout(timeoutId);
-
-  for (const context of contexts) {
-    try {
-      await context.close();
-    } catch {
-      // A timed-out browser may already have torn down this context.
-    }
-  }
-  await browser?.close();
-
-  if (preview?.pid) {
-    try {
-      process.kill(-preview.pid, 'SIGTERM');
-    } catch {
-      // Preview may already have exited after a startup failure.
-    }
   }
 
-  await backend?.close();
-  await rm(tempDirectory, { force: true, recursive: true });
+  return { durationMs, result };
+};
+
+const isMain = process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  const { durationMs, result } = await executeProjectFileJourney();
+
+  process.stdout.write(
+    `${JSON.stringify(
+      {
+        durationMs,
+        ports: { backend: backendPort, preview: port },
+        result,
+        status: 'passed',
+        timeoutMs: journeyTimeoutMs,
+      },
+      null,
+      2
+    )}\n`
+  );
 }
-
-const durationMs = Math.round(performance.now() - startedAt);
-
-if (failure) {
-  const detail = failure instanceof Error ? (failure.stack ?? failure.message) : String(failure);
-  const browserDetail = browserErrors.length > 0 ? `\n${browserErrors.map((error) => error.message).join('\n')}` : '';
-  const previewDetail = previewError ? `\nVite preview stderr:\n${previewError}` : '';
-
-  throw new Error(`${detail}${browserDetail}${previewDetail}\nJourney duration: ${String(durationMs)} ms.`);
-}
-
-process.stdout.write(
-  `${JSON.stringify(
-    {
-      durationMs,
-      ports: { backend: backendPort, preview: port },
-      result,
-      status: 'passed',
-      timeoutMs: journeyTimeoutMs,
-    },
-    null,
-    2
-  )}\n`
-);
