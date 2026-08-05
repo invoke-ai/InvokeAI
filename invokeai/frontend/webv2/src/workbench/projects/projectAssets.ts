@@ -60,20 +60,25 @@ export const PROJECT_HISTORY_ROOT_KEYS: ReadonlySet<string> = new Set(['events',
 export const PROJECT_HISTORY_KEYS: ReadonlySet<string> = new Set(['recentImages', 'snapshot', 'snapshots']);
 
 /**
- * The gallery widget's selection, which is a pointer into gallery content rather
- * than anything the document renders. `selectedImage` holds a whole polymorphic
- * `GalleryItem` (image or video), and the two name keys hold `"<kind>:<name>"`.
+ * The gallery widget's selection: pointers into gallery content rather than
+ * anything the document renders. `selectedImage` holds a whole polymorphic
+ * `GalleryItem` (image or video), the two name keys hold `"<kind>:<name>"`, and
+ * `compareImage` holds the image the Preview widget is comparing against.
  *
- * These are skipped deliberately. The gallery is per-install content: a project
+ * All are skipped deliberately. The gallery is per-install content: a project
  * that arrives on another machine should open with nothing selected, not drag a
  * stranger's gallery in behind it.
  *
- * The skip is by key rather than incidental. `GalleryItem` happens to spell its
- * name field `name`, which no collector key matches, so today these would be
- * missed anyway — but that is an accident of naming, and renaming that field
- * would otherwise change what a project file silently contains.
+ * The two halves got here differently, which is why the skip is by key rather
+ * than left to chance. `selectedImage` and the name keys were already missed,
+ * but only because `GalleryItem` spells its name field `name` and no collector
+ * key matches it — an accident that renaming the field would have undone.
+ * `compareImage` is a `GeneratedImageContract`, so it carries `imageName` and
+ * was genuinely being bundled: excluding it is a real change, and the right one,
+ * since a comparison someone happened to leave open is not part of the project.
  */
 export const GALLERY_SELECTION_KEYS: ReadonlySet<string> = new Set([
+  'compareImage',
   'selectedImage',
   'selectedImageName',
   'selectedImageNames',

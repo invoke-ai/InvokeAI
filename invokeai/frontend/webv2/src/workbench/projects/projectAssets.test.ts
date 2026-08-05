@@ -167,6 +167,25 @@ describe('collectLiveAssetRefs', () => {
     expect(refs.images.has('selected.mp4')).toBe(false);
   });
 
+  /**
+   * `compareImage` is a `GeneratedImageContract`, so it carries `imageName` and
+   * would otherwise be collected. A comparison left open is not project content.
+   */
+  it('excludes the compare selection', () => {
+    const { images } = collectLiveAssetRefs(
+      projectDocument({
+        widgetInstances: {
+          'gallery-1': {
+            state: { values: { compareImage: { ...imageRef('compare.png'), imageUrl: '' } } },
+            typeId: 'gallery',
+          },
+        },
+      })
+    );
+
+    expect(images.has('compare.png')).toBe(false);
+  });
+
   it('keeps excluding the gallery selection even if it starts spelling its name `imageName`', () => {
     const { images } = collectLiveAssetRefs(
       projectDocument({
