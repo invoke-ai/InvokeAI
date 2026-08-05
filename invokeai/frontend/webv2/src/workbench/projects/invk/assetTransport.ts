@@ -1,5 +1,5 @@
 import { mapWithConcurrency } from '@platform/core/concurrency';
-import { apiFetch, apiFetchJson, apiFetchRaw, HttpRequestIdentityExpiredError } from '@platform/transport/http';
+import { apiFetch, apiFetchJson, apiFetchRaw, assertOk, HttpRequestIdentityExpiredError } from '@platform/transport/http';
 
 /**
  * The asset half of a project file: pulling referenced bytes off the server on
@@ -118,7 +118,16 @@ export const findExistingVideoNames = async (
   const found = await mapWithConcurrency(videoNames, VIDEO_EXISTENCE_CONCURRENCY, async (videoName) => {
     const response = await apiFetchRaw(`${VIDEOS_BASE}/i/${encodeURIComponent(videoName)}`, { signal });
 
-    return response.ok ? videoName : null;
+    if (response.ok) {
+      return videoName;
+    }
+
+    if (response.status === 403 || response.status === 404) {
+      return null;
+    }
+
+    await assertOk(response);
+    return null;
   });
 
   return new Set(found.filter((videoName): videoName is string => videoName !== null));
