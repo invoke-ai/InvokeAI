@@ -5,12 +5,12 @@
  * To publish a new entry module, add it here and cover it in dependencyPolicy.test.ts.
  */
 export const FEATURE_PUBLIC_INTERFACES: Readonly<Record<string, readonly string[]>> = {
-  gallery: ['contracts', 'paletteSearch', 'queries', 'react', 'utility', 'widget'],
+  gallery: ['contracts', 'launchpad', 'paletteSearch', 'queries', 'react', 'utility', 'widget'],
   generation: ['components', 'contracts', 'graph', 'prompts', 'queries', 'react', 'runtime', 'settings', 'widget'],
   identity: [],
-  models: ['react'],
+  models: ['launchpad', 'react'],
   nodes: [],
-  queue: ['contracts', 'devices', 'menu', 'queries', 'react', 'reveal', 'utility', 'widget'],
+  queue: ['contracts', 'devices', 'launchpad', 'menu', 'queries', 'react', 'reveal', 'utility', 'widget'],
   upscale: ['widget'],
   workflow: ['contracts', 'graph', 'paletteSearch', 'preview', 'queries', 'react', 'utility', 'widget'],
 };

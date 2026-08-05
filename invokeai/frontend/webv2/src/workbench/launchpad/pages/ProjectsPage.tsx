@@ -1,7 +1,7 @@
-import type { SystemStyleObject } from '@chakra-ui/react';
+/* eslint-disable react-perf/jsx-no-jsx-as-prop */
+import type { ProjectSortId, ProjectsViewId } from '@workbench/launchpad/projects/projectLibraryView';
 
-import { Flex, Heading, HStack, Stack, Text } from '@chakra-ui/react';
-import { useAuthSession } from '@features/identity';
+import { Stack } from '@chakra-ui/react';
 import { LAUNCHPAD_READY_MARK, markSemanticReady } from '@platform/performance/semanticReady';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import {
@@ -9,49 +9,62 @@ import {
   captureAccountScope,
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
-import { Button, Scrollable, toaster } from '@platform/ui';
+import { Button, toaster } from '@platform/ui';
+import { PageShell } from '@platform/ui/PageShell';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { KnownBrowserIssuesAlert } from '@workbench/launchpad/KnownBrowserIssuesAlert';
-import { ProjectsGrid } from '@workbench/launchpad/ProjectsGrid';
-import { refreshProjectLibrary } from '@workbench/projects/library';
+import { prunePinnedProjects, toggleProjectPinPreference } from '@workbench/launchpad/projects/projectPins';
+import { ProjectsBrowser } from '@workbench/launchpad/projects/ProjectsBrowser';
+import { ProjectsToolbar } from '@workbench/launchpad/projects/ProjectsToolbar';
+import { getProjectLibrary, refreshProjectLibrary } from '@workbench/projects/library';
+import { refreshOpenProjects } from '@workbench/projects/openProjects';
 import { importProjectFile, pickProjectFile } from '@workbench/projects/projectFile';
+import { patchWorkbenchPreferences, useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { FileUpIcon, PlusIcon } from 'lucide-react';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /**
- * The Launchpad's home section: your project library. It keeps a comfortable
- * centered measure (the grid reads better than full-bleed) and owns its own
- * scroll so the rail and header stay fixed.
+ * The Launchpad's project library.
+ *
+ * Sort, layout, and pins persist through workbench preferences, so they follow
+ * the account rather than the browser. The search term deliberately does not —
+ * a filter you did not set is a filter you cannot find your way out of.
  */
-const PROJECTS_PAGE_MEASURE_SX: SystemStyleObject = {
-  maxW: '6xl',
-  mx: 'auto',
-  p: { base: 4, md: 8 },
-  w: 'full',
-};
 
 const NEW_PROJECT_SEARCH = { new: true } as const;
 
 export const ProjectsPage = () => {
-  const session = useAuthSession();
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const [searchTerm, setSearchTerm] = useState('');
+  // Captured once per visit: the date buckets should reflect when the library
+  // was opened, and reading the clock each render would rebucket unstably.
+  const [now] = useState(() => Date.now());
+
+  const view = useWorkbenchPreferenceSelector((preferences) => preferences.launchpadProjectsView);
+  const sort = useWorkbenchPreferenceSelector((preferences) => preferences.launchpadProjectsSort);
+  const pinnedIds = useWorkbenchPreferenceSelector((preferences) => preferences.launchpadPinnedProjectIds);
 
   useMountEffect(() => {
     const owner = captureAccountScope();
 
+    void refreshOpenProjects();
     void refreshProjectLibrary().then(() => {
       if (isAccountScopeCurrent(owner)) {
+        prunePinnedProjects(getProjectLibrary().summaries);
         markSemanticReady(LAUNCHPAD_READY_MARK);
       }
     });
   });
 
-  const displayName = session.user?.display_name?.trim();
-  const greeting = displayName
-    ? t('launchpad.projectsGreetingWithName', { name: displayName })
-    : t('launchpad.projectsGreeting');
+  const handleViewChange = useCallback((next: ProjectsViewId) => {
+    void patchWorkbenchPreferences({ launchpadProjectsView: next });
+  }, []);
+  const handleSortChange = useCallback((next: ProjectSortId) => {
+    void patchWorkbenchPreferences({ launchpadProjectsSort: next });
+  }, []);
+  const handleClearSearch = useCallback(() => setSearchTerm(''), []);
 
   const handleImport = useCallback(async () => {
     const owner = captureAccountScope();
@@ -82,33 +95,47 @@ export const ProjectsPage = () => {
   const handleImportClick = useCallback(() => void handleImport(), [handleImport]);
 
   return (
-    <Scrollable h="full" label={t('launchpad.sections.projects')} minH="0">
-      <Stack css={PROJECTS_PAGE_MEASURE_SX} gap="5">
-        <Flex align="center" gap="3" justify="space-between" wrap="wrap">
-          <Stack gap="0.5">
-            <Heading fontSize="xl" fontWeight="700">
-              {greeting}
-            </Heading>
-            <Text color="fg.muted" fontSize="xs">
-              {t('launchpad.projectsSubtitle')}
-            </Text>
-          </Stack>
-          <HStack gap="2" wrap="wrap">
-            <Button size="xs" variant="outline" onClick={handleImportClick}>
-              <FileUpIcon />
-              {t('projects.importWithEllipsis')}
-            </Button>
-            <Button asChild size="xs" variant="solid">
-              <Link search={NEW_PROJECT_SEARCH} to="/app">
-                <PlusIcon />
-                {t('projects.newProject')}
-              </Link>
-            </Button>
-          </HStack>
-        </Flex>
-        <KnownBrowserIssuesAlert />
-        <ProjectsGrid />
-      </Stack>
-    </Scrollable>
+    <PageShell
+      actions={
+        <>
+          <Button size="xs" variant="outline" onClick={handleImportClick}>
+            <FileUpIcon />
+            {t('projects.importWithEllipsis')}
+          </Button>
+          <Button asChild size="xs" variant="solid">
+            <Link search={NEW_PROJECT_SEARCH} to="/app">
+              <PlusIcon />
+              {t('projects.newProject')}
+            </Link>
+          </Button>
+        </>
+      }
+      banner={
+        <Stack gap="4">
+          <KnownBrowserIssuesAlert />
+          <ProjectsToolbar
+            searchTerm={searchTerm}
+            sort={sort}
+            view={view}
+            onSearchTermChange={setSearchTerm}
+            onSortChange={handleSortChange}
+            onViewChange={handleViewChange}
+          />
+        </Stack>
+      }
+      description={t('projects.libraryDescription')}
+      scroll="content"
+      title={t('launchpad.sections.projects')}
+    >
+      <ProjectsBrowser
+        now={now}
+        pinnedIds={pinnedIds}
+        searchTerm={searchTerm}
+        sort={sort}
+        view={view}
+        onClearSearch={handleClearSearch}
+        onTogglePin={toggleProjectPinPreference}
+      />
+    </PageShell>
   );
 };

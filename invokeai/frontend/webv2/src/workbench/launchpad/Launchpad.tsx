@@ -5,12 +5,13 @@ import { NodesPage } from '@features/nodes';
 import { Tabs } from '@platform/ui';
 import { useLocation, useNavigate } from '@tanstack/react-router';
 import { LaunchpadCommandPalette } from '@workbench/palette/LaunchpadCommandPalette';
-import { BoxIcon, BlocksIcon, FolderIcon, UsersIcon, type LucideIcon } from 'lucide-react';
+import { BoxIcon, BlocksIcon, FolderIcon, HouseIcon, UsersIcon, type LucideIcon } from 'lucide-react';
 import { useCallback, useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { LaunchpadNav } from './LaunchpadNav';
+import { LaunchpadNav, type LaunchpadNavGroupId } from './LaunchpadNav';
 import { LaunchpadTopBar } from './LaunchpadTopBar';
+import { HomePage } from './pages/HomePage';
 import { ProjectsPage } from './pages/ProjectsPage';
 
 /**
@@ -21,30 +22,40 @@ import { ProjectsPage } from './pages/ProjectsPage';
  * them. It deliberately mounts none of the workbench providers or runtimes, so
  * it stays on the light side of the route-level code split; the heaviest page,
  * the model manager, lazy-loads its own chunk the first time it is opened.
+ *
+ * Sections carry a `group`, because where you work and what you administer are
+ * not peers: a flat list gave "Users" the same standing as "Projects".
  */
 
-type LaunchpadSectionId = 'projects' | 'models' | 'nodes' | 'users';
+type LaunchpadSectionId = 'home' | 'projects' | 'models' | 'nodes' | 'users';
 
 interface LaunchpadSection {
   id: LaunchpadSectionId;
   label: string;
   icon: LucideIcon;
+  group: LaunchpadNavGroupId;
   render: () => ReactNode;
   condition?: boolean;
 }
 
-const DEFAULT_SECTION_ID: LaunchpadSectionId = 'projects';
-const SECTION_IDS: readonly string[] = ['projects', 'models', 'nodes', 'users'];
+const DEFAULT_SECTION_ID: LaunchpadSectionId = 'home';
+const SECTION_IDS: readonly string[] = ['home', 'projects', 'models', 'nodes', 'users'];
 
 const isSectionId = (value: string): value is LaunchpadSectionId => SECTION_IDS.includes(value);
 
+/** `/` is Home; every other section is its own path. */
 const normalizeSectionId = (value: string): LaunchpadSectionId | null => {
   const id = value.replace(/^\/+/, '');
+
+  if (id === '') {
+    return 'home';
+  }
 
   return isSectionId(id) ? id : null;
 };
 
-const SECTION_PATHS: Record<LaunchpadSectionId, '/projects' | '/models' | '/nodes' | '/users'> = {
+const SECTION_PATHS: Record<LaunchpadSectionId, '/' | '/projects' | '/models' | '/nodes' | '/users'> = {
+  home: '/',
   models: '/models',
   nodes: '/nodes',
   projects: '/projects',
@@ -77,6 +88,14 @@ export const Launchpad = () => {
       (
         [
           {
+            group: 'workspace',
+            icon: HouseIcon,
+            id: 'home',
+            label: t('launchpad.sections.home'),
+            render: () => <HomePage />,
+          },
+          {
+            group: 'workspace',
             icon: FolderIcon,
             id: 'projects',
             label: t('launchpad.sections.projects'),
@@ -84,6 +103,7 @@ export const Launchpad = () => {
           },
           {
             condition: canManageModels,
+            group: 'manage',
             icon: BoxIcon,
             id: 'models',
             label: t('launchpad.sections.models'),
@@ -91,6 +111,7 @@ export const Launchpad = () => {
           },
           {
             condition: canManageNodes,
+            group: 'manage',
             icon: BlocksIcon,
             id: 'nodes',
             label: t('launchpad.sections.nodes'),
@@ -98,6 +119,7 @@ export const Launchpad = () => {
           },
           {
             condition: canManageUsers,
+            group: 'manage',
             icon: UsersIcon,
             id: 'users',
             label: t('launchpad.sections.users'),

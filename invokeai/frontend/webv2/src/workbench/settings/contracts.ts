@@ -1,6 +1,9 @@
 import type { WorkbenchLanguage } from '@platform/i18n/languages';
 import type { WorkbenchThemeId } from '@theme/themes';
 import type { DeveloperLogLevel, DeveloperLogNamespace } from '@workbench/diagnostics/contracts';
+import type { ProjectSortId, ProjectsViewId } from '@workbench/launchpad/projects/projectLibraryView';
+
+export type { ProjectSortId, ProjectsViewId } from '@workbench/launchpad/projects/projectLibraryView';
 
 export type { WorkbenchLanguage } from '@platform/i18n/languages';
 
@@ -57,6 +60,12 @@ export interface WorkbenchPreferences {
   customHotkeys: Record<string, string[]>;
   /** Generate panel section open/closed overrides keyed by section id; absent = section default. */
   generateSectionsOpen: Record<string, boolean>;
+  /** How the Launchpad's project library is laid out. */
+  launchpadProjectsView: ProjectsViewId;
+  /** What the Launchpad's project library is ordered and bucketed by. */
+  launchpadProjectsSort: ProjectSortId;
+  /** Projects pinned to the top of the library, oldest pin first. */
+  launchpadPinnedProjectIds: string[];
   /** User-saved Krea-2 conditioning rebalance curves, in the order they were saved. */
   krea2RebalancePresets: StoredRebalancePreset[];
 }

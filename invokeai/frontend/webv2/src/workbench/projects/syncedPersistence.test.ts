@@ -313,6 +313,40 @@ describe('loadWorkbench session hydration', () => {
     expect(snapshot?.state.activeProjectId).not.toBe(first.id);
     expect(service.hasPendingChanges()).toBe(true);
   });
+
+  it('still starts a draft for a new-project request when the backend is unreachable', async () => {
+    const state = createInitialWorkbenchState();
+    const cachedProjectId = state.projects[0]?.id ?? '';
+
+    storage.set(
+      'invokeai:v7:webv2:workbench',
+      JSON.stringify({ savedAt: '2026-07-19T00:00:00.000Z', state, version: 1 })
+    );
+    api.listProjects.mockRejectedValueOnce(new Error('offline'));
+
+    const snapshot = await service.loadWorkbench({ createNew: true });
+
+    // Returning the cache verbatim here used to reopen whichever project was
+    // last active, so an offline "New project" landed the user in existing work
+    // — and let the Launchpad's intent rearrange it.
+    expect(snapshot?.state.projects).toHaveLength(state.projects.length + 1);
+    expect(snapshot?.state.activeProjectId).not.toBe(cachedProjectId);
+  });
+
+  it('reopens the cached session when the backend is unreachable and no draft was requested', async () => {
+    const state = createInitialWorkbenchState();
+
+    storage.set(
+      'invokeai:v7:webv2:workbench',
+      JSON.stringify({ savedAt: '2026-07-19T00:00:00.000Z', state, version: 1 })
+    );
+    api.listProjects.mockRejectedValueOnce(new Error('offline'));
+
+    const snapshot = await service.loadWorkbench();
+
+    expect(snapshot?.state.projects).toHaveLength(state.projects.length);
+    expect(snapshot?.state.activeProjectId).toBe(state.activeProjectId);
+  });
 });
 
 describe('saveWorkbench', () => {

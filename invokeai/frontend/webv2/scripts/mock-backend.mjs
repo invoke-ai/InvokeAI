@@ -30,6 +30,32 @@ const MOCK_USER_ID = 'fixture-user';
 
 const clone = (value) => structuredClone(value);
 
+/**
+ * Two starter bundles, so the Launchpad's "no models installed" onboarding can
+ * actually be exercised. An empty response renders no call to action at all,
+ * which made the most important path on a fresh install unverifiable.
+ */
+const STARTER_MODEL = {
+  base: 'sd-1',
+  description: 'Fixture starter model',
+  format: 'diffusers',
+  is_installed: false,
+  name: 'Fixture Starter',
+  source: 'https://example.invalid/fixture-starter.safetensors',
+  type: 'main',
+};
+
+const STARTER_MODELS_RESPONSE = {
+  starter_bundles: {
+    'sd-1': { models: [STARTER_MODEL], name: 'Stable Diffusion 1.5' },
+    sdxl: {
+      models: [{ ...STARTER_MODEL, base: 'sdxl', name: 'Fixture Starter XL' }],
+      name: 'SDXL',
+    },
+  },
+  starter_models: [STARTER_MODEL],
+};
+
 const createState = (profile) => {
   const fixture = assertMockBackendFixture(createMockBackendFixture(profile));
 
@@ -707,7 +733,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         return json(200, []);
       }
       if (method === 'GET' && path === '/api/v2/models/starter_models') {
-        return json(200, { starter_bundles: {}, starter_models: [] });
+        return json(200, STARTER_MODELS_RESPONSE);
       }
       if (method === 'GET' && path === '/api/v2/models/hf_login') {
         return json(200, 'unknown');

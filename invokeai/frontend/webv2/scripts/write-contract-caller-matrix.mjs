@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, extname, join, relative, resolve } from 'node:path';
-import ts from 'typescript-legacy';
+
+import { analyzeSource, closeSourceAnalysis, primeSourceAnalysis } from '#architecture/source-analysis';
 
 const packageRoot = process.cwd();
 const sourceRoot = resolve(packageRoot, 'src');
@@ -94,41 +95,8 @@ const resolveImport = (sourcePath, specifier) => {
   return stem ? (pathByStem.get(stem) ?? pathByStem.get(`${stem}/index`) ?? null) : null;
 };
 
-const parse = (path) =>
-  ts.createSourceFile(
-    path,
-    sources.get(path),
-    ts.ScriptTarget.Latest,
-    true,
-    path.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS
-  );
-
-const exportedSymbols = (path) => {
-  const symbols = new Set();
-  for (const statement of parse(path).statements) {
-    const modifiers = ts.canHaveModifiers(statement) ? ts.getModifiers(statement) : undefined;
-    if (modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)) {
-      if (statement.name && ts.isIdentifier(statement.name)) {
-        symbols.add(statement.name.text);
-      }
-      if (ts.isVariableStatement(statement)) {
-        for (const declaration of statement.declarationList.declarations) {
-          if (ts.isIdentifier(declaration.name)) {
-            symbols.add(declaration.name.text);
-          }
-        }
-      }
-    }
-    if (ts.isExportDeclaration(statement) && statement.exportClause && ts.isNamedExports(statement.exportClause)) {
-      for (const element of statement.exportClause.elements) {
-        symbols.add(element.name.text);
-      }
-    }
-  }
-  return [...symbols].sort();
-};
-
 const callerRecords = new Map(hubs.map((hub) => [hub, new Map()]));
+const allCallerRecords = new Map(hubs.map((hub) => [hub, new Set()]));
 const addCaller = (hub, symbol, caller) => {
   const symbols = callerRecords.get(hub);
   const callers = symbols.get(symbol) ?? new Set();
@@ -136,49 +104,55 @@ const addCaller = (hub, symbol, caller) => {
   symbols.set(symbol, callers);
 };
 
-for (const path of paths) {
-  for (const statement of parse(path).statements) {
-    if (
-      !ts.isImportDeclaration(statement) ||
-      !statement.importClause ||
-      !ts.isStringLiteralLike(statement.moduleSpecifier)
-    ) {
-      continue;
-    }
-    const target = resolveImport(path, statement.moduleSpecifier.text);
-    if (!target || !callerRecords.has(target)) {
-      continue;
-    }
-    const bindings = statement.importClause.namedBindings;
-    if (bindings && ts.isNamedImports(bindings)) {
-      for (const element of bindings.elements) {
-        addCaller(target, (element.propertyName ?? element.name).text, path);
+try {
+  // Load the whole tree in one snapshot; parsing file by file costs a round trip each.
+  primeSourceAnalysis(sources);
+
+  for (const path of paths) {
+    for (const reference of analyzeSource(path, sources.get(path)).moduleReferences) {
+      if (reference.form !== 'import-declaration') {
+        continue;
       }
-    } else {
-      addCaller(target, '*', path);
+      const target = resolveImport(path, reference.specifier);
+      if (!target || !callerRecords.has(target)) {
+        continue;
+      }
+      if (reference.symbols.length > 0) {
+        allCallerRecords.get(target).add(path);
+      }
+      for (const symbol of reference.symbols) {
+        if (symbol !== 'default' && symbol !== '*') {
+          addCaller(target, symbol, path);
+        }
+      }
     }
   }
-}
 
-const matrix = hubs.map((hub) => {
-  const callersBySymbol = callerRecords.get(hub);
-  const symbols = exportedSymbols(hub).map((symbol) => {
-    const callers = [...(callersBySymbol.get(symbol) ?? [])].sort();
+  const matrix = hubs.map((hub) => {
+    const callersBySymbol = callerRecords.get(hub);
+    const exportedSymbols = new Set(analyzeSource(hub, sources.get(hub)).publicExports);
+    exportedSymbols.delete('default');
+    exportedSymbols.delete('*');
+    const symbols = [...exportedSymbols].sort().map((symbol) => {
+      const callers = [...(callersBySymbol.get(symbol) ?? [])].sort();
+      return {
+        callers,
+        productionCallers: callers.filter((path) => !isTest(path)),
+        symbol,
+      };
+    });
+    const allCallers = [...allCallerRecords.get(hub)].sort();
     return {
-      callers,
-      productionCallers: callers.filter((path) => !isTest(path)),
-      symbol,
+      allCallers,
+      hub,
+      productionCallerCount: allCallers.filter((path) => !isTest(path)).length,
+      symbols,
     };
   });
-  const allCallers = [...new Set([...callersBySymbol.values()].flatMap((callers) => [...callers]))].sort();
-  return {
-    allCallers,
-    hub,
-    productionCallerCount: allCallers.filter((path) => !isTest(path)).length,
-    symbols,
-  };
-});
 
-const artifactPath = resolve(packageRoot, 'artifacts/architecture/contract-caller-matrix.json');
-mkdirSync(dirname(artifactPath), { recursive: true });
-writeFileSync(artifactPath, `${JSON.stringify({ hubs: matrix }, null, 2)}\n`);
+  const artifactPath = resolve(packageRoot, 'artifacts/architecture/contract-caller-matrix.json');
+  mkdirSync(dirname(artifactPath), { recursive: true });
+  writeFileSync(artifactPath, `${JSON.stringify({ hubs: matrix }, null, 2)}\n`);
+} finally {
+  closeSourceAnalysis();
+}
