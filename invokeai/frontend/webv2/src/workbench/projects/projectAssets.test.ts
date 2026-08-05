@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { collectLiveImageRefs, remapImageRefs, selectCoverImageName } from './projectAssets';
+import { collectLiveAssetRefs, remapAssetRefs, selectCoverImageName } from './projectAssets';
 
 /**
  * The walker's contract, stated as documents rather than as paths: what an
- * archive must bundle, what it must leave behind, and what has to be rewritten
- * when the server hands back a different name.
+ * archive must bundle, what it must leave behind, which kind each name is, and
+ * what has to be rewritten when the server hands back a different name.
  */
 
 const imageRef = (imageName: string) => ({ height: 512, imageName, width: 512 });
@@ -33,6 +33,8 @@ const galleryInstance = (recentImageNames: string[]) => ({
   },
 });
 
+const noMappings = { images: new Map<string, string>(), videos: new Map<string, string>() };
+
 const projectDocument = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
   canvas: {
     document: { layers: [imageLayer('layer-1', 'live-image.png')], version: 2 },
@@ -54,32 +56,33 @@ const projectDocument = (overrides: Record<string, unknown> = {}): Record<string
   ...overrides,
 });
 
-describe('collectLiveImageRefs', () => {
-  it('collects canvas, widget value and graph node references', () => {
-    expect(collectLiveImageRefs(projectDocument())).toEqual(
-      new Set(['live-image.png', 'graph-image.png', 'upscale-input.png'])
-    );
+describe('collectLiveAssetRefs', () => {
+  it('collects canvas, widget value and graph node references as images', () => {
+    const refs = collectLiveAssetRefs(projectDocument());
+
+    expect(refs.images).toEqual(new Set(['live-image.png', 'graph-image.png', 'upscale-input.png']));
+    expect(refs.videos).toEqual(new Set());
   });
 
   it('leaves history behind — queue snapshots, graph history, events, canvas snapshots', () => {
-    const collected = collectLiveImageRefs(projectDocument());
+    const { images } = collectLiveAssetRefs(projectDocument());
 
-    expect(collected.has('queue-image.png')).toBe(false);
-    expect(collected.has('history-image.png')).toBe(false);
-    expect(collected.has('event-image.png')).toBe(false);
-    expect(collected.has('snapshot-image.png')).toBe(false);
+    expect(images.has('queue-image.png')).toBe(false);
+    expect(images.has('history-image.png')).toBe(false);
+    expect(images.has('event-image.png')).toBe(false);
+    expect(images.has('snapshot-image.png')).toBe(false);
   });
 
   it('leaves the gallery widget recents behind', () => {
-    const collected = collectLiveImageRefs(
+    const { images } = collectLiveAssetRefs(
       projectDocument({ widgetInstances: galleryInstance(['recent-a.png', 'recent-b.png']) })
     );
 
-    expect(collected.has('recent-a.png')).toBe(false);
+    expect(images.has('recent-a.png')).toBe(false);
   });
 
   it('finds references nested through arrays and mask bitmaps', () => {
-    const collected = collectLiveImageRefs(
+    const { images } = collectLiveAssetRefs(
       projectDocument({
         canvas: {
           document: {
@@ -96,37 +99,114 @@ describe('collectLiveImageRefs', () => {
       })
     );
 
-    expect(collected).toEqual(new Set(['mask.png', 'reference.png', 'graph-image.png', 'upscale-input.png']));
+    expect(images).toEqual(new Set(['mask.png', 'reference.png', 'graph-image.png', 'upscale-input.png']));
   });
 
   it('ignores empty names and non-string values', () => {
-    expect(collectLiveImageRefs({ canvas: { imageName: '' }, settings: { image_name: 7 } })).toEqual(new Set());
+    const refs = collectLiveAssetRefs({ canvas: { imageName: '' }, settings: { image_name: 7, video_name: null } });
+
+    expect(refs.images).toEqual(new Set());
+    expect(refs.videos).toEqual(new Set());
+  });
+
+  /**
+   * `VideoField { video_name }` reaches `projectGraph` through an imported
+   * workflow. It is a separate namespace from images and must not be conflated.
+   */
+  it('collects a graph node video as a video, never as an image', () => {
+    const refs = collectLiveAssetRefs(
+      projectDocument({
+        projectGraph: { nodes: [{ data: { inputs: { video: { video_name: 'clip.mp4' } } }, id: 'extract-1' }] },
+      })
+    );
+
+    expect(refs.videos).toEqual(new Set(['clip.mp4']));
+    expect(refs.images.has('clip.mp4')).toBe(false);
+  });
+
+  it('returns both sets for a document carrying both kinds', () => {
+    const refs = collectLiveAssetRefs(
+      projectDocument({
+        projectGraph: {
+          nodes: [
+            { data: { inputs: { image: { image_name: 'frame.png' }, video: { video_name: 'clip.mp4' } } }, id: 'n' },
+          ],
+        },
+      })
+    );
+
+    expect(refs.images).toEqual(new Set(['live-image.png', 'frame.png', 'upscale-input.png']));
+    expect(refs.videos).toEqual(new Set(['clip.mp4']));
+  });
+
+  /**
+   * The gallery selection is a pointer into per-install gallery content, not
+   * something the document renders, so neither kind is bundled. The second
+   * assertion is the regression guard: the exclusion is by key, so it survives
+   * `GalleryItem` spelling its name field the same way the canvas does.
+   */
+  it('excludes the gallery selection, of either kind', () => {
+    const refs = collectLiveAssetRefs(
+      projectDocument({
+        widgetInstances: {
+          'gallery-1': {
+            state: {
+              values: {
+                selectedImage: { fullUrl: '', kind: 'video', name: 'selected.mp4' },
+                selectedImageName: 'video:selected.mp4',
+                selectedImageNames: ['video:selected.mp4'],
+              },
+            },
+            typeId: 'gallery',
+          },
+        },
+      })
+    );
+
+    expect(refs.videos).toEqual(new Set());
+    expect(refs.images.has('selected.mp4')).toBe(false);
+  });
+
+  it('keeps excluding the gallery selection even if it starts spelling its name `imageName`', () => {
+    const { images } = collectLiveAssetRefs(
+      projectDocument({
+        widgetInstances: {
+          'gallery-1': {
+            state: { values: { selectedImage: { imageName: 'selected.png', kind: 'image' } } },
+            typeId: 'gallery',
+          },
+        },
+      })
+    );
+
+    expect(images.has('selected.png')).toBe(false);
   });
 });
 
-describe('remapImageRefs', () => {
-  it('returns the document unchanged for an empty mapping', () => {
+describe('remapAssetRefs', () => {
+  it('returns the document unchanged for empty mappings', () => {
     const document = projectDocument();
 
-    expect(remapImageRefs(document, new Map())).toBe(document);
+    expect(remapAssetRefs(document, noMappings)).toBe(document);
   });
 
   it('rewrites live references', () => {
-    const remapped = remapImageRefs(projectDocument(), new Map([['live-image.png', 'uploaded-1.png']])) as {
-      canvas: { document: { layers: { source: { image: { imageName: string } } }[] } };
-    };
+    const remapped = remapAssetRefs(projectDocument(), {
+      ...noMappings,
+      images: new Map([['live-image.png', 'uploaded-1.png']]),
+    }) as { canvas: { document: { layers: { source: { image: { imageName: string } } }[] } } };
 
     expect(remapped.canvas.document.layers[0]!.source.image.imageName).toBe('uploaded-1.png');
   });
 
   it('rewrites history references too, so nothing keeps pointing at the pre-import name', () => {
-    const remapped = remapImageRefs(
-      projectDocument(),
-      new Map([
+    const remapped = remapAssetRefs(projectDocument(), {
+      ...noMappings,
+      images: new Map([
         ['queue-image.png', 'uploaded-queue.png'],
         ['snapshot-image.png', 'uploaded-snapshot.png'],
-      ])
-    ) as {
+      ]),
+    }) as {
       canvas: { snapshots: { document: { layers: { source: { image: { imageName: string } } }[] } }[] };
       queue: {
         items: { snapshot: { canvas: { document: { layers: { source: { image: { imageName: string } } }[] } } } }[];
@@ -140,17 +220,49 @@ describe('remapImageRefs', () => {
   });
 
   it('rewrites the backend spelling of the key as well', () => {
-    const remapped = remapImageRefs(projectDocument(), new Map([['graph-image.png', 'uploaded-graph.png']])) as {
-      projectGraph: { nodes: { data: { inputs: { image: { image_name: string } } } }[] };
-    };
+    const remapped = remapAssetRefs(projectDocument(), {
+      ...noMappings,
+      images: new Map([['graph-image.png', 'uploaded-graph.png']]),
+    }) as { projectGraph: { nodes: { data: { inputs: { image: { image_name: string } } } }[] } };
 
     expect(remapped.projectGraph.nodes[0]!.data.inputs.image.image_name).toBe('uploaded-graph.png');
   });
 
-  it('leaves names absent from the mapping alone', () => {
-    const remapped = remapImageRefs(projectDocument(), new Map([['not-present.png', 'other.png']])) as {
+  it('rewrites a video through the video mapping', () => {
+    const document = projectDocument({
+      projectGraph: { nodes: [{ data: { inputs: { video: { video_name: 'clip.mp4' } } }, id: 'n' }] },
+    });
+    const remapped = remapAssetRefs(document, {
+      ...noMappings,
+      videos: new Map([['clip.mp4', 'server-clip.mp4']]),
+    }) as { projectGraph: { nodes: { data: { inputs: { video: { video_name: string } } } }[] } };
+
+    expect(remapped.projectGraph.nodes[0]!.data.inputs.video.video_name).toBe('server-clip.mp4');
+  });
+
+  /** The namespaces are separate, so a shared name must not cross over. */
+  it('never rewrites an image through the video mapping, or the reverse', () => {
+    const document = projectDocument({
+      canvas: { document: { layers: [imageLayer('l', 'shared')] } },
+      projectGraph: { nodes: [{ data: { inputs: { video: { video_name: 'shared' } } }, id: 'n' }] },
+    });
+    const remapped = remapAssetRefs(document, {
+      images: new Map([['shared', 'image-side']]),
+      videos: new Map([['shared', 'video-side']]),
+    }) as {
       canvas: { document: { layers: { source: { image: { imageName: string } } }[] } };
+      projectGraph: { nodes: { data: { inputs: { video: { video_name: string } } } }[] };
     };
+
+    expect(remapped.canvas.document.layers[0]!.source.image.imageName).toBe('image-side');
+    expect(remapped.projectGraph.nodes[0]!.data.inputs.video.video_name).toBe('video-side');
+  });
+
+  it('leaves names absent from the mapping alone', () => {
+    const remapped = remapAssetRefs(projectDocument(), {
+      ...noMappings,
+      images: new Map([['not-present.png', 'other.png']]),
+    }) as { canvas: { document: { layers: { source: { image: { imageName: string } } }[] } } };
 
     expect(remapped.canvas.document.layers[0]!.source.image.imageName).toBe('live-image.png');
   });

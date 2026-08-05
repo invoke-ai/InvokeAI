@@ -1,12 +1,12 @@
 import { mapWithConcurrency } from '@platform/core/concurrency';
-import { collectLiveImageRefs, selectCoverImageName } from '@workbench/projects/projectAssets';
+import { collectLiveAssetRefs, selectCoverImageName } from '@workbench/projects/projectAssets';
 
 import type { InvkArchiveEntry } from './archive';
-import type { FetchedThumbnail } from './imageTransport';
+import type { FetchedThumbnail } from './assetTransport';
 
 import { binaryEntry, textEntry, writeArchive } from './archive';
-import { INVK_DOCUMENT_ENTRY, INVK_IMAGES_PREFIX, INVK_MANIFEST_ENTRY } from './format';
-import { coverExtensionForMime, fetchImageBytes, fetchImageThumbnail } from './imageTransport';
+import { coverExtensionForMime, fetchImageBytes, fetchImageThumbnail, fetchVideoBytes } from './assetTransport';
+import { INVK_DOCUMENT_ENTRY, INVK_IMAGES_PREFIX, INVK_MANIFEST_ENTRY, INVK_VIDEOS_PREFIX } from './format';
 import { buildInvkManifest, toInvkFileName } from './manifest';
 
 /**
@@ -14,9 +14,9 @@ import { buildInvkManifest, toInvkFileName } from './manifest';
  * way `canvas-engine/export/psdExport.ts` splits PSD export.
  *
  * {@link planInvkExport} decides what the archive contains — entry names, which
- * image names to bundle, which one becomes the cover — from the document alone.
- * No network, no DOM, no fflate, so the interesting decision (what belongs in a
- * project file) is a node test rather than a manual round trip.
+ * asset names to bundle and of which kind, which image becomes the cover — from
+ * the document alone. No network, no DOM, no fflate, so the interesting decision
+ * (what belongs in a project file) is a node test rather than a manual round trip.
  *
  * {@link executeInvkExport} does the parts that can fail: fetching each image,
  * packing the ZIP, handing it to the browser.
@@ -27,8 +27,8 @@ import { buildInvkManifest, toInvkFileName } from './manifest';
  * resolves it.
  */
 
-/** Simultaneous image fetches. Matches the previous frontend's limit. */
-const IMAGE_FETCH_CONCURRENCY = 5;
+/** Simultaneous asset fetches. Matches the previous frontend's limit. */
+const ASSET_FETCH_CONCURRENCY = 5;
 
 export interface InvkExportPlan {
   /** Cover image name, or `null` for a project that has produced nothing. */
@@ -40,6 +40,8 @@ export interface InvkExportPlan {
   /** Image names to bundle, in a stable order. */
   imageNames: string[];
   manifestInput: { appVersion: string; createdAt: string; name: string; sourceProjectId?: string };
+  /** Video names to bundle, in a stable order. */
+  videoNames: string[];
 }
 
 export const planInvkExport = (input: {
@@ -50,19 +52,22 @@ export const planInvkExport = (input: {
 }): InvkExportPlan => {
   const sourceProjectId = typeof input.projectDocument.id === 'string' ? input.projectDocument.id : undefined;
 
+  const refs = collectLiveAssetRefs(input.projectDocument);
+
   return {
     coverImageName: selectCoverImageName(input.projectDocument),
     // Compact rather than indented: the document is machine-read, and the two
     // bytes per line would be the largest entry in the archive before deflate.
     documentJson: JSON.stringify(input.projectDocument),
     fileName: toInvkFileName(input.name),
-    imageNames: [...collectLiveImageRefs(input.projectDocument)].sort(),
+    imageNames: [...refs.images].sort(),
     manifestInput: {
       appVersion: input.appVersion,
       createdAt: input.createdAt,
       name: input.name,
       ...(sourceProjectId === undefined ? {} : { sourceProjectId }),
     },
+    videoNames: [...refs.videos].sort(),
   };
 };
 
@@ -76,46 +81,67 @@ export interface InvkExportDeps {
   download: (blob: Blob, fileName: string) => void;
   fetchImageBytes?: (imageName: string, signal?: AbortSignal) => Promise<Uint8Array | null>;
   fetchImageThumbnail?: (imageName: string, signal?: AbortSignal) => Promise<FetchedThumbnail | null>;
+  fetchVideoBytes?: (videoName: string, signal?: AbortSignal) => Promise<Uint8Array | null>;
   onProgress?: (progress: InvkExportProgress) => void;
   signal?: AbortSignal;
 }
 
 export interface InvkExportResult {
   /** Images successfully written into `images/`. */
-  bundledCount: number;
-  /** Referenced images the server would not serve. Their references still ship. */
-  missingImageNames: string[];
+  bundledImageCount: number;
+  /** Videos successfully written into `videos/`. */
+  bundledVideoCount: number;
+  /** Referenced assets the server would not serve. Their references still ship. */
+  missingAssetNames: string[];
 }
 
 export const executeInvkExport = async (plan: InvkExportPlan, deps: InvkExportDeps): Promise<InvkExportResult> => {
   const readImage = deps.fetchImageBytes ?? fetchImageBytes;
+  const readVideo = deps.fetchVideoBytes ?? fetchVideoBytes;
   const readThumbnail = deps.fetchImageThumbnail ?? fetchImageThumbnail;
   const entries = new Map<string, InvkArchiveEntry>();
-  const missingImageNames: string[] = [];
-  let bundledCount = 0;
+  const missingAssetNames: string[] = [];
+  let bundledImageCount = 0;
+  let bundledVideoCount = 0;
   let completed = 0;
 
   const cover =
     plan.coverImageName === null ? null : await readThumbnail(plan.coverImageName, deps.signal).catch(() => null);
   const coverEntryName = cover === null ? undefined : `cover.${coverExtensionForMime(cover.contentType)}`;
 
-  await mapWithConcurrency(plan.imageNames, IMAGE_FETCH_CONCURRENCY, async (imageName) => {
-    const bytes = await readImage(imageName, deps.signal).catch(() => null);
+  // One queue over both kinds: the concurrency limit is there to be kind to the
+  // backend, and it would not be if images and videos each got their own.
+  const assets = [
+    ...plan.imageNames.map((name) => ({ kind: 'image' as const, name })),
+    ...plan.videoNames.map((name) => ({ kind: 'video' as const, name })),
+  ];
+
+  await mapWithConcurrency(assets, ASSET_FETCH_CONCURRENCY, async ({ kind, name }) => {
+    const bytes = await (kind === 'image' ? readImage(name, deps.signal) : readVideo(name, deps.signal)).catch(
+      () => null
+    );
 
     completed += 1;
-    deps.onProgress?.({ completed, phase: 'bundling', total: plan.imageNames.length });
+    deps.onProgress?.({ completed, phase: 'bundling', total: assets.length });
 
     if (bytes === null) {
-      missingImageNames.push(imageName);
+      missingAssetNames.push(name);
 
       return;
     }
 
-    bundledCount += 1;
-    entries.set(`${INVK_IMAGES_PREFIX}${imageName}`, binaryEntry(bytes));
+    if (kind === 'image') {
+      bundledImageCount += 1;
+      entries.set(`${INVK_IMAGES_PREFIX}${name}`, binaryEntry(bytes));
+
+      return;
+    }
+
+    bundledVideoCount += 1;
+    entries.set(`${INVK_VIDEOS_PREFIX}${name}`, binaryEntry(bytes));
   });
 
-  deps.onProgress?.({ completed: plan.imageNames.length, phase: 'packing', total: plan.imageNames.length });
+  deps.onProgress?.({ completed: assets.length, phase: 'packing', total: assets.length });
 
   const manifest = buildInvkManifest({
     ...plan.manifestInput,
@@ -134,5 +160,5 @@ export const executeInvkExport = async (plan: InvkExportPlan, deps: InvkExportDe
 
   deps.download(blob, plan.fileName);
 
-  return { bundledCount, missingImageNames: missingImageNames.sort() };
+  return { bundledImageCount, bundledVideoCount, missingAssetNames: missingAssetNames.sort() };
 };

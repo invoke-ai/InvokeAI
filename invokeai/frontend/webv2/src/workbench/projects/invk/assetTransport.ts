@@ -1,7 +1,8 @@
+import { mapWithConcurrency } from '@platform/core/concurrency';
 import { apiFetch, apiFetchJson, apiFetchRaw } from '@platform/transport/http';
 
 /**
- * The image half of a project file: pulling referenced bytes off the server on
+ * The asset half of a project file: pulling referenced bytes off the server on
  * the way out, and putting the missing ones back on the way in.
  *
  * This lives beside the archive rather than reaching for
@@ -10,16 +11,27 @@ import { apiFetch, apiFetchJson, apiFetchRaw } from '@platform/transport/http';
  * would make importing a project file — a Launchpad action, on a route that
  * deliberately never loads the editor — pull the canvas graph behind it.
  *
- * Restored images are uploaded with `image_category: 'other'`. That is the
- * canvas's private category: the backend lists it in neither `IMAGE_CATEGORIES`
- * nor `ASSETS_CATEGORIES`, so it appears in no gallery view and no board count
- * (the reasoning is written out in full at `canvas-operations/backend/canvasImages.ts`).
- * The previous frontend uploaded restored images as `'general'`, which empties
- * a stranger's project into your gallery; the pixels a document points at are
- * not gallery content, they are the document.
+ * Restored assets are uploaded with the category `'other'`. That is the canvas's
+ * private category: the backend lists it in neither `IMAGE_CATEGORIES` nor
+ * `ASSETS_CATEGORIES`, so it appears in no gallery view and no board count (the
+ * reasoning is written out in full at `canvas-operations/backend/canvasImages.ts`).
+ * The previous frontend uploaded restored images as `'general'`, which empties a
+ * stranger's project into your gallery; the pixels a document points at are not
+ * gallery content, they are the document.
+ *
+ * ### Images and videos are not symmetric
+ *
+ * Everything here exists twice because the backend keeps the two in separate
+ * namespaces with separate routes. The one place they genuinely differ in shape
+ * is the existence check: images have a bulk `images_by_names`, videos have no
+ * equivalent, so the video check fans out one request per name behind a
+ * concurrency limit. That is what `hydrateVideoRefs` in the gallery's data layer
+ * already does for the same reason, and what the previous frontend did for
+ * images before the bulk endpoint existed.
  */
 
 const IMAGES_BASE = '/api/v1/images';
+const VIDEOS_BASE = '/api/v1/videos';
 
 /**
  * Names per existence request. The endpoint answers any length, but a URL-free
@@ -28,16 +40,27 @@ const IMAGES_BASE = '/api/v1/images';
  */
 const EXISTENCE_BATCH_SIZE = 500;
 
+/** Simultaneous per-name video lookups, matching the image fetch limit. */
+const VIDEO_EXISTENCE_CONCURRENCY = 5;
+
 export interface UploadedImage {
   height: number;
   imageName: string;
   width: number;
 }
 
+export interface UploadedVideo {
+  videoName: string;
+}
+
 interface ImageDTOSubset {
   height: number;
   image_name: string;
   width: number;
+}
+
+interface VideoDTOSubset {
+  video_name: string;
 }
 
 /**
@@ -68,13 +91,44 @@ export const findExistingImageNames = async (
 };
 
 /**
+ * Which of `videoNames` the server already has.
+ *
+ * There is no bulk equivalent of `images_by_names` for videos, so this asks per
+ * name behind a concurrency limit. A 404 is the answer, not an error — the whole
+ * question is which names are absent.
+ */
+export const findExistingVideoNames = async (
+  videoNames: readonly string[],
+  signal?: AbortSignal
+): Promise<Set<string>> => {
+  const found = await mapWithConcurrency(videoNames, VIDEO_EXISTENCE_CONCURRENCY, async (videoName) => {
+    const response = await apiFetchRaw(`${VIDEOS_BASE}/i/${encodeURIComponent(videoName)}`, { signal });
+
+    return response.ok ? videoName : null;
+  });
+
+  return new Set(found.filter((videoName): videoName is string => videoName !== null));
+};
+
+/**
  * Full-resolution bytes for one image, or `null` when the server will not serve
- * it. A missing image is not an export failure: the previous frontend logged and
+ * it. A missing asset is not an export failure: the previous frontend logged and
  * skipped, and a project that exports every layer but one is far more use than
  * one that refuses to export at all.
  */
 export const fetchImageBytes = async (imageName: string, signal?: AbortSignal): Promise<Uint8Array | null> => {
   const response = await apiFetchRaw(`${IMAGES_BASE}/i/${encodeURIComponent(imageName)}/full`, { signal });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  return new Uint8Array(await response.arrayBuffer());
+};
+
+/** The same, for a video. */
+export const fetchVideoBytes = async (videoName: string, signal?: AbortSignal): Promise<Uint8Array | null> => {
+  const response = await apiFetchRaw(`${VIDEOS_BASE}/i/${encodeURIComponent(videoName)}/full`, { signal });
 
   if (!response.ok) {
     return null;
@@ -134,6 +188,27 @@ export const uploadArchiveImage = async (
   return { height: dto.height, imageName: dto.image_name, width: dto.width };
 };
 
+/** The same, for a video. Dimensions are not read: nothing in the document needs them. */
+export const uploadArchiveVideo = async (
+  bytes: Uint8Array,
+  fileName: string,
+  options: { contentType?: string; signal?: AbortSignal } = {}
+): Promise<UploadedVideo> => {
+  const query = new URLSearchParams({ is_intermediate: 'false', video_category: 'other' });
+  const body = new FormData();
+
+  body.append('file', new File([bytes as BlobPart], fileName, { type: options.contentType || 'video/mp4' }));
+
+  const response = await apiFetch(`${VIDEOS_BASE}/upload?${query.toString()}`, {
+    body,
+    method: 'POST',
+    signal: options.signal,
+  });
+  const dto = (await response.json()) as VideoDTOSubset;
+
+  return { videoName: dto.video_name };
+};
+
 const EXTENSION_BY_MIME: Readonly<Record<string, string>> = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
@@ -147,10 +222,18 @@ export const coverExtensionForMime = (contentType: string): string =>
 const MIME_BY_EXTENSION: Readonly<Record<string, string>> = {
   jpeg: 'image/jpeg',
   jpg: 'image/jpeg',
+  mkv: 'video/x-matroska',
+  mov: 'video/quicktime',
+  mp4: 'video/mp4',
   png: 'image/png',
+  webm: 'video/webm',
   webp: 'image/webp',
 };
 
-/** Best guess at a bundled entry's MIME type, from its name. */
+/**
+ * Best guess at a bundled entry's MIME type, from its name. Only ever a hint for
+ * the upload's multipart part — the entry's folder already decided its kind, so
+ * an unrecognized extension falling back to PNG cannot misroute a video.
+ */
 export const mimeForEntryName = (entryName: string): string =>
   MIME_BY_EXTENSION[entryName.split('.').pop()?.toLowerCase() ?? ''] ?? 'image/png';

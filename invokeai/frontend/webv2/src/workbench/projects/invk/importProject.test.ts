@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { binaryEntry, textEntry, writeArchive } from './archive';
 import { InvkFormatError } from './format';
-import { readInvkArchive, restoreArchiveImages } from './importProject';
+import { readInvkArchive, restoreArchiveAssets } from './importProject';
 
 const imageRef = (imageName: string) => ({ height: 64, imageName, width: 64 });
 
@@ -106,7 +106,7 @@ describe('readInvkArchive', () => {
   });
 });
 
-describe('restoreArchiveImages', () => {
+describe('restoreArchiveAssets', () => {
   const contents = async (overrides: Partial<Awaited<ReturnType<typeof readInvkArchive>>> = {}) => ({
     ...(await readInvkArchive(await validArchive())),
     ...overrides,
@@ -117,33 +117,33 @@ describe('restoreArchiveImages', () => {
       Promise.resolve({ height: 1, imageName: fileName, width: 1 })
     );
 
-    const result = await restoreArchiveImages(await contents(), {
+    const result = await restoreArchiveAssets(await contents(), {
       findExistingImageNames: () => Promise.resolve(new Set(['a.png'])),
       uploadArchiveImage: upload,
     });
 
     expect(upload).not.toHaveBeenCalled();
-    expect(result).toMatchObject({ danglingImageNames: [], uploadedCount: 0 });
-    expect(result.mapping.size).toBe(0);
+    expect(result).toMatchObject({ danglingAssetNames: [], uploadedCount: 0 });
+    expect(result.mappings.images.size).toBe(0);
   });
 
   it('records the rename when the server assigns a different name', async () => {
-    const result = await restoreArchiveImages(await contents(), {
+    const result = await restoreArchiveAssets(await contents(), {
       findExistingImageNames: () => Promise.resolve(new Set()),
       uploadArchiveImage: () => Promise.resolve({ height: 1, imageName: 'server-1.png', width: 1 }),
     });
 
-    expect([...result.mapping]).toEqual([['a.png', 'server-1.png']]);
+    expect([...result.mappings.images]).toEqual([['a.png', 'server-1.png']]);
     expect(result.uploadedCount).toBe(1);
   });
 
   it('records no rename when the server keeps the name', async () => {
-    const result = await restoreArchiveImages(await contents(), {
+    const result = await restoreArchiveAssets(await contents(), {
       findExistingImageNames: () => Promise.resolve(new Set()),
       uploadArchiveImage: (_bytes, fileName) => Promise.resolve({ height: 1, imageName: fileName, width: 1 }),
     });
 
-    expect(result.mapping.size).toBe(0);
+    expect(result.mappings.images.size).toBe(0);
     expect(result.uploadedCount).toBe(1);
   });
 
@@ -152,22 +152,22 @@ describe('restoreArchiveImages', () => {
 
     missing.images.delete('a.png');
 
-    const result = await restoreArchiveImages(missing, {
+    const result = await restoreArchiveAssets(missing, {
       findExistingImageNames: () => Promise.resolve(new Set()),
       uploadArchiveImage: () => Promise.reject(new Error('should not be called')),
     });
 
-    expect(result.danglingImageNames).toEqual(['a.png']);
+    expect(result.danglingAssetNames).toEqual(['a.png']);
     expect(result.uploadedCount).toBe(0);
   });
 
   it('reports a failed upload as dangling rather than failing the import', async () => {
-    const result = await restoreArchiveImages(await contents(), {
+    const result = await restoreArchiveAssets(await contents(), {
       findExistingImageNames: () => Promise.resolve(new Set()),
       uploadArchiveImage: () => Promise.reject(new Error('upload failed')),
     });
 
-    expect(result.danglingImageNames).toEqual(['a.png']);
+    expect(result.danglingAssetNames).toEqual(['a.png']);
     expect(result.uploadedCount).toBe(0);
   });
 
@@ -175,7 +175,7 @@ describe('restoreArchiveImages', () => {
     const withCover = await contents({ cover: { bytes: new Uint8Array([9]), entryName: 'cover.webp' } });
     const upload = vi.fn(() => Promise.resolve({ height: 1, imageName: 'server-cover.png', width: 1 }));
 
-    const result = await restoreArchiveImages(withCover, {
+    const result = await restoreArchiveAssets(withCover, {
       findExistingImageNames: () => Promise.resolve(new Set(['a.png'])),
       uploadArchiveImage: upload,
     });
@@ -187,15 +187,64 @@ describe('restoreArchiveImages', () => {
     });
   });
 
+  it('restores a video through the video endpoints, never the image ones', async () => {
+    const videoDocument = {
+      ...document(),
+      projectGraph: { nodes: [{ data: { inputs: { video: { video_name: 'clip.mp4' } } }, id: 'n' }] },
+    };
+    const withVideo = await readInvkArchive(
+      await archiveFile({
+        'images/a.png': new Uint8Array([1]),
+        'manifest.json': JSON.stringify(manifest()),
+        'project.json': JSON.stringify(videoDocument),
+        'videos/clip.mp4': new Uint8Array([7, 7, 7]),
+      })
+    );
+
+    expect([...withVideo.videos.keys()]).toEqual(['clip.mp4']);
+
+    const uploadImage = vi.fn((_bytes: Uint8Array, fileName: string) =>
+      Promise.resolve({ height: 1, imageName: fileName, width: 1 })
+    );
+    const uploadVideo = vi.fn(() => Promise.resolve({ videoName: 'server-clip.mp4' }));
+
+    const result = await restoreArchiveAssets(withVideo, {
+      findExistingImageNames: () => Promise.resolve(new Set(['a.png'])),
+      findExistingVideoNames: () => Promise.resolve(new Set()),
+      uploadArchiveImage: uploadImage,
+      uploadArchiveVideo: uploadVideo,
+    });
+
+    expect(uploadImage).not.toHaveBeenCalled();
+    expect(uploadVideo).toHaveBeenCalledWith(new Uint8Array([7, 7, 7]), 'clip.mp4', {
+      contentType: 'video/mp4',
+      signal: undefined,
+    });
+    expect([...result.mappings.videos]).toEqual([['clip.mp4', 'server-clip.mp4']]);
+    expect(result.mappings.images.size).toBe(0);
+  });
+
+  it('never asks the video endpoint about an images-only archive', async () => {
+    const findVideos = vi.fn(() => Promise.resolve(new Set<string>()));
+
+    await restoreArchiveAssets(await contents(), {
+      findExistingImageNames: () => Promise.resolve(new Set(['a.png'])),
+      findExistingVideoNames: findVideos,
+      uploadArchiveImage: () => Promise.reject(new Error('should not be called')),
+    });
+
+    expect(findVideos).not.toHaveBeenCalled();
+  });
+
   it('survives a cover that fails to upload', async () => {
     const withCover = await contents({ cover: { bytes: new Uint8Array([9]), entryName: 'cover.webp' } });
 
-    const result = await restoreArchiveImages(withCover, {
+    const result = await restoreArchiveAssets(withCover, {
       findExistingImageNames: () => Promise.resolve(new Set(['a.png'])),
       uploadArchiveImage: () => Promise.reject(new Error('nope')),
     });
 
     expect(result.coverImageName).toBeNull();
-    expect(result.danglingImageNames).toEqual([]);
+    expect(result.danglingAssetNames).toEqual([]);
   });
 });

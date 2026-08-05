@@ -69,7 +69,7 @@ describe('executeInvkExport', () => {
         Promise.resolve({ bytes: new Uint8Array([1, 2, 3]), contentType: 'image/webp;charset=binary' }),
     });
 
-    expect(result).toEqual({ bundledCount: 2, missingImageNames: [] });
+    expect(result).toEqual({ bundledImageCount: 2, bundledVideoCount: 0, missingAssetNames: [] });
     expect(download).toHaveBeenCalledTimes(1);
 
     const [blob, fileName] = download.mock.calls[0]! as [Blob, string];
@@ -103,7 +103,7 @@ describe('executeInvkExport', () => {
       fetchImageThumbnail: () => Promise.resolve(null),
     });
 
-    expect(result).toEqual({ bundledCount: 1, missingImageNames: ['live-b.png'] });
+    expect(result).toEqual({ bundledImageCount: 1, bundledVideoCount: 0, missingAssetNames: ['live-b.png'] });
     expect(download).toHaveBeenCalledTimes(1);
   });
 
@@ -114,7 +114,7 @@ describe('executeInvkExport', () => {
       fetchImageThumbnail: () => Promise.reject(new Error('network')),
     });
 
-    expect(result.missingImageNames).toEqual(['live-a.png', 'live-b.png']);
+    expect(result.missingAssetNames).toEqual(['live-a.png', 'live-b.png']);
   });
 
   it('omits the cover entry when there is no cover to fetch', async () => {
@@ -131,6 +131,58 @@ describe('executeInvkExport', () => {
 
     expect([...entries.keys()].sort()).toEqual(['manifest.json', 'project.json']);
     expect(JSON.parse(readEntryText(entries.get(INVK_MANIFEST_ENTRY)!)).cover).toBeUndefined();
+  });
+
+  it('writes videos under their own prefix, beside the images', async () => {
+    const download = vi.fn();
+    const plan = planInvkExport({
+      ...planInput,
+      projectDocument: {
+        ...projectDocument(),
+        projectGraph: { nodes: [{ data: { inputs: { video: { video_name: 'clip.mp4' } } }, id: 'n' }] },
+      },
+    });
+
+    expect(plan.videoNames).toEqual(['clip.mp4']);
+
+    const result = await executeInvkExport(plan, {
+      download,
+      fetchImageBytes: (imageName) => Promise.resolve(bytesFor(imageName)),
+      fetchImageThumbnail: () => Promise.resolve(null),
+      fetchVideoBytes: (videoName) => Promise.resolve(bytesFor(videoName)),
+    });
+
+    expect(result).toEqual({ bundledImageCount: 2, bundledVideoCount: 1, missingAssetNames: [] });
+
+    const [blob] = download.mock.calls[0]! as [Blob];
+    const entries = await readArchive(new Uint8Array(await blob.arrayBuffer()));
+
+    expect([...entries.keys()].sort()).toEqual([
+      'images/live-a.png',
+      'images/live-b.png',
+      'manifest.json',
+      'project.json',
+      'videos/clip.mp4',
+    ]);
+  });
+
+  it('skips a video the server will not serve, exactly as it skips an image', async () => {
+    const plan = planInvkExport({
+      ...planInput,
+      projectDocument: {
+        ...projectDocument(),
+        projectGraph: { nodes: [{ data: { inputs: { video: { video_name: 'clip.mp4' } } }, id: 'n' }] },
+      },
+    });
+
+    const result = await executeInvkExport(plan, {
+      download: vi.fn(),
+      fetchImageBytes: (imageName) => Promise.resolve(bytesFor(imageName)),
+      fetchImageThumbnail: () => Promise.resolve(null),
+      fetchVideoBytes: () => Promise.resolve(null),
+    });
+
+    expect(result).toEqual({ bundledImageCount: 2, bundledVideoCount: 0, missingAssetNames: ['clip.mp4'] });
   });
 
   it('reports progress through bundling and packing', async () => {

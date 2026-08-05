@@ -22,6 +22,20 @@ describe('writeArchive / readArchive', () => {
     expect([...entries.get('images/a.png')!]).toEqual([...pixels]);
   });
 
+  it('round-trips entries from both asset folders', async () => {
+    const blob = await writeArchive(
+      new Map([
+        ['images/a.png', binaryEntry(new Uint8Array([1, 2]))],
+        ['videos/clip.mp4', binaryEntry(new Uint8Array([3, 4, 5]))],
+      ])
+    );
+
+    const entries = await readArchive(await toBytes(blob));
+
+    expect([...entries.keys()].sort()).toEqual(['images/a.png', 'videos/clip.mp4']);
+    expect([...entries.get('videos/clip.mp4')!]).toEqual([3, 4, 5]);
+  });
+
   it('preserves unicode in text entries', async () => {
     const blob = await writeArchive(new Map([['project.json', textEntry('{"name":"プロジェクト — 1"}')]]));
     const entries = await readArchive(await toBytes(blob));

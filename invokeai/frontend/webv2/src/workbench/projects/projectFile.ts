@@ -14,7 +14,7 @@ import { recordProjectCover } from './covers';
 import { createProjectId } from './ids';
 import { INVK_EXTENSION, InvkFormatError } from './invk/format';
 import { upsertProjectSummary } from './library';
-import { remapImageRefs } from './projectAssets';
+import { remapAssetRefs } from './projectAssets';
 
 /**
  * Export and import a project as an `.invk` archive.
@@ -106,8 +106,8 @@ export const importProjectFile = async (
 
   assertAccountScopeCurrent(owner);
 
-  const { restoreArchiveImages } = await import('./invk/importProject');
-  const restored = await restoreArchiveImages(contents, { signal: owner.signal });
+  const { restoreArchiveAssets } = await import('./invk/importProject');
+  const restored = await restoreArchiveAssets(contents, { signal: owner.signal });
 
   assertAccountScopeCurrent(owner);
 
@@ -116,7 +116,7 @@ export const importProjectFile = async (
     typeof contents.projectDocument.name === 'string' && contents.projectDocument.name.trim()
       ? contents.projectDocument.name.trim()
       : 'Imported project';
-  const document = { ...remapImageRefs(contents.projectDocument, restored.mapping), id, name };
+  const document = { ...remapAssetRefs(contents.projectDocument, restored.mappings), id, name };
   // Full validation rehydrates the document through the Workbench reducer, so
   // it is loaded here rather than imported: the Launchpad should not carry the
   // editor's aggregate state just to offer an Import button.

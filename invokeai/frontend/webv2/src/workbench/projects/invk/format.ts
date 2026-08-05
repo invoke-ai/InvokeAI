@@ -17,7 +17,21 @@ export const INVK_VERSION = 2;
 /** Fixed entry paths. `cover` varies by image format and is named in the manifest. */
 export const INVK_MANIFEST_ENTRY = 'manifest.json';
 export const INVK_DOCUMENT_ENTRY = 'project.json';
+
+/**
+ * Bundled bytes are filed by kind, not pooled. Images and videos are separate
+ * backend namespaces with separate fetch and upload routes, so import has to
+ * know which an entry is before it can restore it — and a folder states that
+ * where a shared one would leave it to be guessed from a file extension.
+ *
+ * `images/` is also byte-identical to the legacy v1 container, which is the
+ * continuity this format was built around. Adding `videos/` needs no version
+ * bump: `readInvkArchive` ignores entries it does not recognize, so a reader
+ * predating videos reads such an archive and simply leaves those references
+ * dangling — the same degradation an absent image already gets.
+ */
 export const INVK_IMAGES_PREFIX = 'images/';
+export const INVK_VIDEOS_PREFIX = 'videos/';
 
 export type InvkFormatReason =
   /** A ZIP, but the manifest is a canvas project written by the previous frontend. */

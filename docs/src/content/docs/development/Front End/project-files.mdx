@@ -16,6 +16,9 @@ Workbench projects export to a portable `.invk` archive. The feature lives in `i
 | `project.json` | yes | The whole project document — the same payload the backend stores as the project record's opaque `data`. |
 | `cover.<ext>` | no | Thumbnail of the project's newest result. The extension varies by what the server served, so the entry path is recorded in the manifest. |
 | `images/<image_name>` | no | Image bytes, keyed by the exact `image_name` the exporting server used. |
+| `videos/<video_name>` | no | Video bytes, keyed the same way. |
+
+Assets are filed by kind rather than pooled. Images and videos are separate backend namespaces with separate fetch and upload routes, so import has to know which an entry is before it can restore it — the folder states that, where a shared one would leave it to be guessed from a file extension. Adding `videos/` needed no version bump: `readInvkArchive` ignores entries it does not recognize, so a reader predating it reads such an archive and simply leaves those references dangling, exactly as it would for an absent image.
 
 The manifest is written indented and the document compact: the manifest is the one entry someone might open by hand, and the document is the largest thing in the archive before compression. Text entries are deflated; image entries are stored, since PNG and WEBP are already compressed.
 
@@ -23,7 +26,11 @@ The manifest is written indented and the document compact: the manifest is the o
 
 A project document references its pixels by server image name, never by URL or inline data (see `CanvasImageRef` in `canvas-engine/contracts.ts`). Without the bytes, an exported project opens with nothing but missing layers anywhere except the machine that wrote it. The archive carries them.
 
-Which ones is decided by `collectLiveImageRefs()` in `projects/projectAssets.ts`. It walks the document collecting every string found under the keys `imageName` and `image_name` — the only two keys in the document that hold an image name. Collecting by key rather than by path is what makes it complete: a new control-adapter kind or node field is picked up without touching the collector.
+Which ones is decided by `collectLiveAssetRefs()` in `projects/projectAssets.ts`. It walks the document collecting every string found under `imageName` and `image_name` as an image, and under `video_name` as a video — the only keys in the document that hold an asset name. Collecting by key rather than by path is what makes it complete: a new control-adapter kind or node field is picked up without touching the collector.
+
+`video_name` reaches a document through an imported workflow whose node value was authored elsewhere (`VideoField` in the backend's `fields.py`, consumed by `video_frame_extract` and friends). webv2 cannot author one yet — `VideoField` is absent from `STATEFUL_FIELD_TYPE_NAMES` — but it round-trips one verbatim, so a project file has to carry it.
+
+**The gallery selection is excluded, of either kind.** `selectedImage`, `selectedImageName` and `selectedImageNames` are pointers into per-install gallery content, not things the document renders; a project arriving on another machine should open with nothing selected rather than drag a stranger's gallery in behind it. The skip is by key on purpose: `GalleryItem` happens to spell its name field `name`, which no collector key matches, so these would be missed anyway — but that is an accident of naming, and the explicit skip is what stops a future rename from silently changing what a project file contains.
 
 **History is excluded.** The walker skips the `queue`, `graphHistory` and `events` roots, and the `snapshot`, `snapshots` and `recentImages` keys at any depth. Every queue entry embeds a full canvas snapshot and the gallery widget keeps up to sixty recent results, so bundling all of it would turn a working project into a multi-gigabyte archive. References into history survive in the document and resolve on any install that still has those images.
 
@@ -31,11 +38,13 @@ Which ones is decided by `collectLiveImageRefs()` in `projects/projectAssets.ts`
 
 `readInvkArchive()` unpacks and validates; `restoreArchiveImages()` puts the pixels back.
 
-Restoration checks which referenced images the server already has in one bulk `POST /images/images_by_names` call, uploads only the missing ones out of `images/`, and returns an old-to-new mapping for any the server renamed. `remapImageRefs()` then rewrites the document — the whole document this time, including the history the export left behind, so nothing keeps pointing at a pre-import name.
+Restoration checks which referenced assets the server already has, uploads only the missing ones out of `images/` and `videos/`, and returns an old-to-new mapping **per kind** — the namespaces are separate, so a single flat map would let an image rewrite a video that happened to share its name. `remapAssetRefs()` then rewrites the document — the whole document this time, including the history the export left behind, so nothing keeps pointing at a pre-import name.
 
-Restored images upload with `image_category: 'other'`, the canvas's private category: they appear in no gallery view and no board count. The previous frontend used `general`, which empties a stranger's project into your gallery.
+The existence check is the one place the two kinds are not symmetric. Images have a bulk `POST /images/images_by_names`; videos have no equivalent, so that check fans out one `GET /videos/i/{name}` per name behind the same concurrency limit of 5. This is what `hydrateVideoRefs` in the gallery's data layer already does for the same reason. A project with no video references never issues the video check at all.
 
-An image that is neither on the server nor in the archive is reported as dangling and its reference is left alone, so the project opens with one broken layer rather than not at all. Both fetches and uploads are concurrency-limited to five by `mapWithConcurrency()`.
+Restored assets upload with the category `'other'`, the canvas's private category: they appear in no gallery view and no board count. The previous frontend used `general`, which empties a stranger's project into your gallery.
+
+An asset that is neither on the server nor in the archive is reported as dangling and its reference is left alone, so the project opens with one broken layer rather than not at all. Both fetches and uploads are concurrency-limited to five by `mapWithConcurrency()`, over one queue spanning both kinds — the limit exists to be kind to the backend, and would not be if each kind got its own.
 
 **Import never overwrites.** The document always lands under a freshly minted project id, never the one in the file, so exchanging a project cannot collide and re-importing your own export cannot replace the original.
 
@@ -56,6 +65,8 @@ Future format changes should add a new member to the union rather than widening 
 ## Guards
 
 `archive.ts` is the only module that imports fflate, and it does so with `await import()` so the ZIP codec never enters an initial chunk — the architecture budget fails on a new package appearing in a route's source-owner set. Both directions are bounded by `INVK_MAX_ARCHIVE_BYTES` and `INVK_MAX_ENTRIES`, because an `.invk` is a file someone was handed.
+
+`INVK_MAX_ARCHIVE_BYTES` is 4 GB, a figure chosen when the only payload was layer bitmaps. A single video can be hundreds of megabytes, so hitting the ceiling has gone from theoretical to plausible. The guard fails cleanly into the `too-large` reason, which is the right behavior, but the constant now has a second and much heavier consumer.
 
 ## Compatibility notes
 

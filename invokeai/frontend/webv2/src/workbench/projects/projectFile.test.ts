@@ -25,16 +25,21 @@ const transport = vi.hoisted(() => ({
   coverExtensionForMime: () => 'webp',
   fetchImageBytes: vi.fn((imageName: string) => Promise.resolve(new TextEncoder().encode(`bytes:${imageName}`))),
   fetchImageThumbnail: vi.fn(() => Promise.resolve(null)),
+  fetchVideoBytes: vi.fn((videoName: string) => Promise.resolve(new TextEncoder().encode(`bytes:${videoName}`))),
   findExistingImageNames: vi.fn((_names: readonly string[]) => Promise.resolve(new Set<string>())),
+  findExistingVideoNames: vi.fn((_names: readonly string[]) => Promise.resolve(new Set<string>())),
   mimeForEntryName: () => 'image/png',
   uploadArchiveImage: vi.fn((_bytes: Uint8Array, fileName: string) =>
     Promise.resolve({ height: 1, imageName: `server-${fileName}`, width: 1 })
+  ),
+  uploadArchiveVideo: vi.fn((_bytes: Uint8Array, fileName: string) =>
+    Promise.resolve({ videoName: `server-${fileName}` })
   ),
 }));
 
 vi.mock('./api', () => api);
 vi.mock('@platform/browser/downloadBlob', () => downloads);
-vi.mock('./invk/imageTransport', () => transport);
+vi.mock('./invk/assetTransport', () => transport);
 
 let projectFile: typeof projectFileModule;
 let persistence: typeof persistenceModule;
@@ -92,6 +97,30 @@ describe('exportOpenProject', () => {
 
     expect(downloads.downloadBlob).toHaveBeenCalledTimes(1);
     expect(downloads.downloadBlob.mock.calls[0]![1]).toBe('My project.invk');
+  });
+
+  /**
+   * The transport is mocked by module path, and every assertion below about what
+   * did *not* reach the server is vacuous if that path stops resolving. This one
+   * fails loudly instead: a document with a known image reference must reach the
+   * mock on the way out.
+   */
+  it('reaches the server through the mocked transport', async () => {
+    api.getProject.mockResolvedValue({
+      data: {
+        canvas: { document: { layers: [{ id: 'l', source: { image: { imageName: 'pinned.png' }, type: 'image' } }] } },
+        id: 'p1',
+        layout: {},
+        name: 'Pinned',
+      },
+      name: 'Pinned',
+      project_id: 'p1',
+      revision: 1,
+    });
+
+    await projectFile.exportLibraryProject('p1');
+
+    expect(transport.fetchImageBytes).toHaveBeenCalledWith('pinned.png', expect.anything());
   });
 });
 

@@ -1,12 +1,24 @@
 import { mapWithConcurrency } from '@platform/core/concurrency';
-import { collectLiveImageRefs } from '@workbench/projects/projectAssets';
+import { collectLiveAssetRefs } from '@workbench/projects/projectAssets';
 
-import type { UploadedImage } from './imageTransport';
+import type { UploadedImage, UploadedVideo } from './assetTransport';
 import type { InvkManifest } from './manifest';
 
 import { readArchive, readEntryText } from './archive';
-import { INVK_DOCUMENT_ENTRY, INVK_IMAGES_PREFIX, INVK_MANIFEST_ENTRY, InvkFormatError } from './format';
-import { findExistingImageNames, mimeForEntryName, uploadArchiveImage } from './imageTransport';
+import {
+  findExistingImageNames,
+  findExistingVideoNames,
+  mimeForEntryName,
+  uploadArchiveImage,
+  uploadArchiveVideo,
+} from './assetTransport';
+import {
+  INVK_DOCUMENT_ENTRY,
+  INVK_IMAGES_PREFIX,
+  INVK_MANIFEST_ENTRY,
+  INVK_VIDEOS_PREFIX,
+  InvkFormatError,
+} from './format';
 import { parseInvkManifest } from './manifest';
 
 /**
@@ -29,7 +41,7 @@ import { parseInvkManifest } from './manifest';
  */
 
 /** Simultaneous uploads. Matches the previous frontend's limit. */
-const IMAGE_UPLOAD_CONCURRENCY = 5;
+const ASSET_UPLOAD_CONCURRENCY = 5;
 
 export interface InvkArchiveContents {
   /** Bundled preview bytes and the entry they came from, when the archive has one. */
@@ -38,6 +50,8 @@ export interface InvkArchiveContents {
   images: Map<string, Uint8Array>;
   manifest: InvkManifest;
   projectDocument: Record<string, unknown>;
+  /** Bundled video bytes, keyed by the video name the exporting server used. */
+  videos: Map<string, Uint8Array>;
 }
 
 const parseDocumentEntry = (bytes: Uint8Array): Record<string, unknown> => {
@@ -81,10 +95,16 @@ export const readInvkArchive = async (file: File): Promise<InvkArchiveContents> 
   }
 
   const images = new Map<string, Uint8Array>();
+  const videos = new Map<string, Uint8Array>();
 
   for (const [path, bytes] of entries) {
     if (path.startsWith(INVK_IMAGES_PREFIX)) {
       images.set(path.slice(INVK_IMAGES_PREFIX.length), bytes);
+      continue;
+    }
+
+    if (path.startsWith(INVK_VIDEOS_PREFIX)) {
+      videos.set(path.slice(INVK_VIDEOS_PREFIX.length), bytes);
     }
   }
 
@@ -95,22 +115,24 @@ export const readInvkArchive = async (file: File): Promise<InvkArchiveContents> 
     images,
     manifest,
     projectDocument: parseDocumentEntry(documentEntry),
+    videos,
   };
 };
 
-export interface RestoreImagesResult {
-  /** Referenced images the archive did not carry and the server does not have. */
-  danglingImageNames: string[];
-  /** Old name to new name, for the images the server renamed on upload. */
-  mapping: Map<string, string>;
+export interface RestoreAssetsResult {
   /** The uploaded cover's server name, when the archive carried one. */
   coverImageName: string | null;
-  /** Images uploaded from the archive. */
+  /** Referenced assets the archive did not carry and the server does not have, of either kind. */
+  danglingAssetNames: string[];
+  /** Old name to new name, per kind. Kept apart because the namespaces are. */
+  mappings: { images: Map<string, string>; videos: Map<string, string> };
+  /** Assets uploaded from the archive, of either kind. */
   uploadedCount: number;
 }
 
-export interface RestoreImagesDeps {
+export interface RestoreAssetsDeps {
   findExistingImageNames?: (imageNames: readonly string[], signal?: AbortSignal) => Promise<Set<string>>;
+  findExistingVideoNames?: (videoNames: readonly string[], signal?: AbortSignal) => Promise<Set<string>>;
   onProgress?: (progress: { completed: number; total: number }) => void;
   signal?: AbortSignal;
   uploadArchiveImage?: (
@@ -118,37 +140,83 @@ export interface RestoreImagesDeps {
     fileName: string,
     options?: { contentType?: string; signal?: AbortSignal }
   ) => Promise<UploadedImage>;
+  uploadArchiveVideo?: (
+    bytes: Uint8Array,
+    fileName: string,
+    options?: { contentType?: string; signal?: AbortSignal }
+  ) => Promise<UploadedVideo>;
+}
+
+interface PendingUpload {
+  bytes: Uint8Array;
+  kind: 'image' | 'video';
+  name: string;
 }
 
 /**
- * Make the archive's images available on this server. Only what is missing gets
- * uploaded; a referenced image that is neither on the server nor in the archive
+ * Make the archive's assets available on this server. Only what is missing gets
+ * uploaded; a referenced asset that is neither on the server nor in the archive
  * is reported as dangling and its reference is left exactly as it is, so the
  * project still opens with one broken layer rather than not at all.
  */
-export const restoreArchiveImages = async (
+export const restoreArchiveAssets = async (
   contents: InvkArchiveContents,
-  deps: RestoreImagesDeps = {}
-): Promise<RestoreImagesResult> => {
-  const checkExisting = deps.findExistingImageNames ?? findExistingImageNames;
-  const upload = deps.uploadArchiveImage ?? uploadArchiveImage;
-  const referenced = [...collectLiveImageRefs(contents.projectDocument)].sort();
-  const existing = await checkExisting(referenced, deps.signal);
-  const missing = referenced.filter((imageName) => !existing.has(imageName));
-  const uploadable = missing.filter((imageName) => contents.images.has(imageName));
-  const danglingImageNames = missing.filter((imageName) => !contents.images.has(imageName));
-  const mapping = new Map<string, string>();
+  deps: RestoreAssetsDeps = {}
+): Promise<RestoreAssetsResult> => {
+  const checkExistingImages = deps.findExistingImageNames ?? findExistingImageNames;
+  const checkExistingVideos = deps.findExistingVideoNames ?? findExistingVideoNames;
+  const uploadImage = deps.uploadArchiveImage ?? uploadArchiveImage;
+  const uploadVideo = deps.uploadArchiveVideo ?? uploadArchiveVideo;
+
+  const referenced = collectLiveAssetRefs(contents.projectDocument);
+  const referencedImages = [...referenced.images].sort();
+  const referencedVideos = [...referenced.videos].sort();
+
+  // Both existence checks go out before either upload does; they are
+  // independent, and a project with videos should not wait out the image pass.
+  const [existingImages, existingVideos] = await Promise.all([
+    checkExistingImages(referencedImages, deps.signal),
+    referencedVideos.length === 0
+      ? Promise.resolve(new Set<string>())
+      : checkExistingVideos(referencedVideos, deps.signal),
+  ]);
+
+  const danglingAssetNames: string[] = [];
+  const pending: PendingUpload[] = [];
+
+  for (const [names, existing, store, kind] of [
+    [referencedImages, existingImages, contents.images, 'image'],
+    [referencedVideos, existingVideos, contents.videos, 'video'],
+  ] as const) {
+    for (const name of names) {
+      if (existing.has(name)) {
+        continue;
+      }
+
+      const bytes = store.get(name);
+
+      if (bytes === undefined) {
+        danglingAssetNames.push(name);
+        continue;
+      }
+
+      pending.push({ bytes, kind, name });
+    }
+  }
+
+  const mappings = { images: new Map<string, string>(), videos: new Map<string, string>() };
 
   // The cover is not part of the document, so it is uploaded alongside rather
   // than through the reference set.
   const coverTotal = contents.cover === null ? 0 : 1;
+  const total = pending.length + coverTotal;
   let completed = 0;
   let uploadedCount = 0;
 
   const coverImageName =
     contents.cover === null
       ? null
-      : await upload(contents.cover.bytes, contents.cover.entryName, {
+      : await uploadImage(contents.cover.bytes, contents.cover.entryName, {
           contentType: mimeForEntryName(contents.cover.entryName),
           signal: deps.signal,
         })
@@ -157,32 +225,31 @@ export const restoreArchiveImages = async (
 
   if (contents.cover !== null) {
     completed += 1;
-    deps.onProgress?.({ completed, total: uploadable.length + coverTotal });
+    deps.onProgress?.({ completed, total });
   }
 
-  await mapWithConcurrency(uploadable, IMAGE_UPLOAD_CONCURRENCY, async (imageName) => {
-    const bytes = contents.images.get(imageName)!;
-
+  await mapWithConcurrency(pending, ASSET_UPLOAD_CONCURRENCY, async ({ bytes, kind, name }) => {
     try {
-      const uploaded = await upload(bytes, imageName, {
-        contentType: mimeForEntryName(imageName),
-        signal: deps.signal,
-      });
+      const options = { contentType: mimeForEntryName(name), signal: deps.signal };
+      const restoredName =
+        kind === 'image'
+          ? (await uploadImage(bytes, name, options)).imageName
+          : (await uploadVideo(bytes, name, options)).videoName;
 
       uploadedCount += 1;
 
-      if (uploaded.imageName !== imageName) {
-        mapping.set(imageName, uploaded.imageName);
+      if (restoredName !== name) {
+        mappings[kind === 'image' ? 'images' : 'videos'].set(name, restoredName);
       }
     } catch {
       // A failed upload leaves the reference pointing at a name this server does
-      // not have — the same outcome as an image the archive never carried.
-      danglingImageNames.push(imageName);
+      // not have — the same outcome as an asset the archive never carried.
+      danglingAssetNames.push(name);
     }
 
     completed += 1;
-    deps.onProgress?.({ completed, total: uploadable.length + coverTotal });
+    deps.onProgress?.({ completed, total });
   });
 
-  return { coverImageName, danglingImageNames: danglingImageNames.sort(), mapping, uploadedCount };
+  return { coverImageName, danglingAssetNames: danglingAssetNames.sort(), mappings, uploadedCount };
 };
