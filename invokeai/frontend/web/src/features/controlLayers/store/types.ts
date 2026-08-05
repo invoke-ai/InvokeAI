@@ -10,6 +10,7 @@ import {
   zParameterCLIPGEmbedModel,
   zParameterCLIPLEmbedModel,
   zParameterControlLoRAModel,
+  zParameterErnieImageScheduler,
   zParameterFluxDypeExponent,
   zParameterFluxDypePreset,
   zParameterFluxDypeScale,
@@ -812,8 +813,11 @@ const zPositivePromptHistory = z
 export const zInfillMethod = z.enum(['patchmatch', 'lama', 'cv2', 'color', 'tile']);
 export type InfillMethod = z.infer<typeof zInfillMethod>;
 
+const zPidMode = z.enum(['off', 'fit', 'native']);
+export type PidMode = z.infer<typeof zPidMode>;
+
 export const zParamsState = z.object({
-  _version: z.literal(3),
+  _version: z.literal(4),
   maskBlur: z.number(),
   maskBlurMethod: zParameterMaskBlurMethod,
   canvasCoherenceMode: zParameterCanvasCoherenceMode,
@@ -828,6 +832,11 @@ export const zParamsState = z.object({
   guidance: zParameterGuidance,
   img2imgStrength: zParameterStrength,
   optimizedDenoisingEnabled: z.boolean(),
+  hiDiffusionEnabled: z.boolean(),
+  hiDiffusionRauNetEnabled: z.boolean(),
+  hiDiffusionWindowAttnEnabled: z.boolean(),
+  hiDiffusionT1Ratio: z.number(),
+  hiDiffusionT2Ratio: z.number(),
   iterations: z.number(),
   scheduler: zParameterScheduler,
   fluxScheduler: zParameterFluxScheduler,
@@ -837,6 +846,8 @@ export const zParamsState = z.object({
   zImageScheduler: zParameterZImageScheduler,
   zImageShift: z.number().min(0).max(3).nullable(),
   // Defaults make these resilient to rehydration of persisted state saved before the fields existed.
+  ernieImageScheduler: zParameterErnieImageScheduler.default('euler'),
+  ernieImageUsePromptEnhancer: z.boolean().default(true),
   ideogram4SamplerPreset: zParameterIdeogram4SamplerPreset.default('V4_QUALITY_48'),
   // Optional advanced overrides of the Ideogram 4 sampler preset (null = use the preset's value).
   // Backend requires steps >= 2 (a polish and a main step). `.catch(null)` normalizes a stale/invalid
@@ -889,6 +900,14 @@ export const zParamsState = z.object({
   // Flux2 Klein model components - uses Qwen3 instead of CLIP+T5
   kleinVaeModel: zParameterVAEModel.nullable(), // Optional: Separate FLUX.2 VAE for Klein
   kleinQwen3EncoderModel: zModelIdentifierField.nullable(), // Optional: Separate Qwen3 Encoder for Klein
+  // PiD (Pixel Diffusion Decoder) - optional 4x super-resolution decode replacing the VAE decode.
+  // - 'off':    regular VAE decode
+  // - 'fit':    PiD decodes 4x internally, then downscales back to the bbox (compositing-safe; works in canvas/inpaint)
+  // - 'native': PiD's full 4x output IS the result; the user-facing dimensions are the target, generation runs at target / 4
+  pidMode: zPidMode,
+  pidDecoderModel: zModelIdentifierField.nullable(), // PiD decoder checkpoint (matched to the main model's base)
+  gemma2EncoderModel: zModelIdentifierField.nullable(), // Gemma-2 caption encoder required by PiD
+  pidSteps: z.number().int().min(1).max(4), // PiD distill steps: student schedule has only 4 transitions, so 1-4
   // Qwen Image Edit model components - GGUF transformer needs a Diffusers source for VAE/encoder
   qwenImageComponentSource: zParameterModel.nullable(), // Diffusers model providing VAE + text encoder
   qwenImageVaeModel: zParameterVAEModel.nullable(), // Optional: Standalone Qwen Image VAE checkpoint
@@ -906,6 +925,17 @@ export const zParamsState = z.object({
   zImageSeedVarianceEnabled: z.boolean(),
   zImageSeedVarianceStrength: z.number().min(0).max(2),
   zImageSeedVarianceRandomizePercent: z.number().min(1).max(100),
+  // Krea-2 standalone submodels (optional; used when the transformer is a single-file checkpoint/GGUF
+  // that has no bundled VAE / Qwen3-VL encoder. When null, they are extracted from the diffusers model.)
+  krea2VaeModel: zParameterVAEModel.nullable(),
+  krea2Qwen3VlEncoderModel: zModelIdentifierField.nullable(),
+  // Krea-2 conditioning enhancers (optional; both default off so stock behaviour is unchanged)
+  krea2SeedVarianceEnabled: z.boolean(),
+  krea2SeedVarianceStrength: z.number().min(0).max(2),
+  krea2SeedVarianceRandomizePercent: z.number().min(0).max(100),
+  krea2RebalanceEnabled: z.boolean(),
+  krea2RebalanceMultiplier: z.number().min(0).max(20),
+  krea2RebalanceWeights: z.string(),
   imageSize: z.string().nullable().default(null),
   // OpenAI-specific external options
   openaiQuality: z.enum(['auto', 'high', 'medium', 'low']).default('auto'),
@@ -921,7 +951,7 @@ export const zParamsState = z.object({
 });
 export type ParamsState = z.infer<typeof zParamsState>;
 export const getInitialParamsState = (): ParamsState => ({
-  _version: 3,
+  _version: 4,
   maskBlur: 16,
   maskBlurMethod: 'box',
   canvasCoherenceMode: 'Gaussian Blur',
@@ -936,6 +966,11 @@ export const getInitialParamsState = (): ParamsState => ({
   guidance: 4,
   img2imgStrength: 0.75,
   optimizedDenoisingEnabled: true,
+  hiDiffusionEnabled: false,
+  hiDiffusionRauNetEnabled: true,
+  hiDiffusionWindowAttnEnabled: true,
+  hiDiffusionT1Ratio: 0.4,
+  hiDiffusionT2Ratio: 0.0,
   iterations: 1,
   scheduler: 'dpmpp_3m_k',
   fluxScheduler: 'euler',
@@ -944,6 +979,8 @@ export const getInitialParamsState = (): ParamsState => ({
   fluxDypeExponent: 2.0,
   zImageScheduler: 'euler',
   zImageShift: null,
+  ernieImageScheduler: 'euler',
+  ernieImageUsePromptEnhancer: true,
   ideogram4SamplerPreset: 'V4_QUALITY_48',
   ideogram4Steps: null,
   ideogram4GuidanceScale: null,
@@ -988,6 +1025,10 @@ export const getInitialParamsState = (): ParamsState => ({
   animaLLLiteWeight: 1,
   kleinVaeModel: null,
   kleinQwen3EncoderModel: null,
+  pidMode: 'off',
+  pidDecoderModel: null,
+  gemma2EncoderModel: null,
+  pidSteps: 4,
   qwenImageComponentSource: null,
   qwenImageVaeModel: null,
   qwenImageQwenVLEncoderModel: null,
@@ -1001,6 +1042,14 @@ export const getInitialParamsState = (): ParamsState => ({
   zImageSeedVarianceEnabled: false,
   zImageSeedVarianceStrength: 0.1,
   zImageSeedVarianceRandomizePercent: 50,
+  krea2VaeModel: null,
+  krea2Qwen3VlEncoderModel: null,
+  krea2SeedVarianceEnabled: false,
+  krea2SeedVarianceStrength: 0.1,
+  krea2SeedVarianceRandomizePercent: 50,
+  krea2RebalanceEnabled: false,
+  krea2RebalanceMultiplier: 4,
+  krea2RebalanceWeights: '1.0,1.0,1.0,1.0,1.0,1.0,1.0,2.5,5.0,1.1,4.0,1.0',
   imageSize: null,
   openaiQuality: 'auto',
   openaiBackground: 'auto',

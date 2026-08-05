@@ -1,6 +1,6 @@
 import math
 from contextlib import ExitStack
-from typing import Callable, ClassVar, Iterator, Optional, Tuple
+from typing import Callable, ClassVar, Iterator, Optional
 
 import torch
 import torchvision.transforms as tv_transforms
@@ -24,7 +24,7 @@ from invokeai.app.invocations.model import TransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat
-from invokeai.backend.patches.layer_patcher import LayerPatcher
+from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.qwen_image_lora_constants import (
     QWEN_IMAGE_EDIT_LORA_TRANSFORMER_PREFIX,
 )
@@ -547,7 +547,7 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         return step_callback
 
-    def _lora_iterator(self, context: InvocationContext) -> Iterator[Tuple[ModelPatchRaw, float]]:
+    def _lora_iterator(self, context: InvocationContext) -> Iterator[PatchSpec]:
         """Iterate over LoRA models to apply to the transformer."""
         for lora in self.transformer.loras:
             lora_info = context.models.load(lora.lora)
@@ -555,5 +555,4 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 raise TypeError(
                     f"Expected ModelPatchRaw for LoRA '{lora.lora.key}', got {type(lora_info.model).__name__}."
                 )
-            yield (lora_info.model, lora.weight)
-            del lora_info
+            yield (lora_info.model, lora.weight, lora_info.model_in_ram())

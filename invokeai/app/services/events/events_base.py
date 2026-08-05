@@ -1,7 +1,7 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Literal, Optional
 
 from invokeai.app.services.events.events_common import (
     BatchEnqueuedEvent,
@@ -19,6 +19,9 @@ from invokeai.app.services.events.events_common import (
     InvocationErrorEvent,
     InvocationProgressEvent,
     InvocationStartedEvent,
+    LLMTaskCompleteEvent,
+    LLMTaskErrorEvent,
+    LLMTaskProgressEvent,
     ModelInstallCancelledEvent,
     ModelInstallCompleteEvent,
     ModelInstallDownloadProgressEvent,
@@ -64,7 +67,7 @@ class EventServiceBase:
 
     def emit_invocation_started(self, queue_item: "SessionQueueItem", invocation: "BaseInvocation") -> None:
         """Emitted when an invocation is started"""
-        self.dispatch(InvocationStartedEvent.build(queue_item, invocation))
+        self.dispatch(InvocationStartedEvent.build(queue_item, invocation.get_event_invocation()))
 
     def emit_invocation_progress(
         self,
@@ -75,13 +78,15 @@ class EventServiceBase:
         image: "ProgressImage | None" = None,
     ) -> None:
         """Emitted at periodically during an invocation"""
-        self.dispatch(InvocationProgressEvent.build(queue_item, invocation, message, percentage, image))
+        self.dispatch(
+            InvocationProgressEvent.build(queue_item, invocation.get_event_invocation(), message, percentage, image)
+        )
 
     def emit_invocation_complete(
         self, queue_item: "SessionQueueItem", invocation: "BaseInvocation", output: "BaseInvocationOutput"
     ) -> None:
         """Emitted when an invocation is complete"""
-        self.dispatch(InvocationCompleteEvent.build(queue_item, invocation, output))
+        self.dispatch(InvocationCompleteEvent.build(queue_item, invocation.get_event_invocation(), output))
 
     def emit_invocation_error(
         self,
@@ -92,7 +97,15 @@ class EventServiceBase:
         error_traceback: str,
     ) -> None:
         """Emitted when an invocation encounters an error"""
-        self.dispatch(InvocationErrorEvent.build(queue_item, invocation, error_type, error_message, error_traceback))
+        self.dispatch(
+            InvocationErrorEvent.build(
+                queue_item,
+                invocation.get_event_invocation(),
+                error_type,
+                error_message,
+                error_traceback,
+            )
+        )
 
     # endregion
 
@@ -223,6 +236,41 @@ class EventServiceBase:
     def emit_model_install_error(self, job: "ModelInstallJob") -> None:
         """Emitted when an install job encounters an exception."""
         self.dispatch(ModelInstallErrorEvent.build(job))
+
+    # endregion
+
+    # region LLM utility tasks
+
+    def emit_llm_task_progress(
+        self,
+        task_id: str,
+        user_id: str,
+        phase: Literal["loading_model", "generating"],
+        message: str,
+        percentage: float | None = None,
+        current_tokens: int | None = None,
+        total_tokens: int | None = None,
+    ) -> None:
+        """Emit a progress event for an LLM utility task (expand-prompt, image-to-prompt)."""
+        self.dispatch(
+            LLMTaskProgressEvent(
+                task_id=task_id,
+                user_id=user_id,
+                phase=phase,
+                message=message,
+                percentage=percentage,
+                current_tokens=current_tokens,
+                total_tokens=total_tokens,
+            )
+        )
+
+    def emit_llm_task_complete(self, task_id: str, user_id: str) -> None:
+        """Emit a completion event for an LLM utility task."""
+        self.dispatch(LLMTaskCompleteEvent(task_id=task_id, user_id=user_id))
+
+    def emit_llm_task_error(self, task_id: str, user_id: str, error: str) -> None:
+        """Emit an error event for an LLM utility task."""
+        self.dispatch(LLMTaskErrorEvent(task_id=task_id, user_id=user_id, error=error))
 
     # endregion
 

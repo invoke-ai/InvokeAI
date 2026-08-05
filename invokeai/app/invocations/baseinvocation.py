@@ -207,6 +207,10 @@ class BaseInvocation(ABC, BaseModel):
         """Invoke with provided context and return outputs."""
         pass
 
+    def get_event_invocation(self) -> "BaseInvocation":
+        """Returns the invocation representation included in execution events."""
+        return self
+
     def invoke_internal(self, context: InvocationContext, services: "InvocationServices") -> BaseInvocationOutput:
         """
         Internal invoke method, calls `invoke()` after some prep.
@@ -270,6 +274,16 @@ class BaseInvocation(ABC, BaseModel):
     )
 
     bottleneck: ClassVar[Bottleneck]
+
+    idle_gpu_offloadable: ClassVar[bool] = False
+    """Whether this node's entire execution may be temporarily re-pinned to an idle GPU when
+    `offload_text_encoders_to_idle_gpus` is enabled in multi-GPU mode. Only set this to True on nodes
+    that exclusively load encoder model(s), run a forward pass, and store their result on the CPU —
+    i.e. nodes that do no work tied to the session's own GPU. Set via the `@invocation` decorator.
+
+    Weigh the node's runtime before setting this: the borrow holds the lent GPU's exclusive-use lock
+    for the *whole* node — model load included — and a session dequeued onto that GPU blocks until it
+    is released. See `invokeai/backend/util/device_pool.py`."""
 
     UIConfig: ClassVar[UIConfigBase]
 
@@ -459,6 +473,7 @@ RESERVED_NODE_ATTRIBUTE_FIELD_NAMES = {
     "type",
     "workflow",
     "bottleneck",
+    "idle_gpu_offloadable",
 }
 
 RESERVED_INPUT_FIELD_NAMES = {"metadata", "board"}
@@ -643,6 +658,7 @@ def invocation(
     use_cache: Optional[bool] = True,
     classification: Classification = Classification.Stable,
     bottleneck: Bottleneck = Bottleneck.GPU,
+    idle_gpu_offloadable: bool = False,
 ) -> Callable[[Type[TBaseInvocation]], Type[TBaseInvocation]]:
     """
     Registers an invocation.
@@ -655,6 +671,7 @@ def invocation(
     :param Optional[bool] use_cache: Whether or not to use the invocation cache. Defaults to True. The user may override this in the workflow editor.
     :param Classification classification: The classification of the invocation. Defaults to FeatureClassification.Stable. Use Beta or Prototype if the invocation is unstable.
     :param Bottleneck bottleneck: The bottleneck of the invocation. Defaults to Bottleneck.GPU. Use Network if the invocation is network-bound.
+    :param bool idle_gpu_offloadable: Whether this node's whole execution may run on a borrowed idle GPU when `offload_text_encoders_to_idle_gpus` is enabled. Only set True for encoder-only nodes that store their result on the CPU and do no work on the session's own GPU. Defaults to False.
     """
 
     def wrapper(cls: Type[TBaseInvocation]) -> Type[TBaseInvocation]:
@@ -712,6 +729,7 @@ def invocation(
             cls.model_fields["use_cache"].default = use_cache
 
         cls.bottleneck = bottleneck
+        cls.idle_gpu_offloadable = idle_gpu_offloadable
 
         # Add the invocation type to the model.
 

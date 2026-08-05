@@ -1,3 +1,4 @@
+import re
 from abc import ABC
 from pathlib import Path
 from typing import (
@@ -97,6 +98,52 @@ def _get_flux_lora_format(mod: ModelOnDisk) -> FluxLoRAFormat | None:
     state_dict = mod.load_state_dict()
     value = flux_format_from_state_dict(state_dict, mod.metadata())
     return value
+
+
+# Matches an SDXL UNet attention key, capturing the transformer_blocks index.
+#
+# Anchored on the `lora_unet_` prefix because that is exactly the key set
+# `convert_sdxl_keys_to_diffusers_format()` can convert at load time — keys outside it
+# (e.g. diffusers/PEFT `unet.….lora_A.weight`) would be identified as SDXL here only to
+# raise `ValueError: Unrecognized SDXL LoRA key prefix` mid-generation.
+#
+# Both kohya `sd-scripts` naming conventions are covered: Stability-AI block names
+# (`input_blocks_8_1`, `middle_block_1`, `output_blocks_0_1`) and diffusers block names
+# (`down_blocks_2_attentions_1`, `mid_block_attentions_0`). Requiring a UNet block name
+# in addition to the prefix keeps DiT-style transformers (FLUX/Qwen/Z-Image), which also
+# use `transformer_blocks`, from matching.
+_SDXL_UNET_ATTENTION_RE = re.compile(
+    r"^lora_unet_"
+    r"(?:(?:down_blocks|up_blocks)_\d+_attentions_\d+"
+    r"|mid_block_attentions_\d+"
+    r"|(?:input_blocks|output_blocks)_\d+_\d+"
+    r"|middle_block_\d+)"
+    r"_transformer_blocks_(\d+)_"
+)
+
+
+def _state_dict_looks_like_sdxl_unet_lora(state_dict: dict[str | int, Any]) -> bool:
+    """Detect an SDXL UNet LoRA from its block structure alone.
+
+    SDXL's UNet uses a deep transformer stack (up to 10 transformer blocks) in its
+    lower-resolution attention blocks, so `transformer_blocks` indices reach >= 2.
+    SD1.x/SD2.x UNets only ever have a single transformer block (index 0) per
+    attention. This lets us identify SDXL from UNet-only LoRAs that lack the
+    cross-attention / text-encoder keys `lora_token_vector_length()` relies on
+    (e.g. self-attention-only "slider" LoRAs).
+
+    Known limitation: the `>= 2` threshold is what separates SDXL from SD1.x/SD2.x, so an
+    SDXL LoRA confined to the 2-transformer-block attention blocks (`down_blocks_1` /
+    `up_blocks_1`, indices 0-1) is not detected. Such a LoRA is indistinguishable from
+    SD1/SD2 by block structure alone.
+    """
+    for key in state_dict:
+        if not isinstance(key, str):
+            continue
+        match = _SDXL_UNET_ATTENTION_RE.match(key)
+        if match is not None and int(match.group(1)) >= 2:
+            return True
+    return False
 
 
 # FLUX.2 Klein context_in_dim values: 3 * Qwen3 hidden_size
@@ -691,6 +738,11 @@ class LoRA_LyCORIS_Config_Base(LoRA_Config_Base):
             return BaseModelType.StableDiffusionXL  # recognizes format at https://civitai.com/models/224641
         elif token_vector_length == 2048:
             return BaseModelType.StableDiffusionXL
+        # Some SDXL LoRAs (e.g. self-attention-only "slider" LoRAs) target only the UNet
+        # and lack the cross-attention / text-encoder keys that lora_token_vector_length()
+        # needs. Fall back to detecting SDXL from the UNet's deep transformer-block structure.
+        elif _state_dict_looks_like_sdxl_unet_lora(state_dict):
+            return BaseModelType.StableDiffusionXL
         else:
             raise NotAMatchError(f"unrecognized token vector length {token_vector_length}")
 
@@ -862,6 +914,9 @@ class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         # (with the "transformer." prefix and "single_" variant) which would falsely match our check.
         # Flux Kohya LoRAs use lora_unet_double_blocks or lora_unet_single_blocks.
         has_z_image_keys = state_dict_has_any_keys_starting_with(state_dict, {"diffusion_model.layers."})
+        # Krea-2 LoRAs also carry transformer.transformer_blocks. keys, but uniquely include the
+        # text-fusion stage. Exclude them here so they route to LoRA_LyCORIS_Krea2_Config.
+        has_krea2_keys = _has_krea2_lora_keys(state_dict)
         has_flux_keys = state_dict_has_any_keys_starting_with(
             state_dict,
             {
@@ -875,7 +930,7 @@ class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
             },
         )
 
-        if has_qwen_ie_keys and has_lora_suffix and not has_z_image_keys and not has_flux_keys:
+        if has_qwen_ie_keys and has_lora_suffix and not has_z_image_keys and not has_krea2_keys and not has_flux_keys:
             return
 
         raise NotAMatchError("model does not match Qwen Image LoRA heuristics")
@@ -888,6 +943,7 @@ class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
             {"transformer_blocks.", "transformer.transformer_blocks.", "lora_unet_transformer_blocks_"},
         )
         has_z_image_keys = state_dict_has_any_keys_starting_with(state_dict, {"diffusion_model.layers."})
+        has_krea2_keys = _has_krea2_lora_keys(state_dict)
         has_flux_keys = state_dict_has_any_keys_starting_with(
             state_dict,
             {
@@ -901,9 +957,131 @@ class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
             },
         )
 
-        if has_qwen_ie_keys and not has_z_image_keys and not has_flux_keys:
+        if has_qwen_ie_keys and not has_z_image_keys and not has_krea2_keys and not has_flux_keys:
             return BaseModelType.QwenImage
         raise NotAMatchError("model does not look like a Qwen Image Edit LoRA")
+
+
+def _has_krea2_lora_keys(state_dict: dict[str | int, Any]) -> bool:
+    """True if the state dict targets Krea-2's distinctive modules.
+
+    Covers both the diffusers naming (``text_fusion`` / ``time_mod_proj``) and the native/ComfyUI naming
+    (``txtfusion``, or the gated attention ``attn.wq`` + ``attn.gate`` unique to Krea-2's single-stream
+    blocks) so native-format LoRAs are recognized as Krea-2 rather than falling through to another base.
+    """
+    str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
+    if any(("text_fusion" in k or "txtfusion" in k or "time_mod_proj" in k) for k in str_keys):
+        return True
+    # Native gated attention identifies a transformer-only Krea-2 LoRA that lacks the text-fusion stage.
+    return any(".attn.wq." in k for k in str_keys) and any(".attn.gate." in k for k in str_keys)
+
+
+# Each LoRA weight half must be accompanied by its partner half. An orphaned half installs successfully
+# but crashes later during LoRA conversion, so we reject it at identification time.
+_LORA_PAIR_PARTNERS = {
+    "lora_A.weight": "lora_B.weight",
+    "lora_B.weight": "lora_A.weight",
+    "lora_down.weight": "lora_up.weight",
+    "lora_up.weight": "lora_down.weight",
+}
+
+
+def _lora_weight_keys_are_all_paired(state_dict: dict[str | int, Any], prefixes: tuple[str, ...] | None = None) -> bool:
+    """True if *every* lora_A/lora_B/lora_down/lora_up weight (optionally restricted to `prefixes`) has its
+    partner half present. Returns True when there are no such weights at all (nothing to invalidate)."""
+    string_keys = {key for key in state_dict if isinstance(key, str)}
+    for key in string_keys:
+        if prefixes is not None and not key.startswith(prefixes):
+            continue
+        for suffix, partner_suffix in _LORA_PAIR_PARTNERS.items():
+            if key.endswith(suffix):
+                if f"{key[: -len(suffix)]}{partner_suffix}" not in string_keys:
+                    return False
+                break
+    return True
+
+
+def _has_complete_lora_pair(state_dict: dict[str | int, Any], prefixes: tuple[str, ...] | None = None) -> bool:
+    """True if at least one complete lora_A/B (or lora_down/up) pair exists, optionally under `prefixes`.
+
+    Note this only requires a *complete* pair to exist; it does not by itself reject dangling halves
+    elsewhere — callers pair it with :func:`_lora_weight_keys_are_all_paired` (over the whole state dict)
+    to also reject orphaned halves anywhere.
+    """
+    string_keys = {key for key in state_dict if isinstance(key, str)}
+    for key in string_keys:
+        if prefixes is not None and not key.startswith(prefixes):
+            continue
+        for suffix, partner_suffix in _LORA_PAIR_PARTNERS.items():
+            if key.endswith(suffix) and f"{key[: -len(suffix)]}{partner_suffix}" in string_keys:
+                return True
+    return False
+
+
+# Layouts the converter understands for an explicit Krea-2 override (a transformer-only or text-encoder-only
+# LoRA that lacks the auto-detection text_fusion/time_mod_proj keys still installs under an explicit base).
+_KREA2_SUPPORTED_LORA_PREFIXES = (
+    "transformer.transformer_blocks.",
+    "transformer_blocks.",
+    # The converter also supports the `diffusion_model.` transformer layout
+    # (see krea2_lora_conversion_utils.lora_model_from_krea2_state_dict).
+    "diffusion_model.transformer_blocks.",
+    "diffusion_model.blocks.",
+    "diffusion_model.txtfusion.",
+    "diffusion_model.first.",
+    "diffusion_model.tmlp.",
+    "diffusion_model.tproj.",
+    "diffusion_model.txtmlp.",
+    "diffusion_model.last.linear.",
+    "base_model.model.transformer.transformer_blocks.",
+    "text_encoder.",
+    "base_model.model.text_encoder.",
+)
+
+
+class LoRA_LyCORIS_Krea2_Config(LoRA_LyCORIS_Config_Base, Config_Base):
+    """Model config for Krea-2 LoRA models in LyCORIS (single-file diffusers PEFT) format."""
+
+    base: Literal[BaseModelType.Krea2] = Field(default=BaseModelType.Krea2)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+        raise_for_override_fields(cls, override_fields)
+
+        state_dict = mod.load_state_dict()
+        explicit_krea2_override = override_fields.get("base") is BaseModelType.Krea2
+        has_supported_explicit_pair = _has_complete_lora_pair(state_dict, _KREA2_SUPPORTED_LORA_PREFIXES)
+        # Reject an orphaned half *anywhere* in the state dict (e.g. a dangling text_fusion half not under
+        # the approved prefixes) — it would install here but fail during LoRA conversion at generation time.
+        if explicit_krea2_override and has_supported_explicit_pair and _lora_weight_keys_are_all_paired(state_dict):
+            return cls(**override_fields)
+
+        cls._validate_looks_like_lora(mod)
+        cls._validate_base(mod)
+        return cls(**override_fields)
+
+    @classmethod
+    def _validate_looks_like_lora(cls, mod: ModelOnDisk) -> None:
+        """Krea-2 LoRAs have keys like transformer.text_fusion.* / transformer.transformer_blocks.* with
+        a lora_A/lora_B (or lora_down/lora_up) suffix. The text-fusion stage is unique to Krea-2."""
+        state_dict = mod.load_state_dict()
+        # Require a *complete* lora_A/B (or lora_down/up) pair, not merely any lora/dora suffix: a file with
+        # only ``dora_scale`` and no A/B weights would pass a suffix check but fail later on missing weights.
+        if not (_has_krea2_lora_keys(state_dict) and _has_complete_lora_pair(state_dict)):
+            raise NotAMatchError(
+                "model does not match Krea-2 LoRA heuristics (no complete lora_A/B or lora_down/up pair)"
+            )
+        # Reject a file with an orphaned LoRA half (a valid layer plus a dangling lora_A/B/down/up); it
+        # would install here but fail later during LoRA conversion.
+        if not _lora_weight_keys_are_all_paired(state_dict):
+            raise NotAMatchError("Krea-2 LoRA has an incomplete lora_A/B (or lora_down/up) weight pair")
+
+    @classmethod
+    def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
+        if _has_krea2_lora_keys(mod.load_state_dict()):
+            return BaseModelType.Krea2
+        raise NotAMatchError("model does not look like a Krea-2 LoRA")
 
 
 class LoRA_LyCORIS_Anima_Config(LoRA_LyCORIS_Config_Base, Config_Base):
@@ -1139,6 +1317,12 @@ class LoRA_Diffusers_Config_Base(LoRA_Config_Base):
             case 2048:
                 return BaseModelType.StableDiffusionXL
             case _:
+                # Some SDXL LoRAs (e.g. self-attention-only "slider" LoRAs) target only the
+                # UNet and lack the cross-attention / text-encoder keys that
+                # lora_token_vector_length() needs. Fall back to detecting SDXL from the
+                # UNet's deep transformer-block structure.
+                if _state_dict_looks_like_sdxl_unet_lora(state_dict):
+                    return BaseModelType.StableDiffusionXL
                 raise NotAMatchError(f"unrecognized token vector length {token_vector_length}")
 
     @classmethod
