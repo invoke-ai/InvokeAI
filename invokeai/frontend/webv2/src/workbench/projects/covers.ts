@@ -1,5 +1,4 @@
 import {
-  assertAccountScopeCurrent,
   captureAccountScope,
   isAccountScopeCurrent,
   registerAccountOwnedResource,
@@ -30,6 +29,21 @@ import { getClientStateValue, setClientStateValue } from './api';
  *
  * Writes are skipped when the value has not changed, which is almost always: a
  * cover changes when a generation lands, not on every autosave.
+ *
+ * ### The whole index is one value, so a write must not precede a read
+ *
+ * The KV holds one blob and `setClientStateValue` replaces it outright. Writing
+ * from a store that has not loaded would therefore not add an entry — it would
+ * delete every entry but the one being written.
+ *
+ * That ordering is not hypothetical. Autosave reaches {@link recordProjectCover}
+ * from the editor, which loads the index only when the project switcher or the
+ * Open dialog is opened; someone who reloads straight into a project and
+ * generates has never loaded it. So a record made before the load is held in
+ * {@link pendingCoverNames}, applied on top of the server's answer once it
+ * arrives, and persisted then. A read that *fails* is not a read: the store
+ * stays unloaded and the pending records wait, because merging onto a blank
+ * answer is the same destructive write by another route.
  */
 
 export const PROJECT_COVERS_KEY = 'webv2:project-covers';
@@ -46,8 +60,16 @@ interface ProjectCoversSnapshot {
 const EMPTY: ProjectCoversSnapshot = { coverImageNames: {}, isLoaded: false };
 const store = createExternalStore<ProjectCoversSnapshot>(EMPTY);
 
+/**
+ * Covers recorded before the index loaded, newest write per project. Drained by
+ * {@link loadProjectCovers} — see the module docblock for why they cannot be
+ * persisted where they are made.
+ */
+const pendingCoverNames = new Map<string, string | null>();
+
 registerAccountOwnedResource({
   clear: () => {
+    pendingCoverNames.clear();
     store.setSnapshot(EMPTY);
   },
   name: 'project-covers',
@@ -82,6 +104,17 @@ const persist = (coverImageNames: Record<string, string>, owner: AccountScope): 
   });
 };
 
+/**
+ * Trim to the cap, oldest first. Insertion order is recency order because
+ * {@link recordProjectCover} re-inserts the project it touches, so the entry
+ * being written can never be the one evicted.
+ */
+const boundCovers = (coverImageNames: Record<string, string>): Record<string, string> => {
+  const entries = Object.entries(coverImageNames);
+
+  return entries.length > MAX_TRACKED_COVERS ? Object.fromEntries(entries.slice(-MAX_TRACKED_COVERS)) : coverImageNames;
+};
+
 const loadFlight = createSingleFlight<void>();
 
 /** Fetch the index once per account scope; concurrent calls share the request. */
@@ -94,14 +127,41 @@ export const loadProjectCovers = (): Promise<void> => {
     try {
       raw = await getClientStateValue(PROJECT_COVERS_KEY, owner.signal);
     } catch {
-      // Treated as "no covers yet" — see the module docblock.
+      // Not "no covers yet": a failed read leaves the store unloaded so that
+      // nothing writes over an index we were unable to see. The next refresh
+      // tries again, and any pending records wait for it.
+      return;
     }
 
     if (!isAccountScopeCurrent(owner)) {
       return;
     }
 
-    store.setSnapshot({ coverImageNames: parseProjectCovers(raw), isLoaded: true });
+    const coverImageNames = parseProjectCovers(raw);
+    let hasPendingChange = false;
+
+    for (const [projectId, coverImageName] of pendingCoverNames) {
+      if ((coverImageNames[projectId] ?? null) === coverImageName) {
+        continue;
+      }
+
+      hasPendingChange = true;
+      delete coverImageNames[projectId];
+
+      if (coverImageName !== null) {
+        coverImageNames[projectId] = coverImageName;
+      }
+    }
+
+    pendingCoverNames.clear();
+
+    const bounded = boundCovers(coverImageNames);
+
+    store.setSnapshot({ coverImageNames: bounded, isLoaded: true });
+
+    if (hasPendingChange) {
+      persist(bounded, owner);
+    }
   });
 };
 
@@ -123,7 +183,7 @@ export const recordProjectCover = (
     return;
   }
 
-  const { coverImageNames } = store.getSnapshot();
+  const { coverImageNames, isLoaded } = store.getSnapshot();
 
   if ((coverImageNames[projectId] ?? null) === coverImageName) {
     return;
@@ -131,16 +191,28 @@ export const recordProjectCover = (
 
   const next = { ...coverImageNames };
 
-  if (coverImageName === null) {
-    delete next[projectId];
-  } else {
+  // Deleted before it is set, so an existing project moves to the end: the cap
+  // below evicts in insertion order, and the entry being written now is the one
+  // that must survive it.
+  delete next[projectId];
+
+  if (coverImageName !== null) {
     next[projectId] = coverImageName;
   }
 
-  const entries = Object.entries(next);
-  const bounded = entries.length > MAX_TRACKED_COVERS ? Object.fromEntries(entries.slice(-MAX_TRACKED_COVERS)) : next;
+  const bounded = boundCovers(next);
 
-  store.setSnapshot({ coverImageNames: bounded, isLoaded: true });
+  store.setSnapshot({ coverImageNames: bounded, isLoaded });
+
+  if (!isLoaded) {
+    // The grid can show this immediately, but the KV cannot receive it until we
+    // know what else is in there. See the module docblock.
+    pendingCoverNames.set(projectId, coverImageName);
+    void loadProjectCovers();
+
+    return;
+  }
+
   persist(bounded, owner);
 };
 
@@ -156,9 +228,3 @@ export const forgetProjectCover = (projectId: string, owner: AccountScope = capt
  */
 export const getProjectCoverUrl = (coverImageName: string): string =>
   absolutizeApiUrl(`/api/v1/images/i/${encodeURIComponent(coverImageName)}/thumbnail`);
-
-/** Load the index and report whether it changed anything, for the library's refresh pass. */
-export const ensureProjectCoversLoaded = async (owner: AccountScope): Promise<void> => {
-  await loadProjectCovers();
-  assertAccountScopeCurrent(owner);
-};
