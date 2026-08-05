@@ -39,7 +39,7 @@ Low-VRAM mode and related workload-specific optimizations include:
 - Dynamic RAM and VRAM cache sizes (`max_cache_ram_gb`, `max_cache_vram_gb`)
 - Working memory (`device_working_mem_gb`)
 - Keeping a RAM weight copy (`keep_ram_copy_of_weights`)
-- PiD decode activation chunking (`pid_optimization`)
+- PiD decode activation chunking (`pid_memory_optimization`)
 
 Read on to learn about these features and understand how to fine-tune them for your system and use-cases.
 
@@ -154,7 +154,7 @@ PiD decodes directly into high-resolution pixels, so its activation and sampler 
 To reduce PiD's peak VRAM use, enable its experimental memory optimization in `invokeai.yaml` and restart InvokeAI:
 
 ```yaml
-pid_optimization: true
+pid_memory_optimization: true
 ```
 
 This setting uses lower-precision sampler intermediates and processes parts of the PiD pixel pathway in chunks. It applies to every supported PiD decoder and is disabled by default because chunking makes decoding slower. See [PiD Super-Resolution Decode](/features/pid-decode/) for supported models and usage.

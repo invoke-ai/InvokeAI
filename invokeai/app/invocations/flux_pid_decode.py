@@ -152,7 +152,7 @@ class FluxPiDDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
                 config=PiDDecodeConfig(
                     num_inference_steps=self.num_inference_steps,
                     seed=self.seed,
-                    pid_optimization=context.config.get().pid_optimization,
+                    pid_memory_optimization=context.config.get().pid_memory_optimization,
                 ),
             )
 

@@ -62,7 +62,7 @@ def test_velocity_to_x0_uses_float32_math_and_preserves_input_dtype(
     # A float64 intermediate doubles memory for each full-resolution sampler tensor. PiD already
     # predicts under bf16 autocast, so perform this update in float32 without calling Tensor.double().
     with patch.object(torch.Tensor, "double", side_effect=AssertionError("unexpected float64 conversion")):
-        actual = _velocity_to_x0(x_t, net_output, timestep, pid_optimization=True)
+        actual = _velocity_to_x0(x_t, net_output, timestep, pid_memory_optimization=True)
 
     assert actual.dtype == x_dtype
     torch.testing.assert_close(actual, expected, rtol=0, atol=0)
@@ -75,14 +75,14 @@ def test_velocity_to_x0_uses_original_float64_math_when_optimization_is_disabled
     expected = (x_t.double() - timestep.double().view(1, 1, 1, 1) * net_output.double()).to(x_t.dtype)
 
     with patch("torch.addcmul", side_effect=AssertionError("unexpected optimized path")):
-        actual = _velocity_to_x0(x_t, net_output, timestep, pid_optimization=False)
+        actual = _velocity_to_x0(x_t, net_output, timestep, pid_memory_optimization=False)
 
     torch.testing.assert_close(actual, expected, rtol=0, atol=0)
 
 
-@pytest.mark.parametrize(("pid_optimization", "expected_chunk_size"), [(False, None), (True, 1024)])
+@pytest.mark.parametrize(("pid_memory_optimization", "expected_chunk_size"), [(False, None), (True, 1024)])
 def test_student_sample_loop_passes_per_call_activation_chunk_size(
-    pid_optimization: bool, expected_chunk_size: int | None
+    pid_memory_optimization: bool, expected_chunk_size: int | None
 ) -> None:
     activation_chunk_sizes: list[int | None] = []
 
@@ -98,14 +98,14 @@ def test_student_sample_loop_passes_per_call_activation_chunk_size(
         caption_mask=None,
         lq_latent=None,
         degrade_sigma=torch.zeros(1),
-        pid_optimization=pid_optimization,
+        pid_memory_optimization=pid_memory_optimization,
     )
 
     assert activation_chunk_sizes == [expected_chunk_size]
 
 
-def test_pid_optimization_defaults_to_disabled() -> None:
-    assert PiDDecodeConfig().pid_optimization is False
+def test_pid_memory_optimization_defaults_to_disabled() -> None:
+    assert PiDDecodeConfig().pid_memory_optimization is False
 
 
 def test_matching_decoder_base_is_accepted() -> None:
