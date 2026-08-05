@@ -686,10 +686,6 @@ class Qwen3VLEncoderCheckpointLoader(ModelLoader):
         # Per-layer markers must be read before extract_fp8_scaled_layers() drops them, and before
         # the key remap, which would not carry a ".comfy_quant" suffix to a sensible destination.
         layer_hints = {**extract_comfy_quant_hints(sd), **parse_quantization_metadata(metadata)}
-        # A legacy activation-scale marker this loader has never consumed.
-        for k in list(sd.keys()):
-            if isinstance(k, str) and "scale_input" in k:
-                del sd[k]
 
         # Remap BEFORE pulling the scales out. The remap rewrites whole keys, so each
         # ".weight_scale" travels with its ".weight" and the recovered layer paths already match the

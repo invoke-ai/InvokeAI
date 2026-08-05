@@ -25,7 +25,10 @@ import torch
 FP8_DTYPE = torch.float8_e4m3fn
 
 WEIGHT_SCALE_SUFFIXES = (".weight_scale", ".scale_weight")
-INPUT_SCALE_SUFFIX = ".input_scale"
+# Both spellings occur, exactly as for the weight scale. ComfyUI normalizes `.scale_input` to
+# `.input_scale` on load (comfy/utils.py, convert_old_quants); reading only one of them means a
+# calibrated activation scale is silently discarded and every forward pays the amax reduction.
+INPUT_SCALE_SUFFIXES = (".input_scale", ".scale_input")
 
 QUANT_METADATA_KEY = "_quantization_metadata"
 
@@ -118,13 +121,34 @@ def extract_comfy_quant_hints(sd: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return hints
 
 
-def _strip_scale_suffix(key: str) -> tuple[str, str] | None:
+def _strip_scale_suffix(key: str) -> tuple[str, bool] | None:
+    """Return ``(module path, is_input_scale)``, or None if ``key`` is not a scale key."""
     for suffix in WEIGHT_SCALE_SUFFIXES:
         if key.endswith(suffix):
-            return key[: -len(suffix)], suffix
-    if key.endswith(INPUT_SCALE_SUFFIX):
-        return key[: -len(INPUT_SCALE_SUFFIX)], INPUT_SCALE_SUFFIX
+            return key[: -len(suffix)], False
+    for suffix in INPUT_SCALE_SUFFIXES:
+        if key.endswith(suffix):
+            return key[: -len(suffix)], True
     return None
+
+
+def _usable_input_scale(scale: torch.Tensor | None) -> torch.Tensor | None:
+    """A calibrated static activation scale, or None to fall back to per-forward ``amax`` scaling.
+
+    An ``input_scale`` of exactly 1.0 is a placeholder: the producer wrote the field without
+    calibrating it. Taking it at face value replaces the dynamic scale with *no scaling at all*, so
+    every activation above the fp8 maximum saturates — far worse than the dynamic path it
+    suppresses. ComfyUI drops the key in exactly this case (comfy/utils.py, convert_old_quants).
+
+    Non-finite and non-positive scales are rejected for the same reason: they cannot be a valid
+    divisor, and using one would produce inf/NaN activations instead of a slightly worse image.
+    """
+    if scale is None:
+        return None
+    scale = scale.float().reshape(())
+    if not torch.isfinite(scale) or scale <= 0 or scale.item() == 1.0:
+        return None
+    return scale
 
 
 def extract_fp8_scaled_layers(
@@ -155,8 +179,8 @@ def extract_fp8_scaled_layers(
         parsed = _strip_scale_suffix(key)
         if parsed is None:
             continue
-        path, suffix = parsed
-        if suffix == INPUT_SCALE_SUFFIX:
+        path, is_input_scale = parsed
+        if is_input_scale:
             input_scales[path] = sd.pop(key)
         else:
             weight_scales[path] = sd.pop(key)
@@ -175,7 +199,7 @@ def extract_fp8_scaled_layers(
         hints = layer_meta.get(path, {})
         layers[path] = Fp8ScaledLayer(
             weight_scale=scale.float().reshape(()) if scale.numel() == 1 else scale.float().flatten(),
-            input_scale=input_scales.get(path).float().reshape(()) if path in input_scales else None,
+            input_scale=_usable_input_scale(input_scales.get(path)),
             full_precision_matmul=bool(hints.get("full_precision_matrix_mult", False)),
         )
     return layers

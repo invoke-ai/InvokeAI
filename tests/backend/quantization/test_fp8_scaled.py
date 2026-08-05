@@ -102,6 +102,59 @@ def _comfy_quant_blob(full_precision: bool):
     return torch.tensor(list(payload.encode("utf-8")), dtype=torch.uint8)
 
 
+class TestInputScale:
+    def test_calibrated_scale_is_kept(self):
+        q, scale = _fp8_weight(32, 16)
+        sd = {"lin.weight": q, "lin.weight_scale": scale, "lin.input_scale": torch.tensor(0.017)}
+        layer = extract_fp8_scaled_layers(sd)["lin"]
+        assert layer.input_scale is not None
+        assert pytest.approx(layer.input_scale.item()) == 0.017
+        assert "lin.input_scale" not in sd
+
+    def test_scale_input_spelling_is_accepted(self):
+        """`.scale_input` is the other spelling in the wild; ignoring it discards the calibration."""
+        q, scale = _fp8_weight(32, 16)
+        sd = {"lin.weight": q, "lin.scale_weight": scale, "lin.scale_input": torch.tensor(0.017)}
+        layer = extract_fp8_scaled_layers(sd)["lin"]
+        assert pytest.approx(layer.input_scale.item()) == 0.017
+        assert not [k for k in sd if "scale_input" in k], "must be popped, not left for load_state_dict"
+
+    @pytest.mark.parametrize(
+        "value", [1.0, 0.0, -0.5, float("nan"), float("inf")], ids=["placeholder", "zero", "negative", "nan", "inf"]
+    )
+    def test_unusable_scales_fall_back_to_dynamic(self, value: float):
+        """A 1.0 input_scale is an uncalibrated placeholder. Using it means *no* activation scaling,
+        so everything above the fp8 max saturates -- strictly worse than the per-forward amax it
+        would replace. Zero/negative/non-finite cannot be a divisor at all."""
+        q, scale = _fp8_weight(32, 16)
+        sd = {"lin.weight": q, "lin.weight_scale": scale, "lin.input_scale": torch.tensor(value)}
+        assert extract_fp8_scaled_layers(sd)["lin"].input_scale is None
+
+    @cuda_fp8
+    def test_placeholder_scale_saturates_activations_above_the_fp8_range(self):
+        """End-to-end cost of trusting a 1.0 placeholder.
+
+        fp8_e4m3 is a floating-point format, so a scale factor does not buy relative precision the
+        way it would for int8 — for activations inside +/-448 both paths are equivalent. The damage
+        appears only above the representable range, where an unscaled cast clamps hard while the
+        dynamic amax scale maps the whole tensor into range. Transformer activations do reach that
+        regime, which is why a calibrated input_scale exists at all.
+        """
+        torch.manual_seed(0)
+        q, scale = _fp8_weight(64, 64)
+        q, scale = q.cuda(), scale.cuda()
+        x = (torch.randn(32, 64, dtype=torch.bfloat16, device="cuda") * 2000.0).unsqueeze(0)
+        assert x.abs().max() > 448, "test must exercise the saturating regime"
+        reference = torch.nn.functional.linear(x, dequantize_weight(q, scale, x.dtype))
+
+        def err(got: torch.Tensor) -> float:
+            return ((got.float() - reference.float()).norm() / reference.float().norm()).item()
+
+        dynamic = scaled_mm_linear(x, q, scale, None, input_scale=None)
+        unscaled = scaled_mm_linear(x, q, scale, None, input_scale=torch.tensor(1.0, device="cuda"))
+        assert err(dynamic) < err(unscaled) / 2, f"dynamic={err(dynamic):.4f} unscaled={err(unscaled):.4f}"
+
+
 class TestComfyQuantHints:
     def test_reads_per_layer_markers_and_pops_them(self):
         sd = {
