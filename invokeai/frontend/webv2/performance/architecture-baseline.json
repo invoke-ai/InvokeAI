@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 823809,
+        "brotliBytes": 823567,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 823448,
+        "gzipBytes": 823200,
         "imageRawBytes": 156376,
-        "initialRawBytes": 1912594,
+        "initialRawBytes": 1911464,
         "largestAssetRawBytes": 746170,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 67827,
+        "ownedRawBytes": 66697,
         "requestCount": 33,
         "scriptRequestCount": 17,
         "sourceOwners": [
@@ -239,7 +239,6 @@
           "source:src/workbench/launchpad/intents.ts",
           "source:src/workbench/launchpad/pages/HomePage.tsx",
           "source:src/workbench/launchpad/pages/ProjectsPage.tsx",
-          "source:src/workbench/launchpad/projects/NewProjectCard.tsx",
           "source:src/workbench/launchpad/projects/ProjectActionsMenu.tsx",
           "source:src/workbench/launchpad/projects/ProjectCard.tsx",
           "source:src/workbench/launchpad/projects/ProjectCover.tsx",
@@ -271,15 +270,15 @@
         ]
       },
       "limits": {
-        "brotliBytes": 832048,
+        "brotliBytes": 831803,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 831683,
+        "gzipBytes": 831432,
         "imageRawBytes": 157940,
-        "initialRawBytes": 1931720,
+        "initialRawBytes": 1930579,
         "largestAssetRawBytes": 753632,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 67827,
+        "ownedRawBytes": 66697,
         "requestCount": 33,
         "scriptRequestCount": 17
       },
@@ -289,10 +288,10 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1005525,
+        "brotliBytes": 1005521,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1003037,
+        "gzipBytes": 1003040,
         "imageRawBytes": 156376,
         "initialRawBytes": 2460814,
         "largestAssetRawBytes": 746170,
@@ -790,10 +789,10 @@
         ]
       },
       "limits": {
-        "brotliBytes": 1015581,
+        "brotliBytes": 1015577,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 1013068,
+        "gzipBytes": 1013071,
         "imageRawBytes": 157940,
         "initialRawBytes": 2485423,
         "largestAssetRawBytes": 753632,
