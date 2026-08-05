@@ -116,6 +116,10 @@ const enqueuePersist = (coverImageNames: Record<string, string>, owner: AccountS
   const value = JSON.stringify(coverImageNames);
 
   queue.tail = queue.tail.then(async () => {
+    if (mutationQueue !== queue || !isAccountScopeCurrent(owner)) {
+      return;
+    }
+
     try {
       await setClientStateValue(PROJECT_COVERS_KEY, value, owner.signal);
     } catch {

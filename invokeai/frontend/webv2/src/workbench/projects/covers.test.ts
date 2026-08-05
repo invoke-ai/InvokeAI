@@ -350,7 +350,7 @@ describe('recordProjectCover', () => {
     unsubscribe();
   });
 
-  it('discards the old account queue and ignores its stale completions', async () => {
+  it('discards queued old-account writes and ignores stale completions', async () => {
     const oldAccountWrite = createDeferred();
     const newAccountWrite = createDeferred();
     let didCompleteOldWrite = false;
@@ -372,6 +372,8 @@ describe('recordProjectCover', () => {
     await covers.loadProjectCovers();
     covers.recordProjectCover('old-project', 'old.png');
     await vi.waitFor(() => expect(api.setClientStateValue).toHaveBeenCalledTimes(1));
+    covers.recordProjectCover('old-project-2', 'old-2.png');
+    expect(api.setClientStateValue).toHaveBeenCalledTimes(1);
 
     lifecycle.accountLifecycle.activate('user-b');
     await covers.loadProjectCovers();
@@ -385,6 +387,7 @@ describe('recordProjectCover', () => {
     await vi.waitFor(() => {
       expect(didCompleteOldWrite).toBe(true);
       expect(didFailNewWrite).toBe(true);
+      expect(api.setClientStateValue).toHaveBeenCalledTimes(2);
       expect(listener).toHaveBeenCalledTimes(1);
       expect(covers.getProjectCoverImageName('old-project')).toBeUndefined();
       expect(covers.getProjectCoverImageName('new-project')).toBe('new.png');
