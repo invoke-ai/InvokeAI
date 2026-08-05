@@ -92,7 +92,12 @@ class MiniMaxH3DiffusersModel(ModelLoader):
                 return AutoProcessor.from_pretrained(submodel_path, local_files_only=True)
             case SubModelType.VAE:
                 from invokeai.backend.minimax_h3 import AutoencoderKLMiniMaxH3
+                from invokeai.backend.minimax_h3.rocm_causal_conv3d import patch_minimax_h3_causal_conv3d_for_rocm
 
+                # The convolutional encoder hits MIOpen's Im3d2Col conv3d fallback on ROCm
+                # (~48x, same failure as the Wan VAE); decompose to per-temporal-tap conv2d.
+                # The ViT decoder is unaffected either way.
+                patch_minimax_h3_causal_conv3d_for_rocm()
                 return AutoencoderKLMiniMaxH3.from_pretrained(submodel_path, torch_dtype=dtype, local_files_only=True)
             case SubModelType.AudioVAE:
                 from invokeai.backend.minimax_h3 import AutoencoderKLMiniMaxH3Audio
