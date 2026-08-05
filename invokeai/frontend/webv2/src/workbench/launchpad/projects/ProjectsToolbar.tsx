@@ -3,7 +3,7 @@ import { Button, IconButton } from '@platform/ui/Button';
 import { MenuContent } from '@platform/ui/Menu';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { ArrowUpDownIcon, CheckIcon, LayoutGridIcon, ListIcon, SearchIcon, XIcon } from 'lucide-react';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /* eslint-disable react-perf/jsx-no-jsx-as-prop */
@@ -43,6 +43,40 @@ const VIEW_LABEL_KEY: Record<ProjectsViewId, string> = {
 const VIEW_ICON: Record<ProjectsViewId, typeof LayoutGridIcon> = {
   grid: LayoutGridIcon,
   list: ListIcon,
+};
+
+/**
+ * One position of the layout control.
+ *
+ * The tooltip wraps the icon rather than the item, because `Tooltip.Trigger` is
+ * `asChild` and merges its own `data-state` onto whatever it clones — on the
+ * item that overwrites `data-state="checked"`, so the selected segment styles
+ * as unselected and the indicator measures 0×0.
+ *
+ * An icon is not focusable, though, so hover alone would leave the label
+ * unreachable by keyboard — the tooltip used to sit on an `IconButton`, which
+ * was. The hidden radio *is* the focusable control here, so it drives the
+ * tooltip open alongside pointer hover. Screen readers were never affected:
+ * the radio carries the accessible name either way.
+ */
+const ViewSegment = ({ id }: { id: ProjectsViewId }) => {
+  const { t } = useTranslation();
+  const [isTooltipOpen, setIsTooltipOpen] = useState(false);
+  const handleTooltipOpenChange = useCallback((details: { open: boolean }) => setIsTooltipOpen(details.open), []);
+  const showTooltip = useCallback(() => setIsTooltipOpen(true), []);
+  const hideTooltip = useCallback(() => setIsTooltipOpen(false), []);
+  const label = t(VIEW_LABEL_KEY[id]);
+
+  return (
+    <SegmentGroup.Item px="2" value={id}>
+      <SegmentGroup.ItemHiddenInput aria-label={label} onBlur={hideTooltip} onFocus={showTooltip} />
+      <SegmentGroup.ItemText display="flex">
+        <Tooltip content={label} open={isTooltipOpen} onOpenChange={handleTooltipOpenChange}>
+          <Icon as={VIEW_ICON[id]} boxSize="3.5" />
+        </Tooltip>
+      </SegmentGroup.ItemText>
+    </SegmentGroup.Item>
+  );
 };
 
 export const ProjectsToolbar = ({
@@ -138,21 +172,7 @@ export const ProjectsToolbar = ({
       <SegmentGroup.Root aria-label={t('projects.viewLabel')} size="xs" value={view} onValueChange={handleViewChange}>
         <SegmentGroup.Indicator />
         {PROJECTS_VIEW_IDS.map((id) => (
-          <SegmentGroup.Item key={id} px="2" value={id}>
-            {/* The hidden radio is the control, so it carries the name — the
-                visible label is an icon with no text of its own. */}
-            <SegmentGroup.ItemHiddenInput aria-label={t(VIEW_LABEL_KEY[id])} />
-            <SegmentGroup.ItemText display="flex">
-              {/* The tooltip wraps the icon, never the item: `Tooltip.Trigger`
-                  is `asChild` and merges its own `data-state` onto whatever it
-                  clones, which on the item overwrites `data-state="checked"` —
-                  the selected segment then styles as unselected and the
-                  indicator measures 0×0. */}
-              <Tooltip content={t(VIEW_LABEL_KEY[id])}>
-                <Icon as={VIEW_ICON[id]} boxSize="3.5" />
-              </Tooltip>
-            </SegmentGroup.ItemText>
-          </SegmentGroup.Item>
+          <ViewSegment key={id} id={id} />
         ))}
       </SegmentGroup.Root>
     </Flex>
