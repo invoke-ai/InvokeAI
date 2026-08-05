@@ -21,6 +21,7 @@ import {
   krea2VaeModelSelected,
   minimaxH3DurationSecondsChanged,
   minimaxH3OutputModeChanged,
+  minimaxH3TextEncoderModelSelected,
   minimaxH3TransformerModelSelected,
   negativePromptChanged,
   openaiBackgroundChanged,
@@ -1184,6 +1185,37 @@ const MiniMaxH3TransformerModel: SingleMetadataHandler<ModelIdentifierField | nu
   ),
 };
 //#endregion MiniMaxH3TransformerModel
+
+//#region MiniMaxH3TextEncoderModel
+const MiniMaxH3TextEncoderModel: SingleMetadataHandler<ModelIdentifierField | null> = {
+  [SingleMetadataKey]: true,
+  type: 'MiniMaxH3TextEncoderModel',
+  parse: async (metadata, store) => {
+    const raw = getProperty(metadata, 'minimax_h3_text_encoder_model');
+    if (raw === undefined) {
+      // The graph builder only writes this key when a single-file text-encoder override was
+      // used; reject when absent so the handler is not rendered (and recall-all skips it).
+      return Promise.reject();
+    }
+    if (raw === null) {
+      return Promise.resolve(null);
+    }
+    // Validate the single-file encoder is still installed - recall-all must skip silently
+    // (not clobber or error) when it has since been deleted.
+    const parsed = await parseModelIdentifier(raw, store, 'qwen3_vl_encoder');
+    assert(parsed.type === 'qwen3_vl_encoder' && parsed.base === 'minimax-h3');
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(minimaxH3TextEncoderModelSelected(value));
+  },
+  i18nKey: 'modelManager.minimaxH3TextEncoderModel',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField | null>) => (
+    <MetadataPrimitiveValue value={value ? value.name : 'None'} />
+  ),
+};
+//#endregion MiniMaxH3TextEncoderModel
 
 //#region ZImageShift
 const ZImageShift: SingleMetadataHandler<number | null> = {
@@ -2373,6 +2405,7 @@ export const ImageMetadataHandlers = {
   MiniMaxH3DurationSeconds,
   MiniMaxH3OutputMode,
   MiniMaxH3TransformerModel,
+  MiniMaxH3TextEncoderModel,
   ZImageShift,
   Ideogram4SamplerPreset,
   Ideogram4Steps,

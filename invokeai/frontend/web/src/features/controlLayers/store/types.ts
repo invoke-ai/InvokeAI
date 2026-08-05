@@ -831,7 +831,7 @@ const zPidMode = z.enum(['off', 'fit', 'native']);
 export type PidMode = z.infer<typeof zPidMode>;
 
 export const zParamsState = z.object({
-  _version: z.literal(6),
+  _version: z.literal(7),
   maskBlur: z.number(),
   maskBlurMethod: zParameterMaskBlurMethod,
   canvasCoherenceMode: zParameterCanvasCoherenceMode,
@@ -940,6 +940,7 @@ export const zParamsState = z.object({
   minimaxH3DurationSeconds: z.number().int().min(5).max(14),
   minimaxH3OutputMode: z.enum(['video', 'image']),
   minimaxH3TransformerModel: zParameterModel.nullable(), // Optional: single-file transformer override (e.g. pruned int8)
+  minimaxH3TextEncoderModel: zParameterModel.nullable(), // Optional: single-file truncated Qwen3-VL encoder override (e.g. int8)
   // Z-Image Seed Variance Enhancer settings
   zImageSeedVarianceEnabled: z.boolean(),
   zImageSeedVarianceStrength: z.number().min(0).max(2),
@@ -970,7 +971,7 @@ export const zParamsState = z.object({
 });
 export type ParamsState = z.infer<typeof zParamsState>;
 export const getInitialParamsState = (): ParamsState => ({
-  _version: 6,
+  _version: 7,
   maskBlur: 16,
   maskBlurMethod: 'box',
   canvasCoherenceMode: 'Gaussian Blur',
@@ -1061,6 +1062,7 @@ export const getInitialParamsState = (): ParamsState => ({
   minimaxH3DurationSeconds: 5,
   minimaxH3OutputMode: 'video',
   minimaxH3TransformerModel: null,
+  minimaxH3TextEncoderModel: null,
   zImageSeedVarianceEnabled: false,
   zImageSeedVarianceStrength: 0.1,
   zImageSeedVarianceRandomizePercent: 50,

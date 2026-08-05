@@ -167,13 +167,15 @@ describe('paramsSliceConfig persisted state migration', () => {
     delete v2State.minimaxH3DurationSeconds;
     delete v2State.minimaxH3OutputMode;
     delete v2State.minimaxH3TransformerModel;
+    delete v2State.minimaxH3TextEncoderModel;
 
     const result = migrate?.(v2State) as ReturnType<typeof getInitialParamsState>;
 
     // v2 migrates all the way through the current chain (v2 -> v3 adds Qwen fields,
     // v3 -> v4 adds Krea-2 and PiD fields, v4 -> v5 adds MiniMax H3 fields, v5 -> v6 adds the
-    // MiniMax H3 single-file transformer override).
-    expect(result._version).toBe(6);
+    // MiniMax H3 single-file transformer override, v6 -> v7 adds the single-file text encoder
+    // override).
+    expect(result._version).toBe(7);
     expect(result.qwenImageVaeModel).toBeNull();
     expect(result.qwenImageQwenVLEncoderModel).toBeNull();
     expect(result.hiDiffusionEnabled).toBe(false);
@@ -211,10 +213,11 @@ describe('paramsSliceConfig persisted state migration', () => {
     delete v3State.minimaxH3DurationSeconds;
     delete v3State.minimaxH3OutputMode;
     delete v3State.minimaxH3TransformerModel;
+    delete v3State.minimaxH3TextEncoderModel;
 
     const result = migrate?.(v3State) as ReturnType<typeof getInitialParamsState>;
 
-    expect(result._version).toBe(6);
+    expect(result._version).toBe(7);
     expect(result.krea2VaeModel).toBeNull();
     expect(result.krea2Qwen3VlEncoderModel).toBeNull();
     expect(result.krea2SeedVarianceEnabled).toBe(false);
@@ -242,13 +245,15 @@ describe('paramsSliceConfig persisted state migration', () => {
     delete v4State.minimaxH3DurationSeconds;
     delete v4State.minimaxH3OutputMode;
     delete v4State.minimaxH3TransformerModel;
+    delete v4State.minimaxH3TextEncoderModel;
 
     const result = migrate?.(v4State) as ReturnType<typeof getInitialParamsState>;
 
-    expect(result._version).toBe(6);
+    expect(result._version).toBe(7);
     expect(result.minimaxH3DurationSeconds).toBe(5);
     expect(result.minimaxH3OutputMode).toBe('video');
     expect(result.minimaxH3TransformerModel).toBeNull();
+    expect(result.minimaxH3TextEncoderModel).toBeNull();
     expect(result.positivePrompt).toBe('preserve this prompt');
     expect(result.seed).toBe(4242);
     expect(result.dimensions).toMatchObject({ width: 1344, height: 768 });
@@ -266,14 +271,37 @@ describe('paramsSliceConfig persisted state migration', () => {
       minimaxH3DurationSeconds: 10,
     };
     delete v5State.minimaxH3TransformerModel;
+    delete v5State.minimaxH3TextEncoderModel;
 
     const result = migrate?.(v5State) as ReturnType<typeof getInitialParamsState>;
 
-    expect(result._version).toBe(6);
+    expect(result._version).toBe(7);
     expect(result.minimaxH3TransformerModel).toBeNull();
     expect(result.minimaxH3DurationSeconds).toBe(10);
     expect(result.positivePrompt).toBe('preserve this prompt');
     expect(result.seed).toBe(777);
+  });
+
+  it('backfills the MiniMax H3 text encoder override when migrating from v6 and preserves existing params', () => {
+    expect(migrate).toBeDefined();
+
+    const initial = getInitialParamsState();
+    const v6State: Record<string, unknown> = {
+      ...initial,
+      _version: 6,
+      positivePrompt: 'preserve this prompt',
+      seed: 888,
+      minimaxH3DurationSeconds: 12,
+    };
+    delete v6State.minimaxH3TextEncoderModel;
+
+    const result = migrate?.(v6State) as ReturnType<typeof getInitialParamsState>;
+
+    expect(result._version).toBe(7);
+    expect(result.minimaxH3TextEncoderModel).toBeNull();
+    expect(result.minimaxH3DurationSeconds).toBe(12);
+    expect(result.positivePrompt).toBe('preserve this prompt');
+    expect(result.seed).toBe(888);
   });
 
   it('backfills the ERNIE-Image fields from their zod defaults without a version bump', () => {

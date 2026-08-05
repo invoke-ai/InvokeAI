@@ -16,6 +16,29 @@ from invokeai.backend.minimax_h3.packing import (
 )
 
 
+def validate_text_encoder_depth(text_encoder) -> None:
+    """Reject encoders whose ``hidden_states[MINIMAX_H3_TEXT_ENCODER_LAYER]`` is not H3's conditioning.
+
+    In a full stack that entry is mid-stack and always unnormalized. In a stack truncated to
+    exactly that many layers, transformers appends the post-final-norm output at that index
+    instead - which is only the right tensor when the final norm is an Identity, as in the
+    purpose-truncated H3 single-file encoders (their files ship no final norm and the loader
+    installs an Identity in its place).
+    """
+    num_layers = text_encoder.config.text_config.num_hidden_layers
+    truncated_ok = num_layers == MINIMAX_H3_TEXT_ENCODER_LAYER and isinstance(
+        text_encoder.model.language_model.norm, torch.nn.Identity
+    )
+    if num_layers <= MINIMAX_H3_TEXT_ENCODER_LAYER and not truncated_ok:
+        raise ValueError(
+            f"MiniMax H3 conditions on hidden_states[{MINIMAX_H3_TEXT_ENCODER_LAYER}] of its Qwen3-VL "
+            f"conditioner, which needs more than {MINIMAX_H3_TEXT_ENCODER_LAYER} decoder layers; the "
+            f"selected text encoder has {num_layers}. A truncated stack's last hidden state is post-norm "
+            "and is not the conditioning MiniMax H3 expects (unless the final norm is an Identity, as in "
+            "the H3-truncated single-file encoders)."
+        )
+
+
 def encode_prompt(
     text_encoder,
     tokenizer,
@@ -40,14 +63,7 @@ def encode_prompt(
         ``(prompt_embeds, text_token_tags)``: the ``(1, num_text_tokens, text_dim)`` hidden
         states and the per-row modality tags (vision-block rows are tagged as video).
     """
-    num_layers = text_encoder.config.text_config.num_hidden_layers
-    if num_layers <= MINIMAX_H3_TEXT_ENCODER_LAYER:
-        raise ValueError(
-            f"MiniMax H3 conditions on hidden_states[{MINIMAX_H3_TEXT_ENCODER_LAYER}] of its Qwen3-VL "
-            f"conditioner, which needs more than {MINIMAX_H3_TEXT_ENCODER_LAYER} decoder layers; the "
-            f"selected text encoder has {num_layers}. A truncated stack's last hidden state is post-norm "
-            "and is not the conditioning MiniMax H3 expects."
-        )
+    validate_text_encoder_depth(text_encoder)
 
     pixel_values, image_grid_thw = None, None
     token_ids: list[int] = []

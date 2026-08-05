@@ -156,3 +156,45 @@ def convert_minimax_h3_checkpoint_to_diffusers(
         converted[new_key] = tensor
 
     return converted, markers
+
+
+# --- Quantized Qwen3-VL text encoder single files (Comfy-Org qwen3vl_32b_minimax_h3_*) ---------
+
+_TE_PREFIX_RENAMES = (
+    # Order matters: `model.` would also match `model.visual.` if visual came second.
+    ("visual.", "model.visual."),
+    ("model.", "model.language_model."),
+)
+
+
+def convert_minimax_h3_text_encoder_checkpoint(
+    state_dict: dict[str, torch.Tensor],
+) -> tuple[dict[str, torch.Tensor], dict[str, dict[str, Any]]]:
+    """Convert a Comfy-layout Qwen3-VL H3 text-encoder state dict to the transformers layout.
+
+    The file uses the flat Qwen2-VL-style layout (``model.layers.*`` / ``visual.*``); installed
+    transformers' ``Qwen3VLForConditionalGeneration`` nests these under ``model.language_model.*``
+    and ``model.visual.*``. Unlike the H3 transformer repacks there are no fused projections -
+    q/k/v are stored separately - so this is a pure prefix rename plus ``comfy_quant`` marker
+    extraction (markers are returned keyed by the CONVERTED module name).
+
+    The file intentionally omits ``model.norm`` (the conditioning contract is the UNNORMALIZED
+    hidden state after layer 50) and ``lm_head`` (never used); the loader handles both.
+    """
+    converted: dict[str, torch.Tensor] = {}
+    markers: dict[str, dict[str, Any]] = {}
+
+    for key, tensor in state_dict.items():
+        new_key = key
+        for old, new in _TE_PREFIX_RENAMES:
+            if new_key.startswith(old):
+                new_key = new + new_key[len(old) :]
+                break
+
+        if new_key.endswith(".comfy_quant"):
+            markers[new_key[: -len(".comfy_quant")]] = parse_comfy_quant_marker(tensor)
+            continue
+
+        converted[new_key] = tensor
+
+    return converted, markers

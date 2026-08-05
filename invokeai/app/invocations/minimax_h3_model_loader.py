@@ -37,7 +37,7 @@ class MiniMaxH3ModelLoaderOutput(BaseInvocationOutput):
     title="Main Model - MiniMax H3",
     tags=["model", "minimax", "video"],
     category="model",
-    version="1.1.0",
+    version="1.2.0",
     classification=Classification.Prototype,
 )
 class MiniMaxH3ModelLoaderInvocation(BaseInvocation):
@@ -45,8 +45,9 @@ class MiniMaxH3ModelLoaderInvocation(BaseInvocation):
 
     All six submodels (transformer, text encoder, tokenizer, processor, video VAE, audio VAE)
     come from the one diffusers-layout install. Optionally, a single-file transformer checkpoint
-    (e.g. the pruned int8 repack) replaces the folder's transformer while the encoders and VAEs
-    keep coming from the folder install.
+    (e.g. the pruned int8 repack) replaces the folder's transformer, and/or a single-file
+    truncated Qwen3-VL encoder (e.g. the int8 repack) replaces the folder's text encoder, while
+    everything else keeps coming from the folder install.
     """
 
     model: ModelIdentifierField = InputField(
@@ -67,6 +68,17 @@ class MiniMaxH3ModelLoaderInvocation(BaseInvocation):
         ui_model_format=ModelFormat.Checkpoint,
         title="Transformer (single file)",
     )
+    text_encoder_model: Optional[ModelIdentifierField] = InputField(
+        default=None,
+        description="Optional single-file MiniMax H3 Qwen3-VL text encoder (e.g. the truncated int8 "
+        "repack) used in place of the main model's text encoder. The tokenizer and processor still "
+        "come from the main model.",
+        input=Input.Direct,
+        ui_model_base=BaseModelType.MiniMaxH3,
+        ui_model_type=ModelType.Qwen3VLEncoder,
+        ui_model_format=ModelFormat.Checkpoint,
+        title="Text Encoder (single file)",
+    )
 
     def invoke(self, context: InvocationContext) -> MiniMaxH3ModelLoaderOutput:
         if not context.models.exists(self.model.key):
@@ -80,7 +92,12 @@ class MiniMaxH3ModelLoaderInvocation(BaseInvocation):
             transformer = self.model.model_copy(update={"submodel_type": SubModelType.Transformer})
         tokenizer = self.model.model_copy(update={"submodel_type": SubModelType.Tokenizer})
         processor = self.model.model_copy(update={"submodel_type": SubModelType.Processor})
-        text_encoder = self.model.model_copy(update={"submodel_type": SubModelType.TextEncoder})
+        if self.text_encoder_model is not None:
+            if not context.models.exists(self.text_encoder_model.key):
+                raise ValueError(f"Unknown text encoder model: {self.text_encoder_model.key}")
+            text_encoder = self.text_encoder_model.model_copy(update={"submodel_type": SubModelType.TextEncoder})
+        else:
+            text_encoder = self.model.model_copy(update={"submodel_type": SubModelType.TextEncoder})
         vae = self.model.model_copy(update={"submodel_type": SubModelType.VAE})
         audio_vae = self.model.model_copy(update={"submodel_type": SubModelType.AudioVAE})
 
