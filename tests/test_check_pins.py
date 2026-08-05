@@ -4,6 +4,9 @@ import importlib.util
 import json
 import re
 import shutil
+import subprocess
+import sys
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -178,6 +181,10 @@ def test_python_outside_requires_python_fails(repo_copy: Path, pinned: str):
         "3",  # `uv venv --python 3` is not a version the launcher should be pinning
         "3.12.0.0.0.0",  # satisfies every specifier; uv finds no such interpreter
         "3.12.99999999",  # ditto
+        "3.12.9999",  # ditto, and short enough to look plausible
+        "3.12.0",  # patch pins are rejected outright, even valid-looking ones
+        "3.12.7",  # ditto: uv already resolves "3.12" to the newest patch
+        "03.12",  # normalizes to 3.12 here but reaches the launcher verbatim
         3.12,
         ["3.12"],
         {"major": 3, "minor": 12},
@@ -187,6 +194,145 @@ def test_non_version_python_fails(repo_copy: Path, pinned: object):
     pins = _read_pins(repo_copy)
     pins["python"] = pinned
     _write_pins(repo_copy, pins)
+
+    assert check_pins.main(repo_copy) == 1
+
+
+@pytest.mark.parametrize("pinned", ["3.12.7", "3.12.9999"])
+def test_patch_pin_is_rejected_for_being_a_patch_pin(repo_copy: Path, capsys: pytest.CaptureFixture[str], pinned: str):
+    """Assert the reason, not just the exit code. The classifier check rejects these too, so
+    without this a loosened version pattern would leave the suite green while telling the user
+    to add a classifier for '3.12.7' - advice that makes no sense."""
+    pins = _read_pins(repo_copy)
+    pins["python"] = pinned
+    _write_pins(repo_copy, pins)
+
+    assert check_pins.main(repo_copy) == 1
+    stderr = capsys.readouterr().err
+    assert "a patch component is deliberately not accepted" in stderr
+    # Not the bare word "classifiers" - that appears in the advice footer printed on every failure.
+    assert "classifiers declare support only for" not in stderr
+
+
+def _drop_python_classifiers(repo: Path) -> None:
+    path = repo / "pyproject.toml"
+    updated, count = re.subn(r"(?m)^\s*'Programming Language :: Python :: [0-9]+\.[0-9]+',$\n", "", path.read_text())
+    assert count, "expected at least one 'Programming Language :: Python :: X.Y' classifier"
+    path.write_text(updated)
+
+
+def test_python_not_in_classifiers_fails(repo_copy: Path, capsys: pytest.CaptureFixture[str]):
+    """requires-python allows 3.11, but the project only ships classifiers for 3.12. The pin
+    has to name a version this project actually claims to support."""
+    pins = _read_pins(repo_copy)
+    pins["python"] = "3.11"
+    _write_pins(repo_copy, pins)
+
+    assert check_pins.main(repo_copy) == 1
+    assert "classifiers declare support only for" in capsys.readouterr().err
+
+
+def test_unreal_version_inside_an_open_ended_requires_python_fails(repo_copy: Path):
+    """The hole the classifier check exists to close: with no upper bound in requires-python,
+    a version that no interpreter has would otherwise satisfy every clause."""
+    _set_requires_python(repo_copy, ">=3.11")
+    pins = _read_pins(repo_copy)
+    pins["python"] = "3.99"
+    _write_pins(repo_copy, pins)
+
+    assert check_pins.main(repo_copy) == 1
+
+
+def test_missing_python_classifiers_fails(repo_copy: Path, capsys: pytest.CaptureFixture[str]):
+    """Deleting the classifiers must not silently downgrade the pin check to requires-python only."""
+    _drop_python_classifiers(repo_copy)
+
+    assert check_pins.main(repo_copy) == 1
+    assert "no 'Programming Language :: Python :: X.Y' classifier" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    "classifier",
+    [
+        "Programming Language :: Python :: 3 :: Only",  # no major.minor at all
+        "Programming Language :: Python :: 3",  # ditto
+        "Programming Language :: Python :: 3.12 :: Only",  # not a real classifier; declares nothing
+        "Programming Language :: Python :: 3.1.4",  # ditto
+        "Programming Language :: Python :: 3.12 ",  # trailing space
+        "Programming Language :: Python :: Implementation :: CPython",
+    ],
+)
+def test_classifier_is_not_read_as_a_version(repo_copy: Path, classifier: str):
+    """Only a whole classifier naming exactly one major.minor version counts. Anything that
+    merely contains one must not be read as a declaration of support for it."""
+    _drop_python_classifiers(repo_copy)
+    pyproject = tomllib.loads((repo_copy / "pyproject.toml").read_text())
+    pyproject["project"]["classifiers"].append(classifier)
+
+    assert check_pins._classifier_versions(pyproject) == []
+
+
+def test_duplicate_classifiers_are_reported_once(repo_copy: Path):
+    pyproject = tomllib.loads((repo_copy / "pyproject.toml").read_text())
+    pyproject["project"]["classifiers"].append("Programming Language :: Python :: 3.12")
+
+    assert check_pins._classifier_versions(pyproject) == ["3.12"]
+
+
+@pytest.mark.parametrize("literal", ["3", "true", '"3.12"', "{}", "[3.12]", "[[]]", "[]"])
+def test_malformed_classifiers_do_not_raise(repo_copy: Path, literal: str):
+    """A non-list, or a list of non-strings, must be reported rather than blowing up - the
+    same tolerance requires-python already gets."""
+    path = repo_copy / "pyproject.toml"
+    path.write_text(re.sub(r"(?ms)^classifiers = \[.*?^\]$", f"classifiers = {literal}", path.read_text()))
+    assert "classifiers = [\n" not in (repo_copy / "pyproject.toml").read_text()
+
+    assert check_pins.main(repo_copy) == 1
+
+
+def test_missing_project_table_does_not_raise(repo_copy: Path):
+    """No [project] table at all: both the requires-python and the classifier lookups have to
+    survive it, because a raise here would skip the torch index checks entirely."""
+    path = repo_copy / "pyproject.toml"
+    pyproject = tomllib.loads(path.read_text())
+    del pyproject["project"]
+    assert check_pins._classifier_versions(pyproject) == []
+    assert check_pins._requires_python_clauses(pyproject)[0] == []
+
+    errors = check_pins.check_python(_read_pins(repo_copy), pyproject)
+    assert errors  # reported, not raised
+
+
+def test_absurdly_long_classifier_version_does_not_mask_url_drift(repo_copy: Path, capsys: pytest.CaptureFixture[str]):
+    """int() refuses to parse a string of more than 4300 digits. An unbounded classifier
+    pattern would let one reach _parse_version and raise straight out of check_python,
+    taking the torchIndexUrl checks with it."""
+    path = repo_copy / "pyproject.toml"
+    absurd = "Programming Language :: Python :: " + "9" * 4400 + ".0"
+    path.write_text(path.read_text().replace("classifiers = [\n", f"classifiers = [\n  '{absurd}',\n", 1))
+    pins = _read_pins(repo_copy)
+    pins["torchIndexUrl"]["linux"]["rocm"] = "https://download.pytorch.org/whl/rocm6.3"
+    _write_pins(repo_copy, pins)
+
+    assert check_pins.main(repo_copy) == 1
+    assert "torchIndexUrl.linux.rocm" in capsys.readouterr().err
+
+
+def test_dynamic_classifiers_are_reported_as_such(repo_copy: Path, capsys: pytest.CaptureFixture[str]):
+    """PEP 621 lets the build backend supply classifiers. The checker can't read them, and must
+    say so rather than claiming none are declared."""
+    _drop_python_classifiers(repo_copy)
+    path = repo_copy / "pyproject.toml"
+    path.write_text(re.sub(r'(?m)^dynamic = \["version"\]$', 'dynamic = ["version", "classifiers"]', path.read_text()))
+
+    assert check_pins.main(repo_copy) == 1
+    assert "project.dynamic" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("value", [None, "3.12", ["3.12"], 5])
+def test_non_object_pins_does_not_raise(repo_copy: Path, value: object):
+    """The top level of pins.json is indexed into everywhere; a wrong shape must be reported."""
+    (repo_copy / "pins.json").write_text(json.dumps(value))
 
     assert check_pins.main(repo_copy) == 1
 
@@ -308,6 +454,16 @@ def test_unknown_operator_raises(operator: str):
     """An operator with no branch must not quietly fall through to some other comparison."""
     with pytest.raises(ValueError):
         check_pins._satisfies((3, 12), operator, (3, 13))
+
+
+def test_script_runs_from_any_working_directory(tmp_path: Path):
+    """The repo root comes from the script's own path, so cwd is irrelevant - which is what the
+    module docstring promises, and what CI relies on."""
+    script = REPO_ROOT / "scripts" / "check_pins.py"
+    result = subprocess.run([sys.executable, str(script)], cwd=tmp_path, capture_output=True, text=True)
+
+    assert result.returncode == 0, result.stderr
+    assert "consistent" in result.stdout
 
 
 def test_every_supported_operator_is_covered():

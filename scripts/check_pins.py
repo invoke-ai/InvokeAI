@@ -17,11 +17,17 @@ index and resolves wheels for the wrong backend. This script therefore checks:
   2. Each of those URLs matches the corresponding ``torch-<backend>``
      ``[[tool.uv.index]]`` URL in pyproject.toml.
   3. pins.json's ``python`` — the version the launcher builds the venv with,
-     before it installs anything — satisfies ``project.requires-python``.
+     before it installs anything — satisfies ``project.requires-python`` and is
+     one of the versions pyproject.toml's classifiers claim support for.
      Otherwise the launcher creates an interpreter that the package metadata it
-     is about to install rejects, and the install fails at the last step.
+     is about to install rejects (or that ``uv`` cannot resolve at all), and the
+     install fails at the last step.
 
-Run from anywhere: python scripts/check_pins.py
+The repo root is derived from this file's own location, so the working directory
+does not matter — only the path you hand to python does::
+
+    python3 scripts/check_pins.py                     # from the repo root
+    python3 /path/to/InvokeAI/scripts/check_pins.py   # from anywhere else
 
 Kept dependency-free (stdlib only) so CI can run it with a bare ``python3``,
 which is why the ``requires-python`` handling below is hand-rolled rather than
@@ -54,15 +60,33 @@ REQUIRED_BACKENDS: dict[str, set[str]] = {
     "darwin": set(),
 }
 
-# The version the launcher is told to build the venv with ("3.12", "3.12.7"), and a
-# single requires-python clause ("<3.13"). Both are deliberately narrow: components
-# are bounded so a nonsense pin like "3.12.99999999" - which satisfies any specifier
-# but which `uv venv --python` cannot resolve to a real interpreter - is rejected
-# rather than passed through. Anything else legal in PEP 440 but not matched here
-# (epochs, pre-releases, `~=`, `.*` wildcards) is reported as unevaluatable rather
-# than guessed at, so a specifier this script cannot reason about fails loudly.
-_VERSION_RE = re.compile(r"[0-9]{1,4}(?:\.[0-9]{1,4}){1,2}\Z")
+# The version the launcher is told to build the venv with, which must be exactly
+# major.minor ("3.12"). A patch-level pin is rejected on purpose: `uv venv --python
+# 3.12` resolves to the newest 3.12.x available, whereas `--python 3.12.7` demands
+# one exact build, which freezes users on an unpatched interpreter and stops working
+# outright once that build leaves uv's index. The launcher's own reinstall check
+# compares only `major()`/`minor()` of this field against the existing venv, so a
+# patch component is inert there in any case. Forbidding the third component also
+# makes a bogus patch such as "3.12.9999" - which satisfies every specifier but which
+# `uv python find` cannot resolve - unrepresentable rather than merely unlikely. A
+# bogus major.minor is caught instead by requires-python and by the classifier list.
+# Leading zeros are rejected too, so the pin has exactly one spelling: "03.12" would
+# otherwise compare equal to "3.12" here while reaching the launcher verbatim.
+_VERSION_RE = re.compile(r"(?:0|[1-9][0-9]?)\.(?:0|[1-9][0-9]?)\Z")
+
+# A single requires-python clause ("<3.13", ">=3.11.4"). Anything else legal in PEP
+# 440 but not matched here (epochs, pre-releases, `~=`, `.*` wildcards) is reported as
+# unevaluatable rather than guessed at, so a specifier this script cannot reason about
+# fails loudly.
 _CLAUSE_RE = re.compile(r"(==|!=|>=|<=|>|<)\s*([0-9]{1,4}(?:\.[0-9]{1,4}){0,2})\Z")
+
+# "Programming Language :: Python :: 3.12" - a *whole* classifier naming exactly one
+# major.minor version. The required dot excludes "... :: 3" and "... :: 3 :: Only";
+# the anchor excludes "... :: 3.12 :: Only" and "... :: 3.1.4", neither of which
+# declares support for the version it appears to name. Digits are bounded like the two
+# patterns above so _parse_version's int() cannot hit CPython's str->int digit limit
+# and raise out of check_python, which promises never to raise.
+_CLASSIFIER_RE = re.compile(r"Programming Language :: Python :: ([0-9]{1,4}\.[0-9]{1,4})\Z")
 
 _SUPPORTED_OPERATORS = "==, !=, >=, <=, > and <"
 
@@ -121,6 +145,31 @@ def _requires_python_clauses(pyproject: dict) -> tuple[list[str], list[str]]:
     return clauses, []
 
 
+def _classifier_versions(pyproject: dict) -> list[str]:
+    """The major.minor versions project.classifiers claims support for, in declared order.
+
+    Tolerates every malformed shape - a missing [project] table, a non-list value, non-string
+    entries - by returning nothing, so the caller reports it rather than raising.
+    """
+
+    project = pyproject.get("project")
+    classifiers = project.get("classifiers") if isinstance(project, dict) else None
+    if not isinstance(classifiers, list):
+        return []
+    matches = (_CLASSIFIER_RE.match(entry) for entry in classifiers if isinstance(entry, str))
+    # dict.fromkeys de-duplicates without reordering; a repeated classifier is legal but would
+    # otherwise be listed twice in the error message.
+    return list(dict.fromkeys(match.group(1) for match in matches if match is not None))
+
+
+def _is_dynamic(pyproject: dict, field: str) -> bool:
+    """Whether project.dynamic defers `field` to the build backend (PEP 621)."""
+
+    project = pyproject.get("project")
+    dynamic = project.get("dynamic") if isinstance(project, dict) else None
+    return isinstance(dynamic, list) and field in dynamic
+
+
 def check_python(pins: dict, pyproject: dict) -> list[str]:
     """Check pins.json's `python` against pyproject.toml's `requires-python`.
 
@@ -139,13 +188,36 @@ def check_python(pins: dict, pyproject: dict) -> list[str]:
         return errors
     if not isinstance(pinned, str) or _VERSION_RE.match(pinned) is None:
         errors.append(
-            f"pins.json python is {pinned!r}; expected a version the launcher can hand to "
-            "`uv venv --python`, like '3.12' or '3.12.7'"
+            f"pins.json python is {pinned!r}; expected a major.minor version the launcher can hand "
+            "to `uv venv --python`, like '3.12' (a patch component is deliberately not accepted - "
+            "uv already picks the newest patch for a major.minor version)"
         )
         return errors
 
     version = _parse_version(pinned)
     requires_python = ", ".join(clauses)
+
+    # requires-python says which versions the metadata *allows*; the classifiers say which ones
+    # this project actually ships for. Without the second check a pin like '3.99' - inside an
+    # open-ended requires-python, but not an interpreter uv can find - would still pass.
+    supported = _classifier_versions(pyproject)
+    if not supported and _is_dynamic(pyproject, "classifiers"):
+        errors.append(
+            "pyproject.toml lists 'classifiers' in project.dynamic, so pins.json's python pin "
+            "cannot be checked against the versions this project ships for; teach "
+            "scripts/check_pins.py where the classifiers come from"
+        )
+    elif not supported:
+        errors.append(
+            "pyproject.toml declares no 'Programming Language :: Python :: X.Y' classifier, so "
+            "pins.json's python pin cannot be checked against the versions this project ships for"
+        )
+    elif version not in {_parse_version(entry) for entry in supported}:
+        errors.append(
+            f"pins.json python is '{pinned}' but pyproject.toml's classifiers declare support only "
+            f"for {', '.join(supported)}; add the classifier if that version is really supported, "
+            "otherwise the launcher builds the venv on an interpreter this project does not ship for"
+        )
 
     for clause in clauses:
         match = _CLAUSE_RE.match(clause)
@@ -184,6 +256,10 @@ def _uv_indexes(pyproject: dict) -> dict[str, str]:
 
 def check_pins(pins: dict, pyproject: dict) -> list[str]:
     """Return a list of human-readable problems; empty means pins.json is fine."""
+
+    if not isinstance(pins, dict):
+        # Everything below indexes into it; report the shape rather than raising.
+        return [f"pins.json is {pins!r}, not an object with 'python' and 'torchIndexUrl' keys"]
 
     indexes = _uv_indexes(pyproject)
 
@@ -252,8 +328,8 @@ def main(repo_root: Path = REPO_ROOT) -> int:
         for error in errors:
             print(f"  - {error}", file=sys.stderr)
         print(
-            "\nUpdate pins.json to match the [[tool.uv.index]] URLs and requires-python in "
-            "pyproject.toml (or vice versa).",
+            "\nUpdate pins.json to match the [[tool.uv.index]] URLs, requires-python and python "
+            "classifiers in pyproject.toml (or vice versa).",
             file=sys.stderr,
         )
         return 1
