@@ -72,7 +72,7 @@ PiD is available in both the **Generate** tab (text-to-image) and on the **Canva
 On GPUs with limited VRAM, enable the experimental PiD memory optimizations in `invokeai.yaml`, then restart InvokeAI:
 
 ```yaml
-pid_optimization: true
+pid_memory_optimization: true
 ```
 
 This setting applies to every supported PiD decoder. It reduces peak activation and sampler memory by processing parts of the pixel pathway in chunks, at the cost of slower decoding. It is disabled by default.
