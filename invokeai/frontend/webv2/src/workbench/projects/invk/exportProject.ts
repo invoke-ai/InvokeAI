@@ -193,6 +193,8 @@ export const executeInvkExport = async (plan: InvkExportPlan, deps: InvkExportDe
 
   const blob = await writeArchive(entries);
 
+  deps.signal?.throwIfAborted();
+
   deps.download(blob, plan.fileName);
 
   return { bundledImageCount, bundledVideoCount, missingAssetNames: missingAssetNames.sort() };

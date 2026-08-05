@@ -250,6 +250,27 @@ describe('executeInvkExport', () => {
     expect(download).not.toHaveBeenCalled();
   });
 
+  it('rejects rather than downloading when cancellation occurs during packing', async () => {
+    const download = vi.fn();
+    const controller = new AbortController();
+
+    await expect(
+      executeInvkExport(planInvkExport(planInput), {
+        download,
+        fetchImageBytes: (imageName) => Promise.resolve(bytesFor(imageName)),
+        fetchImageThumbnail: () => Promise.resolve(null),
+        onProgress: ({ phase }) => {
+          if (phase === 'packing') {
+            controller.abort();
+          }
+        },
+        signal: controller.signal,
+      })
+    ).rejects.toMatchObject({ name: 'AbortError' });
+
+    expect(download).not.toHaveBeenCalled();
+  });
+
   it('still treats an unservable asset as a skip, not a cancellation', async () => {
     const download = vi.fn();
     const result = await executeInvkExport(planInvkExport(planInput), {
