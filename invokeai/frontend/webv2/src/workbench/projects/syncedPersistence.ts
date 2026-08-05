@@ -22,7 +22,9 @@ import {
   updateProject as apiUpdateProject,
   type ProjectRecordDTO,
 } from './api';
+import { recordProjectCover } from './covers';
 import { seedProjectLibrary, upsertProjectSummary } from './library';
+import { selectCoverImageName } from './projectAssets';
 import { isProjectDocumentShape, normalizeLegacyProjectDocument, serializeProjectDocument } from './projectDocument';
 import { fetchSessionBlob, serializeSessionBlob, SESSION_STATE_KEY } from './session';
 import { reportProjectSync, type ProjectSyncInfo } from './syncStore';
@@ -127,6 +129,12 @@ const getSerializedProjectDocument = (
   const serialized = { document, json };
 
   syncState.projectDocumentJsonCache.set(project, serialized);
+  // The cache is keyed by project identity, so this runs once per document
+  // version — the only moments a project's cover can have changed. Recording it
+  // here rather than after the push keeps one seam instead of three, and costs
+  // nothing when the push fails: the cover names an image that exists either
+  // way, and `recordProjectCover` is a no-op when the answer has not moved.
+  recordProjectCover(project.id, selectCoverImageName(document), syncState.owner);
 
   return serialized;
 };

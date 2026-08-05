@@ -19,6 +19,7 @@ const ROUTE_SHARED_MODULES = [
   '/features/nodes/index.ts',
   '/features/nodes/ui/NodesPage.tsx',
   '/platform/browser/downloadBlob.ts',
+  '/platform/core/concurrency.ts',
   '/platform/query/client.ts',
   '/platform/time/serverTimestamp.ts',
   '/platform/transport/connectionStore.ts',
@@ -32,9 +33,16 @@ const ROUTE_SHARED_MODULES = [
   // table — a 66 KB, one-extra-request regression on the editor route.
   '/workbench/launchpad/intents.ts',
   '/workbench/palette/settingsEntryDeps.ts',
+  '/workbench/projects/covers.ts',
   '/workbench/projects/ids.ts',
+  // The `.invk` surface both routes touch eagerly: the extension for the file
+  // picker, and the error class every import call site catches to translate.
+  // The schema, the ZIP codec and the archive itself stay behind lazy imports.
+  '/workbench/projects/invk/format.ts',
   '/workbench/projects/library.ts',
+  '/workbench/projects/projectAssets.ts',
   '/workbench/projects/projectFile.ts',
+  '/workbench/projects/projectFileErrors.ts',
   '/workbench/settings/SettingsDialogHost.tsx',
 ] as const;
 
@@ -88,6 +96,12 @@ const getLegacyChunkName = (id: string): string | null => {
 
   if (id.includes('/node_modules/yaml/')) {
     return 'yaml';
+  }
+
+  // Only `projects/invk/archive.ts` reaches for this, and only when a project
+  // file is actually read or written — the same treatment ag-psd gets.
+  if (id.includes('/node_modules/fflate/')) {
+    return 'fflate';
   }
 
   if (id.includes('/node_modules/react-icons/')) {

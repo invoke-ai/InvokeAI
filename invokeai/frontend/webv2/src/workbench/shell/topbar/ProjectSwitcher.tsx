@@ -15,7 +15,9 @@ import { formatRelativeTime } from '@workbench/launchpad/formatRelativeTime';
 import { OpenProjectDialog } from '@workbench/projects/components';
 import { refreshProjectLibrary, useProjectLibrarySelector } from '@workbench/projects/library';
 import { exportOpenProject } from '@workbench/projects/projectFile';
+import { describeProjectFileError } from '@workbench/projects/projectFileErrors';
 import { useProjectActions } from '@workbench/projects/useProjectActions';
+import { useNotify } from '@workbench/useNotify';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import {
   useActiveProjectSelector,
@@ -55,6 +57,7 @@ export const ProjectSwitcher = () => {
   const queries = useWorkbenchQueries();
   const { projects } = useWorkbenchCommands();
   const { closeProject, deleteProject, openProject } = useProjectActions();
+  const notify = useNotify();
   const openWorkbenchWidget = useOpenWorkbenchWidget();
   const [renameTarget, setRenameTarget] = useState<{ id: string; name: string } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
@@ -106,10 +109,17 @@ export const ProjectSwitcher = () => {
   const exportActiveProject = useCallback(() => {
     const project = getProject(activeProjectId);
 
-    if (project) {
-      void exportOpenProject(project);
+    if (!project) {
+      return;
     }
-  }, [activeProjectId, getProject]);
+
+    // Export bundles every image the project points at, so it can fail on a
+    // dropped connection or a project past the archive ceiling. Silence would
+    // read as "nothing happened" when the download never arrives.
+    void exportOpenProject(project).catch((error: unknown) => {
+      notify.error(t('projects.exportFailed'), describeProjectFileError(error, t));
+    });
+  }, [activeProjectId, getProject, notify, t]);
   const closeActiveProject = useCallback(() => {
     const project = getProject(activeProjectId);
 

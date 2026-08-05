@@ -17,6 +17,13 @@ import {
   updateProject as apiUpdateProject,
   type ProjectSummaryDTO,
 } from './api';
+import {
+  forgetProjectCover,
+  getProjectCoverImageName,
+  getProjectCoverUrl,
+  loadProjectCovers,
+  subscribeProjectCovers,
+} from './covers';
 import { createProjectId } from './ids';
 
 /**
@@ -38,10 +45,10 @@ export interface ProjectSummary {
   createdAt: string;
   updatedAt: string;
   /**
-   * Thumbnail for the library grid. Nothing populates this yet — covers land
-   * with the `.invk` project-file work. Consumers must already handle its
-   * absence, which is also the permanent state for a project that has produced
-   * no images.
+   * Thumbnail for the library grid, resolved from the per-user cover index
+   * (`covers.ts`) rather than from the project document, which listings do not
+   * carry. Absent for a project that has produced no images, and for one last
+   * saved by a build that did not record covers.
    */
   coverUrl?: string;
 }
@@ -64,12 +71,44 @@ registerAccountOwnedResource({
   name: 'project-library',
 });
 
-const toSummary = (dto: ProjectSummaryDTO): ProjectSummary => ({
-  createdAt: normalizeServerTimestamp(dto.created_at),
-  id: dto.project_id,
-  name: dto.name,
-  revision: dto.revision,
-  updatedAt: normalizeServerTimestamp(dto.updated_at),
+const withCover = <T extends { id: string }>(summary: T): T & { coverUrl?: string } => {
+  const coverImageName = getProjectCoverImageName(summary.id);
+
+  return coverImageName === undefined ? summary : { ...summary, coverUrl: getProjectCoverUrl(coverImageName) };
+};
+
+const toSummary = (dto: ProjectSummaryDTO): ProjectSummary =>
+  withCover({
+    createdAt: normalizeServerTimestamp(dto.created_at),
+    id: dto.project_id,
+    name: dto.name,
+    revision: dto.revision,
+    updatedAt: normalizeServerTimestamp(dto.updated_at),
+  });
+
+/**
+ * The cover index loads and updates independently of the listing, so summaries
+ * are re-derived whenever it changes. Without this a cover recorded after the
+ * library rendered — the first generation in a new project — would not appear
+ * until the next refresh.
+ */
+subscribeProjectCovers(() => {
+  const { status, summaries } = store.getSnapshot();
+
+  if (status !== 'ready') {
+    return;
+  }
+
+  const next = summaries.map((summary) => {
+    const coverImageName = getProjectCoverImageName(summary.id);
+    const coverUrl = coverImageName === undefined ? undefined : getProjectCoverUrl(coverImageName);
+
+    return coverUrl === summary.coverUrl ? summary : { ...summary, coverUrl };
+  });
+
+  if (next.some((summary, index) => summary !== summaries[index])) {
+    store.patchSnapshot({ summaries: next });
+  }
 });
 
 /** Most recently edited first — the order Home and the Open dialog present. */
@@ -99,8 +138,11 @@ export const refreshProjectLibrary = (): Promise<void> =>
     const owner = captureAccountScope();
 
     return refreshFlight.run(`project-library:${owner.epoch}`, () =>
-      listProjects(owner.signal)
-        .then((dtos) => {
+      // Covers resolve alongside the listing rather than after it: they come
+      // from a different store, and seeding without them would show a grid of
+      // glyphs that fills in a moment later.
+      Promise.all([listProjects(owner.signal), loadProjectCovers()])
+        .then(([dtos]) => {
           seedProjectLibrary(dtos, owner);
         })
         .catch((error: unknown) => {
@@ -132,13 +174,13 @@ export const upsertProjectSummary = (
   const { summaries } = store.getSnapshot();
   const existing = summaries.find((summary) => summary.id === entry.id);
   const updatedAt = new Date().toISOString();
-  const next: ProjectSummary = {
+  const next: ProjectSummary = withCover({
     createdAt: existing?.createdAt ?? updatedAt,
     id: entry.id,
     name: entry.name,
     revision: entry.revision ?? existing?.revision ?? 0,
     updatedAt,
-  };
+  });
 
   store.patchSnapshot({
     status: 'ready',
@@ -152,6 +194,7 @@ export const deleteLibraryProject = async (projectId: string): Promise<void> => 
 
   await apiDeleteProject(projectId, owner.signal);
   assertAccountScopeCurrent(owner);
+  forgetProjectCover(projectId, owner);
   store.patchSnapshot({ summaries: store.getSnapshot().summaries.filter((summary) => summary.id !== projectId) });
 };
 

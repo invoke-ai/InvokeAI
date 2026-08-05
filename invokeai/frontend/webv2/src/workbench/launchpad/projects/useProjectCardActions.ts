@@ -6,6 +6,7 @@ import {
   type ProjectSummary,
 } from '@workbench/projects/library';
 import { exportLibraryProject } from '@workbench/projects/projectFile';
+import { describeProjectFileError } from '@workbench/projects/projectFileErrors';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -66,7 +67,7 @@ export const useProjectCardActions = (summary: ProjectSummary): ProjectCardActio
       await exportLibraryProject(summary.id);
     } catch (error) {
       toaster.create({
-        description: error instanceof Error ? error.message : undefined,
+        description: describeProjectFileError(error, t),
         title: t('projects.exportFailed'),
         type: 'error',
       });

@@ -20,6 +20,7 @@ import { prunePinnedProjects, toggleProjectPinPreference } from '@workbench/laun
 import { getProjectLibrary, refreshProjectLibrary, useProjectLibrarySelector } from '@workbench/projects/library';
 import { refreshOpenProjects } from '@workbench/projects/openProjects';
 import { importProjectFile, pickProjectFile } from '@workbench/projects/projectFile';
+import { describeProjectFileError } from '@workbench/projects/projectFileErrors';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { FileUpIcon, PlusIcon } from 'lucide-react';
 import { useCallback } from 'react';
@@ -85,7 +86,7 @@ export const HomePage = () => {
       }
 
       toaster.create({
-        description: error instanceof Error ? error.message : undefined,
+        description: describeProjectFileError(error, t),
         title: t('projects.importFailed'),
         type: 'error',
       });

@@ -1,6 +1,7 @@
 import type { Project } from '@workbench/projectContracts';
 
-import { downloadText } from '@platform/browser/downloadBlob';
+import { downloadBlob } from '@platform/browser/downloadBlob';
+import { APP_VERSION } from '@platform/runtime/appMetadata';
 import {
   type AccountScope,
   assertAccountScopeCurrent,
@@ -9,64 +10,64 @@ import {
 } from '@platform/state/accountLifecycle';
 
 import { createProject as apiCreateProject, getProject as apiGetProject, type ProjectRecordDTO } from './api';
+import { recordProjectCover } from './covers';
 import { createProjectId } from './ids';
+import { INVK_EXTENSION, InvkFormatError } from './invk/format';
 import { upsertProjectSummary } from './library';
+import { remapImageRefs } from './projectAssets';
 
 /**
- * The portable project file: a versioned envelope around the same document
- * shape the server stores. Export and import both reuse the sync layer's
- * serialize/deserialize pair, so the file format inherits its healing of
- * partial documents and there is exactly one definition of "a project
- * document" in the app.
+ * Export and import a project as an `.invk` archive.
+ *
+ * This module is the workflow; `./invk` is the format. The split matters
+ * because the two have different reasons to change: the archive layout is a
+ * compatibility surface shared with the previous frontend, while what an export
+ * means here — which project, under whose account, landing where — is app
+ * behavior.
+ *
+ * ### Why an archive and not a JSON file
+ *
+ * A project document references its pixels by server image name. Exporting the
+ * document alone produced a file that opened perfectly on the machine that
+ * wrote it and showed nothing but missing layers anywhere else. An `.invk`
+ * carries the bytes, so the file is the project rather than a description of it.
+ *
+ * ### Import never overwrites
+ *
+ * An imported document gets a fresh id, never the one in the file. Two people
+ * exchanging a project would otherwise collide the moment both saved, and
+ * re-importing your own export would silently replace the original.
+ *
+ * The heavy halves — the ZIP codec and the workbench reducer — are both loaded
+ * with `await import()`. The Launchpad offers Import and Export on a route that
+ * never mounts the editor, and it should not pay for either until someone
+ * actually picks a file.
  */
 
-export const PROJECT_FILE_KIND = 'invokeai-project';
-export const PROJECT_FILE_VERSION = 1;
+const readProjectDocument = async (file: File) => {
+  const { readInvkArchive } = await import('./invk/importProject');
 
-export interface ProjectFile {
-  kind: typeof PROJECT_FILE_KIND;
-  version: typeof PROJECT_FILE_VERSION;
-  exportedAt: string;
-  document: Record<string, unknown>;
-}
-
-export const buildProjectFile = (projectDocument: Record<string, unknown>): ProjectFile => ({
-  document: projectDocument,
-  exportedAt: new Date().toISOString(),
-  kind: PROJECT_FILE_KIND,
-  version: PROJECT_FILE_VERSION,
-});
-
-/** Returns the embedded document, or null when the text is not a project file. */
-export const parseProjectFile = (text: string): Record<string, unknown> | null => {
-  try {
-    const parsed = JSON.parse(text) as Partial<ProjectFile> | null;
-
-    if (
-      !parsed ||
-      parsed.kind !== PROJECT_FILE_KIND ||
-      parsed.version !== PROJECT_FILE_VERSION ||
-      !parsed.document ||
-      typeof parsed.document !== 'object' ||
-      Array.isArray(parsed.document)
-    ) {
-      return null;
-    }
-
-    return parsed.document as Record<string, unknown>;
-  } catch {
-    return null;
-  }
+  return readInvkArchive(file);
 };
 
-const sanitizeFileName = (name: string): string => name.replace(/[^\w\- ]+/gu, '').trim() || 'project';
+const exportProjectDocument = async (
+  name: string,
+  projectDocument: Record<string, unknown>,
+  owner: AccountScope
+): Promise<void> => {
+  const { executeInvkExport, planInvkExport } = await import('./invk/exportProject');
 
-const downloadProjectFile = (name: string, projectDocument: Record<string, unknown>): void => {
-  downloadText(
-    JSON.stringify(buildProjectFile(projectDocument), null, 2),
-    `${sanitizeFileName(name)}.invokeproject.json`,
-    'application/json'
-  );
+  assertAccountScopeCurrent(owner);
+
+  const plan = planInvkExport({
+    appVersion: APP_VERSION,
+    createdAt: new Date().toISOString(),
+    name,
+    projectDocument,
+  });
+
+  await executeInvkExport(plan, { download: downloadBlob, signal: owner.signal });
+  assertAccountScopeCurrent(owner);
 };
 
 /** Export a closed project straight from its server record. */
@@ -77,39 +78,45 @@ export const exportLibraryProject = async (
   const record = await apiGetProject(projectId, owner.signal);
 
   assertAccountScopeCurrent(owner);
-  downloadProjectFile(record.name, record.data);
+  await exportProjectDocument(record.name, record.data, owner);
 };
 
 /** Export an open project from its live in-memory document. */
-export const exportOpenProject = async (project: Project): Promise<void> => {
+export const exportOpenProject = async (
+  project: Project,
+  owner: AccountScope = captureAccountScope()
+): Promise<void> => {
   const { serializeProjectDocument } = await import('./projectDocument');
 
-  downloadProjectFile(project.name, serializeProjectDocument(project));
+  assertAccountScopeCurrent(owner);
+  await exportProjectDocument(project.name, serializeProjectDocument(project), owner);
 };
 
 /**
- * Import a project file as a new server project. The document gets a fresh
- * id — never the one in the file — so an import can never collide with (and
- * overwrite) an existing project. Throws with a user-readable message.
+ * Import an `.invk` as a new server project: restore its images, rewrite every
+ * reference the server renamed, then create the project. Throws
+ * {@link InvkFormatError} so callers can translate the reason rather than
+ * surface an internal message.
  */
 export const importProjectFile = async (
   file: File,
   owner: AccountScope = captureAccountScope()
 ): Promise<ProjectRecordDTO> => {
-  const projectDocument = parseProjectFile(await file.text());
+  const contents = await readProjectDocument(file);
 
   assertAccountScopeCurrent(owner);
 
-  if (!projectDocument) {
-    throw new Error('This file is not an Invoke project export.');
-  }
+  const { restoreArchiveImages } = await import('./invk/importProject');
+  const restored = await restoreArchiveImages(contents, { signal: owner.signal });
+
+  assertAccountScopeCurrent(owner);
 
   const id = createProjectId();
   const name =
-    typeof projectDocument.name === 'string' && projectDocument.name.trim()
-      ? projectDocument.name.trim()
+    typeof contents.projectDocument.name === 'string' && contents.projectDocument.name.trim()
+      ? contents.projectDocument.name.trim()
       : 'Imported project';
-  const document = { ...projectDocument, id, name };
+  const document = { ...remapImageRefs(contents.projectDocument, restored.mapping), id, name };
   // Full validation rehydrates the document through the Workbench reducer, so
   // it is loaded here rather than imported: the Launchpad should not carry the
   // editor's aggregate state just to offer an Import button.
@@ -118,13 +125,17 @@ export const importProjectFile = async (
   assertAccountScopeCurrent(owner);
 
   if (!deserializeProjectDocument(document)) {
-    throw new Error('The project file is damaged and cannot be opened.');
+    throw new InvkFormatError('damaged', 'The project document will not rehydrate.');
   }
 
   const record = await apiCreateProject({ data: document, name, project_id: id }, owner.signal);
 
   assertAccountScopeCurrent(owner);
   upsertProjectSummary({ id: record.project_id, name: record.name, revision: record.revision }, owner);
+
+  if (restored.coverImageName !== null) {
+    recordProjectCover(record.project_id, restored.coverImageName, owner);
+  }
 
   return record;
 };
@@ -149,7 +160,7 @@ export const pickProjectFile = (owner: AccountScope = captureAccountScope()): Pr
     const handleAbort = (): void => finish(null);
 
     input.type = 'file';
-    input.accept = 'application/json,.json';
+    input.accept = INVK_EXTENSION;
     input.onchange = () => finish(input.files?.[0] ?? null);
     input.oncancel = () => finish(null);
     owner.signal.addEventListener('abort', handleAbort, { once: true });

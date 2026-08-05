@@ -11,6 +11,7 @@ import { Button, CloseButton, Row, Scrollable } from '@platform/ui';
 import { formatRelativeTime } from '@workbench/launchpad/formatRelativeTime';
 import { refreshProjectLibrary, useProjectLibrarySelector, type ProjectSummary } from '@workbench/projects/library';
 import { importProjectFile, pickProjectFile } from '@workbench/projects/projectFile';
+import { describeProjectFileError } from '@workbench/projects/projectFileErrors';
 import { useNotify } from '@workbench/useNotify';
 import {
   useWorkbenchCommands,
@@ -113,7 +114,7 @@ export const OpenProjectDialog = ({ isOpen, onClose }: { isOpen: boolean; onClos
         return;
       }
 
-      notify.error(t('projects.importFailed'), error instanceof Error ? error.message : undefined);
+      notify.error(t('projects.importFailed'), describeProjectFileError(error, t));
     }
   }, [notify, onClose, persistence, projects, t]);
 

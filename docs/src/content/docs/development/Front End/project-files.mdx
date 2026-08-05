@@ -1,0 +1,64 @@
+---
+title: Project Files (.invk)
+---
+
+Workbench projects export to a portable `.invk` archive. The feature lives in `invokeai/frontend/webv2/src/workbench/projects/` and is exposed as **Import…** on the Launchpad's Home and Projects pages, **Open project…** in the editor's tab bar, and **Export** in the project switcher and each project card's action menu.
+
+`.invk` is shared with the previous frontend's [canvas projects](/development/front-end/canvas-projects/), which write version 1 of the same container. Workbench projects write version 2. The two are deliberately not interchangeable — see [Versions](#versions).
+
+## File format
+
+`.invk` files are ZIP archives. The current manifest version is `2`.
+
+| Target | Required | Description |
+| - | - | - |
+| `manifest.json` | yes | Archive version, app version, creation timestamp, project name, and optionally the source project id and the cover entry's path. |
+| `project.json` | yes | The whole project document — the same payload the backend stores as the project record's opaque `data`. |
+| `cover.<ext>` | no | Thumbnail of the project's newest result. The extension varies by what the server served, so the entry path is recorded in the manifest. |
+| `images/<image_name>` | no | Image bytes, keyed by the exact `image_name` the exporting server used. |
+
+The manifest is written indented and the document compact: the manifest is the one entry someone might open by hand, and the document is the largest thing in the archive before compression. Text entries are deflated; image entries are stored, since PNG and WEBP are already compressed.
+
+## What gets bundled
+
+A project document references its pixels by server image name, never by URL or inline data (see `CanvasImageRef` in `canvas-engine/contracts.ts`). Without the bytes, an exported project opens with nothing but missing layers anywhere except the machine that wrote it. The archive carries them.
+
+Which ones is decided by `collectLiveImageRefs()` in `projects/projectAssets.ts`. It walks the document collecting every string found under the keys `imageName` and `image_name` — the only two keys in the document that hold an image name. Collecting by key rather than by path is what makes it complete: a new control-adapter kind or node field is picked up without touching the collector.
+
+**History is excluded.** The walker skips the `queue`, `graphHistory` and `events` roots, and the `snapshot`, `snapshots` and `recentImages` keys at any depth. Every queue entry embeds a full canvas snapshot and the gallery widget keeps up to sixty recent results, so bundling all of it would turn a working project into a multi-gigabyte archive. References into history survive in the document and resolve on any install that still has those images.
+
+## Loading
+
+`readInvkArchive()` unpacks and validates; `restoreArchiveImages()` puts the pixels back.
+
+Restoration checks which referenced images the server already has in one bulk `POST /images/images_by_names` call, uploads only the missing ones out of `images/`, and returns an old-to-new mapping for any the server renamed. `remapImageRefs()` then rewrites the document — the whole document this time, including the history the export left behind, so nothing keeps pointing at a pre-import name.
+
+Restored images upload with `image_category: 'other'`, the canvas's private category: they appear in no gallery view and no board count. The previous frontend used `general`, which empties a stranger's project into your gallery.
+
+An image that is neither on the server nor in the archive is reported as dangling and its reference is left alone, so the project opens with one broken layer rather than not at all. Both fetches and uploads are concurrency-limited to five by `mapWithConcurrency()`.
+
+**Import never overwrites.** The document always lands under a freshly minted project id, never the one in the file, so exchanging a project cannot collide and re-importing your own export cannot replace the original.
+
+## Covers
+
+`ProjectSummary.coverUrl` comes from a per-user index in the client-state KV (`projects/covers.ts`), not from the archive and not from the document. The library lists projects through `GET /projects`, which returns summaries with no document, so deriving a cover there would mean fetching every project's document to render a page of thumbnails.
+
+The index is written whenever a project is serialized for a save, and on import from the archive's uploaded cover. It is an index and not a truth: a project saved by an older build has no entry and shows the folder glyph, which is also what a project that has produced nothing shows.
+
+## Versions
+
+Manifests parse through a zod discriminated union on `version`, so a version 1 archive is recognized and refused *as what it is* — `InvkFormatError` carries a `reason` (`legacy-canvas-project`, `unsupported-version`, `not-a-project`, `damaged`, `too-large`) that `describeProjectFileError()` maps to a translated string. There is no translation layer from legacy canvas state to `CanvasStateContractV2`.
+
+The legacy reader is the mirror image: it pins `version: 1` and refuses a version 2 archive.
+
+Future format changes should add a new member to the union rather than widening version 2, so that every version this app has ever written can be named precisely when refused.
+
+## Guards
+
+`archive.ts` is the only module that imports fflate, and it does so with `await import()` so the ZIP codec never enters an initial chunk — the architecture budget fails on a new package appearing in a route's source-owner set. Both directions are bounded by `INVK_MAX_ARCHIVE_BYTES` and `INVK_MAX_ENTRIES`, because an `.invk` is a file someone was handed.
+
+## Compatibility notes
+
+The archive stores references to models, LoRAs and other generation resources, not the model files themselves. Loading a project on another install restores its canvas and images, but missing models still need to be installed or replaced.
+
+Gallery boards, queue contents and account preferences are not part of a project and are not exported.

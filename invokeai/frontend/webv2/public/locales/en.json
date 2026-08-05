@@ -414,6 +414,13 @@
     "editedRelative": "Edited {{time}}",
     "exportFailed": "Export failed",
     "failedToLoad": "Failed to load your projects.",
+    "file": {
+      "damaged": "This project file is damaged and cannot be opened.",
+      "legacyCanvasProject": "This is a canvas project from an earlier version of Invoke, which cannot be opened here.",
+      "notAProject": "This file is not an Invoke project.",
+      "tooLarge": "This project file is too large to open.",
+      "unsupportedVersion": "This project file was written by a newer version of Invoke."
+    },
     "gridView": "Grid view",
     "groups": {
       "all": "All projects",
