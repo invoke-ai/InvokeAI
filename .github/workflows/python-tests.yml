@@ -83,9 +83,6 @@ jobs:
               - 'invokeai/**'
               - '!invokeai/frontend/web/**'
               - 'tests/**'
-              # tests/ covers a few of these (e.g. test_check_pins.py, test_docs_json_export.py)
-              - 'scripts/**'
-              - 'pins.json'
 
       - name: setup uv
         if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}

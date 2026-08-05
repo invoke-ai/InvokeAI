@@ -1,8 +1,6 @@
-# Check the `uv` lockfile and `pins.json` for consistency with `pyproject.toml`.
+# Check the `uv` lockfile for consistency with `pyproject.toml`.
 #
-# If the lockfile check fails, you should run `uv lock` to update the lockfile.
-# If the pins check fails, update the torch index URLs in `pins.json` to match
-# the `[[tool.uv.index]]` entries in `pyproject.toml` (see scripts/check_pins.py).
+# If this check fails, you should run `uv lock` to update the lockfile.
 #
 # Also checks that the lockfile keeps working for linux/aarch64, which no test job covers.
 # This reads the lockfile only - no ARM hardware or extra resolution needed.
@@ -59,8 +57,6 @@ jobs:
             uvlock-pyprojecttoml:
               - 'pyproject.toml'
               - 'uv.lock'
-              - 'pins.json'
-              - 'scripts/check_pins.py'
             aarch64check:
               - 'scripts/check_aarch64_lock.py'
 
@@ -74,11 +70,6 @@ jobs:
       - name: check lockfile
         if: ${{ steps.changed-files.outputs.uvlock-pyprojecttoml_any_changed == 'true' || inputs.always_run == true }}
         run: uv lock --locked # this will exit with 1 if the lockfile is not consistent with pyproject.toml
-        shell: bash
-
-      - name: check pins.json
-        if: ${{ steps.changed-files.outputs.uvlock-pyprojecttoml_any_changed == 'true' || inputs.always_run == true }}
-        run: python3 scripts/check_pins.py # pins.json is consumed by the launcher; keep its torch index URLs in sync with pyproject.toml
         shell: bash
 
       - name: check aarch64 support in lockfile

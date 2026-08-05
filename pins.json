@@ -2,7 +2,6 @@
   "python": "3.12",
   "torchIndexUrl": {
     "win32": {
-      "cpu": "https://download.pytorch.org/whl/cpu",
       "cuda": "https://download.pytorch.org/whl/cu128"
     },
     "linux": {
