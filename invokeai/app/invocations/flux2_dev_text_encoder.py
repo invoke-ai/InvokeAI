@@ -77,8 +77,9 @@ DEV_MAX_SEQ_LEN = 512
     title="Prompt - FLUX.2 [dev]",
     tags=["prompt", "conditioning", "flux", "flux2", "dev", "mistral"],
     category="prompt",
-    version="1.0.0",
+    version="1.0.1",
     classification=Classification.Prototype,
+    idle_gpu_offloadable=True,
 )
 class Flux2DevTextEncoderInvocation(BaseInvocation):
     """Encode a prompt for FLUX.2 [dev] using its Mistral Small 3.1 text encoder."""
@@ -102,6 +103,12 @@ class Flux2DevTextEncoderInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> FluxConditioningOutput:
         with ExitStack() as exit_stack:
             mistral_embeds = self._encode_prompt(context, exit_stack)
+
+            # Save the conditioning CPU-backed: this node is idle_gpu_offloadable, so the
+            # encode may have run on a BORROWED GPU whose pool lock is released the moment
+            # this node returns — tensors left on it would pin VRAM on a device another
+            # session may immediately start using. Mirrors flux2_klein_text_encoder.
+            mistral_embeds = mistral_embeds.detach().to("cpu")
 
             # FLUX.2 [dev] does not consume a pooled / CLIP-style embedding; we
             # reuse the FLUX conditioning structure (Klein does the same) and put

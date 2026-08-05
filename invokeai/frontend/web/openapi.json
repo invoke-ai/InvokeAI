@@ -29461,7 +29461,7 @@
         "tags": ["prompt", "conditioning", "flux", "flux2", "dev", "mistral"],
         "title": "Prompt - FLUX.2 [dev]",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "output": {
           "$ref": "#/components/schemas/FluxConditioningOutput"
         }
