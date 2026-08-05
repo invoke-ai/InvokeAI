@@ -163,8 +163,29 @@ export const importProjectFile = async (
 
   assertAccountScopeCurrent(owner);
 
+  const id = createProjectId();
+  const name =
+    typeof contents.projectDocument.name === 'string' && contents.projectDocument.name.trim()
+      ? contents.projectDocument.name.trim()
+      : 'Imported project';
+  const candidate = { ...contents.projectDocument, id, name };
+  // Full validation rehydrates the document through the Workbench reducer, so
+  // it is loaded here rather than imported: the Launchpad should not carry the
+  // editor's aggregate state just to offer an Import button.
+  const { deserializeProjectDocument } = await import('./syncedPersistence');
+
+  assertAccountScopeCurrent(owner);
+
+  const project = deserializeProjectDocument(candidate);
+
+  if (!project) {
+    throw new InvkFormatError('damaged', 'The project document will not rehydrate.');
+  }
+
+  const { serializeProjectDocument } = await import('./projectDocument');
+  const canonicalDocument = serializeProjectDocument(project);
   const { restoreArchiveAssets } = await import('./invk/importProject');
-  const restored = await restoreArchiveAssets(contents, {
+  const restored = await restoreArchiveAssets({ ...contents, projectDocument: canonicalDocument }, {
     signal: owner.signal,
     ...(options.onProgress === undefined
       ? {}
@@ -175,22 +196,7 @@ export const importProjectFile = async (
 
   assertAccountScopeCurrent(owner);
 
-  const id = createProjectId();
-  const name =
-    typeof contents.projectDocument.name === 'string' && contents.projectDocument.name.trim()
-      ? contents.projectDocument.name.trim()
-      : 'Imported project';
-  const document = { ...remapAssetRefs(contents.projectDocument, restored.mappings), id, name };
-  // Full validation rehydrates the document through the Workbench reducer, so
-  // it is loaded here rather than imported: the Launchpad should not carry the
-  // editor's aggregate state just to offer an Import button.
-  const { deserializeProjectDocument } = await import('./syncedPersistence');
-
-  assertAccountScopeCurrent(owner);
-
-  if (!deserializeProjectDocument(document)) {
-    throw new InvkFormatError('damaged', 'The project document will not rehydrate.');
-  }
+  const document = remapAssetRefs(canonicalDocument, restored.mappings);
 
   const record = await apiCreateProject({ data: document, name, project_id: id }, owner.signal);
 

@@ -21,6 +21,8 @@ const api = vi.hoisted(() => ({
 
 const downloads = vi.hoisted(() => ({ downloadBlob: vi.fn(), downloadText: vi.fn() }));
 
+const covers = vi.hoisted(() => ({ recordProjectCover: vi.fn() }));
+
 const transport = vi.hoisted(() => ({
   coverExtensionForMime: () => 'webp',
   // `Uint8Array | null` up front: a fetcher that returns `null` is how the
@@ -45,6 +47,10 @@ const transport = vi.hoisted(() => ({
 }));
 
 vi.mock('./api', () => api);
+vi.mock('./covers', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./covers')>()),
+  recordProjectCover: covers.recordProjectCover,
+}));
 vi.mock('@platform/browser/downloadBlob', () => downloads);
 vi.mock('./invk/assetTransport', () => transport);
 
@@ -59,6 +65,18 @@ const deferred = <T>() => {
 
   return { promise, resolve };
 };
+
+const rasterImageLayer = (id: string, imageName: string) => ({
+  blendMode: 'normal' as const,
+  id,
+  isEnabled: true,
+  isLocked: false,
+  name: id,
+  opacity: 1,
+  source: { image: { height: 1, imageName, width: 1 }, type: 'image' as const },
+  transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+  type: 'raster' as const,
+});
 
 const capturedArchive = (): File => {
   const [blob, fileName] = downloads.downloadBlob.mock.calls.at(-1)! as [Blob, string];
@@ -150,18 +168,21 @@ describe('exportLibraryProject', () => {
  * clean round trip. These pin the reporting all the way out to the caller.
  */
 describe('what a transfer reports', () => {
-  const projectWithImages = () => ({
-    ...createDraftProject([]),
-    canvas: {
-      document: {
-        layers: [
-          { id: 'l1', source: { image: { height: 1, imageName: 'a.png', width: 1 }, type: 'image' } },
-          { id: 'l2', source: { image: { height: 1, imageName: 'b.png', width: 1 }, type: 'image' } },
-        ],
+  const projectWithImages = () => {
+    const project = createDraftProject([]);
+
+    return {
+      ...project,
+      canvas: {
+        ...project.canvas,
+        document: {
+          ...project.canvas.document,
+          layers: [rasterImageLayer('l1', 'a.png'), rasterImageLayer('l2', 'b.png')],
+        },
       },
-    },
-    name: 'Two layers',
-  });
+      name: 'Two layers',
+    };
+  };
 
   it('counts every asset as it is bundled, then reports packing', async () => {
     const document = { ...persistence.serializeProjectDocument(createDraftProject([])), ...projectWithImages() };
@@ -276,8 +297,8 @@ describe('importProjectFile', () => {
     expect(api.createProject).not.toHaveBeenCalled();
   });
 
-  it('refuses an archive whose document is not a usable project', async () => {
-    const { textEntry, writeArchive } = await import('./invk/archive');
+  it('refuses a damaged document before any asset or project mutation', async () => {
+    const { binaryEntry, textEntry, writeArchive } = await import('./invk/archive');
     const blob = await writeArchive(
       new Map([
         [
@@ -292,14 +313,80 @@ describe('importProjectFile', () => {
             })
           ),
         ],
-        ['project.json', textEntry(JSON.stringify({ name: 'No layout' }))],
+        [
+          'project.json',
+          textEntry(
+            JSON.stringify({
+              imageName: 'missing-layout.png',
+              name: 'No layout',
+              video_name: 'missing-layout.mp4',
+            })
+          ),
+        ],
+        ['images/missing-layout.png', binaryEntry(new Uint8Array([1]))],
+        ['videos/missing-layout.mp4', binaryEntry(new Uint8Array([2]))],
       ])
     );
 
     await expect(projectFile.importProjectFile(new File([blob], 'broken.invk'))).rejects.toMatchObject({
       reason: 'damaged',
     });
+    expect(transport.findExistingImageNames).not.toHaveBeenCalled();
+    expect(transport.findExistingVideoNames).not.toHaveBeenCalled();
+    expect(transport.uploadArchiveImage).not.toHaveBeenCalled();
+    expect(transport.uploadArchiveVideo).not.toHaveBeenCalled();
     expect(api.createProject).not.toHaveBeenCalled();
+    expect(covers.recordProjectCover).not.toHaveBeenCalled();
+  });
+
+  it('canonicalizes a legacy document before restoring assets and persisting it', async () => {
+    const { binaryEntry, textEntry, writeArchive } = await import('./invk/archive');
+    const project = createDraftProject([]);
+    const document = {
+      ...persistence.serializeProjectDocument(project),
+      canvas: {
+        ...project.canvas,
+        document: {
+          ...project.canvas.document,
+          layers: [rasterImageLayer('image-layer', 'legacy.png')],
+        },
+      },
+      futureDocumentKey: { survives: true },
+      invocation: { sourceId: 'project-graph' },
+      name: ' Legacy project ',
+    };
+    const blob = await writeArchive(
+      new Map([
+        [
+          'manifest.json',
+          textEntry(
+            JSON.stringify({
+              appVersion: '7.0',
+              contents: 'workbench-project',
+              createdAt: '',
+              name: 'Legacy project',
+              version: 2,
+            })
+          ),
+        ],
+        ['project.json', textEntry(JSON.stringify(document))],
+        ['images/legacy.png', binaryEntry(new Uint8Array([1]))],
+      ])
+    );
+
+    acceptCreate();
+
+    await projectFile.importProjectFile(new File([blob], 'legacy.invk'));
+
+    const createRequest = api.createProject.mock.calls[0]![0] as { data: Record<string, unknown> };
+    const invocation = createRequest.data.invocation as { sourceId: string };
+    const canvas = createRequest.data.canvas as {
+      document: { layers: Array<{ source: { image: { imageName: string } } }> };
+    };
+
+    expect(invocation.sourceId).toBe('workflow');
+    expect(createRequest.data.futureDocumentKey).toEqual({ survives: true });
+    expect(canvas.document.layers[0]?.source.image.imageName).toBe('server-legacy.png');
   });
 
   it('does not upload an account A file after local parsing completes under account B', async () => {
