@@ -60,6 +60,18 @@ from invokeai.backend.wan.sampling_utils import get_spatial_scale_factor, make_n
 # consumes the iterator once per ``apply_smart_model_patches`` invocation, and
 # the expert may be swapped (and re-entered) multiple times in a render.
 LoRAIteratorFactory = Callable[[], Iterable[PatchSpec]]
+WAN_MAX_RESIDENT_TRANSFORMER_BYTES = 2 * 2**30
+
+
+def _get_wan_transformer_working_mem_bytes(device: torch.device, *, enabled: bool) -> int | None:
+    """Reserve all but 2 GiB of VRAM so Wan weights use aggressive layer streaming."""
+    if not enabled or device.type != "cuda":
+        return None
+
+    total_vram = torch.cuda.get_device_properties(device).total_memory
+    if total_vram <= WAN_MAX_RESIDENT_TRANSFORMER_BYTES:
+        return None
+    return total_vram - WAN_MAX_RESIDENT_TRANSFORMER_BYTES
 
 
 def _resolve_variant(context: InvocationContext, transformer_field: WanTransformerField) -> WanVariantType:
@@ -177,6 +189,8 @@ class _ExpertSwapper:
         low_lora_factory: LoRAIteratorFactory | None = None,
         high_is_quantized: bool = False,
         low_is_quantized: bool = False,
+        working_mem_bytes: int | None = None,
+        max_resident_model_bytes: int | None = None,
     ) -> None:
         self._context = context
         self._high_model = high_model
@@ -186,6 +200,8 @@ class _ExpertSwapper:
         self._low_lora_factory = low_lora_factory
         self._high_is_quantized = high_is_quantized
         self._low_is_quantized = low_is_quantized
+        self._working_mem_bytes = working_mem_bytes
+        self._max_resident_model_bytes = max_resident_model_bytes
         self._active_label: str | None = None
         self._active_info: Any | None = None
         self._active_device_ctx: Any | None = None
@@ -243,7 +259,10 @@ class _ExpertSwapper:
         # always fresh — see class docstring for the cache-eviction reasoning.
         model_id = self._high_model if label == self.HIGH else self._low_model
         info = self._context.models.load(model_id)
-        device_ctx = info.model_on_device()
+        if self._working_mem_bytes is None:
+            device_ctx = info.model_on_device()
+        else:
+            device_ctx = info.model_on_device(working_mem_bytes=self._working_mem_bytes)
         cached_weights, model = device_ctx.__enter__()
 
         # Stash the device-context state immediately. If anything below fails (most
@@ -256,6 +275,17 @@ class _ExpertSwapper:
         self._active_info = info
         self._active_device_ctx = device_ctx
         self._active_model = model
+
+        if self._max_resident_model_bytes is not None:
+            cache_record = getattr(info, "_cache_record", None)
+            cached_model = getattr(cache_record, "cached_model", None)
+            cur_vram_bytes = getattr(cached_model, "cur_vram_bytes", None)
+            partial_unload = getattr(cached_model, "partial_unload_from_vram", None)
+            if callable(cur_vram_bytes) and callable(partial_unload):
+                vram_bytes_to_free = max(0, cur_vram_bytes() - self._max_resident_model_bytes)
+                if vram_bytes_to_free > 0:
+                    partial_unload(vram_bytes_to_free, keep_required_weights_in_vram=True)
+                    TorchDevice.empty_cache()
 
         # Apply LoRA patches for this expert. GGUF transformers need sidecar
         # patching since direct patching of GGMLTensors isn't supported.
@@ -602,6 +632,10 @@ class WanDenoiseInvocation(BaseInvocation):
         def low_lora_factory() -> Iterable[PatchSpec]:
             return self._lora_iterator(context, low_loras)
 
+        optimize_memory = context.config.get().wan_memory_optimization
+        working_mem_bytes = _get_wan_transformer_working_mem_bytes(device, enabled=optimize_memory)
+        if working_mem_bytes is not None:
+            context.logger.info("Wan memory optimization: limiting resident transformer weights to about 2 GiB")
         with ExitStack() as exit_stack:
             swapper = _ExpertSwapper(
                 context=context,
@@ -612,9 +646,12 @@ class WanDenoiseInvocation(BaseInvocation):
                 low_lora_factory=low_lora_factory if low_loras else None,
                 high_is_quantized=high_is_quantized,
                 low_is_quantized=low_is_quantized,
+                working_mem_bytes=working_mem_bytes,
+                max_resident_model_bytes=(
+                    WAN_MAX_RESIDENT_TRANSFORMER_BYTES if working_mem_bytes is not None else None
+                ),
             )
             exit_stack.callback(swapper.close)
-            optimize_memory = context.config.get().wan_memory_optimization
 
             for step_idx, t in enumerate(tqdm(timesteps, desc="Denoising (Wan 2.2)", total=total_steps)):
                 timestep = t.expand(latents.shape[0])

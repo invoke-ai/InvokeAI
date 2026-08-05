@@ -28,8 +28,10 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import WanTransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.invocations.wan_denoise import (
+    WAN_MAX_RESIDENT_TRANSFORMER_BYTES,
     WanDenoiseInvocation,
     _ExpertSwapper,
+    _get_wan_transformer_working_mem_bytes,
     _resolve_variant,
     _validate_ref_condition_shape,
     _validate_spatial_dimensions,
@@ -289,6 +291,10 @@ class WanVideoDenoiseInvocation(BaseInvocation):
         def low_lora_factory() -> Iterable[PatchSpec]:
             return proxy._lora_iterator(context, low_loras)
 
+        optimize_memory = context.config.get().wan_memory_optimization
+        working_mem_bytes = _get_wan_transformer_working_mem_bytes(device, enabled=optimize_memory)
+        if working_mem_bytes is not None:
+            context.logger.info("Wan memory optimization: limiting resident transformer weights to about 2 GiB")
         with ExitStack() as exit_stack:
             swapper = _ExpertSwapper(
                 context=context,
@@ -299,9 +305,12 @@ class WanVideoDenoiseInvocation(BaseInvocation):
                 low_lora_factory=low_lora_factory if low_loras else None,
                 high_is_quantized=high_is_quantized,
                 low_is_quantized=low_is_quantized,
+                working_mem_bytes=working_mem_bytes,
+                max_resident_model_bytes=(
+                    WAN_MAX_RESIDENT_TRANSFORMER_BYTES if working_mem_bytes is not None else None
+                ),
             )
             exit_stack.callback(swapper.close)
-            optimize_memory = context.config.get().wan_memory_optimization
 
             for step_idx, t in enumerate(
                 tqdm(timesteps, desc=f"Denoising Wan 2.2 video ({self.num_frames} frames)", total=total_steps)
