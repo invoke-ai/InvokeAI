@@ -4,19 +4,21 @@ title: Project Files (.invk)
 
 Workbench projects export to a portable `.invk` archive. The feature lives in `invokeai/frontend/webv2/src/workbench/projects/` and is exposed as **Import…** on the Launchpad's Home and Projects pages, **Open project…** in the editor's tab bar, and **Export** in the project switcher and each project card's action menu.
 
+Import also accepts the `.invokeproject.json` envelope shipped by earlier webv2 builds. New exports use `.invk`; the JSON path remains read-only compatibility.
+
 `.invk` is shared with the previous frontend's [canvas projects](/development/front-end/canvas-projects/), which write version 1 of the same container. Workbench projects write version 2. The two are deliberately not interchangeable — see [Versions](#versions).
 
 ## File format
 
 `.invk` files are ZIP archives. The current manifest version is `2`.
 
-| Target | Required | Description |
-| - | - | - |
-| `manifest.json` | yes | Archive version, app version, creation timestamp, project name, and optionally the source project id and the cover entry's path. |
-| `project.json` | yes | The whole project document — the same payload the backend stores as the project record's opaque `data`. |
-| `cover.<ext>` | no | Thumbnail of the project's newest result. The extension varies by what the server served, so the entry path is recorded in the manifest. |
-| `images/<image_name>` | no | Image bytes, keyed by the exact `image_name` the exporting server used. |
-| `videos/<video_name>` | no | Video bytes, keyed the same way. |
+| Target                | Required | Description                                                                                                                              |
+| --------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `manifest.json`       | yes      | Archive version, app version, creation timestamp, project name, and optionally the source project id and the cover entry's path.         |
+| `project.json`        | yes      | The whole project document — the same payload the backend stores as the project record's opaque `data`.                                  |
+| `cover.<ext>`         | no       | Thumbnail of the project's newest result. The extension varies by what the server served, so the entry path is recorded in the manifest. |
+| `images/<image_name>` | no       | Image bytes, keyed by the exact `image_name` the exporting server used.                                                                  |
+| `videos/<video_name>` | no       | Video bytes, keyed the same way.                                                                                                         |
 
 Assets are filed by kind rather than pooled. Images and videos are separate backend namespaces with separate fetch and upload routes, so import has to know which an entry is before it can restore it — the folder states that, where a shared one would leave it to be guessed from a file extension. Adding `videos/` needed no version bump: `readInvkArchive` ignores entries it does not recognize, so a reader predating it reads such an archive and simply leaves those references dangling, exactly as it would for an absent image.
 
@@ -44,17 +46,23 @@ The skip is by key on purpose, because the members got there differently. `selec
 
 Import deliberately orders its work as **read → mint identity → validate and canonicalize → restore → remap → create**. It first reads the archive without mutating the server, then assigns the imported project a fresh id and name. The candidate is rehydrated through the Workbench reducer and serialized back to its canonical document before any asset is restored. Only then are missing assets restored, their server-assigned names remapped throughout that canonical document, and the new project created. A malformed document therefore cannot leave restored orphan assets behind, and an import can never overwrite the project whose id was recorded in the archive.
 
+The legacy JSON path follows the same fresh-identity validation and canonicalization boundary, then creates the project directly. A JSON envelope carries no bundled media, so it performs no existence checks, uploads, restoration or remapping.
+
 Restoration checks which referenced assets the server already has, uploads only the missing ones out of `images/` and `videos/`, and returns an old-to-new mapping **per kind** — the namespaces are separate, so a single flat map would let an image rewrite a video that happened to share its name. `remapAssetRefs()` then rewrites the document — the whole document this time, including the history the export left behind, so nothing keeps pointing at a pre-import name.
 
 The existence check is the one place the two kinds are not symmetric. Images have a bulk `POST /images/images_by_names`; videos have no equivalent, so that check fans out one `GET /videos/i/{name}` per name behind the same concurrency limit of 5. For video lookup, only `403` and `404` mean the asset is absent; every other non-success status aborts the import rather than being mistaken for a missing video. This is what `hydrateVideoRefs` in the gallery's data layer already does for the same reason. A project with no video references never issues the video check at all.
 
 Restored assets upload with the category `'other'`, the canvas's private category: they appear in no gallery view and no board count. The previous frontend used `general`, which empties a stranger's project into your gallery.
 
+Restoration records the authoritative server names returned by every successful upload. If project creation then rejects while the importing account scope is still current, import checks the client-chosen project id and sends those names to the image and video batch-delete routes only when the server confirms that id is absent with `404`. A found project or an inconclusive lookup is an ambiguous create, so cleanup is skipped rather than deleting assets that the project may already reference. Cleanup is best-effort and never replaces the primary create error. It is also skipped after a create has returned and after a cross-account rotation: issuing destructive deletes with a new account's credentials would be unsafe. That safety boundary means a rotation after upload can still leave private-category media behind when the old account can no longer authorize cleanup.
+
 An asset that is neither on the server nor in the archive is reported as dangling and its reference is left alone, so the project opens with one broken layer rather than not at all. Both fetches and uploads are concurrency-limited to five by `mapWithConcurrency()`, over one queue spanning both kinds — the limit exists to be kind to the backend, and would not be if each kind got its own.
 
 **Import never overwrites.** The document always lands under a freshly minted project id, never the one in the file, so exchanging a project cannot collide and re-importing your own export cannot replace the original.
 
 **Cancellation is not a skip.** An unservable asset is skipped, but an aborted signal makes every asset unservable at once — so a cancelled export would otherwise pack an archive of nothing and hand it to the browser as a finished download. `isRequestCancellation()` tells the two apart where the request fails. The signal is checked after fetching and again after packing, immediately before the browser download, so cancellation during ZIP creation cannot produce a completed-looking download.
+
+Export from the project switcher flushes Generate's debounced prompt drafts before it reads the active project. An immediate prompt edit is therefore part of the serialized document rather than arriving after export has already started.
 
 ## Reporting
 
@@ -70,13 +78,15 @@ The index is written whenever a project is serialized for a save, and on import.
 
 Each cover write is a complete replacement of that one index value, so writes are serialized. A failed write leaves the optimistic snapshot dirty; a later save or identical cover record retries that complete dirty snapshot instead of silently treating it as clean. Before the index has loaded, pending changes retain both new cover names and clears (`null`), so clearing a cover before load still removes the matching retained server entry once the read succeeds.
 
+A successful load is also final for that account epoch. Later library refreshes reuse the loaded snapshot instead of issuing another blind GET that could overwrite an optimistic cover mutation; a failed initial read remains retryable.
+
 On import the cover prefers an image the restore already put on this server — the archive's `cover` entry is a thumbnail of an image the document also references, and the cover URL asks for a thumbnail anyway, so reusing it is the same picture without a second copy. The bundled bytes are the fallback for a cover whose source image is dangling. Uploading the entry unconditionally left one orphan per import: covers go up under the canvas's private `'other'` category, which appears in no gallery view and no board count, so nobody could find or delete them.
 
-**The whole index is one value, so a write must not precede a read.** `setClientStateValue` replaces the blob outright, so recording a cover from a store that has not loaded would delete every entry but that one — and autosave reaches `recordProjectCover()` from the editor, which loads the index only when the project switcher or the Open dialog opens. Anyone who reloads straight into a project and generates hits exactly that ordering. Records made before the load are held and applied on top of the server's answer once it arrives. A read that *fails* is not a read: the store stays unloaded and the pending records wait, because merging onto a blank answer is the same destructive write by another route.
+**The whole index is one value, so a write must not precede a read.** `setClientStateValue` replaces the blob outright, so recording a cover from a store that has not loaded would delete every entry but that one — and autosave reaches `recordProjectCover()` from the editor, which loads the index only when the project switcher or the Open dialog opens. Anyone who reloads straight into a project and generates hits exactly that ordering. Records made before the load are held and applied on top of the server's answer once it arrives. A read that _fails_ is not a read: the store stays unloaded and the pending records wait, because merging onto a blank answer is the same destructive write by another route.
 
 ## Versions
 
-Manifests parse through a zod discriminated union on `version`, so a version 1 archive is recognized and refused *as what it is* — `InvkFormatError` carries a `reason` (`legacy-canvas-project`, `unsupported-version`, `not-a-project`, `damaged`, `too-large`) that `describeProjectFileError()` maps to a translated string. There is no translation layer from legacy canvas state to `CanvasStateContractV2`.
+Manifests parse through a zod discriminated union on `version`, so a version 1 archive is recognized and refused _as what it is_ — `InvkFormatError` carries a `reason` (`legacy-canvas-project`, `unsupported-version`, `not-a-project`, `damaged`, `too-large`) that `describeProjectFileError()` maps to a translated string. There is no translation layer from legacy canvas state to `CanvasStateContractV2`.
 
 The legacy reader is the mirror image: it pins `version: 1` and refuses a version 2 archive.
 
@@ -86,9 +96,9 @@ Future format changes should add a new member to the union rather than widening 
 
 `archive.ts` is the only module that imports fflate, and it does so with `await import()` so the ZIP codec never enters an initial chunk — the architecture budget fails on a new package appearing in a route's source-owner set. Both directions are bounded by `INVK_MAX_ARCHIVE_BYTES` and `INVK_MAX_ENTRIES`, because an `.invk` is a file someone was handed.
 
-The input `File.size` is rejected before `arrayBuffer()` allocates its bytes. On export, the accumulated entries are checked before packing and the packed ZIP is checked again afterward, because compression can change the final output size.
+The input `File.size` is rejected before `arrayBuffer()` allocates its bytes. On export, one shared response reader checks declared `Content-Length` values and streams every asset through the same fixed 2 GiB allocation budget, including concurrent responses. It cancels a response when its declared length, streamed bytes or cumulative retained bytes cross the ceiling. The accumulated entries are checked before packing and the packed ZIP is checked again afterward, because compression can change the final output size.
 
-On the way in, the budget is enforced through fflate's entry filter (`createExpansionBudget()`), not over the result. `unzip` is fully buffered: by the time it returns a record of entries, every one has already been inflated, so a total measured there would describe an out-of-memory crash rather than prevent it. The filter is consulted per entry with the uncompressed size declared in the central directory, and refuses everything from the crossing point on. The refusal is raised after `unzip` settles rather than thrown from inside it, so `too-large` stays distinguishable from `not-a-project` — a throw inside fflate's walk arrives as a decode failure. An entry whose header understates its size is caught by fflate itself, which inflates into a buffer sized from that declaration and fails the decode when the stream overruns it.
+On the way in, the budget is enforced through fflate's entry filter (`createExpansionBudget()`), not over the result. `unzip` is fully buffered: by the time it returns a record of entries, every one has already been inflated, so a total measured there would describe an out-of-memory crash rather than prevent it. The filter is consulted per entry with its compression method, compressed `size` and uncompressed `originalSize`. Deflated entries allocate from `originalSize`; stored entries allocate from `size`, so stored entries must declare both sizes identically and the actual allocation size is what counts against the cumulative ceiling. The refusal is raised after `unzip` settles rather than thrown from inside it, so `too-large` stays distinguishable from `not-a-project` — a throw inside fflate's walk arrives as a decode failure.
 
 `INVK_MAX_ARCHIVE_BYTES` is 2 GiB — deliberately well under 4 GiB, where ZIP32's 32-bit sizes and offsets stop being able to describe the file. fflate reads zip64 records but `zip()` never writes them, so an archive at that boundary would be produced structurally invalid rather than refused. A single video can be hundreds of megabytes, so this ceiling is reachable in practice; it fails cleanly into the `too-large` reason.
 
@@ -97,6 +107,8 @@ On the way in, the budget is enforced through fflate's entry filter (`createExpa
 The mock-backed browser journey exercises the real export action and file chooser: it exports a representative project, resets the backend, imports into a fresh browser context, and verifies the persisted project, remapped image and video references, restored-media retrieval, and cover-index entry through HTTP. Only image upload was missing from the mock backend's project-file media contract; the journey uses the existing video upload path. This verifies the request and persistence contracts, including server-assigned asset names, not binary fidelity between archived and restored bytes.
 
 ## Compatibility notes
+
+Earlier webv2 builds exported `*.invokeproject.json` files containing a version 1 `invokeai-project` envelope. Import detects that exact extension, validates the envelope, mints a fresh identity, canonicalizes the embedded document and creates it without attempting media restoration. The picker offers both `.invk` and `.invokeproject.json`.
 
 The archive stores references to models, LoRAs and other generation resources, not the model files themselves. Loading a project on another install restores its canvas and images, but missing models still need to be installed or replaced.
 

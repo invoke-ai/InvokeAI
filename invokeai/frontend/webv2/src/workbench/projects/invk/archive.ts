@@ -33,9 +33,9 @@ import { INVK_MIME_TYPE, InvkFormatError } from './format';
  * central directory, which is the only place a ceiling can actually stop a zip
  * bomb rather than describe one.
  *
- * A header that understates its entry's size does not get past this: fflate
- * inflates into a buffer sized from that declaration and fails the decode when
- * the stream overruns it, which surfaces as `not-a-project`.
+ * fflate allocates deflated entries from `originalSize`, but stored entries
+ * from `size`. Stored ZIP entries must declare those sizes identically; the
+ * filter rejects a mismatch before fflate can copy the payload.
  */
 
 /**
@@ -119,7 +119,7 @@ export const writeArchive = async (entries: InvkArchiveEntries): Promise<Blob> =
 
 export interface InvkExpansionBudget {
   /** Consulted per entry before it is inflated; `false` keeps it out of memory. */
-  accept: (file: { name: string; originalSize: number }) => boolean;
+  accept: (file: { compression: number; name: string; originalSize: number; size: number }) => boolean;
   /** The refusal to raise once `unzip` has settled, or `null` if everything fit. */
   getRefusal: () => InvkFormatError | null;
 }
@@ -148,12 +148,17 @@ export const createExpansionBudget = (): InvkExpansionBudget => {
       }
 
       entryCount += 1;
-      expandedBytes += file.originalSize;
 
       if (entryCount > INVK_MAX_ENTRIES) {
         refusal ??= new InvkFormatError('too-large', `Project archive holds more than ${INVK_MAX_ENTRIES} entries.`);
-      } else if (expandedBytes > INVK_MAX_ARCHIVE_BYTES) {
-        refusal ??= new InvkFormatError('too-large', `Project archive expands past ${INVK_MAX_ARCHIVE_BYTES} bytes.`);
+      } else if (file.compression === 0 && file.size !== file.originalSize) {
+        refusal ??= new InvkFormatError('not-a-project', `Stored ZIP entry "${file.name}" has inconsistent sizes.`);
+      } else {
+        expandedBytes += file.compression === 0 ? file.size : file.originalSize;
+
+        if (expandedBytes > INVK_MAX_ARCHIVE_BYTES) {
+          refusal ??= new InvkFormatError('too-large', `Project archive expands past ${INVK_MAX_ARCHIVE_BYTES} bytes.`);
+        }
       }
 
       return refusal === null;

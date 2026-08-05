@@ -112,7 +112,12 @@ describe('writeArchive / readArchive', () => {
  * through `readArchive` would mean actually building a multi-gigabyte archive.
  */
 describe('createExpansionBudget', () => {
-  const entry = (name: string, originalSize: number) => ({ name, originalSize });
+  const entry = (name: string, originalSize: number, size = originalSize, compression = 8) => ({
+    compression,
+    name,
+    originalSize,
+    size,
+  });
   const GIB = 1024 * 1024 * 1024;
 
   it('accepts entries that fit and raises nothing', () => {
@@ -168,6 +173,13 @@ describe('createExpansionBudget', () => {
 
     expect(budget.getRefusal()).toBe(first);
   });
+
+  it('refuses a stored entry whose compressed and original sizes disagree', () => {
+    const budget = createExpansionBudget();
+
+    expect(budget.accept(entry('images/tampered.png', 1, 1024 * 1024, 0))).toBe(false);
+    expect(budget.getRefusal()).toMatchObject({ reason: 'not-a-project' });
+  });
 });
 
 describe('readArchive with the budget in the path', () => {
@@ -183,5 +195,27 @@ describe('readArchive with the budget in the path', () => {
 
     expect([...entries.keys()].sort()).toEqual(['images/a.png', 'project.json']);
     expect(entries.get('images/a.png')!.byteLength).toBe(4096);
+  });
+
+  it('rejects a stored payload whose central directory understates its allocation', async () => {
+    const blob = await writeArchive(
+      new Map([['images/tampered.png', binaryEntry(new Uint8Array(1024 * 1024).fill(0xa5))]])
+    );
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    let centralDirectoryOffset = -1;
+
+    for (let offset = 0; offset <= bytes.byteLength - 4; offset += 1) {
+      if (view.getUint32(offset, true) === 0x02014b50) {
+        centralDirectoryOffset = offset;
+        break;
+      }
+    }
+
+    expect(centralDirectoryOffset).toBeGreaterThanOrEqual(0);
+    // ZIP central-directory uncompressed size. The stored size remains the real 1 MiB.
+    view.setUint32(centralDirectoryOffset + 24, 1, true);
+
+    await expect(readArchive(bytes)).rejects.toMatchObject({ reason: 'not-a-project' });
   });
 });

@@ -130,9 +130,43 @@ export interface RestoreAssetsResult {
   danglingAssetNames: string[];
   /** Old name to new name, per kind. Kept apart because the namespaces are. */
   mappings: { images: Map<string, string>; videos: Map<string, string> };
+  /** Authoritative server identities created by this restore, for failure rollback. */
+  uploadedAssets: UploadedArchiveAssets;
   /** Assets uploaded from the archive, of either kind. */
   uploadedCount: number;
 }
+
+export interface UploadedArchiveAssets {
+  imageNames: string[];
+  videoNames: string[];
+}
+
+export interface RollbackArchiveAssetsDeps {
+  deleteArchiveImages?: (imageNames: string[], signal?: AbortSignal) => Promise<void>;
+  deleteArchiveVideos?: (videoNames: string[], signal?: AbortSignal) => Promise<void>;
+  signal?: AbortSignal;
+}
+
+/** Best-effort cleanup for server identities created by an import that could not create its project. */
+export const rollbackArchiveAssets = async (
+  uploadedAssets: UploadedArchiveAssets,
+  deps: RollbackArchiveAssetsDeps = {}
+): Promise<void> => {
+  const transport = await import('./assetTransport');
+  const deleteImages = deps.deleteArchiveImages ?? transport.deleteArchiveImages;
+  const deleteVideos = deps.deleteArchiveVideos ?? transport.deleteArchiveVideos;
+  const deletions: Promise<void>[] = [];
+
+  if (uploadedAssets.imageNames.length > 0) {
+    deletions.push(deleteImages(uploadedAssets.imageNames, deps.signal));
+  }
+
+  if (uploadedAssets.videoNames.length > 0) {
+    deletions.push(deleteVideos(uploadedAssets.videoNames, deps.signal));
+  }
+
+  await Promise.allSettled(deletions);
+};
 
 export interface RestoreAssetsDeps {
   findExistingImageNames?: (imageNames: readonly string[], signal?: AbortSignal) => Promise<Set<string>>;
@@ -174,6 +208,7 @@ interface PendingUpload {
 const resolveCoverImageName = async (input: {
   contents: InvkArchiveContents;
   mappings: { images: Map<string, string> };
+  newlyUploadedImageNames: Set<string>;
   restoredImageNames: ReadonlySet<string>;
   signal?: AbortSignal;
   uploadImage: NonNullable<RestoreAssetsDeps['uploadArchiveImage']>;
@@ -199,6 +234,8 @@ const resolveCoverImageName = async (input: {
       contentType: mimeForEntryName(cover.entryName),
       signal: input.signal,
     });
+
+    input.newlyUploadedImageNames.add(uploaded.imageName);
 
     return uploaded.imageName;
   } catch {
@@ -266,6 +303,8 @@ export const restoreArchiveAssets = async (
   const total = pending.length + (contents.cover === null ? 0 : 1);
   let completed = 0;
   let uploadedCount = 0;
+  const newlyUploadedImageNames = new Set<string>();
+  const newlyUploadedVideoNames = new Set<string>();
 
   /** Images this server can serve when the restore is done, under their final names. */
   const restoredImageNames = new Set(referencedImages.filter((name) => existingImages.has(name)));
@@ -281,7 +320,10 @@ export const restoreArchiveAssets = async (
       uploadedCount += 1;
 
       if (kind === 'image') {
+        newlyUploadedImageNames.add(restoredName);
         restoredImageNames.add(restoredName);
+      } else {
+        newlyUploadedVideoNames.add(restoredName);
       }
 
       if (restoredName !== name) {
@@ -300,6 +342,7 @@ export const restoreArchiveAssets = async (
   const coverImageName = await resolveCoverImageName({
     contents,
     mappings,
+    newlyUploadedImageNames,
     restoredImageNames,
     signal: deps.signal,
     uploadImage,
@@ -310,5 +353,14 @@ export const restoreArchiveAssets = async (
     deps.onProgress?.({ completed, total });
   }
 
-  return { coverImageName, danglingAssetNames: danglingAssetNames.sort(), mappings, uploadedCount };
+  return {
+    coverImageName,
+    danglingAssetNames: danglingAssetNames.sort(),
+    mappings,
+    uploadedAssets: {
+      imageNames: [...newlyUploadedImageNames].sort(),
+      videoNames: [...newlyUploadedVideoNames].sort(),
+    },
+    uploadedCount,
+  };
 };

@@ -9,12 +9,58 @@ import {
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
 
-import { createProject as apiCreateProject, getProject as apiGetProject, type ProjectRecordDTO } from './api';
+import {
+  createProject as apiCreateProject,
+  getProject as apiGetProject,
+  isProjectNotFoundError,
+  type ProjectRecordDTO,
+} from './api';
 import { recordProjectCover } from './covers';
 import { createProjectId } from './ids';
 import { INVK_EXTENSION, InvkFormatError } from './invk/format';
 import { upsertProjectSummary } from './library';
 import { remapAssetRefs } from './projectAssets';
+
+export const PROJECT_FILE_KIND = 'invokeai-project';
+export const PROJECT_FILE_VERSION = 1;
+export const LEGACY_PROJECT_FILE_EXTENSION = '.invokeproject.json';
+
+export interface ProjectFile {
+  document: Record<string, unknown>;
+  exportedAt: string;
+  kind: typeof PROJECT_FILE_KIND;
+  version: typeof PROJECT_FILE_VERSION;
+}
+
+/** Kept for callers that still construct the JSON envelope shipped before `.invk`. */
+export const buildProjectFile = (projectDocument: Record<string, unknown>): ProjectFile => ({
+  document: projectDocument,
+  exportedAt: new Date().toISOString(),
+  kind: PROJECT_FILE_KIND,
+  version: PROJECT_FILE_VERSION,
+});
+
+/** Returns the embedded legacy document, or null when the text is not one of our exports. */
+export const parseProjectFile = (text: string): Record<string, unknown> | null => {
+  try {
+    const parsed = JSON.parse(text) as Partial<ProjectFile> | null;
+
+    if (
+      !parsed ||
+      parsed.kind !== PROJECT_FILE_KIND ||
+      parsed.version !== PROJECT_FILE_VERSION ||
+      !parsed.document ||
+      typeof parsed.document !== 'object' ||
+      Array.isArray(parsed.document)
+    ) {
+      return null;
+    }
+
+    return parsed.document as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+};
 
 /**
  * Export and import a project as an `.invk` archive.
@@ -89,9 +135,36 @@ export interface ProjectImportOutcome {
 }
 
 const readProjectDocument = async (file: File) => {
+  if (file.name.toLowerCase().endsWith(LEGACY_PROJECT_FILE_EXTENSION)) {
+    const { INVK_MAX_ARCHIVE_BYTES } = await import('./invk/archive');
+
+    if (file.size > INVK_MAX_ARCHIVE_BYTES) {
+      throw new InvkFormatError('too-large', `Project file is ${file.size} bytes.`);
+    }
+
+    const projectDocument = parseProjectFile(await file.text());
+
+    if (projectDocument === null) {
+      throw new InvkFormatError('not-a-project', 'This JSON file is not an Invoke project export.');
+    }
+
+    return { format: 'legacy-json' as const, projectDocument };
+  }
+
   const { readInvkArchive } = await import('./invk/importProject');
 
-  return readInvkArchive(file);
+  return { contents: await readInvkArchive(file), format: 'invk' as const };
+};
+
+/** A rejected create is safe to clean up only when its client-chosen id is confirmed absent. */
+const isProjectConfirmedAbsent = async (projectId: string, owner: AccountScope): Promise<boolean> => {
+  try {
+    await apiGetProject(projectId, owner.signal);
+
+    return false;
+  } catch (error) {
+    return isAccountScopeCurrent(owner) && isProjectNotFoundError(error);
+  }
 };
 
 const exportProjectDocument = async (
@@ -159,16 +232,17 @@ export const importProjectFile = async (
   options: ProjectFileOptions = {}
 ): Promise<ProjectImportOutcome> => {
   const owner = options.owner ?? captureAccountScope();
-  const contents = await readProjectDocument(file);
+  const source = await readProjectDocument(file);
+  const projectDocument = source.format === 'invk' ? source.contents.projectDocument : source.projectDocument;
 
   assertAccountScopeCurrent(owner);
 
   const id = createProjectId();
   const name =
-    typeof contents.projectDocument.name === 'string' && contents.projectDocument.name.trim()
-      ? contents.projectDocument.name.trim()
+    typeof projectDocument.name === 'string' && projectDocument.name.trim()
+      ? projectDocument.name.trim()
       : 'Imported project';
-  const candidate = { ...contents.projectDocument, id, name };
+  const candidate = { ...projectDocument, id, name };
   // Full validation rehydrates the document through the Workbench reducer, so
   // it is loaded here rather than imported: the Launchpad should not carry the
   // editor's aggregate state just to offer an Import button.
@@ -184,30 +258,62 @@ export const importProjectFile = async (
 
   const { serializeProjectDocument } = await import('./projectDocument');
   const canonicalDocument = serializeProjectDocument(project);
-  const { restoreArchiveAssets } = await import('./invk/importProject');
-  const restored = await restoreArchiveAssets({ ...contents, projectDocument: canonicalDocument }, {
-    signal: owner.signal,
-    ...(options.onProgress === undefined
-      ? {}
-      : {
-          onProgress: ({ completed, total }) => options.onProgress?.({ completed, phase: 'restoring', total }),
-        }),
-  });
+  const restored =
+    source.format === 'invk'
+      ? await (async () => {
+          const { restoreArchiveAssets } = await import('./invk/importProject');
 
-  assertAccountScopeCurrent(owner);
+          return restoreArchiveAssets(
+            { ...source.contents, projectDocument: canonicalDocument },
+            {
+              signal: owner.signal,
+              ...(options.onProgress === undefined
+                ? {}
+                : {
+                    onProgress: ({ completed, total }) =>
+                      options.onProgress?.({ completed, phase: 'restoring', total }),
+                  }),
+            }
+          );
+        })()
+      : null;
+  let didCreateProject = false;
 
-  const document = remapAssetRefs(canonicalDocument, restored.mappings);
+  try {
+    assertAccountScopeCurrent(owner);
 
-  const record = await apiCreateProject({ data: document, name, project_id: id }, owner.signal);
+    const document = restored === null ? canonicalDocument : remapAssetRefs(canonicalDocument, restored.mappings);
+    const record = await apiCreateProject({ data: document, name, project_id: id }, owner.signal);
 
-  assertAccountScopeCurrent(owner);
-  upsertProjectSummary({ id: record.project_id, name: record.name, revision: record.revision }, owner);
+    didCreateProject = true;
+    assertAccountScopeCurrent(owner);
+    upsertProjectSummary({ id: record.project_id, name: record.name, revision: record.revision }, owner);
 
-  if (restored.coverImageName !== null) {
-    recordProjectCover(record.project_id, restored.coverImageName, owner);
+    if (restored?.coverImageName) {
+      recordProjectCover(record.project_id, restored.coverImageName, owner);
+    }
+
+    return { danglingAssetNames: restored?.danglingAssetNames ?? [], record };
+  } catch (error) {
+    const canRollback =
+      !didCreateProject &&
+      restored !== null &&
+      isAccountScopeCurrent(owner) &&
+      (await isProjectConfirmedAbsent(id, owner));
+
+    if (canRollback) {
+      try {
+        const { rollbackArchiveAssets } = await import('./invk/importProject');
+
+        await rollbackArchiveAssets(restored.uploadedAssets, { signal: owner.signal });
+      } catch {
+        // Cleanup is best-effort. The create/scope failure is the actionable
+        // result and must never be replaced by a failed delete request.
+      }
+    }
+
+    throw error;
   }
-
-  return { danglingAssetNames: restored.danglingAssetNames, record };
 };
 
 /** Open the browser's file picker for a project file; null when dismissed. */
@@ -230,7 +336,7 @@ export const pickProjectFile = (owner: AccountScope = captureAccountScope()): Pr
     const handleAbort = (): void => finish(null);
 
     input.type = 'file';
-    input.accept = INVK_EXTENSION;
+    input.accept = `${INVK_EXTENSION},${LEGACY_PROJECT_FILE_EXTENSION}`;
     input.onchange = () => finish(input.files?.[0] ?? null);
     input.oncancel = () => finish(null);
     owner.signal.addEventListener('abort', handleAbort, { once: true });

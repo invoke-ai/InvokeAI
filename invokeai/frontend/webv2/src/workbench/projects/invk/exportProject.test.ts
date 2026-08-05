@@ -1,6 +1,13 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { readArchive, readEntryText } from './archive';
+const transportMocks = vi.hoisted(() => ({ apiFetchRaw: vi.fn() }));
+
+vi.mock('@platform/transport/http', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  apiFetchRaw: transportMocks.apiFetchRaw,
+}));
+
+import { INVK_MAX_ARCHIVE_BYTES, readArchive, readEntryText } from './archive';
 import { executeInvkExport, planInvkExport } from './exportProject';
 import { INVK_DOCUMENT_ENTRY, INVK_MANIFEST_ENTRY } from './format';
 
@@ -84,6 +91,10 @@ describe('planInvkExport', () => {
 
 describe('executeInvkExport', () => {
   const bytesFor = (imageName: string) => new Uint8Array([...imageName].map((character) => character.codePointAt(0)!));
+
+  beforeEach(() => {
+    transportMocks.apiFetchRaw.mockReset();
+  });
 
   it('writes a readable archive holding the manifest, document, images and cover', async () => {
     const download = vi.fn();
@@ -282,6 +293,65 @@ describe('executeInvkExport', () => {
 
     expect(result.missingAssetNames).toEqual(['live-a.png']);
     expect(download).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a cumulative response refusal and cancels an active sibling fetch', async () => {
+    let settleFirstRead: (result: ReadableStreamReadResult<Uint8Array>) => void = () => undefined;
+    const firstRead = new Promise<ReadableStreamReadResult<Uint8Array>>((resolve) => {
+      settleFirstRead = resolve;
+    });
+    const firstReader = {
+      cancel: vi.fn(() => {
+        settleFirstRead({ done: true, value: undefined });
+
+        return Promise.resolve();
+      }),
+      read: vi.fn(() => firstRead),
+      releaseLock: vi.fn(),
+    };
+    const secondReader = {
+      cancel: vi.fn(() => Promise.resolve()),
+      read: vi
+        .fn()
+        .mockResolvedValueOnce({ done: false, value: new Uint8Array([1]) })
+        .mockResolvedValueOnce({ done: true, value: undefined }),
+      releaseLock: vi.fn(),
+    };
+    const secondBodyCancel = vi.fn(() => Promise.resolve());
+    const secondGetReader = vi.fn(() => {
+      // With one budget per request, let the first response finish so the
+      // broken export resolves instead of hanging in this regression test.
+      settleFirstRead({ done: true, value: undefined });
+
+      return secondReader;
+    });
+    const responses = [
+      {
+        body: { cancel: vi.fn(() => Promise.resolve()), getReader: vi.fn(() => firstReader) },
+        headers: new Headers({ 'content-length': String(INVK_MAX_ARCHIVE_BYTES) }),
+        ok: true,
+      },
+      {
+        body: { cancel: secondBodyCancel, getReader: secondGetReader },
+        headers: new Headers({ 'content-length': '1' }),
+        ok: true,
+      },
+    ] as unknown as Response[];
+
+    transportMocks.apiFetchRaw.mockImplementation(() => responses.shift());
+    const download = vi.fn();
+
+    await expect(
+      executeInvkExport(planInvkExport(planInput), {
+        download,
+        fetchImageThumbnail: () => Promise.resolve(null),
+      })
+    ).rejects.toMatchObject({ reason: 'too-large' });
+
+    expect(download).not.toHaveBeenCalled();
+    expect(secondGetReader).not.toHaveBeenCalled();
+    expect(secondBodyCancel).toHaveBeenCalledTimes(1);
+    expect(firstReader.cancel).toHaveBeenCalledTimes(1);
   });
 
   it('reports progress through bundling and packing', async () => {

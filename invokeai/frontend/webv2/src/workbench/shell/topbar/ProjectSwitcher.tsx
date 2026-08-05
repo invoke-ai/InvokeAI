@@ -105,6 +105,8 @@ export const ProjectSwitcher = () => {
   );
   const showActiveProjectDetails = useCallback(() => openWorkbenchWidget('project'), [openWorkbenchWidget]);
   const exportActiveProject = useCallback(() => {
+    flushGenerateDrafts();
+
     const project = getProject(activeProjectId);
 
     if (!project) {

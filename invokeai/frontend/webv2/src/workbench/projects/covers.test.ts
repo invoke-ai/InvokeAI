@@ -29,9 +29,9 @@ vi.mock('./api', () => api);
 let covers: typeof coversModule;
 let lifecycle: typeof accountLifecycleModule;
 
-const createDeferred = () => {
-  let resolve!: () => void;
-  const promise = new Promise<void>((resolvePromise) => {
+const createDeferred = <T = void>() => {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
     resolve = resolvePromise;
   });
 
@@ -41,8 +41,14 @@ const createDeferred = () => {
 beforeEach(async () => {
   vi.resetModules();
   api.__clientState.clear();
-  api.getClientStateValue.mockClear();
-  api.setClientStateValue.mockClear();
+  api.getClientStateValue.mockReset();
+  api.getClientStateValue.mockImplementation((key: string) => Promise.resolve(api.__clientState.get(key) ?? null));
+  api.setClientStateValue.mockReset();
+  api.setClientStateValue.mockImplementation((key: string, value: string) => {
+    api.__clientState.set(key, value);
+
+    return Promise.resolve();
+  });
 
   lifecycle = await import('@platform/state/accountLifecycle');
   covers = await import('./covers');
@@ -81,6 +87,25 @@ describe('loadProjectCovers', () => {
 
     await expect(covers.loadProjectCovers()).resolves.toBeUndefined();
     expect(covers.getProjectCoverImageName('p1')).toBeUndefined();
+  });
+
+  it('does not let a later load overwrite a cover mutation after the account index loaded', async () => {
+    const staleRead = createDeferred<string | null>();
+
+    api.getClientStateValue.mockResolvedValueOnce('{"p1":"old.png"}').mockImplementationOnce(() => staleRead.promise);
+
+    await covers.loadProjectCovers();
+
+    const laterLoad = covers.loadProjectCovers();
+    covers.recordProjectCover('p1', 'new.png');
+    staleRead.resolve('{"p1":"old.png"}');
+    await laterLoad;
+
+    await vi.waitFor(() => {
+      expect(covers.getProjectCoverImageName('p1')).toBe('new.png');
+      expect(api.__clientState.get('webv2:project-covers')).toBe('{"p1":"new.png"}');
+    });
+    expect(api.getClientStateValue).toHaveBeenCalledTimes(1);
   });
 });
 

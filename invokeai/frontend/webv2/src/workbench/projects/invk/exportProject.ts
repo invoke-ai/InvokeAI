@@ -5,14 +5,14 @@ import type { InvkArchiveEntry } from './archive';
 import type { FetchedThumbnail } from './assetTransport';
 
 import { binaryEntry, textEntry, writeArchive } from './archive';
+import { coverExtensionForMime, createAssetExportTransport, isRequestCancellation } from './assetTransport';
 import {
-  coverExtensionForMime,
-  fetchImageBytes,
-  fetchImageThumbnail,
-  fetchVideoBytes,
-  isRequestCancellation,
-} from './assetTransport';
-import { INVK_DOCUMENT_ENTRY, INVK_IMAGES_PREFIX, INVK_MANIFEST_ENTRY, INVK_VIDEOS_PREFIX } from './format';
+  INVK_DOCUMENT_ENTRY,
+  INVK_IMAGES_PREFIX,
+  INVK_MANIFEST_ENTRY,
+  INVK_VIDEOS_PREFIX,
+  InvkFormatError,
+} from './format';
 import { buildInvkManifest, toInvkFileName } from './manifest';
 
 /**
@@ -113,9 +113,10 @@ export interface InvkExportResult {
 }
 
 export const executeInvkExport = async (plan: InvkExportPlan, deps: InvkExportDeps): Promise<InvkExportResult> => {
-  const readImage = deps.fetchImageBytes ?? fetchImageBytes;
-  const readVideo = deps.fetchVideoBytes ?? fetchVideoBytes;
-  const readThumbnail = deps.fetchImageThumbnail ?? fetchImageThumbnail;
+  const transport = createAssetExportTransport();
+  const readImage = deps.fetchImageBytes ?? transport.fetchImageBytes;
+  const readVideo = deps.fetchVideoBytes ?? transport.fetchVideoBytes;
+  const readThumbnail = deps.fetchImageThumbnail ?? transport.fetchImageThumbnail;
   const entries = new Map<string, InvkArchiveEntry>();
   const missingAssetNames: string[] = [];
   let bundledImageCount = 0;
@@ -127,7 +128,7 @@ export const executeInvkExport = async (plan: InvkExportPlan, deps: InvkExportDe
     try {
       return await read();
     } catch (error) {
-      if (isRequestCancellation(error)) {
+      if (isRequestCancellation(error) || (error instanceof InvkFormatError && error.reason === 'too-large')) {
         throw error;
       }
 

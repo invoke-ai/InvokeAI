@@ -1,6 +1,7 @@
 import { createDraftProject } from '@workbench/workbenchState';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type * as coversModule from './covers';
 import type * as projectFileModule from './projectFile';
 import type * as persistenceModule from './syncedPersistence';
 
@@ -16,6 +17,8 @@ const api = vi.hoisted(() => ({
   deleteClientStateValue: vi.fn(() => Promise.resolve()),
   getClientStateValue: vi.fn(() => Promise.resolve(null)),
   getProject: vi.fn(),
+  isProjectNotFoundError: (error: unknown) =>
+    typeof error === 'object' && error !== null && 'status' in error && error.status === 404,
   setClientStateValue: vi.fn(() => Promise.resolve()),
 }));
 
@@ -25,6 +28,13 @@ const covers = vi.hoisted(() => ({ recordProjectCover: vi.fn() }));
 
 const transport = vi.hoisted(() => ({
   coverExtensionForMime: () => 'webp',
+  createAssetExportTransport: () => ({
+    fetchImageBytes: transport.fetchImageBytes,
+    fetchImageThumbnail: transport.fetchImageThumbnail,
+    fetchVideoBytes: transport.fetchVideoBytes,
+  }),
+  deleteArchiveImages: vi.fn(() => Promise.resolve()),
+  deleteArchiveVideos: vi.fn(() => Promise.resolve()),
   // `Uint8Array | null` up front: a fetcher that returns `null` is how the
   // "server would not serve it" path is exercised, and inferring the narrower
   // type here would make that untypeable at the call site.
@@ -48,7 +58,7 @@ const transport = vi.hoisted(() => ({
 
 vi.mock('./api', () => api);
 vi.mock('./covers', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./covers')>()),
+  ...(await importOriginal<typeof coversModule>()),
   recordProjectCover: covers.recordProjectCover,
 }));
 vi.mock('@platform/browser/downloadBlob', () => downloads);
@@ -77,6 +87,22 @@ const rasterImageLayer = (id: string, imageName: string) => ({
   transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
   type: 'raster' as const,
 });
+
+const projectWithRestorableAssets = (includeVideo = true) => {
+  const project = createDraftProject([]);
+
+  return {
+    ...project,
+    canvas: {
+      ...project.canvas,
+      document: {
+        ...project.canvas.document,
+        layers: [rasterImageLayer('restored-image', 'archive-image.png')],
+      },
+    },
+    ...(includeVideo ? { futureVideoInput: { video_name: 'archive-video.mp4' } } : {}),
+  };
+};
 
 const capturedArchive = (): File => {
   const [blob, fileName] = downloads.downloadBlob.mock.calls.at(-1)! as [Blob, string];
@@ -107,9 +133,17 @@ beforeEach(async () => {
   transport.findExistingImageNames.mockImplementation((_names: readonly string[]) =>
     Promise.resolve(new Set<string>())
   );
+  transport.findExistingVideoNames.mockImplementation((_names: readonly string[]) =>
+    Promise.resolve(new Set<string>())
+  );
   transport.uploadArchiveImage.mockImplementation((_bytes: Uint8Array, fileName: string) =>
     Promise.resolve({ height: 1, imageName: `server-${fileName}`, width: 1 })
   );
+  transport.uploadArchiveVideo.mockImplementation((_bytes: Uint8Array, fileName: string) =>
+    Promise.resolve({ videoName: `server-${fileName}` })
+  );
+  transport.deleteArchiveImages.mockImplementation(() => Promise.resolve());
+  transport.deleteArchiveVideos.mockImplementation(() => Promise.resolve());
   api.getClientStateValue.mockImplementation(() => Promise.resolve(null));
 
   projectFile = await import('./projectFile');
@@ -387,6 +421,169 @@ describe('importProjectFile', () => {
     expect(invocation.sourceId).toBe('workflow');
     expect(createRequest.data.futureDocumentKey).toEqual({ survives: true });
     expect(canvas.document.layers[0]?.source.image.imageName).toBe('server-legacy.png');
+  });
+
+  it('imports the shipped legacy JSON envelope under a fresh canonical identity without restoring assets', async () => {
+    const legacyDocument = {
+      ...persistence.serializeProjectDocument(projectWithRestorableAssets(false)),
+      futureDocumentKey: { survives: true },
+      id: 'legacy-project-id',
+      invocation: { sourceId: 'project-graph' },
+      name: ' Legacy JSON project ',
+    };
+    const file = new File(
+      [
+        JSON.stringify({
+          document: legacyDocument,
+          exportedAt: '2026-01-01T00:00:00.000Z',
+          kind: 'invokeai-project',
+          version: 1,
+        }),
+      ],
+      'Legacy JSON project.invokeproject.json',
+      { type: 'application/json' }
+    );
+
+    acceptCreate();
+
+    const { record } = await projectFile.importProjectFile(file);
+    const request = api.createProject.mock.calls[0]![0] as {
+      data: Record<string, unknown>;
+      name: string;
+      project_id: string;
+    };
+
+    expect(record.name).toBe('Legacy JSON project');
+    expect(request.project_id).not.toBe('legacy-project-id');
+    expect(request.data.id).toBe(request.project_id);
+    expect(request.data.invocation).toMatchObject({ sourceId: 'workflow' });
+    expect(request.data.futureDocumentKey).toEqual({ survives: true });
+    expect(transport.findExistingImageNames).not.toHaveBeenCalled();
+    expect(transport.findExistingVideoNames).not.toHaveBeenCalled();
+    expect(transport.uploadArchiveImage).not.toHaveBeenCalled();
+    expect(transport.uploadArchiveVideo).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['malformed JSON', '{'],
+    ['another product kind', JSON.stringify({ document: {}, kind: 'other', version: 1 })],
+    [
+      'an unsupported version',
+      JSON.stringify({
+        document: {},
+        kind: 'invokeai-project',
+        version: 2,
+      }),
+    ],
+    ['a missing document', JSON.stringify({ kind: 'invokeai-project', version: 1 })],
+  ])('refuses a legacy JSON envelope with %s before any mutation', async (_case, contents) => {
+    const file = new File([contents], 'invalid.invokeproject.json', { type: 'application/json' });
+
+    await expect(projectFile.importProjectFile(file)).rejects.toMatchObject({ reason: 'not-a-project' });
+    expect(api.createProject).not.toHaveBeenCalled();
+    expect(transport.findExistingImageNames).not.toHaveBeenCalled();
+    expect(transport.findExistingVideoNames).not.toHaveBeenCalled();
+    expect(transport.uploadArchiveImage).not.toHaveBeenCalled();
+    expect(transport.uploadArchiveVideo).not.toHaveBeenCalled();
+  });
+
+  it('refuses an oversized legacy JSON file before materializing its text', async () => {
+    const { INVK_MAX_ARCHIVE_BYTES } = await import('./invk/archive');
+    const text = vi.fn(() => Promise.reject(new Error('legacy text was materialized')));
+    const file = {
+      name: 'oversized.invokeproject.json',
+      size: INVK_MAX_ARCHIVE_BYTES + 1,
+      text,
+    } as unknown as File;
+
+    await expect(projectFile.importProjectFile(file)).rejects.toMatchObject({ reason: 'too-large' });
+    expect(text).not.toHaveBeenCalled();
+  });
+
+  it('rolls back every authoritative uploaded identity when project creation fails without hiding that failure', async () => {
+    const account = await import('@platform/state/accountLifecycle');
+    const { ApiError } = await import('@platform/transport/http');
+    const primaryFailure = new Error('project create rejected');
+
+    account.accountLifecycle.activate('rollback-user');
+    await projectFile.exportOpenProject(projectWithRestorableAssets());
+    api.createProject.mockRejectedValue(primaryFailure);
+    api.getProject.mockRejectedValueOnce(new ApiError('not found', 404));
+    transport.deleteArchiveImages.mockRejectedValueOnce(new Error('image cleanup failed'));
+    transport.deleteArchiveVideos.mockRejectedValueOnce(new Error('video cleanup failed'));
+
+    await expect(projectFile.importProjectFile(capturedArchive())).rejects.toBe(primaryFailure);
+
+    expect(transport.deleteArchiveImages).toHaveBeenCalledWith(['server-archive-image.png'], expect.anything());
+    expect(transport.deleteArchiveVideos).toHaveBeenCalledWith(['server-archive-video.mp4'], expect.anything());
+    account.accountLifecycle.invalidate();
+  });
+
+  it('does not roll back when a rejected create may already have committed the project', async () => {
+    const account = await import('@platform/state/accountLifecycle');
+    const primaryFailure = new Error('connection ended after create');
+
+    account.accountLifecycle.activate('ambiguous-response-user');
+    await projectFile.exportOpenProject(projectWithRestorableAssets(false));
+    api.createProject.mockRejectedValue(primaryFailure);
+    api.getProject.mockResolvedValue({
+      created_at: '2026-06-10 10:00:00.000',
+      data: {},
+      name: 'Committed project',
+      project_id: 'committed-project',
+      revision: 1,
+      updated_at: '2026-06-10 10:00:00.000',
+    });
+
+    await expect(projectFile.importProjectFile(capturedArchive())).rejects.toBe(primaryFailure);
+
+    expect(transport.deleteArchiveImages).not.toHaveBeenCalled();
+    expect(transport.deleteArchiveVideos).not.toHaveBeenCalled();
+    account.accountLifecycle.invalidate();
+  });
+
+  it('does not issue destructive rollback requests under a different account', async () => {
+    const account = await import('@platform/state/accountLifecycle');
+
+    account.accountLifecycle.activate('rollback-user-a');
+    await projectFile.exportOpenProject(projectWithRestorableAssets(false));
+    transport.uploadArchiveImage.mockImplementationOnce((_bytes: Uint8Array, fileName: string) => {
+      account.accountLifecycle.activate('rollback-user-b');
+
+      return Promise.resolve({ height: 1, imageName: `server-${fileName}`, width: 1 });
+    });
+
+    await expect(projectFile.importProjectFile(capturedArchive())).rejects.toThrow('no longer active');
+
+    expect(api.createProject).not.toHaveBeenCalled();
+    expect(transport.deleteArchiveImages).not.toHaveBeenCalled();
+    expect(transport.deleteArchiveVideos).not.toHaveBeenCalled();
+    account.accountLifecycle.invalidate();
+  });
+
+  it('does not roll back assets after an ambiguous create that returned before the account changed', async () => {
+    const account = await import('@platform/state/accountLifecycle');
+
+    account.accountLifecycle.activate('ambiguous-create-user-a');
+    await projectFile.exportOpenProject(projectWithRestorableAssets(false));
+    api.createProject.mockImplementation((request: { name: string; project_id?: string }) => {
+      account.accountLifecycle.activate('ambiguous-create-user-b');
+
+      return Promise.resolve({
+        created_at: '2026-06-10 10:00:00.000',
+        data: {},
+        name: request.name,
+        project_id: request.project_id ?? '',
+        revision: 1,
+        updated_at: '2026-06-10 10:00:00.000',
+      });
+    });
+
+    await expect(projectFile.importProjectFile(capturedArchive())).rejects.toThrow('no longer active');
+
+    expect(transport.deleteArchiveImages).not.toHaveBeenCalled();
+    expect(transport.deleteArchiveVideos).not.toHaveBeenCalled();
+    account.accountLifecycle.invalidate();
   });
 
   it('does not upload an account A file after local parsing completes under account B', async () => {

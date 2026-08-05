@@ -1,5 +1,14 @@
 import { mapWithConcurrency } from '@platform/core/concurrency';
-import { apiFetch, apiFetchJson, apiFetchRaw, assertOk, HttpRequestIdentityExpiredError } from '@platform/transport/http';
+import {
+  apiFetch,
+  apiFetchJson,
+  apiFetchRaw,
+  assertOk,
+  HttpRequestIdentityExpiredError,
+} from '@platform/transport/http';
+
+import { INVK_MAX_ARCHIVE_BYTES } from './archive';
+import { InvkFormatError } from './format';
 
 /**
  * The asset half of a project file: pulling referenced bytes off the server on
@@ -77,6 +86,201 @@ interface VideoDTOSubset {
   video_name: string;
 }
 
+export type AssetResponseReader = (response: Response, signal?: AbortSignal) => Promise<Uint8Array>;
+
+const createAssetResponseByteWriter = () => {
+  const chunks: Uint8Array[] = [];
+  let byteLength = 0;
+
+  return {
+    finish: () => {
+      if (chunks.length === 0) {
+        return new Uint8Array();
+      }
+
+      if (chunks.length === 1) {
+        return chunks[0]!;
+      }
+
+      const bytes = new Uint8Array(byteLength);
+      let offset = 0;
+
+      for (const chunk of chunks) {
+        bytes.set(chunk, offset);
+        offset += chunk.byteLength;
+      }
+
+      return bytes;
+    },
+    write: (chunk: Uint8Array) => {
+      chunks.push(chunk);
+      byteLength += chunk.byteLength;
+    },
+  };
+};
+
+const getDeclaredContentLength = (response: Response): number | null => {
+  const value = response.headers.get('content-length')?.trim();
+
+  if (value === undefined || !/^\d+$/.test(value)) {
+    return null;
+  }
+
+  const byteLength = Number(value);
+
+  return Number.isSafeInteger(byteLength) ? byteLength : Number.POSITIVE_INFINITY;
+};
+
+/**
+ * A single export-scoped reader. Every response is streamed through the same
+ * fixed byte budget, so both one hostile response and many individually-small
+ * responses stop before they can materialize an oversized project in memory.
+ */
+export const createAssetResponseReader = (): AssetResponseReader => {
+  type AssetStreamReader = ReadableStreamDefaultReader<Uint8Array>;
+
+  const activeReaders = new Set<AssetStreamReader>();
+  const cancellationRequests = new WeakMap<AssetStreamReader, Promise<void>>();
+  let fatalRefusal: InvkFormatError | null = null;
+  let usedBytes = 0;
+  let reservedBytes = 0;
+
+  const cancelReader = (reader: AssetStreamReader, reason: unknown): Promise<void> => {
+    const existing = cancellationRequests.get(reader);
+
+    if (existing !== undefined) {
+      return existing;
+    }
+
+    const request = reader.cancel(reason).catch(() => undefined);
+
+    cancellationRequests.set(reader, request);
+
+    return request;
+  };
+
+  const refuseTooLarge = (message: string): InvkFormatError => {
+    if (fatalRefusal === null) {
+      fatalRefusal = new InvkFormatError('too-large', message);
+
+      for (const reader of activeReaders) {
+        void cancelReader(reader, fatalRefusal);
+      }
+    }
+
+    return fatalRefusal;
+  };
+
+  return async (response, signal) => {
+    const body = response.body;
+    const declaredByteLength = getDeclaredContentLength(response);
+
+    const refuseBeforeReading = async (error: unknown): Promise<never> => {
+      try {
+        await body?.cancel(error);
+      } catch {
+        // The refusal is authoritative even if the transport cannot be cancelled.
+      }
+
+      throw error;
+    };
+
+    if (fatalRefusal !== null) {
+      return refuseBeforeReading(fatalRefusal);
+    }
+
+    if (signal?.aborted) {
+      return refuseBeforeReading(signal.reason);
+    }
+
+    if (declaredByteLength !== null && declaredByteLength > INVK_MAX_ARCHIVE_BYTES) {
+      return refuseBeforeReading(refuseTooLarge(`Asset response is larger than ${INVK_MAX_ARCHIVE_BYTES} bytes.`));
+    }
+
+    if (declaredByteLength !== null && usedBytes + reservedBytes + declaredByteLength > INVK_MAX_ARCHIVE_BYTES) {
+      return refuseBeforeReading(refuseTooLarge(`Project assets exceed ${INVK_MAX_ARCHIVE_BYTES} bytes.`));
+    }
+
+    const writer = createAssetResponseByteWriter();
+    let remainingReservation = declaredByteLength ?? 0;
+    let responseBytes = 0;
+
+    reservedBytes += remainingReservation;
+
+    if (body === null) {
+      reservedBytes -= remainingReservation;
+
+      return writer.finish();
+    }
+
+    const reader = body.getReader();
+
+    activeReaders.add(reader);
+
+    let finished = false;
+    const cancelOnAbort = () => {
+      void cancelReader(reader, signal?.reason);
+    };
+
+    signal?.addEventListener('abort', cancelOnAbort, { once: true });
+
+    try {
+      signal?.throwIfAborted();
+
+      while (true) {
+        const result = await reader.read();
+
+        if (fatalRefusal !== null) {
+          throw fatalRefusal;
+        }
+
+        signal?.throwIfAborted();
+
+        if (result.done) {
+          finished = true;
+          reservedBytes -= remainingReservation;
+          remainingReservation = 0;
+
+          return writer.finish();
+        }
+
+        const chunkBytes = result.value.byteLength;
+        const reservationConsumed = Math.min(remainingReservation, chunkBytes);
+        const bytesPastDeclaration = chunkBytes - reservationConsumed;
+
+        if (responseBytes + chunkBytes > INVK_MAX_ARCHIVE_BYTES) {
+          throw refuseTooLarge(`Asset response exceeds ${INVK_MAX_ARCHIVE_BYTES} bytes.`);
+        }
+
+        if (usedBytes + reservedBytes + bytesPastDeclaration > INVK_MAX_ARCHIVE_BYTES) {
+          throw refuseTooLarge(`Project assets exceed ${INVK_MAX_ARCHIVE_BYTES} bytes.`);
+        }
+
+        responseBytes += chunkBytes;
+        usedBytes += chunkBytes;
+        reservedBytes -= reservationConsumed;
+        remainingReservation -= reservationConsumed;
+        writer.write(result.value);
+      }
+    } catch (error) {
+      usedBytes -= responseBytes;
+      reservedBytes -= remainingReservation;
+      responseBytes = 0;
+      remainingReservation = 0;
+
+      if (!finished) {
+        await cancelReader(reader, error);
+      }
+
+      throw fatalRefusal ?? error;
+    } finally {
+      activeReaders.delete(reader);
+      signal?.removeEventListener('abort', cancelOnAbort);
+      reader.releaseLock();
+    }
+  };
+};
+
 /**
  * Which of `imageNames` the server already has. The endpoint silently omits
  * names it cannot serve, which is exactly the answer wanted here: anything
@@ -139,26 +343,40 @@ export const findExistingVideoNames = async (
  * skipped, and a project that exports every layer but one is far more use than
  * one that refuses to export at all.
  */
-export const fetchImageBytes = async (imageName: string, signal?: AbortSignal): Promise<Uint8Array | null> => {
+const fetchImageBytesWithReader = async (
+  imageName: string,
+  signal: AbortSignal | undefined,
+  readResponse: AssetResponseReader
+): Promise<Uint8Array | null> => {
   const response = await apiFetchRaw(`${IMAGES_BASE}/i/${encodeURIComponent(imageName)}/full`, { signal });
 
   if (!response.ok) {
     return null;
   }
 
-  return new Uint8Array(await response.arrayBuffer());
+  return readResponse(response, signal);
 };
 
+export const fetchImageBytes = (imageName: string, signal?: AbortSignal): Promise<Uint8Array | null> =>
+  fetchImageBytesWithReader(imageName, signal, createAssetResponseReader());
+
 /** The same, for a video. */
-export const fetchVideoBytes = async (videoName: string, signal?: AbortSignal): Promise<Uint8Array | null> => {
+const fetchVideoBytesWithReader = async (
+  videoName: string,
+  signal: AbortSignal | undefined,
+  readResponse: AssetResponseReader
+): Promise<Uint8Array | null> => {
   const response = await apiFetchRaw(`${VIDEOS_BASE}/i/${encodeURIComponent(videoName)}/full`, { signal });
 
   if (!response.ok) {
     return null;
   }
 
-  return new Uint8Array(await response.arrayBuffer());
+  return readResponse(response, signal);
 };
+
+export const fetchVideoBytes = (videoName: string, signal?: AbortSignal): Promise<Uint8Array | null> =>
+  fetchVideoBytesWithReader(videoName, signal, createAssetResponseReader());
 
 export interface FetchedThumbnail {
   bytes: Uint8Array;
@@ -167,9 +385,10 @@ export interface FetchedThumbnail {
 }
 
 /** Thumbnail bytes for the cover entry. `null` when the server will not serve it. */
-export const fetchImageThumbnail = async (
+const fetchImageThumbnailWithReader = async (
   imageName: string,
-  signal?: AbortSignal
+  signal: AbortSignal | undefined,
+  readResponse: AssetResponseReader
 ): Promise<FetchedThumbnail | null> => {
   const response = await apiFetchRaw(`${IMAGES_BASE}/i/${encodeURIComponent(imageName)}/thumbnail`, { signal });
 
@@ -178,8 +397,25 @@ export const fetchImageThumbnail = async (
   }
 
   return {
-    bytes: new Uint8Array(await response.arrayBuffer()),
+    bytes: await readResponse(response, signal),
     contentType: response.headers.get('content-type') ?? 'image/webp',
+  };
+};
+
+export const fetchImageThumbnail = (imageName: string, signal?: AbortSignal): Promise<FetchedThumbnail | null> =>
+  fetchImageThumbnailWithReader(imageName, signal, createAssetResponseReader());
+
+/** Production export transport with one cumulative response budget. */
+export const createAssetExportTransport = () => {
+  const readResponse = createAssetResponseReader();
+
+  return {
+    fetchImageBytes: (imageName: string, signal?: AbortSignal) =>
+      fetchImageBytesWithReader(imageName, signal, readResponse),
+    fetchImageThumbnail: (imageName: string, signal?: AbortSignal) =>
+      fetchImageThumbnailWithReader(imageName, signal, readResponse),
+    fetchVideoBytes: (videoName: string, signal?: AbortSignal) =>
+      fetchVideoBytesWithReader(videoName, signal, readResponse),
   };
 };
 
@@ -230,6 +466,32 @@ export const uploadArchiveVideo = async (
   const dto = (await response.json()) as VideoDTOSubset;
 
   return { videoName: dto.video_name };
+};
+
+/** Delete image identities created by a restore whose project could not be created. */
+export const deleteArchiveImages = async (imageNames: string[], signal?: AbortSignal): Promise<void> => {
+  if (imageNames.length === 0) {
+    return;
+  }
+
+  await apiFetchJson<unknown>(`${IMAGES_BASE}/delete`, {
+    body: JSON.stringify({ image_names: imageNames }),
+    method: 'POST',
+    signal,
+  });
+};
+
+/** Delete video identities created by a restore whose project could not be created. */
+export const deleteArchiveVideos = async (videoNames: string[], signal?: AbortSignal): Promise<void> => {
+  if (videoNames.length === 0) {
+    return;
+  }
+
+  await apiFetchJson<unknown>(`${VIDEOS_BASE}/delete`, {
+    body: JSON.stringify({ video_names: videoNames }),
+    method: 'POST',
+    signal,
+  });
 };
 
 const EXTENSION_BY_MIME: Readonly<Record<string, string>> = {

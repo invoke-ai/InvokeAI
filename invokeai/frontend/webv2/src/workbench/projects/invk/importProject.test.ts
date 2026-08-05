@@ -155,6 +155,28 @@ describe('restoreArchiveAssets', () => {
     expect(result.uploadedCount).toBe(1);
   });
 
+  it('returns the authoritative server identities for every newly uploaded asset', async () => {
+    const withVideo = await contents();
+
+    withVideo.projectDocument = {
+      ...withVideo.projectDocument,
+      futureVideoInput: { video_name: 'clip.mp4' },
+    };
+    withVideo.videos.set('clip.mp4', new Uint8Array([7]));
+
+    const result = await restoreArchiveAssets(withVideo, {
+      findExistingImageNames: () => Promise.resolve(new Set()),
+      findExistingVideoNames: () => Promise.resolve(new Set()),
+      uploadArchiveImage: () => Promise.resolve({ height: 1, imageName: 'server-image.png', width: 1 }),
+      uploadArchiveVideo: () => Promise.resolve({ videoName: 'server-video.mp4' }),
+    });
+
+    expect(result.uploadedAssets).toEqual({
+      imageNames: ['server-image.png'],
+      videoNames: ['server-video.mp4'],
+    });
+  });
+
   it('reports a reference the archive never carried as dangling', async () => {
     const missing = await contents();
 
@@ -227,6 +249,7 @@ describe('restoreArchiveAssets', () => {
 
     expect(result.coverImageName).toBe('server-cover.png');
     expect(result.danglingAssetNames).toEqual(['a.png']);
+    expect(result.uploadedAssets.imageNames).toEqual(['server-cover.png']);
     expect(upload).toHaveBeenCalledWith(new Uint8Array([9]), 'cover.webp', {
       contentType: 'image/webp',
       signal: undefined,

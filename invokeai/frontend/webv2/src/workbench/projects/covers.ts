@@ -154,6 +154,10 @@ const loadFlight = createSingleFlight<void>();
 export const loadProjectCovers = (): Promise<void> => {
   const owner = captureAccountScope();
 
+  if (store.getSnapshot().isLoaded) {
+    return Promise.resolve();
+  }
+
   return loadFlight.run(`project-covers:${owner.epoch}`, async () => {
     let raw: string | null = null;
 
