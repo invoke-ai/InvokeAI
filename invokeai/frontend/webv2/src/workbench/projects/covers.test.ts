@@ -1,3 +1,5 @@
+import type * as accountLifecycleModule from '@platform/state/accountLifecycle';
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as coversModule from './covers';
@@ -25,6 +27,16 @@ const api = vi.hoisted(() => {
 vi.mock('./api', () => api);
 
 let covers: typeof coversModule;
+let lifecycle: typeof accountLifecycleModule;
+
+const createDeferred = () => {
+  let resolve!: () => void;
+  const promise = new Promise<void>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+
+  return { promise, resolve };
+};
 
 beforeEach(async () => {
   vi.resetModules();
@@ -32,6 +44,7 @@ beforeEach(async () => {
   api.getClientStateValue.mockClear();
   api.setClientStateValue.mockClear();
 
+  lifecycle = await import('@platform/state/accountLifecycle');
   covers = await import('./covers');
 });
 
@@ -128,6 +141,17 @@ describe('recordProjectCover before the index has loaded', () => {
 
     expect(api.setClientStateValue).not.toHaveBeenCalled();
   });
+
+  it('clears a server cover when the clear was recorded before the index loaded', async () => {
+    api.__clientState.set('webv2:project-covers', '{"p1":"a.png","other":"b.png"}');
+
+    covers.forgetProjectCover('p1');
+    await covers.loadProjectCovers();
+
+    await vi.waitFor(() => {
+      expect(JSON.parse(api.__clientState.get('webv2:project-covers')!)).toEqual({ other: 'b.png' });
+    });
+  });
 });
 
 describe('the tracked-cover cap', () => {
@@ -142,7 +166,9 @@ describe('the tracked-cover cap', () => {
     covers.recordProjectCover('p0', 'new.png');
 
     expect(covers.getProjectCoverImageName('p0')).toBe('new.png');
-    expect(JSON.parse(api.__clientState.get('webv2:project-covers')!).p0).toBe('new.png');
+    await vi.waitFor(() => {
+      expect(JSON.parse(api.__clientState.get('webv2:project-covers')!).p0).toBe('new.png');
+    });
   });
 
   it('drops the oldest entry when a new project pushes past the cap', async () => {
@@ -152,11 +178,13 @@ describe('the tracked-cover cap', () => {
     await covers.loadProjectCovers();
     covers.recordProjectCover('fresh', 'new.png');
 
-    const persisted = JSON.parse(api.__clientState.get('webv2:project-covers')!);
+    await vi.waitFor(() => {
+      const persisted = JSON.parse(api.__clientState.get('webv2:project-covers')!);
 
-    expect(Object.keys(persisted)).toHaveLength(500);
-    expect(persisted.fresh).toBe('new.png');
-    expect(persisted.p0).toBeUndefined();
+      expect(Object.keys(persisted)).toHaveLength(500);
+      expect(persisted.fresh).toBe('new.png');
+      expect(persisted.p0).toBeUndefined();
+    });
   });
 });
 
@@ -166,17 +194,23 @@ describe('recordProjectCover', () => {
     covers.recordProjectCover('p1', 'a.png');
 
     expect(covers.getProjectCoverImageName('p1')).toBe('a.png');
-    expect(JSON.parse(api.__clientState.get('webv2:project-covers')!)).toEqual({ p1: 'a.png' });
+    await vi.waitFor(() => {
+      expect(JSON.parse(api.__clientState.get('webv2:project-covers')!)).toEqual({ p1: 'a.png' });
+    });
   });
 
   /** Autosave runs constantly; a cover changes when a generation lands. */
   it('does not write when nothing changed', async () => {
     await covers.loadProjectCovers();
+    const listener = vi.fn();
+    const unsubscribe = covers.subscribeProjectCovers(listener);
     covers.recordProjectCover('p1', 'a.png');
+    await vi.waitFor(() => expect(listener).toHaveBeenCalledTimes(2));
     api.setClientStateValue.mockClear();
     covers.recordProjectCover('p1', 'a.png');
 
     expect(api.setClientStateValue).not.toHaveBeenCalled();
+    unsubscribe();
   });
 
   it('clears an entry when a project loses its cover', async () => {
@@ -185,7 +219,9 @@ describe('recordProjectCover', () => {
     covers.recordProjectCover('p1', null);
 
     expect(covers.getProjectCoverImageName('p1')).toBeUndefined();
-    expect(JSON.parse(api.__clientState.get('webv2:project-covers')!)).toEqual({});
+    await vi.waitFor(() => {
+      expect(JSON.parse(api.__clientState.get('webv2:project-covers')!)).toEqual({});
+    });
   });
 
   it('notifies subscribers so the library can re-derive', async () => {
@@ -208,6 +244,160 @@ describe('recordProjectCover', () => {
     expect(() => covers.recordProjectCover('p1', 'a.png')).not.toThrow();
     expect(covers.getProjectCoverImageName('p1')).toBe('a.png');
   });
+
+  it('serializes rapid mutations and persists the newest complete blob last', async () => {
+    const firstWrite = createDeferred();
+    const secondWrite = createDeferred();
+    const completedWrites: string[] = [];
+
+    api.setClientStateValue
+      .mockImplementationOnce(async (key: string, value: string) => {
+        await firstWrite.promise;
+        api.__clientState.set(key, value);
+        completedWrites.push(value);
+      })
+      .mockImplementationOnce(async (key: string, value: string) => {
+        await secondWrite.promise;
+        api.__clientState.set(key, value);
+        completedWrites.push(value);
+      });
+
+    await covers.loadProjectCovers();
+    const listener = vi.fn();
+    const unsubscribe = covers.subscribeProjectCovers(listener);
+    covers.recordProjectCover('p1', 'a.png');
+    covers.recordProjectCover('p1', 'b.png');
+
+    await vi.waitFor(() => expect(api.setClientStateValue).toHaveBeenCalledTimes(1));
+    expect(JSON.parse(api.setClientStateValue.mock.calls[0]![1])).toEqual({ p1: 'a.png' });
+
+    firstWrite.resolve();
+    await vi.waitFor(() => expect(api.setClientStateValue).toHaveBeenCalledTimes(2));
+    expect(JSON.parse(api.setClientStateValue.mock.calls[1]![1])).toEqual({ p1: 'b.png' });
+
+    secondWrite.resolve();
+    await vi.waitFor(() => {
+      expect(completedWrites.map((value) => JSON.parse(value))).toEqual([{ p1: 'a.png' }, { p1: 'b.png' }]);
+      expect(JSON.parse(api.__clientState.get('webv2:project-covers')!)).toEqual({ p1: 'b.png' });
+      expect(listener).toHaveBeenCalledTimes(3);
+    });
+    unsubscribe();
+  });
+
+  it('leaves the complete index dirty when a write fails', async () => {
+    await covers.loadProjectCovers();
+    const listener = vi.fn();
+    const unsubscribe = covers.subscribeProjectCovers(listener);
+    api.setClientStateValue.mockRejectedValueOnce(new Error('offline'));
+
+    covers.recordProjectCover('p1', 'a.png');
+    await vi.waitFor(() => expect(api.setClientStateValue).toHaveBeenCalledTimes(1));
+
+    covers.recordProjectCover('already-absent', null);
+
+    await vi.waitFor(() => {
+      expect(api.setClientStateValue).toHaveBeenCalledTimes(2);
+      expect(listener).toHaveBeenCalledTimes(3);
+    });
+    expect(JSON.parse(api.setClientStateValue.mock.calls[1]![1])).toEqual({ p1: 'a.png' });
+    unsubscribe();
+  });
+
+  it('retries an identical mutation when the optimistic snapshot is dirty', async () => {
+    await covers.loadProjectCovers();
+    const listener = vi.fn();
+    const unsubscribe = covers.subscribeProjectCovers(listener);
+    api.setClientStateValue.mockRejectedValueOnce(new Error('offline'));
+
+    covers.recordProjectCover('p1', 'a.png');
+    await vi.waitFor(() => expect(api.setClientStateValue).toHaveBeenCalledTimes(1));
+    covers.recordProjectCover('p1', 'a.png');
+
+    await vi.waitFor(() => {
+      expect(api.setClientStateValue).toHaveBeenCalledTimes(2);
+      expect(listener).toHaveBeenCalledTimes(3);
+    });
+    expect(JSON.parse(api.setClientStateValue.mock.calls[1]![1])).toEqual({ p1: 'a.png' });
+    unsubscribe();
+  });
+
+  it('clears dirty state when the latest retry succeeds after an earlier failure', async () => {
+    const successfulRetry = createDeferred();
+
+    await covers.loadProjectCovers();
+    const listener = vi.fn();
+    const unsubscribe = covers.subscribeProjectCovers(listener);
+    api.setClientStateValue
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockImplementationOnce(async (key: string, value: string) => {
+        await successfulRetry.promise;
+        api.__clientState.set(key, value);
+      });
+
+    covers.recordProjectCover('p1', 'a.png');
+    await vi.waitFor(() => expect(api.setClientStateValue).toHaveBeenCalledTimes(1));
+    covers.recordProjectCover('p1', 'a.png');
+    await vi.waitFor(() => expect(api.setClientStateValue).toHaveBeenCalledTimes(2));
+
+    successfulRetry.resolve();
+    await vi.waitFor(() => {
+      expect(api.__clientState.get('webv2:project-covers')).toBe('{"p1":"a.png"}');
+      expect(listener).toHaveBeenCalledTimes(3);
+    });
+
+    covers.recordProjectCover('p1', 'a.png');
+    expect(api.setClientStateValue).toHaveBeenCalledTimes(2);
+    unsubscribe();
+  });
+
+  it('discards the old account queue and ignores its stale completions', async () => {
+    const oldAccountWrite = createDeferred();
+    const newAccountWrite = createDeferred();
+    let didCompleteOldWrite = false;
+    let didFailNewWrite = false;
+
+    api.setClientStateValue
+      .mockImplementationOnce(async (key: string, value: string) => {
+        await oldAccountWrite.promise;
+        api.__clientState.set(key, value);
+        didCompleteOldWrite = true;
+      })
+      .mockImplementationOnce(async () => {
+        await newAccountWrite.promise;
+        didFailNewWrite = true;
+        throw new Error('offline');
+      });
+
+    lifecycle.accountLifecycle.activate('user-a');
+    await covers.loadProjectCovers();
+    covers.recordProjectCover('old-project', 'old.png');
+    await vi.waitFor(() => expect(api.setClientStateValue).toHaveBeenCalledTimes(1));
+
+    lifecycle.accountLifecycle.activate('user-b');
+    await covers.loadProjectCovers();
+    const listener = vi.fn();
+    const unsubscribe = covers.subscribeProjectCovers(listener);
+    covers.recordProjectCover('new-project', 'new.png');
+    await vi.waitFor(() => expect(api.setClientStateValue).toHaveBeenCalledTimes(2));
+
+    oldAccountWrite.resolve();
+    newAccountWrite.resolve();
+    await vi.waitFor(() => {
+      expect(didCompleteOldWrite).toBe(true);
+      expect(didFailNewWrite).toBe(true);
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(covers.getProjectCoverImageName('old-project')).toBeUndefined();
+      expect(covers.getProjectCoverImageName('new-project')).toBe('new.png');
+    });
+
+    covers.recordProjectCover('new-project', 'new.png');
+    await vi.waitFor(() => {
+      expect(api.setClientStateValue).toHaveBeenCalledTimes(3);
+      expect(JSON.parse(api.setClientStateValue.mock.calls[2]![1])).toEqual({ 'new-project': 'new.png' });
+      expect(listener).toHaveBeenCalledTimes(3);
+    });
+    unsubscribe();
+  });
 });
 
 describe('forgetProjectCover', () => {
@@ -216,7 +406,9 @@ describe('forgetProjectCover', () => {
     covers.recordProjectCover('p1', 'a.png');
     covers.forgetProjectCover('p1');
 
-    expect(JSON.parse(api.__clientState.get('webv2:project-covers')!)).toEqual({});
+    await vi.waitFor(() => {
+      expect(JSON.parse(api.__clientState.get('webv2:project-covers')!)).toEqual({});
+    });
   });
 });
 

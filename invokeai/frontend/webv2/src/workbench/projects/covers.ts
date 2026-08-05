@@ -54,11 +54,19 @@ const MAX_TRACKED_COVERS = 500;
 interface ProjectCoversSnapshot {
   /** Project id to the server image name of its cover. */
   coverImageNames: Record<string, string>;
+  isDirty: boolean;
   isLoaded: boolean;
 }
 
-const EMPTY: ProjectCoversSnapshot = { coverImageNames: {}, isLoaded: false };
+interface CoverMutationQueue {
+  latestRevision: number;
+  owner: AccountScope;
+  tail: Promise<void>;
+}
+
+const EMPTY: ProjectCoversSnapshot = { coverImageNames: {}, isDirty: false, isLoaded: false };
 const store = createExternalStore<ProjectCoversSnapshot>(EMPTY);
+let mutationQueue: CoverMutationQueue | null = null;
 
 /**
  * Covers recorded before the index loaded, newest write per project. Drained by
@@ -70,6 +78,7 @@ const pendingCoverNames = new Map<string, string | null>();
 registerAccountOwnedResource({
   clear: () => {
     pendingCoverNames.clear();
+    mutationQueue = null;
     store.setSnapshot(EMPTY);
   },
   name: 'project-covers',
@@ -97,10 +106,30 @@ export const parseProjectCovers = (raw: string | null): Record<string, string> =
   }
 };
 
-const persist = (coverImageNames: Record<string, string>, owner: AccountScope): void => {
-  void setClientStateValue(PROJECT_COVERS_KEY, JSON.stringify(coverImageNames), owner.signal).catch(() => {
-    // A cover is a thumbnail on a card. Losing the write costs a glyph until
-    // the next save, which is not worth surfacing to anyone.
+const enqueuePersist = (coverImageNames: Record<string, string>, owner: AccountScope): void => {
+  if (mutationQueue === null || mutationQueue.owner !== owner) {
+    mutationQueue = { latestRevision: 0, owner, tail: Promise.resolve() };
+  }
+
+  const queue = mutationQueue;
+  const revision = ++queue.latestRevision;
+  const value = JSON.stringify(coverImageNames);
+
+  queue.tail = queue.tail.then(async () => {
+    try {
+      await setClientStateValue(PROJECT_COVERS_KEY, value, owner.signal);
+    } catch {
+      // A cover is a thumbnail on a card. Losing the write costs a glyph until
+      // the next save, which is not worth surfacing to anyone. Keeping the
+      // snapshot dirty lets the next matching save retry the complete blob.
+      return;
+    }
+
+    if (mutationQueue !== queue || !isAccountScopeCurrent(owner) || queue.latestRevision !== revision) {
+      return;
+    }
+
+    store.setSnapshot({ ...store.getSnapshot(), isDirty: false });
   });
 };
 
@@ -157,10 +186,10 @@ export const loadProjectCovers = (): Promise<void> => {
 
     const bounded = boundCovers(coverImageNames);
 
-    store.setSnapshot({ coverImageNames: bounded, isLoaded: true });
+    store.setSnapshot({ coverImageNames: bounded, isDirty: hasPendingChange, isLoaded: true });
 
     if (hasPendingChange) {
-      persist(bounded, owner);
+      enqueuePersist(bounded, owner);
     }
   });
 };
@@ -183,9 +212,9 @@ export const recordProjectCover = (
     return;
   }
 
-  const { coverImageNames, isLoaded } = store.getSnapshot();
+  const { coverImageNames, isDirty, isLoaded } = store.getSnapshot();
 
-  if ((coverImageNames[projectId] ?? null) === coverImageName) {
+  if (isLoaded && (coverImageNames[projectId] ?? null) === coverImageName && !isDirty) {
     return;
   }
 
@@ -202,7 +231,7 @@ export const recordProjectCover = (
 
   const bounded = boundCovers(next);
 
-  store.setSnapshot({ coverImageNames: bounded, isLoaded });
+  store.setSnapshot({ coverImageNames: bounded, isDirty: true, isLoaded });
 
   if (!isLoaded) {
     // The grid can show this immediately, but the KV cannot receive it until we
@@ -213,7 +242,7 @@ export const recordProjectCover = (
     return;
   }
 
-  persist(bounded, owner);
+  enqueuePersist(bounded, owner);
 };
 
 /** Drop a deleted project's entry so the blob does not accumulate dead ids. */
