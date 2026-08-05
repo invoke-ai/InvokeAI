@@ -28,8 +28,10 @@ def denoise(
         transformer: The FL2VA transformer.
         state: The prepared denoise state (rows, layout, schedules).
         prompt_embeds: The layer-50 Qwen3-VL hidden states, shape ``(1, num_text_tokens, text_dim)``.
-        step_callback: Called after every step with ``(step_index, total_steps, video_rows)`` —
-            the current video rows including conditioning rows, for previews.
+        step_callback: Called after every step with ``(step_index, total_steps, pred_x0_video_rows)``
+            — the step's *predicted-clean* (x-hat-0) estimate of the GENERATED video rows
+            (conditioning rows excluded), float32, for previews. Unlike the noisy running
+            latents, the prediction is decodable at every step.
         is_canceled: Polled once per step; a True return raises ``KeyboardInterrupt``-free
             cancellation by letting the caller's exception type propagate from the callback.
 
@@ -66,6 +68,15 @@ def denoise(
             return_dict=False,
         )
 
+        pred_x0_video_rows: torch.Tensor | None = None
+        if step_callback is not None:
+            # The scheduler's own denoised estimate (`x0 = x_t + sigma * v`, data-ward velocity),
+            # taken BEFORE the in-place Euler update below overwrites x_t.
+            sigma_video = 1.0 - t.to(torch.float32)
+            pred_x0_video_rows = latents[num_condition_video_rows:].to(torch.float32) + sigma_video * noise_pred[
+                0, num_condition_video_rows:
+            ].to(torch.float32)
+
         latents[num_condition_video_rows:] = state.scheduler.step(
             noise_pred[0, num_condition_video_rows:].float(),
             t,
@@ -80,6 +91,7 @@ def denoise(
         )[0]
 
         if step_callback is not None:
-            step_callback(i + 1, total_steps, latents)
+            assert pred_x0_video_rows is not None
+            step_callback(i + 1, total_steps, pred_x0_video_rows)
 
     return latents, audio_latents

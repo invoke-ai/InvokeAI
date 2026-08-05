@@ -91,6 +91,26 @@ def test_step_callback_called_per_step(tiny_transformer):
     assert calls == [(i + 1, NUM_EVALS) for i in range(NUM_EVALS)]
 
 
+def test_step_callback_receives_pred_x0_of_generated_rows(tiny_transformer):
+    """The callback gets the x-hat-0 estimate of the GENERATED video rows: condition rows are
+    excluded, dtype is float32, and at the final step (sigma_next = 0) the Euler update reduces
+    to x_next = x0, so the last callback payload must equal the returned generated rows."""
+    state = _state(with_keyframe=True)
+    num_condition_rows = state.layout.num_condition_video_rows
+    num_generated_rows = state.video_rows.shape[0] - num_condition_rows
+    seen: list[torch.Tensor] = []
+    prompt_embeds = torch.randn(1, 3, TINY_CONFIG["text_dim"], generator=torch.Generator().manual_seed(3))
+    video_rows, _ = denoise(
+        tiny_transformer,
+        state,
+        prompt_embeds,
+        step_callback=lambda step, total, rows: seen.append(rows.clone()),
+    )
+    assert all(rows.shape == (num_generated_rows, video_rows.shape[1]) for rows in seen)
+    assert all(rows.dtype == torch.float32 for rows in seen)
+    torch.testing.assert_close(seen[-1], video_rows[num_condition_rows:].to(torch.float32))
+
+
 def test_cancellation_raises(tiny_transformer):
     state = _state()
     prompt_embeds = torch.randn(1, 3, TINY_CONFIG["text_dim"])
