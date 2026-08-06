@@ -5,7 +5,7 @@ import { Dialog, HStack, Icon, Input, Menu, Portal, Stack, Text } from '@chakra-
 import { Button } from '@platform/ui/Button';
 import { MenuContent } from '@platform/ui/Menu';
 import { ArchiveIcon, DownloadIcon, PencilIcon, Trash2Icon, type LucideIcon } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useGalleryWidget } from './GalleryWidgetContext';
@@ -20,20 +20,17 @@ export interface GalleryBoardMenuTarget {
  * Cursor-anchored actions menu for a single board row (download, rename,
  * archive, delete) so boards can be managed without selecting them first.
  * Opened from the board dropdown via right-click or the row's hover actions
- * button; the dropdown stays open underneath (see onActiveChange).
+ * button; the dropdown stays open underneath.
  */
 export const GalleryBoardMenu = ({
   target,
-  onActiveChange,
   onClose,
 }: {
   target: GalleryBoardMenuTarget | null;
-  /** Reports whether the menu or one of its dialogs is showing, so the host dropdown can stay open. */
-  onActiveChange?: (isActive: boolean) => void;
   onClose: () => void;
 }) => {
   const { t } = useTranslation();
-  const { actions, gallery } = useGalleryWidget();
+  const { actions } = useGalleryWidget();
   const [renameTarget, setRenameTarget] = useState<GalleryBoard | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<GalleryBoard | null>(null);
   const [renameValue, setRenameValue] = useState('');
@@ -42,14 +39,10 @@ export const GalleryBoardMenu = ({
   targetRef.current = target;
 
   const board = target?.board ?? null;
-  // Project boards can be downloaded but never renamed, archived, or deleted.
-  const isManagedBoard = board !== null && board.kind === 'board' && board.id !== gallery.projectBoardId;
-  const isActive = target !== null || renameTarget !== null || deleteTarget !== null;
-
-  useEffect(() => {
-    onActiveChange?.(isActive);
-  }, [isActive, onActiveChange]);
-
+  // A project's board can be downloaded but never renamed, archived, or deleted: those follow
+  // the project. This covers every project's board, not just the open one — the server refuses
+  // all of them, so offering the action anywhere would only produce a 409.
+  const isManagedBoard = board !== null && board.kind === 'board' && board.projectId === null;
   const positioning = useMemo(
     () => ({
       getAnchorRect: () => {
@@ -140,6 +133,7 @@ export const GalleryBoardMenu = ({
           <Menu.Positioner>
             {board && (
               <MenuContent minW="12rem">
+                {board.projectId !== null && <BoardExportProjectMenuItem board={board} />}
                 <BoardDownloadMenuItem board={board} />
                 {isManagedBoard && (
                   <>
@@ -229,6 +223,31 @@ export const GalleryBoardMenu = ({
         </Portal>
       </Dialog.Root>
     </>
+  );
+};
+
+/**
+ * A project's board sits inside a project, so its menu offers both: the whole project as an
+ * `.invk`, and the board's media on its own. The media-only download is the existing action and
+ * keeps its video-omission warning; this one carries the document too.
+ */
+const BoardExportProjectMenuItem = ({ board }: { board: GalleryBoard }) => {
+  const { t } = useTranslation();
+  const { actions } = useGalleryWidget();
+  const projectId = board.projectId;
+  const handleClick = useCallback(() => {
+    if (projectId !== null) {
+      actions.exportProject(projectId, board.name);
+    }
+  }, [actions, board.name, projectId]);
+
+  return (
+    <BoardMenuItem
+      icon={DownloadIcon}
+      label={t('widgets.gallery.exportProjectFromBoard')}
+      value="export-project"
+      onClick={handleClick}
+    />
   );
 };
 

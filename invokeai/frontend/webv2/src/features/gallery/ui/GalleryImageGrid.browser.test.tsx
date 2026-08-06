@@ -174,6 +174,7 @@ const board = {
   imageCount: 3,
   kind: 'board',
   name: 'Board A',
+  projectId: null,
   videoCount: 1,
 } as const;
 

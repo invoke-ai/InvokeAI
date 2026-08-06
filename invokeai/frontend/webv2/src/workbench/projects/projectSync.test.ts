@@ -3,6 +3,7 @@ import type { Project } from '@workbench/projectContracts';
 import { createInitialWorkbenchState, workbenchReducer } from '@workbench/workbenchState.testing';
 import { describe, expect, it } from 'vitest';
 
+import { applyAuthoritativeProjectBoard } from './projectDocument';
 import { createRecoveredDocument, deserializeProjectDocument, serializeProjectDocument } from './syncedPersistence';
 
 const getProject = (overrides: Partial<Project> = {}): Project => {
@@ -212,5 +213,74 @@ describe('reconcileProjectConflict', () => {
     });
 
     expect(next.activeProjectId).toBe(second.id);
+  });
+});
+
+/**
+ * SQLite owns which board belongs to which project; the document only caches it. This is the one
+ * place that writes that cache, so every path — hydration, create, import, duplicate, fork —
+ * agrees on what "the project's board" means.
+ */
+describe('applyAuthoritativeProjectBoard', () => {
+  const galleryDocument = (values: Record<string, unknown>): Record<string, unknown> => ({
+    widgetInstances: {
+      'canvas-1': { state: { values: { projectBoardId: 'not-the-gallery' } }, typeId: 'canvas' },
+      'gallery-1': { state: { values }, typeId: 'gallery' },
+    },
+  });
+
+  const galleryValues = (document: Record<string, unknown>): Record<string, unknown> =>
+    (
+      (document.widgetInstances as Record<string, { state: { values: Record<string, unknown> } }>)['gallery-1'] as {
+        state: { values: Record<string, unknown> };
+      }
+    ).state.values;
+
+  it('replaces the project board and leaves a chosen destination alone', () => {
+    const patched = applyAuthoritativeProjectBoard(
+      galleryDocument({ galleryView: 'assets', projectBoardId: 'stale', selectedBoardId: 'chosen' }),
+      'authoritative',
+      { selectBoard: false }
+    );
+
+    expect(galleryValues(patched)).toEqual({
+      galleryView: 'assets',
+      projectBoardId: 'authoritative',
+      selectedBoardId: 'chosen',
+    });
+  });
+
+  it('also points a first-seen project at its board', () => {
+    const patched = applyAuthoritativeProjectBoard(galleryDocument({ selectedBoardId: 'chosen' }), 'authoritative', {
+      selectBoard: true,
+    });
+
+    expect(galleryValues(patched).selectedBoardId).toBe('authoritative');
+  });
+
+  it('only touches the gallery widget', () => {
+    const patched = applyAuthoritativeProjectBoard(galleryDocument({}), 'authoritative', { selectBoard: true });
+    const instances = patched.widgetInstances as Record<string, { state: { values: Record<string, unknown> } }>;
+
+    expect(instances['canvas-1']!.state.values.projectBoardId).toBe('not-the-gallery');
+  });
+
+  it('patches the legacy widget-states shape too', () => {
+    const patched = applyAuthoritativeProjectBoard(
+      { widgetStates: { gallery: { values: { projectBoardId: 'stale' } } } },
+      'authoritative',
+      { selectBoard: true }
+    ) as { widgetStates: { gallery: { values: Record<string, unknown> } } };
+
+    expect(patched.widgetStates.gallery.values).toEqual({
+      projectBoardId: 'authoritative',
+      selectedBoardId: 'authoritative',
+    });
+  });
+
+  it('invents no shape for a document with no gallery', () => {
+    const document = { id: 'p1', name: 'No gallery' };
+
+    expect(applyAuthoritativeProjectBoard(document, 'authoritative', { selectBoard: true })).toBe(document);
   });
 });

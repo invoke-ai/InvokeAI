@@ -36,7 +36,9 @@ const snapshot = (state: WorkbenchState, savedAt = '2026-07-17T00:00:00.000Z'): 
 
 const saveResult = (state: WorkbenchState, savedAt?: string): WorkbenchSaveResult => ({
   conflicts: [],
+  deletedProjectForks: [],
   hasPendingChanges: false,
+  projectBoardAssignments: [],
   snapshot: snapshot(state, savedAt),
 });
 
@@ -74,7 +76,12 @@ const createAggregate = (initialState = createInitialWorkbenchState()) => {
       listener();
     }
   };
+  const boardAssignments: { boardId: string; projectId: string }[] = [];
   const port: PersistenceAggregatePort = {
+    assignProjectBoard: (assignment) => {
+      boardAssignments.push(assignment);
+      events.push('assignProjectBoard');
+    },
     getPersistedRevision: () => revision,
     getState: () => state,
     hydrate: (nextState) => {
@@ -97,6 +104,15 @@ const createAggregate = (initialState = createInitialWorkbenchState()) => {
       events.push('conflict');
       emit();
     },
+    reconcileDeletedProject: (fork) => {
+      state = {
+        ...state,
+        projects: state.projects.map((project) => (project.id === fork.projectId ? fork.recoveredProject : project)),
+      };
+      revision += 1;
+      events.push('deleted-fork');
+      emit();
+    },
     reportLoadError: (error) => events.push(`load-error:${error}`),
     saveFailed: (error) => events.push(`save-failed:${error}`),
     saveStarted: () => events.push('save-started'),
@@ -113,6 +129,7 @@ const createAggregate = (initialState = createInitialWorkbenchState()) => {
   };
 
   return {
+    boardAssignments,
     connect() {
       state = { ...state, backendConnection: { status: 'connected' } };
       emit();
@@ -346,7 +363,9 @@ describe('Workbench persistence runtime', () => {
           serverProject: { ...original, name: 'Server' },
         },
       ],
+      deletedProjectForks: [],
       hasPendingChanges: false,
+      projectBoardAssignments: [],
       snapshot: snapshot(aggregate.state),
     });
     clock.runAll();

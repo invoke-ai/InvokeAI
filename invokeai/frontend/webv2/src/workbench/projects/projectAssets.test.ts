@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { collectLiveAssetRefs, remapAssetRefs, selectCoverImageName, stripGallerySelection } from './projectAssets';
+import { collectLiveAssetRefs, remapAssetRefs, selectCoverImageName, stripInstallationState } from './projectAssets';
 
 /**
  * The walker's contract, stated as documents rather than as paths: what an
@@ -208,9 +208,9 @@ describe('collectLiveAssetRefs', () => {
  * broken, and invisible to the restore pass that would otherwise report it as
  * dangling.
  */
-describe('stripGallerySelection', () => {
+describe('stripInstallationState', () => {
   it('drops every selection key at any depth', () => {
-    const stripped = stripGallerySelection({
+    const stripped = stripInstallationState({
       widgetInstances: {
         'gallery-1': {
           state: {
@@ -239,11 +239,11 @@ describe('stripGallerySelection', () => {
   it('leaves a document with no selection identical', () => {
     const document = { canvas: { document: { layers: [imageLayer('l1', 'a.png')] } }, id: 'p1' };
 
-    expect(stripGallerySelection(document)).toBe(document);
+    expect(stripInstallationState(document)).toBe(document);
   });
 
   it('keeps the surrounding widget state intact', () => {
-    const stripped = stripGallerySelection({
+    const stripped = stripInstallationState({
       widgetInstances: {
         'gallery-1': { state: { values: { boardId: 'b1', selectedImageName: 'image:x.png' } }, typeId: 'gallery' },
       },
@@ -252,6 +252,39 @@ describe('stripGallerySelection', () => {
     expect(stripped).toEqual({
       widgetInstances: { 'gallery-1': { state: { values: { boardId: 'b1' } }, typeId: 'gallery' } },
     });
+  });
+
+  /**
+   * A board id means nothing on the machine a project arrives at, and the one
+   * naming the project's own board is a cache the server overwrites anyway.
+   */
+  it('drops the gallery board ids from both the current and legacy widget shapes', () => {
+    const stripped = stripInstallationState({
+      widgetInstances: {
+        'gallery-1': {
+          state: { values: { galleryView: 'images', projectBoardId: 'board-1', selectedBoardId: 'board-2' } },
+          typeId: 'gallery',
+        },
+      },
+      widgetStates: { gallery: { values: { projectBoardId: 'board-1', selectedBoardId: 'board-2' } } },
+    });
+
+    expect(JSON.stringify(stripped)).not.toContain('board-1');
+    expect(JSON.stringify(stripped)).not.toContain('board-2');
+    // Everything else the widget holds survives.
+    expect(JSON.stringify(stripped)).toContain('galleryView');
+  });
+
+  /**
+   * Only the gallery widget's own two keys are installation state. A board named
+   * by a workflow node is an authored input and has to survive the round trip.
+   */
+  it('keeps board references that mean something to the document', () => {
+    const document = {
+      workflow: { nodes: [{ inputs: { board: { value: { board_id: 'board-3' } } }, type: 'save_image' }] },
+    };
+
+    expect(stripInstallationState(document)).toBe(document);
   });
 });
 

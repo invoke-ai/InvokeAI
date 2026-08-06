@@ -19,13 +19,16 @@ export interface GalleryActions {
   createBoard: (boardName: string) => Promise<void>;
   deleteBoard: (boardId: string, includeImages: boolean) => Promise<void>;
   downloadBoard: (boardId: string) => Promise<void>;
+  /** Export the project that owns this board as a complete `.invk` archive. */
+  exportProject: (projectId: string, projectName: string) => void;
   loadMore: () => void;
   refresh: () => void;
   renameBoard: (boardId: string, boardName: string) => Promise<void>;
   selectBoard: (boardId: string) => void;
   selectItem: (item: GalleryItem) => void;
   selectItemRange: (items: GalleryItemRef[], primaryItem: GalleryItem) => void;
-  selectProjectBoard: () => Promise<void>;
+  /** Select the project's own board. It always exists, so this never creates one. */
+  selectProjectBoard: () => void;
   setCompareItem: (image: GalleryImageItem | null) => void;
   setSearchTerm: (searchTerm: string) => void;
   setView: (galleryView: GalleryView) => void;

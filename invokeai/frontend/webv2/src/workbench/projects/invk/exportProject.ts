@@ -1,5 +1,5 @@
 import { mapWithConcurrency } from '@platform/core/concurrency';
-import { collectLiveAssetRefs, selectCoverImageName, stripGallerySelection } from '@workbench/projects/projectAssets';
+import { collectLiveAssetRefs, selectCoverImageName, stripInstallationState } from '@workbench/projects/projectAssets';
 
 import type { InvkArchiveEntry } from './archive';
 import type { FetchedThumbnail } from './assetTransport';
@@ -68,7 +68,7 @@ export const planInvkExport = (input: {
   // list: not bundling a reference does not stop it travelling, it only stops
   // it arriving with pixels. The planner is where "what belongs in a project
   // file" is decided, so it is where the answer is applied.
-  const projectDocument = stripGallerySelection(input.projectDocument);
+  const projectDocument = stripInstallationState(input.projectDocument);
   const refs = collectLiveAssetRefs(projectDocument);
 
   return {

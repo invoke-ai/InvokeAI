@@ -134,7 +134,6 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
     getCurrentGalleryLocation,
     loadMore,
     projectBoardId: getGalleryProjectBoardId(galleryValues),
-    projectName,
     selectedBoardId,
   });
 

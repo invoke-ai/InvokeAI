@@ -91,6 +91,25 @@ export const GALLERY_SELECTION_KEYS: ReadonlySet<string> = new Set([
   'selectedImageNames',
 ]);
 
+/**
+ * Board ids the gallery widget holds: which board this project owns, and which
+ * one new results are routed to. Both are *installation* state, not project
+ * state — a board id means nothing on the machine the project arrives at.
+ *
+ * `projectBoardId` in particular is a cache, not a fact. The server owns the
+ * project-to-board relationship, and hydration overwrites this from the project
+ * record. Exporting it would carry a stale pointer to a board the receiving
+ * install has never had, and importing it would fight the authoritative value
+ * the create response is about to supply.
+ *
+ * Board ids elsewhere in the document — a workflow node's board input, say — are
+ * semantically meaningful and are deliberately NOT stripped. That is why this
+ * set names only the two keys the gallery widget owns.
+ */
+export const GALLERY_INSTALLATION_KEYS: ReadonlySet<string> = new Set(['projectBoardId', 'selectedBoardId']);
+
+const INSTALLATION_STATE_KEYS: ReadonlySet<string> = new Set([...GALLERY_SELECTION_KEYS, ...GALLERY_INSTALLATION_KEYS]);
+
 export interface ProjectAssetRefs {
   images: Set<string>;
   videos: Set<string>;
@@ -174,7 +193,7 @@ const stripNode = (node: unknown): unknown => {
   const next: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(node)) {
-    if (GALLERY_SELECTION_KEYS.has(key)) {
+    if (INSTALLATION_STATE_KEYS.has(key)) {
       hasChanged = true;
       continue;
     }
@@ -189,16 +208,21 @@ const stripNode = (node: unknown): unknown => {
 };
 
 /**
- * Drop the gallery's selection keys at every depth, so an exported project
- * opens with nothing selected rather than with pointers into the exporting
- * install's gallery.
+ * Drop everything that describes *this install* rather than the project — the
+ * gallery's selection and its board ids — at every depth, so an exported project
+ * opens with nothing selected, on the board the receiving server assigns it.
  *
  * Every reader of these values already tolerates their absence — selection is
- * parsed with `typeof`/`Array.isArray` guards and falls back to nothing — so
- * removing the key is the same as clearing it, without inventing a shape.
- * Subtrees with nothing to drop keep their identity.
+ * parsed with `typeof`/`Array.isArray` guards and falls back to nothing, and the
+ * board ids are re-supplied from the project record — so removing the key is the
+ * same as clearing it, without inventing a shape. Subtrees with nothing to drop
+ * keep their identity.
+ *
+ * Stripping by key at any depth rather than by walking into `widgetInstances` is
+ * what makes this cover the legacy `widgetStates.gallery` shape for free, and it
+ * is safe because these keys occur nowhere else in a project document.
  */
-export const stripGallerySelection = (projectDocument: Record<string, unknown>): Record<string, unknown> =>
+export const stripInstallationState = (projectDocument: Record<string, unknown>): Record<string, unknown> =>
   stripNode(projectDocument) as Record<string, unknown>;
 
 export interface ProjectAssetMappings {

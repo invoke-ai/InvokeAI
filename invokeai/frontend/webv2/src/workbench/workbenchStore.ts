@@ -411,9 +411,19 @@ const createPersistenceAdapter = (dispatch: WorkbenchDispatch, getState: () => W
   const command = createCommandFactory(dispatch);
 
   return {
+    /**
+     * A project created by persistence learns its board from the create response. Both writes
+     * belong together: the id records which board is the project's, and selecting it is what
+     * makes the project's own output land there rather than in Uncategorized.
+     */
+    assignProjectBoard: ({ boardId, projectId }: { boardId: string; projectId: string }) => {
+      dispatch({ boardId, projectId, type: 'setGalleryProjectBoardId' });
+      dispatch({ boardId, projectId, type: 'selectGalleryBoard' });
+    },
     getState,
     hydrate: command('hydrateWorkbench', (state: WorkbenchState) => ({ state })),
     reconcileConflict: command('reconcileProjectConflict'),
+    reconcileDeletedProject: command('reconcileDeletedProject'),
     saveFailed: command('autosaveFailed', (error: string) => ({ error })),
     saveStarted: command('autosaveStarted'),
     saveSucceeded: command('autosaveSucceeded', (savedAt: string) => ({ savedAt })),

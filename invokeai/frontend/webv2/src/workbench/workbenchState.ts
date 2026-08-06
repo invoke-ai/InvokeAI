@@ -322,6 +322,7 @@ type WorkbenchReducerAction =
   | { type: 'redoProjectChange' }
   | { type: 'hydrateWorkbench'; state: WorkbenchState }
   | { type: 'reconcileProjectConflict'; projectId: string; serverProject: Project; recoveredProject: Project }
+  | { type: 'reconcileDeletedProject'; projectId: string; recoveredProject: Project }
   | { type: 'autosaveStarted' }
   | { type: 'autosaveSucceeded'; savedAt: string }
   | { type: 'autosaveFailed'; error: string }
@@ -3641,6 +3642,30 @@ export const __workbenchReducerInternal = (
         createNotification({
           kind: 'info',
           message: `"${serverProject.name}" was changed elsewhere. Your local edits continue in "${recoveredProject.name}" — manage recoveries in the Project panel.`,
+          title: 'Project recovered',
+        })
+      );
+    }
+    case 'reconcileDeletedProject': {
+      // The project was deleted on another device while this one held unsaved edits. Unlike a
+      // revision conflict there is no server version to adopt — the deletion is the server's
+      // answer. Re-creating the id would undo it everywhere, so the local edits continue under a
+      // fresh identity and the original simply goes.
+      const recoveredProject = normalizeWorkbenchProject(action.recoveredProject);
+      const hasOriginal = state.projects.some((project) => project.id === action.projectId);
+      const projects = hasOriginal
+        ? state.projects.map((project) => (project.id === action.projectId ? recoveredProject : project))
+        : [...state.projects, recoveredProject];
+
+      return addNotification(
+        {
+          ...state,
+          activeProjectId: state.activeProjectId === action.projectId ? recoveredProject.id : state.activeProjectId,
+          projects,
+        },
+        createNotification({
+          kind: 'info',
+          message: `That project was deleted elsewhere. Your unsaved edits continue in "${recoveredProject.name}".`,
           title: 'Project recovered',
         })
       );

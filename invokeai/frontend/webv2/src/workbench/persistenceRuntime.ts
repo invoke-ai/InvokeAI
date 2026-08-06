@@ -4,11 +4,15 @@ import type { WorkbenchState } from '@workbench/projectContracts';
 import type { WorkbenchLoadOptions, WorkbenchSaveResult } from './projects/syncedPersistence';
 
 export interface PersistenceAggregatePort {
+  /** Point a project at the board the server minted for it. */
+  assignProjectBoard(assignment: WorkbenchSaveResult['projectBoardAssignments'][number]): void;
   getPersistedRevision(): number;
   getState(): WorkbenchState;
   hydrate(state: WorkbenchState): void;
   notifyProjectNotFound(): void;
   reconcileConflict(conflict: WorkbenchSaveResult['conflicts'][number]): void;
+  /** Replace a project deleted elsewhere with the fork carrying its unsaved edits. */
+  reconcileDeletedProject(fork: WorkbenchSaveResult['deletedProjectForks'][number]): void;
   reportLoadError(error: string): void;
   saveFailed(error: string): void;
   saveStarted(): void;
@@ -98,6 +102,14 @@ export const createWorkbenchPersistenceRuntime = ({
   const applySaveResult = (result: WorkbenchSaveResult): void => {
     for (const conflict of result.conflicts) {
       aggregate.reconcileConflict(conflict);
+    }
+
+    for (const fork of result.deletedProjectForks) {
+      aggregate.reconcileDeletedProject(fork);
+    }
+
+    for (const assignment of result.projectBoardAssignments) {
+      aggregate.assignProjectBoard(assignment);
     }
   };
 

@@ -18,6 +18,8 @@ import type * as persistenceModule from './syncedPersistence';
 const api = vi.hoisted(() => {
   interface MockRecord {
     project_id: string;
+    /** Every project owns one, and the server is the only thing that decides which. */
+    board_id: string;
     name: string;
     revision: number;
     created_at: string;
@@ -31,6 +33,7 @@ const api = vi.hoisted(() => {
   const conflictError = (): Error => Object.assign(new Error('conflict'), { __status: 409 });
   const notFoundError = (): Error => Object.assign(new Error('not found'), { __status: 404 });
   const toSummary = (record: MockRecord) => ({
+    board_id: record.board_id,
     created_at: record.created_at,
     name: record.name,
     project_id: record.project_id,
@@ -46,6 +49,7 @@ const api = vi.hoisted(() => {
       const id = data.id as string;
 
       records.set(id, {
+        board_id: `board-for-${id}`,
         created_at: '2026-06-10 08:00:00.000',
         data: structuredClone(data),
         name: data.name as string,
@@ -54,26 +58,29 @@ const api = vi.hoisted(() => {
         updated_at: '2026-06-10 08:00:00.000',
       });
     },
-    createProject: vi.fn((request: { project_id?: string; name: string; data: Record<string, unknown> }) => {
-      const id = request.project_id ?? `generated-${records.size}`;
+    createProject: vi.fn(
+      (request: { project_id?: string; board_id?: string; name: string; data: Record<string, unknown> }) => {
+        const id = request.project_id ?? `generated-${records.size}`;
 
-      if (records.has(id)) {
-        return Promise.reject(conflictError());
+        if (records.has(id)) {
+          return Promise.reject(conflictError());
+        }
+
+        const record: MockRecord = {
+          board_id: request.board_id ?? `board-for-${id}`,
+          created_at: '2026-06-10 09:00:00.000',
+          data: structuredClone(request.data),
+          name: request.name,
+          project_id: id,
+          revision: 1,
+          updated_at: '2026-06-10 09:00:00.000',
+        };
+
+        records.set(id, record);
+
+        return Promise.resolve(clone(record));
       }
-
-      const record: MockRecord = {
-        created_at: '2026-06-10 09:00:00.000',
-        data: structuredClone(request.data),
-        name: request.name,
-        project_id: id,
-        revision: 1,
-        updated_at: '2026-06-10 09:00:00.000',
-      };
-
-      records.set(id, record);
-
-      return Promise.resolve(clone(record));
-    }),
+    ),
     deleteClientStateValue: vi.fn((key: string) => {
       clientState.delete(key);
 
@@ -630,5 +637,71 @@ describe('hydrateProjectFromServer', () => {
 
   it('returns null for unknown projects', async () => {
     expect(await service.hydrateProjectFromServer('nope')).toBeNull();
+  });
+});
+
+/**
+ * The document's `projectBoardId` is a cache of a relationship SQLite owns. Every path that learns
+ * the real answer has to write it down, or the project points at a board that means nothing here.
+ */
+describe('authoritative project boards', () => {
+  const galleryBoardIds = (project: Project): { projectBoardId?: unknown; selectedBoardId?: unknown } => {
+    const instance = Object.values(project.widgetInstances).find((entry) => entry.typeId === 'gallery');
+
+    return (instance?.state.values ?? {}) as { projectBoardId?: unknown; selectedBoardId?: unknown };
+  };
+
+  it('reports the board the server minted for a project it created', async () => {
+    const draft = createDraftProject([]);
+
+    const result = await service.saveWorkbench(stateWithProjects([draft]));
+
+    expect(result.projectBoardAssignments).toEqual([{ boardId: `board-for-${draft.id}`, projectId: draft.id }]);
+    // Drained, so the next save does not re-apply it.
+    expect((await service.saveWorkbench(stateWithProjects([draft]))).projectBoardAssignments).toEqual([]);
+  });
+
+  it('overwrites a stale board id when hydrating a record', async () => {
+    const draft = createDraftProject([]);
+    const document = persistence.serializeProjectDocument(draft) as Record<string, unknown>;
+    const instances = document.widgetInstances as Record<string, { state: { values: Record<string, unknown> } }>;
+    const galleryId = Object.keys(instances).find(
+      (key) => (instances[key] as unknown as { typeId: string }).typeId === 'gallery'
+    )!;
+
+    // A board id written by some other install, naming a board that does not exist here.
+    instances[galleryId]!.state.values.projectBoardId = 'board-from-another-machine';
+    instances[galleryId]!.state.values.selectedBoardId = 'deliberate-destination';
+    api.__seed(document);
+
+    const hydrated = await service.hydrateProjectFromServer(draft.id);
+
+    expect(galleryBoardIds(hydrated!).projectBoardId).toBe(`board-for-${draft.id}`);
+    // The chosen destination is the user's, not ours; resolving it is the gallery's job.
+    expect(galleryBoardIds(hydrated!).selectedBoardId).toBe('deliberate-destination');
+  });
+
+  it('forks rather than resurrects a project deleted on another device', async () => {
+    const project = seedServerProject('Deleted elsewhere');
+    const opened = await service.hydrateProjectFromServer(project.id);
+    const edited = { ...opened!, name: 'Edited locally' };
+
+    // Deleted on the other device, after this one had already synced.
+    api.__records.delete(project.id);
+
+    const result = await service.saveWorkbench(stateWithProjects([edited]));
+
+    // The deletion stands...
+    expect(api.__records.has(project.id)).toBe(false);
+    // ...and the work survives under a fresh id, with a board of its own.
+    expect(result.deletedProjectForks).toHaveLength(1);
+    const [fork] = result.deletedProjectForks;
+    expect(fork!.projectId).toBe(project.id);
+    expect(fork!.recoveredProject.id).not.toBe(project.id);
+    expect(fork!.recoveredProject.name).toBe('Edited locally (recovered)');
+    expect(api.__records.get(fork!.recoveredProject.id)).toBeDefined();
+    expect(result.projectBoardAssignments).toEqual([
+      { boardId: `board-for-${fork!.recoveredProject.id}`, projectId: fork!.recoveredProject.id },
+    ]);
   });
 });

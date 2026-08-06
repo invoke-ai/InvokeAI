@@ -2604,6 +2604,7 @@
       "downloadReady": "Download ready",
       "downloadSelection": "Download selection",
       "dropMediaToUploadToBoard": "Drop images or videos to upload to {{name}}",
+      "exportProjectFromBoard": "Export project (.invk)",
       "generationProgress": "Generation progress",
       "generationProgressPercent": "Generation {{percentage}}%",
       "hideArchivedBoards": "Hide archived boards",

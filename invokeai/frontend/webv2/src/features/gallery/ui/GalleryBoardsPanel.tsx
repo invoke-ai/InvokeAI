@@ -165,7 +165,6 @@ export const GalleryBoardsPanel = () => {
                   key={board.id}
                   board={board}
                   isMenuOpen={boardMenuTarget?.board.id === board.id}
-                  isProjectBoard={board.id === gallery.projectBoardId}
                   isSelected={board.id === gallery.selectedBoardId}
                   loadedItemBoardIds={loadedItemBoardIds}
                   onOpenMenu={openBoardMenu}
@@ -194,7 +193,6 @@ export const GalleryBoardsPanel = () => {
                     key={board.id}
                     board={board}
                     isMenuOpen={boardMenuTarget?.board.id === board.id}
-                    isProjectBoard={false}
                     isSelected={board.id === gallery.selectedBoardId}
                     loadedItemBoardIds={loadedItemBoardIds}
                     onSelectBoard={handleSelectBoard}
@@ -215,7 +213,6 @@ export const GalleryBoardsPanel = () => {
                     key={board.id}
                     board={board}
                     isMenuOpen={boardMenuTarget?.board.id === board.id}
-                    isProjectBoard={false}
                     isSelected={board.id === gallery.selectedBoardId}
                     loadedItemBoardIds={loadedItemBoardIds}
                     onOpenMenu={openBoardMenu}

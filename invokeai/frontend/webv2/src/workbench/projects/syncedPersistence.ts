@@ -25,7 +25,12 @@ import {
 import { recordProjectCover } from './covers';
 import { seedProjectLibrary, upsertProjectSummary } from './library';
 import { selectCoverImageName } from './projectAssets';
-import { isProjectDocumentShape, normalizeLegacyProjectDocument, serializeProjectDocument } from './projectDocument';
+import {
+  applyAuthoritativeProjectBoard,
+  isProjectDocumentShape,
+  normalizeLegacyProjectDocument,
+  serializeProjectDocument,
+} from './projectDocument';
 import { fetchSessionBlob, serializeSessionBlob, SESSION_STATE_KEY } from './session';
 import { reportProjectSync, type ProjectSyncInfo } from './syncStore';
 
@@ -69,11 +74,35 @@ export interface ProjectConflictResolution {
   recoveredProject: Project;
 }
 
+/** Local edits rescued from a project that was deleted on another device. */
+export interface ProjectDeletionFork {
+  projectId: string;
+  /** The fork carrying the local edits, under a fresh id and its own board. */
+  recoveredProject: Project;
+}
+
+/** A board the server assigned to a project this save created. */
+export interface ProjectBoardAssignment {
+  boardId: string;
+  projectId: string;
+}
+
 export interface WorkbenchSaveResult {
   snapshot: HydratedWorkbenchSnapshot;
   conflicts: ProjectConflictResolution[];
   /** True when changes are cached locally but could not reach the backend. */
   hasPendingChanges: boolean;
+  /**
+   * Boards the server minted for projects created during this save. A draft is created by
+   * persistence rather than by the editor, so the create response is the only place its board id
+   * exists — discarding it would leave the project pointing at no board until the next reload.
+   */
+  projectBoardAssignments: ProjectBoardAssignment[];
+  /**
+   * Projects deleted elsewhere whose unsaved local edits were forked rather than re-created. The
+   * deletion stands; the work does not.
+   */
+  deletedProjectForks: ProjectDeletionFork[];
 }
 
 export interface WorkbenchLoadOptions {
@@ -91,6 +120,8 @@ interface SyncedPersistenceState {
   lastPushedAccount: string | null;
   /** Immutable owner captured when this synchronization lifetime was constructed. */
   owner: AccountScope;
+  /** Boards learned from create responses, drained by the next save. */
+  pendingBoardAssignments: ProjectBoardAssignment[];
   projectDocumentJsonCache: WeakMap<Project, { document: Record<string, unknown>; json: string }>;
   /** Server-known projects, keyed by project id. */
   syncEntries: Map<string, SyncEntry>;
@@ -102,6 +133,7 @@ const createSyncedPersistenceState = (owner: AccountScope): SyncedPersistenceSta
   localPersistence: createLocalStorageWorkbenchPersistence(owner.storageSuffix),
   lastPushedAccount: null,
   owner,
+  pendingBoardAssignments: [],
   projectDocumentJsonCache: new WeakMap(),
   syncEntries: new Map(),
 });
@@ -138,6 +170,18 @@ const getSerializedProjectDocument = (
 
   return serialized;
 };
+
+/**
+ * Rehydrate a *server record*, which knows the project's real board.
+ *
+ * The document's own `projectBoardId` is a cache and can be stale — written by another install, or
+ * replaced by the migration when the board it named turned out to be ambiguous. Overwriting it
+ * here means every path that reads a project from the server agrees on one answer, and the next
+ * autosave writes the correction back. The saved destination is left alone: it is a deliberate
+ * choice, and `getGallerySelectedBoardId` resolves it against the boards that actually exist.
+ */
+const deserializeProjectRecord = (record: ProjectRecordDTO): Project | null =>
+  deserializeProjectDocument(applyAuthoritativeProjectBoard(record.data, record.board_id, { selectBoard: false }));
 
 /**
  * Rehydrate a document into a live project. This is the half of the codec that
@@ -214,6 +258,7 @@ const pushNewProject = async (syncState: SyncedPersistenceState, project: Projec
 
     assertOwner(syncState);
     syncState.syncEntries.set(project.id, { pushedDoc: JSON.stringify(document), revision: created.revision });
+    syncState.pendingBoardAssignments.push({ boardId: created.board_id, projectId: project.id });
 
     return true;
   } catch (error) {
@@ -230,6 +275,7 @@ const pushNewProject = async (syncState: SyncedPersistenceState, project: Projec
           pushedDoc: JSON.stringify(existing.data),
           revision: existing.revision,
         });
+        syncState.pendingBoardAssignments.push({ boardId: existing.board_id, projectId: project.id });
 
         return true;
       } catch {
@@ -314,7 +360,7 @@ const recoverConflictingProject = async (
       return { kind: 'retry' };
     }
 
-    const serverProject = deserializeProjectDocument(server.data);
+    const serverProject = deserializeProjectRecord(server);
 
     if (!serverProject) {
       return { kind: 'failed' };
@@ -346,10 +392,53 @@ const recoverConflictingProject = async (
   }
 };
 
+/**
+ * Rescue the local edits of a project the server no longer has.
+ *
+ * Deliberately a *fork*, not a re-create. Pushing the original id back would resurrect a project
+ * the user deleted — on every device, and here as a project whose board went with the deletion.
+ * The fork gets a fresh id, and with it a fresh board from the create response.
+ */
+const forkDeletedProject = async (
+  syncState: SyncedPersistenceState,
+  project: Project,
+  document: Record<string, unknown>
+): Promise<ProjectDeletionFork | null> => {
+  assertOwner(syncState);
+
+  const { recoveredDocument, recoveredId, recoveredName } = createRecoveredDocument(project, document);
+  const recoveredProject = deserializeProjectDocument(recoveredDocument);
+
+  if (!recoveredProject) {
+    return null;
+  }
+
+  try {
+    const created = await apiCreateProject(
+      { data: recoveredDocument, name: recoveredName, project_id: recoveredId },
+      syncState.owner.signal
+    );
+
+    assertOwner(syncState);
+    syncState.syncEntries.set(recoveredId, {
+      pushedDoc: JSON.stringify(recoveredDocument),
+      revision: created.revision,
+    });
+    syncState.pendingBoardAssignments.push({ boardId: created.board_id, projectId: recoveredId });
+
+    return { projectId: project.id, recoveredProject };
+  } catch {
+    assertOwner(syncState);
+
+    return null;
+  }
+};
+
 const pushProject = async (
   syncState: SyncedPersistenceState,
   project: Project,
-  conflicts: ProjectConflictResolution[]
+  conflicts: ProjectConflictResolution[],
+  deletedProjectForks: ProjectDeletionFork[]
 ): Promise<string> => {
   assertOwner(syncState);
   const { document, json: documentJson } = getSerializedProjectDocument(syncState, project);
@@ -415,13 +504,19 @@ const pushProject = async (
         syncState.hasPending = true;
       }
     } else if (isProjectNotFoundError(error)) {
-      // Deleted on another device while we held local edits: recreate rather
-      // than drop the user's work.
+      // Deleted on another device while we held local edits. Re-creating under the same id would
+      // undo that deletion — the project would reappear on every device, and on this one it would
+      // be a project whose board the deletion already took. Fork instead: the deletion stands, and
+      // the local work survives as a recovered project with its own id and its own board.
       syncState.syncEntries.delete(project.id);
 
-      if (!(await pushNewProject(syncState, project))) {
-        assertOwner(syncState);
+      const fork = await forkDeletedProject(syncState, project, document);
+
+      assertOwner(syncState);
+      if (fork === null) {
         syncState.hasPending = true;
+      } else {
+        deletedProjectForks.push(fork);
       }
     } else {
       syncState.hasPending = true;
@@ -524,7 +619,7 @@ const loadFromBackend = async (
       continue;
     }
 
-    const project = deserializeProjectDocument(record.data);
+    const project = deserializeProjectRecord(record);
 
     if (project) {
       serverProjects.push(project);
@@ -690,7 +785,7 @@ export const createSyncedWorkbenchPersistence = (
 
   const adoptProjectRecord = (record: ProjectRecordDTO): Project | null => {
     assertOwner(syncState);
-    const project = deserializeProjectDocument(record.data);
+    const project = deserializeProjectRecord(record);
 
     if (!project) {
       return null;
@@ -721,9 +816,12 @@ export const createSyncedWorkbenchPersistence = (
     },
     flushProjectToServer(project): Promise<void> {
       return enqueueMutation(async () => {
+        // A flush is a targeted push, not a save: its outcomes are surfaced by the next save,
+        // which is what carries them to the store.
         const conflicts: ProjectConflictResolution[] = [];
+        const deletedProjectForks: ProjectDeletionFork[] = [];
 
-        await pushProject(syncState, project, conflicts);
+        await pushProject(syncState, project, conflicts, deletedProjectForks);
         assertOwner(syncState);
         persistSyncMap(syncState);
       });
@@ -873,6 +971,7 @@ export const createSyncedWorkbenchPersistence = (
         syncState.hasPending = false;
 
         const conflicts: ProjectConflictResolution[] = [];
+        const deletedProjectForks: ProjectDeletionFork[] = [];
         const projectSyncInfos: Record<string, ProjectSyncInfo> = {};
 
         await pushSessionState(syncState, state);
@@ -881,7 +980,7 @@ export const createSyncedWorkbenchPersistence = (
         for (const project of state.projects) {
           assertOwner(syncState);
           const lastAckedDoc = syncState.syncEntries.get(project.id)?.pushedDoc ?? null;
-          const documentJson = await pushProject(syncState, project, conflicts);
+          const documentJson = await pushProject(syncState, project, conflicts, deletedProjectForks);
 
           assertOwner(syncState);
           const entry = syncState.syncEntries.get(project.id);
@@ -901,7 +1000,16 @@ export const createSyncedWorkbenchPersistence = (
         persistSyncMap(syncState);
         reportProjectSync({ hasPendingChanges: syncState.hasPending, projects: projectSyncInfos });
 
-        return { conflicts, hasPendingChanges: syncState.hasPending, snapshot };
+        // Drained rather than read: each assignment is applied to the store exactly once.
+        const projectBoardAssignments = syncState.pendingBoardAssignments.splice(0);
+
+        return {
+          conflicts,
+          deletedProjectForks,
+          hasPendingChanges: syncState.hasPending,
+          projectBoardAssignments,
+          snapshot,
+        };
       });
     },
     unmarkProjectDeleted(projectId): void {

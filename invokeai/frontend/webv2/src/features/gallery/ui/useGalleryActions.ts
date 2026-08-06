@@ -31,17 +31,15 @@ export const useGalleryActions = ({
   getCurrentGalleryLocation,
   loadMore,
   projectBoardId,
-  projectName,
   selectedBoardId,
 }: {
   boards: GalleryBoard[];
   getCurrentGalleryLocation: () => { galleryView: GalleryView; selectedBoardId: string };
   loadMore: () => void;
   projectBoardId: string | null;
-  projectName: string;
   selectedBoardId: string;
 }): GalleryActions => {
-  const { gallery, notifications } = useGalleryUi();
+  const { exportProject, gallery, notifications } = useGalleryUi();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const uploadFiles = useGalleryUploadAction({ boards, getCurrentGalleryLocation, selectedBoardId });
@@ -171,6 +169,7 @@ export const useGalleryActions = ({
           recordError(error);
         }
       },
+      exportProject,
       loadMore,
       refresh,
       renameBoard: async (boardId, boardName) => {
@@ -193,32 +192,15 @@ export const useGalleryActions = ({
       selectBoard: gallery.selectBoard,
       selectItem: gallery.selectItem,
       selectItemRange: (items, primaryItem) => gallery.setItemMultiSelection(items.map(toGalleryItemKey), primaryItem),
-      selectProjectBoard: async () => {
-        const owner = captureAccountScope();
-
-        if (projectBoardId && boards.some((board) => board.id === projectBoardId)) {
+      /**
+       * The project's board always exists — the server creates it with the project and
+       * hydration writes its id into the document — so selecting it is just a selection.
+       * There is deliberately no create-on-demand branch: a board this client made would
+       * not be the project's, and the server would refuse to let a project adopt it later.
+       */
+      selectProjectBoard: () => {
+        if (projectBoardId) {
           gallery.selectBoard(projectBoardId);
-          return;
-        }
-
-        if (boards.length === 0) {
-          return;
-        }
-
-        try {
-          const board = await createGalleryBoard(projectName, owner.signal);
-
-          assertAccountScopeCurrent(owner);
-          gallery.setProjectBoard(board.id);
-          gallery.selectBoard(board.id);
-          recordSuccess(t('widgets.gallery.projectBoardCreated', { name: board.name }));
-          refresh();
-        } catch (error: unknown) {
-          if (!isAccountScopeCurrent(owner)) {
-            return;
-          }
-
-          recordError(error);
         }
       },
       setCompareItem: gallery.setCompareItem,
@@ -230,11 +212,11 @@ export const useGalleryActions = ({
     };
   }, [
     boards,
+    exportProject,
     gallery,
     loadMore,
     notifications,
     projectBoardId,
-    projectName,
     queryClient,
     selectedBoardId,
     t,

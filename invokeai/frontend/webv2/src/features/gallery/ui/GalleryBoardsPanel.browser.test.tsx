@@ -54,6 +54,7 @@ const createBoard = (overrides: Partial<GalleryBoard> & Pick<GalleryBoard, 'id' 
   assetCount: 3,
   imageCount: 50,
   kind: 'board',
+  projectId: null,
   videoCount: 0,
   ...overrides,
 });

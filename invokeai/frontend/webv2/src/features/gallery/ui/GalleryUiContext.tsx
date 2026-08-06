@@ -96,6 +96,11 @@ export interface GalleryUiAdapter {
   notifications: GalleryNotificationsPort;
   projectId: string;
   projectName: string;
+  /**
+   * Export a project as an `.invk`, reporting progress itself. Keyed by project rather than
+   * board because a board menu can offer this for any project's board, not only the open one.
+   */
+  exportProject(projectId: string, projectName: string): void;
   queueItems: QueueItem[];
   liveFollowEnabled: boolean;
   liveProgressTarget: GalleryLiveTarget | null;

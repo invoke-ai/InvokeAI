@@ -44,6 +44,7 @@ const uncategorized: GalleryBoard = {
   imageCount: 1,
   kind: 'uncategorized',
   name: '',
+  projectId: null,
   videoCount: 0,
 };
 const galleryT = ((key: string) => {
