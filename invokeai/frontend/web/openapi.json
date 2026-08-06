@@ -35178,6 +35178,9 @@
                   "$ref": "#/components/schemas/MiniMaxH3FrameConditioningInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/MiniMaxH3IdealDimensionsInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/MiniMaxH3LatentsToImageInvocation"
                 },
                 {
@@ -43725,6 +43728,9 @@
                 "$ref": "#/components/schemas/MiniMaxH3FrameConditioningInvocation"
               },
               {
+                "$ref": "#/components/schemas/MiniMaxH3IdealDimensionsInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/MiniMaxH3LatentsToImageInvocation"
               },
               {
@@ -45085,6 +45091,9 @@
                 "$ref": "#/components/schemas/MiniMaxH3FrameConditioningInvocation"
               },
               {
+                "$ref": "#/components/schemas/MiniMaxH3IdealDimensionsInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/MiniMaxH3LatentsToImageInvocation"
               },
               {
@@ -46056,6 +46065,9 @@
           "minimax_h3_frame_conditioning": {
             "$ref": "#/components/schemas/MiniMaxH3FrameConditioningOutput"
           },
+          "minimax_h3_ideal_dimensions": {
+            "$ref": "#/components/schemas/IdealSizeOutput"
+          },
           "minimax_h3_latents_to_image": {
             "$ref": "#/components/schemas/ImageOutput"
           },
@@ -46575,6 +46587,7 @@
           "metadata_to_vae",
           "minimax_h3_denoise",
           "minimax_h3_frame_conditioning",
+          "minimax_h3_ideal_dimensions",
           "minimax_h3_latents_to_image",
           "minimax_h3_latents_to_video",
           "minimax_h3_model_loader",
@@ -47358,6 +47371,9 @@
               },
               {
                 "$ref": "#/components/schemas/MiniMaxH3FrameConditioningInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3IdealDimensionsInvocation"
               },
               {
                 "$ref": "#/components/schemas/MiniMaxH3LatentsToImageInvocation"
@@ -48421,6 +48437,9 @@
               },
               {
                 "$ref": "#/components/schemas/MiniMaxH3FrameConditioningInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3IdealDimensionsInvocation"
               },
               {
                 "$ref": "#/components/schemas/MiniMaxH3LatentsToImageInvocation"
@@ -65841,6 +65860,76 @@
         "required": ["output_meta", "frame_conditioning", "type", "type"],
         "title": "MiniMaxH3FrameConditioningOutput",
         "type": "object"
+      },
+      "MiniMaxH3IdealDimensionsInvocation": {
+        "category": "video",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Ideal dimensions for MiniMax H3 from a source image's aspect ratio.\n\nApplies the released pipeline's canvas policy: short edge 768, soft area cap of\n768x1344, both axes rounded to the nearest multiple of 32. Only the aspect ratio of\nthe inputs matters. Aspect ratios beyond 1:4 / 4:1 are rejected. Wire from ``Image\nPrimitive``'s width/height outputs and into the width/height of ``Prompt - MiniMax\nH3``, ``Frame Conditioning - MiniMax H3`` and ``Denoise - MiniMax H3`` (all three\nmust share the same canvas).",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "width": {
+            "default": 1024,
+            "description": "Source image width in pixels.",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 1024,
+            "orig_required": false,
+            "title": "Width",
+            "type": "integer"
+          },
+          "height": {
+            "default": 1024,
+            "description": "Source image height in pixels.",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 1024,
+            "orig_required": false,
+            "title": "Height",
+            "type": "integer"
+          },
+          "type": {
+            "const": "minimax_h3_ideal_dimensions",
+            "default": "minimax_h3_ideal_dimensions",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["minimax", "video", "dimensions", "math"],
+        "title": "MiniMax H3 Ideal Dimensions",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/IdealSizeOutput"
+        }
       },
       "MiniMaxH3LatentsToImageInvocation": {
         "category": "latents",

@@ -1,7 +1,7 @@
 {
   "name": "First Frame to Video - MiniMax H3",
   "author": "InvokeAI",
-  "description": "First-frame-to-video generation with MiniMax H3 (FL2VA): the video starts from your image and animates it per the prompt, with a jointly generated AAC stereo soundtrack muxed into the MP4.",
+  "description": "First-frame-to-video generation with MiniMax H3 (FL2VA): the video starts from your image and animates it per the prompt, with a jointly generated AAC stereo soundtrack muxed into the MP4. The canvas is derived automatically from the image's aspect ratio (768px short edge, max 768x1344).",
   "version": "1.0.0",
   "contact": "",
   "tags": "minimax h3, image to video, first frame, video, audio",
@@ -65,60 +65,6 @@
       "position": {
         "x": -200,
         "y": -250
-      }
-    },
-    {
-      "id": "9bc328ea-83bf-4ac1-98f3-844de0e07208",
-      "type": "invocation",
-      "data": {
-        "id": "9bc328ea-83bf-4ac1-98f3-844de0e07208",
-        "version": "1.0.1",
-        "nodePack": "invokeai",
-        "label": "",
-        "notes": "",
-        "type": "integer",
-        "inputs": {
-          "value": {
-            "name": "value",
-            "label": "Width",
-            "description": "Video width (multiple of 32). Feeds the prompt, frame conditioning and denoise nodes together.",
-            "value": 1344
-          }
-        },
-        "isOpen": true,
-        "isIntermediate": true,
-        "useCache": true
-      },
-      "position": {
-        "x": -200,
-        "y": 100
-      }
-    },
-    {
-      "id": "9c0a326b-9312-4cc4-89cf-cfc13887cd09",
-      "type": "invocation",
-      "data": {
-        "id": "9c0a326b-9312-4cc4-89cf-cfc13887cd09",
-        "version": "1.0.1",
-        "nodePack": "invokeai",
-        "label": "",
-        "notes": "",
-        "type": "integer",
-        "inputs": {
-          "value": {
-            "name": "value",
-            "label": "Height",
-            "description": "Video height (multiple of 32). Feeds the prompt, frame conditioning and denoise nodes together.",
-            "value": 768
-          }
-        },
-        "isOpen": true,
-        "isIntermediate": true,
-        "useCache": true
-      },
-      "position": {
-        "x": -200,
-        "y": 250
       }
     },
     {
@@ -399,6 +345,39 @@
         "x": 1550,
         "y": -50
       }
+    },
+    {
+      "id": "9e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b",
+      "type": "invocation",
+      "data": {
+        "id": "9e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b",
+        "version": "1.0.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "minimax_h3_ideal_dimensions",
+        "inputs": {
+          "width": {
+            "name": "width",
+            "label": "",
+            "description": "",
+            "value": 1024
+          },
+          "height": {
+            "name": "height",
+            "label": "",
+            "description": "",
+            "value": 1024
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": -200,
+        "y": 100
+      }
     }
   ],
   "edges": [
@@ -499,51 +478,67 @@
       "targetHandle": "frame_conditioning"
     },
     {
-      "id": "edge-9bc328ea-value-9b2f7d8c-width",
+      "id": "edge-9f71d3a4-width-9e8d7c6b-width",
       "type": "default",
-      "source": "9bc328ea-83bf-4ac1-98f3-844de0e07208",
-      "target": "9b2f7d8c-2e3f-5c4d-9f2b-3a4e5d6c7b02",
-      "sourceHandle": "value",
+      "source": "9f71d3a4-6f0b-45bd-9c73-a99b40e24b06",
+      "target": "9e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b",
+      "sourceHandle": "width",
       "targetHandle": "width"
     },
     {
-      "id": "edge-9bc328ea-value-9a73db93-width",
+      "id": "edge-9f71d3a4-height-9e8d7c6b-height",
       "type": "default",
-      "source": "9bc328ea-83bf-4ac1-98f3-844de0e07208",
-      "target": "9a73db93-75eb-4468-bba1-d0f9d1c21a07",
-      "sourceHandle": "value",
-      "targetHandle": "width"
-    },
-    {
-      "id": "edge-9bc328ea-value-9d3b9faf-width",
-      "type": "default",
-      "source": "9bc328ea-83bf-4ac1-98f3-844de0e07208",
-      "target": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
-      "sourceHandle": "value",
-      "targetHandle": "width"
-    },
-    {
-      "id": "edge-9c0a326b-value-9b2f7d8c-height",
-      "type": "default",
-      "source": "9c0a326b-9312-4cc4-89cf-cfc13887cd09",
-      "target": "9b2f7d8c-2e3f-5c4d-9f2b-3a4e5d6c7b02",
-      "sourceHandle": "value",
+      "source": "9f71d3a4-6f0b-45bd-9c73-a99b40e24b06",
+      "target": "9e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b",
+      "sourceHandle": "height",
       "targetHandle": "height"
     },
     {
-      "id": "edge-9c0a326b-value-9a73db93-height",
+      "id": "edge-9e8d7c6b-width-9b2f7d8c-width",
       "type": "default",
-      "source": "9c0a326b-9312-4cc4-89cf-cfc13887cd09",
+      "source": "9e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b",
+      "target": "9b2f7d8c-2e3f-5c4d-9f2b-3a4e5d6c7b02",
+      "sourceHandle": "width",
+      "targetHandle": "width"
+    },
+    {
+      "id": "edge-9e8d7c6b-width-9a73db93-width",
+      "type": "default",
+      "source": "9e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b",
       "target": "9a73db93-75eb-4468-bba1-d0f9d1c21a07",
-      "sourceHandle": "value",
+      "sourceHandle": "width",
+      "targetHandle": "width"
+    },
+    {
+      "id": "edge-9e8d7c6b-width-9d3b9faf-width",
+      "type": "default",
+      "source": "9e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b",
+      "target": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+      "sourceHandle": "width",
+      "targetHandle": "width"
+    },
+    {
+      "id": "edge-9e8d7c6b-height-9b2f7d8c-height",
+      "type": "default",
+      "source": "9e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b",
+      "target": "9b2f7d8c-2e3f-5c4d-9f2b-3a4e5d6c7b02",
+      "sourceHandle": "height",
       "targetHandle": "height"
     },
     {
-      "id": "edge-9c0a326b-value-9d3b9faf-height",
+      "id": "edge-9e8d7c6b-height-9a73db93-height",
       "type": "default",
-      "source": "9c0a326b-9312-4cc4-89cf-cfc13887cd09",
+      "source": "9e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b",
+      "target": "9a73db93-75eb-4468-bba1-d0f9d1c21a07",
+      "sourceHandle": "height",
+      "targetHandle": "height"
+    },
+    {
+      "id": "edge-9e8d7c6b-height-9d3b9faf-height",
+      "type": "default",
+      "source": "9e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b",
       "target": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
-      "sourceHandle": "value",
+      "sourceHandle": "height",
       "targetHandle": "height"
     }
   ],
@@ -582,52 +577,6 @@
           "settings": {
             "type": "string-field-config",
             "component": "textarea"
-          }
-        }
-      },
-      "container-h3-size": {
-        "id": "container-h3-size",
-        "parentId": "root",
-        "type": "container",
-        "data": {
-          "layout": "row",
-          "children": [
-            "node-field-h3-width",
-            "node-field-h3-height"
-          ]
-        }
-      },
-      "node-field-h3-width": {
-        "id": "node-field-h3-width",
-        "parentId": "container-h3-size",
-        "type": "node-field",
-        "data": {
-          "fieldIdentifier": {
-            "nodeId": "9bc328ea-83bf-4ac1-98f3-844de0e07208",
-            "fieldName": "value"
-          },
-          "showDescription": true,
-          "settings": {
-            "type": "integer-field-config",
-            "showShuffle": false,
-            "component": "number-input"
-          }
-        }
-      },
-      "node-field-h3-height": {
-        "id": "node-field-h3-height",
-        "parentId": "container-h3-size",
-        "type": "node-field",
-        "data": {
-          "fieldIdentifier": {
-            "nodeId": "9c0a326b-9312-4cc4-89cf-cfc13887cd09",
-            "fieldName": "value"
-          },
-          "showDescription": true,
-          "settings": {
-            "type": "integer-field-config",
-            "showShuffle": false,
-            "component": "number-input"
           }
         }
       },
@@ -710,7 +659,6 @@
             "heading-h3-gen",
             "node-field-h3-image",
             "node-field-h3-prompt",
-            "container-h3-size",
             "container-h3-len",
             "divider-h3",
             "heading-h3-model",
