@@ -40,6 +40,38 @@ def _looks_like_pid_decoder(state_dict: dict[str | int, Any]) -> bool:
     return any(isinstance(k, str) and _PID_MARKER_SUBSTRING in k for k in state_dict)
 
 
+# NVIDIA's official `.pth` checkpoints keep PidDistillModel's `net.` prefix, and carry the other distill
+# submodules alongside the student. Mirrors `_strip_net_prefix` in
+# invokeai/backend/model_manager/load/model_loaders/pid_decoder.py, which is what the loader actually
+# feeds to `load_pid_decoder`.
+_NET_PREFIX = "net."
+
+
+def _pid_net_keys(state_dict: dict[str | int, Any]) -> set[str]:
+    """The checkpoint's keys as PidNet will see them (i.e. with the `net.` prefix stripped)."""
+    return {k[len(_NET_PREFIX) :] if k.startswith(_NET_PREFIX) else k for k in state_dict if isinstance(k, str)}
+
+
+def _raise_if_lq_projection_incomplete(state_dict: dict[str | int, Any], base: BaseModelType) -> None:
+    """Reject a checkpoint that carries only part of the LQ projection.
+
+    A single `lq_proj.*` key is not evidence of a usable decoder: models are built under
+    `skip_torch_weight_init()`, so every weight the checkpoint does not supply stays uninitialised
+    memory (`load_pid_decoder` therefore rejects missing keys too). Catching it here means an
+    incomplete file is reported at install time instead of decoding to garbage or NaNs later.
+    """
+    # Imported lazily: it pulls in the vendored PiD network stack, which model identification
+    # otherwise has no reason to load.
+    from invokeai.backend.pid.decode import required_lq_proj_keys
+
+    missing = sorted(required_lq_proj_keys(base) - _pid_net_keys(state_dict))
+    if missing:
+        raise NotAMatchError(
+            f"PiD checkpoint is missing {len(missing)} of the LQ projection weights required by PidNet "
+            f"(e.g. {missing[:3]}); the file is incomplete or is not a PiD super-resolution decoder"
+        )
+
+
 # The latent input projection (`lq_proj.latent_proj.0`) is a Conv2d whose
 # in-channel count equals the backbone's latent channel count — the released
 # sr4x checkpoints apply no spatial fold here, so the Conv's dim-1 is exactly
@@ -119,15 +151,28 @@ def _backbone_from_filename(name: str) -> BaseModelType | None:
     return None
 
 
-def _variant_from_filename(name: str) -> PiDDecoderVariantType:
-    """Map NVIDIA's `res2k_sr4x` / `res2kto4k_sr4x` filename slice to a variant.
+# Backbones for which NVIDIA ships exactly one preset — for these the variant is known even when the
+# name gives nothing away. FLUX.1 / FLUX.2 / SD3 ship both presets and fall back to `Res2k_Sr4x`.
+_SINGLE_VARIANT_BACKBONES: dict[BaseModelType, PiDDecoderVariantType] = {
+    BaseModelType.StableDiffusionXL: PiDDecoderVariantType.Res2kTo4k_Sr4x,
+    BaseModelType.QwenImage: PiDDecoderVariantType.Res2kTo4k_Sr4x,
+}
 
-    Defaults to ``Res2k_Sr4x`` when no clear marker is present.
+
+def _variant_from_name(name: str, base: BaseModelType) -> PiDDecoderVariantType:
+    """Map NVIDIA's `res2k_sr4x` / `res2kto4k_sr4x` name slice to a variant.
+
+    A direct single-file install is stored as ``<uuid>/model_ema_bf16.pth``, so the on-disk name says
+    nothing — hence the caller also feeds in the install source, which for an HF / URL install still
+    carries NVIDIA's directory name. If neither does, fall back to the backbone's only published
+    preset where there is one, and to ``Res2k_Sr4x`` for the backbones that ship both.
     """
     n = name.lower()
     if "res2kto4k" in n or "res2k_to_4k" in n or "res2k_to4k" in n:
         return PiDDecoderVariantType.Res2kTo4k_Sr4x
-    return PiDDecoderVariantType.Res2k_Sr4x
+    if "res2k" in n:
+        return PiDDecoderVariantType.Res2k_Sr4x
+    return _SINGLE_VARIANT_BACKBONES.get(base, PiDDecoderVariantType.Res2k_Sr4x)
 
 
 class PiDDecoder_Checkpoint_Config_Base(Checkpoint_Config_Base):
@@ -135,9 +180,9 @@ class PiDDecoder_Checkpoint_Config_Base(Checkpoint_Config_Base):
 
     Concrete subclasses pin `base` to a specific backbone. Backbone matching is
     driven primarily by the latent channel count read from the weights, with the
-    filename / directory name as a tie-breaker for the architecturally identical
-    FLUX.1 / SD3 pair. `variant` is carried as data without participating in the
-    discriminator tag (one config class per backbone).
+    install source and the on-disk name as a tie-breaker for the architecturally
+    identical FLUX.1 / SD3 / Qwen-Image family. `variant` is carried as data
+    without participating in the discriminator tag (one config class per backbone).
     """
 
     type: Literal[ModelType.PiDDecoder] = Field(default=ModelType.PiDDecoder)
@@ -162,31 +207,46 @@ class PiDDecoder_Checkpoint_Config_Base(Checkpoint_Config_Base):
                 f"{_SUPPORTED_LQ_HIDDEN_DIM}-dim architecture (NVIDIA's v1.5 checkpoints are not yet supported)."
             )
 
-        # Whether the caller explicitly pinned a base (e.g. a starter-model install passes base=sd-3).
-        # In the ambiguous 16-channel FLUX.1/SD3 case this override is trusted when the filename is silent.
-        had_base_override = override_fields.get("base") is not None
-        cls._validate_base(mod, state_dict, had_base_override=had_base_override)
+        # A direct single-file install stores the checkpoint as `<uuid>/model_ema_bf16.pth`, dropping
+        # NVIDIA's `…official_sd3_distill…` directory name. The install source (an HF path or URL)
+        # survives intact, so it is matched alongside the on-disk name for both backbone and variant.
+        name = f"{override_fields.get('source') or ''} {_name_for_matching(mod)}"
 
-        variant = override_fields.pop("variant", None) or _variant_from_filename(_name_for_matching(mod))
+        # Whether the caller explicitly pinned a base (e.g. a starter-model install passes base=sd-3).
+        # In the ambiguous 16-channel FLUX.1/SD3 case this override is trusted when the name is silent.
+        had_base_override = override_fields.get("base") is not None
+        cls._validate_base(mod, state_dict, name=name, had_base_override=had_base_override)
+
+        base: BaseModelType = cls.model_fields["base"].default
+        # Only a complete LQ projection is loadable — see `_raise_if_lq_projection_incomplete`.
+        _raise_if_lq_projection_incomplete(state_dict, base)
+
+        variant = override_fields.pop("variant", None) or _variant_from_name(name, base)
         return cls(**override_fields, variant=variant)
 
     @classmethod
     def _validate_base(
-        cls, mod: ModelOnDisk, state_dict: dict[str | int, Any], *, had_base_override: bool = False
+        cls,
+        mod: ModelOnDisk,
+        state_dict: dict[str | int, Any],
+        *,
+        name: str | None = None,
+        had_base_override: bool = False,
     ) -> None:
         """Confirm this checkpoint belongs to the config's pinned backbone.
 
         The latent channel count (read from the weights) is authoritative and
-        separates FLUX.2 (128ch) from the 16ch family. FLUX.1 and SD3 share an
-        identical architecture, so within the 16ch family we fall back to the
-        filename / directory name, defaulting to FLUX.1 when it is silent.
+        separates FLUX.2 (128ch) from the 16ch family. FLUX.1, SD3 and Qwen-Image
+        share an identical architecture, so within the 16ch family we fall back to
+        ``name`` (the install source plus the on-disk file / directory name),
+        defaulting to FLUX.1 when it is silent.
 
         ``had_base_override`` is True when the caller explicitly pinned ``base``
         (e.g. a starter-model install). In the ambiguous 16ch case, a trusted
-        override wins over the FLUX.1 default — necessary because the HF
-        single-file download renames the parent directory, dropping the
-        ``…official_sd3_distill…`` hint that would otherwise identify SD3.
+        override wins over the FLUX.1 default — the last resort for a checkpoint
+        whose name says nothing at all.
         """
+        name = name if name is not None else _name_for_matching(mod)
         expected_base = cls.model_fields["base"].default
         channels = _latent_channels_from_state_dict(state_dict)
 
@@ -200,8 +260,8 @@ class PiDDecoder_Checkpoint_Config_Base(Checkpoint_Config_Base):
             if expected_base not in candidate_bases:
                 raise NotAMatchError(f"latent channels={channels} do not match backbone {expected_base}")
             if len(candidate_bases) > 1:
-                # Ambiguous 16ch family — disambiguate FLUX.1 vs SD3 by name.
-                named_base = _backbone_from_filename(_name_for_matching(mod))
+                # Ambiguous 16ch family — disambiguate FLUX.1 / SD3 / Qwen-Image by name.
+                named_base = _backbone_from_filename(name)
                 if named_base in candidate_bases:
                     if named_base is not expected_base:
                         raise NotAMatchError(f"name indicates {named_base}, not {expected_base}")
@@ -213,8 +273,8 @@ class PiDDecoder_Checkpoint_Config_Base(Checkpoint_Config_Base):
                     raise NotAMatchError("ambiguous 16-channel PiD checkpoint; defaulting to FLUX.1")
             return
 
-        # No diagnostic weight (unexpected) → fall back to filename-only matching.
-        inferred_base = _backbone_from_filename(_name_for_matching(mod))
+        # No diagnostic weight (unexpected) → fall back to name-only matching.
+        inferred_base = _backbone_from_filename(name)
         if inferred_base is None:
             raise NotAMatchError(
                 "cannot determine PiD decoder backbone from weights or filename "

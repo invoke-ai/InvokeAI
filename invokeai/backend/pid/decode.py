@@ -20,12 +20,14 @@ from __future__ import annotations
 
 from contextlib import nullcontext
 from dataclasses import dataclass, field
+from functools import lru_cache
 from typing import Optional
 
 import torch
 from torch import Tensor
 
 from invokeai.backend.model_manager.taxonomy import BaseModelType
+from invokeai.backend.pid._src.networks.lq_projection_2d import LQProjection2D
 from invokeai.backend.pid._src.networks.pid_net import PidNet
 
 # ---------------------------------------------------------------------------
@@ -163,6 +165,52 @@ def build_pid_net(backbone: BaseModelType) -> PidNet:
     return PidNet(**kwargs)
 
 
+# Feature width used by the `lq_proj` key-name probe below. Parameter *names* depend only on the
+# structural counts (which branches exist, how many res blocks, how many injection points), never on
+# the tensor dims, so the probe can be built with an 8-wide feature map and costs nothing.
+_LQ_PROBE_DIM = 8
+
+# PidNet's own default for `lq_num_res_blocks` — not part of `_PID_SR4X_BASE`, so the probe has to
+# repeat it. `test_pid_decode.py` asserts the two stay in sync.
+_LQ_NUM_RES_BLOCKS_DEFAULT = 4
+
+
+@lru_cache(maxsize=None)
+def required_lq_proj_keys(backbone: BaseModelType) -> frozenset[str]:
+    """Names (relative to PidNet) of every `lq_proj.*` parameter a built PidNet expects.
+
+    Used by the model-manager config to reject a checkpoint that carries only *some* of the LQ
+    projection — see `load_pid_decoder` for why a partial LQ projection is not loadable.
+
+    Derived from a throwaway `LQProjection2D` built with the real structural counts but tiny feature
+    dims, so it stays in step with the vendored network instead of duplicating a hand-written list.
+    """
+    if backbone not in _PER_BACKBONE:
+        raise ValueError(
+            f"PiD decoder backbone {backbone!r} is not supported. Expected one of: {list(_PER_BACKBONE.keys())}."
+        )
+    kwargs = {**_PID_SR4X_BASE, **_PER_BACKBONE[backbone]}
+    patch_depth = int(kwargs["patch_depth"])
+    interval = int(kwargs["lq_interval"])
+    probe = LQProjection2D(
+        in_channels=int(kwargs["lq_in_channels"]),
+        latent_channels=int(kwargs["lq_latent_channels"]),
+        hidden_dim=_LQ_PROBE_DIM,
+        out_dim=_LQ_PROBE_DIM,
+        patch_size=int(kwargs["patch_size"]),
+        sr_scale=int(kwargs["sr_scale"]),
+        latent_spatial_down_factor=int(kwargs["latent_spatial_down_factor"]),
+        num_res_blocks=_LQ_NUM_RES_BLOCKS_DEFAULT,
+        # Mirrors PidNet.__init__: one injection point every `lq_interval` patch blocks.
+        num_outputs=(patch_depth + interval - 1) // interval,
+        gate_type=str(kwargs["lq_gate_type"]),
+        interval=interval,
+        zero_init=bool(kwargs["zero_init_lq"]),
+        pit_output=bool(kwargs["pit_lq_inject"]),
+    )
+    return frozenset(f"lq_proj.{k}" for k in probe.state_dict())
+
+
 def load_pid_decoder(state_dict: dict[str, Tensor], backbone: BaseModelType) -> PidNet:
     """Instantiate a PidNet for *backbone* and populate it with *state_dict*.
 
@@ -172,9 +220,10 @@ def load_pid_decoder(state_dict: dict[str, Tensor], backbone: BaseModelType) -> 
     returned net.
     """
     net = build_pid_net(backbone)
-    # strict=False keeps parity with the upstream loader: missing LQ-projection
-    # keys are tolerated when reloading PixDiT_T2I weights into PidNet, and
-    # extra keys (e.g. legacy EMA artefacts) are dropped.
+    # strict=False so we can report missing and unexpected keys separately; both are fatal. The model
+    # cache builds loaders under `skip_torch_weight_init()`, which no-ops every `reset_parameters()`,
+    # so a key the checkpoint does not supply is left as uninitialised memory rather than a sane
+    # default — a partial checkpoint would decode to garbage / NaNs instead of failing.
     missing, unexpected = net.load_state_dict(state_dict, strict=False)
     if unexpected:
         raise RuntimeError(
@@ -182,15 +231,17 @@ def load_pid_decoder(state_dict: dict[str, Tensor], backbone: BaseModelType) -> 
             + (f" (+ {len(unexpected) - 5} more)" if len(unexpected) > 5 else "")
         )
     if missing:
-        # We tolerate missing `lq_proj.*` (e.g. if the user accidentally
-        # passed a vanilla PixDiT_T2I checkpoint), but anything else points
-        # to a real architecture mismatch.
-        non_lq = [k for k in missing if "lq_proj" not in k]
-        if non_lq:
-            raise RuntimeError(
-                f"PiD checkpoint is missing non-LQ keys required by PidNet: {non_lq[:5]}"
-                + (f" (+ {len(non_lq) - 5} more)" if len(non_lq) > 5 else "")
-            )
+        lq = [k for k in missing if k.startswith("lq_proj.")]
+        detail = (
+            " (the LQ projection is incomplete — this looks like a base PixDiT_T2I checkpoint rather than a "
+            "PiD super-resolution decoder)"
+            if lq and len(lq) == len(missing)
+            else ""
+        )
+        raise RuntimeError(
+            f"PiD checkpoint is missing {len(missing)} keys required by PidNet{detail}: {missing[:5]}"
+            + (f" (+ {len(missing) - 5} more)" if len(missing) > 5 else "")
+        )
     return net
 
 
@@ -517,4 +568,5 @@ __all__ = [
     "build_pid_net",
     "encode_caption_for_pid",
     "load_pid_decoder",
+    "required_lq_proj_keys",
 ]
