@@ -75,6 +75,11 @@ export type Feature =
   | 'scaleBeforeProcessing'
   | 'seamlessTilingXAxis'
   | 'seamlessTilingYAxis'
+  | 'hidiffusion'
+  | 'hidiffusionRauNet'
+  | 'hidiffusionWindowAttn'
+  | 'hidiffusionT1Ratio'
+  | 'hidiffusionT2Ratio'
   | 'colorCompensation'
   | 'upscaleModel'
   | 'scale'
@@ -246,6 +251,13 @@ export const POPOVER_DATA: { [key in Feature]?: PopoverData } = {
   seamlessTilingYAxis: {
     href: 'https://support.invoke.ai/support/solutions/articles/151000178161-advanced-settings',
   },
+  hidiffusion: {
+    href: 'https://github.com/megvii-research/HiDiffusion',
+  },
+  hidiffusionRauNet: {},
+  hidiffusionWindowAttn: {},
+  hidiffusionT1Ratio: {},
+  hidiffusionT2Ratio: {},
 } as const;
 
 export const OPEN_DELAY = 1000; // in milliseconds
