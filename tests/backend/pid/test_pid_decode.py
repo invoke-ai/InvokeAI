@@ -12,6 +12,7 @@ from invokeai.backend.pid.decode import (
     _student_sample_loop,
     _velocity_to_x0,
     assert_pid_decoder_matches_base,
+    estimate_pid_decode_working_memory,
 )
 
 _CPU = torch.device("cpu")
@@ -106,6 +107,60 @@ def test_student_sample_loop_passes_per_call_activation_chunk_size(
 
 def test_pid_memory_optimization_defaults_to_disabled() -> None:
     assert PiDDecodeConfig().pid_memory_optimization is False
+
+
+def test_working_memory_estimate_shrinks_when_the_optimization_is_enabled() -> None:
+    """Wiring the flag into the decode but not into the estimate is worse than not wiring it at all.
+
+    The cache takes `max(working_mem_bytes, device_working_mem_gb)` and subtracts it from the weight
+    budget, so an estimate calibrated for the unoptimized peak withholds precisely the VRAM the
+    optimization just freed, and PidNet partial-loads to CPU on the machines this feature targets.
+    """
+    latent = torch.zeros(1, 16, 64, 64)  # FLUX: 64 * 4 * 8 = 2048px output
+
+    unoptimized = estimate_pid_decode_working_memory(latent, BaseModelType.Flux)
+    optimized = estimate_pid_decode_working_memory(latent, BaseModelType.Flux, True)
+
+    assert optimized < unoptimized
+    # Measured peaks at 2048px on an RTX 4090: 3.68 GiB unoptimized, 1.50 GiB optimized. The estimates
+    # must sit above their own peak (headroom) and below the other mode's (or the flag buys nothing).
+    gib = 1024**3
+    assert 1.50 * gib < optimized < 2.50 * gib
+    assert 3.68 * gib < unoptimized < 4.50 * gib
+
+
+def test_working_memory_estimate_keeps_a_fixed_term_for_the_chunk_working_set() -> None:
+    """The optimized peak is not a pure multiple of the output size.
+
+    Chunking bounds the per-block activations to a fixed working set, so halving the output area does
+    not halve the peak (measured: 509 MiB at 1024px vs 1533 MiB at 2048px — a factor of 3.0, not 4).
+    A pure scaling constant would therefore under-reserve at small sizes or over-reserve at large ones.
+    """
+    small = estimate_pid_decode_working_memory(torch.zeros(1, 16, 32, 32), BaseModelType.Flux, True)
+    large = estimate_pid_decode_working_memory(torch.zeros(1, 16, 64, 64), BaseModelType.Flux, True)
+
+    assert large < 4 * small, "the estimate scales purely with area — the fixed chunk term is missing"
+    assert large > 2 * small, "the per-pixel term has been lost"
+
+
+def test_working_memory_estimate_never_exceeds_the_unoptimized_one() -> None:
+    """Below the chunk size the pixel blocks run unchunked, so the fixed chunk-working-set term must
+    not be charged: a small output would otherwise reserve *more* with the optimization enabled than
+    without it.
+    """
+    # 8 * 4 * 8 = 256px output -> 256 patch tokens, well under the 1024-token chunk size.
+    small_latent = torch.zeros(1, 16, 8, 8)
+
+    optimized = estimate_pid_decode_working_memory(small_latent, BaseModelType.Flux, True)
+    unoptimized = estimate_pid_decode_working_memory(small_latent, BaseModelType.Flux)
+
+    assert optimized <= unoptimized
+
+
+def test_working_memory_estimate_still_returns_zero_for_unsupported_backbones() -> None:
+    latent = torch.zeros(1, 16, 64, 64)
+    for optimized in (False, True):
+        assert estimate_pid_decode_working_memory(latent, BaseModelType.StableDiffusion1, optimized) == 0
 
 
 def test_matching_decoder_base_is_accepted() -> None:

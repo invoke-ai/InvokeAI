@@ -539,6 +539,19 @@ class PiTBlock(nn.Module):
         return x
 
     def _compress_activation_chunk(self, x: torch.Tensor, s_cond: torch.Tensor) -> torch.Tensor:
+        """First half of a chunk: adaLN + norm1, compressed to one attention token per patch.
+
+        This recomputes ``adaLN_modulation`` that ``_finish_activation_chunk`` computes again, and that
+        is deliberate. Global attention sits between the two halves, so the four slices the second half
+        needs would have to be held for *every* chunk across the attention call - i.e. the full-resolution
+        ``[BL, P2, 4*pixel_dim]`` tensor this whole path exists to avoid (536 MiB in bf16 at 2048px).
+        Recomputing trades roughly 9.9 TFLOP per 2048px decode for that, measured at ~4% wall clock,
+        which is the honest source of the "slower decoding" the setting advertises.
+
+        Computing only the needed slices instead is not the way out either: the six slices are interleaved
+        per pixel position in the projection's output, so selecting two of them means gathering rows of a
+        1536x24576 weight - a ~50 MiB copy per call, spending memory to save the compute.
+        """
         patch_batch, pixels_per_patch, _ = x.shape
         cond_params = self.adaLN_modulation(s_cond).view(patch_batch, pixels_per_patch, 6 * self.pixel_dim)
         shift_msa, scale_msa = torch.chunk(cond_params, 6, dim=-1)[:2]

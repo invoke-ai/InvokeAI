@@ -564,7 +564,7 @@
     {
       "category": "GENERATION",
       "default": false,
-      "description": "Enable experimental PiD decode memory optimizations at the cost of slower decoding.",
+      "description": "Enable experimental PiD decode memory optimizations. Roughly halves the peak activation memory of a PiD decode; in exchange the decoded image changes slightly, because neither the chunked pixel pathway nor the float32 sampler intermediates are bit-exact with the default path.",
       "env_var": "INVOKEAI_PID_MEMORY_OPTIMIZATION",
       "literal_values": [],
       "name": "pid_memory_optimization",
