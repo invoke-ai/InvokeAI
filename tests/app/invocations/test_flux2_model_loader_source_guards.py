@@ -1,12 +1,20 @@
 """The FLUX.2 loaders' cross-variant guard must gate the *encoder* extraction path only.
 
-Klein and [dev] share the same 32-channel `AutoencoderKLFlux2`, and the linear UI relies on that:
-`buildFLUXGraph` falls back to *any* FLUX.2 diffusers pipeline when only the VAE is needed, and
-neither `isFlux2DiffusersMainModelConfig` nor readiness filter by variant. A variant guard on the
-VAE-extraction call site therefore turns a working configuration (GGUF main + standalone encoder +
-a cross-variant diffusers pipeline as the only VAE source) into a runtime `ValueError` behind an
-enabled Invoke button. The encoder path must still reject cross-variant sources, because a
-mismatched tokenizer/encoder only surfaces as an opaque matmul error deep in denoise.
+Klein and [dev] share the same 32-channel `AutoencoderKLFlux2` — the repo ships the Klein-sourced
+`flux2_vae` as a dependency of every [dev] GGUF starter model — so a cross-variant pipeline is a
+legitimate VAE source. In the *Klein* linear UI that is load-bearing: `buildFLUXGraph` falls back to
+any FLUX.2 diffusers pipeline when only the VAE is needed, and `isFlux2DiffusersMainModelConfig`
+does not filter by variant, so a variant guard on the VAE-extraction call site would turn a working
+configuration (GGUF main + standalone encoder + a cross-variant diffusers pipeline as the only VAE
+source) into a runtime `ValueError` behind an enabled Invoke button. The [dev] linear UI is
+stricter — it sources from dev-only pipelines and readiness gates on one — so there the same
+configuration is reachable through the workflow editor rather than the linear UI. Either way the
+backend stays permissive on the VAE path.
+
+The encoder path must still reject cross-variant sources, because a mismatched tokenizer/encoder
+only surfaces as an opaque matmul error deep in denoise. That includes Klein-vs-Klein mismatches:
+`qwen3_source_model` is not variant-filtered in the workflow editor, so a 9B pipeline can be wired
+in as the encoder source for a 4B transformer.
 """
 
 from types import SimpleNamespace
@@ -102,6 +110,106 @@ def test_klein_loader_rejects_a_dev_pipeline_as_encoder_source() -> None:
     )
 
     with pytest.raises(ValueError, match="must be a FLUX.2 Klein pipeline"):
+        invocation.invoke(context)
+
+
+@pytest.mark.parametrize(
+    ("main_variant", "source_variant"),
+    [
+        (Flux2VariantType.Klein4B, Flux2VariantType.Klein9B),
+        (Flux2VariantType.Klein9B, Flux2VariantType.Klein4BBase),
+    ],
+)
+def test_klein_loader_rejects_a_mismatched_klein_pipeline_as_encoder_source(
+    main_variant: Flux2VariantType, source_variant: Flux2VariantType
+) -> None:
+    """Rejecting only [dev] left the Klein-vs-Klein case open: a 9B pipeline carries a Qwen3 8B
+    encoder, which produces wrong-width conditioning against a 4B transformer and fails as an
+    opaque matmul error deep in denoise. The frontend and the standalone-encoder path both enforce
+    the family match, so the workflow editor's `qwen3_source_model` was the only way in."""
+    main = _identifier("klein-gguf")
+    source = _identifier("klein-diffusers")
+
+    invocation = Flux2KleinModelLoaderInvocation.model_construct(
+        model=main,
+        vae_model=None,
+        qwen3_encoder_model=None,
+        qwen3_source_model=source,
+        max_seq_len=512,
+    )
+    context = _context(
+        {
+            "klein-gguf": SimpleNamespace(name="Klein main", format=ModelFormat.GGUFQuantized, variant=main_variant),
+            "klein-diffusers": SimpleNamespace(
+                name="Klein source", format=ModelFormat.Diffusers, variant=source_variant
+            ),
+        }
+    )
+
+    with pytest.raises(ValueError, match="Qwen3 encoder variant mismatch"):
+        invocation.invoke(context)
+
+
+def test_klein_loader_accepts_a_same_family_klein_pipeline_as_encoder_source() -> None:
+    """The distilled and Base variants of one size share a Qwen3 encoder, so they remain valid
+    sources for each other — the guard matches on the Qwen3 family, not on the exact variant."""
+    main = _identifier("klein-gguf")
+    source = _identifier("klein-diffusers")
+
+    invocation = Flux2KleinModelLoaderInvocation.model_construct(
+        model=main,
+        vae_model=None,
+        qwen3_encoder_model=None,
+        qwen3_source_model=source,
+        max_seq_len=512,
+    )
+    context = _context(
+        {
+            "klein-gguf": SimpleNamespace(
+                name="Klein 9B", format=ModelFormat.GGUFQuantized, variant=Flux2VariantType.Klein9B
+            ),
+            "klein-diffusers": SimpleNamespace(
+                name="Klein 9B Base", format=ModelFormat.Diffusers, variant=Flux2VariantType.Klein9BBase
+            ),
+        }
+    )
+
+    output = invocation.invoke(context)
+
+    assert output.qwen3_encoder.text_encoder.key == "klein-diffusers"
+    assert output.qwen3_encoder.text_encoder.submodel_type == SubModelType.TextEncoder
+    assert output.vae.vae.key == "klein-diffusers"
+
+
+def test_klein_loader_rejects_a_standalone_encoder_from_the_wrong_family() -> None:
+    """The standalone-encoder guard shares the Klein->Qwen3 map with the source guard; it had no
+    negative-path coverage at all, so a regression there would have been silent."""
+    main = _identifier("klein-gguf")
+    encoder = _identifier("qwen3-8b", ModelType.Qwen3Encoder)
+    source = _identifier("klein-diffusers")
+
+    invocation = Flux2KleinModelLoaderInvocation.model_construct(
+        model=main,
+        vae_model=None,
+        qwen3_encoder_model=encoder,
+        qwen3_source_model=source,
+        max_seq_len=512,
+    )
+    context = _context(
+        {
+            "klein-gguf": SimpleNamespace(
+                name="Klein 4B", format=ModelFormat.GGUFQuantized, variant=Flux2VariantType.Klein4B
+            ),
+            "qwen3-8b": SimpleNamespace(
+                name="Qwen3 8B", format=ModelFormat.Diffusers, variant=Qwen3VariantType.Qwen3_8B
+            ),
+            "klein-diffusers": SimpleNamespace(
+                name="Klein 4B", format=ModelFormat.Diffusers, variant=Flux2VariantType.Klein4B
+            ),
+        }
+    )
+
+    with pytest.raises(ValueError, match="Qwen3 encoder variant mismatch"):
         invocation.invoke(context)
 
 

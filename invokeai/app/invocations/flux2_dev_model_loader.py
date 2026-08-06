@@ -175,9 +175,16 @@ class Flux2DevModelLoaderInvocation(BaseInvocation):
         """Validate that a model is a Diffusers-format pipeline and return its config.
 
         Deliberately format-only, because this also gates the VAE-extraction path: the 32-channel
-        ``AutoencoderKLFlux2`` is shared between Klein and [dev], and the linear UI relies on that
-        (``buildFLUXGraph`` falls back to *any* FLUX.2 diffusers pipeline when only the VAE is
-        needed). Variant gating belongs to the encoder path only — see ``_validate_encoder_source``.
+        ``AutoencoderKLFlux2`` is shared between Klein and [dev] — the repo ships the Klein-sourced
+        ``flux2_vae`` as a dependency of every [dev] GGUF starter model — so a Klein pipeline is a
+        legitimate VAE source for a [dev] transformer. ``mistral_source_model`` is not
+        variant-filtered in the workflow editor, so the *encoder* path is where variant gating
+        belongs — see ``_validate_encoder_source``.
+
+        Note the [dev] linear UI is stricter than this: ``buildFLUXGraph`` sources from dev-only
+        pipelines and readiness gates on one, so the Klein-pipeline-as-VAE-source case is reachable
+        through the workflow editor only. (The Klein loader's linear UI *does* fall back to any
+        FLUX.2 diffusers pipeline for the VAE.)
         """
         config = context.models.get_config(model)
         if config.format != ModelFormat.Diffusers:
