@@ -1,3 +1,5 @@
+import type { AppStore } from 'app/store/store';
+import { setHiDiffusionEnabled } from 'features/controlLayers/store/paramsSlice';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ImageMetadataHandlers, MetadataUtils, parseMetadataHandler } from './parsing';
@@ -157,5 +159,39 @@ describe('Qwen metadata parsing', () => {
     expect(recalled.size).toBe(1);
     const mockStore = store as ReturnType<typeof createMockStore>;
     expect(mockStore.dispatch).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('HiDiffusion metadata parsing', () => {
+  it('disables HiDiffusion when recalling all metadata from an older image', async () => {
+    let hiDiffusionEnabled = true;
+    const store = {
+      dispatch: vi.fn((action) => {
+        if (action.type === setHiDiffusionEnabled.type) {
+          hiDiffusionEnabled = action.payload;
+        }
+        return action;
+      }),
+      getState: vi.fn(() => ({
+        params: { model: null },
+      })),
+    } as unknown as AppStore;
+
+    await MetadataUtils.recallAllImageMetadata(
+      {
+        generation_mode: 'txt2img',
+        width: 512,
+        height: 512,
+        steps: 20,
+        cfg_scale: 7.5,
+        scheduler: 'euler',
+        positive_prompt: 'an older image',
+        negative_prompt: '',
+      },
+      store
+    );
+
+    expect(store.dispatch).toHaveBeenCalledWith(setHiDiffusionEnabled(false));
+    expect(hiDiffusionEnabled).toBe(false);
   });
 });
