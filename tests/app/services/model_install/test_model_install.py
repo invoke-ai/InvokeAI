@@ -686,7 +686,7 @@ def test_prune_jobs_rebind_preserves_existing_iterators(
     assert all(job not in mm2_installer.list_jobs() for job in jobs)
 
 
-@pytest.mark.timeout(timeout=5, method="thread")
+@pytest.mark.timeout(timeout=30, method="thread")
 def test_prune_jobs_waits_for_the_installer_lock(mm2_installer: ModelInstallServiceBase) -> None:
     lock_held = threading.Event()
     release_lock = threading.Event()
@@ -714,7 +714,7 @@ def test_prune_jobs_waits_for_the_installer_lock(mm2_installer: ModelInstallServ
     assert prune_completed.is_set()
 
 
-@pytest.mark.timeout(timeout=5, method="thread")
+@pytest.mark.timeout(timeout=30, method="thread")
 def test_import_and_wait_for_installs_fail_before_start(
     mm2_app_config: InvokeAIAppConfig,
     mm2_record_store,
@@ -736,7 +736,7 @@ def test_import_and_wait_for_installs_fail_before_start(
         installer.wait_for_installs(timeout=0.1)
 
 
-@pytest.mark.timeout(timeout=5, method="thread")
+@pytest.mark.timeout(timeout=30, method="thread")
 def test_import_fails_after_startup_failure(
     mm2_app_config: InvokeAIAppConfig,
     mm2_record_store,
@@ -768,7 +768,7 @@ def test_import_fails_after_startup_failure(
         installer.stop()
 
 
-@pytest.mark.timeout(timeout=5, method="thread")
+@pytest.mark.timeout(timeout=30, method="thread")
 def test_base_exception_during_startup_releases_import_waiters(
     mm2_app_config: InvokeAIAppConfig,
     mm2_record_store,

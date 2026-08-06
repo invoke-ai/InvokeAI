@@ -193,3 +193,72 @@ def test_shutdown_race_cancels_fresh_claim_instead_of_running_it():
 
     assert run_items == []
     assert canceled == [42]
+
+
+def test_cuda_device_pin_is_deferred_until_first_claim_and_runs_once():
+    """An idle CUDA worker must not create a context, then must pin before its first run only."""
+    from threading import BoundedSemaphore, Event
+    from unittest.mock import MagicMock, patch
+
+    import torch
+
+    from invokeai.app.services.session_processor.session_processor_default import _SessionWorker
+
+    stop_event = Event()
+    resume_event = Event()
+    resume_event.set()
+    poll_now_event = Event()
+    events: list[str] = []
+
+    first = SimpleNamespace(item_id=1, session_id="first", queue_id="default")
+    second = SimpleNamespace(item_id=2, session_id="second", queue_id="default")
+
+    class _ClaimQueue:
+        def __init__(self):
+            self.items = iter([None, first, second])
+
+        def dequeue(self, device=None):
+            item = next(self.items)
+            events.append(f"dequeue:{item.item_id if item else 'empty'}")
+            return item
+
+        def get_queue_item(self, item_id: int):
+            return SimpleNamespace(item_id=item_id, status="in_progress")
+
+    runner = MagicMock()
+
+    def run_item(item):
+        events.append(f"run:{item.item_id}")
+        if item.item_id == second.item_id:
+            stop_event.set()
+
+    runner.workflow_call_queue_lifecycle.run_queue_item.side_effect = run_item
+    worker = _SessionWorker(device=torch.device("cuda:1"), runner=runner)
+    processor = DefaultSessionProcessor()
+    processor._invoker = SimpleNamespace(  # type: ignore[attr-defined]
+        services=SimpleNamespace(session_queue=_ClaimQueue(), logger=MagicMock(), image_moves=None)
+    )
+    processor._polling_interval = 0
+    processor._thread_semaphore = BoundedSemaphore(1)
+
+    with (
+        patch(
+            "invokeai.app.services.session_processor.session_processor_default.torch.cuda.set_device",
+            side_effect=lambda device: events.append(f"pin:{device}"),
+        ) as mock_set_device,
+        patch(
+            "invokeai.app.services.session_processor.session_processor_default.GENERATION_DEVICE_POOL.acquire_session"
+        ),
+        patch(
+            "invokeai.app.services.session_processor.session_processor_default.GENERATION_DEVICE_POOL.release_session"
+        ),
+    ):
+        processor._process(
+            worker=worker,
+            stop_event=stop_event,
+            poll_now_event=poll_now_event,
+            resume_event=resume_event,
+        )
+
+    assert events == ["dequeue:empty", "dequeue:1", "pin:cuda:1", "run:1", "dequeue:2", "run:2"]
+    mock_set_device.assert_called_once_with(torch.device("cuda:1"))
