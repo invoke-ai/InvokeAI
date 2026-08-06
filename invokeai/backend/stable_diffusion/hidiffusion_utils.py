@@ -24,6 +24,8 @@ def hidiffusion_patch(
     t1_ratio: Optional[float] = None,
     t2_ratio: Optional[float] = None,
     generator: torch.Generator | None = None,
+    has_controlnet: bool = False,
+    is_controlnet_text_to_image: bool = False,
 ):
     """Context manager that applies HiDiffusion and restores the model on exit."""
     from invokeai.backend.hidiffusion.hidiffusion import apply_hidiffusion, remove_hidiffusion
@@ -118,6 +120,8 @@ def hidiffusion_patch(
             model,
             apply_raunet=apply_raunet,
             apply_window_attn=apply_window_attn,
+            has_controlnet=has_controlnet,
+            is_controlnet_text_to_image=is_controlnet_text_to_image,
             generator=generator,
         )
         yield
