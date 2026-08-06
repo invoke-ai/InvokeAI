@@ -126,7 +126,12 @@ class SD3PiDDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
         TorchDevice.empty_cache()
 
         pid_info = context.models.load(self.pid_decoder.decoder)
-        estimated_working_memory = estimate_pid_decode_working_memory(latents, BaseModelType.StableDiffusion3)
+        # Read once: the estimate and the decode must agree, or the cache reserves headroom for a
+        # peak that will not happen (or too little for one that will).
+        pid_memory_optimization = context.config.get().pid_memory_optimization
+        estimated_working_memory = estimate_pid_decode_working_memory(
+            latents, BaseModelType.StableDiffusion3, pid_memory_optimization
+        )
         with pid_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, pid_net):
             if not isinstance(pid_net, PidNet):
                 raise TypeError(f"Expected PidNet for PiD decoder, got {type(pid_net).__name__}.")
@@ -145,7 +150,7 @@ class SD3PiDDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
                 config=PiDDecodeConfig(
                     num_inference_steps=self.num_inference_steps,
                     seed=self.seed,
-                    pid_memory_optimization=context.config.get().pid_memory_optimization,
+                    pid_memory_optimization=pid_memory_optimization,
                 ),
             )
 
