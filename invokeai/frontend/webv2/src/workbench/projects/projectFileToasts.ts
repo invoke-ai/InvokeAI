@@ -1,5 +1,6 @@
 import { toaster } from '@platform/ui';
 
+import type { ProjectTransferIssues } from './invk/transfer';
 import type { ProjectFileProgress } from './projectFile';
 
 import { describeProjectFileError } from './projectFileErrors';
@@ -43,10 +44,14 @@ export interface ProjectFileReporter {
   /** Update the live toast from a transfer's progress. */
   report: (progress: ProjectFileProgress) => void;
   /**
-   * Finish cleanly, or as a warning naming what was left behind. `lostAssetNames`
-   * is the export's `missingAssetNames` or the import's `danglingAssetNames`.
+   * Finish cleanly, or as a warning naming what was left behind.
+   *
+   * Board items and document references are counted apart because they cost different things: a
+   * missing board item is a result still findable elsewhere, a missing document reference is a
+   * hole in the canvas. One combined number meant anything from "you will not notice" to "the
+   * project is broken".
    */
-  succeed: (title: string, lostAssetNames: readonly string[]) => void;
+  succeed: (title: string, issues: ProjectTransferIssues) => void;
   /** Finish as a failure, translating an `InvkFormatError` reason where there is one. */
   fail: (title: string, error: unknown) => void;
 }
@@ -91,18 +96,24 @@ export const startProjectFileReport = (t: Translate, title: string): ProjectFile
     report: (progress) => {
       toaster.update(id, { description: describeProgress(t, progress) });
     },
-    succeed: (successTitle, lostAssetNames) => {
-      if (lostAssetNames.length === 0) {
+    succeed: (successTitle, issues) => {
+      const boardCount = issues.boardItemIssues.length;
+      const referenceCount = issues.documentReferenceIssues.length;
+
+      if (boardCount === 0 && referenceCount === 0) {
         settle({ title: successTitle, type: 'success' });
 
         return;
       }
 
-      settle({
-        description: t('projects.file.missingAssets', { count: lostAssetNames.length }),
-        title: successTitle,
-        type: 'warning',
-      });
+      // Counts, never names: a project can lose hundreds of assets at once, and a toast listing
+      // them would be unreadable. The typed detail stays on the outcome for anything that needs it.
+      const parts = [
+        ...(boardCount === 0 ? [] : [t('projects.file.missingBoardItems', { count: boardCount })]),
+        ...(referenceCount === 0 ? [] : [t('projects.file.missingReferences', { count: referenceCount })]),
+      ];
+
+      settle({ description: parts.join(' '), title: successTitle, type: 'warning' });
     },
   };
 };

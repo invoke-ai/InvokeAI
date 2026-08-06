@@ -131,7 +131,7 @@ describe('restoreArchiveAssets', () => {
     });
 
     expect(upload).not.toHaveBeenCalled();
-    expect(result).toMatchObject({ danglingAssetNames: [], uploadedCount: 0 });
+    expect(result).toMatchObject({ documentReferenceIssues: [], uploadedCount: 0 });
     expect(result.mappings.images.size).toBe(0);
   });
 
@@ -187,7 +187,7 @@ describe('restoreArchiveAssets', () => {
       uploadArchiveImage: () => Promise.reject(new Error('should not be called')),
     });
 
-    expect(result.danglingAssetNames).toEqual(['a.png']);
+    expect(result.documentReferenceIssues.map((issue) => issue.name)).toEqual(['a.png']);
     expect(result.uploadedCount).toBe(0);
   });
 
@@ -197,7 +197,7 @@ describe('restoreArchiveAssets', () => {
       uploadArchiveImage: () => Promise.reject(new Error('upload failed')),
     });
 
-    expect(result.danglingAssetNames).toEqual(['a.png']);
+    expect(result.documentReferenceIssues.map((issue) => issue.name)).toEqual(['a.png']);
     expect(result.uploadedCount).toBe(0);
   });
 
@@ -248,7 +248,7 @@ describe('restoreArchiveAssets', () => {
     });
 
     expect(result.coverImageName).toBe('server-cover.png');
-    expect(result.danglingAssetNames).toEqual(['a.png']);
+    expect(result.documentReferenceIssues.map((issue) => issue.name)).toEqual(['a.png']);
     expect(result.uploadedAssets.imageNames).toEqual(['server-cover.png']);
     expect(upload).toHaveBeenCalledWith(new Uint8Array([9]), 'cover.webp', {
       contentType: 'image/webp',
@@ -316,7 +316,7 @@ describe('restoreArchiveAssets', () => {
     });
 
     expect(result.coverImageName).toBeNull();
-    expect(result.danglingAssetNames).toEqual(['a.png']);
+    expect(result.documentReferenceIssues.map((issue) => issue.name)).toEqual(['a.png']);
   });
 
   it('announces a video entry as a video, whatever its extension', async () => {

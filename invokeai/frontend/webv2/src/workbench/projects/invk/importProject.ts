@@ -3,6 +3,7 @@ import { collectLiveAssetRefs, selectCoverImageName } from '@workbench/projects/
 
 import type { UploadedImage, UploadedVideo } from './assetTransport';
 import type { InvkManifest } from './manifest';
+import type { InvkMediaIssue } from './transfer';
 
 import { INVK_MAX_ARCHIVE_BYTES, readArchive, readEntryText } from './archive';
 import {
@@ -20,6 +21,7 @@ import {
   InvkFormatError,
 } from './format';
 import { parseInvkManifest } from './manifest';
+import { createTransferIssueLog } from './transfer';
 
 /**
  * Reading an `.invk` back, in two steps a caller can put a decision between.
@@ -127,7 +129,8 @@ export interface RestoreAssetsResult {
   /** The uploaded cover's server name, when the archive carried one. */
   coverImageName: string | null;
   /** Referenced assets the archive did not carry and the server does not have, of either kind. */
-  danglingAssetNames: string[];
+  /** References neither the archive nor this server could satisfy, with the reason. */
+  documentReferenceIssues: InvkMediaIssue[];
   /** Old name to new name, per kind. Kept apart because the namespaces are. */
   mappings: { images: Map<string, string>; videos: Map<string, string> };
   /** Authoritative server identities created by this restore, for failure rollback. */
@@ -273,7 +276,7 @@ export const restoreArchiveAssets = async (
       : checkExistingVideos(referencedVideos, deps.signal),
   ]);
 
-  const danglingAssetNames: string[] = [];
+  const issues = createTransferIssueLog();
   const pending: PendingUpload[] = [];
 
   for (const [names, existing, store, kind] of [
@@ -288,7 +291,7 @@ export const restoreArchiveAssets = async (
       const bytes = store.get(name);
 
       if (bytes === undefined) {
-        danglingAssetNames.push(name);
+        issues.addDocumentReferenceIssue({ kind, name }, 'missing-entry');
         continue;
       }
 
@@ -332,7 +335,7 @@ export const restoreArchiveAssets = async (
     } catch {
       // A failed upload leaves the reference pointing at a name this server does
       // not have — the same outcome as an asset the archive never carried.
-      danglingAssetNames.push(name);
+      issues.addDocumentReferenceIssue({ kind, name }, 'upload-failed');
     }
 
     completed += 1;
@@ -355,7 +358,7 @@ export const restoreArchiveAssets = async (
 
   return {
     coverImageName,
-    danglingAssetNames: danglingAssetNames.sort(),
+    documentReferenceIssues: issues.toIssues().documentReferenceIssues,
     mappings,
     uploadedAssets: {
       imageNames: [...newlyUploadedImageNames].sort(),

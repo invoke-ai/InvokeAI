@@ -12,11 +12,21 @@
 
 export const INVK_EXTENSION = '.invk';
 export const INVK_MIME_TYPE = 'application/zip';
-export const INVK_VERSION = 2;
+export const INVK_VERSION = 3;
 
 /** Fixed entry paths. `cover` varies by image format and is named in the manifest. */
 export const INVK_MANIFEST_ENTRY = 'manifest.json';
 export const INVK_DOCUMENT_ENTRY = 'project.json';
+
+/**
+ * The project board's contents, as the exporting server enumerated them.
+ *
+ * A project document only references the media it draws with. Everything else the project produced
+ * — results generated but never placed on canvas — is on its board and named nowhere in the
+ * document, so a reader has no way to infer it. Version 3 states it, which is what makes an `.invk`
+ * the project's workspace rather than only its canvas.
+ */
+export const INVK_BOARD_ENTRY = 'board.json';
 
 /**
  * Bundled bytes are filed by kind, not pooled. Images and videos are separate

@@ -42,7 +42,7 @@ describe('parseInvkManifest', () => {
   });
 
   it('reports an unknown numeric version as unsupported', () => {
-    expectReason({ ...v2, version: 3 }, 'unsupported-version');
+    expectReason({ ...v2, version: 4 }, 'unsupported-version');
   });
 
   it('rejects a manifest missing the v2 discriminator', () => {

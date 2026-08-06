@@ -31,14 +31,18 @@ const projectDocument = (): Record<string, unknown> => ({
 
 const planInput = {
   appVersion: '7.0',
+  boardItems: [],
   createdAt: '2026-08-04T00:00:00.000Z',
   name: 'My project',
   projectDocument: projectDocument(),
 };
 
+/** The names a plan will fetch, in the union's stable order. */
+const plannedNames = (plan: ReturnType<typeof planInvkExport>): string[] => plan.transferItems.map((item) => item.name);
+
 describe('planInvkExport', () => {
   it('bundles the live document and nothing from history', () => {
-    expect(planInvkExport(planInput).imageNames).toEqual(['live-a.png', 'live-b.png']);
+    expect(plannedNames(planInvkExport(planInput))).toEqual(['live-a.png', 'live-b.png']);
   });
 
   it('names the file from the project and records the source project id', () => {
@@ -78,14 +82,14 @@ describe('planInvkExport', () => {
 
     expect(plan.documentJson).not.toContain('selected.png');
     expect(plan.documentJson).not.toContain('compare.png');
-    expect(plan.imageNames).toEqual(['live-a.png', 'live-b.png']);
+    expect(plannedNames(plan)).toEqual(['live-a.png', 'live-b.png']);
   });
 
   it('omits the source project id when the document has none', () => {
     const plan = planInvkExport({ ...planInput, projectDocument: { canvas: {}, layout: {}, name: 'x' } });
 
     expect(plan.manifestInput.sourceProjectId).toBeUndefined();
-    expect(plan.imageNames).toEqual([]);
+    expect(plannedNames(plan)).toEqual([]);
   });
 });
 
@@ -105,7 +109,12 @@ describe('executeInvkExport', () => {
         Promise.resolve({ bytes: new Uint8Array([1, 2, 3]), contentType: 'image/webp;charset=binary' }),
     });
 
-    expect(result).toEqual({ bundledImageCount: 2, bundledVideoCount: 0, missingAssetNames: [] });
+    expect(result).toEqual({
+      boardItemIssues: [],
+      bundledImageCount: 2,
+      bundledVideoCount: 0,
+      documentReferenceIssues: [],
+    });
     expect(download).toHaveBeenCalledTimes(1);
 
     const [blob, fileName] = download.mock.calls[0]! as [Blob, string];
@@ -115,6 +124,7 @@ describe('executeInvkExport', () => {
     const entries = await readArchive(new Uint8Array(await blob.arrayBuffer()));
 
     expect([...entries.keys()].sort()).toEqual([
+      'board.json',
       'cover.webp',
       'images/live-a.png',
       'images/live-b.png',
@@ -126,7 +136,7 @@ describe('executeInvkExport', () => {
       cover: 'cover.webp',
       name: 'My project',
       sourceProjectId: 'project-1',
-      version: 2,
+      version: 3,
     });
     expect(JSON.parse(readEntryText(entries.get(INVK_DOCUMENT_ENTRY)!))).toEqual(projectDocument());
   });
@@ -139,7 +149,12 @@ describe('executeInvkExport', () => {
       fetchImageThumbnail: () => Promise.resolve(null),
     });
 
-    expect(result).toEqual({ bundledImageCount: 1, bundledVideoCount: 0, missingAssetNames: ['live-b.png'] });
+    expect(result).toEqual({
+      boardItemIssues: [],
+      bundledImageCount: 1,
+      bundledVideoCount: 0,
+      documentReferenceIssues: [{ kind: 'image', name: 'live-b.png', reason: 'fetch-failed' }],
+    });
     expect(download).toHaveBeenCalledTimes(1);
   });
 
@@ -150,7 +165,12 @@ describe('executeInvkExport', () => {
       fetchImageThumbnail: () => Promise.reject(new Error('network')),
     });
 
-    expect(result.missingAssetNames).toEqual(['live-a.png', 'live-b.png']);
+    // Every one of these is a document reference, so the loss is a hole in the canvas.
+    expect(result.documentReferenceIssues).toEqual([
+      { kind: 'image', name: 'live-a.png', reason: 'fetch-failed' },
+      { kind: 'image', name: 'live-b.png', reason: 'fetch-failed' },
+    ]);
+    expect(result.boardItemIssues).toEqual([]);
   });
 
   it('omits the cover entry when there is no cover to fetch', async () => {
@@ -165,7 +185,9 @@ describe('executeInvkExport', () => {
     const [blob] = download.mock.calls[0]! as [Blob];
     const entries = await readArchive(new Uint8Array(await blob.arrayBuffer()));
 
-    expect([...entries.keys()].sort()).toEqual(['manifest.json', 'project.json']);
+    // `board.json` is written even for a project with no board contents: its absence would be
+    // indistinguishable from a v2 archive that never knew about boards.
+    expect([...entries.keys()].sort()).toEqual(['board.json', 'manifest.json', 'project.json']);
     expect(JSON.parse(readEntryText(entries.get(INVK_MANIFEST_ENTRY)!)).cover).toBeUndefined();
   });
 
@@ -179,7 +201,7 @@ describe('executeInvkExport', () => {
       },
     });
 
-    expect(plan.videoNames).toEqual(['clip.mp4']);
+    expect(plan.transferItems.filter((item) => item.kind === 'video').map((item) => item.name)).toEqual(['clip.mp4']);
 
     const result = await executeInvkExport(plan, {
       download,
@@ -188,12 +210,18 @@ describe('executeInvkExport', () => {
       fetchVideoBytes: (videoName) => Promise.resolve(bytesFor(videoName)),
     });
 
-    expect(result).toEqual({ bundledImageCount: 2, bundledVideoCount: 1, missingAssetNames: [] });
+    expect(result).toEqual({
+      boardItemIssues: [],
+      bundledImageCount: 2,
+      bundledVideoCount: 1,
+      documentReferenceIssues: [],
+    });
 
     const [blob] = download.mock.calls[0]! as [Blob];
     const entries = await readArchive(new Uint8Array(await blob.arrayBuffer()));
 
     expect([...entries.keys()].sort()).toEqual([
+      'board.json',
       'images/live-a.png',
       'images/live-b.png',
       'manifest.json',
@@ -218,7 +246,12 @@ describe('executeInvkExport', () => {
       fetchVideoBytes: () => Promise.resolve(null),
     });
 
-    expect(result).toEqual({ bundledImageCount: 2, bundledVideoCount: 0, missingAssetNames: ['clip.mp4'] });
+    expect(result).toEqual({
+      boardItemIssues: [],
+      bundledImageCount: 2,
+      bundledVideoCount: 0,
+      documentReferenceIssues: [{ kind: 'video', name: 'clip.mp4', reason: 'fetch-failed' }],
+    });
   });
 
   /**
@@ -291,7 +324,7 @@ describe('executeInvkExport', () => {
       fetchImageThumbnail: () => Promise.resolve(null),
     });
 
-    expect(result.missingAssetNames).toEqual(['live-a.png']);
+    expect(result.documentReferenceIssues).toEqual([{ kind: 'image', name: 'live-a.png', reason: 'fetch-failed' }]);
     expect(download).toHaveBeenCalledTimes(1);
   });
 
@@ -369,5 +402,116 @@ describe('executeInvkExport', () => {
       { completed: 2, phase: 'bundling', total: 2 },
       { completed: 2, phase: 'packing', total: 2 },
     ]);
+  });
+});
+
+/**
+ * Version 3's whole point: a project's board is part of the project. A result generated but never
+ * placed on canvas is named nowhere in the document, so without `board.json` it simply vanishes.
+ */
+describe('board membership', () => {
+  const bytesFor = (name: string) => new Uint8Array([...name].map((character) => character.codePointAt(0)!));
+  const boardItem = (name: string, overrides: Record<string, unknown> = {}) => ({
+    category: 'general' as const,
+    kind: 'image' as const,
+    name,
+    starred: false,
+    ...overrides,
+  });
+
+  const readBoard = async (blob: Blob) => {
+    const entries = await readArchive(new Uint8Array(await blob.arrayBuffer()));
+
+    return JSON.parse(readEntryText(entries.get('board.json')!));
+  };
+
+  it('carries board media the document never references', async () => {
+    const download = vi.fn();
+    const plan = planInvkExport({
+      ...planInput,
+      boardItems: [boardItem('unreferenced.png', { category: 'user', starred: true })],
+    });
+
+    expect(plan.transferItems.map((item) => item.name)).toEqual(['live-a.png', 'live-b.png', 'unreferenced.png']);
+
+    const result = await executeInvkExport(plan, {
+      download,
+      fetchImageBytes: (imageName) => Promise.resolve(bytesFor(imageName)),
+      fetchImageThumbnail: () => Promise.resolve(null),
+    });
+
+    expect(result.bundledImageCount).toBe(3);
+
+    const [blob] = download.mock.calls[0]! as [Blob];
+    const entries = await readArchive(new Uint8Array(await blob.arrayBuffer()));
+
+    expect(entries.has('images/unreferenced.png')).toBe(true);
+    // Category and starring travel: they are what the item was, not merely that it existed.
+    expect(await readBoard(blob)).toEqual({
+      items: [{ category: 'user', kind: 'image', name: 'unreferenced.png', starred: true }],
+      version: 1,
+    });
+  });
+
+  it('fetches an item that is both board media and a reference exactly once', async () => {
+    const fetchImageBytes = vi.fn((imageName: string) => Promise.resolve(bytesFor(imageName)));
+
+    await executeInvkExport(planInvkExport({ ...planInput, boardItems: [boardItem('live-a.png')] }), {
+      download: vi.fn(),
+      fetchImageBytes,
+      fetchImageThumbnail: () => Promise.resolve(null),
+    });
+
+    expect(fetchImageBytes.mock.calls.filter(([name]) => name === 'live-a.png')).toHaveLength(1);
+  });
+
+  it('reports an overlapping failure against both roles', async () => {
+    const result = await executeInvkExport(planInvkExport({ ...planInput, boardItems: [boardItem('live-a.png')] }), {
+      download: vi.fn(),
+      fetchImageBytes: (imageName) =>
+        imageName === 'live-a.png' ? Promise.resolve(null) : Promise.resolve(bytesFor(imageName)),
+      fetchImageThumbnail: () => Promise.resolve(null),
+    });
+
+    expect(result.boardItemIssues).toEqual([{ kind: 'image', name: 'live-a.png', reason: 'fetch-failed' }]);
+    expect(result.documentReferenceIssues).toEqual([{ kind: 'image', name: 'live-a.png', reason: 'fetch-failed' }]);
+  });
+
+  /** The descriptor stays so import can report the loss; dropping it would forget it silently. */
+  it('keeps the descriptor for an item whose bytes could not be fetched', async () => {
+    const download = vi.fn();
+
+    await executeInvkExport(planInvkExport({ ...planInput, boardItems: [boardItem('gone.png')] }), {
+      download,
+      fetchImageBytes: (imageName) =>
+        imageName === 'gone.png' ? Promise.resolve(null) : Promise.resolve(bytesFor(imageName)),
+      fetchImageThumbnail: () => Promise.resolve(null),
+    });
+
+    const [blob] = download.mock.calls[0]! as [Blob];
+    const board = await readBoard(blob);
+
+    expect(board.items.map((item: { name: string }) => item.name)).toEqual(['gone.png']);
+  });
+
+  it('records an empty board rather than omitting the entry', async () => {
+    const download = vi.fn();
+
+    await executeInvkExport(planInvkExport(planInput), {
+      download,
+      fetchImageBytes: (imageName) => Promise.resolve(bytesFor(imageName)),
+      fetchImageThumbnail: () => Promise.resolve(null),
+    });
+
+    const [blob] = download.mock.calls[0]! as [Blob];
+
+    expect(await readBoard(blob)).toEqual({ items: [], version: 1 });
+  });
+
+  /** Refused before a single round trip: discovering it after hundreds would be the wrong order. */
+  it('refuses a project that could never be packed, before fetching anything', () => {
+    const boardItems = Array.from({ length: 20_001 }, (_unused, index) => boardItem(`image-${index}.png`));
+
+    expect(() => planInvkExport({ ...planInput, boardItems })).toThrowError(/archive entries/u);
   });
 });

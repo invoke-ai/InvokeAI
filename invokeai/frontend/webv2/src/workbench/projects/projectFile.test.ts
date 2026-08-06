@@ -17,6 +17,8 @@ const api = vi.hoisted(() => ({
   deleteClientStateValue: vi.fn(() => Promise.resolve()),
   getClientStateValue: vi.fn(() => Promise.resolve(null)),
   getProject: vi.fn(),
+  // Every export enumerates the project's board; an empty one is the v2-shaped default.
+  getProjectBoardSnapshot: vi.fn(() => Promise.resolve({ items: [] })),
   isProjectNotFoundError: (error: unknown) =>
     typeof error === 'object' && error !== null && 'status' in error && error.status === 404,
   setClientStateValue: vi.fn(() => Promise.resolve()),
@@ -242,7 +244,7 @@ describe('what a transfer reports', () => {
 
     const outcome = await projectFile.exportLibraryProject('p1');
 
-    expect(outcome.missingAssetNames).toEqual(['b.png']);
+    expect(outcome.documentReferenceIssues).toEqual([{ kind: 'image', name: 'b.png', reason: 'fetch-failed' }]);
     expect(outcome.fileName).toBe('Two layers.invk');
   });
 
@@ -253,7 +255,8 @@ describe('what a transfer reports', () => {
 
     const outcome = await projectFile.exportLibraryProject('p1');
 
-    expect(outcome.missingAssetNames).toEqual([]);
+    expect(outcome.documentReferenceIssues).toEqual([]);
+    expect(outcome.boardItemIssues).toEqual([]);
   });
 
   it('counts uploads on the way in, and names what stayed dangling', async () => {
@@ -275,7 +278,7 @@ describe('what a transfer reports', () => {
 
     const outcome = await projectFile.importProjectFile(archive, { onProgress });
 
-    expect(outcome.danglingAssetNames).toEqual(['b.png']);
+    expect(outcome.documentReferenceIssues).toEqual([{ kind: 'image', name: 'b.png', reason: 'upload-failed' }]);
     expect(onProgress.mock.calls.map(([progress]) => progress.phase)).toContain('restoring');
   });
 });

@@ -9,9 +9,12 @@ import {
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
 
+import type { ProjectTransferIssues } from './invk/transfer';
+
 import {
   createProject as apiCreateProject,
   getProject as apiGetProject,
+  getProjectBoardSnapshot,
   isProjectNotFoundError,
   type ProjectRecordDTO,
 } from './api';
@@ -121,16 +124,12 @@ export interface ProjectFileOptions {
   owner?: AccountScope;
 }
 
-export interface ProjectExportOutcome {
-  /** Assets the server would not serve. Their references still ship. */
-  missingAssetNames: string[];
+export interface ProjectExportOutcome extends ProjectTransferIssues {
   /** The name the archive was downloaded under. */
   fileName: string;
 }
 
-export interface ProjectImportOutcome {
-  /** Referenced assets neither the archive nor this server has. */
-  danglingAssetNames: string[];
+export interface ProjectImportOutcome extends ProjectTransferIssues {
   record: ProjectRecordDTO;
 }
 
@@ -169,6 +168,7 @@ const isProjectConfirmedAbsent = async (projectId: string, owner: AccountScope):
 
 const exportProjectDocument = async (
   name: string,
+  projectId: string,
   projectDocument: Record<string, unknown>,
   options: Required<Pick<ProjectFileOptions, 'owner'>> & ProjectFileOptions
 ): Promise<ProjectExportOutcome> => {
@@ -177,8 +177,15 @@ const exportProjectDocument = async (
 
   assertAccountScopeCurrent(owner);
 
+  // Enumerated before anything is planned, and fatal if it fails. An archive whose `board.json`
+  // silently said "empty" would be a lie the reader has no way to detect — worse than no archive.
+  const snapshot = await getProjectBoardSnapshot(projectId, owner.signal);
+
+  assertAccountScopeCurrent(owner);
+
   const plan = planInvkExport({
     appVersion: APP_VERSION,
+    boardItems: snapshot.items,
     createdAt: new Date().toISOString(),
     name,
     projectDocument,
@@ -192,7 +199,11 @@ const exportProjectDocument = async (
 
   assertAccountScopeCurrent(owner);
 
-  return { fileName: plan.fileName, missingAssetNames: result.missingAssetNames };
+  return {
+    boardItemIssues: result.boardItemIssues,
+    documentReferenceIssues: result.documentReferenceIssues,
+    fileName: plan.fileName,
+  };
 };
 
 /** Export a closed project straight from its server record. */
@@ -205,7 +216,7 @@ export const exportLibraryProject = async (
 
   assertAccountScopeCurrent(owner);
 
-  return exportProjectDocument(record.name, record.data, { ...options, owner });
+  return exportProjectDocument(record.name, record.project_id, record.data, { ...options, owner });
 };
 
 /** Export an open project from its live in-memory document. */
@@ -218,7 +229,10 @@ export const exportOpenProject = async (
 
   assertAccountScopeCurrent(owner);
 
-  return exportProjectDocument(project.name, serializeProjectDocument(project), { ...options, owner });
+  return exportProjectDocument(project.name, project.id, serializeProjectDocument(project), {
+    ...options,
+    owner,
+  });
 };
 
 /**
@@ -293,7 +307,12 @@ export const importProjectFile = async (
       recordProjectCover(record.project_id, restored.coverImageName, owner);
     }
 
-    return { danglingAssetNames: restored?.danglingAssetNames ?? [], record };
+    return {
+      // Board membership does not travel in a v2 archive, so nothing can be lost from it here.
+      boardItemIssues: [],
+      documentReferenceIssues: restored?.documentReferenceIssues ?? [],
+      record,
+    };
   } catch (error) {
     const canRollback =
       !didCreateProject &&

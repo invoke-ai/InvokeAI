@@ -70,10 +70,10 @@ export const useImportProjectFile = (onImported: (record: ProjectRecordDTO) => P
     }
 
     await runReported(t, { failed: t('projects.importFailed'), running: t('projects.importing') }, async (report) => {
-      const { danglingAssetNames, record } = await importProjectFile(file, { onProgress: report.report, owner });
+      const { record, ...issues } = await importProjectFile(file, { onProgress: report.report, owner });
 
       assertAccountScopeCurrent(owner);
-      report.succeed(t('projects.imported', { name: record.name }), danglingAssetNames);
+      report.succeed(t('projects.imported', { name: record.name }), issues);
       await onImported(record);
       assertAccountScopeCurrent(owner);
     });
@@ -92,9 +92,9 @@ export const useExportLibraryProject = (): ((projectId: string, name: string) =>
         t,
         { failed: t('projects.exportFailed'), running: t('projects.exporting', { name }) },
         async (report, owner) => {
-          const { missingAssetNames } = await exportLibraryProject(projectId, { onProgress: report.report, owner });
+          const issues = await exportLibraryProject(projectId, { onProgress: report.report, owner });
 
-          report.succeed(t('projects.exported', { name }), missingAssetNames);
+          report.succeed(t('projects.exported', { name }), issues);
         }
       );
     },
@@ -112,9 +112,9 @@ export const useExportOpenProject = (): ((project: Project) => void) => {
         t,
         { failed: t('projects.exportFailed'), running: t('projects.exporting', { name: project.name }) },
         async (report, owner) => {
-          const { missingAssetNames } = await exportOpenProject(project, { onProgress: report.report, owner });
+          const issues = await exportOpenProject(project, { onProgress: report.report, owner });
 
-          report.succeed(t('projects.exported', { name: project.name }), missingAssetNames);
+          report.succeed(t('projects.exported', { name: project.name }), issues);
         }
       );
     },

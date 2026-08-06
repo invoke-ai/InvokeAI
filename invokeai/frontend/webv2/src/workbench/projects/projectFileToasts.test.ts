@@ -54,7 +54,7 @@ describe('startProjectFileReport', () => {
 
     report.report({ completed: 1, phase: 'bundling', total: 3 });
     report.report({ completed: 2, phase: 'bundling', total: 3 });
-    report.succeed('projects.exported', []);
+    report.succeed('projects.exported', { boardItemIssues: [], documentReferenceIssues: [] });
 
     expect(toaster.create).toHaveBeenCalledTimes(1);
     expect(toaster.update).toHaveBeenCalledTimes(3);
@@ -86,7 +86,7 @@ describe('startProjectFileReport', () => {
   it('finishes a clean run as a plain success with nothing to explain', () => {
     const report = toasts.startProjectFileReport(t, 'projects.exporting');
 
-    report.succeed('projects.exported', []);
+    report.succeed('projects.exported', { boardItemIssues: [], documentReferenceIssues: [] });
 
     expect(toaster.update).toHaveBeenCalledWith('toast-1', {
       duration: undefined,
@@ -99,10 +99,55 @@ describe('startProjectFileReport', () => {
   it('finishes a lossy run as a warning naming the count', () => {
     const report = toasts.startProjectFileReport(t, 'projects.exporting');
 
-    report.succeed('projects.exported', ['a.png', 'b.png']);
+    report.succeed('projects.exported', {
+      boardItemIssues: [],
+      documentReferenceIssues: [
+        { kind: 'image', name: 'a.png', reason: 'fetch-failed' },
+        { kind: 'image', name: 'b.png', reason: 'fetch-failed' },
+      ],
+    });
 
     expect(toaster.update).toHaveBeenCalledWith('toast-1', {
-      description: 'projects.file.missingAssets({"count":2})',
+      description: 'projects.file.missingReferences({"count":2})',
+      duration: undefined,
+      title: 'projects.exported',
+      type: 'warning',
+    });
+  });
+
+  /**
+   * Losing a board result and losing a canvas layer are different sizes of problem, so one count
+   * cannot stand for both.
+   */
+  it('counts board items and document references apart', () => {
+    const report = toasts.startProjectFileReport(t, 'projects.exporting');
+
+    report.succeed('projects.exported', {
+      boardItemIssues: [{ kind: 'video', name: 'clip.mp4', reason: 'fetch-failed' }],
+      documentReferenceIssues: [
+        { kind: 'image', name: 'a.png', reason: 'fetch-failed' },
+        { kind: 'image', name: 'b.png', reason: 'fetch-failed' },
+      ],
+    });
+
+    expect(toaster.update).toHaveBeenCalledWith('toast-1', {
+      description: 'projects.file.missingBoardItems({"count":1}) projects.file.missingReferences({"count":2})',
+      duration: undefined,
+      title: 'projects.exported',
+      type: 'warning',
+    });
+  });
+
+  it('finishes a run that lost only board items as a warning about those', () => {
+    const report = toasts.startProjectFileReport(t, 'projects.exporting');
+
+    report.succeed('projects.exported', {
+      boardItemIssues: [{ kind: 'image', name: 'unreferenced.png', reason: 'fetch-failed' }],
+      documentReferenceIssues: [],
+    });
+
+    expect(toaster.update).toHaveBeenCalledWith('toast-1', {
+      description: 'projects.file.missingBoardItems({"count":1})',
       duration: undefined,
       title: 'projects.exported',
       type: 'warning',
