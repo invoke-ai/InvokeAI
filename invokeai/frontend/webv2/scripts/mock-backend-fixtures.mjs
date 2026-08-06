@@ -36,6 +36,9 @@ export const MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME = 'fixture-video-001.mp4';
 const FIXED_EPOCH_MS = Date.parse(MOCK_BACKEND_FIXED_EPOCH);
 const range = (length, build) => Array.from({ length }, (_, index) => build(index));
 const ordinal = (index, width = 3) => String(index + 1).padStart(width, '0');
+
+/** The single user every fixture belongs to; matches `MOCK_USER_ID` in the mock backend. */
+const FIXTURE_USER_ID = 'fixture-user';
 const timestampAt = (index) => new Date(FIXED_EPOCH_MS - index * 60_000).toISOString();
 
 export const isMockBackendProfileName = (value) => MOCK_BACKEND_PROFILE_NAMES.includes(value);
@@ -207,45 +210,66 @@ const createVideos = () => [
   },
 ];
 
-const createBoards = (images, videos) =>
-  range(10, (index) => {
-    const boardId = `fixture-board-${ordinal(index, 2)}`;
-    const boardImages = images.filter((image) => image.board_id === boardId);
-    const boardVideos = videos.filter((video) => video.board_id === boardId);
-    const cover = [
-      ...boardImages.map((image) => ({
-        createdAt: image.created_at,
-        kind: 'image',
-        name: image.image_name,
-        starred: image.starred,
-      })),
-      ...boardVideos.map((video) => ({
-        createdAt: video.created_at,
-        kind: 'video',
-        name: video.video_name,
-        starred: video.starred,
-      })),
-    ].sort(
-      (left, right) =>
-        Number(right.starred) - Number(left.starred) ||
-        right.createdAt.localeCompare(left.createdAt) ||
-        right.kind.localeCompare(left.kind) ||
-        right.name.localeCompare(left.name)
-    )[0];
+/**
+ * The board a project owns. Every project has exactly one, and only project APIs may rename or
+ * delete it — the generic board routes refuse a claimed board.
+ */
+export const projectBoardId = (index) => `fixture-project-board-${ordinal(index, 2)}`;
 
-    return {
-      archived: false,
-      asset_count: boardImages.filter((image) => image.image_category !== 'general').length,
-      board_id: boardId,
-      board_name: `Fixture Board ${ordinal(index, 2)}`,
-      cover_image_name: cover?.kind === 'image' ? cover.name : null,
-      cover_video_name: cover?.kind === 'video' ? cover.name : null,
-      created_at: timestampAt(index * 10),
-      image_count: boardImages.filter((image) => image.image_category === 'general').length,
-      owner_username: null,
-      video_count: boardVideos.length,
-    };
-  });
+const buildBoard = (boardId, boardName, images, videos, createdAt) => {
+  const boardImages = images.filter((image) => image.board_id === boardId);
+  const boardVideos = videos.filter((video) => video.board_id === boardId);
+  const cover = [
+    ...boardImages.map((image) => ({
+      createdAt: image.created_at,
+      kind: 'image',
+      name: image.image_name,
+      starred: image.starred,
+    })),
+    ...boardVideos.map((video) => ({
+      createdAt: video.created_at,
+      kind: 'video',
+      name: video.video_name,
+      starred: video.starred,
+    })),
+  ].sort(
+    (left, right) =>
+      Number(right.starred) - Number(left.starred) ||
+      right.createdAt.localeCompare(left.createdAt) ||
+      right.kind.localeCompare(left.kind) ||
+      right.name.localeCompare(left.name)
+  )[0];
+
+  return {
+    archived: false,
+    asset_count: boardImages.filter((image) => image.image_category !== 'general').length,
+    board_id: boardId,
+    board_name: boardName,
+    board_visibility: 'private',
+    cover_image_name: cover?.kind === 'image' ? cover.name : null,
+    cover_video_name: cover?.kind === 'video' ? cover.name : null,
+    created_at: createdAt,
+    image_count: boardImages.filter((image) => image.image_category === 'general').length,
+    owner_username: null,
+    user_id: FIXTURE_USER_ID,
+    video_count: boardVideos.length,
+  };
+};
+
+const createBoards = (images, videos, projectCount) => [
+  ...range(10, (index) =>
+    buildBoard(
+      `fixture-board-${ordinal(index, 2)}`,
+      `Fixture Board ${ordinal(index, 2)}`,
+      images,
+      videos,
+      timestampAt(index * 10)
+    )
+  ),
+  ...range(projectCount, (index) =>
+    buildBoard(projectBoardId(index), `Fixture Project ${ordinal(index, 3)}`, images, videos, timestampAt(index))
+  ),
+];
 
 const QUEUE_STATUSES = ['pending', 'waiting', 'in_progress', 'completed', 'failed', 'canceled'];
 
@@ -537,6 +561,8 @@ const createProjects = (count, workflowNodeCount, layerCount) =>
     const timestamp = timestampAt(index);
 
     return {
+      // Every project owns exactly one private board; the server is authoritative for which.
+      board_id: projectBoardId(index),
       created_at: timestamp,
       data,
       name: data.name,
@@ -597,7 +623,7 @@ const createRepresentativeFixture = () => {
   const videos = createVideos();
 
   return {
-    boards: createBoards(images, videos),
+    boards: createBoards(images, videos, counts.projects),
     images,
     models: createModels(counts.models),
     nodeCatalog: {

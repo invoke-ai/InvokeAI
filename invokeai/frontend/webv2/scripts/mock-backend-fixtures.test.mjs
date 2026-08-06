@@ -506,3 +506,136 @@ test('the representative video accessibility journey owns the only generated-med
   assert.match(source, /getByRole\('list', \{ exact: true, name: 'Gallery items' \}\)/);
   assert.match(source, /INVOKEAI_ACCESSIBILITY_JOURNEY/);
 });
+
+test('project boards are owned, protected from the generic board routes, and enumerable', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const projects = await getJson(backend, '/api/v1/projects/');
+    const project = projects.find((entry) => entry.project_id === 'fixture-project-002');
+
+    // Every project owns exactly one board, and no two share one.
+    assert.equal(new Set(projects.map((entry) => entry.board_id)).size, projects.length);
+    assert.ok(project.board_id);
+
+    const board = await getJson(backend, `/api/v1/boards/${project.board_id}`);
+    assert.equal(board.project_id, project.project_id);
+    assert.equal(board.board_name, project.name);
+
+    // An unclaimed board omits the key entirely, matching the backend's null-excluding DTO.
+    const plainBoard = await getJson(backend, '/api/v1/boards/fixture-board-02');
+    assert.equal('project_id' in plainBoard, false);
+
+    // The generic routes refuse a claimed board; only the project APIs may touch it.
+    for (const [method, path, body] of [
+      ['PATCH', `/api/v1/boards/${project.board_id}`, { board_name: 'Renamed' }],
+      ['DELETE', `/api/v1/boards/${project.board_id}?include_images=true`, undefined],
+    ]) {
+      const refused = await fetch(`${backend.origin}${path}`, {
+        body: body === undefined ? undefined : JSON.stringify(body),
+        headers: { 'content-type': 'application/json' },
+        method,
+      });
+      assert.equal(refused.status, 409, `${method} ${path} should be refused`);
+    }
+    assert.equal((await getJson(backend, `/api/v1/boards/${project.board_id}`)).board_name, project.name);
+
+    // Renaming the project renames its board; the two never disagree.
+    await getJson(backend, `/api/v1/projects/${project.project_id}`, {
+      body: JSON.stringify({ data: project.data, expected_revision: project.revision, name: 'Renamed Project' }),
+      headers: { 'content-type': 'application/json' },
+      method: 'PUT',
+    });
+    assert.equal((await getJson(backend, `/api/v1/boards/${project.board_id}`)).board_name, 'Renamed Project');
+  });
+});
+
+test('the board snapshot lists only what the gallery would show on a project board', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const [project] = await getJson(backend, '/api/v1/projects/');
+    const boardId = project.board_id;
+    const upload = async (category, isIntermediate) => {
+      const form = new FormData();
+      form.append('file', new Blob(['x'], { type: 'image/png' }), `${category}-${isIntermediate}.png`);
+      const created = await fetch(
+        `${backend.origin}/api/v1/images/upload?image_category=${category}` +
+          `&is_intermediate=${isIntermediate}&board_id=${boardId}`,
+        { body: form, method: 'POST' }
+      );
+      return (await created.json()).image_name;
+    };
+
+    const general = await upload('general', false);
+    const control = await upload('control', false);
+    await upload('other', false);
+    await upload('general', true);
+
+    const snapshot = await getJson(backend, `/api/v1/projects/${project.project_id}/board-snapshot`);
+
+    // `other` is the canvas's private category and intermediates are hidden — neither travels.
+    assert.deepEqual(snapshot.items.map((item) => item.name).sort(), [control, general].sort());
+    assert.deepEqual(snapshot.items.map((item) => item.category).sort(), ['control', 'general']);
+    assert.equal(
+      snapshot.items.every((item) => item.kind === 'image' && item.starred === false),
+      true
+    );
+
+    await getJson(backend, '/api/v1/images/star', {
+      body: JSON.stringify({ image_names: [general] }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST',
+    });
+    const starred = await getJson(backend, `/api/v1/projects/${project.project_id}/board-snapshot`);
+    assert.equal(starred.items.find((item) => item.name === general).starred, true);
+
+    assert.equal((await fetch(`${backend.origin}/api/v1/projects/nope/board-snapshot`)).status, 404);
+  });
+});
+
+test('copying media mints fresh identities and deleting a project keeps its media', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const [project] = await getJson(backend, '/api/v1/projects/');
+    const source = 'fixture-image-0002.png';
+
+    const staging = await getJson(backend, '/api/v1/boards/?board_name=Staging', { method: 'POST' });
+    const copied = await getJson(backend, '/api/v1/images/copy', {
+      body: JSON.stringify({ board_id: staging.board_id, image_names: [source, 'missing.png'] }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST',
+    });
+
+    assert.deepEqual(copied.failed, ['missing.png']);
+    assert.equal(copied.copied.length, 1);
+    const [{ image_name: copyName }] = copied.copied;
+    // A copy is a new identity, because board membership keys on the name.
+    assert.notEqual(copyName, source);
+    const copy = await getJson(backend, `/api/v1/images/i/${copyName}`);
+    assert.equal(copy.board_id, staging.board_id);
+    assert.equal(copy.image_category, (await getJson(backend, `/api/v1/images/i/${source}`)).image_category);
+    // The source keeps its own board.
+    assert.notEqual((await getJson(backend, `/api/v1/images/i/${source}`)).board_id, staging.board_id);
+
+    // The staging board can then be claimed, which is how an import commits.
+    const claimed = await getJson(backend, '/api/v1/projects/', {
+      body: JSON.stringify({ board_id: staging.board_id, data: {}, name: 'Imported', project_id: 'imported-1' }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST',
+    });
+    assert.equal(claimed.board_id, staging.board_id);
+    // ...but only once.
+    const second = await fetch(`${backend.origin}/api/v1/projects/`, {
+      body: JSON.stringify({ board_id: staging.board_id, data: {}, name: 'Again', project_id: 'imported-2' }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST',
+    });
+    assert.equal(second.status, 409);
+
+    // Deleting a project removes its board but leaves the media uncategorized.
+    await fetch(`${backend.origin}/api/v1/projects/${claimed.project_id}`, { method: 'DELETE' });
+    assert.equal((await fetch(`${backend.origin}/api/v1/boards/${staging.board_id}`)).status, 404);
+    assert.equal((await getJson(backend, `/api/v1/images/i/${copyName}`)).board_id, null);
+
+    assert.equal(
+      (await getJson(backend, '/api/v1/projects/')).some((entry) => entry.project_id === project.project_id),
+      true
+    );
+  });
+});

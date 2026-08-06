@@ -65,6 +65,7 @@ const createState = (profile) => {
     images: new Map(fixture.images.map((image) => [image.image_name, clone(image)])),
     models: new Map(fixture.models.map((model) => [model.key, clone(model)])),
     mutationClock: 0,
+    nextBoardNumber: fixture.boards.length + 1,
     nextImageNumber: fixture.images.length + 1,
     nextProjectNumber: fixture.projects.length + 1,
     nextVideoNumber: fixture.videos.length + 1,
@@ -87,6 +88,7 @@ const timestamp = (state) => {
 };
 
 const summaryOf = (project) => ({
+  board_id: project.board_id,
   created_at: project.created_at,
   name: project.name,
   project_id: project.project_id,
@@ -358,6 +360,44 @@ const listVideos = (state, url) => {
   };
 };
 
+/** The project that owns this board, if any. Derived, exactly as the backend derives it. */
+const projectIdForBoard = (state, boardId) =>
+  [...state.projects.values()].find((project) => project.board_id === boardId)?.project_id ?? null;
+
+/**
+ * Visible board membership, matching `GET /projects/{id}/board-snapshot`: intermediates and the
+ * canvas's private `other` category are excluded, and the result is sorted by kind then name.
+ */
+const boardSnapshotItems = (state, boardId) => {
+  const visible = (category) => ['general', 'control', 'mask', 'user'].includes(category);
+  const items = [
+    ...[...state.images.values()]
+      .filter((image) => image.board_id === boardId && !image.is_intermediate && visible(image.image_category))
+      .map((image) => ({
+        category: image.image_category,
+        kind: 'image',
+        name: image.image_name,
+        starred: Boolean(image.starred),
+      })),
+    ...[...state.videos.values()]
+      .filter(
+        (video) =>
+          video.board_id === boardId &&
+          video.owner_user_id === MOCK_USER_ID &&
+          !video.is_intermediate &&
+          visible(video.video_category)
+      )
+      .map((video) => ({
+        category: video.video_category,
+        kind: 'video',
+        name: video.video_name,
+        starred: Boolean(video.starred),
+      })),
+  ];
+
+  return items.sort((left, right) => left.kind.localeCompare(right.kind) || left.name.localeCompare(right.name));
+};
+
 const boardDto = (state, board) => {
   const images = [...state.images.values()].filter((image) => image.board_id === board.board_id);
   const videos = [...state.videos.values()].filter(
@@ -384,12 +424,16 @@ const boardDto = (state, board) => {
       right.name.localeCompare(left.name)
   )[0];
 
+  const projectId = projectIdForBoard(state, board.board_id);
+
   return {
     ...board,
     asset_count: images.filter((image) => image.image_category !== 'general').length,
     cover_image_name: cover?.kind === 'image' ? cover.name : null,
     cover_video_name: cover?.kind === 'video' ? cover.name : null,
     image_count: images.filter((image) => image.image_category === 'general').length,
+    // The backend's BoardRecord excludes nulls, so an unclaimed board omits the key entirely.
+    ...(projectId === null ? {} : { project_id: projectId }),
     video_count: videos.length,
   };
 };
@@ -594,10 +638,42 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
 
           const now = timestamp(state);
           const projectNumber = state.nextProjectNumber;
+          const name = requested.name ?? `Project Name #${projectNumber}`;
+
+          // Creating a project either adopts the board it was given or makes one. Adopting is what
+          // lets an import upload its media before the project exists, so that creating the project
+          // is the import's single commit point.
+          let boardId = requested.board_id ?? null;
+          if (boardId === null) {
+            boardId = `mock-project-board-${projectNumber}`;
+            state.boards.set(boardId, {
+              archived: false,
+              board_id: boardId,
+              board_name: name,
+              board_visibility: 'private',
+              created_at: now,
+              deleted_at: null,
+              owner_username: null,
+              updated_at: now,
+              user_id: MOCK_USER_ID,
+            });
+          } else {
+            const board = state.boards.get(boardId);
+            if (!board) {
+              return json(404, { detail: 'Board not found' });
+            }
+            if (board.board_visibility !== 'private' || projectIdForBoard(state, boardId) !== null) {
+              return json(409, { detail: 'Board is not available to be claimed by a project' });
+            }
+            board.board_name = name;
+            board.updated_at = now;
+          }
+
           const project = {
+            board_id: boardId,
             created_at: now,
             data: requested.data ?? {},
-            name: requested.name ?? `Project Name #${projectNumber}`,
+            name,
             project_id: requested.project_id ?? `mock-project-${projectNumber}`,
             revision: 1,
             updated_at: now,
@@ -634,12 +710,42 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           project.revision += 1;
           project.updated_at = timestamp(state);
 
+          // The board's name tracks the project's; the two commit together.
+          const board = state.boards.get(project.board_id);
+          if (board) {
+            board.board_name = project.name;
+            board.updated_at = project.updated_at;
+          }
+
           return json(200, project);
         }
         if (method === 'DELETE') {
-          state.projects.delete(projectId);
+          if (project) {
+            state.projects.delete(projectId);
+            // The board goes with the project; its media survives as uncategorized.
+            state.boards.delete(project.board_id);
+            for (const image of state.images.values()) {
+              if (image.board_id === project.board_id) {
+                image.board_id = null;
+              }
+            }
+            for (const video of state.videos.values()) {
+              if (video.board_id === project.board_id) {
+                video.board_id = null;
+              }
+            }
+          }
           return json(200, { ok: true });
         }
+      }
+
+      const boardSnapshotMatch = /^\/api\/v1\/projects\/([^/]+)\/board-snapshot$/.exec(path);
+      if (method === 'GET' && boardSnapshotMatch) {
+        const project = state.projects.get(decodeURIComponent(boardSnapshotMatch[1]));
+
+        return project
+          ? json(200, { items: boardSnapshotItems(state, project.board_id) })
+          : json(404, { detail: 'Project not found' });
       }
 
       if (path.startsWith('/api/v1/client_state/')) {
@@ -788,11 +894,33 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         return json(200, state.nodeCatalog);
       }
 
-      if (method === 'GET' && (path === '/api/v1/boards' || path === '/api/v1/boards/')) {
-        return json(
-          200,
-          [...state.boards.values()].map((board) => boardDto(state, board))
-        );
+      if (path === '/api/v1/boards' || path === '/api/v1/boards/') {
+        if (method === 'GET') {
+          return json(
+            200,
+            [...state.boards.values()].map((board) => boardDto(state, board))
+          );
+        }
+        if (method === 'POST') {
+          const now = timestamp(state);
+          const boardId = `mock-board-${state.nextBoardNumber}`;
+          const board = {
+            archived: false,
+            board_id: boardId,
+            board_name: url.searchParams.get('board_name') ?? `Board ${state.nextBoardNumber}`,
+            board_visibility: 'private',
+            created_at: now,
+            deleted_at: null,
+            owner_username: null,
+            updated_at: now,
+            user_id: MOCK_USER_ID,
+          };
+
+          state.nextBoardNumber += 1;
+          state.boards.set(boardId, board);
+
+          return json(201, boardDto(state, board));
+        }
       }
 
       const boardMatch = /^\/api\/v1\/boards\/([^/]+)$/.exec(path);
@@ -806,7 +934,34 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         if (method === 'GET') {
           return json(200, boardDto(state, board));
         }
+        if (method === 'PATCH') {
+          const changes = await readJsonBody(request);
+
+          // A project's board takes its name, archived state and visibility from the project.
+          if (
+            projectIdForBoard(state, boardId) !== null &&
+            (changes.board_name !== undefined ||
+              changes.archived !== undefined ||
+              changes.board_visibility !== undefined)
+          ) {
+            return json(409, { detail: 'This board belongs to a project' });
+          }
+
+          for (const key of ['archived', 'board_name', 'board_visibility', 'cover_image_name']) {
+            if (changes[key] !== undefined) {
+              board[key] = changes[key];
+            }
+          }
+          board.updated_at = timestamp(state);
+
+          return json(201, boardDto(state, board));
+        }
         if (method === 'DELETE') {
+          if (projectIdForBoard(state, boardId) !== null) {
+            // Refused before any media is touched — the whole point of the ordering.
+            return json(409, { detail: 'This board belongs to a project' });
+          }
+
           const includeImages = url.searchParams.get('include_images') === 'true';
           const boardImages = [...state.images.values()].filter((image) => image.board_id === boardId);
           const boardVideos = [...state.videos.values()].filter(
@@ -916,6 +1071,114 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         state.images.set(imageName, image);
         response.setHeader('location', image.image_url);
         return json(201, image);
+      }
+
+      if (method === 'POST' && (path === '/api/v1/images/star' || path === '/api/v1/images/unstar')) {
+        const body = await readJsonBody(request);
+        const names = Array.isArray(body.image_names) ? [...new Set(body.image_names)] : [];
+        const succeeded = [];
+        const affectedBoards = [];
+        const starred = path.endsWith('/star');
+
+        for (const name of names) {
+          const image = state.images.get(name);
+
+          if (!image) {
+            continue;
+          }
+          image.starred = starred;
+          succeeded.push(name);
+          affectedBoards.push(image.board_id ?? 'none');
+        }
+
+        return json(200, {
+          affected_boards: [...new Set(affectedBoards)],
+          ...(starred ? { starred_images: succeeded } : { unstarred_images: succeeded }),
+        });
+      }
+
+      if (method === 'POST' && path === '/api/v1/images/copy') {
+        const body = await readJsonBody(request);
+        const names = Array.isArray(body.image_names) ? body.image_names : [];
+        const boardId = body.board_id ?? null;
+
+        if (boardId !== null && !state.boards.has(boardId)) {
+          return json(404, { detail: 'Board not found' });
+        }
+
+        const copied = [];
+        const failed = [];
+
+        for (const name of names) {
+          const source = state.images.get(name);
+
+          if (!source) {
+            failed.push(name);
+            continue;
+          }
+
+          const suffix = String(state.nextImageNumber).padStart(3, '0');
+          const imageName = `fixture-copy-${suffix}.png`;
+          const now = timestamp(state);
+
+          state.nextImageNumber += 1;
+          // A genuinely new identity: `board_images` keys on the name, so a copy must own its own.
+          // Category and provenance travel; starring does not (callers use /images/star).
+          state.images.set(imageName, {
+            ...clone(source),
+            board_id: boardId,
+            created_at: now,
+            image_name: imageName,
+            image_url: `/api/v1/images/i/${imageName}/full`,
+            is_intermediate: false,
+            starred: false,
+            thumbnail_url: `/api/v1/images/i/${imageName}/thumbnail`,
+            updated_at: now,
+          });
+          copied.push({ image_name: imageName, source_image_name: name });
+        }
+
+        return json(200, { copied, failed });
+      }
+
+      if (method === 'POST' && path === '/api/v1/videos/copy') {
+        const body = await readJsonBody(request);
+        const names = Array.isArray(body.video_names) ? body.video_names : [];
+        const boardId = body.board_id ?? null;
+
+        if (boardId !== null && !state.boards.has(boardId)) {
+          return json(404, { detail: 'Board not found' });
+        }
+
+        const copied = [];
+        const failed = [];
+
+        for (const name of names) {
+          const source = state.videos.get(name);
+
+          if (!source || source.owner_user_id !== MOCK_USER_ID) {
+            failed.push(name);
+            continue;
+          }
+
+          const suffix = String(state.nextVideoNumber).padStart(3, '0');
+          const videoName = `fixture-copy-${suffix}.mp4`;
+          const now = timestamp(state);
+
+          state.nextVideoNumber += 1;
+          state.videos.set(videoName, {
+            ...clone(source),
+            board_id: boardId,
+            created_at: now,
+            is_intermediate: false,
+            starred: false,
+            updated_at: now,
+            video_name: videoName,
+          });
+          copied.push({ source_video_name: name, video_name: videoName });
+        }
+
+        return json(200, { copied, failed });
       }
 
       if (method === 'GET' && (path === '/api/v1/images' || path === '/api/v1/images/')) {
