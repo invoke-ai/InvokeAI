@@ -27749,7 +27749,7 @@
         "category": "video",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Trim a video to a contiguous frame range and re-encode as MP4.\n\nBoth bounds are inclusive and 0-based \u2014 ``start_frame=10, end_frame=50``\nemits 41 frames. Negative indices count from the end (``end_frame=-1``\nis the final frame), matching ``video_frame_extract``. The output frame\nrate defaults to the source video's frame rate; set ``fps=0`` to inherit\nit (or 16 fps if the source rate can't be probed).\n\nThe resolved (positive) ``start_frame`` and ``end_frame`` are also emitted as\noutputs, so chained workflows can re-use the boundary indices \u2014 e.g. feeding\nthem into a downstream Frame from Video to extract the same boundary frame.",
+        "description": "Trim a video to a contiguous frame range and re-encode as MP4.\n\nBoth bounds are inclusive and 0-based \u2014 ``start_frame=10, end_frame=50``\nemits 41 frames. Negative indices count from the end (``end_frame=-1``\nis the final frame), matching ``video_frame_extract``. The output frame\nrate defaults to the source video's frame rate; set ``fps=0`` to inherit\nit (or 16 fps if the source rate can't be probed). If the source has an\naudio track, the same range of it is carried into the output (retimed\nwith the video when the output fps changes playback speed); silent\nsources stay silent.\n\nThe resolved (positive) ``start_frame`` and ``end_frame`` are also emitted as\noutputs, so chained workflows can re-use the boundary indices \u2014 e.g. feeding\nthem into a downstream Frame from Video to extract the same boundary frame.",
         "node_pack": "invokeai",
         "properties": {
           "board": {
@@ -27869,7 +27869,7 @@
         "tags": ["video", "trim", "range", "frames"],
         "title": "Frame Range from Video",
         "type": "object",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "output": {
           "$ref": "#/components/schemas/ExtractVideoRangeOutput"
         }
