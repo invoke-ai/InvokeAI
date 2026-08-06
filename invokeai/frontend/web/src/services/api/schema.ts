@@ -1362,6 +1362,37 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/images/copy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Copy Images To Board
+         * @description Copies images, optionally onto a board, and returns the new names.
+         *
+         *     Each copy is a genuinely new image with its own name, because `board_images` keys on
+         *     `image_name` — one image can sit on exactly one board, so sharing a name between two boards is
+         *     not representable. Duplicating a project needs that: its copy must own its media outright.
+         *
+         *     The pixels never leave the server. Category, origin and the metadata/workflow/graph embedded in
+         *     the PNG all travel; the originating session and node do not. Starring is not copied — callers
+         *     that want it use `POST /images/star`, the same path an import uses.
+         *
+         *     Per-image failures are reported rather than raised, so one unreadable source cannot cost the
+         *     caller the whole batch.
+         */
+        post: operations["copy_images_to_board"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/images/star": {
         parameters: {
             query?: never;
@@ -1691,6 +1722,32 @@ export type paths = {
         get: operations["get_video_names"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/videos/copy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Copy Videos To Board
+         * @description Copies videos, optionally onto a board, and returns the new names.
+         *
+         *     The image twin of this route explains why copies rather than shared references: `board_videos`
+         *     keys on `video_name`, so one video sits on exactly one board.
+         *
+         *     Blocking work (the service copies the file off disk) runs on FastAPI's threadpool by virtue of
+         *     this being a sync `def`, so a large batch cannot stall the event loop.
+         */
+        post: operations["copy_videos_to_board"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3236,7 +3293,7 @@ export type paths = {
         put?: never;
         /**
          * Create Project
-         * @description Creates a project for the current user.
+         * @description Creates a project, and the private board it owns, for the current user.
          */
         post: operations["create_project"];
         delete?: never;
@@ -3268,6 +3325,30 @@ export type paths = {
          * @description Deletes one of the current user's projects. Idempotent.
          */
         delete: operations["delete_project"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/board-snapshot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Project Board Snapshot
+         * @description Lists everything on the project's board that the gallery would show.
+         *
+         *     Intermediates and the canvas's private `other` category are excluded. Unpaginated: the caller
+         *     that needs this — exporting a project — has to hold the whole list anyway, and enforces its own
+         *     archive limits over it.
+         */
+        get: operations["get_project_board_snapshot"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -4848,6 +4929,11 @@ export type components = {
              * @description The username of the board owner (for admin view).
              */
             owner_username?: string | null;
+            /**
+             * Project Id
+             * @description The id of the project that owns this board, if any.
+             */
+            project_id?: string | null;
         };
         /**
          * BoardField
@@ -4905,6 +4991,32 @@ export type components = {
              * @description The list of batch_ids to cancel all queue items for
              */
             batch_ids: string[];
+        };
+        /** Body_copy_images_to_board */
+        Body_copy_images_to_board: {
+            /**
+             * Image Names
+             * @description The names of the images to copy
+             */
+            image_names: string[];
+            /**
+             * Board Id
+             * @description The board to put the copies on, if any
+             */
+            board_id?: string | null;
+        };
+        /** Body_copy_videos_to_board */
+        Body_copy_videos_to_board: {
+            /**
+             * Video Names
+             * @description The names of the videos to copy
+             */
+            video_names: string[];
+            /**
+             * Board Id
+             * @description The board to put the copies on, if any
+             */
+            board_id?: string | null;
         };
         /** Body_create_image_upload_entry */
         Body_create_image_upload_entry: {
@@ -8476,6 +8588,58 @@ export type components = {
              * @constant
              */
             type: "control_output";
+        };
+        /** CopiedImage */
+        CopiedImage: {
+            /**
+             * Source Image Name
+             * @description The image that was copied
+             */
+            source_image_name: string;
+            /**
+             * Image Name
+             * @description The name assigned to the copy
+             */
+            image_name: string;
+        };
+        /** CopiedVideo */
+        CopiedVideo: {
+            /**
+             * Source Video Name
+             * @description The video that was copied
+             */
+            source_video_name: string;
+            /**
+             * Video Name
+             * @description The name assigned to the copy
+             */
+            video_name: string;
+        };
+        /** CopyImagesResult */
+        CopyImagesResult: {
+            /**
+             * Copied
+             * @description The copies that were made, in request order
+             */
+            copied: components["schemas"]["CopiedImage"][];
+            /**
+             * Failed
+             * @description The source image names that could not be copied
+             */
+            failed: string[];
+        };
+        /** CopyVideosResult */
+        CopyVideosResult: {
+            /**
+             * Copied
+             * @description The copies that were made, in request order
+             */
+            copied: components["schemas"]["CopiedVideo"][];
+            /**
+             * Failed
+             * @description The source video names that could not be copied
+             */
+            failed: string[];
         };
         /**
          * Core Metadata
@@ -29543,6 +29707,52 @@ export type components = {
             dataURL: string;
         };
         /**
+         * ProjectBoardItemDTO
+         * @description One visible item on a project's board.
+         */
+        ProjectBoardItemDTO: {
+            /**
+             * Category
+             * @description The item's gallery category
+             * @enum {string}
+             */
+            category: "general" | "control" | "mask" | "user";
+            /**
+             * Kind
+             * @description Which namespace the name belongs to
+             * @enum {string}
+             */
+            kind: "image" | "video";
+            /**
+             * Name
+             * @description The server-assigned image or video name
+             */
+            name: string;
+            /**
+             * Starred
+             * @description Whether the item is starred
+             */
+            starred: boolean;
+        };
+        /**
+         * ProjectBoardSnapshotDTO
+         * @description Everything a project's board holds that the gallery would show.
+         *
+         *     This is the enumeration an export needs in order to carry a project's whole workspace rather
+         *     than only the media its document happens to reference. Intermediates and the canvas's private
+         *     `other` category are excluded, because neither is something the gallery shows on the board.
+         *
+         *     Deliberately unversioned: `.invk`'s `board.json` carries its own version, so the archive format
+         *     is free to change without the wire format following it, and vice versa.
+         */
+        ProjectBoardSnapshotDTO: {
+            /**
+             * Items
+             * @description The board's visible items, ordered by kind then name
+             */
+            items: components["schemas"]["ProjectBoardItemDTO"][];
+        };
+        /**
          * ProjectCreateRequest
          * @description Request body for creating a project.
          */
@@ -29552,6 +29762,11 @@ export type components = {
              * @description Client-generated project id (e.g. for imports); generated when omitted
              */
             project_id?: string | null;
+            /**
+             * Board Id
+             * @description An existing unclaimed private board for the project to adopt, renamed to match. Omit to create one. Restoring a project uploads its media into such a board first, so that creating the project is the single commit point for an import.
+             */
+            board_id?: string | null;
             /**
              * Name
              * @description The project's display name
@@ -29575,6 +29790,11 @@ export type components = {
              * @description The project's client-generated identifier
              */
             project_id: string;
+            /**
+             * Board Id
+             * @description The project's private board; only project APIs may rename or delete it
+             */
+            board_id: string;
             /**
              * Name
              * @description The project's display name
@@ -29613,6 +29833,11 @@ export type components = {
              * @description The project's client-generated identifier
              */
             project_id: string;
+            /**
+             * Board Id
+             * @description The project's private board; only project APIs may rename or delete it
+             */
+            board_id: string;
             /**
              * Name
              * @description The project's display name
@@ -43704,6 +43929,39 @@ export interface operations {
             };
         };
     };
+    copy_images_to_board: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Body_copy_images_to_board"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CopyImagesResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     star_images_in_list: {
         parameters: {
             query?: never;
@@ -44432,6 +44690,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VideoNamesResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    copy_videos_to_board: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Body_copy_videos_to_board"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CopyVideosResult"];
                 };
             };
             /** @description Validation Error */
@@ -47784,6 +48075,38 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_project_board_snapshot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The id of the project whose board to enumerate */
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectBoardSnapshotDTO"];
+                };
             };
             /** @description Validation Error */
             422: {

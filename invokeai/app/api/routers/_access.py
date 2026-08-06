@@ -72,6 +72,33 @@ def assert_image_read_access(image_name: str, current_user: CurrentUserOrDefault
     raise HTTPException(status_code=403, detail="Not authorized to access this image")
 
 
+def assert_board_write_access(board_id: str | None, current_user: CurrentUserOrDefault) -> None:
+    """Raise if the current user may not put media on this board.
+
+    `None` means "no board" — always allowed, so upload routes can pass their optional board
+    straight through. Otherwise access is granted when the user is an admin, owns the board, or
+    the board is Public (public boards accept contributions from any user).
+
+    Shared boards are deliberately read-only here: `Shared` grants visibility, not contribution.
+    """
+    if board_id is None:
+        return
+
+    try:
+        board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Board not found")
+
+    if current_user.is_admin:
+        return
+    if board.user_id == current_user.user_id:
+        return
+    if board.board_visibility == BoardVisibility.Public:
+        return
+
+    raise HTTPException(status_code=403, detail="Not authorized to modify this board")
+
+
 def assert_board_read_access(board_id: str, current_user: CurrentUserOrDefault) -> None:
     """Raise 403 if the current user may not read images from this board.
 

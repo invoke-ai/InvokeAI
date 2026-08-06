@@ -17,6 +17,9 @@ from invokeai.app.api.routers._access import (
     assert_board_read_access as _assert_board_read_access,
 )
 from invokeai.app.api.routers._access import (
+    assert_board_write_access as _assert_board_write_access,
+)
+from invokeai.app.api.routers._access import (
     assert_image_owner as _assert_image_owner,
 )
 from invokeai.app.api.routers._access import (
@@ -102,19 +105,7 @@ async def upload_image(
     """Uploads an image for the current user"""
     # If uploading into a board, verify the user has write access.
     # Public boards allow uploads from any authenticated user.
-    if board_id is not None:
-        from invokeai.app.services.board_records.board_records_common import BoardVisibility
-
-        try:
-            board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
-        except Exception:
-            raise HTTPException(status_code=404, detail="Board not found")
-        if (
-            not current_user.is_admin
-            and board.user_id != current_user.user_id
-            and board.board_visibility != BoardVisibility.Public
-        ):
-            raise HTTPException(status_code=403, detail="Not authorized to upload to this board")
+    _assert_board_write_access(board_id, current_user)
 
     assert_image_move_maintenance_inactive()
 
@@ -579,6 +570,73 @@ async def delete_uncategorized_images(
         )
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to delete images")
+
+
+class CopiedImage(BaseModel):
+    source_image_name: str = Field(description="The image that was copied")
+    image_name: str = Field(description="The name assigned to the copy")
+
+
+class CopyImagesResult(BaseModel):
+    copied: list[CopiedImage] = Field(description="The copies that were made, in request order")
+    failed: list[str] = Field(description="The source image names that could not be copied")
+
+
+@images_router.post("/copy", operation_id="copy_images_to_board", response_model=CopyImagesResult)
+async def copy_images_to_board(
+    current_user: CurrentUserOrDefault,
+    image_names: list[str] = Body(description="The names of the images to copy"),
+    board_id: Optional[str] = Body(default=None, description="The board to put the copies on, if any"),
+) -> CopyImagesResult:
+    """Copies images, optionally onto a board, and returns the new names.
+
+    Each copy is a genuinely new image with its own name, because `board_images` keys on
+    `image_name` — one image can sit on exactly one board, so sharing a name between two boards is
+    not representable. Duplicating a project needs that: its copy must own its media outright.
+
+    The pixels never leave the server. Category, origin and the metadata/workflow/graph embedded in
+    the PNG all travel; the originating session and node do not. Starring is not copied — callers
+    that want it use `POST /images/star`, the same path an import uses.
+
+    Per-image failures are reported rather than raised, so one unreadable source cannot cost the
+    caller the whole batch.
+    """
+    _assert_board_write_access(board_id, current_user)
+
+    copied: list[CopiedImage] = []
+    failed: list[str] = []
+
+    for image_name in image_names:
+        try:
+            _assert_image_read_access(image_name, current_user)
+            record = ApiDependencies.invoker.services.images.get_record(image_name)
+            pil_image = ApiDependencies.invoker.services.images.get_pil_image(image_name)
+            # The same extraction the upload route performs: provenance lives in the PNG's text
+            # chunks, so reading it back here keeps a copy's metadata without any extra plumbing.
+            extracted = extract_metadata_from_image(
+                pil_image=pil_image,
+                invokeai_metadata_override=None,
+                invokeai_workflow_override=None,
+                invokeai_graph_override=None,
+                logger=ApiDependencies.invoker.services.logger,
+            )
+            image_dto = ApiDependencies.invoker.services.images.create(
+                image=pil_image,
+                image_origin=record.image_origin,
+                image_category=record.image_category,
+                board_id=board_id,
+                is_intermediate=False,
+                metadata=extracted.invokeai_metadata,
+                workflow=extracted.invokeai_workflow,
+                graph=extracted.invokeai_graph,
+                user_id=current_user.user_id,
+            )
+            copied.append(CopiedImage(source_image_name=image_name, image_name=image_dto.image_name))
+        except Exception:
+            ApiDependencies.invoker.services.logger.error(f"Failed to copy image {image_name}")
+            failed.append(image_name)
+
+    return CopyImagesResult(copied=copied, failed=failed)
 
 
 class ImagesUpdatedFromListResult(BaseModel):
