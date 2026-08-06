@@ -35,6 +35,37 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
             except Exception as e:
                 raise BoardRecordDeleteException from e
 
+    def delete_if_unclaimed(self, board_id: str) -> bool:
+        with self._db.transaction() as cursor:
+            try:
+                cursor.execute(
+                    """--sql
+                    DELETE FROM boards
+                    WHERE board_id = ?
+                      AND NOT EXISTS (
+                        SELECT 1 FROM projects WHERE projects.board_id = boards.board_id
+                      );
+                    """,
+                    (board_id,),
+                )
+                return cursor.rowcount > 0
+            except Exception as e:
+                raise BoardRecordDeleteException from e
+
+    def get_project_ids_for_boards(self, board_ids: list[str]) -> dict[str, str]:
+        if not board_ids:
+            return {}
+
+        placeholders = ", ".join("?" for _ in board_ids)
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                f"""--sql
+                SELECT board_id, project_id FROM projects WHERE board_id IN ({placeholders});
+                """,
+                tuple(board_ids),
+            )
+            return {row[0]: row[1] for row in cursor.fetchall()}
+
     def save(
         self,
         board_name: str,

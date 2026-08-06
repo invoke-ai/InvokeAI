@@ -14,6 +14,25 @@ class BoardRecordStorageBase(ABC):
         pass
 
     @abstractmethod
+    def delete_if_unclaimed(self, board_id: str) -> bool:
+        """Delete a board only if no project owns it. Returns whether it was deleted.
+
+        The check and the delete are one statement so that a project claiming the board concurrently
+        either commits first and this returns False, or loses and finds the board already gone.
+        Callers must not destroy the board's media until this has returned True.
+        """
+        pass
+
+    @abstractmethod
+    def get_project_ids_for_boards(self, board_ids: list[str]) -> dict[str, str]:
+        """Map board id to owning project id, for the boards that a project owns.
+
+        Boards with no project are absent from the result. Bulk because board listings would
+        otherwise issue one lookup per row.
+        """
+        pass
+
+    @abstractmethod
     def save(
         self,
         board_name: str,

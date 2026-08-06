@@ -61,6 +61,9 @@ _PATCHED_API_DEPENDENCIES_MODULES = (
     "invokeai.app.api.routers._access",
     "invokeai.app.api.routers.model_manager",
     "invokeai.app.api.routers.app_info",
+    "invokeai.app.api.routers.projects",
+    "invokeai.app.api.routers.boards",
+    "invokeai.app.api.routers.videos",
 )
 
 

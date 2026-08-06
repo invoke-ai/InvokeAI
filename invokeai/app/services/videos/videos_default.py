@@ -320,18 +320,25 @@ class VideoService(VideoServiceABC):
             raise e
 
     def delete_videos_on_board(self, board_id: str, user_id: Optional[str] = None) -> tuple[list[str], list[str]]:
+        # When ``user_id`` is set the lookup filters to videos owned by that user so the
+        # cascade doesn't destroy other users' contributions to a public/shared board.
+        video_names = self.__invoker.services.board_video_records.get_all_board_video_names_for_board(
+            board_id, categories=None, is_intermediate=None, user_id=user_id
+        )
+        return self.delete_videos_by_names(video_names)
+
+    def delete_videos_by_names(self, video_names: list[str]) -> tuple[list[str], list[str]]:
+        """Delete exactly these videos, returning ``(deleted, failed)``.
+
+        Split from ``delete_videos_on_board`` so a caller that must decide whether the board may go
+        *before* destroying anything can enumerate first and delete second.
+        """
         try:
-            # When ``user_id`` is set the lookup filters to videos owned by that user so the
-            # cascade doesn't destroy other users' contributions to a public/shared board.
-            video_names = self.__invoker.services.board_video_records.get_all_board_video_names_for_board(
-                board_id, categories=None, is_intermediate=None, user_id=user_id
-            )
             # Only delete records for files we actually managed to remove. Otherwise a
             # transient FS error would leave the file orphaned on disk with no record
             # pointing at it — the API would report success and the user would have no
-            # way to clean up the leak. The board itself will still be deleted by the
-            # caller, so any preserved records cascade to "uncategorized" via the
-            # board_videos FK.
+            # way to clean up the leak. A preserved record simply stays on the server;
+            # when its board goes it becomes "uncategorized" via the board_videos FK.
             deleted_video_names: list[str] = []
             failed_video_names: list[str] = []
             staged_deletes: list[tuple[str, object]] = []

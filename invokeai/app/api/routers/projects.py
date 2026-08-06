@@ -7,6 +7,9 @@ from pydantic import BaseModel, Field
 from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.project_records.project_records_common import (
+    ProjectBoardNotFoundError,
+    ProjectBoardSnapshotDTO,
+    ProjectBoardUnavailableError,
     ProjectRecordConflictError,
     ProjectRecordDTO,
     ProjectRecordExistsError,
@@ -22,6 +25,14 @@ class ProjectCreateRequest(BaseModel):
 
     project_id: str | None = Field(
         default=None, description="Client-generated project id (e.g. for imports); generated when omitted"
+    )
+    board_id: str | None = Field(
+        default=None,
+        description=(
+            "An existing unclaimed private board for the project to adopt, renamed to match. Omit to create"
+            " one. Restoring a project uploads its media into such a board first, so that creating the"
+            " project is the single commit point for an import."
+        ),
     )
     name: str = Field(description="The project's display name")
     data: dict[str, Any] = Field(description="The opaque client-owned project document")
@@ -48,16 +59,19 @@ async def create_project(
     current_user: CurrentUserOrDefault,
     request: ProjectCreateRequest = Body(description="The project to create"),
 ) -> ProjectRecordDTO:
-    """Creates a project for the current user."""
+    """Creates a project, and the private board it owns, for the current user."""
     try:
         return ApiDependencies.invoker.services.project_records.create(
             user_id=current_user.user_id,
             name=request.name,
             data=request.data,
             project_id=request.project_id,
+            board_id=request.board_id,
         )
-    except ProjectRecordExistsError as e:
+    except (ProjectRecordExistsError, ProjectBoardUnavailableError) as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    except ProjectBoardNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
 
 @projects_router.get("/{project_id}", operation_id="get_project", response_model=ProjectRecordDTO)
@@ -94,6 +108,27 @@ async def update_project(
             status_code=status.HTTP_409_CONFLICT,
             detail={"message": str(e), "current_revision": e.current_revision},
         )
+
+
+@projects_router.get(
+    "/{project_id}/board-snapshot",
+    operation_id="get_project_board_snapshot",
+    response_model=ProjectBoardSnapshotDTO,
+)
+async def get_project_board_snapshot(
+    current_user: CurrentUserOrDefault,
+    project_id: str = Path(description="The id of the project whose board to enumerate"),
+) -> ProjectBoardSnapshotDTO:
+    """Lists everything on the project's board that the gallery would show.
+
+    Intermediates and the canvas's private `other` category are excluded. Unpaginated: the caller
+    that needs this — exporting a project — has to hold the whole list anyway, and enforces its own
+    archive limits over it.
+    """
+    try:
+        return ApiDependencies.invoker.services.project_records.get_board_snapshot(current_user.user_id, project_id)
+    except ProjectRecordNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
 
 @projects_router.delete("/{project_id}", operation_id="delete_project", status_code=status.HTTP_204_NO_CONTENT)

@@ -308,15 +308,24 @@ class ImageService(ImageServiceABC):
             raise e
 
     def delete_images_on_board(self, board_id: str, user_id: Optional[str] = None) -> tuple[list[str], list[str]]:
+        # When ``user_id`` is set the lookup filters to images owned by that user so the
+        # cascade doesn't destroy other users' contributions to a public/shared board.
+        image_names = self.__invoker.services.board_image_records.get_all_board_image_names_for_board(
+            board_id,
+            categories=None,
+            is_intermediate=None,
+            user_id=user_id,
+        )
+        return self.delete_images_by_names(image_names)
+
+    def delete_images_by_names(self, image_names: list[str]) -> tuple[list[str], list[str]]:
+        """Delete exactly these images, returning ``(deleted, failed)``.
+
+        Split from ``delete_images_on_board`` so a caller that must decide whether the board may go
+        *before* destroying anything can enumerate first and delete second. Records whose file
+        delete fails keep their record on purpose and come back as failures.
+        """
         try:
-            # When ``user_id`` is set the lookup filters to images owned by that user so the
-            # cascade doesn't destroy other users' contributions to a public/shared board.
-            image_names = self.__invoker.services.board_image_records.get_all_board_image_names_for_board(
-                board_id,
-                categories=None,
-                is_intermediate=None,
-                user_id=user_id,
-            )
             deleted_image_names: list[str] = []
             failed_image_names: list[str] = []
             staged_deletes: list[tuple[str, object]] = []

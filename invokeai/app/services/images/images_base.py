@@ -153,6 +153,16 @@ class ImageServiceABC(ABC):
         pass
 
     @abstractmethod
+    def delete_images_by_names(self, image_names: list[str]) -> tuple[list[str], list[str]]:
+        """Deletes exactly these images; returns ``(deleted_names, failed_names)``.
+
+        For callers that must decide whether the deletion may proceed *before* destroying
+        anything, and so enumerate the names themselves. Same per-image failure semantics as
+        ``delete_images_on_board``.
+        """
+        pass
+
+    @abstractmethod
     def delete_images_on_board(self, board_id: str, user_id: Optional[str] = None) -> tuple[list[str], list[str]]:
         """Deletes all images on a board; returns ``(deleted_names, failed_names)``.
 

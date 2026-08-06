@@ -44,6 +44,14 @@ class BoardServiceABC(ABC):
         pass
 
     @abstractmethod
+    def delete_if_unclaimed(
+        self,
+        board_id: str,
+    ) -> bool:
+        """Delete a board only if no project owns it. Returns whether it was deleted."""
+        pass
+
+    @abstractmethod
     def get_many(
         self,
         user_id: str,

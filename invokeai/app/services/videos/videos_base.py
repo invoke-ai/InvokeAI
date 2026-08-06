@@ -134,6 +134,16 @@ class VideoServiceABC(ABC):
         pass
 
     @abstractmethod
+    def delete_videos_by_names(self, video_names: list[str]) -> tuple[list[str], list[str]]:
+        """Deletes exactly these videos; returns ``(deleted_names, failed_names)``.
+
+        For callers that must decide whether the deletion may proceed *before* destroying
+        anything, and so enumerate the names themselves. Same per-video failure semantics as
+        ``delete_videos_on_board``.
+        """
+        pass
+
+    @abstractmethod
     def delete_videos_on_board(self, board_id: str, user_id: Optional[str] = None) -> tuple[list[str], list[str]]:
         """Deletes all videos on a board; returns ``(deleted_names, failed_names)``.
 

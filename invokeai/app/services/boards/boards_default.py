@@ -54,6 +54,9 @@ class BoardService(BoardServiceABC):
         board_record = self.__invoker.services.board_records.save(board_name, user_id)
         return board_record_to_dto(board_record, None, 0, 0)
 
+    def _get_project_id(self, board_id: str) -> Optional[str]:
+        return self.__invoker.services.board_records.get_project_ids_for_boards([board_id]).get(board_id)
+
     def get_dto(self, board_id: str) -> BoardDTO:
         board_record = self.__invoker.services.board_records.get(board_id)
         cover_image_name, cover_video_name = self._resolve_cover(board_record.board_id)
@@ -65,6 +68,7 @@ class BoardService(BoardServiceABC):
             asset_count,
             cover_video_name=cover_video_name,
             video_count=video_count,
+            project_id=self._get_project_id(board_id),
         )
 
     def update(
@@ -82,10 +86,14 @@ class BoardService(BoardServiceABC):
             asset_count,
             cover_video_name=cover_video_name,
             video_count=video_count,
+            project_id=self._get_project_id(board_id),
         )
 
     def delete(self, board_id: str) -> None:
         self.__invoker.services.board_records.delete(board_id)
+
+    def delete_if_unclaimed(self, board_id: str) -> bool:
+        return self.__invoker.services.board_records.delete_if_unclaimed(board_id)
 
     def get_many(
         self,
@@ -100,9 +108,10 @@ class BoardService(BoardServiceABC):
         board_records = self.__invoker.services.board_records.get_many(
             user_id, is_admin, order_by, direction, offset, limit, include_archived
         )
-        summaries = self.__invoker.services.gallery.get_board_media_summaries(
-            [record.board_id for record in board_records.items]
-        )
+        board_ids = [record.board_id for record in board_records.items]
+        summaries = self.__invoker.services.gallery.get_board_media_summaries(board_ids)
+        # One lookup for the page, not one per row.
+        project_ids = self.__invoker.services.board_records.get_project_ids_for_boards(board_ids)
         board_dtos = []
         for r in board_records.items:
             summary = summaries[r.board_id]
@@ -123,6 +132,7 @@ class BoardService(BoardServiceABC):
                     owner_username,
                     cover_video_name=summary.cover_video_name,
                     video_count=summary.video_count,
+                    project_id=project_ids.get(r.board_id),
                 )
             )
 
@@ -139,9 +149,10 @@ class BoardService(BoardServiceABC):
         board_records = self.__invoker.services.board_records.get_all(
             user_id, is_admin, order_by, direction, include_archived
         )
-        summaries = self.__invoker.services.gallery.get_board_media_summaries(
-            [record.board_id for record in board_records]
-        )
+        board_ids = [record.board_id for record in board_records]
+        summaries = self.__invoker.services.gallery.get_board_media_summaries(board_ids)
+        # One lookup for the whole listing, not one per row.
+        project_ids = self.__invoker.services.board_records.get_project_ids_for_boards(board_ids)
         board_dtos = []
         for r in board_records:
             summary = summaries[r.board_id]
@@ -162,6 +173,7 @@ class BoardService(BoardServiceABC):
                     owner_username,
                     cover_video_name=summary.cover_video_name,
                     video_count=summary.video_count,
+                    project_id=project_ids.get(r.board_id),
                 )
             )
 
