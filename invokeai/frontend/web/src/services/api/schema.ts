@@ -38685,6 +38685,13 @@ export type components = {
          * Concatenate Videos
          * @description Join two or more videos into a single MP4.
          *
+         *     Audio: if any input carries an audio track, the output gets an AAC track assembled on
+         *     the emitted timeline — silent inputs contribute silence, `cut` splices the tracks,
+         *     `crossfade` blends them equal-power over the transition window, and
+         *     `fade_through_black` fades the outgoing track to silence and the incoming one up from
+         *     it, mirroring the video. An fps override retimes audio with the video (a deliberate
+         *     speed/pitch change). If no input has audio, the output has no audio stream.
+         *
          *     Transitions:
          *
          *     * ``cut`` — hard splice, no blending. Fastest; total length is the sum of inputs.

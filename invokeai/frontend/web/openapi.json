@@ -87864,7 +87864,7 @@
         "category": "video",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Join two or more videos into a single MP4.\n\nTransitions:\n\n* ``cut`` \u2014 hard splice, no blending. Fastest; total length is the sum of inputs.\n* ``crossfade`` \u2014 linear A\u2192B cross-dissolve over ``transition_frames``. Each boundary\n  consumes ``transition_frames`` from both adjacent clips, so total length is\n  ``sum(inputs) - transition_frames * (n - 1)``.\n* ``fade_through_black`` \u2014 A fades to black, then B fades in from black. Each boundary\n  consumes ``transition_frames // 2`` frames from the preceding clip's tail and the\n  remainder (``transition_frames - transition_frames // 2``) from the next clip's head,\n  so the total emitted is exactly ``transition_frames`` per boundary \u2014 even for odd\n  ``transition_frames`` \u2014 and the overall length equals the sum of inputs.\n\nAll inputs must share the same pixel dimensions. Output frame rate defaults to the\nfirst input's fps; override with ``fps`` to force a specific rate (the frames are not\nresampled, only the container is encoded at the new rate).",
+        "description": "Join two or more videos into a single MP4.\n\nAudio: if any input carries an audio track, the output gets an AAC track assembled on\nthe emitted timeline \u2014 silent inputs contribute silence, `cut` splices the tracks,\n`crossfade` blends them equal-power over the transition window, and\n`fade_through_black` fades the outgoing track to silence and the incoming one up from\nit, mirroring the video. An fps override retimes audio with the video (a deliberate\nspeed/pitch change). If no input has audio, the output has no audio stream.\n\nTransitions:\n\n* ``cut`` \u2014 hard splice, no blending. Fastest; total length is the sum of inputs.\n* ``crossfade`` \u2014 linear A\u2192B cross-dissolve over ``transition_frames``. Each boundary\n  consumes ``transition_frames`` from both adjacent clips, so total length is\n  ``sum(inputs) - transition_frames * (n - 1)``.\n* ``fade_through_black`` \u2014 A fades to black, then B fades in from black. Each boundary\n  consumes ``transition_frames // 2`` frames from the preceding clip's tail and the\n  remainder (``transition_frames - transition_frames // 2``) from the next clip's head,\n  so the total emitted is exactly ``transition_frames`` per boundary \u2014 even for odd\n  ``transition_frames`` \u2014 and the overall length equals the sum of inputs.\n\nAll inputs must share the same pixel dimensions. Output frame rate defaults to the\nfirst input's fps; override with ``fps`` to force a specific rate (the frames are not\nresampled, only the container is encoded at the new rate).",
         "node_pack": "invokeai",
         "properties": {
           "board": {
@@ -87997,7 +87997,7 @@
         "tags": ["video", "concat", "transition"],
         "title": "Concatenate Videos",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/VideoOutput"
         }
