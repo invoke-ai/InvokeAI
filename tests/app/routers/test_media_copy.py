@@ -247,7 +247,7 @@ def _insert_video_record(mock_invoker: Invoker, name: str, user_id: str) -> None
         )
 
 
-def test_copying_a_video_preserves_its_shape_and_provenance(
+def test_copying_a_video_delegates_copy_invariants_to_the_video_service(
     client: TestClient, mock_invoker: Invoker, user1_token: str
 ):
     user_id = _owner_id(client, user1_token)
@@ -255,17 +255,10 @@ def test_copying_a_video_preserves_its_shape_and_provenance(
     _insert_video_record(mock_invoker, "src.mp4", user_id)
 
     videos = MagicMock()
-    videos.get_path.return_value = "/tmp/source.mp4"
-    metadata = MagicMock()
-    metadata.model_dump_json.return_value = json.dumps(SOURCE_METADATA)
-    videos.get_metadata.return_value = metadata
-    videos.get_workflow.return_value = "{}"
-    videos.get_graph.return_value = None
     created = MagicMock()
     created.video_name = "copy-001.mp4"
-    # The route checks the copy actually landed where it was told, so the double has to say so.
     created.board_id = board_id
-    videos.create.return_value = created
+    videos.copy.return_value = created
     mock_invoker.services.videos = videos
 
     response = client.post(
@@ -276,16 +269,7 @@ def test_copying_a_video_preserves_its_shape_and_provenance(
 
     assert response.status_code == status.HTTP_200_OK
     assert response.json() == {"copied": [{"source_video_name": "src.mp4", "video_name": "copy-001.mp4"}], "failed": []}
-    kwargs = videos.create.call_args.kwargs
-    assert (kwargs["width"], kwargs["height"], kwargs["duration"], kwargs["fps"]) == (640, 480, 2.5, 24.0)
-    assert kwargs["video_category"] == ImageCategory.GENERAL
-    assert kwargs["board_id"] == board_id
-    assert kwargs["is_intermediate"] is False
-    assert json.loads(kwargs["metadata"]) == SOURCE_METADATA
-    assert kwargs["workflow"] == "{}"
-    # The path handed over is the source's own managed file, and `create` consumes what it is
-    # given. Without this the copy moves the original's bytes away from it.
-    assert kwargs["move_source"] is False
+    videos.copy.assert_called_once_with(source_video_name="src.mp4", board_id=board_id, user_id=user_id)
 
 
 def test_a_video_copy_that_missed_its_board_is_reported_as_failed(
@@ -298,14 +282,7 @@ def test_a_video_copy_that_missed_its_board_is_reported_as_failed(
     _insert_video_record(mock_invoker, "src.mp4", user_id)
 
     videos = MagicMock()
-    videos.get_path.return_value = "/tmp/source.mp4"
-    videos.get_metadata.return_value = None
-    videos.get_workflow.return_value = None
-    videos.get_graph.return_value = None
-    created = MagicMock()
-    created.video_name = "copy-001.mp4"
-    created.board_id = None  # The attachment silently did not happen.
-    videos.create.return_value = created
+    videos.copy.side_effect = RuntimeError("copy missed board")
     mock_invoker.services.videos = videos
 
     response = client.post(
@@ -331,4 +308,4 @@ def test_copying_someone_elses_video_is_refused_per_name(client: TestClient, moc
 
     assert response.status_code == status.HTTP_200_OK
     assert response.json() == {"copied": [], "failed": ["theirs.mp4"]}
-    videos.create.assert_not_called()
+    videos.copy.assert_not_called()

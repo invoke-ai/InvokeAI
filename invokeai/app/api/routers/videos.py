@@ -109,22 +109,6 @@ def _assert_video_direct_owner(video_name: str, current_user: CurrentUserOrDefau
     raise HTTPException(status_code=403, detail="Not authorized to move this video")
 
 
-def _read_video_thumbnail(video_name: str) -> Optional[PILImage.Image]:
-    """The video's stored first-frame thumbnail, or None if it has none.
-
-    Best-effort by design: the only caller uses it to skip a decode, and a missing or unreadable
-    thumbnail is not a reason to fail a copy — the save path extracts one itself when handed None.
-    """
-    try:
-        thumbnail_path = Path(ApiDependencies.invoker.services.videos.get_path(video_name, thumbnail=True))
-        if not thumbnail_path.exists():
-            return None
-        with PILImage.open(thumbnail_path) as thumbnail:
-            return thumbnail.copy()
-    except Exception:
-        return None
-
-
 def _is_accepted_video_upload(file: UploadFile) -> bool:
     if file.content_type and file.content_type.startswith(ACCEPTED_VIDEO_MIME_PREFIXES):
         return True
@@ -770,40 +754,11 @@ def copy_videos_to_board(
     for video_name in video_names:
         try:
             _assert_video_read_access(video_name, current_user)
-            record = ApiDependencies.invoker.services.video_records.get(video_name)
-            source_path = Path(ApiDependencies.invoker.services.videos.get_path(video_name))
-            # A video's provenance is not in the file the way a PNG's is, so it is read back
-            # through the services and handed to `create` as the same strings an upload would.
-            metadata = ApiDependencies.invoker.services.videos.get_metadata(video_name)
-            video_dto = ApiDependencies.invoker.services.videos.create(
-                source_path=source_path,
-                width=record.width,
-                height=record.height,
-                duration=record.duration,
-                fps=record.fps,
-                video_origin=record.video_origin,
-                video_category=record.video_category,
+            video_dto = ApiDependencies.invoker.services.videos.copy(
+                source_video_name=video_name,
                 board_id=board_id,
-                is_intermediate=False,
-                metadata=metadata.model_dump_json() if metadata is not None else None,
-                workflow=ApiDependencies.invoker.services.videos.get_workflow(video_name),
-                graph=ApiDependencies.invoker.services.videos.get_graph(video_name),
                 user_id=current_user.user_id,
-                # The source's thumbnail is already the first frame at the size the copy wants, so
-                # reusing it spares a decode-worker subprocess per copied video. A source without
-                # one falls back to extraction, exactly as an upload would.
-                first_frame=_read_video_thumbnail(video_name),
-                move_source=False,
             )
-
-            # `create` treats board attachment as best-effort — losing a freshly generated video
-            # over a categorization problem would be worse than losing its board. A copy is the
-            # other way round: the caller asked for a copy *on a board* and is about to remap a
-            # document onto the name we return, so a copy that landed uncategorized is a failure
-            # reported as one, not a success with a surprise in it.
-            if board_id is not None and video_dto.board_id != board_id:
-                raise RuntimeError(f"Copy of {video_name} did not reach board {board_id}")
-
             copied.append(CopiedVideo(source_video_name=video_name, video_name=video_dto.video_name))
         except Exception:
             ApiDependencies.invoker.services.logger.error(f"Failed to copy video {video_name}", exc_info=True)

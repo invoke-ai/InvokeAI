@@ -75,6 +75,16 @@ class VideoServiceABC(ABC):
         pass
 
     @abstractmethod
+    def copy(self, source_video_name: str, board_id: Optional[str] = None, user_id: Optional[str] = None) -> VideoDTO:
+        """Copies a stored video under a fresh identity.
+
+        Provenance is preserved, the source file is never consumed, and a requested board
+        attachment is atomic from the caller's perspective: a copy that cannot reach the board is
+        deleted before this method fails.
+        """
+        pass
+
+    @abstractmethod
     def update(self, video_name: str, changes: VideoRecordChanges) -> VideoDTO:
         """Updates a video."""
         pass

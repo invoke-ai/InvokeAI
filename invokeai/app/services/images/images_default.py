@@ -24,6 +24,7 @@ from invokeai.app.services.image_records.image_records_common import (
 from invokeai.app.services.images.images_base import ImageServiceABC
 from invokeai.app.services.images.images_common import ImageDTO, image_record_to_dto
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.shared.bulk_media_delete import StagedMediaDeleteAdapter, delete_media_by_names
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 
@@ -403,41 +404,20 @@ class ImageService(ImageServiceABC):
         delete fails keep their record on purpose and come back as failures.
         """
         try:
-            deleted_image_names: list[str] = []
-            failed_image_names: list[str] = []
-            staged_deletes: list[tuple[str, object]] = []
-            for image_name in image_names:
-                try:
-                    record = self.__invoker.services.image_records.get(image_name)
-                    token = self.__invoker.services.image_files.stage_delete(
-                        image_name, image_subfolder=record.image_subfolder
-                    )
-                    staged_deletes.append((image_name, token))
-                    deleted_image_names.append(image_name)
-                except Exception as e:
-                    failed_image_names.append(image_name)
-                    self.__invoker.services.logger.error(
-                        f"Failed to delete image file {image_name}; keeping record: {str(e)}"
-                    )
-            try:
-                self.__invoker.services.image_records.delete_many(deleted_image_names)
-            except Exception:
-                for image_name, token in staged_deletes:
-                    try:
-                        self.__invoker.services.image_files.rollback_delete(token)
-                    except Exception as rollback_error:
-                        self.__invoker.services.logger.error(
-                            f"Failed to restore staged image files for {image_name}: {rollback_error}"
-                        )
-                raise
-            for _, token in staged_deletes:
-                try:
-                    self.__invoker.services.image_files.commit_delete(token)
-                except Exception as cleanup_error:
-                    self.__invoker.services.logger.error(f"Failed to purge staged image files: {cleanup_error}")
-            for image_name in deleted_image_names:
-                self._on_deleted(image_name)
-            return deleted_image_names, failed_image_names
+            records = self.__invoker.services.image_records
+            files = self.__invoker.services.image_files
+            return delete_media_by_names(
+                image_names,
+                StagedMediaDeleteAdapter(
+                    kind="image",
+                    stage=lambda name: files.stage_delete(name, image_subfolder=records.get(name).image_subfolder),
+                    delete_records=records.delete_many,
+                    rollback=files.rollback_delete,
+                    commit=files.commit_delete,
+                    notify_deleted=self._on_deleted,
+                    log_error=self.__invoker.services.logger.error,
+                ),
+            )
         except ImageRecordDeleteException:
             self.__invoker.services.logger.error("Failed to delete image records")
             raise
