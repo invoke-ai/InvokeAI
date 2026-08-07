@@ -22,6 +22,7 @@ from invokeai.app.invocations.model import (
     is_self_contained_sdnq_pipeline,
 )
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     Flux2VariantType,
@@ -30,6 +31,19 @@ from invokeai.backend.model_manager.taxonomy import (
     Qwen3VariantType,
     SubModelType,
 )
+
+# FLUX.2 Klein variant -> the Qwen3 encoder variant it was trained against, and the single place
+# that relationship is written down on the backend. Mirrors `KLEIN_TO_QWEN3_VARIANT_MAP` in
+# `invokeai/frontend/web/src/features/parameters/util/flux2Klein.ts` — keep the two in sync.
+# Variants sharing a Qwen3 entry (`klein_9b` and `klein_9b_base`) are valid encoder sources for
+# each other. [dev] is deliberately absent: it uses a Mistral encoder, so it can never satisfy a
+# Klein transformer, and `.get()` returning None is what makes the guards below fail closed.
+_KLEIN_TO_QWEN3_VARIANT: dict[Flux2VariantType, Qwen3VariantType] = {
+    Flux2VariantType.Klein4B: Qwen3VariantType.Qwen3_4B,
+    Flux2VariantType.Klein4BBase: Qwen3VariantType.Qwen3_4B,
+    Flux2VariantType.Klein9B: Qwen3VariantType.Qwen3_8B,
+    Flux2VariantType.Klein9BBase: Qwen3VariantType.Qwen3_8B,
+}
 
 
 @invocation_output("flux2_klein_model_loader_output")
@@ -156,7 +170,7 @@ class Flux2KleinModelLoaderInvocation(BaseInvocation):
             qwen3_encoder = self.model.model_copy(update={"submodel_type": SubModelType.TextEncoder})
         elif self.qwen3_source_model is not None:
             # Extract from separate Diffusers model
-            self._validate_diffusers_format(context, self.qwen3_source_model, "Qwen3 Source")
+            self._validate_encoder_source(context, self.qwen3_source_model, "Qwen3 Source", main_config)
             qwen3_tokenizer = self.qwen3_source_model.model_copy(update={"submodel_type": SubModelType.Tokenizer})
             qwen3_encoder = self.qwen3_source_model.model_copy(update={"submodel_type": SubModelType.TextEncoder})
         else:
@@ -177,58 +191,86 @@ class Flux2KleinModelLoaderInvocation(BaseInvocation):
 
     def _validate_diffusers_format(
         self, context: InvocationContext, model: ModelIdentifierField, model_name: str
-    ) -> None:
-        """Validate that a model exposes the diffusers-style submodel layout. Plain diffusers
-        pipelines qualify, as do SDNQ-quantized pipeline folders that ship the VAE + Qwen3
-        submodels; single-file SDNQ FLUX.2 checkpoints and partial pipelines (missing VAE / Qwen3
-        submodels) are rejected.
+    ) -> AnyModelConfig:
+        """Validate that a model exposes the diffusers-style submodel layout and return its config.
+
+        Deliberately format-only, because this also gates the VAE-extraction path: the 32-channel
+        ``AutoencoderKLFlux2`` is shared between Klein and [dev], and the linear UI relies on that
+        (``buildFLUXGraph`` falls back to *any* FLUX.2 diffusers pipeline when only the VAE is
+        needed). Variant gating belongs to the encoder path only — see ``_validate_encoder_source``.
+
+        Plain diffusers pipelines qualify, as do SDNQ-quantized pipeline folders that ship the VAE +
+        Qwen3 submodels; single-file SDNQ FLUX.2 checkpoints and partial pipelines (missing VAE /
+        Qwen3 submodels) are rejected.
         """
         config = context.models.get_config(model)
-        if config.format == ModelFormat.Diffusers:
-            return
-        if is_self_contained_sdnq_pipeline(config):
-            return
+        if config.format == ModelFormat.Diffusers or is_self_contained_sdnq_pipeline(config):
+            return config
         raise ValueError(
             f"The {model_name} model must be a Diffusers-style FLUX.2 pipeline (with VAE / Qwen3 "
             f"submodels). The selected model '{config.name}' is in {config.format.value} format."
         )
 
-    def _validate_qwen3_encoder_variant(self, context: InvocationContext, main_config) -> None:
+    def _validate_encoder_source(
+        self,
+        context: InvocationContext,
+        model: ModelIdentifierField,
+        model_name: str,
+        main_config: AnyModelConfig,
+    ) -> None:
+        """Validate a Diffusers pipeline used as the *text encoder* source.
+
+        The source's tokenizer + encoder are extracted and paired with *this* model's transformer,
+        so they must come from the same Qwen3 family. Mismatched widths produce conditioning that
+        only fails as an opaque matmul error deep in denoise, so reject it here where the user still
+        gets a clear message. The linear UI (``buildFLUXGraph``) and the standalone-encoder path
+        (``_validate_qwen3_encoder_variant``) already enforce the family match; the workflow editor
+        lets any FLUX.2 Diffusers pipeline be wired in here, so this is the entry point that closes it.
+        """
+        config = self._validate_diffusers_format(context, model, model_name)
+        source_variant = getattr(config, "variant", None)
+        source_qwen3 = _KLEIN_TO_QWEN3_VARIANT.get(source_variant)
+
+        # An allowlist, not "reject [dev]": a future third FLUX.2 variant has to fail closed here
+        # the way the [dev] loader's guard already makes it, rather than being silently accepted.
+        if source_qwen3 is None:
+            described = f"variant '{source_variant.value}'" if source_variant is not None else "not a Klein pipeline"
+            raise ValueError(
+                f"The {model_name} model must be a FLUX.2 Klein pipeline, "
+                f"but the selected model '{config.name}' is {described}. "
+                "Its text encoder is incompatible with the Klein transformer. "
+                "(Its VAE is compatible - this only blocks encoder extraction.)"
+            )
+
+        required_qwen3 = _KLEIN_TO_QWEN3_VARIANT.get(getattr(main_config, "variant", None))
+        if required_qwen3 is not None and source_qwen3 != required_qwen3:
+            raise ValueError(
+                f"Qwen3 encoder variant mismatch: FLUX.2 Klein {main_config.variant.value} requires a "
+                f"{required_qwen3.value} encoder, but the {model_name} pipeline '{config.name}' "
+                f"({source_variant.value}) carries {source_qwen3.value}. "
+                "Select a Klein pipeline from the same family - 4B pairs with 4B, 9B with 9B."
+            )
+
+    def _validate_qwen3_encoder_variant(self, context: InvocationContext, main_config: AnyModelConfig) -> None:
         """Validate that the standalone Qwen3 encoder variant matches the FLUX.2 Klein variant.
 
-        - FLUX.2 Klein 4B requires Qwen3 4B encoder
-        - FLUX.2 Klein 9B requires Qwen3 8B encoder
+        - FLUX.2 Klein 4B (and 4B Base) require the Qwen3 4B encoder
+        - FLUX.2 Klein 9B (and 9B Base) require the Qwen3 8B encoder
         """
         if self.qwen3_encoder_model is None:
             return
 
-        # Get the Qwen3 encoder config
-        qwen3_config = context.models.get_config(self.qwen3_encoder_model)
-
-        # Check if the config has a variant field
-        if not hasattr(qwen3_config, "variant"):
-            # Can't validate, skip
+        # `getattr(..., None)` rather than `hasattr`: the field can exist and still be None, and
+        # comparing None against the expected variant would then raise `AttributeError` on
+        # `.value` in the error path instead of the intended `ValueError`.
+        qwen3_variant = getattr(context.models.get_config(self.qwen3_encoder_model), "variant", None)
+        if qwen3_variant is None:
             return
 
-        qwen3_variant = qwen3_config.variant
-
-        # Get the FLUX.2 Klein variant from the main model config
-        if not hasattr(main_config, "variant"):
-            return
-
-        flux2_variant = main_config.variant
-
-        # Validate the variants match
-        # Klein4B/Klein4BBase requires Qwen3_4B, Klein9B/Klein9BBase requires Qwen3_8B
-        expected_qwen3_variant = None
-        if flux2_variant in (Flux2VariantType.Klein4B, Flux2VariantType.Klein4BBase):
-            expected_qwen3_variant = Qwen3VariantType.Qwen3_4B
-        elif flux2_variant in (Flux2VariantType.Klein9B, Flux2VariantType.Klein9BBase):
-            expected_qwen3_variant = Qwen3VariantType.Qwen3_8B
-
+        expected_qwen3_variant = _KLEIN_TO_QWEN3_VARIANT.get(getattr(main_config, "variant", None))
         if expected_qwen3_variant is not None and qwen3_variant != expected_qwen3_variant:
             raise ValueError(
-                f"Qwen3 encoder variant mismatch: FLUX.2 Klein {flux2_variant.value} requires "
+                f"Qwen3 encoder variant mismatch: FLUX.2 Klein {main_config.variant.value} requires "
                 f"{expected_qwen3_variant.value} encoder, but {qwen3_variant.value} was selected. "
-                f"Please select a matching Qwen3 encoder or use a Diffusers format model which includes the correct encoder."
+                "Please select a matching Qwen3 encoder or use a Diffusers format model which includes the correct encoder."
             )

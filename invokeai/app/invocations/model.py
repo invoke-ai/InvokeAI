@@ -108,6 +108,18 @@ class Qwen3EncoderField(BaseModel):
     loras: List[LoRAField] = Field(default_factory=list, description="LoRAs to apply on model loading")
 
 
+class MistralEncoderField(BaseModel):
+    """Field for the Mistral text encoder used by FLUX.2 [dev].
+
+    The "tokenizer" submodel actually points to the multimodal processor (AutoProcessor /
+    Mistral3Processor), which wraps the tokenizer plus the chat template needed by FLUX.2.
+    """
+
+    tokenizer: ModelIdentifierField = Field(description="Info to load tokenizer / processor submodel")
+    text_encoder: ModelIdentifierField = Field(description="Info to load text_encoder submodel")
+    loras: List[LoRAField] = Field(default_factory=list, description="LoRAs to apply on model loading")
+
+
 class Mistral3EncoderField(BaseModel):
     """Field for Mistral3 text encoder used by ERNIE-Image models."""
 

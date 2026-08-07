@@ -44,7 +44,7 @@ import type { TabName } from 'features/ui/store/uiTypes';
 import i18n from 'i18next';
 import { atom, computed } from 'nanostores';
 import { useEffect } from 'react';
-import { selectFlux2DiffusersModels } from 'services/api/hooks/modelsByType';
+import { selectFlux2DevDiffusersModels, selectFlux2DiffusersModels } from 'services/api/hooks/modelsByType';
 import type { MainOrExternalModelConfig } from 'services/api/types';
 import { isExternalApiModelConfig, isSelfContainedSDNQPipeline } from 'services/api/types';
 import { $isConnected } from 'services/events/stores';
@@ -121,6 +121,7 @@ const debouncedUpdateReasons = debounce(async (arg: UpdateReasonsArg) => {
     const hasFlux2DiffusersQwen3Source = flux2DiffusersModels.some(
       (m) => 'variant' in m && isFlux2KleinQwen3Compatible(m.variant, modelVariant)
     );
+    const hasFlux2DevDiffusersSource = selectFlux2DevDiffusersModels(store.getState()).length > 0;
     const reasons = await getReasonsWhyCannotEnqueueGenerateTab({
       isConnected,
       model,
@@ -130,6 +131,7 @@ const debouncedUpdateReasons = debounce(async (arg: UpdateReasonsArg) => {
       loras,
       hasFlux2DiffusersVaeSource,
       hasFlux2DiffusersQwen3Source,
+      hasFlux2DevDiffusersSource,
     });
     $reasonsWhyCannotEnqueue.set(reasons);
   } else if (tab === 'canvas') {
@@ -140,6 +142,7 @@ const debouncedUpdateReasons = debounce(async (arg: UpdateReasonsArg) => {
     const hasFlux2DiffusersQwen3Source = flux2DiffusersModels.some(
       (m) => 'variant' in m && isFlux2KleinQwen3Compatible(m.variant, modelVariant)
     );
+    const hasFlux2DevDiffusersSource = selectFlux2DevDiffusersModels(store.getState()).length > 0;
     const reasons = await getReasonsWhyCannotEnqueueCanvasTab({
       isConnected,
       model,
@@ -155,6 +158,7 @@ const debouncedUpdateReasons = debounce(async (arg: UpdateReasonsArg) => {
       loras,
       hasFlux2DiffusersVaeSource,
       hasFlux2DiffusersQwen3Source,
+      hasFlux2DevDiffusersSource,
     });
     $reasonsWhyCannotEnqueue.set(reasons);
   } else if (tab === 'workflows') {
@@ -251,6 +255,7 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
   dynamicPrompts: DynamicPromptsState;
   hasFlux2DiffusersVaeSource: boolean;
   hasFlux2DiffusersQwen3Source: boolean;
+  hasFlux2DevDiffusersSource: boolean;
 }) => {
   const {
     isConnected,
@@ -261,6 +266,7 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     dynamicPrompts,
     hasFlux2DiffusersVaeSource,
     hasFlux2DiffusersQwen3Source,
+    hasFlux2DevDiffusersSource,
   } = arg;
   const { positivePrompt } = params;
   const reasons: Reason[] = [];
@@ -302,55 +308,33 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
   }
 
   if (model?.base === 'flux2') {
-    // A FLUX.2 Klein model is a self-sufficient source when its config exposes the diffusers-style
+    // A FLUX.2 model is a self-sufficient source when its config exposes the diffusers-style
     // submodels (transformer/vae/text_encoder/tokenizer). Plain Diffusers pipelines always do; an
     // SDNQ pipeline qualifies only when it ships all of them — a truthy submodels dict is not enough,
     // since a partial pipeline may expose only the transformer and the backend would then request
-    // missing fixed subfolders. Single-file / GGUF Klein models have no submodels and need a
-    // standalone VAE + Qwen3 (or a diffusers source).
+    // missing fixed subfolders. Single-file / GGUF models have no submodels and need a standalone
+    // VAE + text encoder, or a Diffusers source of the matching variant family.
     const mainIsPipeline =
       model.format === 'diffusers' ||
       ((model as { format?: unknown }).format === 'sdnq_quantized' && isSelfContainedSDNQPipeline(model));
     if (!mainIsPipeline) {
-      if (!params.kleinVaeModel && !hasFlux2DiffusersVaeSource) {
-        reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinVaeModelSelected') });
+      if ('variant' in model && model.variant === 'dev') {
+        // FLUX.2 [dev]: needs FLUX.2 VAE + Mistral text encoder.
+        if (!params.flux2VaeModel && !hasFlux2DevDiffusersSource) {
+          reasons.push({ content: i18n.t('parameters.invoke.noFlux2DevVaeModelSelected') });
+        }
+        if (!params.flux2DevMistralEncoderModel && !hasFlux2DevDiffusersSource) {
+          reasons.push({ content: i18n.t('parameters.invoke.noFlux2DevMistralEncoderModelSelected') });
+        }
+      } else {
+        // FLUX.2 Klein: needs FLUX.2 VAE + Qwen3 text encoder (variant-matched).
+        if (!params.flux2VaeModel && !hasFlux2DiffusersVaeSource) {
+          reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinVaeModelSelected') });
+        }
+        if (!params.kleinQwen3EncoderModel && !hasFlux2DiffusersQwen3Source) {
+          reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinQwen3EncoderModelSelected') });
+        }
       }
-      if (!params.kleinQwen3EncoderModel && !hasFlux2DiffusersQwen3Source) {
-        reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinQwen3EncoderModelSelected') });
-      }
-    }
-  }
-
-  if (model?.base === 'flux2' && params.pidMode !== 'off') {
-    // PiD decode (any FLUX.2 format) needs both a PiD decoder and the Gemma-2 caption encoder.
-    if (!params.pidDecoderModel) {
-      reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
-    }
-    if (!params.gemma2EncoderModel) {
-      reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
-    }
-  }
-
-  if (model?.base === 'sd-3' && params.pidMode !== 'off') {
-    // PiD decode needs both a PiD decoder and the Gemma-2 caption encoder.
-    if (!params.pidDecoderModel) {
-      reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
-    }
-    if (!params.gemma2EncoderModel) {
-      reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
-    }
-  }
-
-  if (model?.base === 'sdxl' && params.pidMode !== 'off') {
-    // PiD decode needs the decoder + Gemma-2 encoder, and is not compatible with the SDXL Refiner.
-    if (!params.pidDecoderModel) {
-      reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
-    }
-    if (!params.gemma2EncoderModel) {
-      reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
-    }
-    if (params.refinerModel) {
-      reasons.push({ content: i18n.t('parameters.invoke.pidIncompatibleWithRefiner') });
     }
   }
 
@@ -664,6 +648,7 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   canvasIsSelectingObject: boolean;
   hasFlux2DiffusersVaeSource: boolean;
   hasFlux2DiffusersQwen3Source: boolean;
+  hasFlux2DevDiffusersSource: boolean;
 }) => {
   const {
     isConnected,
@@ -680,6 +665,7 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     canvasIsSelectingObject,
     hasFlux2DiffusersVaeSource,
     hasFlux2DiffusersQwen3Source,
+    hasFlux2DevDiffusersSource,
   } = arg;
   const { positivePrompt } = params;
   const reasons: Reason[] = [];
@@ -788,7 +774,7 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   }
 
   if (model?.base === 'flux2') {
-    // A FLUX.2 Klein model is a self-sufficient source when its config exposes the diffusers-style
+    // A FLUX.2 model is a self-sufficient source when its config exposes the diffusers-style
     // submodels. Plain Diffusers pipelines always do; an SDNQ pipeline qualifies only when it ships
     // all of them — a truthy submodels dict is not enough, since a partial pipeline may expose only
     // the transformer and the backend would then request missing fixed subfolders. Mirrors the
@@ -796,13 +782,22 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     const mainIsPipeline =
       model.format === 'diffusers' ||
       ((model as { format?: unknown }).format === 'sdnq_quantized' && isSelfContainedSDNQPipeline(model));
-    // VAE is shared across variants, but Qwen3 encoder requires a variant-matching diffusers model.
+    // VAE is shared across variants, but the text encoder requires a variant-matching diffusers model.
     if (!mainIsPipeline) {
-      if (!params.kleinVaeModel && !hasFlux2DiffusersVaeSource) {
-        reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinVaeModelSelected') });
-      }
-      if (!params.kleinQwen3EncoderModel && !hasFlux2DiffusersQwen3Source) {
-        reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinQwen3EncoderModelSelected') });
+      if ('variant' in model && model.variant === 'dev') {
+        if (!params.flux2VaeModel && !hasFlux2DevDiffusersSource) {
+          reasons.push({ content: i18n.t('parameters.invoke.noFlux2DevVaeModelSelected') });
+        }
+        if (!params.flux2DevMistralEncoderModel && !hasFlux2DevDiffusersSource) {
+          reasons.push({ content: i18n.t('parameters.invoke.noFlux2DevMistralEncoderModelSelected') });
+        }
+      } else {
+        if (!params.flux2VaeModel && !hasFlux2DiffusersVaeSource) {
+          reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinVaeModelSelected') });
+        }
+        if (!params.kleinQwen3EncoderModel && !hasFlux2DiffusersQwen3Source) {
+          reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinQwen3EncoderModelSelected') });
+        }
       }
     }
 

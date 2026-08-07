@@ -158,6 +158,7 @@ export const zModelType = z.enum([
   't5_encoder',
   'qwen3_encoder',
   'qwen_vl_encoder',
+  'mistral_encoder',
   'qwen3_vl_encoder',
   'wan_t5_encoder',
   'gemma2_encoder',
@@ -192,7 +193,7 @@ export const zSubModelType = z.enum([
 export const zClipVariantType = z.enum(['large', 'gigantic']);
 export const zModelVariantType = z.enum(['normal', 'inpaint', 'depth']);
 export const zFluxVariantType = z.enum(['dev', 'dev_fill', 'schnell']);
-export const zFlux2VariantType = z.enum(['klein_4b', 'klein_4b_base', 'klein_9b', 'klein_9b_base']);
+export const zFlux2VariantType = z.enum(['klein_4b', 'klein_4b_base', 'klein_9b', 'klein_9b_base', 'dev']);
 export const zZImageVariantType = z.enum(['turbo', 'zbase']);
 export const zKrea2VariantType = z.enum(['krea2_turbo', 'krea2_base']);
 const zQwenImageVariantType = z.enum(['generate', 'edit']);
@@ -201,6 +202,7 @@ const zWanVariantType = z.enum(['t2v_a14b', 'i2v_a14b', 'ti2v_5b']);
  *  targets. A14B = inner_dim 5120 (both T2V and I2V), 5B = inner_dim 3072. */
 const zWanLoRAVariantType = z.enum(['a14b', '5b']);
 export const zQwen3VariantType = z.enum(['qwen3_4b', 'qwen3_8b', 'qwen3_06b']);
+const zMistralVariantType = z.enum(['cow_mistral3_small', 'mistral3_24b']);
 const zPiDDecoderVariantType = z.enum(['res2k_sr4x', 'res2kto4k_sr4x']);
 export const zAnyModelVariant = z.union([
   zModelVariantType,
@@ -213,6 +215,7 @@ export const zAnyModelVariant = z.union([
   zWanVariantType,
   zWanLoRAVariantType,
   zQwen3VariantType,
+  zMistralVariantType,
   zPiDDecoderVariantType,
 ]);
 export type AnyModelVariant = z.infer<typeof zAnyModelVariant>;
@@ -229,6 +232,7 @@ export const zModelFormat = z.enum([
   't5_encoder',
   'qwen3_encoder',
   'qwen_vl_encoder',
+  'mistral_encoder',
   'qwen3_vl_encoder',
   'wan_t5_encoder',
   'gemma2_encoder',
