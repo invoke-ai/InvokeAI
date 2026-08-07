@@ -1740,25 +1740,53 @@ wan_22_ti2v_5b_gguf_q8_0 = StarterModel(
 # endregion
 
 # region MiniMax H3 (local)
-# TODO(minimax-h3): no starter entry yet — the installer cannot express a viable download.
-# MiniMax H3 FL2VA lives in huggingface.co/MiniMaxAI/MiniMax-H3 as a root-level Modular
-# Diffusers layout whose probe requires the root `modular_model_index.json`, but the repo also
-# carries the Ref2VA transformer (`transformer_ref/`) and the original remote-code checkpoints
-# (`FL2VA/`, `Ref2VA/`) as siblings:
-#   - a bare `MiniMaxAI/MiniMax-H3` source downloads ~498 GB (every subtree matches
-#     `filter_files`' weight patterns) for a ~42.5 GB working set;
-#   - a `::transformer+text_encoder+tokenizer+processor+vae+audio_vae` subfolder source skips
-#     the root `modular_model_index.json` (`filter_files` keeps only files INSIDE the listed
-#     subfolders), so identification fails and the install lands as an unknown model.
-# Unblocking this needs either (a) `filter_files` learning to include root config JSONs
-# alongside a subfolder set — an installer-wide behavior change that would also alter what
-# existing `::subfolder` sources (e.g. the Wan T5 encoder) download — or (b) an upstream
-# FL2VA-only diffusers repo. Until then, users install by pointing the Model Manager at a
-# locally assembled root-layout folder (see the "MiniMax H3" default workflows' notes).
-# Any future entry must keep "MiniMax H3" verbatim in its name/description (the MiniMax H3
-# Community License requires prominent attribution) and should note the license's territory
-# restrictions (excludes the US, EU, UK and South Korea, extending to outputs), which is why
-# this region is isolated in its own droppable commit.
+# License note: the MiniMax H3 Community License requires prominent "MiniMax H3" attribution
+# (keep it verbatim in every name/description below) and restricts use by territory (excludes
+# the US, EU, UK and South Korea, extending to outputs). These entries live in their own
+# droppable commit so a release can exclude them without touching anything else.
+#
+# The full huggingface.co/MiniMaxAI/MiniMax-H3 repo is ~498 GB (it also carries the Ref2VA
+# transformer and the original remote-code checkpoints). The slim main below downloads only the
+# shared components (tokenizer, processor, video/audio VAEs) plus the two config JSONs that
+# identification needs (~11 GB); the transformer and text encoder come from Comfy-Org's int8
+# single-file repacks, selected in the MiniMax H3 Model Loader. Total ~59 GB.
+
+minimax_h3_components = StarterModel(
+    name="MiniMax H3 Components",
+    base=BaseModelType.MiniMaxH3,
+    source="MiniMaxAI/MiniMax-H3::modular_model_index.json+transformer/config.json+tokenizer+processor+vae+audio_vae",
+    description="MiniMax H3 shared components: tokenizer, processor and video/audio VAEs, without "
+    "transformer or text-encoder weights (~11 GB). Pair with the MiniMax H3 single-file transformer "
+    "and text encoder. NOTE: This model is distributed under a restrictive license that forbids its "
+    "use in certain territories. Please see https://huggingface.co/MiniMaxAI/MiniMax-H3 for details.",
+    type=ModelType.Main,
+    format=ModelFormat.Diffusers,
+)
+
+minimax_h3_int8_text_encoder = StarterModel(
+    name="MiniMax H3 Text Encoder (int8)",
+    base=BaseModelType.MiniMaxH3,
+    source="Comfy-Org/MiniMax-H3::text_encoders/qwen3vl_32b_minimax_h3_int8_convrot.safetensors",
+    description="Truncated Qwen3-VL-32B conditioning encoder for MiniMax H3, int8 quantized (~27 GB). "
+    "Select it in the MiniMax H3 Model Loader's text encoder field. NOTE: This model is distributed "
+    "under a restrictive license that forbids its use in certain territories. Please see "
+    "https://huggingface.co/MiniMaxAI/MiniMax-H3 for details.",
+    type=ModelType.Qwen3VLEncoder,
+    format=ModelFormat.Checkpoint,
+)
+
+minimax_h3_int8_transformer = StarterModel(
+    name="MiniMax H3 FL2VA Transformer (int8, pruned)",
+    base=BaseModelType.MiniMaxH3,
+    source="Comfy-Org/MiniMax-H3::diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+    description="MiniMax H3 video+audio generation. AdaLN-pruned int8 single-file transformer (~21 GB); "
+    "select it in the MiniMax H3 Model Loader's transformer field. Total size with dependencies: ~59 GB. "
+    "NOTE: This model is distributed under a restrictive license that forbids its use in certain "
+    "territories. Please see https://huggingface.co/MiniMaxAI/MiniMax-H3 for details.",
+    type=ModelType.Main,
+    format=ModelFormat.Checkpoint,
+    dependencies=[minimax_h3_components, minimax_h3_int8_text_encoder],
+)
 # endregion
 
 alibabacloud_wan26_t2i = StarterModel(
@@ -2261,6 +2289,9 @@ STARTER_MODELS: list[StarterModel] = [
     wan_22_ti2v_5b_diffusers,
     wan_22_ti2v_5b_gguf_q4_k_m,
     wan_22_ti2v_5b_gguf_q8_0,
+    minimax_h3_int8_transformer,
+    minimax_h3_int8_text_encoder,
+    minimax_h3_components,
     gemini_flash_image,
     gemini_pro_image_preview,
     gemini_3_1_flash_image_preview,
@@ -2432,6 +2463,15 @@ ideogram_bundle: list[StarterModel] = [
     ideogram_4_nf4,
 ]
 
+# The minimal working set for MiniMax H3 video+audio generation (~59 GB): shared components from
+# the official repo plus Comfy-Org's int8 single-file transformer and text encoder. See the
+# license note in the MiniMax H3 region above.
+minimax_h3_bundle: list[StarterModel] = [
+    minimax_h3_components,
+    minimax_h3_int8_text_encoder,
+    minimax_h3_int8_transformer,
+]
+
 STARTER_BUNDLES: dict[str, StarterModelBundle] = {
     BaseModelType.StableDiffusion1: StarterModelBundle(name="Stable Diffusion 1.5", models=sd1_bundle),
     BaseModelType.StableDiffusionXL: StarterModelBundle(name="SDXL", models=sdxl_bundle),
@@ -2444,6 +2484,7 @@ STARTER_BUNDLES: dict[str, StarterModelBundle] = {
     BaseModelType.Krea2: StarterModelBundle(name="Krea-2", models=krea2_bundle),
     "wan_t2v": StarterModelBundle(name="Wan 2.2 Text-to-Video", models=wan_t2v_bundle),
     "wan_i2v": StarterModelBundle(name="Wan 2.2 Image-to-Video", models=wan_i2v_bundle),
+    BaseModelType.MiniMaxH3: StarterModelBundle(name="MiniMax H3", models=minimax_h3_bundle),
     BaseModelType.Ideogram4: StarterModelBundle(name="Ideogram 4", models=ideogram_bundle),
 }
 
