@@ -427,6 +427,8 @@
       "missingReferences_one": "1 project reference could not be included.",
       "missingReferences_other": "{{count}} project references could not be included.",
       "notAProject": "This file is not an Invoke project.",
+      "notSynced": "This project has changes that have not reached the server yet. Try again once it reconnects.",
+      "supersededElsewhere": "This project was changed on another device. Your local edits continue in the recovered copy — use that one instead.",
       "packing": "Packing the archive…",
       "restoringProgress": "Restoring {{completed}} of {{total}} assets…",
       "tooLarge": "This project file is too large to open.",

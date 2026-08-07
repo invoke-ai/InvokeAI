@@ -2,6 +2,7 @@ import type { AccountScope } from '@platform/state/accountLifecycle';
 import type { ProjectBoardItemDTO, ProjectRecordDTO } from '@workbench/projects/api';
 import type * as apiModule from '@workbench/projects/api';
 
+import { ProjectCreateAbsentError } from '@workbench/projects/api';
 import { createDraftProject } from '@workbench/workbenchState';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -16,10 +17,11 @@ import type * as duplicateProjectModule from './duplicateProject';
  * original's image, and a failure before the create undoes exactly what it made.
  */
 
+// `createProjectSettled` is the seam, not `createProject`: it is what decides whether a create that
+// went unanswered actually landed, and therefore whether the copies below may be deleted.
 const api = vi.hoisted(() => ({
-  createProject: vi.fn(),
+  createProjectSettled: vi.fn(),
   getProject: vi.fn(),
-  isProjectConfirmedAbsent: vi.fn(),
   isProjectNotFoundError: (error: unknown) =>
     typeof error === 'object' && error !== null && 'status' in error && error.status === 404,
 }));
@@ -104,7 +106,7 @@ const copiesOf = (names: readonly string[]) => ({
 });
 
 const createdData = (): Record<string, unknown> =>
-  (api.createProject.mock.calls[0]![0] as { data: Record<string, unknown> }).data;
+  (api.createProjectSettled.mock.calls[0]![0] as { data: Record<string, unknown> }).data;
 
 const restoredLayerName = (): string =>
   (
@@ -129,7 +131,7 @@ beforeEach(async () => {
   transport.findExistingVideoNames.mockImplementation((names: readonly string[]) => Promise.resolve(new Set(names)));
   transport.starImages.mockImplementation(() => Promise.resolve({ failed: [] }));
   transport.starVideos.mockImplementation(() => Promise.resolve({ failed: [] }));
-  api.createProject.mockImplementation(
+  api.createProjectSettled.mockImplementation(
     (request: { board_id?: string; data: Record<string, unknown>; name: string; project_id: string }) =>
       Promise.resolve({
         board_id: request.board_id ?? 'server-created-board',
@@ -159,7 +161,10 @@ describe('duplicateProjectRecord', () => {
       'staging-board',
       owner.signal
     );
-    expect(api.createProject.mock.calls[0]![0]).toMatchObject({ board_id: 'staging-board', name: 'Source copy' });
+    expect(api.createProjectSettled.mock.calls[0]![0]).toMatchObject({
+      board_id: 'staging-board',
+      name: 'Source copy',
+    });
     expect(result.record.project_id).not.toBe('source');
     expect(result.boardItemIssues).toEqual([]);
   });
@@ -253,14 +258,13 @@ describe('duplicateProjectRecord', () => {
     await duplicateProject.duplicateProjectRecord({ boardItems: [], owner, record: sourceRecord() });
 
     expect(transport.createStagingBoard).not.toHaveBeenCalled();
-    expect(api.createProject.mock.calls[0]![0]).not.toHaveProperty('board_id');
+    expect(api.createProjectSettled.mock.calls[0]![0]).not.toHaveProperty('board_id');
   });
 
-  it('deletes the copies it made and the staging board when the create fails', async () => {
-    const failure = new Error('create rejected');
+  it('deletes the copies it made and the staging board when the create provably did not happen', async () => {
+    const failure = new ProjectCreateAbsentError(new Error('the server refused the create'));
 
-    api.createProject.mockRejectedValue(failure);
-    api.isProjectConfirmedAbsent.mockResolvedValueOnce(true);
+    api.createProjectSettled.mockRejectedValue(failure);
 
     await expect(
       duplicateProject.duplicateProjectRecord({
@@ -275,11 +279,16 @@ describe('duplicateProjectRecord', () => {
     expect(transport.deleteStagingBoard).toHaveBeenCalledWith('staging-board', owner.signal);
   });
 
-  it('leaves the copies alone when a rejected create may already have claimed the board', async () => {
+  /**
+   * The outcome that used to be decided by a `GET`, and decided wrongly: the read returns 404 while
+   * the create transaction is still committing, so the copies were deleted out from under a project
+   * that then appeared — with every reference in its document dangling. An unproven absence must
+   * leave the media alone.
+   */
+  it('leaves the copies alone when a rejected create may already have landed', async () => {
     const failure = new Error('connection ended after create');
 
-    api.createProject.mockRejectedValue(failure);
-    api.isProjectConfirmedAbsent.mockResolvedValueOnce(false);
+    api.createProjectSettled.mockRejectedValue(failure);
 
     await expect(
       duplicateProject.duplicateProjectRecord({ boardItems: [boardItem()], owner, record: sourceRecord() })
@@ -292,10 +301,10 @@ describe('duplicateProjectRecord', () => {
   it('does not issue destructive cleanup under a different account', async () => {
     const account = await import('@platform/state/accountLifecycle');
 
-    api.createProject.mockImplementation(() => {
+    api.createProjectSettled.mockImplementation(() => {
       account.accountLifecycle.activate('duplicate-user-b');
 
-      return Promise.reject(new Error('create rejected'));
+      return Promise.reject(new ProjectCreateAbsentError(new Error('create rejected')));
     });
 
     await expect(

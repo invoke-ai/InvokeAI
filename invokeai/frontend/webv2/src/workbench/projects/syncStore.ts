@@ -1,6 +1,8 @@
 import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
 
+import type { ProjectPushOutcome } from './projectFlush';
+
 /**
  * The bridge between the project sync layer and everything outside the editor.
  *
@@ -59,8 +61,24 @@ registerAccountOwnedResource({
 export interface OpenProjectHandle {
   /** Close the tab, after the project has been deleted on the server. */
   close: () => void;
-  /** Push the live document and wait for the server to acknowledge it. */
-  flush: () => Promise<void>;
+  /**
+   * Delete the project on the server, from inside the sync engine's mutation queue.
+   *
+   * The queue is the point. Marking the project deleted stops a save that has not begun, but says
+   * nothing to a `PUT` already on the wire — that one returns 404 once the delete commits, and the
+   * engine's answer to a 404 is to fork the local edits into a new server-side project. Deleting
+   * *through* the queue means the in-flight push finishes first, so there is no 404 to misread and
+   * no copy of the project the person just deleted.
+   */
+  deleteOnServer: () => Promise<void>;
+  /**
+   * Push the live document, and report whether the server actually took it.
+   *
+   * Deliberately an outcome rather than a rejection. A push that did not land is recoverable — the
+   * document is cached and the next save retries — so a rename or a closing tab is right to ignore
+   * it. A caller about to read the project back from the server is not: see `assertProjectFlushed`.
+   */
+  flush: () => Promise<ProjectPushOutcome>;
   /** Stop the autosave from recreating this project while it is being deleted. */
   markDeleted: () => void;
   /**

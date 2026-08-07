@@ -6,7 +6,10 @@ import type * as apiModule from './api';
 import type * as coversModule from './covers';
 import type * as assetTransportModule from './invk/assetTransport';
 import type * as projectFileModule from './projectFile';
+import type { ProjectPushOutcome } from './projectFlush';
 import type * as persistenceModule from './syncedPersistence';
+
+import { ProjectCreateAbsentError } from './api';
 
 /**
  * The `.invk` workflow end to end: export writes an archive that import reads
@@ -16,13 +19,12 @@ import type * as persistenceModule from './syncedPersistence';
  */
 
 const api = vi.hoisted(() => ({
-  createProject: vi.fn(),
+  createProjectSettled: vi.fn(),
   deleteClientStateValue: vi.fn(() => Promise.resolve()),
   getClientStateValue: vi.fn(() => Promise.resolve(null)),
   getProject: vi.fn(),
   // Every export enumerates the project's board; most of these cases do not care what is on it.
   getProjectBoardSnapshot: vi.fn((): Promise<{ items: ProjectBoardItemDTO[] }> => Promise.resolve({ items: [] })),
-  isProjectConfirmedAbsent: vi.fn(),
   isProjectNotFoundError: (error: unknown) =>
     typeof error === 'object' && error !== null && 'status' in error && error.status === 404,
   setClientStateValue: vi.fn(() => Promise.resolve()),
@@ -137,7 +139,7 @@ const capturedArchive = (): File => {
 
 /** The server answers with the board it claimed, or with the one it created for a boardless create. */
 const acceptCreate = (): void => {
-  api.createProject.mockImplementation(
+  api.createProjectSettled.mockImplementation(
     (request: { board_id?: string; data?: Record<string, unknown>; name: string; project_id?: string }) =>
       Promise.resolve({
         board_id: request.board_id ?? 'server-created-board',
@@ -245,7 +247,7 @@ describe('exportLibraryProject', () => {
     const order: string[] = [];
     const flush = vi.fn(() => {
       order.push('flush');
-      return Promise.resolve();
+      return Promise.resolve<ProjectPushOutcome>({ documentJson: '{}', kind: 'acknowledged' });
     });
 
     api.getProject.mockImplementation(() => {
@@ -260,6 +262,7 @@ describe('exportLibraryProject', () => {
     });
     registerOpenProject('p1', {
       close: vi.fn(),
+      deleteOnServer: vi.fn(),
       flush,
       markDeleted: vi.fn(),
       rename: vi.fn(),
@@ -274,6 +277,37 @@ describe('exportLibraryProject', () => {
 
     expect(flush).toHaveBeenCalledTimes(1);
     expect(order).toEqual(['flush', 'get']);
+  });
+
+  /**
+   * The record read below is the last one the server *acknowledged*, which is precisely what the
+   * flush exists to move past. A flush that resolved without landing is therefore indistinguishable
+   * from one that worked: the archive gets built from stale bytes and downloaded under a success
+   * toast, silently missing everything since the last successful autosave.
+   */
+  it('refuses to export a project whose flush never reached the server', async () => {
+    const { registerOpenProject, unregisterOpenProject } = await import('./syncStore');
+
+    registerOpenProject('p1', {
+      close: vi.fn(),
+      deleteOnServer: vi.fn(),
+      flush: vi.fn(() => Promise.resolve<ProjectPushOutcome>({ documentJson: '{}', kind: 'unsynced' })),
+      markDeleted: vi.fn(),
+      rename: vi.fn(),
+      unmarkDeleted: vi.fn(),
+    });
+
+    try {
+      await expect(projectFile.exportLibraryProject('p1')).rejects.toMatchObject({
+        name: 'ProjectFlushError',
+        reason: 'unsynced',
+      });
+    } finally {
+      unregisterOpenProject('p1');
+    }
+
+    expect(api.getProject).not.toHaveBeenCalled();
+    expect(downloads.downloadBlob).not.toHaveBeenCalled();
   });
 
   it('does not flush a project nothing holds', async () => {
@@ -425,7 +459,7 @@ describe('importing a project board', () => {
       signal: expect.anything(),
     });
     expect(transport.uploadBoardVideo).toHaveBeenCalledWith(expect.anything(), 'clip.mp4', expect.anything());
-    expect(api.createProject.mock.calls[0]![0]).toMatchObject({ board_id: 'staging-board' });
+    expect(api.createProjectSettled.mock.calls[0]![0]).toMatchObject({ board_id: 'staging-board' });
     expect(outcome.boardItemIssues).toEqual([]);
     expect(outcome.documentReferenceIssues).toEqual([]);
   });
@@ -442,7 +476,7 @@ describe('importing a project board', () => {
     acceptCreate();
     await projectFile.importProjectFile(await exportedBoardArchive());
 
-    const { data } = api.createProject.mock.calls[0]![0] as {
+    const { data } = api.createProjectSettled.mock.calls[0]![0] as {
       data: { canvas: { document: { layers: Array<{ source: { image: { imageName: string } } }> } } };
     };
 
@@ -475,7 +509,7 @@ describe('importing a project board', () => {
     );
 
     const outcome = await projectFile.importProjectFile(await exportedBoardArchive());
-    const { data } = api.createProject.mock.calls[0]![0] as {
+    const { data } = api.createProjectSettled.mock.calls[0]![0] as {
       data: { canvas: { document: { layers: Array<{ source: { image: { imageName: string } } }> } } };
     };
     const restoredName = data.canvas.document.layers[0]!.source.image.imageName;
@@ -504,7 +538,7 @@ describe('importing a project board', () => {
     await projectFile.importProjectFile(capturedArchive());
 
     expect(transport.createStagingBoard).not.toHaveBeenCalled();
-    expect(api.createProject.mock.calls[0]![0]).not.toHaveProperty('board_id');
+    expect(api.createProjectSettled.mock.calls[0]![0]).not.toHaveProperty('board_id');
   });
 
   it('creates no staging board for a document that will not rehydrate', async () => {
@@ -536,14 +570,13 @@ describe('importing a project board', () => {
 
   it('deletes the media it created and then the staging board when the create fails', async () => {
     const account = await import('@platform/state/accountLifecycle');
-    const primaryFailure = new Error('project create rejected');
+    const primaryFailure = new ProjectCreateAbsentError(new Error('project create rejected'));
 
     account.accountLifecycle.activate('board-rollback-user');
 
     const archive = await exportedBoardArchive();
 
-    api.createProject.mockRejectedValue(primaryFailure);
-    api.isProjectConfirmedAbsent.mockResolvedValueOnce(true);
+    api.createProjectSettled.mockRejectedValue(primaryFailure);
 
     await expect(projectFile.importProjectFile(archive)).rejects.toBe(primaryFailure);
 
@@ -556,7 +589,7 @@ describe('importing a project board', () => {
     account.accountLifecycle.invalidate();
   });
 
-  it('leaves the staging board alone when a rejected create may already have claimed it', async () => {
+  it('leaves the staging board alone when a rejected create may already have landed', async () => {
     const account = await import('@platform/state/accountLifecycle');
     const primaryFailure = new Error('connection ended after create');
 
@@ -564,8 +597,7 @@ describe('importing a project board', () => {
 
     const archive = await exportedBoardArchive();
 
-    api.createProject.mockRejectedValue(primaryFailure);
-    api.isProjectConfirmedAbsent.mockResolvedValueOnce(false);
+    api.createProjectSettled.mockRejectedValue(primaryFailure);
 
     await expect(projectFile.importProjectFile(archive)).rejects.toBe(primaryFailure);
 
@@ -587,7 +619,10 @@ describe('importProjectFile', () => {
     expect(record.project_id).not.toBe(project.id);
     expect(record.name).toBe('Exported project');
 
-    const createRequest = api.createProject.mock.calls[0]![0] as { data: Record<string, unknown>; project_id: string };
+    const createRequest = api.createProjectSettled.mock.calls[0]![0] as {
+      data: Record<string, unknown>;
+      project_id: string;
+    };
 
     expect(createRequest.data.id).toBe(createRequest.project_id);
   });
@@ -624,7 +659,7 @@ describe('importProjectFile', () => {
 
     await projectFile.importProjectFile(file);
 
-    const { data } = api.createProject.mock.calls[0]![0] as { data: Record<string, unknown> };
+    const { data } = api.createProjectSettled.mock.calls[0]![0] as { data: Record<string, unknown> };
     const serialized = JSON.stringify(data);
 
     expect(serialized).not.toContain('theirs-compare.png');
@@ -655,14 +690,14 @@ describe('importProjectFile', () => {
     await expect(projectFile.importProjectFile(new File([blob], 'legacy.invk'))).rejects.toMatchObject({
       reason: 'legacy-canvas-project',
     });
-    expect(api.createProject).not.toHaveBeenCalled();
+    expect(api.createProjectSettled).not.toHaveBeenCalled();
   });
 
   it('refuses a file that is not an archive before touching the server', async () => {
     await expect(projectFile.importProjectFile(new File(['{"some":"json"}'], 'x.invk'))).rejects.toMatchObject({
       reason: 'not-a-project',
     });
-    expect(api.createProject).not.toHaveBeenCalled();
+    expect(api.createProjectSettled).not.toHaveBeenCalled();
   });
 
   it('refuses a damaged document before any asset or project mutation', async () => {
@@ -703,7 +738,7 @@ describe('importProjectFile', () => {
     expect(transport.findExistingVideoNames).not.toHaveBeenCalled();
     expect(transport.uploadArchiveImage).not.toHaveBeenCalled();
     expect(transport.uploadArchiveVideo).not.toHaveBeenCalled();
-    expect(api.createProject).not.toHaveBeenCalled();
+    expect(api.createProjectSettled).not.toHaveBeenCalled();
     expect(covers.recordProjectCover).not.toHaveBeenCalled();
   });
 
@@ -746,7 +781,7 @@ describe('importProjectFile', () => {
 
     await projectFile.importProjectFile(new File([blob], 'legacy.invk'));
 
-    const createRequest = api.createProject.mock.calls[0]![0] as { data: Record<string, unknown> };
+    const createRequest = api.createProjectSettled.mock.calls[0]![0] as { data: Record<string, unknown> };
     const invocation = createRequest.data.invocation as { sourceId: string };
     const canvas = createRequest.data.canvas as {
       document: { layers: Array<{ source: { image: { imageName: string } } }> };
@@ -781,7 +816,7 @@ describe('importProjectFile', () => {
     acceptCreate();
 
     const { record } = await projectFile.importProjectFile(file);
-    const request = api.createProject.mock.calls[0]![0] as {
+    const request = api.createProjectSettled.mock.calls[0]![0] as {
       data: Record<string, unknown>;
       name: string;
       project_id: string;
@@ -814,7 +849,7 @@ describe('importProjectFile', () => {
     const file = new File([contents], 'invalid.invokeproject.json', { type: 'application/json' });
 
     await expect(projectFile.importProjectFile(file)).rejects.toMatchObject({ reason: 'not-a-project' });
-    expect(api.createProject).not.toHaveBeenCalled();
+    expect(api.createProjectSettled).not.toHaveBeenCalled();
     expect(transport.findExistingImageNames).not.toHaveBeenCalled();
     expect(transport.findExistingVideoNames).not.toHaveBeenCalled();
     expect(transport.uploadArchiveImage).not.toHaveBeenCalled();
@@ -836,12 +871,11 @@ describe('importProjectFile', () => {
 
   it('rolls back every authoritative uploaded identity when project creation fails without hiding that failure', async () => {
     const account = await import('@platform/state/accountLifecycle');
-    const primaryFailure = new Error('project create rejected');
+    const primaryFailure = new ProjectCreateAbsentError(new Error('project create rejected'));
 
     account.accountLifecycle.activate('rollback-user');
     await projectFile.exportOpenProject(projectWithRestorableAssets());
-    api.createProject.mockRejectedValue(primaryFailure);
-    api.isProjectConfirmedAbsent.mockResolvedValueOnce(true);
+    api.createProjectSettled.mockRejectedValue(primaryFailure);
     transport.deleteArchiveImages.mockRejectedValueOnce(new Error('image cleanup failed'));
     transport.deleteArchiveVideos.mockRejectedValueOnce(new Error('video cleanup failed'));
 
@@ -852,14 +886,13 @@ describe('importProjectFile', () => {
     account.accountLifecycle.invalidate();
   });
 
-  it('does not roll back when a rejected create may already have committed the project', async () => {
+  it('does not roll back when a rejected create is not proof the project is absent', async () => {
     const account = await import('@platform/state/accountLifecycle');
     const primaryFailure = new Error('connection ended after create');
 
     account.accountLifecycle.activate('ambiguous-response-user');
     await projectFile.exportOpenProject(projectWithRestorableAssets(false));
-    api.createProject.mockRejectedValue(primaryFailure);
-    api.isProjectConfirmedAbsent.mockResolvedValueOnce(false);
+    api.createProjectSettled.mockRejectedValue(primaryFailure);
 
     await expect(projectFile.importProjectFile(capturedArchive())).rejects.toBe(primaryFailure);
 
@@ -881,7 +914,7 @@ describe('importProjectFile', () => {
 
     await expect(projectFile.importProjectFile(capturedArchive())).rejects.toThrow('no longer active');
 
-    expect(api.createProject).not.toHaveBeenCalled();
+    expect(api.createProjectSettled).not.toHaveBeenCalled();
     expect(transport.deleteArchiveImages).not.toHaveBeenCalled();
     expect(transport.deleteArchiveVideos).not.toHaveBeenCalled();
     account.accountLifecycle.invalidate();
@@ -892,7 +925,7 @@ describe('importProjectFile', () => {
 
     account.accountLifecycle.activate('ambiguous-create-user-a');
     await projectFile.exportOpenProject(projectWithRestorableAssets(false));
-    api.createProject.mockImplementation((request: { name: string; project_id?: string }) => {
+    api.createProjectSettled.mockImplementation((request: { name: string; project_id?: string }) => {
       account.accountLifecycle.activate('ambiguous-create-user-b');
 
       return Promise.resolve({
@@ -931,7 +964,7 @@ describe('importProjectFile', () => {
     contents.resolve(bytes);
 
     await expect(imported).rejects.toThrow('no longer active');
-    expect(api.createProject).not.toHaveBeenCalled();
+    expect(api.createProjectSettled).not.toHaveBeenCalled();
     account.accountLifecycle.invalidate();
   });
 });

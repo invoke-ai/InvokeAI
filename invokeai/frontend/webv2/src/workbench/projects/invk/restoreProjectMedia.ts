@@ -1,4 +1,8 @@
+import type { AccountScope } from '@platform/state/accountLifecycle';
+
 import { mapWithConcurrency } from '@platform/core/concurrency';
+import { isAccountScopeCurrent } from '@platform/state/accountLifecycle';
+import { ProjectCreateAbsentError } from '@workbench/projects/api';
 
 import type { InvkBoardItem, InvkMediaKind } from './board';
 import type { InvkMediaRef, ProjectTransferIssues } from './transfer';
@@ -44,13 +48,19 @@ import { buildMissingMediaName, createTransferIssueLog, toMediaKey } from './tra
  *
  * ### A failed board item must not resolve to a stranger
  *
- * The dangerous case is an item that is *both* on the board and referenced by the document, whose
+ * The dangerous case is an item that is *both* on the board and named by the document, whose
  * materialization fails. Leaving the reference on the old name is not "no worse than before": on the
  * same server — every duplication, and every re-import — that name is already taken, by the source
  * project's own image. The project would open showing the right picture from the wrong owner, and
  * deleting the original would break it with no explanation. So a failed board item forces its
  * document references onto {@link buildMissingMediaName}, which resolves to nothing and renders as
  * a missing layer, exactly as a dangling v2 reference already does.
+ *
+ * "Named by the document" means anywhere in it. `remapAssetRefs` walks the whole document; the live
+ * reference set does not, because `collectLiveAssetRefs` skips history — `recentImages`, canvas
+ * snapshots, the queue. So the placeholder is written for every failed item, and the live set decides
+ * only what is worth *reporting*: a gallery recent that stops resolving is not something the person
+ * lost from this project, and counting it would inflate every report.
  */
 
 /**
@@ -292,6 +302,26 @@ export const restoreProjectMedia = async (
   const boardKeys = new Set(input.boardItems.map(toMediaKey));
   /** Descriptor position, so a placeholder name does not depend on the order failures happened in. */
   const descriptorIndexes = new Map(input.boardItems.map((item, index) => [toMediaKey(item), index]));
+  /**
+   * A distinct placeholder index for every failed name.
+   *
+   * Descriptor position is the stable answer and is used wherever it exists. A materializer that
+   * reports a failure for a name that was never a descriptor has no position — and collapsing those
+   * onto one index would give two unrelated missing items the same placeholder, quietly merging
+   * them into a single dangling reference. Counting past the descriptors keeps them apart.
+   */
+  let nextUnknownIndex = input.boardItems.length;
+  const missingNameIndex = (key: string): number => {
+    const index = descriptorIndexes.get(key);
+
+    if (index !== undefined) {
+      return index;
+    }
+
+    nextUnknownIndex += 1;
+
+    return nextUnknownIndex - 1;
+  };
   const starredKeys = new Set(input.boardItems.filter((item) => item.starred).map(toMediaKey));
 
   // Document-only references are the ones the board does not own; those the board owns are
@@ -388,22 +418,33 @@ export const restoreProjectMedia = async (
     }
   }
 
-  /** A board item that did not arrive: reported, and forced dangling if the document wanted it. */
+  /** A board item that did not arrive: forced dangling everywhere, and reported where it shows. */
   const failBoardItem = (failure: MaterializeFailure): void => {
-    settledBoardKeys.add(toMediaKey(failure));
-    issues.addBoardItemIssue(failure, failure.reason);
-
     const key = toMediaKey(failure);
 
-    if (!documentKeys.has(key)) {
+    if (settledBoardKeys.has(key)) {
       return;
     }
 
+    settledBoardKeys.add(key);
+    issues.addBoardItemIssue(failure, failure.reason);
+
+    // Mapped unconditionally, because `remapAssetRefs` rewrites the *whole* document while
+    // `documentKeys` describes only its live references — `collectLiveAssetRefs` deliberately skips
+    // `recentImages`, `snapshots` and the queue. A name left unmapped therefore survives in history,
+    // and on this server that name is already taken: by the source project's own image. The copy
+    // would open showing the right picture from the wrong owner, and deleting the original would
+    // break it with no explanation. Every occurrence goes to the placeholder instead.
     kindAdapters[failure.kind].mapping.set(
       failure.name,
-      buildMissingMediaName(input.projectId, failure.kind, descriptorIndexes.get(key) ?? 0)
+      buildMissingMediaName(input.projectId, failure.kind, missingNameIndex(key))
     );
-    issues.addDocumentReferenceIssue(failure, failure.reason);
+
+    // Only the live references are *reported*. A gallery recent that no longer resolves is not
+    // something the person lost from this project, and counting it would inflate every report.
+    if (documentKeys.has(key)) {
+      issues.addDocumentReferenceIssue(failure, failure.reason);
+    }
   };
 
   for (const failure of boardResult.failed) {
@@ -534,6 +575,40 @@ export const restoreProjectMedia = async (
   }
 
   return { coverImageName, mappings, ...issues.toIssues() };
+};
+
+/**
+ * Run a restore's rollback, but only when the project it was staging certainly does not exist.
+ *
+ * Both directions of this — import and duplication — got here the same way and get it wrong the
+ * same way, so the decision lives once. Three things have to hold before anything is deleted:
+ *
+ * - the create did not already succeed, because after that the media belongs to a real project;
+ * - the failure is one that proves the project is absent, which is what
+ *   {@link ProjectCreateAbsentError} means and why the create goes through `createProjectSettled`
+ *   rather than a bare `POST`. An unknown outcome must never authorize a deletion: the uploads are
+ *   recoverable clutter, whereas a project stripped of its media is not recoverable at all;
+ * - the account has not changed underneath us, so the deletes are aimed at the right server and the
+ *   right person.
+ *
+ * The rollback itself is best-effort — the original failure is the actionable result and must not be
+ * replaced by a message about a delete request nobody asked for.
+ */
+export const rollbackUnlessProjectExists = async (
+  error: unknown,
+  didCreateProject: boolean,
+  owner: AccountScope,
+  rollback: () => Promise<void>
+): Promise<void> => {
+  if (didCreateProject || !(error instanceof ProjectCreateAbsentError) || !isAccountScopeCurrent(owner)) {
+    return;
+  }
+
+  try {
+    await rollback();
+  } catch {
+    // Best-effort, per the docblock above.
+  }
 };
 
 export interface RollbackRestoredMediaDeps {

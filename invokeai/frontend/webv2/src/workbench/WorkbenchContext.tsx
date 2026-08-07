@@ -8,6 +8,8 @@ import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { shallowEqual as selectorShallowEqual, useExternalStoreSelector } from '@platform/state/selectors';
 import { createContext, use, useEffect, useSyncExternalStore, useState, type ReactNode } from 'react';
 
+import type { ProjectPushOutcome } from './projects/projectFlush';
+
 import { WorkbenchSplashScreen } from './components/WorkbenchSplashScreen';
 import { createExtensionRegistry, type ExtensionRegistry } from './extensions/extensionRegistry';
 import { createWorkbenchPersistenceRuntime } from './persistenceRuntime';
@@ -89,12 +91,15 @@ export const WorkbenchProvider = ({
           store.commands.projects.close(projectId);
         }
       },
-      flushProject: async (projectId) => {
+      deleteProject: (projectId) => persistence.deleteProjectOnServer(projectId),
+      flushProject: (projectId) => {
         const project = store.getSnapshot().projects.find((candidate) => candidate.id === projectId);
 
-        if (project) {
-          await persistence.flushProjectToServer(project);
-        }
+        // A project the editor no longer holds has nothing to push, and the id is by definition
+        // whatever the server last acknowledged for it.
+        return project
+          ? persistence.flushProjectToServer(project)
+          : Promise.resolve<ProjectPushOutcome>({ documentJson: '', kind: 'acknowledged' });
       },
       getOpenProjectIds: () => store.getSnapshot().projects.map((project) => project.id),
       markProjectDeleted: (projectId) => {

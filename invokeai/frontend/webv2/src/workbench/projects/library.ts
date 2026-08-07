@@ -29,6 +29,7 @@ import {
   subscribeProjectCovers,
 } from './covers';
 import { refreshOpenProjects } from './openProjects';
+import { assertProjectFlushed } from './projectFlush';
 import { pruneSessionProject } from './session';
 import { getOpenProject } from './syncStore';
 
@@ -208,18 +209,17 @@ export const deleteLibraryProject = async (projectId: string): Promise<void> => 
   const owner = captureAccountScope();
   const openProject = getOpenProject(projectId);
 
-  // Marked before the request so an autosave in flight cannot recreate the project — and with it a
-  // board — between the DELETE and the tab closing.
-  openProject?.markDeleted();
-
-  try {
+  if (openProject) {
+    // Through the sync engine's queue, not beside it. Marking the project first stops a save that
+    // has not begun, but a PUT already on the wire is past every check the engine has: it comes
+    // back 404 once this DELETE commits, and the engine answers a 404 by forking the local document
+    // into a new server project — a copy of the thing just deleted, pointing at media the deletion
+    // removed. Queueing means the push finishes before the DELETE is sent. Marking and unmarking
+    // are the handle's business too, because a project left marked stops autosaving for the rest of
+    // the session, silently and with no way to notice.
+    await openProject.deleteOnServer();
+  } else {
     await apiDeleteProject(projectId, owner.signal);
-  } catch (error) {
-    // Unmarked here rather than by the caller, because a project left marked stops autosaving for
-    // the rest of the session — silently, and with no way to notice. Two of the three call sites
-    // had to remember this and one of them did not.
-    openProject?.unmarkDeleted();
-    throw error;
   }
 
   assertAccountScopeCurrent(owner);
@@ -272,10 +272,16 @@ export const renameLibraryProject = async (projectId: string, name: string): Pro
  *
  * An open project is flushed first and the flush is fatal if it fails. Duplicating what the server
  * last acknowledged would silently drop everything the person can see on screen, and a copy that
- * quietly omits the last ten minutes of work is worse than no copy.
+ * quietly omits the last ten minutes of work is worse than no copy — so a flush that did not land,
+ * or that landed under a different id, raises rather than letting the GET below answer for it.
  */
 export const readProjectForDuplication = async (projectId: string, owner: AccountScope): Promise<ProjectRecordDTO> => {
-  await getOpenProject(projectId)?.flush();
+  const openProject = getOpenProject(projectId);
+
+  if (openProject) {
+    assertProjectFlushed(await openProject.flush());
+  }
+
   assertAccountScopeCurrent(owner);
 
   return apiGetProject(projectId, owner.signal);

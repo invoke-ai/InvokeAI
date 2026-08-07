@@ -1,7 +1,7 @@
 import type { ProjectBoardItemDTO, ProjectRecordDTO } from '@workbench/projects/api';
 
-import { type AccountScope, assertAccountScopeCurrent, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
-import { createProject as apiCreateProject, isProjectConfirmedAbsent } from '@workbench/projects/api';
+import { type AccountScope, assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
+import { createProjectSettled } from '@workbench/projects/api';
 import { createProjectId } from '@workbench/projects/ids';
 import {
   collectLiveAssetRefs,
@@ -22,7 +22,12 @@ import {
   isRequestCancellation,
 } from './assetTransport';
 import { InvkFormatError } from './format';
-import { createRestoredMediaLedger, restoreProjectMedia, rollbackRestoredMedia } from './restoreProjectMedia';
+import {
+  createRestoredMediaLedger,
+  restoreProjectMedia,
+  rollbackRestoredMedia,
+  rollbackUnlessProjectExists,
+} from './restoreProjectMedia';
 import { toMediaRefs } from './transfer';
 
 /**
@@ -188,14 +193,14 @@ export const duplicateProjectRecord = async (
 
     assertAccountScopeCurrent(owner);
 
-    const record = await apiCreateProject(
+    const record = await createProjectSettled(
       {
         data: remapAssetRefs(canonicalDocument, restored.mappings),
         name,
         project_id: id,
         ...(stagingBoardId === null ? {} : { board_id: stagingBoardId }),
       },
-      owner.signal
+      owner
     );
 
     didCreateProject = true;
@@ -211,17 +216,9 @@ export const duplicateProjectRecord = async (
       },
     };
   } catch (error) {
-    const canRollback =
-      !didCreateProject && isAccountScopeCurrent(owner) && (await isProjectConfirmedAbsent(id, owner));
-
-    if (canRollback) {
-      try {
-        await rollbackRestoredMedia(ledger, { signal: owner.signal });
-      } catch {
-        // Best-effort: the create failure is the actionable result, and must never be replaced by
-        // a failed delete request.
-      }
-    }
+    await rollbackUnlessProjectExists(error, didCreateProject, owner, () =>
+      rollbackRestoredMedia(ledger, { signal: owner.signal })
+    );
 
     throw error;
   }

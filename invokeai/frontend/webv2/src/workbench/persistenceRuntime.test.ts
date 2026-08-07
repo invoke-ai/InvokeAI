@@ -1,8 +1,9 @@
 import type { HydratedWorkbenchSnapshot } from '@workbench/persistenceContracts';
-import type { WorkbenchState } from '@workbench/projectContracts';
+import type { Project, WorkbenchState } from '@workbench/projectContracts';
 
 import { describe, expect, it, vi } from 'vitest';
 
+import type { ProjectRecoveredIdentity } from './projects/projectFlush';
 import type { WorkbenchSaveResult } from './projects/syncedPersistence';
 
 import {
@@ -65,6 +66,37 @@ class FakeClock implements PersistenceClock {
   }
 }
 
+const recoveredIdentity = (projectId: string, name = 'Recovered'): ProjectRecoveredIdentity => ({
+  id: 'recovered',
+  name,
+  recoveredAt: '2026-08-07T00:00:00.000Z',
+  recoveryOf: projectId,
+});
+
+/**
+ * What the real reducers do with a fork: keep the live project's content and re-label it with the
+ * server's identity. Mirrored here rather than simplified to `recoveredProject`, because the runtime
+ * applies these results even when the save that produced them is stale — and a fake that swapped in
+ * the snapshot would agree with a runtime that silently discarded the newest edits.
+ */
+const forkFromLive = (
+  state: WorkbenchState,
+  projectId: string,
+  resolution: { recoveredIdentity: ProjectRecoveredIdentity; recoveredProject: Project }
+): Project => {
+  const live = state.projects.find((project) => project.id === projectId);
+
+  return live
+    ? {
+        ...live,
+        id: resolution.recoveredIdentity.id,
+        name: resolution.recoveredIdentity.name,
+        recoveredAt: resolution.recoveredIdentity.recoveredAt,
+        recoveryOf: resolution.recoveredIdentity.recoveryOf,
+      }
+    : resolution.recoveredProject;
+};
+
 const createAggregate = (initialState = createInitialWorkbenchState()) => {
   let state = structuredClone(initialState);
   let revision = 0;
@@ -97,7 +129,7 @@ const createAggregate = (initialState = createInitialWorkbenchState()) => {
         projects: [
           ...state.projects.filter((project) => project.id !== conflict.projectId),
           conflict.serverProject,
-          conflict.recoveredProject,
+          forkFromLive(state, conflict.projectId, conflict),
         ],
       };
       revision += 1;
@@ -107,7 +139,9 @@ const createAggregate = (initialState = createInitialWorkbenchState()) => {
     reconcileDeletedProject: (fork) => {
       state = {
         ...state,
-        projects: state.projects.map((project) => (project.id === fork.projectId ? fork.recoveredProject : project)),
+        projects: state.projects.map((project) =>
+          project.id === fork.projectId ? forkFromLive(state, fork.projectId, fork) : project
+        ),
       };
       revision += 1;
       events.push('deleted-fork');
@@ -134,10 +168,11 @@ const createAggregate = (initialState = createInitialWorkbenchState()) => {
       state = { ...state, backendConnection: { status: 'connected' } };
       emit();
     },
-    edit(name = 'Edited') {
+    /** `patch` is for content a fork's identity does not overwrite, so a test can tell them apart. */
+    edit(name = 'Edited', patch: Partial<Project> = {}) {
       state = {
         ...state,
-        projects: state.projects.map((project, index) => (index === 0 ? { ...project, name } : project)),
+        projects: state.projects.map((project, index) => (index === 0 ? { ...project, ...patch, name } : project)),
       };
       revision += 1;
       emit();
@@ -304,6 +339,53 @@ describe('Workbench persistence runtime', () => {
     expect(aggregate.events).toContain('save-succeeded:current');
   });
 
+  it('applies a stale save’s deletion fork without discarding what landed mid-flight', async () => {
+    // The two halves of this have to hold together. Dropping the fork because the save went stale
+    // re-creates the deleted project under its old id on the next push; applying a fork built from
+    // the pushed snapshot throws away the edit that made the save stale in the first place. The
+    // answer is that a fork carries an identity, not a document.
+    const aggregate = createAggregate();
+    const { persistence } = createPersistence(() => Promise.resolve(null));
+    const pending = deferred<WorkbenchSaveResult>();
+    vi.mocked(persistence.saveWorkbench).mockImplementationOnce(() => pending.promise);
+    const clock = new FakeClock();
+    const runtime = createWorkbenchPersistenceRuntime({ aggregate: aggregate.port, clock, persistence });
+
+    runtime.start();
+    await flushPromises();
+    aggregate.edit('Before the push', { settings: { ...aggregate.state.projects[0]!.settings, useCpuNoise: false } });
+
+    const original = aggregate.state.projects[0]!;
+
+    clock.runAll();
+
+    // Lands while the save is in flight, which is what makes the result stale.
+    aggregate.edit('After the push started', { settings: { ...original.settings, useCpuNoise: true } });
+
+    pending.resolve({
+      ...saveResult(aggregate.state, 'stale'),
+      deletedProjectForks: [
+        {
+          projectId: original.id,
+          recoveredIdentity: recoveredIdentity(original.id, 'Recovered'),
+          // What the push was carrying, one edit behind.
+          recoveredProject: { ...original, id: 'recovered', name: 'Before the push' },
+        },
+      ],
+    });
+    await flushPromises();
+
+    // Applied despite the staleness: dropping it would let the next push re-create the deleted id.
+    expect(aggregate.events).toContain('deleted-fork');
+    expect(aggregate.state.projects.map((project) => project.id)).not.toContain(original.id);
+
+    const fork = aggregate.state.projects.find((project) => project.id === 'recovered');
+
+    expect(fork?.recoveryOf).toBe(original.id);
+    // ...and the edit that made it stale is in the fork rather than lost between the two copies.
+    expect(fork?.settings.useCpuNoise).toBe(true);
+  });
+
   it('ignores server outcomes once disposed', async () => {
     const aggregate = createAggregate();
     const { persistence } = createPersistence(() => Promise.resolve(null));
@@ -421,6 +503,7 @@ describe('Workbench persistence runtime', () => {
       conflicts: [
         {
           projectId: original.id,
+          recoveredIdentity: recoveredIdentity(original.id),
           recoveredProject: { ...original, id: 'recovered', name: 'Recovered' },
           serverProject: { ...original, name: 'Server' },
         },

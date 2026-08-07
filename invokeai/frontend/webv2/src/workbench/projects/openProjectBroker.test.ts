@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { ProjectPushOutcome } from './projectFlush';
+
 import { createOpenProjectBroker } from './openProjectBroker';
 import { getOpenProject } from './syncStore';
 
@@ -13,7 +15,8 @@ const createHarness = () => {
   const listeners = new Set<() => void>();
   const deps = {
     closeProject: vi.fn(),
-    flushProject: vi.fn(() => Promise.resolve()),
+    deleteProject: vi.fn(() => Promise.resolve()),
+    flushProject: vi.fn(() => Promise.resolve<ProjectPushOutcome>({ documentJson: '{}', kind: 'acknowledged' })),
     getOpenProjectIds: vi.fn(() => openIds),
     markProjectDeleted: vi.fn(),
     renameProject: vi.fn(),
@@ -112,7 +115,7 @@ describe('createOpenProjectBroker', () => {
     harness.deps.flushProject.mockImplementation(() => {
       order.push('flush');
 
-      return Promise.resolve();
+      return Promise.resolve<ProjectPushOutcome>({ documentJson: '{}', kind: 'acknowledged' });
     });
     startBroker(harness.deps);
     harness.setOpenIds(['a']);
@@ -123,7 +126,7 @@ describe('createOpenProjectBroker', () => {
     expect(order).toEqual(['rename', 'flush']);
   });
 
-  it('routes deletion and closing at the project it was published for', () => {
+  it('routes deletion and closing at the project it was published for', async () => {
     const harness = createHarness();
 
     startBroker(harness.deps);
@@ -132,10 +135,28 @@ describe('createOpenProjectBroker', () => {
     const handle = getOpenProject('a')!;
 
     handle.markDeleted();
+    await handle.deleteOnServer();
     handle.close();
 
     expect(harness.deps.markProjectDeleted).toHaveBeenCalledWith('a');
+    expect(harness.deps.deleteProject).toHaveBeenCalledWith('a');
     expect(harness.deps.closeProject).toHaveBeenCalledWith('a');
+  });
+
+  /**
+   * A rename is already in the reducer and the local snapshot by the time the flush runs, and the
+   * next save retries the push. Failing the rename because the network blipped would undo nothing
+   * and explain less — so the outcome is read by the surfaces that read the project back, not here.
+   */
+  it('does not fail a rename whose flush did not reach the server', async () => {
+    const harness = createHarness();
+
+    harness.deps.flushProject.mockResolvedValue({ documentJson: '{}', kind: 'unsynced' });
+    startBroker(harness.deps);
+    harness.setOpenIds(['a']);
+
+    await expect(getOpenProject('a')!.rename('New name')).resolves.toBeUndefined();
+    expect(harness.deps.renameProject).toHaveBeenCalledWith('a', 'New name');
   });
 
   /**

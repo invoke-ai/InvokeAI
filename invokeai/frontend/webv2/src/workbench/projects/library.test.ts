@@ -3,6 +3,7 @@ import type * as accountLifecycleModule from '@platform/state/accountLifecycle';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as libraryModule from './library';
+import type { ProjectPushOutcome } from './projectFlush';
 import type * as syncStoreModule from './syncStore';
 
 /**
@@ -66,10 +67,15 @@ const openProject = (projectId: string, calls: string[] = []) => {
     close: vi.fn(() => {
       calls.push('close');
     }),
+    deleteOnServer: vi.fn(() => {
+      calls.push('deleteOnServer');
+
+      return Promise.resolve();
+    }),
     flush: vi.fn(() => {
       calls.push('flush');
 
-      return Promise.resolve();
+      return Promise.resolve<ProjectPushOutcome>({ documentJson: '{}', kind: 'acknowledged' });
     }),
     markDeleted: vi.fn(() => {
       calls.push('markDeleted');
@@ -215,30 +221,46 @@ describe('library mutations', () => {
     expect(library.getProjectLibrary().summaries[0]?.name).toBe('New name');
   });
 
-  it('deletes an open project without letting its autosave recreate it, then closes the tab', async () => {
-    api.deleteProject.mockResolvedValue(undefined);
-
+  /**
+   * The DELETE goes through the sync engine's own queue, not beside it. Marking the project stops a
+   * save that has not begun, but a PUT already on the wire is past every check the engine has — it
+   * returns 404 once the DELETE commits, and the engine answers a 404 by forking the local document
+   * into a *new* server project. Queueing is what makes that unreachable rather than unlikely.
+   */
+  it('deletes an open project through the sync engine, then closes the tab', async () => {
     const { calls } = openProject('open');
 
     await library.deleteLibraryProject('open');
 
-    expect(calls).toEqual(['markDeleted', 'close']);
-    expect(api.deleteProject).toHaveBeenCalledWith('open', expect.any(AbortSignal));
+    expect(calls).toEqual(['deleteOnServer', 'close']);
+    // Never beside the engine: a bare HTTP delete is what could overtake an in-flight push.
+    expect(api.deleteProject).not.toHaveBeenCalled();
+  });
+
+  it('deletes a closed project over HTTP, because no engine holds it', async () => {
+    api.deleteProject.mockResolvedValue(undefined);
+
+    await library.deleteLibraryProject('closed');
+
+    expect(api.deleteProject).toHaveBeenCalledWith('closed', expect.any(AbortSignal));
   });
 
   /**
    * A project left marked deleted never autosaves again for the rest of the session, and nothing
-   * says so. Unmarking belongs here, beside the mark, rather than in each caller's catch — one of
-   * the two that had to remember it did not.
+   * says so. Unmarking belongs with the mark, inside the handle, rather than in each caller's catch.
    */
-  it('lets an open project save again when its deletion fails', async () => {
-    api.deleteProject.mockRejectedValue(new Error('offline'));
+  it('surfaces a failed deletion of an open project to its caller', async () => {
+    const { calls, handle } = openProject('open');
 
-    const { calls } = openProject('open');
+    handle.deleteOnServer.mockImplementation(() => {
+      calls.push('deleteOnServer');
+
+      return Promise.reject(new Error('offline'));
+    });
 
     await expect(library.deleteLibraryProject('open')).rejects.toThrow('offline');
 
-    expect(calls).toEqual(['markDeleted', 'unmarkDeleted']);
+    expect(calls).toEqual(['deleteOnServer']);
   });
 
   it('takes a deleted project out of the saved session', async () => {
@@ -286,6 +308,38 @@ describe('library mutations', () => {
     await library.readProjectForDuplication('source', account.accountLifecycle.capture());
 
     expect(calls).toEqual(['flush', 'get']);
+  });
+
+  /**
+   * The GET below returns the last *acknowledged* document, which is exactly what the flush exists
+   * to move past. A flush that resolved without landing therefore reads as success and copies stale
+   * bytes, under a clean toast — so an unacknowledged push has to end the operation instead.
+   */
+  it('refuses to duplicate a project whose flush never reached the server', async () => {
+    const { calls, handle } = openProject('source');
+
+    handle.flush.mockImplementation(() => {
+      calls.push('flush');
+
+      return Promise.resolve<ProjectPushOutcome>({ documentJson: '{}', kind: 'unsynced' });
+    });
+
+    await expect(library.readProjectForDuplication('source', account.accountLifecycle.capture())).rejects.toMatchObject(
+      { name: 'ProjectFlushError', reason: 'unsynced' }
+    );
+
+    expect(calls).toEqual(['flush']);
+    expect(api.getProject).not.toHaveBeenCalled();
+  });
+
+  it('refuses to duplicate a project whose id was taken over by another device', async () => {
+    const { handle } = openProject('source');
+
+    handle.flush.mockResolvedValue({ documentJson: '{}', kind: 'superseded' });
+
+    await expect(library.readProjectForDuplication('source', account.accountLifecycle.capture())).rejects.toMatchObject(
+      { reason: 'superseded' }
+    );
   });
 
   it('duplicates through the shared restore engine and adopts the copy', async () => {

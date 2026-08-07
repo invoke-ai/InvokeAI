@@ -1,3 +1,5 @@
+import type { ProjectPushOutcome } from './projectFlush';
+
 import { type OpenProjectHandle, registerOpenProject, unregisterOpenProject } from './syncStore';
 
 /**
@@ -16,8 +18,10 @@ import { type OpenProjectHandle, registerOpenProject, unregisterOpenProject } fr
 export interface OpenProjectBrokerDeps {
   /** Drop the tab. Called after the project is already gone from the server. */
   closeProject: (projectId: string) => void;
-  /** Push this project's live document and wait for the acknowledgement. */
-  flushProject: (projectId: string) => Promise<void>;
+  /** Remove the project from the server, in the sync engine's own queue. */
+  deleteProject: (projectId: string) => Promise<void>;
+  /** Push this project's live document and report whether the server took it. */
+  flushProject: (projectId: string) => Promise<ProjectPushOutcome>;
   getOpenProjectIds: () => string[];
   /** Stop the autosave recreating a project that is being deleted. */
   markProjectDeleted: (projectId: string) => void;
@@ -36,11 +40,16 @@ export const createOpenProjectBroker = (deps: OpenProjectBrokerDeps): OpenProjec
 
   const buildHandle = (projectId: string): OpenProjectHandle => ({
     close: () => deps.closeProject(projectId),
+    deleteOnServer: () => deps.deleteProject(projectId),
     flush: () => deps.flushProject(projectId),
     markDeleted: () => deps.markProjectDeleted(projectId),
     // Renaming through the reducer first is what keeps the open document and the server's copy
     // telling the same story: the flush that follows carries the new name on the project's own
     // revision chain, where a library PUT would have landed beside it and forced a conflict fork.
+    //
+    // The flush outcome is deliberately ignored. The rename is already in the reducer and on the
+    // local snapshot; a push that did not land is retried by the next save, and failing the rename
+    // because the network blipped would undo nothing and explain less.
     rename: async (name: string) => {
       deps.renameProject(projectId, name);
       await deps.flushProject(projectId);

@@ -741,6 +741,164 @@ describe('authoritative project boards', () => {
     expect(result.projectBoardAssignments).toHaveLength(1);
   });
 
+  /**
+   * The two callers that read a project back from the server — export and duplicate — have to be
+   * able to tell a push that landed from one that merely failed recoverably. Every branch below
+   * resolves, by design; the outcome is the only thing that distinguishes them.
+   */
+  describe('what a flush reports', () => {
+    it('acknowledges a push the server took', async () => {
+      const project = seedServerProject('Synced');
+      const opened = await service.hydrateProjectFromServer(project.id);
+
+      await expect(service.flushProjectToServer({ ...opened!, name: 'Edited' })).resolves.toMatchObject({
+        kind: 'acknowledged',
+      });
+    });
+
+    it('acknowledges a project the server already holds unchanged', async () => {
+      const project = seedServerProject('Synced');
+      const opened = await service.hydrateProjectFromServer(project.id);
+
+      await expect(service.flushProjectToServer(opened!)).resolves.toMatchObject({ kind: 'acknowledged' });
+    });
+
+    it('reports a push the server never took as unsynced', async () => {
+      const project = seedServerProject('Synced');
+      const opened = await service.hydrateProjectFromServer(project.id);
+
+      api.updateProject.mockRejectedValueOnce(new Error('the proxy refused the body'));
+
+      await expect(service.flushProjectToServer({ ...opened!, name: 'Edited' })).resolves.toMatchObject({
+        kind: 'unsynced',
+      });
+      expect(service.hasPendingChanges()).toBe(true);
+    });
+
+    it('reports a fork as superseded, because the id now holds the other version', async () => {
+      const project = seedServerProject('Contested');
+      const opened = await service.hydrateProjectFromServer(project.id);
+
+      // The other device wins the race with content of its own, so this is a genuine divergence
+      // rather than a revision that merely drifted.
+      api.__records.set(project.id, {
+        ...api.__records.get(project.id)!,
+        data: persistence.serializeProjectDocument({ ...project, name: 'Their version' }),
+        name: 'Their version',
+        revision: 99,
+      });
+
+      await expect(service.flushProjectToServer({ ...opened!, name: 'My version' })).resolves.toMatchObject({
+        kind: 'superseded',
+      });
+    });
+
+    it('reports a project deleted elsewhere as superseded', async () => {
+      const project = seedServerProject('Deleted elsewhere');
+      const opened = await service.hydrateProjectFromServer(project.id);
+
+      api.__records.delete(project.id);
+
+      await expect(service.flushProjectToServer({ ...opened!, name: 'Edited locally' })).resolves.toMatchObject({
+        kind: 'superseded',
+      });
+    });
+  });
+
+  /**
+   * The delete is queued behind the push rather than racing it. Were it not, a slow PUT would come
+   * back 404 after the DELETE committed, and the engine's answer to a 404 is to fork — recreating,
+   * server-side, exactly what the person deleted, pointing at media the deletion already removed.
+   */
+  it('does not fork a project this browser is deleting', async () => {
+    const project = seedServerProject('Doomed');
+    const opened = await service.hydrateProjectFromServer(project.id);
+    const edited = { ...opened!, name: 'Edited just before deleting' };
+
+    let releaseUpdate: () => void = () => undefined;
+    const updateReached = new Promise<void>((resolve) => {
+      releaseUpdate = resolve;
+    });
+    const realUpdate = api.updateProject.getMockImplementation()!;
+
+    api.updateProject.mockImplementationOnce(async (...args: Parameters<typeof realUpdate>) => {
+      releaseUpdate();
+      // Long enough for the delete below to be requested while this is still on the wire.
+      await new Promise((resolve) => {
+        setTimeout(resolve, 0);
+      });
+
+      return realUpdate(...args);
+    });
+
+    const flush = service.flushProjectToServer(edited);
+
+    await updateReached;
+
+    const deletion = service.deleteProjectOnServer(project.id);
+
+    await Promise.all([flush, deletion]);
+
+    expect(api.__records.has(project.id)).toBe(false);
+    // No "(recovered)" project anywhere: the deletion is the whole answer.
+    expect([...api.__records.keys()]).toEqual([]);
+
+    const result = await service.saveWorkbench(stateWithProjects([edited]));
+
+    expect(result.deletedProjectForks).toEqual([]);
+    expect(api.__records.size).toBe(0);
+  });
+
+  /**
+   * The belt to the queue's braces. Queueing removes the race for every caller that goes through
+   * `deleteProjectOnServer`, but the check at the top of a push runs before its awaits — so a
+   * deletion recorded while a `PUT` is on the wire has to be re-read when that `PUT` comes back 404,
+   * or the fork happens anyway.
+   */
+  it('re-reads the deletion set when a push it started comes back 404', async () => {
+    const project = seedServerProject('Doomed');
+    const opened = await service.hydrateProjectFromServer(project.id);
+    const realUpdate = api.updateProject.getMockImplementation()!;
+
+    api.updateProject.mockImplementationOnce((...args: Parameters<typeof realUpdate>) => {
+      // Exactly the window the check at the top of the push cannot see: the deletion lands after
+      // the request left, so this push is the one that discovers the 404.
+      api.__records.delete(project.id);
+      service.markProjectDeleted(project.id);
+
+      return realUpdate(...args);
+    });
+
+    await expect(service.flushProjectToServer({ ...opened!, name: 'Edited locally' })).resolves.toMatchObject({
+      kind: 'superseded',
+    });
+
+    // No "(recovered)" project was left behind on the server.
+    expect([...api.__records.keys()]).toEqual([]);
+
+    const result = await service.saveWorkbench(stateWithProjects([{ ...opened!, name: 'Edited locally' }]));
+
+    expect(result.deletedProjectForks).toEqual([]);
+    expect(api.__records.size).toBe(0);
+  });
+
+  it('lets a project save again when its deletion fails', async () => {
+    const project = seedServerProject('Survives');
+    const opened = await service.hydrateProjectFromServer(project.id);
+
+    api.deleteProject.mockRejectedValueOnce(new Error('offline'));
+
+    await expect(service.deleteProjectOnServer(project.id)).rejects.toThrow('offline');
+
+    // Its place in the revision chain comes back with it, so the next push is a PUT rather than a
+    // create that has to recover through a 409.
+    const result = await service.saveWorkbench(stateWithProjects([{ ...opened!, name: 'Edited after' }]));
+
+    expect(result.deletedProjectForks).toEqual([]);
+    expect(api.createProject).not.toHaveBeenCalled();
+    expect(api.__records.get(project.id)?.name).toBe('Edited after');
+  });
+
   it('never re-creates a project it has already forked', async () => {
     // The original stays in the aggregate until the reconciliation reaches it. A push in that
     // window would POST the old id back and undo the deletion on every device — the exact outcome

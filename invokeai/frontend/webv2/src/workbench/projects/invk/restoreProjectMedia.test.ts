@@ -216,6 +216,68 @@ describe('board media', () => {
     ]);
   });
 
+  /**
+   * The live reference set skips history — `collectLiveAssetRefs` walks past `recentImages`, canvas
+   * snapshots and the queue — but `remapAssetRefs` rewrites the whole document. Gating the *mapping*
+   * on that set therefore left the newest generated result, which is on the board and in the gallery
+   * recents but not yet on canvas, pointing at the source project's image: the copy renders the
+   * original's picture, and deleting the original breaks it with no explanation.
+   */
+  it('remaps a failed board item the document names only from history', async () => {
+    const result = await restore(
+      // No document ref: this name lives in `recentImages`, which the live-ref walker skips.
+      { boardItems: [boardItem({ name: 'newest.png' })], documentRefs: [] },
+      { materializeBoardMedia: freshNameMaterializer({ fail: new Set(['newest.png']) }) }
+    );
+
+    expect(result.mappings.images.get('newest.png')).toBe(`${PROJECT_ID}-missing-image-0`);
+    expect(result.boardItemIssues).toEqual([{ kind: 'image', name: 'newest.png', reason: 'upload-failed' }]);
+    // Still not *reported*: a gallery recent that stops resolving is not something the person lost
+    // from this project, and counting it would inflate every report.
+    expect(result.documentReferenceIssues).toEqual([]);
+  });
+
+  it('reports a failure the materializer raised twice only once', async () => {
+    const result = await restore(
+      { boardItems: [boardItem({ name: 'twice.png' })], documentRefs: [imageRef('twice.png')] },
+      {
+        materializeBoardMedia: (items, _boardId, onItemSettled) => {
+          onItemSettled();
+
+          const failed = items.map((item) => ({ kind: item.kind, name: item.name, reason: 'upload-failed' as const }));
+
+          return Promise.resolve({ failed: [...failed, ...failed], materialized: [] });
+        },
+      }
+    );
+
+    expect(result.boardItemIssues).toEqual([{ kind: 'image', name: 'twice.png', reason: 'upload-failed' }]);
+    expect(result.documentReferenceIssues).toEqual([{ kind: 'image', name: 'twice.png', reason: 'upload-failed' }]);
+  });
+
+  it('keeps two failures the board never described apart', async () => {
+    // No descriptor position to derive from. Collapsing both onto index 0 would merge two unrelated
+    // missing items into one dangling reference.
+    const result = await restore(
+      { boardItems: [boardItem({ name: 'described.png' })] },
+      {
+        materializeBoardMedia: (_items, _boardId, onItemSettled) => {
+          onItemSettled();
+
+          return Promise.resolve({
+            failed: [
+              { kind: 'image' as const, name: 'stray-a.png', reason: 'upload-failed' as const },
+              { kind: 'image' as const, name: 'stray-b.png', reason: 'upload-failed' as const },
+            ],
+            materialized: [],
+          });
+        },
+      }
+    );
+
+    expect(result.mappings.images.get('stray-a.png')).not.toBe(result.mappings.images.get('stray-b.png'));
+  });
+
   /** A materializer that answers neither way has still not delivered the media. */
   it('treats an unaccounted descriptor as a failure rather than a silent success', async () => {
     const result = await restore(

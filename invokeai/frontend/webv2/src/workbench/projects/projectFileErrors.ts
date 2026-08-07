@@ -1,4 +1,5 @@
 import { InvkFormatError } from './invk/format';
+import { ProjectFlushError } from './projectFlush';
 
 /**
  * Turn a failed project-file read or write into something worth showing.
@@ -17,8 +18,13 @@ import { InvkFormatError } from './invk/format';
  * to open" while they were exporting it names the wrong operation and the wrong
  * file — theirs, not one they were handed.
  *
- * Anything that is not an `InvkFormatError` reached us from the network or the
- * reducer. Those already carry messages meant for people, so they pass through.
+ * `ProjectFlushError` is the third case: not a bad file but a project whose
+ * newest content never reached the server, so there is nothing correct to
+ * export or copy yet. Its own message names the mechanism rather than the fix,
+ * which is the wrong half to show someone.
+ *
+ * Anything else reached us from the network or the reducer. Those already carry
+ * messages meant for people, so they pass through.
  */
 export type ProjectFileDirection = 'read' | 'write';
 
@@ -27,6 +33,10 @@ export const describeProjectFileError = (
   t: (key: string) => string,
   direction: ProjectFileDirection = 'read'
 ): string | undefined => {
+  if (error instanceof ProjectFlushError) {
+    return t(error.reason === 'unsynced' ? 'projects.file.notSynced' : 'projects.file.supersededElsewhere');
+  }
+
   if (!(error instanceof InvkFormatError)) {
     return error instanceof Error ? error.message : undefined;
   }

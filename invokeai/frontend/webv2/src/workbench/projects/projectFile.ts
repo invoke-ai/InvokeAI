@@ -12,10 +12,9 @@ import {
 import type { ProjectTransferIssues } from './invk/transfer';
 
 import {
-  createProject as apiCreateProject,
+  createProjectSettled,
   getProject as apiGetProject,
   getProjectBoardSnapshot,
-  isProjectConfirmedAbsent,
   type ProjectRecordDTO,
 } from './api';
 import { recordProjectCover } from './covers';
@@ -23,6 +22,7 @@ import { createProjectId } from './ids';
 import { INVK_EXTENSION, InvkFormatError } from './invk/format';
 import { upsertProjectSummary } from './library';
 import { remapAssetRefs, stripInstallationState } from './projectAssets';
+import { assertProjectFlushed } from './projectFlush';
 import { getOpenProject } from './syncStore';
 
 export const PROJECT_FILE_KIND = 'invokeai-project';
@@ -203,14 +203,22 @@ const exportProjectDocument = async (
  * this — a project card, a gallery board's menu — are reachable while that project is open, and the
  * board most likely to be right-clicked is the open project's own. Exporting what the server last
  * acknowledged would hand someone a file that silently omits the last ten minutes of their work.
+ *
+ * A flush that does not land therefore ends the export. The archive is built from the record read
+ * below, so an unacknowledged push means the file would be wrong in exactly the way this call
+ * exists to prevent — and wrong invisibly, under a download and a success toast.
  */
 export const exportLibraryProject = async (
   projectId: string,
   options: ProjectFileOptions = {}
 ): Promise<ProjectExportOutcome> => {
   const owner = options.owner ?? captureAccountScope();
+  const openProject = getOpenProject(projectId);
 
-  await getOpenProject(projectId)?.flush();
+  if (openProject) {
+    assertProjectFlushed(await openProject.flush());
+  }
+
   assertAccountScopeCurrent(owner);
 
   const record = await apiGetProject(projectId, owner.signal);
@@ -337,14 +345,14 @@ export const importProjectFile = async (
     assertAccountScopeCurrent(owner);
 
     const document = restored === null ? canonicalDocument : remapAssetRefs(canonicalDocument, restored.mappings);
-    const record = await apiCreateProject(
+    const record = await createProjectSettled(
       {
         data: document,
         name,
         project_id: id,
         ...(stagingBoardId === null ? {} : { board_id: stagingBoardId }),
       },
-      owner.signal
+      owner
     );
 
     didCreateProject = true;
@@ -366,20 +374,12 @@ export const importProjectFile = async (
       },
     };
   } catch (error) {
-    const canRollback =
-      !didCreateProject &&
-      ledger !== null &&
-      restoreMedia !== null &&
-      isAccountScopeCurrent(owner) &&
-      (await isProjectConfirmedAbsent(id, owner));
-
-    if (canRollback) {
-      try {
-        await restoreMedia.rollbackRestoredMedia(ledger, { signal: owner.signal });
-      } catch {
-        // Cleanup is best-effort. The create/scope failure is the actionable
-        // result and must never be replaced by a failed delete request.
-      }
+    // Reached through the lazily-loaded module, so a legacy JSON import still never pulls the
+    // restore engine into the graph — it has no media to undo.
+    if (ledger !== null && restoreMedia !== null) {
+      await restoreMedia.rollbackUnlessProjectExists(error, didCreateProject, owner, () =>
+        restoreMedia.rollbackRestoredMedia(ledger, { signal: owner.signal })
+      );
     }
 
     throw error;

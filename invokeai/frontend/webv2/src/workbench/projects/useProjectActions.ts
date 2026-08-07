@@ -121,10 +121,13 @@ export const useProjectActions = (): {
 
     try {
       // Deletion goes through the library for every surface. For a project the workbench holds it
-      // routes through this editor's own sync handle, which is what stops an in-flight autosave
-      // recreating the project — and with it a board — between the DELETE and the tab closing.
+      // routes through this editor's own sync handle, which issues the DELETE inside the sync
+      // engine's mutation queue — so a push already on the wire finishes first and cannot come back
+      // 404 and fork the project into a copy of the thing being deleted.
       await deleteLibraryProject(project.id);
     } catch (error) {
+      // The handle unmarks its own failures; this covers the surfaces that reach a project the
+      // editor does not hold, and is idempotent for the ones it does.
       persistenceService.unmarkProjectDeleted(project.id);
       notify.error(t('projects.deleteFailed'), error instanceof Error ? error.message : undefined);
 

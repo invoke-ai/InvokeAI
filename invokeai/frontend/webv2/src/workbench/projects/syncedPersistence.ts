@@ -15,6 +15,8 @@ import {
   withAuthoritativeProjectBoard,
 } from '@workbench/workbenchState';
 
+import type { ProjectPushOutcome, ProjectRecoveredIdentity } from './projectFlush';
+
 import {
   createProject as apiCreateProject,
   deleteClientStateValue,
@@ -77,6 +79,7 @@ export interface ProjectConflictResolution {
   serverProject: Project;
   /** The forked copy carrying the local edits that lost the race. */
   recoveredProject: Project;
+  recoveredIdentity: ProjectRecoveredIdentity;
 }
 
 /** Local edits rescued from a project that was deleted on another device. */
@@ -84,6 +87,7 @@ export interface ProjectDeletionFork {
   projectId: string;
   /** The fork carrying the local edits, under a fresh id and its own board. */
   recoveredProject: Project;
+  recoveredIdentity: ProjectRecoveredIdentity;
 }
 
 /** A board the server assigned to a project this save created. */
@@ -333,21 +337,24 @@ const getRecoveryBaseName = (name: string): string => name.replace(/(\s*\((?:r|R
 export const createRecoveredDocument = (
   project: Project,
   document: Record<string, unknown>
-): { recoveredId: string; recoveredName: string; recoveredDocument: Record<string, unknown> } => {
+): { recoveredIdentity: ProjectRecoveredIdentity; recoveredDocument: Record<string, unknown> } => {
   const recoveryOf = project.recoveryOf ?? project.id;
-  const recoveredId = `${recoveryOf}-recovered-${Date.now().toString(36)}`;
-  const recoveredName = `${getRecoveryBaseName(project.name)} (recovered)`;
+  const recoveredIdentity: ProjectRecoveredIdentity = {
+    id: `${recoveryOf}-recovered-${Date.now().toString(36)}`,
+    name: `${getRecoveryBaseName(project.name)} (recovered)`,
+    recoveredAt: new Date().toISOString(),
+    recoveryOf,
+  };
 
   return {
     recoveredDocument: {
       ...document,
-      id: recoveredId,
-      name: recoveredName,
-      recoveredAt: new Date().toISOString(),
-      recoveryOf,
+      id: recoveredIdentity.id,
+      name: recoveredIdentity.name,
+      recoveredAt: recoveredIdentity.recoveredAt,
+      recoveryOf: recoveredIdentity.recoveryOf,
     },
-    recoveredId,
-    recoveredName,
+    recoveredIdentity,
   };
 };
 
@@ -399,7 +406,7 @@ const recoverConflictingProject = async (
       return { kind: 'failed' };
     }
 
-    const { recoveredDocument, recoveredId, recoveredName } = createRecoveredDocument(project, document);
+    const { recoveredDocument, recoveredIdentity } = createRecoveredDocument(project, document);
     const recoveredProject = deserializeProjectDocument(recoveredDocument);
 
     if (!recoveredProject) {
@@ -407,23 +414,36 @@ const recoverConflictingProject = async (
     }
 
     const created = await apiCreateProject(
-      { data: recoveredDocument, name: recoveredName, project_id: recoveredId },
+      { data: recoveredDocument, name: recoveredIdentity.name, project_id: recoveredIdentity.id },
       syncState.owner.signal
     );
 
     assertOwner(syncState);
-    syncState.syncEntries.set(recoveredId, {
+    syncState.syncEntries.set(recoveredIdentity.id, {
       pushedDoc: JSON.stringify(recoveredDocument),
       revision: created.revision,
     });
+    // Recorded for the same reason the deletion fork records it: the fork is a project the server
+    // created, so its board id exists nowhere else. Without this the fork opens with a gallery bound
+    // to the original's board — which the conflict left in the server version's hands.
+    syncState.pendingBoardAssignments.push({ boardId: created.board_id, projectId: recoveredIdentity.id });
 
-    return { kind: 'forked', resolution: { projectId: project.id, recoveredProject, serverProject } };
+    return {
+      kind: 'forked',
+      resolution: { projectId: project.id, recoveredIdentity, recoveredProject, serverProject },
+    };
   } catch {
     assertOwner(syncState);
 
     return { kind: 'failed' };
   }
 };
+
+type DeletionForkOutcome =
+  | { kind: 'forked'; fork: ProjectDeletionFork }
+  /** The 404 was this browser's own deletion. There is nothing to rescue and nothing went wrong. */
+  | { kind: 'abandoned' }
+  | { kind: 'failed' };
 
 /**
  * Rescue the local edits of a project the server no longer has.
@@ -436,58 +456,81 @@ const forkDeletedProject = async (
   syncState: SyncedPersistenceState,
   project: Project,
   document: Record<string, unknown>
-): Promise<ProjectDeletionFork | null> => {
+): Promise<DeletionForkOutcome> => {
   assertOwner(syncState);
 
-  const { recoveredDocument, recoveredId, recoveredName } = createRecoveredDocument(project, document);
+  const { recoveredDocument, recoveredIdentity } = createRecoveredDocument(project, document);
   const recoveredProject = deserializeProjectDocument(recoveredDocument);
 
   if (!recoveredProject) {
-    return null;
+    return { kind: 'failed' };
   }
 
   try {
     const created = await apiCreateProject(
-      { data: recoveredDocument, name: recoveredName, project_id: recoveredId },
+      { data: recoveredDocument, name: recoveredIdentity.name, project_id: recoveredIdentity.id },
       syncState.owner.signal
     );
 
     assertOwner(syncState);
-    syncState.syncEntries.set(recoveredId, {
+
+    // Re-read after the create, not just before it. `deleteLibraryProject` marks the id before
+    // issuing its DELETE, but a PUT already on the wire is past that check — the 404 that brought us
+    // here can be this browser's own deletion arriving first. Forking on it would resurrect the
+    // project the person just deleted, as a copy pointing at media the deletion already removed.
+    if (syncState.deletedProjectIds.has(project.id)) {
+      try {
+        await apiDeleteProject(recoveredIdentity.id, syncState.owner.signal);
+      } catch {
+        // The fork is an empty private project either way; failing to remove it is clutter, not a
+        // broken state, and it must not replace the deletion's own outcome.
+      }
+
+      assertOwner(syncState);
+      syncState.syncEntries.delete(recoveredIdentity.id);
+
+      return { kind: 'abandoned' };
+    }
+
+    syncState.syncEntries.set(recoveredIdentity.id, {
       pushedDoc: JSON.stringify(recoveredDocument),
       revision: created.revision,
     });
-    syncState.pendingBoardAssignments.push({ boardId: created.board_id, projectId: recoveredId });
+    syncState.pendingBoardAssignments.push({ boardId: created.board_id, projectId: recoveredIdentity.id });
 
-    return { projectId: project.id, recoveredProject };
+    return { fork: { projectId: project.id, recoveredIdentity, recoveredProject }, kind: 'forked' };
   } catch {
     assertOwner(syncState);
 
-    return null;
+    return { kind: 'failed' };
   }
 };
 
-const pushProject = async (syncState: SyncedPersistenceState, project: Project): Promise<string> => {
+const pushProject = async (syncState: SyncedPersistenceState, project: Project): Promise<ProjectPushOutcome> => {
   assertOwner(syncState);
   const { document, json: documentJson } = getSerializedProjectDocument(syncState, project);
   const entry = syncState.syncEntries.get(project.id);
 
-  if (
-    syncState.deletedProjectIds.has(project.id) ||
-    syncState.forkedProjectIds.has(project.id) ||
-    entry?.pushedDoc === documentJson
-  ) {
-    return documentJson;
+  // A deleted or already-forked id holds someone else's answer — the deletion, or the server
+  // version that won the race. Nothing is pushed, and nothing read back under this id would be ours.
+  if (syncState.deletedProjectIds.has(project.id) || syncState.forkedProjectIds.has(project.id)) {
+    return { documentJson, kind: 'superseded' };
+  }
+
+  if (entry?.pushedDoc === documentJson) {
+    return { documentJson, kind: 'acknowledged' };
   }
 
   if (!entry) {
     if (!(await pushNewProject(syncState, project))) {
       assertOwner(syncState);
       syncState.hasPending = true;
+
+      return { documentJson, kind: 'unsynced' };
     }
 
     assertOwner(syncState);
-    return documentJson;
+    return { documentJson, kind: 'acknowledged' };
   }
 
   try {
@@ -529,12 +572,20 @@ const pushProject = async (syncState: SyncedPersistenceState, project: Project):
           assertOwner(syncState);
           // A genuinely concurrent writer; the next save re-evaluates.
           syncState.hasPending = true;
+
+          return { documentJson, kind: 'unsynced' };
         }
       } else if (outcome.kind === 'forked') {
         syncState.pendingConflicts.push(outcome.resolution);
+
+        // This id now holds the server's version, not ours.
+        return { documentJson, kind: 'superseded' };
       } else if (outcome.kind === 'failed') {
         syncState.hasPending = true;
+
+        return { documentJson, kind: 'unsynced' };
       }
+      // 'adopted': the server already held these exact bytes, so the push had nothing to do.
     } else if (isProjectNotFoundError(error)) {
       // Deleted on another device while we held local edits. Re-creating under the same id would
       // undo that deletion — the project would reappear on every device, and on this one it would
@@ -542,24 +593,39 @@ const pushProject = async (syncState: SyncedPersistenceState, project: Project):
       // the local work survives as a recovered project with its own id and its own board.
       syncState.syncEntries.delete(project.id);
 
-      const fork = await forkDeletedProject(syncState, project, document);
+      // Unless the deletion was ours. `markDeleted` runs before the DELETE, but a PUT already on the
+      // wire is past the check at the top of this function, so a fast DELETE can turn our own push
+      // into a 404 — and forking on that resurrects, server-side, exactly what the person deleted.
+      if (syncState.deletedProjectIds.has(project.id)) {
+        return { documentJson, kind: 'superseded' };
+      }
+
+      const outcome = await forkDeletedProject(syncState, project, document);
 
       assertOwner(syncState);
-      if (fork === null) {
+      if (outcome.kind === 'failed') {
         syncState.hasPending = true;
-      } else {
+
+        return { documentJson, kind: 'unsynced' };
+      }
+
+      if (outcome.kind === 'forked') {
         // Recorded before the aggregate hears about it, so nothing re-creates the original id in
         // the meantime — see `forkedProjectIds`.
         syncState.forkedProjectIds.add(project.id);
-        syncState.pendingDeletedForks.push(fork);
+        syncState.pendingDeletedForks.push(outcome.fork);
       }
+
+      return { documentJson, kind: 'superseded' };
     } else {
       syncState.hasPending = true;
+
+      return { documentJson, kind: 'unsynced' };
     }
   }
 
   assertOwner(syncState);
-  return documentJson;
+  return { documentJson, kind: 'acknowledged' };
 };
 
 const pushSessionState = async (syncState: SyncedPersistenceState, state: WorkbenchState): Promise<void> => {
@@ -742,7 +808,8 @@ const loadFromBackend = async (
 export interface SyncedWorkbenchPersistence {
   adoptProjectRecord(record: ProjectRecordDTO): Project | null;
   clearWorkbench(): Promise<void>;
-  flushProjectToServer(project: Project): Promise<void>;
+  deleteProjectOnServer(projectId: string): Promise<void>;
+  flushProjectToServer(project: Project): Promise<ProjectPushOutcome>;
   hasPendingChanges(): boolean;
   hydrateProjectFromServer(projectId: string): Promise<Project | null>;
   loadWorkbench(options?: WorkbenchLoadOptions): Promise<HydratedWorkbenchSnapshot | null>;
@@ -818,6 +885,41 @@ export const createSyncedWorkbenchPersistence = (
     return result;
   };
 
+  /**
+   * Sync entries dropped by {@link markDeleted}, kept so a deletion that fails can be undone whole.
+   *
+   * Without this, unmarking restores the project's right to save but not its place in the revision
+   * chain: the next push finds no entry, takes the create path, and has to recover through a 409.
+   */
+  const entriesHeldForDeletion = new Map<string, SyncEntry>();
+
+  const markDeleted = (projectId: string): void => {
+    assertOwner(syncState);
+    syncState.deletedProjectIds.add(projectId);
+
+    const entry = syncState.syncEntries.get(projectId);
+
+    if (entry) {
+      entriesHeldForDeletion.set(projectId, entry);
+    }
+
+    syncState.syncEntries.delete(projectId);
+    persistSyncMap(syncState);
+  };
+
+  const unmarkDeleted = (projectId: string): void => {
+    assertOwner(syncState);
+    syncState.deletedProjectIds.delete(projectId);
+
+    const entry = entriesHeldForDeletion.get(projectId);
+
+    if (entry) {
+      syncState.syncEntries.set(projectId, entry);
+      entriesHeldForDeletion.delete(projectId);
+      persistSyncMap(syncState);
+    }
+  };
+
   const adoptProjectRecord = (record: ProjectRecordDTO): Project | null => {
     assertOwner(syncState);
     const project = deserializeProjectRecord(record);
@@ -845,18 +947,52 @@ export const createSyncedWorkbenchPersistence = (
         assertOwner(syncState);
         syncState.syncEntries.clear();
         syncState.deletedProjectIds.clear();
+        entriesHeldForDeletion.clear();
         syncState.lastPushedAccount = null;
         syncState.hasPending = false;
       });
     },
-    flushProjectToServer(project): Promise<void> {
+    /**
+     * Remove the project from the server without letting a save race the removal.
+     *
+     * Queued rather than issued directly, which is the whole point: `markProjectDeleted` stops a
+     * push that has not started, but a `PUT` already in flight is past every check the engine has.
+     * That push comes back 404 once the DELETE commits, and the engine's answer to a 404 is to fork
+     * the local document into a *new* server project — resurrecting, as a copy, what the person
+     * just deleted, pointing at media the deletion already removed. Waiting for the queue removes
+     * the race rather than detecting it.
+     */
+    deleteProjectOnServer(projectId): Promise<void> {
+      return enqueueMutation(async () => {
+        markDeleted(projectId);
+
+        try {
+          await apiDeleteProject(projectId, syncState.owner.signal);
+        } catch (error) {
+          assertOwner(syncState);
+          unmarkDeleted(projectId);
+          throw error;
+        }
+
+        assertOwner(syncState);
+      });
+    },
+    flushProjectToServer(project): Promise<ProjectPushOutcome> {
       return enqueueMutation(async () => {
         // A flush is a targeted push, not a save. Any conflict or fork it produces waits on
         // `syncState` for the next save to drain — the flush has no caller to hand them to, and
         // they are already true of the server by the time it returns.
-        await pushProject(syncState, project);
+        //
+        // What it *does* hand back is whether the push landed. Every caller here has a recoverable
+        // failure on its hands, so this still does not reject; but "recoverable" and "done" are
+        // different answers, and a caller about to read the project back from the server needs the
+        // second one. `assertProjectFlushed` in `./projectFlush` is where that is spent.
+        const outcome = await pushProject(syncState, project);
+
         assertOwner(syncState);
         persistSyncMap(syncState);
+
+        return outcome;
       });
     },
     hasPendingChanges(): boolean {
@@ -965,10 +1101,7 @@ export const createSyncedWorkbenchPersistence = (
      * and removal happens only through the library's explicit delete.
      */
     markProjectDeleted(projectId): void {
-      assertOwner(syncState);
-      syncState.deletedProjectIds.add(projectId);
-      syncState.syncEntries.delete(projectId);
-      persistSyncMap(syncState);
+      markDeleted(projectId);
     },
     persistEmptySession(state): Promise<void> {
       return enqueueMutation(async () => {
@@ -1011,7 +1144,7 @@ export const createSyncedWorkbenchPersistence = (
         for (const project of state.projects) {
           assertOwner(syncState);
           const lastAckedDoc = syncState.syncEntries.get(project.id)?.pushedDoc ?? null;
-          const documentJson = await pushProject(syncState, project);
+          const { documentJson } = await pushProject(syncState, project);
 
           assertOwner(syncState);
           const entry = syncState.syncEntries.get(project.id);
@@ -1044,8 +1177,7 @@ export const createSyncedWorkbenchPersistence = (
       });
     },
     unmarkProjectDeleted(projectId): void {
-      assertOwner(syncState);
-      syncState.deletedProjectIds.delete(projectId);
+      unmarkDeleted(projectId);
     },
   };
 };
