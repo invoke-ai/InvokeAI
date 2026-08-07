@@ -29,10 +29,10 @@ import { toMediaRefs } from './transfer';
  * Reading an `.invk` back, in two steps a caller can put a decision between.
  *
  * {@link readInvkArchive} is pure inspection: unpack, validate the manifest, parse the document and
- * — for a v3 archive — the board enumeration, then index the bundled bytes. It touches no network
- * and mutates nothing, so a caller can read a file, discover it is a legacy canvas project, and say
- * so without having created anything. Everything structural fails here, before a board or a single
- * uploaded image exists.
+ * the board enumeration, then index the bundled bytes. It touches no network and mutates nothing, so
+ * a caller can read a file, discover it is a legacy canvas project, and say so without having
+ * created anything. Everything structural fails here, before a board or a single uploaded image
+ * exists.
  *
  * {@link restoreArchiveMedia} is the part with consequences. It is a thin wiring of
  * `restoreProjectMedia`, which is shared with duplication: this module supplies the one thing that
@@ -45,7 +45,15 @@ import { toMediaRefs } from './transfer';
 /** Simultaneous uploads. Matches the previous frontend's limit. */
 const BOARD_UPLOAD_CONCURRENCY = 5;
 
-interface InvkArchiveBase {
+export interface InvkArchiveContents {
+  /**
+   * What the project's board held, or `null` for an archive that names no board.
+   *
+   * `null` and `{items: []}` are deliberately different answers. "This file does not describe a
+   * board" calls for the server to create an empty one; "this project's board was empty" is a fact
+   * the restore already knows. Only the first may have a board invented for it.
+   */
+  boardSnapshot: InvkBoardSnapshot | null;
   /** Bundled preview bytes and the entry they came from, when the archive has one. */
   cover: { bytes: Uint8Array; entryName: string } | null;
   /** Bundled image bytes, keyed by the image name the exporting server used. */
@@ -55,25 +63,6 @@ interface InvkArchiveBase {
   /** Bundled video bytes, keyed by the video name the exporting server used. */
   videos: Map<string, Uint8Array>;
 }
-
-/** An archive written before board membership travelled: the document and its bytes, nothing else. */
-export interface InvkArchiveV2 extends InvkArchiveBase {
-  boardSnapshot: null;
-  version: 2;
-}
-
-/** An archive that also states what was on the project's board. */
-export interface InvkArchiveV3 extends InvkArchiveBase {
-  boardSnapshot: InvkBoardSnapshot;
-  version: 3;
-}
-
-/**
- * Discriminated on the version rather than carrying an optional snapshot, so "this archive predates
- * boards" and "this archive's board was empty" cannot be confused — they call for different
- * restores, and only one of them is allowed to invent an empty board.
- */
-export type InvkArchiveContents = InvkArchiveV2 | InvkArchiveV3;
 
 const parseDocumentEntry = (bytes: Uint8Array): Record<string, unknown> => {
   let parsed: unknown;
@@ -91,11 +80,18 @@ const parseDocumentEntry = (bytes: Uint8Array): Record<string, unknown> => {
   return parsed as Record<string, unknown>;
 };
 
-const parseBoardEntry = (entries: ReadonlyMap<string, Uint8Array>): InvkBoardSnapshot => {
+/**
+ * The board enumeration, or `null` when the archive carries none.
+ *
+ * Absent is a valid archive — a build from before project boards wrote one — but *malformed* is
+ * not: an enumeration that cannot be trusted has to fail before anything is created, because half
+ * of it is not a board.
+ */
+const parseBoardEntry = (entries: ReadonlyMap<string, Uint8Array>): InvkBoardSnapshot | null => {
   const entry = entries.get(INVK_BOARD_ENTRY);
 
   if (!entry) {
-    throw new InvkFormatError('damaged', `Archive has no ${INVK_BOARD_ENTRY}.`);
+    return null;
   }
 
   try {
@@ -151,9 +147,9 @@ export const readInvkArchive = async (file: File): Promise<InvkArchiveContents> 
     throw new InvkFormatError('damaged', `Archive has no ${INVK_DOCUMENT_ENTRY}.`);
   }
 
-  // Before the bytes are indexed: a v3 archive whose enumeration is malformed must create nothing,
+  // Before the bytes are indexed: an archive whose enumeration is malformed must create nothing,
   // and the enumeration is what decides which of those bytes are board media at all.
-  const boardSnapshot = manifest.version === 3 ? parseBoardEntry(entries) : null;
+  const boardSnapshot = parseBoardEntry(entries);
   const images = new Map<string, Uint8Array>();
   const videos = new Map<string, Uint8Array>();
 
@@ -175,17 +171,15 @@ export const readInvkArchive = async (file: File): Promise<InvkArchiveContents> 
   }
 
   const coverBytes = manifest.cover === undefined ? undefined : entries.get(manifest.cover);
-  const contents = {
+
+  return {
+    boardSnapshot,
     cover: coverBytes === undefined ? null : { bytes: coverBytes, entryName: manifest.cover! },
     images,
     manifest,
     projectDocument: parseDocumentEntry(documentEntry),
     videos,
   };
-
-  return boardSnapshot === null
-    ? { ...contents, boardSnapshot: null, version: 2 }
-    : { ...contents, boardSnapshot, version: 3 };
 };
 
 export interface ArchiveBoardUploadDeps {
@@ -203,7 +197,7 @@ export interface ArchiveBoardUploadDeps {
  * so its absence is a loss worth naming.
  */
 export const createArchiveMediaMaterializer = (
-  archive: Pick<InvkArchiveBase, 'images' | 'videos'>,
+  archive: Pick<InvkArchiveContents, 'images' | 'videos'>,
   deps: ArchiveBoardUploadDeps = {}
 ): MediaMaterializer => {
   const uploadImage = deps.uploadBoardImage ?? uploadBoardImage;
@@ -264,8 +258,8 @@ export type RestoreArchiveMediaDeps = ArchiveBoardUploadDeps &
  * Make an archive's media exist on this server: board items onto the staging board under fresh
  * identities, document-only references deduplicated against what is already here.
  *
- * A v2 archive has no board, so this is exactly the v2 restore it always was — the shared engine
- * simply sees an empty descriptor list.
+ * An archive that names no board restores its document references and nothing else — the shared
+ * engine simply sees an empty descriptor list.
  */
 export const restoreArchiveMedia = (
   archive: InvkArchiveContents,

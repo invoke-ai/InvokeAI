@@ -10,29 +10,30 @@ import { INVK_EXTENSION, INVK_VERSION, InvkFormatError } from './format';
  * createdAt, name}` — alongside an `images/` folder keyed by backend image name.
  * That container is kept verbatim. Version 2 changes only the payload: where a
  * v1 archive carried four canvas-shaped state files, a v2 archive carries one
- * `project.json` holding the whole workbench project document, plus an optional
- * cover. Version 3 adds `board.json`, the project board's contents — the part of
- * a project that the document does not reference and a reader cannot infer.
+ * `project.json` holding the whole workbench project document, `board.json`
+ * describing the project's board, and an optional cover.
  *
  * ```
  * <name>.invk
  * ├── manifest.json          this file's shape
- * ├── project.json           the project document (v2 and v3)
- * ├── board.json             the project board's visible contents (v3 only)
+ * ├── project.json           the project document
+ * ├── board.json             the project board's visible contents
  * ├── cover.<ext>            optional preview; the entry name is recorded here
  * ├── images/<image_name>    bytes, named exactly as the server names them
  * └── videos/<video_name>    the same, for the other namespace
  * ```
  *
- * Parsing is a discriminated union rather than a strict `z.literal(3)` so that
+ * Parsing is a discriminated union rather than a strict `z.literal(2)` so that
  * every version this app has written can be named precisely when refused. "This
  * is a canvas project from an earlier version" is a sentence someone can act on;
  * a zod issue list is not. The legacy reader is the mirror image — it pins
  * `version: 1` and will refuse the others, which is correct and needs no change.
  *
- * Version 2 is still read, and is deliberately not asked to carry board
- * membership: an archive written before boards existed has no board to describe,
- * and inventing one for it would claim knowledge the file does not contain.
+ * Adding `board.json` did not bump the version, because a version tells a reader
+ * what it may assume about a file *someone else wrote* and no such file predates
+ * the entry — webv2 has not shipped. A reader treats the entry as optional and
+ * its absence as "this archive names no board", which is exactly what a dev build
+ * from before boards produced.
  *
  * The names and the error class live in `./format`, which carries no zod, so
  * that the file picker and the error toast do not drag the schema into the
@@ -59,15 +60,13 @@ const zManifestV2 = z.object({
   version: z.literal(2),
 });
 
-const zManifestV3 = zManifestV2.extend({ version: z.literal(3) });
+const zManifest = z.discriminatedUnion('version', [zManifestV1, zManifestV2]);
 
-const zManifest = z.discriminatedUnion('version', [zManifestV1, zManifestV2, zManifestV3]);
-
-/** A manifest this app can read: v2 or v3, which differ only in what else the archive holds. */
-export type InvkManifest = z.infer<typeof zManifestV2> | z.infer<typeof zManifestV3>;
+/** A manifest this app can read: the workbench project container. */
+export type InvkManifest = z.infer<typeof zManifestV2>;
 
 /**
- * Accepts a v2 or v3 manifest; throws {@link InvkFormatError} for anything else.
+ * Accepts a v2 manifest; throws {@link InvkFormatError} for anything else.
  * Never returns a v1 manifest — recognizing v1 exists only to name the refusal.
  */
 export const parseInvkManifest = (data: unknown): InvkManifest => {

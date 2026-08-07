@@ -136,7 +136,7 @@ describe('executeInvkExport', () => {
       cover: 'cover.webp',
       name: 'My project',
       sourceProjectId: 'project-1',
-      version: 3,
+      version: 2,
     });
     expect(JSON.parse(readEntryText(entries.get(INVK_DOCUMENT_ENTRY)!))).toEqual(projectDocument());
   });

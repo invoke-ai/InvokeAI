@@ -56,11 +56,12 @@ const validArchive = (overrides: Record<string, string | Uint8Array> = {}) =>
     ...overrides,
   });
 
-const v3Archive = (overrides: Record<string, string | Uint8Array> = {}) =>
+/** The archive this app writes: a document, its bytes, and the project board it came from. */
+const boardArchive = (overrides: Record<string, string | Uint8Array> = {}) =>
   archiveFile({
     'board.json': boardEntry(),
     'images/a.png': new Uint8Array([1, 2, 3]),
-    'manifest.json': JSON.stringify(manifest({ version: 3 })),
+    'manifest.json': JSON.stringify(manifest()),
     'project.json': JSON.stringify(document()),
     ...overrides,
   });
@@ -84,44 +85,31 @@ describe('readInvkArchive', () => {
   });
 
   /**
-   * An archive that predates boards genuinely has none, and an archive whose board was empty says
-   * so. Discriminating on the version keeps those apart: only the first may have a board invented
-   * for it.
+   * "This file names no board" and "this project's board was empty" are different answers, and the
+   * restore treats them differently — only the first may have an empty board invented for it. An
+   * archive with no `board.json` is one a build from before project boards wrote, not a broken one.
    */
-  it('reads a v2 archive as having no board at all', async () => {
+  it('reads an archive with no board enumeration as naming no board', async () => {
     const contents = await readInvkArchive(await validArchive());
 
-    expect(contents.version).toBe(2);
     expect(contents.boardSnapshot).toBeNull();
   });
 
-  it('reads and canonicalizes a v3 board enumeration', async () => {
+  it('reads and canonicalizes a board enumeration', async () => {
     const contents = await readInvkArchive(
-      await v3Archive({
+      await boardArchive({
         'board.json': boardEntry([boardItem({ name: 'z.png' }), boardItem({ kind: 'video', name: 'a.mp4' })]),
       })
     );
 
-    expect(contents.version).toBe(3);
     // Sorted by kind then name, whatever order the writer used.
     expect(contents.boardSnapshot?.items.map((item) => item.name)).toEqual(['z.png', 'a.mp4']);
   });
 
-  it('reads an empty v3 board without inventing anything', async () => {
-    const contents = await readInvkArchive(await v3Archive({ 'board.json': boardEntry([]) }));
+  it('reads an empty board without inventing anything', async () => {
+    const contents = await readInvkArchive(await boardArchive({ 'board.json': boardEntry([]) }));
 
     expect(contents.boardSnapshot).toEqual({ items: [], version: 1 });
-  });
-
-  it('reports a v3 archive with no board enumeration as damaged', async () => {
-    const blob = await writeArchive(
-      new Map([
-        ['manifest.json', textEntry(JSON.stringify(manifest({ version: 3 })))],
-        ['project.json', textEntry(JSON.stringify(document()))],
-      ])
-    );
-
-    await expect(readInvkArchive(new File([blob], 'project.invk'))).rejects.toMatchObject({ reason: 'damaged' });
   });
 
   it.each([
@@ -130,7 +118,7 @@ describe('readInvkArchive', () => {
     ['an unsafe name', JSON.stringify({ items: [boardItem({ name: '../escape.png' })], version: 1 })],
     ['an unknown version', JSON.stringify({ items: [], version: 2 })],
   ])('reports a board enumeration that is %s as damaged', async (_case, contents) => {
-    await expect(readInvkArchive(await v3Archive({ 'board.json': contents }))).rejects.toMatchObject({
+    await expect(readInvkArchive(await boardArchive({ 'board.json': contents }))).rejects.toMatchObject({
       reason: 'damaged',
     });
   });
@@ -303,7 +291,7 @@ describe('restoreArchiveMedia', () => {
    * board media, and the layer follows it to the copy.
    */
   it('restores an overlapping item once and points the document at the copy', async () => {
-    const archive = await readInvkArchive(await v3Archive());
+    const archive = await readInvkArchive(await boardArchive());
     const ledger = createRestoredMediaLedger('staging');
     const uploadImage = vi.fn(() => Promise.resolve({ height: 1, imageName: 'never', width: 1 }));
 
@@ -318,10 +306,10 @@ describe('restoreArchiveMedia', () => {
     expect(ledger).toMatchObject({ boardImageNames: ['board-a.png'], imageNames: [] });
   });
 
-  /** Unreferenced board media is exactly what v3 exists to carry. */
+  /** Unreferenced board media is exactly what `board.json` exists to carry. */
   it('restores board media the document never mentions', async () => {
     const archive = await readInvkArchive(
-      await v3Archive({
+      await boardArchive({
         'board.json': boardEntry([boardItem({ name: 'unreferenced.png', starred: true })]),
         'images/unreferenced.png': new Uint8Array([5]),
       })
@@ -342,7 +330,7 @@ describe('restoreArchiveMedia', () => {
     expect(ledger.imageNames).toEqual(['loose-a.png']);
   });
 
-  it('restores a v2 archive as document references only, with no board media', async () => {
+  it('restores an archive with no board as document references only', async () => {
     const archive = await readInvkArchive(await validArchive());
     const ledger = createRestoredMediaLedger(null);
 
@@ -356,7 +344,7 @@ describe('restoreArchiveMedia', () => {
     expect(ledger).toMatchObject({ boardImageNames: [], boardVideoNames: [], imageNames: ['loose-a.png'] });
   });
 
-  it('deduplicates a v2 reference the destination already has', async () => {
+  it('deduplicates a document reference the destination already has', async () => {
     const archive = await readInvkArchive(await validArchive());
     const ledger = createRestoredMediaLedger(null);
     const uploadImage = vi.fn(() => Promise.resolve({ height: 1, imageName: 'never', width: 1 }));
@@ -373,7 +361,7 @@ describe('restoreArchiveMedia', () => {
 
   it('announces a bundled video as a video, whatever its extension', async () => {
     const archive = await readInvkArchive(
-      await v3Archive({
+      await boardArchive({
         'board.json': boardEntry([boardItem({ kind: 'video', name: 'clip.unknown' })]),
         'videos/clip.unknown': new Uint8Array([7]),
       })

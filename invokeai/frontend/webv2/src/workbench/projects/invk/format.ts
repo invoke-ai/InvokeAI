@@ -12,7 +12,18 @@
 
 export const INVK_EXTENSION = '.invk';
 export const INVK_MIME_TYPE = 'application/zip';
-export const INVK_VERSION = 3;
+
+/**
+ * Workbench projects are version 2 of this container; version 1 is the previous frontend's canvas
+ * project, which is refused by name.
+ *
+ * Board membership did not bump this. A version exists to tell a reader what it is allowed to
+ * assume about a file *someone else wrote*, and webv2 has not shipped — no v2 archive exists
+ * anywhere that predates `board.json`, so a version that distinguished them would describe a
+ * population of files with no members. An archive without the entry is still read (dev builds wrote
+ * some), and it means what its absence says: this file names no board.
+ */
+export const INVK_VERSION = 2;
 
 /** Fixed entry paths. `cover` varies by image format and is named in the manifest. */
 export const INVK_MANIFEST_ENTRY = 'manifest.json';
@@ -23,8 +34,8 @@ export const INVK_DOCUMENT_ENTRY = 'project.json';
  *
  * A project document only references the media it draws with. Everything else the project produced
  * — results generated but never placed on canvas — is on its board and named nowhere in the
- * document, so a reader has no way to infer it. Version 3 states it, which is what makes an `.invk`
- * the project's workspace rather than only its canvas.
+ * document, so a reader has no way to infer it. This entry states it, which is what makes an
+ * `.invk` the project's workspace rather than only its canvas.
  */
 export const INVK_BOARD_ENTRY = 'board.json';
 

@@ -69,7 +69,7 @@ export const assertMockBackendProfileName = (value) => {
 export const PROJECT_FILE_BOARD = Object.freeze({
   /** Generated, on the board, and drawn by the canvas: the overlap case. */
   referencedImage: 'fixture-image-0002.png',
-  /** Generated, on the board, referenced by nothing. Travels only because v3 enumerates the board. */
+  /** Generated, on the board, referenced by nothing. Travels only because the archive enumerates the board. */
   unreferencedImage: 'fixture-image-0005.png',
   /** An upload, filed under the `user` asset category. */
   userAsset: 'fixture-image-0006.png',

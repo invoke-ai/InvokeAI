@@ -284,7 +284,7 @@ const runRoundTrip = async ({ backend, browser, contexts, errors, tempDirectory 
   const bundledImages = Object.keys(entries).filter((name) => name.startsWith('images/'));
   const bundledVideos = Object.keys(entries).filter((name) => name.startsWith('videos/'));
 
-  assert.equal(manifest.version, 3);
+  assert.equal(manifest.version, 2);
   assert.equal(manifest.contents, 'workbench-project');
   assert.equal(archivedBoard.version, 1);
   assert.deepEqual(boardShape(archivedBoard.items), EXPECTED_BOARD_SHAPE);

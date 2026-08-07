@@ -18,7 +18,7 @@ const api = vi.hoisted(() => ({
   deleteClientStateValue: vi.fn(() => Promise.resolve()),
   getClientStateValue: vi.fn(() => Promise.resolve(null)),
   getProject: vi.fn(),
-  // Every export enumerates the project's board; an empty one is the v2-shaped default.
+  // Every export enumerates the project's board; most of these cases do not care what is on it.
   getProjectBoardSnapshot: vi.fn((): Promise<{ items: ProjectBoardItemDTO[] }> => Promise.resolve({ items: [] })),
   isProjectNotFoundError: (error: unknown) =>
     typeof error === 'object' && error !== null && 'status' in error && error.status === 404,
@@ -309,7 +309,7 @@ describe('what a transfer reports', () => {
 });
 
 /**
- * The v3 half: an archive carries the project's board, and importing it gives that board's media
+ * The board half: an archive carries the project's board, and importing it gives that board's media
  * new identities on a staging board the create then claims. Nothing here may reuse a name the
  * destination already holds — `board_images` keys on the image name, so a reused name would move a
  * stranger's picture onto this project's board instead of copying it.
@@ -454,7 +454,7 @@ describe('importing a project board', () => {
               contents: 'workbench-project',
               createdAt: '',
               name: 'No layout',
-              version: 3,
+              version: 2,
             })
           ),
         ],

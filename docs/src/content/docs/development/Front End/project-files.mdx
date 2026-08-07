@@ -6,7 +6,7 @@ Workbench projects export to a portable `.invk` archive. The feature lives in `i
 
 Import also accepts the `.invokeproject.json` envelope shipped by earlier webv2 builds. New exports use `.invk`; the JSON path remains read-only compatibility.
 
-`.invk` is shared with the previous frontend's [canvas projects](/development/front-end/canvas-projects/), which write version 1 of the same container. Workbench projects write version 3. The two are deliberately not interchangeable — see [Versions](#versions).
+`.invk` is shared with the previous frontend's [canvas projects](/development/front-end/canvas-projects/), which write version 1 of the same container. Workbench projects write version 2. The two are deliberately not interchangeable — see [Versions](#versions).
 
 ## Every project owns one board
 
@@ -19,16 +19,18 @@ The backend gives each project exactly one private board (`projects.board_id` is
 
 ## File format
 
-`.invk` files are ZIP archives. The current manifest version is `3`.
+`.invk` files are ZIP archives. The current manifest version is `2`.
 
 | Target                | Required | Description                                                                                                                              |
 | --------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | `manifest.json`       | yes      | Archive version, app version, creation timestamp, project name, and optionally the source project id and the cover entry's path.         |
 | `project.json`        | yes      | The whole project document — the same payload the backend stores as the project record's opaque `data`.                                  |
-| `board.json`          | v3       | The project board's visible contents as the exporting server enumerated them: `{version: 1, items: [{kind, category, name, starred}]}`.  |
+| `board.json`          | yes\*    | The project board's visible contents as the exporting server enumerated them: `{version: 1, items: [{kind, category, name, starred}]}`.  |
 | `cover.<ext>`         | no       | Thumbnail of the project's newest result. The extension varies by what the server served, so the entry path is recorded in the manifest. |
 | `images/<image_name>` | no       | Image bytes, keyed by the exact `image_name` the exporting server used.                                                                  |
 | `videos/<video_name>` | no       | Video bytes, keyed the same way.                                                                                                         |
+
+\* Every archive this app writes carries `board.json`. A reader still treats it as optional, because dev builds from before project boards wrote archives without it; its absence means "this file names no board", which is different from a board that was empty.
 
 Assets are filed by kind rather than pooled. Images and videos are separate backend namespaces with separate fetch and upload routes, so import has to know which an entry is before it can restore it — the folder states that, where a shared one would leave it to be guessed from a file extension. Adding `videos/` needed no version bump: `readInvkArchive` ignores entries it does not recognize, so a reader predating it reads such an archive and simply leaves those references dangling, exactly as it would for an absent image.
 
@@ -130,13 +132,15 @@ On import the cover prefers an image the restore already put on this server — 
 
 ## Versions
 
-Version 3 requires `board.json` and refuses an archive without it as `damaged`. Version 2 is still read and is deliberately *not* asked to carry board membership: an archive written before boards existed has no board to describe, and inventing an empty one for it would claim knowledge the file does not contain — so a v2 import restores its document references and lets the server create the new project an empty board. The archive's `board.json` carries its own `version: 1`, which is the *file's* version and not the API's: the snapshot endpoint returns `{items}` and nothing else, so neither format is pinned to the other.
+Adding `board.json` did **not** bump the manifest version. A version tells a reader what it may assume about a file *somebody else wrote*, and webv2 has not shipped — no archive exists anywhere that predates the entry except the ones dev builds produced, and those are read exactly as what they are: an archive that names no board, whose import restores document references and lets the server create the new project an empty board. Inventing an empty board for such a file would claim knowledge it does not contain, which is why "absent" and "empty" stay distinguishable in the reader.
+
+A malformed `board.json` is a different matter and is refused as `damaged`: half an enumeration is not a board. The entry carries its own `version: 1`, which is the *file's* version and not the API's — the snapshot endpoint returns `{items}` and nothing else, so neither format is pinned to the other.
 
 Manifests parse through a zod discriminated union on `version`, so a version 1 archive is recognized and refused _as what it is_ — `InvkFormatError` carries a `reason` (`legacy-canvas-project`, `unsupported-version`, `not-a-project`, `damaged`, `too-large`) that `describeProjectFileError()` maps to a translated string. There is no translation layer from legacy canvas state to `CanvasStateContractV2`.
 
 The legacy reader is the mirror image: it pins `version: 1` and refuses everything this app writes.
 
-Future format changes should add a new member to the union rather than widening version 3, so that every version this app has ever written can be named precisely when refused.
+Future format changes should add a new member to the union rather than widening version 2, so that every version this app has ever written can be named precisely when refused.
 
 ## Guards
 
