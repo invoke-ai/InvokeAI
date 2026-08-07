@@ -1,19 +1,39 @@
 import type { ModelConfig, ModelTaxonomyType } from '@features/models/react';
 import type { FieldInputTemplate } from '@features/workflow/contracts';
 
-import { createListCollection, HStack, Input, Switch, Text } from '@chakra-ui/react';
-import { galleryDestinations, type GalleryBoard } from '@features/gallery';
-import { getSelectedGalleryImageFromValues } from '@features/gallery/contracts';
+import { Box, createListCollection, HStack, Image, Input, Switch, Text } from '@chakra-ui/react';
+import { useDndContext, useDndMonitor, useDroppable, type DragEndEvent } from '@dnd-kit/core';
+import { galleryDestinations, galleryTransfers, type GalleryBoard } from '@features/gallery';
+import { getSelectedGalleryImageFromValues, getSelectedGalleryItemFromValues } from '@features/gallery/contracts';
+import { invalidateGallery } from '@features/gallery/queries';
+import { galleryImageUrls, galleryVideoUrls } from '@features/gallery/utility';
 import { SCHEDULER_OPTIONS } from '@features/generation/settings';
-import { useWorkflowProjectSelector } from '@features/workflow/ui/WorkflowUiContext';
+import {
+  getWorkflowMediaFieldDropId,
+  getWorkflowMediaFieldDropItem,
+  type WorkflowMediaKind,
+} from '@features/workflow/ui/fields/mediaFieldDnd';
+import { useWorkflowProjectSelector, useWorkflowUi } from '@features/workflow/ui/WorkflowUiContext';
 import {
   assertAccountScopeCurrent,
   captureAccountScope,
+  isAccountScopeCurrent,
   registerAccountOwnedResource,
   type AccountScope,
 } from '@platform/state/accountLifecycle';
-import { Button, ColorPicker, Combobox, formatHexColor, parseHexColor, ResizableTextarea, Select } from '@platform/ui';
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ChangeEvent } from 'react';
+import {
+  Button,
+  ColorPicker,
+  Combobox,
+  DropZone,
+  formatHexColor,
+  parseHexColor,
+  ResizableTextarea,
+  Select,
+  toaster,
+} from '@platform/ui';
+import { useQueryClient } from '@tanstack/react-query';
+import { lazy, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState, type ChangeEvent } from 'react';
 
 const ModelSelect = lazy(() => import('@features/models/react').then((module) => ({ default: module.ModelSelect })));
 const MODEL_SELECT_FALLBACK = (
@@ -23,6 +43,7 @@ const MODEL_SELECT_FALLBACK = (
 );
 
 export const getWorkflowSelectedGalleryImage = getSelectedGalleryImageFromValues;
+export const getWorkflowSelectedGalleryItem = getSelectedGalleryItemFromValues;
 
 /**
  * Direct-input controls for workflow fields, shared between the node editor
@@ -367,56 +388,243 @@ const BoardInput = ({ id, invalid, onChange, template, value }: WorkflowFieldInp
   );
 };
 
-const ImageInput = ({ invalid, onChange, value }: WorkflowFieldInputProps) => {
-  const gallerySelection = useWorkflowProjectSelector((project) =>
-    getWorkflowSelectedGalleryImage(project.galleryValues)
+const MEDIA_FIELD_CONFIG = {
+  image: {
+    fileAccept: 'image/*',
+    getThumbnailUrl: (name: string) => galleryImageUrls.thumbnail(name),
+    nameKey: 'image_name',
+    noun: 'image',
+  },
+  video: {
+    fileAccept: 'video/*',
+    getThumbnailUrl: (name: string) => galleryVideoUrls.thumbnail(name),
+    nameKey: 'video_name',
+    noun: 'video',
+  },
+} as const satisfies Record<
+  WorkflowMediaKind,
+  { fileAccept: string; getThumbnailUrl: (name: string) => string; nameKey: string; noun: string }
+>;
+
+const HIDDEN_FILE_INPUT_STYLE = { display: 'none' } as const;
+
+/**
+ * Direct input for `ImageField` / `VideoField`: shows the current item with a
+ * thumbnail, adopts the gallery selection, accepts a single-item gallery drag
+ * onto the row, and uploads a local file to the gallery's selected board.
+ */
+const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputProps & { kind: WorkflowMediaKind }) => {
+  const config = MEDIA_FIELD_CONFIG[kind];
+  const selectedGalleryItem = useWorkflowProjectSelector((project) =>
+    getWorkflowSelectedGalleryItem(project.galleryValues)
   );
-  const imageName =
-    typeof (value as { image_name?: unknown } | null)?.image_name === 'string'
-      ? (value as { image_name: string }).image_name
+  const gallerySelection = selectedGalleryItem?.kind === kind ? selectedGalleryItem : null;
+  const uploadBoardId = useWorkflowProjectSelector((project) =>
+    typeof project.galleryValues.selectedBoardId === 'string' ? project.galleryValues.selectedBoardId : 'none'
+  );
+  const mediaName =
+    typeof (value as Record<string, unknown> | null | undefined)?.[config.nameKey] === 'string'
+      ? ((value as Record<string, string>)[config.nameKey] ?? null)
       : null;
   const invalidAriaProps = useMemo(() => (invalid ? { 'aria-invalid': true } : {}), [invalid]);
+
+  // dnd: the whole input row is a drop target for a single gallery item of the
+  // matching kind. The instance-unique suffix keeps ids distinct when the node
+  // editor and the Linear UI panel render the same field at once.
+  const instanceId = useId();
+  const dropId = getWorkflowMediaFieldDropId(`${id ?? 'field'}:${instanceId}`);
+  const { active } = useDndContext();
+  const acceptsActiveDrag = getWorkflowMediaFieldDropItem(active?.data.current, kind) !== null;
+  const { isOver, setNodeRef } = useDroppable({ disabled: !acceptsActiveDrag, id: dropId });
+  const onDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      if (event.over?.id !== dropId) {
+        return;
+      }
+
+      const item = getWorkflowMediaFieldDropItem(event.active.data.current, kind);
+
+      if (item) {
+        onChange({ [config.nameKey]: item.name });
+      }
+    },
+    [config.nameKey, dropId, kind, onChange]
+  );
+
+  useDndMonitor({ onDragEnd });
+
+  // Upload: file picker -> gallery upload -> adopt the uploaded item. The
+  // adoption is pinned to this widget instance AND the project it started in:
+  // `onChange` dispatches into the *active* project, so a completion arriving
+  // after a project switch (or after this node was deleted, which unmounts the
+  // widget) must not be applied - the upload itself still succeeded, so the
+  // gallery is refreshed and the user is pointed there instead.
+  const { project } = useWorkflowUi();
+  const queryClient = useQueryClient();
+  const isMountedRef = useRef(true);
+
+  useEffect(
+    () => () => {
+      isMountedRef.current = false;
+    },
+    []
+  );
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const onUploadClick = useCallback(() => fileInputRef.current?.click(), []);
+  const onFileChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.currentTarget.files?.[0];
+
+      // Reset so picking the same file again re-fires the change event.
+      event.currentTarget.value = '';
+
+      if (!file) {
+        return;
+      }
+
+      // `accept` on the input is advisory only ("All Files" bypasses it); an
+      // unknown type (empty string) is left for the server to judge.
+      if (file.type && !file.type.startsWith(`${kind}/`)) {
+        toaster.create({ title: `Please choose a ${config.noun} file`, type: 'error' });
+
+        return;
+      }
+
+      const owner = captureAccountScope();
+      const projectId = project.getSnapshot().id;
+
+      setIsUploading(true);
+      void (async () => {
+        try {
+          const name =
+            kind === 'image'
+              ? (await galleryTransfers.upload(file, uploadBoardId, { signal: owner.signal })).imageName
+              : (await galleryTransfers.uploadVideo(file, uploadBoardId, { signal: owner.signal })).name;
+
+          assertAccountScopeCurrent(owner);
+          void invalidateGallery(queryClient, owner);
+
+          if (isMountedRef.current && project.getSnapshot().id === projectId) {
+            onChange({ [config.nameKey]: name });
+          } else {
+            toaster.create({
+              description: `The workflow changed while ${name} uploaded - find it in the gallery.`,
+              title: 'Upload finished',
+              type: 'info',
+            });
+          }
+        } catch {
+          if (isAccountScopeCurrent(owner)) {
+            toaster.create({ title: `Failed to upload ${config.noun}`, type: 'error' });
+          }
+        } finally {
+          if (isAccountScopeCurrent(owner) && isMountedRef.current) {
+            setIsUploading(false);
+          }
+        }
+      })();
+    },
+    [config.nameKey, config.noun, kind, onChange, project, queryClient, uploadBoardId]
+  );
+
   const onUseGallerySelectionClick = useCallback(() => {
     if (gallerySelection) {
-      onChange({ image_name: gallerySelection.imageName });
+      onChange({ [config.nameKey]: gallerySelection.name });
     }
-  }, [gallerySelection, onChange]);
+  }, [config.nameKey, gallerySelection, onChange]);
   const onClearClick = useCallback(() => onChange(undefined), [onChange]);
 
+  // A stale value (media deleted since the workflow was saved) 404s the
+  // thumbnail; hide the broken-image glyph and keep showing the name. A new
+  // value retries.
+  const [failedThumbnail, setFailedThumbnail] = useState<string | null>(null);
+  const onThumbnailError = useCallback(() => setFailedThumbnail(mediaName), [mediaName]);
+
   return (
-    <HStack
-      boxShadow={invalid ? '0 0 0 1px {colors.red.solid}' : undefined}
-      gap="1.5"
-      minW="0"
-      rounded="sm"
-      w="full"
-      {...invalidAriaProps}
-    >
-      {imageName ? (
-        <Text color="fg.muted" flex="1" fontSize="2xs" minW="0" title={imageName} truncate>
-          {imageName}
-        </Text>
-      ) : (
-        <Text color="fg.subtle" flex="1" fontSize="2xs">
-          No image set
-        </Text>
-      )}
-      <Button
-        className="nodrag"
-        disabled={!gallerySelection}
-        size="2xs"
-        title={gallerySelection ? `Use ${gallerySelection.imageName}` : 'Select an image in the Gallery first.'}
-        variant="outline"
-        onClick={onUseGallerySelectionClick}
+    <Box ref={setNodeRef} position="relative" w="full">
+      <HStack
+        boxShadow={invalid ? '0 0 0 1px {colors.red.solid}' : undefined}
+        gap="1.5"
+        minW="0"
+        rounded="sm"
+        w="full"
+        {...invalidAriaProps}
       >
-        Use gallery selection
-      </Button>
-      {imageName ? (
-        <Button className="nodrag" size="2xs" variant="ghost" onClick={onClearClick}>
-          Clear
+        {mediaName ? (
+          <>
+            {failedThumbnail !== mediaName ? (
+              <Image
+                alt=""
+                boxSize="6"
+                flexShrink={0}
+                objectFit="cover"
+                rounded="xs"
+                src={config.getThumbnailUrl(mediaName)}
+                onError={onThumbnailError}
+              />
+            ) : null}
+            <Text color="fg.muted" flex="1" fontSize="2xs" minW="0" title={mediaName} truncate>
+              {mediaName}
+            </Text>
+          </>
+        ) : (
+          <Text color="fg.subtle" flex="1" fontSize="2xs">
+            {`No ${config.noun} set`}
+          </Text>
+        )}
+        <Button
+          className="nodrag"
+          disabled={!gallerySelection}
+          size="2xs"
+          title={gallerySelection ? `Use ${gallerySelection.name}` : `Select a ${config.noun} in the Gallery first.`}
+          variant="outline"
+          onClick={onUseGallerySelectionClick}
+        >
+          Use gallery selection
         </Button>
+        <Button
+          className="nodrag"
+          disabled={isUploading}
+          size="2xs"
+          title={`Upload a ${config.noun} and use it here`}
+          variant="outline"
+          onClick={onUploadClick}
+        >
+          {isUploading ? 'Uploading…' : 'Upload'}
+        </Button>
+        {mediaName ? (
+          <Button className="nodrag" size="2xs" variant="ghost" onClick={onClearClick}>
+            Clear
+          </Button>
+        ) : null}
+        <input
+          ref={fileInputRef}
+          accept={config.fileAccept}
+          aria-label={`Upload ${config.noun} file`}
+          style={HIDDEN_FILE_INPUT_STYLE}
+          type="file"
+          onChange={onFileChange}
+        />
+      </HStack>
+      {acceptsActiveDrag ? (
+        <DropZone
+          alignItems="center"
+          display="flex"
+          inset="0"
+          isOver={isOver}
+          justifyContent="center"
+          pointerEvents="none"
+          position="absolute"
+          variant="overlay"
+        >
+          <Text fontSize="2xs" fontWeight="700">
+            {`Drop ${config.noun}`}
+          </Text>
+        </DropZone>
       ) : null}
-    </HStack>
+    </Box>
   );
 };
 
@@ -458,7 +666,24 @@ const ColorInput = ({ invalid, onChange, value }: WorkflowFieldInputProps) => {
   );
 };
 
+const CONNECTION_ONLY_FALLBACK = (
+  <Text color="fg.subtle" fontSize="2xs">
+    Connection only
+  </Text>
+);
+
 export const WorkflowFieldInput = (props: WorkflowFieldInputProps) => {
+  // COLLECTION media fields (e.g. Concatenate Videos' list input) hold arrays;
+  // the single-value media widget would write a bare object into them. The
+  // node editor never shows a control for COLLECTION fields, but linear-form
+  // elements migrated from legacy `exposedFields` can reach here directly.
+  if (
+    (props.template.type.name === 'ImageField' || props.template.type.name === 'VideoField') &&
+    props.template.type.cardinality === 'COLLECTION'
+  ) {
+    return CONNECTION_ONLY_FALLBACK;
+  }
+
   switch (props.template.type.name) {
     case 'StringField':
       return <StringInput {...props} />;
@@ -476,14 +701,12 @@ export const WorkflowFieldInput = (props: WorkflowFieldInputProps) => {
     case 'BoardField':
       return <BoardInput {...props} />;
     case 'ImageField':
-      return <ImageInput {...props} />;
+      return <MediaInput {...props} kind="image" />;
+    case 'VideoField':
+      return <MediaInput {...props} kind="video" />;
     case 'ColorField':
       return <ColorInput {...props} />;
     default:
-      return (
-        <Text color="fg.subtle" fontSize="2xs">
-          Connection only
-        </Text>
-      );
+      return CONNECTION_ONLY_FALLBACK;
   }
 };
