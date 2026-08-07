@@ -9,10 +9,12 @@ import { createExternalStore } from '@platform/state/externalStore';
 import { createSingleFlight } from '@platform/state/singleFlight';
 import { normalizeServerTimestamp } from '@platform/time/serverTimestamp';
 
+import type { ProjectTransferIssues } from './invk/transfer';
+
 import {
-  createProject as apiCreateProject,
   deleteProject as apiDeleteProject,
   getProject as apiGetProject,
+  getProjectBoardSnapshot,
   listProjects,
   updateProject as apiUpdateProject,
   type ProjectRecordDTO,
@@ -23,9 +25,9 @@ import {
   getProjectCoverImageName,
   getProjectCoverUrl,
   loadProjectCovers,
+  recordProjectCover,
   subscribeProjectCovers,
 } from './covers';
-import { createProjectId } from './ids';
 import { refreshOpenProjects } from './openProjects';
 import { pruneSessionProject } from './session';
 import { getOpenProject } from './syncStore';
@@ -278,24 +280,41 @@ export const adoptCreatedProject = (record: ProjectRecordDTO, owner: AccountScop
   return summary;
 };
 
-/** Copy a project under a fresh id; returns the new summary. */
-export const duplicateLibraryProject = async (projectId: string): Promise<ProjectSummary> => {
+export interface DuplicatedProject extends ProjectTransferIssues {
+  summary: ProjectSummary;
+}
+
+/**
+ * Copy a project, its board and everything on it, under a fresh id.
+ *
+ * The board is enumerated before anything is created, and a failure to enumerate it aborts: a copy
+ * whose board came back silently empty would look like a successful duplication of a project that
+ * had produced nothing. The copying itself lives behind the lazy `invk/` boundary with import's
+ * restore engine, which it shares — this is where the two directions meet, not a second
+ * implementation of them.
+ */
+export const duplicateLibraryProject = async (projectId: string): Promise<DuplicatedProject> => {
   const owner = captureAccountScope();
   const record = await readProjectForDuplication(projectId, owner);
 
   assertAccountScopeCurrent(owner);
-  const newId = createProjectId();
-  const name = `${record.name} copy`;
-  const created = await apiCreateProject(
-    {
-      data: { ...record.data, id: newId, name },
-      name,
-      project_id: newId,
-    },
-    owner.signal
-  );
+
+  const snapshot = await getProjectBoardSnapshot(projectId, owner.signal);
 
   assertAccountScopeCurrent(owner);
 
-  return adoptCreatedProject(created, owner);
+  const { duplicateProjectRecord } = await import('./invk/duplicateProject');
+  const duplicated = await duplicateProjectRecord({ boardItems: snapshot.items, owner, record });
+
+  assertAccountScopeCurrent(owner);
+
+  if (duplicated.coverImageName) {
+    recordProjectCover(duplicated.record.project_id, duplicated.coverImageName, owner);
+  }
+
+  return {
+    boardItemIssues: duplicated.boardItemIssues,
+    documentReferenceIssues: duplicated.documentReferenceIssues,
+    summary: adoptCreatedProject(duplicated.record, owner),
+  };
 };

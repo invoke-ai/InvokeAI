@@ -553,6 +553,77 @@ export const uploadBoardVideo = async (
   return { videoName: dto.video_name };
 };
 
+/** One copy the server made, under the identity it assigned. */
+export interface CopiedMedia {
+  name: string;
+  sourceName: string;
+}
+
+export interface CopyMediaResult {
+  /** Source names the server would not copy. Reported per name, never fatal for the batch. */
+  failed: string[];
+  copied: CopiedMedia[];
+}
+
+/**
+ * Copy media onto a board without the bytes leaving the server.
+ *
+ * Duplication needs new identities for the same reason import does — `board_images` keys on the
+ * image name — but both projects live on this one server, so round-tripping the pixels through the
+ * browser would cost twice the board's size in traffic, two requests per item, and would run into
+ * the same cumulative budget that bounds an export. The endpoint carries category, origin and the
+ * metadata embedded in the PNG; starring is not part of a copy, so callers star afterwards through
+ * the same path an import uses.
+ */
+export const copyImagesToBoard = async (
+  imageNames: readonly string[],
+  boardId: string,
+  signal?: AbortSignal
+): Promise<CopyMediaResult> => {
+  if (imageNames.length === 0) {
+    return { copied: [], failed: [] };
+  }
+
+  const body = await apiFetchJson<{
+    copied?: { image_name: string; source_image_name: string }[];
+    failed?: string[];
+  }>(`${IMAGES_BASE}/copy`, {
+    body: JSON.stringify({ board_id: boardId, image_names: imageNames }),
+    method: 'POST',
+    signal,
+  });
+
+  return {
+    copied: (body.copied ?? []).map((entry) => ({ name: entry.image_name, sourceName: entry.source_image_name })),
+    failed: body.failed ?? [],
+  };
+};
+
+/** The same, for videos. */
+export const copyVideosToBoard = async (
+  videoNames: readonly string[],
+  boardId: string,
+  signal?: AbortSignal
+): Promise<CopyMediaResult> => {
+  if (videoNames.length === 0) {
+    return { copied: [], failed: [] };
+  }
+
+  const body = await apiFetchJson<{
+    copied?: { source_video_name: string; video_name: string }[];
+    failed?: string[];
+  }>(`${VIDEOS_BASE}/copy`, {
+    body: JSON.stringify({ board_id: boardId, video_names: videoNames }),
+    method: 'POST',
+    signal,
+  });
+
+  return {
+    copied: (body.copied ?? []).map((entry) => ({ name: entry.video_name, sourceName: entry.source_video_name })),
+    failed: body.failed ?? [],
+  };
+};
+
 /** Names the server would not star, out of the names asked for. */
 export interface BulkStarResult {
   failed: string[];

@@ -16,12 +16,17 @@ const api = vi.hoisted(() => ({
   deleteProject: vi.fn(),
   getClientStateValue: vi.fn(() => Promise.resolve<string | null>(null)),
   getProject: vi.fn(),
+  getProjectBoardSnapshot: vi.fn(),
   listProjects: vi.fn(),
   setClientStateValue: vi.fn(() => Promise.resolve()),
   updateProject: vi.fn(),
 }));
 
+/** The copying itself is `duplicateProject`'s own test; this file owns the library's part of it. */
+const duplication = vi.hoisted(() => ({ duplicateProjectRecord: vi.fn() }));
+
 vi.mock('./api', () => api);
+vi.mock('./invk/duplicateProject', () => duplication);
 
 let library: typeof libraryModule;
 let syncStore: typeof syncStoreModule;
@@ -46,6 +51,9 @@ beforeEach(async () => {
   api.getClientStateValue.mockResolvedValue(null);
   api.setClientStateValue.mockReset();
   api.setClientStateValue.mockResolvedValue(undefined);
+  api.getProjectBoardSnapshot.mockReset();
+  api.getProjectBoardSnapshot.mockResolvedValue({ items: [] });
+  duplication.duplicateProjectRecord.mockReset();
 
   library = await import('./library');
   syncStore = await import('./syncStore');
@@ -262,23 +270,43 @@ describe('library mutations', () => {
     expect(calls).toEqual(['flush', 'get']);
   });
 
-  it('duplicateLibraryProject copies under a fresh id', async () => {
+  it('duplicates through the shared restore engine and adopts the copy', async () => {
     api.getProject.mockResolvedValue({
       ...summaryDto('source', 'Source', '2026-06-10 10:00:00.000'),
       data: { id: 'source', layout: {}, name: 'Source' },
     });
-    api.createProject.mockImplementation((request: { project_id?: string; name: string }) =>
-      Promise.resolve({ ...summaryDto(request.project_id ?? '', request.name, '2026-06-10 11:00:00.000'), data: {} })
-    );
+    api.getProjectBoardSnapshot.mockResolvedValue({
+      items: [{ category: 'general', kind: 'image', name: 'on-board.png', starred: false }],
+    });
+    duplication.duplicateProjectRecord.mockResolvedValue({
+      boardItemIssues: [{ kind: 'image', name: 'lost.png', reason: 'upload-failed' }],
+      coverImageName: null,
+      documentReferenceIssues: [],
+      record: { ...summaryDto('copy-id', 'Source copy', '2026-06-10 11:00:00.000'), data: {} },
+    });
 
-    const copy = await library.duplicateLibraryProject('source');
+    const duplicated = await library.duplicateLibraryProject('source');
 
-    expect(copy.id).not.toBe('source');
-    expect(copy.name).toBe('Source copy');
+    // The board is enumerated before anything is created: a copy whose board came back silently
+    // empty would look like a faithful duplication of a project that had produced nothing.
+    expect(api.getProjectBoardSnapshot).toHaveBeenCalledWith('source', expect.any(AbortSignal));
+    expect(duplication.duplicateProjectRecord.mock.calls[0]?.[0]).toMatchObject({
+      boardItems: [{ name: 'on-board.png' }],
+      record: { project_id: 'source' },
+    });
+    expect(duplicated.summary.id).toBe('copy-id');
+    expect(duplicated.boardItemIssues).toHaveLength(1);
+    expect(library.getProjectLibrary().summaries[0]?.name).toBe('Source copy');
+  });
 
-    const createRequest = api.createProject.mock.calls[0][0] as { data: Record<string, unknown>; project_id: string };
+  it('does not create anything when the board cannot be enumerated', async () => {
+    api.getProject.mockResolvedValue({
+      ...summaryDto('source', 'Source', '2026-06-10 10:00:00.000'),
+      data: { id: 'source', layout: {}, name: 'Source' },
+    });
+    api.getProjectBoardSnapshot.mockRejectedValue(new Error('snapshot unavailable'));
 
-    expect(createRequest.data.id).toBe(createRequest.project_id);
-    expect(createRequest.data.name).toBe('Source copy');
+    await expect(library.duplicateLibraryProject('source')).rejects.toThrow('snapshot unavailable');
+    expect(duplication.duplicateProjectRecord).not.toHaveBeenCalled();
   });
 });

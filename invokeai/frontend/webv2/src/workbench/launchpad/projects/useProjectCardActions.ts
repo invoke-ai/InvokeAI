@@ -47,12 +47,24 @@ export const useProjectCardActions = (summary: ProjectSummary): ProjectCardActio
 
   const duplicate = useCallback(async () => {
     try {
-      const copy = await duplicateLibraryProject(summary.id);
+      const { boardItemIssues, documentReferenceIssues, summary: copy } = await duplicateLibraryProject(summary.id);
+      // A copy that lost part of its board is not a failure — the project exists and opens — but it
+      // is not a plain success either, and the two counts mean different things: a missing board
+      // item is a result still findable elsewhere, a missing reference is a hole in the canvas.
+      const lost = [
+        ...(boardItemIssues.length === 0
+          ? []
+          : [t('projects.file.missingBoardItems', { count: boardItemIssues.length })]),
+        ...(documentReferenceIssues.length === 0
+          ? []
+          : [t('projects.file.missingReferences', { count: documentReferenceIssues.length })]),
+      ];
 
       toaster.create({
-        description: t('projects.projectDuplicatedDescription', { name: copy.name }),
+        description:
+          lost.length === 0 ? t('projects.projectDuplicatedDescription', { name: copy.name }) : lost.join(' '),
         title: t('projects.projectDuplicated'),
-        type: 'success',
+        type: lost.length === 0 ? 'success' : 'warning',
       });
     } catch (error) {
       toaster.create({
