@@ -94,6 +94,25 @@ const EXISTENCE_BATCH_CONCURRENCY = INVK_TRANSFER_CONCURRENCY;
 const VIDEO_EXISTENCE_CONCURRENCY = INVK_TRANSFER_CONCURRENCY;
 
 /**
+ * Maximum names accepted by the backend's synchronous media batch routes.
+ *
+ * This is deliberately smaller than the archive's entry ceiling: archive size bounds a complete
+ * transfer, while this bounds one unit of server work. Every adapter below owns the split so callers
+ * can reason in project-sized lists without learning transport limits.
+ */
+const MEDIA_REQUEST_BATCH_SIZE = 1_000;
+
+const toBatches = <T>(items: readonly T[], size: number): T[][] => {
+  const batches: T[][] = [];
+
+  for (let offset = 0; offset < items.length; offset += size) {
+    batches.push(items.slice(offset, offset + size));
+  }
+
+  return batches;
+};
+
+/**
  * Let go of a response whose body this module is not going to read.
  *
  * `apiFetchRaw` hands back the response untouched, so a skipped asset or an existence probe leaves
@@ -610,6 +629,61 @@ export interface CopyMediaResult {
   copied: CopiedMedia[];
 }
 
+interface CopyMediaRequest<Entry> {
+  boardId: string;
+  endpoint: string;
+  names: readonly string[];
+  requestKey: 'image_names' | 'video_names';
+  signal?: AbortSignal;
+  toCopiedMedia: (entry: Entry) => CopiedMedia;
+}
+
+/** Enforce the synchronous-route ceiling once for every server-side copy transport. */
+const copyMediaToBoard = async <Entry>({
+  boardId,
+  endpoint,
+  names,
+  requestKey,
+  signal,
+  toCopiedMedia,
+}: CopyMediaRequest<Entry>): Promise<CopyMediaResult> => {
+  const result: CopyMediaResult = { copied: [], failed: [] };
+  const batches = toBatches(names, MEDIA_REQUEST_BATCH_SIZE);
+
+  for (let batchIndex = 0; batchIndex < batches.length; batchIndex += 1) {
+    const batch = batches[batchIndex]!;
+    if (signal?.aborted) {
+      result.failed.push(...batches.slice(batchIndex).flat());
+      break;
+    }
+
+    try {
+      // Do not abort an in-flight copy request. The server performs synchronous work and may have
+      // created identities even after the browser disconnects; retaining its response is the only
+      // way the restore ledger can remove them. Cancellation is honored between bounded requests.
+      const body = await apiFetchJson<{ copied?: Entry[]; failed?: string[] }>(endpoint, {
+        body: JSON.stringify({ board_id: boardId, [requestKey]: batch }),
+        method: 'POST',
+      });
+
+      result.copied.push(...(body.copied ?? []).map(toCopiedMedia));
+      result.failed.push(...(body.failed ?? []));
+    } catch (error) {
+      if (isRequestCancellation(error)) {
+        throw error;
+      }
+      result.failed.push(...batch);
+    }
+
+    if (signal?.aborted) {
+      result.failed.push(...batches.slice(batchIndex + 1).flat());
+      break;
+    }
+  }
+
+  return result;
+};
+
 /**
  * Copy media onto a board without the bytes leaving the server.
  *
@@ -620,54 +694,34 @@ export interface CopyMediaResult {
  * metadata embedded in the PNG; starring is not part of a copy, so callers star afterwards through
  * the same path an import uses.
  */
-export const copyImagesToBoard = async (
+export const copyImagesToBoard = (
   imageNames: readonly string[],
   boardId: string,
   signal?: AbortSignal
-): Promise<CopyMediaResult> => {
-  if (imageNames.length === 0) {
-    return { copied: [], failed: [] };
-  }
-
-  const body = await apiFetchJson<{
-    copied?: { image_name: string; source_image_name: string }[];
-    failed?: string[];
-  }>(`${IMAGES_BASE}/copy`, {
-    body: JSON.stringify({ board_id: boardId, image_names: imageNames }),
-    method: 'POST',
+): Promise<CopyMediaResult> =>
+  copyMediaToBoard<{ image_name: string; source_image_name: string }>({
+    boardId,
+    endpoint: `${IMAGES_BASE}/copy`,
+    names: imageNames,
+    requestKey: 'image_names',
     signal,
+    toCopiedMedia: (entry) => ({ name: entry.image_name, sourceName: entry.source_image_name }),
   });
 
-  return {
-    copied: (body.copied ?? []).map((entry) => ({ name: entry.image_name, sourceName: entry.source_image_name })),
-    failed: body.failed ?? [],
-  };
-};
-
 /** The same, for videos. */
-export const copyVideosToBoard = async (
+export const copyVideosToBoard = (
   videoNames: readonly string[],
   boardId: string,
   signal?: AbortSignal
-): Promise<CopyMediaResult> => {
-  if (videoNames.length === 0) {
-    return { copied: [], failed: [] };
-  }
-
-  const body = await apiFetchJson<{
-    copied?: { source_video_name: string; video_name: string }[];
-    failed?: string[];
-  }>(`${VIDEOS_BASE}/copy`, {
-    body: JSON.stringify({ board_id: boardId, video_names: videoNames }),
-    method: 'POST',
+): Promise<CopyMediaResult> =>
+  copyMediaToBoard<{ source_video_name: string; video_name: string }>({
+    boardId,
+    endpoint: `${VIDEOS_BASE}/copy`,
+    names: videoNames,
+    requestKey: 'video_names',
     signal,
+    toCopiedMedia: (entry) => ({ name: entry.video_name, sourceName: entry.source_video_name }),
   });
-
-  return {
-    copied: (body.copied ?? []).map((entry) => ({ name: entry.video_name, sourceName: entry.source_video_name })),
-    failed: body.failed ?? [],
-  };
-};
 
 /** Names the server would not star, out of the names asked for. */
 export interface BulkStarResult {
@@ -711,13 +765,26 @@ export const starVideos = async (videoNames: readonly string[], signal?: AbortSi
     return { failed: [] };
   }
 
-  const body = await apiFetchJson<{ starred_videos?: string[] }>(`${VIDEOS_BASE}/star`, {
-    body: JSON.stringify({ video_names: videoNames }),
-    method: 'POST',
-    signal,
-  });
+  const failed: string[] = [];
 
-  return toBulkStarResult(videoNames, body.starred_videos ?? []);
+  for (const batch of toBatches(videoNames, MEDIA_REQUEST_BATCH_SIZE)) {
+    try {
+      const body = await apiFetchJson<{ starred_videos?: string[] }>(`${VIDEOS_BASE}/star`, {
+        body: JSON.stringify({ video_names: batch }),
+        method: 'POST',
+        signal,
+      });
+
+      failed.push(...toBulkStarResult(batch, body.starred_videos ?? []).failed);
+    } catch (error) {
+      if (isRequestCancellation(error)) {
+        throw error;
+      }
+      failed.push(...batch);
+    }
+  }
+
+  return { failed };
 };
 
 /**
@@ -775,11 +842,28 @@ export const deleteArchiveVideos = async (videoNames: string[], signal?: AbortSi
     return;
   }
 
-  await apiFetchJson<unknown>(`${VIDEOS_BASE}/delete`, {
-    body: JSON.stringify({ video_names: videoNames }),
-    method: 'POST',
-    signal,
-  });
+  let firstError: unknown = null;
+
+  for (const batch of toBatches(videoNames, MEDIA_REQUEST_BATCH_SIZE)) {
+    try {
+      await apiFetchJson<unknown>(`${VIDEOS_BASE}/delete`, {
+        body: JSON.stringify({ video_names: batch }),
+        method: 'POST',
+        signal,
+      });
+    } catch (error) {
+      if (isRequestCancellation(error)) {
+        throw error;
+      }
+      firstError ??= error;
+    }
+  }
+
+  if (firstError !== null) {
+    throw firstError instanceof Error
+      ? firstError
+      : new Error('One or more video cleanup requests failed.', { cause: firstError });
+  }
 };
 
 const EXTENSION_BY_MIME: Readonly<Record<string, string>> = {

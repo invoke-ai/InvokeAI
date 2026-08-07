@@ -15,7 +15,7 @@ import {
   createProject as apiCreateProject,
   getProject as apiGetProject,
   getProjectBoardSnapshot,
-  isProjectNotFoundError,
+  isProjectConfirmedAbsent,
   type ProjectRecordDTO,
 } from './api';
 import { recordProjectCover } from './covers';
@@ -154,17 +154,6 @@ const readProjectDocument = async (file: File) => {
   const { readInvkArchive } = await import('./invk/importProject');
 
   return { contents: await readInvkArchive(file), format: 'invk' as const };
-};
-
-/** A rejected create is safe to clean up only when its client-chosen id is confirmed absent. */
-const isProjectConfirmedAbsent = async (projectId: string, owner: AccountScope): Promise<boolean> => {
-  try {
-    await apiGetProject(projectId, owner.signal);
-
-    return false;
-  } catch (error) {
-    return isAccountScopeCurrent(owner) && isProjectNotFoundError(error);
-  }
 };
 
 const exportProjectDocument = async (

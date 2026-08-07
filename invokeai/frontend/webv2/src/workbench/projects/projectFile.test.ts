@@ -2,6 +2,7 @@ import { createDraftProject } from '@workbench/workbenchState';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ProjectBoardItemDTO } from './api';
+import type * as apiModule from './api';
 import type * as coversModule from './covers';
 import type * as assetTransportModule from './invk/assetTransport';
 import type * as projectFileModule from './projectFile';
@@ -21,6 +22,7 @@ const api = vi.hoisted(() => ({
   getProject: vi.fn(),
   // Every export enumerates the project's board; most of these cases do not care what is on it.
   getProjectBoardSnapshot: vi.fn((): Promise<{ items: ProjectBoardItemDTO[] }> => Promise.resolve({ items: [] })),
+  isProjectConfirmedAbsent: vi.fn(),
   isProjectNotFoundError: (error: unknown) =>
     typeof error === 'object' && error !== null && 'status' in error && error.status === 404,
   setClientStateValue: vi.fn(() => Promise.resolve()),
@@ -70,7 +72,10 @@ const transport = vi.hoisted(() => ({
   ),
 }));
 
-vi.mock('./api', () => api);
+vi.mock('./api', async (importOriginal) => ({
+  ...(await importOriginal<typeof apiModule>()),
+  ...api,
+}));
 vi.mock('./covers', async (importOriginal) => ({
   ...(await importOriginal<typeof coversModule>()),
   recordProjectCover: covers.recordProjectCover,
@@ -530,7 +535,6 @@ describe('importing a project board', () => {
   });
 
   it('deletes the media it created and then the staging board when the create fails', async () => {
-    const { ApiError } = await import('@platform/transport/http');
     const account = await import('@platform/state/accountLifecycle');
     const primaryFailure = new Error('project create rejected');
 
@@ -539,7 +543,7 @@ describe('importing a project board', () => {
     const archive = await exportedBoardArchive();
 
     api.createProject.mockRejectedValue(primaryFailure);
-    api.getProject.mockRejectedValueOnce(new ApiError('not found', 404));
+    api.isProjectConfirmedAbsent.mockResolvedValueOnce(true);
 
     await expect(projectFile.importProjectFile(archive)).rejects.toBe(primaryFailure);
 
@@ -561,15 +565,7 @@ describe('importing a project board', () => {
     const archive = await exportedBoardArchive();
 
     api.createProject.mockRejectedValue(primaryFailure);
-    api.getProject.mockResolvedValue({
-      board_id: 'staging-board',
-      created_at: '2026-06-10 10:00:00.000',
-      data: {},
-      name: 'Board project',
-      project_id: 'committed',
-      revision: 1,
-      updated_at: '2026-06-10 10:00:00.000',
-    });
+    api.isProjectConfirmedAbsent.mockResolvedValueOnce(false);
 
     await expect(projectFile.importProjectFile(archive)).rejects.toBe(primaryFailure);
 
@@ -840,13 +836,12 @@ describe('importProjectFile', () => {
 
   it('rolls back every authoritative uploaded identity when project creation fails without hiding that failure', async () => {
     const account = await import('@platform/state/accountLifecycle');
-    const { ApiError } = await import('@platform/transport/http');
     const primaryFailure = new Error('project create rejected');
 
     account.accountLifecycle.activate('rollback-user');
     await projectFile.exportOpenProject(projectWithRestorableAssets());
     api.createProject.mockRejectedValue(primaryFailure);
-    api.getProject.mockRejectedValueOnce(new ApiError('not found', 404));
+    api.isProjectConfirmedAbsent.mockResolvedValueOnce(true);
     transport.deleteArchiveImages.mockRejectedValueOnce(new Error('image cleanup failed'));
     transport.deleteArchiveVideos.mockRejectedValueOnce(new Error('video cleanup failed'));
 
@@ -864,14 +859,7 @@ describe('importProjectFile', () => {
     account.accountLifecycle.activate('ambiguous-response-user');
     await projectFile.exportOpenProject(projectWithRestorableAssets(false));
     api.createProject.mockRejectedValue(primaryFailure);
-    api.getProject.mockResolvedValue({
-      created_at: '2026-06-10 10:00:00.000',
-      data: {},
-      name: 'Committed project',
-      project_id: 'committed-project',
-      revision: 1,
-      updated_at: '2026-06-10 10:00:00.000',
-    });
+    api.isProjectConfirmedAbsent.mockResolvedValueOnce(false);
 
     await expect(projectFile.importProjectFile(capturedArchive())).rejects.toBe(primaryFailure);
 

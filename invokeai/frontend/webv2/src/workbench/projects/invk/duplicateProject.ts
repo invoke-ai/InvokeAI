@@ -1,11 +1,7 @@
 import type { ProjectBoardItemDTO, ProjectRecordDTO } from '@workbench/projects/api';
 
 import { type AccountScope, assertAccountScopeCurrent, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
-import {
-  createProject as apiCreateProject,
-  getProject as apiGetProject,
-  isProjectNotFoundError,
-} from '@workbench/projects/api';
+import { createProject as apiCreateProject, isProjectConfirmedAbsent } from '@workbench/projects/api';
 import { createProjectId } from '@workbench/projects/ids';
 import {
   collectLiveAssetRefs,
@@ -70,11 +66,12 @@ export interface DuplicateProjectResult extends ProjectTransferIssues {
 }
 
 /**
- * The duplication half of the materialization seam: one request per kind, and the pixels stay put.
+ * The duplication half of the materialization seam: one bounded request sequence per kind, and the
+ * pixels stay put.
  *
- * Progress moves per item once each batch answers rather than during it. The copy is a single
- * server-side request per kind, so there is no finer truth to report — and unlike an import, there
- * is no upload to sit and watch.
+ * Progress moves per item once the sequence answers rather than during it. Each request is a
+ * synchronous server-side copy capped by the transport, so there is no finer event to report — and
+ * unlike an import, there is no browser upload to sit and watch.
  *
  * A batch that does not answer at all — a proxy timing out a large board — is every name in it
  * failing, not the duplication failing. The route reports per-item failures precisely so one bad
@@ -119,17 +116,6 @@ export const createCopyMediaMaterializer = (
       ],
     };
   };
-};
-
-/** A rejected create is safe to clean up only when its client-chosen id is confirmed absent. */
-const isProjectConfirmedAbsent = async (projectId: string, owner: AccountScope): Promise<boolean> => {
-  try {
-    await apiGetProject(projectId, owner.signal);
-
-    return false;
-  } catch (error) {
-    return isAccountScopeCurrent(owner) && isProjectNotFoundError(error);
-  }
 };
 
 /**

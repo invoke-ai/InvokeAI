@@ -1,5 +1,6 @@
 import type { AccountScope } from '@platform/state/accountLifecycle';
 import type { ProjectBoardItemDTO, ProjectRecordDTO } from '@workbench/projects/api';
+import type * as apiModule from '@workbench/projects/api';
 
 import { createDraftProject } from '@workbench/workbenchState';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -18,6 +19,7 @@ import type * as duplicateProjectModule from './duplicateProject';
 const api = vi.hoisted(() => ({
   createProject: vi.fn(),
   getProject: vi.fn(),
+  isProjectConfirmedAbsent: vi.fn(),
   isProjectNotFoundError: (error: unknown) =>
     typeof error === 'object' && error !== null && 'status' in error && error.status === 404,
 }));
@@ -38,7 +40,10 @@ const transport = vi.hoisted(() => ({
   uploadArchiveVideo: vi.fn(() => Promise.reject(new Error('duplication uploads nothing'))),
 }));
 
-vi.mock('@workbench/projects/api', () => api);
+vi.mock('@workbench/projects/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof apiModule>()),
+  ...api,
+}));
 // Partial, so the module's constants and pure predicates stay real — a stub of
 // `isRequestCancellation` would let the tests agree with a duplication that mistook a
 // cancellation for a board's worth of individually failed copies.
@@ -252,11 +257,10 @@ describe('duplicateProjectRecord', () => {
   });
 
   it('deletes the copies it made and the staging board when the create fails', async () => {
-    const { ApiError } = await import('@platform/transport/http');
     const failure = new Error('create rejected');
 
     api.createProject.mockRejectedValue(failure);
-    api.getProject.mockRejectedValue(new ApiError('not found', 404));
+    api.isProjectConfirmedAbsent.mockResolvedValueOnce(true);
 
     await expect(
       duplicateProject.duplicateProjectRecord({
@@ -275,7 +279,7 @@ describe('duplicateProjectRecord', () => {
     const failure = new Error('connection ended after create');
 
     api.createProject.mockRejectedValue(failure);
-    api.getProject.mockResolvedValue(sourceRecord());
+    api.isProjectConfirmedAbsent.mockResolvedValueOnce(false);
 
     await expect(
       duplicateProject.duplicateProjectRecord({ boardItems: [boardItem()], owner, record: sourceRecord() })

@@ -15,8 +15,11 @@ vi.mock('@platform/transport/http', async (importOriginal) => ({
 }));
 
 import {
+  copyImagesToBoard,
+  copyVideosToBoard,
   createAssetResponseReader,
   createStagingBoard,
+  deleteArchiveVideos,
   deleteStagingBoard,
   fetchImageBytes,
   fetchImageThumbnail,
@@ -61,6 +64,10 @@ describe('findExistingVideoNames', () => {
 });
 
 describe('import rollback transport', () => {
+  beforeEach(() => {
+    mocks.apiFetchJson.mockReset();
+  });
+
   it('sends authoritative image and video identities to their batch-delete routes', async () => {
     const transport = (await import('./assetTransport')) as typeof assetTransportModule & {
       deleteArchiveImages?: (names: string[], signal?: AbortSignal) => Promise<void>;
@@ -90,6 +97,18 @@ describe('import rollback transport', () => {
       method: 'POST',
       signal,
     });
+  });
+
+  it('chunks video cleanup to the server request ceiling', async () => {
+    const names = Array.from({ length: 1_001 }, (_, index) => `video-${String(index)}.mp4`);
+
+    mocks.apiFetchJson.mockResolvedValue({});
+    await deleteArchiveVideos(names);
+
+    expect(mocks.apiFetchJson).toHaveBeenCalledTimes(2);
+    expect(
+      mocks.apiFetchJson.mock.calls.map(([, options]) => JSON.parse(options.body as string).video_names.length)
+    ).toEqual([1_000, 1]);
   });
 });
 
@@ -160,6 +179,67 @@ describe('board media transport', () => {
     await expect(starImages([])).resolves.toEqual({ failed: [] });
     await expect(starVideos([])).resolves.toEqual({ failed: [] });
     expect(mocks.apiFetchJson).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['images', copyImagesToBoard, 'image_names', 'image_name', 'source_image_name'],
+    ['videos', copyVideosToBoard, 'video_names', 'video_name', 'source_video_name'],
+  ] as const)(
+    'chunks project %s copies to the server request ceiling',
+    async (_, copy, requestKey, nameKey, sourceKey) => {
+      const extension = requestKey === 'image_names' ? 'png' : 'mp4';
+      const names = Array.from({ length: 1_001 }, (_, index) => `media-${String(index)}.${extension}`);
+
+      mocks.apiFetchJson.mockImplementation((_path: string, options: { body: string }) => {
+        const requested = JSON.parse(options.body)[requestKey] as string[];
+
+        return Promise.resolve({
+          copied: requested.map((name) => ({ [nameKey]: `copy-${name}`, [sourceKey]: name })),
+          failed: [],
+        });
+      });
+
+      await expect(copy(names, 'staging')).resolves.toMatchObject({ copied: { length: names.length }, failed: [] });
+      expect(mocks.apiFetchJson).toHaveBeenCalledTimes(2);
+      expect(
+        mocks.apiFetchJson.mock.calls.map(([, options]) => JSON.parse(options.body as string)[requestKey].length)
+      ).toEqual([1_000, 1]);
+    }
+  );
+
+  it('finishes an in-flight copy batch after cancellation so its identities remain available for rollback', async () => {
+    const controller = new AbortController();
+    const names = Array.from({ length: 1_001 }, (_, index) => `media-${String(index)}.png`);
+
+    mocks.apiFetchJson.mockImplementation((_path: string, options: { body: string; signal?: AbortSignal }) => {
+      const requested = JSON.parse(options.body).image_names as string[];
+      controller.abort();
+
+      return Promise.resolve({
+        copied: requested.map((name) => ({ image_name: `copy-${name}`, source_image_name: name })),
+        failed: [],
+      });
+    });
+
+    await expect(copyImagesToBoard(names, 'staging', controller.signal)).resolves.toMatchObject({
+      copied: { length: 1_000 },
+      failed: [names.at(-1)],
+    });
+    expect(mocks.apiFetchJson).toHaveBeenCalledTimes(1);
+    expect(mocks.apiFetchJson.mock.calls[0]![1].signal).toBeUndefined();
+  });
+
+  it('chunks video starring to the server request ceiling', async () => {
+    const names = Array.from({ length: 1_001 }, (_, index) => `video-${String(index)}.mp4`);
+
+    mocks.apiFetchJson.mockImplementation((_path: string, options: { body: string }) => {
+      const requested = JSON.parse(options.body).video_names as string[];
+
+      return Promise.resolve({ starred_videos: requested });
+    });
+
+    await expect(starVideos(names)).resolves.toEqual({ failed: [] });
+    expect(mocks.apiFetchJson).toHaveBeenCalledTimes(2);
   });
 
   it('creates a staging board by name and truncates it as the backend would', async () => {

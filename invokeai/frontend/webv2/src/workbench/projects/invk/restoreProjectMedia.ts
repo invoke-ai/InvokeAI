@@ -209,6 +209,14 @@ interface PendingUpload {
   name: string;
 }
 
+interface RestoreKindAdapter {
+  addBoardIdentity: (name: string) => void;
+  addDocumentIdentity: (name: string) => void;
+  mapping: Map<string, string>;
+  markResolvable: (name: string) => void;
+  upload: (bytes: Uint8Array, name: string, signal?: AbortSignal) => Promise<string>;
+}
+
 const emptyMaterializeResult = (): MaterializeResult => ({ failed: [], materialized: [] });
 
 /**
@@ -310,6 +318,24 @@ export const restoreProjectMedia = async (
 
   /** Names this server can serve once the restore is done, under their final identities. */
   const restoredImageNames = new Set<string>();
+  const kindAdapters: Record<InvkMediaKind, RestoreKindAdapter> = {
+    image: {
+      addBoardIdentity: (name) => input.ledger.boardImageNames.push(name),
+      addDocumentIdentity: (name) => input.ledger.imageNames.push(name),
+      mapping: mappings.images,
+      markResolvable: (name) => restoredImageNames.add(name),
+      upload: async (bytes, name, signal) =>
+        (await uploadImage(bytes, name, { contentType: mimeForEntryName(name), signal })).imageName,
+    },
+    video: {
+      addBoardIdentity: (name) => input.ledger.boardVideoNames.push(name),
+      addDocumentIdentity: (name) => input.ledger.videoNames.push(name),
+      mapping: mappings.videos,
+      markResolvable: () => undefined,
+      upload: async (bytes, name, signal) =>
+        (await uploadVideo(bytes, name, { contentType: mimeForEntryName(name, 'video'), signal })).videoName,
+    },
+  };
 
   // Started before the board upload, awaited after it. The existence checks depend only on the
   // document's own references, which are known here — and the board upload is the minutes-long part
@@ -345,19 +371,16 @@ export const restoreProjectMedia = async (
 
   for (const entry of boardResult.materialized) {
     const key = toMediaKey({ kind: entry.kind, name: entry.sourceName });
+    const adapter = kindAdapters[entry.kind];
 
     settledBoardKeys.add(key);
     sourceNamesByFreshName.set(toMediaKey({ kind: entry.kind, name: entry.name }), entry.sourceName);
 
-    if (entry.kind === 'image') {
-      input.ledger.boardImageNames.push(entry.name);
-      restoredImageNames.add(entry.name);
-    } else {
-      input.ledger.boardVideoNames.push(entry.name);
-    }
+    adapter.addBoardIdentity(entry.name);
+    adapter.markResolvable(entry.name);
 
     if (entry.sourceName !== entry.name) {
-      mappings[entry.kind === 'image' ? 'images' : 'videos'].set(entry.sourceName, entry.name);
+      adapter.mapping.set(entry.sourceName, entry.name);
     }
 
     if (starredKeys.has(key)) {
@@ -376,7 +399,7 @@ export const restoreProjectMedia = async (
       return;
     }
 
-    mappings[failure.kind === 'image' ? 'images' : 'videos'].set(
+    kindAdapters[failure.kind].mapping.set(
       failure.name,
       buildMissingMediaName(input.projectId, failure.kind, descriptorIndexes.get(key) ?? 0)
     );
@@ -432,9 +455,7 @@ export const restoreProjectMedia = async (
   ] as const) {
     for (const name of names) {
       if (existing.has(name)) {
-        if (kind === 'image') {
-          restoredImageNames.add(name);
-        }
+        kindAdapters[kind].markResolvable(name);
 
         // Satisfied by media that is already here, which is the whole point of the dedup.
         total -= 1;
@@ -473,21 +494,14 @@ export const restoreProjectMedia = async (
     }
 
     try {
-      const options = { contentType: mimeForEntryName(name, kind), signal: deps.signal };
-      const restoredName =
-        kind === 'image'
-          ? (await uploadImage(bytes, name, options)).imageName
-          : (await uploadVideo(bytes, name, options)).videoName;
+      const adapter = kindAdapters[kind];
+      const restoredName = await adapter.upload(bytes, name, deps.signal);
 
-      if (kind === 'image') {
-        input.ledger.imageNames.push(restoredName);
-        restoredImageNames.add(restoredName);
-      } else {
-        input.ledger.videoNames.push(restoredName);
-      }
+      adapter.addDocumentIdentity(restoredName);
+      adapter.markResolvable(restoredName);
 
       if (restoredName !== name) {
-        mappings[kind === 'image' ? 'images' : 'videos'].set(name, restoredName);
+        adapter.mapping.set(name, restoredName);
       }
     } catch (error) {
       // Not a failure of this asset: an aborted signal or an expired account makes every remaining

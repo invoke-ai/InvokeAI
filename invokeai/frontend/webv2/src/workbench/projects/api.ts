@@ -1,3 +1,6 @@
+import type { AccountScope } from '@platform/state/accountLifecycle';
+
+import { isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { ApiError, apiFetch, apiFetchJson } from '@platform/transport/http';
 
 /**
@@ -102,6 +105,17 @@ export const getProjectBoardSnapshot = (projectId: string, signal?: AbortSignal)
 export const isProjectConflictError = (error: unknown): boolean => error instanceof ApiError && error.status === 409;
 
 export const isProjectNotFoundError = (error: unknown): boolean => error instanceof ApiError && error.status === 404;
+
+/** A rejected create is safe to compensate only when its chosen id is authoritatively absent. */
+export const isProjectConfirmedAbsent = async (projectId: string, owner: AccountScope): Promise<boolean> => {
+  try {
+    await getProject(projectId, owner.signal);
+
+    return false;
+  } catch (error) {
+    return isAccountScopeCurrent(owner) && isProjectNotFoundError(error);
+  }
+};
 
 export const getClientStateValue = (key: string, signal?: AbortSignal): Promise<string | null> =>
   apiFetchJson<string | null>(`${CLIENT_STATE_BASE}/get_by_key?key=${encodeURIComponent(key)}`, { signal });
