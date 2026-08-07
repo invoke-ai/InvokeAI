@@ -67,7 +67,7 @@ class ProjectRecordsSqlite(ProjectRecordsStorageBase):
                 if board_id is None:
                     resolved_board_id = self._insert_board(cursor, user_id=user_id, name=name)
                 else:
-                    self._claim_board(cursor, user_id=user_id, board_id=board_id, name=name)
+                    self._claim_board(cursor, user_id=user_id, board_id=board_id, name=name, project_id=project_id)
                     resolved_board_id = board_id
 
                 cursor.execute(
@@ -298,12 +298,20 @@ class ProjectRecordsSqlite(ProjectRecordsStorageBase):
         )
         return board_id
 
-    def _claim_board(self, cursor: sqlite3.Cursor, *, user_id: str, board_id: str, name: str) -> None:
+    def _claim_board(self, cursor: sqlite3.Cursor, *, user_id: str, board_id: str, name: str, project_id: str) -> None:
         """Take ownership of an existing private board, or explain why it cannot be taken.
 
         One query answers every way a claim can fail. The `UNIQUE` constraint on `projects.board_id`
         settles the race this check cannot see: two imports claiming the same board both pass here,
         and exactly one of them survives the insert.
+
+        The project being created is excluded from the "already claimed" test, so a client that
+        re-sends a create it never got an answer for reaches the project insert and is refused there,
+        as `ProjectRecordExistsError` — the truth. Without the exclusion it would be told its board
+        was unavailable, which reads as "somebody else took it" and is the opposite of what happened.
+        A repeated create is not an edge case: it is how a client establishes whether a request whose
+        response was lost actually landed, and the answer decides whether it deletes the media it
+        uploaded.
         """
         cursor.execute(
             """--sql
@@ -311,11 +319,14 @@ class ProjectRecordsSqlite(ProjectRecordsStorageBase):
                 b.user_id,
                 b.board_visibility,
                 EXISTS(SELECT 1 FROM shared_boards s WHERE s.board_id = b.board_id),
-                EXISTS(SELECT 1 FROM projects p WHERE p.board_id = b.board_id)
+                EXISTS(
+                    SELECT 1 FROM projects p
+                    WHERE p.board_id = b.board_id AND NOT (p.user_id = ? AND p.project_id = ?)
+                )
             FROM boards b
             WHERE b.board_id = ?;
             """,
-            (board_id,),
+            (user_id, project_id, board_id),
         )
         row = cursor.fetchone()
 

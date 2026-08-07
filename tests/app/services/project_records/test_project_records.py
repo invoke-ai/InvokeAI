@@ -303,6 +303,29 @@ def test_a_rejected_claim_leaves_the_board_name_alone(
     assert _board_name(db, "staging") == "Untitled"
 
 
+def test_repeating_a_create_says_the_project_exists_rather_than_blaming_the_board(
+    project_records: ProjectRecordsSqlite, db: SqliteDatabase, other_user_id: str
+) -> None:
+    """A client whose create response was lost re-sends it to find out whether the first one landed,
+    and the answer decides whether it deletes the media it already uploaded. Reporting the board as
+    unavailable would read as "somebody else took it" — the opposite of what happened, and the
+    reading that gets the uploads thrown away."""
+    _insert_board(db, "staging", name="Untitled")
+    project_records.create(SYSTEM_USER_ID, "Imported", {}, project_id="project-import", board_id="staging")
+
+    with pytest.raises(ProjectRecordExistsError):
+        project_records.create(SYSTEM_USER_ID, "Imported", {}, project_id="project-import", board_id="staging")
+
+    # A different account claiming the same board is still refused: the exclusion is for the project
+    # being created, not for board claims in general. (Foreign ownership is caught first, as a 404,
+    # so the board is re-pointed at the other account to reach the claimed check.)
+    db._conn.execute("UPDATE boards SET user_id = ? WHERE board_id = 'staging';", (other_user_id,))
+    db._conn.commit()
+
+    with pytest.raises(ProjectBoardUnavailableError):
+        project_records.create(other_user_id, "Theirs", {}, project_id="project-import", board_id="staging")
+
+
 def test_rename_renames_the_board_but_only_on_a_winning_save(
     project_records: ProjectRecordsSqlite, db: SqliteDatabase
 ) -> None:
