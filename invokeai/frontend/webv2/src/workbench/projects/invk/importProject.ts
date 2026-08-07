@@ -11,7 +11,13 @@ import type {
 import type { InvkMediaRef } from './transfer';
 
 import { INVK_MAX_ARCHIVE_BYTES, readArchive, readEntryText } from './archive';
-import { isRequestCancellation, mimeForEntryName, uploadBoardImage, uploadBoardVideo } from './assetTransport';
+import {
+  INVK_TRANSFER_CONCURRENCY,
+  isRequestCancellation,
+  mimeForEntryName,
+  uploadBoardImage,
+  uploadBoardVideo,
+} from './assetTransport';
 import { parseInvkBoardSnapshot } from './board';
 import {
   INVK_BOARD_ENTRY,
@@ -41,9 +47,6 @@ import { toMediaRefs } from './transfer';
  * Neither touches the document. The caller applies the returned mapping, because the caller is also
  * the one assigning the new project id.
  */
-
-/** Simultaneous uploads. Matches the previous frontend's limit. */
-const BOARD_UPLOAD_CONCURRENCY = 5;
 
 export interface InvkArchiveContents {
   /**
@@ -195,6 +198,10 @@ export interface ArchiveBoardUploadDeps {
  * media can never reuse a name the destination already has. A descriptor the archive carries no
  * bytes for is reported rather than skipped silently: the exporting server told us it was there,
  * so its absence is a loss worth naming.
+ *
+ * Each entry is dropped from the archive as it lands. An `.invk` may be two gigabytes, and holding
+ * every entry until the import finishes means holding the whole archive *and* everything unpacked
+ * from it through the restore and the create that follows — for bytes the server already has.
  */
 export const createArchiveMediaMaterializer = (
   archive: Pick<InvkArchiveContents, 'images' | 'videos'>,
@@ -206,8 +213,9 @@ export const createArchiveMediaMaterializer = (
   return async (items, boardId, onItemSettled) => {
     const result: Awaited<ReturnType<MediaMaterializer>> = { failed: [], materialized: [] };
 
-    await mapWithConcurrency(items, BOARD_UPLOAD_CONCURRENCY, async (item) => {
-      const bytes = (item.kind === 'image' ? archive.images : archive.videos).get(item.name);
+    await mapWithConcurrency(items, INVK_TRANSFER_CONCURRENCY, async (item) => {
+      const entries = item.kind === 'image' ? archive.images : archive.videos;
+      const bytes = entries.get(item.name);
 
       if (bytes === undefined) {
         result.failed.push({ kind: item.kind, name: item.name, reason: 'missing-entry' });
@@ -229,6 +237,7 @@ export const createArchiveMediaMaterializer = (
             : (await uploadVideo(bytes, item.name, options)).videoName;
 
         result.materialized.push({ kind: item.kind, name, sourceName: item.name });
+        entries.delete(item.name);
       } catch (error) {
         // A cancelled signal or an expired account is not this item failing — it is every
         // remaining item failing at once, which is an ended operation rather than a lossy one.

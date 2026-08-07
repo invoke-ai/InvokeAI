@@ -3,7 +3,7 @@ import { toaster } from '@platform/ui';
 import type { InvkMediaIssueReason, ProjectTransferIssues } from './invk/transfer';
 import type { ProjectFileProgress } from './projectFile';
 
-import { describeProjectFileError } from './projectFileErrors';
+import { describeProjectFileError, type ProjectFileDirection } from './projectFileErrors';
 
 /**
  * How a project file reports itself while it runs, and what it says when it is
@@ -85,11 +85,29 @@ const describeProgress = (t: Translate, progress: ProjectFileProgress): string =
 };
 
 /**
+ * How often the live toast may redraw while a transfer runs.
+ *
+ * Progress arrives once per asset, and a project can have hundreds — each one otherwise a toaster
+ * state update, during the phase that is already saturating the network. A count that moves five
+ * times a second is as much as anyone reads, and the final value is always drawn, so the number a
+ * person is left looking at is never a stale one.
+ */
+const PROGRESS_REDRAW_INTERVAL_MS = 200;
+
+/**
  * Open the live toast for a transfer that is starting. The returned reporter
  * owns that toast for the rest of the operation; every path through a caller's
  * `try`/`catch` has to end in `succeed` or `fail`, or the toast stays up.
+ *
+ * `direction` decides how a failure is worded: the same `too-large` reason is raised by opening a
+ * file someone handed you and by exporting a project of your own, and those need different
+ * sentences.
  */
-export const startProjectFileReport = (t: Translate, title: string): ProjectFileReporter => {
+export const startProjectFileReport = (
+  t: Translate,
+  title: string,
+  direction: ProjectFileDirection = 'read'
+): ProjectFileReporter => {
   const id = toaster.create({
     // No duration: a transfer ends when it ends, and a toast that expired
     // mid-export would leave the operation invisible again.
@@ -98,21 +116,65 @@ export const startProjectFileReport = (t: Translate, title: string): ProjectFile
     type: 'loading',
   });
 
+  let isSettled = false;
+  let redrawTimer: ReturnType<typeof setTimeout> | null = null;
+  let pendingDescription: string | null = null;
+
+  const clearRedraw = (): void => {
+    if (redrawTimer !== null) {
+      clearTimeout(redrawTimer);
+      redrawTimer = null;
+    }
+    pendingDescription = null;
+  };
+
   const settle = (options: { description?: string; title: string; type: 'error' | 'success' | 'warning' }): void => {
+    isSettled = true;
+    clearRedraw();
     toaster.update(id, { ...options, duration: undefined });
   };
 
   return {
     dismiss: () => {
+      isSettled = true;
+      clearRedraw();
       toaster.dismiss(id);
     },
     fail: (failureTitle, error) => {
-      const description = describeProjectFileError(error, t);
+      // A verdict is not taken back. `succeed` runs before the caller's own follow-up work — the
+      // navigation after an import, say — and a failure there is not a failure of the transfer:
+      // telling someone their import failed after it demonstrably worked is the worse lie.
+      if (isSettled) {
+        return;
+      }
+
+      const description = describeProjectFileError(error, t, direction);
 
       settle({ ...(description === undefined ? {} : { description }), title: failureTitle, type: 'error' });
     },
     report: (progress) => {
-      toaster.update(id, { description: describeProgress(t, progress) });
+      if (isSettled) {
+        return;
+      }
+
+      pendingDescription = describeProgress(t, progress);
+
+      if (redrawTimer !== null) {
+        return;
+      }
+
+      // Leading edge, then trailing: the first count appears at once, and whatever the latest is
+      // when the interval expires replaces it.
+      toaster.update(id, { description: pendingDescription });
+      pendingDescription = null;
+      redrawTimer = setTimeout(() => {
+        redrawTimer = null;
+
+        if (pendingDescription !== null && !isSettled) {
+          toaster.update(id, { description: pendingDescription });
+          pendingDescription = null;
+        }
+      }, PROGRESS_REDRAW_INTERVAL_MS);
     },
     succeed: (successTitle, issues) => {
       const { boardItems, documentReferences, unstarred } = countIssues(issues);

@@ -7,7 +7,12 @@ import type { InvkBoardItem, InvkBoardSnapshot } from './board';
 import type { InvkTransferItem, ProjectTransferIssues } from './transfer';
 
 import { binaryEntry, INVK_MAX_ENTRIES, textEntry, writeArchive } from './archive';
-import { coverExtensionForMime, createAssetExportTransport, isRequestCancellation } from './assetTransport';
+import {
+  coverExtensionForMime,
+  createAssetExportTransport,
+  INVK_TRANSFER_CONCURRENCY,
+  isRequestCancellation,
+} from './assetTransport';
 import { buildInvkBoardSnapshot } from './board';
 import {
   INVK_BOARD_ENTRY,
@@ -43,9 +48,6 @@ import { createTransferIssueLog, planMediaTransfer, toMediaRefs } from './transf
  * request propagates, and the signal is checked once more before the archive is
  * written — nothing reaches the disk after the export stopped being wanted.
  */
-
-/** Simultaneous asset fetches. Matches the previous frontend's limit. */
-const ASSET_FETCH_CONCURRENCY = 5;
 
 export interface InvkExportPlan {
   /** The board's contents exactly as they will be written to `board.json`. */
@@ -163,7 +165,7 @@ export const executeInvkExport = async (plan: InvkExportPlan, deps: InvkExportDe
   // would not be if images and videos each got their own.
   const assets = plan.transferItems;
 
-  await mapWithConcurrency(assets, ASSET_FETCH_CONCURRENCY, async (item) => {
+  await mapWithConcurrency(assets, INVK_TRANSFER_CONCURRENCY, async (item) => {
     const { kind, name } = item;
     const bytes = await skipUnservable(() =>
       kind === 'image' ? readImage(name, deps.signal) : readVideo(name, deps.signal)

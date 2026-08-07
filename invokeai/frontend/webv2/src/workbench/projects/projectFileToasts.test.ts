@@ -57,20 +57,73 @@ describe('startProjectFileReport', () => {
     report.succeed('projects.exported', { boardItemIssues: [], documentReferenceIssues: [] });
 
     expect(toaster.create).toHaveBeenCalledTimes(1);
-    expect(toaster.update).toHaveBeenCalledTimes(3);
     expect(toaster.update.mock.calls.every(([id]) => id === 'toast-1')).toBe(true);
   });
 
+  /**
+   * Progress arrives once per asset and a project can hold hundreds of them, during the phase
+   * already saturating the network. The first count shows at once; the rest coalesce.
+   */
+  it('redraws at most once per interval while assets settle', () => {
+    vi.useFakeTimers();
+
+    try {
+      const report = toasts.startProjectFileReport(t, 'projects.exporting');
+
+      report.report({ completed: 1, phase: 'bundling', total: 300 });
+      report.report({ completed: 2, phase: 'bundling', total: 300 });
+      report.report({ completed: 3, phase: 'bundling', total: 300 });
+
+      expect(toaster.update).toHaveBeenCalledTimes(1);
+      expect(toaster.update.mock.calls[0]![1].description).toBe(
+        'projects.file.bundlingProgress({"completed":1,"total":300})'
+      );
+
+      // Whatever the latest count is when the interval expires — never a stale one.
+      vi.advanceTimersByTime(500);
+      expect(toaster.update).toHaveBeenCalledTimes(2);
+      expect(toaster.update.mock.calls[1]![1].description).toBe(
+        'projects.file.bundlingProgress({"completed":3,"total":300})'
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('counts assets while bundling and stops counting while packing', () => {
-    const report = toasts.startProjectFileReport(t, 'projects.exporting');
+    vi.useFakeTimers();
 
-    report.report({ completed: 2, phase: 'bundling', total: 7 });
-    expect(toaster.update.mock.calls[0]![1].description).toBe(
-      'projects.file.bundlingProgress({"completed":2,"total":7})'
-    );
+    try {
+      const report = toasts.startProjectFileReport(t, 'projects.exporting');
 
-    report.report({ completed: 7, phase: 'packing', total: 7 });
-    expect(toaster.update.mock.calls[1]![1].description).toBe('projects.file.packing');
+      report.report({ completed: 2, phase: 'bundling', total: 7 });
+      expect(toaster.update.mock.calls[0]![1].description).toBe(
+        'projects.file.bundlingProgress({"completed":2,"total":7})'
+      );
+
+      vi.advanceTimersByTime(500);
+      report.report({ completed: 7, phase: 'packing', total: 7 });
+      expect(toaster.update.mock.calls[1]![1].description).toBe('projects.file.packing');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  /**
+   * `succeed` runs before a caller's own follow-up work — the navigation after an import. A
+   * failure there is not a failure of the transfer, and saying so after it demonstrably worked is
+   * the worse lie.
+   */
+  it('does not take back a verdict it has already given', () => {
+    const report = toasts.startProjectFileReport(t, 'projects.importing');
+
+    report.succeed('projects.imported', { boardItemIssues: [], documentReferenceIssues: [] });
+    report.fail('projects.importFailed', new Error('navigation blew up'));
+
+    const settles = toaster.update.mock.calls.filter(([, options]) => options.duration === undefined);
+
+    expect(settles).toHaveLength(1);
+    expect(settles[0]![1]).toMatchObject({ title: 'projects.imported', type: 'success' });
   });
 
   it('counts uploads on the way back in', () => {

@@ -62,6 +62,9 @@ const zManifestV2 = z.object({
 
 const zManifest = z.discriminatedUnion('version', [zManifestV1, zManifestV2]);
 
+/** Every version this app has ever written or can name. Anything else genuinely is from the future. */
+const KNOWN_VERSIONS: ReadonlySet<number> = new Set([1, 2]);
+
 /** A manifest this app can read: the workbench project container. */
 export type InvkManifest = z.infer<typeof zManifestV2>;
 
@@ -75,7 +78,14 @@ export const parseInvkManifest = (data: unknown): InvkManifest => {
   if (!parsed.success) {
     const version = (data as { version?: unknown } | null)?.version;
 
-    throw new InvkFormatError(typeof version === 'number' ? 'unsupported-version' : 'not-a-project');
+    if (typeof version !== 'number') {
+      throw new InvkFormatError('not-a-project');
+    }
+
+    // A version this app has written is a version it can read, so a manifest that still fails to
+    // parse at one of them is damaged — a truncated name, a missing timestamp. Calling that
+    // "written by a newer version of Invoke" tells someone to go and upgrade over a broken file.
+    throw new InvkFormatError(KNOWN_VERSIONS.has(version) ? 'damaged' : 'unsupported-version');
   }
 
   if (parsed.data.version === 1) {

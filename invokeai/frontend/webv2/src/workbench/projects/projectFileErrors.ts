@@ -1,7 +1,7 @@
 import { InvkFormatError } from './invk/format';
 
 /**
- * Turn a failed project-file read into something worth showing.
+ * Turn a failed project-file read or write into something worth showing.
  *
  * Every import entry point — Home, the Projects page, the in-editor Open dialog
  * — used to pass `error.message` straight into a toast, which meant a person who
@@ -10,10 +10,23 @@ import { InvkFormatError } from './invk/format';
  * and, importantly, says something different for each way this can go wrong:
  * the fix for a legacy canvas project is not the fix for a corrupt archive.
  *
+ * The direction matters for the two reasons both halves can raise. `too-large`
+ * comes from the export planner, the archive writer and the response reader as
+ * readily as from opening a file, and `damaged` is raised by duplication for a
+ * document that will not rehydrate. Telling someone their project "is too large
+ * to open" while they were exporting it names the wrong operation and the wrong
+ * file — theirs, not one they were handed.
+ *
  * Anything that is not an `InvkFormatError` reached us from the network or the
  * reducer. Those already carry messages meant for people, so they pass through.
  */
-export const describeProjectFileError = (error: unknown, t: (key: string) => string): string | undefined => {
+export type ProjectFileDirection = 'read' | 'write';
+
+export const describeProjectFileError = (
+  error: unknown,
+  t: (key: string) => string,
+  direction: ProjectFileDirection = 'read'
+): string | undefined => {
   if (!(error instanceof InvkFormatError)) {
     return error instanceof Error ? error.message : undefined;
   }
@@ -26,10 +39,10 @@ export const describeProjectFileError = (error: unknown, t: (key: string) => str
       return t('projects.file.unsupportedVersion');
     }
     case 'damaged': {
-      return t('projects.file.damaged');
+      return t(direction === 'write' ? 'projects.file.damagedProject' : 'projects.file.damaged');
     }
     case 'too-large': {
-      return t('projects.file.tooLarge');
+      return t(direction === 'write' ? 'projects.file.tooLargeToWrite' : 'projects.file.tooLarge');
     }
     default: {
       return t('projects.file.notAProject');

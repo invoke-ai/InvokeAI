@@ -420,6 +420,7 @@
     "file": {
       "bundlingProgress": "Bundling {{completed}} of {{total}} assets…",
       "damaged": "This project file is damaged and cannot be opened.",
+      "damagedProject": "This project cannot be read and could not be copied.",
       "legacyCanvasProject": "This is a canvas project from an earlier version of Invoke, which cannot be opened here.",
       "missingBoardItems_one": "1 board item could not be included.",
       "missingBoardItems_other": "{{count}} board items could not be included.",
@@ -429,6 +430,7 @@
       "packing": "Packing the archive…",
       "restoringProgress": "Restoring {{completed}} of {{total}} assets…",
       "tooLarge": "This project file is too large to open.",
+      "tooLargeToWrite": "This project is too large to package into a project file.",
       "unstarredItems_one": "1 item could not be re-starred.",
       "unstarredItems_other": "{{count}} items could not be re-starred.",
       "unsupportedVersion": "This project file was written by a newer version of Invoke."

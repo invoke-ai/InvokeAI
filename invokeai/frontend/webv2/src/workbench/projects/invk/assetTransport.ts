@@ -50,6 +50,15 @@ import { InvkFormatError } from './format';
  * images before the bulk endpoint existed.
  */
 
+/**
+ * Simultaneous requests any one transfer may have in flight, in either direction.
+ *
+ * Matches the previous frontend's limit. One number rather than four identical ones, because it is
+ * one budget: the point is to be kind to a backend that is very likely also generating, and a limit
+ * per phase would multiply exactly what it exists to bound.
+ */
+export const INVK_TRANSFER_CONCURRENCY = 5;
+
 const BOARDS_BASE = '/api/v1/boards';
 const IMAGES_BASE = '/api/v1/images';
 const VIDEOS_BASE = '/api/v1/videos';
@@ -78,8 +87,27 @@ export const isRequestCancellation = (error: unknown): boolean =>
  */
 const EXISTENCE_BATCH_SIZE = 500;
 
+/** Simultaneous existence batches, matching the transfer limit. */
+const EXISTENCE_BATCH_CONCURRENCY = INVK_TRANSFER_CONCURRENCY;
+
 /** Simultaneous per-name video lookups, matching the image fetch limit. */
-const VIDEO_EXISTENCE_CONCURRENCY = 5;
+const VIDEO_EXISTENCE_CONCURRENCY = INVK_TRANSFER_CONCURRENCY;
+
+/**
+ * Let go of a response whose body this module is not going to read.
+ *
+ * `apiFetchRaw` hands back the response untouched, so a skipped asset or an existence probe leaves
+ * an unconsumed stream holding its connection until the collector gets to it. This module's whole
+ * argument is that it is bounded and kind to the backend; that has to include the requests it
+ * decides not to use.
+ */
+const discardBody = async (response: Response): Promise<void> => {
+  try {
+    await response.body?.cancel();
+  } catch {
+    // A body that cannot be cancelled is already finished with.
+  }
+};
 
 export interface UploadedImage {
   height: number;
@@ -305,22 +333,27 @@ export const findExistingImageNames = async (
   imageNames: readonly string[],
   signal?: AbortSignal
 ): Promise<Set<string>> => {
-  const existing = new Set<string>();
+  const batches: string[][] = [];
 
   for (let offset = 0; offset < imageNames.length; offset += EXISTENCE_BATCH_SIZE) {
-    const batch = imageNames.slice(offset, offset + EXISTENCE_BATCH_SIZE);
-    const found = await apiFetchJson<ImageDTOSubset[]>(`${IMAGES_BASE}/images_by_names`, {
-      body: JSON.stringify({ image_names: batch }),
-      method: 'POST',
-      signal,
-    });
-
-    for (const dto of found) {
-      existing.add(dto.image_name);
-    }
+    batches.push(imageNames.slice(offset, offset + EXISTENCE_BATCH_SIZE));
   }
 
-  return existing;
+  // Through the same pool as everything else. Splitting the names was meant to stop one slow
+  // lookup stalling the check, which a sequential loop gives straight back.
+  const found = await mapWithConcurrency(
+    batches,
+    EXISTENCE_BATCH_CONCURRENCY,
+    (batch) =>
+      apiFetchJson<ImageDTOSubset[]>(`${IMAGES_BASE}/images_by_names`, {
+        body: JSON.stringify({ image_names: batch }),
+        method: 'POST',
+        signal,
+      }),
+    { signal }
+  );
+
+  return new Set(found.flat().map((dto) => dto.image_name));
 };
 
 /**
@@ -334,20 +367,29 @@ export const findExistingVideoNames = async (
   videoNames: readonly string[],
   signal?: AbortSignal
 ): Promise<Set<string>> => {
-  const found = await mapWithConcurrency(videoNames, VIDEO_EXISTENCE_CONCURRENCY, async (videoName) => {
-    const response = await apiFetchRaw(`${VIDEOS_BASE}/i/${encodeURIComponent(videoName)}`, { signal });
+  const found = await mapWithConcurrency(
+    videoNames,
+    VIDEO_EXISTENCE_CONCURRENCY,
+    async (videoName) => {
+      const response = await apiFetchRaw(`${VIDEOS_BASE}/i/${encodeURIComponent(videoName)}`, { signal });
 
-    if (response.ok) {
-      return videoName;
-    }
+      if (response.ok) {
+        // The DTO is not wanted, only its existence — but an unread body holds its connection open
+        // until it is collected, and this runs once per referenced video.
+        await discardBody(response);
+        return videoName;
+      }
 
-    if (response.status === 403 || response.status === 404) {
+      if (response.status === 403 || response.status === 404) {
+        await discardBody(response);
+        return null;
+      }
+
+      await assertOk(response);
       return null;
-    }
-
-    await assertOk(response);
-    return null;
-  });
+    },
+    { signal }
+  );
 
   return new Set(found.filter((videoName): videoName is string => videoName !== null));
 };
@@ -366,6 +408,7 @@ const fetchImageBytesWithReader = async (
   const response = await apiFetchRaw(`${IMAGES_BASE}/i/${encodeURIComponent(imageName)}/full`, { signal });
 
   if (!response.ok) {
+    await discardBody(response);
     return null;
   }
 
@@ -384,6 +427,7 @@ const fetchVideoBytesWithReader = async (
   const response = await apiFetchRaw(`${VIDEOS_BASE}/i/${encodeURIComponent(videoName)}/full`, { signal });
 
   if (!response.ok) {
+    await discardBody(response);
     return null;
   }
 
@@ -408,6 +452,7 @@ const fetchImageThumbnailWithReader = async (
   const response = await apiFetchRaw(`${IMAGES_BASE}/i/${encodeURIComponent(imageName)}/thumbnail`, { signal });
 
   if (!response.ok) {
+    await discardBody(response);
     return null;
   }
 

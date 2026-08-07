@@ -4,6 +4,7 @@ import type { ProjectBoardItemDTO, ProjectRecordDTO } from '@workbench/projects/
 import { createDraftProject } from '@workbench/workbenchState';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type * as assetTransportModule from './assetTransport';
 import type * as duplicateProjectModule from './duplicateProject';
 
 /**
@@ -38,7 +39,13 @@ const transport = vi.hoisted(() => ({
 }));
 
 vi.mock('@workbench/projects/api', () => api);
-vi.mock('./assetTransport', () => transport);
+// Partial, so the module's constants and pure predicates stay real — a stub of
+// `isRequestCancellation` would let the tests agree with a duplication that mistook a
+// cancellation for a board's worth of individually failed copies.
+vi.mock('./assetTransport', async (importOriginal) => ({
+  ...(await importOriginal<typeof assetTransportModule>()),
+  ...transport,
+}));
 
 let duplicateProject: typeof duplicateProjectModule;
 let owner: AccountScope;

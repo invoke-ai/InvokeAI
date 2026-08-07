@@ -9,6 +9,7 @@ import {
   deleteStagingBoard,
   findExistingImageNames,
   findExistingVideoNames,
+  INVK_TRANSFER_CONCURRENCY,
   isRequestCancellation,
   mimeForEntryName,
   starImages,
@@ -52,9 +53,6 @@ import { buildMissingMediaName, createTransferIssueLog, toMediaKey } from './tra
  * a missing layer, exactly as a dangling v2 reference already does.
  */
 
-/** Simultaneous uploads. Matches the previous frontend's limit. */
-const ASSET_UPLOAD_CONCURRENCY = 5;
-
 /**
  * A `catch` handler that degrades to `fallback`, except for the errors that must end the restore.
  *
@@ -66,6 +64,26 @@ const ASSET_UPLOAD_CONCURRENCY = 5;
  * signal or a rotated account makes *every* remaining call fail. Degrading those would report the
  * project as half-restored and then create it anyway.
  */
+/**
+ * Hold a check's outcome — value or failure — so an early-started promise cannot become an
+ * unhandled rejection while the restore is busy elsewhere.
+ */
+type SettledExisting = { names: Set<string> } | { error: unknown };
+
+const settleExisting = (promise: Promise<Set<string>>): Promise<SettledExisting> =>
+  promise.then(
+    (names) => ({ names }),
+    (error: unknown) => ({ error })
+  );
+
+const unwrapExisting = (settled: SettledExisting): Set<string> => {
+  if ('error' in settled) {
+    throw settled.error;
+  }
+
+  return settled.names;
+};
+
 const degradeUnlessCancelled =
   <T>(fallback: T) =>
   (error: unknown): T => {
@@ -185,7 +203,8 @@ export interface RestoreProjectMediaResult extends ProjectTransferIssues {
 }
 
 interface PendingUpload {
-  bytes: Uint8Array;
+  /** Cleared once uploaded, so a queue of hundreds does not pin every asset's bytes to the end. */
+  bytes: Uint8Array | null;
   kind: InvkMediaKind;
   name: string;
 }
@@ -292,6 +311,29 @@ export const restoreProjectMedia = async (
   /** Names this server can serve once the restore is done, under their final identities. */
   const restoredImageNames = new Set<string>();
 
+  // Started before the board upload, awaited after it. The existence checks depend only on the
+  // document's own references, which are known here — and the board upload is the minutes-long part
+  // of a large import, so waiting it out first meant the video probe, which is one request per
+  // name, began only once everything else had finished.
+  //
+  // An empty answer is the safe degradation: the check exists only to skip uploading something the
+  // destination already has, so failing it costs bandwidth, never correctness. Aborting the import
+  // over it would be losing the project to save a request.
+  //
+  // Settled rather than left to reject: a promise started here but not awaited until after the
+  // board upload would surface as an unhandled rejection if the upload threw first. Cancellation
+  // still ends the restore — it is re-thrown at the await below, in its proper order.
+  const existingImagesPromise = settleExisting(
+    documentOnlyImages.length === 0
+      ? Promise.resolve(new Set<string>())
+      : checkExistingImages(documentOnlyImages, deps.signal).catch(degradeUnlessCancelled(new Set<string>()))
+  );
+  const existingVideosPromise = settleExisting(
+    documentOnlyVideos.length === 0
+      ? Promise.resolve(new Set<string>())
+      : checkExistingVideos(documentOnlyVideos, deps.signal).catch(degradeUnlessCancelled(new Set<string>()))
+  );
+
   const boardResult =
     stagingBoardId === null
       ? emptyMaterializeResult()
@@ -377,20 +419,9 @@ export const restoreProjectMedia = async (
     }
   }
 
-  // Both existence checks go out before either upload does; they are independent, and a project
-  // with videos should not wait out the image pass.
-  //
-  // An empty answer is the safe degradation: the check exists only to skip uploading something the
-  // destination already has, so failing it costs bandwidth, never correctness. Aborting the import
-  // over it would be losing the project to save a request.
-  const [existingImages, existingVideos] = await Promise.all([
-    documentOnlyImages.length === 0
-      ? Promise.resolve(new Set<string>())
-      : checkExistingImages(documentOnlyImages, deps.signal).catch(degradeUnlessCancelled(new Set<string>())),
-    documentOnlyVideos.length === 0
-      ? Promise.resolve(new Set<string>())
-      : checkExistingVideos(documentOnlyVideos, deps.signal).catch(degradeUnlessCancelled(new Set<string>())),
-  ]);
+  const [existingImages, existingVideos] = (await Promise.all([existingImagesPromise, existingVideosPromise])).map(
+    unwrapExisting
+  ) as [Set<string>, Set<string>];
 
   const pending: PendingUpload[] = [];
   const plannedTotal = total;
@@ -428,7 +459,19 @@ export const restoreProjectMedia = async (
     deps.onProgress?.({ completed, total });
   }
 
-  await mapWithConcurrency(pending, ASSET_UPLOAD_CONCURRENCY, async ({ bytes, kind, name }) => {
+  await mapWithConcurrency(pending, INVK_TRANSFER_CONCURRENCY, async (item) => {
+    const { kind, name } = item;
+    const bytes = item.bytes;
+
+    // Dropped from the queue before the request, not after: the upload body holds its own
+    // reference for as long as it needs one, and the queue was the reason a restore of a large
+    // project held every asset it had not sent yet.
+    item.bytes = null;
+
+    if (bytes === null) {
+      return;
+    }
+
     try {
       const options = { contentType: mimeForEntryName(name, kind), signal: deps.signal };
       const restoredName =

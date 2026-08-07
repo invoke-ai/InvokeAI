@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { ProjectRecordDTO } from './api';
 import type { DuplicatedProject } from './library';
+import type { ProjectFileDirection } from './projectFileErrors';
 
 import { duplicateLibraryProject } from './library';
 import { exportLibraryProject, exportOpenProject, importProjectFile, pickProjectFile } from './projectFile';
@@ -34,11 +35,11 @@ import { startProjectFileReport } from './projectFileToasts';
 /** Runs the sequence, keeping the toast and the account scope in step. */
 const runReported = async <T>(
   t: (key: string, options?: Record<string, unknown>) => string,
-  titles: { failed: string; running: string },
+  titles: { direction?: ProjectFileDirection; failed: string; running: string },
   run: (report: ReturnType<typeof startProjectFileReport>, owner: ReturnType<typeof captureAccountScope>) => Promise<T>
 ): Promise<void> => {
   const owner = captureAccountScope();
-  const report = startProjectFileReport(t, titles.running);
+  const report = startProjectFileReport(t, titles.running, titles.direction);
 
   try {
     await run(report, owner);
@@ -92,7 +93,7 @@ export const useExportLibraryProject = (): ((projectId: string, name: string) =>
     (projectId: string, name: string) => {
       void runReported(
         t,
-        { failed: t('projects.exportFailed'), running: t('projects.exporting', { name }) },
+        { direction: 'write', failed: t('projects.exportFailed'), running: t('projects.exporting', { name }) },
         async (report, owner) => {
           const issues = await exportLibraryProject(projectId, { onProgress: report.report, owner });
 
@@ -120,7 +121,7 @@ export const useDuplicateProject = (
     (projectId: string) => {
       void runReported(
         t,
-        { failed: t('projects.duplicateFailed'), running: t('projects.duplicating') },
+        { direction: 'write', failed: t('projects.duplicateFailed'), running: t('projects.duplicating') },
         async (report, owner) => {
           const duplicated = await duplicateLibraryProject(projectId, {
             // Everything a duplication moves is restored onto the copy's board, so the phase is
@@ -148,7 +149,11 @@ export const useExportOpenProject = (): ((project: Project) => void) => {
     (project: Project) => {
       void runReported(
         t,
-        { failed: t('projects.exportFailed'), running: t('projects.exporting', { name: project.name }) },
+        {
+          direction: 'write',
+          failed: t('projects.exportFailed'),
+          running: t('projects.exporting', { name: project.name }),
+        },
         async (report, owner) => {
           const issues = await exportOpenProject(project, { onProgress: report.report, owner });
 

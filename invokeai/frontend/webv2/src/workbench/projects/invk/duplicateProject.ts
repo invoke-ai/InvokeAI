@@ -185,6 +185,11 @@ export const duplicateProjectRecord = async (
         projectId: id,
       },
       {
+        // Both projects live on this server, so every document-only reference resolves here by
+        // definition — the check would ask the server whether it has media it just told us about.
+        // For videos that is one request per referenced video, against a certain answer.
+        findExistingImageNames: (names) => Promise.resolve(new Set(names)),
+        findExistingVideoNames: (names) => Promise.resolve(new Set(names)),
         materializeBoardMedia: createCopyMediaMaterializer({
           ...(deps.copyImages === undefined ? {} : { copyImages: deps.copyImages }),
           ...(deps.copyVideos === undefined ? {} : { copyVideos: deps.copyVideos }),

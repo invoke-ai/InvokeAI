@@ -45,8 +45,14 @@ describe('parseInvkManifest', () => {
     expectReason({ ...v2, version: 4 }, 'unsupported-version');
   });
 
-  it('rejects a manifest missing the v2 discriminator', () => {
-    expectReason({ appVersion: '7.0', createdAt: '', name: 'x', version: 2 }, 'unsupported-version');
+  /**
+   * A version this app writes is a version it can read, so one that still fails to parse is a
+   * broken file — not a newer Invoke. Telling someone to upgrade over a truncated manifest sends
+   * them somewhere that cannot help.
+   */
+  it('reports a malformed manifest at a version it knows as damaged', () => {
+    expectReason({ appVersion: '7.0', createdAt: '', name: 'x', version: 2 }, 'damaged');
+    expectReason({ version: 1 }, 'damaged');
   });
 
   it('rejects junk as not a project', () => {
