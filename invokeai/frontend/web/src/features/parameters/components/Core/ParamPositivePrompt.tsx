@@ -27,6 +27,7 @@ import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { ExpandPromptButton } from 'features/prompt/ExpandPromptButton';
 import { ImageToPromptButton } from 'features/prompt/ImageToPromptButton';
 import { PromptPopover } from 'features/prompt/PromptPopover';
+import { PromptTokenCounter } from 'features/prompt/tokenCounter/PromptTokenCounter';
 import { clearPromptUndo, consumePromptUndo } from 'features/prompt/promptUndo';
 import { usePrompt } from 'features/prompt/usePrompt';
 import { usePromptAttentionHotkeys } from 'features/prompt/usePromptAttentionHotkeys';
@@ -349,6 +350,7 @@ export const ParamPositivePrompt = memo(() => {
             </Flex>
           </PromptOverlayButtonWrapper>
           <PromptLabel label={t('controlLayers.prompt')} />
+          <PromptTokenCounter promptText={prompt} />
           {viewMode && (
             <ViewModePrompt
               prompt={prompt}
