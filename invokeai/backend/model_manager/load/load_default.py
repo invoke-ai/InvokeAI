@@ -58,6 +58,32 @@ _FP8_DEFAULT_SKIP_PATTERNS: tuple[str, ...] = (
     r"^proj_out$",
 )
 
+# Model formats whose weights are already quantized. FP8 storage is meaningless for them (the
+# payload is packed integers, not values we may re-encode) and actively harmful — see
+# `_should_use_fp8`. Declared as strings to keep this module free of a taxonomy import at module
+# scope; compared against `config.format`, which is a `ModelFormat` str-enum.
+_QUANTIZED_MODEL_FORMATS: frozenset[str] = frozenset(
+    {
+        "gguf_quantized",
+        "bnb_quantized_nf4b",
+        "bnb_quantized_int8b",
+    }
+)
+
+
+def _is_quantized_param(param: torch.nn.Parameter) -> bool:
+    """Whether `param` holds a quantized payload that must not be re-encoded as FP8.
+
+    Two signals, both observed in practice:
+
+    - Not floating point. bnb's NF4/INT8 weights are packed `uint8` (and `bnb.nn.LinearNF4`
+      subclasses `nn.Linear`, so a class check alone does not catch them). Casting those to float8
+      succeeds silently and the layer then returns finite garbage.
+    - A `torch.Tensor` *subclass*, e.g. `GGMLTensor`, which keeps its quantized payload plus
+      metadata and rejects dtype changes outright.
+    """
+    return not param.data.is_floating_point() or type(param.data) is not torch.Tensor
+
 
 # The construction path is not thread-safe on its own; it monkey-patches process-global torch state
 # (see MODEL_LOAD_LOCK). Concurrent callers must hold the MODEL_LOAD_LOCK write lock (see
@@ -234,11 +260,16 @@ class ModelLoader(ModelLoaderBase):
         if self._torch_device.type != "cuda":
             return False
 
-        # Z-Image has dtype mismatch issues with diffusers' layerwise casting
-        # (skipped modules produce bf16, hooked modules expect fp16).
-        from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
+        from invokeai.backend.model_manager.taxonomy import ModelType
 
-        if hasattr(config, "base") and config.base == BaseModelType.ZImage:
+        # Already-quantized models are excluded. Their weights are packed integer payloads, not
+        # values we may re-encode, and every quantized-format loader reaches this helper. Casting
+        # them is not a no-op:
+        #   - GGUF raises `Operation changed the dtype of GGMLTensor unexpectedly` at load time.
+        #   - bnb NF4 corrupts *silently* — `bnb.nn.LinearNF4` subclasses `nn.Linear`, so the packed
+        #     uint8 payload is cast to float8, inference still returns finite numbers, and the model
+        #     just produces garbage.
+        if hasattr(config, "format") and config.format in _QUANTIZED_MODEL_FORMATS:
             return False
 
         # VAEs are excluded — fp8 storage causes noticeable quality degradation in decode.
@@ -310,7 +341,19 @@ class ModelLoader(ModelLoaderBase):
         # `register_forward_hook` path fires around `nn.Module._call_impl` without replacing
         # `forward`, so `CustomLinear.forward` is still reached.
         if isinstance(model, torch.nn.Module):
-            self._apply_fp8_to_nn_module(model, storage_dtype=storage_dtype, compute_dtype=compute_dtype)
+            # Diffusers models declare their own precision-sensitive modules in
+            # `_skip_layerwise_casting_patterns`, and `enable_layerwise_casting()` honors them. Since
+            # we no longer call it, we have to apply that list ourselves — it is not cosmetic. Z-Image's
+            # `TimestepEmbedder.forward` reads `self.mlp[0].weight.dtype` and casts its *input* to it;
+            # with an fp8 weight the input becomes float8 before our pre-hook can restore the weight,
+            # and `F.linear` dies with `"addmm_cuda" not implemented for 'Float8_e4m3fn'`. Hence
+            # `['t_embedder', 'cap_embedder']` for that model.
+            self._apply_fp8_to_nn_module(
+                model,
+                storage_dtype=storage_dtype,
+                compute_dtype=compute_dtype,
+                extra_skip_patterns=tuple(getattr(model, "_skip_layerwise_casting_patterns", None) or ()),
+            )
         else:
             return model
 
@@ -323,7 +366,12 @@ class ModelLoader(ModelLoaderBase):
         return model
 
     @staticmethod
-    def _apply_fp8_to_nn_module(model: torch.nn.Module, storage_dtype: torch.dtype, compute_dtype: torch.dtype) -> None:
+    def _apply_fp8_to_nn_module(
+        model: torch.nn.Module,
+        storage_dtype: torch.dtype,
+        compute_dtype: torch.dtype,
+        extra_skip_patterns: tuple[str, ...] = (),
+    ) -> None:
         """Apply FP8 layerwise casting to a plain nn.Module.
 
         Mirrors diffusers' `apply_layerwise_casting` semantics: only the layer classes in
@@ -331,14 +379,26 @@ class ModelLoader(ModelLoaderBase):
         `_FP8_DEFAULT_SKIP_PATTERNS` (norm, pos_embed, patch_embed, proj_in/out) are skipped.
         Without the skip list, precision-sensitive tiny learned scalars (e.g. FLUX RMSNorm.scale)
         get crushed to FP8 and quality degrades noticeably.
+
+        `extra_skip_patterns` carries the model's own declared exclusions (diffusers'
+        `_skip_layerwise_casting_patterns`), which are model-specific and cannot be inferred from
+        layer types or generic name patterns.
+
+        Modules holding already-quantized weights are skipped regardless of their class. This is a
+        backstop behind the format check in `_should_use_fp8`, which cannot see quantization that
+        is not reflected in the model's format (e.g. a `diffusers`-format checkpoint whose weights
+        were quantized by an external tool).
         """
+        skip_patterns = _FP8_DEFAULT_SKIP_PATTERNS + tuple(extra_skip_patterns)
         for module_name, module in model.named_modules():
             if not isinstance(module, _FP8_SUPPORTED_PYTORCH_LAYERS):
                 continue
-            if any(re.search(pattern, module_name) for pattern in _FP8_DEFAULT_SKIP_PATTERNS):
+            if any(re.search(pattern, module_name) for pattern in skip_patterns):
                 continue
             params = list(module.parameters(recurse=False))
             if not params:
+                continue
+            if any(_is_quantized_param(p) for p in params):
                 continue
 
             for param in params:
