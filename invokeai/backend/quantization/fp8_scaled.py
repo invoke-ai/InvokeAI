@@ -345,6 +345,91 @@ def device_supports_fp8_matmul(device: torch.device) -> bool:
     return cached
 
 
+def should_keep_fp8_weights(device: torch.device) -> bool:
+    """Whether fp8 weights in a checkpoint should survive the load instead of being dequantized.
+
+    Only true when the fp8 matmul is both enabled and usable, because keeping weights quantized
+    without it is the worst of both worlds: the same VRAM as fp8 but a dequantize round trip on
+    every forward (measured slower than plain bf16).
+    """
+    return is_fp8_matmul_enabled() and device_supports_fp8_matmul(device)
+
+
+def _is_fp8_matmul_weight(key: str, tensor: Any, model: torch.nn.Module | None) -> bool:
+    """Whether this state-dict entry is a weight `scaled_mm_linear` can actually consume.
+
+    Only the ``.weight`` of an ``nn.Linear`` qualifies. This matters because checkpoints exist that
+    quantize *everything* — biases, norm weights, even learned pad tokens. Keeping those in fp8 does
+    not save anything worth having and actively breaks inference: an fp8 norm or pad token flows
+    into the activations, and the next Linear then receives an fp8 *input*, which dies in
+    ``x.abs()`` with ``"abs_cuda" not implemented for 'Float8_e4m3fn'``. Observed on a Z-Image
+    checkpoint where 243 of 453 fp8 tensors were 1-D.
+    """
+    if not key.endswith(".weight") or getattr(tensor, "dim", None) is None or tensor.dim() < 2:
+        return False
+    if model is None:
+        # No model to resolve against: the 2-D + `.weight` shape test above is the safe subset.
+        return True
+    try:
+        module = model.get_submodule(key[: -len(".weight")])
+    except AttributeError:
+        return False
+    return isinstance(module, torch.nn.Linear)
+
+
+def cast_state_dict(
+    sd: dict[str, Any],
+    dtype: torch.dtype,
+    *,
+    keep_fp8: bool,
+    model: torch.nn.Module | None = None,
+    skip_patterns: Iterable[str] = (),
+) -> int:
+    """Cast every tensor in ``sd`` to ``dtype`` in place, optionally leaving fp8 weights quantized.
+
+    Loaders historically cast the whole state dict unconditionally, which silently dequantizes a
+    checkpoint that ships raw fp8 weights (fp8 tensors with no ``weight_scale`` alongside them) —
+    the VRAM saving and the tensor cores are both thrown away before the model is ever built.
+
+    Only ``float8_e4m3fn`` is preserved. ``float8_e5m2`` is left to be cast because
+    :func:`scaled_mm_linear` cannot use it as the weight operand on Ada, so keeping it quantized
+    would buy VRAM at the cost of a per-forward dequantize.
+
+    ``skip_patterns`` are substrings of the state-dict key whose weights must be dequantized even
+    when the rest stays fp8. Pass the model's ``_skip_layerwise_casting_patterns``: diffusers uses
+    it to mark precision-sensitive modules, and some of them *read their own weight's dtype and cast
+    their activations to it*. Z-Image's ``TimestepEmbedder.forward`` does exactly that
+    (``t_freq.to(self.mlp[0].weight.dtype)``), so leaving its weight in fp8 hands the next Linear an
+    fp8 activation and the forward dies in ``x.abs()`` with
+    ``"abs_cuda" not implemented for 'Float8_e4m3fn'``.
+
+    Returns the number of tensors left in fp8.
+    """
+    patterns = tuple(skip_patterns)
+    kept = 0
+    for key in sd:
+        tensor = sd[key]
+        if (
+            keep_fp8
+            and getattr(tensor, "dtype", None) is FP8_DTYPE
+            and _is_fp8_matmul_weight(key, tensor, model)
+            and not any(pattern in key for pattern in patterns)
+        ):
+            kept += 1
+            continue
+        sd[key] = tensor.to(dtype)
+    return kept
+
+
+def count_fp8_weights(model: torch.nn.Module) -> int:
+    """Number of parameters already stored as ``float8_e4m3fn``.
+
+    Used to tell a checkpoint that arrived quantized apart from one this loader is about to
+    quantize itself — the two must not both happen (see `ModelLoader._apply_fp8_layerwise_casting`).
+    """
+    return sum(1 for p in model.parameters() if p.dtype is FP8_DTYPE)
+
+
 def dequantize_weight(weight: torch.Tensor, weight_scale: torch.Tensor | None, dtype: torch.dtype) -> torch.Tensor:
     """Cast an fp8 weight up to ``dtype``, applying its scale if it has one.
 

@@ -74,6 +74,7 @@ from invokeai.backend.model_manager.taxonomy import (
 from invokeai.backend.model_manager.util.model_util import (
     convert_bundle_to_flux_transformer_checkpoint,
 )
+from invokeai.backend.quantization.fp8_scaled import FP8_DTYPE, cast_state_dict, should_keep_fp8_weights
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
 from invokeai.backend.quantization.gguf.utils import TORCH_COMPATIBLE_QTYPES
 from invokeai.backend.util.silence_warnings import SilenceWarnings
@@ -650,11 +651,19 @@ class FluxCheckpointModel(ModelLoader):
         sd = load_file(model_path)
         if "model.diffusion_model.double_blocks.0.img_attn.norm.key_norm.scale" in sd:
             sd = convert_bundle_to_flux_transformer_checkpoint(sd)
-        new_sd_size = sum([ten.nelement() * torch.bfloat16.itemsize for ten in sd.values()])
+        # A checkpoint that ships raw fp8 weights (fp8 tensors, no weight_scale) keeps them when the
+        # fp8 matmul is available; casting them to bf16 here would throw away both the VRAM saving
+        # and the tensor cores before the model is ever built.
+        keep_fp8 = should_keep_fp8_weights(self._torch_device)
+        new_sd_size = sum(
+            ten.nelement() * (ten.element_size() if keep_fp8 and ten.dtype is FP8_DTYPE else torch.bfloat16.itemsize)
+            for ten in sd.values()
+        )
         self._ram_cache.make_room(new_sd_size)
-        for k in sd.keys():
-            # We need to cast to bfloat16 due to it being the only currently supported dtype for inference
-            sd[k] = sd[k].to(torch.bfloat16)
+        # Everything else is cast to bfloat16, the only dtype currently supported for inference.
+        kept = cast_state_dict(sd, torch.bfloat16, keep_fp8=keep_fp8, model=model)
+        if kept:
+            self._logger.info(f"FLUX: kept {kept} raw fp8 weight(s) quantized for the fp8 tensor cores.")
         model.load_state_dict(sd, assign=True)
         return model
 
@@ -998,9 +1007,19 @@ class Flux2CheckpointModel(ModelLoader):
                         out_features2, in_features2, dtype=torch.bfloat16
                     )
 
-        # Convert to bfloat16 and load
-        for k in converted_sd.keys():
-            converted_sd[k] = converted_sd[k].to(torch.bfloat16)
+        # Convert to bfloat16 and load, leaving raw fp8 weights quantized when the tensor cores can
+        # take them (the scaled-fp8 path above has already folded any weight_scale it found). The
+        # model's own precision-sensitive list is honored — see the Z-Image loader for why that is
+        # a correctness requirement and not just a quality nicety.
+        kept = cast_state_dict(
+            converted_sd,
+            torch.bfloat16,
+            keep_fp8=should_keep_fp8_weights(self._torch_device),
+            model=model,
+            skip_patterns=getattr(model, "_skip_layerwise_casting_patterns", None) or (),
+        )
+        if kept:
+            self._logger.info(f"FLUX.2: kept {kept} raw fp8 weight(s) quantized for the fp8 tensor cores.")
 
         # Load the state dict - guidance weights were already initialized above if missing
         model.load_state_dict(converted_sd, assign=True)

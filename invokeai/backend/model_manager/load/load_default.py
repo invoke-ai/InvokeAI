@@ -27,6 +27,7 @@ from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
     SubModelType,
 )
+from invokeai.backend.quantization.fp8_scaled import count_fp8_weights, should_keep_fp8_weights
 from invokeai.backend.util.devices import TorchDevice
 
 # Layer classes that benefit from FP8 storage. Mirrors diffusers'
@@ -287,6 +288,22 @@ class ModelLoader(ModelLoaderBase):
         """Apply FP8 layerwise casting to a model if enabled in its config."""
         if not self._should_use_fp8(config, submodel_type):
             return model
+
+        # A checkpoint that already ships fp8 weights is running (or is about to run) on the fp8
+        # tensor cores. Layerwise casting would install hooks that restore the compute dtype before
+        # every forward, so `CustomLinear._can_use_fp8_matmul` would no longer see an fp8 weight and
+        # would silently fall back to the dequantized path — the VRAM toggle would make the model
+        # *slower* with no indication why. Storage has nothing to add here anyway: the weights are
+        # already 1 byte per parameter.
+        if isinstance(model, torch.nn.Module) and should_keep_fp8_weights(self._torch_device):
+            already_fp8 = count_fp8_weights(model)
+            if already_fp8:
+                self._logger.info(
+                    f"FP8 storage skipped for {config.name}: {already_fp8} weight(s) are already fp8 and "
+                    "are being run on the fp8 tensor cores (fp8_compute). Layerwise casting would "
+                    "disable that matmul without saving any further VRAM."
+                )
+                return model
 
         storage_dtype = torch.float8_e4m3fn
         compute_dtype = self._torch_dtype

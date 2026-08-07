@@ -27,6 +27,7 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelType,
     SubModelType,
 )
+from invokeai.backend.quantization.fp8_scaled import FP8_DTYPE, cast_state_dict, should_keep_fp8_weights
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
 from invokeai.backend.qwen3.qwen3_tokenizer import load_bundled_qwen3_tokenizer
 from invokeai.backend.util.devices import TorchDevice
@@ -280,13 +281,29 @@ class ZImageCheckpointModel(ModelLoader):
         for k in keys_to_remove:
             del sd[k]
 
-        # Handle memory management and dtype conversion
-        new_sd_size = sum([ten.nelement() * model_dtype.itemsize for ten in sd.values()])
+        # Handle memory management and dtype conversion. A checkpoint that ships raw fp8 weights
+        # (fp8 tensors, no weight_scale) keeps them when the fp8 matmul is available — casting them
+        # here would discard both the VRAM saving and the tensor cores before the model is built.
+        keep_fp8 = should_keep_fp8_weights(self._torch_device)
+        new_sd_size = sum(
+            ten.nelement() * (ten.element_size() if keep_fp8 and ten.dtype is FP8_DTYPE else model_dtype.itemsize)
+            for ten in sd.values()
+        )
         self._ram_cache.make_room(new_sd_size)
 
-        # Convert to target dtype
-        for k in sd.keys():
-            sd[k] = sd[k].to(model_dtype)
+        # Honor the model's own precision-sensitive list. Z-Image declares
+        # ["t_embedder", "cap_embedder"], and `TimestepEmbedder.forward` casts its activations to
+        # `self.mlp[0].weight.dtype` — an fp8 weight there turns the activations fp8 and the forward
+        # dies in `x.abs()`. Those layers must be dequantized even though the rest stays quantized.
+        kept = cast_state_dict(
+            sd,
+            model_dtype,
+            keep_fp8=keep_fp8,
+            model=model,
+            skip_patterns=getattr(model, "_skip_layerwise_casting_patterns", None) or (),
+        )
+        if kept:
+            self._logger.info(f"Z-Image: kept {kept} raw fp8 weight(s) quantized for the fp8 tensor cores.")
 
         model.load_state_dict(sd, assign=True)
         return model

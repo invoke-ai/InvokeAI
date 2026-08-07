@@ -27,6 +27,7 @@ from invokeai.backend.model_manager.taxonomy import (
 from invokeai.backend.quantization.fp8_scaled import (
     FP8_DTYPE,
     attach_fp8_scales,
+    cast_state_dict,
     dequantize_fp8_scaled,
     device_supports_fp8_matmul,
     extract_comfy_quant_hints,
@@ -34,6 +35,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     full_precision_hints_respected,
     is_fp8_matmul_enabled,
     parse_quantization_metadata,
+    should_keep_fp8_weights,
 )
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
 from invokeai.backend.util.devices import TorchDevice
@@ -425,12 +427,27 @@ class Krea2CheckpointModel(ModelLoader):
             for ten in sd.values()
         )
         self._ram_cache.make_room(new_sd_size)
-        for k in sd.keys():
-            if sd[k].dtype is not FP8_DTYPE:
-                sd[k] = sd[k].to(model_dtype)
+        # `keep_fp8` covers the scaled path decided above; a checkpoint with raw fp8 weights (fp8
+        # tensors and no weight_scale) yields no fp8_layers at all, but its weights are still usable
+        # on the tensor cores, so they are kept whenever the matmul is available.
+        kept = cast_state_dict(
+            sd,
+            model_dtype,
+            keep_fp8=bool(fp8_layers) or should_keep_fp8_weights(target_device),
+            model=model,
+            skip_patterns=getattr(model, "_skip_layerwise_casting_patterns", None) or (),
+        )
 
         model.load_state_dict(sd, assign=True, strict=False)
         _reject_incomplete_load(model, what="Krea-2 single-file checkpoint")
+
+        if kept and not fp8_layers:
+            # Raw fp8: no scales to attach, but say so — otherwise the tensor-core path is invisible,
+            # and the only other fp8 log line (the scaled one below) never fires for this checkpoint.
+            self._logger.info(
+                f"Krea-2: kept {kept} raw fp8 weight(s) quantized (no weight_scale in the checkpoint); "
+                "they will run on the fp8 tensor cores with unit scaling."
+            )
 
         if fp8_layers:
             attached = attach_fp8_scales(model, fp8_layers)

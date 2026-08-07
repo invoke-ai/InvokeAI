@@ -5,6 +5,8 @@ from invokeai.backend.quantization.fp8_scaled import (
     FP8_DTYPE,
     Fp8ScaledLayer,
     attach_fp8_scales,
+    cast_state_dict,
+    count_fp8_weights,
     dequantize_fp8_scaled,
     dequantize_weight,
     device_supports_fp8_matmul,
@@ -100,6 +102,106 @@ def _comfy_quant_blob(full_precision: bool):
     """The per-layer marker some ComfyUI exports write instead of the header entry."""
     payload = f'{{"format": "float8_e4m3fn", "full_precision_matrix_mult": {"true" if full_precision else "false"}}}'
     return torch.tensor(list(payload.encode("utf-8")), dtype=torch.uint8)
+
+
+class TestRawFp8:
+    """Checkpoints that ship fp8 weights with no weight_scale at all."""
+
+    def test_cast_state_dict_preserves_fp8_when_asked(self):
+        q, _ = _fp8_weight(32, 16)
+        sd = {"lin.weight": q, "lin.bias": torch.zeros(32), "norm.weight": torch.ones(16)}
+        kept = cast_state_dict(sd, torch.bfloat16, keep_fp8=True)
+        assert kept == 1
+        assert sd["lin.weight"].dtype is FP8_DTYPE, "raw fp8 must survive the load"
+        assert sd["lin.bias"].dtype is torch.bfloat16
+        assert sd["norm.weight"].dtype is torch.bfloat16
+
+    def test_cast_state_dict_dequantizes_when_matmul_unavailable(self):
+        """Without the matmul, staying quantized costs a dequantize per forward for no gain."""
+        q, _ = _fp8_weight(32, 16)
+        sd = {"lin.weight": q}
+        assert cast_state_dict(sd, torch.bfloat16, keep_fp8=False) == 0
+        assert sd["lin.weight"].dtype is torch.bfloat16
+
+    def test_e5m2_is_never_preserved(self):
+        """scaled_mm cannot take e5m2 as the weight operand on Ada, so keeping it buys nothing."""
+        sd = {"lin.weight": torch.zeros(32, 16).to(torch.float8_e5m2)}
+        assert cast_state_dict(sd, torch.bfloat16, keep_fp8=True) == 0
+        assert sd["lin.weight"].dtype is torch.bfloat16
+
+    def test_only_linear_weights_stay_quantized(self):
+        """The regression an end-to-end run caught: checkpoints exist that quantize *everything*.
+
+        A Z-Image checkpoint had 243 of its 453 fp8 tensors 1-D — biases, norm weights, a learned
+        pad token. Keeping those quantized saves nothing usable and breaks inference: the fp8 value
+        flows into the activations and the next Linear receives an fp8 *input*, which dies in
+        `x.abs()` with `"abs_cuda" not implemented for 'Float8_e4m3fn'`.
+        """
+        model = torch.nn.Sequential()
+        model.add_module("lin", torch.nn.Linear(16, 32))
+        model.add_module("norm", torch.nn.LayerNorm(32))
+        q, _ = _fp8_weight(32, 16)
+        sd = {
+            "lin.weight": q,  # keep: a Linear weight the matmul can use
+            "lin.bias": torch.zeros(32).to(FP8_DTYPE),  # dequantize: bias
+            "norm.weight": torch.ones(32).to(FP8_DTYPE),  # dequantize: 1-D norm
+            "pad_token": torch.zeros(1, 32).to(FP8_DTYPE),  # dequantize: not a module weight
+        }
+        assert cast_state_dict(sd, torch.bfloat16, keep_fp8=True, model=model) == 1
+        assert sd["lin.weight"].dtype is FP8_DTYPE
+        for key in ("lin.bias", "norm.weight", "pad_token"):
+            assert sd[key].dtype is torch.bfloat16, f"{key} must not stay fp8"
+
+    def test_skip_patterns_dequantize_named_modules(self):
+        """Modules a model marks precision-sensitive must be dequantized even if they are Linears.
+
+        Z-Image declares `_skip_layerwise_casting_patterns = ["t_embedder", "cap_embedder"]`, and
+        `TimestepEmbedder.forward` casts its activations to `self.mlp[0].weight.dtype` — an fp8
+        weight there makes the activations fp8.
+        """
+        model = torch.nn.Sequential()
+        model.add_module("t_embedder", torch.nn.Linear(16, 32))
+        model.add_module("blocks", torch.nn.Linear(16, 32))
+        q, _ = _fp8_weight(32, 16)
+        sd = {"t_embedder.weight": q, "blocks.weight": q.clone()}
+        assert cast_state_dict(sd, torch.bfloat16, keep_fp8=True, model=model, skip_patterns=["t_embedder"]) == 1
+        assert sd["t_embedder.weight"].dtype is torch.bfloat16
+        assert sd["blocks.weight"].dtype is FP8_DTYPE
+
+    def test_count_fp8_weights(self):
+        model = torch.nn.Sequential(torch.nn.Linear(16, 32, bias=False), torch.nn.Linear(32, 16, bias=False))
+        assert count_fp8_weights(model) == 0
+        model[0].weight = torch.nn.Parameter(_fp8_weight(32, 16)[0], requires_grad=False)
+        assert count_fp8_weights(model) == 1
+
+    @cuda_fp8
+    def test_fp8_weight_without_scale_uses_the_tensor_cores(self):
+        """The runtime already supports scale-less fp8 — `weight_scale` is optional in
+        `scaled_mm_linear`, and `_can_use_fp8_matmul` only requires the fp8 dtype. This pins that
+        down so a future change cannot quietly make a scale mandatory."""
+        from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
+            apply_custom_layers_to_model,
+        )
+
+        torch.manual_seed(0)
+        net = torch.nn.Sequential(torch.nn.Linear(64, 64, bias=False)).cuda()
+        net[0].weight.data = (net[0].weight.data * 0.02).to(FP8_DTYPE)
+        apply_custom_layers_to_model(net)
+        lin = net[0]
+        x = torch.randn(1, 32, 64, device="cuda", dtype=torch.bfloat16)
+
+        set_fp8_matmul_enabled(True)
+        try:
+            assert getattr(lin, "weight_scale", None) is None
+            assert lin._can_use_fp8_matmul(x) is True
+            out = net(x)
+        finally:
+            set_fp8_matmul_enabled(None)
+
+        reference = torch.nn.functional.linear(x, dequantize_weight(lin.weight, None, x.dtype))
+        rel = ((out.float() - reference.float()).norm() / reference.float().norm()).item()
+        assert torch.isfinite(out).all()
+        assert rel < 0.1, f"unit-scaled fp8 matmul drifted too far from bf16: {rel:.4f}"
 
 
 class TestInputScale:
