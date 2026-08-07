@@ -621,7 +621,7 @@ const RELEASE_PARAMS_KEYS = {
       'zImageVaeModel',
     ],
   },
-  'f10d2a4f5a': {
+  f10d2a4f5a: {
     version: 5,
     keys: [
       'animaLLLiteModel',
@@ -1283,31 +1283,37 @@ describe('paramsSliceConfig persisted state migration', () => {
     expect(result.wanGuidanceScaleLowNoise).toBe(3.5);
   });
 
-  it('fills the PiD fields on a v4 blob written before they existed, without the repair pass', () => {
+  it('fills the fields added after the v4 bump from their zod defaults', () => {
     expect(migrate).toBeDefined();
 
-    // The PiD fields landed a day *after* the _version 3 -> 4 bump (1aeb05bbf0 on 2026-07-29,
-    // 3f5588f21f on 2026-07-30), so dev builds from that window persist v4 blobs without them. For
-    // as long as 4 was the current version no branch in the chain could reach those blobs, and the
-    // zod defaults were the only thing standing between those users and a wiped slice. main's
-    // v4 -> v5 step now seeds them as well; the defaults are what covers the same gap on the
-    // current tier, which by definition still has no step.
+    // Everything added since 1aeb05bbf0 bumped _version to 4 landed in a tier the chain could not
+    // reach for as long as 4 was current: a v4 blob matched no branch, so no step could seed it and
+    // a zod default was the only option. The PiD fields (3f5588f21f, one day after the bump) are the
+    // case that dev builds actually hit; the ERNIE-Image and HiDiffusion fields followed the same
+    // route. main's v4 -> v5 step now also seeds the PiD fields, but the defaults are what covers
+    // the same gap on the current tier, which by definition still has no step.
     const blob = buildReleaseBlob('1aeb05bbf0', { positivePrompt: 'a fluffy cat', seed: 42 });
     expect('pidMode' in blob).toBe(false);
+    expect('hiDiffusionEnabled' in blob).toBe(false);
 
     applyParamsVersionMigrations(blob);
     expect(blob._version).toBe(5);
 
     // Deliberately parsed directly rather than through migrate(). The repair pass would backfill
-    // these four from getInitialParamsState() to the very same values, so going through migrate()
-    // cannot tell the version steps and the zod defaults apart from the safety net catching their
-    // absence — the assertions would hold with both reverted.
+    // these from getInitialParamsState() to the very same values, so going through migrate() cannot
+    // tell the version steps and the zod defaults apart from the safety net catching their absence —
+    // the assertions would hold with both reverted.
     const result = zParamsState.parse(blob);
 
     expect(result.pidMode).toBe('off');
     expect(result.pidDecoderModel).toBeNull();
     expect(result.gemma2EncoderModel).toBeNull();
     expect(result.pidSteps).toBe(4);
+    expect(result.hiDiffusionEnabled).toBe(false);
+    expect(result.hiDiffusionRauNetEnabled).toBe(true);
+    expect(result.hiDiffusionWindowAttnEnabled).toBe(true);
+    expect(result.hiDiffusionT1Ratio).toBe(0.4);
+    expect(result.hiDiffusionT2Ratio).toBe(0.0);
     expect(result.positivePrompt).toBe('a fluffy cat');
     expect(result.seed).toBe(42);
   });

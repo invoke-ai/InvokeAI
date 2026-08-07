@@ -1162,25 +1162,6 @@ export const applyParamsVersionMigrations = (state: any): void => {
     state.gemma2EncoderModel = state.gemma2EncoderModel ?? null;
     state.pidSteps = state.pidSteps ?? 4;
   }
-
-  // The HiDiffusion fields were added to the schema without a version bump, so they can be missing
-  // from a blob of any version — seeded outside the version steps for that reason. They have no zod
-  // default, so an absent key would fail the parse() at the end of migrate() and wipe the slice.
-  if (!('hiDiffusionEnabled' in state)) {
-    state.hiDiffusionEnabled = false;
-  }
-  if (!('hiDiffusionRauNetEnabled' in state)) {
-    state.hiDiffusionRauNetEnabled = true;
-  }
-  if (!('hiDiffusionWindowAttnEnabled' in state)) {
-    state.hiDiffusionWindowAttnEnabled = true;
-  }
-  if (!('hiDiffusionT1Ratio' in state)) {
-    state.hiDiffusionT1Ratio = 0.4;
-  }
-  if (!('hiDiffusionT2Ratio' in state)) {
-    state.hiDiffusionT2Ratio = 0.0;
-  }
 };
 
 export const paramsSliceConfig: SliceConfig<typeof slice> = {

@@ -832,11 +832,15 @@ export const zParamsState = z.object({
   guidance: zParameterGuidance,
   img2imgStrength: zParameterStrength,
   optimizedDenoisingEnabled: z.boolean(),
-  hiDiffusionEnabled: z.boolean(),
-  hiDiffusionRauNetEnabled: z.boolean(),
-  hiDiffusionWindowAttnEnabled: z.boolean(),
-  hiDiffusionT1Ratio: z.number(),
-  hiDiffusionT2Ratio: z.number(),
+  // Added after the `_version` 3 -> 4 bump, so while 4 was current no migration step could seed them
+  // — a blob already at v4 matched no branch in the chain. Without defaults they are required, and
+  // every persisted blob in existence fails the parse in `migrate()`, wiping the user's whole params
+  // slice on upgrade. The defaults are still what covers the current tier, which has no step either.
+  hiDiffusionEnabled: z.boolean().default(false),
+  hiDiffusionRauNetEnabled: z.boolean().default(true),
+  hiDiffusionWindowAttnEnabled: z.boolean().default(true),
+  hiDiffusionT1Ratio: z.number().default(0.4),
+  hiDiffusionT2Ratio: z.number().default(0.0),
   iterations: z.number(),
   scheduler: zParameterScheduler,
   fluxScheduler: zParameterFluxScheduler,
