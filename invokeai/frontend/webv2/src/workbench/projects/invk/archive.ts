@@ -1,54 +1,29 @@
 import { INVK_MIME_TYPE, InvkFormatError } from './format';
 
 /**
- * The ZIP seam. The only module in the app that knows `.invk` is a ZIP, and the
- * only one that imports fflate.
+ * The ZIP seam. The only module that knows `.invk` is a ZIP, and the only one that imports fflate —
+ * lazily, so a route that never opens a project file never pays for it.
  *
- * fflate is loaded with `await import()` at call time, exactly as `psdExport.ts`
- * loads ag-psd and `wildcardFiles.ts` loads `yaml`. Reading or writing a project
- * file is a deliberate, occasional act; the bytes that make it possible have no
- * business in the graph a person downloads to look at their projects. The
- * architecture budget enforces this — a new package appearing in a route's
- * initial chunk fails the gate on the source-owner set alone, before anyone
- * looks at kilobytes.
+ * JSON entries are deflated, image entries stored: bitmaps are already PNG or WEBP, while the
+ * document is repetitive JSON that compresses tenfold.
  *
- * ### Compression
+ * ### Why the read guard lives in fflate's filter
  *
- * JSON entries are deflated; image entries are stored. Layer bitmaps and
- * generated results are already PNG or WEBP, so deflating them spends CPU
- * proportional to the archive to save a fraction of a percent. The project
- * document, by contrast, is repetitive JSON that routinely compresses tenfold.
+ * `unzip` is fully buffered — by the time it returns, every entry is already inflated in memory, so
+ * a total measured there is a postmortem rather than a guard. The filter is consulted per entry
+ * *before* inflation, using the central directory's declared size, which is the only place a
+ * ceiling can actually stop a zip bomb.
  *
- * ### Guards
- *
- * Both directions are bounded. An `.invk` is a file someone was handed, and an
- * unbounded `unzip` on a hostile one is a way to be handed an out-of-memory
- * crash instead of an error message.
- *
- * Reading enforces its budget in fflate's entry filter rather than after the
- * fact. `unzip` is fully buffered — by the time it hands back a record of
- * entries, every one of them has already been inflated into memory, so a total
- * measured there is a postmortem, not a guard. The filter is consulted per
- * entry *before* inflation, with the declared uncompressed size from the
- * central directory, which is the only place a ceiling can actually stop a zip
- * bomb rather than describe one.
- *
- * fflate allocates deflated entries from `originalSize`, but stored entries
- * from `size`. Stored ZIP entries must declare those sizes identically; the
- * filter rejects a mismatch before fflate can copy the payload.
+ * fflate allocates deflated entries from `originalSize` but stored entries from `size`. Stored
+ * entries must declare those identically, so the filter rejects a mismatch before the copy.
  */
 
 /**
- * Ceiling for a single archive, in either direction. Large enough for a real
- * project with hundreds of full-resolution layers and a video or two; small
- * enough that a malicious file fails fast rather than exhausting the tab.
+ * Ceiling for a single archive, in either direction.
  *
- * Deliberately well under 4 GiB. That is where ZIP32's 32-bit sizes and offsets
- * stop being able to describe the file, and fflate writes no zip64 records — it
- * reads them, but `zip()` has no path that emits them — so an archive at that
- * boundary would be written structurally invalid rather than rejected. The
- * browser gives out first anyway: `zip()` holds the entries and the packed
- * output in memory at once.
+ * Deliberately well under 4 GiB, where ZIP32's 32-bit sizes stop describing the file: fflate reads
+ * zip64 records but `zip()` never emits them, so an archive at that boundary would be written
+ * structurally invalid rather than rejected.
  */
 export const INVK_MAX_ARCHIVE_BYTES = 2 * 1024 * 1024 * 1024;
 
@@ -125,14 +100,9 @@ export interface InvkExpansionBudget {
 }
 
 /**
- * The read-side ceiling, as a value the ZIP walk consults rather than a total
- * measured afterwards.
- *
- * The refusal is *returned* rather than thrown from `accept`, because a throw
- * inside fflate's own walk unwinds through its decoder and arrives as a decode
- * failure — the caller would be told the file was not a project when what
- * actually happened is that it was too big. Refusing the entry and reporting
- * afterwards keeps the two reasons distinct while still inflating nothing.
+ * The read-side ceiling, consulted during the walk. The refusal is *returned* rather than thrown
+ * from `accept`: a throw inside fflate's walk unwinds through its decoder and arrives as a decode
+ * failure, so the caller would be told the file was not a project when it was merely too big.
  */
 export const createExpansionBudget = (): InvkExpansionBudget => {
   let entryCount = 0;

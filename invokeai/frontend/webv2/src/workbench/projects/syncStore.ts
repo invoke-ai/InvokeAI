@@ -5,23 +5,16 @@ import type { ProjectPushOutcome } from './projectFlush';
 
 /**
  * The bridge between the project sync layer and everything outside the editor.
- *
- * Two things live here. {@link ProjectSyncSnapshot} is a read-only window for shell surfaces (the
- * Project panel's debug section), written by `syncedPersistence` after each load/save pass.
- * {@link OpenProjectHandle} is the other direction: a way for non-workbench code to mutate a project
- * the workbench is currently holding, *through* the sync engine rather than behind its back.
+ * {@link ProjectSyncSnapshot} is a read-only window for shell surfaces; {@link OpenProjectHandle}
+ * is the other direction.
  *
  * ### One invariant, replacing three races
  *
- * A project the workbench holds is mutated only through the sync engine; every other project is
- * mutated over HTTP. The library used to GET-and-PUT unconditionally, which meant renaming an open
- * project landed a write beside its revision chain — the next autosave then saw a revision it did
- * not expect and forked the project into a conflict copy. Duplicating one copied whatever the
- * server last acknowledged, which is not what the person could see on screen. And deleting one
- * raced the autosave that was about to recreate it.
- *
- * Now that a project's board commits with its name, a stray write is worse still: it renames the
- * board too. So the branch is explicit, and there is exactly one of it per operation.
+ * A project the workbench holds is mutated only through the sync engine; every other project over
+ * HTTP. Unconditional GET-and-PUT meant renaming an open project forked it into a conflict copy,
+ * duplicating one copied what the server last acknowledged rather than what was on screen, and
+ * deleting one raced the autosave about to recreate it. Now that a board commits with its project's
+ * name, a stray write renames the board too.
  */
 
 export interface ProjectSyncInfo {
@@ -64,11 +57,10 @@ export interface OpenProjectHandle {
   /**
    * Delete the project on the server, from inside the sync engine's mutation queue.
    *
-   * The queue is the point. Marking the project deleted stops a save that has not begun, but says
-   * nothing to a `PUT` already on the wire — that one returns 404 once the delete commits, and the
-   * engine's answer to a 404 is to fork the local edits into a new server-side project. Deleting
-   * *through* the queue means the in-flight push finishes first, so there is no 404 to misread and
-   * no copy of the project the person just deleted.
+   * The queue is the point. Marking the project deleted stops a save that has not begun but says
+   * nothing to a `PUT` already on the wire, which returns 404 once the delete commits — and the
+   * engine's answer to a 404 is to fork the local edits into a new server-side project, a copy of
+   * the thing just deleted. Deleting *through* the queue lets the in-flight push finish first.
    */
   deleteOnServer: () => Promise<void>;
   /**

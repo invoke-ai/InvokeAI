@@ -26,27 +26,14 @@ import { buildInvkManifest, toInvkFileName } from './manifest';
 import { createTransferIssueLog, planMediaTransfer, toMediaRefs } from './transfer';
 
 /**
- * Writing an `.invk`, split into a pure planner and an impure executor the same
- * way `canvas-engine/export/psdExport.ts` splits PSD export.
+ * Writing an `.invk`, split into a pure planner and an impure executor, as
+ * `canvas-engine/export/psdExport.ts` splits PSD export. {@link planInvkExport} decides what the
+ * archive contains from the document alone, so that decision is a node test.
  *
- * {@link planInvkExport} decides what the archive contains — entry names, which
- * asset names to bundle and of which kind, which image becomes the cover — from
- * the document alone. No network, no DOM, no fflate, so the interesting decision
- * (what belongs in a project file) is a node test rather than a manual round trip.
- *
- * {@link executeInvkExport} does the parts that can fail: fetching each image,
- * packing the ZIP, handing it to the browser.
- *
- * An image the server will not serve is logged in the result and skipped, never
- * fatal. Half a project's pixels beats none, and the reference survives in the
- * document either way — importing onto the machine that still has the image
- * resolves it.
- *
- * Cancellation is the one failure that is *not* a skip. An aborted signal makes
- * every asset unservable at once, and skipping all of them would pack an archive
- * of nothing and hand it to the browser as a finished download. So a cancelled
- * request propagates, and the signal is checked once more before the archive is
- * written — nothing reaches the disk after the export stopped being wanted.
+ * An unservable image is logged and skipped, never fatal. Cancellation is the one failure that is
+ * *not* a skip: it makes every asset unservable at once, and skipping all of them would pack an
+ * archive of nothing and hand it over as a finished download. The signal is checked once more
+ * before the archive is written.
  */
 
 export interface InvkExportPlan {

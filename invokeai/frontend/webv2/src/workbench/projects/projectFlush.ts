@@ -1,14 +1,12 @@
 /**
  * What a push to the server actually achieved, as distinct from whether the call threw.
  *
- * Its own module rather than part of the sync engine, because the two callers that need it —
- * `library.ts` for duplication and `projectFile.ts` for export — are modules the sync engine itself
- * imports. Reaching back into it for this would make that a cycle.
+ * Its own module rather than part of the sync engine: the caller that needs it, `library.ts`, is a
+ * module the sync engine itself imports, so reaching back would be a cycle.
  *
- * Every failure the engine can hit is recoverable: the document is cached locally and the next save
- * retries, which is why a push swallows them all rather than rejecting. But "recoverable" is not the
- * same as "done", and reading a project back from the server after an unacknowledged push is how an
- * export or a copy silently ships someone's work minus the last ten minutes of it.
+ * A push swallows every failure because they are all recoverable — the document is cached and the
+ * next save retries. But "recoverable" is not "done", and reading a project back after an
+ * unacknowledged push is how an export ships someone's work minus the last ten minutes of it.
  */
 
 /** The document the push was carrying, so a caller can compare it with what the engine recorded. */
@@ -42,14 +40,7 @@ export class ProjectFlushError extends Error {
   }
 }
 
-/**
- * Read back only what the server has certainly acknowledged.
- *
- * Both callers — export and duplicate — do the same two things: flush the open project, then GET
- * the record. The GET returns the last *acknowledged* document, so without this the flush's failure
- * is indistinguishable from its success and the copy is built from stale bytes under a clean
- * success toast.
- */
+/** Refuse anything the server has not certainly acknowledged. See {@link readAcknowledgedProject}. */
 export const assertProjectFlushed = (outcome: ProjectPushOutcome): void => {
   if (outcome.kind !== 'acknowledged') {
     throw new ProjectFlushError(outcome.kind);
@@ -57,13 +48,10 @@ export const assertProjectFlushed = (outcome: ProjectPushOutcome): void => {
 };
 
 /**
- * Who a recovery fork *is*, separately from what it holds.
- *
- * The fork's `recoveredProject` is built from the document as it was when the push started, so
- * applying it wholesale overwrites anything edited since. The identity is the only part of it the
- * local store actually needs: a project that is still open can adopt these four fields and keep its
- * live content, which is both newer and already what the person is looking at. The snapshot stays
- * for the case where there is no live project left to re-identify — a tab closed mid-flight.
+ * Who a recovery fork *is*, separately from what it holds. `recoveredProject` is built from the
+ * document as it was when the push started, so applying it wholesale overwrites anything edited
+ * since; a project still open adopts these four fields instead and keeps its live content. The
+ * snapshot stays for the case with no live project left to re-identify — a tab closed mid-flight.
  */
 export interface ProjectRecoveredIdentity {
   id: string;

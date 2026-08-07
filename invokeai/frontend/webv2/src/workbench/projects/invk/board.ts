@@ -4,26 +4,19 @@ import { INVK_MAX_ENTRIES } from './archive';
 import { InvkFormatError } from './format';
 
 /**
- * `board.json`: what was on the project's board when the archive was written.
- *
- * A project document names only the media it draws with. Everything else the project produced —
- * results generated but never placed on canvas, uploads kept for later — is board membership and
- * appears nowhere in the document, so a reader cannot infer it. This entry states it, and is the
- * difference between an `.invk` carrying a project's canvas and carrying its workspace.
+ * `board.json`: what was on the project's board when the archive was written. A document names only
+ * the media it draws with, so everything else the project produced appears nowhere in it — this
+ * entry is the difference between carrying a project's canvas and carrying its workspace.
  *
  * ```json
  * { "version": 1, "items": [{ "category": "general", "kind": "image", "name": "…", "starred": false }] }
  * ```
  *
- * The version here is the *file's*, not the API's. The board snapshot endpoint returns the same
- * items but carries no version of its own, deliberately: an archive format that moved whenever the
- * wire format did would be pinned to it forever, and vice versa.
+ * The version is the *file's*, not the API's: an archive format pinned to the wire format would
+ * have to move whenever it did, and vice versa.
  *
- * Validation is strict and structural. A duplicate `(kind, name)` or a name that is not a plain
- * basename is not a warning to be reported alongside the import — it means the file is malformed,
- * and a malformed archive must be refused before anything is uploaded. Import cannot sensibly
- * "partially trust" an enumeration: a name containing a path separator is either an attempt to
- * write outside the archive's namespace or a bug, and neither is something to restore.
+ * Validation is strict and structural — a duplicate `(kind, name)` or a non-basename name means the
+ * file is malformed and must be refused before anything is uploaded, not reported alongside it.
  */
 
 export type InvkMediaKind = 'image' | 'video';

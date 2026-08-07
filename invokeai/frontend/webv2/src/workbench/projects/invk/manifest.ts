@@ -3,15 +3,9 @@ import { z } from 'zod';
 import { INVK_EXTENSION, INVK_VERSION, InvkFormatError } from './format';
 
 /**
- * The `.invk` manifest: what an archive is, before anything reads what is in it.
- *
- * `.invk` is not new. The canvas project files written by the previous frontend
- * are ZIPs with this same root `manifest.json` — `{version, appVersion,
- * createdAt, name}` — alongside an `images/` folder keyed by backend image name.
- * That container is kept verbatim. Version 2 changes only the payload: where a
- * v1 archive carried four canvas-shaped state files, a v2 archive carries one
- * `project.json` holding the whole workbench project document, `board.json`
- * describing the project's board, and an optional cover.
+ * The `.invk` manifest. The previous frontend's canvas project files are ZIPs with this same root
+ * `manifest.json` and `images/` folder; that container is kept verbatim, and version 2 changes only
+ * the payload.
  *
  * ```
  * <name>.invk
@@ -23,21 +17,12 @@ import { INVK_EXTENSION, INVK_VERSION, InvkFormatError } from './format';
  * └── videos/<video_name>    the same, for the other namespace
  * ```
  *
- * Parsing is a discriminated union rather than a strict `z.literal(2)` so that
- * every version this app has written can be named precisely when refused. "This
- * is a canvas project from an earlier version" is a sentence someone can act on;
- * a zod issue list is not. The legacy reader is the mirror image — it pins
- * `version: 1` and will refuse the others, which is correct and needs no change.
+ * Parsed as a discriminated union rather than `z.literal(2)` so a refusal can name the version
+ * precisely: "this is a canvas project from an earlier version" is actionable, a zod issue list is
+ * not.
  *
- * Adding `board.json` did not bump the version, because a version tells a reader
- * what it may assume about a file *someone else wrote* and no such file predates
- * the entry — webv2 has not shipped. A reader treats the entry as optional and
- * its absence as "this archive names no board", which is exactly what a dev build
- * from before boards produced.
- *
- * The names and the error class live in `./format`, which carries no zod, so
- * that the file picker and the error toast do not drag the schema into the
- * Launchpad's initial bundle.
+ * Adding `board.json` did not bump the version — a version tells a reader what it may assume about
+ * a file *someone else wrote*, and webv2 has not shipped. Readers treat the entry as optional.
  */
 
 const zManifestV1 = z.object({

@@ -190,14 +190,9 @@ class DiskImageFileStorage(ImageFileStorageBase):
     ) -> None:
         """Duplicate an image's files under a new name, without decoding them.
 
-        A copy is byte-identical, so `shutil.copy2` is both the cheapest way to make one and the
-        most faithful: every PNG chunk travels, including ones this application does not parse and
-        would silently drop on a re-encode. Going through `save()` instead would decode and
-        re-encode the pixels — hundreds of milliseconds and a fresh compression pass per image, to
-        arrive at the same picture.
-
-        Nothing is cached here. The source's cache entry belongs to the source, and a copy nobody
-        has read yet has no business occupying a slot.
+        `shutil.copy2` is both cheapest and most faithful: every PNG chunk travels, including ones
+        this application does not parse and would drop on a re-encode. Nothing is cached — a copy
+        nobody has read yet has no business occupying a slot.
         """
         try:
             self.__validate_storage_folders()

@@ -3,23 +3,18 @@ import type { ProjectAssetRefs } from '@workbench/projects/projectAssets';
 import type { InvkBoardItem, InvkMediaKind } from './board';
 
 /**
- * The vocabulary shared by everything that moves a project's media: export, import, and
- * duplication.
+ * The vocabulary shared by export, import and duplication — and the one rule they all turn on.
  *
- * All three face the same problem. A project's media comes from two places that overlap — the
- * board, which is membership, and the document, which is references — and an item can be in
- * either, or both. What must happen to it differs by which:
+ * A project's media comes from two overlapping places, and what must happen differs by which:
  *
- * - **Board membership** must be *copied*. `board_images` keys on the image name, so one image sits
- *   on exactly one board; a restored project that reused an existing name would be sharing another
- *   project's media, and deleting either board would take it from both.
+ * - **Board membership** must be *copied*. `board_images` has `PRIMARY KEY (image_name)`, so one
+ *   image sits on exactly one board; reusing an existing name would *share* another project's
+ *   media, and deleting either board would take it from both.
  * - **Document references** may be *reused*. They are pointers, not membership, so an image the
- *   destination already has satisfies the reference without a second copy. This is the v2
- *   behaviour, and it is still right for media that lives outside the project's own board.
+ *   destination already has satisfies them without a second copy.
  *
- * The consequence is the rule this module exists to encode: an item that is *both* is restored as
- * board media, and its document references are rewritten to the copy. And when that copy fails, the
- * reference must not be left pointing at the old name — see {@link buildMissingMediaName}.
+ * So an item that is *both* is restored as board media and its references rewritten to the copy.
+ * When that copy fails the reference must not keep the old name — see {@link buildMissingMediaName}.
  */
 
 /** One item, in whichever namespace it belongs to. */
@@ -50,15 +45,9 @@ export interface InvkMediaIssue extends InvkMediaRef {
 }
 
 /**
- * What a transfer could not carry, split by what it means to the person holding the file.
- *
- * A missing board item costs a result they can still see elsewhere. A missing document reference
- * costs a layer in the canvas — the project opens with a hole in it. Reporting one number for both
- * made "12 assets could not be included" mean anything from "nothing you will notice" to "the
- * canvas is broken", so they are counted apart.
- *
- * An item that was both appears in both arrays. That is not double-counting: it genuinely failed
- * in both roles.
+ * What a transfer could not carry, counted apart: a missing board item costs a result still
+ * findable elsewhere, a missing document reference costs a layer in the canvas. An item that was
+ * both appears in both arrays — it genuinely failed in both roles.
  */
 export interface ProjectTransferIssues {
   boardItemIssues: InvkMediaIssue[];
@@ -105,11 +94,9 @@ export interface InvkTransferItem extends InvkMediaRef {
 }
 
 /**
- * Merge board membership and document references into one list, each item appearing once.
- *
- * Fetching is the expensive half of an export and uploading the expensive half of an import, so an
- * item that is both must be handled once, not twice — and the union is also what lets a single
- * failure be reported correctly against both roles.
+ * Merge board membership and document references into one list, each item once. An item that is
+ * both must be fetched or uploaded once, and the union is what lets one failure be reported
+ * against both roles.
  */
 export const planMediaTransfer = (
   boardItems: readonly InvkBoardItem[],
@@ -150,17 +137,11 @@ export const planMediaTransfer = (
 
 /**
  * A name guaranteed not to resolve, for a document reference whose board media could not be
- * restored.
+ * restored. Keeping the original would be worse: the destination may hold its own image under that
+ * exact name — during a duplication it certainly does — so the project would open pointing at a
+ * stranger's picture, plausibly and silently.
  *
- * Leaving the original name in place would be worse than a broken reference. Names are assigned by
- * the exporting server, and the destination may well have its own image under that exact name —
- * on the same server, during a duplication, it certainly does. The project would then open
- * pointing at a stranger's picture, silently and plausibly, with nothing to indicate it is the
- * wrong one. A reference that resolves to nothing is honest: it renders as a missing layer,
- * exactly as a dangling v2 reference already does.
- *
- * Derived from the new project id, so it is stable within one import (every occurrence of the old
- * name maps to the same placeholder) and unique across imports.
+ * Derived from the new project id, so it is stable within one import and unique across them.
  */
 export const buildMissingMediaName = (projectId: string, kind: InvkMediaKind, index: number): string =>
   `${projectId}-missing-${kind}-${index}`;

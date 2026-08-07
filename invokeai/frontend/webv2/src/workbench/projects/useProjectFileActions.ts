@@ -19,17 +19,10 @@ import { startProjectFileReport } from './projectFileToasts';
 /**
  * Picking, importing and exporting a project file, with the reporting attached.
  *
- * Five surfaces offer these — Home, the Projects page, the in-editor Open
- * dialog, the project switcher, and every project card — and each had written
- * out the same twenty lines of scope capture, picker, try/catch and toast. They
- * had already drifted: the import sites checked the account scope before
- * showing an error and the export sites did not, so cancelling an export by
- * signing out produced a toast written for a developer.
- *
- * Keeping the sequence in one place is what makes progress and partial-success
- * reporting land on all five at once rather than on whichever was edited last.
- * What differs between call sites is only what happens with the imported record,
- * which is the callback.
+ * Five surfaces offer these, and each had its own copy of the scope capture, picker, try/catch and
+ * toast — which had already drifted. One sequence is what makes progress and partial-success
+ * reporting land on all five at once. Only what happens with the imported record differs, and that
+ * is the callback.
  */
 
 /** Runs the sequence, keeping the toast and the account scope in step. */

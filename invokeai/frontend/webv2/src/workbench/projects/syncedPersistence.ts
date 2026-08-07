@@ -46,22 +46,15 @@ export { serializeProjectDocument } from './projectDocument';
 /**
  * Backend-first workbench persistence (spec: Persistence Model).
  *
- * The backend database is the source of truth: each project is one
- * revision-versioned document on the server, and the small session blob
- * (open tabs + active project, with legacy account data) lives in the per-user
- * client-state KV. The user-scoped localStorage snapshot is kept as a
- * write-through cache so the workbench still loads and autosaves while the
- * backend is unreachable; un-pushed changes are replayed on the next save or
- * reconnect.
+ * The server is the source of truth: one revision-versioned document per project, plus a session
+ * blob in the per-user client-state KV. The localStorage snapshot is a write-through cache, so the
+ * workbench still loads and autosaves offline and replays on reconnect.
  *
- * Workbench state only ever holds the open projects (the session); the full
- * set of saved projects lives in the project library as summaries. Saving
- * pushes what is open and never deletes — projects leave the server only
- * through the library's explicit delete.
+ * Workbench state holds only the open projects; the rest live in the library as summaries. Saving
+ * never deletes — projects leave the server only through the library's explicit delete.
  *
- * Conflicts never lose work: when a save is based on a stale revision, the
- * server version wins for that project id and the local version is forked
- * into a "(recovered)" project beside it.
+ * Conflicts never lose work: the server version keeps the id, and the local version forks into a
+ * "(recovered)" project beside it.
  */
 
 const SYNC_MAP_BASE_KEY = 'invokeai:v7:webv2:workbench-sync';
@@ -125,12 +118,9 @@ interface SyncedPersistenceState {
   /** Ids deleted in this runtime lifetime, guarding against racing saves. */
   deletedProjectIds: Set<string>;
   /**
-   * Ids that have already been forked because the server no longer had them.
-   *
-   * The fork exists on the server from the moment it is made, but the original stays in the
-   * aggregate until the reconciliation reaches it. In that window `pushProject` would find no sync
-   * entry and re-create the project under its old id — undoing the very deletion the fork exists to
-   * respect. So a forked id is never pushed again.
+   * Ids already forked because the server no longer had them. The original stays in the aggregate
+   * until reconciliation reaches it, and in that window `pushProject` would find no sync entry and
+   * re-create it under its old id — undoing the deletion the fork exists to respect.
    */
   forkedProjectIds: Set<string>;
   hasPending: boolean;
@@ -139,12 +129,9 @@ interface SyncedPersistenceState {
   /** Immutable owner captured when this synchronization lifetime was constructed. */
   owner: AccountScope;
   /**
-   * What the server said that the aggregate has not been told yet, drained by the next save.
-   *
-   * A push happens from a save *and* from a targeted flush, and only the save has somewhere to
-   * return an outcome to. Holding them here rather than in the caller's local arrays is what makes
-   * "the next save carries them" true rather than aspirational: a flush that forks a project or
-   * resolves a conflict cannot silently drop the answer.
+   * What the server said that the aggregate has not been told yet, drained by the next save. A push
+   * happens from a save *and* from a targeted flush, and only the save has somewhere to return an
+   * outcome to — so a flush that forks a project cannot silently drop the answer.
    */
   pendingBoardAssignments: ProjectBoardAssignment[];
   pendingConflicts: ProjectConflictResolution[];
@@ -202,13 +189,9 @@ const getSerializedProjectDocument = (
 };
 
 /**
- * Rehydrate a *server record*, which knows the project's real board.
- *
- * The document's own `projectBoardId` is a cache and can be stale — written by another install, or
- * replaced by the migration when the board it named turned out to be ambiguous. Overwriting it
- * here means every path that reads a project from the server agrees on one answer, and the next
- * autosave writes the correction back. The saved destination is left alone: it is a deliberate
- * choice, and `getGallerySelectedBoardId` resolves it against the boards that actually exist.
+ * Rehydrate a *server record*, which knows the project's real board. The document's own
+ * `projectBoardId` is a stale-able cache, so overwriting it here means every path that reads from
+ * the server agrees on one answer. The saved destination is left alone — it is a deliberate choice.
  */
 const deserializeProjectRecord = (record: ProjectRecordDTO): Project | null => {
   const project = deserializeProjectDocument(
@@ -242,10 +225,8 @@ const getSyncMapStorageKey = (syncState: SyncedPersistenceState): string =>
   `${SYNC_MAP_BASE_KEY}${syncState.owner.storageSuffix}`;
 
 /**
- * The revision map survives reloads so that, while offline, we can still tell
- * "this local project was synced before but is gone from the server (deleted
- * elsewhere — drop it)" apart from "this local project was created offline
- * (push it)".
+ * The revision map survives reloads so an offline runtime can tell "synced before, now gone from
+ * the server — drop it" apart from "created offline — push it".
  */
 const persistSyncMap = (syncState: SyncedPersistenceState): void => {
   assertOwner(syncState);
@@ -329,11 +310,7 @@ const pushNewProject = async (syncState: SyncedPersistenceState, project: Projec
 /** Strip any number of stacked "(recovered)" suffixes left by older recoveries. */
 const getRecoveryBaseName = (name: string): string => name.replace(/(\s*\((?:r|R)ecovered\))+$/u, '').trim() || name;
 
-/**
- * Build the fork document for a conflicted project: lineage always points at
- * the root original (a recovery of a recovery still keys to the first
- * project), and the name never stacks suffixes.
- */
+/** Lineage points at the root original, so a recovery of a recovery still keys to the first. */
 export const createRecoveredDocument = (
   project: Project,
   document: Record<string, unknown>
@@ -365,15 +342,11 @@ type ConflictOutcome =
   | { kind: 'failed' };
 
 /**
- * A save lost the revision race. Forking is the last resort — it only happens
- * when content actually diverged:
+ * A save lost the revision race. Forking is the last resort — only when content actually diverged:
  *
- * - server content == what we tried to push → adopt the revision, done
- * - server content == the base this edit started from → revisions drifted
- *   without divergence (e.g. crash between an acknowledged PUT and the
- *   revision write); adopt the revision and retry the edit
- * - anything else → the server version keeps the id, the local edits fork
- *   into a "(recovered)" project so nothing is lost
+ * - server content == what we pushed → adopt the revision, done
+ * - server content == this edit's base → revisions drifted without divergence; adopt and retry
+ * - anything else → the server version keeps the id, the local edits fork into "(recovered)"
  */
 const recoverConflictingProject = async (
   syncState: SyncedPersistenceState,
@@ -446,11 +419,9 @@ type DeletionForkOutcome =
   | { kind: 'failed' };
 
 /**
- * Rescue the local edits of a project the server no longer has.
- *
- * Deliberately a *fork*, not a re-create. Pushing the original id back would resurrect a project
- * the user deleted — on every device, and here as a project whose board went with the deletion.
- * The fork gets a fresh id, and with it a fresh board from the create response.
+ * Rescue the local edits of a project the server no longer has. A *fork*, not a re-create: pushing
+ * the original id back would resurrect a project the user deleted, on every device. The fork gets a
+ * fresh id, and with it a fresh board from the create response.
  */
 const forkDeletedProject = async (
   syncState: SyncedPersistenceState,
@@ -952,16 +923,7 @@ export const createSyncedWorkbenchPersistence = (
         syncState.hasPending = false;
       });
     },
-    /**
-     * Remove the project from the server without letting a save race the removal.
-     *
-     * Queued rather than issued directly, which is the whole point: `markProjectDeleted` stops a
-     * push that has not started, but a `PUT` already in flight is past every check the engine has.
-     * That push comes back 404 once the DELETE commits, and the engine's answer to a 404 is to fork
-     * the local document into a *new* server project — resurrecting, as a copy, what the person
-     * just deleted, pointing at media the deletion already removed. Waiting for the queue removes
-     * the race rather than detecting it.
-     */
+    /** Queued, not issued directly — see {@link OpenProjectHandle.deleteOnServer}. */
     deleteProjectOnServer(projectId): Promise<void> {
       return enqueueMutation(async () => {
         markDeleted(projectId);

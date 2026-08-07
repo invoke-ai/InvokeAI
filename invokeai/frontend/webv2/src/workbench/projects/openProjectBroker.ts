@@ -3,17 +3,11 @@ import type { ProjectPushOutcome } from './projectFlush';
 import { type OpenProjectHandle, registerOpenProject, unregisterOpenProject } from './syncStore';
 
 /**
- * Publishes one {@link OpenProjectHandle} per open tab, for the whole life of the mounted editor.
+ * Publishes one {@link OpenProjectHandle} per open tab, for the life of the mounted editor.
  *
- * The registry has to say exactly which projects the workbench holds, because that is what decides
- * whether the library mutates a project through the sync engine or over HTTP — and a registry that
- * disagreed with the tabs would put a write on the wrong side of the invariant. So it is derived
- * from workbench state on every change rather than maintained by open and close call sites, which
- * is a rule that cannot drift as new ways to open a project are added.
- *
- * The dependencies are plain functions rather than the store and the persistence service. This
- * module belongs to the project layer, which the workbench shell wires up; taking the aggregates
- * themselves would invert that.
+ * Derived from workbench state on every change rather than maintained by open and close call sites:
+ * the registry decides whether the library mutates through the sync engine or over HTTP, so one
+ * that disagreed with the tabs would put a write on the wrong side of that invariant.
  */
 export interface OpenProjectBrokerDeps {
   /** Drop the tab. Called after the project is already gone from the server. */
@@ -60,11 +54,9 @@ export const createOpenProjectBroker = (deps: OpenProjectBrokerDeps): OpenProjec
   /**
    * Publish the current open set, unregistering whatever is no longer in it.
    *
-   * Registration is unconditional rather than skipped for ids already published. The registry is
-   * cleared when the account changes, and a `published` set that believed it was still there would
-   * never re-register — silently sending every library mutation back over HTTP for the rest of the
-   * mount, which is the one thing this module exists to prevent. `published` therefore records only
-   * what to *retract*, and the registry stays the single source of what is currently published.
+   * Registration is unconditional: the registry is cleared when the account changes, and a
+   * `published` set that believed otherwise would never re-register, silently sending every library
+   * mutation over HTTP for the rest of the mount. `published` records only what to *retract*.
    */
   const sync = (): void => {
     const openIds = new Set(deps.getOpenProjectIds());

@@ -34,27 +34,16 @@ import { toMediaRefs } from './transfer';
 /**
  * Reading an `.invk` back, in two steps a caller can put a decision between.
  *
- * {@link readInvkArchive} is pure inspection: unpack, validate the manifest, parse the document and
- * the board enumeration, then index the bundled bytes. It touches no network and mutates nothing, so
- * a caller can read a file, discover it is a legacy canvas project, and say so without having
- * created anything. Everything structural fails here, before a board or a single uploaded image
- * exists.
- *
- * {@link restoreArchiveMedia} is the part with consequences. It is a thin wiring of
- * `restoreProjectMedia`, which is shared with duplication: this module supplies the one thing that
- * differs, namely that the bytes come out of the archive.
- *
- * Neither touches the document. The caller applies the returned mapping, because the caller is also
- * the one assigning the new project id.
+ * {@link readInvkArchive} is pure inspection — no network, no mutation — so everything structural
+ * fails before a board or a single uploaded image exists. {@link restoreArchiveMedia} is the part
+ * with consequences. Neither touches the document: the caller applies the returned mapping,
+ * because the caller is also the one assigning the new project id.
  */
 
 export interface InvkArchiveContents {
   /**
-   * What the project's board held, or `null` for an archive that names no board.
-   *
-   * `null` and `{items: []}` are deliberately different answers. "This file does not describe a
-   * board" calls for the server to create an empty one; "this project's board was empty" is a fact
-   * the restore already knows. Only the first may have a board invented for it.
+   * What the project's board held, or `null` for an archive that names no board. `null` and
+   * `{items: []}` are different answers: only the first may have a board invented for it.
    */
   boardSnapshot: InvkBoardSnapshot | null;
   /** Bundled preview bytes and the entry they came from, when the archive has one. */
@@ -84,11 +73,8 @@ const parseDocumentEntry = (bytes: Uint8Array): Record<string, unknown> => {
 };
 
 /**
- * The board enumeration, or `null` when the archive carries none.
- *
- * Absent is a valid archive — a build from before project boards wrote one — but *malformed* is
- * not: an enumeration that cannot be trusted has to fail before anything is created, because half
- * of it is not a board.
+ * The board enumeration, or `null` when the archive carries none. Absent is valid; *malformed* is
+ * not, and must fail before anything is created — half an enumeration is not a board.
  */
 const parseBoardEntry = (entries: ReadonlyMap<string, Uint8Array>): InvkBoardSnapshot | null => {
   const entry = entries.get(INVK_BOARD_ENTRY);
@@ -109,12 +95,9 @@ const parseBoardEntry = (entries: ReadonlyMap<string, Uint8Array>): InvkBoardSna
 };
 
 /**
- * The part of `images/<name>` that is a name, or `null` for anything that is not.
- *
- * A ZIP path is attacker-controlled text. `images/../../x.png` and `images/nested/x.png` both have a
- * remainder that is not a file name, and either would let an entry masquerade as media the board
- * enumeration then asks for by name. Media names on the server never contain a separator, so the
- * check costs nothing legitimate.
+ * The part of `images/<name>` that is a name, or `null` otherwise. A ZIP path is attacker-controlled:
+ * `images/../../x.png` would let an entry masquerade as media the board enumeration asks for by
+ * name. Server media names never contain a separator, so the check costs nothing legitimate.
  */
 const toSafeBasename = (path: string, prefix: string): string | null => {
   const name = path.slice(prefix.length);
@@ -192,16 +175,12 @@ export interface ArchiveBoardUploadDeps {
 }
 
 /**
- * The import half of the materialization seam: board media comes out of the archive.
+ * The import half of the materialization seam: board media comes out of the archive. Uploaded with
+ * no existence check — see `transfer.ts`. A descriptor the archive carries no bytes for is reported
+ * rather than skipped: the exporting server said it was there.
  *
- * Every descriptor is uploaded, with no existence check — see `restoreProjectMedia` for why board
- * media can never reuse a name the destination already has. A descriptor the archive carries no
- * bytes for is reported rather than skipped silently: the exporting server told us it was there,
- * so its absence is a loss worth naming.
- *
- * Each entry is dropped from the archive as it lands. An `.invk` may be two gigabytes, and holding
- * every entry until the import finishes means holding the whole archive *and* everything unpacked
- * from it through the restore and the create that follows — for bytes the server already has.
+ * Entries are dropped as they land. An `.invk` may be two gigabytes, and holding every one until
+ * the import finishes means holding the archive *and* everything unpacked from it.
  */
 export const createArchiveMediaMaterializer = (
   archive: Pick<InvkArchiveContents, 'images' | 'videos'>,
@@ -270,11 +249,8 @@ export type RestoreArchiveMediaDeps = ArchiveBoardUploadDeps &
   Omit<RestoreProjectMediaDeps, 'documentMediaBytes' | 'materializeBoardMedia'>;
 
 /**
- * Make an archive's media exist on this server: board items onto the staging board under fresh
- * identities, document-only references deduplicated against what is already here.
- *
- * An archive that names no board restores its document references and nothing else — the shared
- * engine simply sees an empty descriptor list.
+ * Make an archive's media exist here: board items onto the staging board under fresh identities,
+ * document-only references deduplicated against what is already present.
  */
 export const restoreArchiveMedia = (
   archive: InvkArchiveContents,

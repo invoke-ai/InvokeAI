@@ -35,11 +35,7 @@ export interface ProjectCreateRequest {
   project_id?: string;
   /**
    * An existing unclaimed private board for the new project to adopt, renamed to match. Omit to
-   * have the server create one.
-   *
-   * Restoring a project uploads its media into such a board first and passes it here, which makes
-   * creating the project the single commit point for an import: the media is in place before the
-   * project exists, and a create that fails leaves no half-built project behind.
+   * have the server create one. This is what makes the create an import's single commit point.
    */
   board_id?: string;
   name: string;
@@ -124,22 +120,17 @@ export class ProjectCreateAbsentError extends Error {
 
 /**
  * Create a project, resolving the one outcome a bare `POST` cannot report: a create that reached
- * the server but whose response did not reach us.
+ * the server but whose response did not reach us. Getting that wrong orphans a board's worth of
+ * already-uploaded media, or *deletes* it out from under a project that does exist.
  *
- * This matters because the caller has already uploaded a board's worth of media by the time it runs.
- * Getting the answer wrong in one direction orphans those uploads; in the other it *deletes* them,
- * out from under a project that does exist, leaving every reference in its document dangling.
- *
- * A read cannot decide it. `GET` on the chosen id returns 404 while the create transaction is still
- * committing, which is exactly the window a dropped connection leaves open — so the probe reports
- * "absent" about a project that is moments from existing. A write can: SQLite has a single writer,
- * so a second `POST` cannot commit before the first one finishes, and its answer is about a settled
- * database rather than one mid-transaction.
+ * A read cannot decide it — `GET` returns 404 while the create transaction is still committing,
+ * exactly the window a dropped connection leaves open. A write can: SQLite has a single writer, so
+ * a second `POST` cannot commit before the first finishes and its answer is about a settled
+ * database.
  *
  * - `201` — the first attempt never landed and this one did.
- * - `409` — the retry ran to completion against the server, so the follow-up `GET` is no longer
- *   racing anything: a record means the first create committed and is adopted; a 404 means the id is
- *   genuinely free and something else (another importer holding the staging board) refused this.
+ * - `409` — the retry ran to completion, so the follow-up `GET` races nothing: a record means the
+ *   first create committed and is adopted; a 404 means something else holds the staging board.
  * - any other deterministic rejection — the server answered, and answered no.
  * - another transport failure — still unknown, and unknown must not authorize deletion.
  */

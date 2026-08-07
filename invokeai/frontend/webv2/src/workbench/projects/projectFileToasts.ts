@@ -6,30 +6,11 @@ import type { ProjectFileProgress } from './projectFile';
 import { describeProjectFileError, type ProjectFileDirection } from './projectFileErrors';
 
 /**
- * How a project file reports itself while it runs, and what it says when it is
- * done.
+ * One live toast per transfer, updated in place. No progress bar: the countable unit is assets and
+ * the expensive one is bytes, so a bar drawn from the first would sit at 99% through the second.
  *
- * Every entry point — Home, the Projects page, the in-editor Open dialog, the
- * project switcher, each project card — used to start one of these and then say
- * nothing until it either finished or threw. For an operation whose duration is
- * set by how much someone has drawn, that is a long silence: a few hundred
- * full-resolution layers is a few hundred round trips and hundreds of megabytes.
- * A button that appears to do nothing for two minutes gets pressed again.
- *
- * The reporter is one live toast rather than a new one per phase, so a slow
- * export occupies one line and updates in place instead of stacking. It is
- * deliberately unglamorous: a count, then a result. There is no progress bar,
- * because the honest unit here is assets and the expensive one is bytes, and a
- * bar drawn from the first would sit at 99% through the whole of the second.
- *
- * ### Half-success is a result, not a success
- *
- * Export skips assets the server will not serve; import leaves references
- * dangling when neither the archive nor this server has them. Both are correct
- * — a project that exports every layer but one is far more use than one that
- * refuses — but both are things the person holding the file needs to know
- * before they hand it to someone else. So a lossy run finishes as a warning
- * naming the count, and only a clean one finishes as a plain success.
+ * A lossy run settles as a warning naming the count, not a success — the person holding the file
+ * needs to know before they hand it to someone else.
  */
 
 /** i18next's `t`, narrowed to what this module needs. */
@@ -44,12 +25,8 @@ export interface ProjectFileReporter {
   /** Update the live toast from a transfer's progress. */
   report: (progress: ProjectFileProgress) => void;
   /**
-   * Finish cleanly, or as a warning naming what was left behind.
-   *
-   * Board items and document references are counted apart because they cost different things: a
-   * missing board item is a result still findable elsewhere, a missing document reference is a
-   * hole in the canvas. One combined number meant anything from "you will not notice" to "the
-   * project is broken".
+   * Board items and document references are counted apart: a missing board item is a result still
+   * findable elsewhere, a missing document reference is a hole in the canvas.
    */
   succeed: (title: string, issues: ProjectTransferIssues) => void;
   /** Finish as a failure, translating an `InvkFormatError` reason where there is one. */
@@ -57,14 +34,8 @@ export interface ProjectFileReporter {
 }
 
 /**
- * The reasons that mean the media is *not here*, as opposed to here without its flag.
- *
- * `star-failed` is the odd one out: the item arrived, it just did not get its star back. Folding it
- * into "could not be included" tells someone their project lost media when nothing was lost, which
- * is the one thing these counts exist to answer accurately.
- *
- * Phrasing a reason is this module's job, so the set lives here — `transfer.ts` owns the taxonomy
- * and is imported type-only, which also keeps it out of the two routes' initial chunks.
+ * The reasons that mean the media is *not here*. `star-failed` is excluded: the item arrived, it
+ * just did not get its star back, and counting it would report lost media when nothing was lost.
  */
 const MISSING_REASONS: ReadonlySet<InvkMediaIssueReason> = new Set(['fetch-failed', 'missing-entry', 'upload-failed']);
 
@@ -84,24 +55,13 @@ const describeProgress = (t: Translate, progress: ProjectFileProgress): string =
   return t(key, { completed: progress.completed, total: progress.total });
 };
 
-/**
- * How often the live toast may redraw while a transfer runs.
- *
- * Progress arrives once per asset, and a project can have hundreds — each one otherwise a toaster
- * state update, during the phase that is already saturating the network. A count that moves five
- * times a second is as much as anyone reads, and the final value is always drawn, so the number a
- * person is left looking at is never a stale one.
- */
+/** Progress arrives once per asset; five redraws a second is as much as anyone reads. */
 const PROGRESS_REDRAW_INTERVAL_MS = 200;
 
 /**
- * Open the live toast for a transfer that is starting. The returned reporter
- * owns that toast for the rest of the operation; every path through a caller's
- * `try`/`catch` has to end in `succeed` or `fail`, or the toast stays up.
- *
- * `direction` decides how a failure is worded: the same `too-large` reason is raised by opening a
- * file someone handed you and by exporting a project of your own, and those need different
- * sentences.
+ * Open the live toast. The reporter owns it for the rest of the operation — every path through a
+ * caller's `try`/`catch` must end in `succeed` or `fail`, or the toast stays up. `direction` words
+ * the failure: the same `too-large` reason arises from opening a file and from exporting one.
  */
 export const startProjectFileReport = (
   t: Translate,

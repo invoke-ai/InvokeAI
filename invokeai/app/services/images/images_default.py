@@ -120,24 +120,16 @@ class ImageService(ImageServiceABC):
     ) -> ImageDTO:
         """Duplicate an existing image under a new identity, optionally onto a board.
 
-        Duplicating a project needs genuinely new identities — `board_images` keys on
-        `image_name`, so one image sits on exactly one board — but the *picture* is the same
-        picture. So the record is cloned from the source's record and the file is copied byte for
-        byte. Nothing is decoded, nothing is re-encoded, and the embedded metadata, workflow and
-        graph travel because they are chunks in the file rather than something re-derived here.
+        New identity, same picture: the record is cloned and the file copied byte for byte, so
+        embedded metadata, workflow and graph travel as file chunks rather than being re-derived.
+        The copy is never intermediate, and starring is not copied.
 
-        The copy is never intermediate: an intermediate is a step in someone else's run, and a
-        copy is a thing a person asked for. Starring is not copied either — callers that want it
-        use the same star route the gallery uses.
-
-        Attaching to the board is checked *before* the file is written, where the video twin writes
-        the file first and removes it again on discovering the attachment was lost. Both are fatal
-        and both leave nothing behind; the orders differ because `create` — which the video path
-        reuses — swallows a failed attachment, so there it can only be detected after the fact.
+        Board attachment is checked *before* the file is written, where the video twin writes first
+        and withdraws on failure. The orders differ because `create` — which the video path reuses —
+        swallows a failed attachment, so there it can only be detected after the fact.
 
         Nothing partial survives a failure: the unwind covers everything after the record exists,
-        including reading the DTO back, and removes the file as well as the row. A row whose file
-        endpoints 404 is a broken gallery entry; a file with no row is disk nobody can reach.
+        including reading the DTO back, and removes the file as well as the row.
         """
         try:
             record = self.__invoker.services.image_records.get(source_image_name)

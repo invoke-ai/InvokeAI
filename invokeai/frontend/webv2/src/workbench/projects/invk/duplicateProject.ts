@@ -31,23 +31,14 @@ import {
 import { toMediaRefs } from './transfer';
 
 /**
- * Duplicating a project: the same restore, with the bytes taking a shortcut.
+ * Duplicating a project: the same restore as import, with the bytes taking a shortcut.
  *
- * A copy has to own its media outright — `board_images` keys on the image name, so two projects
- * cannot share a board image — which makes duplication the same problem as import: materialize the
- * board under new identities, rewrite the document onto them, claim the staging board by creating
- * the project. Only the materialization differs, and it differs because both projects live on this
- * one server: the copy endpoints do it in place, so a 2 GiB board costs no traffic instead of 4 GiB
- * and 2N requests through a browser tab.
+ * A copy must own its media outright (see `transfer.ts`), which makes this import's problem. Only
+ * materialization differs, and it differs because both projects live on this one server: the copy
+ * endpoints work in place, so a 2 GiB board costs no traffic instead of 4 GiB and 2N requests.
  *
- * Document-only references are the other half of that. They point at media that already exists here
- * and is not the project's own board content, so the copy reuses the identities rather than
- * duplicating them — the shared engine's existence check finds every one of them, and nothing is
- * uploaded.
- *
- * What the previous implementation did was `POST` the source's document with a new id and name. It
- * carried no media at all, so the copy's board was empty, and it did not canonicalize or strip
- * installation state either — the copy inherited the original's board id and gallery selection.
+ * Document-only references already exist here and are not the project's own board content, so the
+ * shared engine's existence check finds them all and nothing is uploaded.
  */
 
 export interface DuplicateProjectInput {
@@ -71,17 +62,12 @@ export interface DuplicateProjectResult extends ProjectTransferIssues {
 }
 
 /**
- * The duplication half of the materialization seam: one bounded request sequence per kind, and the
- * pixels stay put.
+ * The duplication half of the materialization seam: one bounded request sequence per kind, pixels
+ * staying put. Progress moves per item once the sequence answers — there is no finer event.
  *
- * Progress moves per item once the sequence answers rather than during it. Each request is a
- * synchronous server-side copy capped by the transport, so there is no finer event to report — and
- * unlike an import, there is no browser upload to sit and watch.
- *
- * A batch that does not answer at all — a proxy timing out a large board — is every name in it
- * failing, not the duplication failing. The route reports per-item failures precisely so one bad
- * source cannot cost the caller the batch; letting a transport error do what the route refuses to
- * would give that guarantee away at the last step.
+ * A batch that does not answer at all is every name in it failing, not the duplication failing:
+ * the route reports per-item failures so one bad source cannot cost the batch, and letting a
+ * transport error do what the route refuses would give that away at the last step.
  */
 export const createCopyMediaMaterializer = (
   deps: { copyImages?: typeof copyImagesToBoard; copyVideos?: typeof copyVideosToBoard; signal?: AbortSignal } = {}
