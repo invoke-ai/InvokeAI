@@ -276,10 +276,10 @@ class TestOwnershipFilteringOmittedBoard:
 
 
 class TestGetImageNamesQueryPlans:
-    def test_default_category_query_retains_covering_index(self, store: SqliteImageRecordStorage) -> None:
+    def test_default_category_query_has_no_forced_index(self, store: SqliteImageRecordStorage) -> None:
         _save(store, "image.png", user_id="alice")
 
-        result, statement, details = _capture_names_plan(
+        result, statement, _ = _capture_names_plan(
             store,
             categories=[ImageCategory.GENERAL],
             is_intermediate=False,
@@ -288,29 +288,26 @@ class TestGetImageNamesQueryPlans:
 
         assert result.image_names == ["image.png"]
         assert "LEFT JOIN board_images" not in statement
-        assert any("COVERING INDEX idx_images_gallery_names" in detail for detail in details)
+        assert "INDEXED BY" not in statement
+        assert "NOT INDEXED" not in statement
 
     @pytest.mark.parametrize(
-        ("kwargs", "expected_access"),
+        "kwargs",
         [
-            ({"search_term": "does-not-match"}, "idx_images_image_category"),
-            ({"user_id": "alice", "is_admin": False}, "idx_images_user_id"),
-            ({"user_id": "alice", "is_admin": False, "starred_first": False}, "idx_images_user_id"),
-            (
-                {"user_id": "alice", "is_admin": False, "order_dir": SQLiteDirection.Ascending},
-                "SCAN images",
-            ),
+            {"search_term": "does-not-match"},
+            {"user_id": "alice", "is_admin": False},
+            {"user_id": "alice", "is_admin": False, "starred_first": False},
+            {"user_id": "alice", "is_admin": False, "order_dir": SQLiteDirection.Ascending},
         ],
     )
-    def test_noncovering_shapes_avoid_gallery_index(
+    def test_query_shapes_do_not_force_indexes(
         self,
         store: SqliteImageRecordStorage,
         kwargs,
-        expected_access: str,
     ) -> None:
         _save(store, "image.png", user_id="alice")
 
-        _, statement, details = _capture_names_plan(
+        _, statement, _ = _capture_names_plan(
             store,
             categories=[ImageCategory.GENERAL],
             is_intermediate=False,
@@ -318,8 +315,8 @@ class TestGetImageNamesQueryPlans:
         )
 
         assert "LEFT JOIN board_images" not in statement
-        assert all("idx_images_gallery_names" not in detail for detail in details)
-        assert any(expected_access in detail for detail in details)
+        assert "INDEXED BY" not in statement
+        assert "NOT INDEXED" not in statement
 
     def test_none_board_uses_anti_membership_filter(self, stores) -> None:
         image_store, board_store, board_image_store = stores
@@ -340,10 +337,10 @@ class TestGetImageNamesQueryPlans:
         assert "NOT EXISTS" in statement
         assert "LEFT JOIN board_images" not in statement
 
-    def test_nonadmin_asset_query_uses_category_index(self, store: SqliteImageRecordStorage) -> None:
+    def test_nonadmin_asset_query_has_no_forced_index(self, store: SqliteImageRecordStorage) -> None:
         _save(store, "asset.png", user_id="alice", category=ImageCategory.CONTROL)
 
-        result, _, details = _capture_names_plan(
+        result, statement, _ = _capture_names_plan(
             store,
             categories=[ImageCategory.CONTROL],
             is_intermediate=False,
@@ -352,5 +349,5 @@ class TestGetImageNamesQueryPlans:
         )
 
         assert result.image_names == ["asset.png"]
-        assert all("idx_images_gallery_names" not in detail for detail in details)
-        assert any("idx_images_image_category" in detail for detail in details)
+        assert "INDEXED BY" not in statement
+        assert "NOT INDEXED" not in statement

@@ -297,11 +297,11 @@ class TestGetBoardMediaSummaries:
 
 
 class TestGalleryQueryPlans:
-    def test_default_name_list_uses_covering_index_without_membership_join(self, services) -> None:
+    def test_default_name_list_omits_membership_join_and_query_hints(self, services) -> None:
         _save_image(services["images"], "image.png", user_id="alice")
         _save_video(services["videos"], "video.mp4", user_id="alice")
 
-        result, statement, details = _capture_plan(
+        result, statement, _ = _capture_plan(
             services,
             lambda: services["gallery"].list_item_names(
                 categories=[ImageCategory.GENERAL],
@@ -318,24 +318,22 @@ class TestGalleryQueryPlans:
         assert result.total_count == 2
         assert result.starred_count == 0
         assert "LEFT JOIN board_images" not in statement
-        assert any("COVERING INDEX idx_images_gallery_names" in detail for detail in details)
+        assert "INDEXED BY" not in statement
+        assert "NOT INDEXED" not in statement
 
     @pytest.mark.parametrize(
-        ("kwargs", "expected_index"),
+        "kwargs",
         [
-            ({"search_term": "does-not-match"}, "idx_images_image_category"),
-            ({"user_id": "alice", "is_admin": False}, "idx_images_user_id"),
-            (
-                {"user_id": "alice", "is_admin": False, "order_dir": SQLiteDirection.Ascending},
-                "SCAN images",
-            ),
-            ({"user_id": "alice", "is_admin": False, "starred_first": False}, "idx_images_user_id"),
+            {"search_term": "does-not-match"},
+            {"user_id": "alice", "is_admin": False},
+            {"user_id": "alice", "is_admin": False, "order_dir": SQLiteDirection.Ascending},
+            {"user_id": "alice", "is_admin": False, "starred_first": False},
         ],
     )
-    def test_noncovering_name_shapes_avoid_gallery_index(self, services, kwargs, expected_index: str) -> None:
+    def test_name_shapes_do_not_force_indexes(self, services, kwargs) -> None:
         _save_image(services["images"], "image.png", user_id="alice")
 
-        _, _, details = _capture_plan(
+        _, statement, _ = _capture_plan(
             services,
             lambda: services["gallery"].list_item_names(
                 categories=[ImageCategory.GENERAL],
@@ -345,10 +343,8 @@ class TestGalleryQueryPlans:
             "UNION ALL",
         )
 
-        image_details = [detail for detail in details if "images" in detail and "board_images" not in detail]
-        assert image_details
-        assert all("idx_images_gallery_names" not in detail for detail in image_details)
-        assert any(expected_index in detail for detail in image_details)
+        assert "INDEXED BY" not in statement
+        assert "NOT INDEXED" not in statement
 
     def test_explicit_board_starts_from_mixed_membership(self, services) -> None:
         board = services["boards"].save("Small", "alice")
@@ -384,7 +380,7 @@ class TestGalleryQueryPlans:
         _save_video(services["videos"], "asset.mp4", user_id="alice", category=ImageCategory.CONTROL)
         _save_image(services["images"], "general.png", user_id="alice")
 
-        result, _, details = _capture_plan(
+        result, statement, _ = _capture_plan(
             services,
             lambda: services["gallery"].list_item_names(
                 categories=[ImageCategory.CONTROL],
@@ -399,9 +395,10 @@ class TestGalleryQueryPlans:
             (GalleryItemKind.VIDEO, "asset.mp4"),
         }
         assert result.total_count == 2
-        assert any("COVERING INDEX idx_images_gallery_names" in detail for detail in details)
+        assert "INDEXED BY" not in statement
+        assert "NOT INDEXED" not in statement
 
-        _, _, non_admin_details = _capture_plan(
+        _, non_admin_statement, _ = _capture_plan(
             services,
             lambda: services["gallery"].list_item_names(
                 categories=[ImageCategory.CONTROL],
@@ -411,15 +408,14 @@ class TestGalleryQueryPlans:
             ),
             "UNION ALL",
         )
-        image_details = [detail for detail in non_admin_details if "images" in detail and "board_images" not in detail]
-        assert all("idx_images_gallery_names" not in detail for detail in image_details)
-        assert any("idx_images_image_category" in detail for detail in image_details)
+        assert "INDEXED BY" not in non_admin_statement
+        assert "NOT INDEXED" not in non_admin_statement
 
     def test_paginated_item_path_keeps_result_shape_and_avoids_gallery_index(self, services) -> None:
         _save_image(services["images"], "image.png", user_id="alice")
         _save_video(services["videos"], "video.mp4", user_id="alice")
 
-        result, statement, details = _capture_plan(
+        result, statement, _ = _capture_plan(
             services,
             lambda: services["gallery"].list_items(
                 offset=1,
@@ -438,10 +434,8 @@ class TestGalleryQueryPlans:
         assert result.items[0].kind in {GalleryItemKind.IMAGE, GalleryItemKind.VIDEO}
         assert result.items[0].full_url
         assert "LEFT JOIN board_images" in statement
-        image_details = [detail for detail in details if "images" in detail and "board_images" not in detail]
-        assert image_details
-        assert all("idx_images_gallery_names" not in detail for detail in image_details)
-        assert any("idx_images_image_category" in detail for detail in image_details)
+        assert "INDEXED BY" not in statement
+        assert "NOT INDEXED" not in statement
 
     def test_board_image_count_starts_from_membership(self, services) -> None:
         board = services["boards"].save("Small", "alice")

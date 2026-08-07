@@ -50,8 +50,6 @@ class SqliteGalleryService(GalleryServiceABC):
     ) -> OffsetPaginatedResults[GalleryItem]:
         image_half, image_params, image_count_query = self._build_half(
             kind="image",
-            starred_first=starred_first,
-            order_dir=order_dir,
             origin=origin,
             categories=categories,
             is_intermediate=is_intermediate,
@@ -62,8 +60,6 @@ class SqliteGalleryService(GalleryServiceABC):
         )
         video_half, video_params, video_count_query = self._build_half(
             kind="video",
-            starred_first=starred_first,
-            order_dir=order_dir,
             origin=origin,
             categories=categories,
             is_intermediate=is_intermediate,
@@ -119,8 +115,6 @@ class SqliteGalleryService(GalleryServiceABC):
     ) -> GalleryItemNamesResult:
         image_half, image_params, _ = self._build_half(
             kind="image",
-            starred_first=starred_first,
-            order_dir=order_dir,
             origin=origin,
             categories=categories,
             is_intermediate=is_intermediate,
@@ -133,8 +127,6 @@ class SqliteGalleryService(GalleryServiceABC):
         )
         video_half, video_params, _ = self._build_half(
             kind="video",
-            starred_first=starred_first,
-            order_dir=order_dir,
             origin=origin,
             categories=categories,
             is_intermediate=is_intermediate,
@@ -342,8 +334,6 @@ class SqliteGalleryService(GalleryServiceABC):
     def _build_half(
         self,
         kind: str,
-        starred_first: bool,
-        order_dir: SQLiteDirection,
         origin: Optional[ResourceOrigin],
         categories: Optional[list[ImageCategory]],
         is_intermediate: Optional[bool],
@@ -382,45 +372,21 @@ class SqliteGalleryService(GalleryServiceABC):
         else:
             raise ValueError(f"Unknown kind: {kind}")
 
-        base_index_hint = ""
-        if kind == "image":
-            has_general_category_filter = categories is not None and set(categories) == {ImageCategory.GENERAL}
-            has_non_admin_user_filter = user_id is not None and not is_admin
-            if board_id is not None and board_id != "none":
-                base_index_hint = "INDEXED BY idx_images_image_name"
-            elif not names_only:
-                if has_non_admin_user_filter and (categories is None or has_general_category_filter):
-                    base_index_hint = "INDEXED BY idx_images_user_id"
-                elif categories is not None:
-                    base_index_hint = "INDEXED BY idx_images_image_category"
-                else:
-                    base_index_hint = "NOT INDEXED"
-            elif search_term:
-                base_index_hint = "INDEXED BY idx_images_image_category" if categories is not None else "NOT INDEXED"
-            elif has_non_admin_user_filter and (categories is None or has_general_category_filter):
-                if not starred_first or order_dir == SQLiteDirection.Descending:
-                    base_index_hint = "INDEXED BY idx_images_user_id"
-                else:
-                    base_index_hint = "NOT INDEXED"
-            elif has_non_admin_user_filter and categories is not None:
-                base_index_hint = "INDEXED BY idx_images_image_category"
-
-        base_table_ref = f"{base_table} {base_index_hint}".rstrip()
         if board_id == "none":
-            from_clause = f"FROM {base_table_ref}"
+            from_clause = f"FROM {base_table}"
             board_id_expr = "NULL"
         elif board_id is not None:
             # CROSS JOIN keeps explicit-board work proportional to board membership.
             from_clause = (
-                f"FROM {join_table} CROSS JOIN {base_table_ref} ON {join_table}.{name_col} = {base_table}.{name_col}"
+                f"FROM {join_table} CROSS JOIN {base_table} ON {join_table}.{name_col} = {base_table}.{name_col}"
             )
             board_id_expr = f"{join_table}.board_id"
         elif names_only:
-            from_clause = f"FROM {base_table_ref}"
+            from_clause = f"FROM {base_table}"
             board_id_expr = "NULL"
         else:
             from_clause = (
-                f"FROM {base_table_ref} LEFT JOIN {join_table} ON {join_table}.{name_col} = {base_table}.{name_col}"
+                f"FROM {base_table} LEFT JOIN {join_table} ON {join_table}.{name_col} = {base_table}.{name_col}"
             )
             board_id_expr = f"{join_table}.board_id"
 
