@@ -263,6 +263,8 @@ def test_copying_a_video_preserves_its_shape_and_provenance(
     videos.get_graph.return_value = None
     created = MagicMock()
     created.video_name = "copy-001.mp4"
+    # The route checks the copy actually landed where it was told, so the double has to say so.
+    created.board_id = board_id
     videos.create.return_value = created
     mock_invoker.services.videos = videos
 
@@ -284,6 +286,35 @@ def test_copying_a_video_preserves_its_shape_and_provenance(
     # The path handed over is the source's own managed file, and `create` consumes what it is
     # given. Without this the copy moves the original's bytes away from it.
     assert kwargs["move_source"] is False
+
+
+def test_a_video_copy_that_missed_its_board_is_reported_as_failed(
+    client: TestClient, mock_invoker: Invoker, user1_token: str
+):
+    """`create` treats board attachment as best-effort, which is right for a generation and wrong
+    here: the caller is about to remap a document onto the name we return."""
+    user_id = _owner_id(client, user1_token)
+    board_id = _create_board(client, user1_token, "Video+Target")
+    _insert_video_record(mock_invoker, "src.mp4", user_id)
+
+    videos = MagicMock()
+    videos.get_path.return_value = "/tmp/source.mp4"
+    videos.get_metadata.return_value = None
+    videos.get_workflow.return_value = None
+    videos.get_graph.return_value = None
+    created = MagicMock()
+    created.video_name = "copy-001.mp4"
+    created.board_id = None  # The attachment silently did not happen.
+    videos.create.return_value = created
+    mock_invoker.services.videos = videos
+
+    response = client.post(
+        "/api/v1/videos/copy",
+        json={"video_names": ["src.mp4"], "board_id": board_id},
+        headers=_auth(user1_token),
+    )
+
+    assert response.json() == {"copied": [], "failed": ["src.mp4"]}
 
 
 def test_copying_someone_elses_video_is_refused_per_name(client: TestClient, mock_invoker: Invoker, user1_token: str):

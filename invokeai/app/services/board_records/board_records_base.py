@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Optional
 
 from invokeai.app.services.board_records.board_records_common import BoardChanges, BoardRecord, BoardRecordOrderBy
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
@@ -7,11 +8,6 @@ from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 
 class BoardRecordStorageBase(ABC):
     """Low-level service responsible for interfacing with the board record store."""
-
-    @abstractmethod
-    def delete(self, board_id: str) -> None:
-        """Deletes a board record."""
-        pass
 
     @abstractmethod
     def delete_if_unclaimed(self, board_id: str) -> bool:
@@ -28,8 +24,14 @@ class BoardRecordStorageBase(ABC):
         """Map board id to owning project id, for the boards that a project owns.
 
         Boards with no project are absent from the result. Bulk because board listings would
-        otherwise issue one lookup per row.
+        otherwise issue one lookup per row; chunked internally, because a listing can name every
+        board on the install and the query is parameterized per id.
         """
+        pass
+
+    @abstractmethod
+    def get_with_project_id(self, board_id: str) -> tuple[BoardRecord, Optional[str]]:
+        """The board record and the id of the project that claims it, if any, in one query."""
         pass
 
     @abstractmethod

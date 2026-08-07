@@ -9,6 +9,7 @@ from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.project_records.project_records_common import (
     ProjectBoardNotFoundError,
     ProjectBoardSnapshotDTO,
+    ProjectBoardTooLargeError,
     ProjectBoardUnavailableError,
     ProjectRecordConflictError,
     ProjectRecordDTO,
@@ -122,13 +123,17 @@ async def get_project_board_snapshot(
     """Lists everything on the project's board that the gallery would show.
 
     Intermediates and the canvas's private `other` category are excluded. Unpaginated: the caller
-    that needs this — exporting a project — has to hold the whole list anyway, and enforces its own
-    archive limits over it.
+    that needs this — exporting a project — has to hold the whole list anyway. It is still bounded,
+    because the answer is built entirely in memory and any client with a project id can ask for it;
+    a board past the ceiling is one an export could not have packed either, so it is refused as a
+    413 rather than paged.
     """
     try:
         return ApiDependencies.invoker.services.project_records.get_board_snapshot(current_user.user_id, project_id)
     except ProjectRecordNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ProjectBoardTooLargeError as e:
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail=str(e))
 
 
 @projects_router.delete("/{project_id}", operation_id="delete_project", status_code=status.HTTP_204_NO_CONTENT)
@@ -136,5 +141,12 @@ async def delete_project(
     current_user: CurrentUserOrDefault,
     project_id: str = Path(description="The id of the project to delete"),
 ) -> None:
-    """Deletes one of the current user's projects. Idempotent."""
+    """Deletes one of the current user's projects, and the board it owns, in one transaction.
+
+    Idempotent. The media survives: deleting the board drops its memberships, so the images and
+    videos on it return to Uncategorized, exactly as they would if the board were deleted without
+    `include_images`. There is deliberately no option to take them with it — a project is a
+    workspace, and emptying someone's gallery is not what deleting one should be able to mean.
+    Nothing is reported back for the same reason: nothing was destroyed to report.
+    """
     ApiDependencies.invoker.services.project_records.delete(current_user.user_id, project_id)

@@ -606,6 +606,11 @@ def copy_images_to_board(
 
     A sync `def`, so FastAPI runs the batch on its threadpool: file copies are blocking, and a
     board's worth of them on the event loop would stall every other request for the duration.
+
+    Read access is enough to copy, which means an image on a board shared with you can be copied
+    into something you own, and the copy outlives the share. That is deliberate — it is what makes
+    a shared board usable as a source — but it is a real widening of what "read-only" means, so it
+    is stated rather than left to be discovered.
     """
     _assert_board_write_access(board_id, current_user)
     assert_image_move_maintenance_inactive()

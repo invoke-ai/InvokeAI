@@ -54,11 +54,11 @@ class BoardService(BoardServiceABC):
         board_record = self.__invoker.services.board_records.save(board_name, user_id)
         return board_record_to_dto(board_record, None, 0, 0)
 
-    def _get_project_id(self, board_id: str) -> Optional[str]:
-        return self.__invoker.services.board_records.get_project_ids_for_boards([board_id]).get(board_id)
-
     def get_dto(self, board_id: str) -> BoardDTO:
-        board_record = self.__invoker.services.board_records.get(board_id)
+        # One query for the record and its claiming project. `get_dto` is what every authorization
+        # check resolves through, so a second lookup here is a second transaction — and the lock it
+        # takes — on the most-travelled read in the API.
+        board_record, project_id = self.__invoker.services.board_records.get_with_project_id(board_id)
         cover_image_name, cover_video_name = self._resolve_cover(board_record.board_id)
         image_count, video_count, asset_count = self._get_counts(board_id)
         return board_record_to_dto(
@@ -68,7 +68,7 @@ class BoardService(BoardServiceABC):
             asset_count,
             cover_video_name=cover_video_name,
             video_count=video_count,
-            project_id=self._get_project_id(board_id),
+            project_id=project_id,
         )
 
     def update(
@@ -76,21 +76,11 @@ class BoardService(BoardServiceABC):
         board_id: str,
         changes: BoardChanges,
     ) -> BoardDTO:
-        board_record = self.__invoker.services.board_records.update(board_id, changes)
-        cover_image_name, cover_video_name = self._resolve_cover(board_record.board_id)
-        image_count, video_count, asset_count = self._get_counts(board_id)
-        return board_record_to_dto(
-            board_record,
-            cover_image_name,
-            image_count,
-            asset_count,
-            cover_video_name=cover_video_name,
-            video_count=video_count,
-            project_id=self._get_project_id(board_id),
-        )
-
-    def delete(self, board_id: str) -> None:
-        self.__invoker.services.board_records.delete(board_id)
+        self.__invoker.services.board_records.update(board_id, changes)
+        # Re-read through `get_dto` rather than shaping the update's own return: it is the one
+        # place that resolves cover, counts and claiming project together, and an update that
+        # dropped `project_id` would tell the gallery a project's board is an ordinary one.
+        return self.get_dto(board_id)
 
     def delete_if_unclaimed(self, board_id: str) -> bool:
         return self.__invoker.services.board_records.delete_if_unclaimed(board_id)

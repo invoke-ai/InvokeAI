@@ -3,13 +3,16 @@ import sqlite3
 import uuid
 from typing import Any, Optional
 
-from invokeai.app.services.board_records.board_records_common import BoardVisibility
+from invokeai.app.services.board_records.board_records_common import BOARD_NAME_MAX_LENGTH, BoardVisibility
+from invokeai.app.services.image_records.image_records_common import ASSETS_CATEGORIES, IMAGE_CATEGORIES
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.project_records.project_records_base import ProjectRecordsStorageBase
 from invokeai.app.services.project_records.project_records_common import (
+    PROJECT_BOARD_SNAPSHOT_MAX_ITEMS,
     ProjectBoardItemDTO,
     ProjectBoardNotFoundError,
     ProjectBoardSnapshotDTO,
+    ProjectBoardTooLargeError,
     ProjectBoardUnavailableError,
     ProjectRecordConflictError,
     ProjectRecordDTO,
@@ -20,9 +23,12 @@ from invokeai.app.services.project_records.project_records_common import (
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.util.misc import uuid_string
 
-# `BoardChanges.board_name` caps names at 300 characters. Project names are unbounded, so the board
-# carrying a project's name is truncated to stay inside what the generic board API would accept.
-BOARD_NAME_MAX_LENGTH = 300
+# The categories a board view lists, straight from the gallery's own definition of them. Spelling
+# them out in the SQL below would put a fourth copy of this list in the least discoverable place
+# there is: `other` — the canvas's private category — is in neither, which is exactly why the
+# snapshot must not carry it, and that reasoning belongs with the constants that encode it.
+_VISIBLE_BOARD_CATEGORIES = tuple(category.value for category in (*IMAGE_CATEGORIES, *ASSETS_CATEGORIES))
+_VISIBLE_CATEGORY_PLACEHOLDERS = ", ".join("?" for _ in _VISIBLE_BOARD_CATEGORIES)
 
 
 class ProjectRecordsSqlite(ProjectRecordsStorageBase):
@@ -74,7 +80,11 @@ class ProjectRecordsSqlite(ProjectRecordsStorageBase):
         except sqlite3.IntegrityError as e:
             # The board insert/rename rolls back with the project insert, so a rejected create never
             # leaves an orphan board behind.
-            raise self._classify_integrity_error(e, project_id=project_id, board_id=board_id) from e
+            classified = self._classify_integrity_error(e, project_id=project_id, board_id=board_id)
+
+            if classified is None:
+                raise
+            raise classified from e
 
         return self.get(user_id, project_id)
 
@@ -216,21 +226,24 @@ class ProjectRecordsSqlite(ProjectRecordsStorageBase):
 
             # One union over both namespaces, shaped like `get_board_media_summaries`. The filters
             # are what make the result match what the gallery shows for this board: intermediates
-            # are hidden, and `other` — the canvas's private category — is in neither
-            # IMAGE_CATEGORIES nor ASSETS_CATEGORIES and so appears in no board view.
+            # are hidden, and the categories come from IMAGE_CATEGORIES/ASSETS_CATEGORIES, which
+            # `other` — the canvas's private category — is deliberately in neither of.
             #
             # `deleted_at` is deliberately *not* filtered. Soft delete is unused and no other
             # board query consults it, so filtering here would make the snapshot disagree with the
             # counts shown beside the board.
+            #
+            # Bounded, unlike the counts: the caller holds the whole answer in memory and so does
+            # this, and the route is reachable by anyone with a project id.
             cursor.execute(
-                """--sql
+                f"""--sql
                 SELECT 'image' AS kind, images.image_name AS name,
                        images.image_category AS category, images.starred AS starred
                 FROM board_images
                 INNER JOIN images ON board_images.image_name = images.image_name
                 WHERE board_images.board_id = ?
                   AND images.is_intermediate = FALSE
-                  AND images.image_category IN ('general', 'control', 'mask', 'user')
+                  AND images.image_category IN ({_VISIBLE_CATEGORY_PLACEHOLDERS})
                 UNION ALL
                 SELECT 'video' AS kind, videos.video_name AS name,
                        videos.video_category AS category, videos.starred AS starred
@@ -238,12 +251,22 @@ class ProjectRecordsSqlite(ProjectRecordsStorageBase):
                 INNER JOIN videos ON board_videos.video_name = videos.video_name
                 WHERE board_videos.board_id = ?
                   AND videos.is_intermediate = FALSE
-                  AND videos.video_category IN ('general', 'control', 'mask', 'user')
-                ORDER BY kind ASC, name ASC;
+                  AND videos.video_category IN ({_VISIBLE_CATEGORY_PLACEHOLDERS})
+                ORDER BY kind ASC, name ASC
+                LIMIT ?;
                 """,
-                (row[0], row[0]),
+                (
+                    row[0],
+                    *_VISIBLE_BOARD_CATEGORIES,
+                    row[0],
+                    *_VISIBLE_BOARD_CATEGORIES,
+                    PROJECT_BOARD_SNAPSHOT_MAX_ITEMS + 1,
+                ),
             )
             rows = cursor.fetchall()
+
+        if len(rows) > PROJECT_BOARD_SNAPSHOT_MAX_ITEMS:
+            raise ProjectBoardTooLargeError(project_id, PROJECT_BOARD_SNAPSHOT_MAX_ITEMS)
 
         return ProjectBoardSnapshotDTO(
             items=[ProjectBoardItemDTO(kind=r[0], name=r[1], category=r[2], starred=bool(r[3])) for r in rows]
@@ -315,13 +338,22 @@ class ProjectRecordsSqlite(ProjectRecordsStorageBase):
     @staticmethod
     def _classify_integrity_error(
         error: sqlite3.IntegrityError, *, project_id: str, board_id: Optional[str]
-    ) -> Exception:
-        """Name which uniqueness a rejected insert violated.
+    ) -> Optional[Exception]:
+        """Name which constraint a rejected insert violated, or `None` to let it through unchanged.
 
-        Two constraints can reject the same statement: the composite primary key, meaning the user
-        already has this project id, and `projects.board_id`, meaning another project claimed the
-        board after `_claim_board` looked.
+        Two are expected: the composite primary key, meaning the user already has this project id,
+        and `projects.board_id`, meaning another project claimed the board between `_claim_board`
+        looking and this insert committing.
+
+        Decided on `sqlite_errorname` rather than on the message text. A substring match would call
+        a foreign-key failure — a user row that vanished, say — "project already exists", sending
+        the client to pick a new id forever over a problem no new id can fix. Anything unrecognized
+        is re-raised as itself rather than guessed at.
         """
-        if board_id is not None and "projects.board_id" in str(error):
+        errorname = getattr(error, "sqlite_errorname", "")
+
+        if errorname == "SQLITE_CONSTRAINT_UNIQUE" and board_id is not None:
             return ProjectBoardUnavailableError(board_id)
-        return ProjectRecordExistsError(project_id)
+        if errorname == "SQLITE_CONSTRAINT_PRIMARYKEY":
+            return ProjectRecordExistsError(project_id)
+        return None

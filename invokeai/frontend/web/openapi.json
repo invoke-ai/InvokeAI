@@ -5775,7 +5775,7 @@
       "post": {
         "tags": ["images"],
         "summary": "Copy Images To Board",
-        "description": "Copies images, optionally onto a board, and returns the new names.\n\nEach copy is a genuinely new image with its own name, because `board_images` keys on\n`image_name` \u2014 one image can sit on exactly one board, so sharing a name between two boards is\nnot representable. Duplicating a project needs that: its copy must own its media outright.\n\nThe pixels never leave the server, and never leave the disk either: `images.copy` clones the\nrecord and copies the file byte for byte, so the embedded metadata, workflow and graph travel\nwithout being parsed and rewritten. Category and origin travel; the originating session and\nnode do not. Starring is not copied \u2014 callers that want it use `POST /images/star`, the same\npath an import uses.\n\nPer-image failures are reported rather than raised, so one unreadable source cannot cost the\ncaller the whole batch.\n\nA sync `def`, so FastAPI runs the batch on its threadpool: file copies are blocking, and a\nboard's worth of them on the event loop would stall every other request for the duration.",
+        "description": "Copies images, optionally onto a board, and returns the new names.\n\nEach copy is a genuinely new image with its own name, because `board_images` keys on\n`image_name` \u2014 one image can sit on exactly one board, so sharing a name between two boards is\nnot representable. Duplicating a project needs that: its copy must own its media outright.\n\nThe pixels never leave the server, and never leave the disk either: `images.copy` clones the\nrecord and copies the file byte for byte, so the embedded metadata, workflow and graph travel\nwithout being parsed and rewritten. Category and origin travel; the originating session and\nnode do not. Starring is not copied \u2014 callers that want it use `POST /images/star`, the same\npath an import uses.\n\nPer-image failures are reported rather than raised, so one unreadable source cannot cost the\ncaller the whole batch.\n\nA sync `def`, so FastAPI runs the batch on its threadpool: file copies are blocking, and a\nboard's worth of them on the event loop would stall every other request for the duration.\n\nRead access is enough to copy, which means an image on a board shared with you can be copied\ninto something you own, and the copy outlives the share. That is deliberate \u2014 it is what makes\na shared board usable as a source \u2014 but it is a real widening of what \"read-only\" means, so it\nis stated rather than left to be discovered.",
         "operationId": "copy_images_to_board",
         "requestBody": {
           "content": {
@@ -7238,7 +7238,7 @@
       "post": {
         "tags": ["videos"],
         "summary": "Copy Videos To Board",
-        "description": "Copies videos, optionally onto a board, and returns the new names.\n\nThe image twin of this route explains why copies rather than shared references: `board_videos`\nkeys on `video_name`, so one video sits on exactly one board.\n\nBlocking work (the service copies the file off disk) runs on FastAPI's threadpool by virtue of\nthis being a sync `def`, so a large batch cannot stall the event loop.\n\n`move_source=False` is load-bearing, not defensive: `create` consumes the path it is given,\nbecause every other caller hands it a temp file. Here the path is the *source's own* file.",
+        "description": "Copies videos, optionally onto a board, and returns the new names.\n\nThe image twin of this route explains why copies rather than shared references: `board_videos`\nkeys on `video_name`, so one video sits on exactly one board.\n\nBlocking work (the service copies the file off disk) runs on FastAPI's threadpool by virtue of\nthis being a sync `def`, so a large batch cannot stall the event loop.\n\n`move_source=False` is load-bearing, not defensive: `create` consumes the path it is given,\nbecause every other caller hands it a temp file. Here the path is the *source's own* file.\n\nRead access is enough to copy, which means a video on a board shared with you can be copied\ninto something you own, and the copy outlives the share. That is deliberate \u2014 it is what makes\na shared board usable as a source \u2014 but it is a real widening of what \"read-only\" means, so it\nis stated rather than left to be discovered.",
         "operationId": "copy_videos_to_board",
         "requestBody": {
           "content": {
@@ -12870,7 +12870,7 @@
       "delete": {
         "tags": ["projects"],
         "summary": "Delete Project",
-        "description": "Deletes one of the current user's projects. Idempotent.",
+        "description": "Deletes one of the current user's projects, and the board it owns, in one transaction.\n\nIdempotent. The media survives: deleting the board drops its memberships, so the images and\nvideos on it return to Uncategorized, exactly as they would if the board were deleted without\n`include_images`. There is deliberately no option to take them with it \u2014 a project is a\nworkspace, and emptying someone's gallery is not what deleting one should be able to mean.\nNothing is reported back for the same reason: nothing was destroyed to report.",
         "operationId": "delete_project",
         "security": [
           {
@@ -12911,7 +12911,7 @@
       "get": {
         "tags": ["projects"],
         "summary": "Get Project Board Snapshot",
-        "description": "Lists everything on the project's board that the gallery would show.\n\nIntermediates and the canvas's private `other` category are excluded. Unpaginated: the caller\nthat needs this \u2014 exporting a project \u2014 has to hold the whole list anyway, and enforces its own\narchive limits over it.",
+        "description": "Lists everything on the project's board that the gallery would show.\n\nIntermediates and the canvas's private `other` category are excluded. Unpaginated: the caller\nthat needs this \u2014 exporting a project \u2014 has to hold the whole list anyway. It is still bounded,\nbecause the answer is built entirely in memory and any client with a project id can ask for it;\na board past the ceiling is one an export could not have packed either, so it is refused as a\n413 rather than paged.",
         "operationId": "get_project_board_snapshot",
         "security": [
           {

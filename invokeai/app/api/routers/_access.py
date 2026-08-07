@@ -99,6 +99,57 @@ def assert_board_write_access(board_id: str | None, current_user: CurrentUserOrD
     raise HTTPException(status_code=403, detail="Not authorized to modify this board")
 
 
+def assert_video_read_access(video_name: str, current_user: CurrentUserOrDefault) -> None:
+    """Raise 403 if the current user may not view the video.
+
+    Deliberately identical in shape to `assert_image_read_access`, and delegating to
+    `assert_board_read_access` for the same reason: the video twin used to inline a narrower rule
+    that recognized only Shared and Public visibility, so a video on a board explicitly shared with
+    you was unreadable while the image beside it was fine. Two media kinds on one board should not
+    disagree about who can see them.
+    """
+    if current_user.is_admin:
+        return
+
+    owner = ApiDependencies.invoker.services.video_records.get_user_id(video_name)
+    if owner is not None and owner == current_user.user_id:
+        return
+
+    board_id = ApiDependencies.invoker.services.board_video_records.get_board_for_video(video_name)
+    if board_id is not None:
+        assert_board_read_access(board_id, current_user)
+        return
+
+    raise HTTPException(status_code=403, detail="Not authorized to access this video")
+
+
+def assert_video_owner(video_name: str, current_user: CurrentUserOrDefault) -> None:
+    """Raise 403 if the current user may not mutate the video.
+
+    The mutation twin of `assert_image_owner`: the direct owner, the owner of the board it sits on,
+    or a Public board, which grants contribution rights.
+    """
+    if current_user.is_admin:
+        return
+
+    owner = ApiDependencies.invoker.services.video_records.get_user_id(video_name)
+    if owner is not None and owner == current_user.user_id:
+        return
+
+    board_id = ApiDependencies.invoker.services.board_video_records.get_board_for_video(video_name)
+    if board_id is not None:
+        try:
+            board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
+            if board.user_id == current_user.user_id:
+                return
+            if board.board_visibility == BoardVisibility.Public:
+                return
+        except Exception:
+            pass
+
+    raise HTTPException(status_code=403, detail="Not authorized to modify this video")
+
+
 def assert_board_read_access(board_id: str, current_user: CurrentUserOrDefault) -> None:
     """Raise 403 if the current user may not read images from this board.
 

@@ -9,7 +9,7 @@ exist there.
 
 This migration moves the relationship into the schema: `projects.board_id` becomes `NOT NULL UNIQUE`
 with a foreign key to `boards`. The `UNIQUE` makes "a board belongs to at most one project" a
-database fact, and the FK's default `RESTRICT` makes "a claimed board cannot be deleted" one too,
+database fact, and the FK makes "a claimed board cannot be deleted" one too,
 backing the application's 409 rather than merely agreeing with it.
 
 Existing projects keep the board they were already using **only when that is unambiguously safe**.
@@ -27,6 +27,7 @@ and a new name.
 
 import json
 import sqlite3
+from logging import Logger
 from typing import Any, Optional
 
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import Migration
@@ -34,38 +35,85 @@ from invokeai.app.util.misc import uuid_string
 
 # `BoardChanges.board_name` caps names at 300 characters. Project names are unbounded, so a board
 # adopting a project's name is truncated to stay inside what the generic board API would accept.
+#
+# Pinned here rather than imported from `board_records_common`, deliberately: a migration has to
+# keep doing what it did on the day it shipped, and a database migrated at 300 does not un-migrate
+# itself if that ceiling later moves.
 BOARD_NAME_MAX_LENGTH = 300
 
 
 class AddProjectBoardsMigrationCallback:
+    def __init__(self, logger: Logger) -> None:
+        self._logger = logger
+
     def __call__(self, cursor: sqlite3.Cursor) -> None:
+        self._drop_orphaned_projects(cursor)
         assignments = self._assign_boards(cursor)
         self._rebuild_projects_table(cursor, assignments)
+
+    def _drop_orphaned_projects(self, cursor: sqlite3.Cursor) -> None:
+        """Remove project rows whose owner no longer exists.
+
+        The rebuilt table re-inserts every row under `FOREIGN KEY (user_id) REFERENCES users`, with
+        `PRAGMA foreign_keys = ON` and no way to turn it off inside the migrator's transaction. The
+        old table tolerated an orphan; the new one aborts on it, which would take the whole
+        migration — and with it the app's ability to open the database — over a row nothing can
+        reach. They are unreachable already: every project query filters by `user_id`.
+        """
+        cursor.execute(
+            """--sql
+            SELECT project_id, user_id FROM projects
+            WHERE user_id NOT IN (SELECT user_id FROM users);
+            """
+        )
+        orphans = cursor.fetchall()
+
+        if not orphans:
+            return
+
+        for project_id, user_id in orphans:
+            self._logger.warning(
+                f"Project boards migration: dropping project {project_id}, whose owner {user_id} no longer exists."
+            )
+
+        cursor.execute(
+            """--sql
+            DELETE FROM projects WHERE user_id NOT IN (SELECT user_id FROM users);
+            """
+        )
 
     def _assign_boards(self, cursor: sqlite3.Cursor) -> list[tuple[int, str]]:
         """Resolve one board per project, creating boards as needed.
 
         Returns (rowid, board_id) pairs. Projects are visited in `rowid` order so that when two of
         them name the same board the earlier one wins, deterministically and repeatably.
+
+        Read one row at a time, through a cursor of its own. `data` is a whole project document —
+        canvas layers, queue history, the lot — so a `fetchall()` here would hold every project on
+        the install in memory at once, and this runs at startup on a machine that is about to load
+        models. The second cursor is what makes that safe: the writes below run on `cursor`, and
+        issuing them on the cursor being iterated would discard the result set out from under it.
         """
-        cursor.execute(
+        reader = cursor.connection.cursor()
+        reader.execute(
             """--sql
-            SELECT rowid, user_id, name, data FROM projects ORDER BY rowid ASC;
+            SELECT rowid, project_id, user_id, name, data FROM projects ORDER BY rowid ASC;
             """
         )
-        projects = cursor.fetchall()
 
         assignments: list[tuple[int, str]] = []
         # Boards claimed earlier in this run. The column does not exist yet, so this set is the only
         # record of what has already been spoken for.
         claimed: set[str] = set()
+        adopted = 0
 
-        for rowid, user_id, name, data in projects:
-            board_id = self._adopt_board(cursor, user_id=user_id, data=data, claimed=claimed)
+        for rowid, project_id, user_id, name, data in reader:
+            board_id = self._adopt_board(cursor, project_id=project_id, user_id=user_id, data=data, claimed=claimed)
 
             if board_id is None:
                 board_id = self._insert_board(cursor, user_id=user_id, name=name)
             else:
+                adopted += 1
                 # Un-archived as well as renamed, and for the same reason the claim path does it:
                 # a project's board follows the project, and the generic board API refuses to
                 # change `archived` on a claimed board. Someone who had archived their project's
@@ -81,20 +129,36 @@ class AddProjectBoardsMigrationCallback:
             claimed.add(board_id)
             assignments.append((rowid, board_id))
 
+        reader.close()
+        self._logger.info(
+            f"Project boards migration: {len(assignments)} project(s), {adopted} kept the board they were using."
+        )
+
         return assignments
 
-    def _adopt_board(self, cursor: sqlite3.Cursor, *, user_id: str, data: str, claimed: set[str]) -> Optional[str]:
-        """Return the project's existing board if exactly one candidate is safe to adopt."""
+    def _adopt_board(
+        self, cursor: sqlite3.Cursor, *, project_id: str, user_id: str, data: str, claimed: set[str]
+    ) -> Optional[str]:
+        """Return the project's existing board if exactly one candidate is safe to adopt.
+
+        Every refusal is logged. A project that adopts nothing starts on a fresh empty board and its
+        old gallery contents stay where they are — the right way to be wrong, but invisible: the
+        person sees a project that has apparently lost its images, and without this an operator has
+        no way to find out which projects were affected or why.
+        """
         candidates = _collect_board_candidates(data)
 
         # Two gallery widgets disagreeing about which board is the project's leaves no way to pick
         # correctly, and guessing would hand a project someone else's media.
         if len(candidates) != 1:
+            if candidates:
+                self._log_refusal(project_id, f"its document names {len(candidates)} boards")
             return None
 
         board_id = next(iter(candidates))
 
         if board_id in claimed:
+            self._log_refusal(project_id, f"board {board_id} was already claimed by an earlier project")
             return None
 
         cursor.execute(
@@ -111,20 +175,30 @@ class AddProjectBoardsMigrationCallback:
         row = cursor.fetchone()
 
         if row is None:
+            self._log_refusal(project_id, f"board {board_id} no longer exists")
             return None
 
         board_user_id, board_visibility, is_shared = row
 
         if board_user_id != user_id:
+            self._log_refusal(project_id, f"board {board_id} belongs to another account")
             return None
         # A project board is private by definition; adopting a shared or public one would lock a
         # board other people can see into a single project's lifecycle.
         if board_visibility != "private":
+            self._log_refusal(project_id, f"board {board_id} is {board_visibility}, not private")
             return None
         if is_shared:
+            self._log_refusal(project_id, f"board {board_id} is shared with other accounts")
             return None
 
         return board_id
+
+    def _log_refusal(self, project_id: str, reason: str) -> None:
+        self._logger.warning(
+            f"Project boards migration: project {project_id} starts on a new empty board because {reason}."
+            " Its previous board and everything on it are untouched."
+        )
 
     def _insert_board(self, cursor: sqlite3.Cursor, *, user_id: str, name: str) -> str:
         board_id = uuid_string()
@@ -159,8 +233,9 @@ class AddProjectBoardsMigrationCallback:
                 -- Opaque client-owned project document (JSON).
                 data TEXT NOT NULL,
                 -- The project's private board. UNIQUE is what makes "at most one project per board"
-                -- a schema fact; the FK's default RESTRICT is what stops a claimed board being
-                -- deleted through the generic board API.
+                -- a schema fact; RESTRICT is what stops a claimed board being deleted through the
+                -- generic board API. Spelled out rather than left to the default: SQLite's default
+                -- is NO ACTION, which behaves identically only while the constraint is immediate.
                 board_id TEXT NOT NULL UNIQUE,
                 -- Incremented on every update; used for optimistic concurrency.
                 revision INTEGER NOT NULL DEFAULT 1,
@@ -168,7 +243,7 @@ class AddProjectBoardsMigrationCallback:
                 updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
                 PRIMARY KEY (user_id, project_id),
                 FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-                FOREIGN KEY (board_id) REFERENCES boards(board_id)
+                FOREIGN KEY (board_id) REFERENCES boards(board_id) ON DELETE RESTRICT
             );
             """
         )
@@ -248,12 +323,16 @@ def _add_candidate(candidates: set[str], values: Any) -> None:
         candidates.add(board_id)
 
 
-def build_migration() -> Migration:
-    """Build the migration that gives every project its own board."""
+def build_migration(logger: Logger) -> Migration:
+    """Build the migration that gives every project its own board.
+
+    Takes the logger because this migration can decline to adopt a board, and a project that
+    silently starts on an empty one looks to its owner like a project that lost its images.
+    """
     return Migration(
         id="2026_08_06_add_project_boards",
         # The repair migration is what guarantees `projects` exists at all on databases that were
         # ever opened by an upstream build; it transitively guarantees `boards` and `shared_boards`.
         depends_on="2026_07_30_repair_projects_table",
-        callback=AddProjectBoardsMigrationCallback(),
+        callback=AddProjectBoardsMigrationCallback(logger),
     )

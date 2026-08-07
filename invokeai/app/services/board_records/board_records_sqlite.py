@@ -1,5 +1,5 @@
 import sqlite3
-from typing import Union, cast
+from typing import Optional, Union, cast
 
 from invokeai.app.services.board_records.board_records_base import BoardRecordStorageBase
 from invokeai.app.services.board_records.board_records_common import (
@@ -16,24 +16,15 @@ from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.util.misc import uuid_string
 
+# Board ids per `IN (...)`. Well under SQLITE_MAX_VARIABLE_NUMBER on every build, including the
+# 999-variable default of older SQLite.
+_BOARD_ID_QUERY_CHUNK = 500
+
 
 class SqliteBoardRecordStorage(BoardRecordStorageBase):
     def __init__(self, db: SqliteDatabase) -> None:
         super().__init__()
         self._db = db
-
-    def delete(self, board_id: str) -> None:
-        with self._db.transaction() as cursor:
-            try:
-                cursor.execute(
-                    """--sql
-                    DELETE FROM boards
-                    WHERE board_id = ?;
-                    """,
-                    (board_id,),
-                )
-            except Exception as e:
-                raise BoardRecordDeleteException from e
 
     def delete_if_unclaimed(self, board_id: str) -> bool:
         with self._db.transaction() as cursor:
@@ -56,15 +47,49 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
         if not board_ids:
             return {}
 
-        placeholders = ", ".join("?" for _ in board_ids)
+        # Chunked because the caller is a board *listing*: an admin's `GET /boards/?all=true`
+        # passes every board on the install at once, and one bind parameter per board runs into
+        # SQLITE_MAX_VARIABLE_NUMBER — which fails the whole listing rather than degrading.
+        claimed: dict[str, str] = {}
         with self._db.transaction() as cursor:
-            cursor.execute(
-                f"""--sql
-                SELECT board_id, project_id FROM projects WHERE board_id IN ({placeholders});
-                """,
-                tuple(board_ids),
-            )
-            return {row[0]: row[1] for row in cursor.fetchall()}
+            for start in range(0, len(board_ids), _BOARD_ID_QUERY_CHUNK):
+                chunk = board_ids[start : start + _BOARD_ID_QUERY_CHUNK]
+                placeholders = ", ".join("?" for _ in chunk)
+                cursor.execute(
+                    f"""--sql
+                    SELECT board_id, project_id FROM projects WHERE board_id IN ({placeholders});
+                    """,
+                    tuple(chunk),
+                )
+                claimed.update({row[0]: row[1] for row in cursor.fetchall()})
+        return claimed
+
+    def get_with_project_id(self, board_id: str) -> tuple[BoardRecord, Optional[str]]:
+        """The board and the project that claims it, in one query.
+
+        `get_dto` needs both and is called on every authorization check, so asking for them
+        separately doubled the round trips — and the transactions, which take a re-entrant lock —
+        on the hottest read in the API.
+        """
+        with self._db.transaction() as cursor:
+            try:
+                cursor.execute(
+                    """--sql
+                    SELECT boards.*, projects.project_id AS claimed_by_project_id
+                    FROM boards
+                    LEFT JOIN projects ON projects.board_id = boards.board_id
+                    WHERE boards.board_id = ?;
+                    """,
+                    (board_id,),
+                )
+                result = cast(Union[sqlite3.Row, None], cursor.fetchone())
+            except sqlite3.Error as e:
+                raise BoardRecordNotFoundException from e
+        if result is None:
+            raise BoardRecordNotFoundException
+        row = dict(result)
+        project_id = row.pop("claimed_by_project_id", None)
+        return BoardRecord(**row), project_id
 
     def save(
         self,

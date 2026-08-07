@@ -145,8 +145,11 @@ def _board_of(db: sqlite3.Connection, project_id: str, user_id: str = "u1") -> s
     return row[0]
 
 
-def _run(db: sqlite3.Connection) -> None:
-    AddProjectBoardsMigrationCallback()(db.cursor())
+def _run(db: sqlite3.Connection) -> AddProjectBoardsMigrationCallback:
+    """Run the migration, handing back the callback so a test can inspect what it reported."""
+    callback = AddProjectBoardsMigrationCallback(Logger("migration-test"))
+    callback(db.cursor())
+    return callback
 
 
 # --- adoption -------------------------------------------------------------------------------
@@ -303,6 +306,50 @@ def test_an_adopted_board_is_un_archived() -> None:
     assert archived == 0
 
 
+def test_a_refused_adoption_is_logged_with_its_reason() -> None:
+    """A project that adopts nothing looks, to its owner, like a project that lost its images.
+    Nothing else records which projects were affected or why."""
+    db = _make_db()
+    _add_user(db, "u1")
+    _add_user(db, "u2")
+    _add_board(db, "theirs", user_id="u2")
+    _add_project(db, "p1", name="Mine", data=_gallery_document("theirs"))
+
+    logger = Logger("migration-test")
+    warnings: list[str] = []
+    logger.warning = warnings.append  # type: ignore[method-assign]
+    AddProjectBoardsMigrationCallback(logger)(db.cursor())
+
+    assert len(warnings) == 1
+    assert "p1" in warnings[0]
+    assert "another account" in warnings[0]
+
+
+def test_a_project_whose_owner_is_gone_is_dropped_rather_than_failing_the_migration() -> None:
+    """The rebuilt table enforces the users foreign key that the old one did not. An orphan would
+    abort the migration, and with it the app's ability to open the database at all."""
+    db = _make_db()
+    _add_user(db, "u1")
+    _add_project(db, "kept", name="Kept")
+    # Straight past the foreign key, the way a database that once ran without enforcement would.
+    # The commit matters: the pragma is a no-op inside a transaction, and the insert above opened
+    # one implicitly.
+    db.commit()
+    db.execute("PRAGMA foreign_keys = OFF;")
+    _add_project(db, "orphan", user_id="gone", name="Orphan")
+    db.commit()
+    db.execute("PRAGMA foreign_keys = ON;")
+
+    logger = Logger("migration-test")
+    warnings: list[str] = []
+    logger.warning = warnings.append  # type: ignore[method-assign]
+    AddProjectBoardsMigrationCallback(logger)(db.cursor())
+
+    assert _board_of(db, "kept")
+    assert db.execute("SELECT COUNT(*) FROM projects;").fetchone()[0] == 1
+    assert any("orphan" in warning for warning in warnings)
+
+
 def test_a_long_project_name_is_truncated_to_what_the_board_api_accepts() -> None:
     db = _make_db()
     _add_user(db, "u1")
@@ -442,7 +489,7 @@ def test_an_empty_projects_table_migrates_cleanly() -> None:
 
 
 def test_migration_has_a_dated_id_and_depends_on_the_projects_repair() -> None:
-    migration = build_migration()
+    migration = build_migration(Logger("test"))
     assert migration.id == MIGRATION_ID
     assert migration.depends_on == "2026_07_30_repair_projects_table"
     assert migration.from_version is None

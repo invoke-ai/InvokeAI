@@ -17,10 +17,19 @@ from starlette.concurrency import run_in_threadpool
 from invokeai.app.api.auth_dependencies import CurrentMediaUserOrDefault, CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.routers._access import (
+    assert_board_read_access as _assert_board_read_access,
+)
+from invokeai.app.api.routers._access import (
     assert_board_write_access as _assert_board_write_access,
 )
+from invokeai.app.api.routers._access import (
+    assert_video_owner as _assert_video_owner,
+)
+from invokeai.app.api.routers._access import (
+    assert_video_read_access as _assert_video_read_access,
+)
 from invokeai.app.api.routers._limits import MAX_COPY_BATCH_SIZE
-from invokeai.app.api.routers.images import WorkflowAndGraphResponse, _assert_board_read_access
+from invokeai.app.api.routers.images import WorkflowAndGraphResponse
 from invokeai.app.invocations.fields import MetadataField, MetadataFieldValidator
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.shared.pagination import MAX_PAGE_SIZE, OffsetPaginatedResults
@@ -84,30 +93,6 @@ def _get_video_cache_control() -> str:
     return f"max-age={VIDEO_MAX_AGE}"
 
 
-def _assert_video_owner(video_name: str, current_user: CurrentUserOrDefault) -> None:
-    """Raise 403 if the current user does not own the video and is not an admin."""
-    from invokeai.app.services.board_records.board_records_common import BoardVisibility
-
-    if current_user.is_admin:
-        return
-    owner = ApiDependencies.invoker.services.video_records.get_user_id(video_name)
-    if owner is not None and owner == current_user.user_id:
-        return
-
-    board_id = ApiDependencies.invoker.services.board_video_records.get_board_for_video(video_name)
-    if board_id is not None:
-        try:
-            board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
-            if board.user_id == current_user.user_id:
-                return
-            if board.board_visibility == BoardVisibility.Public:
-                return
-        except Exception:
-            pass
-
-    raise HTTPException(status_code=403, detail="Not authorized to modify this video")
-
-
 def _assert_video_direct_owner(video_name: str, current_user: CurrentUserOrDefault) -> None:
     """Raise 403 if the current user is not the direct owner of the video.
 
@@ -122,28 +107,6 @@ def _assert_video_direct_owner(video_name: str, current_user: CurrentUserOrDefau
     if owner is not None and owner == current_user.user_id:
         return
     raise HTTPException(status_code=403, detail="Not authorized to move this video")
-
-
-def _assert_video_read_access(video_name: str, current_user: CurrentUserOrDefault) -> None:
-    """Raise 403 if the current user may not view the video."""
-    from invokeai.app.services.board_records.board_records_common import BoardVisibility
-
-    if current_user.is_admin:
-        return
-    owner = ApiDependencies.invoker.services.video_records.get_user_id(video_name)
-    if owner is not None and owner == current_user.user_id:
-        return
-
-    board_id = ApiDependencies.invoker.services.board_video_records.get_board_for_video(video_name)
-    if board_id is not None:
-        try:
-            board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
-            if board.board_visibility in (BoardVisibility.Shared, BoardVisibility.Public):
-                return
-        except Exception:
-            pass
-
-    raise HTTPException(status_code=403, detail="Not authorized to access this video")
 
 
 def _read_video_thumbnail(video_name: str) -> Optional[PILImage.Image]:
@@ -793,6 +756,11 @@ def copy_videos_to_board(
 
     `move_source=False` is load-bearing, not defensive: `create` consumes the path it is given,
     because every other caller hands it a temp file. Here the path is the *source's own* file.
+
+    Read access is enough to copy, which means a video on a board shared with you can be copied
+    into something you own, and the copy outlives the share. That is deliberate — it is what makes
+    a shared board usable as a source — but it is a real widening of what "read-only" means, so it
+    is stated rather than left to be discovered.
     """
     _assert_board_write_access(board_id, current_user)
 
@@ -827,6 +795,15 @@ def copy_videos_to_board(
                 first_frame=_read_video_thumbnail(video_name),
                 move_source=False,
             )
+
+            # `create` treats board attachment as best-effort — losing a freshly generated video
+            # over a categorization problem would be worse than losing its board. A copy is the
+            # other way round: the caller asked for a copy *on a board* and is about to remap a
+            # document onto the name we return, so a copy that landed uncategorized is a failure
+            # reported as one, not a success with a surprise in it.
+            if board_id is not None and video_dto.board_id != board_id:
+                raise RuntimeError(f"Copy of {video_name} did not reach board {board_id}")
+
             copied.append(CopiedVideo(source_video_name=video_name, video_name=video_dto.video_name))
         except Exception:
             ApiDependencies.invoker.services.logger.error(f"Failed to copy video {video_name}", exc_info=True)

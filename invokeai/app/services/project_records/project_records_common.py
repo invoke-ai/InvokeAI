@@ -51,6 +51,24 @@ class ProjectBoardUnavailableError(Exception):
         super().__init__(f"Board {board_id} is not available to be claimed by a project")
 
 
+PROJECT_BOARD_SNAPSHOT_MAX_ITEMS = 20_000
+"""The largest board the snapshot route will enumerate.
+
+The snapshot is unpaginated on purpose — the caller that needs it, exporting a project, has to hold
+the whole list anyway. That is a reason not to page it, not a reason to have no ceiling: the answer
+is built entirely in memory and any client with a project id can ask for it. Matched to the
+archive's own `INVK_MAX_ENTRIES`, so a board this route refuses is one the export could not have
+packed either.
+"""
+
+
+class ProjectBoardTooLargeError(Exception):
+    """Raised when a project's board holds more than the snapshot route will enumerate."""
+
+    def __init__(self, project_id: str, limit: int) -> None:
+        super().__init__(f"Project {project_id} has more than {limit} items on its board")
+
+
 class ProjectSummaryDTO(BaseModel):
     """Lightweight project listing entry; the document payload is omitted."""
 

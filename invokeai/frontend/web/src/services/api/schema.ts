@@ -1390,6 +1390,11 @@ export type paths = {
          *
          *     A sync `def`, so FastAPI runs the batch on its threadpool: file copies are blocking, and a
          *     board's worth of them on the event loop would stall every other request for the duration.
+         *
+         *     Read access is enough to copy, which means an image on a board shared with you can be copied
+         *     into something you own, and the copy outlives the share. That is deliberate — it is what makes
+         *     a shared board usable as a source — but it is a real widening of what "read-only" means, so it
+         *     is stated rather than left to be discovered.
          */
         post: operations["copy_images_to_board"];
         delete?: never;
@@ -1754,6 +1759,11 @@ export type paths = {
          *
          *     `move_source=False` is load-bearing, not defensive: `create` consumes the path it is given,
          *     because every other caller hands it a temp file. Here the path is the *source's own* file.
+         *
+         *     Read access is enough to copy, which means a video on a board shared with you can be copied
+         *     into something you own, and the copy outlives the share. That is deliberate — it is what makes
+         *     a shared board usable as a source — but it is a real widening of what "read-only" means, so it
+         *     is stated rather than left to be discovered.
          */
         post: operations["copy_videos_to_board"];
         delete?: never;
@@ -3330,7 +3340,13 @@ export type paths = {
         post?: never;
         /**
          * Delete Project
-         * @description Deletes one of the current user's projects. Idempotent.
+         * @description Deletes one of the current user's projects, and the board it owns, in one transaction.
+         *
+         *     Idempotent. The media survives: deleting the board drops its memberships, so the images and
+         *     videos on it return to Uncategorized, exactly as they would if the board were deleted without
+         *     `include_images`. There is deliberately no option to take them with it — a project is a
+         *     workspace, and emptying someone's gallery is not what deleting one should be able to mean.
+         *     Nothing is reported back for the same reason: nothing was destroyed to report.
          */
         delete: operations["delete_project"];
         options?: never;
@@ -3350,8 +3366,10 @@ export type paths = {
          * @description Lists everything on the project's board that the gallery would show.
          *
          *     Intermediates and the canvas's private `other` category are excluded. Unpaginated: the caller
-         *     that needs this — exporting a project — has to hold the whole list anyway, and enforces its own
-         *     archive limits over it.
+         *     that needs this — exporting a project — has to hold the whole list anyway. It is still bounded,
+         *     because the answer is built entirely in memory and any client with a project id can ask for it;
+         *     a board past the ceiling is one an export could not have packed either, so it is refused as a
+         *     413 rather than paged.
          */
         get: operations["get_project_board_snapshot"];
         put?: never;
