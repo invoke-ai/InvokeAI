@@ -13,50 +13,19 @@ import { INVK_MAX_ARCHIVE_BYTES } from './archive';
 import { InvkFormatError } from './format';
 
 /**
- * The asset half of a project file: pulling referenced bytes off the server on
- * the way out, and putting the missing ones back on the way in.
+ * The asset half of a project file: pulling referenced bytes off the server on the way out, and
+ * putting the missing ones back on the way in.
  *
- * This lives beside the archive rather than reaching for
- * `canvas-operations/backend/canvasImages.ts`, which does the same upload for
- * paint layers. That module is private to canvas-operations, and exporting it
- * would make importing a project file — a Launchpad action, on a route that
- * deliberately never loads the editor — pull the canvas graph behind it.
+ * Not reached through `canvas-operations/backend/canvasImages.ts`, which does the same upload:
+ * importing is a Launchpad action on a route that never loads the editor, and it must not pull the
+ * canvas graph behind it.
  *
- * ### Two upload paths, because a restore carries two kinds of media
- *
- * A document *reference* is a pointer to pixels the project draws with. Those go
- * up under the category `'other'` and onto no board — that is the canvas's
- * private category: the backend lists it in neither `IMAGE_CATEGORIES` nor
- * `ASSETS_CATEGORIES`, so it appears in no gallery view and no board count (the
- * reasoning is written out in full at `canvas-operations/backend/canvasImages.ts`).
- * The previous frontend uploaded restored images as `'general'`, which empties a
- * stranger's project into your gallery; the pixels a document points at are not
- * gallery content, they are the document.
- *
- * A project *board item* is the opposite: it is gallery content, and the archive
- * recorded the category it was filed under. {@link uploadBoardImage} and its
- * video twin put it back under that category, on the project's staging board, so
- * the restored board looks like the exported one rather than like a pile of
- * uncategorized uploads.
- *
- * ### Images and videos are not symmetric
- *
- * Everything here exists twice because the backend keeps the two in separate
- * namespaces with separate routes. The one place they genuinely differ in shape
- * is the existence check: images have a bulk `images_by_names`, videos have no
- * equivalent, so the video check fans out one request per name behind a
- * concurrency limit. That is what `hydrateVideoRefs` in the gallery's data layer
- * already does for the same reason, and what the previous frontend did for
- * images before the bulk endpoint existed.
+ * Document references upload under category `'other'` — the canvas's private category, in neither
+ * `IMAGE_CATEGORIES` nor `ASSETS_CATEGORIES` — because pixels a document points at are the
+ * document, not gallery content. Board items upload under the category the archive recorded.
  */
 
-/**
- * Simultaneous requests any one transfer may have in flight, in either direction.
- *
- * Matches the previous frontend's limit. One number rather than four identical ones, because it is
- * one budget: the point is to be kind to a backend that is very likely also generating, and a limit
- * per phase would multiply exactly what it exists to bound.
- */
+/** One budget for the whole transfer: a per-phase limit would multiply what it exists to bound. */
 export const INVK_TRANSFER_CONCURRENCY = 5;
 
 const BOARDS_BASE = '/api/v1/boards';
@@ -67,39 +36,19 @@ const VIDEOS_BASE = '/api/v1/videos';
 const MAX_BOARD_NAME_LENGTH = 300;
 
 /**
- * Whether a failed request means "the work this belonged to is over" rather
- * than "this one asset could not be served".
+ * Whether a failure means "this work is over" rather than "this one asset could not be served".
  *
- * Export treats an unservable asset as a skip, which is right — half a
- * project's pixels beats none. But an aborted signal makes *every* asset
- * unservable, and a skip-everything export writes an archive full of nothing
- * and hands it to the browser as though it had succeeded. The two have to be
- * told apart at the point the request fails, because by the time the archive is
- * packed they look identical.
+ * An aborted signal makes *every* asset unservable, and a skip-everything export writes an empty
+ * archive and hands it over as a success. Distinguishable only where the request fails — by the
+ * time the archive is packed the two look identical.
  */
 export const isRequestCancellation = (error: unknown): boolean =>
   error instanceof HttpRequestIdentityExpiredError || (error instanceof Error && error.name === 'AbortError');
 
-/**
- * Names per existence request. The endpoint answers any length, but a URL-free
- * POST body of ten thousand names is still a request worth splitting so that one
- * slow lookup cannot stall the whole check.
- */
+/** Names per existence request, so one slow lookup cannot stall the whole check. */
 const EXISTENCE_BATCH_SIZE = 500;
 
-/** Simultaneous existence batches, matching the transfer limit. */
-const EXISTENCE_BATCH_CONCURRENCY = INVK_TRANSFER_CONCURRENCY;
-
-/** Simultaneous per-name video lookups, matching the image fetch limit. */
-const VIDEO_EXISTENCE_CONCURRENCY = INVK_TRANSFER_CONCURRENCY;
-
-/**
- * Maximum names accepted by the backend's synchronous media batch routes.
- *
- * This is deliberately smaller than the archive's entry ceiling: archive size bounds a complete
- * transfer, while this bounds one unit of server work. Every adapter below owns the split so callers
- * can reason in project-sized lists without learning transport limits.
- */
+/** Maximum names the backend's synchronous batch routes accept. Adapters below own the split. */
 const MEDIA_REQUEST_BATCH_SIZE = 1_000;
 
 const toBatches = <T>(items: readonly T[], size: number): T[][] => {
@@ -112,14 +61,7 @@ const toBatches = <T>(items: readonly T[], size: number): T[][] => {
   return batches;
 };
 
-/**
- * Let go of a response whose body this module is not going to read.
- *
- * `apiFetchRaw` hands back the response untouched, so a skipped asset or an existence probe leaves
- * an unconsumed stream holding its connection until the collector gets to it. This module's whole
- * argument is that it is bounded and kind to the backend; that has to include the requests it
- * decides not to use.
- */
+/** `apiFetchRaw` returns the response untouched, so an unread body pins its connection. */
 const discardBody = async (response: Response): Promise<void> => {
   try {
     await response.body?.cancel();
@@ -150,35 +92,20 @@ interface VideoDTOSubset {
 
 export type AssetResponseReader = (response: Response, signal?: AbortSignal) => Promise<Uint8Array>;
 
-const createAssetResponseByteWriter = () => {
-  const chunks: Uint8Array[] = [];
-  let byteLength = 0;
+const concatChunks = (chunks: readonly Uint8Array[], byteLength: number): Uint8Array => {
+  if (chunks.length < 2) {
+    return chunks[0] ?? new Uint8Array();
+  }
 
-  return {
-    finish: () => {
-      if (chunks.length === 0) {
-        return new Uint8Array();
-      }
+  const bytes = new Uint8Array(byteLength);
+  let offset = 0;
 
-      if (chunks.length === 1) {
-        return chunks[0]!;
-      }
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
 
-      const bytes = new Uint8Array(byteLength);
-      let offset = 0;
-
-      for (const chunk of chunks) {
-        bytes.set(chunk, offset);
-        offset += chunk.byteLength;
-      }
-
-      return bytes;
-    },
-    write: (chunk: Uint8Array) => {
-      chunks.push(chunk);
-      byteLength += chunk.byteLength;
-    },
-  };
+  return bytes;
 };
 
 const getDeclaredContentLength = (response: Response): number | null => {
@@ -194,9 +121,8 @@ const getDeclaredContentLength = (response: Response): number | null => {
 };
 
 /**
- * A single export-scoped reader. Every response is streamed through the same
- * fixed byte budget, so both one hostile response and many individually-small
- * responses stop before they can materialize an oversized project in memory.
+ * A single export-scoped reader: every response streams through one fixed byte budget, so neither a
+ * hostile response nor many small ones can materialize an oversized project in memory.
  */
 export const createAssetResponseReader = (): AssetResponseReader => {
   type AssetStreamReader = ReadableStreamDefaultReader<Uint8Array>;
@@ -263,7 +189,8 @@ export const createAssetResponseReader = (): AssetResponseReader => {
       return refuseBeforeReading(refuseTooLarge(`Project assets exceed ${INVK_MAX_ARCHIVE_BYTES} bytes.`));
     }
 
-    const writer = createAssetResponseByteWriter();
+    const chunks: Uint8Array[] = [];
+    let chunkBytesTotal = 0;
     let remainingReservation = declaredByteLength ?? 0;
     let responseBytes = 0;
 
@@ -272,7 +199,7 @@ export const createAssetResponseReader = (): AssetResponseReader => {
     if (body === null) {
       reservedBytes -= remainingReservation;
 
-      return writer.finish();
+      return concatChunks(chunks, chunkBytesTotal);
     }
 
     const reader = body.getReader();
@@ -303,7 +230,7 @@ export const createAssetResponseReader = (): AssetResponseReader => {
           reservedBytes -= remainingReservation;
           remainingReservation = 0;
 
-          return writer.finish();
+          return concatChunks(chunks, chunkBytesTotal);
         }
 
         const chunkBytes = result.value.byteLength;
@@ -322,7 +249,8 @@ export const createAssetResponseReader = (): AssetResponseReader => {
         usedBytes += chunkBytes;
         reservedBytes -= reservationConsumed;
         remainingReservation -= reservationConsumed;
-        writer.write(result.value);
+        chunks.push(result.value);
+        chunkBytesTotal += chunkBytes;
       }
     } catch (error) {
       usedBytes -= responseBytes;
@@ -343,26 +271,16 @@ export const createAssetResponseReader = (): AssetResponseReader => {
   };
 };
 
-/**
- * Which of `imageNames` the server already has. The endpoint silently omits
- * names it cannot serve, which is exactly the answer wanted here: anything
- * missing from the response has to come out of the archive.
- */
+/** Which of `imageNames` the server already has; anything omitted must come out of the archive. */
 export const findExistingImageNames = async (
   imageNames: readonly string[],
   signal?: AbortSignal
 ): Promise<Set<string>> => {
-  const batches: string[][] = [];
-
-  for (let offset = 0; offset < imageNames.length; offset += EXISTENCE_BATCH_SIZE) {
-    batches.push(imageNames.slice(offset, offset + EXISTENCE_BATCH_SIZE));
-  }
-
   // Through the same pool as everything else. Splitting the names was meant to stop one slow
   // lookup stalling the check, which a sequential loop gives straight back.
   const found = await mapWithConcurrency(
-    batches,
-    EXISTENCE_BATCH_CONCURRENCY,
+    toBatches(imageNames, EXISTENCE_BATCH_SIZE),
+    INVK_TRANSFER_CONCURRENCY,
     (batch) =>
       apiFetchJson<ImageDTOSubset[]>(`${IMAGES_BASE}/images_by_names`, {
         body: JSON.stringify({ image_names: batch }),
@@ -376,11 +294,8 @@ export const findExistingImageNames = async (
 };
 
 /**
- * Which of `videoNames` the server already has.
- *
- * There is no bulk equivalent of `images_by_names` for videos, so this asks per
- * name behind a concurrency limit. A 404 is the answer, not an error — the whole
- * question is which names are absent.
+ * Which of `videoNames` the server already has. No bulk equivalent of `images_by_names` exists for
+ * videos, so this asks per name; a 404 is the answer, not an error.
  */
 export const findExistingVideoNames = async (
   videoNames: readonly string[],
@@ -388,7 +303,7 @@ export const findExistingVideoNames = async (
 ): Promise<Set<string>> => {
   const found = await mapWithConcurrency(
     videoNames,
-    VIDEO_EXISTENCE_CONCURRENCY,
+    INVK_TRANSFER_CONCURRENCY,
     async (videoName) => {
       const response = await apiFetchRaw(`${VIDEOS_BASE}/i/${encodeURIComponent(videoName)}`, { signal });
 
@@ -414,44 +329,43 @@ export const findExistingVideoNames = async (
 };
 
 /**
- * Full-resolution bytes for one image, or `null` when the server will not serve
- * it. A missing asset is not an export failure: the previous frontend logged and
- * skipped, and a project that exports every layer but one is far more use than
- * one that refuses to export at all.
+ * Bytes for one asset, or `null` when the server will not serve it. A missing asset is not an export
+ * failure: a project that exports every layer but one is far more use than one that refuses.
  */
+const fetchAsset = async (
+  url: string,
+  signal: AbortSignal | undefined,
+  readResponse: AssetResponseReader
+): Promise<{ bytes: Uint8Array; contentType: string | null } | null> => {
+  const response = await apiFetchRaw(url, { signal });
+
+  if (!response.ok) {
+    await discardBody(response);
+    return null;
+  }
+
+  return { bytes: await readResponse(response, signal), contentType: response.headers.get('content-type') };
+};
+
+const assetUrl = (base: string, name: string, variant: 'full' | 'thumbnail'): string =>
+  `${base}/i/${encodeURIComponent(name)}/${variant}`;
+
 const fetchImageBytesWithReader = async (
   imageName: string,
   signal: AbortSignal | undefined,
   readResponse: AssetResponseReader
-): Promise<Uint8Array | null> => {
-  const response = await apiFetchRaw(`${IMAGES_BASE}/i/${encodeURIComponent(imageName)}/full`, { signal });
-
-  if (!response.ok) {
-    await discardBody(response);
-    return null;
-  }
-
-  return readResponse(response, signal);
-};
+): Promise<Uint8Array | null> =>
+  (await fetchAsset(assetUrl(IMAGES_BASE, imageName, 'full'), signal, readResponse))?.bytes ?? null;
 
 export const fetchImageBytes = (imageName: string, signal?: AbortSignal): Promise<Uint8Array | null> =>
   fetchImageBytesWithReader(imageName, signal, createAssetResponseReader());
 
-/** The same, for a video. */
 const fetchVideoBytesWithReader = async (
   videoName: string,
   signal: AbortSignal | undefined,
   readResponse: AssetResponseReader
-): Promise<Uint8Array | null> => {
-  const response = await apiFetchRaw(`${VIDEOS_BASE}/i/${encodeURIComponent(videoName)}/full`, { signal });
-
-  if (!response.ok) {
-    await discardBody(response);
-    return null;
-  }
-
-  return readResponse(response, signal);
-};
+): Promise<Uint8Array | null> =>
+  (await fetchAsset(assetUrl(VIDEOS_BASE, videoName, 'full'), signal, readResponse))?.bytes ?? null;
 
 export const fetchVideoBytes = (videoName: string, signal?: AbortSignal): Promise<Uint8Array | null> =>
   fetchVideoBytesWithReader(videoName, signal, createAssetResponseReader());
@@ -462,23 +376,14 @@ export interface FetchedThumbnail {
   contentType: string;
 }
 
-/** Thumbnail bytes for the cover entry. `null` when the server will not serve it. */
 const fetchImageThumbnailWithReader = async (
   imageName: string,
   signal: AbortSignal | undefined,
   readResponse: AssetResponseReader
 ): Promise<FetchedThumbnail | null> => {
-  const response = await apiFetchRaw(`${IMAGES_BASE}/i/${encodeURIComponent(imageName)}/thumbnail`, { signal });
+  const fetched = await fetchAsset(assetUrl(IMAGES_BASE, imageName, 'thumbnail'), signal, readResponse);
 
-  if (!response.ok) {
-    await discardBody(response);
-    return null;
-  }
-
-  return {
-    bytes: await readResponse(response, signal),
-    contentType: response.headers.get('content-type') ?? 'image/webp',
-  };
+  return fetched === null ? null : { bytes: fetched.bytes, contentType: fetched.contentType ?? 'image/webp' };
 };
 
 export const fetchImageThumbnail = (imageName: string, signal?: AbortSignal): Promise<FetchedThumbnail | null> =>
@@ -499,53 +404,75 @@ export const createAssetExportTransport = () => {
 };
 
 /**
- * Put archived bytes back on the server. The returned name is authoritative and
- * frequently differs from the archived one — the server names images itself —
- * which is why every import ends with a remapping pass.
+ * Put bytes on the server. The returned name is authoritative and frequently differs from the one
+ * asked for — the server names media itself — which is why every import ends with a remapping pass.
+ *
+ * A board upload's name is a genuinely new identity, always — see the `board_images` rule in
+ * `transfer.ts`.
  */
+const uploadMedia = async <T>(
+  base: string,
+  query: Record<string, string>,
+  bytes: Uint8Array,
+  fileName: string,
+  defaultContentType: string,
+  options: { contentType?: string; signal?: AbortSignal }
+): Promise<T> => {
+  const body = new FormData();
+
+  body.append('file', new File([bytes as BlobPart], fileName, { type: options.contentType || defaultContentType }));
+
+  const response = await apiFetch(`${base}/upload?${new URLSearchParams(query).toString()}`, {
+    body,
+    method: 'POST',
+    signal: options.signal,
+  });
+
+  return (await response.json()) as T;
+};
+
+const IMAGE_UPLOAD_MIME = 'application/octet-stream';
+const VIDEO_UPLOAD_MIME = 'video/mp4';
+
+/** Dimensions travel for images because the document needs them; nothing needs a video's. */
+const toUploadedImage = (dto: ImageDTOSubset): UploadedImage => ({
+  height: dto.height,
+  imageName: dto.image_name,
+  width: dto.width,
+});
+
 export const uploadArchiveImage = async (
   bytes: Uint8Array,
   fileName: string,
   options: { contentType?: string; signal?: AbortSignal } = {}
-): Promise<UploadedImage> => {
-  const query = new URLSearchParams({ image_category: 'other', is_intermediate: 'false' });
-  const body = new FormData();
-
-  body.append(
-    'file',
-    new File([bytes as BlobPart], fileName, { type: options.contentType || 'application/octet-stream' })
+): Promise<UploadedImage> =>
+  toUploadedImage(
+    await uploadMedia<ImageDTOSubset>(
+      IMAGES_BASE,
+      { image_category: 'other', is_intermediate: 'false' },
+      bytes,
+      fileName,
+      IMAGE_UPLOAD_MIME,
+      options
+    )
   );
 
-  const response = await apiFetch(`${IMAGES_BASE}/upload?${query.toString()}`, {
-    body,
-    method: 'POST',
-    signal: options.signal,
-  });
-  const dto = (await response.json()) as ImageDTOSubset;
-
-  return { height: dto.height, imageName: dto.image_name, width: dto.width };
-};
-
-/** The same, for a video. Dimensions are not read: nothing in the document needs them. */
 export const uploadArchiveVideo = async (
   bytes: Uint8Array,
   fileName: string,
   options: { contentType?: string; signal?: AbortSignal } = {}
-): Promise<UploadedVideo> => {
-  const query = new URLSearchParams({ is_intermediate: 'false', video_category: 'other' });
-  const body = new FormData();
-
-  body.append('file', new File([bytes as BlobPart], fileName, { type: options.contentType || 'video/mp4' }));
-
-  const response = await apiFetch(`${VIDEOS_BASE}/upload?${query.toString()}`, {
-    body,
-    method: 'POST',
-    signal: options.signal,
-  });
-  const dto = (await response.json()) as VideoDTOSubset;
-
-  return { videoName: dto.video_name };
-};
+): Promise<UploadedVideo> => ({
+  videoName: (
+    await uploadMedia<VideoDTOSubset>(
+      VIDEOS_BASE,
+      { is_intermediate: 'false', video_category: 'other' },
+      bytes,
+      fileName,
+      VIDEO_UPLOAD_MIME,
+      options
+    )
+  ).video_name,
+});
 
 export interface BoardUploadOptions {
   /** The project's staging board. Board media is never uploaded unboarded. */
@@ -556,66 +483,38 @@ export interface BoardUploadOptions {
   signal?: AbortSignal;
 }
 
-/**
- * Put one of the project board's images back, under its archived category and on
- * the staging board the new project is about to claim.
- *
- * The returned name is a genuinely new identity, always — `board_images` has
- * `PRIMARY KEY (image_name)`, so an image sits on exactly one board and a restore
- * that reused an existing name would be moving a stranger's picture onto this
- * project's board rather than copying it.
- */
 export const uploadBoardImage = async (
   bytes: Uint8Array,
   fileName: string,
   options: BoardUploadOptions
-): Promise<UploadedImage> => {
-  const query = new URLSearchParams({
-    board_id: options.boardId,
-    image_category: options.category,
-    is_intermediate: 'false',
-  });
-  const body = new FormData();
-
-  body.append(
-    'file',
-    new File([bytes as BlobPart], fileName, { type: options.contentType || 'application/octet-stream' })
+): Promise<UploadedImage> =>
+  toUploadedImage(
+    await uploadMedia<ImageDTOSubset>(
+      IMAGES_BASE,
+      { board_id: options.boardId, image_category: options.category, is_intermediate: 'false' },
+      bytes,
+      fileName,
+      IMAGE_UPLOAD_MIME,
+      options
+    )
   );
 
-  const response = await apiFetch(`${IMAGES_BASE}/upload?${query.toString()}`, {
-    body,
-    method: 'POST',
-    signal: options.signal,
-  });
-  const dto = (await response.json()) as ImageDTOSubset;
-
-  return { height: dto.height, imageName: dto.image_name, width: dto.width };
-};
-
-/** The same, for one of the board's videos. */
 export const uploadBoardVideo = async (
   bytes: Uint8Array,
   fileName: string,
   options: BoardUploadOptions
-): Promise<UploadedVideo> => {
-  const query = new URLSearchParams({
-    board_id: options.boardId,
-    is_intermediate: 'false',
-    video_category: options.category,
-  });
-  const body = new FormData();
-
-  body.append('file', new File([bytes as BlobPart], fileName, { type: options.contentType || 'video/mp4' }));
-
-  const response = await apiFetch(`${VIDEOS_BASE}/upload?${query.toString()}`, {
-    body,
-    method: 'POST',
-    signal: options.signal,
-  });
-  const dto = (await response.json()) as VideoDTOSubset;
-
-  return { videoName: dto.video_name };
-};
+): Promise<UploadedVideo> => ({
+  videoName: (
+    await uploadMedia<VideoDTOSubset>(
+      VIDEOS_BASE,
+      { board_id: options.boardId, is_intermediate: 'false', video_category: options.category },
+      bytes,
+      fileName,
+      VIDEO_UPLOAD_MIME,
+      options
+    )
+  ).video_name,
+});
 
 /** One copy the server made, under the identity it assigned. */
 export interface CopiedMedia {
@@ -658,9 +557,9 @@ const copyMediaToBoard = async <Entry>({
     }
 
     try {
-      // Do not abort an in-flight copy request. The server performs synchronous work and may have
-      // created identities even after the browser disconnects; retaining its response is the only
-      // way the restore ledger can remove them. Cancellation is honored between bounded requests.
+      // Deliberately unaborted: the server works synchronously and may create identities after the
+      // browser disconnects, and its response is the only way the ledger learns to remove them.
+      // Cancellation is honoured between requests instead.
       const body = await apiFetchJson<{ copied?: Entry[]; failed?: string[] }>(endpoint, {
         body: JSON.stringify({ board_id: boardId, [requestKey]: batch }),
         method: 'POST',
@@ -685,14 +584,8 @@ const copyMediaToBoard = async <Entry>({
 };
 
 /**
- * Copy media onto a board without the bytes leaving the server.
- *
- * Duplication needs new identities for the same reason import does — `board_images` keys on the
- * image name — but both projects live on this one server, so round-tripping the pixels through the
- * browser would cost twice the board's size in traffic, two requests per item, and would run into
- * the same cumulative budget that bounds an export. The endpoint carries category, origin and the
- * metadata embedded in the PNG; starring is not part of a copy, so callers star afterwards through
- * the same path an import uses.
+ * Copy media onto a board without the bytes leaving the server. Carries category, origin and
+ * embedded metadata; starring is not part of a copy, so callers star afterwards.
  */
 export const copyImagesToBoard = (
   imageNames: readonly string[],
@@ -729,14 +622,8 @@ export interface BulkStarResult {
 }
 
 /**
- * What a bulk star actually achieved.
- *
- * Both endpoints answer with the names they *did* star, and only the video one
- * also lists failures — a name it skipped (a foreign one, or one deleted between
- * the upload and the star) appears in neither list. Deriving the failures from
- * the success list rather than reading `failed_*` therefore covers both routes
- * with one rule, and the rule is the honest one: anything not reported as starred
- * did not get starred.
+ * Failures are derived from the success list, not read from `failed_*`: only the video endpoint
+ * reports failures, and a name it silently skipped appears in neither list.
  */
 const toBulkStarResult = (requested: readonly string[], starred: readonly string[]): BulkStarResult => {
   const succeeded = new Set(starred);
@@ -788,15 +675,10 @@ export const starVideos = async (videoNames: readonly string[], signal?: AbortSi
 };
 
 /**
- * An unclaimed private board for a restore to upload into, which project creation
- * then claims and renames.
+ * An unclaimed private board for a restore to upload into, which project creation then claims.
  *
- * Creating the project first would mean posting it with the old asset names and
- * then updating it with the remapped ones, making the *update* the commit point:
- * a failure there leaves a real project full of references to media that never
- * arrived. Staging inverts that — the media is in place before the project
- * exists, and the create either claims the board and its contents or leaves
- * nothing a person can see.
+ * This is what makes the create the commit point: the media is in place before the project exists,
+ * so the create either claims the board and its contents or leaves nothing a person can see.
  */
 export const createStagingBoard = async (boardName: string, signal?: AbortSignal): Promise<string> => {
   const query = new URLSearchParams({ board_name: boardName.slice(0, MAX_BOARD_NAME_LENGTH) });
@@ -809,12 +691,9 @@ export const createStagingBoard = async (boardName: string, signal?: AbortSignal
 };
 
 /**
- * Drop a staging board whose project was never created.
- *
- * `include_images=false` deliberately: the restore deletes the identities it
- * created itself, one by one, and anything else that wandered onto the board in
- * the meantime — a generation that finished while the import ran — must survive
- * as Uncategorized rather than be collected by a cleanup that never meant it.
+ * Drop a staging board whose project was never created. `include_images=false` deliberately: the
+ * restore deletes its own identities one by one, and a generation that landed on the board
+ * meanwhile must survive as Uncategorized.
  */
 export const deleteStagingBoard = async (boardId: string, signal?: AbortSignal): Promise<void> => {
   await apiFetchJson<unknown>(`${BOARDS_BASE}/${encodeURIComponent(boardId)}?include_images=false`, {
@@ -883,11 +762,7 @@ const IMAGE_MIME_BY_EXTENSION: Readonly<Record<string, string>> = {
   webp: 'image/webp',
 };
 
-/**
- * Only MP4 survives the backend's upload path — it probes the container and
- * 415s anything else (`_is_mp4_file` in `videos.py`) — so this is a table of
- * what a bundled entry might be *named*, not of what will be accepted.
- */
+/** What a bundled entry might be *named*; only MP4 survives the backend's `_is_mp4_file` probe. */
 const VIDEO_MIME_BY_EXTENSION: Readonly<Record<string, string>> = {
   m4v: 'video/mp4',
   mkv: 'video/x-matroska',
@@ -897,14 +772,8 @@ const VIDEO_MIME_BY_EXTENSION: Readonly<Record<string, string>> = {
 };
 
 /**
- * Best guess at a bundled entry's MIME type, from its name and the folder it
- * came out of. Only ever a hint for the upload's multipart part.
- *
- * The fallback is per kind because the receiving endpoint checks it. A video
- * whose extension is not in the table falling back to `image/png` would be
- * announced to `/videos/upload` as an image and refused before its bytes were
- * ever read — the entry's folder already established what it is, so the guess
- * should never contradict it.
+ * Best guess at a bundled entry's MIME type. The fallback is per kind because the endpoint checks
+ * it: an unknown video extension falling back to `image/png` would be refused by `/videos/upload`.
  */
 export const mimeForEntryName = (entryName: string, kind: 'image' | 'video' = 'image'): string => {
   const extension = entryName.split('.').pop()?.toLowerCase() ?? '';

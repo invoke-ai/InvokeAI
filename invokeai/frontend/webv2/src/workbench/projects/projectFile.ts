@@ -11,38 +11,25 @@ import {
 
 import type { ProjectTransferIssues } from './invk/transfer';
 
-import {
-  createProjectSettled,
-  getProject as apiGetProject,
-  getProjectBoardSnapshot,
-  type ProjectRecordDTO,
-} from './api';
+import { createProjectSettled, getProjectBoardSnapshot, type ProjectRecordDTO } from './api';
 import { recordProjectCover } from './covers';
 import { createProjectId } from './ids';
 import { INVK_EXTENSION, InvkFormatError } from './invk/format';
-import { upsertProjectSummary } from './library';
+import { readAcknowledgedProject, upsertProjectSummary } from './library';
 import { remapAssetRefs, stripInstallationState } from './projectAssets';
-import { assertProjectFlushed } from './projectFlush';
-import { getOpenProject } from './syncStore';
 
-export const PROJECT_FILE_KIND = 'invokeai-project';
-export const PROJECT_FILE_VERSION = 1;
 export const LEGACY_PROJECT_FILE_EXTENSION = '.invokeproject.json';
 
-export interface ProjectFile {
+const PROJECT_FILE_KIND = 'invokeai-project';
+const PROJECT_FILE_VERSION = 1;
+
+/** The JSON envelope shipped before `.invk`. Read only — nothing writes one any more. */
+interface ProjectFile {
   document: Record<string, unknown>;
   exportedAt: string;
   kind: typeof PROJECT_FILE_KIND;
   version: typeof PROJECT_FILE_VERSION;
 }
-
-/** Kept for callers that still construct the JSON envelope shipped before `.invk`. */
-export const buildProjectFile = (projectDocument: Record<string, unknown>): ProjectFile => ({
-  document: projectDocument,
-  exportedAt: new Date().toISOString(),
-  kind: PROJECT_FILE_KIND,
-  version: PROJECT_FILE_VERSION,
-});
 
 /** Returns the embedded legacy document, or null when the text is not one of our exports. */
 export const parseProjectFile = (text: string): Record<string, unknown> | null => {
@@ -67,44 +54,15 @@ export const parseProjectFile = (text: string): Record<string, unknown> | null =
 };
 
 /**
- * Export and import a project as an `.invk` archive.
+ * Export and import a project as an `.invk` archive. This module is the workflow; `./invk` is the
+ * format.
  *
- * This module is the workflow; `./invk` is the format. The split matters
- * because the two have different reasons to change: the archive layout is a
- * compatibility surface shared with the previous frontend, while what an export
- * means here — which project, under whose account, landing where — is app
- * behavior.
+ * An imported document gets a fresh id, never the one in the file: two people exchanging a project
+ * would otherwise collide the moment both saved.
  *
- * ### Why an archive and not a JSON file
- *
- * A project document references its pixels by server image name. Exporting the
- * document alone produced a file that opened perfectly on the machine that
- * wrote it and showed nothing but missing layers anywhere else. An `.invk`
- * carries the bytes, so the file is the project rather than a description of it.
- *
- * ### Import never overwrites
- *
- * An imported document gets a fresh id, never the one in the file. Two people
- * exchanging a project would otherwise collide the moment both saved, and
- * re-importing your own export would silently replace the original.
- *
- * The heavy halves — the ZIP codec and the workbench reducer — are both loaded
- * with `await import()`. The Launchpad offers Import and Export on a route that
- * never mounts the editor, and it should not pay for either until someone
- * actually picks a file.
- *
- * ### Both directions report as they go, and report what they lost
- *
- * A project file is the one operation here whose duration is set by how much
- * someone has drawn: a few hundred full-resolution layers is a few hundred
- * round trips and hundreds of megabytes. Silence for that long reads as a
- * broken button, so {@link ProjectFileProgress} is reported throughout.
- *
- * Both directions can also half-succeed. Export skips an asset the server will
- * not serve; import leaves a reference dangling when the archive did not carry
- * it and this server does not have it. Both were computed and discarded before,
- * which made a project that lost forty layers indistinguishable from a clean
- * round trip. They are returned now, and every call site says so.
+ * The ZIP codec and the workbench reducer are both `await import()`ed. The Launchpad offers Import
+ * and Export on a route that never mounts the editor, and should not pay for either until someone
+ * picks a file.
  */
 
 /**
@@ -196,32 +154,13 @@ const exportProjectDocument = async (
   };
 };
 
-/**
- * Export a project from its server record.
- *
- * Flushed first when the editor holds it, for the reason duplication is: the surfaces that call
- * this — a project card, a gallery board's menu — are reachable while that project is open, and the
- * board most likely to be right-clicked is the open project's own. Exporting what the server last
- * acknowledged would hand someone a file that silently omits the last ten minutes of their work.
- *
- * A flush that does not land therefore ends the export. The archive is built from the record read
- * below, so an unacknowledged push means the file would be wrong in exactly the way this call
- * exists to prevent — and wrong invisibly, under a download and a success toast.
- */
+/** Export a project from its server record, flushing it first — see {@link readAcknowledgedProject}. */
 export const exportLibraryProject = async (
   projectId: string,
   options: ProjectFileOptions = {}
 ): Promise<ProjectExportOutcome> => {
   const owner = options.owner ?? captureAccountScope();
-  const openProject = getOpenProject(projectId);
-
-  if (openProject) {
-    assertProjectFlushed(await openProject.flush());
-  }
-
-  assertAccountScopeCurrent(owner);
-
-  const record = await apiGetProject(projectId, owner.signal);
+  const record = await readAcknowledgedProject(projectId, owner);
 
   assertAccountScopeCurrent(owner);
 
@@ -245,24 +184,12 @@ export const exportOpenProject = async (
 };
 
 /**
- * Import an `.invk` as a new server project: restore its media, rewrite every
- * reference the server renamed, then create the project — claiming the board its
- * media was staged on, in the same request. Throws {@link InvkFormatError} so
- * callers can translate the reason rather than surface an internal message.
+ * Import an `.invk` as a new server project: restore its media, rewrite every reference the server
+ * renamed, then create the project — claiming its staging board in the same request. Throws
+ * {@link InvkFormatError} so callers can translate the reason.
  *
- * ### Creating the project is the commit point
- *
- * Everything before it is either free to abandon or cleaned up: the document is
- * canonicalized before a board exists, the board is created before any media is
- * uploaded, and the create either claims that board with its contents or leaves
- * nothing a person can see. The alternative — create the project, upload, then
- * update it with the remapped names — makes the *update* the commit point, and a
- * failure there leaves a real project full of references to media that never
- * arrived.
- *
- * A v2 archive and a legacy JSON document have no board to stage, so they create
- * no staging board and the server gives the new project an empty one, exactly as
- * it does for a project made from scratch.
+ * Creating the project is the commit point; see {@link createStagingBoard}. A v2 archive or a
+ * legacy JSON document stages no board, and the server gives the new project an empty one.
  */
 export const importProjectFile = async (
   file: File,

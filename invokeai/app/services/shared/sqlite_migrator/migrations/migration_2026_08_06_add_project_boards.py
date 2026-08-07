@@ -1,34 +1,25 @@
 """Give every project a first-class board that SQLite owns.
 
-Until now a "project board" was a fiction the client maintained: the Workbench created an ordinary
-board on demand and stashed its id in the opaque project document at
-`widgetInstances.<id>.state.values.projectBoardId`. Nothing on the server knew the board belonged to
-a project, so the board could be renamed, archived or deleted out from under it, two projects could
-name the same board, and a project restored on another install pointed at a board id that did not
-exist there.
+A "project board" used to be a client-side fiction: an ordinary board whose id lived in the opaque
+project document. Nothing on the server knew it belonged to a project, so it could be renamed,
+archived or deleted out from under one, and two projects could name the same board.
 
-This migration moves the relationship into the schema: `projects.board_id` becomes `NOT NULL UNIQUE`
-with a foreign key to `boards`. The `UNIQUE` makes "a board belongs to at most one project" a
-database fact, and the FK makes "a claimed board cannot be deleted" one too,
-backing the application's 409 rather than merely agreeing with it.
+`projects.board_id` becomes `NOT NULL UNIQUE` with a foreign key to `boards`, making "at most one
+project per board" and "a claimed board cannot be deleted" database facts rather than application
+conventions.
 
-Existing projects keep the board they were already using **only when that is unambiguously safe**.
-The document is opaque and client-written, so its `projectBoardId` is treated as a hint to be
-verified, never as an assertion: a candidate is adopted only when exactly one distinct value survives
-every ownership test. Anything ambiguous — two candidates, a board owned by someone else, a shared or
-public board, one another project already took — gets a fresh empty board instead. That is the
-conservative direction: a project that adopts nothing merely starts with an empty board, whereas a
-project that adopts the wrong board takes ownership of media it does not own.
+Existing projects keep their board **only when that is unambiguously safe**. The document is
+client-written, so its `projectBoardId` is a hint to verify, never an assertion: adopted only when
+exactly one distinct value survives every ownership test. Anything ambiguous gets a fresh empty
+board — a project that adopts nothing merely starts empty, whereas one that adopts the wrong board
+takes ownership of media it does not own.
 
-Nothing is moved between boards. `board_images` and `board_videos` are read but never written, so no
-image or video changes hands here. The projects table gains a column, boards may gain rows and a new
-name, and an FK-free quarantine table is created only when a legacy project refers to a user row it
-cannot reach — either because that account is gone, or because the database has no `users` table at
-all. See `_quarantine_every_project` for how the second case arises.
+Nothing moves between boards: `board_images` and `board_videos` are read but never written.
 """
 
 import json
 import sqlite3
+from collections.abc import Callable
 from logging import Logger
 from typing import Any, Optional
 
@@ -61,50 +52,46 @@ class AddProjectBoardsMigrationCallback:
 
         self._rebuild_projects_table(cursor, assignments)
 
-    def _quarantine_orphaned_projects(self, cursor: sqlite3.Cursor) -> None:
-        """Preserve project rows whose owner no longer exists outside the live table.
+    def _quarantine(self, cursor: sqlite3.Cursor, where: str, describe: Callable[[str, str], str]) -> None:
+        """Copy the project rows matching `where` into a FK-free table, keeping them whole.
 
-        The rebuilt table re-inserts every row under `FOREIGN KEY (user_id) REFERENCES users`, with
-        `PRAGMA foreign_keys = ON` and no way to turn it off inside the migrator's transaction. The
-        old table tolerated an orphan; the new one aborts on it, which would take the whole
-        migration — and with it the app's ability to open the database — over a row nothing can
-        reach. They cannot remain live, but deleting their documents would make repair impossible.
-        A deliberately FK-free quarantine keeps the complete original row for an operator to
-        inspect or restore after repairing the missing account.
+        The rebuild re-inserts every row under `FOREIGN KEY (user_id) REFERENCES users` with
+        `PRAGMA foreign_keys = ON`, which cannot be turned off inside the migrator's transaction, so
+        an unreachable row would abort the whole migration — and with it the app's ability to open
+        the database. Deleting the documents instead would make repair impossible.
         """
-        cursor.execute(
-            """--sql
-            SELECT project_id, user_id FROM projects
-            WHERE user_id NOT IN (SELECT user_id FROM users);
-            """
-        )
-        orphans = cursor.fetchall()
+        cursor.execute(f"SELECT project_id, user_id FROM projects WHERE {where};")
+        rows = cursor.fetchall()
 
-        if not orphans:
+        if not rows:
             return
 
         self._create_quarantine_table(cursor)
         cursor.execute(
-            """--sql
+            f"""--sql
             INSERT OR IGNORE INTO orphaned_projects_2026_08_06
                 (project_id, user_id, name, data, revision, created_at, updated_at)
             SELECT project_id, user_id, name, data, revision, created_at, updated_at
-            FROM projects
-            WHERE user_id NOT IN (SELECT user_id FROM users);
+            FROM projects WHERE {where};
             """
         )
 
-        for project_id, user_id in orphans:
-            self._logger.warning(
-                f"Project boards migration: quarantining project {project_id}, whose owner {user_id} no longer exists,"
-                " in orphaned_projects_2026_08_06."
-            )
+        for project_id, user_id in rows:
+            self._logger.warning(describe(project_id, user_id))
 
-        cursor.execute(
-            """--sql
-            DELETE FROM projects WHERE user_id NOT IN (SELECT user_id FROM users);
-            """
+    def _quarantine_orphaned_projects(self, cursor: sqlite3.Cursor) -> None:
+        """Rescue rows whose owner no longer exists, then delete them from the live table."""
+        orphaned = "user_id NOT IN (SELECT user_id FROM users)"
+
+        self._quarantine(
+            cursor,
+            orphaned,
+            lambda project_id, user_id: (
+                f"Project boards migration: quarantining project {project_id}, whose owner {user_id}"
+                " no longer exists, in orphaned_projects_2026_08_06."
+            ),
         )
+        cursor.execute(f"DELETE FROM projects WHERE {orphaned};")
 
     def _quarantine_every_project(self, cursor: sqlite3.Cursor) -> None:
         """The same rescue, for a database that has no `users` table at all.
@@ -116,38 +103,21 @@ class AddProjectBoardsMigrationCallback:
         reference to `users` was a foreign key clause, which SQLite does not resolve until DML, so
         such a root opened without complaint until this migration became the first to read the table.
 
-        Note what is *not* done here: the rows are copied out but never deleted. With the foreign key
-        enforced and its target missing, SQLite refuses any DML against `projects` — including a
-        `DELETE`. Dropping the table in the rebuild is what removes them, and that needs no
-        resolution.
+        Note what is *not* done here, unlike the orphan case: the rows are copied out but never
+        deleted. With the foreign key enforced and its target missing, SQLite refuses any DML against
+        `projects` — including a `DELETE`. Dropping the table in the rebuild is what removes them,
+        and that needs no resolution.
         """
-        cursor.execute(
-            """--sql
-            SELECT project_id, user_id FROM projects;
-            """
-        )
-        projects = cursor.fetchall()
-
-        if not projects:
-            return
-
-        self._create_quarantine_table(cursor)
-        cursor.execute(
-            """--sql
-            INSERT OR IGNORE INTO orphaned_projects_2026_08_06
-                (project_id, user_id, name, data, revision, created_at, updated_at)
-            SELECT project_id, user_id, name, data, revision, created_at, updated_at
-            FROM projects;
-            """
-        )
-
-        for project_id, user_id in projects:
-            self._logger.warning(
+        self._quarantine(
+            cursor,
+            "1 = 1",
+            lambda project_id, user_id: (
                 f"Project boards migration: quarantining project {project_id} in"
                 " orphaned_projects_2026_08_06. This database has no users table, so its owner"
                 f" {user_id} cannot be resolved — it was last opened by an upstream build and this"
                 " fork's multiuser migration never ran on it."
-            )
+            ),
+        )
 
     def _create_quarantine_table(self, cursor: sqlite3.Cursor) -> None:
         """Deliberately free of foreign keys, so it can hold rows the live table cannot."""
@@ -170,14 +140,13 @@ class AddProjectBoardsMigrationCallback:
     def _assign_boards(self, cursor: sqlite3.Cursor) -> list[tuple[int, str]]:
         """Resolve one board per project, creating boards as needed.
 
-        Returns (rowid, board_id) pairs. Projects are visited in `rowid` order so that when two of
-        them name the same board the earlier one wins, deterministically and repeatably.
+        Returns (rowid, board_id) pairs, visited in `rowid` order so the earlier project wins when
+        two name the same board.
 
-        Read one row at a time, through a cursor of its own. `data` is a whole project document —
-        canvas layers, queue history, the lot — so a `fetchall()` here would hold every project on
-        the install in memory at once, and this runs at startup on a machine that is about to load
-        models. The second cursor is what makes that safe: the writes below run on `cursor`, and
-        issuing them on the cursor being iterated would discard the result set out from under it.
+        Row at a time, through a cursor of its own: `data` is a whole project document, so
+        `fetchall()` would hold every project in memory at startup. The second cursor is what makes
+        that safe — the writes below run on `cursor`, which would discard the result set being
+        iterated.
         """
         reader = cursor.connection.cursor()
         reader.execute(

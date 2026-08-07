@@ -305,7 +305,7 @@ describe('library mutations', () => {
       });
     });
 
-    await library.readProjectForDuplication('source', account.accountLifecycle.capture());
+    await library.readAcknowledgedProject('source', account.accountLifecycle.capture());
 
     expect(calls).toEqual(['flush', 'get']);
   });
@@ -324,9 +324,10 @@ describe('library mutations', () => {
       return Promise.resolve<ProjectPushOutcome>({ documentJson: '{}', kind: 'unsynced' });
     });
 
-    await expect(library.readProjectForDuplication('source', account.accountLifecycle.capture())).rejects.toMatchObject(
-      { name: 'ProjectFlushError', reason: 'unsynced' }
-    );
+    await expect(library.readAcknowledgedProject('source', account.accountLifecycle.capture())).rejects.toMatchObject({
+      name: 'ProjectFlushError',
+      reason: 'unsynced',
+    });
 
     expect(calls).toEqual(['flush']);
     expect(api.getProject).not.toHaveBeenCalled();
@@ -337,9 +338,9 @@ describe('library mutations', () => {
 
     handle.flush.mockResolvedValue({ documentJson: '{}', kind: 'superseded' });
 
-    await expect(library.readProjectForDuplication('source', account.accountLifecycle.capture())).rejects.toMatchObject(
-      { reason: 'superseded' }
-    );
+    await expect(library.readAcknowledgedProject('source', account.accountLifecycle.capture())).rejects.toMatchObject({
+      reason: 'superseded',
+    });
   });
 
   it('duplicates through the shared restore engine and adopts the copy', async () => {

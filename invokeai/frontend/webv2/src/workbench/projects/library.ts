@@ -196,12 +196,10 @@ export const upsertProjectSummary = (
 };
 
 /**
- * Every mutation below branches on one question: does the workbench currently hold this project?
- *
- * If it does, the mutation goes through {@link getOpenProject} — the sync engine — and if it does
- * not, it goes over HTTP. A library write landing beside an open project's revision chain used to
- * fork it into a conflict copy; now that a project's board renames with it, such a write would
- * rename the board too, from outside the transaction that is supposed to own both.
+ * Every mutation below branches on one question: does the workbench hold this project? If so it
+ * goes through {@link getOpenProject} — the sync engine — otherwise over HTTP. A library write
+ * landing beside an open project's revision chain forks it into a conflict copy, and now that a
+ * board renames with its project, would rename the board from outside the owning transaction.
  */
 
 /** Permanently remove a project from the server, its board with it. The only deletion path. */
@@ -268,14 +266,12 @@ export const renameLibraryProject = async (projectId: string, name: string): Pro
 };
 
 /**
- * The acknowledged record for a project about to be copied.
- *
- * An open project is flushed first and the flush is fatal if it fails. Duplicating what the server
- * last acknowledged would silently drop everything the person can see on screen, and a copy that
- * quietly omits the last ten minutes of work is worse than no copy — so a flush that did not land,
- * or that landed under a different id, raises rather than letting the GET below answer for it.
+ * The server record for a project about to be copied or exported, flushed first when the editor
+ * holds it, and fatal if that flush does not land. The GET returns the last *acknowledged*
+ * document, so without this an unacknowledged push is indistinguishable from a successful one and
+ * the copy silently omits the last ten minutes of work under a success toast.
  */
-export const readProjectForDuplication = async (projectId: string, owner: AccountScope): Promise<ProjectRecordDTO> => {
+export const readAcknowledgedProject = async (projectId: string, owner: AccountScope): Promise<ProjectRecordDTO> => {
   const openProject = getOpenProject(projectId);
 
   if (openProject) {
@@ -301,20 +297,16 @@ export interface DuplicatedProject extends ProjectTransferIssues {
 }
 
 /**
- * Copy a project, its board and everything on it, under a fresh id.
- *
- * The board is enumerated before anything is created, and a failure to enumerate it aborts: a copy
- * whose board came back silently empty would look like a successful duplication of a project that
- * had produced nothing. The copying itself lives behind the lazy `invk/` boundary with import's
- * restore engine, which it shares — this is where the two directions meet, not a second
- * implementation of them.
+ * Copy a project, its board and everything on it, under a fresh id. Enumerating the board is fatal:
+ * a board that came back silently empty would look like a successful copy of a project that had
+ * produced nothing. The copying shares import's restore engine behind the lazy `invk/` boundary.
  */
 export const duplicateLibraryProject = async (
   projectId: string,
   options: { onProgress?: (progress: { completed: number; total: number }) => void; owner?: AccountScope } = {}
 ): Promise<DuplicatedProject> => {
   const owner = options.owner ?? captureAccountScope();
-  const record = await readProjectForDuplication(projectId, owner);
+  const record = await readAcknowledgedProject(projectId, owner);
 
   assertAccountScopeCurrent(owner);
 

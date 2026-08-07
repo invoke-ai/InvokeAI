@@ -11,6 +11,21 @@ from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.board_records.board_records_common import BoardVisibility
 
 
+def _board_grants_contribution(board_id: str, current_user: CurrentUserOrDefault) -> bool:
+    """Whether this user may put media on the board: they own it, or it is Public.
+
+    Shared boards are deliberately excluded — `Shared` grants visibility, not contribution. A board
+    that cannot be read at all answers `False` rather than raising, so the media-owner helpers below
+    can fall through to their own denial instead of reporting a board error for a media request.
+    """
+    try:
+        board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
+    except Exception:
+        return False
+
+    return board.user_id == current_user.user_id or board.board_visibility == BoardVisibility.Public
+
+
 def assert_image_owner(image_name: str, current_user: CurrentUserOrDefault) -> None:
     """Raise 403 if the current user does not own the image and is not an admin.
 
@@ -29,15 +44,8 @@ def assert_image_owner(image_name: str, current_user: CurrentUserOrDefault) -> N
         return
 
     board_id = ApiDependencies.invoker.services.board_image_records.get_board_for_image(image_name)
-    if board_id is not None:
-        try:
-            board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
-            if board.user_id == current_user.user_id:
-                return
-            if board.board_visibility == BoardVisibility.Public:
-                return
-        except Exception:
-            pass
+    if board_id is not None and _board_grants_contribution(board_id, current_user):
+        return
 
     raise HTTPException(status_code=403, detail="Not authorized to modify this image")
 
@@ -137,15 +145,8 @@ def assert_video_owner(video_name: str, current_user: CurrentUserOrDefault) -> N
         return
 
     board_id = ApiDependencies.invoker.services.board_video_records.get_board_for_video(video_name)
-    if board_id is not None:
-        try:
-            board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
-            if board.user_id == current_user.user_id:
-                return
-            if board.board_visibility == BoardVisibility.Public:
-                return
-        except Exception:
-            pass
+    if board_id is not None and _board_grants_contribution(board_id, current_user):
+        return
 
     raise HTTPException(status_code=403, detail="Not authorized to modify this video")
 

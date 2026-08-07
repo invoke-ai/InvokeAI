@@ -1,50 +1,24 @@
 /**
  * Which assets a project document points at, and how to rewrite those pointers.
  *
- * The document stores pixels the way `canvas-engine/contracts.ts` describes:
- * by name, never by URL or inline data. That is what makes the document small
- * enough to autosave, and also what makes a bare document export useless on
- * another install — the names resolve to nothing there. Bundling the bytes into
- * an `.invk` archive means first knowing which names the document actually uses.
- *
- * ### Two kinds, kept apart
- *
- * Images and videos live in separate backend namespaces, with separate tables,
- * separate fetch and upload routes, and no shared name space. A document can
- * carry both — `video_name` reaches `projectGraph` through an imported workflow
- * whose node value was authored elsewhere (`VideoField` in the backend's
- * `fields.py`; webv2 cannot author one yet, but it round-trips one verbatim).
- * So collection returns a set per kind and remapping takes a mapping per kind:
- * an image and a video could in principle share a name, and a single flat map
- * would let one rewrite the other.
- *
  * ### Collection is by key, not by path
  *
- * Three keys in the document hold an asset name: `imageName` (the webv2 canvas
- * contracts), `image_name` and `video_name` (graph node values, which mirror the
- * backend's field naming). Collecting every string found at those keys is
- * complete by construction — a new control-adapter kind, a new node field, a
- * widget nobody has written yet, all get picked up without touching this file.
+ * Three keys hold an asset name: `imageName`, `image_name` and `video_name`. Collecting every
+ * string found at those keys is complete by construction — a new adapter kind or node field is
+ * picked up without touching this file. The legacy frontend walks a hand-written list of paths
+ * instead, which is why it enumerates `ip_adapter` and `flux_redux` by name and drops the pixels of
+ * anything added since. A false positive costs nothing: it fails to resolve and is skipped.
  *
- * The alternative, walking a hand-written list of paths, is what the legacy
- * frontend does, and it is why its collector enumerates `ip_adapter` and
- * `flux_redux` by name and silently drops the pixels of any adapter added since.
- * A false positive here costs nothing: a string that is not really an asset name
- * fails to resolve on the server and is skipped.
+ * Images and videos get a set and a mapping each, because they are separate backend namespaces and
+ * could share a name — one flat map would let one rewrite the other.
  *
  * ### Collection skips history, remapping does not
  *
- * A project document carries far more than the live document. Every queue entry
- * embeds a whole canvas snapshot, `canvas.snapshots` holds full document copies,
- * and the gallery widget keeps up to sixty recent results. Bundling all of that
- * turns a working project into a multi-gigabyte archive, so
- * {@link collectLiveAssetRefs} walks only what the project needs in order to
- * open correctly.
- *
- * {@link remapAssetRefs} walks everything, with no skips. The asymmetry is the
- * point: if a bundled asset comes back from the server under a new name, every
- * reference to it has to follow — including the ones in history we chose not to
- * bundle, which would otherwise point at the pre-import name forever.
+ * Queue entries embed whole canvas snapshots and the gallery keeps sixty recents, so bundling
+ * everything turns a working project into a multi-gigabyte archive; {@link collectLiveAssetRefs}
+ * walks only what the project needs to open. {@link remapAssetRefs} walks everything, because a
+ * renamed asset's references must all follow — including the history we chose not to bundle, which
+ * would otherwise point at the pre-import name forever.
  */
 
 /** Keys whose string values name an image. */
@@ -60,29 +34,12 @@ export const PROJECT_HISTORY_ROOT_KEYS: ReadonlySet<string> = new Set(['events',
 export const PROJECT_HISTORY_KEYS: ReadonlySet<string> = new Set(['recentImages', 'snapshot', 'snapshots']);
 
 /**
- * The gallery widget's selection: pointers into gallery content rather than
- * anything the document renders. `selectedImage` holds a whole polymorphic
- * `GalleryItem` (image or video), the two name keys hold `"<kind>:<name>"`, and
- * `compareImage` holds the image the Preview widget is comparing against.
+ * The gallery widget's selection: per-install content, so a project arriving elsewhere opens with
+ * nothing selected rather than dragging a stranger's gallery behind it.
  *
- * All are skipped deliberately. The gallery is per-install content: a project
- * that arrives on another machine should open with nothing selected, not drag a
- * stranger's gallery in behind it.
- *
- * Skipping them during collection is only half of that. A reference that is not
- * bundled and not stripped still travels — it simply travels broken, pointing at
- * an image the receiving server has never had, and import cannot even report it
- * as dangling because the same skip hides it from the restore pass.
- * {@link stripGallerySelection} is the other half, and the export planner
- * applies it before the document is serialized.
- *
- * The two halves got here differently, which is why the skip is by key rather
- * than left to chance. `selectedImage` and the name keys were already missed,
- * but only because `GalleryItem` spells its name field `name` and no collector
- * key matches it — an accident that renaming the field would have undone.
- * `compareImage` is a `GeneratedImageContract`, so it carries `imageName` and
- * was genuinely being bundled: excluding it is a real change, and the right one,
- * since a comparison someone happened to leave open is not part of the project.
+ * Skipping them during collection is only half of it — an unbundled, unstripped reference still
+ * travels, just broken, and the same skip hides it from the restore pass so import cannot even
+ * report it as dangling. {@link stripGallerySelection} is the other half.
  */
 export const GALLERY_SELECTION_KEYS: ReadonlySet<string> = new Set([
   'compareImage',
@@ -92,36 +49,24 @@ export const GALLERY_SELECTION_KEYS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Board ids the gallery widget holds: which board this project owns, and which
- * one new results are routed to. Both are *installation* state, not project
- * state — a board id means nothing on the machine the project arrives at.
+ * Board ids the gallery widget holds. Installation state, not project state: `projectBoardId` is a
+ * cache the server owns and hydration overwrites.
  *
- * `projectBoardId` in particular is a cache, not a fact. The server owns the
- * project-to-board relationship, and hydration overwrites this from the project
- * record. Exporting it would carry a stale pointer to a board the receiving
- * install has never had, and importing it would fight the authoritative value
- * the create response is about to supply.
- *
- * Board ids elsewhere in the document — a workflow node's board input, say — are
- * semantically meaningful and are deliberately NOT stripped. That is why this
- * set names only the two keys the gallery widget owns.
+ * Board ids elsewhere in the document — a workflow node's board input — are meaningful and
+ * deliberately NOT stripped, which is why this names only the gallery widget's two keys.
  */
 export const GALLERY_INSTALLATION_KEYS: ReadonlySet<string> = new Set(['projectBoardId', 'selectedBoardId']);
 
 const INSTALLATION_STATE_KEYS: ReadonlySet<string> = new Set([...GALLERY_SELECTION_KEYS, ...GALLERY_INSTALLATION_KEYS]);
 
 /**
- * URLs the document caches beside a media name, which name *this* install's server and this
- * install's copy of the media.
+ * URLs the document caches beside a media name, naming *this* install's copy.
  *
- * They are installation state like the keys above, but they cannot be removed the way those are.
- * The persisted-recents validator (`getBoundedRecentImages`) requires both to be strings and drops
- * any entry missing one, so deleting them would silently discard the whole gallery-recents overlay
- * on import. Blanked instead: every consumer already falls back to deriving the URL from the media
- * name (`item.thumbnailUrl || item.fullUrl`, `slot.candidate.thumbnailUrl || galleryImageUrls…`),
- * which is the only correct answer once a transfer has renamed the media anyway. The name is
- * remapped; a URL built around the *old* name is not, and would keep resolving — to the source
- * project's picture.
+ * Blanked, not removed: `getBoundedRecentImages` requires both to be strings and drops any entry
+ * missing one, so deleting them would discard the whole gallery-recents overlay on import. Every
+ * consumer already falls back to deriving the URL from the name, which is the only correct answer
+ * once a transfer has renamed the media — the name is remapped, a URL built around the old one is
+ * not, and would keep resolving to the source project's picture.
  */
 const DERIVED_URL_KEYS: ReadonlySet<string> = new Set(['imageUrl', 'thumbnailUrl', 'videoUrl']);
 
@@ -186,79 +131,20 @@ export const collectLiveAssetRefs = (projectDocument: Record<string, unknown>): 
   return refs;
 };
 
-const stripNode = (node: unknown): unknown => {
-  if (Array.isArray(node)) {
-    let hasChanged = false;
-    const next = node.map((item) => {
-      const stripped = stripNode(item);
-
-      hasChanged ||= stripped !== item;
-
-      return stripped;
-    });
-
-    return hasChanged ? next : node;
-  }
-
-  if (!isRecord(node)) {
-    return node;
-  }
-
-  let hasChanged = false;
-  const next: Record<string, unknown> = {};
-
-  for (const [key, value] of Object.entries(node)) {
-    if (INSTALLATION_STATE_KEYS.has(key)) {
-      hasChanged = true;
-      continue;
-    }
-
-    if (DERIVED_URL_KEYS.has(key) && typeof value === 'string') {
-      next[key] = '';
-      hasChanged ||= value !== '';
-      continue;
-    }
-
-    const stripped = stripNode(value);
-
-    next[key] = stripped;
-    hasChanged ||= stripped !== value;
-  }
-
-  return hasChanged ? next : node;
-};
+/** `{ drop: true }` removes the key, `{ value }` replaces it, `null` recurses into it. */
+type NodeVisit = { drop: true } | { value: unknown } | null;
 
 /**
- * Drop everything that describes *this install* rather than the project — the
- * gallery's selection, its board ids, and the URLs cached beside media names — at
- * every depth, so an exported project opens with nothing selected, on the board
- * the receiving server assigns it, resolving its pictures through the names it
- * actually owns.
+ * Walk every entry of a project document at every depth, applying `visit`.
  *
- * Every reader of the selection and board values already tolerates their absence —
- * selection is parsed with `typeof`/`Array.isArray` guards and falls back to
- * nothing, and the board ids are re-supplied from the project record — so removing
- * the key is the same as clearing it, without inventing a shape. The cached URLs
- * are blanked rather than removed, for the reason {@link DERIVED_URL_KEYS} gives.
- * Subtrees with nothing to change keep their identity.
- *
- * Stripping by key at any depth rather than by walking into `widgetInstances` is
- * what makes this cover the legacy `widgetStates.gallery` shape for free, and it
- * is safe because these keys occur nowhere else in a project document.
+ * Subtrees with nothing to change keep their identity, so a document that matches nothing comes
+ * back as the very same object rather than a structurally-equal copy.
  */
-export const stripInstallationState = (projectDocument: Record<string, unknown>): Record<string, unknown> =>
-  stripNode(projectDocument) as Record<string, unknown>;
-
-export interface ProjectAssetMappings {
-  images: ReadonlyMap<string, string>;
-  videos: ReadonlyMap<string, string>;
-}
-
-const remapNode = (node: unknown, mappings: ProjectAssetMappings): unknown => {
+const mapDocument = (node: unknown, visit: (key: string, value: unknown) => NodeVisit): unknown => {
   if (Array.isArray(node)) {
     let hasChanged = false;
     const next = node.map((item) => {
-      const mapped = remapNode(item, mappings);
+      const mapped = mapDocument(item, visit);
 
       hasChanged ||= mapped !== item;
 
@@ -276,26 +162,48 @@ const remapNode = (node: unknown, mappings: ProjectAssetMappings): unknown => {
   const next: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(node)) {
-    if (typeof value === 'string') {
-      const mapping = IMAGE_NAME_KEYS.has(key) ? mappings.images : VIDEO_NAME_KEYS.has(key) ? mappings.videos : null;
+    const visited = visit(key, value);
 
-      if (mapping) {
-        const replacement = mapping.get(value);
+    if (visited === null) {
+      const mapped = mapDocument(value, visit);
 
-        next[key] = replacement ?? value;
-        hasChanged ||= replacement !== undefined && replacement !== value;
-        continue;
-      }
+      next[key] = mapped;
+      hasChanged ||= mapped !== value;
+      continue;
     }
 
-    const mapped = remapNode(value, mappings);
+    if ('drop' in visited) {
+      hasChanged = true;
+      continue;
+    }
 
-    next[key] = mapped;
-    hasChanged ||= mapped !== value;
+    next[key] = visited.value;
+    hasChanged ||= visited.value !== value;
   }
 
   return hasChanged ? next : node;
 };
+
+/**
+ * Drop everything describing *this install* rather than the project, at every depth.
+ *
+ * Removing a key is the same as clearing it here: every reader already tolerates absence. By key at
+ * any depth rather than by walking `widgetInstances`, which covers the legacy `widgetStates.gallery`
+ * shape for free and is safe because these keys occur nowhere else in a document.
+ */
+export const stripInstallationState = (projectDocument: Record<string, unknown>): Record<string, unknown> =>
+  mapDocument(projectDocument, (key, value) => {
+    if (INSTALLATION_STATE_KEYS.has(key)) {
+      return { drop: true };
+    }
+
+    return DERIVED_URL_KEYS.has(key) && typeof value === 'string' ? { value: '' } : null;
+  }) as Record<string, unknown>;
+
+export interface ProjectAssetMappings {
+  images: ReadonlyMap<string, string>;
+  videos: ReadonlyMap<string, string>;
+}
 
 /**
  * Rewrite every asset reference in the document through the mapping for its
@@ -309,7 +217,15 @@ export const remapAssetRefs = (
 ): Record<string, unknown> =>
   mappings.images.size === 0 && mappings.videos.size === 0
     ? projectDocument
-    : (remapNode(projectDocument, mappings) as Record<string, unknown>);
+    : (mapDocument(projectDocument, (key, value) => {
+        if (typeof value !== 'string') {
+          return null;
+        }
+
+        const mapping = IMAGE_NAME_KEYS.has(key) ? mappings.images : VIDEO_NAME_KEYS.has(key) ? mappings.videos : null;
+
+        return mapping === null ? null : { value: mapping.get(value) ?? value };
+      }) as Record<string, unknown>);
 
 const readGalleryRecentImageName = (projectDocument: Record<string, unknown>): string | null => {
   const instances = projectDocument.widgetInstances;

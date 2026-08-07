@@ -34,15 +34,13 @@ _VISIBLE_CATEGORY_PLACEHOLDERS = ", ".join("?" for _ in _VISIBLE_BOARD_CATEGORIE
 class ProjectRecordsSqlite(ProjectRecordsStorageBase):
     """SQLite implementation of per-user project document storage.
 
-    A project and its board are one unit here. Every write that touches both — creating them,
-    renaming them, deleting them — happens inside a single `self._db.transaction()` so the two can
-    never disagree.
+    A project and its board are one unit: every write touching both happens inside a single
+    `self._db.transaction()`.
 
-    That transaction is the reason this class talks to `boards` in raw SQL rather than through
+    That transaction is why this class talks to `boards` in raw SQL rather than through
     `BoardService`. `SqliteDatabase.transaction()` guards a re-entrant lock and commits on the way
-    out of *every* level, so calling another service's method from inside an open transaction would
-    commit this one's half-finished work. Nothing between the `with` and its close may call anything
-    that opens a transaction of its own, including `self.get()`.
+    out of *every* level, so calling another service from inside an open transaction would commit
+    this one's half-finished work — including `self.get()`.
     """
 
     def __init__(self, db: SqliteDatabase) -> None:
@@ -183,13 +181,7 @@ class ProjectRecordsSqlite(ProjectRecordsStorageBase):
 
     def delete(self, user_id: str, project_id: str) -> None:
         with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                SELECT board_id FROM projects WHERE user_id = ? AND project_id = ?;
-                """,
-                (user_id, project_id),
-            )
-            row = cursor.fetchone()
+            row = self._board_row(cursor, user_id=user_id, project_id=project_id)
 
             if row is None:
                 return
@@ -213,13 +205,7 @@ class ProjectRecordsSqlite(ProjectRecordsStorageBase):
 
     def get_board_snapshot(self, user_id: str, project_id: str) -> ProjectBoardSnapshotDTO:
         with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                SELECT board_id FROM projects WHERE user_id = ? AND project_id = ?;
-                """,
-                (user_id, project_id),
-            )
-            row = cursor.fetchone()
+            row = self._board_row(cursor, user_id=user_id, project_id=project_id)
 
             if row is None:
                 raise ProjectRecordNotFoundError(project_id)
@@ -274,18 +260,27 @@ class ProjectRecordsSqlite(ProjectRecordsStorageBase):
 
     def get_board_id(self, user_id: str, project_id: str) -> str:
         with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                SELECT board_id FROM projects WHERE user_id = ? AND project_id = ?;
-                """,
-                (user_id, project_id),
-            )
-            row = cursor.fetchone()
+            row = self._board_row(cursor, user_id=user_id, project_id=project_id)
 
         if row is None:
             raise ProjectRecordNotFoundError(project_id)
 
         return row[0]
+
+    def _board_row(self, cursor: sqlite3.Cursor, *, user_id: str, project_id: str) -> Optional[sqlite3.Row]:
+        """The project's board row, or `None` when this user has no such project.
+
+        Cursor-taking rather than transaction-opening, so callers stay in charge of the unit of work
+        this class's docstring describes.
+        """
+        cursor.execute(
+            """--sql
+            SELECT board_id FROM projects WHERE user_id = ? AND project_id = ?;
+            """,
+            (user_id, project_id),
+        )
+
+        return cursor.fetchone()
 
     def _insert_board(self, cursor: sqlite3.Cursor, *, user_id: str, name: str) -> str:
         board_id = uuid_string()
