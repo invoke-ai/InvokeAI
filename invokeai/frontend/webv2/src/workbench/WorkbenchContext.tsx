@@ -11,6 +11,7 @@ import { createContext, use, useEffect, useSyncExternalStore, useState, type Rea
 import { WorkbenchSplashScreen } from './components/WorkbenchSplashScreen';
 import { createExtensionRegistry, type ExtensionRegistry } from './extensions/extensionRegistry';
 import { createWorkbenchPersistenceRuntime } from './persistenceRuntime';
+import { createOpenProjectBroker } from './projects/openProjectBroker';
 import {
   createSyncedWorkbenchPersistence,
   type SyncedWorkbenchPersistence,
@@ -76,8 +77,35 @@ export const WorkbenchProvider = ({
       persistence,
       signal: owner.signal,
     });
+    // Published for the whole life of the mount, so a library surface rendered beside the editor
+    // mutates an open project through the sync engine rather than beside it.
+    const openProjectBroker = createOpenProjectBroker({
+      closeProject: (projectId) => {
+        store.commands.projects.close(projectId);
+      },
+      flushProject: async (projectId) => {
+        const project = store.getSnapshot().projects.find((candidate) => candidate.id === projectId);
+
+        if (project) {
+          await persistence.flushProjectToServer(project);
+        }
+      },
+      getOpenProjectIds: () => store.getSnapshot().projects.map((project) => project.id),
+      markProjectDeleted: (projectId) => {
+        persistence.markProjectDeleted(projectId);
+      },
+      renameProject: (projectId, name) => {
+        store.commands.projects.rename(projectId, name);
+      },
+      subscribe: store.subscribe,
+    });
+
     persistenceRuntime.start();
-    return () => persistenceRuntime.dispose();
+
+    return () => {
+      openProjectBroker.dispose();
+      persistenceRuntime.dispose();
+    };
   });
 
   return (

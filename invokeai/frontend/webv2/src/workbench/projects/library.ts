@@ -15,6 +15,7 @@ import {
   getProject as apiGetProject,
   listProjects,
   updateProject as apiUpdateProject,
+  type ProjectRecordDTO,
   type ProjectSummaryDTO,
 } from './api';
 import {
@@ -25,6 +26,9 @@ import {
   subscribeProjectCovers,
 } from './covers';
 import { createProjectId } from './ids';
+import { refreshOpenProjects } from './openProjects';
+import { pruneSessionProject } from './session';
+import { getOpenProject } from './syncStore';
 
 /**
  * The project library: every project saved on the server for the current
@@ -188,23 +192,52 @@ export const upsertProjectSummary = (
   });
 };
 
-/** Permanently remove a project from the server. The only deletion path. */
+/**
+ * Every mutation below branches on one question: does the workbench currently hold this project?
+ *
+ * If it does, the mutation goes through {@link getOpenProject} — the sync engine — and if it does
+ * not, it goes over HTTP. A library write landing beside an open project's revision chain used to
+ * fork it into a conflict copy; now that a project's board renames with it, such a write would
+ * rename the board too, from outside the transaction that is supposed to own both.
+ */
+
+/** Permanently remove a project from the server, its board with it. The only deletion path. */
 export const deleteLibraryProject = async (projectId: string): Promise<void> => {
   const owner = captureAccountScope();
+  const openProject = getOpenProject(projectId);
 
+  // Marked before the request so an autosave in flight cannot recreate the project — and with it a
+  // board — between the DELETE and the tab closing.
+  openProject?.markDeleted();
   await apiDeleteProject(projectId, owner.signal);
   assertAccountScopeCurrent(owner);
+  openProject?.close();
   forgetProjectCover(projectId, owner);
   store.patchSnapshot({ summaries: store.getSnapshot().summaries.filter((summary) => summary.id !== projectId) });
+
+  // The saved session outlives the editor, so a deleted project has to leave it here or the next
+  // boot tries to open something the server no longer has.
+  await pruneSessionProject(projectId, owner.signal);
+  await refreshOpenProjects();
 };
 
 /**
- * Rename a project that is not open in the editor. Open projects rename
- * through the workbench reducer instead, so their document and the autosave
- * revision chain stay consistent.
+ * Rename a project. An open one renames through the reducer so its document, its revision chain and
+ * its board stay in step; a closed one is a read-modify-write against the server.
  */
 export const renameLibraryProject = async (projectId: string, name: string): Promise<void> => {
   const owner = captureAccountScope();
+  const openProject = getOpenProject(projectId);
+
+  if (openProject) {
+    await openProject.rename(name);
+    assertAccountScopeCurrent(owner);
+    // The flush has already told the server; this only keeps the grid from waiting for a refetch.
+    upsertProjectSummary({ id: projectId, name, revision: null }, owner);
+
+    return;
+  }
+
   const record = await apiGetProject(projectId, owner.signal);
 
   assertAccountScopeCurrent(owner);
@@ -222,10 +255,33 @@ export const renameLibraryProject = async (projectId: string, name: string): Pro
   upsertProjectSummary({ id: updated.project_id, name: updated.name, revision: updated.revision }, owner);
 };
 
+/**
+ * The acknowledged record for a project about to be copied.
+ *
+ * An open project is flushed first and the flush is fatal if it fails. Duplicating what the server
+ * last acknowledged would silently drop everything the person can see on screen, and a copy that
+ * quietly omits the last ten minutes of work is worse than no copy.
+ */
+export const readProjectForDuplication = async (projectId: string, owner: AccountScope): Promise<ProjectRecordDTO> => {
+  await getOpenProject(projectId)?.flush();
+  assertAccountScopeCurrent(owner);
+
+  return apiGetProject(projectId, owner.signal);
+};
+
+/** Adopt a project this account just created elsewhere (an import, a duplication). */
+export const adoptCreatedProject = (record: ProjectRecordDTO, owner: AccountScope): ProjectSummary => {
+  const summary = toSummary(record);
+
+  upsertProjectSummary({ id: summary.id, name: summary.name, revision: summary.revision }, owner);
+
+  return summary;
+};
+
 /** Copy a project under a fresh id; returns the new summary. */
 export const duplicateLibraryProject = async (projectId: string): Promise<ProjectSummary> => {
   const owner = captureAccountScope();
-  const record = await apiGetProject(projectId, owner.signal);
+  const record = await readProjectForDuplication(projectId, owner);
 
   assertAccountScopeCurrent(owner);
   const newId = createProjectId();
@@ -238,10 +294,8 @@ export const duplicateLibraryProject = async (projectId: string): Promise<Projec
     },
     owner.signal
   );
+
   assertAccountScopeCurrent(owner);
-  const summary = toSummary(created);
 
-  upsertProjectSummary({ id: summary.id, name: summary.name, revision: summary.revision }, owner);
-
-  return summary;
+  return adoptCreatedProject(created, owner);
 };

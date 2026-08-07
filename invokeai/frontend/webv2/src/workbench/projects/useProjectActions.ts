@@ -112,11 +112,11 @@ export const useProjectActions = (): {
 
   const deleteProject = async (project: Project): Promise<void> => {
     flushGenerateDrafts();
-    // Marked before the request so an in-flight autosave cannot recreate the
-    // project server-side between the DELETE and the tab closing.
-    persistenceService.markProjectDeleted(project.id);
 
     try {
+      // Deletion goes through the library for every surface. For a project the workbench holds it
+      // routes through this editor's own sync handle, which is what stops an in-flight autosave
+      // recreating the project — and with it a board — between the DELETE and the tab closing.
       await deleteLibraryProject(project.id);
     } catch (error) {
       persistenceService.unmarkProjectDeleted(project.id);

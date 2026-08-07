@@ -2,7 +2,7 @@ import type { LaunchpadIntentId } from '@workbench/launchpad/intents';
 import type { AccountState, WorkbenchState } from '@workbench/projectContracts';
 import type { WorkbenchPreferences } from '@workbench/settings/contracts';
 
-import { getClientStateValue } from './api';
+import { getClientStateValue, setClientStateValue } from './api';
 
 /**
  * The per-user session blob in the client-state KV: the editor session — which
@@ -77,6 +77,41 @@ export const fetchSessionBlob = async (signal?: AbortSignal): Promise<WorkbenchS
     signal?.throwIfAborted();
 
     return null;
+  }
+};
+
+/**
+ * Take a deleted project out of the saved session.
+ *
+ * A project is deleted from surfaces that may not have the editor mounted, and the session blob is
+ * what the `/app` guard and the Launchpad's "open" grouping read. Leaving the id there means the
+ * next boot tries to hydrate a project the server no longer has, and the Launchpad shows it as
+ * open until something else rewrites the blob.
+ *
+ * Best-effort and silent: the deletion has already happened, and failing to tidy the session after
+ * it is not a reason to tell someone their project was not deleted.
+ */
+export const pruneSessionProject = async (projectId: string, signal?: AbortSignal): Promise<void> => {
+  try {
+    const blob = await fetchSessionBlob(signal);
+
+    if (!blob?.openProjectIds?.includes(projectId)) {
+      return;
+    }
+
+    const openProjectIds = blob.openProjectIds.filter((id) => id !== projectId);
+
+    await setClientStateValue(
+      SESSION_STATE_KEY,
+      JSON.stringify({
+        account: blob.account,
+        activeProjectId: blob.activeProjectId === projectId ? (openProjectIds[0] ?? '') : blob.activeProjectId,
+        openProjectIds,
+      } satisfies WorkbenchSessionBlob),
+      signal
+    );
+  } catch {
+    signal?.throwIfAborted();
   }
 };
 

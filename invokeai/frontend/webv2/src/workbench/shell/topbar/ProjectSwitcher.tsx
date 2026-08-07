@@ -244,7 +244,7 @@ export const ProjectSwitcher = () => {
         <RenameDialog initialName={renameTarget.name} isOpen onClose={closeRenameDialog} onSubmit={renameProject} />
       ) : null}
       <ConfirmDialog
-        body={t('projects.deleteProjectTabBody', { name: deleteTarget?.name ?? '' })}
+        body={`${t('projects.deleteProjectTabBody', { name: deleteTarget?.name ?? '' })} ${t('projects.deleteProjectBoardNote')}`}
         confirmLabel={t('projects.deleteProject')}
         isOpen={deleteTarget !== null}
         title={t('projects.deleteProjectQuestion')}

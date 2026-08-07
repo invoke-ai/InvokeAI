@@ -3,6 +3,7 @@ import type * as accountLifecycleModule from '@platform/state/accountLifecycle';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as libraryModule from './library';
+import type * as syncStoreModule from './syncStore';
 
 /**
  * The project library store: summaries normalized at the boundary, sorted by
@@ -13,14 +14,17 @@ import type * as libraryModule from './library';
 const api = vi.hoisted(() => ({
   createProject: vi.fn(),
   deleteProject: vi.fn(),
+  getClientStateValue: vi.fn(() => Promise.resolve<string | null>(null)),
   getProject: vi.fn(),
   listProjects: vi.fn(),
+  setClientStateValue: vi.fn(() => Promise.resolve()),
   updateProject: vi.fn(),
 }));
 
 vi.mock('./api', () => api);
 
 let library: typeof libraryModule;
+let syncStore: typeof syncStoreModule;
 let account: typeof accountLifecycleModule;
 
 const summaryDto = (id: string, name: string, updatedAt: string) => ({
@@ -38,10 +42,41 @@ beforeEach(async () => {
   api.getProject.mockReset();
   api.listProjects.mockReset();
   api.updateProject.mockReset();
+  api.getClientStateValue.mockReset();
+  api.getClientStateValue.mockResolvedValue(null);
+  api.setClientStateValue.mockReset();
+  api.setClientStateValue.mockResolvedValue(undefined);
 
   library = await import('./library');
+  syncStore = await import('./syncStore');
   account = await import('@platform/state/accountLifecycle');
 });
+
+/** A stand-in for the editor holding a project, with every call recorded in order. */
+const openProject = (projectId: string, calls: string[] = []) => {
+  const handle = {
+    close: vi.fn(() => {
+      calls.push('close');
+    }),
+    flush: vi.fn(() => {
+      calls.push('flush');
+
+      return Promise.resolve();
+    }),
+    markDeleted: vi.fn(() => {
+      calls.push('markDeleted');
+    }),
+    rename: vi.fn((name: string) => {
+      calls.push(`rename:${name}`);
+
+      return Promise.resolve();
+    }),
+  };
+
+  syncStore.registerOpenProject(projectId, handle);
+
+  return { calls, handle };
+};
 
 describe('refreshProjectLibrary', () => {
   it('normalizes SQLite timestamps to ISO and sorts newest first', async () => {
@@ -148,6 +183,83 @@ describe('library mutations', () => {
       expect.any(AbortSignal)
     );
     expect(library.getProjectLibrary().summaries[0]?.name).toBe('New name');
+  });
+
+  /**
+   * The invariant: a project the workbench holds is mutated through the sync engine, everything
+   * else over HTTP. A library PUT beside an open project's revision chain used to fork it into a
+   * conflict copy, and would now rename its board from outside the transaction that owns both.
+   */
+  it('renames an open project through the editor rather than over HTTP', async () => {
+    api.listProjects.mockResolvedValue([summaryDto('open', 'Old name', '2026-06-10 10:00:00.000')]);
+    await library.refreshProjectLibrary();
+
+    const { handle } = openProject('open');
+
+    await library.renameLibraryProject('open', 'New name');
+
+    expect(handle.rename).toHaveBeenCalledWith('New name');
+    expect(api.getProject).not.toHaveBeenCalled();
+    expect(api.updateProject).not.toHaveBeenCalled();
+    expect(library.getProjectLibrary().summaries[0]?.name).toBe('New name');
+  });
+
+  it('deletes an open project without letting its autosave recreate it, then closes the tab', async () => {
+    api.deleteProject.mockResolvedValue(undefined);
+
+    const { calls } = openProject('open');
+
+    await library.deleteLibraryProject('open');
+
+    expect(calls).toEqual(['markDeleted', 'close']);
+    expect(api.deleteProject).toHaveBeenCalledWith('open', expect.any(AbortSignal));
+  });
+
+  it('takes a deleted project out of the saved session', async () => {
+    api.deleteProject.mockResolvedValue(undefined);
+    api.getClientStateValue.mockResolvedValue(
+      JSON.stringify({
+        account: { userId: 'user-a' },
+        activeProjectId: 'doomed',
+        openProjectIds: ['doomed', 'kept'],
+      })
+    );
+
+    await library.deleteLibraryProject('doomed');
+
+    const [, blob] = api.setClientStateValue.mock.calls.at(-1) as unknown as [string, string];
+
+    // The next boot would otherwise try to hydrate a project the server no longer has.
+    expect(JSON.parse(blob)).toMatchObject({ activeProjectId: 'kept', openProjectIds: ['kept'] });
+  });
+
+  it('leaves the session alone when the deleted project was not open', async () => {
+    api.deleteProject.mockResolvedValue(undefined);
+    api.getClientStateValue.mockResolvedValue(
+      JSON.stringify({ account: {}, activeProjectId: 'kept', openProjectIds: ['kept'] })
+    );
+
+    await library.deleteLibraryProject('closed');
+
+    expect(api.setClientStateValue).not.toHaveBeenCalled();
+  });
+
+  /** A copy of what the server last acknowledged would silently drop what is on screen. */
+  it('flushes an open project before reading it for duplication', async () => {
+    const { calls } = openProject('source');
+
+    api.getProject.mockImplementation(() => {
+      calls.push('get');
+
+      return Promise.resolve({
+        ...summaryDto('source', 'Source', '2026-06-10 10:00:00.000'),
+        data: { id: 'source', layout: {}, name: 'Source' },
+      });
+    });
+
+    await library.readProjectForDuplication('source', account.accountLifecycle.capture());
+
+    expect(calls).toEqual(['flush', 'get']);
   });
 
   it('duplicateLibraryProject copies under a fresh id', async () => {
