@@ -325,7 +325,7 @@ def test_a_refused_adoption_is_logged_with_its_reason() -> None:
     assert "another account" in warnings[0]
 
 
-def test_a_project_whose_owner_is_gone_is_dropped_rather_than_failing_the_migration() -> None:
+def test_a_project_whose_owner_is_gone_is_quarantined_before_the_live_table_is_rebuilt() -> None:
     """The rebuilt table enforces the users foreign key that the old one did not. An orphan would
     abort the migration, and with it the app's ability to open the database at all."""
     db = _make_db()
@@ -339,6 +339,10 @@ def test_a_project_whose_owner_is_gone_is_dropped_rather_than_failing_the_migrat
     _add_project(db, "orphan", user_id="gone", name="Orphan")
     db.commit()
     db.execute("PRAGMA foreign_keys = ON;")
+    orphan_before = db.execute(
+        "SELECT project_id, user_id, name, data, revision, created_at, updated_at FROM projects WHERE project_id = ?;",
+        ("orphan",),
+    ).fetchone()
 
     logger = Logger("migration-test")
     warnings: list[str] = []
@@ -347,6 +351,9 @@ def test_a_project_whose_owner_is_gone_is_dropped_rather_than_failing_the_migrat
 
     assert _board_of(db, "kept")
     assert db.execute("SELECT COUNT(*) FROM projects;").fetchone()[0] == 1
+    assert db.execute(
+        "SELECT project_id, user_id, name, data, revision, created_at, updated_at FROM orphaned_projects_2026_08_06;"
+    ).fetchall() == [orphan_before]
     assert any("orphan" in warning for warning in warnings)
 
 

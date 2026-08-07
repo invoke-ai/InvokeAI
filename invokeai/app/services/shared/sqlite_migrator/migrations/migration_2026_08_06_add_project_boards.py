@@ -21,8 +21,9 @@ conservative direction: a project that adopts nothing merely starts with an empt
 project that adopts the wrong board takes ownership of media it does not own.
 
 Nothing is moved between boards. `board_images` and `board_videos` are read but never written, so no
-image or video changes hands here; only the projects table gains a column, and boards may gain rows
-and a new name.
+image or video changes hands here. The projects table gains a column, boards may gain rows and a new
+name, and an FK-free quarantine table is created only when a legacy project refers to a user row
+that no longer exists.
 """
 
 import json
@@ -47,18 +48,20 @@ class AddProjectBoardsMigrationCallback:
         self._logger = logger
 
     def __call__(self, cursor: sqlite3.Cursor) -> None:
-        self._drop_orphaned_projects(cursor)
+        self._quarantine_orphaned_projects(cursor)
         assignments = self._assign_boards(cursor)
         self._rebuild_projects_table(cursor, assignments)
 
-    def _drop_orphaned_projects(self, cursor: sqlite3.Cursor) -> None:
-        """Remove project rows whose owner no longer exists.
+    def _quarantine_orphaned_projects(self, cursor: sqlite3.Cursor) -> None:
+        """Preserve project rows whose owner no longer exists outside the live table.
 
         The rebuilt table re-inserts every row under `FOREIGN KEY (user_id) REFERENCES users`, with
         `PRAGMA foreign_keys = ON` and no way to turn it off inside the migrator's transaction. The
         old table tolerated an orphan; the new one aborts on it, which would take the whole
         migration — and with it the app's ability to open the database — over a row nothing can
-        reach. They are unreachable already: every project query filters by `user_id`.
+        reach. They cannot remain live, but deleting their documents would make repair impossible.
+        A deliberately FK-free quarantine keeps the complete original row for an operator to
+        inspect or restore after repairing the missing account.
         """
         cursor.execute(
             """--sql
@@ -71,9 +74,35 @@ class AddProjectBoardsMigrationCallback:
         if not orphans:
             return
 
+        cursor.execute(
+            """--sql
+            CREATE TABLE IF NOT EXISTS orphaned_projects_2026_08_06 (
+                project_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                data TEXT NOT NULL,
+                revision INTEGER NOT NULL,
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL,
+                quarantined_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
+                PRIMARY KEY (user_id, project_id)
+            );
+            """
+        )
+        cursor.execute(
+            """--sql
+            INSERT OR IGNORE INTO orphaned_projects_2026_08_06
+                (project_id, user_id, name, data, revision, created_at, updated_at)
+            SELECT project_id, user_id, name, data, revision, created_at, updated_at
+            FROM projects
+            WHERE user_id NOT IN (SELECT user_id FROM users);
+            """
+        )
+
         for project_id, user_id in orphans:
             self._logger.warning(
-                f"Project boards migration: dropping project {project_id}, whose owner {user_id} no longer exists."
+                f"Project boards migration: quarantining project {project_id}, whose owner {user_id} no longer exists,"
+                " in orphaned_projects_2026_08_06."
             )
 
         cursor.execute(
