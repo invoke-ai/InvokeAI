@@ -168,6 +168,4 @@ export const selectSystemShouldConfirmOnNewSession = createSystemSelector((syste
 export const selectSystemShouldShowInvocationProgressDetail = createSystemSelector(
   (system) => system.shouldShowInvocationProgressDetail
 );
-export const selectSystemShouldShowTokenCounter = createSystemSelector(
-  (system) => system.shouldShowTokenCounter
-);
+export const selectSystemShouldShowTokenCounter = createSystemSelector((system) => system.shouldShowTokenCounter);

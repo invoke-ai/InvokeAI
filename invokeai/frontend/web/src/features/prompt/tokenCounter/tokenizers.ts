@@ -10,9 +10,7 @@ const tokenizerCache = new Map<string, Tokenizer>();
 /**
  * Returns the tokenizer family and max token limit based on base model name.
  */
-export const getTokenizerConfig = (
-  baseModel?: string
-): { family: TokenizerFamily; limit: number } => {
+export const getTokenizerConfig = (baseModel?: string): { family: TokenizerFamily; limit: number } => {
   if (!baseModel) {
     return { family: 'estimate', limit: 77 };
   }
@@ -135,10 +133,7 @@ export const getOrCreateTokenizer = (family: TokenizerFamily): Tokenizer => {
 /**
  * Calculates token count for prompt text given base model.
  */
-export const calculatePromptTokens = (
-  text: string,
-  baseModel?: string
-): TokenCountResult => {
+export const calculatePromptTokens = (text: string, baseModel?: string): TokenCountResult => {
   const { family, limit } = getTokenizerConfig(baseModel);
 
   if (!text || !text.trim()) {

@@ -27,8 +27,8 @@ import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { ExpandPromptButton } from 'features/prompt/ExpandPromptButton';
 import { ImageToPromptButton } from 'features/prompt/ImageToPromptButton';
 import { PromptPopover } from 'features/prompt/PromptPopover';
-import { PromptTokenCounter } from 'features/prompt/tokenCounter/PromptTokenCounter';
 import { clearPromptUndo, consumePromptUndo } from 'features/prompt/promptUndo';
+import { PromptTokenCounter } from 'features/prompt/tokenCounter/PromptTokenCounter';
 import { usePrompt } from 'features/prompt/usePrompt';
 import { usePromptAttentionHotkeys } from 'features/prompt/usePromptAttentionHotkeys';
 import {
