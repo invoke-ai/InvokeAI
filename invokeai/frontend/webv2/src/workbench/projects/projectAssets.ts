@@ -110,6 +110,21 @@ export const GALLERY_INSTALLATION_KEYS: ReadonlySet<string> = new Set(['projectB
 
 const INSTALLATION_STATE_KEYS: ReadonlySet<string> = new Set([...GALLERY_SELECTION_KEYS, ...GALLERY_INSTALLATION_KEYS]);
 
+/**
+ * URLs the document caches beside a media name, which name *this* install's server and this
+ * install's copy of the media.
+ *
+ * They are installation state like the keys above, but they cannot be removed the way those are.
+ * The persisted-recents validator (`getBoundedRecentImages`) requires both to be strings and drops
+ * any entry missing one, so deleting them would silently discard the whole gallery-recents overlay
+ * on import. Blanked instead: every consumer already falls back to deriving the URL from the media
+ * name (`item.thumbnailUrl || item.fullUrl`, `slot.candidate.thumbnailUrl || galleryImageUrls…`),
+ * which is the only correct answer once a transfer has renamed the media anyway. The name is
+ * remapped; a URL built around the *old* name is not, and would keep resolving — to the source
+ * project's picture.
+ */
+const DERIVED_URL_KEYS: ReadonlySet<string> = new Set(['imageUrl', 'thumbnailUrl', 'videoUrl']);
+
 export interface ProjectAssetRefs {
   images: Set<string>;
   videos: Set<string>;
@@ -198,6 +213,12 @@ const stripNode = (node: unknown): unknown => {
       continue;
     }
 
+    if (DERIVED_URL_KEYS.has(key) && typeof value === 'string') {
+      next[key] = '';
+      hasChanged ||= value !== '';
+      continue;
+    }
+
     const stripped = stripNode(value);
 
     next[key] = stripped;
@@ -209,14 +230,17 @@ const stripNode = (node: unknown): unknown => {
 
 /**
  * Drop everything that describes *this install* rather than the project — the
- * gallery's selection and its board ids — at every depth, so an exported project
- * opens with nothing selected, on the board the receiving server assigns it.
+ * gallery's selection, its board ids, and the URLs cached beside media names — at
+ * every depth, so an exported project opens with nothing selected, on the board
+ * the receiving server assigns it, resolving its pictures through the names it
+ * actually owns.
  *
- * Every reader of these values already tolerates their absence — selection is
- * parsed with `typeof`/`Array.isArray` guards and falls back to nothing, and the
- * board ids are re-supplied from the project record — so removing the key is the
- * same as clearing it, without inventing a shape. Subtrees with nothing to drop
- * keep their identity.
+ * Every reader of the selection and board values already tolerates their absence —
+ * selection is parsed with `typeof`/`Array.isArray` guards and falls back to
+ * nothing, and the board ids are re-supplied from the project record — so removing
+ * the key is the same as clearing it, without inventing a shape. The cached URLs
+ * are blanked rather than removed, for the reason {@link DERIVED_URL_KEYS} gives.
+ * Subtrees with nothing to change keep their identity.
  *
  * Stripping by key at any depth rather than by walking into `widgetInstances` is
  * what makes this cover the legacy `widgetStates.gallery` shape for free, and it

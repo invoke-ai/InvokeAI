@@ -276,6 +276,56 @@ describe('stripInstallationState', () => {
   });
 
   /**
+   * A URL is built around a media name and a server. The name is remapped by a transfer; the URL is
+   * not — so a cached one keeps resolving, to the *source* project's picture, on a document that no
+   * longer references that media at all.
+   */
+  it('blanks the cached media URLs rather than dropping them', () => {
+    const stripped = stripInstallationState({
+      widgetInstances: {
+        'gallery-1': {
+          state: {
+            values: {
+              recentImages: [
+                {
+                  height: 1,
+                  imageName: 'recent.png',
+                  imageUrl: 'http://source-install/api/v1/images/i/recent.png/full',
+                  queuedAt: '2026-08-07T00:00:00.000Z',
+                  sourceQueueItemId: 'q1',
+                  thumbnailUrl: 'http://source-install/api/v1/images/i/recent.png/thumbnail',
+                  width: 1,
+                },
+              ],
+            },
+          },
+          typeId: 'gallery',
+        },
+      },
+    });
+
+    const [recent] = (
+      (stripped.widgetInstances as Record<string, { state: { values: { recentImages: Record<string, unknown>[] } } }>)[
+        'gallery-1'
+      ] as { state: { values: { recentImages: Record<string, unknown>[] } } }
+    ).state.values.recentImages;
+
+    // Blanked, not removed: `getBoundedRecentImages` requires both to be strings and silently drops
+    // any entry missing one, so deleting the keys would discard the whole recents overlay.
+    expect(recent).toMatchObject({ imageName: 'recent.png', imageUrl: '', thumbnailUrl: '' });
+    expect(Object.keys(recent!)).toContain('thumbnailUrl');
+    expect(JSON.stringify(stripped)).not.toContain('source-install');
+  });
+
+  it('leaves an already-blank URL identical', () => {
+    const document = {
+      widgetStates: { gallery: { values: { recentImages: [{ imageName: 'a.png', imageUrl: '' }] } } },
+    };
+
+    expect(stripInstallationState(document)).toBe(document);
+  });
+
+  /**
    * Only the gallery widget's own two keys are installation state. A board named
    * by a workflow node is an authored input and has to survive the round trip.
    */
