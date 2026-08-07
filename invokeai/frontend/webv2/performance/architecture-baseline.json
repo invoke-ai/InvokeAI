@@ -858,9 +858,7 @@
       "src/features/queue/ui/launchpad/QueueStatusBand.tsx",
       "src/workbench/launchpad/home/livePanels.ts"
     ],
-    "editorForbiddenInitialChunkNames": [
-      "ag-psd"
-    ],
+    "editorForbiddenInitialChunkNames": ["ag-psd"],
     "inactiveWidgetGateOwner": "deepen-widget-registry-loading"
   }
 }
