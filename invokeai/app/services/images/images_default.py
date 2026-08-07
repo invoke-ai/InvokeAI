@@ -129,6 +129,15 @@ class ImageService(ImageServiceABC):
         The copy is never intermediate: an intermediate is a step in someone else's run, and a
         copy is a thing a person asked for. Starring is not copied either — callers that want it
         use the same star route the gallery uses.
+
+        Attaching to the board is checked *before* the file is written, where the video twin writes
+        the file first and removes it again on discovering the attachment was lost. Both are fatal
+        and both leave nothing behind; the orders differ because `create` — which the video path
+        reuses — swallows a failed attachment, so there it can only be detected after the fact.
+
+        Nothing partial survives a failure: the unwind covers everything after the record exists,
+        including reading the DTO back, and removes the file as well as the row. A row whose file
+        endpoints 404 is a broken gallery entry; a file with no row is disk nobody can reach.
         """
         try:
             record = self.__invoker.services.image_records.get(source_image_name)
@@ -140,6 +149,7 @@ class ImageService(ImageServiceABC):
             image_subfolder = strategy.get_subfolder(image_name, record.image_category, False)
 
             record_saved = False
+            file_copied = False
             try:
                 self.__invoker.services.image_records.save(
                     image_name=image_name,
@@ -170,9 +180,21 @@ class ImageService(ImageServiceABC):
                     source_subfolder=record.image_subfolder or "",
                     image_subfolder=image_subfolder,
                 )
+                file_copied = True
+
+                image_dto = self.get_dto(image_name)
+                self._on_changed(image_dto)
+                return image_dto
             except Exception:
-                # Unwind the record so a failed copy cannot leave the gallery holding a row whose
-                # file endpoints 404 — the board membership goes with it via the FK.
+                # Unwind whatever exists, newest first. The board membership goes with the record
+                # via the FK.
+                if file_copied:
+                    try:
+                        self.__invoker.services.image_files.delete(image_name, image_subfolder=image_subfolder)
+                    except Exception as cleanup_error:
+                        self.__invoker.services.logger.error(
+                            f"Failed to roll back the file for copy {image_name}: {cleanup_error}"
+                        )
                 if record_saved:
                     try:
                         self.__invoker.services.image_records.delete(image_name)
@@ -181,10 +203,6 @@ class ImageService(ImageServiceABC):
                             f"Failed to roll back the record for copy {image_name}: {cleanup_error}"
                         )
                 raise
-
-            image_dto = self.get_dto(image_name)
-            self._on_changed(image_dto)
-            return image_dto
         except Exception:
             self.__invoker.services.logger.error(f"Failed to copy image {source_image_name}", exc_info=True)
             raise

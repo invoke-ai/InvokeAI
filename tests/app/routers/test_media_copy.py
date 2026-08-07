@@ -193,6 +193,34 @@ def test_a_failed_copy_leaves_no_ghost_record(
     assert set(mock_invoker.services.image_records.get_image_names().image_names) == before
 
 
+def _files_under(image_files: DiskImageFileStorage) -> set[Path]:
+    return {path for path in image_files.image_root.rglob("*") if path.is_file()}
+
+
+def test_a_copy_that_fails_after_its_file_landed_leaves_neither_row_nor_file(
+    client: TestClient, mock_invoker: Invoker, user1_token: str, real_images: DiskImageFileStorage, monkeypatch
+):
+    """The unwind has to cover everything after the record exists, not only the steps before the
+    file is written. Reading the copy's DTO back is the last thing that can fail, and a failure
+    there used to leave both the row and the bytes behind — the row unreachable through the copy
+    route that reported the failure, and the file unreachable through anything at all."""
+    user_id = _owner_id(client, user1_token)
+    source = _create_source_image(mock_invoker, user_id)
+    records_before = set(mock_invoker.services.image_records.get_image_names().image_names)
+    files_before = _files_under(real_images)
+
+    def explode(image_name: str):
+        raise RuntimeError("the DTO read failed after the file was written")
+
+    monkeypatch.setattr(mock_invoker.services.images, "get_dto", explode)
+
+    response = _copy_images(client, user1_token, image_names=[source.image_name])
+
+    assert response.json() == {"copied": [], "failed": [source.image_name]}
+    assert set(mock_invoker.services.image_records.get_image_names().image_names) == records_before
+    assert _files_under(real_images) == files_before
+
+
 def test_copying_into_a_board_you_cannot_write_is_refused(
     client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str, real_images: DiskImageFileStorage
 ):

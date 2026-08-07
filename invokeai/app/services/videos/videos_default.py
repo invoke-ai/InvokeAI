@@ -159,7 +159,14 @@ class VideoService(VideoServiceABC):
             raise
 
     def copy(self, source_video_name: str, board_id: Optional[str] = None, user_id: Optional[str] = None) -> VideoDTO:
-        """Duplicate a video without moving the source or exposing partial attachment semantics."""
+        """Duplicate a video without moving the source or exposing partial attachment semantics.
+
+        A lost board attachment is fatal here as it is for images, but it is caught *after* the copy
+        rather than before: this path goes through ``create``, which deliberately swallows a failed
+        attachment so a freshly generated video is never lost to it. That leaves no way to refuse up
+        front, so the copy is made and then withdrawn — through ``delete``, which takes the files
+        with the record.
+        """
         record = self.get_record(source_video_name)
         metadata = self.get_metadata(source_video_name)
         first_frame: Optional[Image.Image] = None
