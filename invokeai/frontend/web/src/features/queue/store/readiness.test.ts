@@ -306,6 +306,7 @@ const buildZImageTabArg = (overrides: {
   dynamicPrompts: baseDynamicPrompts,
   hasFlux2DiffusersVaeSource: false,
   hasFlux2DiffusersQwen3Source: false,
+  hasFlux2DevDiffusersSource: false,
 });
 
 const hasZImageVaeReason = (reasons: { content: string }[]) =>
@@ -480,6 +481,7 @@ const buildPidCanvasArg = (model: MainModelConfig, bboxSide: number) => ({
   canvasIsSelectingObject: false,
   hasFlux2DiffusersVaeSource: false,
   hasFlux2DiffusersQwen3Source: false,
+  hasFlux2DevDiffusersSource: false,
 });
 
 const hasBboxGridReason = (reasons: { content: string }[]) =>

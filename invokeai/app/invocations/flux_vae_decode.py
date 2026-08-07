@@ -64,8 +64,17 @@ class FluxVaeDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
                 img = vae.decode(latents)
             else:
                 # Diffusers AutoencoderKL returns DecoderOutput with .sample attribute
-                # Scale latents for diffusers VAE (FLUX uses shift_factor and scale_factor)
-                latents = (latents / vae.config.scaling_factor) + vae.config.shift_factor
+                # Scale latents for diffusers VAE (FLUX uses shift_factor and scale_factor).
+                # `shift_factor` is optional on AutoencoderKL: the FLUX VAE sets one, but a plain
+                # SD-style config leaves it None, and `tensor + None` raises TypeError. Absent means
+                # no shift — same handling as the Z-Image and PiD decode paths.
+                scaling_factor = vae.config.scaling_factor
+                shift_factor = getattr(vae.config, "shift_factor", None)
+
+                latents = latents / scaling_factor
+                if shift_factor is not None:
+                    latents = latents + shift_factor
+
                 img = vae.decode(latents, return_dict=False)[0]
 
         img = img.clamp(-1, 1)

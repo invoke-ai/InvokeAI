@@ -2253,6 +2253,61 @@ _TOKENIZER_FILENAMES = (
 )
 
 
+# Class names that legitimately identify each component of an SDNQ pipeline, used both to map a
+# `model_index.json` entry onto a submodel type and to check the component's own config agrees.
+# `AutoencoderKL` and `AutoencoderKLFlux2` are interchangeable spellings of the VAE slot.
+_SDNQ_FLUX2_TRANSFORMER_CLASS_NAMES = {"Flux2Transformer2DModel"}
+_SDNQ_ZIMAGE_TRANSFORMER_CLASS_NAMES = {"ZImageTransformer2DModel"}
+_SDNQ_VAE_CLASS_NAMES = {"AutoencoderKLFlux2", "AutoencoderKL"}
+
+# Keys a component config uses to name its own class. Transformers models use `architectures`,
+# diffusers models `_class_name`, and tokenizers `tokenizer_class`.
+_COMPONENT_CLASS_CONFIG_FILENAMES = ("config.json", "model_index.json", "tokenizer_config.json")
+
+
+def _sdnq_component_declared_classes(component_path: Path) -> set[str]:
+    """Class names the component's *own* config files declare, if any."""
+    import json
+
+    declared: set[str] = set()
+    for filename in _COMPONENT_CLASS_CONFIG_FILENAMES:
+        config_path = component_path / filename
+        if not config_path.is_file():
+            continue
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                config = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            continue
+        if not isinstance(config, dict):
+            continue
+        architectures = config.get("architectures")
+        if isinstance(architectures, list):
+            declared.update(name for name in architectures if isinstance(name, str))
+        for key in ("_class_name", "tokenizer_class"):
+            name = config.get(key)
+            if isinstance(name, str):
+                declared.add(name)
+    return declared
+
+
+def _sdnq_component_matches_advertised_class(component_path: Path, accepted_class_names: set[str]) -> bool:
+    """True if the component's own config agrees with the class `model_index.json` advertises for it.
+
+    `model_index.json` records what a pipeline *claims* each component is, and that claim is what
+    selects the loader — but nothing forces it to be true. A folder can advertise `Qwen3ForCausalLM`
+    for `text_encoder/` and ship a Qwen2 or multimodal Qwen2-VL model there; the folder is populated,
+    so a file-presence check passes and the pipeline is recorded as self-contained. The mismatch then
+    only surfaces at generation time, when the loader builds a Qwen3ForCausalLM against a state dict
+    that cannot satisfy it.
+
+    A component that declares no class at all is accepted, so repos whose component configs omit
+    these keys keep working — the same leniency as `Qwen3Encoder_SDNQ_Config._validate_is_qwen3_encoder`.
+    """
+    declared = _sdnq_component_declared_classes(component_path)
+    return not declared or bool(declared & accepted_class_names)
+
+
 def _sdnq_component_dir_is_populated(component_path: Path, submodel_type: SubModelType) -> bool:
     """True if `component_path` holds the files the component's loader needs.
 
@@ -2383,12 +2438,16 @@ class Main_SDNQ_Diffusers_Flux2_Config(Main_Config_Base, Config_Base):
             match class_name:
                 case "Flux2Transformer2DModel":
                     submodel_type, model_type = SubModelType.Transformer, ModelType.Main
+                    accepted_class_names = _SDNQ_FLUX2_TRANSFORMER_CLASS_NAMES
                 case name if name in _SDNQ_PIPELINE_TEXT_ENCODER_CLASS_NAMES:
                     submodel_type, model_type = SubModelType.TextEncoder, ModelType.Qwen3Encoder
+                    accepted_class_names = _SDNQ_PIPELINE_TEXT_ENCODER_CLASS_NAMES
                 case name if name in _QWEN_TOKENIZER_CLASS_NAMES:
                     submodel_type, model_type = SubModelType.Tokenizer, ModelType.Qwen3Encoder
+                    accepted_class_names = _QWEN_TOKENIZER_CLASS_NAMES
                 case "AutoencoderKLFlux2" | "AutoencoderKL":
                     submodel_type, model_type = SubModelType.VAE, ModelType.VAE
+                    accepted_class_names = _SDNQ_VAE_CLASS_NAMES
                 case _:
                     continue
 
@@ -2400,6 +2459,11 @@ class Main_SDNQ_Diffusers_Flux2_Config(Main_Config_Base, Config_Base):
             # tokenizer/ subfolders that have nothing to load.
             component_path = mod.path / key
             if not _sdnq_component_dir_is_populated(component_path, submodel_type):
+                continue
+
+            # Populated is not the same as correct: the index's class name is a claim about the
+            # folder, not a fact. Require the component's own config to agree before recording it.
+            if not _sdnq_component_matches_advertised_class(component_path, accepted_class_names):
                 continue
 
             submodels[submodel_type] = SubmodelDefinition(
@@ -2507,12 +2571,16 @@ class Main_SDNQ_Diffusers_ZImage_Config(Main_Config_Base, Config_Base):
             match class_name:
                 case "ZImageTransformer2DModel":
                     submodel_type, model_type = SubModelType.Transformer, ModelType.Main
+                    accepted_class_names = _SDNQ_ZIMAGE_TRANSFORMER_CLASS_NAMES
                 case name if name in _SDNQ_PIPELINE_TEXT_ENCODER_CLASS_NAMES:
                     submodel_type, model_type = SubModelType.TextEncoder, ModelType.Qwen3Encoder
+                    accepted_class_names = _SDNQ_PIPELINE_TEXT_ENCODER_CLASS_NAMES
                 case name if name in _QWEN_TOKENIZER_CLASS_NAMES:
                     submodel_type, model_type = SubModelType.Tokenizer, ModelType.Qwen3Encoder
+                    accepted_class_names = _QWEN_TOKENIZER_CLASS_NAMES
                 case "AutoencoderKL":
                     submodel_type, model_type = SubModelType.VAE, ModelType.VAE
+                    accepted_class_names = _SDNQ_VAE_CLASS_NAMES
                 case _:
                     continue
 
@@ -2521,6 +2589,10 @@ class Main_SDNQ_Diffusers_ZImage_Config(Main_Config_Base, Config_Base):
             # mis-classified as a self-contained SDNQ pipeline.
             component_path = mod.path / key
             if not _sdnq_component_dir_is_populated(component_path, submodel_type):
+                continue
+
+            # ...and whose own config agrees with the class the index advertises for it.
+            if not _sdnq_component_matches_advertised_class(component_path, accepted_class_names):
                 continue
 
             submodels[submodel_type] = SubmodelDefinition(

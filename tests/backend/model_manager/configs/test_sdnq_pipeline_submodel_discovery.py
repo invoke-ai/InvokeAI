@@ -305,3 +305,70 @@ def test_sdnq_pipeline_without_index_transformer_is_not_self_contained(tmp_path:
     assert config.submodels is not None
     assert SubModelType.Transformer not in config.submodels
     assert not is_self_contained_sdnq_pipeline(config)
+
+
+# --- Mismatched components: the index advertises a loadable class over a folder holding something else ---
+# model_index.json is a claim about each folder, not a fact about it. A repo can advertise the one
+# class the loader supports and ship a different model, which passes both the class-name check and the
+# file-presence check. The pipeline is then recorded as self-contained and the mismatch only surfaces
+# at generation time, when the loader builds the advertised class against an incompatible state dict.
+
+
+@pytest.mark.parametrize(
+    ("factory", "root_name"),
+    [
+        (Main_SDNQ_Diffusers_Flux2_Config, "flux2-mismatched-encoder"),
+        (Main_SDNQ_Diffusers_ZImage_Config, "zimage-mismatched-encoder"),
+    ],
+)
+def test_sdnq_pipeline_with_a_mismatched_text_encoder_folder_is_not_self_contained(
+    tmp_path: Path, factory, root_name: str
+):
+    """Index says Qwen3ForCausalLM; the folder holds a multimodal Qwen-VL model."""
+    maker = _make_flux2_pipeline if factory is Main_SDNQ_Diffusers_Flux2_Config else _make_zimage_pipeline
+    root = maker(tmp_path / root_name, "Qwen3ForCausalLM")
+    _write_qwen_vl_text_encoder(root)
+
+    config = factory.from_model_on_disk(_mod(root), {**_REQUIRED_FIELDS, "path": root.as_posix()})
+
+    _assert_pipeline_not_self_contained(config)
+
+
+@pytest.mark.parametrize(
+    ("factory", "root_name"),
+    [
+        (Main_SDNQ_Diffusers_Flux2_Config, "flux2-mismatched-vae"),
+        (Main_SDNQ_Diffusers_ZImage_Config, "zimage-mismatched-vae"),
+    ],
+)
+def test_sdnq_pipeline_with_a_mismatched_vae_folder_is_not_self_contained(tmp_path: Path, factory, root_name: str):
+    """Index says the VAE slot holds an AutoencoderKL; the folder declares an unrelated model."""
+    maker = _make_flux2_pipeline if factory is Main_SDNQ_Diffusers_Flux2_Config else _make_zimage_pipeline
+    root = maker(tmp_path / root_name, "Qwen3ForCausalLM")
+    (root / "vae" / "config.json").write_text(json.dumps({"_class_name": "Qwen2ForCausalLM"}), encoding="utf-8")
+
+    config = factory.from_model_on_disk(_mod(root), {**_REQUIRED_FIELDS, "path": root.as_posix()})
+
+    assert config.submodels is not None
+    assert SubModelType.VAE not in config.submodels
+    assert not is_self_contained_sdnq_pipeline(config)
+
+
+@pytest.mark.parametrize(
+    ("factory", "root_name"),
+    [
+        (Main_SDNQ_Diffusers_Flux2_Config, "flux2-undeclared-components"),
+        (Main_SDNQ_Diffusers_ZImage_Config, "zimage-undeclared-components"),
+    ],
+)
+def test_sdnq_pipeline_with_components_that_declare_no_class_is_still_self_contained(
+    tmp_path: Path, factory, root_name: str
+):
+    """The check is strict on mismatch, lenient on silence: a component config that names no class at
+    all is accepted, so repos whose component configs omit `_class_name`/`architectures` still load."""
+    maker = _make_flux2_pipeline if factory is Main_SDNQ_Diffusers_Flux2_Config else _make_zimage_pipeline
+    root = maker(tmp_path / root_name, "Qwen3ForCausalLM")
+
+    config = factory.from_model_on_disk(_mod(root), {**_REQUIRED_FIELDS, "path": root.as_posix()})
+
+    _assert_complete_pipeline(config)
