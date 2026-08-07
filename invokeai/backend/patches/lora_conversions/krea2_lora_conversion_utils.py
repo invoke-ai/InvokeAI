@@ -102,7 +102,10 @@ def _maybe_convert_native_krea2_state_dict(
         return state_dict
     converted_state_dict: Dict[str, torch.Tensor] = {}
     for key, value in state_dict.items():
-        converted_key = _native_krea2_key_to_diffusers(key) if _looks_like_native_krea2_key(key) else key
+        # `.pt`/`.ckpt` sources can carry non-string keys. They are never native Krea-2 keys, but the
+        # substring tests in `_looks_like_native_krea2_key` raise TypeError rather than returning False.
+        is_native = isinstance(key, str) and _looks_like_native_krea2_key(key)
+        converted_key = _native_krea2_key_to_diffusers(key) if is_native else key
         if converted_key in converted_state_dict:
             raise ValueError(
                 f"Krea-2 LoRA has conflicting layers that normalize to the same target '{converted_key}'. "
@@ -141,9 +144,13 @@ _KREA2_NATIVE_KOHYA_PARSING_TREE: ParsingTree = {
         "projector": {},
     },
     "first": {},
-    "tmlp": {INDEX_PLACEHOLDER: {}},
-    "tproj": {INDEX_PLACEHOLDER: {}},
-    "txtmlp": {INDEX_PLACEHOLDER: {}},
+    # Literal indices rather than INDEX_PLACEHOLDER: these are ``nn.Sequential`` stages, and only the
+    # positions listed in ``_NATIVE_KREA2_TOP_LEVEL_RENAMES`` hold a Linear — the rest are activations with
+    # no weights. Accepting any index would rewrite e.g. ``lora_unet_tmlp_1`` into ``tmlp.1.*``, which the
+    # native pass then does not recognize, leaving a half-converted key instead of the untouched original.
+    "tmlp": {"0": {}, "2": {}},
+    "tproj": {"1": {}},
+    "txtmlp": {"1": {}, "3": {}},
     "last": {"linear": {}},
 }
 
@@ -156,10 +163,15 @@ def _kohya_module_path_is_leaf(module_path: str, parsing_tree: ParsingTree) -> b
     """
     subtree = parsing_tree
     for component in module_path.split("."):
-        component_key = INDEX_PLACEHOLDER if component.isnumeric() else component
-        if component_key not in subtree:
+        # Mirror ``insert_periods_into_kohya_key``'s precedence: an exact match wins over the index
+        # placeholder. Without that, a numeric component would always be looked up as INDEX_PLACEHOLDER and
+        # a tree enumerating the specific indices it accepts (``tmlp`` below) could never reach its leaves.
+        if component in subtree:
+            subtree = subtree[component]
+        elif component.isnumeric() and INDEX_PLACEHOLDER in subtree:
+            subtree = subtree[INDEX_PLACEHOLDER]
+        else:
             return False
-        subtree = subtree[component_key]
     return not subtree
 
 
@@ -190,7 +202,13 @@ def _maybe_convert_kohya_krea2_state_dict(
             # ``alpha``, ...) follows it. Some writers emit a doubled separator after the prefix.
             flat_path, dot, weight_suffix = key[len(_KREA2_KOHYA_PREFIX) :].lstrip("_").partition(".")
             module_path = _unflatten_kohya_krea2_module_path(flat_path)
-            if module_path is not None:
+            # Only rewrite when ``_group_by_layer`` can split the suffix back off. Un-flattening introduces
+            # dots into the module path, and the grouper's fallback for an unknown suffix is a blind
+            # ``rsplit(".", 2)`` — on a dotted path that cuts *inside the module name*, fusing two modules
+            # into one bogus layer that aborts the whole load. LyCORIS suffixes such as ``.lokr_w1`` or
+            # ``.hada_w1_a`` hit exactly that. Flattened, they have no interior dot and group harmlessly,
+            # so leaving them verbatim keeps them at the pre-existing warn-and-skip behaviour.
+            if module_path is not None and f".{weight_suffix}" in _SUFFIX_TO_VALUE_KEY:
                 converted_key = f"{module_path}{dot}{weight_suffix}"
         if converted_key in converted_state_dict:
             raise ValueError(

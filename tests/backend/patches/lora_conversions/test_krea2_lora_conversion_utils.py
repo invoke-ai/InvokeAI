@@ -313,6 +313,12 @@ def test_kohya_flattened_krea2_keys_tolerate_doubled_separator() -> None:
         "blocks_6_attn_qknorm_qnorm",
         # Not a Krea-2 module layout at all (e.g. a flattened adapter for some other architecture).
         "double_blocks_0_img_attn_proj",
+        # Sequential positions that hold an activation rather than a Linear. The parsing tree enumerates the
+        # indices it accepts, so these are rejected outright instead of being rewritten to `tmlp.1.*` — a
+        # half-converted key that the native pass no longer recognizes.
+        "tmlp_1",
+        "tproj_0",
+        "txtmlp_2",
     ],
 )
 def test_unrecognized_kohya_flattened_keys_are_left_untouched(flat_module: str) -> None:
@@ -325,6 +331,50 @@ def test_unrecognized_kohya_flattened_keys_are_left_untouched(flat_module: str) 
 
     # Left verbatim rather than rewritten into a plausible-looking but wrong module path.
     assert set(model.layers) == {f"{KREA2_LORA_TRANSFORMER_PREFIX}lora_unet_{flat_module}"}
+
+
+@pytest.mark.parametrize(
+    "lycoris_suffixes",
+    [
+        ("lokr_w1", "lokr_w2"),
+        ("hada_w1_a", "hada_w1_b", "hada_w2_a", "hada_w2_b"),
+        ("diff", "diff_b"),
+    ],
+)
+def test_kohya_lycoris_algorithm_keys_do_not_abort_the_load(lycoris_suffixes: tuple[str, ...]) -> None:
+    # LyCORIS supports per-module algorithms, so one kohya file can mix ordinary lora_down/up modules with
+    # LoKr/LoHa/full ones. Un-flattening a key whose suffix `_group_by_layer` cannot split back off used to
+    # feed it a dotted path, whose blind `rsplit(".", 2)` fallback then cut inside the module name and fused
+    # two modules into one unsupported layer — aborting the *entire* adapter at generation time.
+    state_dict = {
+        "lora_unet_blocks_0_attn_wv.lora_down.weight": torch.ones(2, 4),
+        "lora_unet_blocks_0_attn_wv.lora_up.weight": torch.ones(4, 2),
+        **{f"lora_unet_blocks_6_attn_wq.{suffix}": torch.ones(4, 4) for suffix in lycoris_suffixes},
+    }
+
+    model = lora_model_from_krea2_state_dict(state_dict)
+
+    # The ordinary module still converts, and the LyCORIS one stays verbatim so it degrades to the per-layer
+    # "Failed to find module" warning at apply time rather than taking the whole adapter down.
+    assert set(model.layers) == {
+        f"{KREA2_LORA_TRANSFORMER_PREFIX}transformer_blocks.0.attn.to_v",
+        f"{KREA2_LORA_TRANSFORMER_PREFIX}lora_unet_blocks_6_attn_wq",
+    }
+
+
+def test_non_string_keys_survive_the_kohya_and_native_passes() -> None:
+    # `.pt`/`.ckpt` sources can carry non-string keys. Once the kohya pass rewrites something, the native pass
+    # runs its substring tests over every key — which raised `TypeError: argument of type 'int' is not
+    # iterable` on an int key rather than leaving it alone.
+    state_dict = {
+        0: torch.ones(2),
+        "lora_unet_blocks_0_attn_wv.lora_down.weight": torch.ones(2, 4),
+        "lora_unet_blocks_0_attn_wv.lora_up.weight": torch.ones(4, 2),
+    }
+
+    model = lora_model_from_krea2_state_dict(state_dict)
+
+    assert f"{KREA2_LORA_TRANSFORMER_PREFIX}transformer_blocks.0.attn.to_v" in model.layers
 
 
 def test_conflicting_kohya_and_native_aliases_raise() -> None:
