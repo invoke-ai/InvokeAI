@@ -103,6 +103,9 @@ const build = (generationMode: 'txt2img' | 'img2img' | 'inpaint' | 'outpaint' = 
 const nodesOf = (g: BuiltGraph) => Object.values(g.getGraph().nodes) as Record<string, unknown>[];
 const positiveEncoder = (g: BuiltGraph) =>
   nodesOf(g).find((n) => n.type === 'ernie_image_text_encoder' && String(n.id).startsWith('pos_prompt'));
+const enhancer = (g: BuiltGraph) => nodesOf(g).find((n) => n.type === 'ernie_image_prompt_enhancer');
+const edgesInto = (g: BuiltGraph, node: Record<string, unknown> | undefined, field: string) =>
+  g.getGraph().edges.filter((e) => e.destination.node_id === node?.id && e.destination.field === field);
 
 describe('buildErnieImageGraph', () => {
   beforeEach(() => {
@@ -130,19 +133,19 @@ describe('buildErnieImageGraph', () => {
 
   describe('prompt enhancer', () => {
     // The enhancer is handed the target size and rewrites the prompt to suit that aspect ratio.
-    // Its node defaults are 1024x1024, so leaving `pe_width`/`pe_height` unwired means a portrait
+    // Its node defaults are 1024x1024, so leaving `width`/`height` unwired means a portrait
     // generation is enhanced for a square image.
     it('passes the real generation dimensions to the enhancer', async () => {
       const { g } = await build();
 
-      expect(positiveEncoder(g)).toMatchObject({ pe_width: 832, pe_height: 1216 });
+      expect(enhancer(g)).toMatchObject({ width: 832, height: 1216 });
     });
 
     it('tracks the generation dimensions rather than hardcoding them', async () => {
       originalSize = { width: 1536, height: 640 };
       const { g } = await build();
 
-      expect(positiveEncoder(g)).toMatchObject({ pe_width: 1536, pe_height: 640 });
+      expect(enhancer(g)).toMatchObject({ width: 1536, height: 640 });
     });
 
     it('reports the original size, not the intermediate scaled render size', async () => {
@@ -150,18 +153,36 @@ describe('buildErnieImageGraph', () => {
       // user ends up with has the original dimensions -- that is the aspect ratio to enhance for.
       const { g } = await build();
 
-      expect(positiveEncoder(g)).toMatchObject({ pe_width: originalSize.width });
-      expect(positiveEncoder(g)).not.toMatchObject({ pe_width: scaledSize.width });
+      expect(enhancer(g)).toMatchObject({ width: originalSize.width });
+      expect(enhancer(g)).not.toMatchObject({ width: scaledSize.width });
     });
 
-    it('wires the enhancer edge only when the toggle is on', async () => {
+    // The enhancer is a node of its own rather than a mode of the encoder so that it keeps running
+    // on the session's GPU: `ernie_image_text_encoder` is `idle_gpu_offloadable`, and an
+    // autoregressive rewrite is far too long to hold a borrowed idle GPU's lock for.
+    it('runs the enhancer as its own node, feeding the positive encoder', async () => {
       const { g } = await build();
-      expect(g.getGraph().edges.some((e) => e.destination.field === 'prompt_enhancer')).toBe(true);
+      const pe = enhancer(g);
 
+      expect(pe).toBeDefined();
+      expect(edgesInto(g, pe, 'prompt_enhancer')).toHaveLength(1);
+      // The user's prompt reaches the encoder *through* the enhancer, not directly.
+      const intoEncoderPrompt = edgesInto(g, positiveEncoder(g), 'prompt');
+      expect(intoEncoderPrompt).toHaveLength(1);
+      expect(intoEncoderPrompt[0]?.source.node_id).toBe(pe?.id);
+    });
+
+    it('omits the enhancer node entirely when the toggle is off', async () => {
       nextId = 0;
       usePromptEnhancer = false;
-      const { g: gOff } = await build();
-      expect(gOff.getGraph().edges.some((e) => e.destination.field === 'prompt_enhancer')).toBe(false);
+      const { g } = await build();
+
+      expect(enhancer(g)).toBeUndefined();
+      expect(g.getGraph().edges.some((e) => e.destination.field === 'prompt_enhancer')).toBe(false);
+      // ...and the prompt node then wires straight into the encoder, so nothing is left unwired.
+      const intoEncoderPrompt = edgesInto(g, positiveEncoder(g), 'prompt');
+      expect(intoEncoderPrompt).toHaveLength(1);
+      expect(String(intoEncoderPrompt[0]?.source.node_id)).toMatch(/^positive_prompt/);
     });
 
     it('never enhances the negative prompt', async () => {
@@ -170,7 +191,9 @@ describe('buildErnieImageGraph', () => {
         (n) => n.type === 'ernie_image_text_encoder' && String(n.id).startsWith('neg_prompt')
       );
 
-      expect(negEncoder).toMatchObject({ use_prompt_enhancer: false });
+      // The negative encoder takes its prompt as a literal field, with no edge from the enhancer.
+      expect(negEncoder).toMatchObject({ prompt: 'a negative prompt' });
+      expect(edgesInto(g, negEncoder, 'prompt')).toHaveLength(0);
     });
   });
 

@@ -10,13 +10,14 @@ import { loraAllDeleted, loraRecalled } from 'features/controlLayers/store/loras
 import {
   animaQwen3EncoderModelSelected,
   animaVaeModelSelected,
+  flux2DevMistralEncoderModelSelected,
+  flux2VaeModelSelected,
   geminiTemperatureChanged,
   geminiThinkingLevelChanged,
   heightChanged,
   imageSizeChanged,
   isValidKrea2RebalanceWeights,
   kleinQwen3EncoderModelSelected,
-  kleinVaeModelSelected,
   krea2Qwen3VlEncoderModelSelected,
   krea2VaeModelSelected,
   negativePromptChanged,
@@ -42,6 +43,11 @@ import {
   setFluxDypeScale,
   setFluxScheduler,
   setGuidance,
+  setHiDiffusionEnabled,
+  setHiDiffusionRauNetEnabled,
+  setHiDiffusionT1Ratio,
+  setHiDiffusionT2Ratio,
+  setHiDiffusionWindowAttnEnabled,
   setIdeogram4ColorPalette,
   setIdeogram4GuidanceScale,
   setIdeogram4Mu,
@@ -424,19 +430,33 @@ const CLIPSkip: SingleMetadataHandler<ParameterCLIPSkip> = {
 const Guidance: SingleMetadataHandler<ParameterGuidance> = {
   [SingleMetadataKey]: true,
   type: 'Guidance',
-  parse: (metadata, _store) => {
-    // Legacy FLUX.2 images may still carry a `guidance` field, but guidance_embeds
-    // is inert for all current Klein variants. Reject parsing for FLUX.2 metadata
-    // so the handler is skipped on both display and recall - avoids leaking a stale
-    // value into the shared guidance param (which is still used by FLUX.1).
+  parse: async (metadata, store) => {
+    // guidance_embeds is inert for FLUX.2 Klein but genuinely consumed by FLUX.2 [dev]
+    // (the graph sets guidance_embeds=True and passes the recorded guidance). So reject
+    // only for non-dev FLUX.2: this displays and recalls the value for [dev] while never
+    // leaking a stale value into the shared guidance param for Klein (shared with FLUX.1).
+    // Resolve the image's own model to read its variant; if it can't be resolved (e.g.
+    // uninstalled), fall back to skipping — same safe behavior as before for Klein.
     const rawModel = getProperty(metadata, 'model');
     const modelBase = (rawModel as { base?: unknown } | undefined)?.base;
     if (modelBase === 'flux2') {
-      throw new Error('Guidance is not used for FLUX.2 Klein models.');
+      let isDev = false;
+      try {
+        const config = await resolveModel(
+          rawModel as { key: string; hash?: string; name: string; base: string; type: string },
+          store
+        );
+        isDev = 'variant' in config && config.variant === 'dev';
+      } catch {
+        isDev = false;
+      }
+      if (!isDev) {
+        throw new Error('Guidance is not used for FLUX.2 Klein models.');
+      }
     }
     const raw = getProperty(metadata, 'guidance');
     const parsed = zParameterGuidance.parse(raw);
-    return Promise.resolve(parsed);
+    return parsed;
   },
   recall: (value, store) => {
     store.dispatch(setGuidance(value));
@@ -697,6 +717,96 @@ const SeamlessY: SingleMetadataHandler<ParameterSeamlessY> = {
   ValueComponent: ({ value }: SingleMetadataValueProps<ParameterSeamlessY>) => <MetadataPrimitiveValue value={value} />,
 };
 //#endregion SeamlessY
+
+//#region HiDiffusion
+const HiDiffusion: SingleMetadataHandler<boolean> = {
+  [SingleMetadataKey]: true,
+  type: 'HiDiffusion',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'hidiffusion');
+    const parsed = raw === undefined ? false : z.boolean().parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(setHiDiffusionEnabled(value));
+  },
+  i18nKey: 'metadata.hiDiffusion',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<boolean>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion HiDiffusion
+
+//#region HiDiffusionRAUNet
+const HiDiffusionRauNet: SingleMetadataHandler<boolean> = {
+  [SingleMetadataKey]: true,
+  type: 'HiDiffusionRauNet',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'hidiffusion_raunet');
+    const parsed = z.boolean().parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(setHiDiffusionRauNetEnabled(value));
+  },
+  i18nKey: 'metadata.hiDiffusionRauNet',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<boolean>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion HiDiffusionRAUNet
+
+//#region HiDiffusionWindowAttn
+const HiDiffusionWindowAttn: SingleMetadataHandler<boolean> = {
+  [SingleMetadataKey]: true,
+  type: 'HiDiffusionWindowAttn',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'hidiffusion_window_attn');
+    const parsed = z.boolean().parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(setHiDiffusionWindowAttnEnabled(value));
+  },
+  i18nKey: 'metadata.hiDiffusionWindowAttn',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<boolean>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion HiDiffusionWindowAttn
+
+//#region HiDiffusionT1Ratio
+const HiDiffusionT1Ratio: SingleMetadataHandler<number> = {
+  [SingleMetadataKey]: true,
+  type: 'HiDiffusionT1Ratio',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'hidiffusion_t1_ratio');
+    const parsed = z.number().parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(setHiDiffusionT1Ratio(value));
+  },
+  i18nKey: 'metadata.hiDiffusionT1Ratio',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<number>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion HiDiffusionT1Ratio
+
+//#region HiDiffusionT2Ratio
+const HiDiffusionT2Ratio: SingleMetadataHandler<number> = {
+  [SingleMetadataKey]: true,
+  type: 'HiDiffusionT2Ratio',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'hidiffusion_t2_ratio');
+    const parsed = z.number().parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(setHiDiffusionT2Ratio(value));
+  },
+  i18nKey: 'metadata.hiDiffusionT2Ratio',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<number>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion HiDiffusionT2Ratio
 
 //#region ZImageSeedVarianceEnabled
 const ZImageSeedVarianceEnabled: SingleMetadataHandler<boolean> = {
@@ -1722,21 +1832,25 @@ const AnimaQwen3EncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
 };
 //#endregion AnimaQwen3EncoderModel
 
-//#region KleinVAEModel
-const KleinVAEModel: SingleMetadataHandler<ModelIdentifierField> = {
+//#region Flux2VAEModel
+/**
+ * FLUX.2 Klein and FLUX.2 [dev] share a single VAE slot (`flux2VaeModel`) and the same
+ * `metadata.vae` field — both draw from the 32-channel AutoencoderKLFlux2 pool — so one
+ * handler covers both variants and no dev/Klein disambiguation is needed on recall.
+ */
+const Flux2VAEModel: SingleMetadataHandler<ModelIdentifierField> = {
   [SingleMetadataKey]: true,
-  type: 'KleinVAEModel',
+  type: 'Flux2VAEModel',
   parse: async (metadata, store) => {
     const raw = getProperty(metadata, 'vae');
     const parsed = await parseModelIdentifier(raw, store, 'vae');
     assert(parsed.type === 'vae');
-    // Only recall if the current main model is FLUX.2 Klein
     const base = selectBase(store.getState());
-    assert(base === 'flux2', 'KleinVAEModel handler only works with FLUX.2 Klein models');
-    return Promise.resolve(parsed);
+    assert(base === 'flux2', 'Flux2VAEModel handler only works with FLUX.2 models');
+    return parsed;
   },
   recall: (value, store) => {
-    store.dispatch(kleinVaeModelSelected(value));
+    store.dispatch(flux2VaeModelSelected(value));
   },
   i18nKey: 'metadata.vae',
   LabelComponent: MetadataLabel,
@@ -1744,7 +1858,7 @@ const KleinVAEModel: SingleMetadataHandler<ModelIdentifierField> = {
     <MetadataPrimitiveValue value={`${value.name} (${value.base.toUpperCase()})`} />
   ),
 };
-//#endregion KleinVAEModel
+//#endregion Flux2VAEModel
 
 //#region KleinQwen3EncoderModel
 const KleinQwen3EncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
@@ -1754,7 +1868,8 @@ const KleinQwen3EncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
     const raw = getProperty(metadata, 'qwen3_encoder');
     const parsed = await parseModelIdentifier(raw, store, 'qwen3_encoder');
     assert(parsed.type === 'qwen3_encoder');
-    // Only recall if the current main model is FLUX.2 Klein
+    // qwen3_encoder is Klein-only metadata; dev never writes it. Just gate on
+    // base. (parseModelIdentifier already rejects when the field is absent.)
     const base = selectBase(store.getState());
     assert(base === 'flux2', 'KleinQwen3EncoderModel handler only works with FLUX.2 Klein models');
     return Promise.resolve(parsed);
@@ -1769,6 +1884,31 @@ const KleinQwen3EncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
   ),
 };
 //#endregion KleinQwen3EncoderModel
+
+//#region Flux2DevMistralEncoderModel
+const Flux2DevMistralEncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
+  [SingleMetadataKey]: true,
+  type: 'Flux2DevMistralEncoderModel',
+  parse: async (metadata, store) => {
+    const raw = getProperty(metadata, 'mistral_encoder');
+    const parsed = await parseModelIdentifier(raw, store, 'mistral_encoder');
+    assert(parsed.type === 'mistral_encoder');
+    // mistral_encoder is dev-only metadata; Klein never writes it. Just gate on
+    // base. (parseModelIdentifier already rejects when the field is absent.)
+    const base = selectBase(store.getState());
+    assert(base === 'flux2', 'Flux2DevMistralEncoderModel handler only works with FLUX.2 models');
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(flux2DevMistralEncoderModelSelected(value));
+  },
+  i18nKey: 'metadata.mistralEncoder',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField>) => (
+    <MetadataPrimitiveValue value={`${value.name} (${value.base.toUpperCase()})`} />
+  ),
+};
+//#endregion Flux2DevMistralEncoderModel
 
 //#region LoRAs
 const LoRAs: CollectionMetadataHandler<LoRA[]> = {
@@ -2153,6 +2293,11 @@ export const ImageMetadataHandlers = {
   DenoisingStrength,
   SeamlessX,
   SeamlessY,
+  HiDiffusion,
+  HiDiffusionRauNet,
+  HiDiffusionWindowAttn,
+  HiDiffusionT1Ratio,
+  HiDiffusionT2Ratio,
   RefinerModel,
   RefinerSteps,
   RefinerCFGScale,
@@ -2170,8 +2315,9 @@ export const ImageMetadataHandlers = {
   ZImageQwen3SourceModel,
   AnimaVAEModel,
   AnimaQwen3EncoderModel,
-  KleinVAEModel,
+  Flux2VAEModel,
   KleinQwen3EncoderModel,
+  Flux2DevMistralEncoderModel,
   ZImageSeedVarianceEnabled,
   ZImageSeedVarianceStrength,
   ZImageSeedVarianceRandomizePercent,

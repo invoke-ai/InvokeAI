@@ -743,7 +743,7 @@
             },
             "selectBboxTool": {
                 "title": "Bbox Tool",
-                "desc": "Select the bounding box tool."
+                "desc": "Tap to select the bounding box tool, or hold to use it temporarily."
             },
             "decrementToolWidth": {
                 "title": "Decrement Tool Width",
@@ -1068,6 +1068,11 @@
         "seedreamOptimizePrompt": "Seedream Optimize Prompt",
         "guidance": "Guidance",
         "height": "Height",
+        "hiDiffusion": "HiDiffusion",
+        "hiDiffusionRauNet": "HiDiffusion: RAU-Net",
+        "hiDiffusionWindowAttn": "HiDiffusion: Window Attention",
+        "hiDiffusionT1Ratio": "HiDiffusion: T1 Ratio",
+        "hiDiffusionT2Ratio": "HiDiffusion: T2 Ratio",
         "imageDetails": "Image Details",
         "imageDimensions": "Image Dimensions",
         "imageSize": "Image Size",
@@ -1083,6 +1088,7 @@
         "noRecallParameters": "No parameters to recall found",
         "parameterSet": "Parameter {{parameter}} set",
         "parsingFailed": "Parsing Failed",
+        "mistralEncoder": "Mistral Encoder",
         "positivePrompt": "Positive Prompt",
         "qwen3Encoder": "Qwen3 Encoder",
         "qwen3Source": "Qwen3 Source",
@@ -1405,6 +1411,7 @@
         "pidSteps": "PiD Steps",
         "qwen3Encoder": "Qwen3 Encoder",
         "qwenVLEncoder": "Qwen2.5-VL Encoder",
+        "mistralEncoder": "Mistral Encoder",
         "qwen3VLEncoder": "Qwen3-VL Encoder",
         "animaVae": "VAE",
         "animaVaePlaceholder": "Select Anima-compatible VAE",
@@ -1430,6 +1437,12 @@
         "flux2KleinQwen3Encoder": "Qwen3 Encoder (optional)",
         "flux2KleinQwen3EncoderPlaceholder": "From diffusers model",
         "flux2KleinQwen3EncoderNoModelPlaceholder": "No diffusers model available",
+        "flux2DevVae": "FLUX.2 [dev] VAE",
+        "flux2DevVaePlaceholder": "Auto (from Diffusers source)",
+        "flux2DevVaeNoModelPlaceholder": "Select a FLUX.2 VAE model",
+        "flux2DevMistralEncoder": "FLUX.2 [dev] Mistral Encoder",
+        "flux2DevMistralEncoderPlaceholder": "Auto (from Diffusers source)",
+        "flux2DevMistralEncoderNoModelPlaceholder": "Select a Mistral text encoder",
         "qwenImageComponentSource": "VAE/Encoder Source (Diffusers)",
         "qwenImageComponentSourcePlaceholder": "GGUF models require this unless a standalone VAE & Encoder is installed",
         "qwenImageVae": "VAE",
@@ -1717,6 +1730,11 @@
         "cfgScale": "CFG Scale",
         "cfgRescaleMultiplier": "CFG Rescale Multiplier",
         "clipSkip": "CLIP Skip",
+        "hiDiffusion": "HiDiffusion",
+        "hiDiffusionRauNet": "HiDiffusion: RAU-Net",
+        "hiDiffusionWindowAttn": "HiDiffusion: Window Attention",
+        "hiDiffusionT1Ratio": "HiDiffusion: T1 Ratio",
+        "hiDiffusionT2Ratio": "HiDiffusion: T2 Ratio",
         "coherenceMode": "Mode",
         "coherenceEdgeSize": "Edge Size",
         "coherenceMinDenoise": "Min Denoise",
@@ -1771,6 +1789,8 @@
             "noQwen3EncoderModelSelected": "No Qwen3 Encoder model selected for FLUX2 Klein generation",
             "noFlux2KleinVaeModelSelected": "No VAE selected. Non-diffusers FLUX.2 Klein models require a standalone VAE",
             "noFlux2KleinQwen3EncoderModelSelected": "No Qwen3 Encoder selected. Non-diffusers FLUX.2 Klein models require a standalone Qwen3 Encoder",
+            "noFlux2DevVaeModelSelected": "No VAE selected. Non-diffusers FLUX.2 [dev] models require a standalone FLUX.2 VAE",
+            "noFlux2DevMistralEncoderModelSelected": "No Mistral Encoder selected. Non-diffusers FLUX.2 [dev] models require a standalone Mistral text encoder",
             "noQwenImageComponentSourceSelected": "GGUF Qwen Image models require a Diffusers Component Source for VAE/encoder",
             "noWanComponentSourceSelected": "GGUF Wan 2.2 models require a Diffusers Component Source for VAE/encoder",
             "noZImageVaeSourceSelected": "No VAE source: Select VAE (FLUX) or Qwen3 Source model",
@@ -2131,6 +2151,41 @@
         "invalidBboxDesc": "The bounding box has no valid dimensions"
     },
     "popovers": {
+        "hidiffusion": {
+            "heading": "HiDiffusion",
+            "paragraphs": [
+                "Enables HiDiffusion denoising for higher-resolution generation.",
+                "Try at 1536px or higher for the most visible effect."
+            ]
+        },
+        "hidiffusionRauNet": {
+            "heading": "HiDiffusion: RAU-Net",
+            "paragraphs": [
+                "Enables RAU-Net blocks used by HiDiffusion.",
+                "Can improve structure and detail at higher resolutions."
+            ]
+        },
+        "hidiffusionWindowAttn": {
+            "heading": "HiDiffusion: Window Attention",
+            "paragraphs": [
+                "Enables windowed attention used by HiDiffusion.",
+                "Can boost local detail, but may affect global coherence."
+            ]
+        },
+        "hidiffusionT1Ratio": {
+            "heading": "HiDiffusion: T1 Ratio",
+            "paragraphs": [
+                "Controls the early switch point for HiDiffusion (T1).",
+                "Lower values switch earlier; higher values preserve global structure longer."
+            ]
+        },
+        "hidiffusionT2Ratio": {
+            "heading": "HiDiffusion: T2 Ratio",
+            "paragraphs": [
+                "Controls the late switch point for HiDiffusion (T2).",
+                "Higher values keep window attention active longer."
+            ]
+        },
         "clipSkip": {
             "heading": "CLIP Skip",
             "paragraphs": [

@@ -817,7 +817,7 @@ const zPidMode = z.enum(['off', 'fit', 'native']);
 export type PidMode = z.infer<typeof zPidMode>;
 
 export const zParamsState = z.object({
-  _version: z.literal(4),
+  _version: z.literal(5),
   maskBlur: z.number(),
   maskBlurMethod: zParameterMaskBlurMethod,
   canvasCoherenceMode: zParameterCanvasCoherenceMode,
@@ -832,6 +832,11 @@ export const zParamsState = z.object({
   guidance: zParameterGuidance,
   img2imgStrength: zParameterStrength,
   optimizedDenoisingEnabled: z.boolean(),
+  hiDiffusionEnabled: z.boolean(),
+  hiDiffusionRauNetEnabled: z.boolean(),
+  hiDiffusionWindowAttnEnabled: z.boolean(),
+  hiDiffusionT1Ratio: z.number(),
+  hiDiffusionT2Ratio: z.number(),
   iterations: z.number(),
   scheduler: zParameterScheduler,
   fluxScheduler: zParameterFluxScheduler,
@@ -892,9 +897,13 @@ export const zParamsState = z.object({
   animaScheduler: zParameterAnimaScheduler,
   animaLLLiteModel: zModelIdentifierField.nullable().default(null), // Optional: ControlNet-LLLite inpaint adapter for Anima
   animaLLLiteWeight: z.number().min(-10).max(10).default(1),
-  // Flux2 Klein model components - uses Qwen3 instead of CLIP+T5
-  kleinVaeModel: zParameterVAEModel.nullable(), // Optional: Separate FLUX.2 VAE for Klein
+  // FLUX.2 VAE shared by Klein and [dev] — both use the same 32-channel AutoencoderKLFlux2 pool,
+  // so a single slot avoids losing the selection when switching a GGUF between the two.
+  flux2VaeModel: zParameterVAEModel.nullable(), // Optional: Separate FLUX.2 VAE (Klein + [dev])
+  // Flux2 Klein text encoder - uses Qwen3 instead of CLIP+T5
   kleinQwen3EncoderModel: zModelIdentifierField.nullable(), // Optional: Separate Qwen3 Encoder for Klein
+  // Flux2 [dev] text encoder - uses Mistral Small 3.1 (24B)
+  flux2DevMistralEncoderModel: zModelIdentifierField.nullable(), // Optional: Standalone Mistral encoder for [dev]
   // PiD (Pixel Diffusion Decoder) - optional 4x super-resolution decode replacing the VAE decode.
   // - 'off':    regular VAE decode
   // - 'fit':    PiD decodes 4x internally, then downscales back to the bbox (compositing-safe; works in canvas/inpaint)
@@ -946,7 +955,7 @@ export const zParamsState = z.object({
 });
 export type ParamsState = z.infer<typeof zParamsState>;
 export const getInitialParamsState = (): ParamsState => ({
-  _version: 4,
+  _version: 5,
   maskBlur: 16,
   maskBlurMethod: 'box',
   canvasCoherenceMode: 'Gaussian Blur',
@@ -961,6 +970,11 @@ export const getInitialParamsState = (): ParamsState => ({
   guidance: 4,
   img2imgStrength: 0.75,
   optimizedDenoisingEnabled: true,
+  hiDiffusionEnabled: false,
+  hiDiffusionRauNetEnabled: true,
+  hiDiffusionWindowAttnEnabled: true,
+  hiDiffusionT1Ratio: 0.4,
+  hiDiffusionT2Ratio: 0.0,
   iterations: 1,
   scheduler: 'dpmpp_3m_k',
   fluxScheduler: 'euler',
@@ -1013,8 +1027,9 @@ export const getInitialParamsState = (): ParamsState => ({
   animaScheduler: 'euler',
   animaLLLiteModel: null,
   animaLLLiteWeight: 1,
-  kleinVaeModel: null,
+  flux2VaeModel: null,
   kleinQwen3EncoderModel: null,
+  flux2DevMistralEncoderModel: null,
   pidMode: 'off',
   pidDecoderModel: null,
   gemma2EncoderModel: null,
