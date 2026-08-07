@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   binaryEntry,
@@ -77,6 +77,37 @@ describe('writeArchive / readArchive', () => {
     await expect(readArchive(new TextEncoder().encode('this is not a zip'))).rejects.toMatchObject({
       reason: 'not-a-project',
     });
+  });
+
+  /**
+   * `unzip` reports the damage this version happens to produce through its callback, which is
+   * wrapped. It is not contractually bound to: a throw out of its own walk would bypass that wrap
+   * and reach the caller as an fflate message, so the two ways a file can be unreadable would stop
+   * looking the same from outside. Forced rather than provoked, because provoking it means relying
+   * on which corruptions a given fflate release chooses to raise rather than report.
+   */
+  it('reports damage fflate raises synchronously as not a project too', async () => {
+    vi.resetModules();
+    vi.doMock('fflate', () => ({
+      unzip: () => {
+        throw new Error('invalid zip data');
+      },
+      zip: () => undefined,
+    }));
+
+    try {
+      const { readArchive: readWithThrowingUnzip } = await import('./archive');
+
+      // Matched by shape, not by class: resetting the registry gives this import its own copy of
+      // `./format`, so `InvkFormatError` here is a different constructor than the one above.
+      await expect(readWithThrowingUnzip(new Uint8Array([1, 2, 3]))).rejects.toMatchObject({
+        name: 'InvkFormatError',
+        reason: 'not-a-project',
+      });
+    } finally {
+      vi.doUnmock('fflate');
+      vi.resetModules();
+    }
   });
 
   it('reports an oversized input rather than expanding it', async () => {

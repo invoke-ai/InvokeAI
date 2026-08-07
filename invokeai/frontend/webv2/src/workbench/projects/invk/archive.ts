@@ -181,15 +181,23 @@ export const readArchive = async (bytes: Uint8Array): Promise<Map<string, Uint8A
   const { unzip } = await import('fflate');
   const budget = createExpansionBudget();
   const expanded = await new Promise<Record<string, Uint8Array>>((resolve, reject) => {
-    unzip(bytes, { filter: budget.accept }, (error, data) => {
-      if (error) {
-        reject(new InvkFormatError('not-a-project', error.message));
+    // `unzip` reports most damage through the callback, but raises some of it — a central directory
+    // it cannot walk at all — synchronously. That throw rejects this promise with fflate's own error
+    // rather than the one this function promises to raise, so it is caught here too. Otherwise the
+    // guarantee holds for a truncated file and quietly fails for a corrupt one.
+    try {
+      unzip(bytes, { filter: budget.accept }, (error, data) => {
+        if (error) {
+          reject(new InvkFormatError('not-a-project', error.message));
 
-        return;
-      }
+          return;
+        }
 
-      resolve(data);
-    });
+        resolve(data);
+      });
+    } catch (error) {
+      reject(new InvkFormatError('not-a-project', error instanceof Error ? error.message : 'Unreadable archive.'));
+    }
   });
 
   const refusal = budget.getRefusal();
