@@ -103,6 +103,12 @@ const slice = createSlice({
     setZImageScheduler: (state, action: PayloadAction<'euler' | 'heun' | 'lcm'>) => {
       state.zImageScheduler = action.payload;
     },
+    setErnieImageScheduler: (state, action: PayloadAction<'euler' | 'heun' | 'lcm'>) => {
+      state.ernieImageScheduler = action.payload;
+    },
+    setErnieImageUsePromptEnhancer: (state, action: PayloadAction<boolean>) => {
+      state.ernieImageUsePromptEnhancer = action.payload;
+    },
     setZImageShift: (state, action: PayloadAction<number | null>) => {
       state.zImageShift = action.payload;
     },
@@ -163,6 +169,21 @@ const slice = createSlice({
     },
     setOptimizedDenoisingEnabled: (state, action: PayloadAction<boolean>) => {
       state.optimizedDenoisingEnabled = action.payload;
+    },
+    setHiDiffusionEnabled: (state, action: PayloadAction<boolean>) => {
+      state.hiDiffusionEnabled = action.payload;
+    },
+    setHiDiffusionRauNetEnabled: (state, action: PayloadAction<boolean>) => {
+      state.hiDiffusionRauNetEnabled = action.payload;
+    },
+    setHiDiffusionWindowAttnEnabled: (state, action: PayloadAction<boolean>) => {
+      state.hiDiffusionWindowAttnEnabled = action.payload;
+    },
+    setHiDiffusionT1Ratio: (state, action: PayloadAction<number>) => {
+      state.hiDiffusionT1Ratio = action.payload;
+    },
+    setHiDiffusionT2Ratio: (state, action: PayloadAction<number>) => {
+      state.hiDiffusionT2Ratio = action.payload;
     },
     setSeamlessXAxis: (state, action: PayloadAction<boolean>) => {
       state.seamlessXAxis = action.payload;
@@ -835,6 +856,8 @@ export const {
   setFluxDypeScale,
   setFluxDypeExponent,
   setZImageScheduler,
+  setErnieImageScheduler,
+  setErnieImageUsePromptEnhancer,
   setZImageShift,
   setIdeogram4SamplerPreset,
   setIdeogram4Steps,
@@ -855,6 +878,11 @@ export const {
   setSeed,
   setImg2imgStrength,
   setOptimizedDenoisingEnabled,
+  setHiDiffusionEnabled,
+  setHiDiffusionRauNetEnabled,
+  setHiDiffusionWindowAttnEnabled,
+  setHiDiffusionT1Ratio,
+  setHiDiffusionT2Ratio,
   setSeamlessXAxis,
   setSeamlessYAxis,
   setShouldRandomizeSeed,
@@ -977,6 +1005,22 @@ export const paramsSliceConfig: SliceConfig<typeof slice> = {
         state.pidSteps = 4;
       }
 
+      if (!('hiDiffusionEnabled' in state)) {
+        state.hiDiffusionEnabled = false;
+      }
+      if (!('hiDiffusionRauNetEnabled' in state)) {
+        state.hiDiffusionRauNetEnabled = true;
+      }
+      if (!('hiDiffusionWindowAttnEnabled' in state)) {
+        state.hiDiffusionWindowAttnEnabled = true;
+      }
+      if (!('hiDiffusionT1Ratio' in state)) {
+        state.hiDiffusionT1Ratio = 0.4;
+      }
+      if (!('hiDiffusionT2Ratio' in state)) {
+        state.hiDiffusionT2Ratio = 0.0;
+      }
+
       return zParamsState.parse(state);
     },
   },
@@ -994,6 +1038,7 @@ export const selectIsZImage = createParamsSelector((params) => params.model?.bas
 export const selectIsIdeogram4 = createParamsSelector((params) => params.model?.base === 'ideogram-4');
 export const selectIsAnima = createParamsSelector((params) => params.model?.base === 'anima');
 export const selectIsFlux2 = createParamsSelector((params) => params.model?.base === 'flux2');
+export const selectIsErnieImage = createParamsSelector((params) => params.model?.base === 'ernie-image');
 export const selectIsExternal = createParamsSelector((params) => params.model?.base === 'external');
 export const selectIsQwenImage = createParamsSelector((params) => params.model?.base === 'qwen-image');
 export const selectIsKrea2 = createParamsSelector((params) => params.model?.base === 'krea-2');
@@ -1060,6 +1105,11 @@ export const selectInfillPatchmatchDownscaleSize = createParamsSelector(
 export const selectInfillColorValue = createParamsSelector((params) => params.infillColorValue);
 export const selectImg2imgStrength = createParamsSelector((params) => params.img2imgStrength);
 export const selectOptimizedDenoisingEnabled = createParamsSelector((params) => params.optimizedDenoisingEnabled);
+export const selectHiDiffusionEnabled = createParamsSelector((params) => params.hiDiffusionEnabled);
+export const selectHiDiffusionRauNetEnabled = createParamsSelector((params) => params.hiDiffusionRauNetEnabled);
+export const selectHiDiffusionWindowAttnEnabled = createParamsSelector((params) => params.hiDiffusionWindowAttnEnabled);
+export const selectHiDiffusionT1Ratio = createParamsSelector((params) => params.hiDiffusionT1Ratio);
+export const selectHiDiffusionT2Ratio = createParamsSelector((params) => params.hiDiffusionT2Ratio);
 export const selectPositivePrompt = createParamsSelector((params) => params.positivePrompt);
 export const selectNegativePrompt = createParamsSelector((params) => params.negativePrompt);
 export const selectNegativePromptWithFallback = createParamsSelector((params) => params.negativePrompt ?? '');
@@ -1167,6 +1217,8 @@ export const selectFluxDypePreset = createParamsSelector((params) => params.flux
 export const selectFluxDypeScale = createParamsSelector((params) => params.fluxDypeScale);
 export const selectFluxDypeExponent = createParamsSelector((params) => params.fluxDypeExponent);
 export const selectZImageScheduler = createParamsSelector((params) => params.zImageScheduler);
+export const selectErnieImageScheduler = createParamsSelector((params) => params.ernieImageScheduler);
+export const selectErnieImageUsePromptEnhancer = createParamsSelector((params) => params.ernieImageUsePromptEnhancer);
 export const selectZImageShift = createParamsSelector((params) => params.zImageShift);
 export const selectIdeogram4SamplerPreset = createParamsSelector((params) => params.ideogram4SamplerPreset);
 export const selectIdeogram4Steps = createParamsSelector((params) => params.ideogram4Steps);

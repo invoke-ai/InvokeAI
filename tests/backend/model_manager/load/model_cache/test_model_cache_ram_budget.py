@@ -252,6 +252,7 @@ def test_get_vram_in_use_queries_this_caches_execution_device(mock_logger):
     mc = "invokeai.backend.model_manager.load.model_cache.model_cache"
     with (
         patch(f"{mc}.torch.cuda.mem_get_info", return_value=(10 * GB, 48 * GB)),
+        patch(f"{mc}.torch.cuda.get_device_properties", return_value=MagicMock(total_memory=48 * GB)),
         patch(f"{mc}.torch.cuda.memory_allocated", return_value=42) as mock_alloc,
     ):
         cache = ModelCache(
@@ -265,6 +266,30 @@ def test_get_vram_in_use_queries_this_caches_execution_device(mock_logger):
         try:
             assert cache._get_vram_in_use() == 42
             mock_alloc.assert_called_with(torch.device("cuda:1"))
+        finally:
+            cache.shutdown()
+
+
+def test_cuda_cache_init_queries_total_vram_without_mem_get_info(mock_logger):
+    """CUDA cache sizing must not call the VRAM-holding mem_get_info API during idle startup."""
+    import torch
+
+    mc = "invokeai.backend.model_manager.load.model_cache.model_cache"
+    with (
+        patch(f"{mc}.torch.cuda.get_device_properties", return_value=MagicMock(total_memory=48 * GB)) as mock_props,
+        patch(f"{mc}.torch.cuda.mem_get_info", return_value=(10 * GB, 48 * GB)) as mock_mem_get_info,
+    ):
+        cache = ModelCache(
+            execution_device_working_mem_gb=3.0,
+            enable_partial_loading=True,
+            keep_ram_copy_of_weights=True,
+            execution_device="cuda:1",
+            storage_device="cpu",
+            logger=mock_logger,
+        )
+        try:
+            mock_props.assert_called_once_with(torch.device("cuda:1"))
+            mock_mem_get_info.assert_not_called()
         finally:
             cache.shutdown()
 
