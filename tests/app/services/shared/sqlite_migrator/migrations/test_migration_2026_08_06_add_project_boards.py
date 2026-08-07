@@ -101,10 +101,11 @@ def _add_board(
     user_id: str = "u1",
     name: str = "Board",
     visibility: str = "private",
+    archived: bool = False,
 ) -> None:
     db.execute(
-        "INSERT INTO boards (board_id, board_name, user_id, board_visibility) VALUES (?, ?, ?, ?);",
-        (board_id, name, user_id, visibility),
+        "INSERT INTO boards (board_id, board_name, user_id, board_visibility, archived) VALUES (?, ?, ?, ?, ?);",
+        (board_id, name, user_id, visibility, archived),
     )
 
 
@@ -138,9 +139,7 @@ def _add_project(
 
 
 def _board_of(db: sqlite3.Connection, project_id: str, user_id: str = "u1") -> str:
-    cursor = db.execute(
-        "SELECT board_id FROM projects WHERE user_id = ? AND project_id = ?;", (user_id, project_id)
-    )
+    cursor = db.execute("SELECT board_id FROM projects WHERE user_id = ? AND project_id = ?;", (user_id, project_id))
     row = cursor.fetchone()
     assert row is not None
     return row[0]
@@ -286,6 +285,22 @@ def test_a_created_board_is_private_unarchived_and_owned_by_the_project_owner() 
         (_board_of(db, "p1"),),
     ).fetchone()
     assert row == ("Fresh project", "u1", "private", 0)
+
+
+def test_an_adopted_board_is_un_archived() -> None:
+    """Someone who archived their project's gallery board before upgrading would otherwise end up
+    with a project whose board is hidden from every listing, and no route left to unhide it: the
+    generic board API refuses `archived` on a claimed board, and there is no project archive API."""
+    db = _make_db()
+    _add_user(db, "u1")
+    _add_board(db, "b1", name="Archived board", archived=True)
+    _add_project(db, "p1", name="Project", data=_gallery_document("b1"))
+
+    _run(db)
+
+    assert _board_of(db, "p1") == "b1"
+    archived = db.execute("SELECT archived FROM boards WHERE board_id = 'b1';").fetchone()[0]
+    assert archived == 0
 
 
 def test_a_long_project_name_is_truncated_to_what_the_board_api_accepts() -> None:

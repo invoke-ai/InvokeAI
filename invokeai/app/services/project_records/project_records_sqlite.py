@@ -302,9 +302,12 @@ class ProjectRecordsSqlite(ProjectRecordsStorageBase):
         if row[1] != BoardVisibility.Private.value or row[2] or row[3]:
             raise ProjectBoardUnavailableError(board_id)
 
+        # Un-archived as well as renamed. A project's board takes its archived state from the
+        # project, and `PATCH /boards/{id}` refuses to set it on a claimed board — so a board that
+        # arrived archived would be invisible in every listing with no API left to fix it.
         cursor.execute(
             """--sql
-            UPDATE boards SET board_name = ? WHERE board_id = ?;
+            UPDATE boards SET board_name = ?, archived = FALSE WHERE board_id = ?;
             """,
             (name[:BOARD_NAME_MAX_LENGTH], board_id),
         )

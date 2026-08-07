@@ -66,9 +66,14 @@ class AddProjectBoardsMigrationCallback:
             if board_id is None:
                 board_id = self._insert_board(cursor, user_id=user_id, name=name)
             else:
+                # Un-archived as well as renamed, and for the same reason the claim path does it:
+                # a project's board follows the project, and the generic board API refuses to
+                # change `archived` on a claimed board. Someone who had archived their project's
+                # gallery board before upgrading would otherwise end up with a project whose board
+                # is invisible in every listing and unreachable by any route.
                 cursor.execute(
                     """--sql
-                    UPDATE boards SET board_name = ? WHERE board_id = ?;
+                    UPDATE boards SET board_name = ?, archived = FALSE WHERE board_id = ?;
                     """,
                     (name[:BOARD_NAME_MAX_LENGTH], board_id),
                 )
@@ -78,9 +83,7 @@ class AddProjectBoardsMigrationCallback:
 
         return assignments
 
-    def _adopt_board(
-        self, cursor: sqlite3.Cursor, *, user_id: str, data: str, claimed: set[str]
-    ) -> Optional[str]:
+    def _adopt_board(self, cursor: sqlite3.Cursor, *, user_id: str, data: str, claimed: set[str]) -> Optional[str]:
         """Return the project's existing board if exactly one candidate is safe to adopt."""
         candidates = _collect_board_candidates(data)
 

@@ -151,13 +151,21 @@ def _insert_board(
     user_id: str = SYSTEM_USER_ID,
     name: str = "Loose board",
     visibility: str = "private",
+    archived: bool = False,
 ) -> str:
     with db.transaction() as cursor:
         cursor.execute(
-            "INSERT INTO boards (board_id, board_name, user_id, board_visibility) VALUES (?, ?, ?, ?);",
-            (board_id, name, user_id, visibility),
+            "INSERT INTO boards (board_id, board_name, user_id, board_visibility, archived) VALUES (?, ?, ?, ?, ?);",
+            (board_id, name, user_id, visibility, archived),
         )
     return board_id
+
+
+def _board_is_archived(db: SqliteDatabase, board_id: str) -> bool:
+    with db.transaction() as cursor:
+        cursor.execute("SELECT archived FROM boards WHERE board_id = ?;", (board_id,))
+        row = cursor.fetchone()
+    return bool(row[0])
 
 
 def _board_name(db: SqliteDatabase, board_id: str) -> str | None:
@@ -208,6 +216,24 @@ def test_create_claims_a_supplied_board_and_renames_it(
     assert _board_name(db, "staging-board") == "Imported"
     # Claiming reuses the board rather than making another.
     assert _board_count(db) == before
+
+
+def test_claiming_a_board_un_archives_it(project_records: ProjectRecordsSqlite, db: SqliteDatabase) -> None:
+    """A project's board follows the project, and `PATCH /boards/{id}` refuses `archived` on a
+    claimed board — so a board claimed while archived would be invisible in every listing with no
+    route left to bring it back."""
+    _insert_board(db, "staging-board", name="Untitled", archived=True)
+
+    created = project_records.create(SYSTEM_USER_ID, "Imported", {}, board_id="staging-board")
+
+    assert created.board_id == "staging-board"
+    assert _board_is_archived(db, "staging-board") is False
+
+
+def test_a_project_creates_its_board_un_archived(project_records: ProjectRecordsSqlite, db: SqliteDatabase) -> None:
+    created = project_records.create(SYSTEM_USER_ID, "My Project", {})
+
+    assert _board_is_archived(db, created.board_id) is False
 
 
 def test_claiming_a_missing_or_foreign_board_reports_it_as_missing(
@@ -395,9 +421,7 @@ def test_the_snapshot_excludes_what_the_gallery_does_not_show(
     assert [item.name for item in snapshot.items] == ["shown.png", "shown.mp4"]
 
 
-def test_the_snapshot_excludes_media_on_other_boards(
-    project_records: ProjectRecordsSqlite, db: SqliteDatabase
-) -> None:
+def test_the_snapshot_excludes_media_on_other_boards(project_records: ProjectRecordsSqlite, db: SqliteDatabase) -> None:
     mine = project_records.create(SYSTEM_USER_ID, "Mine", {})
     theirs = project_records.create(SYSTEM_USER_ID, "Other", {})
     _put_image(db, "mine.png", mine.board_id)
