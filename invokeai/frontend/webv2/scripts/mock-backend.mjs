@@ -79,6 +79,32 @@ const createState = (profile) => {
   };
 };
 
+/**
+ * Put media back under names a fresh state does not have, without its projects or boards.
+ *
+ * A restore has to be provably free of name adoption: board media must take a new identity even
+ * when the destination already holds an image with the archived name — on the same server it always
+ * does, and reusing it would move a stranger's picture onto the restored board. Reset alone cannot
+ * express that, because it clears everything, so the journey names the collisions it wants kept.
+ * The media lands unboarded, exactly as media whose board was deleted would.
+ */
+const seedCollisionMedia = (state, names) => {
+  const source = createMockBackendFixture('representative');
+  const requested = new Set(names);
+
+  for (const image of source.images) {
+    if (requested.has(image.image_name)) {
+      state.images.set(image.image_name, { ...clone(image), board_id: null, is_intermediate: false });
+    }
+  }
+
+  for (const video of source.videos) {
+    if (requested.has(video.video_name)) {
+      state.videos.set(video.video_name, { ...clone(video), board_id: null, is_intermediate: false });
+    }
+  }
+};
+
 const timestamp = (state) => {
   const value = new Date(FIXED_EPOCH_MS + state.mutationClock * 1_000).toISOString();
 
@@ -591,6 +617,15 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           state = createState(assertMockBackendProfileName(requestedProfile));
         } catch (error) {
           return json(400, { detail: error instanceof Error ? error.message : String(error) });
+        }
+
+        const collisions = [...url.searchParams.getAll('collide'), ...(body.collide ?? [])]
+          .flatMap((value) => String(value).split(','))
+          .map((value) => value.trim())
+          .filter(Boolean);
+
+        if (collisions.length > 0) {
+          seedCollisionMedia(state, collisions);
         }
 
         return json(200, { ok: true, ...getProfileInfo(state) });

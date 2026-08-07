@@ -8,7 +8,12 @@ import {
   stripTransientWorkbenchState,
   type WorkbenchPersistenceService,
 } from '@workbench/persistence';
-import { createDraftProject, createInitialWorkbenchState, normalizeWorkbenchProject } from '@workbench/workbenchState';
+import {
+  createDraftProject,
+  createInitialWorkbenchState,
+  normalizeWorkbenchProject,
+  withAuthoritativeProjectBoard,
+} from '@workbench/workbenchState';
 
 import {
   createProject as apiCreateProject,
@@ -180,8 +185,15 @@ const getSerializedProjectDocument = (
  * autosave writes the correction back. The saved destination is left alone: it is a deliberate
  * choice, and `getGallerySelectedBoardId` resolves it against the boards that actually exist.
  */
-const deserializeProjectRecord = (record: ProjectRecordDTO): Project | null =>
-  deserializeProjectDocument(applyAuthoritativeProjectBoard(record.data, record.board_id, { selectBoard: false }));
+const deserializeProjectRecord = (record: ProjectRecordDTO): Project | null => {
+  const project = deserializeProjectDocument(
+    applyAuthoritativeProjectBoard(record.data, record.board_id, { selectBoard: false })
+  );
+
+  // Again after rehydration, because the document may have had no gallery values for the first
+  // patch to land in — see `withAuthoritativeProjectBoard`.
+  return project === null ? null : withAuthoritativeProjectBoard(project, record.board_id);
+};
 
 /**
  * Rehydrate a document into a live project. This is the half of the codec that

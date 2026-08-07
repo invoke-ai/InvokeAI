@@ -6,16 +6,26 @@ Workbench projects export to a portable `.invk` archive. The feature lives in `i
 
 Import also accepts the `.invokeproject.json` envelope shipped by earlier webv2 builds. New exports use `.invk`; the JSON path remains read-only compatibility.
 
-`.invk` is shared with the previous frontend's [canvas projects](/development/front-end/canvas-projects/), which write version 1 of the same container. Workbench projects write version 2. The two are deliberately not interchangeable — see [Versions](#versions).
+`.invk` is shared with the previous frontend's [canvas projects](/development/front-end/canvas-projects/), which write version 1 of the same container. Workbench projects write version 3. The two are deliberately not interchangeable — see [Versions](#versions).
+
+## Every project owns one board
+
+The backend gives each project exactly one private board (`projects.board_id` is `NOT NULL UNIQUE` with a foreign key to `boards`). The board is the project's workspace: everything it generates lands there, and only the project APIs may touch it.
+
+- **Renaming** a project renames its board in the same transaction. The generic `PATCH /boards/{id}` refuses a claimed board with `409`, so the two names cannot commit independently.
+- **Deleting** a project deletes its board with it, in one transaction. `DELETE /boards/{id}` refuses a claimed board *before* touching any media, and the foreign key is the backstop for a board claimed concurrently.
+- **The media survives.** Deleting a project removes the board and its memberships; the images and videos themselves return to Uncategorized, exactly as they would if the board were deleted without `include_images`.
+- **The document's `projectBoardId` is a cache, never the truth.** Hydration overwrites it from the project record, and export strips it — along with `selectedBoardId` — because a board id means nothing on the install a project arrives at. Board ids elsewhere in a document, such as a workflow node's board input, are deliberately left alone.
 
 ## File format
 
-`.invk` files are ZIP archives. The current manifest version is `2`.
+`.invk` files are ZIP archives. The current manifest version is `3`.
 
 | Target                | Required | Description                                                                                                                              |
 | --------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | `manifest.json`       | yes      | Archive version, app version, creation timestamp, project name, and optionally the source project id and the cover entry's path.         |
 | `project.json`        | yes      | The whole project document — the same payload the backend stores as the project record's opaque `data`.                                  |
+| `board.json`          | v3       | The project board's visible contents as the exporting server enumerated them: `{version: 1, items: [{kind, category, name, starred}]}`.  |
 | `cover.<ext>`         | no       | Thumbnail of the project's newest result. The extension varies by what the server served, so the entry path is recorded in the manifest. |
 | `images/<image_name>` | no       | Image bytes, keyed by the exact `image_name` the exporting server used.                                                                  |
 | `videos/<video_name>` | no       | Video bytes, keyed the same way.                                                                                                         |
@@ -26,15 +36,23 @@ The manifest is written indented and the document compact: the manifest is the o
 
 ## What gets bundled
 
-A project document references its pixels by server image name, never by URL or inline data (see `CanvasImageRef` in `canvas-engine/contracts.ts`). Without the bytes, an exported project opens with nothing but missing layers anywhere except the machine that wrote it. The archive carries them.
+A project's media comes from two places that overlap, and the difference between them decides everything about how a transfer treats an item.
 
-Which ones is decided by `collectLiveAssetRefs()` in `projects/projectAssets.ts`. It walks the document collecting every string found under `imageName` and `image_name` as an image, and under `video_name` as a video — the only keys in the document that hold an asset name. Collecting by key rather than by path is what makes it complete: a new control-adapter kind or node field is picked up without touching the collector.
+**Board membership** is what the project's gallery shows: everything it has produced, including results the canvas never used. It comes from `GET /projects/{id}/board-snapshot` and is written to `board.json`. Enumerating it is fatal if it fails — an archive whose `board.json` silently said "empty" would be a lie the reader has no way to detect.
+
+**Document references** are the pixels the project draws with. They come from `collectLiveAssetRefs()`, exactly as they always did.
+
+An item can be either or both, and the union is fetched once. What travels in `board.json` is only what the gallery would show for that board: the four visible categories (`general`, `control`, `mask`, `user`) and nothing intermediate. The canvas's private `other` category never travels as board membership — the media a document points at is the document, not gallery content — though a document reference under any category still travels as a bundled asset.
+
+Which document references is decided by `collectLiveAssetRefs()` in `projects/projectAssets.ts`. It walks the document collecting every string found under `imageName` and `image_name` as an image, and under `video_name` as a video — the only keys in the document that hold an asset name. Collecting by key rather than by path is what makes it complete: a new control-adapter kind or node field is picked up without touching the collector.
 
 `video_name` reaches a document through an imported workflow whose node value was authored elsewhere (`VideoField` in the backend's `fields.py`, consumed by `video_frame_extract` and friends). webv2 cannot author one yet — `VideoField` is absent from `STATEFUL_FIELD_TYPE_NAMES` — but it round-trips one verbatim, so a project file has to carry it.
 
+**Installation state is excluded.** `stripInstallationState()` removes the gallery's `projectBoardId` and `selectedBoardId` along with its selection, at any depth, before the document is serialized. Both describe *this install*: the board ids mean nothing elsewhere, and the receiving server assigns its own.
+
 **The gallery selection is excluded, of either kind.** `selectedImage`, `selectedImageName`, `selectedImageNames` and `compareImage` are pointers into per-install gallery content, not things the document renders; a project arriving on another machine should open with nothing selected rather than drag a stranger's gallery in behind it.
 
-Exclusion is two things, not one. The collector skips those keys so their pixels are never bundled, and `stripGallerySelection()` removes them from the document before `planInvkExport()` serializes it. Skipping alone would not be enough: an unbundled reference still travels, it just travels broken — and because import collects with the same skip list, the restore pass cannot even report it as dangling. Every reader of these values already parses them with `typeof`/`Array.isArray` guards and falls back to no selection, so removing the key is the same as clearing it.
+Exclusion is two things, not one. The collector skips those keys so their pixels are never bundled, and `stripInstallationState()` removes them from the document before `planInvkExport()` serializes it. Skipping alone would not be enough: an unbundled reference still travels, it just travels broken — and because import collects with the same skip list, the restore pass cannot even report it as dangling. Every reader of these values already parses them with `typeof`/`Array.isArray` guards and falls back to no selection, so removing the key is the same as clearing it.
 
 The skip is by key on purpose, because the members got there differently. `selectedImage` and the name keys were already missed — `GalleryItem` spells its name field `name`, which no collector key matches — but that is an accident of naming that a rename would have undone. `compareImage` is a `GeneratedImageContract` carrying `imageName`, so it was genuinely being bundled until the exclusion became explicit.
 
@@ -42,11 +60,21 @@ The skip is by key on purpose, because the members got there differently. `selec
 
 ## Loading
 
-`readInvkArchive()` unpacks and validates; `restoreArchiveAssets()` puts the pixels back.
+`readInvkArchive()` unpacks and validates; `restoreProjectMedia()` — shared with duplication — puts the media back.
 
-Import deliberately orders its work as **read → mint identity → validate and canonicalize → restore → remap → create**. It first reads the archive without mutating the server, then assigns the imported project a fresh id and name. The candidate is rehydrated through the Workbench reducer and serialized back to its canonical document before any asset is restored. Only then are missing assets restored, their server-assigned names remapped throughout that canonical document, and the new project created. A malformed document therefore cannot leave restored orphan assets behind, and an import can never overwrite the project whose id was recorded in the archive.
+Import deliberately orders its work as **read → mint identity → validate and canonicalize → stage a board → restore → remap → create**. It first reads the archive without mutating the server, then assigns the imported project a fresh id and name. The candidate is rehydrated through the Workbench reducer and serialized back to its canonical document before any asset is restored. Only then are missing assets restored, their server-assigned names remapped throughout that canonical document, and the new project created. A malformed document therefore cannot leave restored orphan assets behind, and an import can never overwrite the project whose id was recorded in the archive.
+
+**Creating the project is the commit point.** When an archive carries board media, the restore first creates an unclaimed private *staging board* and uploads onto it, then passes that board's id to `POST /projects`, which claims and renames it in the same transaction that writes the remapped document. Creating the project first would mean posting the old names and then updating with the remapped ones — making the update the commit point, where a failure leaves a real project full of references to media that never arrived. A v2 archive or a legacy JSON document has no board to stage, so the server simply creates an empty one, exactly as it does for a project made from scratch.
 
 The legacy JSON path follows the same fresh-identity validation and canonicalization boundary, then creates the project directly. A JSON envelope carries no bundled media, so it performs no existence checks, uploads, restoration or remapping.
+
+### Board media always gets a fresh identity
+
+`board_images` has `PRIMARY KEY (image_name)`: an image sits on exactly one board. A restore that saw its own name already on the destination and reused it would not be restoring the project's board — it would be *moving* somebody else's image onto it, and deleting either project's board would then take that image from both. So every board item is uploaded (or, when duplicating, copied) unconditionally, with no existence check, and the document is rewritten to the new name. Its archived category and starring are restored: the category on upload, the starring through the same `POST /images/star` the gallery uses, so import and duplication share one starring path.
+
+Document references outside the board keep the v2 behaviour: an identity the destination already has satisfies them, so nothing is uploaded twice. That is what makes re-importing your own export nearly free.
+
+**A failed board item is forced dangling.** If an item that is both board membership and a document reference cannot be restored, its reference must not be left on the archived name. On the same server — every duplication, every re-import — that name is already taken, by the source project's own image, so the project would open showing the right picture from the wrong owner, and deleting the original would break it with no explanation. Such a reference is remapped to a name derived from the new project id, which resolves to nothing and renders as a missing layer, exactly as a dangling v2 reference already does.
 
 Restoration checks which referenced assets the server already has, uploads only the missing ones out of `images/` and `videos/`, and returns an old-to-new mapping **per kind** — the namespaces are separate, so a single flat map would let an image rewrite a video that happened to share its name. `remapAssetRefs()` then rewrites the document — the whole document this time, including the history the export left behind, so nothing keeps pointing at a pre-import name.
 
@@ -54,7 +82,17 @@ The existence check is the one place the two kinds are not symmetric. Images hav
 
 Restored assets upload with the category `'other'`, the canvas's private category: they appear in no gallery view and no board count. The previous frontend used `general`, which empties a stranger's project into your gallery.
 
-Restoration records the authoritative server names returned by every successful upload. If project creation then rejects while the importing account scope is still current, import checks the client-chosen project id and sends those names to the image and video batch-delete routes only when the server confirms that id is absent with `404`. A found project or an inconclusive lookup is an ambiguous create, so cleanup is skipped rather than deleting assets that the project may already reference. Cleanup is best-effort and never replaces the primary create error. It is also skipped after a create has returned and after a cross-account rotation: issuing destructive deletes with a new account's credentials would be unsafe. That safety boundary means a rotation after upload can still leave private-category media behind when the old account can no longer authorize cleanup.
+### Duplication
+
+Duplicating a project is the same restore with the bytes taking a shortcut. Both projects live on one server, so `POST /images/copy` and `POST /videos/copy` mint the new identities in place: no bytes reach the browser, and a 2 GiB board costs no traffic rather than 4 GiB and two requests per item. Everything else — the planning, the remapping, the forced-dangling rule, the issue reporting, the rollback ledger — is the code import uses; only the materialization step differs. Document-only references are not copied at all, because the identities they name already exist here.
+
+An open project is flushed to the server before it is read, and a failed flush aborts the duplication: copying what the server last acknowledged would silently drop everything the person can still see.
+
+### Rollback
+
+Restoration records the authoritative server names returned by every successful upload or copy, as it goes rather than at the end, so a restore that is cancelled part way through is still cleanable. If project creation then rejects while the importing account scope is still current, import checks the client-chosen project id and sends those names to the image and video batch-delete routes only when the server confirms that id is absent with `404`. A found project or an inconclusive lookup is an ambiguous create, so cleanup is skipped rather than deleting assets that the project may already reference. Cleanup is best-effort and never replaces the primary create error. It is also skipped after a create has returned and after a cross-account rotation: issuing destructive deletes with a new account's credentials would be unsafe. That safety boundary means a rotation after upload can still leave private-category media behind when the old account can no longer authorize cleanup.
+
+The staging board is deleted last, and with `include_images=false`, so anything that wandered onto it while the import ran — a generation that finished in the meantime — survives as Uncategorized rather than being collected by a cleanup that never meant it.
 
 An asset that is neither on the server nor in the archive is reported as dangling and its reference is left alone, so the project opens with one broken layer rather than not at all. Both fetches and uploads are concurrency-limited to five by `mapWithConcurrency()`, over one queue spanning both kinds — the limit exists to be kind to the backend, and would not be if each kind got its own.
 
@@ -69,6 +107,12 @@ Export from the project switcher flushes Generate's debounced prompt drafts befo
 A project file is the one operation here whose duration is set by how much someone has drawn: a few hundred full-resolution layers is a few hundred round trips and hundreds of megabytes. Every entry point runs through `useProjectFileActions.ts`, which owns the scope capture, the picker, the try/catch, and one live toast per operation (`projectFileToasts.ts`). Keeping the sequence in one place is what stops the five surfaces drifting — they already had, with the import sites checking the account scope before showing an error and the export sites not, so cancelling an export by signing out produced a toast written for a developer.
 
 Both directions can half-succeed: export skips assets the server will not serve, import leaves references dangling. Both are correct, and both are things the person holding the file needs to know before handing it to someone else — so a lossy run finishes as a warning naming the count, and only a clean run finishes as a plain success. An operation cancelled by the account going away has no verdict to show and dismisses its toast instead.
+
+**Losses are counted apart, because they cost different things.** A missing board item is a result still findable elsewhere; a missing document reference is a hole in the canvas. One combined number meant anything from "you will not notice" to "the project is broken", so `ProjectTransferIssues` carries `boardItemIssues` and `documentReferenceIssues` separately, each entry typed with a reason (`fetch-failed`, `missing-entry`, `upload-failed`, `star-failed`). An item that was both appears in both arrays — it genuinely failed in both roles. Only the two counts reach the toast; the typed detail stays on the returned outcome.
+
+A media failure is never fatal. The failures that do abort are the ones that would produce a lie or a half-built project: an unreadable archive, a document that will not rehydrate, an enumeration that could not be fetched, a cancelled signal, an expired account.
+
+**Complete export versus media-only download.** A project board's menu offers both. *Export project (.invk)* is the project — its document, its board and the bytes. *Download Board* is the pixels as a ZIP of images, with the count of videos it omits stated in the label. They are different things and neither replaces the other.
 
 ## Covers
 
@@ -86,11 +130,13 @@ On import the cover prefers an image the restore already put on this server — 
 
 ## Versions
 
+Version 3 requires `board.json` and refuses an archive without it as `damaged`. Version 2 is still read and is deliberately *not* asked to carry board membership: an archive written before boards existed has no board to describe, and inventing an empty one for it would claim knowledge the file does not contain — so a v2 import restores its document references and lets the server create the new project an empty board. The archive's `board.json` carries its own `version: 1`, which is the *file's* version and not the API's: the snapshot endpoint returns `{items}` and nothing else, so neither format is pinned to the other.
+
 Manifests parse through a zod discriminated union on `version`, so a version 1 archive is recognized and refused _as what it is_ — `InvkFormatError` carries a `reason` (`legacy-canvas-project`, `unsupported-version`, `not-a-project`, `damaged`, `too-large`) that `describeProjectFileError()` maps to a translated string. There is no translation layer from legacy canvas state to `CanvasStateContractV2`.
 
-The legacy reader is the mirror image: it pins `version: 1` and refuses a version 2 archive.
+The legacy reader is the mirror image: it pins `version: 1` and refuses everything this app writes.
 
-Future format changes should add a new member to the union rather than widening version 2, so that every version this app has ever written can be named precisely when refused.
+Future format changes should add a new member to the union rather than widening version 3, so that every version this app has ever written can be named precisely when refused.
 
 ## Guards
 
@@ -104,7 +150,11 @@ On the way in, the budget is enforced through fflate's entry filter (`createExpa
 
 ## HTTP-contract verification
 
-The mock-backed browser journey exercises the real export action and file chooser: it exports a representative project, resets the backend, imports into a fresh browser context, and verifies the persisted project, remapped image and video references, restored-media retrieval, and cover-index entry through HTTP. Only image upload was missing from the mock backend's project-file media contract; the journey uses the existing video upload path. This verifies the request and persistence contracts, including server-assigned asset names, not binary fidelity between archived and restored bytes.
+The mock-backed browser journey exercises the real export action and file chooser end to end. It opens a fixture project whose board deliberately carries every case — a result the canvas also draws with, one it never used, an asset per visible category, a video, a starred item, an intermediate and an `other` item that must not travel, plus references that live outside the board — exports it, inspects the manifest, `board.json` and the binary entries, then resets the backend *preserving deliberate name collisions* and imports into a fresh browser context.
+
+The collisions are the point: the destination is seeded with images and a video under the archived names, so the journey can prove that board media takes new identities while a document-only reference is satisfied by the identity already there. It then duplicates the imported project and asserts the same rules with no bytes moving, and finally imports a deliberately damaged archive to check that the two warning counts are reported separately and differ.
+
+This verifies the request and persistence contracts, including server-assigned asset names, not binary fidelity between archived and restored bytes. Generation metadata does survive a real round trip: `image_files_disk.save` writes it into the PNG's text chunks and `extract_metadata_from_image` reads it back, which is how `POST /images/copy` carries provenance without any extra plumbing — pinned by `TestProvenanceRoundTrip` in `tests/app/services/image_files/test_image_files_disk.py`.
 
 ## Compatibility notes
 
@@ -112,4 +162,4 @@ Earlier webv2 builds exported `*.invokeproject.json` files containing a version 
 
 The archive stores references to models, LoRAs and other generation resources, not the model files themselves. Loading a project on another install restores its canvas and images, but missing models still need to be installed or replaced.
 
-Gallery boards, queue contents and account preferences are not part of a project and are not exported.
+**Not exported:** models and LoRAs, workflows from the library, queue history, intermediates, the canvas's private `other` media except where the document references it, gallery boards other than the project's own, and account preferences. A project file carries one project's workspace, not the install around it.

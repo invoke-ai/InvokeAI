@@ -9,6 +9,8 @@ import {
   MOCK_BACKEND_PROFILE_COUNTS,
   MOCK_BACKEND_PROFILE_NAMES,
   MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME,
+  PROJECT_FILE_BOARD,
+  PROJECT_FILE_BOARD_ID,
   validateMockBackendFixture,
 } from './mock-backend-fixtures.mjs';
 import { startMockBackend } from './mock-backend.mjs';
@@ -96,6 +98,43 @@ test('Fixture Project 002 carries the image and video references used by the pro
   });
 });
 
+/**
+ * The board path can only be proved end to end if the fixture contains the cases: an item that is
+ * both board membership and a canvas reference, one that is only membership, each visible category,
+ * the two kinds of media that must be excluded, and references that live outside the board.
+ */
+test('Fixture Project 002 owns a board carrying every case the project-file journey exercises', () => {
+  const fixture = createMockBackendFixture('representative');
+  const project = fixture.projects[1];
+  const byName = new Map(fixture.images.map((image) => [image.image_name, image]));
+  const onBoard = (name) => byName.get(name)?.board_id;
+
+  assert.equal(project.board_id, PROJECT_FILE_BOARD_ID);
+  assert.equal(onBoard(PROJECT_FILE_BOARD.referencedImage), PROJECT_FILE_BOARD_ID);
+  assert.equal(onBoard(PROJECT_FILE_BOARD.unreferencedImage), PROJECT_FILE_BOARD_ID);
+  assert.equal(byName.get(PROJECT_FILE_BOARD.userAsset)?.image_category, 'user');
+  assert.equal(byName.get(PROJECT_FILE_BOARD.maskAsset)?.image_category, 'mask');
+  assert.equal(byName.get(PROJECT_FILE_BOARD.starredImage)?.starred, true);
+  assert.equal(byName.get(PROJECT_FILE_BOARD.canvasOwnedImage)?.image_category, 'other');
+  assert.equal(byName.get(PROJECT_FILE_BOARD.intermediateImage)?.is_intermediate, true);
+  assert.equal(
+    fixture.videos.find((video) => video.video_name === PROJECT_FILE_BOARD.video)?.board_id,
+    PROJECT_FILE_BOARD_ID
+  );
+
+  // The canvas draws with these, and no project owns them: on import they deduplicate against the
+  // destination, and on duplication they are not copied at all.
+  const layerNames = project.data.canvas.document.layers.map((layer) => layer.source.image.imageName);
+
+  for (const name of PROJECT_FILE_BOARD.externalImages) {
+    assert.ok(layerNames.includes(name), `${name} must stay a canvas reference`);
+    assert.notEqual(onBoard(name), PROJECT_FILE_BOARD_ID);
+  }
+
+  assert.ok(layerNames.includes(PROJECT_FILE_BOARD.referencedImage));
+  assert.ok(!layerNames.includes(PROJECT_FILE_BOARD.unreferencedImage));
+});
+
 test('the HTTP reset contract selects profiles explicitly and restores the startup profile by default', async () => {
   const backend = await startMockBackend(0, { profile: 'empty' });
 
@@ -134,7 +173,9 @@ test('the HTTP reset contract selects profiles explicitly and restores the start
 
     assert.deepEqual(generationDevices, [{ device: 'cpu', name: 'CPU' }]);
     assert.equal(images.items.length, 17);
-    assert.equal(images.total, 1_000);
+    // One of the thousand is an intermediate on Fixture Project 002's board, which every gallery
+    // listing hides — it exists so the project-file journey can prove it never travels.
+    assert.equal(images.total, 999);
     assert.equal(itemIds.item_ids.length, 500);
     assert.equal(models.models.length, 100);
     assert.equal(nodeCatalog.node_packs.flatMap((pack) => pack.node_types).length, 100);

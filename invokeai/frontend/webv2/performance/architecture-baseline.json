@@ -2,17 +2,17 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 824604,
+        "brotliBytes": 826351,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 824231,
+        "gzipBytes": 825960,
         "imageRawBytes": 156376,
-        "initialRawBytes": 1914481,
+        "initialRawBytes": 1919126,
         "largestAssetRawBytes": 746170,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 66759,
-        "requestCount": 33,
-        "scriptRequestCount": 17,
+        "ownedRawBytes": 66207,
+        "requestCount": 35,
+        "scriptRequestCount": 19,
         "sourceOwners": [
           "package:@ark-ui/react",
           "package:@chakra-ui/react",
@@ -264,6 +264,7 @@
           "source:src/workbench/projects/projectFileErrors.ts",
           "source:src/workbench/projects/projectFileToasts.ts",
           "source:src/workbench/projects/session.ts",
+          "source:src/workbench/projects/syncStore.ts",
           "source:src/workbench/projects/useProjectFileActions.ts",
           "source:src/workbench/settings/SettingsButton.tsx",
           "source:src/workbench/settings/SettingsDialogHost.tsx",
@@ -272,17 +273,17 @@
         ]
       },
       "limits": {
-        "brotliBytes": 832851,
+        "brotliBytes": 834615,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 832474,
+        "gzipBytes": 834220,
         "imageRawBytes": 157940,
-        "initialRawBytes": 1933626,
+        "initialRawBytes": 1938318,
         "largestAssetRawBytes": 753632,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 66759,
-        "requestCount": 33,
-        "scriptRequestCount": 17
+        "ownedRawBytes": 66207,
+        "requestCount": 35,
+        "scriptRequestCount": 19
       },
       "owner": "app",
       "remediationTicket": "set-performance-budgets",
@@ -290,17 +291,17 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1006358,
+        "brotliBytes": 1009372,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1003881,
+        "gzipBytes": 1006745,
         "imageRawBytes": 156376,
-        "initialRawBytes": 2463476,
+        "initialRawBytes": 2471744,
         "largestAssetRawBytes": 746170,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 113398,
-        "requestCount": 77,
-        "scriptRequestCount": 61,
+        "ownedRawBytes": 113633,
+        "requestCount": 79,
+        "scriptRequestCount": 63,
         "sourceOwners": [
           "package:@ark-ui/react",
           "package:@chakra-ui/react",
@@ -699,6 +700,8 @@
           "source:src/workbench/projects/ids.ts",
           "source:src/workbench/projects/invk/format.ts",
           "source:src/workbench/projects/library.ts",
+          "source:src/workbench/projects/openProjectBroker.ts",
+          "source:src/workbench/projects/openProjects.ts",
           "source:src/workbench/projects/projectAssets.ts",
           "source:src/workbench/projects/projectDocument.ts",
           "source:src/workbench/projects/projectFile.ts",
@@ -793,24 +796,24 @@
         ]
       },
       "limits": {
-        "brotliBytes": 1016422,
+        "brotliBytes": 1019466,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 1013920,
+        "gzipBytes": 1016813,
         "imageRawBytes": 157940,
-        "initialRawBytes": 2488111,
+        "initialRawBytes": 2496462,
         "largestAssetRawBytes": 753632,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 113398,
-        "requestCount": 77,
-        "scriptRequestCount": 61
+        "ownedRawBytes": 113633,
+        "requestCount": 79,
+        "scriptRequestCount": 63
       },
       "owner": "workbench",
       "remediationTicket": "deepen-widget-registry-loading",
       "source": "src/app/WorkbenchApp.tsx"
     }
   },
-  "capturedAt": "2026-08-05",
+  "capturedAt": "2026-08-07",
   "developmentInvalidation": {
     "platformUiBarrel": {
       "specifier": "@platform/ui",
@@ -855,7 +858,9 @@
       "src/features/queue/ui/launchpad/QueueStatusBand.tsx",
       "src/workbench/launchpad/home/livePanels.ts"
     ],
-    "editorForbiddenInitialChunkNames": ["ag-psd"],
+    "editorForbiddenInitialChunkNames": [
+      "ag-psd"
+    ],
     "inactiveWidgetGateOwner": "deepen-widget-registry-loading"
   }
 }

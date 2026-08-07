@@ -53,12 +53,58 @@ export const assertMockBackendProfileName = (value) => {
   return value;
 };
 
+/**
+ * What Fixture Project 002's own board holds, and what sits just outside it.
+ *
+ * The project-file journey is the only place the whole board path runs end to end, and it can only
+ * prove the interesting rules if the fixture actually contains them: a result the canvas draws with
+ * *and* the board owns (so a restore must copy it and rewrite the layer), a result the document
+ * never mentions (which is the entire reason `.invk` carries a board at all), assets under each
+ * visible category, media that must be excluded, and references that live outside the board and so
+ * must be deduplicated rather than copied.
+ *
+ * Every name here is an existing fixture image reassigned to the project's board — the image count
+ * is a pinned dimension of the representative profile, so this composition must not change it.
+ */
+export const PROJECT_FILE_BOARD = Object.freeze({
+  /** Generated, on the board, and drawn by the canvas: the overlap case. */
+  referencedImage: 'fixture-image-0002.png',
+  /** Generated, on the board, referenced by nothing. Travels only because v3 enumerates the board. */
+  unreferencedImage: 'fixture-image-0005.png',
+  /** An upload, filed under the `user` asset category. */
+  userAsset: 'fixture-image-0006.png',
+  /** A control-layer asset, so the restore has more than one category to preserve. */
+  maskAsset: 'fixture-image-0007.png',
+  /** Already starred in the base composition, so starring survives without perturbing any ordering. */
+  starredImage: 'fixture-image-0012.png',
+  /** The canvas's private category. On the board, and it must never travel as board membership. */
+  canvasOwnedImage: 'fixture-image-0008.png',
+  /** Hidden from every gallery view, and from the snapshot with it. */
+  intermediateImage: 'fixture-image-0009.png',
+  /** A visible video on the board, which is a separate namespace and a separate copy path. */
+  video: 'fixture-video-project.mp4',
+  /** Drawn by the canvas but owned by no project: reused on import, never copied. */
+  externalImages: Object.freeze(['fixture-image-0001.png', 'fixture-image-0003.png', 'fixture-image-0004.png']),
+});
+
+/** Category and visibility overrides that put the board composition above onto the project's board. */
+const PROJECT_BOARD_IMAGES = new Map([
+  [PROJECT_FILE_BOARD.referencedImage, { image_category: 'general' }],
+  [PROJECT_FILE_BOARD.unreferencedImage, { image_category: 'general' }],
+  [PROJECT_FILE_BOARD.starredImage, { image_category: 'general', starred: true }],
+  [PROJECT_FILE_BOARD.userAsset, { image_category: 'user' }],
+  [PROJECT_FILE_BOARD.maskAsset, { image_category: 'mask' }],
+  [PROJECT_FILE_BOARD.canvasOwnedImage, { image_category: 'other' }],
+  [PROJECT_FILE_BOARD.intermediateImage, { image_category: 'general', is_intermediate: true }],
+]);
+
 const createImages = (count) =>
   range(count, (index) => {
     const id = ordinal(index, 4);
     const imageName = `fixture-image-${id}.png`;
     const boardIndex = index % 10;
     const imageCategory = index % 10 === 0 ? 'control' : 'general';
+    const projectBoardMembership = PROJECT_BOARD_IMAGES.get(imageName);
 
     return {
       board_id: index % 8 === 0 ? null : `fixture-board-${ordinal(boardIndex, 2)}`,
@@ -71,6 +117,9 @@ const createImages = (count) =>
       starred: index % 11 === 0,
       thumbnail_url: `/api/v1/images/i/${imageName}/thumbnail`,
       width: 512 + (index % 4) * 64,
+      ...(projectBoardMembership === undefined
+        ? {}
+        : { board_id: PROJECT_FILE_BOARD_ID, starred: false, ...projectBoardMembership }),
     };
   });
 
@@ -171,6 +220,27 @@ const createVideos = () => [
     workflow: null,
   },
   {
+    // On Fixture Project 002's own board: videos are a separate namespace with their own copy and
+    // upload routes, so a project file that only ever carried images would prove half the path.
+    board_id: 'fixture-project-board-02',
+    created_at: timestampAt(5),
+    duration: 1,
+    fps: 10,
+    graph: null,
+    height: 64,
+    is_intermediate: false,
+    metadata: { prompt: 'project board fixture' },
+    owner_user_id: 'fixture-user',
+    starred: false,
+    thumbnail_url: '/api/v1/videos/i/fixture-video-project.mp4/thumbnail',
+    video_category: 'general',
+    video_name: 'fixture-video-project.mp4',
+    video_origin: 'internal',
+    video_url: '/api/v1/videos/i/fixture-video-project.mp4/full',
+    width: 64,
+    workflow: null,
+  },
+  {
     board_id: null,
     created_at: timestampAt(4),
     duration: 1,
@@ -215,6 +285,13 @@ const createVideos = () => [
  * delete it — the generic board routes refuse a claimed board.
  */
 export const projectBoardId = (index) => `fixture-project-board-${ordinal(index, 2)}`;
+
+/**
+ * The board owned by Fixture Project 002 — the project the project-file journey exports, imports
+ * and duplicates. Declared here rather than inlined so the composition above and the journey's
+ * assertions cannot drift from the project they describe.
+ */
+export const PROJECT_FILE_BOARD_ID = projectBoardId(1);
 
 const buildBoard = (boardId, boardName, images, videos, createdAt) => {
   const boardImages = images.filter((image) => image.board_id === boardId);

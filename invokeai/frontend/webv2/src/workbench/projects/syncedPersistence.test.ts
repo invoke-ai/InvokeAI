@@ -681,6 +681,25 @@ describe('authoritative project boards', () => {
     expect(galleryBoardIds(hydrated!).selectedBoardId).toBe('deliberate-destination');
   });
 
+  /**
+   * Patching the document is not enough on its own. A project saved by a build that never opened
+   * its Gallery widget has no gallery values for the patch to land in, and the instance the reducer
+   * creates during normalization arrives afterwards, empty — so the board has to be written again
+   * once the project is hydrated.
+   */
+  it('tells a project its board even when its document had no gallery state', async () => {
+    const draft = createDraftProject([]);
+    const document = persistence.serializeProjectDocument(draft) as Record<string, unknown>;
+
+    delete document.widgetInstances;
+    delete document.widgetStates;
+    api.__seed(document);
+
+    const hydrated = await service.hydrateProjectFromServer(draft.id);
+
+    expect(galleryBoardIds(hydrated!).projectBoardId).toBe(`board-for-${draft.id}`);
+  });
+
   it('forks rather than resurrects a project deleted on another device', async () => {
     const project = seedServerProject('Deleted elsewhere');
     const opened = await service.hydrateProjectFromServer(project.id);

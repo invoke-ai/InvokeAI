@@ -152,6 +152,17 @@ describe('gallery state view', () => {
     expect(getGallerySelectedBoardId(values, boards)).toBe('none');
   });
 
+  /**
+   * Never having chosen a destination is not a choice of Uncategorized. A project saved before it
+   * owned a board should still work on its own board, where everything else it has made lives.
+   */
+  it('uses the project board when nothing was ever selected', () => {
+    const projectBoards = [...boards, { ...boards[1]!, id: 'project-board', name: 'My Project', projectId: 'p1' }];
+
+    expect(getGallerySelectedBoardId({ projectBoardId: 'project-board' }, projectBoards)).toBe('project-board');
+    expect(getGallerySelectedBoardId({}, projectBoards)).toBe('none');
+  });
+
   it('does not render local fallback images while backend images are loading', () => {
     const values = { recentImages: [createImage('local-fallback.png')], selectedBoardId: 'none' };
     const gallery = getGalleryStateView(values, boards, null, true);

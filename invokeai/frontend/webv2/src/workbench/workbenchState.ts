@@ -1317,6 +1317,24 @@ export const normalizeWorkbenchProject = (project: Project): Project => {
   };
 };
 
+/**
+ * Write the server's board id into a *hydrated* project's gallery state.
+ *
+ * Patching the document before rehydration is not enough on its own. A project saved by a build
+ * that never opened its Gallery widget — or one whose document predates widget instances entirely —
+ * has no gallery values for the patch to land in, and the instance the reducer creates during
+ * normalization arrives afterwards, empty. Such a project would then show the placeholder board row
+ * forever and route nothing at its own board, which is the one thing the server is authoritative
+ * about.
+ *
+ * Applied after normalization, so the instance exists. A project whose layout has no gallery widget
+ * at all is returned untouched: there is nothing to tell.
+ */
+export const withAuthoritativeProjectBoard = (project: Project, boardId: string): Project =>
+  updateProjectWidgetValues(project, 'gallery', (values) =>
+    values.projectBoardId === boardId ? values : { ...values, projectBoardId: boardId }
+  );
+
 const clampPanelSize = (region: WidgetRegion, sizePx: number): number => {
   if (region === 'bottom') {
     return Math.min(MAX_STATUS_PANEL_SIZE_PX, Math.max(MIN_STATUS_PANEL_SIZE_PX, sizePx));

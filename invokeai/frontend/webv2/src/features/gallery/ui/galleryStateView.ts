@@ -235,12 +235,20 @@ export const getGallerySearchTerm = (values: Record<string, unknown>): string =>
  * install, or one whose pre-migration board was rejected as ambiguous, names a board id that means
  * nothing here, and dropping it to Uncategorized would quietly scatter that project's output.
  *
+ * No saved selection at all is the same case, not a choice of Uncategorized. A project saved before
+ * it owned a board — or by a build that never wrote a destination — should still work on its own
+ * board, which is where everything else it has made already lives.
+ *
  * An empty board list means "still loading", not "no such board", so nothing is resolved yet.
  */
 export const getGallerySelectedBoardId = (values: Record<string, unknown>, backendBoards: GalleryBoard[]): string => {
-  const selectedBoardId = typeof values.selectedBoardId === 'string' ? values.selectedBoardId : 'none';
+  const selectedBoardId = typeof values.selectedBoardId === 'string' ? values.selectedBoardId : null;
 
-  if (backendBoards.length === 0 || backendBoards.some((board) => board.id === selectedBoardId)) {
+  if (backendBoards.length === 0) {
+    return selectedBoardId ?? 'none';
+  }
+
+  if (selectedBoardId !== null && backendBoards.some((board) => board.id === selectedBoardId)) {
     return selectedBoardId;
   }
 
