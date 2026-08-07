@@ -133,12 +133,12 @@ export const getOrCreateTokenizer = (family: TokenizerFamily): Tokenizer => {
 };
 
 /**
- * Asynchronously calculates token count for prompt text given base model.
+ * Calculates token count for prompt text given base model.
  */
-export const calculatePromptTokens = async (
+export const calculatePromptTokens = (
   text: string,
   baseModel?: string
-): Promise<TokenCountResult> => {
+): TokenCountResult => {
   const { family, limit } = getTokenizerConfig(baseModel);
 
   if (!text || !text.trim()) {
