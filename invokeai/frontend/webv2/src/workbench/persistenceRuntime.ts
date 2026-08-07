@@ -124,14 +124,28 @@ export const createWorkbenchPersistenceRuntime = ({
     saveGeneration: number,
     requireCurrentRevision: boolean
   ): void => {
-    if (isStaleSave(revision, saveGeneration, requireCurrentRevision)) {
+    if (disposed) {
+      return;
+    }
+
+    // Staleness is read before anything is applied, because applying is itself an edit: assigning
+    // a board dispatches through the reducer and bumps the generation this check compares against.
+    const isStale = isStaleSave(revision, saveGeneration, requireCurrentRevision);
+
+    // Applied either way. These are facts about the *server* — the board it minted, the fork it
+    // already holds — not statements about the snapshot that was sent. A save is stale whenever a
+    // keystroke lands while it is in flight, which for a project's very first save is the common
+    // case; dropping the answer there leaves a new project pointing at no board, and a deleted one
+    // recreated under its old id by the next push.
+    applySaveResult(result);
+
+    if (isStale) {
       return;
     }
     lastSavedRevision = revision;
     failedRevision = null;
     scheduledRevision = null;
     aggregate.saveSucceeded(result.snapshot.savedAt);
-    applySaveResult(result);
     publish({ error: null, phase: 'idle' });
   };
 

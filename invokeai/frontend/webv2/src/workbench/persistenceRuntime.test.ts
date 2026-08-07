@@ -265,6 +265,68 @@ describe('Workbench persistence runtime', () => {
     expect(aggregate.events).toContain('save-succeeded:current');
   });
 
+  it('applies server outcomes from a save that went stale', async () => {
+    // A stale save is one whose *snapshot* moved on, which says nothing about what the server
+    // answered. The board id in a create response exists nowhere else, and the first save of a new
+    // draft is exactly the one an edit is most likely to overtake — so dropping it there leaves the
+    // project pointing at no board until the next reload.
+    const aggregate = createAggregate();
+    const { persistence } = createPersistence(() => Promise.resolve(null));
+    const first = deferred<WorkbenchSaveResult>();
+    const second = deferred<WorkbenchSaveResult>();
+    vi.mocked(persistence.saveWorkbench)
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise);
+    const clock = new FakeClock();
+    const runtime = createWorkbenchPersistenceRuntime({ aggregate: aggregate.port, clock, persistence });
+
+    runtime.start();
+    await flushPromises();
+    aggregate.edit('First');
+    clock.runAll();
+
+    // The edit that makes the in-flight save stale.
+    aggregate.edit('Second');
+    clock.runAll();
+
+    first.resolve({
+      ...saveResult(aggregate.state, 'stale'),
+      projectBoardAssignments: [{ boardId: 'board-1', projectId: 'project-1' }],
+    });
+    await flushPromises();
+
+    expect(aggregate.boardAssignments).toEqual([{ boardId: 'board-1', projectId: 'project-1' }]);
+    // Still stale for the purposes of the save's own bookkeeping.
+    expect(aggregate.events).not.toContain('save-succeeded:stale');
+
+    second.resolve(saveResult(aggregate.state, 'current'));
+    await flushPromises();
+    expect(aggregate.events).toContain('save-succeeded:current');
+  });
+
+  it('ignores server outcomes once disposed', async () => {
+    const aggregate = createAggregate();
+    const { persistence } = createPersistence(() => Promise.resolve(null));
+    const pending = deferred<WorkbenchSaveResult>();
+    vi.mocked(persistence.saveWorkbench).mockImplementationOnce(() => pending.promise);
+    const clock = new FakeClock();
+    const runtime = createWorkbenchPersistenceRuntime({ aggregate: aggregate.port, clock, persistence });
+
+    runtime.start();
+    await flushPromises();
+    aggregate.edit('First');
+    clock.runAll();
+    runtime.dispose();
+
+    pending.resolve({
+      ...saveResult(aggregate.state),
+      projectBoardAssignments: [{ boardId: 'board-1', projectId: 'project-1' }],
+    });
+    await flushPromises();
+
+    expect(aggregate.boardAssignments).toEqual([]);
+  });
+
   it('keeps one save in flight and coalesces queued edits into the latest state', async () => {
     const aggregate = createAggregate();
     const { persistence } = createPersistence(() => Promise.resolve(null));

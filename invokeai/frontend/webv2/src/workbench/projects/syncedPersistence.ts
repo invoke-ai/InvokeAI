@@ -120,13 +120,31 @@ export interface WorkbenchLoadOptions {
 interface SyncedPersistenceState {
   /** Ids deleted in this runtime lifetime, guarding against racing saves. */
   deletedProjectIds: Set<string>;
+  /**
+   * Ids that have already been forked because the server no longer had them.
+   *
+   * The fork exists on the server from the moment it is made, but the original stays in the
+   * aggregate until the reconciliation reaches it. In that window `pushProject` would find no sync
+   * entry and re-create the project under its old id — undoing the very deletion the fork exists to
+   * respect. So a forked id is never pushed again.
+   */
+  forkedProjectIds: Set<string>;
   hasPending: boolean;
   localPersistence: WorkbenchPersistenceService;
   lastPushedAccount: string | null;
   /** Immutable owner captured when this synchronization lifetime was constructed. */
   owner: AccountScope;
-  /** Boards learned from create responses, drained by the next save. */
+  /**
+   * What the server said that the aggregate has not been told yet, drained by the next save.
+   *
+   * A push happens from a save *and* from a targeted flush, and only the save has somewhere to
+   * return an outcome to. Holding them here rather than in the caller's local arrays is what makes
+   * "the next save carries them" true rather than aspirational: a flush that forks a project or
+   * resolves a conflict cannot silently drop the answer.
+   */
   pendingBoardAssignments: ProjectBoardAssignment[];
+  pendingConflicts: ProjectConflictResolution[];
+  pendingDeletedForks: ProjectDeletionFork[];
   projectDocumentJsonCache: WeakMap<Project, { document: Record<string, unknown>; json: string }>;
   /** Server-known projects, keyed by project id. */
   syncEntries: Map<string, SyncEntry>;
@@ -134,11 +152,14 @@ interface SyncedPersistenceState {
 
 const createSyncedPersistenceState = (owner: AccountScope): SyncedPersistenceState => ({
   deletedProjectIds: new Set(),
+  forkedProjectIds: new Set(),
   hasPending: false,
   localPersistence: createLocalStorageWorkbenchPersistence(owner.storageSuffix),
   lastPushedAccount: null,
   owner,
   pendingBoardAssignments: [],
+  pendingConflicts: [],
+  pendingDeletedForks: [],
   projectDocumentJsonCache: new WeakMap(),
   syncEntries: new Map(),
 });
@@ -446,17 +467,16 @@ const forkDeletedProject = async (
   }
 };
 
-const pushProject = async (
-  syncState: SyncedPersistenceState,
-  project: Project,
-  conflicts: ProjectConflictResolution[],
-  deletedProjectForks: ProjectDeletionFork[]
-): Promise<string> => {
+const pushProject = async (syncState: SyncedPersistenceState, project: Project): Promise<string> => {
   assertOwner(syncState);
   const { document, json: documentJson } = getSerializedProjectDocument(syncState, project);
   const entry = syncState.syncEntries.get(project.id);
 
-  if (syncState.deletedProjectIds.has(project.id) || entry?.pushedDoc === documentJson) {
+  if (
+    syncState.deletedProjectIds.has(project.id) ||
+    syncState.forkedProjectIds.has(project.id) ||
+    entry?.pushedDoc === documentJson
+  ) {
     return documentJson;
   }
 
@@ -511,7 +531,7 @@ const pushProject = async (
           syncState.hasPending = true;
         }
       } else if (outcome.kind === 'forked') {
-        conflicts.push(outcome.resolution);
+        syncState.pendingConflicts.push(outcome.resolution);
       } else if (outcome.kind === 'failed') {
         syncState.hasPending = true;
       }
@@ -528,7 +548,10 @@ const pushProject = async (
       if (fork === null) {
         syncState.hasPending = true;
       } else {
-        deletedProjectForks.push(fork);
+        // Recorded before the aggregate hears about it, so nothing re-creates the original id in
+        // the meantime — see `forkedProjectIds`.
+        syncState.forkedProjectIds.add(project.id);
+        syncState.pendingDeletedForks.push(fork);
       }
     } else {
       syncState.hasPending = true;
@@ -828,12 +851,10 @@ export const createSyncedWorkbenchPersistence = (
     },
     flushProjectToServer(project): Promise<void> {
       return enqueueMutation(async () => {
-        // A flush is a targeted push, not a save: its outcomes are surfaced by the next save,
-        // which is what carries them to the store.
-        const conflicts: ProjectConflictResolution[] = [];
-        const deletedProjectForks: ProjectDeletionFork[] = [];
-
-        await pushProject(syncState, project, conflicts, deletedProjectForks);
+        // A flush is a targeted push, not a save. Any conflict or fork it produces waits on
+        // `syncState` for the next save to drain — the flush has no caller to hand them to, and
+        // they are already true of the server by the time it returns.
+        await pushProject(syncState, project);
         assertOwner(syncState);
         persistSyncMap(syncState);
       });
@@ -982,8 +1003,6 @@ export const createSyncedWorkbenchPersistence = (
         assertOwner(syncState);
         syncState.hasPending = false;
 
-        const conflicts: ProjectConflictResolution[] = [];
-        const deletedProjectForks: ProjectDeletionFork[] = [];
         const projectSyncInfos: Record<string, ProjectSyncInfo> = {};
 
         await pushSessionState(syncState, state);
@@ -992,7 +1011,7 @@ export const createSyncedWorkbenchPersistence = (
         for (const project of state.projects) {
           assertOwner(syncState);
           const lastAckedDoc = syncState.syncEntries.get(project.id)?.pushedDoc ?? null;
-          const documentJson = await pushProject(syncState, project, conflicts, deletedProjectForks);
+          const documentJson = await pushProject(syncState, project);
 
           assertOwner(syncState);
           const entry = syncState.syncEntries.get(project.id);
@@ -1012,14 +1031,14 @@ export const createSyncedWorkbenchPersistence = (
         persistSyncMap(syncState);
         reportProjectSync({ hasPendingChanges: syncState.hasPending, projects: projectSyncInfos });
 
-        // Drained rather than read: each assignment is applied to the store exactly once.
-        const projectBoardAssignments = syncState.pendingBoardAssignments.splice(0);
-
+        // Drained rather than read: each outcome is applied to the store exactly once. The runtime
+        // applies what it is handed even when the save it came from went stale, so draining here is
+        // safe — nothing is dropped between this call and the reducer.
         return {
-          conflicts,
-          deletedProjectForks,
+          conflicts: syncState.pendingConflicts.splice(0),
+          deletedProjectForks: syncState.pendingDeletedForks.splice(0),
           hasPendingChanges: syncState.hasPending,
-          projectBoardAssignments,
+          projectBoardAssignments: syncState.pendingBoardAssignments.splice(0),
           snapshot,
         };
       });

@@ -723,4 +723,41 @@ describe('authoritative project boards', () => {
       { boardId: `board-for-${fork!.recoveredProject.id}`, projectId: fork!.recoveredProject.id },
     ]);
   });
+
+  it('carries a flush-time fork to the next save instead of dropping it', async () => {
+    // A flush has no caller to return outcomes to — rename, export and duplicate all go through
+    // one. If the fork it produced were dropped, the aggregate would never hear about it.
+    const project = seedServerProject('Deleted elsewhere');
+    const opened = await service.hydrateProjectFromServer(project.id);
+    const edited = { ...opened!, name: 'Edited locally' };
+
+    api.__records.delete(project.id);
+    await service.flushProjectToServer(edited);
+
+    const result = await service.saveWorkbench(stateWithProjects([edited]));
+
+    expect(result.deletedProjectForks).toHaveLength(1);
+    expect(result.deletedProjectForks[0]!.projectId).toBe(project.id);
+    expect(result.projectBoardAssignments).toHaveLength(1);
+  });
+
+  it('never re-creates a project it has already forked', async () => {
+    // The original stays in the aggregate until the reconciliation reaches it. A push in that
+    // window would POST the old id back and undo the deletion on every device — the exact outcome
+    // forking exists to avoid.
+    const project = seedServerProject('Deleted elsewhere');
+    const opened = await service.hydrateProjectFromServer(project.id);
+    const edited = { ...opened!, name: 'Edited locally' };
+
+    api.__records.delete(project.id);
+    await service.flushProjectToServer(edited);
+    expect(api.__records.has(project.id)).toBe(false);
+
+    // The aggregate has not applied the fork yet, so the original is still in the saved state.
+    const result = await service.saveWorkbench(stateWithProjects([edited]));
+
+    expect(api.__records.has(project.id)).toBe(false);
+    // And the fork is reported exactly once, not once per push.
+    expect(result.deletedProjectForks).toHaveLength(1);
+  });
 });
