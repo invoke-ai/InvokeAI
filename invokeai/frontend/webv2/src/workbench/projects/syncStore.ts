@@ -63,6 +63,13 @@ export interface OpenProjectHandle {
   flush: () => Promise<void>;
   /** Stop the autosave from recreating this project while it is being deleted. */
   markDeleted: () => void;
+  /**
+   * Undo {@link markDeleted} after a deletion that did not happen.
+   *
+   * Paired with it here rather than left to call sites, because a project left marked never
+   * autosaves again for the rest of the session — a silent, unrecoverable failure to notice.
+   */
+  unmarkDeleted: () => void;
   /** Rename through the reducer, then flush — so the project and its board rename together. */
   rename: (name: string) => Promise<void>;
 }

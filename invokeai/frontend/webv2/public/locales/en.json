@@ -411,6 +411,7 @@
     "deleteProjectTabBody": "Delete \"{{name}}\"? The project and its saved copy on the server are removed permanently. To keep it in your library, close the tab instead.",
     "deleteProjectWithEllipsis": "Delete project…",
     "duplicateFailed": "Duplicate failed",
+    "duplicating": "Duplicating project…",
     "editedRelative": "Edited {{time}}",
     "exportFailed": "Export failed",
     "exported": "Exported \"{{name}}\"",

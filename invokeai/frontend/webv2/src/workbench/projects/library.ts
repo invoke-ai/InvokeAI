@@ -211,7 +211,17 @@ export const deleteLibraryProject = async (projectId: string): Promise<void> => 
   // Marked before the request so an autosave in flight cannot recreate the project — and with it a
   // board — between the DELETE and the tab closing.
   openProject?.markDeleted();
-  await apiDeleteProject(projectId, owner.signal);
+
+  try {
+    await apiDeleteProject(projectId, owner.signal);
+  } catch (error) {
+    // Unmarked here rather than by the caller, because a project left marked stops autosaving for
+    // the rest of the session — silently, and with no way to notice. Two of the three call sites
+    // had to remember this and one of them did not.
+    openProject?.unmarkDeleted();
+    throw error;
+  }
+
   assertAccountScopeCurrent(owner);
   openProject?.close();
   forgetProjectCover(projectId, owner);
@@ -293,8 +303,11 @@ export interface DuplicatedProject extends ProjectTransferIssues {
  * restore engine, which it shares — this is where the two directions meet, not a second
  * implementation of them.
  */
-export const duplicateLibraryProject = async (projectId: string): Promise<DuplicatedProject> => {
-  const owner = captureAccountScope();
+export const duplicateLibraryProject = async (
+  projectId: string,
+  options: { onProgress?: (progress: { completed: number; total: number }) => void; owner?: AccountScope } = {}
+): Promise<DuplicatedProject> => {
+  const owner = options.owner ?? captureAccountScope();
   const record = await readProjectForDuplication(projectId, owner);
 
   assertAccountScopeCurrent(owner);
@@ -304,7 +317,10 @@ export const duplicateLibraryProject = async (projectId: string): Promise<Duplic
   assertAccountScopeCurrent(owner);
 
   const { duplicateProjectRecord } = await import('./invk/duplicateProject');
-  const duplicated = await duplicateProjectRecord({ boardItems: snapshot.items, owner, record });
+  const duplicated = await duplicateProjectRecord(
+    { boardItems: snapshot.items, owner, record },
+    options.onProgress ? { onProgress: options.onProgress } : {}
+  );
 
   assertAccountScopeCurrent(owner);
 

@@ -1,11 +1,6 @@
 import { toaster } from '@platform/ui';
-import {
-  deleteLibraryProject,
-  duplicateLibraryProject,
-  renameLibraryProject,
-  type ProjectSummary,
-} from '@workbench/projects/library';
-import { useExportLibraryProject } from '@workbench/projects/useProjectFileActions';
+import { deleteLibraryProject, renameLibraryProject, type ProjectSummary } from '@workbench/projects/library';
+import { useDuplicateProject, useExportLibraryProject } from '@workbench/projects/useProjectFileActions';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -18,7 +13,8 @@ import { dropProjectPin } from './projectPins';
  */
 export interface ProjectCardActions {
   rename: (name: string) => Promise<void>;
-  duplicate: () => Promise<void>;
+  /** Reports its own progress and result, so there is nothing to await here. */
+  duplicate: () => void;
   /** Reports its own progress and result, so there is nothing to await here. */
   export: () => void;
   delete: () => Promise<void>;
@@ -27,6 +23,7 @@ export interface ProjectCardActions {
 export const useProjectCardActions = (summary: ProjectSummary): ProjectCardActions => {
   const { t } = useTranslation();
   const startExport = useExportLibraryProject();
+  const startDuplicate = useDuplicateProject();
 
   const rename = useCallback(
     async (name: string) => {
@@ -45,35 +42,12 @@ export const useProjectCardActions = (summary: ProjectSummary): ProjectCardActio
     [summary.id, t]
   );
 
-  const duplicate = useCallback(async () => {
-    try {
-      const { boardItemIssues, documentReferenceIssues, summary: copy } = await duplicateLibraryProject(summary.id);
-      // A copy that lost part of its board is not a failure — the project exists and opens — but it
-      // is not a plain success either, and the two counts mean different things: a missing board
-      // item is a result still findable elsewhere, a missing reference is a hole in the canvas.
-      const lost = [
-        ...(boardItemIssues.length === 0
-          ? []
-          : [t('projects.file.missingBoardItems', { count: boardItemIssues.length })]),
-        ...(documentReferenceIssues.length === 0
-          ? []
-          : [t('projects.file.missingReferences', { count: documentReferenceIssues.length })]),
-      ];
-
-      toaster.create({
-        description:
-          lost.length === 0 ? t('projects.projectDuplicatedDescription', { name: copy.name }) : lost.join(' '),
-        title: t('projects.projectDuplicated'),
-        type: lost.length === 0 ? 'success' : 'warning',
-      });
-    } catch (error) {
-      toaster.create({
-        description: error instanceof Error ? error.message : undefined,
-        title: t('projects.duplicateFailed'),
-        type: 'error',
-      });
-    }
-  }, [summary.id, t]);
+  // Progress, partial success and error translation all come from the shared reporter — the same
+  // one import and export use. Duplication runs the same restore engine over the same board, so a
+  // hand-rolled toast here only meant it reported that work differently from its twins.
+  const duplicate = useCallback(() => {
+    startDuplicate(summary.id);
+  }, [startDuplicate, summary.id]);
 
   const exportProject = useCallback(() => {
     startExport(summary.id, summary.name);

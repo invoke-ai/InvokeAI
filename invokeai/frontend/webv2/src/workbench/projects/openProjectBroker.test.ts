@@ -17,6 +17,7 @@ const createHarness = () => {
     getOpenProjectIds: vi.fn(() => openIds),
     markProjectDeleted: vi.fn(),
     renameProject: vi.fn(),
+    unmarkProjectDeleted: vi.fn(),
     subscribe: (listener: () => void) => {
       listeners.add(listener);
 

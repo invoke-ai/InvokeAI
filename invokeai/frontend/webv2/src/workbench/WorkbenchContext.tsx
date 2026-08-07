@@ -81,7 +81,13 @@ export const WorkbenchProvider = ({
     // mutates an open project through the sync engine rather than beside it.
     const openProjectBroker = createOpenProjectBroker({
       closeProject: (projectId) => {
-        store.commands.projects.close(projectId);
+        // The last tab is not this handle's business. `close` refuses it *and* raises "at least one
+        // project must remain open" — correct for someone closing a tab, wrong for a deletion,
+        // which is not asking to keep working here. Leaving the editor is the caller's job
+        // (`leaveEditorIfLast`), and it is already doing it.
+        if (store.getSnapshot().projects.length > 1) {
+          store.commands.projects.close(projectId);
+        }
       },
       flushProject: async (projectId) => {
         const project = store.getSnapshot().projects.find((candidate) => candidate.id === projectId);
@@ -98,6 +104,9 @@ export const WorkbenchProvider = ({
         store.commands.projects.rename(projectId, name);
       },
       subscribe: store.subscribe,
+      unmarkProjectDeleted: (projectId) => {
+        persistence.unmarkProjectDeleted(projectId);
+      },
     });
 
     persistenceRuntime.start();

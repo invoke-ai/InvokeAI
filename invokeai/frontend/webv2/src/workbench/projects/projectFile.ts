@@ -22,7 +22,8 @@ import { recordProjectCover } from './covers';
 import { createProjectId } from './ids';
 import { INVK_EXTENSION, InvkFormatError } from './invk/format';
 import { upsertProjectSummary } from './library';
-import { remapAssetRefs } from './projectAssets';
+import { remapAssetRefs, stripInstallationState } from './projectAssets';
+import { getOpenProject } from './syncStore';
 
 export const PROJECT_FILE_KIND = 'invokeai-project';
 export const PROJECT_FILE_VERSION = 1;
@@ -206,12 +207,23 @@ const exportProjectDocument = async (
   };
 };
 
-/** Export a closed project straight from its server record. */
+/**
+ * Export a project from its server record.
+ *
+ * Flushed first when the editor holds it, for the reason duplication is: the surfaces that call
+ * this — a project card, a gallery board's menu — are reachable while that project is open, and the
+ * board most likely to be right-clicked is the open project's own. Exporting what the server last
+ * acknowledged would hand someone a file that silently omits the last ten minutes of their work.
+ */
 export const exportLibraryProject = async (
   projectId: string,
   options: ProjectFileOptions = {}
 ): Promise<ProjectExportOutcome> => {
   const owner = options.owner ?? captureAccountScope();
+
+  await getOpenProject(projectId)?.flush();
+  assertAccountScopeCurrent(owner);
+
   const record = await apiGetProject(projectId, owner.signal);
 
   assertAccountScopeCurrent(owner);
@@ -270,7 +282,11 @@ export const importProjectFile = async (
     typeof projectDocument.name === 'string' && projectDocument.name.trim()
       ? projectDocument.name.trim()
       : 'Imported project';
-  const candidate = { ...projectDocument, id, name };
+  // Stripped on the way in as well as on the way out, so the rule holds for documents this app did
+  // not write: a legacy `.invokeproject.json`, an archive from a dev build, a hand-edited one. A
+  // stranger's `selectedImage`/`compareImage` would otherwise arrive intact and unfixable — the
+  // collector skips those keys, so the restore can neither fetch them nor report them as dangling.
+  const candidate = { ...stripInstallationState(projectDocument), id, name };
   // Full validation rehydrates the document through the Workbench reducer, so
   // it is loaded here rather than imported: the Launchpad should not carry the
   // editor's aggregate state just to offer an Import button.

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ProjectBoardItemDTO } from './api';
 import type * as coversModule from './covers';
+import type * as assetTransportModule from './invk/assetTransport';
 import type * as projectFileModule from './projectFile';
 import type * as persistenceModule from './syncedPersistence';
 
@@ -75,7 +76,13 @@ vi.mock('./covers', async (importOriginal) => ({
   recordProjectCover: covers.recordProjectCover,
 }));
 vi.mock('@platform/browser/downloadBlob', () => downloads);
-vi.mock('./invk/assetTransport', () => transport);
+// Partial, so the module's pure predicates stay real. `isRequestCancellation` decides whether a
+// failure is this asset's or the whole operation's — a stub of it would let the tests agree with a
+// restore that mistook a cancelled import for three hundred dangling references.
+vi.mock('./invk/assetTransport', async (importOriginal) => ({
+  ...(await importOriginal<typeof assetTransportModule>()),
+  ...transport,
+}));
 
 let projectFile: typeof projectFileModule;
 let persistence: typeof persistenceModule;
@@ -220,6 +227,59 @@ describe('exportLibraryProject', () => {
 
     expect(api.getProject).toHaveBeenCalledWith('p1', expect.anything());
     expect(downloads.downloadBlob.mock.calls[0]![1]).toBe('Closed.invk');
+  });
+
+  /**
+   * This is reachable from a project card and from the gallery board menu, both of which can be on
+   * screen while the editor holds that project — and the board most likely to be right-clicked is
+   * the open project's own. Reading the server record without flushing first hands someone a file
+   * missing everything since the last autosave.
+   */
+  it('flushes an open project before reading its record', async () => {
+    const { registerOpenProject, unregisterOpenProject } = await import('./syncStore');
+    const order: string[] = [];
+    const flush = vi.fn(() => {
+      order.push('flush');
+      return Promise.resolve();
+    });
+
+    api.getProject.mockImplementation(() => {
+      order.push('get');
+
+      return Promise.resolve({
+        data: persistence.serializeProjectDocument({ ...createDraftProject([]), name: 'Open' }),
+        name: 'Open',
+        project_id: 'p1',
+        revision: 3,
+      });
+    });
+    registerOpenProject('p1', {
+      close: vi.fn(),
+      flush,
+      markDeleted: vi.fn(),
+      rename: vi.fn(),
+      unmarkDeleted: vi.fn(),
+    });
+
+    try {
+      await projectFile.exportLibraryProject('p1');
+    } finally {
+      unregisterOpenProject('p1');
+    }
+
+    expect(flush).toHaveBeenCalledTimes(1);
+    expect(order).toEqual(['flush', 'get']);
+  });
+
+  it('does not flush a project nothing holds', async () => {
+    api.getProject.mockResolvedValue({
+      data: persistence.serializeProjectDocument({ ...createDraftProject([]), name: 'Closed' }),
+      name: 'Closed',
+      project_id: 'p1',
+      revision: 3,
+    });
+
+    await expect(projectFile.exportLibraryProject('p1')).resolves.toBeDefined();
   });
 });
 
@@ -534,6 +594,45 @@ describe('importProjectFile', () => {
     const createRequest = api.createProject.mock.calls[0]![0] as { data: Record<string, unknown>; project_id: string };
 
     expect(createRequest.data.id).toBe(createRequest.project_id);
+  });
+
+  /**
+   * Export strips installation state, so its own archives never carry it — but import must not
+   * rely on that. A legacy `.invokeproject.json`, a dev-build archive or a hand-edited one can all
+   * arrive with a stranger's gallery selection, and the collector skips those keys, so a restore
+   * can neither fetch what they point at nor report it as dangling.
+   */
+  it('strips a stranger’s gallery selection from a document it did not write', async () => {
+    acceptCreate();
+    const envelope = {
+      document: {
+        ...createDraftProject([]),
+        name: 'Handed over',
+        widgetInstances: {
+          'gallery-1': {
+            state: {
+              values: {
+                compareImage: { imageName: 'theirs-compare.png', imageUrl: '' },
+                selectedImage: { imageName: 'theirs-selected.png', kind: 'image' },
+                selectedImageNames: ['image:theirs-selected.png'],
+              },
+            },
+            typeId: 'gallery',
+          },
+        },
+      },
+      kind: 'invokeai-project',
+      version: 1,
+    };
+    const file = new File([JSON.stringify(envelope)], 'handed-over.invokeproject.json');
+
+    await projectFile.importProjectFile(file);
+
+    const { data } = api.createProject.mock.calls[0]![0] as { data: Record<string, unknown> };
+    const serialized = JSON.stringify(data);
+
+    expect(serialized).not.toContain('theirs-compare.png');
+    expect(serialized).not.toContain('theirs-selected.png');
   });
 
   it('uploads only the images the server is missing', async () => {

@@ -21,6 +21,8 @@ export interface OpenProjectBrokerDeps {
   getOpenProjectIds: () => string[];
   /** Stop the autosave recreating a project that is being deleted. */
   markProjectDeleted: (projectId: string) => void;
+  /** Let it save again after a deletion that failed. */
+  unmarkProjectDeleted: (projectId: string) => void;
   renameProject: (projectId: string, name: string) => void;
   subscribe: (listener: () => void) => () => void;
 }
@@ -43,6 +45,7 @@ export const createOpenProjectBroker = (deps: OpenProjectBrokerDeps): OpenProjec
       deps.renameProject(projectId, name);
       await deps.flushProject(projectId);
     },
+    unmarkDeleted: () => deps.unmarkProjectDeleted(projectId),
   });
 
   const sync = (): void => {

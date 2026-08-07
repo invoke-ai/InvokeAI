@@ -9,7 +9,9 @@ import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { ProjectRecordDTO } from './api';
+import type { DuplicatedProject } from './library';
 
+import { duplicateLibraryProject } from './library';
 import { exportLibraryProject, exportOpenProject, importProjectFile, pickProjectFile } from './projectFile';
 import { startProjectFileReport } from './projectFileToasts';
 
@@ -99,6 +101,42 @@ export const useExportLibraryProject = (): ((projectId: string, name: string) =>
       );
     },
     [t]
+  );
+};
+
+/**
+ * Duplicate a project, reported like the transfers it shares its engine with.
+ *
+ * Duplication is a project file operation in everything but the file: same restore, same partial
+ * success, same durations. It reported none of that — no progress for the whole server-side copy,
+ * and `InvkFormatError`'s developer message straight into a toast on failure.
+ */
+export const useDuplicateProject = (
+  onDuplicated?: (duplicated: DuplicatedProject) => Promise<void> | void
+): ((projectId: string) => void) => {
+  const { t } = useTranslation();
+
+  return useCallback(
+    (projectId: string) => {
+      void runReported(
+        t,
+        { failed: t('projects.duplicateFailed'), running: t('projects.duplicating') },
+        async (report, owner) => {
+          const duplicated = await duplicateLibraryProject(projectId, {
+            // Everything a duplication moves is restored onto the copy's board, so the phase is
+            // fixed. Naming it here keeps the reporting vocabulary in the reporting layer.
+            onProgress: ({ completed, total }) => report.report({ completed, phase: 'restoring', total }),
+            owner,
+          });
+
+          assertAccountScopeCurrent(owner);
+          report.succeed(t('projects.projectDuplicated'), duplicated);
+          await onDuplicated?.(duplicated);
+          assertAccountScopeCurrent(owner);
+        }
+      );
+    },
+    [onDuplicated, t]
   );
 };
 

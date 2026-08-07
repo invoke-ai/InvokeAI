@@ -79,6 +79,9 @@ const openProject = (projectId: string, calls: string[] = []) => {
 
       return Promise.resolve();
     }),
+    unmarkDeleted: vi.fn(() => {
+      calls.push('unmarkDeleted');
+    }),
   };
 
   syncStore.registerOpenProject(projectId, handle);
@@ -221,6 +224,21 @@ describe('library mutations', () => {
 
     expect(calls).toEqual(['markDeleted', 'close']);
     expect(api.deleteProject).toHaveBeenCalledWith('open', expect.any(AbortSignal));
+  });
+
+  /**
+   * A project left marked deleted never autosaves again for the rest of the session, and nothing
+   * says so. Unmarking belongs here, beside the mark, rather than in each caller's catch — one of
+   * the two that had to remember it did not.
+   */
+  it('lets an open project save again when its deletion fails', async () => {
+    api.deleteProject.mockRejectedValue(new Error('offline'));
+
+    const { calls } = openProject('open');
+
+    await expect(library.deleteLibraryProject('open')).rejects.toThrow('offline');
+
+    expect(calls).toEqual(['markDeleted', 'unmarkDeleted']);
   });
 
   it('takes a deleted project out of the saved session', async () => {
