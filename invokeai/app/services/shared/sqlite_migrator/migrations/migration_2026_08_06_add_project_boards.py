@@ -22,8 +22,9 @@ project that adopts the wrong board takes ownership of media it does not own.
 
 Nothing is moved between boards. `board_images` and `board_videos` are read but never written, so no
 image or video changes hands here. The projects table gains a column, boards may gain rows and a new
-name, and an FK-free quarantine table is created only when a legacy project refers to a user row
-that no longer exists.
+name, and an FK-free quarantine table is created only when a legacy project refers to a user row it
+cannot reach — either because that account is gone, or because the database has no `users` table at
+all. See `_quarantine_every_project` for how the second case arises.
 """
 
 import json
@@ -48,8 +49,16 @@ class AddProjectBoardsMigrationCallback:
         self._logger = logger
 
     def __call__(self, cursor: sqlite3.Cursor) -> None:
-        self._quarantine_orphaned_projects(cursor)
-        assignments = self._assign_boards(cursor)
+        if _table_exists(cursor, "users"):
+            self._quarantine_orphaned_projects(cursor)
+            assignments = self._assign_boards(cursor)
+        else:
+            # No project can survive a rebuild whose foreign key has no table to point at, so every
+            # one of them is quarantined and none is assigned a board. See
+            # `_quarantine_every_project` for why a database can reach this migration in that state.
+            self._quarantine_every_project(cursor)
+            assignments = []
+
         self._rebuild_projects_table(cursor, assignments)
 
     def _quarantine_orphaned_projects(self, cursor: sqlite3.Cursor) -> None:
@@ -74,21 +83,7 @@ class AddProjectBoardsMigrationCallback:
         if not orphans:
             return
 
-        cursor.execute(
-            """--sql
-            CREATE TABLE IF NOT EXISTS orphaned_projects_2026_08_06 (
-                project_id TEXT NOT NULL,
-                user_id TEXT NOT NULL,
-                name TEXT NOT NULL,
-                data TEXT NOT NULL,
-                revision INTEGER NOT NULL,
-                created_at DATETIME NOT NULL,
-                updated_at DATETIME NOT NULL,
-                quarantined_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
-                PRIMARY KEY (user_id, project_id)
-            );
-            """
-        )
+        self._create_quarantine_table(cursor)
         cursor.execute(
             """--sql
             INSERT OR IGNORE INTO orphaned_projects_2026_08_06
@@ -108,6 +103,67 @@ class AddProjectBoardsMigrationCallback:
         cursor.execute(
             """--sql
             DELETE FROM projects WHERE user_id NOT IN (SELECT user_id FROM users);
+            """
+        )
+
+    def _quarantine_every_project(self, cursor: sqlite3.Cursor) -> None:
+        """The same rescue, for a database that has no `users` table at all.
+
+        `users` is created by *this fork's* `migration_27`. A root last opened by an upstream build
+        at schema version 27 or later already has that id recorded, against upstream's unrelated
+        migration of the same number, so the fork's version never runs there — the same shared-root
+        divergence `2026_07_30_repair_projects_table` exists to handle for `projects`. Every earlier
+        reference to `users` was a foreign key clause, which SQLite does not resolve until DML, so
+        such a root opened without complaint until this migration became the first to read the table.
+
+        Note what is *not* done here: the rows are copied out but never deleted. With the foreign key
+        enforced and its target missing, SQLite refuses any DML against `projects` — including a
+        `DELETE`. Dropping the table in the rebuild is what removes them, and that needs no
+        resolution.
+        """
+        cursor.execute(
+            """--sql
+            SELECT project_id, user_id FROM projects;
+            """
+        )
+        projects = cursor.fetchall()
+
+        if not projects:
+            return
+
+        self._create_quarantine_table(cursor)
+        cursor.execute(
+            """--sql
+            INSERT OR IGNORE INTO orphaned_projects_2026_08_06
+                (project_id, user_id, name, data, revision, created_at, updated_at)
+            SELECT project_id, user_id, name, data, revision, created_at, updated_at
+            FROM projects;
+            """
+        )
+
+        for project_id, user_id in projects:
+            self._logger.warning(
+                f"Project boards migration: quarantining project {project_id} in"
+                " orphaned_projects_2026_08_06. This database has no users table, so its owner"
+                f" {user_id} cannot be resolved — it was last opened by an upstream build and this"
+                " fork's multiuser migration never ran on it."
+            )
+
+    def _create_quarantine_table(self, cursor: sqlite3.Cursor) -> None:
+        """Deliberately free of foreign keys, so it can hold rows the live table cannot."""
+        cursor.execute(
+            """--sql
+            CREATE TABLE IF NOT EXISTS orphaned_projects_2026_08_06 (
+                project_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                data TEXT NOT NULL,
+                revision INTEGER NOT NULL,
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL,
+                quarantined_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
+                PRIMARY KEY (user_id, project_id)
+            );
             """
         )
 
@@ -252,6 +308,12 @@ class AddProjectBoardsMigrationCallback:
         # body out from under us.
         cursor.execute("DROP TRIGGER IF EXISTS tg_projects_updated_at;")
 
+        # The migrator runs this whole callback in one transaction, so a half-finished rebuild is
+        # not reachable through it. This is for the database that met a build predating that
+        # guarantee: without it such a database fails forever on `table projects_with_boards
+        # already exists`, and the scratch table is worthless in every other case anyway.
+        cursor.execute("DROP TABLE IF EXISTS projects_with_boards;")
+
         cursor.execute(
             """--sql
             CREATE TABLE projects_with_boards (
@@ -306,6 +368,11 @@ class AddProjectBoardsMigrationCallback:
             END;
             """
         )
+
+
+def _table_exists(cursor: sqlite3.Cursor, name: str) -> bool:
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?;", (name,))
+    return cursor.fetchone() is not None
 
 
 def _collect_board_candidates(data: str) -> set[str]:

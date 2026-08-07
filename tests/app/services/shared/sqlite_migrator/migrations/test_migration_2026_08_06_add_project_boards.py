@@ -357,6 +357,50 @@ def test_a_project_whose_owner_is_gone_is_quarantined_before_the_live_table_is_r
     assert any("orphan" in warning for warning in warnings)
 
 
+def test_a_database_with_no_users_table_migrates_instead_of_refusing_to_open() -> None:
+    """A root last opened by an upstream build has this fork's `migration_27` recorded against
+    upstream's unrelated migration of that number, so `users` was never created. Reading it
+    unguarded turns the first start on such a root into a `MigrationError` that no restart clears —
+    and the root opened fine before this migration existed, because a foreign key alone is not
+    resolved until DML."""
+    db = _make_db()
+    db.execute("DROP TABLE users;")
+    db.commit()
+
+    logger = Logger("migration-test")
+    warnings: list[str] = []
+    logger.warning = warnings.append  # type: ignore[method-assign]
+    AddProjectBoardsMigrationCallback(logger)(db.cursor())
+
+    columns = {row[1] for row in db.execute("PRAGMA table_info(projects);").fetchall()}
+    assert "board_id" in columns
+    assert db.execute("SELECT COUNT(*) FROM projects;").fetchone()[0] == 0
+    assert warnings == []
+
+
+def test_a_project_on_a_database_with_no_users_table_is_quarantined_rather_than_dropped() -> None:
+    """No row can satisfy the rebuilt table's foreign key when its target does not exist, so every
+    project is an orphan — but its document is still the only copy of someone's work."""
+    db = _make_db()
+    db.execute("PRAGMA foreign_keys = OFF;")
+    _add_project(db, "stranded", name="Stranded")
+    db.commit()
+    db.execute("DROP TABLE users;")
+    db.commit()
+    db.execute("PRAGMA foreign_keys = ON;")
+
+    logger = Logger("migration-test")
+    warnings: list[str] = []
+    logger.warning = warnings.append  # type: ignore[method-assign]
+    AddProjectBoardsMigrationCallback(logger)(db.cursor())
+
+    assert db.execute("SELECT COUNT(*) FROM projects;").fetchone()[0] == 0
+    assert db.execute("SELECT project_id, name FROM orphaned_projects_2026_08_06;").fetchall() == [
+        ("stranded", "Stranded")
+    ]
+    assert any("no users table" in warning for warning in warnings)
+
+
 def test_a_long_project_name_is_truncated_to_what_the_board_api_accepts() -> None:
     db = _make_db()
     _add_user(db, "u1")
@@ -544,3 +588,31 @@ def test_it_runs_once_through_the_real_migrator_and_is_not_reapplied(tmp_path: P
     for migration in all_migrations:
         again.register_migration(migration)
     assert again.run_migrations() is False
+
+
+def test_it_runs_through_the_real_migrator_on_a_database_with_no_projects(tmp_path: Path) -> None:
+    """The install that has never made a project is the majority of installs, and it is the one the
+    seeded end-to-end test above cannot speak for: with no project there is no `INSERT`, so the
+    rebuild is pure DDL and its atomicity depends on the migrator rather than on luck."""
+    logger = Logger("test")
+    context = MigrationBuildContext(app_config=MagicMock(), logger=logger, image_files=MagicMock())
+    all_migrations = build_migrations(context)
+
+    db = SqliteDatabase(db_path=tmp_path / "projects.db", logger=logger, verbose=False)
+    migrator = SqliteMigrator(db=db)
+    for migration in all_migrations:
+        migrator.register_migration(migration)
+    assert migrator.run_migrations() is True
+
+    cursor = db._conn.cursor()
+    columns = {row[1] for row in cursor.execute("PRAGMA table_info(projects);").fetchall()}
+    assert "board_id" in columns
+    cursor.execute("SELECT COUNT(*) FROM projects;")
+    assert cursor.fetchone()[0] == 0
+    # The scratch table must not outlive the rebuild, and the trigger must be back.
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='projects_with_boards';")
+    assert cursor.fetchone() is None
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='trigger' AND name='tg_projects_updated_at';")
+    assert cursor.fetchone() is not None
+    cursor.execute("PRAGMA foreign_key_check;")
+    assert cursor.fetchall() == []
