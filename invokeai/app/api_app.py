@@ -500,7 +500,7 @@ app.add_middleware(
     expose_headers=["X-Refreshed-Token"],
 )
 
-configure_gzip(app, app_config.gzip_compresslevel)
+configure_gzip(app, app_config.http_compression_level)
 
 
 # Include all routers

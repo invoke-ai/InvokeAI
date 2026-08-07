@@ -103,7 +103,7 @@ def test_the_real_app_uses_the_content_type_aware_middleware():
 
 @pytest.mark.parametrize("content_type", ["application/json", "text/html; charset=utf-8", "image/svg+xml"])
 def test_level_zero_disables_compression_entirely(content_type: str):
-    """`gzip_compresslevel: 0` is how a deployment behind a compressing proxy opts out."""
+    """`http_compression_level: 0` is how a deployment behind a compressing proxy opts out."""
     disabled = _build_app(compresslevel=0)
 
     r = disabled.get("/payload", params={"content_type": content_type}, headers={"Accept-Encoding": "gzip"})
@@ -150,14 +150,14 @@ def test_the_real_app_uses_the_configured_level():
 
     installed = [m for m in app.user_middleware if m.cls is ContentTypeAwareGZipMiddleware]
     assert len(installed) == 1
-    assert installed[0].kwargs["compresslevel"] == app_config.gzip_compresslevel
+    assert installed[0].kwargs["compresslevel"] == app_config.http_compression_level
 
 
 def test_the_default_level_is_unchanged():
     """Adding the setting must not change what existing installs do — the default is still 9."""
     from invokeai.app.services.config.config_default import InvokeAIAppConfig
 
-    assert InvokeAIAppConfig().gzip_compresslevel == 9
+    assert InvokeAIAppConfig().http_compression_level == 9
 
 
 @pytest.mark.parametrize("level", [-1, 10])
@@ -168,7 +168,7 @@ def test_out_of_range_levels_are_rejected(level: int):
     from invokeai.app.services.config.config_default import InvokeAIAppConfig
 
     with pytest.raises(ValidationError):
-        InvokeAIAppConfig(gzip_compresslevel=level)
+        InvokeAIAppConfig(http_compression_level=level)
 
 
 def test_clients_without_gzip_support_get_plain_bodies(client: TestClient):

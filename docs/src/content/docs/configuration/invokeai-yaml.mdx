@@ -192,10 +192,10 @@ Changing this setting only affects newly-created images. Existing images remain 
 
 API responses (JSON, HTML, JS, CSS, SVG) are gzipped before being sent. Already-compressed responses — PNG, WebP, JPEG, MP4 — are passed through untouched, since compressing them costs CPU and returns a body no smaller than the original.
 
-Compression runs on the server's event loop, which means it blocks *everything else* for its duration: no other request is served and no progress event is delivered while it runs. The `gzip_compresslevel` setting controls that trade-off:
+Compression runs on the server's event loop, which means it blocks *everything else* for its duration: no other request is served and no progress event is delivered while it runs. The `http_compression_level` setting controls that trade-off:
 
 ```yaml
-gzip_compresslevel: 9 # default value
+http_compression_level: 9 # default value
 ```
 
 | Value  | Behavior                                                                                       |
@@ -213,10 +213,10 @@ If the UI feels sluggish while a large library is being browsed, lowering this i
 | `6`   | 36.1 ms | 5.9% of input |
 | `9`   | 90.2 ms | 5.7% of input |
 
-Level 9 spends 5.5× the event-loop time to save 0.4 percentage points of bandwidth. On a locally-served install the bandwidth is free and the stall is not, so `gzip_compresslevel: 1` is usually the better setting there — the default stays at `9` only so that upgrading does not silently change how anyone's install behaves.
+Level 9 spends 5.5× the event-loop time to save 0.4 percentage points of bandwidth. On a locally-served install the bandwidth is free and the stall is not, so `http_compression_level: 1` is usually the better setting there — the default stays at `9` only so that upgrading does not silently change how anyone's install behaves.
 
 :::tip[Behind a reverse proxy]
-If you serve InvokeAI through nginx, Caddy, or similar, set `gzip_compresslevel: 0` and let the proxy compress instead. The proxy does that work in its own process rather than on InvokeAI's event loop, and it avoids compressing the same bytes twice.
+If you serve InvokeAI through nginx, Caddy, or similar, set `http_compression_level: 0` and let the proxy compress instead. The proxy does that work in its own process rather than on InvokeAI's event loop, and it avoids compressing the same bytes twice.
 :::
 
 #### Logging
