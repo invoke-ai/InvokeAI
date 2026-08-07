@@ -53,7 +53,7 @@ def _raise_if_no_weight_shards(submodel_path: Path, submodel_label: str) -> None
     config JSONs, so a generic from_pretrained() here would otherwise die on a cryptic
     missing-shard error deep inside diffusers/transformers.
     """
-    if not any(any(submodel_path.glob(pattern)) for pattern in ("*.safetensors", "*.bin", "*.pt", "*.ckpt")):
+    if not any(any(submodel_path.glob(pattern)) for pattern in ("*.safetensors", "*.bin", "*.pth", "*.pt", "*.ckpt")):
         raise ValueError(
             f"This MiniMax H3 model folder has no {submodel_label} weights - it is a components-only "
             f"(slim) install. In the MiniMax H3 Model Loader, select a single-file {submodel_label} "

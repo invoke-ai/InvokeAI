@@ -1529,7 +1529,7 @@ class Main_Diffusers_MiniMaxH3_Config(Diffusers_Config_Base, Main_Config_Base, C
         if components_only is None:
             transformer_dir = mod.path / "transformer"
             components_only = not any(
-                any(transformer_dir.glob(pattern)) for pattern in ("*.safetensors", "*.bin", "*.pt", "*.ckpt")
+                any(transformer_dir.glob(pattern)) for pattern in ("*.safetensors", "*.bin", "*.pth", "*.pt", "*.ckpt")
             )
 
         return cls(
