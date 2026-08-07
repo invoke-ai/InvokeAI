@@ -8,7 +8,11 @@ from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.routers._access import assert_board_read_access as _assert_board_read_access
 from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
-from invokeai.app.services.board_records.board_records_common import BoardChanges, BoardRecordOrderBy
+from invokeai.app.services.board_records.board_records_common import (
+    BoardChanges,
+    BoardRecordOrderBy,
+    BoardRecordProjectOwnedException,
+)
 from invokeai.app.services.boards.boards_common import BoardDTO
 from invokeai.app.services.image_records.image_records_common import ImageCategory
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
@@ -116,6 +120,11 @@ async def update_board(
     try:
         result = ApiDependencies.invoker.services.boards.update(board_id=board_id, changes=changes)
         return result
+    except BoardRecordProjectOwnedException:
+        raise HTTPException(
+            status_code=409,
+            detail="This board belongs to a project; rename or archive the project instead",
+        )
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to update board")
 

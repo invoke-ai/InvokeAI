@@ -8,6 +8,7 @@ from invokeai.app.services.board_records.board_records_common import (
     BoardRecordDeleteException,
     BoardRecordNotFoundException,
     BoardRecordOrderBy,
+    BoardRecordProjectOwnedException,
     BoardRecordSaveException,
     deserialize_board_record,
 )
@@ -152,49 +153,43 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
     ) -> BoardRecord:
         with self._db.transaction() as cursor:
             try:
-                # Change the name of a board
-                if changes.board_name is not None:
-                    cursor.execute(
-                        """--sql
-                        UPDATE boards
-                        SET board_name = ?
-                        WHERE board_id = ?;
-                        """,
-                        (changes.board_name, board_id),
-                    )
+                changes_project_owned_state = (
+                    changes.board_name is not None
+                    or changes.archived is not None
+                    or changes.board_visibility is not None
+                )
+                # One conditional write, not a read followed by a write. A project claim racing
+                # this statement either commits first and makes rowcount zero, or waits until this
+                # update has committed; there is no stale DTO window in which project-owned state
+                # can be renamed, archived or published.
+                cursor.execute(
+                    """--sql
+                    UPDATE boards
+                    SET board_name = COALESCE(?, board_name),
+                        cover_image_name = COALESCE(?, cover_image_name),
+                        archived = COALESCE(?, archived),
+                        board_visibility = COALESCE(?, board_visibility)
+                    WHERE board_id = ?
+                      AND (
+                        ? = FALSE
+                        OR NOT EXISTS (SELECT 1 FROM projects WHERE projects.board_id = boards.board_id)
+                      );
+                    """,
+                    (
+                        changes.board_name,
+                        changes.cover_image_name,
+                        changes.archived,
+                        changes.board_visibility.value if changes.board_visibility is not None else None,
+                        board_id,
+                        changes_project_owned_state,
+                    ),
+                )
 
-                # Change the cover image of a board
-                if changes.cover_image_name is not None:
-                    cursor.execute(
-                        """--sql
-                        UPDATE boards
-                        SET cover_image_name = ?
-                        WHERE board_id = ?;
-                        """,
-                        (changes.cover_image_name, board_id),
-                    )
-
-                # Change the archived status of a board
-                if changes.archived is not None:
-                    cursor.execute(
-                        """--sql
-                        UPDATE boards
-                        SET archived = ?
-                        WHERE board_id = ?;
-                        """,
-                        (changes.archived, board_id),
-                    )
-
-                # Change the visibility of a board
-                if changes.board_visibility is not None:
-                    cursor.execute(
-                        """--sql
-                        UPDATE boards
-                        SET board_visibility = ?
-                        WHERE board_id = ?;
-                        """,
-                        (changes.board_visibility.value, board_id),
-                    )
+                if cursor.rowcount == 0:
+                    cursor.execute("SELECT 1 FROM boards WHERE board_id = ?;", (board_id,))
+                    if cursor.fetchone() is None:
+                        raise BoardRecordNotFoundException
+                    raise BoardRecordProjectOwnedException
 
             except sqlite3.Error as e:
                 raise BoardRecordSaveException from e

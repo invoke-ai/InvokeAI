@@ -1017,6 +1017,62 @@ def test_setting_only_the_cover_of_a_project_board_is_still_allowed(
     assert response.status_code == status.HTTP_201_CREATED
 
 
+@pytest.mark.parametrize(
+    ("changes", "unchanged"),
+    [
+        ({"board_name": "Raced rename"}, {"board_name": "Claimed during PATCH"}),
+        ({"archived": True}, {"archived": False}),
+        ({"board_visibility": "public"}, {"board_visibility": "private"}),
+    ],
+)
+def test_board_update_cannot_race_a_project_claim(
+    client: TestClient,
+    mock_invoker: Invoker,
+    monkeypatch: pytest.MonkeyPatch,
+    user1_token: str,
+    changes: dict[str, Any],
+    unchanged: dict[str, Any],
+):
+    """The claimed-board check and mutation must be one database decision.
+
+    Returning an unclaimed DTO and claiming the board immediately afterwards pins the race without
+    sleeps or threads: an unconditional update sees stale state, while a conditional write cannot.
+    """
+    created = client.post(
+        "/api/v1/boards/?board_name=Unclaimed",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    ).json()
+    board_id = created["board_id"]
+    original_get_dto = mock_invoker.services.boards.get_dto
+    did_claim = False
+
+    def get_then_claim(*, board_id: str):
+        nonlocal did_claim
+        board = original_get_dto(board_id)
+        if not did_claim:
+            did_claim = True
+            mock_invoker.services.project_records.create(
+                user_id=created["user_id"],
+                name="Claimed during PATCH",
+                data={},
+                board_id=board_id,
+            )
+        return board
+
+    monkeypatch.setattr(mock_invoker.services.boards, "get_dto", get_then_claim)
+
+    response = client.patch(
+        f"/api/v1/boards/{board_id}",
+        json=changes,
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+
+    assert response.status_code == status.HTTP_409_CONFLICT
+    board = original_get_dto(board_id)
+    for field, value in unchanged.items():
+        assert getattr(board, field) == value
+
+
 @pytest.mark.parametrize("include_images", [False, True])
 def test_generic_deletion_of_a_project_board_is_refused_without_touching_media(
     client: TestClient, mock_invoker: Invoker, user1_token: str, admin_token: str, include_images: bool

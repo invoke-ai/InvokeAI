@@ -117,6 +117,13 @@ class BoardRecordSaveException(Exception):
         super().__init__(message)
 
 
+class BoardRecordProjectOwnedException(BoardRecordSaveException):
+    """Raised when a generic board update would change project-owned state."""
+
+    def __init__(self, message="Board belongs to a project"):
+        super().__init__(message)
+
+
 class BoardRecordDeleteException(Exception):
     """Raised when an board record cannot be deleted."""
 
