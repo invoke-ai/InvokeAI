@@ -1799,6 +1799,23 @@ OPENAI_GPT_IMAGE_PANEL_SCHEMA = ExternalModelPanelSchema(
     prompts=[{"name": "reference_images"}], image=[{"name": "dimensions"}]
 )
 
+atlascloud_flux_schnell = StarterModel(
+    name="Atlas Cloud FLUX.1 Schnell",
+    base=BaseModelType.External,
+    source="external://atlascloud/black-forest-labs/flux-schnell",
+    description="FLUX.1 Schnell text-to-image generation through the Atlas Cloud asynchronous media API. Requires a configured Atlas Cloud API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img"],
+        supports_negative_prompt=False,
+        supports_seed=True,
+        max_images_per_request=4,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
+)
+
 openai_gpt_image_2 = StarterModel(
     name="GPT Image 2",
     base=BaseModelType.External,
@@ -2242,6 +2259,7 @@ STARTER_MODELS: list[StarterModel] = [
     gemini_flash_image,
     gemini_pro_image_preview,
     gemini_3_1_flash_image_preview,
+    atlascloud_flux_schnell,
     openai_gpt_image_2,
     openai_gpt_image_1_5,
     openai_gpt_image_1,
