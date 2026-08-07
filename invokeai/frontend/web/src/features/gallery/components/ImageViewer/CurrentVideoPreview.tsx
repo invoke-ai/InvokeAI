@@ -33,6 +33,7 @@ import type { VideoDTO } from 'services/api/types';
 import { SELECTED_ITEM_REVEAL_DURATION_MS, useImageViewerContext } from './context';
 import { NoContentForViewer } from './NoContentForViewer';
 import { ProgressImage } from './ProgressImage2';
+import { ProgressImageTiles } from './ProgressImageTiles';
 import { ProgressIndicator } from './ProgressIndicator2';
 import { VideoPlayButtonOverlay } from './VideoPlayButtonOverlay';
 
@@ -76,6 +77,7 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
   const {
     $progressEvent,
     $progressImage,
+    $activeProgressData,
     $isProgressImageResolving,
     $isTemporarilyShowingSelectedImage,
     lastRenderedItemNameRef,
@@ -83,6 +85,7 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
   } = useImageViewerContext();
   const progressEvent = useStore($progressEvent);
   const progressImage = useStore($progressImage);
+  const activeProgressData = useStore($activeProgressData);
   const isProgressImageResolving = useStore($isProgressImageResolving);
   const isTemporarilyShowingSelectedImage = useStore($isTemporarilyShowingSelectedImage);
   const hasProgressImage = progressImage !== null;
@@ -92,6 +95,9 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
   // returns when the user closes the player.
   const withProgress =
     shouldShowProgressInViewer && hasProgressImage && !isTemporarilyShowingSelectedImage && !isPlaying;
+  // When more than one session is generating concurrently (multi-GPU), tile their previews instead
+  // of letting the sessions overwrite each other's full-size preview. Mirrors CurrentImagePreview.
+  const withTiledProgress = withProgress && activeProgressData.length > 1;
   const { goToPreviousImage, goToNextImage, isFetching } = useNextPrevItemNavigation();
   const selectedVideoRevealTimeoutId = useRef(0);
 
@@ -421,9 +427,15 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
       )}
       {withProgress && (
         <Flex w="full" h="full" position="absolute" alignItems="center" justifyContent="center" bg="base.900">
-          <ProgressImage progressImage={progressImage} />
-          {progressEvent && (
-            <ProgressIndicator progressEvent={progressEvent} position="absolute" top={6} right={6} size={8} />
+          {withTiledProgress ? (
+            <ProgressImageTiles data={activeProgressData} />
+          ) : (
+            <>
+              <ProgressImage progressImage={progressImage} />
+              {progressEvent && (
+                <ProgressIndicator progressEvent={progressEvent} position="absolute" top={6} right={6} size={8} />
+              )}
+            </>
           )}
         </Flex>
       )}

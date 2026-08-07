@@ -27,6 +27,13 @@ describe('CurrentVideoPreview progress overlay', () => {
     expect(source).toContain('lastRenderedItemNameRef.current = videoName');
   });
 
+  it('tiles concurrent sessions instead of letting them overwrite each other (multi-GPU)', () => {
+    // CurrentImagePreview tiles per-session previews when several renders run at once; the video
+    // overlay must do the same or the sessions fight over the single full-size preview slot.
+    expect(source).toMatch(/withTiledProgress = withProgress && activeProgressData\.length > 1/);
+    expect(source).toContain('<ProgressImageTiles data={activeProgressData} />');
+  });
+
   it('clears a pending post-render overlay when the video element errors', () => {
     // onLoadedMetadata normally clears the resolve state; an errored element never fires it.
     const errorHandler = source.slice(source.indexOf('const handleVideoError'), source.indexOf('const handlePlay'));
