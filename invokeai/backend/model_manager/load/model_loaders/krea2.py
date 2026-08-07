@@ -93,7 +93,7 @@ def _is_native_krea2_format(sd: dict[str, Any]) -> bool:
     )
 
 
-def _dequantize_scaled_fp8(sd: dict[str, Any], dtype: "torch.dtype | None" = None) -> dict[str, Any]:
+def _dequantize_scaled_fp8(sd: dict[str, Any], dtype: "torch.dtype") -> dict[str, Any]:
     """Dequantize ComfyUI 'scaled fp8' weights: ``dequant = weight.float() * weight_scale``.
 
     Each quantized layer stores an fp8 ``<name>.weight`` plus a (usually scalar) ``<name>.weight_scale``.
@@ -105,13 +105,17 @@ def _dequantize_scaled_fp8(sd: dict[str, Any], dtype: "torch.dtype | None" = Non
     peak at ~50 GB of RAM (4 bytes/param) before the caller's later bf16 cast brings it down to ~25 GB,
     which puts a 32 GB machine into swap during a cold load. This mirrors the same fix already applied
     to the FLUX.2 loader.
+
+    ``dtype`` is required on purpose. It used to default to bfloat16, which is wrong on a device where
+    ``choose_bfloat16_safe_dtype`` picks float16: the weights would land in bf16 and then take a second
+    rounding step on the caller's later float16 cast. Callers already know the compute dtype, so there
+    is no reason to guess one here.
     """
     import torch
 
     scale_keys = [k for k in sd if isinstance(k, str) and k.endswith(".weight_scale")]
     if not scale_keys:
         return sd
-    dtype = dtype or torch.bfloat16
     out = dict(sd)
     for scale_key in scale_keys:
         weight_key = scale_key.replace(".weight_scale", ".weight")

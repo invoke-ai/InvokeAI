@@ -90,7 +90,7 @@ class TestDequantizeScaledFp8:
             "layer.weight": torch.tensor([2.0, 4.0]),
             "layer.weight_scale": torch.tensor(0.5),
         }
-        out = _dequantize_scaled_fp8(sd)
+        out = _dequantize_scaled_fp8(sd, torch.bfloat16)
         assert "layer.weight_scale" not in out
         assert torch.allclose(out["layer.weight"].float(), torch.tensor([1.0, 2.0]))
 
@@ -105,18 +105,23 @@ class TestDequantizeScaledFp8:
             "layer.weight": torch.tensor([2.0, 4.0]),
             "layer.weight_scale": torch.tensor(0.5),
         }
-        assert _dequantize_scaled_fp8(dict(sd))["layer.weight"].dtype is torch.bfloat16
+        assert _dequantize_scaled_fp8(dict(sd), torch.bfloat16)["layer.weight"].dtype is torch.bfloat16
         assert _dequantize_scaled_fp8(dict(sd), torch.float16)["layer.weight"].dtype is torch.float16
+
+    def test_dtype_is_required(self) -> None:
+        """No implicit bfloat16 fallback: on a float16-only device that would cost an extra rounding step."""
+        with pytest.raises(TypeError):
+            _dequantize_scaled_fp8({"layer.weight": torch.tensor([2.0])})  # type: ignore[call-arg]
 
     def test_noop_without_scale_keys(self) -> None:
         sd = {"layer.weight": torch.tensor([2.0, 4.0])}
-        out = _dequantize_scaled_fp8(sd)
+        out = _dequantize_scaled_fp8(sd, torch.bfloat16)
         assert out is sd
 
     def test_orphan_scale_key_is_dropped(self) -> None:
         # A scale key with no matching weight is simply removed (nothing to multiply).
         sd = {"other.weight": torch.tensor([1.0]), "layer.weight_scale": torch.tensor(0.5)}
-        out = _dequantize_scaled_fp8(sd)
+        out = _dequantize_scaled_fp8(sd, torch.bfloat16)
         assert "layer.weight_scale" not in out
         assert "other.weight" in out
 
