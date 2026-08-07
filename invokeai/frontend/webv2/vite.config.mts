@@ -9,6 +9,12 @@ import { chunkSourceManifest } from './scripts/chunk-source-manifest.mjs';
 // backend dev server runs on a non-default port.
 const BACKEND_URL = process.env.INVOKEAI_DEV_BACKEND ?? 'http://127.0.0.1:9090';
 const BACKEND_WS_URL = BACKEND_URL.replace(/^http/, 'ws');
+
+// Set e.g. INVOKEAI_DEV_HOSTS=my-box.local,10.0.0.5 when reaching the dev
+// server by a hostname other than localhost.
+const ALLOWED_HOSTS = process.env.INVOKEAI_DEV_HOSTS?.split(',')
+  .map((host) => host.trim())
+  .filter(Boolean);
 const PROJECT_ROOT = fileURLToPath(new URL('.', import.meta.url));
 
 const ROUTE_SHARED_MODULES = [
@@ -27,10 +33,6 @@ const ROUTE_SHARED_MODULES = [
   '/workbench/components/WorkbenchSplashScreen.tsx',
   '/workbench/hotkeys/catalog.ts',
   '/workbench/launchpad/formatRelativeTime.ts',
-  // The Launchpad writes `?intent=` and the editor's session controller reads
-  // it. Without this the editor pulls the whole Launchpad chunk for a lookup
-  // table — a 66 KB, one-extra-request regression on the editor route.
-  '/workbench/launchpad/intents.ts',
   '/workbench/palette/settingsEntryDeps.ts',
   '/workbench/projects/ids.ts',
   '/workbench/projects/library.ts',
@@ -130,6 +132,13 @@ export default defineConfig({
               test: (id) => matchesAnySuffix(id, WORKBENCH_TOPBAR_MODULES),
             },
             {
+              // Plotly is large (~1MB min) and only used by the lazy-loaded
+              // Image Map plot; keep it out of the eager vendor chunk.
+              name: 'plotly',
+              priority: 30,
+              test: (id) => id.includes('plotly') && id.includes('node_modules'),
+            },
+            {
               name: getLegacyChunkName,
             },
           ],
@@ -157,6 +166,7 @@ export default defineConfig({
     },
   },
   server: {
+    allowedHosts: ALLOWED_HOSTS,
     host: '0.0.0.0',
     port: 5174,
     proxy: {

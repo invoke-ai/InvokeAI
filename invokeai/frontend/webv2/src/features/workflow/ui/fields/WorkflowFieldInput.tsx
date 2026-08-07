@@ -1,9 +1,15 @@
 import type { ModelConfig, ModelTaxonomyType } from '@features/models/react';
 import type { FieldInputTemplate } from '@features/workflow/contracts';
 
-import { Box, createListCollection, HStack, Image, Input, Switch, Text } from '@chakra-ui/react';
+import { Badge, Box, createListCollection, Flex, HStack, Icon, Image, Input, Switch, Text } from '@chakra-ui/react';
 import { useDndContext, useDndMonitor, useDroppable, type DragEndEvent } from '@dnd-kit/core';
-import { galleryDestinations, galleryTransfers, type GalleryBoard } from '@features/gallery';
+import {
+  formatGalleryVideoDuration,
+  galleryDestinations,
+  galleryItems,
+  galleryTransfers,
+  type GalleryBoard,
+} from '@features/gallery';
 import { getSelectedGalleryImageFromValues, getSelectedGalleryItemFromValues } from '@features/gallery/contracts';
 import { invalidateGallery } from '@features/gallery/queries';
 import { galleryImageUrls, galleryVideoUrls } from '@features/gallery/utility';
@@ -32,7 +38,8 @@ import {
   Select,
   toaster,
 } from '@platform/ui';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { FilmIcon, ImageIcon } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState, type ChangeEvent } from 'react';
 
 const ModelSelect = lazy(() => import('@features/models/react').then((module) => ({ default: module.ModelSelect })));
@@ -537,43 +544,116 @@ const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputPr
   const onClearClick = useCallback(() => onChange(undefined), [onChange]);
 
   // A stale value (media deleted since the workflow was saved) 404s the
-  // thumbnail; hide the broken-image glyph and keep showing the name. A new
-  // value retries.
+  // thumbnail; degrade to a media icon rather than the broken-image glyph. A
+  // new value retries.
   const [failedThumbnail, setFailedThumbnail] = useState<string | null>(null);
   const onThumbnailError = useCallback(() => setFailedThumbnail(mediaName), [mediaName]);
 
+  // Resolve the item's details for the dimensions/duration badge (the legacy
+  // editor's widget shows the same). Best-effort: the preview works from the
+  // name alone, so a failed lookup just drops the badge.
+  const { data: mediaItem } = useQuery({
+    enabled: mediaName !== null,
+    queryFn: ({ signal }) => galleryItems.resolve({ kind, name: mediaName ?? '' }, signal),
+    queryKey: ['workflow-media-field-item', kind, mediaName],
+    retry: false,
+    staleTime: 60_000,
+  });
+  const badge =
+    mediaItem && mediaItem.name === mediaName && mediaItem.width > 0
+      ? `${mediaItem.width}x${mediaItem.height}${
+          mediaItem.kind === 'video' ? ` · ${formatGalleryVideoDuration(mediaItem.durationSeconds)}` : ''
+        }`
+      : null;
+
+  const FallbackIcon = kind === 'video' ? FilmIcon : ImageIcon;
+
   return (
-    <Box ref={setNodeRef} position="relative" w="full">
-      <HStack
+    <Box position="relative" w="full" {...invalidAriaProps}>
+      {/* The whole preview area is the drop target, like the legacy editor's widget. */}
+      <Box
+        ref={setNodeRef}
         boxShadow={invalid ? '0 0 0 1px {colors.red.solid}' : undefined}
-        gap="1.5"
-        minW="0"
+        className="nodrag"
+        h="32"
+        position="relative"
         rounded="sm"
         w="full"
-        {...invalidAriaProps}
       >
         {mediaName ? (
           <>
-            {failedThumbnail !== mediaName ? (
-              <Image
-                alt=""
-                boxSize="6"
-                flexShrink={0}
-                objectFit="cover"
-                rounded="xs"
-                src={config.getThumbnailUrl(mediaName)}
-                onError={onThumbnailError}
-              />
+            <Flex
+              alignItems="center"
+              borderWidth="1px"
+              h="full"
+              justifyContent="center"
+              overflow="hidden"
+              rounded="sm"
+              w="full"
+            >
+              {failedThumbnail !== mediaName ? (
+                <Image
+                  alt=""
+                  maxH="full"
+                  maxW="full"
+                  objectFit="contain"
+                  src={config.getThumbnailUrl(mediaName)}
+                  title={mediaName}
+                  onError={onThumbnailError}
+                />
+              ) : (
+                <Box title={mediaName}>
+                  <Icon as={FallbackIcon} boxSize="10" color="fg.subtle" />
+                </Box>
+              )}
+            </Flex>
+            {badge !== null ? (
+              <Badge
+                bottom="1"
+                fontVariantNumeric="tabular-nums"
+                insetInlineEnd="1"
+                pointerEvents="none"
+                position="absolute"
+                size="xs"
+                variant="solid"
+              >
+                {badge}
+              </Badge>
             ) : null}
-            <Text color="fg.muted" flex="1" fontSize="2xs" minW="0" title={mediaName} truncate>
-              {mediaName}
-            </Text>
           </>
         ) : (
-          <Text color="fg.subtle" flex="1" fontSize="2xs">
-            {`No ${config.noun} set`}
-          </Text>
+          <Flex
+            alignItems="center"
+            borderStyle="dashed"
+            borderWidth="1px"
+            h="full"
+            justifyContent="center"
+            rounded="sm"
+            w="full"
+          >
+            <Text color="fg.subtle" fontSize="xs">
+              {`Drop a ${config.noun} here`}
+            </Text>
+          </Flex>
         )}
+        {acceptsActiveDrag ? (
+          <DropZone
+            alignItems="center"
+            display="flex"
+            inset="0"
+            isOver={isOver}
+            justifyContent="center"
+            pointerEvents="none"
+            position="absolute"
+            variant="overlay"
+          >
+            <Text fontSize="xs" fontWeight="700">
+              {`Drop ${config.noun}`}
+            </Text>
+          </DropZone>
+        ) : null}
+      </Box>
+      <HStack gap="1.5" mt="1" w="full">
         <Button
           className="nodrag"
           disabled={!gallerySelection}
@@ -608,22 +688,6 @@ const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputPr
           onChange={onFileChange}
         />
       </HStack>
-      {acceptsActiveDrag ? (
-        <DropZone
-          alignItems="center"
-          display="flex"
-          inset="0"
-          isOver={isOver}
-          justifyContent="center"
-          pointerEvents="none"
-          position="absolute"
-          variant="overlay"
-        >
-          <Text fontSize="2xs" fontWeight="700">
-            {`Drop ${config.noun}`}
-          </Text>
-        </DropZone>
-      ) : null}
     </Box>
   );
 };

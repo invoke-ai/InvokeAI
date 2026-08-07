@@ -14,9 +14,12 @@ import { WorkflowFieldInput } from './WorkflowFieldInput';
 
 const uploadImageMock = vi.fn();
 const uploadVideoMock = vi.fn();
+const resolveItemMock = vi.fn();
 
 vi.mock('@features/gallery', () => ({
+  formatGalleryVideoDuration: (seconds: number) => `${seconds}s`,
   galleryDestinations: { list: () => Promise.resolve([]) },
+  galleryItems: { resolve: (...args: unknown[]) => resolveItemMock(...args) },
   galleryTransfers: {
     upload: (...args: unknown[]) => uploadImageMock(...args),
     uploadVideo: (...args: unknown[]) => uploadVideoMock(...args),
@@ -69,6 +72,9 @@ beforeEach(() => {
   root = createRoot(host);
   uploadImageMock.mockReset();
   uploadVideoMock.mockReset();
+  resolveItemMock.mockReset();
+  resolveItemMock.mockResolvedValue(SELECTED_GALLERY_VIDEO);
+  queryClient.clear();
   delete galleryValues.selectedImage;
 });
 
@@ -126,7 +132,7 @@ describe('WorkflowFieldInput media inputs', () => {
     await renderField(VIDEO_TEMPLATE, undefined, vi.fn());
 
     expect(host.textContent).not.toContain('Connection only');
-    expect(host.textContent).toContain('No video set');
+    expect(host.textContent).toContain('Drop a video here');
     expect(findButton('Use gallery selection').disabled).toBe(true);
     expect(findButton('Upload').disabled).toBe(false);
     expect(host.querySelector<HTMLInputElement>('input[type="file"]')?.accept).toBe('video/*');
@@ -145,8 +151,11 @@ describe('WorkflowFieldInput media inputs', () => {
     expect(onChange).toHaveBeenCalledWith({ video_name: 'clip.mp4' });
 
     await renderField(VIDEO_TEMPLATE, { video_name: 'clip.mp4' }, onChange);
-    expect(host.textContent).toContain('clip.mp4');
     expect(host.querySelector('img')?.src).toContain('/api/v1/videos/i/clip.mp4/thumbnail');
+    await vi.waitFor(() => {
+      // Dimensions/duration badge from the resolved item details.
+      expect(host.textContent).toContain('640x480 · 5s');
+    });
 
     await act(() => findButton('Clear').click());
     expect(onChange).toHaveBeenCalledWith(undefined);
