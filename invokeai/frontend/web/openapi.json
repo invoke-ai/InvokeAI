@@ -5775,7 +5775,7 @@
       "post": {
         "tags": ["images"],
         "summary": "Copy Images To Board",
-        "description": "Copies images, optionally onto a board, and returns the new names.\n\nEach copy is a genuinely new image with its own name, because `board_images` keys on\n`image_name` \u2014 one image can sit on exactly one board, so sharing a name between two boards is\nnot representable. Duplicating a project needs that: its copy must own its media outright.\n\nThe pixels never leave the server. Category, origin and the metadata/workflow/graph embedded in\nthe PNG all travel; the originating session and node do not. Starring is not copied \u2014 callers\nthat want it use `POST /images/star`, the same path an import uses.\n\nPer-image failures are reported rather than raised, so one unreadable source cannot cost the\ncaller the whole batch.",
+        "description": "Copies images, optionally onto a board, and returns the new names.\n\nEach copy is a genuinely new image with its own name, because `board_images` keys on\n`image_name` \u2014 one image can sit on exactly one board, so sharing a name between two boards is\nnot representable. Duplicating a project needs that: its copy must own its media outright.\n\nThe pixels never leave the server, and never leave the disk either: `images.copy` clones the\nrecord and copies the file byte for byte, so the embedded metadata, workflow and graph travel\nwithout being parsed and rewritten. Category and origin travel; the originating session and\nnode do not. Starring is not copied \u2014 callers that want it use `POST /images/star`, the same\npath an import uses.\n\nPer-image failures are reported rather than raised, so one unreadable source cannot cost the\ncaller the whole batch.\n\nA sync `def`, so FastAPI runs the batch on its threadpool: file copies are blocking, and a\nboard's worth of them on the event loop would stall every other request for the duration.",
         "operationId": "copy_images_to_board",
         "requestBody": {
           "content": {
@@ -7238,7 +7238,7 @@
       "post": {
         "tags": ["videos"],
         "summary": "Copy Videos To Board",
-        "description": "Copies videos, optionally onto a board, and returns the new names.\n\nThe image twin of this route explains why copies rather than shared references: `board_videos`\nkeys on `video_name`, so one video sits on exactly one board.\n\nBlocking work (the service copies the file off disk) runs on FastAPI's threadpool by virtue of\nthis being a sync `def`, so a large batch cannot stall the event loop.",
+        "description": "Copies videos, optionally onto a board, and returns the new names.\n\nThe image twin of this route explains why copies rather than shared references: `board_videos`\nkeys on `video_name`, so one video sits on exactly one board.\n\nBlocking work (the service copies the file off disk) runs on FastAPI's threadpool by virtue of\nthis being a sync `def`, so a large batch cannot stall the event loop.\n\n`move_source=False` is load-bearing, not defensive: `create` consumes the path it is given,\nbecause every other caller hands it a temp file. Here the path is the *source's own* file.",
         "operationId": "copy_videos_to_board",
         "requestBody": {
           "content": {
@@ -16442,6 +16442,7 @@
               "type": "string"
             },
             "type": "array",
+            "maxItems": 1000,
             "title": "Image Names",
             "description": "The names of the images to copy"
           },
@@ -16469,6 +16470,7 @@
               "type": "string"
             },
             "type": "array",
+            "maxItems": 1000,
             "title": "Video Names",
             "description": "The names of the videos to copy"
           },

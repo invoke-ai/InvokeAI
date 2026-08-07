@@ -1379,12 +1379,17 @@ export type paths = {
          *     `image_name` — one image can sit on exactly one board, so sharing a name between two boards is
          *     not representable. Duplicating a project needs that: its copy must own its media outright.
          *
-         *     The pixels never leave the server. Category, origin and the metadata/workflow/graph embedded in
-         *     the PNG all travel; the originating session and node do not. Starring is not copied — callers
-         *     that want it use `POST /images/star`, the same path an import uses.
+         *     The pixels never leave the server, and never leave the disk either: `images.copy` clones the
+         *     record and copies the file byte for byte, so the embedded metadata, workflow and graph travel
+         *     without being parsed and rewritten. Category and origin travel; the originating session and
+         *     node do not. Starring is not copied — callers that want it use `POST /images/star`, the same
+         *     path an import uses.
          *
          *     Per-image failures are reported rather than raised, so one unreadable source cannot cost the
          *     caller the whole batch.
+         *
+         *     A sync `def`, so FastAPI runs the batch on its threadpool: file copies are blocking, and a
+         *     board's worth of them on the event loop would stall every other request for the duration.
          */
         post: operations["copy_images_to_board"];
         delete?: never;
@@ -1746,6 +1751,9 @@ export type paths = {
          *
          *     Blocking work (the service copies the file off disk) runs on FastAPI's threadpool by virtue of
          *     this being a sync `def`, so a large batch cannot stall the event loop.
+         *
+         *     `move_source=False` is load-bearing, not defensive: `create` consumes the path it is given,
+         *     because every other caller hands it a temp file. Here the path is the *source's own* file.
          */
         post: operations["copy_videos_to_board"];
         delete?: never;

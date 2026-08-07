@@ -25,6 +25,7 @@ from invokeai.app.api.routers._access import (
 from invokeai.app.api.routers._access import (
     assert_image_read_access as _assert_image_read_access,
 )
+from invokeai.app.api.routers._limits import MAX_COPY_BATCH_SIZE
 from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
 from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.image_records.image_records_common import (
@@ -583,9 +584,9 @@ class CopyImagesResult(BaseModel):
 
 
 @images_router.post("/copy", operation_id="copy_images_to_board", response_model=CopyImagesResult)
-async def copy_images_to_board(
+def copy_images_to_board(
     current_user: CurrentUserOrDefault,
-    image_names: list[str] = Body(description="The names of the images to copy"),
+    image_names: list[str] = Body(description="The names of the images to copy", max_length=MAX_COPY_BATCH_SIZE),
     board_id: Optional[str] = Body(default=None, description="The board to put the copies on, if any"),
 ) -> CopyImagesResult:
     """Copies images, optionally onto a board, and returns the new names.
@@ -594,14 +595,20 @@ async def copy_images_to_board(
     `image_name` — one image can sit on exactly one board, so sharing a name between two boards is
     not representable. Duplicating a project needs that: its copy must own its media outright.
 
-    The pixels never leave the server. Category, origin and the metadata/workflow/graph embedded in
-    the PNG all travel; the originating session and node do not. Starring is not copied — callers
-    that want it use `POST /images/star`, the same path an import uses.
+    The pixels never leave the server, and never leave the disk either: `images.copy` clones the
+    record and copies the file byte for byte, so the embedded metadata, workflow and graph travel
+    without being parsed and rewritten. Category and origin travel; the originating session and
+    node do not. Starring is not copied — callers that want it use `POST /images/star`, the same
+    path an import uses.
 
     Per-image failures are reported rather than raised, so one unreadable source cannot cost the
     caller the whole batch.
+
+    A sync `def`, so FastAPI runs the batch on its threadpool: file copies are blocking, and a
+    board's worth of them on the event loop would stall every other request for the duration.
     """
     _assert_board_write_access(board_id, current_user)
+    assert_image_move_maintenance_inactive()
 
     copied: list[CopiedImage] = []
     failed: list[str] = []
@@ -609,31 +616,14 @@ async def copy_images_to_board(
     for image_name in image_names:
         try:
             _assert_image_read_access(image_name, current_user)
-            record = ApiDependencies.invoker.services.images.get_record(image_name)
-            pil_image = ApiDependencies.invoker.services.images.get_pil_image(image_name)
-            # The same extraction the upload route performs: provenance lives in the PNG's text
-            # chunks, so reading it back here keeps a copy's metadata without any extra plumbing.
-            extracted = extract_metadata_from_image(
-                pil_image=pil_image,
-                invokeai_metadata_override=None,
-                invokeai_workflow_override=None,
-                invokeai_graph_override=None,
-                logger=ApiDependencies.invoker.services.logger,
-            )
-            image_dto = ApiDependencies.invoker.services.images.create(
-                image=pil_image,
-                image_origin=record.image_origin,
-                image_category=record.image_category,
+            image_dto = ApiDependencies.invoker.services.images.copy(
+                source_image_name=image_name,
                 board_id=board_id,
-                is_intermediate=False,
-                metadata=extracted.invokeai_metadata,
-                workflow=extracted.invokeai_workflow,
-                graph=extracted.invokeai_graph,
                 user_id=current_user.user_id,
             )
             copied.append(CopiedImage(source_image_name=image_name, image_name=image_dto.image_name))
         except Exception:
-            ApiDependencies.invoker.services.logger.error(f"Failed to copy image {image_name}")
+            ApiDependencies.invoker.services.logger.error(f"Failed to copy image {image_name}", exc_info=True)
             failed.append(image_name)
 
     return CopyImagesResult(copied=copied, failed=failed)

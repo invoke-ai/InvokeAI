@@ -54,6 +54,7 @@ class VideoService(VideoServiceABC):
         graph: Optional[str] = None,
         user_id: Optional[str] = None,
         first_frame: Optional[Image.Image] = None,
+        move_source: bool = True,
     ) -> VideoDTO:
         if video_origin not in ResourceOrigin:
             raise InvalidOriginException
@@ -112,6 +113,7 @@ class VideoService(VideoServiceABC):
                 workflow=workflow,
                 graph=graph,
                 first_frame=first_frame,
+                move_source=move_source,
             )
 
             video_dto = self.get_dto(video_name)

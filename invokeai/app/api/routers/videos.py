@@ -19,6 +19,7 @@ from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.routers._access import (
     assert_board_write_access as _assert_board_write_access,
 )
+from invokeai.app.api.routers._limits import MAX_COPY_BATCH_SIZE
 from invokeai.app.api.routers.images import WorkflowAndGraphResponse, _assert_board_read_access
 from invokeai.app.invocations.fields import MetadataField, MetadataFieldValidator
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
@@ -143,6 +144,22 @@ def _assert_video_read_access(video_name: str, current_user: CurrentUserOrDefaul
             pass
 
     raise HTTPException(status_code=403, detail="Not authorized to access this video")
+
+
+def _read_video_thumbnail(video_name: str) -> Optional[PILImage.Image]:
+    """The video's stored first-frame thumbnail, or None if it has none.
+
+    Best-effort by design: the only caller uses it to skip a decode, and a missing or unreadable
+    thumbnail is not a reason to fail a copy — the save path extracts one itself when handed None.
+    """
+    try:
+        thumbnail_path = Path(ApiDependencies.invoker.services.videos.get_path(video_name, thumbnail=True))
+        if not thumbnail_path.exists():
+            return None
+        with PILImage.open(thumbnail_path) as thumbnail:
+            return thumbnail.copy()
+    except Exception:
+        return None
 
 
 def _is_accepted_video_upload(file: UploadFile) -> bool:
@@ -763,7 +780,7 @@ class CopyVideosResult(BaseModel):
 @videos_router.post("/copy", operation_id="copy_videos_to_board", response_model=CopyVideosResult)
 def copy_videos_to_board(
     current_user: CurrentUserOrDefault,
-    video_names: list[str] = Body(description="The names of the videos to copy"),
+    video_names: list[str] = Body(description="The names of the videos to copy", max_length=MAX_COPY_BATCH_SIZE),
     board_id: Optional[str] = Body(default=None, description="The board to put the copies on, if any"),
 ) -> CopyVideosResult:
     """Copies videos, optionally onto a board, and returns the new names.
@@ -773,6 +790,9 @@ def copy_videos_to_board(
 
     Blocking work (the service copies the file off disk) runs on FastAPI's threadpool by virtue of
     this being a sync `def`, so a large batch cannot stall the event loop.
+
+    `move_source=False` is load-bearing, not defensive: `create` consumes the path it is given,
+    because every other caller hands it a temp file. Here the path is the *source's own* file.
     """
     _assert_board_write_access(board_id, current_user)
 
@@ -801,10 +821,15 @@ def copy_videos_to_board(
                 workflow=ApiDependencies.invoker.services.videos.get_workflow(video_name),
                 graph=ApiDependencies.invoker.services.videos.get_graph(video_name),
                 user_id=current_user.user_id,
+                # The source's thumbnail is already the first frame at the size the copy wants, so
+                # reusing it spares a decode-worker subprocess per copied video. A source without
+                # one falls back to extraction, exactly as an upload would.
+                first_frame=_read_video_thumbnail(video_name),
+                move_source=False,
             )
             copied.append(CopiedVideo(source_video_name=video_name, video_name=video_dto.video_name))
         except Exception:
-            ApiDependencies.invoker.services.logger.error(f"Failed to copy video {video_name}")
+            ApiDependencies.invoker.services.logger.error(f"Failed to copy video {video_name}", exc_info=True)
             failed.append(video_name)
 
     return CopyVideosResult(copied=copied, failed=failed)

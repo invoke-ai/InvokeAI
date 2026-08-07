@@ -61,12 +61,16 @@ class VideoServiceABC(ABC):
         graph: Optional[str] = None,
         user_id: Optional[str] = None,
         first_frame: Optional[Image.Image] = None,
+        move_source: bool = True,
     ) -> VideoDTO:
-        """Creates a video by moving/copying the file at `source_path` into storage and recording it.
+        """Creates a video by moving the file at `source_path` into storage and recording it.
 
         ``first_frame``, when provided (e.g. the upload path already decoded frame 0 to
         prove decodability), is used as the thumbnail source instead of spawning another
         decode worker.
+
+        ``source_path`` is consumed unless ``move_source=False``. Every caller that hands over a
+        temp file wants the default; a caller copying a video the server already owns must not.
         """
         pass
 

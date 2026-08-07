@@ -61,6 +61,21 @@ class ImageServiceABC(ABC):
         pass
 
     @abstractmethod
+    def copy(
+        self,
+        source_image_name: str,
+        board_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+    ) -> ImageDTO:
+        """Duplicates an existing image under a new identity, optionally onto a board.
+
+        The record is cloned and the file copied byte for byte — no decode, no re-encode — so
+        embedded metadata, workflow and graph travel with it. The copy is never intermediate and
+        is never starred.
+        """
+        pass
+
+    @abstractmethod
     def update(
         self,
         image_name: str,

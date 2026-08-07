@@ -111,6 +111,83 @@ class ImageService(ImageServiceABC):
             self.__invoker.services.logger.error(f"Problem saving image record and file: {str(e)}")
             raise e
 
+    def copy(
+        self,
+        source_image_name: str,
+        board_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+    ) -> ImageDTO:
+        """Duplicate an existing image under a new identity, optionally onto a board.
+
+        Duplicating a project needs genuinely new identities — `board_images` keys on
+        `image_name`, so one image sits on exactly one board — but the *picture* is the same
+        picture. So the record is cloned from the source's record and the file is copied byte for
+        byte. Nothing is decoded, nothing is re-encoded, and the embedded metadata, workflow and
+        graph travel because they are chunks in the file rather than something re-derived here.
+
+        The copy is never intermediate: an intermediate is a step in someone else's run, and a
+        copy is a thing a person asked for. Starring is not copied either — callers that want it
+        use the same star route the gallery uses.
+        """
+        try:
+            record = self.__invoker.services.image_records.get(source_image_name)
+            metadata = self.__invoker.services.image_records.get_metadata(source_image_name)
+
+            image_name = self.__invoker.services.names.create_image_name()
+            strategy_name = self.__invoker.services.configuration.image_subfolder_strategy
+            strategy = create_subfolder_strategy(strategy_name)
+            image_subfolder = strategy.get_subfolder(image_name, record.image_category, False)
+
+            record_saved = False
+            try:
+                self.__invoker.services.image_records.save(
+                    image_name=image_name,
+                    image_origin=record.image_origin,
+                    image_category=record.image_category,
+                    width=record.width,
+                    height=record.height,
+                    has_workflow=record.has_workflow,
+                    is_intermediate=False,
+                    metadata=metadata.model_dump_json() if metadata is not None else None,
+                    user_id=user_id,
+                    image_subfolder=image_subfolder,
+                )
+                record_saved = True
+
+                if board_id is not None:
+                    # Deliberately fatal, unlike `create`. There the alternative to a board is
+                    # losing a freshly generated image; here the caller asked for a copy *on a
+                    # board*, and a copy that silently landed uncategorized would be reported as a
+                    # success that the caller then remaps its document onto.
+                    self.__invoker.services.board_image_records.add_image_to_board(
+                        board_id=board_id, image_name=image_name
+                    )
+
+                self.__invoker.services.image_files.copy(
+                    source_image_name=source_image_name,
+                    image_name=image_name,
+                    source_subfolder=record.image_subfolder or "",
+                    image_subfolder=image_subfolder,
+                )
+            except Exception:
+                # Unwind the record so a failed copy cannot leave the gallery holding a row whose
+                # file endpoints 404 — the board membership goes with it via the FK.
+                if record_saved:
+                    try:
+                        self.__invoker.services.image_records.delete(image_name)
+                    except Exception as cleanup_error:
+                        self.__invoker.services.logger.error(
+                            f"Failed to roll back the record for copy {image_name}: {cleanup_error}"
+                        )
+                raise
+
+            image_dto = self.get_dto(image_name)
+            self._on_changed(image_dto)
+            return image_dto
+        except Exception:
+            self.__invoker.services.logger.error(f"Failed to copy image {source_image_name}", exc_info=True)
+            raise
+
     def update(
         self,
         image_name: str,
