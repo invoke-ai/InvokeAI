@@ -28,6 +28,7 @@ const getInitialState = (): SystemState => ({
   shouldHighlightFocusedRegions: false,
   shouldUseMiddleClickToOpenInNewTab: false,
   prefersNumericAttentionWeights: false,
+  shouldShowTokenCounter: false,
 });
 
 const slice = createSlice({
@@ -83,6 +84,9 @@ const slice = createSlice({
     setShouldUseMiddleClickToOpenInNewTab(state, action: PayloadAction<boolean>) {
       state.shouldUseMiddleClickToOpenInNewTab = action.payload;
     },
+    setShouldShowTokenCounter(state, action: PayloadAction<boolean>) {
+      state.shouldShowTokenCounter = action.payload;
+    },
   },
 });
 
@@ -102,6 +106,7 @@ export const {
   setPrefersNumericAttentionStyle,
   setShouldHighlightFocusedRegions,
   setShouldUseMiddleClickToOpenInNewTab,
+  setShouldShowTokenCounter,
 } = slice.actions;
 
 export const systemSliceConfig: SliceConfig<typeof slice> = {
@@ -121,6 +126,9 @@ export const systemSliceConfig: SliceConfig<typeof slice> = {
       if (state._version === 2) {
         state.shouldUseMiddleClickToOpenInNewTab = false;
         state._version = 3;
+      }
+      if (!('shouldShowTokenCounter' in state)) {
+        state.shouldShowTokenCounter = false;
       }
       return zSystemState.parse(state);
     },
@@ -159,4 +167,7 @@ export const selectSystemPrefersNumericAttentionWeights = createSystemSelector(
 export const selectSystemShouldConfirmOnNewSession = createSystemSelector((system) => system.shouldConfirmOnNewSession);
 export const selectSystemShouldShowInvocationProgressDetail = createSystemSelector(
   (system) => system.shouldShowInvocationProgressDetail
+);
+export const selectSystemShouldShowTokenCounter = createSystemSelector(
+  (system) => system.shouldShowTokenCounter
 );
