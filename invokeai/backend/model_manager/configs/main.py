@@ -1487,6 +1487,12 @@ class Main_Diffusers_MiniMaxH3_Config(Diffusers_Config_Base, Main_Config_Base, C
 
     base: Literal[BaseModelType.MiniMaxH3] = Field(BaseModelType.MiniMaxH3)
     variant: MiniMaxH3VariantType = Field()
+    components_only: bool = Field(
+        default=False,
+        description="Whether the folder holds only the shared components (tokenizer, processor, VAEs) "
+        "without transformer weights - a slim install whose transformer and text encoder must be "
+        "supplied as single-file overrides at generation time.",
+    )
 
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
@@ -1515,10 +1521,22 @@ class Main_Diffusers_MiniMaxH3_Config(Diffusers_Config_Base, Main_Config_Base, C
 
         repo_variant = override_fields.pop("repo_variant", None) or cls._get_repo_variant_or_raise(mod)
 
+        # A slim ("components-only") install carries the transformer's config.json for variant
+        # identification but no weight shards - the transformer and text encoder come from
+        # single-file installs selected in the model loader instead. Record that here so the UI
+        # can require those selections up front rather than failing mid-generation.
+        components_only = override_fields.pop("components_only", None)
+        if components_only is None:
+            transformer_dir = mod.path / "transformer"
+            components_only = not any(
+                any(transformer_dir.glob(pattern)) for pattern in ("*.safetensors", "*.bin", "*.pt", "*.ckpt")
+            )
+
         return cls(
             **override_fields,
             variant=variant,
             repo_variant=repo_variant,
+            components_only=components_only,
         )
 
     @classmethod

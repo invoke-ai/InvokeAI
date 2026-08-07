@@ -1027,3 +1027,33 @@ def test_heuristic_import_with_type(mm2_installer: ModelInstallServiceBase, mode
     mm2_installer.wait_for_job(install_job2, timeout=10)
     assert install_job2.complete
     assert install_job2.config_out if model_params["type"] == "embedding" else not install_job2.config_out
+
+
+def test_multifile_download_layout_with_explicit_files(mm2_installer: ModelInstallServiceBase, tmp_path: Path) -> None:
+    """Explicit file entries in a multi-subfolder source keep their repo-relative paths: the root
+    pipeline index lands at the model root and transformer/config.json stays inside transformer/
+    (naive relative_to() matching would flatten it to the root), while plain subfolder entries keep
+    the pre-existing one-directory-per-subfolder layout."""
+    from invokeai.backend.model_manager.metadata.metadata_base import RemoteModelFile
+
+    remote_files = [
+        RemoteModelFile(url="https://example.com/root_index", path=Path("MiniMax-H3/modular_model_index.json")),
+        RemoteModelFile(url="https://example.com/transformer_config", path=Path("MiniMax-H3/transformer/config.json")),
+        RemoteModelFile(url="https://example.com/vae_config", path=Path("MiniMax-H3/vae/config.json")),
+        RemoteModelFile(
+            url="https://example.com/vae_weights", path=Path("MiniMax-H3/vae/diffusion_pytorch_model.safetensors")
+        ),
+    ]
+    job = mm2_installer._multifile_download(  # pyright: ignore[reportAttributeAccessIssue]
+        remote_files=remote_files,
+        dest=tmp_path,
+        subfolders=[Path("modular_model_index.json"), Path("transformer/config.json"), Path("vae")],
+        submit_job=False,
+    )
+    top = Path("MiniMax-H3_modular_model_index_config_vae")
+    assert {part.dest.relative_to(tmp_path.resolve()) for part in job.download_parts} == {
+        top / "modular_model_index.json",
+        top / "transformer" / "config.json",
+        top / "vae" / "config.json",
+        top / "vae" / "diffusion_pytorch_model.safetensors",
+    }

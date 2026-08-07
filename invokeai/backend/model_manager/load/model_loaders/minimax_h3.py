@@ -45,6 +45,22 @@ from invokeai.backend.model_manager.util.qwen3_vl import normalize_qwen3vl_rope_
 from invokeai.backend.util.devices import TorchDevice
 
 
+def _raise_if_no_weight_shards(submodel_path: Path, submodel_label: str) -> None:
+    """Fail with an actionable message when a components-only (slim) install is asked for a
+    submodel whose weights it does not carry.
+
+    A slim MiniMax H3 install ships the shared components (tokenizer, processor, VAEs) plus bare
+    config JSONs, so a generic from_pretrained() here would otherwise die on a cryptic
+    missing-shard error deep inside diffusers/transformers.
+    """
+    if not any(any(submodel_path.glob(pattern)) for pattern in ("*.safetensors", "*.bin", "*.pt", "*.ckpt")):
+        raise ValueError(
+            f"This MiniMax H3 model folder has no {submodel_label} weights - it is a components-only "
+            f"(slim) install. In the MiniMax H3 Model Loader, select a single-file {submodel_label} "
+            f"(for example the Comfy-Org int8 release) to use with it."
+        )
+
+
 @ModelLoaderRegistry.register(base=BaseModelType.MiniMaxH3, type=ModelType.Main, format=ModelFormat.Diffusers)
 class MiniMaxH3DiffusersModel(ModelLoader):
     """Loader for MiniMax H3 diffusers-format models (FL2VA)."""
@@ -67,12 +83,16 @@ class MiniMaxH3DiffusersModel(ModelLoader):
 
         match submodel_type:
             case SubModelType.Transformer:
+                _raise_if_no_weight_shards(submodel_path, "transformer")
+
                 from invokeai.backend.minimax_h3 import MiniMaxH3Transformer3DModel
 
                 return MiniMaxH3Transformer3DModel.from_pretrained(
                     submodel_path, torch_dtype=dtype, local_files_only=True
                 )
             case SubModelType.TextEncoder:
+                _raise_if_no_weight_shards(submodel_path, "text encoder")
+
                 from transformers import AutoConfig, Qwen3VLForConditionalGeneration
 
                 te_config = normalize_qwen3vl_rope_config(
