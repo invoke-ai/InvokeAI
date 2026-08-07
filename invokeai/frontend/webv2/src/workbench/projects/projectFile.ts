@@ -236,10 +236,24 @@ export const exportOpenProject = async (
 };
 
 /**
- * Import an `.invk` as a new server project: restore its images, rewrite every
- * reference the server renamed, then create the project. Throws
- * {@link InvkFormatError} so callers can translate the reason rather than
- * surface an internal message.
+ * Import an `.invk` as a new server project: restore its media, rewrite every
+ * reference the server renamed, then create the project — claiming the board its
+ * media was staged on, in the same request. Throws {@link InvkFormatError} so
+ * callers can translate the reason rather than surface an internal message.
+ *
+ * ### Creating the project is the commit point
+ *
+ * Everything before it is either free to abandon or cleaned up: the document is
+ * canonicalized before a board exists, the board is created before any media is
+ * uploaded, and the create either claims that board with its contents or leaves
+ * nothing a person can see. The alternative — create the project, upload, then
+ * update it with the remapped names — makes the *update* the commit point, and a
+ * failure there leaves a real project full of references to media that never
+ * arrived.
+ *
+ * A v2 archive and a legacy JSON document have no board to stage, so they create
+ * no staging board and the server gives the new project an empty one, exactly as
+ * it does for a project made from scratch.
  */
 export const importProjectFile = async (
   file: File,
@@ -270,34 +284,63 @@ export const importProjectFile = async (
     throw new InvkFormatError('damaged', 'The project document will not rehydrate.');
   }
 
-  const { serializeProjectDocument } = await import('./projectDocument');
+  const { applyAuthoritativeProjectBoard, serializeProjectDocument } = await import('./projectDocument');
   const canonicalDocument = serializeProjectDocument(project);
-  const restored =
-    source.format === 'invk'
-      ? await (async () => {
-          const { restoreArchiveAssets } = await import('./invk/importProject');
+  const archive = source.format === 'invk' ? source.contents : null;
+  // Loaded only for an archive: a legacy JSON document restores nothing, so it has nothing to undo.
+  const restoreMedia = archive === null ? null : await import('./invk/restoreProjectMedia');
 
-          return restoreArchiveAssets(
-            { ...source.contents, projectDocument: canonicalDocument },
-            {
-              signal: owner.signal,
-              ...(options.onProgress === undefined
-                ? {}
-                : {
-                    onProgress: ({ completed, total }) =>
-                      options.onProgress?.({ completed, phase: 'restoring', total }),
-                  }),
-            }
-          );
+  assertAccountScopeCurrent(owner);
+
+  // Only an archive that actually carries board media needs somewhere to put it. An empty board is
+  // the server's to create, and staging one would be an unclaimed board to leak for no gain.
+  const stagingBoardId =
+    archive?.boardSnapshot && archive.boardSnapshot.items.length > 0
+      ? await (async () => {
+          const { createStagingBoard } = await import('./invk/assetTransport');
+
+          return createStagingBoard(name, owner.signal);
         })()
       : null;
+  const ledger = restoreMedia?.createRestoredMediaLedger(stagingBoardId) ?? null;
   let didCreateProject = false;
 
   try {
     assertAccountScopeCurrent(owner);
 
+    const restored =
+      archive === null || ledger === null
+        ? null
+        : await (async () => {
+            const { restoreArchiveMedia } = await import('./invk/importProject');
+
+            return restoreArchiveMedia(
+              archive,
+              { boardId: stagingBoardId, ledger, projectDocument: canonicalDocument, projectId: id },
+              {
+                signal: owner.signal,
+                ...(options.onProgress === undefined
+                  ? {}
+                  : {
+                      onProgress: ({ completed, total }) =>
+                        options.onProgress?.({ completed, phase: 'restoring', total }),
+                    }),
+              }
+            );
+          })();
+
+    assertAccountScopeCurrent(owner);
+
     const document = restored === null ? canonicalDocument : remapAssetRefs(canonicalDocument, restored.mappings);
-    const record = await apiCreateProject({ data: document, name, project_id: id }, owner.signal);
+    const record = await apiCreateProject(
+      {
+        data: document,
+        name,
+        project_id: id,
+        ...(stagingBoardId === null ? {} : { board_id: stagingBoardId }),
+      },
+      owner.signal
+    );
 
     didCreateProject = true;
     assertAccountScopeCurrent(owner);
@@ -308,23 +351,26 @@ export const importProjectFile = async (
     }
 
     return {
-      // Board membership does not travel in a v2 archive, so nothing can be lost from it here.
-      boardItemIssues: [],
+      boardItemIssues: restored?.boardItemIssues ?? [],
       documentReferenceIssues: restored?.documentReferenceIssues ?? [],
-      record,
+      // The board the server says it claimed, not the one we asked it to: a project meeting its
+      // owner for the first time is also pointed at its board, which is what `selectBoard` means.
+      record: {
+        ...record,
+        data: applyAuthoritativeProjectBoard(record.data, record.board_id, { selectBoard: true }),
+      },
     };
   } catch (error) {
     const canRollback =
       !didCreateProject &&
-      restored !== null &&
+      ledger !== null &&
+      restoreMedia !== null &&
       isAccountScopeCurrent(owner) &&
       (await isProjectConfirmedAbsent(id, owner));
 
     if (canRollback) {
       try {
-        const { rollbackArchiveAssets } = await import('./invk/importProject');
-
-        await rollbackArchiveAssets(restored.uploadedAssets, { signal: owner.signal });
+        await restoreMedia.rollbackRestoredMedia(ledger, { signal: owner.signal });
       } catch {
         // Cleanup is best-effort. The create/scope failure is the actionable
         // result and must never be replaced by a failed delete request.

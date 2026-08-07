@@ -1,51 +1,51 @@
 import { mapWithConcurrency } from '@platform/core/concurrency';
 import { collectLiveAssetRefs, selectCoverImageName } from '@workbench/projects/projectAssets';
 
-import type { UploadedImage, UploadedVideo } from './assetTransport';
-import type { InvkManifest } from './manifest';
-import type { InvkMediaIssue } from './transfer';
+import type { InvkBoardSnapshot } from './board';
+import type {
+  MediaMaterializer,
+  RestoredMediaLedger,
+  RestoreProjectMediaDeps,
+  RestoreProjectMediaResult,
+} from './restoreProjectMedia';
+import type { InvkMediaRef } from './transfer';
 
 import { INVK_MAX_ARCHIVE_BYTES, readArchive, readEntryText } from './archive';
+import { mimeForEntryName, uploadBoardImage, uploadBoardVideo } from './assetTransport';
+import { parseInvkBoardSnapshot } from './board';
 import {
-  findExistingImageNames,
-  findExistingVideoNames,
-  mimeForEntryName,
-  uploadArchiveImage,
-  uploadArchiveVideo,
-} from './assetTransport';
-import {
+  INVK_BOARD_ENTRY,
   INVK_DOCUMENT_ENTRY,
   INVK_IMAGES_PREFIX,
   INVK_MANIFEST_ENTRY,
   INVK_VIDEOS_PREFIX,
   InvkFormatError,
 } from './format';
-import { parseInvkManifest } from './manifest';
-import { createTransferIssueLog } from './transfer';
+import { type InvkManifest, parseInvkManifest } from './manifest';
+import { restoreProjectMedia } from './restoreProjectMedia';
+import { toMediaRefs } from './transfer';
 
 /**
  * Reading an `.invk` back, in two steps a caller can put a decision between.
  *
- * {@link readInvkArchive} is pure inspection: unpack, validate the manifest,
- * parse the document, index the bundled bytes. It touches no network and mutates
- * nothing, so a caller can read a file, discover it is a legacy canvas project,
- * and say so without having created anything.
+ * {@link readInvkArchive} is pure inspection: unpack, validate the manifest, parse the document and
+ * — for a v3 archive — the board enumeration, then index the bundled bytes. It touches no network
+ * and mutates nothing, so a caller can read a file, discover it is a legacy canvas project, and say
+ * so without having created anything. Everything structural fails here, before a board or a single
+ * uploaded image exists.
  *
- * {@link restoreArchiveAssets} is the part with consequences: ask the server
- * which referenced assets it already has, upload the rest out of the archive,
- * and report the old-to-new renames. It deliberately does *not* touch the
- * document — the caller applies the mapping, because the caller is also the one
- * assigning the new project id.
+ * {@link restoreArchiveMedia} is the part with consequences. It is a thin wiring of
+ * `restoreProjectMedia`, which is shared with duplication: this module supplies the one thing that
+ * differs, namely that the bytes come out of the archive.
  *
- * Deduplication is what makes re-importing cheap and makes importing onto the
- * machine that exported it nearly free: an image already on the server is never
- * uploaded twice, so nothing accumulates.
+ * Neither touches the document. The caller applies the returned mapping, because the caller is also
+ * the one assigning the new project id.
  */
 
 /** Simultaneous uploads. Matches the previous frontend's limit. */
-const ASSET_UPLOAD_CONCURRENCY = 5;
+const BOARD_UPLOAD_CONCURRENCY = 5;
 
-export interface InvkArchiveContents {
+interface InvkArchiveBase {
   /** Bundled preview bytes and the entry they came from, when the archive has one. */
   cover: { bytes: Uint8Array; entryName: string } | null;
   /** Bundled image bytes, keyed by the image name the exporting server used. */
@@ -55,6 +55,25 @@ export interface InvkArchiveContents {
   /** Bundled video bytes, keyed by the video name the exporting server used. */
   videos: Map<string, Uint8Array>;
 }
+
+/** An archive written before board membership travelled: the document and its bytes, nothing else. */
+export interface InvkArchiveV2 extends InvkArchiveBase {
+  boardSnapshot: null;
+  version: 2;
+}
+
+/** An archive that also states what was on the project's board. */
+export interface InvkArchiveV3 extends InvkArchiveBase {
+  boardSnapshot: InvkBoardSnapshot;
+  version: 3;
+}
+
+/**
+ * Discriminated on the version rather than carrying an optional snapshot, so "this archive predates
+ * boards" and "this archive's board was empty" cannot be confused — they call for different
+ * restores, and only one of them is allowed to invent an empty board.
+ */
+export type InvkArchiveContents = InvkArchiveV2 | InvkArchiveV3;
 
 const parseDocumentEntry = (bytes: Uint8Array): Record<string, unknown> => {
   let parsed: unknown;
@@ -70,6 +89,38 @@ const parseDocumentEntry = (bytes: Uint8Array): Record<string, unknown> => {
   }
 
   return parsed as Record<string, unknown>;
+};
+
+const parseBoardEntry = (entries: ReadonlyMap<string, Uint8Array>): InvkBoardSnapshot => {
+  const entry = entries.get(INVK_BOARD_ENTRY);
+
+  if (!entry) {
+    throw new InvkFormatError('damaged', `Archive has no ${INVK_BOARD_ENTRY}.`);
+  }
+
+  try {
+    return parseInvkBoardSnapshot(JSON.parse(readEntryText(entry)));
+  } catch (error) {
+    if (error instanceof InvkFormatError) {
+      throw error;
+    }
+
+    throw new InvkFormatError('damaged', `${INVK_BOARD_ENTRY} is not valid JSON.`);
+  }
+};
+
+/**
+ * The part of `images/<name>` that is a name, or `null` for anything that is not.
+ *
+ * A ZIP path is attacker-controlled text. `images/../../x.png` and `images/nested/x.png` both have a
+ * remainder that is not a file name, and either would let an entry masquerade as media the board
+ * enumeration then asks for by name. Media names on the server never contain a separator, so the
+ * check costs nothing legitimate.
+ */
+const toSafeBasename = (path: string, prefix: string): string | null => {
+  const name = path.slice(prefix.length);
+
+  return name === '' || name === '.' || name === '..' || /[/\\\0]/u.test(name) ? null : name;
 };
 
 /** Unpack and validate an archive. Throws {@link InvkFormatError} and nothing else. */
@@ -100,270 +151,150 @@ export const readInvkArchive = async (file: File): Promise<InvkArchiveContents> 
     throw new InvkFormatError('damaged', `Archive has no ${INVK_DOCUMENT_ENTRY}.`);
   }
 
+  // Before the bytes are indexed: a v3 archive whose enumeration is malformed must create nothing,
+  // and the enumeration is what decides which of those bytes are board media at all.
+  const boardSnapshot = manifest.version === 3 ? parseBoardEntry(entries) : null;
   const images = new Map<string, Uint8Array>();
   const videos = new Map<string, Uint8Array>();
 
   for (const [path, bytes] of entries) {
-    if (path.startsWith(INVK_IMAGES_PREFIX)) {
-      images.set(path.slice(INVK_IMAGES_PREFIX.length), bytes);
-      continue;
-    }
+    for (const [prefix, store] of [
+      [INVK_IMAGES_PREFIX, images],
+      [INVK_VIDEOS_PREFIX, videos],
+    ] as const) {
+      if (!path.startsWith(prefix)) {
+        continue;
+      }
 
-    if (path.startsWith(INVK_VIDEOS_PREFIX)) {
-      videos.set(path.slice(INVK_VIDEOS_PREFIX.length), bytes);
+      const name = toSafeBasename(path, prefix);
+
+      if (name !== null) {
+        store.set(name, bytes);
+      }
     }
   }
 
   const coverBytes = manifest.cover === undefined ? undefined : entries.get(manifest.cover);
-
-  return {
+  const contents = {
     cover: coverBytes === undefined ? null : { bytes: coverBytes, entryName: manifest.cover! },
     images,
     manifest,
     projectDocument: parseDocumentEntry(documentEntry),
     videos,
   };
+
+  return boardSnapshot === null
+    ? { ...contents, boardSnapshot: null, version: 2 }
+    : { ...contents, boardSnapshot, version: 3 };
 };
 
-export interface RestoreAssetsResult {
-  /** The uploaded cover's server name, when the archive carried one. */
-  coverImageName: string | null;
-  /** Referenced assets the archive did not carry and the server does not have, of either kind. */
-  /** References neither the archive nor this server could satisfy, with the reason. */
-  documentReferenceIssues: InvkMediaIssue[];
-  /** Old name to new name, per kind. Kept apart because the namespaces are. */
-  mappings: { images: Map<string, string>; videos: Map<string, string> };
-  /** Authoritative server identities created by this restore, for failure rollback. */
-  uploadedAssets: UploadedArchiveAssets;
-  /** Assets uploaded from the archive, of either kind. */
-  uploadedCount: number;
-}
-
-export interface UploadedArchiveAssets {
-  imageNames: string[];
-  videoNames: string[];
-}
-
-export interface RollbackArchiveAssetsDeps {
-  deleteArchiveImages?: (imageNames: string[], signal?: AbortSignal) => Promise<void>;
-  deleteArchiveVideos?: (videoNames: string[], signal?: AbortSignal) => Promise<void>;
+export interface ArchiveBoardUploadDeps {
   signal?: AbortSignal;
-}
-
-/** Best-effort cleanup for server identities created by an import that could not create its project. */
-export const rollbackArchiveAssets = async (
-  uploadedAssets: UploadedArchiveAssets,
-  deps: RollbackArchiveAssetsDeps = {}
-): Promise<void> => {
-  const transport = await import('./assetTransport');
-  const deleteImages = deps.deleteArchiveImages ?? transport.deleteArchiveImages;
-  const deleteVideos = deps.deleteArchiveVideos ?? transport.deleteArchiveVideos;
-  const deletions: Promise<void>[] = [];
-
-  if (uploadedAssets.imageNames.length > 0) {
-    deletions.push(deleteImages(uploadedAssets.imageNames, deps.signal));
-  }
-
-  if (uploadedAssets.videoNames.length > 0) {
-    deletions.push(deleteVideos(uploadedAssets.videoNames, deps.signal));
-  }
-
-  await Promise.allSettled(deletions);
-};
-
-export interface RestoreAssetsDeps {
-  findExistingImageNames?: (imageNames: readonly string[], signal?: AbortSignal) => Promise<Set<string>>;
-  findExistingVideoNames?: (videoNames: readonly string[], signal?: AbortSignal) => Promise<Set<string>>;
-  onProgress?: (progress: { completed: number; total: number }) => void;
-  signal?: AbortSignal;
-  uploadArchiveImage?: (
-    bytes: Uint8Array,
-    fileName: string,
-    options?: { contentType?: string; signal?: AbortSignal }
-  ) => Promise<UploadedImage>;
-  uploadArchiveVideo?: (
-    bytes: Uint8Array,
-    fileName: string,
-    options?: { contentType?: string; signal?: AbortSignal }
-  ) => Promise<UploadedVideo>;
-}
-
-interface PendingUpload {
-  bytes: Uint8Array;
-  kind: 'image' | 'video';
-  name: string;
+  uploadBoardImage?: typeof uploadBoardImage;
+  uploadBoardVideo?: typeof uploadBoardVideo;
 }
 
 /**
- * The cover, preferring an image the restore already put on this server.
+ * The import half of the materialization seam: board media comes out of the archive.
  *
- * The archive's `cover` entry is a thumbnail of an image the document also
- * references, and `getProjectCoverUrl` asks for a thumbnail anyway — so once
- * that image is restored, pointing the index at it is the same picture without
- * a second copy. Uploading the entry unconditionally instead left one orphan
- * per import: covers go up under the canvas's private `'other'` category, which
- * appears in no gallery view and no board count, so nobody could ever find or
- * delete them.
- *
- * The bundled bytes are the fallback, for the case that made them worth
- * carrying: a cover whose source image is dangling here.
+ * Every descriptor is uploaded, with no existence check — see `restoreProjectMedia` for why board
+ * media can never reuse a name the destination already has. A descriptor the archive carries no
+ * bytes for is reported rather than skipped silently: the exporting server told us it was there,
+ * so its absence is a loss worth naming.
  */
-const resolveCoverImageName = async (input: {
-  contents: InvkArchiveContents;
-  mappings: { images: Map<string, string> };
-  newlyUploadedImageNames: Set<string>;
-  restoredImageNames: ReadonlySet<string>;
-  signal?: AbortSignal;
-  uploadImage: NonNullable<RestoreAssetsDeps['uploadArchiveImage']>;
-}): Promise<string | null> => {
-  const documentCoverName = selectCoverImageName(input.contents.projectDocument);
+export const createArchiveMediaMaterializer = (
+  archive: Pick<InvkArchiveBase, 'images' | 'videos'>,
+  deps: ArchiveBoardUploadDeps = {}
+): MediaMaterializer => {
+  const uploadImage = deps.uploadBoardImage ?? uploadBoardImage;
+  const uploadVideo = deps.uploadBoardVideo ?? uploadBoardVideo;
 
-  if (documentCoverName !== null) {
-    const restoredName = input.mappings.images.get(documentCoverName) ?? documentCoverName;
+  return async (items, boardId, onItemSettled) => {
+    const result: Awaited<ReturnType<MediaMaterializer>> = { failed: [], materialized: [] };
 
-    if (input.restoredImageNames.has(restoredName)) {
-      return restoredName;
-    }
-  }
-
-  const { cover } = input.contents;
-
-  if (cover === null) {
-    return null;
-  }
-
-  try {
-    const uploaded = await input.uploadImage(cover.bytes, cover.entryName, {
-      contentType: mimeForEntryName(cover.entryName),
-      signal: input.signal,
-    });
-
-    input.newlyUploadedImageNames.add(uploaded.imageName);
-
-    return uploaded.imageName;
-  } catch {
-    // A project with no cover shows the folder glyph, which is a state the
-    // library already renders. Not worth failing an import over.
-    return null;
-  }
-};
-
-/**
- * Make the archive's assets available on this server. Only what is missing gets
- * uploaded; a referenced asset that is neither on the server nor in the archive
- * is reported as dangling and its reference is left exactly as it is, so the
- * project still opens with one broken layer rather than not at all.
- */
-export const restoreArchiveAssets = async (
-  contents: InvkArchiveContents,
-  deps: RestoreAssetsDeps = {}
-): Promise<RestoreAssetsResult> => {
-  const checkExistingImages = deps.findExistingImageNames ?? findExistingImageNames;
-  const checkExistingVideos = deps.findExistingVideoNames ?? findExistingVideoNames;
-  const uploadImage = deps.uploadArchiveImage ?? uploadArchiveImage;
-  const uploadVideo = deps.uploadArchiveVideo ?? uploadArchiveVideo;
-
-  const referenced = collectLiveAssetRefs(contents.projectDocument);
-  const referencedImages = [...referenced.images].sort();
-  const referencedVideos = [...referenced.videos].sort();
-
-  // Both existence checks go out before either upload does; they are
-  // independent, and a project with videos should not wait out the image pass.
-  const [existingImages, existingVideos] = await Promise.all([
-    checkExistingImages(referencedImages, deps.signal),
-    referencedVideos.length === 0
-      ? Promise.resolve(new Set<string>())
-      : checkExistingVideos(referencedVideos, deps.signal),
-  ]);
-
-  const issues = createTransferIssueLog();
-  const pending: PendingUpload[] = [];
-
-  for (const [names, existing, store, kind] of [
-    [referencedImages, existingImages, contents.images, 'image'],
-    [referencedVideos, existingVideos, contents.videos, 'video'],
-  ] as const) {
-    for (const name of names) {
-      if (existing.has(name)) {
-        continue;
-      }
-
-      const bytes = store.get(name);
+    await mapWithConcurrency(items, BOARD_UPLOAD_CONCURRENCY, async (item) => {
+      const bytes = (item.kind === 'image' ? archive.images : archive.videos).get(item.name);
 
       if (bytes === undefined) {
-        issues.addDocumentReferenceIssue({ kind, name }, 'missing-entry');
-        continue;
+        result.failed.push({ kind: item.kind, name: item.name, reason: 'missing-entry' });
+        onItemSettled();
+
+        return;
       }
 
-      pending.push({ bytes, kind, name });
-    }
-  }
+      try {
+        const options = {
+          boardId,
+          category: item.category,
+          contentType: mimeForEntryName(item.name, item.kind),
+          ...(deps.signal === undefined ? {} : { signal: deps.signal }),
+        };
+        const name =
+          item.kind === 'image'
+            ? (await uploadImage(bytes, item.name, options)).imageName
+            : (await uploadVideo(bytes, item.name, options)).videoName;
 
-  const mappings = { images: new Map<string, string>(), videos: new Map<string, string>() };
-
-  // The cover is not part of the document, so it does not come through the
-  // reference set; it is still counted here so progress spans the whole restore.
-  const total = pending.length + (contents.cover === null ? 0 : 1);
-  let completed = 0;
-  let uploadedCount = 0;
-  const newlyUploadedImageNames = new Set<string>();
-  const newlyUploadedVideoNames = new Set<string>();
-
-  /** Images this server can serve when the restore is done, under their final names. */
-  const restoredImageNames = new Set(referencedImages.filter((name) => existingImages.has(name)));
-
-  await mapWithConcurrency(pending, ASSET_UPLOAD_CONCURRENCY, async ({ bytes, kind, name }) => {
-    try {
-      const options = { contentType: mimeForEntryName(name, kind), signal: deps.signal };
-      const restoredName =
-        kind === 'image'
-          ? (await uploadImage(bytes, name, options)).imageName
-          : (await uploadVideo(bytes, name, options)).videoName;
-
-      uploadedCount += 1;
-
-      if (kind === 'image') {
-        newlyUploadedImageNames.add(restoredName);
-        restoredImageNames.add(restoredName);
-      } else {
-        newlyUploadedVideoNames.add(restoredName);
+        result.materialized.push({ kind: item.kind, name, sourceName: item.name });
+      } catch {
+        result.failed.push({ kind: item.kind, name: item.name, reason: 'upload-failed' });
       }
 
-      if (restoredName !== name) {
-        mappings[kind === 'image' ? 'images' : 'videos'].set(name, restoredName);
-      }
-    } catch {
-      // A failed upload leaves the reference pointing at a name this server does
-      // not have — the same outcome as an asset the archive never carried.
-      issues.addDocumentReferenceIssue({ kind, name }, 'upload-failed');
-    }
+      onItemSettled();
+    });
 
-    completed += 1;
-    deps.onProgress?.({ completed, total });
-  });
-
-  const coverImageName = await resolveCoverImageName({
-    contents,
-    mappings,
-    newlyUploadedImageNames,
-    restoredImageNames,
-    signal: deps.signal,
-    uploadImage,
-  });
-
-  if (contents.cover !== null) {
-    completed += 1;
-    deps.onProgress?.({ completed, total });
-  }
-
-  return {
-    coverImageName,
-    documentReferenceIssues: issues.toIssues().documentReferenceIssues,
-    mappings,
-    uploadedAssets: {
-      imageNames: [...newlyUploadedImageNames].sort(),
-      videoNames: [...newlyUploadedVideoNames].sort(),
-    },
-    uploadedCount,
+    return result;
   };
+};
+
+export interface RestoreArchiveMediaInput {
+  /** The staging board for this archive's board media, or `null` when it carries none. */
+  boardId: string | null;
+  /** The canonical document, already rehydrated and re-serialized. */
+  projectDocument: Record<string, unknown>;
+  /** The id the project will be created under. */
+  projectId: string;
+  /** Written as the restore runs, so a failure can undo exactly what it made. */
+  ledger: RestoredMediaLedger;
+}
+
+export type RestoreArchiveMediaDeps = ArchiveBoardUploadDeps &
+  Omit<RestoreProjectMediaDeps, 'documentMediaBytes' | 'materializeBoardMedia'>;
+
+/**
+ * Make an archive's media exist on this server: board items onto the staging board under fresh
+ * identities, document-only references deduplicated against what is already here.
+ *
+ * A v2 archive has no board, so this is exactly the v2 restore it always was — the shared engine
+ * simply sees an empty descriptor list.
+ */
+export const restoreArchiveMedia = (
+  archive: InvkArchiveContents,
+  input: RestoreArchiveMediaInput,
+  deps: RestoreArchiveMediaDeps = {}
+): Promise<RestoreProjectMediaResult> => {
+  const { signal, uploadBoardImage: overrideImage, uploadBoardVideo: overrideVideo, ...restoreDeps } = deps;
+  const bytesFor = (ref: InvkMediaRef): Uint8Array | undefined =>
+    (ref.kind === 'image' ? archive.images : archive.videos).get(ref.name);
+
+  return restoreProjectMedia(
+    {
+      boardId: input.boardId,
+      boardItems: archive.boardSnapshot?.items ?? [],
+      coverBytes: archive.cover,
+      coverSourceImageName: selectCoverImageName(input.projectDocument),
+      documentRefs: toMediaRefs(collectLiveAssetRefs(input.projectDocument)),
+      ledger: input.ledger,
+      projectId: input.projectId,
+    },
+    {
+      ...restoreDeps,
+      documentMediaBytes: bytesFor,
+      materializeBoardMedia: createArchiveMediaMaterializer(archive, {
+        ...(signal === undefined ? {} : { signal }),
+        ...(overrideImage === undefined ? {} : { uploadBoardImage: overrideImage }),
+        ...(overrideVideo === undefined ? {} : { uploadBoardVideo: overrideVideo }),
+      }),
+      ...(signal === undefined ? {} : { signal }),
+    }
+  );
 };

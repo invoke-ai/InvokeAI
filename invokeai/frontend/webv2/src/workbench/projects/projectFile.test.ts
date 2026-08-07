@@ -1,6 +1,7 @@
 import { createDraftProject } from '@workbench/workbenchState';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { ProjectBoardItemDTO } from './api';
 import type * as coversModule from './covers';
 import type * as projectFileModule from './projectFile';
 import type * as persistenceModule from './syncedPersistence';
@@ -18,7 +19,7 @@ const api = vi.hoisted(() => ({
   getClientStateValue: vi.fn(() => Promise.resolve(null)),
   getProject: vi.fn(),
   // Every export enumerates the project's board; an empty one is the v2-shaped default.
-  getProjectBoardSnapshot: vi.fn(() => Promise.resolve({ items: [] })),
+  getProjectBoardSnapshot: vi.fn((): Promise<{ items: ProjectBoardItemDTO[] }> => Promise.resolve({ items: [] })),
   isProjectNotFoundError: (error: unknown) =>
     typeof error === 'object' && error !== null && 'status' in error && error.status === 404,
   setClientStateValue: vi.fn(() => Promise.resolve()),
@@ -35,8 +36,10 @@ const transport = vi.hoisted(() => ({
     fetchImageThumbnail: transport.fetchImageThumbnail,
     fetchVideoBytes: transport.fetchVideoBytes,
   }),
+  createStagingBoard: vi.fn(() => Promise.resolve('staging-board')),
   deleteArchiveImages: vi.fn(() => Promise.resolve()),
   deleteArchiveVideos: vi.fn(() => Promise.resolve()),
+  deleteStagingBoard: vi.fn(() => Promise.resolve()),
   // `Uint8Array | null` up front: a fetcher that returns `null` is how the
   // "server would not serve it" path is exercised, and inferring the narrower
   // type here would make that untypeable at the call site.
@@ -50,11 +53,19 @@ const transport = vi.hoisted(() => ({
   findExistingImageNames: vi.fn((_names: readonly string[]) => Promise.resolve(new Set<string>())),
   findExistingVideoNames: vi.fn((_names: readonly string[]) => Promise.resolve(new Set<string>())),
   mimeForEntryName: () => 'image/png',
+  starImages: vi.fn((_names: readonly string[]) => Promise.resolve({ failed: [] as string[] })),
+  starVideos: vi.fn((_names: readonly string[]) => Promise.resolve({ failed: [] as string[] })),
   uploadArchiveImage: vi.fn((_bytes: Uint8Array, fileName: string) =>
     Promise.resolve({ height: 1, imageName: `server-${fileName}`, width: 1 })
   ),
   uploadArchiveVideo: vi.fn((_bytes: Uint8Array, fileName: string) =>
     Promise.resolve({ videoName: `server-${fileName}` })
+  ),
+  uploadBoardImage: vi.fn((_bytes: Uint8Array, fileName: string) =>
+    Promise.resolve({ height: 1, imageName: `board-${fileName}`, width: 1 })
+  ),
+  uploadBoardVideo: vi.fn((_bytes: Uint8Array, fileName: string) =>
+    Promise.resolve({ videoName: `board-${fileName}` })
   ),
 }));
 
@@ -112,16 +123,19 @@ const capturedArchive = (): File => {
   return new File([blob], fileName);
 };
 
+/** The server answers with the board it claimed, or with the one it created for a boardless create. */
 const acceptCreate = (): void => {
-  api.createProject.mockImplementation((request: { name: string; project_id?: string }) =>
-    Promise.resolve({
-      created_at: '2026-06-10 10:00:00.000',
-      data: {},
-      name: request.name,
-      project_id: request.project_id ?? '',
-      revision: 1,
-      updated_at: '2026-06-10 10:00:00.000',
-    })
+  api.createProject.mockImplementation(
+    (request: { board_id?: string; data?: Record<string, unknown>; name: string; project_id?: string }) =>
+      Promise.resolve({
+        board_id: request.board_id ?? 'server-created-board',
+        created_at: '2026-06-10 10:00:00.000',
+        data: request.data ?? {},
+        name: request.name,
+        project_id: request.project_id ?? '',
+        revision: 1,
+        updated_at: '2026-06-10 10:00:00.000',
+      })
   );
 };
 
@@ -144,8 +158,19 @@ beforeEach(async () => {
   transport.uploadArchiveVideo.mockImplementation((_bytes: Uint8Array, fileName: string) =>
     Promise.resolve({ videoName: `server-${fileName}` })
   );
+  transport.uploadBoardImage.mockImplementation((_bytes: Uint8Array, fileName: string) =>
+    Promise.resolve({ height: 1, imageName: `board-${fileName}`, width: 1 })
+  );
+  transport.uploadBoardVideo.mockImplementation((_bytes: Uint8Array, fileName: string) =>
+    Promise.resolve({ videoName: `board-${fileName}` })
+  );
+  transport.starImages.mockImplementation((_names: readonly string[]) => Promise.resolve({ failed: [] as string[] }));
+  transport.starVideos.mockImplementation((_names: readonly string[]) => Promise.resolve({ failed: [] as string[] }));
+  transport.createStagingBoard.mockImplementation(() => Promise.resolve('staging-board'));
+  transport.deleteStagingBoard.mockImplementation(() => Promise.resolve());
   transport.deleteArchiveImages.mockImplementation(() => Promise.resolve());
   transport.deleteArchiveVideos.mockImplementation(() => Promise.resolve());
+  api.getProjectBoardSnapshot.mockImplementation(() => Promise.resolve({ items: [] }));
   api.getClientStateValue.mockImplementation(() => Promise.resolve(null));
 
   projectFile = await import('./projectFile');
@@ -280,6 +305,217 @@ describe('what a transfer reports', () => {
 
     expect(outcome.documentReferenceIssues).toEqual([{ kind: 'image', name: 'b.png', reason: 'upload-failed' }]);
     expect(onProgress.mock.calls.map(([progress]) => progress.phase)).toContain('restoring');
+  });
+});
+
+/**
+ * The v3 half: an archive carries the project's board, and importing it gives that board's media
+ * new identities on a staging board the create then claims. Nothing here may reuse a name the
+ * destination already holds — `board_images` keys on the image name, so a reused name would move a
+ * stranger's picture onto this project's board instead of copying it.
+ */
+describe('importing a project board', () => {
+  const boardProject = () => {
+    const project = createDraftProject([]);
+
+    return {
+      ...project,
+      canvas: {
+        ...project.canvas,
+        document: { ...project.canvas.document, layers: [rasterImageLayer('l1', 'shared.png')] },
+      },
+      name: 'Board project',
+    };
+  };
+
+  const boardSnapshot = (): { items: ProjectBoardItemDTO[] } => ({
+    items: [
+      { category: 'general', kind: 'image', name: 'shared.png', starred: true },
+      { category: 'user', kind: 'image', name: 'unreferenced.png', starred: false },
+      { category: 'general', kind: 'video', name: 'clip.mp4', starred: false },
+    ],
+  });
+
+  const exportedBoardArchive = async (): Promise<File> => {
+    api.getProjectBoardSnapshot.mockResolvedValue(boardSnapshot());
+    await projectFile.exportOpenProject(boardProject());
+
+    return capturedArchive();
+  };
+
+  const uploadedBoardNames = () => transport.uploadBoardImage.mock.calls.map(([, fileName]) => fileName);
+
+  it('stages the board, restores its media under fresh names, and claims it on create', async () => {
+    acceptCreate();
+
+    const archive = await exportedBoardArchive();
+    const outcome = await projectFile.importProjectFile(archive);
+
+    expect(transport.createStagingBoard).toHaveBeenCalledWith('Board project', expect.anything());
+    expect(uploadedBoardNames().sort()).toEqual(['shared.png', 'unreferenced.png']);
+    expect(transport.uploadBoardImage).toHaveBeenCalledWith(expect.anything(), 'unreferenced.png', {
+      boardId: 'staging-board',
+      category: 'user',
+      contentType: 'image/png',
+      signal: expect.anything(),
+    });
+    expect(transport.uploadBoardVideo).toHaveBeenCalledWith(expect.anything(), 'clip.mp4', expect.anything());
+    expect(api.createProject.mock.calls[0]![0]).toMatchObject({ board_id: 'staging-board' });
+    expect(outcome.boardItemIssues).toEqual([]);
+    expect(outcome.documentReferenceIssues).toEqual([]);
+  });
+
+  it('stars only the descriptors that were starred', async () => {
+    acceptCreate();
+    await projectFile.importProjectFile(await exportedBoardArchive());
+
+    expect(transport.starImages).toHaveBeenCalledWith(['board-shared.png'], expect.anything());
+    expect(transport.starVideos).toHaveBeenCalledWith([], expect.anything());
+  });
+
+  it('rewrites the document onto the copy rather than the archived name', async () => {
+    acceptCreate();
+    await projectFile.importProjectFile(await exportedBoardArchive());
+
+    const { data } = api.createProject.mock.calls[0]![0] as {
+      data: { canvas: { document: { layers: Array<{ source: { image: { imageName: string } } }> } } };
+    };
+
+    expect(data.canvas.document.layers[0]?.source.image.imageName).toBe('board-shared.png');
+  });
+
+  /** The dedup that document references get is deliberately not applied to board membership. */
+  it('copies board media even when this server already has that name', async () => {
+    acceptCreate();
+    transport.findExistingImageNames.mockImplementation((names: readonly string[]) => Promise.resolve(new Set(names)));
+
+    await projectFile.importProjectFile(await exportedBoardArchive());
+
+    expect(uploadedBoardNames().sort()).toEqual(['shared.png', 'unreferenced.png']);
+  });
+
+  /**
+   * The failure that must never bind to a stranger: on this server `shared.png` is taken, by the
+   * project this archive came from.
+   */
+  it('forces an overlapping reference dangling when its board upload fails', async () => {
+    acceptCreate();
+    // The destination has an image called `shared.png` — it is the source project's own. Falling
+    // back to that name would open the copy pointing at somebody else's picture.
+    transport.findExistingImageNames.mockImplementation((names: readonly string[]) => Promise.resolve(new Set(names)));
+    transport.uploadBoardImage.mockImplementation((_bytes: Uint8Array, fileName: string) =>
+      fileName === 'shared.png'
+        ? Promise.reject(new Error('rejected'))
+        : Promise.resolve({ height: 1, imageName: `board-${fileName}`, width: 1 })
+    );
+
+    const outcome = await projectFile.importProjectFile(await exportedBoardArchive());
+    const { data } = api.createProject.mock.calls[0]![0] as {
+      data: { canvas: { document: { layers: Array<{ source: { image: { imageName: string } } }> } } };
+    };
+    const restoredName = data.canvas.document.layers[0]!.source.image.imageName;
+
+    expect(restoredName).not.toBe('shared.png');
+    expect(restoredName).toContain('-missing-image-');
+    expect(outcome.boardItemIssues).toEqual([{ kind: 'image', name: 'shared.png', reason: 'upload-failed' }]);
+    expect(outcome.documentReferenceIssues).toEqual([{ kind: 'image', name: 'shared.png', reason: 'upload-failed' }]);
+  });
+
+  it('points the imported document at the board the server says it claimed', async () => {
+    acceptCreate();
+
+    const { record } = await projectFile.importProjectFile(await exportedBoardArchive());
+    const values = Object.values(record.data.widgetInstances as Record<string, { state?: { values?: unknown } }>)
+      .map((instance) => instance.state?.values as { projectBoardId?: string; selectedBoardId?: string } | undefined)
+      .filter((instanceValues) => instanceValues?.projectBoardId !== undefined);
+
+    expect(values.length).toBeGreaterThan(0);
+    expect(values[0]).toMatchObject({ projectBoardId: 'staging-board', selectedBoardId: 'staging-board' });
+  });
+
+  it('creates no staging board for an archive whose board was empty', async () => {
+    acceptCreate();
+    await projectFile.exportOpenProject(boardProject());
+    await projectFile.importProjectFile(capturedArchive());
+
+    expect(transport.createStagingBoard).not.toHaveBeenCalled();
+    expect(api.createProject.mock.calls[0]![0]).not.toHaveProperty('board_id');
+  });
+
+  it('creates no staging board for a document that will not rehydrate', async () => {
+    const { textEntry, writeArchive } = await import('./invk/archive');
+    const blob = await writeArchive(
+      new Map([
+        [
+          'manifest.json',
+          textEntry(
+            JSON.stringify({
+              appVersion: '7.0',
+              contents: 'workbench-project',
+              createdAt: '',
+              name: 'No layout',
+              version: 3,
+            })
+          ),
+        ],
+        ['board.json', textEntry(JSON.stringify({ items: [], version: 1 }))],
+        ['project.json', textEntry(JSON.stringify({ name: 'No layout' }))],
+      ])
+    );
+
+    await expect(projectFile.importProjectFile(new File([blob], 'broken.invk'))).rejects.toMatchObject({
+      reason: 'damaged',
+    });
+    expect(transport.createStagingBoard).not.toHaveBeenCalled();
+  });
+
+  it('deletes the media it created and then the staging board when the create fails', async () => {
+    const { ApiError } = await import('@platform/transport/http');
+    const account = await import('@platform/state/accountLifecycle');
+    const primaryFailure = new Error('project create rejected');
+
+    account.accountLifecycle.activate('board-rollback-user');
+
+    const archive = await exportedBoardArchive();
+
+    api.createProject.mockRejectedValue(primaryFailure);
+    api.getProject.mockRejectedValueOnce(new ApiError('not found', 404));
+
+    await expect(projectFile.importProjectFile(archive)).rejects.toBe(primaryFailure);
+
+    expect(transport.deleteArchiveImages).toHaveBeenCalledWith(
+      ['board-shared.png', 'board-unreferenced.png'],
+      expect.anything()
+    );
+    expect(transport.deleteArchiveVideos).toHaveBeenCalledWith(['board-clip.mp4'], expect.anything());
+    expect(transport.deleteStagingBoard).toHaveBeenCalledWith('staging-board', expect.anything());
+    account.accountLifecycle.invalidate();
+  });
+
+  it('leaves the staging board alone when a rejected create may already have claimed it', async () => {
+    const account = await import('@platform/state/accountLifecycle');
+    const primaryFailure = new Error('connection ended after create');
+
+    account.accountLifecycle.activate('board-ambiguous-user');
+
+    const archive = await exportedBoardArchive();
+
+    api.createProject.mockRejectedValue(primaryFailure);
+    api.getProject.mockResolvedValue({
+      board_id: 'staging-board',
+      created_at: '2026-06-10 10:00:00.000',
+      data: {},
+      name: 'Board project',
+      project_id: 'committed',
+      revision: 1,
+      updated_at: '2026-06-10 10:00:00.000',
+    });
+
+    await expect(projectFile.importProjectFile(archive)).rejects.toBe(primaryFailure);
+
+    expect(transport.deleteStagingBoard).not.toHaveBeenCalled();
+    expect(transport.deleteArchiveImages).not.toHaveBeenCalled();
+    account.accountLifecycle.invalidate();
   });
 });
 

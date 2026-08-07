@@ -7,6 +7,8 @@ import {
   HttpRequestIdentityExpiredError,
 } from '@platform/transport/http';
 
+import type { InvkMediaCategory } from './board';
+
 import { INVK_MAX_ARCHIVE_BYTES } from './archive';
 import { InvkFormatError } from './format';
 
@@ -20,13 +22,22 @@ import { InvkFormatError } from './format';
  * would make importing a project file — a Launchpad action, on a route that
  * deliberately never loads the editor — pull the canvas graph behind it.
  *
- * Restored assets are uploaded with the category `'other'`. That is the canvas's
+ * ### Two upload paths, because a restore carries two kinds of media
+ *
+ * A document *reference* is a pointer to pixels the project draws with. Those go
+ * up under the category `'other'` and onto no board — that is the canvas's
  * private category: the backend lists it in neither `IMAGE_CATEGORIES` nor
  * `ASSETS_CATEGORIES`, so it appears in no gallery view and no board count (the
  * reasoning is written out in full at `canvas-operations/backend/canvasImages.ts`).
  * The previous frontend uploaded restored images as `'general'`, which empties a
  * stranger's project into your gallery; the pixels a document points at are not
  * gallery content, they are the document.
+ *
+ * A project *board item* is the opposite: it is gallery content, and the archive
+ * recorded the category it was filed under. {@link uploadBoardImage} and its
+ * video twin put it back under that category, on the project's staging board, so
+ * the restored board looks like the exported one rather than like a pile of
+ * uncategorized uploads.
  *
  * ### Images and videos are not symmetric
  *
@@ -39,8 +50,12 @@ import { InvkFormatError } from './format';
  * images before the bulk endpoint existed.
  */
 
+const BOARDS_BASE = '/api/v1/boards';
 const IMAGES_BASE = '/api/v1/images';
 const VIDEOS_BASE = '/api/v1/videos';
+
+/** The backend truncates board names at 300 characters; doing it here keeps the name we chose. */
+const MAX_BOARD_NAME_LENGTH = 300;
 
 /**
  * Whether a failed request means "the work this belonged to is over" rather
@@ -466,6 +481,163 @@ export const uploadArchiveVideo = async (
   const dto = (await response.json()) as VideoDTOSubset;
 
   return { videoName: dto.video_name };
+};
+
+export interface BoardUploadOptions {
+  /** The project's staging board. Board media is never uploaded unboarded. */
+  boardId: string;
+  /** The category the exporting server had it filed under. */
+  category: InvkMediaCategory;
+  contentType?: string;
+  signal?: AbortSignal;
+}
+
+/**
+ * Put one of the project board's images back, under its archived category and on
+ * the staging board the new project is about to claim.
+ *
+ * The returned name is a genuinely new identity, always — `board_images` has
+ * `PRIMARY KEY (image_name)`, so an image sits on exactly one board and a restore
+ * that reused an existing name would be moving a stranger's picture onto this
+ * project's board rather than copying it.
+ */
+export const uploadBoardImage = async (
+  bytes: Uint8Array,
+  fileName: string,
+  options: BoardUploadOptions
+): Promise<UploadedImage> => {
+  const query = new URLSearchParams({
+    board_id: options.boardId,
+    image_category: options.category,
+    is_intermediate: 'false',
+  });
+  const body = new FormData();
+
+  body.append(
+    'file',
+    new File([bytes as BlobPart], fileName, { type: options.contentType || 'application/octet-stream' })
+  );
+
+  const response = await apiFetch(`${IMAGES_BASE}/upload?${query.toString()}`, {
+    body,
+    method: 'POST',
+    signal: options.signal,
+  });
+  const dto = (await response.json()) as ImageDTOSubset;
+
+  return { height: dto.height, imageName: dto.image_name, width: dto.width };
+};
+
+/** The same, for one of the board's videos. */
+export const uploadBoardVideo = async (
+  bytes: Uint8Array,
+  fileName: string,
+  options: BoardUploadOptions
+): Promise<UploadedVideo> => {
+  const query = new URLSearchParams({
+    board_id: options.boardId,
+    is_intermediate: 'false',
+    video_category: options.category,
+  });
+  const body = new FormData();
+
+  body.append('file', new File([bytes as BlobPart], fileName, { type: options.contentType || 'video/mp4' }));
+
+  const response = await apiFetch(`${VIDEOS_BASE}/upload?${query.toString()}`, {
+    body,
+    method: 'POST',
+    signal: options.signal,
+  });
+  const dto = (await response.json()) as VideoDTOSubset;
+
+  return { videoName: dto.video_name };
+};
+
+/** Names the server would not star, out of the names asked for. */
+export interface BulkStarResult {
+  failed: string[];
+}
+
+/**
+ * What a bulk star actually achieved.
+ *
+ * Both endpoints answer with the names they *did* star, and only the video one
+ * also lists failures — a name it skipped (a foreign one, or one deleted between
+ * the upload and the star) appears in neither list. Deriving the failures from
+ * the success list rather than reading `failed_*` therefore covers both routes
+ * with one rule, and the rule is the honest one: anything not reported as starred
+ * did not get starred.
+ */
+const toBulkStarResult = (requested: readonly string[], starred: readonly string[]): BulkStarResult => {
+  const succeeded = new Set(starred);
+
+  return { failed: requested.filter((name) => !succeeded.has(name)) };
+};
+
+/** Star restored images. Starring is never part of an upload or a copy — it is always this call. */
+export const starImages = async (imageNames: readonly string[], signal?: AbortSignal): Promise<BulkStarResult> => {
+  if (imageNames.length === 0) {
+    return { failed: [] };
+  }
+
+  const body = await apiFetchJson<{ starred_images?: string[] }>(`${IMAGES_BASE}/star`, {
+    body: JSON.stringify({ image_names: imageNames }),
+    method: 'POST',
+    signal,
+  });
+
+  return toBulkStarResult(imageNames, body.starred_images ?? []);
+};
+
+/** The same, for videos. */
+export const starVideos = async (videoNames: readonly string[], signal?: AbortSignal): Promise<BulkStarResult> => {
+  if (videoNames.length === 0) {
+    return { failed: [] };
+  }
+
+  const body = await apiFetchJson<{ starred_videos?: string[] }>(`${VIDEOS_BASE}/star`, {
+    body: JSON.stringify({ video_names: videoNames }),
+    method: 'POST',
+    signal,
+  });
+
+  return toBulkStarResult(videoNames, body.starred_videos ?? []);
+};
+
+/**
+ * An unclaimed private board for a restore to upload into, which project creation
+ * then claims and renames.
+ *
+ * Creating the project first would mean posting it with the old asset names and
+ * then updating it with the remapped ones, making the *update* the commit point:
+ * a failure there leaves a real project full of references to media that never
+ * arrived. Staging inverts that — the media is in place before the project
+ * exists, and the create either claims the board and its contents or leaves
+ * nothing a person can see.
+ */
+export const createStagingBoard = async (boardName: string, signal?: AbortSignal): Promise<string> => {
+  const query = new URLSearchParams({ board_name: boardName.slice(0, MAX_BOARD_NAME_LENGTH) });
+  const dto = await apiFetchJson<{ board_id: string }>(`${BOARDS_BASE}/?${query.toString()}`, {
+    method: 'POST',
+    signal,
+  });
+
+  return dto.board_id;
+};
+
+/**
+ * Drop a staging board whose project was never created.
+ *
+ * `include_images=false` deliberately: the restore deletes the identities it
+ * created itself, one by one, and anything else that wandered onto the board in
+ * the meantime — a generation that finished while the import ran — must survive
+ * as Uncategorized rather than be collected by a cleanup that never meant it.
+ */
+export const deleteStagingBoard = async (boardId: string, signal?: AbortSignal): Promise<void> => {
+  await apiFetchJson<unknown>(`${BOARDS_BASE}/${encodeURIComponent(boardId)}?include_images=false`, {
+    method: 'DELETE',
+    signal,
+  });
 };
 
 /** Delete image identities created by a restore whose project could not be created. */

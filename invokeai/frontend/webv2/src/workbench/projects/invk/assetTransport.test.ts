@@ -1,25 +1,37 @@
 import { ApiError } from '@platform/transport/http';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as assetTransportModule from './assetTransport';
 
 import { INVK_MAX_ARCHIVE_BYTES } from './archive';
 
-const mocks = vi.hoisted(() => ({ apiFetchJson: vi.fn(), apiFetchRaw: vi.fn() }));
+const mocks = vi.hoisted(() => ({ apiFetch: vi.fn(), apiFetchJson: vi.fn(), apiFetchRaw: vi.fn() }));
 
 vi.mock('@platform/transport/http', async (importOriginal) => ({
   ...(await importOriginal<object>()),
+  apiFetch: mocks.apiFetch,
   apiFetchJson: mocks.apiFetchJson,
   apiFetchRaw: mocks.apiFetchRaw,
 }));
 
 import {
   createAssetResponseReader,
+  createStagingBoard,
+  deleteStagingBoard,
   fetchImageBytes,
   fetchImageThumbnail,
   fetchVideoBytes,
   findExistingVideoNames,
+  starImages,
+  starVideos,
+  uploadArchiveImage,
+  uploadBoardImage,
+  uploadBoardVideo,
 } from './assetTransport';
+
+/** The query string is the contract with the upload route; these pin it by hand. */
+const uploadQuery = (): URLSearchParams =>
+  new URLSearchParams((mocks.apiFetch.mock.calls.at(-1)![0] as string).split('?')[1]);
 
 describe('findExistingVideoNames', () => {
   it('returns a video name when its lookup succeeds', async () => {
@@ -77,6 +89,99 @@ describe('import rollback transport', () => {
       body: JSON.stringify({ video_names: ['server-video.mp4'] }),
       method: 'POST',
       signal,
+    });
+  });
+});
+
+describe('board media transport', () => {
+  beforeEach(() => {
+    mocks.apiFetch.mockReset();
+    mocks.apiFetchJson.mockReset();
+  });
+
+  it('uploads an image onto the staging board under its archived category', async () => {
+    mocks.apiFetch.mockResolvedValue(
+      new Response(JSON.stringify({ height: 2, image_name: 'fresh.png', width: 3 }), { status: 201 })
+    );
+
+    await expect(
+      uploadBoardImage(new Uint8Array([1]), 'archived.png', {
+        boardId: 'staging',
+        category: 'control',
+        contentType: 'image/png',
+      })
+    ).resolves.toEqual({ height: 2, imageName: 'fresh.png', width: 3 });
+
+    expect(Object.fromEntries(uploadQuery())).toEqual({
+      board_id: 'staging',
+      image_category: 'control',
+      is_intermediate: 'false',
+    });
+  });
+
+  it('uploads a video onto the staging board under its archived category', async () => {
+    mocks.apiFetch.mockResolvedValue(new Response(JSON.stringify({ video_name: 'fresh.mp4' }), { status: 201 }));
+
+    await expect(
+      uploadBoardVideo(new Uint8Array([1]), 'archived.mp4', { boardId: 'staging', category: 'user' })
+    ).resolves.toEqual({ videoName: 'fresh.mp4' });
+
+    expect(Object.fromEntries(uploadQuery())).toEqual({
+      board_id: 'staging',
+      is_intermediate: 'false',
+      video_category: 'user',
+    });
+  });
+
+  /**
+   * A document reference is not gallery content: it goes up unboarded, under the canvas's private
+   * category. The two upload paths must not drift into each other.
+   */
+  it('keeps document-reference uploads unboarded and private', async () => {
+    mocks.apiFetch.mockResolvedValue(
+      new Response(JSON.stringify({ height: 1, image_name: 'fresh.png', width: 1 }), { status: 201 })
+    );
+
+    await uploadArchiveImage(new Uint8Array([1]), 'referenced.png');
+
+    expect(Object.fromEntries(uploadQuery())).toEqual({ image_category: 'other', is_intermediate: 'false' });
+  });
+
+  it('reports every name the star endpoints did not confirm', async () => {
+    mocks.apiFetchJson
+      .mockResolvedValueOnce({ starred_images: ['kept.png'] })
+      .mockResolvedValueOnce({ starred_videos: ['kept.mp4'] });
+
+    await expect(starImages(['kept.png', 'skipped.png'])).resolves.toEqual({ failed: ['skipped.png'] });
+    await expect(starVideos(['kept.mp4', 'skipped.mp4'])).resolves.toEqual({ failed: ['skipped.mp4'] });
+  });
+
+  it('asks for nothing when there is nothing to star', async () => {
+    await expect(starImages([])).resolves.toEqual({ failed: [] });
+    await expect(starVideos([])).resolves.toEqual({ failed: [] });
+    expect(mocks.apiFetchJson).not.toHaveBeenCalled();
+  });
+
+  it('creates a staging board by name and truncates it as the backend would', async () => {
+    mocks.apiFetchJson.mockResolvedValue({ board_id: 'staging' });
+
+    await expect(createStagingBoard('x'.repeat(320))).resolves.toBe('staging');
+
+    const [url, options] = mocks.apiFetchJson.mock.calls[0]! as [string, { method: string }];
+
+    expect(new URLSearchParams(url.split('?')[1]).get('board_name')).toBe('x'.repeat(300));
+    expect(options.method).toBe('POST');
+  });
+
+  /** Untracked media that landed on the board while the import ran must survive as Uncategorized. */
+  it('deletes a staging board without taking its media with it', async () => {
+    mocks.apiFetchJson.mockResolvedValue({});
+
+    await deleteStagingBoard('staging');
+
+    expect(mocks.apiFetchJson).toHaveBeenCalledWith('/api/v1/boards/staging?include_images=false', {
+      method: 'DELETE',
+      signal: undefined,
     });
   });
 });

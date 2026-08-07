@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import type { InvkBoardItem } from './board';
+
 import { binaryEntry, INVK_MAX_ARCHIVE_BYTES, textEntry, writeArchive } from './archive';
 import { InvkFormatError } from './format';
-import { readInvkArchive, restoreArchiveAssets } from './importProject';
+import { createArchiveMediaMaterializer, readInvkArchive, restoreArchiveMedia } from './importProject';
+import { createRestoredMediaLedger } from './restoreProjectMedia';
 
 const imageRef = (imageName: string) => ({ height: 64, imageName, width: 64 });
 
@@ -21,6 +24,16 @@ const manifest = (overrides: Record<string, unknown> = {}) => ({
   version: 2,
   ...overrides,
 });
+
+const boardItem = (overrides: Partial<InvkBoardItem> = {}): InvkBoardItem => ({
+  category: 'general',
+  kind: 'image',
+  name: 'a.png',
+  starred: false,
+  ...overrides,
+});
+
+const boardEntry = (items: InvkBoardItem[] = [boardItem()]) => JSON.stringify({ items, version: 1 });
 
 const archiveFile = async (entries: Record<string, string | Uint8Array>): Promise<File> => {
   const blob = await writeArchive(
@@ -43,6 +56,15 @@ const validArchive = (overrides: Record<string, string | Uint8Array> = {}) =>
     ...overrides,
   });
 
+const v3Archive = (overrides: Record<string, string | Uint8Array> = {}) =>
+  archiveFile({
+    'board.json': boardEntry(),
+    'images/a.png': new Uint8Array([1, 2, 3]),
+    'manifest.json': JSON.stringify(manifest({ version: 3 })),
+    'project.json': JSON.stringify(document()),
+    ...overrides,
+  });
+
 describe('readInvkArchive', () => {
   it('refuses an oversized file before allocating its bytes', async () => {
     const arrayBuffer = vi.fn(() => Promise.resolve(new ArrayBuffer(0)));
@@ -59,6 +81,70 @@ describe('readInvkArchive', () => {
     expect(contents.projectDocument).toEqual(document());
     expect([...contents.images.keys()]).toEqual(['a.png']);
     expect(contents.cover).toBeNull();
+  });
+
+  /**
+   * An archive that predates boards genuinely has none, and an archive whose board was empty says
+   * so. Discriminating on the version keeps those apart: only the first may have a board invented
+   * for it.
+   */
+  it('reads a v2 archive as having no board at all', async () => {
+    const contents = await readInvkArchive(await validArchive());
+
+    expect(contents.version).toBe(2);
+    expect(contents.boardSnapshot).toBeNull();
+  });
+
+  it('reads and canonicalizes a v3 board enumeration', async () => {
+    const contents = await readInvkArchive(
+      await v3Archive({
+        'board.json': boardEntry([boardItem({ name: 'z.png' }), boardItem({ kind: 'video', name: 'a.mp4' })]),
+      })
+    );
+
+    expect(contents.version).toBe(3);
+    // Sorted by kind then name, whatever order the writer used.
+    expect(contents.boardSnapshot?.items.map((item) => item.name)).toEqual(['z.png', 'a.mp4']);
+  });
+
+  it('reads an empty v3 board without inventing anything', async () => {
+    const contents = await readInvkArchive(await v3Archive({ 'board.json': boardEntry([]) }));
+
+    expect(contents.boardSnapshot).toEqual({ items: [], version: 1 });
+  });
+
+  it('reports a v3 archive with no board enumeration as damaged', async () => {
+    const blob = await writeArchive(
+      new Map([
+        ['manifest.json', textEntry(JSON.stringify(manifest({ version: 3 })))],
+        ['project.json', textEntry(JSON.stringify(document()))],
+      ])
+    );
+
+    await expect(readInvkArchive(new File([blob], 'project.invk'))).rejects.toMatchObject({ reason: 'damaged' });
+  });
+
+  it.each([
+    ['unparseable', 'not json'],
+    ['a duplicate descriptor', JSON.stringify({ items: [boardItem(), boardItem()], version: 1 })],
+    ['an unsafe name', JSON.stringify({ items: [boardItem({ name: '../escape.png' })], version: 1 })],
+    ['an unknown version', JSON.stringify({ items: [], version: 2 })],
+  ])('reports a board enumeration that is %s as damaged', async (_case, contents) => {
+    await expect(readInvkArchive(await v3Archive({ 'board.json': contents }))).rejects.toMatchObject({
+      reason: 'damaged',
+    });
+  });
+
+  /** A ZIP path is attacker-controlled text; a media name from the server never has a separator. */
+  it('ignores bundled entries whose names are not plain basenames', async () => {
+    const contents = await readInvkArchive(
+      await validArchive({
+        'images/': new Uint8Array([]),
+        'images/nested/deep.png': new Uint8Array([4]),
+      })
+    );
+
+    expect([...contents.images.keys()]).toEqual(['a.png']);
   });
 
   it('resolves the cover entry named by the manifest', async () => {
@@ -114,236 +200,203 @@ describe('readInvkArchive', () => {
   });
 });
 
-describe('restoreArchiveAssets', () => {
-  const contents = async (overrides: Partial<Awaited<ReturnType<typeof readInvkArchive>>> = {}) => ({
-    ...(await readInvkArchive(await validArchive())),
+describe('createArchiveMediaMaterializer', () => {
+  const bytes = (value: number) => new Uint8Array([value]);
+  const archive = () => ({
+    images: new Map([['a.png', bytes(1)]]),
+    videos: new Map([['clip.mp4', bytes(2)]]),
+  });
+
+  it('uploads each descriptor to the staging board under its archived category', async () => {
+    const uploadBoardImage = vi.fn(() => Promise.resolve({ height: 1, imageName: 'fresh.png', width: 1 }));
+    const uploadBoardVideo = vi.fn(() => Promise.resolve({ videoName: 'fresh.mp4' }));
+    const materialize = createArchiveMediaMaterializer(archive(), { uploadBoardImage, uploadBoardVideo });
+    const settled = vi.fn();
+
+    const result = await materialize(
+      [boardItem({ category: 'control' }), boardItem({ category: 'user', kind: 'video', name: 'clip.mp4' })],
+      'staging',
+      settled
+    );
+
+    expect(uploadBoardImage).toHaveBeenCalledWith(bytes(1), 'a.png', {
+      boardId: 'staging',
+      category: 'control',
+      contentType: 'image/png',
+    });
+    expect(uploadBoardVideo).toHaveBeenCalledWith(bytes(2), 'clip.mp4', {
+      boardId: 'staging',
+      category: 'user',
+      contentType: 'video/mp4',
+    });
+    expect(result.materialized).toEqual([
+      { kind: 'image', name: 'fresh.png', sourceName: 'a.png' },
+      { kind: 'video', name: 'fresh.mp4', sourceName: 'clip.mp4' },
+    ]);
+    expect(settled).toHaveBeenCalledTimes(2);
+  });
+
+  /** Never an existence check: board media is copied, never adopted. See `restoreProjectMedia`. */
+  it('uploads a descriptor whose name the destination may already hold', async () => {
+    const uploadBoardImage = vi.fn((_bytes: Uint8Array, fileName: string) =>
+      Promise.resolve({ height: 1, imageName: `server-${fileName}`, width: 1 })
+    );
+    const result = await createArchiveMediaMaterializer(archive(), { uploadBoardImage })(
+      [boardItem()],
+      'staging',
+      () => undefined
+    );
+
+    expect(result.materialized).toEqual([{ kind: 'image', name: 'server-a.png', sourceName: 'a.png' }]);
+  });
+
+  it('reports a descriptor the archive carried no bytes for', async () => {
+    const uploadBoardImage = vi.fn(() => Promise.reject(new Error('should not be called')));
+    const result = await createArchiveMediaMaterializer(archive(), { uploadBoardImage })(
+      [boardItem({ name: 'absent.png' })],
+      'staging',
+      () => undefined
+    );
+
+    expect(result.failed).toEqual([{ kind: 'image', name: 'absent.png', reason: 'missing-entry' }]);
+    expect(uploadBoardImage).not.toHaveBeenCalled();
+  });
+
+  it('reports a rejected upload without abandoning the rest of the board', async () => {
+    const uploadBoardImage = vi.fn((_bytes: Uint8Array, fileName: string) =>
+      fileName === 'a.png'
+        ? Promise.reject(new Error('rejected'))
+        : Promise.resolve({ height: 1, imageName: 'fresh.png', width: 1 })
+    );
+    const withSecond = archive();
+
+    withSecond.images.set('b.png', bytes(3));
+
+    const result = await createArchiveMediaMaterializer(withSecond, { uploadBoardImage })(
+      [boardItem(), boardItem({ name: 'b.png' })],
+      'staging',
+      () => undefined
+    );
+
+    expect(result.failed).toEqual([{ kind: 'image', name: 'a.png', reason: 'upload-failed' }]);
+    expect(result.materialized).toEqual([{ kind: 'image', name: 'fresh.png', sourceName: 'b.png' }]);
+  });
+});
+
+describe('restoreArchiveMedia', () => {
+  const restoreDeps = (overrides = {}) => ({
+    findExistingImageNames: () => Promise.resolve(new Set<string>()),
+    findExistingVideoNames: () => Promise.resolve(new Set<string>()),
+    starImages: () => Promise.resolve({ failed: [] }),
+    starVideos: () => Promise.resolve({ failed: [] }),
+    uploadBoardImage: (_bytes: Uint8Array, fileName: string) =>
+      Promise.resolve({ height: 1, imageName: `board-${fileName}`, width: 1 }),
+    uploadBoardVideo: (_bytes: Uint8Array, fileName: string) => Promise.resolve({ videoName: `board-${fileName}` }),
+    uploadImage: (_bytes: Uint8Array, fileName: string) =>
+      Promise.resolve({ height: 1, imageName: `loose-${fileName}`, width: 1 }),
+    uploadVideo: (_bytes: Uint8Array, fileName: string) => Promise.resolve({ videoName: `loose-${fileName}` }),
     ...overrides,
   });
 
-  it('uploads only what the server is missing', async () => {
-    const upload = vi.fn((_bytes: Uint8Array, fileName: string) =>
-      Promise.resolve({ height: 1, imageName: fileName, width: 1 })
-    );
-
-    const result = await restoreArchiveAssets(await contents(), {
-      findExistingImageNames: () => Promise.resolve(new Set(['a.png'])),
-      uploadArchiveImage: upload,
-    });
-
-    expect(upload).not.toHaveBeenCalled();
-    expect(result).toMatchObject({ documentReferenceIssues: [], uploadedCount: 0 });
-    expect(result.mappings.images.size).toBe(0);
-  });
-
-  it('records the rename when the server assigns a different name', async () => {
-    const result = await restoreArchiveAssets(await contents(), {
-      findExistingImageNames: () => Promise.resolve(new Set()),
-      uploadArchiveImage: () => Promise.resolve({ height: 1, imageName: 'server-1.png', width: 1 }),
-    });
-
-    expect([...result.mappings.images]).toEqual([['a.png', 'server-1.png']]);
-    expect(result.uploadedCount).toBe(1);
-  });
-
-  it('records no rename when the server keeps the name', async () => {
-    const result = await restoreArchiveAssets(await contents(), {
-      findExistingImageNames: () => Promise.resolve(new Set()),
-      uploadArchiveImage: (_bytes, fileName) => Promise.resolve({ height: 1, imageName: fileName, width: 1 }),
-    });
-
-    expect(result.mappings.images.size).toBe(0);
-    expect(result.uploadedCount).toBe(1);
-  });
-
-  it('returns the authoritative server identities for every newly uploaded asset', async () => {
-    const withVideo = await contents();
-
-    withVideo.projectDocument = {
-      ...withVideo.projectDocument,
-      futureVideoInput: { video_name: 'clip.mp4' },
-    };
-    withVideo.videos.set('clip.mp4', new Uint8Array([7]));
-
-    const result = await restoreArchiveAssets(withVideo, {
-      findExistingImageNames: () => Promise.resolve(new Set()),
-      findExistingVideoNames: () => Promise.resolve(new Set()),
-      uploadArchiveImage: () => Promise.resolve({ height: 1, imageName: 'server-image.png', width: 1 }),
-      uploadArchiveVideo: () => Promise.resolve({ videoName: 'server-video.mp4' }),
-    });
-
-    expect(result.uploadedAssets).toEqual({
-      imageNames: ['server-image.png'],
-      videoNames: ['server-video.mp4'],
-    });
-  });
-
-  it('reports a reference the archive never carried as dangling', async () => {
-    const missing = await contents();
-
-    missing.images.delete('a.png');
-
-    const result = await restoreArchiveAssets(missing, {
-      findExistingImageNames: () => Promise.resolve(new Set()),
-      uploadArchiveImage: () => Promise.reject(new Error('should not be called')),
-    });
-
-    expect(result.documentReferenceIssues.map((issue) => issue.name)).toEqual(['a.png']);
-    expect(result.uploadedCount).toBe(0);
-  });
-
-  it('reports a failed upload as dangling rather than failing the import', async () => {
-    const result = await restoreArchiveAssets(await contents(), {
-      findExistingImageNames: () => Promise.resolve(new Set()),
-      uploadArchiveImage: () => Promise.reject(new Error('upload failed')),
-    });
-
-    expect(result.documentReferenceIssues.map((issue) => issue.name)).toEqual(['a.png']);
-    expect(result.uploadedCount).toBe(0);
-  });
-
   /**
-   * The bundled cover is a thumbnail of an image the document also references,
-   * and the cover URL asks for a thumbnail anyway — so once that image is on
-   * the server, uploading the entry too would leave an orphan nobody can find:
-   * covers go up under the `'other'` category, which shows in no gallery view.
+   * The overlap case: `a.png` is both on the board and drawn by the canvas. It travels once, as
+   * board media, and the layer follows it to the copy.
    */
-  it('reuses the restored cover image instead of uploading a second copy', async () => {
-    const withCover = await contents({ cover: { bytes: new Uint8Array([9]), entryName: 'cover.webp' } });
-    const upload = vi.fn(() => Promise.resolve({ height: 1, imageName: 'server-cover.png', width: 1 }));
+  it('restores an overlapping item once and points the document at the copy', async () => {
+    const archive = await readInvkArchive(await v3Archive());
+    const ledger = createRestoredMediaLedger('staging');
+    const uploadImage = vi.fn(() => Promise.resolve({ height: 1, imageName: 'never', width: 1 }));
 
-    const result = await restoreArchiveAssets(withCover, {
-      findExistingImageNames: () => Promise.resolve(new Set(['a.png'])),
-      uploadArchiveImage: upload,
-    });
-
-    expect(result.coverImageName).toBe('a.png');
-    expect(upload).not.toHaveBeenCalled();
-  });
-
-  it('follows the rename when the cover image was uploaded under a new name', async () => {
-    const withCover = await contents({ cover: { bytes: new Uint8Array([9]), entryName: 'cover.webp' } });
-    const upload = vi.fn((_bytes: Uint8Array, fileName: string) =>
-      Promise.resolve({ height: 1, imageName: `server-${fileName}`, width: 1 })
+    const result = await restoreArchiveMedia(
+      archive,
+      { boardId: 'staging', ledger, projectDocument: archive.projectDocument, projectId: 'project-new' },
+      restoreDeps({ uploadImage })
     );
-
-    const result = await restoreArchiveAssets(withCover, {
-      findExistingImageNames: () => Promise.resolve(new Set()),
-      uploadArchiveImage: upload,
-    });
-
-    expect(result.coverImageName).toBe('server-a.png');
-    // Once for the image itself, never again for the cover.
-    expect(upload).toHaveBeenCalledTimes(1);
-  });
-
-  it('falls back to the bundled cover when its source image is dangling', async () => {
-    const withCover = await contents({ cover: { bytes: new Uint8Array([9]), entryName: 'cover.webp' } });
-
-    withCover.images.delete('a.png');
-
-    const upload = vi.fn(() => Promise.resolve({ height: 1, imageName: 'server-cover.png', width: 1 }));
-    const result = await restoreArchiveAssets(withCover, {
-      findExistingImageNames: () => Promise.resolve(new Set()),
-      uploadArchiveImage: upload,
-    });
-
-    expect(result.coverImageName).toBe('server-cover.png');
-    expect(result.documentReferenceIssues.map((issue) => issue.name)).toEqual(['a.png']);
-    expect(result.uploadedAssets.imageNames).toEqual(['server-cover.png']);
-    expect(upload).toHaveBeenCalledWith(new Uint8Array([9]), 'cover.webp', {
-      contentType: 'image/webp',
-      signal: undefined,
-    });
-  });
-
-  it('restores a video through the video endpoints, never the image ones', async () => {
-    const videoDocument = {
-      ...document(),
-      projectGraph: { nodes: [{ data: { inputs: { video: { video_name: 'clip.mp4' } } }, id: 'n' }] },
-    };
-    const withVideo = await readInvkArchive(
-      await archiveFile({
-        'images/a.png': new Uint8Array([1]),
-        'manifest.json': JSON.stringify(manifest()),
-        'project.json': JSON.stringify(videoDocument),
-        'videos/clip.mp4': new Uint8Array([7, 7, 7]),
-      })
-    );
-
-    expect([...withVideo.videos.keys()]).toEqual(['clip.mp4']);
-
-    const uploadImage = vi.fn((_bytes: Uint8Array, fileName: string) =>
-      Promise.resolve({ height: 1, imageName: fileName, width: 1 })
-    );
-    const uploadVideo = vi.fn(() => Promise.resolve({ videoName: 'server-clip.mp4' }));
-
-    const result = await restoreArchiveAssets(withVideo, {
-      findExistingImageNames: () => Promise.resolve(new Set(['a.png'])),
-      findExistingVideoNames: () => Promise.resolve(new Set()),
-      uploadArchiveImage: uploadImage,
-      uploadArchiveVideo: uploadVideo,
-    });
 
     expect(uploadImage).not.toHaveBeenCalled();
-    expect(uploadVideo).toHaveBeenCalledWith(new Uint8Array([7, 7, 7]), 'clip.mp4', {
-      contentType: 'video/mp4',
-      signal: undefined,
-    });
-    expect([...result.mappings.videos]).toEqual([['clip.mp4', 'server-clip.mp4']]);
+    expect([...result.mappings.images]).toEqual([['a.png', 'board-a.png']]);
+    expect(ledger).toMatchObject({ boardImageNames: ['board-a.png'], imageNames: [] });
+  });
+
+  /** Unreferenced board media is exactly what v3 exists to carry. */
+  it('restores board media the document never mentions', async () => {
+    const archive = await readInvkArchive(
+      await v3Archive({
+        'board.json': boardEntry([boardItem({ name: 'unreferenced.png', starred: true })]),
+        'images/unreferenced.png': new Uint8Array([5]),
+      })
+    );
+    const ledger = createRestoredMediaLedger('staging');
+    const starImages = vi.fn(() => Promise.resolve({ failed: [] }));
+
+    const result = await restoreArchiveMedia(
+      archive,
+      { boardId: 'staging', ledger, projectDocument: archive.projectDocument, projectId: 'project-new' },
+      restoreDeps({ starImages })
+    );
+
+    expect(ledger.boardImageNames).toEqual(['board-unreferenced.png']);
+    expect(starImages).toHaveBeenCalledWith(['board-unreferenced.png'], undefined);
+    // The document's own `a.png` is not board media here, so it deduplicates as a plain reference.
+    expect(result.mappings.images.get('a.png')).toBe('loose-a.png');
+    expect(ledger.imageNames).toEqual(['loose-a.png']);
+  });
+
+  it('restores a v2 archive as document references only, with no board media', async () => {
+    const archive = await readInvkArchive(await validArchive());
+    const ledger = createRestoredMediaLedger(null);
+
+    const result = await restoreArchiveMedia(
+      archive,
+      { boardId: null, ledger, projectDocument: archive.projectDocument, projectId: 'project-new' },
+      restoreDeps()
+    );
+
+    expect(result.boardItemIssues).toEqual([]);
+    expect(ledger).toMatchObject({ boardImageNames: [], boardVideoNames: [], imageNames: ['loose-a.png'] });
+  });
+
+  it('deduplicates a v2 reference the destination already has', async () => {
+    const archive = await readInvkArchive(await validArchive());
+    const ledger = createRestoredMediaLedger(null);
+    const uploadImage = vi.fn(() => Promise.resolve({ height: 1, imageName: 'never', width: 1 }));
+
+    const result = await restoreArchiveMedia(
+      archive,
+      { boardId: null, ledger, projectDocument: archive.projectDocument, projectId: 'project-new' },
+      restoreDeps({ findExistingImageNames: () => Promise.resolve(new Set(['a.png'])), uploadImage })
+    );
+
+    expect(uploadImage).not.toHaveBeenCalled();
     expect(result.mappings.images.size).toBe(0);
   });
 
-  it('never asks the video endpoint about an images-only archive', async () => {
-    const findVideos = vi.fn(() => Promise.resolve(new Set<string>()));
-
-    await restoreArchiveAssets(await contents(), {
-      findExistingImageNames: () => Promise.resolve(new Set(['a.png'])),
-      findExistingVideoNames: findVideos,
-      uploadArchiveImage: () => Promise.reject(new Error('should not be called')),
-    });
-
-    expect(findVideos).not.toHaveBeenCalled();
-  });
-
-  it('survives a fallback cover that fails to upload', async () => {
-    const withCover = await contents({ cover: { bytes: new Uint8Array([9]), entryName: 'cover.webp' } });
-
-    withCover.images.delete('a.png');
-
-    const result = await restoreArchiveAssets(withCover, {
-      findExistingImageNames: () => Promise.resolve(new Set()),
-      uploadArchiveImage: () => Promise.reject(new Error('nope')),
-    });
-
-    expect(result.coverImageName).toBeNull();
-    expect(result.documentReferenceIssues.map((issue) => issue.name)).toEqual(['a.png']);
-  });
-
-  it('announces a video entry as a video, whatever its extension', async () => {
-    const videoDocument = {
-      ...document(),
-      projectGraph: { nodes: [{ data: { inputs: { video: { video_name: 'clip.unknown' } } }, id: 'n' }] },
-    };
-    const withVideo = await readInvkArchive(
-      await archiveFile({
-        'manifest.json': JSON.stringify(manifest()),
-        'project.json': JSON.stringify(videoDocument),
+  it('announces a bundled video as a video, whatever its extension', async () => {
+    const archive = await readInvkArchive(
+      await v3Archive({
+        'board.json': boardEntry([boardItem({ kind: 'video', name: 'clip.unknown' })]),
         'videos/clip.unknown': new Uint8Array([7]),
       })
     );
-    const uploadVideo = vi.fn(() => Promise.resolve({ videoName: 'server-clip.mp4' }));
+    const uploadBoardVideo = vi.fn(() => Promise.resolve({ videoName: 'board-clip.mp4' }));
 
-    await restoreArchiveAssets(withVideo, {
-      findExistingImageNames: () => Promise.resolve(new Set(['a.png'])),
-      findExistingVideoNames: () => Promise.resolve(new Set()),
-      uploadArchiveVideo: uploadVideo,
-    });
+    await restoreArchiveMedia(
+      archive,
+      {
+        boardId: 'staging',
+        ledger: createRestoredMediaLedger('staging'),
+        projectDocument: archive.projectDocument,
+        projectId: 'project-new',
+      },
+      restoreDeps({ uploadBoardVideo })
+    );
 
-    // `image/png` here would be announced to the video endpoint as an image and
-    // refused before the bytes were read.
-    expect(uploadVideo).toHaveBeenCalledWith(new Uint8Array([7]), 'clip.unknown', {
+    // `image/png` here would be announced to the video endpoint as an image and refused before the
+    // bytes were read.
+    expect(uploadBoardVideo).toHaveBeenCalledWith(new Uint8Array([7]), 'clip.unknown', {
+      boardId: 'staging',
+      category: 'general',
       contentType: 'video/mp4',
-      signal: undefined,
     });
   });
 });
