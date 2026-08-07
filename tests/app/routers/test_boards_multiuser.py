@@ -952,9 +952,7 @@ def _claim_board_for_a_project(client: TestClient, mock_invoker: Invoker, token:
     return board["board_id"]
 
 
-def test_a_project_board_reports_the_project_that_owns_it(
-    client: TestClient, mock_invoker: Invoker, user1_token: str
-):
+def test_a_project_board_reports_the_project_that_owns_it(client: TestClient, mock_invoker: Invoker, user1_token: str):
     board_id = _claim_board_for_a_project(client, mock_invoker, user1_token, "Claimed+Board")
 
     response = client.get(f"/api/v1/boards/{board_id}", headers={"Authorization": f"Bearer {user1_token}"})

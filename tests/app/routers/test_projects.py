@@ -140,9 +140,7 @@ def test_deleting_a_project_deletes_its_board(client: TestClient, user1_token: s
     assert board.status_code == status.HTTP_404_NOT_FOUND
 
 
-def test_deleting_a_project_leaves_its_media_uncategorized(
-    client: TestClient, mock_invoker: Invoker, user1_token: str
-):
+def test_deleting_a_project_leaves_its_media_uncategorized(client: TestClient, mock_invoker: Invoker, user1_token: str):
     created = _create_project(client, user1_token).json()
     with mock_invoker.services.board_records._db.transaction() as cursor:
         cursor.execute(
@@ -210,9 +208,10 @@ def test_the_board_snapshot_of_a_missing_or_foreign_project_is_a_404(
     assert client.get("/api/v1/projects/nope/board-snapshot", headers=_auth(user1_token)).status_code == (
         status.HTTP_404_NOT_FOUND
     )
-    assert client.get(
-        f"/api/v1/projects/{created['project_id']}/board-snapshot", headers=_auth(user2_token)
-    ).status_code == status.HTTP_404_NOT_FOUND
+    assert (
+        client.get(f"/api/v1/projects/{created['project_id']}/board-snapshot", headers=_auth(user2_token)).status_code
+        == status.HTTP_404_NOT_FOUND
+    )
 
 
 def test_projects_stay_private_to_their_owner(client: TestClient, user1_token: str, user2_token: str):
@@ -222,11 +221,14 @@ def test_projects_stay_private_to_their_owner(client: TestClient, user1_token: s
     assert client.get(f"/api/v1/projects/{project_id}", headers=_auth(user2_token)).status_code == (
         status.HTTP_404_NOT_FOUND
     )
-    assert client.put(
-        f"/api/v1/projects/{project_id}",
-        json={"name": "Stolen", "data": {}, "expected_revision": 1},
-        headers=_auth(user2_token),
-    ).status_code == status.HTTP_404_NOT_FOUND
+    assert (
+        client.put(
+            f"/api/v1/projects/{project_id}",
+            json={"name": "Stolen", "data": {}, "expected_revision": 1},
+            headers=_auth(user2_token),
+        ).status_code
+        == status.HTTP_404_NOT_FOUND
+    )
 
     # Deleting someone else's project is a silent no-op, and must not take their board with it.
     client.delete(f"/api/v1/projects/{project_id}", headers=_auth(user2_token))
