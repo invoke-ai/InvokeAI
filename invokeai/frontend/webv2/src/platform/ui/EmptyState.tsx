@@ -28,7 +28,9 @@ export const EmptyState = React.forwardRef<HTMLDivElement, EmptyStateProps>(func
   const fgColor = danger ? 'fg.error' : undefined;
   const isStart = align === 'start';
   return (
-    <ChakraEmptyState.Root ref={ref} {...rest} {...(isStart ? { px: '0' } : {})} size={props.size ?? 'sm'}>
+    // `px` before the spread, not after: dropping the recipe's inset is this prop's job, but a
+    // caller that asked for its own padding still outranks it.
+    <ChakraEmptyState.Root ref={ref} px={isStart ? '0' : undefined} {...rest} size={props.size ?? 'sm'}>
       <ChakraEmptyState.Content alignItems={isStart ? 'flex-start' : undefined}>
         {icon && <ChakraEmptyState.Indicator color={fgColor}>{icon}</ChakraEmptyState.Indicator>}
         {description ? (
@@ -37,7 +39,10 @@ export const EmptyState = React.forwardRef<HTMLDivElement, EmptyStateProps>(func
             <ChakraEmptyState.Description>{description}</ChakraEmptyState.Description>
           </VStack>
         ) : (
-          <ChakraEmptyState.Title color={fgColor}>{title}</ChakraEmptyState.Title>
+          // A title long enough to wrap aligns with the rest of the block, not against it.
+          <ChakraEmptyState.Title color={fgColor} textAlign={isStart ? 'start' : undefined}>
+            {title}
+          </ChakraEmptyState.Title>
         )}
         {children}
       </ChakraEmptyState.Content>

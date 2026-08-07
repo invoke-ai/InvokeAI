@@ -48,6 +48,15 @@ export const createOpenProjectBroker = (deps: OpenProjectBrokerDeps): OpenProjec
     unmarkDeleted: () => deps.unmarkProjectDeleted(projectId),
   });
 
+  /**
+   * Publish the current open set, unregistering whatever is no longer in it.
+   *
+   * Registration is unconditional rather than skipped for ids already published. The registry is
+   * cleared when the account changes, and a `published` set that believed it was still there would
+   * never re-register — silently sending every library mutation back over HTTP for the rest of the
+   * mount, which is the one thing this module exists to prevent. `published` therefore records only
+   * what to *retract*, and the registry stays the single source of what is currently published.
+   */
   const sync = (): void => {
     const openIds = new Set(deps.getOpenProjectIds());
 
@@ -59,10 +68,8 @@ export const createOpenProjectBroker = (deps: OpenProjectBrokerDeps): OpenProjec
     }
 
     for (const projectId of openIds) {
-      if (!published.has(projectId)) {
-        registerOpenProject(projectId, buildHandle(projectId));
-        published.add(projectId);
-      }
+      registerOpenProject(projectId, buildHandle(projectId));
+      published.add(projectId);
     }
   };
 

@@ -99,9 +99,15 @@ export const useProjectActions = (): {
 
     const projectToFlush = queries.getProject(project.id) ?? project;
 
-    void persistenceService.flushProjectToServer(projectToFlush).finally(() => {
-      persistenceService.releaseProjectSync(project.id);
-    });
+    // `.finally()` forwards the rejection it was chained onto, so `void` alone left an unhandled
+    // one behind — reachable by closing a tab while the account is going away, which is when the
+    // flush rejects. The tab is closing either way; the flush was best-effort.
+    void persistenceService
+      .flushProjectToServer(projectToFlush)
+      .finally(() => {
+        persistenceService.releaseProjectSync(project.id);
+      })
+      .catch(() => undefined);
 
     if (leaveEditorIfLast(project.id)) {
       return;

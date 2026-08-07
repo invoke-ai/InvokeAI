@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createOpenProjectBroker } from './openProjectBroker';
 import { getOpenProject } from './syncStore';
@@ -39,17 +39,35 @@ const createHarness = () => {
 };
 
 describe('createOpenProjectBroker', () => {
+  const brokers: { dispose: () => void }[] = [];
+
+  const startBroker = (deps: Parameters<typeof createOpenProjectBroker>[0]) => {
+    const broker = createOpenProjectBroker(deps);
+
+    brokers.push(broker);
+
+    return broker;
+  };
+
   beforeEach(async () => {
     const account = await import('@platform/state/accountLifecycle');
 
     account.accountLifecycle.activate('broker-user');
   });
 
+  // The registry is module state. A test that leaves a handle in it is a test the next one
+  // inherits, and these only pass in isolation by using different ids.
+  afterEach(() => {
+    for (const broker of brokers.splice(0)) {
+      broker.dispose();
+    }
+  });
+
   it('publishes a handle for every project the editor already holds', () => {
     const harness = createHarness();
 
     harness.setOpenIds(['a', 'b']);
-    createOpenProjectBroker(harness.deps);
+    startBroker(harness.deps);
 
     expect(getOpenProject('a')).not.toBeNull();
     expect(getOpenProject('b')).not.toBeNull();
@@ -58,7 +76,7 @@ describe('createOpenProjectBroker', () => {
 
   it('follows the open set as tabs come and go', () => {
     const harness = createHarness();
-    const broker = createOpenProjectBroker(harness.deps);
+    const broker = startBroker(harness.deps);
 
     harness.setOpenIds(['a']);
     expect(getOpenProject('a')).not.toBeNull();
@@ -73,7 +91,7 @@ describe('createOpenProjectBroker', () => {
   /** The handle is the mounted editor's. When the editor goes, every mutation must fall back to HTTP. */
   it('withdraws every handle when the editor unmounts', () => {
     const harness = createHarness();
-    const broker = createOpenProjectBroker(harness.deps);
+    const broker = startBroker(harness.deps);
 
     harness.setOpenIds(['a', 'b']);
     broker.dispose();
@@ -96,7 +114,7 @@ describe('createOpenProjectBroker', () => {
 
       return Promise.resolve();
     });
-    createOpenProjectBroker(harness.deps);
+    startBroker(harness.deps);
     harness.setOpenIds(['a']);
 
     await getOpenProject('a')!.rename('New name');
@@ -108,7 +126,7 @@ describe('createOpenProjectBroker', () => {
   it('routes deletion and closing at the project it was published for', () => {
     const harness = createHarness();
 
-    createOpenProjectBroker(harness.deps);
+    startBroker(harness.deps);
     harness.setOpenIds(['a']);
 
     const handle = getOpenProject('a')!;
@@ -118,5 +136,26 @@ describe('createOpenProjectBroker', () => {
 
     expect(harness.deps.markProjectDeleted).toHaveBeenCalledWith('a');
     expect(harness.deps.closeProject).toHaveBeenCalledWith('a');
+  });
+
+  /**
+   * The registry is cleared when the account changes. A broker that trusted its own record of what
+   * it had published would never register those projects again, and every library mutation would
+   * silently take the HTTP path for the rest of the mount — the exact thing this exists to stop.
+   */
+  it('republishes its handles after the registry is cleared underneath it', async () => {
+    const harness = createHarness();
+    const account = await import('@platform/state/accountLifecycle');
+
+    startBroker(harness.deps);
+    harness.setOpenIds(['a']);
+    expect(getOpenProject('a')).not.toBeNull();
+
+    account.accountLifecycle.activate('someone-else');
+    expect(getOpenProject('a')).toBeNull();
+
+    harness.setOpenIds(['a', 'b']);
+    expect(getOpenProject('a')).not.toBeNull();
+    expect(getOpenProject('b')).not.toBeNull();
   });
 });

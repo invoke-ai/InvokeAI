@@ -135,7 +135,6 @@ const Probe = ({
       },
     ],
     loadMore: vi.fn(),
-    projectBoardId: null,
     selectedBoardId,
     getCurrentGalleryLocation,
   });
@@ -164,7 +163,6 @@ const adapter: GalleryUiAdapter = {
     setItemMultiSelection,
     setPage: noop,
     setPageInfo: noop,
-    setProjectBoard: noop,
     setSearchTerm: noop,
     setView: noop,
     toggleItemSelection: noop,

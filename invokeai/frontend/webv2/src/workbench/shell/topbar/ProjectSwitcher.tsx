@@ -241,7 +241,15 @@ export const ProjectSwitcher = () => {
       </Menu.Root>
 
       {renameTarget ? (
-        <RenameDialog initialName={renameTarget.name} isOpen onClose={closeRenameDialog} onSubmit={renameProject} />
+        <RenameDialog
+          initialName={renameTarget.name}
+          isOpen
+          label={t('projects.renameProjectNameLabel')}
+          submitLabel={t('common.rename')}
+          title={t('projects.renameProject')}
+          onClose={closeRenameDialog}
+          onSubmit={renameProject}
+        />
       ) : null}
       <ConfirmDialog
         body={`${t('projects.deleteProjectTabBody', { name: deleteTarget?.name ?? '' })} ${t('projects.deleteProjectBoardNote')}`}
@@ -251,7 +259,10 @@ export const ProjectSwitcher = () => {
         onClose={closeDeleteDialog}
         onConfirm={confirmDeleteProject}
       />
-      {isOpenDialogVisible ? <OpenProjectDialog isOpen onClose={hideOpenDialog} /> : null}
+      {/* Rendered unconditionally and driven by `open`: the dialog already declares `lazyMount`
+          and `unmountOnExit`, so it costs nothing while closed — and unmounting it here instead
+          skipped its exit transition, closing by cutting rather than fading. */}
+      <OpenProjectDialog isOpen={isOpenDialogVisible} onClose={hideOpenDialog} />
     </>
   );
 };

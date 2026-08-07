@@ -27,8 +27,6 @@ export interface GalleryActions {
   selectBoard: (boardId: string) => void;
   selectItem: (item: GalleryItem) => void;
   selectItemRange: (items: GalleryItemRef[], primaryItem: GalleryItem) => void;
-  /** Select the project's own board. It always exists, so this never creates one. */
-  selectProjectBoard: () => void;
   setCompareItem: (image: GalleryImageItem | null) => void;
   setSearchTerm: (searchTerm: string) => void;
   setView: (galleryView: GalleryView) => void;

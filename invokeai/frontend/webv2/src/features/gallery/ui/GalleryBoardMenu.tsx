@@ -4,7 +4,7 @@ import type { GalleryBoard } from '@features/gallery/core/types';
 import { Dialog, HStack, Icon, Input, Menu, Portal, Stack, Text } from '@chakra-ui/react';
 import { Button } from '@platform/ui/Button';
 import { MenuContent } from '@platform/ui/Menu';
-import { ArchiveIcon, DownloadIcon, PencilIcon, Trash2Icon, type LucideIcon } from 'lucide-react';
+import { ArchiveIcon, DownloadIcon, FileDownIcon, PencilIcon, Trash2Icon, type LucideIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -30,7 +30,7 @@ export const GalleryBoardMenu = ({
   onClose: () => void;
 }) => {
   const { t } = useTranslation();
-  const { actions } = useGalleryWidget();
+  const { actions, gallery } = useGalleryWidget();
   const [renameTarget, setRenameTarget] = useState<GalleryBoard | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<GalleryBoard | null>(null);
   const [renameValue, setRenameValue] = useState('');
@@ -42,7 +42,12 @@ export const GalleryBoardMenu = ({
   // A project's board can be downloaded but never renamed, archived, or deleted: those follow
   // the project. This covers every project's board, not just the open one — the server refuses
   // all of them, so offering the action anywhere would only produce a 409.
-  const isManagedBoard = board !== null && board.kind === 'board' && board.projectId === null;
+  //
+  // The open project's own board is checked locally as well. `project_id` is omitted rather than
+  // nulled by the backend's DTO, so a response that has lost it would make the project's board
+  // look ordinary — offering a rename that 409s and dropping the badge that explains why.
+  const isManagedBoard =
+    board !== null && board.kind === 'board' && board.projectId === null && board.id !== gallery.projectBoardId;
   const positioning = useMemo(
     () => ({
       getAnchorRect: () => {
@@ -133,7 +138,12 @@ export const GalleryBoardMenu = ({
           <Menu.Positioner>
             {board && (
               <MenuContent minW="12rem">
-                {board.projectId !== null && <BoardExportProjectMenuItem board={board} />}
+                {board.projectId !== null && (
+                  <>
+                    <BoardExportProjectMenuItem board={board} />
+                    <Menu.Separator />
+                  </>
+                )}
                 <BoardDownloadMenuItem board={board} />
                 {isManagedBoard && (
                   <>
@@ -243,7 +253,7 @@ const BoardExportProjectMenuItem = ({ board }: { board: GalleryBoard }) => {
 
   return (
     <BoardMenuItem
-      icon={DownloadIcon}
+      icon={FileDownIcon}
       label={t('widgets.gallery.exportProjectFromBoard')}
       value="export-project"
       onClick={handleClick}

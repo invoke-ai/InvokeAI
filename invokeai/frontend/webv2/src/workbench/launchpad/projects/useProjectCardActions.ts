@@ -1,7 +1,7 @@
 import { toaster } from '@platform/ui';
 import { deleteLibraryProject, renameLibraryProject, type ProjectSummary } from '@workbench/projects/library';
 import { useDuplicateProject, useExportLibraryProject } from '@workbench/projects/useProjectFileActions';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { dropProjectPin } from './projectPins';
@@ -68,5 +68,11 @@ export const useProjectCardActions = (summary: ProjectSummary): ProjectCardActio
     }
   }, [summary.id, t]);
 
-  return { delete: deleteProject, duplicate, export: exportProject, rename };
+  // Memoized because `ProjectActionsMenu` derives callbacks from this object, and the browser
+  // renders one of these per row in a virtualized list: a fresh literal each render invalidates
+  // every one of them on every render.
+  return useMemo(
+    () => ({ delete: deleteProject, duplicate, export: exportProject, rename }),
+    [deleteProject, duplicate, exportProject, rename]
+  );
 };

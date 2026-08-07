@@ -15,7 +15,6 @@ import { GalleryBoardDragMonitor } from './GalleryBoardDragMonitor';
 import { GalleryLayout } from './GalleryLayout';
 import {
   getGalleryPage,
-  getGalleryProjectBoardId,
   getGallerySearchTerm,
   getGallerySelectedBoardId,
   getGalleryStateView,
@@ -133,7 +132,6 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
     boards: data.boards,
     getCurrentGalleryLocation,
     loadMore,
-    projectBoardId: getGalleryProjectBoardId(galleryValues),
     selectedBoardId,
   });
 

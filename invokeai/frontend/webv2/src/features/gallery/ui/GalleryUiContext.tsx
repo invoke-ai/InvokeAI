@@ -54,7 +54,6 @@ export interface GalleryCommandsPort {
   setItemMultiSelection(itemKeys: GalleryItemKey[], primaryItem: GalleryItem): void;
   setPage(page: number): void;
   setPageInfo(totalImages: number): void;
-  setProjectBoard(boardId: string): void;
   setSearchTerm(searchTerm: string): void;
   setView(view: GalleryView): void;
   toggleItemSelection(item: GalleryItem, nextPrimaryItem: GalleryItem | null): void;

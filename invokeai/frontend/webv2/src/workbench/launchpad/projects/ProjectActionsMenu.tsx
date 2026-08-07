@@ -89,6 +89,9 @@ export const ProjectActionsMenu = ({
       <RenameDialog
         initialName={projectName}
         isOpen={isRenameOpen}
+        label={t('projects.renameProjectNameLabel')}
+        submitLabel={t('common.rename')}
+        title={t('projects.renameProject')}
         onClose={closeRenameDialog}
         onSubmit={actions.rename}
       />

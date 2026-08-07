@@ -30,13 +30,11 @@ export const useGalleryActions = ({
   boards,
   getCurrentGalleryLocation,
   loadMore,
-  projectBoardId,
   selectedBoardId,
 }: {
   boards: GalleryBoard[];
   getCurrentGalleryLocation: () => { galleryView: GalleryView; selectedBoardId: string };
   loadMore: () => void;
-  projectBoardId: string | null;
   selectedBoardId: string;
 }): GalleryActions => {
   const { exportProject, gallery, notifications } = useGalleryUi();
@@ -192,17 +190,6 @@ export const useGalleryActions = ({
       selectBoard: gallery.selectBoard,
       selectItem: gallery.selectItem,
       selectItemRange: (items, primaryItem) => gallery.setItemMultiSelection(items.map(toGalleryItemKey), primaryItem),
-      /**
-       * The project's board always exists — the server creates it with the project and
-       * hydration writes its id into the document — so selecting it is just a selection.
-       * There is deliberately no create-on-demand branch: a board this client made would
-       * not be the project's, and the server would refuse to let a project adopt it later.
-       */
-      selectProjectBoard: () => {
-        if (projectBoardId) {
-          gallery.selectBoard(projectBoardId);
-        }
-      },
       setCompareItem: gallery.setCompareItem,
       setSearchTerm: gallery.setSearchTerm,
       setView: gallery.setView,
@@ -210,16 +197,5 @@ export const useGalleryActions = ({
       updateSettings: gallery.updateSettings,
       uploadFiles,
     };
-  }, [
-    boards,
-    exportProject,
-    gallery,
-    loadMore,
-    notifications,
-    projectBoardId,
-    queryClient,
-    selectedBoardId,
-    t,
-    uploadFiles,
-  ]);
+  }, [boards, exportProject, gallery, loadMore, notifications, queryClient, selectedBoardId, t, uploadFiles]);
 };

@@ -412,13 +412,18 @@ const createPersistenceAdapter = (dispatch: WorkbenchDispatch, getState: () => W
 
   return {
     /**
-     * A project created by persistence learns its board from the create response. Both writes
-     * belong together: the id records which board is the project's, and selecting it is what
-     * makes the project's own output land there rather than in Uncategorized.
+     * A project created by persistence learns its board from the create response.
+     *
+     * Recording the id is the whole write. It does *not* also select the board: the create response
+     * arrives a round trip after the draft appears, and forcing a selection then would overwrite
+     * whatever the person picked in the meantime. Nothing is lost by leaving it —
+     * `getGallerySelectedBoardId` already falls back to the project's board when the saved
+     * selection does not resolve, which is exactly this case. It matches hydration, which passes
+     * `selectBoard: false` for the same reason, and makes this idempotent, which matters because
+     * an assignment can be applied from a save whose snapshot has already moved on.
      */
     assignProjectBoard: ({ boardId, projectId }: { boardId: string; projectId: string }) => {
       dispatch({ boardId, projectId, type: 'setGalleryProjectBoardId' });
-      dispatch({ boardId, projectId, type: 'selectGalleryBoard' });
     },
     getState,
     hydrate: command('hydrateWorkbench', (state: WorkbenchState) => ({ state })),

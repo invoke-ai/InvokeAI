@@ -88,7 +88,6 @@ const adapter: GalleryUiAdapter = {
     setItemMultiSelection: noop,
     setPage: noop,
     setPageInfo: noop,
-    setProjectBoard: noop,
     setSearchTerm: noop,
     setView: noop,
     toggleItemSelection: noop,

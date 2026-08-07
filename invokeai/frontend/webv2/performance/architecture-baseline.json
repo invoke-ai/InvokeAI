@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 826351,
+        "brotliBytes": 826868,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 825960,
+        "gzipBytes": 826468,
         "imageRawBytes": 156376,
-        "initialRawBytes": 1919126,
+        "initialRawBytes": 1920562,
         "largestAssetRawBytes": 746170,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 66207,
+        "ownedRawBytes": 66295,
         "requestCount": 35,
         "scriptRequestCount": 19,
         "sourceOwners": [
@@ -273,15 +273,15 @@
         ]
       },
       "limits": {
-        "brotliBytes": 834615,
+        "brotliBytes": 835137,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 834220,
+        "gzipBytes": 834733,
         "imageRawBytes": 157940,
-        "initialRawBytes": 1938318,
+        "initialRawBytes": 1939768,
         "largestAssetRawBytes": 753632,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 66207,
+        "ownedRawBytes": 66295,
         "requestCount": 35,
         "scriptRequestCount": 19
       },
@@ -291,12 +291,12 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1009372,
+        "brotliBytes": 1009800,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1006745,
+        "gzipBytes": 1007220,
         "imageRawBytes": 156376,
-        "initialRawBytes": 2471744,
+        "initialRawBytes": 2473503,
         "largestAssetRawBytes": 746170,
         "otherAssetRawBytes": 0,
         "ownedRawBytes": 113633,
@@ -796,12 +796,12 @@
         ]
       },
       "limits": {
-        "brotliBytes": 1019466,
+        "brotliBytes": 1019898,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 1016813,
+        "gzipBytes": 1017293,
         "imageRawBytes": 157940,
-        "initialRawBytes": 2496462,
+        "initialRawBytes": 2498239,
         "largestAssetRawBytes": 753632,
         "otherAssetRawBytes": 0,
         "ownedRawBytes": 113633,
