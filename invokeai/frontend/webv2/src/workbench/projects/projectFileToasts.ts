@@ -1,6 +1,6 @@
 import { toaster } from '@platform/ui';
 
-import type { ProjectTransferIssues } from './invk/transfer';
+import type { InvkMediaIssueReason, ProjectTransferIssues } from './invk/transfer';
 import type { ProjectFileProgress } from './projectFile';
 
 import { describeProjectFileError } from './projectFileErrors';
@@ -56,6 +56,24 @@ export interface ProjectFileReporter {
   fail: (title: string, error: unknown) => void;
 }
 
+/**
+ * The reasons that mean the media is *not here*, as opposed to here without its flag.
+ *
+ * `star-failed` is the odd one out: the item arrived, it just did not get its star back. Folding it
+ * into "could not be included" tells someone their project lost media when nothing was lost, which
+ * is the one thing these counts exist to answer accurately.
+ *
+ * Phrasing a reason is this module's job, so the set lives here — `transfer.ts` owns the taxonomy
+ * and is imported type-only, which also keeps it out of the two routes' initial chunks.
+ */
+const MISSING_REASONS: ReadonlySet<InvkMediaIssueReason> = new Set(['fetch-failed', 'missing-entry', 'upload-failed']);
+
+const countIssues = (issues: ProjectTransferIssues) => ({
+  boardItems: issues.boardItemIssues.filter((issue) => MISSING_REASONS.has(issue.reason)).length,
+  documentReferences: issues.documentReferenceIssues.filter((issue) => MISSING_REASONS.has(issue.reason)).length,
+  unstarred: issues.boardItemIssues.filter((issue) => issue.reason === 'star-failed').length,
+});
+
 const describeProgress = (t: Translate, progress: ProjectFileProgress): string => {
   if (progress.phase === 'packing') {
     return t('projects.file.packing');
@@ -97,10 +115,9 @@ export const startProjectFileReport = (t: Translate, title: string): ProjectFile
       toaster.update(id, { description: describeProgress(t, progress) });
     },
     succeed: (successTitle, issues) => {
-      const boardCount = issues.boardItemIssues.length;
-      const referenceCount = issues.documentReferenceIssues.length;
+      const { boardItems, documentReferences, unstarred } = countIssues(issues);
 
-      if (boardCount === 0 && referenceCount === 0) {
+      if (boardItems === 0 && documentReferences === 0 && unstarred === 0) {
         settle({ title: successTitle, type: 'success' });
 
         return;
@@ -109,8 +126,9 @@ export const startProjectFileReport = (t: Translate, title: string): ProjectFile
       // Counts, never names: a project can lose hundreds of assets at once, and a toast listing
       // them would be unreadable. The typed detail stays on the outcome for anything that needs it.
       const parts = [
-        ...(boardCount === 0 ? [] : [t('projects.file.missingBoardItems', { count: boardCount })]),
-        ...(referenceCount === 0 ? [] : [t('projects.file.missingReferences', { count: referenceCount })]),
+        ...(boardItems === 0 ? [] : [t('projects.file.missingBoardItems', { count: boardItems })]),
+        ...(documentReferences === 0 ? [] : [t('projects.file.missingReferences', { count: documentReferences })]),
+        ...(unstarred === 0 ? [] : [t('projects.file.unstarredItems', { count: unstarred })]),
       ];
 
       settle({ description: parts.join(' '), title: successTitle, type: 'warning' });

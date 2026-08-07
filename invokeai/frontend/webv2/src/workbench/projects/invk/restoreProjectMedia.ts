@@ -9,6 +9,7 @@ import {
   deleteStagingBoard,
   findExistingImageNames,
   findExistingVideoNames,
+  isRequestCancellation,
   mimeForEntryName,
   starImages,
   starVideos,
@@ -53,6 +54,27 @@ import { buildMissingMediaName, createTransferIssueLog, toMediaKey } from './tra
 
 /** Simultaneous uploads. Matches the previous frontend's limit. */
 const ASSET_UPLOAD_CONCURRENCY = 5;
+
+/**
+ * A `catch` handler that degrades to `fallback`, except for the errors that must end the restore.
+ *
+ * Nothing in a restore is worth the whole restore. Starring is a flag; an existence probe only
+ * spares a redundant upload. A batch of either failing should cost what it is worth, not reach the
+ * caller's rollback and delete every asset that had already arrived.
+ *
+ * Cancellation is the exception, and has to be, because it is not a failure of the call: an aborted
+ * signal or a rotated account makes *every* remaining call fail. Degrading those would report the
+ * project as half-restored and then create it anyway.
+ */
+const degradeUnlessCancelled =
+  <T>(fallback: T) =>
+  (error: unknown): T => {
+    if (isRequestCancellation(error)) {
+      throw error;
+    }
+
+    return fallback;
+  };
 
 /** One board item that now exists here, under the name this server chose for it. */
 export interface MaterializedMedia {
@@ -335,9 +357,13 @@ export const restoreProjectMedia = async (
   // Starring is a separate call by design: the same one import and duplication use, and the same
   // one the gallery uses. A star that fails costs a flag, not the media, so it is reported against
   // the board item and nowhere else — the document does not care whether a layer is starred.
+  //
+  // Which is why the call itself must not reject: a rejection here reaches the caller's rollback
+  // and deletes every image that was just uploaded, over a flag. A whole batch that failed to send
+  // is every name in it failing to be starred.
   const [imageStars, videoStars] = await Promise.all([
-    starRestoredImages(starTargets.image, deps.signal),
-    starRestoredVideos(starTargets.video, deps.signal),
+    starRestoredImages(starTargets.image, deps.signal).catch(degradeUnlessCancelled({ failed: starTargets.image })),
+    starRestoredVideos(starTargets.video, deps.signal).catch(degradeUnlessCancelled({ failed: starTargets.video })),
   ]);
 
   for (const [kind, failed] of [
@@ -353,13 +379,17 @@ export const restoreProjectMedia = async (
 
   // Both existence checks go out before either upload does; they are independent, and a project
   // with videos should not wait out the image pass.
+  //
+  // An empty answer is the safe degradation: the check exists only to skip uploading something the
+  // destination already has, so failing it costs bandwidth, never correctness. Aborting the import
+  // over it would be losing the project to save a request.
   const [existingImages, existingVideos] = await Promise.all([
     documentOnlyImages.length === 0
       ? Promise.resolve(new Set<string>())
-      : checkExistingImages(documentOnlyImages, deps.signal),
+      : checkExistingImages(documentOnlyImages, deps.signal).catch(degradeUnlessCancelled(new Set<string>())),
     documentOnlyVideos.length === 0
       ? Promise.resolve(new Set<string>())
-      : checkExistingVideos(documentOnlyVideos, deps.signal),
+      : checkExistingVideos(documentOnlyVideos, deps.signal).catch(degradeUnlessCancelled(new Set<string>())),
   ]);
 
   const pending: PendingUpload[] = [];
@@ -416,7 +446,14 @@ export const restoreProjectMedia = async (
       if (restoredName !== name) {
         mappings[kind === 'image' ? 'images' : 'videos'].set(name, restoredName);
       }
-    } catch {
+    } catch (error) {
+      // Not a failure of this asset: an aborted signal or an expired account makes every remaining
+      // upload fail too, and reporting them one by one would finish with a warning naming hundreds
+      // of dangling references and a project created anyway.
+      if (isRequestCancellation(error)) {
+        throw error;
+      }
+
       // A failed upload leaves the reference pointing at a name this server does not have — the
       // same outcome as an asset the source never carried, and honest for the same reason.
       issues.addDocumentReferenceIssue({ kind, name }, 'upload-failed');

@@ -428,6 +428,8 @@
       "packing": "Packing the archive…",
       "restoringProgress": "Restoring {{completed}} of {{total}} assets…",
       "tooLarge": "This project file is too large to open.",
+      "unstarredItems_one": "1 item could not be re-starred.",
+      "unstarredItems_other": "{{count}} items could not be re-starred.",
       "unsupportedVersion": "This project file was written by a newer version of Invoke."
     },
     "gridView": "Grid view",

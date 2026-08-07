@@ -11,7 +11,7 @@ import type {
 import type { InvkMediaRef } from './transfer';
 
 import { INVK_MAX_ARCHIVE_BYTES, readArchive, readEntryText } from './archive';
-import { mimeForEntryName, uploadBoardImage, uploadBoardVideo } from './assetTransport';
+import { isRequestCancellation, mimeForEntryName, uploadBoardImage, uploadBoardVideo } from './assetTransport';
 import { parseInvkBoardSnapshot } from './board';
 import {
   INVK_BOARD_ENTRY,
@@ -229,7 +229,13 @@ export const createArchiveMediaMaterializer = (
             : (await uploadVideo(bytes, item.name, options)).videoName;
 
         result.materialized.push({ kind: item.kind, name, sourceName: item.name });
-      } catch {
+      } catch (error) {
+        // A cancelled signal or an expired account is not this item failing — it is every
+        // remaining item failing at once, which is an ended operation rather than a lossy one.
+        if (isRequestCancellation(error)) {
+          throw error;
+        }
+
         result.failed.push({ kind: item.kind, name: item.name, reason: 'upload-failed' });
       }
 

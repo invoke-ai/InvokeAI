@@ -18,7 +18,13 @@ import type { InvkBoardItem } from './board';
 import type { MediaMaterializer } from './restoreProjectMedia';
 import type { ProjectTransferIssues } from './transfer';
 
-import { copyImagesToBoard, copyVideosToBoard, createStagingBoard } from './assetTransport';
+import {
+  type CopyMediaResult,
+  copyImagesToBoard,
+  copyVideosToBoard,
+  createStagingBoard,
+  isRequestCancellation,
+} from './assetTransport';
 import { InvkFormatError } from './format';
 import { createRestoredMediaLedger, restoreProjectMedia, rollbackRestoredMedia } from './restoreProjectMedia';
 import { toMediaRefs } from './transfer';
@@ -69,19 +75,33 @@ export interface DuplicateProjectResult extends ProjectTransferIssues {
  * Progress moves per item once each batch answers rather than during it. The copy is a single
  * server-side request per kind, so there is no finer truth to report — and unlike an import, there
  * is no upload to sit and watch.
+ *
+ * A batch that does not answer at all — a proxy timing out a large board — is every name in it
+ * failing, not the duplication failing. The route reports per-item failures precisely so one bad
+ * source cannot cost the caller the batch; letting a transport error do what the route refuses to
+ * would give that guarantee away at the last step.
  */
 export const createCopyMediaMaterializer = (
   deps: { copyImages?: typeof copyImagesToBoard; copyVideos?: typeof copyVideosToBoard; signal?: AbortSignal } = {}
 ): MediaMaterializer => {
   const copyImages = deps.copyImages ?? copyImagesToBoard;
   const copyVideos = deps.copyVideos ?? copyVideosToBoard;
+  const allFailed =
+    (names: string[]) =>
+    (error: unknown): CopyMediaResult => {
+      if (isRequestCancellation(error)) {
+        throw error;
+      }
+
+      return { copied: [], failed: names };
+    };
 
   return async (items, boardId, onItemSettled) => {
     const imageNames = items.filter((item) => item.kind === 'image').map((item) => item.name);
     const videoNames = items.filter((item) => item.kind === 'video').map((item) => item.name);
     const [images, videos] = await Promise.all([
-      copyImages(imageNames, boardId, deps.signal),
-      copyVideos(videoNames, boardId, deps.signal),
+      copyImages(imageNames, boardId, deps.signal).catch(allFailed(imageNames)),
+      copyVideos(videoNames, boardId, deps.signal).catch(allFailed(videoNames)),
     ]);
 
     for (let index = 0; index < items.length; index += 1) {

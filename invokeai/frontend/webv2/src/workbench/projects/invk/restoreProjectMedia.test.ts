@@ -143,6 +143,29 @@ describe('board media', () => {
     expect(result.mappings.images.get('board.png')).toBe('staging-board-board.png');
   });
 
+  /**
+   * A rejected star call reaches the caller's rollback, which deletes every asset the restore just
+   * uploaded. Trading a whole project's media for a flag is the one thing this must not do.
+   */
+  it('does not lose the restore when the star request itself fails', async () => {
+    const result = await restore(
+      { boardItems: [boardItem({ starred: true })], documentRefs: [imageRef('board.png')] },
+      { starImages: () => Promise.reject(new Error('500')) }
+    );
+
+    expect(result.boardItemIssues).toEqual([{ kind: 'image', name: 'board.png', reason: 'star-failed' }]);
+    expect(result.mappings.images.get('board.png')).toBe('staging-board-board.png');
+    expect(result.ledger.boardImageNames).toEqual(['staging-board-board.png']);
+  });
+
+  it('ends the restore when starring fails because the operation was cancelled', async () => {
+    const cancelled = Object.assign(new Error('aborted'), { name: 'AbortError' });
+
+    await expect(
+      restore({ boardItems: [boardItem({ starred: true })] }, { starImages: () => Promise.reject(cancelled) })
+    ).rejects.toBe(cancelled);
+  });
+
   it('reports a descriptor the source could not materialize', async () => {
     const result = await restore(
       { boardItems: [boardItem({ name: 'gone.png' })] },
@@ -206,6 +229,36 @@ describe('board media', () => {
 });
 
 describe('document-only references', () => {
+  /**
+   * The existence check is an optimization — it only decides whether an upload can be skipped. A
+   * failed probe should cost bandwidth, never the import.
+   */
+  it('uploads everything when the existence check fails', async () => {
+    const uploadImage = vi.fn((_bytes: Uint8Array, fileName: string) =>
+      Promise.resolve({ height: 1, imageName: `uploaded-${fileName}`, width: 1 })
+    );
+    const result = await restore(
+      { documentRefs: [imageRef('external.png')] },
+      {
+        documentMediaBytes: () => new Uint8Array([1]),
+        findExistingImageNames: () => Promise.reject(new Error('500')),
+        uploadImage,
+      }
+    );
+
+    expect(uploadImage).toHaveBeenCalledTimes(1);
+    expect(result.mappings.images.get('external.png')).toBe('uploaded-external.png');
+    expect(result.documentReferenceIssues).toEqual([]);
+  });
+
+  it('ends the restore when the existence check fails because the operation was cancelled', async () => {
+    const cancelled = Object.assign(new Error('aborted'), { name: 'AbortError' });
+
+    await expect(
+      restore({ documentRefs: [imageRef('external.png')] }, { findExistingImageNames: () => Promise.reject(cancelled) })
+    ).rejects.toBe(cancelled);
+  });
+
   it('reuses media the destination already has instead of uploading it again', async () => {
     const uploadImage = vi.fn(() => Promise.resolve({ height: 1, imageName: 'never', width: 1 }));
     const result = await restore(
