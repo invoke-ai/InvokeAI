@@ -1,9 +1,12 @@
 import json
 import sqlite3
+from collections.abc import Iterator
 from logging import Logger
 from pathlib import Path
 from typing import Any, Optional
 from unittest.mock import MagicMock
+
+import pytest
 
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.shared.sqlite_migrator.migration_loader import MigrationBuildContext, build_migrations
@@ -14,6 +17,16 @@ from invokeai.app.services.shared.sqlite_migrator.migrations.migration_2026_08_0
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_impl import SqliteMigrator
 
 MIGRATION_ID = "2026_08_06_add_project_boards"
+
+
+@pytest.fixture
+def db() -> Iterator[sqlite3.Connection]:
+    """A schema-only database with one user, which is what all but a handful of these need."""
+    connection = _make_db()
+
+    _add_user(connection, "u1")
+    yield connection
+    connection.close()
 
 
 def _make_db() -> sqlite3.Connection:
@@ -155,9 +168,7 @@ def _run(db: sqlite3.Connection) -> AddProjectBoardsMigrationCallback:
 # --- adoption -------------------------------------------------------------------------------
 
 
-def test_adopts_the_single_valid_candidate_and_renames_it_to_the_project() -> None:
-    db = _make_db()
-    _add_user(db, "u1")
+def test_adopts_the_single_valid_candidate_and_renames_it_to_the_project(db: sqlite3.Connection) -> None:
     _add_board(db, "board-1", name="Old board name")
     _add_project(db, "p1", name="My project", data=_gallery_document("board-1"))
 
@@ -167,9 +178,7 @@ def test_adopts_the_single_valid_candidate_and_renames_it_to_the_project() -> No
     assert db.execute("SELECT board_name FROM boards WHERE board_id = 'board-1';").fetchone()[0] == "My project"
 
 
-def test_adopts_a_candidate_written_in_the_legacy_widget_states_shape() -> None:
-    db = _make_db()
-    _add_user(db, "u1")
+def test_adopts_a_candidate_written_in_the_legacy_widget_states_shape(db: sqlite3.Connection) -> None:
     _add_board(db, "board-1")
     _add_project(db, "p1", data=_gallery_document("board-1", legacy=True))
 
@@ -178,9 +187,7 @@ def test_adopts_a_candidate_written_in_the_legacy_widget_states_shape() -> None:
     assert _board_of(db, "p1") == "board-1"
 
 
-def test_adopts_when_several_gallery_instances_name_the_same_board() -> None:
-    db = _make_db()
-    _add_user(db, "u1")
+def test_adopts_when_several_gallery_instances_name_the_same_board(db: sqlite3.Connection) -> None:
     _add_board(db, "board-1")
     _add_project(db, "p1", data=_gallery_document("board-1", "board-1"))
 
@@ -189,9 +196,7 @@ def test_adopts_when_several_gallery_instances_name_the_same_board() -> None:
     assert _board_of(db, "p1") == "board-1"
 
 
-def test_creates_a_fresh_board_when_two_candidates_disagree() -> None:
-    db = _make_db()
-    _add_user(db, "u1")
+def test_creates_a_fresh_board_when_two_candidates_disagree(db: sqlite3.Connection) -> None:
     _add_board(db, "board-1")
     _add_board(db, "board-2")
     _add_project(db, "p1", data=_gallery_document("board-1", "board-2"))
@@ -201,10 +206,8 @@ def test_creates_a_fresh_board_when_two_candidates_disagree() -> None:
     assert _board_of(db, "p1") not in {"board-1", "board-2"}
 
 
-def test_creates_a_fresh_board_for_each_disqualified_candidate() -> None:
+def test_creates_a_fresh_board_for_each_disqualified_candidate(db: sqlite3.Connection) -> None:
     """Every ownership test, one project each, so a regression names the rule it broke."""
-    db = _make_db()
-    _add_user(db, "u1")
     _add_user(db, "u2")
 
     _add_board(db, "board-foreign", user_id="u2")
@@ -250,9 +253,7 @@ def test_creates_a_fresh_board_for_each_disqualified_candidate() -> None:
         assert _board_of(db, project_id) not in disqualified
 
 
-def test_the_earlier_project_wins_a_board_two_projects_both_name() -> None:
-    db = _make_db()
-    _add_user(db, "u1")
+def test_the_earlier_project_wins_a_board_two_projects_both_name(db: sqlite3.Connection) -> None:
     _add_board(db, "board-1")
     _add_project(db, "p-first", data=_gallery_document("board-1"))
     _add_project(db, "p-second", data=_gallery_document("board-1"))
@@ -263,10 +264,8 @@ def test_the_earlier_project_wins_a_board_two_projects_both_name() -> None:
     assert _board_of(db, "p-second") != "board-1"
 
 
-def test_two_users_may_share_a_project_id_and_still_get_distinct_boards() -> None:
+def test_two_users_may_share_a_project_id_and_still_get_distinct_boards(db: sqlite3.Connection) -> None:
     """`projects` is keyed (user_id, project_id), so the same id on two users is legal."""
-    db = _make_db()
-    _add_user(db, "u1")
     _add_user(db, "u2")
     _add_project(db, "shared-id", user_id="u1", name="Mine")
     _add_project(db, "shared-id", user_id="u2", name="Theirs")
@@ -276,9 +275,7 @@ def test_two_users_may_share_a_project_id_and_still_get_distinct_boards() -> Non
     assert _board_of(db, "shared-id", "u1") != _board_of(db, "shared-id", "u2")
 
 
-def test_a_created_board_is_private_unarchived_and_owned_by_the_project_owner() -> None:
-    db = _make_db()
-    _add_user(db, "u1")
+def test_a_created_board_is_private_unarchived_and_owned_by_the_project_owner(db: sqlite3.Connection) -> None:
     _add_project(db, "p1", name="Fresh project")
 
     _run(db)
@@ -290,12 +287,10 @@ def test_a_created_board_is_private_unarchived_and_owned_by_the_project_owner() 
     assert row == ("Fresh project", "u1", "private", 0)
 
 
-def test_an_adopted_board_is_un_archived() -> None:
+def test_an_adopted_board_is_un_archived(db: sqlite3.Connection) -> None:
     """Someone who archived their project's gallery board before upgrading would otherwise end up
     with a project whose board is hidden from every listing, and no route left to unhide it: the
     generic board API refuses `archived` on a claimed board, and there is no project archive API."""
-    db = _make_db()
-    _add_user(db, "u1")
     _add_board(db, "b1", name="Archived board", archived=True)
     _add_project(db, "p1", name="Project", data=_gallery_document("b1"))
 
@@ -306,11 +301,9 @@ def test_an_adopted_board_is_un_archived() -> None:
     assert archived == 0
 
 
-def test_a_refused_adoption_is_logged_with_its_reason() -> None:
+def test_a_refused_adoption_is_logged_with_its_reason(db: sqlite3.Connection) -> None:
     """A project that adopts nothing looks, to its owner, like a project that lost its images.
     Nothing else records which projects were affected or why."""
-    db = _make_db()
-    _add_user(db, "u1")
     _add_user(db, "u2")
     _add_board(db, "theirs", user_id="u2")
     _add_project(db, "p1", name="Mine", data=_gallery_document("theirs"))
@@ -325,11 +318,9 @@ def test_a_refused_adoption_is_logged_with_its_reason() -> None:
     assert "another account" in warnings[0]
 
 
-def test_a_project_whose_owner_is_gone_is_quarantined_before_the_live_table_is_rebuilt() -> None:
+def test_a_project_whose_owner_is_gone_is_quarantined_before_the_live_table_is_rebuilt(db: sqlite3.Connection) -> None:
     """The rebuilt table enforces the users foreign key that the old one did not. An orphan would
     abort the migration, and with it the app's ability to open the database at all."""
-    db = _make_db()
-    _add_user(db, "u1")
     _add_project(db, "kept", name="Kept")
     # Straight past the foreign key, the way a database that once ran without enforcement would.
     # The commit matters: the pragma is a no-op inside a transaction, and the insert above opened
@@ -401,9 +392,7 @@ def test_a_project_on_a_database_with_no_users_table_is_quarantined_rather_than_
     assert any("no users table" in warning for warning in warnings)
 
 
-def test_a_long_project_name_is_truncated_to_what_the_board_api_accepts() -> None:
-    db = _make_db()
-    _add_user(db, "u1")
+def test_a_long_project_name_is_truncated_to_what_the_board_api_accepts(db: sqlite3.Connection) -> None:
     _add_project(db, "p1", name="x" * 400)
 
     _run(db)
@@ -415,9 +404,7 @@ def test_a_long_project_name_is_truncated_to_what_the_board_api_accepts() -> Non
 # --- structure ------------------------------------------------------------------------------
 
 
-def test_every_project_gets_a_unique_board_and_the_column_rejects_reuse() -> None:
-    db = _make_db()
-    _add_user(db, "u1")
+def test_every_project_gets_a_unique_board_and_the_column_rejects_reuse(db: sqlite3.Connection) -> None:
     for index in range(5):
         _add_project(db, f"p{index}")
 
@@ -438,10 +425,8 @@ def test_every_project_gets_a_unique_board_and_the_column_rejects_reuse() -> Non
         pass
 
 
-def test_a_claimed_board_cannot_be_deleted_out_from_under_its_project() -> None:
+def test_a_claimed_board_cannot_be_deleted_out_from_under_its_project(db: sqlite3.Connection) -> None:
     """The FK is the database-level backstop behind the API's 409."""
-    db = _make_db()
-    _add_user(db, "u1")
     _add_project(db, "p1")
     _run(db)
 
@@ -452,9 +437,7 @@ def test_a_claimed_board_cannot_be_deleted_out_from_under_its_project() -> None:
         pass
 
 
-def test_board_membership_is_never_touched() -> None:
-    db = _make_db()
-    _add_user(db, "u1")
+def test_board_membership_is_never_touched(db: sqlite3.Connection) -> None:
     _add_board(db, "board-1")
     _add_board(db, "board-2")
     db.execute("INSERT INTO images VALUES ('i1.png');")
@@ -469,9 +452,7 @@ def test_board_membership_is_never_touched() -> None:
     assert db.execute("SELECT board_id, video_name FROM board_videos;").fetchall() == [("board-2", "v1.mp4")]
 
 
-def test_the_rebuilt_table_keeps_its_key_columns_ordering_and_trigger() -> None:
-    db = _make_db()
-    _add_user(db, "u1")
+def test_the_rebuilt_table_keeps_its_key_columns_ordering_and_trigger(db: sqlite3.Connection) -> None:
     db.execute(
         "INSERT INTO projects (project_id, user_id, name, data, revision, created_at, updated_at)"
         " VALUES ('p1','u1','first','{}', 7, '2020-01-01 00:00:00.000', '2020-01-02 00:00:00.000');"
@@ -504,9 +485,7 @@ def test_the_rebuilt_table_keeps_its_key_columns_ordering_and_trigger() -> None:
     )
 
 
-def test_deleting_a_user_still_cascades_their_projects() -> None:
-    db = _make_db()
-    _add_user(db, "u1")
+def test_deleting_a_user_still_cascades_their_projects(db: sqlite3.Connection) -> None:
     _add_project(db, "p1")
     _run(db)
 
@@ -515,9 +494,7 @@ def test_deleting_a_user_still_cascades_their_projects() -> None:
     assert db.execute("SELECT COUNT(*) FROM projects;").fetchone()[0] == 0
 
 
-def test_foreign_keys_are_consistent_afterwards() -> None:
-    db = _make_db()
-    _add_user(db, "u1")
+def test_foreign_keys_are_consistent_afterwards(db: sqlite3.Connection) -> None:
     _add_board(db, "board-1")
     _add_project(db, "p1", data=_gallery_document("board-1"))
     _add_project(db, "p2")

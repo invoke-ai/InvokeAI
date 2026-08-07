@@ -12,16 +12,7 @@ from fastapi import status
 from fastapi.testclient import TestClient
 
 from invokeai.app.services.invoker import Invoker
-
-
-def _auth(token: str) -> dict[str, str]:
-    return {"Authorization": f"Bearer {token}"}
-
-
-def _create_board(client: TestClient, token: str, name: str = "Loose+Board") -> str:
-    response = client.post(f"/api/v1/boards/?board_name={name}", headers=_auth(token))
-    assert response.status_code == status.HTTP_201_CREATED
-    return response.json()["board_id"]
+from tests.app.routers.conftest import _auth, _create_board
 
 
 def _create_project(client: TestClient, token: str, **body: Any):

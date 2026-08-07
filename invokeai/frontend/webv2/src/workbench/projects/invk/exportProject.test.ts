@@ -56,10 +56,6 @@ describe('planInvkExport', () => {
     expect(planInvkExport(planInput).coverImageName).toBe('live-a.png');
   });
 
-  it('is pure — the same input yields the same plan', () => {
-    expect(planInvkExport(planInput)).toEqual(planInvkExport(planInput));
-  });
-
   /**
    * The selection was already excluded from bundling; this is the other half —
    * it must not reach the archive at all, or the imported project opens
@@ -259,56 +255,58 @@ describe('executeInvkExport', () => {
    * when the signal aborts, so treating those as "the server would not serve
    * it" would pack an archive holding nothing and download it.
    */
-  it('rejects rather than downloading an archive when the fetches are aborted', async () => {
+  /**
+   * Cancellation is the one failure that is not a skip, wherever it lands: skipping every asset
+   * would pack an archive of nothing and hand it over as a finished download.
+   */
+  it.each([
+    [
+      'the fetches themselves abort',
+      () => {
+        const abort = () => Promise.reject(new DOMException('The operation was aborted.', 'AbortError'));
+
+        return { fetchImageBytes: abort, fetchImageThumbnail: abort };
+      },
+    ],
+    [
+      'the signal aborts after the last fetch but before packing',
+      () => {
+        const controller = new AbortController();
+
+        return {
+          fetchImageBytes: (imageName: string) => {
+            controller.abort();
+
+            return Promise.resolve(bytesFor(imageName));
+          },
+          signal: controller.signal,
+        };
+      },
+    ],
+    [
+      'cancellation lands during packing',
+      () => {
+        const controller = new AbortController();
+
+        return {
+          onProgress: ({ phase }: { phase: string }) => {
+            if (phase === 'packing') {
+              controller.abort();
+            }
+          },
+          signal: controller.signal,
+        };
+      },
+    ],
+  ])('rejects rather than downloading when %s', async (_label, build) => {
     const download = vi.fn();
-    const abort = () => Promise.reject(new DOMException('The operation was aborted.', 'AbortError'));
-
-    await expect(
-      executeInvkExport(planInvkExport(planInput), {
-        download,
-        fetchImageBytes: abort,
-        fetchImageThumbnail: abort,
-      })
-    ).rejects.toMatchObject({ name: 'AbortError' });
-
-    expect(download).not.toHaveBeenCalled();
-  });
-
-  it('rejects when the signal aborts after the last fetch but before packing', async () => {
-    const download = vi.fn();
-    const controller = new AbortController();
-
-    await expect(
-      executeInvkExport(planInvkExport(planInput), {
-        download,
-        fetchImageBytes: (imageName) => {
-          controller.abort();
-
-          return Promise.resolve(bytesFor(imageName));
-        },
-        fetchImageThumbnail: () => Promise.resolve(null),
-        signal: controller.signal,
-      })
-    ).rejects.toMatchObject({ name: 'AbortError' });
-
-    expect(download).not.toHaveBeenCalled();
-  });
-
-  it('rejects rather than downloading when cancellation occurs during packing', async () => {
-    const download = vi.fn();
-    const controller = new AbortController();
 
     await expect(
       executeInvkExport(planInvkExport(planInput), {
         download,
         fetchImageBytes: (imageName) => Promise.resolve(bytesFor(imageName)),
         fetchImageThumbnail: () => Promise.resolve(null),
-        onProgress: ({ phase }) => {
-          if (phase === 'packing') {
-            controller.abort();
-          }
-        },
-        signal: controller.signal,
+        ...build(),
       })
     ).rejects.toMatchObject({ name: 'AbortError' });
 

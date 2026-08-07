@@ -1,8 +1,6 @@
 import { ApiError } from '@platform/transport/http';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type * as assetTransportModule from './assetTransport';
-
 import { INVK_MAX_ARCHIVE_BYTES } from './archive';
 
 const mocks = vi.hoisted(() => ({ apiFetch: vi.fn(), apiFetchJson: vi.fn(), apiFetchRaw: vi.fn() }));
@@ -19,6 +17,7 @@ import {
   copyVideosToBoard,
   createAssetResponseReader,
   createStagingBoard,
+  deleteArchiveImages,
   deleteArchiveVideos,
   deleteStagingBoard,
   fetchImageBytes,
@@ -69,23 +68,13 @@ describe('import rollback transport', () => {
   });
 
   it('sends authoritative image and video identities to their batch-delete routes', async () => {
-    const transport = (await import('./assetTransport')) as typeof assetTransportModule & {
-      deleteArchiveImages?: (names: string[], signal?: AbortSignal) => Promise<void>;
-      deleteArchiveVideos?: (names: string[], signal?: AbortSignal) => Promise<void>;
-    };
-
-    expect(transport.deleteArchiveImages).toBeTypeOf('function');
-    expect(transport.deleteArchiveVideos).toBeTypeOf('function');
-
-    if (!transport.deleteArchiveImages || !transport.deleteArchiveVideos) {
-      return;
-    }
-
+    // Imported at the top rather than probed for: a `toBeTypeOf` guard with an early return passes
+    // silently if the export ever disappears, which is the one thing this test exists to catch.
     const signal = new AbortController().signal;
 
     mocks.apiFetchJson.mockResolvedValue({});
-    await transport.deleteArchiveImages(['server-image.png'], signal);
-    await transport.deleteArchiveVideos(['server-video.mp4'], signal);
+    await deleteArchiveImages(['server-image.png'], signal);
+    await deleteArchiveVideos(['server-video.mp4'], signal);
 
     expect(mocks.apiFetchJson).toHaveBeenNthCalledWith(1, '/api/v1/images/delete', {
       body: JSON.stringify({ image_names: ['server-image.png'] }),
@@ -118,38 +107,31 @@ describe('board media transport', () => {
     mocks.apiFetchJson.mockReset();
   });
 
-  it('uploads an image onto the staging board under its archived category', async () => {
-    mocks.apiFetch.mockResolvedValue(
-      new Response(JSON.stringify({ height: 2, image_name: 'fresh.png', width: 3 }), { status: 201 })
-    );
+  it.each([
+    [
+      'image',
+      () =>
+        uploadBoardImage(new Uint8Array([1]), 'archived.png', {
+          boardId: 'staging',
+          category: 'control',
+          contentType: 'image/png',
+        }),
+      { height: 2, image_name: 'fresh.png', width: 3 },
+      { height: 2, imageName: 'fresh.png', width: 3 },
+      { board_id: 'staging', image_category: 'control', is_intermediate: 'false' },
+    ],
+    [
+      'video',
+      () => uploadBoardVideo(new Uint8Array([1]), 'archived.mp4', { boardId: 'staging', category: 'user' }),
+      { video_name: 'fresh.mp4' },
+      { videoName: 'fresh.mp4' },
+      { board_id: 'staging', is_intermediate: 'false', video_category: 'user' },
+    ],
+  ])('uploads a %s onto the staging board under its archived category', async (_kind, upload, dto, expected, query) => {
+    mocks.apiFetch.mockResolvedValue(new Response(JSON.stringify(dto), { status: 201 }));
 
-    await expect(
-      uploadBoardImage(new Uint8Array([1]), 'archived.png', {
-        boardId: 'staging',
-        category: 'control',
-        contentType: 'image/png',
-      })
-    ).resolves.toEqual({ height: 2, imageName: 'fresh.png', width: 3 });
-
-    expect(Object.fromEntries(uploadQuery())).toEqual({
-      board_id: 'staging',
-      image_category: 'control',
-      is_intermediate: 'false',
-    });
-  });
-
-  it('uploads a video onto the staging board under its archived category', async () => {
-    mocks.apiFetch.mockResolvedValue(new Response(JSON.stringify({ video_name: 'fresh.mp4' }), { status: 201 }));
-
-    await expect(
-      uploadBoardVideo(new Uint8Array([1]), 'archived.mp4', { boardId: 'staging', category: 'user' })
-    ).resolves.toEqual({ videoName: 'fresh.mp4' });
-
-    expect(Object.fromEntries(uploadQuery())).toEqual({
-      board_id: 'staging',
-      is_intermediate: 'false',
-      video_category: 'user',
-    });
+    await expect(upload()).resolves.toEqual(expected);
+    expect(Object.fromEntries(uploadQuery())).toEqual(query);
   });
 
   /**

@@ -145,60 +145,35 @@ describe('collectLiveAssetRefs', () => {
    * assertion is the regression guard: the exclusion is by key, so it survives
    * `GalleryItem` spelling its name field the same way the canvas does.
    */
-  it('excludes the gallery selection, of either kind', () => {
-    const refs = collectLiveAssetRefs(
-      projectDocument({
-        widgetInstances: {
-          'gallery-1': {
-            state: {
-              values: {
-                selectedImage: { fullUrl: '', kind: 'video', name: 'selected.mp4' },
-                selectedImageName: 'video:selected.mp4',
-                selectedImageNames: ['video:selected.mp4'],
-              },
-            },
-            typeId: 'gallery',
-          },
-        },
-      })
-    );
-
-    expect(refs.videos).toEqual(new Set());
-    expect(refs.images.has('selected.mp4')).toBe(false);
-  });
-
   /**
-   * `compareImage` is a `GeneratedImageContract`, so it carries `imageName` and
-   * would otherwise be collected. A comparison left open is not project content.
+   * `compareImage` is a `GeneratedImageContract`, so it carries `imageName` and would otherwise be
+   * collected. A comparison left open is not project content. The last row guards the exclusion
+   * against `selectedImage` starting to spell its name `imageName`, which no collector key matches
+   * today only by accident.
    */
-  it('excludes the compare selection', () => {
-    const { images } = collectLiveAssetRefs(
-      projectDocument({
-        widgetInstances: {
-          'gallery-1': {
-            state: { values: { compareImage: { ...imageRef('compare.png'), imageUrl: '' } } },
-            typeId: 'gallery',
-          },
-        },
-      })
+  it.each([
+    [
+      'the selection, of either kind',
+      {
+        selectedImage: { fullUrl: '', kind: 'video', name: 'selected.mp4' },
+        selectedImageName: 'video:selected.mp4',
+        selectedImageNames: ['video:selected.mp4'],
+      },
+      'selected.mp4',
+    ],
+    ['the compare selection', { compareImage: { ...imageRef('compare.png'), imageUrl: '' } }, 'compare.png'],
+    [
+      'a selection spelling its name `imageName`',
+      { selectedImage: { imageName: 'selected.png', kind: 'image' } },
+      'selected.png',
+    ],
+  ])('excludes %s', (_label, values, excluded) => {
+    const refs = collectLiveAssetRefs(
+      projectDocument({ widgetInstances: { 'gallery-1': { state: { values }, typeId: 'gallery' } } })
     );
 
-    expect(images.has('compare.png')).toBe(false);
-  });
-
-  it('keeps excluding the gallery selection even if it starts spelling its name `imageName`', () => {
-    const { images } = collectLiveAssetRefs(
-      projectDocument({
-        widgetInstances: {
-          'gallery-1': {
-            state: { values: { selectedImage: { imageName: 'selected.png', kind: 'image' } } },
-            typeId: 'gallery',
-          },
-        },
-      })
-    );
-
-    expect(images.has('selected.png')).toBe(false);
+    expect(refs.images.has(excluded)).toBe(false);
+    expect(refs.videos.has(excluded)).toBe(false);
   });
 });
 
@@ -234,12 +209,6 @@ describe('stripInstallationState', () => {
     expect(JSON.stringify(stripped)).not.toContain('compare.png');
     // History is not selection: those references travel deliberately.
     expect(JSON.stringify(stripped)).toContain('recent.png');
-  });
-
-  it('leaves a document with no selection identical', () => {
-    const document = { canvas: { document: { layers: [imageLayer('l1', 'a.png')] } }, id: 'p1' };
-
-    expect(stripInstallationState(document)).toBe(document);
   });
 
   it('keeps the surrounding widget state intact', () => {
@@ -317,23 +286,22 @@ describe('stripInstallationState', () => {
     expect(JSON.stringify(stripped)).not.toContain('source-install');
   });
 
-  it('leaves an already-blank URL identical', () => {
-    const document = {
-      widgetStates: { gallery: { values: { recentImages: [{ imageName: 'a.png', imageUrl: '' }] } } },
-    };
-
-    expect(stripInstallationState(document)).toBe(document);
-  });
-
   /**
-   * Only the gallery widget's own two keys are installation state. A board named
-   * by a workflow node is an authored input and has to survive the round trip.
+   * Subtrees with nothing to change keep their identity. The last row matters most: only the
+   * gallery widget's own two keys are installation state, so a board named by a workflow node is an
+   * authored input that has to survive the round trip.
    */
-  it('keeps board references that mean something to the document', () => {
-    const document = {
-      workflow: { nodes: [{ inputs: { board: { value: { board_id: 'board-3' } } }, type: 'save_image' }] },
-    };
-
+  it.each([
+    ['no selection', { canvas: { document: { layers: [imageLayer('l1', 'a.png')] } }, id: 'p1' }],
+    [
+      'an already-blank URL',
+      { widgetStates: { gallery: { values: { recentImages: [{ imageName: 'a.png', imageUrl: '' }] } } } },
+    ],
+    [
+      'a board reference that means something',
+      { workflow: { nodes: [{ inputs: { board: { value: { board_id: 'board-3' } } }, type: 'save_image' }] } },
+    ],
+  ])('returns a document with %s unchanged', (_label, document) => {
     expect(stripInstallationState(document)).toBe(document);
   });
 });
@@ -444,11 +412,10 @@ describe('selectCoverImageName', () => {
     ).toBe('below.png');
   });
 
-  it('is null for a project that has produced nothing', () => {
-    expect(selectCoverImageName({ canvas: { document: { layers: [] } }, id: 'p', layout: {}, name: 'n' })).toBeNull();
-  });
-
-  it('is null for a document missing the canvas entirely', () => {
-    expect(selectCoverImageName({ id: 'p', layout: {}, name: 'n' })).toBeNull();
+  it.each([
+    ['a project that has produced nothing', { canvas: { document: { layers: [] } }, id: 'p', layout: {}, name: 'n' }],
+    ['a document missing the canvas entirely', { id: 'p', layout: {}, name: 'n' }],
+  ])('is null for %s', (_label, document) => {
+    expect(selectCoverImageName(document)).toBeNull();
   });
 });

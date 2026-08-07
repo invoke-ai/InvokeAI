@@ -747,61 +747,58 @@ describe('authoritative project boards', () => {
    * resolves, by design; the outcome is the only thing that distinguishes them.
    */
   describe('what a flush reports', () => {
-    it('acknowledges a push the server took', async () => {
+    /**
+     * `arrange` runs after the project is open and before the flush, so each row states exactly
+     * what makes its outcome different. The un-renamed row still pushes: hydration normalizes the
+     * document, so its serialized form differs from what the server holds.
+     */
+    it.each([
+      ['acknowledged', 'a push the server took', 'Edited', () => undefined],
+      ['acknowledged', 'a project the server already holds unchanged', undefined, () => undefined],
+      [
+        'unsynced',
+        'a push the server never took',
+        'Edited',
+        () => {
+          api.updateProject.mockRejectedValueOnce(new Error('the proxy refused the body'));
+        },
+      ],
+      [
+        'superseded',
+        'a fork, because the id now holds the other version',
+        'My version',
+        (id: string, project: Project) => {
+          // The other device wins the race with content of its own, so this is a genuine
+          // divergence rather than a revision that merely drifted.
+          api.__records.set(id, {
+            ...api.__records.get(id)!,
+            data: persistence.serializeProjectDocument({ ...project, name: 'Their version' }),
+            name: 'Their version',
+            revision: 99,
+          });
+        },
+      ],
+      [
+        'superseded',
+        'a project deleted elsewhere',
+        'Edited locally',
+        (id: string) => {
+          api.__records.delete(id);
+        },
+      ],
+    ])('reports %s for %s', async (kind, _label, rename, arrange) => {
       const project = seedServerProject('Synced');
       const opened = await service.hydrateProjectFromServer(project.id);
 
-      await expect(service.flushProjectToServer({ ...opened!, name: 'Edited' })).resolves.toMatchObject({
-        kind: 'acknowledged',
-      });
-    });
+      arrange(project.id, project);
 
-    it('acknowledges a project the server already holds unchanged', async () => {
-      const project = seedServerProject('Synced');
-      const opened = await service.hydrateProjectFromServer(project.id);
+      const flushed = rename === undefined ? opened! : { ...opened!, name: rename };
 
-      await expect(service.flushProjectToServer(opened!)).resolves.toMatchObject({ kind: 'acknowledged' });
-    });
+      await expect(service.flushProjectToServer(flushed)).resolves.toMatchObject({ kind });
 
-    it('reports a push the server never took as unsynced', async () => {
-      const project = seedServerProject('Synced');
-      const opened = await service.hydrateProjectFromServer(project.id);
-
-      api.updateProject.mockRejectedValueOnce(new Error('the proxy refused the body'));
-
-      await expect(service.flushProjectToServer({ ...opened!, name: 'Edited' })).resolves.toMatchObject({
-        kind: 'unsynced',
-      });
-      expect(service.hasPendingChanges()).toBe(true);
-    });
-
-    it('reports a fork as superseded, because the id now holds the other version', async () => {
-      const project = seedServerProject('Contested');
-      const opened = await service.hydrateProjectFromServer(project.id);
-
-      // The other device wins the race with content of its own, so this is a genuine divergence
-      // rather than a revision that merely drifted.
-      api.__records.set(project.id, {
-        ...api.__records.get(project.id)!,
-        data: persistence.serializeProjectDocument({ ...project, name: 'Their version' }),
-        name: 'Their version',
-        revision: 99,
-      });
-
-      await expect(service.flushProjectToServer({ ...opened!, name: 'My version' })).resolves.toMatchObject({
-        kind: 'superseded',
-      });
-    });
-
-    it('reports a project deleted elsewhere as superseded', async () => {
-      const project = seedServerProject('Deleted elsewhere');
-      const opened = await service.hydrateProjectFromServer(project.id);
-
-      api.__records.delete(project.id);
-
-      await expect(service.flushProjectToServer({ ...opened!, name: 'Edited locally' })).resolves.toMatchObject({
-        kind: 'superseded',
-      });
+      if (kind === 'unsynced') {
+        expect(service.hasPendingChanges()).toBe(true);
+      }
     });
   });
 

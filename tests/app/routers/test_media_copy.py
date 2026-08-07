@@ -23,19 +23,10 @@ from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.names.names_default import SimpleNameService
 from invokeai.app.services.urls.urls_default import LocalUrlService
+from tests.app.routers.conftest import _auth, _create_board
 
 SOURCE_METADATA = {"positive_prompt": "a cat", "seed": 12345}
 SOURCE_WORKFLOW = '{"name": "a workflow"}'
-
-
-def _auth(token: str) -> dict[str, str]:
-    return {"Authorization": f"Bearer {token}"}
-
-
-def _create_board(client: TestClient, token: str, name: str = "Target") -> str:
-    response = client.post(f"/api/v1/boards/?board_name={name}", headers=_auth(token))
-    assert response.status_code == status.HTTP_201_CREATED
-    return response.json()["board_id"]
 
 
 def _owner_id(client: TestClient, token: str) -> str:
@@ -142,23 +133,12 @@ def test_copying_an_image_leaves_the_source_untouched(
     copy_path = real_images.get_path(copy_name, image_subfolder=copy_record.image_subfolder)
     assert copy_path != source_path
     assert copy_path.read_bytes() == source_bytes
+    # Copied without a board, so it lands uncategorized rather than on one of the caller's.
+    assert mock_invoker.services.images.get_dto(copy_name).board_id is None
     # And the source's own provenance still reads back the way it did before the copy.
     assert mock_invoker.services.images.get_workflow(source.image_name) == SOURCE_WORKFLOW
     source_metadata = mock_invoker.services.images.get_metadata(source.image_name)
     assert source_metadata is not None and json.loads(source_metadata.model_dump_json()) == SOURCE_METADATA
-
-
-def test_copying_without_a_board_leaves_the_copy_uncategorized(
-    client: TestClient, mock_invoker: Invoker, user1_token: str, real_images: DiskImageFileStorage
-):
-    user_id = _owner_id(client, user1_token)
-    source = _create_source_image(mock_invoker, user_id)
-
-    response = _copy_images(client, user1_token, image_names=[source.image_name])
-
-    assert response.status_code == status.HTTP_200_OK
-    copy_name = response.json()["copied"][0]["image_name"]
-    assert mock_invoker.services.images.get_dto(copy_name).board_id is None
 
 
 def test_one_unreadable_source_does_not_cost_the_batch(

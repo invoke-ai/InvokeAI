@@ -155,37 +155,9 @@ const acceptCreate = (): void => {
 
 beforeEach(async () => {
   vi.resetModules();
-  vi.clearAllMocks();
-  transport.fetchImageBytes.mockImplementation((imageName: string) =>
-    Promise.resolve(new TextEncoder().encode(`bytes:${imageName}`))
-  );
-  transport.fetchImageThumbnail.mockImplementation(() => Promise.resolve(null));
-  transport.findExistingImageNames.mockImplementation((_names: readonly string[]) =>
-    Promise.resolve(new Set<string>())
-  );
-  transport.findExistingVideoNames.mockImplementation((_names: readonly string[]) =>
-    Promise.resolve(new Set<string>())
-  );
-  transport.uploadArchiveImage.mockImplementation((_bytes: Uint8Array, fileName: string) =>
-    Promise.resolve({ height: 1, imageName: `server-${fileName}`, width: 1 })
-  );
-  transport.uploadArchiveVideo.mockImplementation((_bytes: Uint8Array, fileName: string) =>
-    Promise.resolve({ videoName: `server-${fileName}` })
-  );
-  transport.uploadBoardImage.mockImplementation((_bytes: Uint8Array, fileName: string) =>
-    Promise.resolve({ height: 1, imageName: `board-${fileName}`, width: 1 })
-  );
-  transport.uploadBoardVideo.mockImplementation((_bytes: Uint8Array, fileName: string) =>
-    Promise.resolve({ videoName: `board-${fileName}` })
-  );
-  transport.starImages.mockImplementation((_names: readonly string[]) => Promise.resolve({ failed: [] as string[] }));
-  transport.starVideos.mockImplementation((_names: readonly string[]) => Promise.resolve({ failed: [] as string[] }));
-  transport.createStagingBoard.mockImplementation(() => Promise.resolve('staging-board'));
-  transport.deleteStagingBoard.mockImplementation(() => Promise.resolve());
-  transport.deleteArchiveImages.mockImplementation(() => Promise.resolve());
-  transport.deleteArchiveVideos.mockImplementation(() => Promise.resolve());
-  api.getProjectBoardSnapshot.mockImplementation(() => Promise.resolve({ items: [] }));
-  api.getClientStateValue.mockImplementation(() => Promise.resolve(null));
+  // `resetAllMocks` restores the implementations the hoisted `vi.fn(impl)` factories declare, so
+  // the defaults do not need re-establishing here.
+  vi.resetAllMocks();
 
   projectFile = await import('./projectFile');
   persistence = await import('./syncedPersistence');
@@ -541,33 +513,6 @@ describe('importing a project board', () => {
     expect(api.createProjectSettled.mock.calls[0]![0]).not.toHaveProperty('board_id');
   });
 
-  it('creates no staging board for a document that will not rehydrate', async () => {
-    const { textEntry, writeArchive } = await import('./invk/archive');
-    const blob = await writeArchive(
-      new Map([
-        [
-          'manifest.json',
-          textEntry(
-            JSON.stringify({
-              appVersion: '7.0',
-              contents: 'workbench-project',
-              createdAt: '',
-              name: 'No layout',
-              version: 2,
-            })
-          ),
-        ],
-        ['board.json', textEntry(JSON.stringify({ items: [], version: 1 }))],
-        ['project.json', textEntry(JSON.stringify({ name: 'No layout' }))],
-      ])
-    );
-
-    await expect(projectFile.importProjectFile(new File([blob], 'broken.invk'))).rejects.toMatchObject({
-      reason: 'damaged',
-    });
-    expect(transport.createStagingBoard).not.toHaveBeenCalled();
-  });
-
   it('deletes the media it created and then the staging board when the create fails', async () => {
     const account = await import('@platform/state/accountLifecycle');
     const primaryFailure = new ProjectCreateAbsentError(new Error('project create rejected'));
@@ -678,28 +623,6 @@ describe('importProjectFile', () => {
     expect(transport.uploadArchiveImage).not.toHaveBeenCalled();
   });
 
-  it('refuses a legacy canvas project by reason', async () => {
-    const { binaryEntry, textEntry, writeArchive } = await import('./invk/archive');
-    const blob = await writeArchive(
-      new Map([
-        ['manifest.json', textEntry(JSON.stringify({ appVersion: '6.9', createdAt: '', name: 'C', version: 1 }))],
-        ['canvas_state.json', binaryEntry(new Uint8Array([1]))],
-      ])
-    );
-
-    await expect(projectFile.importProjectFile(new File([blob], 'legacy.invk'))).rejects.toMatchObject({
-      reason: 'legacy-canvas-project',
-    });
-    expect(api.createProjectSettled).not.toHaveBeenCalled();
-  });
-
-  it('refuses a file that is not an archive before touching the server', async () => {
-    await expect(projectFile.importProjectFile(new File(['{"some":"json"}'], 'x.invk'))).rejects.toMatchObject({
-      reason: 'not-a-project',
-    });
-    expect(api.createProjectSettled).not.toHaveBeenCalled();
-  });
-
   it('refuses a damaged document before any asset or project mutation', async () => {
     const { binaryEntry, textEntry, writeArchive } = await import('./invk/archive');
     const blob = await writeArchive(
@@ -734,6 +657,7 @@ describe('importProjectFile', () => {
     await expect(projectFile.importProjectFile(new File([blob], 'broken.invk'))).rejects.toMatchObject({
       reason: 'damaged',
     });
+    expect(transport.createStagingBoard).not.toHaveBeenCalled();
     expect(transport.findExistingImageNames).not.toHaveBeenCalled();
     expect(transport.findExistingVideoNames).not.toHaveBeenCalled();
     expect(transport.uploadArchiveImage).not.toHaveBeenCalled();

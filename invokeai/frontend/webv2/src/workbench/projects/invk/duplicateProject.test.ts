@@ -117,20 +117,19 @@ const restoredLayerName = (): string =>
 
 beforeEach(async () => {
   vi.resetModules();
-  vi.clearAllMocks();
+  // Restores the hoisted `vi.fn(impl)` defaults; only `createProjectSettled`, which has none, is
+  // re-established below.
+  vi.resetAllMocks();
 
   const account = await import('@platform/state/accountLifecycle');
 
   account.accountLifecycle.activate('duplicate-user');
   owner = account.captureAccountScope();
 
-  transport.createStagingBoard.mockImplementation(() => Promise.resolve('staging-board'));
+  // These two are hoisted as bare `vi.fn()` with no implementation, so unlike the rest they are
+  // not restored by the reset above.
   transport.copyImagesToBoard.mockImplementation((names: readonly string[]) => Promise.resolve(copiesOf(names)));
   transport.copyVideosToBoard.mockImplementation((names: readonly string[]) => Promise.resolve(copiesOf(names)));
-  transport.findExistingImageNames.mockImplementation((names: readonly string[]) => Promise.resolve(new Set(names)));
-  transport.findExistingVideoNames.mockImplementation((names: readonly string[]) => Promise.resolve(new Set(names)));
-  transport.starImages.mockImplementation(() => Promise.resolve({ failed: [] }));
-  transport.starVideos.mockImplementation(() => Promise.resolve({ failed: [] }));
   api.createProjectSettled.mockImplementation(
     (request: { board_id?: string; data: Record<string, unknown>; name: string; project_id: string }) =>
       Promise.resolve({

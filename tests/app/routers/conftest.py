@@ -96,6 +96,12 @@ def _auth(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
+def _create_board(client: TestClient, token: str, name: str = "Loose+Board") -> str:
+    response = client.post(f"/api/v1/boards/?board_name={name}", headers=_auth(token))
+    assert response.status_code == 201
+    return response.json()["board_id"]
+
+
 @pytest.fixture
 def enable_multiuser(monkeypatch: Any, mock_invoker: Invoker):
     """Enable multiuser mode and patch ApiDependencies across the routers covered by router-level tests.

@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from 'vitest';
 import type { InvkBoardItem } from './board';
 
 import { binaryEntry, INVK_MAX_ARCHIVE_BYTES, textEntry, writeArchive } from './archive';
-import { InvkFormatError } from './format';
 import { createArchiveMediaMaterializer, readInvkArchive, restoreArchiveMedia } from './importProject';
 import { createRestoredMediaLedger } from './restoreProjectMedia';
 
@@ -156,35 +155,14 @@ describe('readInvkArchive', () => {
     await expect(readInvkArchive(file)).rejects.toMatchObject({ reason: 'legacy-canvas-project' });
   });
 
-  it('refuses an archive with no manifest', async () => {
-    await expect(readInvkArchive(await archiveFile({ 'project.json': '{}' }))).rejects.toMatchObject({
-      reason: 'not-a-project',
-    });
-  });
-
-  it('refuses a file that is not a ZIP', async () => {
-    await expect(readInvkArchive(new File(['not a zip'], 'project.invk'))).rejects.toMatchObject({
-      reason: 'not-a-project',
-    });
-  });
-
-  it('reports a manifest without a document as damaged', async () => {
-    const file = await archiveFile({ 'manifest.json': JSON.stringify(manifest()) });
-
-    await expect(readInvkArchive(file)).rejects.toMatchObject({ reason: 'damaged' });
-  });
-
-  it('reports an unparseable document as damaged', async () => {
-    const file = await validArchive({ 'project.json': 'not json' });
-
-    await expect(readInvkArchive(file)).rejects.toBeInstanceOf(InvkFormatError);
-    await expect(readInvkArchive(file)).rejects.toMatchObject({ reason: 'damaged' });
-  });
-
-  it('reports a document that is an array as damaged', async () => {
-    await expect(readInvkArchive(await validArchive({ 'project.json': '[]' }))).rejects.toMatchObject({
-      reason: 'damaged',
-    });
+  it.each([
+    ['an archive with no manifest', () => archiveFile({ 'project.json': '{}' }), 'not-a-project'],
+    ['a file that is not a ZIP', () => new File(['not a zip'], 'project.invk'), 'not-a-project'],
+    ['a manifest with no document', () => archiveFile({ 'manifest.json': JSON.stringify(manifest()) }), 'damaged'],
+    ['an unparseable document', () => validArchive({ 'project.json': 'not json' }), 'damaged'],
+    ['a document that is an array', () => validArchive({ 'project.json': '[]' }), 'damaged'],
+  ])('refuses %s as %s', async (_label, build, reason) => {
+    await expect(readInvkArchive(await build())).rejects.toMatchObject({ name: 'InvkFormatError', reason });
   });
 });
 

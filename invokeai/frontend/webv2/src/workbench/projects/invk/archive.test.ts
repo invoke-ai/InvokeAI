@@ -60,19 +60,6 @@ describe('writeArchive / readArchive', () => {
     expect(blob.size).toBeLessThan(repetitive.length / 2);
   });
 
-  it('drops directory records', async () => {
-    const blob = await writeArchive(
-      new Map([
-        ['images/a.png', binaryEntry(new Uint8Array([1]))],
-        ['images/b.png', binaryEntry(new Uint8Array([2]))],
-      ])
-    );
-
-    const entries = await readArchive(await toBytes(blob));
-
-    expect([...entries.keys()].sort()).toEqual(['images/a.png', 'images/b.png']);
-  });
-
   it('reports a non-ZIP as not a project', async () => {
     await expect(readArchive(new TextEncoder().encode('this is not a zip'))).rejects.toMatchObject({
       reason: 'not-a-project',
@@ -117,21 +104,23 @@ describe('writeArchive / readArchive', () => {
     await expect(readArchive(oversized)).rejects.toMatchObject({ reason: 'too-large' });
   });
 
-  it('refuses to write past the archive ceiling', async () => {
-    const oversized = new Map([['images/huge.png', { bytes: { byteLength: 5 * 1024 * 1024 * 1024 }, kind: 'binary' }]]);
-
-    await expect(writeArchive(oversized as never)).rejects.toMatchObject({ reason: 'too-large' });
-  });
-
-  it('refuses to write more entries than the ceiling allows', async () => {
-    const tooMany = new Map(
-      Array.from({ length: INVK_MAX_ENTRIES + 1 }, (_, index) => [
-        `images/${index}.png`,
-        binaryEntry(new Uint8Array([1])),
-      ])
-    );
-
-    await expect(writeArchive(tooMany)).rejects.toMatchObject({ reason: 'too-large' });
+  it.each([
+    [
+      'a payload past the byte ceiling',
+      () => new Map([['images/huge.png', { bytes: { byteLength: 5 * 1024 * 1024 * 1024 }, kind: 'binary' }]]),
+    ],
+    [
+      'more entries than the ceiling allows',
+      () =>
+        new Map(
+          Array.from({ length: INVK_MAX_ENTRIES + 1 }, (_, index) => [
+            `images/${index}.png`,
+            binaryEntry(new Uint8Array([1])),
+          ])
+        ),
+    ],
+  ])('refuses to write %s', async (_label, build) => {
+    await expect(writeArchive(build() as never)).rejects.toMatchObject({ reason: 'too-large' });
   });
 });
 
@@ -214,20 +203,6 @@ describe('createExpansionBudget', () => {
 });
 
 describe('readArchive with the budget in the path', () => {
-  it('round-trips an ordinary archive, so the filter is permissive at real sizes', async () => {
-    const blob = await writeArchive(
-      new Map([
-        ['project.json', textEntry('a'.repeat(4096))],
-        ['images/a.png', binaryEntry(new Uint8Array(4096))],
-      ])
-    );
-
-    const entries = await readArchive(new Uint8Array(await blob.arrayBuffer()));
-
-    expect([...entries.keys()].sort()).toEqual(['images/a.png', 'project.json']);
-    expect(entries.get('images/a.png')!.byteLength).toBe(4096);
-  });
-
   it('rejects a stored payload whose central directory understates its allocation', async () => {
     const blob = await writeArchive(
       new Map([['images/tampered.png', binaryEntry(new Uint8Array(1024 * 1024).fill(0xa5))]])

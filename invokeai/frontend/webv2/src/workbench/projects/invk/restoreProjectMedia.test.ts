@@ -166,26 +166,6 @@ describe('board media', () => {
     ).rejects.toBe(cancelled);
   });
 
-  it('reports a descriptor the source could not materialize', async () => {
-    const result = await restore(
-      { boardItems: [boardItem({ name: 'gone.png' })] },
-      {
-        materializeBoardMedia: (items, _boardId, onItemSettled) => {
-          onItemSettled();
-
-          return Promise.resolve({
-            failed: items.map((item) => ({ kind: item.kind, name: item.name, reason: 'missing-entry' as const })),
-            materialized: [],
-          });
-        },
-      }
-    );
-
-    expect(result.boardItemIssues).toEqual([{ kind: 'image', name: 'gone.png', reason: 'missing-entry' }]);
-    expect(result.documentReferenceIssues).toEqual([]);
-    expect(result.ledger.boardImageNames).toEqual([]);
-  });
-
   /**
    * The invariant this module exists for. The old name is not neutral: on the same server it is
    * already taken, by the source project's own image.
@@ -237,24 +217,6 @@ describe('board media', () => {
     expect(result.documentReferenceIssues).toEqual([]);
   });
 
-  it('reports a failure the materializer raised twice only once', async () => {
-    const result = await restore(
-      { boardItems: [boardItem({ name: 'twice.png' })], documentRefs: [imageRef('twice.png')] },
-      {
-        materializeBoardMedia: (items, _boardId, onItemSettled) => {
-          onItemSettled();
-
-          const failed = items.map((item) => ({ kind: item.kind, name: item.name, reason: 'upload-failed' as const }));
-
-          return Promise.resolve({ failed: [...failed, ...failed], materialized: [] });
-        },
-      }
-    );
-
-    expect(result.boardItemIssues).toEqual([{ kind: 'image', name: 'twice.png', reason: 'upload-failed' }]);
-    expect(result.documentReferenceIssues).toEqual([{ kind: 'image', name: 'twice.png', reason: 'upload-failed' }]);
-  });
-
   it('keeps two failures the board never described apart', async () => {
     // No descriptor position to derive from. Collapsing both onto index 0 would merge two unrelated
     // missing items into one dangling reference.
@@ -279,14 +241,54 @@ describe('board media', () => {
   });
 
   /** A materializer that answers neither way has still not delivered the media. */
-  it('treats an unaccounted descriptor as a failure rather than a silent success', async () => {
+  /**
+   * Three ways a descriptor can fail to arrive, all of which must produce exactly one issue and one
+   * placeholder: reported missing, reported twice, and not reported at all.
+   */
+  it.each([
+    [
+      'the source could not materialize it',
+      (items: readonly InvkBoardItem[]) =>
+        items.map((item) => ({ kind: item.kind, name: item.name, reason: 'missing-entry' as const })),
+      'missing-entry' as const,
+    ],
+    [
+      'the materializer raised it twice',
+      (items: readonly InvkBoardItem[]) => {
+        const failed = items.map((item) => ({ kind: item.kind, name: item.name, reason: 'upload-failed' as const }));
+
+        return [...failed, ...failed];
+      },
+      'upload-failed' as const,
+    ],
+    ['the materializer never accounted for it', () => [], 'upload-failed' as const],
+  ])('reports a board item once when %s', async (_label, failuresFor, reason) => {
     const result = await restore(
-      { boardItems: [boardItem({ name: 'ignored.png' })], documentRefs: [imageRef('ignored.png')] },
-      { materializeBoardMedia: () => Promise.resolve({ failed: [], materialized: [] }) }
+      { boardItems: [boardItem({ name: 'gone.png' })], documentRefs: [imageRef('gone.png')] },
+      {
+        materializeBoardMedia: (items, _boardId, onItemSettled) => {
+          onItemSettled();
+
+          return Promise.resolve({ failed: failuresFor(items), materialized: [] });
+        },
+      }
     );
 
-    expect(result.boardItemIssues).toEqual([{ kind: 'image', name: 'ignored.png', reason: 'upload-failed' }]);
-    expect(result.mappings.images.get('ignored.png')).toBe(`${PROJECT_ID}-missing-image-0`);
+    expect(result.boardItemIssues).toEqual([{ kind: 'image', name: 'gone.png', reason }]);
+    expect(result.documentReferenceIssues).toEqual([{ kind: 'image', name: 'gone.png', reason }]);
+    expect(result.mappings.images.get('gone.png')).toBe(`${PROJECT_ID}-missing-image-0`);
+    expect(result.ledger.boardImageNames).toEqual([]);
+  });
+
+  /** The document-reference issue above comes from the overlap, not from the board failure itself. */
+  it('reports no document-reference issue for a failed item the document never named', async () => {
+    const result = await restore(
+      { boardItems: [boardItem({ name: 'gone.png' })] },
+      { materializeBoardMedia: freshNameMaterializer({ fail: new Set(['gone.png']) }) }
+    );
+
+    expect(result.boardItemIssues).toEqual([{ kind: 'image', name: 'gone.png', reason: 'upload-failed' }]);
+    expect(result.documentReferenceIssues).toEqual([]);
   });
 });
 

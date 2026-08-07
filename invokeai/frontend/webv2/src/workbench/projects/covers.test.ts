@@ -41,14 +41,7 @@ const createDeferred = <T = void>() => {
 beforeEach(async () => {
   vi.resetModules();
   api.__clientState.clear();
-  api.getClientStateValue.mockReset();
-  api.getClientStateValue.mockImplementation((key: string) => Promise.resolve(api.__clientState.get(key) ?? null));
-  api.setClientStateValue.mockReset();
-  api.setClientStateValue.mockImplementation((key: string, value: string) => {
-    api.__clientState.set(key, value);
-
-    return Promise.resolve();
-  });
+  vi.resetAllMocks();
 
   lifecycle = await import('@platform/state/accountLifecycle');
   covers = await import('./covers');
