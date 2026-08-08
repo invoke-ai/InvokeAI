@@ -27,7 +27,7 @@ from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory
     title="Latents to Image - Qwen Image",
     tags=["latents", "image", "vae", "l2i", "qwen_image"],
     category="latents",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
 class QwenImageLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -35,12 +35,26 @@ class QwenImageLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard)
 
     latents: LatentsField = InputField(description=FieldDescriptions.latents, input=Input.Connection)
     vae: VAEField = InputField(description=FieldDescriptions.vae, input=Input.Connection)
+    tiled: bool = InputField(default=False, description=FieldDescriptions.tiled)
+    # NOTE: tile_size = 0 is a special value meaning "use the model's default", matching the
+    # SD/SDXL l2i node. `int | None` is avoided because the workflow UI does not handle it well.
+    tile_size: int = InputField(default=0, multiple_of=8, description=FieldDescriptions.vae_tile_size)
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ImageOutput:
         latents = context.tensors.load(self.latents.latents_name)
 
         vae_info = context.models.load(self.vae.vae)
+        tiled = self.tiled or context.config.get().force_tiled_decode
+        # Resolve tile_size=0 ("model default") before estimating, so the memory the cache reserves
+        # matches the tiles the VAE will actually use. Without this the estimate stays at the
+        # full-frame figure (~21 GB at 2560x1440 on CUDA) and tiling frees nothing: the VAE is
+        # bounded, but the cache still evicts other models to honour the reservation.
+        effective_tile_size = None
+        if tiled:
+            effective_tile_size = (
+                self.tile_size if self.tile_size > 0 else getattr(vae_info.model, "tile_sample_min_height", 256)
+            )
         # NOTE: vae_info.model may be an AutoencoderKLWan (a native-layout qwen_image_vae single file is
         # classified with the Anima base); it is reinterpreted as AutoencoderKLQwenImage inside the
         # model_on_device context below. The working-memory estimate only reads tensor shape + element
@@ -49,6 +63,7 @@ class QwenImageLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard)
             operation="decode",
             image_tensor=latents,
             vae=vae_info.model,
+            tile_size=effective_tile_size,
         )
         with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
             context.util.signal_progress("Running VAE")
@@ -62,13 +77,15 @@ class QwenImageLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard)
                 # which would wrongly place the latents (and thus the whole decode) on the CPU (see #9373).
                 latents = latents.to(device=vae_info.compute_device, dtype=vae.dtype)
 
-                # Honor the global force_tiled_decode setting, like the SD/SDXL l2i node. Tiling bounds the
-                # VAE's per-tile memory, which is the scalable way to decode very large outputs that would
-                # exceed VRAM even after offloading the transformer/text encoder. For normal sizes, leave
-                # it off (faster, no tile blending) — the reserved working memory offloads other models so
-                # the full-frame decode fits.
-                if context.config.get().force_tiled_decode:
-                    vae.enable_tiling()
+                # Tiling bounds the VAE's per-tile memory, which is the scalable way to decode very
+                # large outputs that would exceed VRAM even after offloading the transformer/text
+                # encoder. For normal sizes, leave it off (faster, no tile blending) — the reserved
+                # working memory offloads other models so the full-frame decode fits.
+                if tiled:
+                    if self.tile_size > 0:
+                        vae.enable_tiling(tile_sample_min_height=self.tile_size, tile_sample_min_width=self.tile_size)
+                    else:
+                        vae.enable_tiling()
                 else:
                     vae.disable_tiling()
 
