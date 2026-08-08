@@ -8,6 +8,7 @@ import { CanvasEraserToolModule } from 'features/controlLayers/konva/CanvasTool/
 import { CanvasGradientToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasGradientToolModule';
 import { CanvasLassoToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasLassoToolModule';
 import { CanvasMoveToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasMoveToolModule';
+import { CanvasPathToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasPathToolModule';
 import { CanvasShapeToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasShapeToolModule';
 import { CanvasTextToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasTextToolModule';
 import { CanvasViewToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasViewToolModule';
@@ -85,6 +86,7 @@ export class CanvasToolModule extends CanvasModuleBase {
     brush: CanvasBrushToolModule;
     eraser: CanvasEraserToolModule;
     rect: CanvasShapeToolModule;
+    path: CanvasPathToolModule;
     lasso: CanvasLassoToolModule;
     gradient: CanvasGradientToolModule;
     colorPicker: CanvasColorPickerToolModule;
@@ -147,6 +149,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       brush: new CanvasBrushToolModule(this),
       eraser: new CanvasEraserToolModule(this),
       rect: new CanvasShapeToolModule(this),
+      path: new CanvasPathToolModule(this),
       lasso: new CanvasLassoToolModule(this),
       gradient: new CanvasGradientToolModule(this),
       colorPicker: new CanvasColorPickerToolModule(this),
@@ -164,6 +167,7 @@ export class CanvasToolModule extends CanvasModuleBase {
     this.konva.group.add(this.tools.brush.konva.group);
     this.konva.group.add(this.tools.eraser.konva.group);
     this.konva.group.add(this.tools.rect.konva.group);
+    this.konva.group.add(this.tools.path.konva.group);
     this.konva.group.add(this.tools.colorPicker.konva.group);
     this.konva.group.add(this.tools.text.konva.group);
     this.konva.group.add(this.tools.bbox.konva.group);
@@ -195,6 +199,7 @@ export class CanvasToolModule extends CanvasModuleBase {
         }
 
         this.tools.rect.onToolChanged();
+        this.tools.path.onToolChanged();
         this.tools.lasso.onToolChanged();
         void this.tools.text.onToolChanged();
         this.render();
@@ -302,6 +307,9 @@ export class CanvasToolModule extends CanvasModuleBase {
     const segmentingAdapter = this.manager.stateApi.$segmentingAdapter.get();
     const transformingAdapter = this.manager.stateApi.$transformingAdapter.get();
     const selectedEntityAdapter = this.manager.stateApi.getSelectedEntityAdapter();
+    const isVectorLayerDrawTool =
+      selectedEntityAdapter?.state.type === 'vector_layer' &&
+      (tool === 'brush' || tool === 'eraser' || tool === 'rect' || tool === 'gradient');
 
     if (this.manager.stage.getIsZoomDragging()) {
       stage.setCursor(ZOOM_DRAG_CURSOR);
@@ -332,12 +340,16 @@ export class CanvasToolModule extends CanvasModuleBase {
         stage.setCursor('not-allowed');
       } else if (selectedEntityAdapter.$isLocked.get()) {
         stage.setCursor('not-allowed');
+      } else if (isVectorLayerDrawTool) {
+        stage.setCursor('not-allowed');
       } else if (tool === 'brush') {
         this.tools.brush.syncCursorStyle();
       } else if (tool === 'eraser') {
         this.tools.eraser.syncCursorStyle();
       } else if (tool === 'move') {
         this.tools.move.syncCursorStyle();
+      } else if (tool === 'path') {
+        this.tools.path.syncCursorStyle();
       } else if (tool === 'rect') {
         this.tools.rect.syncCursorStyle();
       } else if (tool === 'gradient') {
@@ -356,6 +368,7 @@ export class CanvasToolModule extends CanvasModuleBase {
     this.tools.brush.render();
     this.tools.eraser.render();
     this.tools.rect.render();
+    this.tools.path.render();
     this.tools.colorPicker.render();
     this.tools.text.render();
     this.tools.bbox.render();
@@ -481,6 +494,35 @@ export class CanvasToolModule extends CanvasModuleBase {
       return true;
     }
 
+    if (tool === 'path') {
+      if (this.manager.$isBusy.get()) {
+        return false;
+      }
+
+      if (this.manager.stage.getIsDragging()) {
+        return false;
+      }
+
+      const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
+      if (!selectedEntity || selectedEntity.state.type !== 'vector_layer') {
+        return false;
+      }
+
+      if (selectedEntity.$isDisabled.get()) {
+        return false;
+      }
+
+      if (selectedEntity.$isEntityTypeHidden.get()) {
+        return false;
+      }
+
+      if (selectedEntity.$isLocked.get()) {
+        return false;
+      }
+
+      return true;
+    }
+
     if (this.manager.stateApi.getRenderedEntityCount() === 0) {
       return false;
     }
@@ -508,6 +550,13 @@ export class CanvasToolModule extends CanvasModuleBase {
     }
 
     if (selectedEntity.$isLocked.get()) {
+      return false;
+    }
+
+    if (
+      selectedEntity.state.type === 'vector_layer' &&
+      (tool === 'brush' || tool === 'eraser' || tool === 'rect' || tool === 'gradient')
+    ) {
       return false;
     }
 
@@ -569,6 +618,8 @@ export class CanvasToolModule extends CanvasModuleBase {
         await this.tools.brush.onStagePointerDown(e);
       } else if (tool === 'eraser') {
         await this.tools.eraser.onStagePointerDown(e);
+      } else if (tool === 'path') {
+        this.tools.path.onStagePointerDown(e);
       } else if (tool === 'rect') {
         await this.tools.rect.onStagePointerDown(e);
       } else if (tool === 'lasso') {
@@ -605,6 +656,8 @@ export class CanvasToolModule extends CanvasModuleBase {
         this.tools.brush.onStagePointerUp(e);
       } else if (tool === 'eraser') {
         this.tools.eraser.onStagePointerUp(e);
+      } else if (tool === 'path') {
+        this.tools.path.onStagePointerUp(e);
       } else if (tool === 'rect') {
         await this.tools.rect.onStagePointerUp(e);
       } else if (tool === 'lasso') {
@@ -642,6 +695,8 @@ export class CanvasToolModule extends CanvasModuleBase {
         await this.tools.brush.onStagePointerMove(e);
       } else if (tool === 'eraser') {
         await this.tools.eraser.onStagePointerMove(e);
+      } else if (tool === 'path') {
+        this.tools.path.onStagePointerMove(e);
       } else if (tool === 'rect') {
         await this.tools.rect.onStagePointerMove(e);
       } else if (tool === 'lasso') {
@@ -725,6 +780,7 @@ export class CanvasToolModule extends CanvasModuleBase {
     try {
       this.$isPrimaryPointerDown.set(false);
       void this.tools.lasso.onWindowPointerUp();
+      this.tools.path.onWindowPointerUp();
       await this.tools.rect.onWindowPointerUp();
       const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
 
@@ -767,6 +823,11 @@ export class CanvasToolModule extends CanvasModuleBase {
           return;
         }
         await this.tools.rect.onWindowPointerMove();
+      } else if (this.$tool.get() === 'path') {
+        if (!this.tools.path.hasActiveEditDragSession()) {
+          return;
+        }
+        this.tools.path.onWindowPointerMove(e);
       } else if (this.$tool.get() === 'lasso') {
         if (!this.tools.lasso.hasActiveSession()) {
           return;
@@ -817,12 +878,24 @@ export class CanvasToolModule extends CanvasModuleBase {
       // Cancel shape drawing on escape
       e.preventDefault();
       const tool = this.$tool.get();
-      const toolToCancel = getToolToCancelOnEscape(
+      let toolToCancel = getToolToCancelOnEscape(
         tool,
         this.$baseTool.get(),
         this.tools.lasso.hasActiveSession(),
         this.tools.rect.hasSuspendableSession()
       );
+
+      if (toolToCancel === null) {
+        if (tool === 'path') {
+          toolToCancel = 'path';
+        } else if (
+          (tool === 'view' || tool === 'colorPicker') &&
+          this.$baseTool.get() === 'path' &&
+          this.tools.path.hasActiveSession()
+        ) {
+          toolToCancel = 'path';
+        }
+      }
 
       this.manager.stateApi.$spaceKey.set(false);
       this.tools.rect.stopDragTranslation();
@@ -831,6 +904,9 @@ export class CanvasToolModule extends CanvasModuleBase {
       }
       if (toolToCancel === 'lasso') {
         this.tools.lasso.reset();
+      }
+      if (toolToCancel === 'path') {
+        this.tools.path.cancel();
       }
       if (toolToCancel && tool !== toolToCancel) {
         this.clearTemporaryToolHotkeys();
@@ -845,6 +921,22 @@ export class CanvasToolModule extends CanvasModuleBase {
         selectedEntity.bufferRenderer.clearBuffer();
       }
       return;
+    }
+
+    if (e.key === 'Enter') {
+      const tool = this.$tool.get();
+      const isPathQuickSwitch =
+        (tool === 'view' || tool === 'colorPicker') &&
+        this.$baseTool.get() === 'path' &&
+        this.tools.path.hasActiveSession();
+      if ((tool === 'path' || isPathQuickSwitch) && this.tools.path.hasActiveSession()) {
+        e.preventDefault();
+        this.tools.path.commit();
+        if (isPathQuickSwitch) {
+          this.clearTemporaryToolHotkeys();
+        }
+        return;
+      }
     }
 
     if (isSpaceKey) {
@@ -960,6 +1052,7 @@ export class CanvasToolModule extends CanvasModuleBase {
         bbox: this.tools.bbox.repr(),
         view: this.tools.view.repr(),
         move: this.tools.move.repr(),
+        path: this.tools.path.repr(),
       },
     };
   };

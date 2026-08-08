@@ -5,6 +5,7 @@ import { ToolColorPickerButton } from 'features/controlLayers/components/Tool/To
 import { ToolGradientButton } from 'features/controlLayers/components/Tool/ToolGradientButton';
 import { ToolLassoButton } from 'features/controlLayers/components/Tool/ToolLassoButton';
 import { ToolMoveButton } from 'features/controlLayers/components/Tool/ToolMoveButton';
+import { ToolPathButton } from 'features/controlLayers/components/Tool/ToolPathButton';
 import { ToolShapesButton } from 'features/controlLayers/components/Tool/ToolShapesButton';
 import { ToolTextButton } from 'features/controlLayers/components/Tool/ToolTextButton';
 import React from 'react';
@@ -19,6 +20,7 @@ export const ToolChooser: React.FC = () => {
         <ToolBrushButton />
         <ToolEraserButton />
         <ToolShapesButton />
+        <ToolPathButton />
         <ToolGradientButton />
         <ToolTextButton />
         <ToolLassoButton />

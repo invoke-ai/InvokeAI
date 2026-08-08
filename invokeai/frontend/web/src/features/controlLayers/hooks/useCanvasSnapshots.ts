@@ -123,6 +123,7 @@ export const useCanvasSnapshots = () => {
           {
             rasterLayers: canvasState.rasterLayers.entities,
             controlLayers: canvasState.controlLayers.entities,
+            vectorLayers: canvasState.vectorLayers.entities,
             inpaintMasks: canvasState.inpaintMasks.entities,
             regionalGuidance: canvasState.regionalGuidance.entities,
             bbox: canvasState.bbox,

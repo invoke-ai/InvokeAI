@@ -6,6 +6,7 @@ import type { CanvasEntityAdapterControlLayer } from 'features/controlLayers/kon
 import type { CanvasEntityAdapterInpaintMask } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterInpaintMask';
 import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterRasterLayer';
 import type { CanvasEntityAdapterRegionalGuidance } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterRegionalGuidance';
+import type { CanvasEntityAdapterVectorLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterVectorLayer';
 import { canvasToBlob } from 'features/controlLayers/konva/util';
 import { toast } from 'features/toast/toast';
 import { useCallback } from 'react';
@@ -24,6 +25,7 @@ export const useCopyLayerToClipboard = () => {
         | CanvasEntityAdapterControlLayer
         | CanvasEntityAdapterInpaintMask
         | CanvasEntityAdapterRegionalGuidance
+        | CanvasEntityAdapterVectorLayer
         | null
     ) => {
       if (!adapter) {

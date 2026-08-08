@@ -7,6 +7,7 @@ import {
   selectInpaintMaskEntities,
   selectRasterLayerEntities,
   selectRegionalGuidanceEntities,
+  selectVectorLayerEntities,
 } from 'features/controlLayers/store/selectors';
 import type {
   CanvasControlLayerState,
@@ -14,6 +15,7 @@ import type {
   CanvasRasterLayerState,
   CanvasRegionalGuidanceState,
   CanvasState,
+  CanvasVectorLayerState,
 } from 'features/controlLayers/store/types';
 import { getEntityIdentifier } from 'features/controlLayers/store/types';
 import type { Logger } from 'roarr';
@@ -47,6 +49,10 @@ export class CanvasEntityRendererModule extends CanvasModuleBase {
     );
 
     this.subscriptions.add(
+      this.manager.stateApi.createStoreSubscription(selectVectorLayerEntities, this.createNewVectorLayers)
+    );
+
+    this.subscriptions.add(
       this.manager.stateApi.createStoreSubscription(selectInpaintMaskEntities, this.createNewInpaintMasks)
     );
 
@@ -61,6 +67,7 @@ export class CanvasEntityRendererModule extends CanvasModuleBase {
     this.log.debug('Initializing module');
     this.createNewRasterLayers(this.manager.stateApi.runSelector(selectRasterLayerEntities));
     this.createNewControlLayers(this.manager.stateApi.runSelector(selectControlLayerEntities));
+    this.createNewVectorLayers(this.manager.stateApi.runSelector(selectVectorLayerEntities));
     this.createNewRegionalGuidance(this.manager.stateApi.runSelector(selectRegionalGuidanceEntities));
     this.createNewInpaintMasks(this.manager.stateApi.runSelector(selectInpaintMaskEntities));
     this.arrangeEntities(this.manager.stateApi.runSelector(selectCanvasSlice), null);
@@ -78,6 +85,15 @@ export class CanvasEntityRendererModule extends CanvasModuleBase {
   createNewControlLayers = (entities: CanvasControlLayerState[]) => {
     for (const entityState of entities) {
       if (!this.manager.adapters.controlLayers.has(entityState.id)) {
+        const adapter = this.manager.createAdapter(getEntityIdentifier(entityState));
+        adapter.initialize();
+      }
+    }
+  };
+
+  createNewVectorLayers = (entities: CanvasVectorLayerState[]) => {
+    for (const entityState of entities) {
+      if (!this.manager.adapters.vectorLayers.has(entityState.id)) {
         const adapter = this.manager.createAdapter(getEntityIdentifier(entityState));
         adapter.initialize();
       }
@@ -107,6 +123,7 @@ export class CanvasEntityRendererModule extends CanvasModuleBase {
       !prevState ||
       state.rasterLayers.entities !== prevState.rasterLayers.entities ||
       state.controlLayers.entities !== prevState.controlLayers.entities ||
+      state.vectorLayers.entities !== prevState.vectorLayers.entities ||
       state.regionalGuidance.entities !== prevState.regionalGuidance.entities ||
       state.inpaintMasks.entities !== prevState.inpaintMasks.entities ||
       state.selectedEntityIdentifier?.id !== prevState.selectedEntityIdentifier?.id
@@ -119,8 +136,9 @@ export class CanvasEntityRendererModule extends CanvasModuleBase {
       // 1. Background
       // 2. Raster layers
       // 3. Control layers
-      // 4. Regions
-      // 5. Inpaint masks
+      // 4. Vector layers
+      // 5. Regions
+      // 6. Inpaint masks
       // 6. Preview layer (bbox, staging area, progress image, tool)
 
       this.manager.background.konva.layer.zIndex(zIndex++);
@@ -131,6 +149,10 @@ export class CanvasEntityRendererModule extends CanvasModuleBase {
 
       for (const { id } of this.manager.stateApi.getControlLayersState().entities) {
         this.manager.adapters.controlLayers.get(id)?.konva.layer.zIndex(zIndex++);
+      }
+
+      for (const { id } of this.manager.stateApi.getVectorLayersState().entities) {
+        this.manager.adapters.vectorLayers.get(id)?.konva.layer.zIndex(zIndex++);
       }
 
       for (const { id } of this.manager.stateApi.getRegionsState().entities) {
