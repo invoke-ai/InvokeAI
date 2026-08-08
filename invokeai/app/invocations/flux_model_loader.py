@@ -15,6 +15,7 @@ from invokeai.app.util.t5_model_identifier import (
 )
 from invokeai.backend.flux.util import get_flux_max_seq_length
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base
+from invokeai.backend.model_manager.configs.main import Main_SDNQ_Diffusers_FLUX_Config
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, SubModelType
 
 
@@ -82,7 +83,7 @@ class FluxModelLoaderInvocation(BaseInvocation):
         t5_encoder = preprocess_t5_encoder_model_identifier(self.t5_encoder_model)
 
         transformer_config = context.models.get_config(transformer)
-        assert isinstance(transformer_config, Checkpoint_Config_Base)
+        assert isinstance(transformer_config, (Checkpoint_Config_Base, Main_SDNQ_Diffusers_FLUX_Config))
 
         return FluxModelLoaderOutput(
             transformer=TransformerField(transformer=transformer, loras=[]),

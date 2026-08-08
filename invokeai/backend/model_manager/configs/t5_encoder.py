@@ -1,6 +1,9 @@
-from typing import Any, Literal, Self
+import json
+from pathlib import Path
+from typing import Any, Literal, Optional, Self
 
 from pydantic import Field
+from safetensors import safe_open
 
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Config_Base
 from invokeai.backend.model_manager.configs.identification_utils import (
@@ -15,6 +18,20 @@ from invokeai.backend.model_manager.configs.identification_utils import (
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+
+
+def _safetensors_dir_has_sdnq_keys(directory) -> bool:
+    """Return True if any safetensors file in ``directory`` looks SDNQ-quantized (weight + matching scale)."""
+    for st_file in sorted(directory.glob("*.safetensors")):
+        try:
+            with safe_open(st_file, framework="pt") as f:
+                keys = set(f.keys())
+        except Exception:
+            continue
+        for key in keys:
+            if key.endswith(".weight") and f"{key[:-7]}.scale" in keys:
+                return True
+    return False
 
 
 class T5Encoder_T5Encoder_Config(Config_Base):
@@ -83,6 +100,102 @@ class T5Encoder_BnBLLMint8_Config(Config_Base):
         has_scb_key_suffix = state_dict_has_any_keys_ending_with(mod.load_state_dict(), "SCB")
         if not has_scb_key_suffix:
             raise NotAMatchError("state dict does not look like bnb quantized llm_int8")
+
+
+class T5Encoder_SDNQ_Config(Config_Base):
+    """Configuration for SDNQ-quantized T5 Encoder models.
+
+    Matches two layouts:
+
+    1. **Standalone T5 bundle**: ``mod.path`` is the pipeline-style root, with
+       ``text_encoder_2/`` (and usually ``tokenizer_2/``) as subfolders.
+    2. **Inline submodel**: ``mod.path`` *is* the ``text_encoder_2`` folder itself —
+       this is how a parent FluxPipeline / similar config registers its T5 submodel
+       (``submodels[TextEncoder2].path_or_prefix`` points straight at the folder).
+
+    In both cases, the SDNQ-quantized state lives next to a ``config.json`` declaring
+    ``T5EncoderModel`` and is signalled either by ``quantization_config.json`` with
+    ``quant_method == "sdnq"`` or by SDNQ-style ``weight`` + ``scale`` key pairs.
+    """
+
+    base: Literal[BaseModelType.Any] = Field(default=BaseModelType.Any)
+    type: Literal[ModelType.T5Encoder] = Field(default=ModelType.T5Encoder)
+    format: Literal[ModelFormat.SDNQQuantized] = Field(default=ModelFormat.SDNQQuantized)
+    cpu_only: bool | None = Field(default=None, description="Whether this model should run on CPU only")
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        te_dir = cls._locate_text_encoder_dir(mod)
+        raise_for_class_name(te_dir / "config.json", "T5EncoderModel")
+
+        cls._raise_if_not_sdnq_quantized(te_dir)
+
+        # Every FLUX workflow requests a Tokenizer2 alongside the encoder, and the loader can only load
+        # it from a `tokenizer_2/` folder. Reject an install that has no resolvable tokenizer (e.g. a
+        # bare inline `text_encoder_2` folder with no sibling `tokenizer_2/`) at identification time so
+        # it never registers as a selectable T5 that then fails mid-workflow on the missing tokenizer.
+        if cls.resolve_tokenizer_dir(mod.path) is None:
+            raise NotAMatchError("no tokenizer_2 folder resolvable for this SDNQ T5 encoder layout")
+
+        return cls(**override_fields)
+
+    @staticmethod
+    def resolve_text_encoder_dir(path: Path) -> Optional[Path]:
+        """Return the directory holding T5's config.json + safetensors, or None.
+
+        Two layouts: a standalone bundle (``path`` is the pipeline root, T5 under ``text_encoder_2/``)
+        or an inline submodel (``path`` *is* the ``text_encoder_2`` folder).
+        """
+        nested = path / "text_encoder_2"
+        if (nested / "config.json").exists():
+            return nested
+        if (path / "config.json").exists():
+            return path
+        return None
+
+    @staticmethod
+    def resolve_tokenizer_dir(path: Path) -> Optional[Path]:
+        """Return the ``tokenizer_2/`` directory for either layout, or None if it doesn't exist.
+
+        In the standalone-bundle layout ``tokenizer_2/`` is a child of the pipeline root; in the
+        inline layout (``path`` is the ``text_encoder_2`` folder) it's a *sibling* of that folder.
+        The encoder loader picks the encoder dir by the same layout test, so the tokenizer must too —
+        using ``path / "tokenizer_2"`` unconditionally is wrong for the inline case.
+        """
+        if (path / "text_encoder_2" / "config.json").exists():
+            candidate = path / "tokenizer_2"
+        else:
+            candidate = path.parent / "tokenizer_2"
+        return candidate if candidate.exists() else None
+
+    @classmethod
+    def _locate_text_encoder_dir(cls, mod: ModelOnDisk):
+        """Return the directory that actually holds T5's config.json + safetensors."""
+        te_dir = cls.resolve_text_encoder_dir(mod.path)
+        if te_dir is None:
+            raise NotAMatchError("no text_encoder_2/config.json or config.json at model root")
+        return te_dir
+
+    @classmethod
+    def _raise_if_not_sdnq_quantized(cls, te_dir) -> None:
+        quant_config_path = te_dir / "quantization_config.json"
+        if quant_config_path.exists():
+            try:
+                with open(quant_config_path, "r", encoding="utf-8") as f:
+                    quant_config = json.load(f)
+            except (OSError, ValueError):
+                quant_config = {}
+            if quant_config.get("quant_method") == "sdnq":
+                return
+
+        if _safetensors_dir_has_sdnq_keys(te_dir):
+            return
+
+        raise NotAMatchError("text_encoder_2 does not look like an SDNQ-quantized T5 encoder")
 
 
 class T5Encoder_GGUF_Config(Checkpoint_Config_Base, Config_Base):
