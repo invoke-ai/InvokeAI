@@ -134,8 +134,21 @@ class SlidingWindowTokenMiddleware(BaseHTTPMiddleware):
                         # process-wide lock; run it off the event loop so a contended
                         # lock (e.g. generation-result writes) can't stall every
                         # concurrent request from inside this per-mutation middleware.
+                        # Refresh only for a user that still exists and is active, and mint
+                        # the new token from the *database* record — not the old token's
+                        # claims. Otherwise a demoted administrator's stale is_admin claim
+                        # (and the media cookie carrying it) would be renewed indefinitely
+                        # by their own mutations, and a deactivated user could keep an
+                        # active session alive.
                         user = await run_in_threadpool(ApiDependencies.invoker.services.users.get, token_data.user_id)
                         if user is None or not user.is_active:
+                            return response
+                        # Never refresh a revoked token. This runs after the route, so an
+                        # authenticated route has already rejected it — but an unauthenticated
+                        # route returning 2xx with a stale Bearer header still reaches here,
+                        # and minting from the current record would launder the revoked token
+                        # into a valid one.
+                        if token_data.token_epoch != user.token_epoch:
                             return response
                         # Use the remember_me claim from the token to determine the
                         # correct refresh duration. This avoids the bug where a 7-day
@@ -150,6 +163,7 @@ class SlidingWindowTokenMiddleware(BaseHTTPMiddleware):
                             email=user.email,
                             is_admin=user.is_admin,
                             remember_me=token_data.remember_me,
+                            token_epoch=user.token_epoch,
                         )
                         new_token = create_access_token(refreshed_data, expires_delta)
                         response.headers["X-Refreshed-Token"] = new_token
@@ -198,8 +212,9 @@ def _identify_video_upload_user(scope: Scope) -> tuple[bool, str | None]:
     token_data = verify_token(token)
     if token_data is None:
         return False, None
-    user = ApiDependencies.invoker.services.users.get(token_data.user_id)
-    if user is None or not user.is_active:
+    from invokeai.app.api.auth_dependencies import resolve_authorized_user
+
+    if resolve_authorized_user(token_data) is None:
         return False, None
     return True, token_data.user_id
 

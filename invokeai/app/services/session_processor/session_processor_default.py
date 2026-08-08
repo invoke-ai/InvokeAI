@@ -6,6 +6,7 @@ from threading import Event as ThreadEvent
 from typing import Iterator, Optional
 
 import torch
+from starlette.concurrency import run_in_threadpool
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput
 from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
@@ -14,6 +15,7 @@ from invokeai.app.services.events.events_common import (
     FastAPIEvent,
     QueueClearedEvent,
     QueueItemStatusChangedEvent,
+    UserAccessChangedEvent,
     register_events,
 )
 from invokeai.app.services.invocation_stats.invocation_stats_common import GESStatsNotFoundError
@@ -40,6 +42,44 @@ from invokeai.app.services.shared.invocation_context import InvocationContextDat
 from invokeai.app.util.profiler import Profiler
 from invokeai.backend.util.device_pool import GENERATION_DEVICE_POOL
 from invokeai.backend.util.devices import TorchDevice
+
+
+def queue_owner_is_active(services: InvocationServices, queue_item: SessionQueueItem) -> bool:
+    """Whether the queue item's owner is still permitted to execute work.
+
+    Deactivating (or deleting) an account must also revoke its queued execution:
+    a queued graph consumes GPU time, reads media, and writes outputs on behalf of
+    its owner. Pending items are rejected at dequeue; running items are stopped at
+    the next node boundary (and immediately mid-node for nodes with step callbacks,
+    via the cancel event set when the item is canceled).
+
+    The check is skipped entirely when multiuser mode is disabled.
+
+    The ``system`` user — which owns everything migrated from before multiuser support
+    (see migration_27) — is deliberately NOT special-cased. It has a real, active
+    database row, so it passes on its own merits. Exempting it here would only change
+    behaviour when the row is missing or inactive, and that is precisely the case where
+    this gate would then disagree with the save gates in `invocation_context`, which
+    have no such exemption: the item would burn GPU time and then fail at the first
+    `context.images.save()`. Better to reject it at dequeue.
+
+    A failed lookup is treated as active. This runs between nodes on a path with no
+    exception handling of its own, so letting a transient error (e.g. a busy-timeout
+    on the shared SQLite connection under multi-GPU write contention) escape would
+    abandon the session without its normal teardown. Denying execution on a failed
+    read would also revoke privileges the database never actually revoked; the next
+    node boundary re-checks, and the dequeue gate catches the item on its next run.
+    """
+    if not services.configuration.multiuser:
+        return True
+    try:
+        user = services.users.get(queue_item.user_id)
+    except Exception:
+        services.logger.warning(
+            f"Could not verify owner {queue_item.user_id} of queue item {queue_item.item_id}; allowing execution"
+        )
+        return True
+    return user is not None and user.is_active
 
 
 class DefaultSessionRunner(SessionRunnerBase):
@@ -100,6 +140,17 @@ class DefaultSessionRunner(SessionRunnerBase):
                 break
 
             if invocation is None or self._is_canceled():
+                break
+
+            # Revalidate the owner between nodes: an account deactivated mid-session
+            # must not execute further nodes. Cancel the item so its status reflects
+            # why execution stopped.
+            if not queue_owner_is_active(self._services, queue_item):
+                self._services.logger.warning(
+                    f"Canceling queue item {queue_item.item_id}: owner {queue_item.user_id} is deactivated or deleted"
+                )
+                with suppress(SessionQueueItemNotFoundError):
+                    self._services.session_queue.cancel_queue_item(queue_item.item_id)
                 break
 
             self.run_node(invocation, queue_item)
@@ -470,6 +521,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
         register_events(QueueClearedEvent, self._on_queue_cleared)
         register_events(BatchEnqueuedEvent, self._on_batch_enqueued)
         register_events(QueueItemStatusChangedEvent, self._on_queue_item_status_changed)
+        register_events(UserAccessChangedEvent, self._on_user_access_changed)
 
         devices = self._resolve_devices()
 
@@ -567,6 +619,46 @@ class DefaultSessionProcessor(SessionProcessorBase):
     async def _on_batch_enqueued(self, event: FastAPIEvent[BatchEnqueuedEvent]) -> None:
         self._poll_now()
 
+    async def _on_user_access_changed(self, event: FastAPIEvent[UserAccessChangedEvent]) -> None:
+        # If the owner of the currently running queue item was deactivated or deleted,
+        # cancel the item immediately. Canceling emits a QueueItemStatusChangedEvent,
+        # which sets the cancel event (see `_on_queue_item_status_changed`), stopping
+        # long-running nodes at their next step callback rather than waiting for the
+        # node to finish. Pending items are handled at dequeue.
+        event_data = event[1]
+        if event_data.is_active:
+            return
+        # A single user may have items running on several workers concurrently, so
+        # cancel every match rather than stopping at the first.
+        item_ids: list[int] = []
+        for worker in self._workers:
+            queue_item = worker.queue_item
+            if queue_item is not None and queue_item.user_id == event_data.user_id:
+                self._invoker.services.logger.warning(
+                    f"Canceling queue item {queue_item.item_id}: owner {queue_item.user_id} was deactivated or deleted"
+                )
+                item_ids.append(queue_item.item_id)
+        if not item_ids:
+            return
+
+        # Run the cancellations in a thread. `cancel_queue_item` walks the workflow-call
+        # chain and issues a transaction per item, all behind the process-wide SQLite lock;
+        # doing that inline would block the event loop — and with it every HTTP response,
+        # socket emission, and event dispatch, including the QueueItemStatusChangedEvents
+        # this cancellation depends on to reach the workers.
+        #
+        # The workers' cancel events are deliberately NOT set here. `cancel_queue_item`
+        # writes the row terminal before emitting, and `_process` relies on that ordering:
+        # a cancel event set while the row is still non-terminal is treated as a stale
+        # signal from a previous item and cleared (see the guard after dequeue), which
+        # would discard this cancellation.
+        def _cancel_all() -> None:
+            for item_id in item_ids:
+                with suppress(SessionQueueItemNotFoundError):
+                    self._invoker.services.session_queue.cancel_queue_item(item_id)
+
+        await run_in_threadpool(_cancel_all)
+
     async def _on_queue_item_status_changed(self, event: FastAPIEvent[QueueItemStatusChangedEvent]) -> None:
         # Find the worker (if any) currently running the item whose status changed.
         for worker in self._workers:
@@ -613,6 +705,20 @@ class DefaultSessionProcessor(SessionProcessorBase):
     def _is_image_move_maintenance_active(self) -> bool:
         image_moves = getattr(self._invoker.services, "image_moves", None)
         return image_moves is not None and image_moves.is_maintenance_active()
+
+    def _cancel_queue_item_if_owner_inactive(self, queue_item: SessionQueueItem) -> bool:
+        """Cancel a dequeued item whose owner is deactivated or deleted.
+
+        Returns True if the item was rejected (canceled) and must not be executed.
+        """
+        if queue_owner_is_active(self._invoker.services, queue_item):
+            return False
+        self._invoker.services.logger.warning(
+            f"Canceling queue item {queue_item.item_id}: owner {queue_item.user_id} is deactivated or deleted"
+        )
+        with suppress(SessionQueueItemNotFoundError):
+            self._invoker.services.session_queue.cancel_queue_item(queue_item.item_id)
+        return True
 
     def _process(
         self,
@@ -712,6 +818,12 @@ class DefaultSessionProcessor(SessionProcessorBase):
                                 f"Queue item {worker.queue_item.item_id} was canceled before it started; skipping."
                             )
                             continue
+
+                    # Reject items whose owner was deactivated or deleted while the item
+                    # was pending — no invocation may run and no output may be saved on
+                    # behalf of a revoked account.
+                    if self._cancel_queue_item_if_owner_inactive(worker.queue_item):
+                        continue
 
                     # GC-ing here can reduce peak memory usage of the invoke process by freeing allocated memory blocks.
                     # Most queue items take seconds to execute, so the relative cost of a GC is very small.

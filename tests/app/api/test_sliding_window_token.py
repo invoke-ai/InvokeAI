@@ -21,6 +21,7 @@ def _setup_jwt_secret(monkeypatch: pytest.MonkeyPatch):
         email="test@test.com",
         is_admin=False,
         is_active=True,
+        token_epoch=0,
     )
     users = SimpleNamespace(get=lambda user_id: user if user_id == user.user_id else None)
     monkeypatch.setattr(
@@ -30,6 +31,29 @@ def _setup_jwt_secret(monkeypatch: pytest.MonkeyPatch):
         raising=False,
     )
     return user
+
+
+def _patch_user_record(monkeypatch: pytest.MonkeyPatch, user) -> None:
+    """Point the middleware's user lookup at `user` (or None for a deleted account).
+
+    Overrides the record installed by `_setup_jwt_secret`. The middleware revalidates
+    against the database on every refresh regardless of multiuser mode, so this is all
+    the harness needs to vary.
+    """
+    from invokeai.app.api.dependencies import ApiDependencies
+
+    monkeypatch.setattr(
+        ApiDependencies,
+        "invoker",
+        SimpleNamespace(
+            services=SimpleNamespace(
+                users=SimpleNamespace(
+                    get=lambda user_id: user if user is not None and user.user_id == user_id else None
+                )
+            )
+        ),
+        raising=False,
+    )
 
 
 def _create_test_app() -> FastAPI:
@@ -310,3 +334,102 @@ class TestSlidingWindowBehindSubPathProxy:
 
         assert response.status_code == 200
         assert "X-Refreshed-Token" not in response.headers
+
+
+class TestSlidingWindowMultiuserRevalidation:
+    """In multiuser mode, refresh must derive authorization from the database and
+    refuse to renew tokens for missing or deactivated users."""
+
+    def test_demoted_admin_refresh_carries_db_role(self, monkeypatch: pytest.MonkeyPatch):
+        """A stale is_admin=True claim is NOT renewed — the refreshed token carries the
+        database's is_admin=False."""
+        from types import SimpleNamespace
+
+        from invokeai.app.services.auth.token_service import verify_token
+
+        _patch_user_record(
+            monkeypatch,
+            SimpleNamespace(user_id="test-user", email="test@test.com", is_admin=False, is_active=True, token_epoch=0),
+        )
+        app = _create_test_app()
+        client = TestClient(app)
+        stale_admin_token = create_access_token(
+            TokenData(user_id="test-user", email="test@test.com", is_admin=True, remember_me=False)
+        )
+
+        response = client.post("/test", headers={"Authorization": f"Bearer {stale_admin_token}"})
+
+        assert response.status_code == 200
+        refreshed = verify_token(response.headers["X-Refreshed-Token"])
+        assert refreshed is not None
+        assert refreshed.is_admin is False
+
+    def test_promoted_user_refresh_carries_db_role(self, monkeypatch: pytest.MonkeyPatch):
+        from types import SimpleNamespace
+
+        from invokeai.app.services.auth.token_service import verify_token
+
+        _patch_user_record(
+            monkeypatch,
+            SimpleNamespace(user_id="test-user", email="test@test.com", is_admin=True, is_active=True, token_epoch=0),
+        )
+        app = _create_test_app()
+        client = TestClient(app)
+        stale_token = create_access_token(
+            TokenData(user_id="test-user", email="test@test.com", is_admin=False, remember_me=False)
+        )
+
+        response = client.post("/test", headers={"Authorization": f"Bearer {stale_token}"})
+
+        refreshed = verify_token(response.headers["X-Refreshed-Token"])
+        assert refreshed is not None
+        assert refreshed.is_admin is True
+
+    def test_deactivated_user_gets_no_refresh(self, monkeypatch: pytest.MonkeyPatch):
+        """No X-Refreshed-Token and no media cookie for a deactivated account."""
+        from types import SimpleNamespace
+
+        _patch_user_record(
+            monkeypatch,
+            SimpleNamespace(user_id="test-user", email="test@test.com", is_admin=False, is_active=False, token_epoch=0),
+        )
+        app = _create_test_app()
+        client = TestClient(app)
+        token = _make_token()
+
+        response = client.post("/test", headers={"Authorization": f"Bearer {token}"})
+
+        assert response.status_code == 200
+        assert "X-Refreshed-Token" not in response.headers
+        assert response.cookies.get("invokeai_media_token") is None
+
+    def test_deleted_user_gets_no_refresh(self, monkeypatch: pytest.MonkeyPatch):
+        _patch_user_record(monkeypatch, None)
+        app = _create_test_app()
+        client = TestClient(app)
+        token = _make_token()
+
+        response = client.post("/test", headers={"Authorization": f"Bearer {token}"})
+
+        assert response.status_code == 200
+        assert "X-Refreshed-Token" not in response.headers
+        assert response.cookies.get("invokeai_media_token") is None
+
+    def test_active_user_refresh_preserves_remember_me(self, monkeypatch: pytest.MonkeyPatch):
+        from types import SimpleNamespace
+
+        from invokeai.app.services.auth.token_service import verify_token
+
+        _patch_user_record(
+            monkeypatch,
+            SimpleNamespace(user_id="test-user", email="test@test.com", is_admin=False, is_active=True, token_epoch=0),
+        )
+        app = _create_test_app()
+        client = TestClient(app)
+        token = _make_token(remember_me=True)
+
+        response = client.post("/test", headers={"Authorization": f"Bearer {token}"})
+
+        refreshed = verify_token(response.headers["X-Refreshed-Token"])
+        assert refreshed is not None
+        assert refreshed.remember_me is True

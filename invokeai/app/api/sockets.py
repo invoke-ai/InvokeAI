@@ -45,6 +45,7 @@ from invokeai.app.services.events.events_common import (
     QueueItemsRetriedEvent,
     QueueItemStatusChangedEvent,
     RecallParametersUpdatedEvent,
+    UserAccessChangedEvent,
     WorkflowAccessRevokedEvent,
     WorkflowCreatedEvent,
     WorkflowDeletedEvent,
@@ -102,6 +103,7 @@ MODEL_EVENTS = {
 
 BULK_DOWNLOAD_EVENTS = {BulkDownloadStartedEvent, BulkDownloadCompleteEvent, BulkDownloadErrorEvent}
 WORKFLOW_EVENTS = {WorkflowCreatedEvent, WorkflowUpdatedEvent, WorkflowDeletedEvent}
+USER_EVENTS = {UserAccessChangedEvent}
 
 LLM_TASK_EVENTS = {LLMTaskProgressEvent, LLMTaskCompleteEvent, LLMTaskErrorEvent}
 
@@ -142,6 +144,7 @@ class SocketIO:
         register_events(BULK_DOWNLOAD_EVENTS, self._handle_bulk_image_download_event)
         register_events(LLM_TASK_EVENTS, self._handle_llm_task_event)
         register_events(WORKFLOW_EVENTS, self._handle_workflow_event)
+        register_events(USER_EVENTS, self._handle_user_access_changed)
 
     async def _handle_connect(self, sid: str, environ: dict, auth: dict | None) -> bool:
         """Handle socket connection and authenticate the user.
@@ -169,34 +172,45 @@ class SocketIO:
         if token:
             token_data = verify_token(token)
             if token_data:
+                is_admin = token_data.is_admin
                 # In multiuser mode, also verify the backing user record still
                 # exists and is active — mirrors the REST auth check in
                 # auth_dependencies.py.  A deleted or deactivated user whose
                 # JWT has not yet expired must not be allowed to open a socket.
+                token_epoch = token_data.token_epoch
                 if self._is_multiuser_enabled():
                     try:
-                        from invokeai.app.api.dependencies import ApiDependencies
+                        from invokeai.app.api.auth_dependencies import resolve_authorized_user
 
-                        user = ApiDependencies.invoker.services.users.get(token_data.user_id)
-                        if user is None or not user.is_active:
-                            logger.warning(f"Rejecting socket {sid}: user {token_data.user_id} not found or inactive")
+                        user = resolve_authorized_user(token_data)
+                        if user is None:
+                            logger.warning(
+                                f"Rejecting socket {sid}: user {token_data.user_id} not found, inactive, or revoked"
+                            )
                             return False
+                        # The token proves identity only — authorization comes from the
+                        # database. A demoted admin reconnecting with an old token must
+                        # not rejoin the admin room; a promoted user gets admin rooms
+                        # without re-login.
+                        is_admin = user.is_admin
+                        token_epoch = user.token_epoch
                     except Exception:
                         # If user service is unavailable, fail closed
                         logger.warning(f"Rejecting socket {sid}: unable to verify user record")
                         return False
 
-                # Store user_id and is_admin in socket users dict
+                # Store user_id, is_admin and the epoch this socket authenticated under.
+                # The epoch lets `_handle_user_access_changed` drop exactly the sockets
+                # whose token a later revocation invalidated.
                 self._socket_users[sid] = {
                     "user_id": token_data.user_id,
-                    "is_admin": token_data.is_admin,
+                    "is_admin": is_admin,
+                    "token_epoch": token_epoch,
                 }
-                logger.info(
-                    f"Socket {sid} connected with user_id: {token_data.user_id}, is_admin: {token_data.is_admin}"
-                )
+                logger.info(f"Socket {sid} connected with user_id: {token_data.user_id}, is_admin: {is_admin}")
                 await self._sio.enter_room(sid, f"user:{token_data.user_id}")
                 await self._sio.enter_room(sid, "workflows:shared")
-                if token_data.is_admin:
+                if is_admin:
                     await self._sio.enter_room(sid, "admin")
                 return True
 
@@ -239,6 +253,46 @@ class SocketIO:
         if sid in self._socket_users:
             del self._socket_users[sid]
             logger.debug(f"Socket {sid} disconnected and cleaned up")
+
+    async def _handle_user_access_changed(self, event: FastAPIEvent[UserAccessChangedEvent]) -> None:
+        """Re-authorize a user's open sockets when their role or active status changes.
+
+        Socket room membership is established at connect time; without this handler a
+        demoted administrator's sockets would remain in the admin room (receiving other
+        users' private events) and a deactivated or deleted user's sockets would keep
+        receiving their own private events indefinitely.
+
+        - Deactivated/deleted: disconnect every socket belonging to the user. A
+          reconnect attempt with the old token is rejected by ``_handle_connect``'s
+          database check.
+        - Sessions revoked (password change): disconnect the sockets that authenticated
+          under a superseded token epoch. Without this the account stays active, so the
+          branch above does not fire and revoked sessions keep streaming events from an
+          already-open socket — HTTP would be locked out while the socket was not. The
+          session that performed the change reconnects with its replacement token; the
+          others fail ``_handle_connect`` and stay out.
+        - Demoted: leave the admin room and update the cached ``is_admin`` so
+          ``_handle_sub_queue`` cannot re-add it.
+        - Promoted: join the admin room, matching the DB-derived REST behavior.
+        """
+        _, event_data = event
+        affected_sids = [sid for sid, info in self._socket_users.items() if info.get("user_id") == event_data.user_id]
+        for sid in affected_sids:
+            if not event_data.is_active:
+                logger.info(f"Disconnecting socket {sid}: user {event_data.user_id} deactivated or deleted")
+                await self._sio.disconnect(sid)
+                continue
+            if self._socket_users[sid].get("token_epoch", 0) != event_data.token_epoch:
+                logger.info(f"Disconnecting socket {sid}: user {event_data.user_id} revoked its earlier sessions")
+                await self._sio.disconnect(sid)
+                continue
+            self._socket_users[sid]["is_admin"] = event_data.is_admin
+            if event_data.is_admin:
+                await self._sio.enter_room(sid, "admin")
+                logger.info(f"Socket {sid} joined admin room: user {event_data.user_id} promoted")
+            else:
+                await self._sio.leave_room(sid, "admin")
+                logger.info(f"Socket {sid} left admin room: user {event_data.user_id} demoted")
 
     async def _handle_sub_queue(self, sid: str, data: Any) -> None:
         """Handle queue subscription and add socket to both queue and user-specific rooms."""

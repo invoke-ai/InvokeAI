@@ -144,7 +144,7 @@
       "patch": {
         "tags": ["authentication"],
         "summary": "Update Current User",
-        "description": "Update the current user's own profile.\n\nTo change the password, both ``current_password`` and ``new_password`` must\nbe provided. The current password is verified before the change is applied.\n\nArgs:\n    request: Profile fields to update\n    current_user: The authenticated user\n\nReturns:\n    The updated user\n\nRaises:\n    HTTPException: 400 if current password is incorrect or new password is weak\n    HTTPException: 404 if user not found",
+        "description": "Update the current user's own profile.\n\nTo change the password, both ``current_password`` and ``new_password`` must\nbe provided. The current password is verified before the change is applied.\n\nA password change signs out the account's *other* sessions: it bumps the\nrevocation epoch, invalidating every previously issued token. This response\ncarries a replacement token in ``X-Refreshed-Token`` so the caller stays\nsigned in.\n\nArgs:\n    request: Profile fields to update\n    current_user: The authenticated user\n    http_request: The HTTP request, used to scope the replacement media cookie\n    response: The HTTP response, used to return the replacement token\n\nReturns:\n    The updated user\n\nRaises:\n    HTTPException: 400 if current password is incorrect or new password is weak\n    HTTPException: 404 if user not found",
         "operationId": "update_current_user_api_v1_auth_me_patch",
         "requestBody": {
           "content": {
@@ -375,7 +375,7 @@
       "patch": {
         "tags": ["authentication"],
         "summary": "Update User",
-        "description": "Update a user. Requires admin privileges.\n\nArgs:\n    user_id: The user ID\n    request: Fields to update\n\nReturns:\n    The updated user\n\nRaises:\n    HTTPException: 400 if password is weak\n    HTTPException: 404 if user not found",
+        "description": "Update a user. Requires admin privileges.\n\nResetting a password revokes the target's existing sessions. An admin resetting\ntheir own password receives a replacement token in ``X-Refreshed-Token`` so they\nare not signed out by their own action.\n\nArgs:\n    user_id: The user ID\n    request: Fields to update\n\nReturns:\n    The updated user\n\nRaises:\n    HTTPException: 400 if password is weak, or if the change would remove the\n        last administrator\n    HTTPException: 404 if user not found",
         "operationId": "update_user_api_v1_auth_users__user_id__patch",
         "security": [
           {
@@ -432,7 +432,7 @@
       "delete": {
         "tags": ["authentication"],
         "summary": "Delete User",
-        "description": "Delete a user. Requires admin privileges.\n\nAdmins can delete any user including other admins, but cannot delete the last\nremaining admin.\n\nArgs:\n    user_id: The user ID\n\nRaises:\n    HTTPException: 400 if attempting to delete the last admin\n    HTTPException: 404 if user not found",
+        "description": "Delete a user. Requires admin privileges.\n\nAdmins can delete any user including other admins, but cannot delete the last\nremaining admin, nor the internal system user.\n\nArgs:\n    user_id: The user ID\n\nRaises:\n    HTTPException: 400 if attempting to delete the last admin or the system user\n    HTTPException: 404 if user not found",
         "operationId": "delete_user_api_v1_auth_users__user_id__delete",
         "security": [
           {
@@ -84507,6 +84507,12 @@
             ],
             "title": "Last Login At",
             "description": "When user last logged in"
+          },
+          "token_epoch": {
+            "type": "integer",
+            "title": "Token Epoch",
+            "description": "Revocation epoch; tokens minted before the current value are rejected",
+            "default": 0
           }
         },
         "type": "object",
