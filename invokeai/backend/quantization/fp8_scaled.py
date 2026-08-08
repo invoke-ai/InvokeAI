@@ -18,6 +18,8 @@ that :class:`CustomLinear` can decide per forward what to do with it.
 """
 
 from dataclasses import dataclass
+from logging import Logger
+from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 import torch
@@ -54,6 +56,24 @@ class Fp8ScaledLayer:
 
     def is_per_tensor(self) -> bool:
         return self.weight_scale.numel() == 1
+
+
+def read_safetensors_metadata(path: Path, logger: Logger | None = None) -> dict[str, str] | None:
+    """Read the safetensors header metadata, or None if it cannot be read.
+
+    Only used to enrich fp8 handling (per-layer ``full_precision_matrix_mult`` hints), so an
+    unreadable header must not fail the model load. It is warned about rather than swallowed: without
+    the hints, layers the quantizer marked as unsafe would silently be multiplied in fp8.
+    """
+    try:
+        from safetensors import safe_open
+
+        with safe_open(path, framework="pt") as f:
+            return f.metadata()
+    except Exception as e:
+        if logger is not None:
+            logger.warning(f"Could not read safetensors metadata from {path.name} ({e}); fp8 layer hints unavailable.")
+        return None
 
 
 def parse_quantization_metadata(metadata: Mapping[str, Any] | None) -> dict[str, dict[str, Any]]:
@@ -243,7 +263,8 @@ def attach_fp8_scales(
     parse time, so the recovered metadata stays inspectable, and are suppressed when the user has
     turned the hints off (see :func:`full_precision_hints_respected`).
 
-    Returns the number of modules that were annotated.
+    Returns the number of modules that were annotated. A caller that expects *every* recovered
+    layer to be annotated should check that count with :func:`warn_on_unattached_scales`.
     """
     wanted = set(module_paths) if module_paths is not None else None
     respect_hints = full_precision_hints_respected()
@@ -264,6 +285,24 @@ def attach_fp8_scales(
         module._fp8_full_precision_matmul = layer.full_precision_matmul and respect_hints
         count += 1
     return count
+
+
+def warn_on_unattached_scales(logger: Logger, what: str, attached: int, layers: Mapping[str, Any]) -> None:
+    """Complain when :func:`attach_fp8_scales` annotated fewer modules than there were layers.
+
+    Every recovered layer should reach a module: :func:`split_fp8_scaled_layers` has already folded
+    the ones that cannot stay quantized. A shortfall therefore means a scale went nowhere, and a
+    weight is now off by ``1/weight_scale`` — visually a broken or washed-out generation, with
+    nothing in the log to point at it. Loaders otherwise report ``attached`` as if it were the whole
+    story, which reads as success.
+    """
+    missing = len(layers) - attached
+    if missing > 0:
+        logger.warning(
+            f"{what}: {missing} of {len(layers)} scaled fp8 layer(s) did not receive their weight_scale. "
+            "Those weights are quantized but unscaled, which will degrade output. This is a bug — "
+            "please report the checkpoint."
+        )
 
 
 # ----------------------------------------------------------------------------------- runtime path
@@ -333,16 +372,46 @@ def full_precision_hints_respected() -> bool:
         return True
 
 
+def _probe_fp8_matmul(index: int) -> bool:
+    """Run one minimal ``_scaled_mm`` on device ``index`` and report whether it worked.
+
+    Asking the device is the only reliable test. ``get_device_capability`` reports the *gfx arch*
+    on ROCm, not an SM version, so an RDNA3 card (gfx1100) answers ``(11, 0)`` and sails past a
+    ``>= (8, 9)`` check — then every forward raises ``torch._scaled_mm is only supported on CUDA
+    devices with compute capability >= 9.0 or 8.9, or ROCm MI300+``. The whole point of the
+    capability gate is to *fall back* rather than raise mid-generation, so it must not itself be a
+    guess. The probe is one 16x16 matmul, run once per device and cached.
+    """
+    try:
+        device = torch.device("cuda", index)
+        # Column-major right operand, i.e. exactly the layout `scaled_mm_linear` feeds it.
+        lhs = torch.zeros((_MM_ALIGNMENT, _MM_ALIGNMENT), device=device, dtype=FP8_DTYPE)
+        rhs = torch.zeros((_MM_ALIGNMENT, _MM_ALIGNMENT), device=device, dtype=FP8_DTYPE).t()
+        scale = torch.ones((1, 1), device=device, dtype=torch.float32)
+        torch._scaled_mm(lhs, rhs, scale, scale, out_dtype=torch.bfloat16)
+    except Exception:
+        return False
+    return True
+
+
 def device_supports_fp8_matmul(device: torch.device) -> bool:
-    """Whether ``torch._scaled_mm`` can run on this device (Ada/SM 8.9 and newer)."""
+    """Whether ``torch._scaled_mm`` can run on this device (Ada/SM 8.9 and newer, or MI300+)."""
     if device.type != "cuda" or not torch.cuda.is_available():
         return False
     index = device.index if device.index is not None else torch.cuda.current_device()
     cached = _fp8_mm_supported.get(index)
     if cached is None:
-        cached = torch.cuda.get_device_capability(index) >= (8, 9)
+        # The capability check is only a cheap pre-filter that spares older CUDA cards the probe;
+        # it is deliberately not trusted on its own (see `_probe_fp8_matmul`).
+        supported = torch.version.hip is not None or torch.cuda.get_device_capability(index) >= (8, 9)
+        cached = supported and _probe_fp8_matmul(index)
         _fp8_mm_supported[index] = cached
     return cached
+
+
+def reset_fp8_matmul_support_cache() -> None:
+    """Forget the probed per-device support. For tests; the answer cannot change at runtime."""
+    _fp8_mm_supported.clear()
 
 
 def should_keep_fp8_weights(device: torch.device) -> bool:
@@ -377,6 +446,37 @@ def _is_fp8_matmul_weight(key: str, tensor: Any, model: torch.nn.Module | None) 
     return isinstance(module, torch.nn.Linear)
 
 
+def can_stay_quantized(
+    key: str,
+    tensor: Any,
+    model: torch.nn.Module | None,
+    skip_patterns: Iterable[str] = (),
+) -> bool:
+    """Whether this state-dict entry may be left in fp8 by :func:`cast_state_dict`.
+
+    Single source of truth for that decision: the loaders reserve RAM against it
+    (:func:`predict_cast_state_dict_size`) and decide which scaled layers survive with it
+    (:func:`split_fp8_scaled_layers`), so the three must never drift apart.
+
+    Only ``float8_e4m3fn`` qualifies. ``float8_e5m2`` is always cast because
+    :func:`scaled_mm_linear` cannot use it as the weight operand on Ada, so keeping it quantized
+    would buy VRAM at the cost of a per-forward dequantize.
+
+    ``skip_patterns`` are substrings of the state-dict key whose weights must be dequantized even
+    when the rest stays fp8. Pass the model's ``_skip_layerwise_casting_patterns``: diffusers uses
+    it to mark precision-sensitive modules, and some of them *read their own weight's dtype and cast
+    their activations to it*. Z-Image's ``TimestepEmbedder.forward`` does exactly that
+    (``t_freq.to(self.mlp[0].weight.dtype)``), so leaving its weight in fp8 hands the next Linear an
+    fp8 activation and the forward dies in ``x.abs()`` with
+    ``"abs_cuda" not implemented for 'Float8_e4m3fn'``.
+    """
+    return (
+        getattr(tensor, "dtype", None) is FP8_DTYPE
+        and _is_fp8_matmul_weight(key, tensor, model)
+        and not any(pattern in key for pattern in skip_patterns)
+    )
+
+
 def cast_state_dict(
     sd: dict[str, Any],
     dtype: torch.dtype,
@@ -391,17 +491,10 @@ def cast_state_dict(
     checkpoint that ships raw fp8 weights (fp8 tensors with no ``weight_scale`` alongside them) —
     the VRAM saving and the tensor cores are both thrown away before the model is ever built.
 
-    Only ``float8_e4m3fn`` is preserved. ``float8_e5m2`` is left to be cast because
-    :func:`scaled_mm_linear` cannot use it as the weight operand on Ada, so keeping it quantized
-    would buy VRAM at the cost of a per-forward dequantize.
-
-    ``skip_patterns`` are substrings of the state-dict key whose weights must be dequantized even
-    when the rest stays fp8. Pass the model's ``_skip_layerwise_casting_patterns``: diffusers uses
-    it to mark precision-sensitive modules, and some of them *read their own weight's dtype and cast
-    their activations to it*. Z-Image's ``TimestepEmbedder.forward`` does exactly that
-    (``t_freq.to(self.mlp[0].weight.dtype)``), so leaving its weight in fp8 hands the next Linear an
-    fp8 activation and the forward dies in ``x.abs()`` with
-    ``"abs_cuda" not implemented for 'Float8_e4m3fn'``.
+    A *scaled* fp8 weight must never reach this function still carrying an unapplied scale: the
+    plain ``tensor.to(dtype)`` below drops the scale silently, leaving the weight off by
+    ``1/weight_scale``. Run :func:`split_fp8_scaled_layers` first — it folds the scale into exactly
+    those layers this function would cast.
 
     Returns the number of tensors left in fp8.
     """
@@ -409,16 +502,74 @@ def cast_state_dict(
     kept = 0
     for key in sd:
         tensor = sd[key]
-        if (
-            keep_fp8
-            and getattr(tensor, "dtype", None) is FP8_DTYPE
-            and _is_fp8_matmul_weight(key, tensor, model)
-            and not any(pattern in key for pattern in patterns)
-        ):
+        if keep_fp8 and can_stay_quantized(key, tensor, model, patterns):
             kept += 1
             continue
         sd[key] = tensor.to(dtype)
     return kept
+
+
+def predict_cast_state_dict_size(
+    sd: Mapping[str, Any],
+    dtype: torch.dtype,
+    *,
+    keep_fp8: bool,
+    model: torch.nn.Module | None = None,
+    skip_patterns: Iterable[str] = (),
+) -> int:
+    """Bytes the state dict will occupy once :func:`cast_state_dict` has run over it.
+
+    Loaders call this to size their ``make_room()`` reservation. Charging 1 byte/element for every
+    fp8 tensor is wrong in the direction that hurts: only 2-D ``nn.Linear`` weights outside the skip
+    patterns stay quantized, and everything else — biases, norms, learned pad tokens, the
+    deliberately-dequantized precision-sensitive Linears — lands at ``dtype.itemsize``. On a
+    checkpoint that quantized all 453 of its tensors that under-count is most of the difference.
+    """
+    patterns = tuple(skip_patterns)
+    total = 0
+    for key, tensor in sd.items():
+        if keep_fp8 and can_stay_quantized(key, tensor, model, patterns):
+            total += tensor.nelement() * tensor.element_size()
+        else:
+            total += tensor.nelement() * dtype.itemsize
+    return total
+
+
+def split_fp8_scaled_layers(
+    sd: dict[str, Any],
+    layers: Mapping[str, Fp8ScaledLayer],
+    dtype: torch.dtype,
+    *,
+    model: torch.nn.Module | None = None,
+    skip_patterns: Iterable[str] = (),
+) -> dict[str, Fp8ScaledLayer]:
+    """Dequantize the scaled layers that cannot stay quantized; return the ones that can.
+
+    Every filter that keeps a weight *out* of fp8 — a skip pattern, a weight that is not a 2-D
+    ``nn.Linear.weight`` — is a filter that would otherwise let :func:`cast_state_dict` do a plain
+    ``.to(dtype)`` on a scaled weight, i.e. drop its ``weight_scale`` and leave the weight off by
+    ``1/weight_scale``. :func:`attach_fp8_scales` cannot repair that afterwards: it skips any module
+    whose weight is no longer fp8, so the scale is lost for good. Krea-2 hits this on ordinary
+    ComfyUI exports, where ``time_embed.linear_1/linear_2`` are quantized like any other Linear and
+    match the model's ``time_embed`` skip pattern.
+
+    So the filters are applied here instead, *before* the cast, and the affected layers go through
+    :func:`dequantize_fp8_scaled`, which applies the scale properly. They are then dropped from the
+    returned mapping — they are no longer fp8, so there is nothing left to attach.
+    """
+    patterns = tuple(skip_patterns)
+    usable: dict[str, Fp8ScaledLayer] = {}
+    unusable: dict[str, Fp8ScaledLayer] = {}
+    for path, layer in layers.items():
+        key = f"{path}.weight"
+        tensor = sd.get(key)
+        if tensor is not None and can_stay_quantized(key, tensor, model, patterns):
+            usable[path] = layer
+        else:
+            unusable[path] = layer
+    if unusable:
+        dequantize_fp8_scaled(sd, unusable, dtype)
+    return usable
 
 
 def count_fp8_weights(model: torch.nn.Module) -> int:

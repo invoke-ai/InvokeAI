@@ -74,7 +74,12 @@ from invokeai.backend.model_manager.taxonomy import (
 from invokeai.backend.model_manager.util.model_util import (
     convert_bundle_to_flux_transformer_checkpoint,
 )
-from invokeai.backend.quantization.fp8_scaled import FP8_DTYPE, cast_state_dict, should_keep_fp8_weights
+from invokeai.backend.quantization.fp8_scaled import (
+    can_stay_quantized,
+    cast_state_dict,
+    predict_cast_state_dict_size,
+    should_keep_fp8_weights,
+)
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
 from invokeai.backend.quantization.gguf.utils import TORCH_COMPATIBLE_QTYPES
 from invokeai.backend.util.silence_warnings import SilenceWarnings
@@ -655,11 +660,7 @@ class FluxCheckpointModel(ModelLoader):
         # fp8 matmul is available; casting them to bf16 here would throw away both the VRAM saving
         # and the tensor cores before the model is ever built.
         keep_fp8 = should_keep_fp8_weights(self._torch_device)
-        new_sd_size = sum(
-            ten.nelement() * (ten.element_size() if keep_fp8 and ten.dtype is FP8_DTYPE else torch.bfloat16.itemsize)
-            for ten in sd.values()
-        )
-        self._ram_cache.make_room(new_sd_size)
+        self._ram_cache.make_room(predict_cast_state_dict_size(sd, torch.bfloat16, keep_fp8=keep_fp8, model=model))
         # Everything else is cast to bfloat16, the only dtype currently supported for inference.
         kept = cast_state_dict(sd, torch.bfloat16, keep_fp8=keep_fp8, model=model)
         if kept:
@@ -915,7 +916,8 @@ class Flux2CheckpointModel(ModelLoader):
 
         # Handle FP8 quantized weights (ComfyUI-style or scaled FP8)
         # These store weights as: layer.weight (FP8) + layer.weight_scale (FP32 scalar)
-        sd = self._dequantize_fp8_weights(sd)
+        keep_fp8 = should_keep_fp8_weights(self._torch_device)
+        sd = self._dequantize_fp8_weights(sd, keep_fp8=keep_fp8)
 
         # Check if keys have ComfyUI-style prefix and strip if needed
         prefix_to_strip = None
@@ -1014,7 +1016,7 @@ class Flux2CheckpointModel(ModelLoader):
         kept = cast_state_dict(
             converted_sd,
             torch.bfloat16,
-            keep_fp8=should_keep_fp8_weights(self._torch_device),
+            keep_fp8=keep_fp8,
             model=model,
             skip_patterns=getattr(model, "_skip_layerwise_casting_patterns", None) or (),
         )
@@ -1026,7 +1028,7 @@ class Flux2CheckpointModel(ModelLoader):
 
         return model
 
-    def _dequantize_fp8_weights(self, sd: dict) -> dict:
+    def _dequantize_fp8_weights(self, sd: dict, keep_fp8: bool = False) -> dict:
         """Dequantize FP8 quantized weights in the state dict.
 
         ComfyUI and some FLUX.2 models store quantized weights as:
@@ -1036,6 +1038,18 @@ class Flux2CheckpointModel(ModelLoader):
         Dequantization formula: dequantized = weight.to(float) * weight_scale
 
         Also handles FP8 tensors stored with float8_e4m3fn dtype by converting to float.
+
+        ``keep_fp8`` spares the *raw* fp8 weights (fp8 with no ``weight_scale``) that trailing
+        conversion, so they survive to `cast_state_dict` and reach the tensor cores. Without it this
+        method converts every float8 tensor unconditionally and nothing fp8 is left downstream — the
+        FLUX.2 half of the raw-fp8 path would never execute. Scaled weights are always folded here:
+        they have already had their scale applied a few lines up, so they are no longer float8 by
+        the time the loop below runs.
+
+        The test is deliberately the model-less form of :func:`can_stay_quantized` — the module tree
+        does not exist yet at this point, and the keys are still in checkpoint naming. It is a
+        superset: `cast_state_dict` re-applies the same predicate later *with* the model and casts
+        whatever turns out not to be an ``nn.Linear`` weight.
         """
         # Check for ComfyUI-style scale factors
         weight_scale_keys = [k for k in sd.keys() if isinstance(k, str) and k.endswith(".weight_scale")]
@@ -1089,6 +1103,8 @@ class Flux2CheckpointModel(ModelLoader):
                     # 0-dimensional tensor (scalar) - likely metadata, remove it
                     keys_to_remove_scalars.append(key)
                 elif hasattr(tensor, "dtype") and "float8" in str(tensor.dtype):
+                    if keep_fp8 and can_stay_quantized(key, tensor, None):
+                        continue
                     # Native FP8 tensor - mark for conversion
                     keys_to_convert.append(key)
 

@@ -98,29 +98,31 @@ If you see unexpected quality regressions, disable FP8 Storage on the affected m
 
 ## FP8 Compute
 
-Everything above describes FP8 *Storage*: a per-model toggle that changes how weights are **stored**, while the math still runs in BF16. `fp8_compute` is a separate, global setting in `invokeai.yaml` that changes how they are **multiplied** — ComfyUI "scaled fp8" checkpoints stay quantized and their matmuls run on the FP8 tensor cores via `torch._scaled_mm`, instead of being dequantized at load time.
+Everything above describes FP8 *Storage*, which changes how weights are **stored** while the math still runs in BF16. `fp8_compute` is a separate, global setting in `invokeai.yaml` that also does the **math** in FP8, on GPUs that have hardware for it. That makes generation faster, not just smaller.
 
-It needs an Ada (SM 8.9) or newer NVIDIA GPU and falls back to the dequantized path automatically on anything older. It applies to checkpoints that already ship quantized; FP8 Storage is the toggle for full-precision ones.
+It is for models that were **already saved in FP8** by whoever published them — you'll often see these labelled "fp8" or "fp8_scaled" in the filename. Normally InvokeAI unpacks them back to BF16 while loading; with `fp8_compute` on, they stay as they are and run directly on the GPU's FP8 hardware. FP8 Storage is the toggle for the other case: a full-precision model you want to shrink yourself.
+
+Not every part of a model stays in FP8 — the small, precision-sensitive pieces are always unpacked. Those are a tiny share of the weights, so you still get nearly the full VRAM saving.
+
+You need an FP8-capable GPU: RTX 40-series or newer, the datacenter cards of those generations, or AMD MI300 and newer. InvokeAI checks your card the first time it needs to — by actually trying a small FP8 operation rather than going by the model name — so a card that can't do it quietly falls back to the normal path instead of failing partway through a generation.
 
 :::danger[Reproducibility requires the model to be fully in VRAM]
 With `fp8_compute` enabled, **the same seed only reproduces the same image if the model is 100% resident in VRAM.**
 
-The FP8 matmul needs both operands on the same device, so a layer whose weights are still in RAM cannot use it and silently falls back to the dequantized BF16 path. That fallback is numerically different — and *which* layers it hits depends on how much of the model happened to fit at that moment, which shifts between runs as VRAM pressure changes.
+FP8 math only happens for the parts of the model that are actually on the GPU. Anything still sitting in system RAM takes the normal path instead, which gives slightly different numbers — and *which* parts that affects depends on how much of the model happened to fit at that moment, which changes from run to run.
 
-Measured on a 24 GB card with a ~12 GB transformer sitting at 88–95% residency: two runs with an identical seed and identical settings differed in **98.7% of all pixels**. With the model fully resident, repeated runs were **bit-identical**.
+Measured on a 24 GB card with a ~12 GB model at 88–95% loaded: two runs with an identical seed and identical settings differed in **98.7% of all pixels**. With the model fully loaded, repeated runs came out **identical**.
 
-A *constant* residency fraction would in principle be reproducible too, but nothing guarantees one in practice — other resident models, per-node working-memory reservations and allocator state all move the line between runs.
-
-To get repeatable output, check the model's load line in the log for `VRAM: … (100.0%)`. If it is below that, free up VRAM (lower resolution, fewer resident models, a smaller text encoder) or set `enable_partial_loading: false`.
+To get repeatable output, check the model's load line in the log for `VRAM: … (100.0%)`. If it is below that, free up VRAM (lower resolution, fewer models loaded at once, a smaller text encoder) or set `enable_partial_loading: false`.
 :::
 
-Keeping the model fully resident is worth it for speed as well: on the same 24 GB card, streaming the last 5–12% of the transformer over PCIe cost **+47% per step** (1.03 → 1.51 s/it at 1024², 8 steps).
+Keeping the whole model on the GPU is worth it for speed as well: on the same 24 GB card, having to stream the last 5–12% of the model over PCIe cost **+47% per step** (1.03 → 1.51 s/it at 1024², 8 steps).
 
-### Layers the checkpoint marks as full-precision
+### When the model asks for full precision
 
-Some scaled-fp8 checkpoints mark individual layers with `full_precision_matrix_mult`, meaning the producer measured them as unsafe to multiply in FP8. InvokeAI honors those markers by default, which means those layers dequantize on every forward instead of using the tensor cores. On checkpoints that mark many layers this can cost a large part of the FP8 Compute speedup.
+Some FP8 models come with a note from whoever made them, marking certain layers as ones that should not use FP8 math. InvokeAI follows those notes by default, so those layers run the slower way. On a model that marks a lot of layers, this can eat much of the FP8 Compute speedup.
 
-`fp8_compute_full_precision_hints: false` overrides the markers and runs every quantized layer on the tensor cores. It is faster, but you are deliberately going against the checkpoint author's instruction — the marked layers were flagged as numerically sensitive, so compare output before settling on it.
+Setting `fp8_compute_full_precision_hints: false` ignores the notes and runs everything on the FP8 hardware. It is faster, but you are overriding the model author's judgement about which layers are sensitive — so compare a few images before sticking with it.
 
 ## Troubleshooting
 

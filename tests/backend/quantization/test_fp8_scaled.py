@@ -1,3 +1,6 @@
+import logging
+from unittest import mock
+
 import pytest
 import torch
 
@@ -13,9 +16,13 @@ from invokeai.backend.quantization.fp8_scaled import (
     extract_comfy_quant_hints,
     extract_fp8_scaled_layers,
     parse_quantization_metadata,
+    predict_cast_state_dict_size,
+    reset_fp8_matmul_support_cache,
     scaled_mm_linear,
     set_fp8_matmul_enabled,
     set_full_precision_hints_respected,
+    split_fp8_scaled_layers,
+    warn_on_unattached_scales,
 )
 
 cuda_fp8 = pytest.mark.skipif(
@@ -358,6 +365,137 @@ class TestKrea2MetadataRemap:
         assert mapping["blocks.0.attn.wo"] == "transformer_blocks.0.attn.to_out.0"
         assert mapping["blocks.3.mlp.down"] == "transformer_blocks.3.ff.down"
         assert mapping["txtfusion.refiner_blocks.1.attn.wk"] == "text_fusion.refiner_blocks.1.attn.to_k"
+
+
+class TestSplitScaledLayers:
+    """A scaled layer must never reach `cast_state_dict` still holding an unapplied scale."""
+
+    def _model(self):
+        model = torch.nn.Sequential()
+        model.add_module("time_embed", torch.nn.Sequential())
+        model.time_embed.add_module("linear_2", torch.nn.Linear(16, 32))
+        model.add_module("attn", torch.nn.Linear(16, 32))
+        return model
+
+    def test_skip_pattern_layer_is_dequantized_with_its_scale(self):
+        """The Krea-2 regression: `time_embed` matches the model's skip patterns, so the cast would
+        turn its fp8 weight into bf16 *codes* — the scale silently dropped, the weight off by
+        1/weight_scale, and `attach_fp8_scales` unable to repair it afterwards."""
+        model = self._model()
+        w = torch.randn(32, 16, dtype=torch.bfloat16) * 0.02
+        scale = (w.abs().amax() / torch.finfo(FP8_DTYPE).max).float().clamp(min=1e-12)
+        q = (w / scale).to(FP8_DTYPE)
+        sd = {"time_embed.linear_2.weight": q, "attn.weight": q.clone()}
+        layers = {
+            "time_embed.linear_2": Fp8ScaledLayer(weight_scale=scale),
+            "attn": Fp8ScaledLayer(weight_scale=scale),
+        }
+
+        remaining = split_fp8_scaled_layers(
+            sd, layers, torch.bfloat16, model=model, skip_patterns=["time_embed", "norm"]
+        )
+
+        assert set(remaining) == {"attn"}, "only the layer that can stay quantized is left to attach"
+        assert sd["time_embed.linear_2.weight"].dtype is torch.bfloat16
+        rel = ((sd["time_embed.linear_2.weight"].float() - w.float()).norm() / w.float().norm()).item()
+        assert rel < 0.05, f"the scale was not applied on the way down: rel-err {rel:.4f}"
+
+        # And the survivor is untouched by the subsequent cast, so its scale still attaches.
+        assert cast_state_dict(sd, torch.bfloat16, keep_fp8=True, model=model, skip_patterns=["time_embed"]) == 1
+        model.load_state_dict(sd, assign=True, strict=False)
+        assert attach_fp8_scales(model, remaining) == 1
+        assert torch.equal(model.attn.weight_scale, scale)
+
+    def test_non_linear_scaled_weight_is_dequantized_with_its_scale(self):
+        """Same failure without any skip pattern: a scaled tensor that is not an nn.Linear weight
+        fails `_is_fp8_matmul_weight`, so the cast would strip its scale."""
+        model = self._model()
+        q, scale = _fp8_weight(32, 16)
+        sd = {"pad_token.weight": q}
+        remaining = split_fp8_scaled_layers(
+            sd, {"pad_token": Fp8ScaledLayer(weight_scale=scale)}, torch.bfloat16, model=model
+        )
+        assert remaining == {}
+        assert torch.equal(sd["pad_token.weight"], dequantize_weight(q, scale, torch.bfloat16))
+
+    def test_warns_when_a_scale_finds_no_module(self):
+        logger = logging.getLogger("fp8-test")
+        with mock.patch.object(logger, "warning") as warn:
+            warn_on_unattached_scales(logger, "Krea-2", 1, {"a": object(), "b": object()})
+        assert warn.call_count == 1
+        assert "1 of 2" in warn.call_args[0][0]
+
+    def test_silent_when_every_scale_landed(self):
+        logger = logging.getLogger("fp8-test")
+        with mock.patch.object(logger, "warning") as warn:
+            warn_on_unattached_scales(logger, "Krea-2", 2, {"a": object(), "b": object()})
+        assert warn.call_count == 0
+
+
+class TestPredictedSize:
+    def test_matches_what_cast_state_dict_actually_leaves(self):
+        """`make_room` reserves against this, so a mismatch is a silent under-reservation."""
+        model = torch.nn.Sequential()
+        model.add_module("lin", torch.nn.Linear(16, 32))
+        model.add_module("t_embedder", torch.nn.Linear(16, 32))
+        model.add_module("norm", torch.nn.LayerNorm(32))
+        q, _ = _fp8_weight(32, 16)
+        sd = {
+            "lin.weight": q,
+            "lin.bias": torch.zeros(32).to(FP8_DTYPE),
+            "t_embedder.weight": q.clone(),
+            "norm.weight": torch.ones(32).to(FP8_DTYPE),
+            "pad_token": torch.zeros(1, 32).to(FP8_DTYPE),
+        }
+        kwargs = {"model": model, "skip_patterns": ["t_embedder"]}
+        # What the loaders used to reserve: 1 byte/element for *every* fp8 tensor.
+        naive = sum(t.nelement() * (t.element_size() if t.dtype is FP8_DTYPE else 2) for t in sd.values())
+
+        predicted = predict_cast_state_dict_size(sd, torch.bfloat16, keep_fp8=True, **kwargs)
+        cast_state_dict(sd, torch.bfloat16, keep_fp8=True, **kwargs)
+        actual = sum(t.nelement() * t.element_size() for t in sd.values())
+        assert predicted == actual
+
+        # Only `lin.weight` stays 1 byte/element; the rest lands at 2, so the old sum under-counted.
+        assert naive < actual
+
+    def test_all_dequantized_when_keep_fp8_is_off(self):
+        q, _ = _fp8_weight(32, 16)
+        sd = {"lin.weight": q}
+        assert predict_cast_state_dict_size(sd, torch.bfloat16, keep_fp8=False) == q.nelement() * 2
+
+
+class TestDeviceSupport:
+    def test_probe_decides_rather_than_the_capability_number(self):
+        """ROCm reports the gfx arch from `get_device_capability`, so RDNA3 (gfx1100 -> (11, 0))
+        passes a `>= (8, 9)` test and then raises on every forward. The probe is what decides."""
+        reset_fp8_matmul_support_cache()
+        with mock.patch("torch.cuda.is_available", return_value=True):
+            with mock.patch("torch.cuda.get_device_capability", return_value=(11, 0)):
+                with mock.patch(
+                    "invokeai.backend.quantization.fp8_scaled._probe_fp8_matmul", return_value=False
+                ) as probe:
+                    assert device_supports_fp8_matmul(torch.device("cuda", 0)) is False
+                    assert probe.called
+        reset_fp8_matmul_support_cache()
+
+    def test_probe_result_is_cached_per_device(self):
+        reset_fp8_matmul_support_cache()
+        with mock.patch("torch.cuda.is_available", return_value=True):
+            with mock.patch("torch.cuda.get_device_capability", return_value=(8, 9)):
+                with mock.patch(
+                    "invokeai.backend.quantization.fp8_scaled._probe_fp8_matmul", return_value=True
+                ) as probe:
+                    assert device_supports_fp8_matmul(torch.device("cuda", 0)) is True
+                    assert device_supports_fp8_matmul(torch.device("cuda", 0)) is True
+                    assert probe.call_count == 1
+        reset_fp8_matmul_support_cache()
+
+    def test_non_cuda_never_probes(self):
+        reset_fp8_matmul_support_cache()
+        with mock.patch("invokeai.backend.quantization.fp8_scaled._probe_fp8_matmul") as probe:
+            assert device_supports_fp8_matmul(torch.device("cpu")) is False
+            assert not probe.called
 
 
 class TestDequantize:
