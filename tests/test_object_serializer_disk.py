@@ -1,6 +1,9 @@
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
+from queue import Empty
+from threading import Event, get_ident
 
 import pytest
 import torch
@@ -69,6 +72,12 @@ def test_obj_serializer_disk_deletes(obj_serializer: ObjectSerializerDisk[MockDa
     obj_serializer.delete(obj_1_name)
     assert not Path(obj_serializer._output_dir, obj_1_name).exists()
     assert Path(obj_serializer._output_dir, obj_2_name).exists()
+
+
+def test_obj_serializer_disk_delete_is_noop_when_object_is_missing(
+    obj_serializer: ObjectSerializerDisk[MockDataclass],
+):
+    obj_serializer.delete("missing_object_name")
 
 
 def test_obj_serializer_ephemeral_creates_tempdir(tmp_path: Path):
@@ -186,3 +195,126 @@ def test_obj_serializer_fwd_cache_calls_delete_callback(fwd_cache: ObjectSeriali
     obj_1_name = fwd_cache.save(obj_1)
     fwd_cache.delete(obj_1_name)
     assert called_name == obj_1_name
+
+
+def test_obj_serializer_fwd_cache_removes_deleted_ids_from_eviction_queue(
+    fwd_cache: ObjectSerializerForwardCache[MockDataclass],
+):
+    obj_1_name = fwd_cache.save(MockDataclass(foo="bar"))
+    obj_2_name = fwd_cache.save(MockDataclass(foo="baz"))
+    fwd_cache.delete(obj_1_name)
+
+    obj_3_name = fwd_cache.save(MockDataclass(foo="qux"))
+
+    assert obj_1_name not in fwd_cache._cache
+    assert obj_2_name in fwd_cache._cache
+    assert obj_3_name in fwd_cache._cache
+    assert fwd_cache._cache_ids.qsize() == 2
+
+
+def test_obj_serializer_fwd_cache_cleans_up_when_storage_object_is_missing(
+    fwd_cache: ObjectSerializerForwardCache[MockDataclass],
+):
+    called_names: list[str] = []
+    fwd_cache.on_deleted(called_names.append)
+    obj_name = fwd_cache.save(MockDataclass(foo="bar"))
+    underlying_storage = fwd_cache._underlying_storage
+    assert isinstance(underlying_storage, ObjectSerializerDisk)
+    underlying_storage._get_path(obj_name).unlink()
+
+    fwd_cache.delete(obj_name)
+
+    assert obj_name not in fwd_cache._cache
+    assert fwd_cache._cache_ids.qsize() == 0
+    assert called_names == [obj_name]
+
+
+def test_obj_serializer_fwd_cache_preserves_fifo_order_after_deletion(tmp_path: Path):
+    fwd_cache = ObjectSerializerForwardCache(
+        ObjectSerializerDisk[MockDataclass](tmp_path, safe_globals=[MockDataclass]), max_cache_size=3
+    )
+    obj_1_name = fwd_cache.save(MockDataclass(foo="one"))
+    obj_2_name = fwd_cache.save(MockDataclass(foo="two"))
+    obj_3_name = fwd_cache.save(MockDataclass(foo="three"))
+    fwd_cache.delete(obj_2_name)
+    obj_4_name = fwd_cache.save(MockDataclass(foo="four"))
+    obj_5_name = fwd_cache.save(MockDataclass(foo="five"))
+
+    assert obj_1_name not in fwd_cache._cache
+    assert obj_2_name not in fwd_cache._cache
+    assert obj_3_name in fwd_cache._cache
+    assert obj_4_name in fwd_cache._cache
+    assert obj_5_name in fwd_cache._cache
+    assert fwd_cache._cache_ids.qsize() == 3
+
+
+def test_obj_serializer_fwd_cache_delete_of_evicted_object_is_noop(
+    fwd_cache: ObjectSerializerForwardCache[MockDataclass],
+):
+    obj_1_name = fwd_cache.save(MockDataclass(foo="one"))
+    obj_2_name = fwd_cache.save(MockDataclass(foo="two"))
+    obj_3_name = fwd_cache.save(MockDataclass(foo="three"))
+    cache_before_delete = fwd_cache._cache.copy()
+    queue_size_before_delete = fwd_cache._cache_ids.qsize()
+
+    fwd_cache.delete(obj_1_name)
+
+    assert fwd_cache._cache == cache_before_delete
+    assert fwd_cache._cache_ids.qsize() == queue_size_before_delete
+    assert obj_2_name in fwd_cache._cache
+    assert obj_3_name in fwd_cache._cache
+
+
+def test_obj_serializer_fwd_cache_concurrent_deletes_do_not_leave_stale_eviction_ids(
+    fwd_cache: ObjectSerializerForwardCache[MockDataclass], monkeypatch: pytest.MonkeyPatch
+):
+    obj_1_name = fwd_cache.save(MockDataclass(foo="one"))
+    obj_2_name = fwd_cache.save(MockDataclass(foo="two"))
+    first_delete_thread_id: int | None = None
+    first_drained_queue = Event()
+    release_first_delete = Event()
+    second_delete_started = Event()
+    second_delete_finished = Event()
+    original_get_nowait = fwd_cache._cache_ids.get_nowait
+
+    def controlled_get_nowait():
+        try:
+            return original_get_nowait()
+        except Empty:
+            if get_ident() == first_delete_thread_id:
+                first_drained_queue.set()
+                assert release_first_delete.wait(timeout=5)
+            raise
+
+    monkeypatch.setattr(fwd_cache._cache_ids, "get_nowait", controlled_get_nowait)
+
+    def delete_first():
+        nonlocal first_delete_thread_id
+        first_delete_thread_id = get_ident()
+        fwd_cache.delete(obj_1_name)
+
+    def delete_second():
+        second_delete_started.set()
+        fwd_cache.delete(obj_2_name)
+        second_delete_finished.set()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        first_delete = executor.submit(delete_first)
+        assert first_drained_queue.wait(timeout=5)
+        second_delete = executor.submit(delete_second)
+        assert second_delete_started.wait(timeout=5)
+        try:
+            assert not second_delete_finished.wait(timeout=0.1)
+        finally:
+            release_first_delete.set()
+        first_delete.result(timeout=5)
+        second_delete.result(timeout=5)
+
+    assert fwd_cache._cache == {}
+    assert fwd_cache._cache_ids.qsize() == 0
+
+    obj_3_name = fwd_cache.save(MockDataclass(foo="three"))
+    obj_4_name = fwd_cache.save(MockDataclass(foo="four"))
+
+    assert set(fwd_cache._cache) == {obj_3_name, obj_4_name}
+    assert fwd_cache._cache_ids.qsize() == 2
