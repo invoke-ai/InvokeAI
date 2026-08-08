@@ -7,6 +7,7 @@ from collections import deque
 from dataclasses import dataclass
 from functools import wraps
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     Concatenate,
@@ -22,7 +23,6 @@ from typing import (
     get_origin,
 )
 
-import networkx as nx
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -53,6 +53,27 @@ from invokeai.app.invocations.fields import Input, InputField, OutputField, UITy
 from invokeai.app.invocations.logic import IfInvocation
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.misc import uuid_string
+
+if TYPE_CHECKING:
+    import networkx as nx
+else:
+
+    class _LazyNetworkX:
+        _module: Any | None = None
+
+        def _load(self) -> Any:
+            if self._module is None:
+                import networkx
+
+                self._module = networkx
+                globals()["nx"] = networkx
+            return self._module
+
+        def __getattr__(self, name: str) -> Any:
+            return getattr(self._load(), name)
+
+    nx = _LazyNetworkX()
+
 
 # in 3.10 this would be "from types import NoneType"
 NoneType = type(None)
@@ -641,7 +662,7 @@ class _ExecutionMaterializer:
         return prepared_nodes_by_iteration_path
 
     def _get_target_iteration_path(
-        self, source_node_id: str, graph: nx.DiGraph, prepared_iterator_nodes: tuple[str, ...]
+        self, source_node_id: str, graph: "nx.DiGraph", prepared_iterator_nodes: tuple[str, ...]
     ) -> Optional[tuple[int, ...]]:
         parent_iterators = self._get_parent_iterator_exec_nodes(source_node_id, graph, list(prepared_iterator_nodes))
         parent_paths = [self._state._get_iteration_path(prepared_id) for prepared_id, _ in parent_iterators]
@@ -656,7 +677,7 @@ class _ExecutionMaterializer:
     def _get_indexed_iteration_node(
         self,
         source_node_id: str,
-        graph: nx.DiGraph,
+        graph: "nx.DiGraph",
         prepared_iterator_nodes: tuple[str, ...],
         prepared_nodes_by_iteration_path: dict[tuple[int, ...], list[str]],
     ) -> Optional[str]:
@@ -672,7 +693,7 @@ class _ExecutionMaterializer:
                 return None
         return None
 
-    def _get_parent_iteration_mappings(self, next_node_id: str, graph: nx.DiGraph) -> Iterable[list[tuple[str, str]]]:
+    def _get_parent_iteration_mappings(self, next_node_id: str, graph: "nx.DiGraph") -> Iterable[list[tuple[str, str]]]:
         parent_node_ids = [source_id for source_id, _ in graph.in_edges(next_node_id)]
         iterator_graph = self.iterator_graph(graph)
         iterator_nodes = self.get_node_iterators(next_node_id, iterator_graph)
@@ -692,7 +713,7 @@ class _ExecutionMaterializer:
         }
 
         def iter_mappings() -> Iterable[list[tuple[str, str]]]:
-            execution_graph: Optional[nx.DiGraph] = None
+            execution_graph: Optional["nx.DiGraph"] = None
             for prepared_iterators in itertools.product(*iterator_nodes_prepared):
                 mapping: list[tuple[str, str]] = []
                 for node_id in parent_node_ids:
@@ -750,7 +771,7 @@ class _ExecutionMaterializer:
 
         return new_nodes
 
-    def iterator_graph(self, base: Optional[nx.DiGraph] = None) -> nx.DiGraph:
+    def iterator_graph(self, base: Optional["nx.DiGraph"] = None) -> "nx.DiGraph":
         """Gets a DiGraph with edges to collectors removed so an ancestor search produces all active iterators for any node"""
         g = base.copy() if base is not None else self._state.graph.nx_graph_flat()
         collectors = (
@@ -760,7 +781,7 @@ class _ExecutionMaterializer:
             g.remove_edges_from(list(g.in_edges(c)))
         return g
 
-    def get_node_iterators(self, node_id: str, it_graph: Optional[nx.DiGraph] = None) -> list[str]:
+    def get_node_iterators(self, node_id: str, it_graph: Optional["nx.DiGraph"] = None) -> list[str]:
         g = it_graph or self.iterator_graph()
         return [n for n in nx.ancestors(g, node_id) if isinstance(self._state.graph.get_node(n), IterateInvocation)]
 
@@ -772,7 +793,7 @@ class _ExecutionMaterializer:
         }
 
     def _get_parent_iterator_exec_nodes(
-        self, source_node_id: str, graph: nx.DiGraph, prepared_iterator_nodes: list[str]
+        self, source_node_id: str, graph: "nx.DiGraph", prepared_iterator_nodes: list[str]
     ) -> list[tuple[str, str]]:
         iterator_source_node_mapping = [
             (prepared_exec_node_id, self._state.prepared_source_mapping[prepared_exec_node_id])
@@ -785,7 +806,7 @@ class _ExecutionMaterializer:
         ]
 
     def _matches_parent_iterators(
-        self, candidate_exec_node_id: str, parent_iterators: list[tuple[str, str]], execution_graph: nx.DiGraph
+        self, candidate_exec_node_id: str, parent_iterators: list[tuple[str, str]], execution_graph: "nx.DiGraph"
     ) -> bool:
         return all(
             nx.has_path(execution_graph, parent_iterator_exec_id, candidate_exec_node_id)
@@ -797,7 +818,7 @@ class _ExecutionMaterializer:
         prepared_nodes: set[str],
         prepared_iterator_nodes: list[str],
         parent_iterators: list[tuple[str, str]],
-        execution_graph: nx.DiGraph,
+        execution_graph: "nx.DiGraph",
     ) -> Optional[str]:
         prepared_iterator = next((node_id for node_id in prepared_iterator_nodes if node_id in prepared_nodes), None)
         if prepared_iterator is None:
@@ -807,7 +828,7 @@ class _ExecutionMaterializer:
         return None
 
     def _find_prepared_node_matching_iterators(
-        self, prepared_nodes: set[str], parent_iterators: list[tuple[str, str]], execution_graph: nx.DiGraph
+        self, prepared_nodes: set[str], parent_iterators: list[tuple[str, str]], execution_graph: "nx.DiGraph"
     ) -> Optional[str]:
         return next(
             (
@@ -821,8 +842,8 @@ class _ExecutionMaterializer:
     def get_iteration_node(
         self,
         source_node_id: str,
-        graph: nx.DiGraph,
-        execution_graph: nx.DiGraph,
+        graph: "nx.DiGraph",
+        execution_graph: "nx.DiGraph",
         prepared_iterator_nodes: list[str],
         prepared_nodes: Optional[set[str]] = None,
     ) -> Optional[str]:
@@ -846,7 +867,7 @@ class _ExecutionMaterializer:
 
         return self._find_prepared_node_matching_iterators(prepared_nodes, parent_iterators, execution_graph)
 
-    def prepare(self, base_g: Optional[nx.DiGraph] = None) -> Optional[str]:
+    def prepare(self, base_g: Optional["nx.DiGraph"] = None) -> Optional[str]:
         g = base_g or self._state.graph.nx_graph_flat()
         next_node_id = next(
             (
@@ -1065,7 +1086,7 @@ class _ExecutionRuntime:
         return iterator_sources
 
     def _get_iterator_exec_id(
-        self, iterator_source_id: str, exec_node_id: str, execution_graph: nx.DiGraph
+        self, iterator_source_id: str, exec_node_id: str, execution_graph: "nx.DiGraph"
     ) -> Optional[str]:
         prepared = self._state.source_prepared_mapping.get(iterator_source_id)
         if not prepared:
@@ -2286,7 +2307,7 @@ class Graph(BaseModel):
 
         return None
 
-    def nx_graph(self) -> nx.DiGraph:
+    def nx_graph(self) -> "nx.DiGraph":
         """Returns a NetworkX DiGraph representing the layout of this graph"""
         # TODO: Cache this?
         g = nx.DiGraph()
@@ -2294,7 +2315,7 @@ class Graph(BaseModel):
         g.add_edges_from({(e.source.node_id, e.destination.node_id) for e in self.edges})
         return g
 
-    def nx_graph_flat(self, nx_graph: Optional[nx.DiGraph] = None) -> nx.DiGraph:
+    def nx_graph_flat(self, nx_graph: Optional["nx.DiGraph"] = None) -> "nx.DiGraph":
         """Returns a flattened NetworkX DiGraph, including all subgraphs (but not with iterations expanded)"""
         g = nx_graph or nx.DiGraph()
 
@@ -2756,20 +2777,20 @@ class GraphExecutionState(BaseModel):
     def _create_execution_node(self, node_id: str, iteration_node_map: list[tuple[str, str]]) -> list[str]:
         return self._materializer().create_execution_node(node_id, iteration_node_map)
 
-    def _iterator_graph(self, base: Optional[nx.DiGraph] = None) -> nx.DiGraph:
+    def _iterator_graph(self, base: Optional["nx.DiGraph"] = None) -> "nx.DiGraph":
         return self._materializer().iterator_graph(base)
 
-    def _get_node_iterators(self, node_id: str, it_graph: Optional[nx.DiGraph] = None) -> list[str]:
+    def _get_node_iterators(self, node_id: str, it_graph: Optional["nx.DiGraph"] = None) -> list[str]:
         return self._materializer().get_node_iterators(node_id, it_graph)
 
-    def _prepare(self, base_g: Optional[nx.DiGraph] = None) -> Optional[str]:
+    def _prepare(self, base_g: Optional["nx.DiGraph"] = None) -> Optional[str]:
         return self._materializer().prepare(base_g)
 
     def _get_iteration_node(
         self,
         source_node_id: str,
-        graph: nx.DiGraph,
-        execution_graph: nx.DiGraph,
+        graph: "nx.DiGraph",
+        execution_graph: "nx.DiGraph",
         prepared_iterator_nodes: list[str],
     ) -> Optional[str]:
         return self._materializer().get_iteration_node(source_node_id, graph, execution_graph, prepared_iterator_nodes)
