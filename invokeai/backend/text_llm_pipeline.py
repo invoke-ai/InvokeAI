@@ -53,7 +53,7 @@ class TextLLMPipeline:
             messages.append({"role": "user", "content": prompt})
             try:
                 formatted_prompt: str = self._tokenizer.apply_chat_template(
-                    messages, tokenize=False, add_generation_prompt=True
+                    messages, tokenize=False, add_generation_prompt=True, enable_thinking=False
                 )
             except Exception as e:  # noqa: BLE001 - jinja2 TemplateError is not importable here
                 # Some chat templates (notably Gemma) reject a dedicated "system" role. Fold the
@@ -61,7 +61,7 @@ class TextLLMPipeline:
                 if system_prompt and "system role" in str(e).lower():
                     merged = [{"role": "user", "content": f"{system_prompt}\n\n{prompt}"}]
                     formatted_prompt = self._tokenizer.apply_chat_template(
-                        merged, tokenize=False, add_generation_prompt=True
+                        merged, tokenize=False, add_generation_prompt=True, enable_thinking=False
                     )
                 else:
                     raise
