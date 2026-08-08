@@ -166,6 +166,7 @@ const createGenerateValues = (overrides: Partial<GenerateWidgetValues> = {}): Ge
   positivePromptHeightPx: 96,
   promptTemplate: null,
   promptTemplateViewMode: false,
+  mistralEncoderModel: null,
   qwen3EncoderModel: null,
   qwenVLEncoderModel: null,
   qwen3VLEncoderModel: null,

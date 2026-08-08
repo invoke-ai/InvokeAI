@@ -552,6 +552,7 @@ export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanv
   if (input.regionalGuidance && input.regionalGuidance.length > 0 && isRegionalGuidanceSupportedForBase(model.base)) {
     addRegionalGuidance(backendGraph, {
       base: model.base,
+      modelVariant: model.variant,
       regions: input.regionalGuidance,
       ...(model.base === 'krea-2'
         ? {
