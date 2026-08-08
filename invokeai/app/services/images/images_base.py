@@ -61,6 +61,21 @@ class ImageServiceABC(ABC):
         pass
 
     @abstractmethod
+    def copy(
+        self,
+        source_image_name: str,
+        board_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+    ) -> ImageDTO:
+        """Duplicates an existing image under a new identity, optionally onto a board.
+
+        The record is cloned and the file copied byte for byte — no decode, no re-encode — so
+        embedded metadata, workflow and graph travel with it. The copy is never intermediate and
+        is never starred.
+        """
+        pass
+
+    @abstractmethod
     def update(
         self,
         image_name: str,
@@ -150,6 +165,16 @@ class ImageServiceABC(ABC):
     @abstractmethod
     def get_intermediates_count(self, user_id: Optional[str] = None) -> int:
         """Gets the number of intermediate images. If user_id is provided, only counts that user's intermediates."""
+        pass
+
+    @abstractmethod
+    def delete_images_by_names(self, image_names: list[str]) -> tuple[list[str], list[str]]:
+        """Deletes exactly these images; returns ``(deleted_names, failed_names)``.
+
+        For callers that must decide whether the deletion may proceed *before* destroying
+        anything, and so enumerate the names themselves. Same per-image failure semantics as
+        ``delete_images_on_board``.
+        """
         pass
 
     @abstractmethod

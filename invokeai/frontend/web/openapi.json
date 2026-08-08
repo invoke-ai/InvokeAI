@@ -5771,6 +5771,51 @@
         ]
       }
     },
+    "/api/v1/images/copy": {
+      "post": {
+        "tags": ["images"],
+        "summary": "Copy Images To Board",
+        "description": "Copies images, optionally onto a board, and returns the new names.\n\nEach copy is a genuinely new image with its own name, because `board_images` keys on\n`image_name` \u2014 one image can sit on exactly one board, so sharing a name between two boards is\nnot representable. Duplicating a project needs that: its copy must own its media outright.\n\nThe pixels never leave the server, and never leave the disk either: `images.copy` clones the\nrecord and copies the file byte for byte, so the embedded metadata, workflow and graph travel\nwithout being parsed and rewritten. Category and origin travel; the originating session and\nnode do not. Starring is not copied \u2014 callers that want it use `POST /images/star`, the same\npath an import uses.\n\nPer-image failures are reported rather than raised, so one unreadable source cannot cost the\ncaller the whole batch.\n\nA sync `def`, so FastAPI runs the batch on its threadpool: file copies are blocking, and a\nboard's worth of them on the event loop would stall every other request for the duration.\n\nRead access is enough to copy, which means an image on a board shared with you can be copied\ninto something you own, and the copy outlives the share. That is deliberate \u2014 it is what makes\na shared board usable as a source \u2014 but it is a real widening of what \"read-only\" means, so it\nis stated rather than left to be discovered.",
+        "operationId": "copy_images_to_board",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_copy_images_to_board"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CopyImagesResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/images/star": {
       "post": {
         "tags": ["images"],
@@ -7187,6 +7232,51 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/videos/copy": {
+      "post": {
+        "tags": ["videos"],
+        "summary": "Copy Videos To Board",
+        "description": "Copies videos, optionally onto a board, and returns the new names.\n\nThe image twin of this route explains why copies rather than shared references: `board_videos`\nkeys on `video_name`, so one video sits on exactly one board.\n\nBlocking work (the service copies the file off disk) runs on FastAPI's threadpool by virtue of\nthis being a sync `def`, so a large batch cannot stall the event loop.\n\n`move_source=False` is load-bearing, not defensive: `create` consumes the path it is given,\nbecause every other caller hands it a temp file. Here the path is the *source's own* file.\n\nRead access is enough to copy, which means a video on a board shared with you can be copied\ninto something you own, and the copy outlives the share. That is deliberate \u2014 it is what makes\na shared board usable as a source \u2014 but it is a real widening of what \"read-only\" means, so it\nis stated rather than left to be discovered.",
+        "operationId": "copy_videos_to_board",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_copy_videos_to_board"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CopyVideosResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/videos/star": {
@@ -12631,7 +12721,7 @@
       "post": {
         "tags": ["projects"],
         "summary": "Create Project",
-        "description": "Creates a project for the current user.",
+        "description": "Creates a project, and the private board it owns, for the current user.",
         "operationId": "create_project",
         "requestBody": {
           "content": {
@@ -12780,7 +12870,7 @@
       "delete": {
         "tags": ["projects"],
         "summary": "Delete Project",
-        "description": "Deletes one of the current user's projects. Idempotent.",
+        "description": "Deletes one of the current user's projects, and the board it owns, in one transaction.\n\nIdempotent. The media survives: deleting the board drops its memberships, so the images and\nvideos on it return to Uncategorized, exactly as they would if the board were deleted without\n`include_images`. There is deliberately no option to take them with it \u2014 a project is a\nworkspace, and emptying someone's gallery is not what deleting one should be able to mean.\nNothing is reported back for the same reason: nothing was destroyed to report.",
         "operationId": "delete_project",
         "security": [
           {
@@ -12803,6 +12893,54 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project_id}/board-snapshot": {
+      "get": {
+        "tags": ["projects"],
+        "summary": "Get Project Board Snapshot",
+        "description": "Lists everything on the project's board that the gallery would show.\n\nIntermediates and the canvas's private `other` category are excluded. Unpaginated: the caller\nthat needs this \u2014 exporting a project \u2014 has to hold the whole list anyway. It is still bounded,\nbecause the answer is built entirely in memory and any client with a project id can ask for it;\na board past the ceiling is one an export could not have packed either, so it is refused as a\n413 rather than paged.",
+        "operationId": "get_project_board_snapshot",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The id of the project whose board to enumerate",
+              "title": "Project Id"
+            },
+            "description": "The id of the project whose board to enumerate"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectBoardSnapshotDTO"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -16191,6 +16329,18 @@
             ],
             "title": "Owner Username",
             "description": "The username of the board owner (for admin view)."
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id",
+            "description": "The id of the project that owns this board, if any."
           }
         },
         "type": "object",
@@ -16284,6 +16434,62 @@
         "type": "object",
         "required": ["batch_ids"],
         "title": "Body_cancel_by_batch_ids"
+      },
+      "Body_copy_images_to_board": {
+        "properties": {
+          "image_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Image Names",
+            "description": "The names of the images to copy"
+          },
+          "board_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Board Id",
+            "description": "The board to put the copies on, if any"
+          }
+        },
+        "type": "object",
+        "required": ["image_names"],
+        "title": "Body_copy_images_to_board"
+      },
+      "Body_copy_videos_to_board": {
+        "properties": {
+          "video_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Video Names",
+            "description": "The names of the videos to copy"
+          },
+          "board_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Board Id",
+            "description": "The board to put the copies on, if any"
+          }
+        },
+        "type": "object",
+        "required": ["video_names"],
+        "title": "Body_copy_videos_to_board"
       },
       "Body_create_image_upload_entry": {
         "properties": {
@@ -22659,6 +22865,86 @@
         "required": ["output_meta", "control", "type", "type"],
         "title": "ControlOutput",
         "type": "object"
+      },
+      "CopiedImage": {
+        "properties": {
+          "source_image_name": {
+            "type": "string",
+            "title": "Source Image Name",
+            "description": "The image that was copied"
+          },
+          "image_name": {
+            "type": "string",
+            "title": "Image Name",
+            "description": "The name assigned to the copy"
+          }
+        },
+        "type": "object",
+        "required": ["source_image_name", "image_name"],
+        "title": "CopiedImage"
+      },
+      "CopiedVideo": {
+        "properties": {
+          "source_video_name": {
+            "type": "string",
+            "title": "Source Video Name",
+            "description": "The video that was copied"
+          },
+          "video_name": {
+            "type": "string",
+            "title": "Video Name",
+            "description": "The name assigned to the copy"
+          }
+        },
+        "type": "object",
+        "required": ["source_video_name", "video_name"],
+        "title": "CopiedVideo"
+      },
+      "CopyImagesResult": {
+        "properties": {
+          "copied": {
+            "items": {
+              "$ref": "#/components/schemas/CopiedImage"
+            },
+            "type": "array",
+            "title": "Copied",
+            "description": "The copies that were made, in request order"
+          },
+          "failed": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Failed",
+            "description": "The source image names that could not be copied"
+          }
+        },
+        "type": "object",
+        "required": ["copied", "failed"],
+        "title": "CopyImagesResult"
+      },
+      "CopyVideosResult": {
+        "properties": {
+          "copied": {
+            "items": {
+              "$ref": "#/components/schemas/CopiedVideo"
+            },
+            "type": "array",
+            "title": "Copied",
+            "description": "The copies that were made, in request order"
+          },
+          "failed": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Failed",
+            "description": "The source video names that could not be copied"
+          }
+        },
+        "type": "object",
+        "required": ["copied", "failed"],
+        "title": "CopyVideosResult"
       },
       "CoreMetadataInvocation": {
         "additionalProperties": true,
@@ -70807,6 +71093,52 @@
         "title": "ProgressImage",
         "type": "object"
       },
+      "ProjectBoardItemDTO": {
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": ["general", "control", "mask", "user"],
+            "title": "Category",
+            "description": "The item's gallery category"
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["image", "video"],
+            "title": "Kind",
+            "description": "Which namespace the name belongs to"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The server-assigned image or video name"
+          },
+          "starred": {
+            "type": "boolean",
+            "title": "Starred",
+            "description": "Whether the item is starred"
+          }
+        },
+        "type": "object",
+        "required": ["category", "kind", "name", "starred"],
+        "title": "ProjectBoardItemDTO",
+        "description": "One visible item on a project's board."
+      },
+      "ProjectBoardSnapshotDTO": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectBoardItemDTO"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "The board's visible items, ordered by kind then name"
+          }
+        },
+        "type": "object",
+        "required": ["items"],
+        "title": "ProjectBoardSnapshotDTO",
+        "description": "Everything a project's board holds that the gallery would show.\n\nThis is the enumeration an export needs in order to carry a project's whole workspace rather\nthan only the media its document happens to reference. Intermediates and the canvas's private\n`other` category are excluded, because neither is something the gallery shows on the board.\n\nDeliberately unversioned: `.invk`'s `board.json` carries its own version, so the archive format\nis free to change without the wire format following it, and vice versa."
+      },
       "ProjectCreateRequest": {
         "properties": {
           "project_id": {
@@ -70820,6 +71152,18 @@
             ],
             "title": "Project Id",
             "description": "Client-generated project id (e.g. for imports); generated when omitted"
+          },
+          "board_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Board Id",
+            "description": "An existing unclaimed private board for the project to adopt, renamed to match. Omit to create one. Restoring a project uploads its media into such a board first, so that creating the project is the single commit point for an import."
           },
           "name": {
             "type": "string",
@@ -70845,6 +71189,11 @@
             "title": "Project Id",
             "description": "The project's client-generated identifier"
           },
+          "board_id": {
+            "type": "string",
+            "title": "Board Id",
+            "description": "The project's private board; only project APIs may rename or delete it"
+          },
           "name": {
             "type": "string",
             "title": "Name",
@@ -70873,7 +71222,7 @@
           }
         },
         "type": "object",
-        "required": ["project_id", "name", "revision", "created_at", "updated_at", "data"],
+        "required": ["project_id", "board_id", "name", "revision", "created_at", "updated_at", "data"],
         "title": "ProjectRecordDTO",
         "description": "Full project record including the client-owned document."
       },
@@ -70883,6 +71232,11 @@
             "type": "string",
             "title": "Project Id",
             "description": "The project's client-generated identifier"
+          },
+          "board_id": {
+            "type": "string",
+            "title": "Board Id",
+            "description": "The project's private board; only project APIs may rename or delete it"
           },
           "name": {
             "type": "string",
@@ -70906,7 +71260,7 @@
           }
         },
         "type": "object",
-        "required": ["project_id", "name", "revision", "created_at", "updated_at"],
+        "required": ["project_id", "board_id", "name", "revision", "created_at", "updated_at"],
         "title": "ProjectSummaryDTO",
         "description": "Lightweight project listing entry; the document payload is omitted."
       },

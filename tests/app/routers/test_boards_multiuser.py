@@ -89,14 +89,16 @@ def enable_multiuser_for_tests(monkeypatch: Any, mock_invoker: Invoker):
     mock_video_records.get_most_recent_video_for_board.return_value = None
     mock_invoker.services.video_records = mock_video_records
     mock_invoker.services.videos = MagicMock()
-    # delete_videos_on_board now returns the authoritative ``deleted_videos`` list (only the
+    # ``delete_videos_by_names`` returns the authoritative ``deleted_videos`` list (only the
     # videos whose file deletion actually succeeded). Default to an empty list so pydantic
     # validation on ``DeleteBoardResult`` doesn't reject the MagicMock auto-return.
+    mock_invoker.services.videos.delete_videos_by_names.return_value = ([], [])
     mock_invoker.services.videos.delete_videos_on_board.return_value = ([], [])
     # The images service is a real ImageService instance in mock_services; the delete-board
-    # cascade calls ``delete_images_on_board`` on it, which fails without an initialized
+    # cascade calls ``delete_images_by_names`` on it, which fails without an initialized
     # invoker. Stub it so the multiuser router tests can assert the cascade args.
     mock_invoker.services.images = MagicMock()
+    mock_invoker.services.images.delete_images_by_names.return_value = ([], [])
     mock_invoker.services.images.delete_images_on_board.return_value = ([], [])
 
     mock_deps = MockApiDependencies(mock_invoker)
@@ -721,7 +723,7 @@ def test_admin_can_change_any_board_visibility(client: TestClient, admin_token: 
 
 
 def test_delete_board_with_include_images_cascades_videos(client: TestClient, mock_invoker: Invoker, user1_token: str):
-    """include_images=true must also call delete_videos_on_board (not image-only)."""
+    """include_images=true must also destroy the board's videos (not image-only)."""
     create = client.post(
         "/api/v1/boards/?board_name=Cascade+Test+Board",
         headers={"Authorization": f"Bearer {user1_token}"},
@@ -729,10 +731,16 @@ def test_delete_board_with_include_images_cascades_videos(client: TestClient, mo
     assert create.status_code == status.HTTP_201_CREATED
     board_id = create.json()["board_id"]
 
+    # Membership is enumerated before the board is deleted (the board FK cascades the rows
+    # away), then those exact names are destroyed.
+    mock_invoker.services.board_video_records.get_all_board_video_names_for_board.return_value = [
+        "video_a.mp4",
+        "video_b.mp4",
+    ]
     # The cascade returns the names of videos it actually deleted; the router must surface
     # *that* list (not the pre-delete enumeration) so the response can't claim a video was
     # destroyed when its DB record was preserved due to a file-delete failure.
-    mock_invoker.services.videos.delete_videos_on_board.return_value = (["video_a.mp4", "video_b.mp4"], [])
+    mock_invoker.services.videos.delete_videos_by_names.return_value = (["video_a.mp4", "video_b.mp4"], [])
 
     response = client.delete(
         f"/api/v1/boards/{board_id}?include_images=true",
@@ -742,9 +750,7 @@ def test_delete_board_with_include_images_cascades_videos(client: TestClient, mo
     body = response.json()
     assert body["board_id"] == board_id
     assert set(body["deleted_videos"]) == {"video_a.mp4", "video_b.mp4"}
-    mock_invoker.services.videos.delete_videos_on_board.assert_called_once()
-    call = mock_invoker.services.videos.delete_videos_on_board.call_args
-    assert call.kwargs["board_id"] == board_id
+    mock_invoker.services.videos.delete_videos_by_names.assert_called_once_with(["video_a.mp4", "video_b.mp4"])
 
 
 def test_delete_board_with_partial_video_file_delete_failure_reports_only_actual_deletes(
@@ -767,8 +773,8 @@ def test_delete_board_with_partial_video_file_delete_failure_reports_only_actual
     # The service deleted "good.mp4" successfully but preserved "stuck.mp4" because its
     # file delete failed. The router must NOT claim "stuck.mp4" was deleted, and must
     # report the failure from the service's own accounting (not a racy listing diff).
-    mock_invoker.services.images.delete_images_on_board.return_value = (["good.png"], ["stuck.png"])
-    mock_invoker.services.videos.delete_videos_on_board.return_value = (["good.mp4"], ["stuck.mp4"])
+    mock_invoker.services.images.delete_images_by_names.return_value = (["good.png"], ["stuck.png"])
+    mock_invoker.services.videos.delete_videos_by_names.return_value = (["good.mp4"], ["stuck.mp4"])
 
     response = client.delete(
         f"/api/v1/boards/{board_id}?include_images=true",
@@ -786,19 +792,26 @@ def test_delete_board_with_partial_video_file_delete_failure_reports_only_actual
 def test_delete_board_reports_partial_cascade_completion(
     client: TestClient, mock_invoker: Invoker, user1_token: str, failure_phase: str
 ):
+    """The board is deleted before its media, so which phase failed decides what survives.
+
+    A board that cannot be deleted must leave every image and video intact — that ordering is
+    what stops a project's media being destroyed by a delete the board itself would refuse.
+    """
     create = client.post(
         "/api/v1/boards/?board_name=Partial+Cascade+Failure",
         headers={"Authorization": f"Bearer {user1_token}"},
     )
     assert create.status_code == status.HTTP_201_CREATED
     board_id = create.json()["board_id"]
-    mock_invoker.services.images.delete_images_on_board.return_value = (["deleted.png"], [])
-    mock_invoker.services.videos.delete_videos_on_board.return_value = (["deleted.mp4"], [])
+    mock_invoker.services.images.delete_images_by_names.return_value = (["deleted.png"], [])
+    mock_invoker.services.videos.delete_videos_by_names.return_value = (["deleted.mp4"], [])
     if failure_phase == "videos":
-        mock_invoker.services.videos.delete_videos_on_board.side_effect = RuntimeError("video delete failed")
+        mock_invoker.services.videos.delete_videos_by_names.side_effect = RuntimeError("video delete failed")
 
     board_delete_patch = (
-        patch.object(mock_invoker.services.boards, "delete", side_effect=RuntimeError("board delete failed"))
+        patch.object(
+            mock_invoker.services.boards, "delete_if_unclaimed", side_effect=RuntimeError("board delete failed")
+        )
         if failure_phase == "board"
         else nullcontext()
     )
@@ -810,9 +823,17 @@ def test_delete_board_reports_partial_cascade_completion(
 
     assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
     detail = response.json()["detail"]
-    assert detail["deleted_images"] == ["deleted.png"]
-    assert detail["deleted_videos"] == ([] if failure_phase == "videos" else ["deleted.mp4"])
-    assert detail["board_deleted"] is False
+    if failure_phase == "board":
+        assert detail["board_deleted"] is False
+        # Nothing was touched: the media deletion never ran.
+        assert detail["deleted_images"] == []
+        assert detail["deleted_videos"] == []
+        mock_invoker.services.images.delete_images_by_names.assert_not_called()
+        mock_invoker.services.videos.delete_videos_by_names.assert_not_called()
+    else:
+        assert detail["board_deleted"] is True
+        assert detail["deleted_images"] == ["deleted.png"]
+        assert detail["deleted_videos"] == []
 
 
 def test_delete_board_with_include_images_filters_cascade_by_user(
@@ -840,17 +861,15 @@ def test_delete_board_with_include_images_filters_cascade_by_user(
     )
     assert response.status_code == status.HTTP_200_OK
 
-    # The router must pass the current user's id through to the cascade so the SQL filter
-    # narrows the lookup + delete to that user's rows only. Admins skip the filter (pass
-    # ``user_id=None``); this test exercises the non-admin path.
-    delete_images_call = mock_invoker.services.images.delete_images_on_board.call_args
-    delete_videos_call = mock_invoker.services.videos.delete_videos_on_board.call_args
-    assert delete_images_call.kwargs.get("user_id") is not None
-    assert delete_videos_call.kwargs.get("user_id") is not None
-    # Both cascade calls must share the same user_id (the requester).
-    requester_id = delete_images_call.kwargs["user_id"]
-    assert delete_images_call.kwargs["user_id"] == requester_id
-    assert delete_videos_call.kwargs["user_id"] == requester_id
+    # The router must pass the current user's id through to the enumeration — which is now what
+    # narrows the cascade, since the names it captures are exactly the ones later destroyed.
+    # Admins skip the filter (pass ``user_id=None``); this test exercises the non-admin path.
+    images_call = mock_invoker.services.board_images.get_all_board_image_names_for_board.call_args
+    videos_call = mock_invoker.services.board_video_records.get_all_board_video_names_for_board.call_args
+    requester_id = images_call.kwargs.get("user_id")
+    assert requester_id is not None
+    # Both enumerations must share the same user_id (the requester).
+    assert videos_call.kwargs.get("user_id") == requester_id
 
 
 def test_delete_board_with_include_images_admin_skips_user_filter(
@@ -873,10 +892,10 @@ def test_delete_board_with_include_images_admin_skips_user_filter(
     )
     assert response.status_code == status.HTTP_200_OK
 
-    delete_images_call = mock_invoker.services.images.delete_images_on_board.call_args
-    delete_videos_call = mock_invoker.services.videos.delete_videos_on_board.call_args
-    assert delete_images_call.kwargs.get("user_id") is None
-    assert delete_videos_call.kwargs.get("user_id") is None
+    images_call = mock_invoker.services.board_images.get_all_board_image_names_for_board.call_args
+    videos_call = mock_invoker.services.board_video_records.get_all_board_video_names_for_board.call_args
+    assert images_call.kwargs.get("user_id") is None
+    assert videos_call.kwargs.get("user_id") is None
 
 
 def test_delete_board_without_include_images_lists_uncategorized_videos(
@@ -909,3 +928,172 @@ def test_delete_board_without_include_images_lists_uncategorized_videos(
 
 def test_delete_board_is_offloaded_by_fastapi() -> None:
     assert not inspect.iscoroutinefunction(delete_board)
+
+
+# ---------------------------------------------------------------------------
+# Project-owned boards: the generic routes must not touch them
+# ---------------------------------------------------------------------------
+
+
+def _claim_board_for_a_project(client: TestClient, mock_invoker: Invoker, token: str, name: str) -> str:
+    """Create a board and hand it to a new project, returning the board id."""
+    create = client.post(
+        f"/api/v1/boards/?board_name={name}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert create.status_code == status.HTTP_201_CREATED
+    board = create.json()
+    mock_invoker.services.project_records.create(
+        user_id=board["user_id"],
+        name="Owning project",
+        data={},
+        board_id=board["board_id"],
+    )
+    return board["board_id"]
+
+
+def test_a_project_board_reports_the_project_that_owns_it(client: TestClient, mock_invoker: Invoker, user1_token: str):
+    board_id = _claim_board_for_a_project(client, mock_invoker, user1_token, "Claimed+Board")
+
+    response = client.get(f"/api/v1/boards/{board_id}", headers={"Authorization": f"Bearer {user1_token}"})
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json()["project_id"] is not None
+
+    listed = client.get("/api/v1/boards/?all=true", headers={"Authorization": f"Bearer {user1_token}"})
+    claimed = [b for b in listed.json() if b["board_id"] == board_id]
+    assert len(claimed) == 1
+    assert claimed[0]["project_id"] is not None
+
+
+def test_an_unclaimed_board_omits_the_project_id(client: TestClient, user1_token: str):
+    """`BoardRecord` excludes nulls, so a plain board must simply not carry the field."""
+    create = client.post(
+        "/api/v1/boards/?board_name=Plain+Board",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert create.json().get("project_id") is None
+
+
+@pytest.mark.parametrize("changes", [{"board_name": "Renamed"}, {"archived": True}, {"board_visibility": "public"}])
+def test_generic_update_of_a_project_board_is_refused(
+    client: TestClient, mock_invoker: Invoker, user1_token: str, admin_token: str, changes: dict[str, Any]
+):
+    board_id = _claim_board_for_a_project(client, mock_invoker, user1_token, "Protected+Board")
+
+    for token in (user1_token, admin_token):
+        response = client.patch(
+            f"/api/v1/boards/{board_id}",
+            json=changes,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code == status.HTTP_409_CONFLICT
+
+    # The project's name is still the board's name.
+    board = client.get(f"/api/v1/boards/{board_id}", headers={"Authorization": f"Bearer {user1_token}"}).json()
+    assert board["board_name"] == "Owning project"
+    assert board["archived"] is False
+    assert board["board_visibility"] == "private"
+
+
+def test_setting_only_the_cover_of_a_project_board_is_still_allowed(
+    client: TestClient, mock_invoker: Invoker, user1_token: str
+):
+    """The cover is a display detail with no bearing on the project relationship."""
+    board_id = _claim_board_for_a_project(client, mock_invoker, user1_token, "Cover+Board")
+    # `boards.cover_image_name` is a foreign key, so the image has to actually exist.
+    with mock_invoker.services.board_records._db.transaction() as cursor:
+        cursor.execute(
+            "INSERT INTO images (image_name, image_origin, image_category, width, height)"
+            " VALUES ('cover.png', 'internal', 'general', 64, 64);"
+        )
+
+    response = client.patch(
+        f"/api/v1/boards/{board_id}",
+        json={"cover_image_name": "cover.png"},
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+
+    assert response.status_code == status.HTTP_201_CREATED
+
+
+@pytest.mark.parametrize(
+    ("changes", "unchanged"),
+    [
+        ({"board_name": "Raced rename"}, {"board_name": "Claimed during PATCH"}),
+        ({"archived": True}, {"archived": False}),
+        ({"board_visibility": "public"}, {"board_visibility": "private"}),
+    ],
+)
+def test_board_update_cannot_race_a_project_claim(
+    client: TestClient,
+    mock_invoker: Invoker,
+    monkeypatch: pytest.MonkeyPatch,
+    user1_token: str,
+    changes: dict[str, Any],
+    unchanged: dict[str, Any],
+):
+    """The claimed-board check and mutation must be one database decision.
+
+    Returning an unclaimed DTO and claiming the board immediately afterwards pins the race without
+    sleeps or threads: an unconditional update sees stale state, while a conditional write cannot.
+    """
+    created = client.post(
+        "/api/v1/boards/?board_name=Unclaimed",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    ).json()
+    board_id = created["board_id"]
+    original_get_dto = mock_invoker.services.boards.get_dto
+    did_claim = False
+
+    def get_then_claim(*, board_id: str):
+        nonlocal did_claim
+        board = original_get_dto(board_id)
+        if not did_claim:
+            did_claim = True
+            mock_invoker.services.project_records.create(
+                user_id=created["user_id"],
+                name="Claimed during PATCH",
+                data={},
+                board_id=board_id,
+            )
+        return board
+
+    monkeypatch.setattr(mock_invoker.services.boards, "get_dto", get_then_claim)
+
+    response = client.patch(
+        f"/api/v1/boards/{board_id}",
+        json=changes,
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+
+    assert response.status_code == status.HTTP_409_CONFLICT
+    board = original_get_dto(board_id)
+    for field, value in unchanged.items():
+        assert getattr(board, field) == value
+
+
+@pytest.mark.parametrize("include_images", [False, True])
+def test_generic_deletion_of_a_project_board_is_refused_without_touching_media(
+    client: TestClient, mock_invoker: Invoker, user1_token: str, admin_token: str, include_images: bool
+):
+    """The refusal must land before any media is destroyed — that is the whole point of
+    enumerating first and deleting the board second."""
+    board_id = _claim_board_for_a_project(client, mock_invoker, user1_token, "Undeletable+Board")
+    mock_invoker.services.board_images.get_all_board_image_names_for_board.return_value = ["keep.png"]
+    mock_invoker.services.board_video_records.get_all_board_video_names_for_board.return_value = ["keep.mp4"]
+
+    for token in (user1_token, admin_token):
+        response = client.delete(
+            f"/api/v1/boards/{board_id}?include_images={'true' if include_images else 'false'}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code == status.HTTP_409_CONFLICT
+
+    mock_invoker.services.images.delete_images_by_names.assert_not_called()
+    mock_invoker.services.videos.delete_videos_by_names.assert_not_called()
+    # The board is still there.
+    assert (
+        client.get(f"/api/v1/boards/{board_id}", headers={"Authorization": f"Bearer {user1_token}"}).status_code
+        == status.HTTP_200_OK
+    )

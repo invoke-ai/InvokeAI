@@ -50,6 +50,11 @@ interface BackendBoardDTO {
   created_at?: string | null;
   /** Board owner's display name; populated only for admins on multi-user backends. */
   owner_username?: string | null;
+  /**
+   * The project that owns this board. The backend's board DTO excludes nulls, so
+   * an ordinary board omits the key entirely rather than sending `null`.
+   */
+  project_id?: string | null;
 }
 
 /**
@@ -211,6 +216,7 @@ const mapBoard = (board: BackendBoardDTO): GalleryBoard => ({
   kind: 'board',
   name: board.board_name,
   ownerName: board.owner_username ?? null,
+  projectId: board.project_id ?? null,
   videoCount: board.video_count ?? 0,
 });
 
@@ -381,6 +387,8 @@ export const listGalleryBoards = async ({
       // Synthesized, not stored: `kind` is the durable fact and the UI resolves
       // the label from it, so no untranslatable name crosses the transport.
       name: '',
+      // A virtual board is nobody's project board.
+      projectId: null,
       videoCount: uncategorizedVideoCount,
     },
     ...boards.filter((board) => includeArchived || !board.archived).map(mapBoard),
@@ -415,6 +423,8 @@ export const listGalleryDateBoards = async (signal?: AbortSignal): Promise<Galle
     imageCount: board.image_count,
     kind: 'date',
     name: board.board_name,
+    // A virtual board is nobody's project board.
+    projectId: null,
     videoCount: board.video_count ?? 0,
   }));
 };

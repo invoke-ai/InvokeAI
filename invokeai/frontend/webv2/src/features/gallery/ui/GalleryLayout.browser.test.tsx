@@ -39,6 +39,7 @@ const board: GalleryBoard = {
   imageCount: 50,
   kind: 'board',
   name: 'dogs',
+  projectId: null,
   videoCount: 0,
 };
 

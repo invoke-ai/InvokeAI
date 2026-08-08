@@ -47,8 +47,6 @@ export const DEVELOPER_LOG_NAMESPACES: DeveloperLogNamespace[] = [
 
 export const DEFAULT_PROJECT_SETTINGS: ProjectSettings = {
   antialiasProgressImages: false,
-  preferNumericAttentionStyle: false,
-  showPromptSyntaxHighlighting: false,
   showProgressDetails: false,
   showProgressImagesInViewer: true,
   useCpuNoise: true,
@@ -70,8 +68,10 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   launchpadPinnedProjectIds: [],
   launchpadProjectsSort: 'edited',
   launchpadProjectsView: 'grid',
+  preferNumericAttentionStyle: false,
   queueJobsScope: 'all',
   reduceMotion: false,
+  showPromptSyntaxHighlighting: false,
   showFocusRegionHighlight: true,
   themeId: DEFAULT_THEME_ID,
   workflowEdgeStyle: 'curved',
@@ -231,14 +231,6 @@ export const normalizeProjectSettings = (settings?: Partial<ProjectSettings>): P
     typeof settings?.antialiasProgressImages === 'boolean'
       ? settings.antialiasProgressImages
       : DEFAULT_PROJECT_SETTINGS.antialiasProgressImages,
-  preferNumericAttentionStyle:
-    typeof settings?.preferNumericAttentionStyle === 'boolean'
-      ? settings.preferNumericAttentionStyle
-      : DEFAULT_PROJECT_SETTINGS.preferNumericAttentionStyle,
-  showPromptSyntaxHighlighting:
-    typeof settings?.showPromptSyntaxHighlighting === 'boolean'
-      ? settings.showPromptSyntaxHighlighting
-      : DEFAULT_PROJECT_SETTINGS.showPromptSyntaxHighlighting,
   showProgressDetails:
     typeof settings?.showProgressDetails === 'boolean'
       ? settings.showProgressDetails
@@ -300,6 +292,10 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
   launchpadProjectsView: isProjectsViewId(preferences?.launchpadProjectsView)
     ? preferences.launchpadProjectsView
     : DEFAULT_PREFERENCES.launchpadProjectsView,
+  preferNumericAttentionStyle:
+    typeof preferences?.preferNumericAttentionStyle === 'boolean'
+      ? preferences.preferNumericAttentionStyle
+      : DEFAULT_PREFERENCES.preferNumericAttentionStyle,
   queueJobsScope:
     preferences?.queueJobsScope === 'all-projects'
       ? 'all'
@@ -312,6 +308,10 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
     typeof preferences?.showFocusRegionHighlight === 'boolean'
       ? preferences.showFocusRegionHighlight
       : DEFAULT_PREFERENCES.showFocusRegionHighlight,
+  showPromptSyntaxHighlighting:
+    typeof preferences?.showPromptSyntaxHighlighting === 'boolean'
+      ? preferences.showPromptSyntaxHighlighting
+      : DEFAULT_PREFERENCES.showPromptSyntaxHighlighting,
   themeId: isWorkbenchThemeId(preferences?.themeId) ? preferences.themeId : DEFAULT_PREFERENCES.themeId,
   workflowEdgeStyle:
     preferences?.workflowEdgeStyle === 'square' || preferences?.workflowEdgeStyle === 'straight'

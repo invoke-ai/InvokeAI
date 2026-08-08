@@ -96,6 +96,17 @@ class SqliteMigrator:
             # exception is raised.
             with self._db._conn as conn:
                 cursor = conn.cursor()
+                # Begun explicitly, because the context manager above only commits or rolls back a
+                # transaction that is already open — it does not start one. The connection runs in
+                # Python's legacy implicit-transaction mode, which opens a transaction before DML
+                # and never before DDL, so a callback that issues nothing but `CREATE`/`DROP`/
+                # `ALTER` would commit statement by statement in autocommit with nothing for the
+                # rollback to undo. A migration that dropped a table and died before recreating it
+                # would leave the database wedged and the migration unrecorded, so every restart
+                # would re-run it and fail again. Beginning here makes atomicity a property of the
+                # migrator rather than an accident of whether a given migration happens to write a
+                # row.
+                cursor.execute("BEGIN;")
                 self._create_applied_migrations_table(cursor)
                 if migration.from_version is not None and self._get_current_version(cursor) != migration.from_version:
                     raise MigrationError(
