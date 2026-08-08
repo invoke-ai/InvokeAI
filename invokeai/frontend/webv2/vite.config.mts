@@ -34,6 +34,10 @@ const ROUTE_SHARED_MODULES = [
   '/workbench/components/WorkbenchSplashScreen.tsx',
   '/workbench/hotkeys/catalog.ts',
   '/workbench/launchpad/formatRelativeTime.ts',
+  // The Launchpad writes `?intent=` and the editor's session controller reads
+  // it. Without this the editor pulls the whole Launchpad chunk for a lookup
+  // table — a 66 KB, one-extra-request regression on the editor route.
+  '/workbench/launchpad/intents.ts',
   '/workbench/palette/settingsEntryDeps.ts',
   '/workbench/projects/covers.ts',
   '/workbench/projects/ids.ts',
@@ -153,13 +157,6 @@ export default defineConfig({
               name: 'workbench-topbar',
               priority: 30,
               test: (id) => matchesAnySuffix(id, WORKBENCH_TOPBAR_MODULES),
-            },
-            {
-              // Plotly is large (~1MB min) and only used by the lazy-loaded
-              // Image Map plot; keep it out of the eager vendor chunk.
-              name: 'plotly',
-              priority: 30,
-              test: (id) => id.includes('plotly') && id.includes('node_modules'),
             },
             {
               name: getLegacyChunkName,
