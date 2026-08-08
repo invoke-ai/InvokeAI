@@ -6191,16 +6191,6 @@
             "description": "The session ID associated with this upload, if any"
           }
         ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "$ref": "#/components/schemas/Body_upload_video"
-              }
-            }
-          }
-        },
         "responses": {
           "201": {
             "description": "The video was uploaded successfully",
@@ -6222,6 +6212,37 @@
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
                 }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "title": "Body_upload_video",
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "title": "File",
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "metadata": {
+                    "title": "Metadata",
+                    "description": "The metadata to associate with the video, must be a stringified JSON dict",
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": ["file"]
               }
             }
           }
@@ -16128,30 +16149,6 @@
         "type": "object",
         "required": ["file"],
         "title": "Body_upload_image"
-      },
-      "Body_upload_video": {
-        "properties": {
-          "file": {
-            "type": "string",
-            "format": "binary",
-            "title": "File"
-          },
-          "metadata": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Metadata",
-            "description": "The metadata to associate with the video, must be a stringified JSON dict"
-          }
-        },
-        "type": "object",
-        "required": ["file"],
-        "title": "Body_upload_video"
       },
       "BooleanCollectionInvocation": {
         "category": "primitives",

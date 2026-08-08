@@ -5036,19 +5036,6 @@ export type components = {
              */
             metadata?: string | null;
         };
-        /** Body_upload_video */
-        Body_upload_video: {
-            /**
-             * File
-             * Format: binary
-             */
-            file: Blob;
-            /**
-             * Metadata
-             * @description The metadata to associate with the video, must be a stringified JSON dict
-             */
-            metadata?: string | null;
-        };
         /**
          * Boolean Collection Primitive
          * @description A collection of boolean primitive values
@@ -44199,7 +44186,18 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "multipart/form-data": components["schemas"]["Body_upload_video"];
+                "multipart/form-data": {
+                    /**
+                     * File
+                     * Format: binary
+                     */
+                    file: Blob;
+                    /**
+                     * Metadata
+                     * @description The metadata to associate with the video, must be a stringified JSON dict
+                     */
+                    metadata?: string | null;
+                };
             };
         };
         responses: {
