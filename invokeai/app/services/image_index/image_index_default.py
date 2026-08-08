@@ -327,14 +327,38 @@ class ImageIndexService(ImageIndexServiceBase):
                 self._record_failure(loaded_names)
                 return False
 
-            # L2-normalize so cosine similarity is a plain dot product downstream.
-            norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
-            norms[norms == 0] = 1.0
-            embeddings = embeddings / norms
+            # L2-normalize so cosine similarity is a plain dot product downstream. The norm is
+            # computed in float64: in float32 the sum of squares under/overflows well inside the
+            # range of the vector itself (components uniformly below ~1e-22 give norm 0.0, above
+            # ~1.8e19 give inf), which would misread a perfectly normalizable row as degenerate.
+            norms = np.linalg.norm(embeddings.astype(np.float64), axis=1, keepdims=True)
+            # A row whose norm is zero or non-finite cannot be normalized: it stays all-zero or
+            # becomes non-finite, either of which the storage layer rejects because it yields NaN
+            # in every similarity it takes part in. Drop those rows and fail only their own
+            # names — the old `norms[norms == 0] = 1.0` handed an all-zero vector straight to
+            # upsert_embedding, whose ValueError then failed the whole batch.
+            degenerate = ~np.isfinite(norms).all(axis=1) | (norms[:, 0] == 0)
+            if degenerate.any():
+                dropped = [name for name, bad in zip(loaded_names, degenerate, strict=True) if bad]
+                logger.warning(f"Image index: encoder returned unusable embeddings for {dropped}")
+                self._record_failure(dropped)
+                keep = ~degenerate
+                # Reassigned before `stored` and the handler below, so dropped names are already
+                # accounted for and cannot be failed a second time. Shrinking it also makes the
+                # `len(loaded_names) == len(image_names)` return False, which re-arms the
+                # backfill so these images are retried rather than stranded.
+                loaded_names = [name for name, ok in zip(loaded_names, keep, strict=True) if ok]
+                embeddings = embeddings[keep]
+                norms = norms[keep]
+            embeddings = (embeddings / norms).astype(np.float32)
 
             stored: list[str] = []
             try:
                 for name, embedding in zip(loaded_names, embeddings, strict=True):
+                    # Deliberately not caught per-image: any exception from here must reach the
+                    # handler below, which fails every unstored name and returns False to re-arm
+                    # the backfill. Swallowing one image's error here would leave it unembedded
+                    # with no retry ever scheduled, wedging `pending` above zero.
                     self._invoker.services.image_index_records.upsert_embedding(name, self._model_id, embedding)
                     stored.append(name)
                     self._attempts.pop(name, None)

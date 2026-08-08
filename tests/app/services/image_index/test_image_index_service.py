@@ -287,6 +287,38 @@ def test_bad_encoder_output_marks_batch_failed(
         service.stop()
 
 
+def test_zero_norm_embedding_fails_only_its_own_image(
+    image_records: SqliteImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+) -> None:
+    """A degenerate encoder row must not cost the rest of its batch their embeddings.
+
+    An all-zero vector cannot be L2-normalized and is rejected by the storage layer, since it
+    yields NaN in every similarity it takes part in. Both images here are encoded in one batch.
+    """
+
+    def encode(images: list[Image.Image]) -> np.ndarray:
+        vectors = np.ones((len(images), DIM), dtype=np.float32)
+        vectors[0] = 0.0  # first image of the batch is degenerate
+        return vectors
+
+    service = ImageIndexService(encode_fn=encode, model_id=MODEL_ID)
+    try:
+        _save_image(image_records, "a-bad.png")
+        _save_image(image_records, "b-good.png")
+        service.start(_make_invoker(images_service, index_records))
+        _wait_until(lambda: not service._backfill_pending.is_set())
+
+        # The healthy image is embedded despite sharing a batch with the degenerate one.
+        assert index_records.get_embeddings(["b-good.png"], MODEL_ID)[0] == ["b-good.png"]
+        assert index_records.get_embeddings(["a-bad.png"], MODEL_ID)[0] == []
+        _wait_until(lambda: "a-bad.png" in service._failed)
+        assert "b-good.png" not in service._failed
+    finally:
+        service.stop()
+
+
 def test_status_event_emitted(
     image_records: SqliteImageRecordStorage,
     images_service: ImageService,
@@ -405,6 +437,69 @@ def test_upsert_failure_routes_through_retry_to_success(
 
     _wait_until(lambda: index_records.get_embeddings(["flaky.png"], MODEL_ID)[0] == ["flaky.png"], timeout=15.0)
     _wait_until(lambda: any(e.total == 1 and e.embedded == 1 and e.pending == 0 for e in _status_events(invoker)))
+
+
+def test_upsert_value_error_also_routes_through_retry(
+    image_records: SqliteImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+    service: ImageIndexService,
+) -> None:
+    """ValueError must reach the retry path like any other raise.
+
+    The storage layer uses ValueError for rejected embeddings, so it is tempting to catch it
+    per-image and skip to the next one. That strands the image: the batch would still report
+    full success, the backfill would never be re-armed, and `pending` would sit above zero
+    forever with the image at one attempt and never retried.
+    """
+    invoker = _make_invoker(images_service, index_records)
+    service.start(invoker)
+    _wait_until(lambda: not service._backfill_pending.is_set())
+
+    real_upsert = index_records.upsert_embedding
+    calls = {"count": 0}
+
+    def flaky_upsert(name: str, model_id: str, embedding: np.ndarray) -> None:
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise ValueError("rejected by a future storage-layer validation")
+        real_upsert(name, model_id, embedding)
+
+    index_records.upsert_embedding = flaky_upsert  # type: ignore[method-assign]
+
+    _save_image(image_records, "flaky.png")
+    images_service._on_changed(_dto_for(image_records, "flaky.png"))
+
+    _wait_until(lambda: index_records.get_embeddings(["flaky.png"], MODEL_ID)[0] == ["flaky.png"], timeout=15.0)
+    _wait_until(lambda: any(e.total == 1 and e.embedded == 1 and e.pending == 0 for e in _status_events(invoker)))
+
+
+def test_normalizable_extreme_magnitudes_are_not_dropped(
+    image_records: SqliteImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+) -> None:
+    """Tiny-but-normalizable vectors must not be misread as degenerate.
+
+    In float32 the sum of squares underflows long before the vector itself does, so computing
+    the norm at the storage dtype would report 0.0 for a row that normalizes perfectly.
+    """
+
+    def encode(images: list[Image.Image]) -> np.ndarray:
+        return np.full((len(images), DIM), 1e-25, dtype=np.float32)
+
+    service = ImageIndexService(encode_fn=encode, model_id=MODEL_ID)
+    try:
+        _save_image(image_records, "tiny.png")
+        service.start(_make_invoker(images_service, index_records))
+        _wait_until(lambda: not service._backfill_pending.is_set())
+
+        names, matrix = index_records.get_embeddings(["tiny.png"], MODEL_ID)
+        assert names == ["tiny.png"]
+        assert np.isclose(np.linalg.norm(matrix[0]), 1.0)
+        assert "tiny.png" not in service._failed
+    finally:
+        service.stop()
 
 
 def test_ineligible_transition_clears_failure_bookkeeping(
