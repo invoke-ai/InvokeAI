@@ -1,7 +1,6 @@
 import functools
 from typing import Callable
 
-import numpy as np
 import torch
 from PIL import Image
 from tqdm import tqdm
@@ -90,20 +89,17 @@ class SpandrelImageToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         tiles = sorted(tiles, key=lambda x: x.coords.left)
         tiles = sorted(tiles, key=lambda x: x.coords.top)
 
-        # Prepare input image for inference.
-        image_tensor = SpandrelImageToImageModel.pil_to_tensor(image)
-
         # Scale the tiles for re-assembling the final image.
         scale = spandrel_model.scale
         scaled_tiles = [cls.scale_tile(tile, scale=scale) for tile in tiles]
 
         # Prepare the output tensor.
-        _, channels, height, width = image_tensor.shape
+        channels = len(image.getbands())
         output_tensor = torch.zeros(
-            (height * scale, width * scale, channels), dtype=torch.uint8, device=torch.device("cpu")
+            (image.height * scale, image.width * scale, channels), dtype=torch.uint8, device=torch.device("cpu")
         )
 
-        image_tensor = image_tensor.to(device=TorchDevice.choose_torch_device(), dtype=spandrel_model.dtype)
+        device = TorchDevice.choose_torch_device()
 
         # Run the model on each tile.
         pbar = tqdm(list(zip(tiles, scaled_tiles, strict=True)), desc="Upscaling Tiles")
@@ -116,8 +112,12 @@ class SpandrelImageToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
             if is_canceled():
                 raise CanceledException
 
-            # Extract the current tile from the input tensor.
-            input_tile = image_tensor[:, :, tile.coords.top : tile.coords.bottom, tile.coords.left : tile.coords.right]
+            # Crop the current tile from the input image and convert it on demand. Converting the
+            # whole image up front would keep a float32 copy of it in memory for the entire loop,
+            # even though only one tile is ever used at a time.
+            input_tile = SpandrelImageToImageModel.pil_to_tensor(
+                image.crop((tile.coords.left, tile.coords.top, tile.coords.right, tile.coords.bottom))
+            ).to(device=device, dtype=spandrel_model.dtype)
 
             # Run the model on the tile.
             output_tile = spandrel_model.run(input_tile)
@@ -144,9 +144,9 @@ class SpandrelImageToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
 
             step_callback(pbar.n + 1, pbar.total)
 
-        # Convert the output tensor to a PIL image.
-        np_image = output_tensor.detach().numpy().astype(np.uint8)
-        pil_image = Image.fromarray(np_image)
+        # Convert the output tensor to a PIL image. `output_tensor` is already uint8, so `.numpy()`
+        # is a zero-copy view; casting it to uint8 again here would copy the whole image for nothing.
+        pil_image = Image.fromarray(output_tensor.numpy())
 
         return pil_image
 
