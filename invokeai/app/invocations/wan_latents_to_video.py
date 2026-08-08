@@ -172,6 +172,10 @@ class WanLatentsToVideoInvocation(BaseInvocation, WithMetadata, WithBoard):
 
                 if use_tiling:
                     vae.enable_tiling()
+                else:
+                    # AutoencoderKLWan is cached and shared with Anima. Clear any
+                    # tiling state left by a prior image decode before streaming.
+                    vae.disable_tiling()
                 try:
                     with torch.inference_mode():
                         # Denormalise from denoiser space back to VAE space.
@@ -180,6 +184,12 @@ class WanLatentsToVideoInvocation(BaseInvocation, WithMetadata, WithBoard):
                         latents = latents * latents_std + latents_mean
 
                         if stream_decode:
+                            duration = t_pixel / float(self.fps)
+                            context.logger.info(
+                                f"Encoding MP4: {t_pixel} frames @ {self.fps} fps "
+                                f"({duration:.2f}s) at {w_pixel}x{h_pixel} via libx264"
+                            )
+                            context.util.signal_progress(f"Encoding MP4 ({t_pixel} frames @ {self.fps} fps)")
                             writer = make_mp4_writer(tmp_path, self.fps)
                             try:
                                 for chunk in iter_wan_vae_decode_chunks(vae, latents):
@@ -194,8 +204,8 @@ class WanLatentsToVideoInvocation(BaseInvocation, WithMetadata, WithBoard):
                             num_frames = decoded.shape[1]
                         del latents, latents_mean, latents_std
                 finally:
+                    # The VAE instance is cached and shared; don't leak tiling into other nodes.
                     if use_tiling:
-                        # The VAE instance is cached and shared; don't leak tiling into other nodes.
                         vae.disable_tiling()
 
             TorchDevice.empty_cache()

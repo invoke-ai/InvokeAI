@@ -93,6 +93,7 @@ def test_wan_memory_optimization_is_not_sticky_between_calls() -> None:
 
     assert ffn_sequence_lengths[:optimized_call_count] == [2, 2, 1]
     assert ffn_sequence_lengths[optimized_call_count:] == [hidden_states.shape[1]]
+    assert "forward" not in transformer.blocks[0].__dict__
 
 
 def test_wan_memory_optimization_restores_blocks_after_exception() -> None:

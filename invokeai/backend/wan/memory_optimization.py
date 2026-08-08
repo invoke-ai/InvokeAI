@@ -216,8 +216,9 @@ def wan_memory_optimization(
     ):
         raise RuntimeError("Wan memory optimization context cannot be nested.")
 
-    patched_blocks: list[tuple[torch.nn.Module, Any]] = []
+    patched_blocks: list[tuple[torch.nn.Module, Any, bool]] = []
     original_transformer_forward = transformer.forward
+    transformer_had_instance_forward = "forward" in transformer.__dict__
     patch_transformer_forward = all(
         hasattr(transformer, name)
         for name in ("condition_embedder", "patch_embedding", "proj_out", "rope", "scale_shift_table")
@@ -229,17 +230,24 @@ def wan_memory_optimization(
             transformer.forward = MethodType(_optimized_wan_transformer_forward, transformer)
         for block in blocks:
             original_forward = block.forward
+            had_instance_forward = "forward" in block.__dict__
             block._invokeai_original_forward = original_forward
             block._invokeai_activation_chunk_size = activation_chunk_size
             block.forward = MethodType(_optimized_wan_block_forward, block)
-            patched_blocks.append((block, original_forward))
+            patched_blocks.append((block, original_forward, had_instance_forward))
         yield
     finally:
-        for block, original_forward in patched_blocks:
-            block.forward = original_forward
+        for block, original_forward, had_instance_forward in patched_blocks:
+            if had_instance_forward:
+                block.forward = original_forward
+            else:
+                del block.forward
             del block._invokeai_original_forward
             del block._invokeai_activation_chunk_size
         if patch_transformer_forward:
-            transformer.forward = original_transformer_forward
+            if transformer_had_instance_forward:
+                transformer.forward = original_transformer_forward
+            else:
+                del transformer.forward
             del transformer._invokeai_original_forward
             del transformer._invokeai_activation_chunk_size

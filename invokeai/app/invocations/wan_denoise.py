@@ -44,6 +44,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import LoRAField, WanTransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, WanVariantType
 from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.wan_lora_constants import WAN_LORA_TRANSFORMER_PREFIX
@@ -220,11 +221,10 @@ class _ExpertSwapper:
         # Capture the outgoing expert's cache record before _release() drops our handle.
         # We need it to force-unload below.
         outgoing_cached_model = None
+        outgoing_info = self._active_info
         if self._active_info is not None:
-            # ``LoadedModel`` exposes its cache_record only via a private attribute. There
-            # is no public ``unload_from_vram`` on the LoadedModel today, and we don't want
-            # to take on a broader backend refactor in this fix; tolerate AttributeError
-            # so a future refactor doesn't break the swap.
+            # ``LoadedModel`` keeps the cache record private, but exposes
+            # ``unload_from_vram`` so cache error handling stays in one place.
             outgoing_cached_model = getattr(self._active_info, "_cache_record", None)
             if outgoing_cached_model is not None:
                 outgoing_cached_model = getattr(outgoing_cached_model, "cached_model", None)
@@ -246,7 +246,14 @@ class _ExpertSwapper:
         # and now — the cached_model object still owns the tensors.
         if outgoing_cached_model is not None:
             try:
-                outgoing_cached_model.full_unload_from_vram()
+                unload_from_vram = getattr(outgoing_info, "unload_from_vram", None)
+                if callable(unload_from_vram):
+                    unload_from_vram(outgoing_cached_model.total_bytes())
+                else:
+                    # Keep compatibility with old LoadedModel handles while preserving
+                    # the process-global register_parameter guard.
+                    with MODEL_LOAD_LOCK.read_lock():
+                        outgoing_cached_model.full_unload_from_vram()
             except Exception:
                 pass
 
@@ -280,11 +287,11 @@ class _ExpertSwapper:
             cache_record = getattr(info, "_cache_record", None)
             cached_model = getattr(cache_record, "cached_model", None)
             cur_vram_bytes = getattr(cached_model, "cur_vram_bytes", None)
-            partial_unload = getattr(cached_model, "partial_unload_from_vram", None)
-            if callable(cur_vram_bytes) and callable(partial_unload):
+            unload_from_vram = getattr(info, "unload_from_vram", None)
+            if callable(cur_vram_bytes) and callable(unload_from_vram):
                 vram_bytes_to_free = max(0, cur_vram_bytes() - self._max_resident_model_bytes)
                 if vram_bytes_to_free > 0:
-                    partial_unload(vram_bytes_to_free, keep_required_weights_in_vram=True)
+                    unload_from_vram(vram_bytes_to_free, keep_required_weights_in_vram=True)
                     TorchDevice.empty_cache()
 
         # Apply LoRA patches for this expert. GGUF transformers need sidecar
