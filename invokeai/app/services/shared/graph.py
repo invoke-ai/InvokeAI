@@ -66,6 +66,7 @@ else:
                 import networkx
 
                 self._module = networkx
+                globals()["nx"] = networkx
             return self._module
 
         def __getattr__(self, name: str) -> Any:

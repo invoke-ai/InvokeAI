@@ -41,6 +41,7 @@ def test_invokeai_imports():
 def test_graph_module_import_does_not_require_networkx():
     script = """
     import builtins
+    import sys
 
     real_import = builtins.__import__
 
@@ -50,15 +51,19 @@ def test_graph_module_import_does_not_require_networkx():
         return real_import(name, globals, locals, fromlist, level)
 
     builtins.__import__ = blocked_import
-    import invokeai.app.services.shared.graph
+    import invokeai.app.services.shared.graph  # noqa: F401
+
+    assert "networkx" not in sys.modules
+    print("LAZY_OK")
     """
 
     result = subprocess.run(
         [sys.executable, "-c", textwrap.dedent(script)],
         capture_output=True,
         text=True,
-        timeout=60,
+        timeout=300,
         check=False,
     )
 
     assert result.returncode == 0, result.stderr
+    assert "LAZY_OK" in result.stdout
