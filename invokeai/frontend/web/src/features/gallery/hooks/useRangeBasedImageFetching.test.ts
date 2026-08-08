@@ -177,9 +177,10 @@ describe('useRangeBasedImageFetching', () => {
     scrollTo({ startIndex: 0, endIndex: 2 });
     await advance(THROTTLE_MS * 4);
 
-    // The catch-driven retry produces a fetch per throttle window. Without it, clearing
-    // pendingRanges after the failed fetch still re-runs the effect once, so the count caps at
-    // two — three or more requires the catch handler restoring the ranges.
+    // The initial failure produces a fetch at the leading and trailing edges of the throttle
+    // window, and the first backoff retry (1s) restores the ranges for at least one more pass.
+    // Without the retry, clearing pendingRanges after the failed fetch still re-runs the effect
+    // once, so the count caps at two — three or more requires the retry restoring the ranges.
     expect(mocks.imageFetches.length).toBeGreaterThanOrEqual(3);
     expect(mocks.cachedImageNames).toEqual([]);
 
@@ -192,6 +193,72 @@ describe('useRangeBasedImageFetching', () => {
     await advance(THROTTLE_MS * 10);
     expect(mocks.imageFetches.length).toBe(fetchesAfterRecovery);
     expect(renderCount).toBe(settledRenders);
+  });
+
+  it('stops retrying when failure is sustained, instead of storming', async () => {
+    // Review finding on the original retry: restoring the ranges immediately meant a sustained
+    // backend outage produced a request every throttle window, forever — a fixed-rate storm from
+    // every open tab against a backend trying to come back up. The bounded retry backs off
+    // (1s, 2s, 4s, 8s, 16s) and gives up after five consecutive scheduled retries, so the request
+    // stream must terminate. Each retry pass produces at most a leading and a trailing fetch,
+    // bounding the total at 12; six requires every backoff retry to have actually fired.
+    mocks.failFetches = true;
+    renderHook(IMAGE_NAMES, true);
+    scrollTo({ startIndex: 0, endIndex: 2 });
+    await advance(35_000);
+
+    expect(mocks.imageFetches.length).toBeGreaterThanOrEqual(6);
+    expect(mocks.imageFetches.length).toBeLessThanOrEqual(12);
+
+    const settledFetches = mocks.imageFetches.length;
+    const settledRenders = renderCount;
+    await advance(30_000);
+    expect(mocks.imageFetches.length).toBe(settledFetches);
+    expect(renderCount).toBe(settledRenders);
+  });
+
+  it('resumes retrying after giving up when the user scrolls', async () => {
+    mocks.failFetches = true;
+    renderHook(IMAGE_NAMES, true);
+    scrollTo({ startIndex: 0, endIndex: 2 });
+    await advance(35_000);
+    const fetchesAfterGiveUp = mocks.imageFetches.length;
+
+    // A new range report is fresh user input: it restarts the retry budget, so the grid does not
+    // stay dead until reload. With the budget still exhausted, only the scroll-triggered fetch and
+    // its trailing companion would fire — three or more new fetches requires the backoff schedule
+    // to have restarted.
+    scrollTo({ startIndex: 0, endIndex: 2 });
+    await advance(2_000);
+    expect(mocks.imageFetches.length).toBeGreaterThanOrEqual(fetchesAfterGiveUp + 3);
+  });
+
+  it('recovers a range that failed while the user was scrolling elsewhere', async () => {
+    // Review finding on the original retry: the catch (`prev.length > 0 ? prev : ranges`) dropped
+    // the failed range whenever another range had been reported in the meantime — rows the user
+    // had scrolled past stayed grey placeholders. The retry now merges the failed ranges with
+    // whatever is pending instead of choosing one side, so both ranges end up fetched with no
+    // further user input.
+    const names = ['a.png', 'b.png', 'c.png', 'd.png', 'e.png', 'f.png', 'g.png', 'h.png', 'i.png'];
+    mocks.failFetches = true;
+    renderHook(names, true);
+    scrollTo({ startIndex: 0, endIndex: 2 });
+    // The fetches for the failed range land at t=500 (throttle edges), scheduling the 1s backoff
+    // retry for t=1500.
+    await advance(1_250);
+
+    // The backend recovers, and the user scrolls to a disjoint range. The first report fires on
+    // the throttle's leading edge (t=1250); the second lands in pendingRanges and stays there
+    // until the trailing edge (t=1750) — so the backoff retry at t=1500 finds a non-empty
+    // pendingRanges and must merge into it rather than pick a side.
+    mocks.failFetches = false;
+    scrollTo({ startIndex: 6, endIndex: 8 });
+    scrollTo({ startIndex: 6, endIndex: 8 });
+    await advance(3_000);
+
+    // Both the failed range (a-c) and the new one (g-i) land, with no user input beyond the one
+    // scroll — and nothing outside the reported ranges is fetched.
+    expect([...mocks.cachedImageNames].sort()).toEqual(['a.png', 'b.png', 'c.png', 'g.png', 'h.png', 'i.png']);
   });
 
   it('still fetches for new ranges after settling', async () => {

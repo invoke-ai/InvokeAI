@@ -1,5 +1,6 @@
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppStore } from 'app/store/storeHooks';
+import { coalesceRanges, useBoundedRangeRetry } from 'common/hooks/useBoundedRangeRetry';
 import { useCallback, useEffect, useState } from 'react';
 import type { ListRange } from 'react-virtuoso';
 import { queueApi, useGetQueueItemDTOsByItemIdsMutation } from 'services/api/endpoints/queue';
@@ -44,6 +45,13 @@ export const useRangeBasedQueueItemFetching = ({
   const [lastRange, setLastRange] = useState<ListRange | null>(null);
   const [pendingRanges, setPendingRanges] = useState<ListRange[]>(EMPTY_ARRAY);
 
+  const restoreFailedRanges = useCallback((failedRanges: ListRange[]) => {
+    // Merge with whatever is pending — replacing either side would drop ranges the user reported
+    // while the failed fetch was in flight, or ranges that failed while the user was scrolling.
+    setPendingRanges((prev) => (prev.length > 0 ? coalesceRanges([...prev, ...failedRanges]) : failedRanges));
+  }, []);
+  const { onFetchFailure, resetRetryBudget } = useBoundedRangeRetry(restoreFailedRanges);
+
   const fetchQueueItems = useCallback(
     (ranges: ListRange[], itemIds: number[]) => {
       if (!enabled) {
@@ -54,12 +62,14 @@ export const useRangeBasedQueueItemFetching = ({
       if (uncachedItemIds.length > 0) {
         getQueueItemDTOsByItemIds({ item_ids: uncachedItemIds })
           .unwrap()
+          .then(resetRetryBudget)
           .catch(() => {
             // This bulk fetch is the ONLY fetcher for these rows: `QueueItemAtPosition` consumes
             // the cache with `skip: isUninitialized`, so a row whose DTO never arrived does not
-            // fetch for itself. Put the ranges back so the effect re-runs and tries again —
-            // otherwise a transient failure leaves placeholders until the user happens to scroll.
-            setPendingRanges((prev) => (prev.length > 0 ? prev : ranges));
+            // fetch for itself. Hand the ranges to the bounded retry so they are restored after a
+            // backoff — otherwise a transient failure leaves placeholders until the user happens
+            // to scroll.
+            onFetchFailure(ranges);
           });
       }
       // Clear unconditionally. Returning early without clearing (the previous behaviour when
@@ -73,15 +83,21 @@ export const useRangeBasedQueueItemFetching = ({
       // uncached; clearing on both paths means the stable reference is now what stops it.
       setPendingRanges(EMPTY_ARRAY);
     },
-    [enabled, getQueueItemDTOsByItemIds, store]
+    [enabled, getQueueItemDTOsByItemIds, onFetchFailure, resetRetryBudget, store]
   );
 
   const throttledFetchQueueItems = useThrottledCallback(fetchQueueItems, 500);
 
-  const onRangeChanged = useCallback((range: ListRange) => {
-    setLastRange(range);
-    setPendingRanges((prev) => [...prev, range]);
-  }, []);
+  const onRangeChanged = useCallback(
+    (range: ListRange) => {
+      // A new range report is fresh user input — restart the retry budget so a list that gave up
+      // after sustained failure resumes retrying as the user scrolls.
+      resetRetryBudget();
+      setLastRange(range);
+      setPendingRanges((prev) => [...prev, range]);
+    },
+    [resetRetryBudget]
+  );
 
   useEffect(() => {
     const combinedRanges = lastRange ? [...pendingRanges, lastRange] : pendingRanges;

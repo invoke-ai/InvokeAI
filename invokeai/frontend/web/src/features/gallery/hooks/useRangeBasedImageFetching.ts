@@ -1,5 +1,6 @@
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppStore } from 'app/store/storeHooks';
+import { coalesceRanges, useBoundedRangeRetry } from 'common/hooks/useBoundedRangeRetry';
 import { isVideoName } from 'features/gallery/store/types';
 import { useCallback, useEffect, useState } from 'react';
 import type { ListRange } from 'react-virtuoso';
@@ -54,6 +55,13 @@ export const useRangeBasedImageFetching = ({
   const [lastRange, setLastRange] = useState<ListRange | null>(null);
   const [pendingRanges, setPendingRanges] = useState<ListRange[]>(EMPTY_ARRAY);
 
+  const restoreFailedRanges = useCallback((failedRanges: ListRange[]) => {
+    // Merge with whatever is pending — replacing either side would drop ranges the user reported
+    // while the failed fetch was in flight, or ranges that failed while the user was scrolling.
+    setPendingRanges((prev) => (prev.length > 0 ? coalesceRanges([...prev, ...failedRanges]) : failedRanges));
+  }, []);
+  const { onFetchFailure, resetRetryBudget } = useBoundedRangeRetry(restoreFailedRanges);
+
   const fetchItems = useCallback(
     (ranges: ListRange[], allNames: string[]) => {
       if (!enabled) {
@@ -67,13 +75,14 @@ export const useRangeBasedImageFetching = ({
       if (uncachedImageNames.length > 0) {
         getImageDTOsByNames({ image_names: uncachedImageNames })
           .unwrap()
+          .then(resetRetryBudget)
           .catch(() => {
             // This bulk fetch is the ONLY fetcher for these rows: `ImageAtPosition` consumes the
             // cache with `skip: isUninitialized`, so a row whose DTO never arrived does not fetch
-            // for itself, and images (unlike videos) have no retry affordance. Put the ranges back
-            // so the effect re-runs and tries again — otherwise a transient failure leaves grey
-            // placeholders until the user happens to scroll. The throttle bounds the retry rate.
-            setPendingRanges((prev) => (prev.length > 0 ? prev : ranges));
+            // for itself, and images (unlike videos) have no retry affordance. Hand the ranges to
+            // the bounded retry so they are restored after a backoff — otherwise a transient
+            // failure leaves grey placeholders until the user happens to scroll.
+            onFetchFailure(ranges);
           });
       }
 
@@ -95,15 +104,21 @@ export const useRangeBasedImageFetching = ({
       // React bail out instead.
       setPendingRanges(EMPTY_ARRAY);
     },
-    [enabled, getImageDTOsByNames, store]
+    [enabled, getImageDTOsByNames, onFetchFailure, resetRetryBudget, store]
   );
 
   const throttledFetchItems = useThrottledCallback(fetchItems, 500);
 
-  const onRangeChanged = useCallback((range: ListRange) => {
-    setLastRange(range);
-    setPendingRanges((prev) => [...prev, range]);
-  }, []);
+  const onRangeChanged = useCallback(
+    (range: ListRange) => {
+      // A new range report is fresh user input — restart the retry budget so a grid that gave up
+      // after sustained failure resumes retrying as the user scrolls.
+      resetRetryBudget();
+      setLastRange(range);
+      setPendingRanges((prev) => [...prev, range]);
+    },
+    [resetRetryBudget]
+  );
 
   useEffect(() => {
     const combinedRanges = lastRange ? [...pendingRanges, lastRange] : pendingRanges;
