@@ -7,7 +7,14 @@ from uuid import uuid4
 from invokeai.app.services.auth.password_utils import hash_password, validate_password_strength, verify_password
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.users.users_base import UserServiceBase
-from invokeai.app.services.users.users_common import UserCreateRequest, UserDTO, UserUpdateRequest
+from invokeai.app.services.users.users_common import (
+    LastAdministratorError,
+    UserCreateRequest,
+    UserDTO,
+    UserUpdateRequest,
+)
+
+LAST_ADMIN_DETAIL = "Cannot remove the last administrator"
 
 
 class UserService(UserServiceBase):
@@ -159,6 +166,13 @@ class UserService(UserServiceBase):
         query = f"UPDATE users SET {', '.join(updates)} WHERE user_id = ?"
 
         with self._db.transaction() as cursor:
+            # BEGIN IMMEDIATE takes the write lock up front, so the guard below reads a count
+            # no other connection can change before this transaction commits. Without it the
+            # SELECT would run in autocommit and a second process (invoke-usermod) could slip
+            # its own write in between. In-process callers are additionally serialized by the
+            # database's shared RLock.
+            cursor.execute("BEGIN IMMEDIATE")
+            self._assert_not_last_admin(cursor, user_id, is_admin=changes.is_admin, is_active=changes.is_active)
             cursor.execute(query, params)
 
         updated_user = self.get(user_id)
@@ -173,6 +187,10 @@ class UserService(UserServiceBase):
             raise ValueError(f"User {user_id} not found")
 
         with self._db.transaction() as cursor:
+            # See the note in `update`: the guard and the write share one write-locked
+            # transaction so the admin count cannot change between them.
+            cursor.execute("BEGIN IMMEDIATE")
+            self._assert_not_last_admin(cursor, user_id, is_deleting=True)
             cursor.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
 
     def authenticate(self, email: str, password: str) -> UserDTO | None:
@@ -286,3 +304,41 @@ class UserService(UserServiceBase):
             cursor.execute("SELECT COUNT(*) FROM users WHERE is_admin = TRUE AND is_active = TRUE")
             row = cursor.fetchone()
         return int(row[0]) if row else 0
+
+    def _assert_not_last_admin(
+        self,
+        cursor: sqlite3.Cursor,
+        user_id: str,
+        *,
+        is_deleting: bool = False,
+        is_admin: bool | None = None,
+        is_active: bool | None = None,
+    ) -> None:
+        """Reject a change that would drop the number of active administrators to zero.
+
+        Must be called on the cursor of the transaction that performs the write, after that
+        transaction has taken its write lock — see the ``BEGIN IMMEDIATE`` in the callers.
+        Reading the count in a separate transaction is what made this a TOCTOU: two callers
+        could each observe two admins and each proceed to remove one.
+
+        ``is_admin``/``is_active`` are the *requested* values, where ``None`` means "not being
+        changed" — deletion is signalled separately by ``is_deleting`` rather than by both
+        being ``None``, which would also describe a rename. Only a change that actually
+        revokes administrator status is checked, so renaming the last admin stays allowed.
+        """
+        cursor.execute("SELECT is_admin, is_active FROM users WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        if row is None:
+            return
+
+        # An admin who is already inactive is not counted, so removing them changes nothing.
+        if not (bool(row[0]) and bool(row[1])):
+            return
+
+        if not (is_deleting or is_admin is False or is_active is False):
+            return
+
+        cursor.execute("SELECT COUNT(*) FROM users WHERE is_admin = TRUE AND is_active = TRUE")
+        count_row = cursor.fetchone()
+        if (int(count_row[0]) if count_row else 0) <= 1:
+            raise LastAdministratorError(LAST_ADMIN_DETAIL)
