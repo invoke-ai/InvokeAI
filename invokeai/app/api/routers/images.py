@@ -1,13 +1,13 @@
 import io
 import json
 import traceback
-from typing import ClassVar, Optional
+from typing import Annotated, ClassVar, Optional
 
 from fastapi import BackgroundTasks, Body, HTTPException, Path, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.routing import APIRouter
 from PIL import Image
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, StringConstraints, model_validator
 
 from invokeai.app.api.auth_dependencies import CurrentMediaUserOrDefault, CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
@@ -36,7 +36,7 @@ from invokeai.app.services.images.images_common import (
     StarredImagesResult,
     UnstarredImagesResult,
 )
-from invokeai.app.services.shared.pagination import OffsetPaginatedResults
+from invokeai.app.services.shared.pagination import MAX_PAGE_SIZE, OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.util.controlnet_utils import heuristic_resize_fast
 from invokeai.backend.image_util.util import np_to_pil, pil_to_np
@@ -46,6 +46,14 @@ images_router = APIRouter(prefix="/v1/images", tags=["images"])
 
 # images are immutable; set a high max-age
 IMAGE_MAX_AGE = 31536000
+
+# Every name in a batch body costs at least one DB lookup, so an unbounded list lets an
+# authenticated client pin a worker with a single request. Mirrors MAX_VIDEO_BATCH_SIZE
+# in the videos router; comfortably above any selection the UI can produce.
+MAX_IMAGE_BATCH_SIZE = 1000
+# Names are UUID-derived filenames; the bound only exists to keep a hostile body from
+# turning into megabytes of SQL parameters.
+ImageName = Annotated[str, StringConstraints(max_length=255)]
 
 
 def _get_image_cache_control() -> str:
@@ -455,8 +463,11 @@ async def list_image_dtos(
         default=None,
         description="The board id to filter by. Use 'none' to find images without a board.",
     ),
-    offset: int = Query(default=0, description="The page offset"),
-    limit: int = Query(default=10, description="The number of images per page"),
+    # Bounds matter: these flow verbatim into SQL, and a negative LIMIT means *unlimited*
+    # in SQLite — one request would materialize every image row into a DTO. The lower
+    # bound on `limit` is 0, not 1: the frontend issues limit=0 count-only queries.
+    offset: int = Query(default=0, ge=0, description="The page offset"),
+    limit: int = Query(default=10, ge=0, le=MAX_PAGE_SIZE, description="The number of images per page"),
     order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
     starred_first: bool = Query(default=True, description="Whether to sort by starred images first"),
     search_term: Optional[str] = Query(default=None, description="The term to search for"),
@@ -488,7 +499,9 @@ async def list_image_dtos(
 @images_router.post("/delete", operation_id="delete_images_from_list", response_model=DeleteImagesResult)
 async def delete_images_from_list(
     current_user: CurrentUserOrDefault,
-    image_names: list[str] = Body(description="The list of names of images to delete", embed=True),
+    image_names: list[ImageName] = Body(
+        description="The list of names of images to delete", embed=True, max_length=MAX_IMAGE_BATCH_SIZE
+    ),
 ) -> DeleteImagesResult:
     try:
         assert_image_move_maintenance_inactive()
@@ -575,7 +588,9 @@ class ImagesUpdatedFromListResult(BaseModel):
 @images_router.post("/star", operation_id="star_images_in_list", response_model=StarredImagesResult)
 async def star_images_in_list(
     current_user: CurrentUserOrDefault,
-    image_names: list[str] = Body(description="The list of names of images to star", embed=True),
+    image_names: list[ImageName] = Body(
+        description="The list of names of images to star", embed=True, max_length=MAX_IMAGE_BATCH_SIZE
+    ),
 ) -> StarredImagesResult:
     try:
         assert_image_move_maintenance_inactive()
@@ -585,9 +600,18 @@ async def star_images_in_list(
         raise
 
     try:
+        # Skip — but do not re-raise — auth failures so a foreign name mid-batch doesn't
+        # discard the response payload for images that were already starred. Re-raising
+        # turned partial successes into an error-shaped response, so the client never
+        # invalidated caches for the images that did change and the UI showed them
+        # unstarred until the next full refresh. Matches delete_images_from_list and the
+        # video star/unstar routes.
         starred_images: set[str] = set()
+        failed_images: set[str] = set()
         affected_boards: set[str] = set()
-        for image_name in image_names:
+        # Dedup while preserving order — a repeated name would otherwise be processed
+        # twice and could land in both starred_images and failed_images.
+        for image_name in dict.fromkeys(image_names):
             try:
                 _assert_image_owner(image_name, current_user)
                 updated_image_dto = ApiDependencies.invoker.services.images.update(
@@ -596,11 +620,15 @@ async def star_images_in_list(
                 starred_images.add(image_name)
                 affected_boards.add(updated_image_dto.board_id or "none")
             except HTTPException:
-                raise
+                continue
             except Exception:
-                pass
+                # A genuine storage failure, not an auth/404 skip: it used to be swallowed
+                # by `pass`, so the client counted the image as starred and the star
+                # silently vanished on reload.
+                failed_images.add(image_name)
         return StarredImagesResult(
             starred_images=list(starred_images),
+            failed_images=list(failed_images),
             affected_boards=list(affected_boards),
         )
     except HTTPException:
@@ -612,7 +640,9 @@ async def star_images_in_list(
 @images_router.post("/unstar", operation_id="unstar_images_in_list", response_model=UnstarredImagesResult)
 async def unstar_images_in_list(
     current_user: CurrentUserOrDefault,
-    image_names: list[str] = Body(description="The list of names of images to unstar", embed=True),
+    image_names: list[ImageName] = Body(
+        description="The list of names of images to unstar", embed=True, max_length=MAX_IMAGE_BATCH_SIZE
+    ),
 ) -> UnstarredImagesResult:
     try:
         assert_image_move_maintenance_inactive()
@@ -622,9 +652,12 @@ async def unstar_images_in_list(
         raise
 
     try:
+        # See star_images_in_list: skip foreign names instead of re-raising mid-batch, and
+        # report genuine storage failures instead of swallowing them.
         unstarred_images: set[str] = set()
+        failed_images: set[str] = set()
         affected_boards: set[str] = set()
-        for image_name in image_names:
+        for image_name in dict.fromkeys(image_names):
             try:
                 _assert_image_owner(image_name, current_user)
                 updated_image_dto = ApiDependencies.invoker.services.images.update(
@@ -633,11 +666,12 @@ async def unstar_images_in_list(
                 unstarred_images.add(image_name)
                 affected_boards.add(updated_image_dto.board_id or "none")
             except HTTPException:
-                raise
+                continue
             except Exception:
-                pass
+                failed_images.add(image_name)
         return UnstarredImagesResult(
             unstarred_images=list(unstarred_images),
+            failed_images=list(failed_images),
             affected_boards=list(affected_boards),
         )
     except HTTPException:
@@ -784,7 +818,11 @@ async def get_image_names(
 )
 async def get_images_by_names(
     current_user: CurrentUserOrDefault,
-    image_names: list[str] = Body(embed=True, description="Object containing list of image names to fetch DTOs for"),
+    image_names: list[ImageName] = Body(
+        embed=True,
+        description="Object containing list of image names to fetch DTOs for",
+        max_length=MAX_IMAGE_BATCH_SIZE,
+    ),
 ) -> list[ImageDTO]:
     """Gets image DTOs for the specified image names. Maintains order of input names."""
 

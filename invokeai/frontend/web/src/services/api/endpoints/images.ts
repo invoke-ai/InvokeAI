@@ -2,6 +2,8 @@ import { skipToken } from '@reduxjs/toolkit/query';
 import { getStore } from 'app/store/nanostores/store';
 import type { CroppableImageWithDims } from 'features/controlLayers/store/types';
 import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
+import { toast } from 'features/toast/toast';
+import i18n from 'i18next';
 import type { components, paths } from 'services/api/schema';
 import type {
   GetImageNamesArgs,
@@ -203,6 +205,20 @@ export const imagesApi = api.injectEndpoints({
         method: 'POST',
         body,
       }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          const { data: result } = await queryFulfilled;
+          if (result.failed_images.length > 0) {
+            toast({
+              id: 'IMAGES_FAILED_TO_UPDATE',
+              title: i18n.t('toast.imagesFailedToUpdate', { count: result.failed_images.length }),
+              status: 'warning',
+            });
+          }
+        } catch {
+          // Global API error handling reports request-level failures.
+        }
+      },
       invalidatesTags: (result) => {
         if (!result) {
           return [];
@@ -228,6 +244,20 @@ export const imagesApi = api.injectEndpoints({
         method: 'POST',
         body,
       }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          const { data: result } = await queryFulfilled;
+          if (result.failed_images.length > 0) {
+            toast({
+              id: 'IMAGES_FAILED_TO_UPDATE',
+              title: i18n.t('toast.imagesFailedToUpdate', { count: result.failed_images.length }),
+              status: 'warning',
+            });
+          }
+        } catch {
+          // Global API error handling reports request-level failures.
+        }
+      },
       invalidatesTags: (result) => {
         if (!result) {
           return [];

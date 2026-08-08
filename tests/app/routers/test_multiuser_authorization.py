@@ -765,6 +765,13 @@ class TestImageMutationAuth:
     def test_non_owner_cannot_star_image(
         self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
     ):
+        """Batch star skips foreign items instead of re-raising the first 403.
+
+        Same rationale as test_non_owner_cannot_batch_delete_image: re-raising mid-batch
+        discarded the partial successes, so the client never learned which images HAD
+        changed. Only the response shape changes — the foreign image must still not be
+        starred, and must not be advertised as starred.
+        """
         user1 = mock_invoker.services.users.get_by_email("user1@test.com")
         assert user1 is not None
         _save_image(mock_invoker, "user1-star-blocked", user1.user_id)
@@ -774,7 +781,12 @@ class TestImageMutationAuth:
             json={"image_names": ["user1-star-blocked"]},
             headers=_auth(user2_token),
         )
-        assert r.status_code == status.HTTP_403_FORBIDDEN
+        assert r.status_code == status.HTTP_200_OK
+        body = r.json()
+        assert body["starred_images"] == []
+        # An auth skip is not a failure — it must not be reported (and toasted) as one.
+        assert body["failed_images"] == []
+        assert mock_invoker.services.image_records.get("user1-star-blocked").starred is False
 
     def test_non_owner_cannot_batch_delete_image(
         self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
