@@ -434,7 +434,10 @@ class DownloadQueueService(DownloadQueueServiceBase):
         if resp.status_code == 416 and resume_from > 0:
             # Range not satisfiable - local partial is already complete
             match = re.fullmatch(r"bytes \*/(\d+)", resp.headers.get("Content-Range", ""), flags=re.IGNORECASE)
-            expected = int(match.group(1)) if match else None
+            # Content-Range is optional on 416 responses. Reuse the size known when
+            # the download started, but never resume_from itself: that would accept
+            # every partial file as complete.
+            expected = int(match.group(1)) if match else (job.expected_total_bytes or job.total_bytes or None)
             if expected is not None and resume_from == expected:
                 job.total_bytes = expected
                 job.expected_total_bytes = expected
