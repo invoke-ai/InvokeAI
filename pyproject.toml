@@ -79,6 +79,7 @@ dependencies = [
   # both of those were silent breakages that only surfaced because something happened to assert on them.
   "fastapi>=0.141.1,<0.142",
   "huggingface-hub",
+  "networkx",
   "pydantic-settings",
   "pydantic",
   "python-socketio",
