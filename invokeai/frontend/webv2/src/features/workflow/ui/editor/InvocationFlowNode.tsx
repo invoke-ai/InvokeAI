@@ -463,6 +463,7 @@ const InputFieldRow = ({
             <WorkflowFieldInput
               id={`${node.id}-${template.name}-value`}
               invalid={isInvalid}
+              nodeId={node.id}
               template={template}
               value={instance?.value}
               onChange={(value) =>

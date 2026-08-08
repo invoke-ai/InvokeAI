@@ -30,7 +30,7 @@ export interface FieldInputTemplate {
   default?: unknown;
   uiHidden: boolean;
   uiOrder: number | null;
-  uiComponent: 'slider' | 'textarea' | null;
+  uiComponent: 'slider' | 'textarea' | 'video-frame-index' | null;
   uiChoiceLabels: Record<string, string> | null;
   /** Enum choices when the field is an EnumField. */
   options: string[] | null;

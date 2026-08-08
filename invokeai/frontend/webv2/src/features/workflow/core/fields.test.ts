@@ -83,6 +83,21 @@ describe('workflow field validation', () => {
     expect(isWorkflowFieldValueValid(input({ type: single('ImageField') }), { image_name: '' })).toBe(false);
   });
 
+  it('validates video fields like image fields (direct-input media)', () => {
+    expect(isWorkflowFieldValueValid(input({ type: single('VideoField') }), { video_name: 'clip.mp4' })).toBe(true);
+    expect(isWorkflowFieldValueValid(input({ type: single('VideoField') }), { video_name: '' })).toBe(false);
+    expect(isWorkflowFieldValueValid(input({ type: single('VideoField') }), {})).toBe(false);
+  });
+
+  it('keeps COLLECTION media values on the generic non-null check (persisted arrays stay valid)', () => {
+    const videos = input({ type: { batch: false, cardinality: 'COLLECTION', name: 'VideoField' } });
+    const images = input({ type: { batch: false, cardinality: 'COLLECTION', name: 'ImageField' } });
+
+    expect(isWorkflowFieldValueValid(videos, [{ video_name: 'a.mp4' }, { video_name: 'b.mp4' }])).toBe(true);
+    expect(isWorkflowFieldValueValid(videos, undefined)).toBe(false);
+    expect(isWorkflowFieldValueValid(images, [{ image_name: 'a.png' }])).toBe(true);
+  });
+
   it('treats empty board values as the Auto sentinel', () => {
     expect(isWorkflowFieldValueValid(input({ type: single('BoardField') }), undefined)).toBe(true);
     expect(isWorkflowFieldValueValid(input({ type: single('BoardField') }), { board_id: 'board-id' })).toBe(true);

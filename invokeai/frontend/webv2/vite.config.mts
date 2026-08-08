@@ -9,6 +9,12 @@ import { chunkSourceManifest } from './scripts/chunk-source-manifest.mjs';
 // backend dev server runs on a non-default port.
 const BACKEND_URL = process.env.INVOKEAI_DEV_BACKEND ?? 'http://127.0.0.1:9090';
 const BACKEND_WS_URL = BACKEND_URL.replace(/^http/, 'ws');
+
+// Set e.g. INVOKEAI_DEV_HOSTS=my-box.local,10.0.0.5 when reaching the dev
+// server by a hostname other than localhost.
+const ALLOWED_HOSTS = process.env.INVOKEAI_DEV_HOSTS?.split(',')
+  .map((host) => host.trim())
+  .filter(Boolean);
 const PROJECT_ROOT = fileURLToPath(new URL('.', import.meta.url));
 
 const ROUTE_SHARED_MODULES = [
@@ -180,6 +186,7 @@ export default defineConfig({
     },
   },
   server: {
+    allowedHosts: ALLOWED_HOSTS,
     host: '0.0.0.0',
     port: 5174,
     proxy: {
