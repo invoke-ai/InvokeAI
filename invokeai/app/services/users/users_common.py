@@ -112,3 +112,11 @@ class UserUpdateRequest(BaseModel):
     password: str | None = Field(default=None, description="New password")
     is_admin: bool | None = Field(default=None, description="Whether user should have admin privileges")
     is_active: bool | None = Field(default=None, description="Whether user account should be active")
+
+
+class LastAdministratorError(ValueError):
+    """Raised when a change would leave the instance with no active administrator.
+
+    Subclasses :class:`ValueError` so that callers which already map service-layer
+    ``ValueError`` to a 400 keep working unchanged.
+    """
