@@ -4,8 +4,8 @@ import time
 from typing import Callable
 
 import torch
-from torch.overrides import TorchFunctionMode
 from transformers import PreTrainedModel, PreTrainedTokenizerBase, TextIteratorStreamer
+from transformers.generation.logits_process import LogitsProcessor
 
 DEFAULT_SYSTEM_PROMPT = (
     "You are an expert prompt writer for AI image generation. "
@@ -30,12 +30,29 @@ STREAM_TIMEOUT = 120.0
 PROGRESS_EMIT_INTERVAL = 0.1
 
 
-class _SeededMultinomialMode(TorchFunctionMode):
-    """Use invocation-local generators for multinomial sampling in this thread."""
+_seeded_multinomial_state = threading.local()
+_original_torch_multinomial = torch.multinomial
+_original_tensor_multinomial = torch.Tensor.multinomial
+
+
+class _SeededMultinomialMode:
+    """Use an invocation-local generator for multinomial sampling in this thread."""
 
     def __init__(self, seed: int):
         self._seed = seed
         self._generators: dict[torch.device, torch.Generator] = {}
+        self._previous: "_SeededMultinomialMode | None" = None
+
+    def __enter__(self) -> "_SeededMultinomialMode":
+        self._previous = getattr(_seeded_multinomial_state, "active", None)
+        _seeded_multinomial_state.active = self
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        if self._previous is None:
+            del _seeded_multinomial_state.active
+        else:
+            _seeded_multinomial_state.active = self._previous
 
     def _get_generator(self, device: torch.device) -> torch.Generator:
         generator_device = torch.device("cpu") if device.type == "mps" else device
@@ -43,22 +60,57 @@ class _SeededMultinomialMode(TorchFunctionMode):
             self._generators[generator_device] = torch.Generator(device=generator_device).manual_seed(self._seed)
         return self._generators[generator_device]
 
-    def __torch_function__(self, func, types, args=(), kwargs=None):
-        kwargs = dict(kwargs or {})
-        if func is not torch.multinomial or kwargs.get("generator") is not None:
-            return func(*args, **kwargs)
 
-        probabilities = args[0] if args else kwargs["input"]
-        generator = self._get_generator(probabilities.device)
-        kwargs["generator"] = generator
-        if probabilities.device.type != "mps":
-            return func(*args, **kwargs)
+def _sample_with_seed(input: torch.Tensor, args: tuple, kwargs: dict, original_multinomial) -> torch.Tensor:
+    mode: _SeededMultinomialMode | None = getattr(_seeded_multinomial_state, "active", None)
+    one_shot = False
+    if mode is None:
+        mode = getattr(_seeded_multinomial_state, "next_mode", None)
+        one_shot = mode is not None
 
-        if args:
-            args = (probabilities.cpu(), *args[1:])
-        else:
-            kwargs["input"] = probabilities.cpu()
-        return func(*args, **kwargs).to(probabilities.device)
+    try:
+        if mode is None or kwargs.get("generator") is not None:
+            return original_multinomial(input, *args, **kwargs)
+
+        kwargs = dict(kwargs)
+        kwargs["generator"] = mode._get_generator(input.device)
+        if input.device.type != "mps":
+            return original_multinomial(input, *args, **kwargs)
+
+        # MPS has no usable device generator. Sampling on CPU keeps the invocation-local seed,
+        # then returns the selected token to the model device. Generation already synchronizes
+        # on each sampled token, so this is a correctness fallback rather than a fast path.
+        output = original_multinomial(input.cpu(), *args, **kwargs)
+        return output.to(input.device)
+    finally:
+        if one_shot:
+            del _seeded_multinomial_state.next_mode
+
+
+def _seeded_torch_multinomial(input: torch.Tensor, *args, **kwargs) -> torch.Tensor:
+    return _sample_with_seed(input, args, kwargs, _original_torch_multinomial)
+
+
+def _seeded_tensor_multinomial(input: torch.Tensor, *args, **kwargs) -> torch.Tensor:
+    return _sample_with_seed(input, args, kwargs, _original_tensor_multinomial)
+
+
+class _SeededMultinomialProcessor(LogitsProcessor):
+    """Arm seeded sampling for the multinomial call immediately after logits processing."""
+
+    def __init__(self, mode: _SeededMultinomialMode):
+        self._mode = mode
+
+    def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor) -> torch.FloatTensor:
+        _seeded_multinomial_state.next_mode = self._mode
+        return scores
+
+
+# Transformers calls torch.multinomial directly today, while Tensor.multinomial is a supported
+# equivalent used by other callers. Install wrappers once so ordinary calls pay only a small
+# thread-local check; model forward operators are untouched.
+torch.multinomial = _seeded_torch_multinomial
+torch.Tensor.multinomial = _seeded_tensor_multinomial
 
 
 class TextLLMPipeline:
@@ -116,6 +168,9 @@ class TextLLMPipeline:
             temperature=0.7,
             top_p=0.9,
             streamer=streamer,
+            # Arm the generator only for Transformers' sampling call. Wrapping all of
+            # generate() in TorchFunctionMode intercepts every model-forward operator.
+            logits_processor=[_SeededMultinomialProcessor(_SeededMultinomialMode(seed))],
         )
 
         # model.generate blocks until done; run it in a thread so we can consume the
@@ -124,8 +179,7 @@ class TextLLMPipeline:
 
         def _generate() -> None:
             try:
-                with _SeededMultinomialMode(seed):
-                    self._model.generate(**generation_kwargs)
+                self._model.generate(**generation_kwargs)
             except BaseException as e:
                 generation_error.append(e)
                 # transformers only calls streamer.end() on the normal exit of the

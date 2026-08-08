@@ -26473,6 +26473,20 @@
             ],
             "title": "System Prompt"
           },
+          "seed": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 4294967295.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seed",
+            "description": "Seed for reproducible text generation"
+          },
           "task_id": {
             "anyOf": [
               {
@@ -26496,6 +26510,10 @@
             "type": "string",
             "title": "Expanded Prompt"
           },
+          "seed": {
+            "type": "integer",
+            "title": "Seed"
+          },
           "error": {
             "anyOf": [
               {
@@ -26509,7 +26527,7 @@
           }
         },
         "type": "object",
-        "required": ["expanded_prompt"],
+        "required": ["expanded_prompt", "seed"],
         "title": "ExpandPromptResponse"
       },
       "ExposedField": {
