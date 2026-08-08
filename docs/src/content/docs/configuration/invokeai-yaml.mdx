@@ -188,6 +188,37 @@ Available strategies:
 
 Changing this setting only affects newly-created images. Existing images remain in their current locations unless you run [Image Storage Maintenance](/features/image-storage-maintenance/).
 
+#### Response Compression
+
+API responses (JSON, HTML, JS, CSS, SVG) are gzipped before being sent. Already-compressed responses — PNG, WebP, JPEG, MP4 — are passed through untouched, since compressing them costs CPU and returns a body no smaller than the original.
+
+Compression runs on the server's event loop, which means it blocks *everything else* for its duration: no other request is served and no progress event is delivered while it runs. The `http_compression_level` setting controls that trade-off:
+
+```yaml
+http_compression_level: 9 # default value
+```
+
+| Value  | Behavior                                                                                       |
+| ------ | ---------------------------------------------------------------------------------------------- |
+| `0`    | No compression. Responses are sent as-is and the compression middleware is not installed.       |
+| `1`    | Fastest compression, slightly larger output.                                                    |
+| `2`–`8` | Progressively slower, marginally smaller.                                                      |
+| `9`    | Smallest output, by far the slowest. This is the default.                                       |
+
+If the UI feels sluggish while a large library is being browsed, lowering this is one of the cheapest wins available. Measured on the image-name list of a 200,000-image library (8.48 MB of JSON):
+
+| Level | Time    | Output    |
+| ----- | ------: | --------: |
+| `1`   | 16.4 ms | 6.1% of input |
+| `6`   | 36.1 ms | 5.9% of input |
+| `9`   | 90.2 ms | 5.7% of input |
+
+Level 9 spends 5.5× the event-loop time to save 0.4 percentage points of bandwidth. On a locally-served install the bandwidth is free and the stall is not, so `http_compression_level: 1` is usually the better setting there — the default stays at `9` only so that upgrading does not silently change how anyone's install behaves.
+
+:::tip[Behind a reverse proxy]
+If you serve InvokeAI through nginx, Caddy, or similar, set `http_compression_level: 0` and let the proxy compress instead. The proxy does that work in its own process rather than on InvokeAI's event loop, and it avoids compressing the same bytes twice.
+:::
+
 #### Logging
 
 Several different log handler destinations are available, and multiple destinations are supported by providing a list:

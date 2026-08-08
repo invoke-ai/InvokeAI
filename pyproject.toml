@@ -68,10 +68,16 @@ dependencies = [
 
   # Core application dependencies, pinned for reproducible builds.
   "fastapi-events",
-  # FastAPI 0.119.0 breaks OpenAPI schema generation for the AnyInvocation class. It's not clear if this is an Invoke,
-  # FastAPI or pydantic bug. Probably Invoke's, because we are doing something unusual with AnyInvocation. 0.118.3 is
-  # the last known-good version.
-  "fastapi== 0.118.3",
+  # The old pin sat at 0.118.3 because 0.119.0 crashed generating our OpenAPI schema. That was a FastAPI bug, not
+  # ours (`KeyError: '$ref'` in fastapi/_compat/v2.py, which assumed every field mapping carries a `$ref`), and it
+  # is fixed as of 0.124.0 — no change to AnyInvocation was needed.
+  #
+  # Two later changes did need adapting to, both handled: 0.130 emits `contentMediaType` instead of
+  # `format: binary` for file uploads (see the Blob mapping in frontend/web/scripts/typegen.js), and 0.141 keeps
+  # included routers as a single node in `app.routes` rather than copying their routes into it (see
+  # `_iter_route_contexts` in tests/app/routers/test_model_manager_authorization.py). Keep the minor-version bound:
+  # both of those were silent breakages that only surfaced because something happened to assert on them.
+  "fastapi>=0.141.1,<0.142",
   "huggingface-hub",
   "pydantic-settings",
   "pydantic",

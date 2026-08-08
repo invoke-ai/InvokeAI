@@ -45,7 +45,7 @@ def _validate_dest(dest: str) -> str:
     "/",
     operation_id="list_downloads",
 )
-async def list_downloads(current_user: CurrentUserOrDefault) -> List[DownloadJob]:
+def list_downloads(current_user: CurrentUserOrDefault) -> List[DownloadJob]:
     """Get a list of active and inactive jobs."""
     queue = ApiDependencies.invoker.services.download_queue
     return queue.list_jobs()
@@ -59,7 +59,7 @@ async def list_downloads(current_user: CurrentUserOrDefault) -> List[DownloadJob
         400: {"description": "Bad request"},
     },
 )
-async def prune_downloads(current_user: AdminUserOrDefault) -> Response:
+def prune_downloads(current_user: AdminUserOrDefault) -> Response:
     """Prune completed and errored jobs."""
     queue = ApiDependencies.invoker.services.download_queue
     queue.prune_jobs()
@@ -70,7 +70,7 @@ async def prune_downloads(current_user: AdminUserOrDefault) -> Response:
     "/i/",
     operation_id="download",
 )
-async def download(
+def download(
     current_user: CurrentUserOrDefault,
     source: AnyHttpUrl = Body(description="download source"),
     dest: str = Body(description="download destination"),
@@ -91,7 +91,7 @@ async def download(
         404: {"description": "The requested download JobID could not be found"},
     },
 )
-async def get_download_job(
+def get_download_job(
     current_user: CurrentUserOrDefault,
     id: int = Path(description="ID of the download job to fetch."),
 ) -> DownloadJob:
@@ -111,7 +111,7 @@ async def get_download_job(
         404: {"description": "The requested download JobID could not be found"},
     },
 )
-async def cancel_download_job(
+def cancel_download_job(
     current_user: CurrentUserOrDefault,
     id: int = Path(description="ID of the download job to cancel."),
 ) -> Response:
@@ -132,7 +132,7 @@ async def cancel_download_job(
         204: {"description": "Download jobs have been cancelled"},
     },
 )
-async def cancel_all_download_jobs(current_user: AdminUserOrDefault) -> Response:
+def cancel_all_download_jobs(current_user: AdminUserOrDefault) -> Response:
     """Cancel all download jobs."""
     ApiDependencies.invoker.services.download_queue.cancel_all_jobs()
     return Response(status_code=204)

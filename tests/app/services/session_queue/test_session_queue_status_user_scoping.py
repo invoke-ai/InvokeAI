@@ -143,3 +143,40 @@ def test_get_queue_item_ids_returns_all_users_ids(session_queue: SqliteSessionQu
 
     assert set(result.item_ids) == {a_item_id, b_item_id}
     assert result.total_count == 2
+
+
+def test_get_queue_item_summaries_by_ids_returns_only_requested_queue_items_in_order(
+    session_queue: SqliteSessionQueue,
+) -> None:
+    first_id = _insert_queue_item(session_queue, user_id="user-a")
+    second_id = _insert_queue_item(session_queue, user_id="user-b")
+    with session_queue._db.transaction() as cursor:
+        cursor.execute(
+            """--sql
+            UPDATE session_queue
+            SET origin = ?, destination = ?, device = ?, field_values = ?
+            WHERE item_id = ?
+            """,
+            (
+                "canvas",
+                "gallery",
+                "cuda:1",
+                '[{"node_path":"node","field_name":"seed","value":123}]',
+                second_id,
+            ),
+        )
+
+    summaries = session_queue.get_queue_item_summaries_by_ids(
+        queue_id="default", item_ids=[second_id, 999999, first_id]
+    )
+
+    assert [item.item_id for item in summaries] == [second_id, first_id]
+    assert summaries[0].origin == "canvas"
+    assert summaries[0].destination == "gallery"
+    assert summaries[0].device == "cuda:1"
+    assert summaries[0].field_values is not None
+    assert summaries[0].field_values[0].field_name == "seed"
+    assert summaries[0].field_values[0].value == 123
+    assert summaries[0].user_id == "user-b"
+    assert summaries[0].created_at is not None
+    assert summaries[0].status == "pending"

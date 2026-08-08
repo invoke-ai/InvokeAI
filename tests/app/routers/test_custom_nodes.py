@@ -1,6 +1,5 @@
 """Tests for the custom nodes router."""
 
-import asyncio
 import json
 import sys
 from pathlib import Path
@@ -135,7 +134,9 @@ class TestUninstallPackNameValidation:
                 patch("invokeai.app.api.routers.custom_nodes.shutil") as mock_shutil,
                 patch("invokeai.app.api.routers.custom_nodes._remove_workflows_by_ids") as mock_remove_workflows,
             ):
-                response = asyncio.run(uninstall_custom_node_pack(MagicMock(), pack_name))
+                # The route is `def`, not `async def`, so that its synchronous filesystem work
+                # runs in the threadpool instead of on the event loop.
+                response = uninstall_custom_node_pack(MagicMock(), pack_name)
 
             assert response.name == pack_name
             assert response.success is False

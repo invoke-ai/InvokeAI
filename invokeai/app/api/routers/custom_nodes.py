@@ -154,7 +154,7 @@ def _get_installed_packs() -> list[NodePackInfo]:
     operation_id="list_custom_node_packs",
     response_model=NodePackListResponse,
 )
-async def list_custom_node_packs(current_admin: AdminUserOrDefault) -> NodePackListResponse:
+def list_custom_node_packs(current_admin: AdminUserOrDefault) -> NodePackListResponse:
     """Lists all installed custom node packs.
 
     Admin-only: the response includes absolute filesystem paths, and non-admins have no
@@ -169,7 +169,7 @@ async def list_custom_node_packs(current_admin: AdminUserOrDefault) -> NodePackL
     operation_id="install_custom_node_pack",
     response_model=InstallNodePackResponse,
 )
-async def install_custom_node_pack(
+def install_custom_node_pack(
     current_admin: AdminUserOrDefault,
     request: InstallNodePackRequest = Body(description="The source URL to install from."),
 ) -> InstallNodePackResponse:
@@ -285,7 +285,7 @@ async def install_custom_node_pack(
     operation_id="uninstall_custom_node_pack",
     response_model=UninstallNodePackResponse,
 )
-async def uninstall_custom_node_pack(
+def uninstall_custom_node_pack(
     current_admin: AdminUserOrDefault,
     pack_name: str,
 ) -> UninstallNodePackResponse:
@@ -357,7 +357,7 @@ async def uninstall_custom_node_pack(
     "/reload",
     operation_id="reload_custom_nodes",
 )
-async def reload_custom_nodes(current_admin: AdminUserOrDefault) -> dict[str, str]:
+def reload_custom_nodes(current_admin: AdminUserOrDefault) -> dict[str, str]:
     """Triggers a reload of all custom nodes.
 
     This re-scans the nodes directory and loads any new node packs.

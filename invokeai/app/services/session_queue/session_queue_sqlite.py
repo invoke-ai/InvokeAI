@@ -31,6 +31,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     SessionQueueCountsByDestination,
     SessionQueueItem,
     SessionQueueItemNotFoundError,
+    SessionQueueItemSummary,
     SessionQueueStatus,
     TooManySessionsError,
     ValueToInsertTuple,
@@ -1360,6 +1361,41 @@ class SqliteSessionQueue(SessionQueueBase):
         item_ids = [row[0] for row in result]
 
         return ItemIdsResult(item_ids=item_ids, total_count=len(item_ids))
+
+    def get_queue_item_summaries_by_ids(self, queue_id: str, item_ids: list[int]) -> list[SessionQueueItemSummary]:
+        if not item_ids:
+            return []
+
+        placeholders = ", ".join("?" for _ in item_ids)
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                f"""--sql
+                SELECT
+                    sq.item_id,
+                    sq.created_at,
+                    sq.status,
+                    sq.device,
+                    sq.started_at,
+                    sq.completed_at,
+                    sq.origin,
+                    sq.destination,
+                    sq.batch_id,
+                    sq.user_id,
+                    u.display_name AS user_display_name,
+                    u.email AS user_email,
+                    sq.field_values
+                FROM session_queue sq
+                LEFT JOIN users u ON sq.user_id = u.user_id
+                WHERE sq.queue_id = ? AND sq.item_id IN ({placeholders})
+                """,
+                (queue_id, *item_ids),
+            )
+            rows = cast(list[sqlite3.Row], cursor.fetchall())
+
+        summaries_by_id = {
+            row["item_id"]: SessionQueueItemSummary.queue_item_summary_from_dict(dict(row)) for row in rows
+        }
+        return [summaries_by_id[item_id] for item_id in item_ids if item_id in summaries_by_id]
 
     def get_queue_status(
         self,

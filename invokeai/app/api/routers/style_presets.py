@@ -78,7 +78,7 @@ def _load_record_or_404(style_preset_id: str) -> StylePresetRecordDTO:
         200: {"model": StylePresetRecordWithImage},
     },
 )
-async def get_style_preset(
+def get_style_preset(
     current_user: CurrentUserOrDefault,
     style_preset_id: str = Path(description="The style preset to get"),
 ) -> StylePresetRecordWithImage:
@@ -157,7 +157,7 @@ async def update_style_preset(
     "/i/{style_preset_id}",
     operation_id="delete_style_preset",
 )
-async def delete_style_preset(
+def delete_style_preset(
     current_user: CurrentUserOrDefault,
     style_preset_id: str = Path(description="The style preset to delete"),
 ) -> None:
@@ -238,7 +238,7 @@ async def create_style_preset(
         200: {"model": list[StylePresetRecordWithImage]},
     },
 )
-async def list_style_presets(current_user: CurrentUserOrDefault) -> list[StylePresetRecordWithImage]:
+def list_style_presets(current_user: CurrentUserOrDefault) -> list[StylePresetRecordWithImage]:
     """Gets the style presets visible to the current user."""
     style_presets_with_image: list[StylePresetRecordWithImage] = []
     style_presets = ApiDependencies.invoker.services.style_preset_records.get_many(
@@ -265,7 +265,7 @@ async def list_style_presets(current_user: CurrentUserOrDefault) -> list[StylePr
     },
     status_code=200,
 )
-async def get_style_preset_image(
+def get_style_preset_image(
     current_user: CurrentUserOrDefault,
     style_preset_id: str = Path(description="The id of the style preset image to get"),
 ) -> FileResponse:
@@ -294,7 +294,7 @@ async def get_style_preset_image(
     responses={200: {"content": {"text/csv": {}}, "description": "A CSV file with the requested data."}},
     status_code=200,
 )
-async def export_style_presets(current_user: AdminUserOrDefault):
+def export_style_presets(current_user: AdminUserOrDefault):
     # Admin-only export covers every user preset.
     output = io.StringIO()
     writer = csv.writer(output)
