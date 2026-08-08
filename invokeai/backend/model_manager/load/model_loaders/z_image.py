@@ -27,9 +27,74 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelType,
     SubModelType,
 )
+from invokeai.backend.quantization.fp8_scaled import (
+    attach_fp8_scales,
+    cast_state_dict,
+    dequantize_fp8_scaled,
+    extract_comfy_quant_hints,
+    extract_fp8_scaled_layers,
+    full_precision_hints_respected,
+    parse_quantization_metadata,
+    predict_cast_state_dict_size,
+    read_safetensors_metadata,
+    should_keep_fp8_weights,
+    split_fp8_scaled_layers,
+    warn_on_unattached_scales,
+)
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
 from invokeai.backend.qwen3.qwen3_tokenizer import load_bundled_qwen3_tokenizer
 from invokeai.backend.util.devices import TorchDevice
+
+# Per-layer quantization side-channel entries that sit next to a fused `qkv.weight` and therefore
+# have to be split along with it. The scale spellings are the ones `fp8_scaled` accepts; the marker
+# is a JSON blob describing the layer, identical for all three halves of the split.
+_QKV_SPLIT_SIDECHANNEL_SUFFIXES = ("weight_scale", "scale_weight", "input_scale", "scale_input", "comfy_quant")
+
+
+def _split_qkv_sidechannel(key: str, value: Any) -> tuple[Any, Any, Any]:
+    """Split a fused-QKV scale/marker into the parts belonging to Q, K and V.
+
+    A per-tensor scale (and any marker blob) describes the whole fused tensor, so each third
+    inherits it unchanged. A per-output-channel scale has one entry per row and is split exactly
+    like the weight.
+    """
+    tensor = torch.as_tensor(value) if hasattr(value, "shape") else value
+    if not hasattr(tensor, "shape") or tensor.dim() == 0 or tensor.shape[0] == 1:
+        return (tensor, tensor, tensor)
+    if tensor.numel() == 1 or key.endswith(("comfy_quant", "input_scale", "scale_input")):
+        # A marker blob is a 1-D byte string, not a per-channel vector — never split it.
+        return (tensor, tensor, tensor)
+    if tensor.shape[0] % 3 != 0:
+        raise ValueError(
+            f"Cannot split fused QKV quantization data '{key}': first dimension ({tensor.shape[0]}) is "
+            "neither 1 nor divisible by 3, so it matches neither a per-tensor nor a per-channel scale."
+        )
+    third = tensor.shape[0] // 3
+    return (tensor[:third], tensor[third : 2 * third], tensor[2 * third :])
+
+
+def _remap_z_image_layer_paths(layer_names: Any) -> dict[str, list[str]]:
+    """Map native Z-Image layer paths to their diffusers equivalents.
+
+    ``_quantization_metadata`` names its layers in the checkpoint's own scheme, but the scales are
+    extracted after the state dict has been renamed. Rather than restating the rename rules — which
+    would drift — each name is pushed through the real converter as a lone ``<name>.weight`` entry
+    and the resulting keys are read back. A fused ``qkv`` maps to *three* diffusers layers, so the
+    mapping is one-to-many.
+    """
+    mapping: dict[str, list[str]] = {}
+    for name in layer_names:
+        if not isinstance(name, str):
+            continue
+        try:
+            # 3 rows so the qkv split is well-defined; the values themselves are never read.
+            converted = _convert_z_image_gguf_to_diffusers({f"{name}.weight": torch.empty(3, 1)})
+        except Exception:
+            continue
+        targets = [k[: -len(".weight")] for k in converted if isinstance(k, str) and k.endswith(".weight")]
+        if targets:
+            mapping[name] = targets
+    return mapping
 
 
 def _convert_z_image_gguf_to_diffusers(sd: dict[str, Any]) -> dict[str, Any]:
@@ -88,9 +153,15 @@ def _convert_z_image_gguf_to_diffusers(sd: dict[str, Any]) -> dict[str, Any]:
             prefix = key.rsplit(".attention.qkv.", 1)[0]
             suffix = key.rsplit(".attention.qkv.", 1)[1]  # "weight" or "bias"
 
-            # Skip non-weight/bias tensors (e.g., FP8 scale_weight tensors)
-            # These are quantization metadata and should not be split
             if suffix not in ("weight", "bias"):
+                # Quantization side-channel for the fused weight. It has to travel with the split,
+                # or the recovered scale is keyed on `...attention.qkv`, a module path that no
+                # longer exists — `attach_fp8_scales` then finds nothing and the three split
+                # weights stay quantized but *unscaled*, i.e. off by 1/weight_scale.
+                if suffix in _QKV_SPLIT_SIDECHANNEL_SUFFIXES:
+                    for name, part in zip(("to_q", "to_k", "to_v"), _split_qkv_sidechannel(key, value), strict=True):
+                        new_sd[f"{prefix}.attention.{name}.{suffix}"] = part
+                    continue
                 new_sd[key] = value
                 continue
 
@@ -222,6 +293,11 @@ class ZImageCheckpointModel(ModelLoader):
                     stripped_sd[key] = value
             sd = stripped_sd
 
+        # Per-layer `full_precision_matrix_mult` hints, from the safetensors header and/or the
+        # per-tensor `.comfy_quant` markers. The header names layers in the checkpoint's own scheme,
+        # so it is remapped below; the markers ride along through the key conversion instead.
+        header_hints = parse_quantization_metadata(read_safetensors_metadata(model_path, self._logger))
+
         # Check if the state dict is in original format (not diffusers format)
         # Original format has keys like "x_embedder.weight" instead of "all_x_embedder.2-1.weight"
         needs_conversion = any(k.startswith("x_embedder.") for k in sd.keys() if isinstance(k, str))
@@ -229,6 +305,10 @@ class ZImageCheckpointModel(ModelLoader):
         if needs_conversion:
             # Convert from original format to diffusers format
             sd = _convert_z_image_gguf_to_diffusers(sd)
+            path_map = _remap_z_image_layer_paths(header_hints.keys())
+            header_hints = {
+                target: hints for name, hints in header_hints.items() for target in path_map.get(name, [name])
+            }
 
         # Create an empty model with the default Z-Image config
         # Z-Image-Turbo uses these default parameters from diffusers
@@ -258,7 +338,8 @@ class ZImageCheckpointModel(ModelLoader):
         # Filter out keys that don't belong to the ZImageTransformer2DModel.
         # Merged checkpoints (e.g. LoRA-baked models) may bundle text encoder weights
         # (text_encoders.*) or other non-transformer keys alongside the transformer weights.
-        # Also filter FP8 quantization metadata (scale_weight, scaled_fp8).
+        # This runs *before* the scales are extracted so a bundled encoder's own scale keys are
+        # dropped here rather than being recovered as transformer layers that resolve to nothing.
         valid_prefixes = (
             "all_x_embedder.",
             "all_final_layer.",
@@ -270,25 +351,63 @@ class ZImageCheckpointModel(ModelLoader):
             "rope_embedder.",
         )
         valid_exact = {"x_pad_token", "cap_pad_token"}
-        keys_to_remove = [
-            k
-            for k in sd.keys()
-            if not (k.startswith(valid_prefixes) or k in valid_exact)
-            or k.endswith(".scale_weight")
-            or k == "scaled_fp8"
-        ]
+        keys_to_remove = [k for k in sd.keys() if not (k.startswith(valid_prefixes) or k in valid_exact)]
         for k in keys_to_remove:
             del sd[k]
 
-        # Handle memory management and dtype conversion
-        new_sd_size = sum([ten.nelement() * model_dtype.itemsize for ten in sd.values()])
-        self._ram_cache.make_room(new_sd_size)
+        # ComfyUI 'scaled fp8' (fp8 weight + .weight_scale/.scale_weight). Until now the loader
+        # deleted those scales and cast the weight — silently producing a weight off by
+        # 1/weight_scale — and had no way to tell such a checkpoint from a raw fp8 one.
+        layer_hints = {**extract_comfy_quant_hints(sd), **header_hints}
+        fp8_layers = extract_fp8_scaled_layers(sd, layer_hints=layer_hints)
 
-        # Convert to target dtype
-        for k in sd.keys():
-            sd[k] = sd[k].to(model_dtype)
+        # Handle memory management and dtype conversion. A checkpoint that ships raw fp8 weights
+        # (fp8 tensors, no weight_scale) keeps them when the fp8 matmul is available — casting them
+        # here would discard both the VRAM saving and the tensor cores before the model is built.
+        keep_fp8 = should_keep_fp8_weights(self._torch_device)
+        if fp8_layers and not keep_fp8:
+            # Legacy behavior, but now with the scale actually applied: fold it into the weight.
+            dequantize_fp8_scaled(sd, fp8_layers, model_dtype)
+            fp8_layers = {}
+
+        # Honor the model's own precision-sensitive list. Z-Image declares
+        # ["t_embedder", "cap_embedder"], and `TimestepEmbedder.forward` casts its activations to
+        # `self.mlp[0].weight.dtype` — an fp8 weight there turns the activations fp8 and the forward
+        # dies in `x.abs()`. Those layers must be dequantized even though the rest stays quantized.
+        skip_patterns = tuple(getattr(model, "_skip_layerwise_casting_patterns", None) or ())
+        # Scaled layers that the cast would dequantize anyway are folded here, scale applied, so
+        # `cast_state_dict` never strips a scale it cannot put back.
+        fp8_layers = split_fp8_scaled_layers(sd, fp8_layers, model_dtype, model=model, skip_patterns=skip_patterns)
+
+        self._ram_cache.make_room(
+            predict_cast_state_dict_size(sd, model_dtype, keep_fp8=keep_fp8, model=model, skip_patterns=skip_patterns)
+        )
+        kept = cast_state_dict(
+            sd,
+            model_dtype,
+            keep_fp8=keep_fp8,
+            model=model,
+            skip_patterns=skip_patterns,
+        )
 
         model.load_state_dict(sd, assign=True)
+
+        if fp8_layers:
+            attached = attach_fp8_scales(model, fp8_layers)
+            self._logger.info(f"Z-Image: kept {attached} layer(s) in fp8 (scaled fp8 checkpoint, fp8_compute enabled)")
+            warn_on_unattached_scales(self._logger, "Z-Image", attached, fp8_layers)
+            marked = sum(1 for layer in fp8_layers.values() if layer.full_precision_matmul)
+            if marked and full_precision_hints_respected():
+                self._logger.info(
+                    f"Z-Image: {marked} of {len(fp8_layers)} layer(s) are marked full_precision_matrix_mult "
+                    "and will dequantize per forward. Set fp8_compute_full_precision_hints=false to run "
+                    "them on the fp8 tensor cores instead."
+                )
+        elif kept:
+            self._logger.info(
+                f"Z-Image: kept {kept} raw fp8 weight(s) quantized (no weight_scale in the checkpoint); "
+                "they will run on the fp8 tensor cores with unit scaling."
+            )
         return model
 
 

@@ -99,3 +99,46 @@ class TestSwapScaleShift:
     def test_leaves_malformed_tensor_untouched(self):
         weight = torch.ones(3)  # odd length -> cannot be split
         assert torch.allclose(_flux2_swap_scale_shift(weight), weight)
+
+
+class TestFlux2RawFp8Gate:
+    """`_dequantize_fp8_weights` runs before `cast_state_dict`, so anything it converts is gone.
+
+    Its trailing loop used to cast *every* float8 tensor unconditionally, which meant nothing fp8
+    ever reached `cast_state_dict` and the FLUX.2 half of the raw-fp8 path could not execute.
+    """
+
+    def _dequantize(self, sd, keep_fp8):
+        from invokeai.backend.model_manager.load.model_loaders.flux import Flux2CheckpointModel
+
+        # The method does not touch `self`; calling it unbound avoids building a whole loader.
+        return Flux2CheckpointModel._dequantize_fp8_weights(None, sd, keep_fp8=keep_fp8)
+
+    def test_raw_fp8_linear_weights_survive_when_kept(self):
+        sd = {
+            "double_blocks.0.img_attn.qkv.weight": torch.zeros(48, 16).to(torch.float8_e4m3fn),
+            "double_blocks.0.img_attn.qkv.bias": torch.zeros(48).to(torch.float8_e4m3fn),
+            "double_blocks.0.img_norm.scale": torch.ones(16).to(torch.float8_e4m3fn),
+        }
+        out = self._dequantize(sd, keep_fp8=True)
+        assert out["double_blocks.0.img_attn.qkv.weight"].dtype is torch.float8_e4m3fn
+        # 1-D tensors are never usable on the tensor cores and must not stay quantized.
+        assert out["double_blocks.0.img_attn.qkv.bias"].dtype is torch.bfloat16
+        assert out["double_blocks.0.img_norm.scale"].dtype is torch.bfloat16
+
+    def test_everything_is_dequantized_when_not_kept(self):
+        sd = {"double_blocks.0.img_attn.qkv.weight": torch.zeros(48, 16).to(torch.float8_e4m3fn)}
+        out = self._dequantize(sd, keep_fp8=False)
+        assert out["double_blocks.0.img_attn.qkv.weight"].dtype is torch.bfloat16
+
+    def test_scaled_fp8_is_still_folded_even_when_keeping(self):
+        """A weight with a `weight_scale` is dequantized *with* its scale, as before — only
+        scale-less fp8 is kept, because only that is safe to hand to `_scaled_mm` unscaled."""
+        sd = {
+            "double_blocks.0.img_attn.qkv.weight": torch.ones(48, 16).to(torch.float8_e4m3fn),
+            "double_blocks.0.img_attn.qkv.weight_scale": torch.tensor(4.0),
+        }
+        out = self._dequantize(sd, keep_fp8=True)
+        assert out["double_blocks.0.img_attn.qkv.weight"].dtype is torch.bfloat16
+        assert torch.allclose(out["double_blocks.0.img_attn.qkv.weight"], torch.full((48, 16), 4.0).bfloat16())
+        assert "double_blocks.0.img_attn.qkv.weight_scale" not in out
