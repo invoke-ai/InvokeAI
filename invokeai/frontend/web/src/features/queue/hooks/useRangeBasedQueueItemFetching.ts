@@ -1,4 +1,6 @@
+import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppStore } from 'app/store/storeHooks';
+import { coalesceRanges, useBoundedRangeRetry } from 'common/hooks/useBoundedRangeRetry';
 import { useCallback, useEffect, useState } from 'react';
 import type { ListRange } from 'react-virtuoso';
 import { queueApi, useGetQueueItemDTOsByItemIdsMutation } from 'services/api/endpoints/queue';
@@ -41,7 +43,14 @@ export const useRangeBasedQueueItemFetching = ({
   const store = useAppStore();
   const [getQueueItemDTOsByItemIds] = useGetQueueItemDTOsByItemIdsMutation();
   const [lastRange, setLastRange] = useState<ListRange | null>(null);
-  const [pendingRanges, setPendingRanges] = useState<ListRange[]>([]);
+  const [pendingRanges, setPendingRanges] = useState<ListRange[]>(EMPTY_ARRAY);
+
+  const restoreFailedRanges = useCallback((failedRanges: ListRange[]) => {
+    // Merge with whatever is pending — replacing either side would drop ranges the user reported
+    // while the failed fetch was in flight, or ranges that failed while the user was scrolling.
+    setPendingRanges((prev) => (prev.length > 0 ? coalesceRanges([...prev, ...failedRanges]) : failedRanges));
+  }, []);
+  const { onFetchFailure, resetRetryBudget } = useBoundedRangeRetry(restoreFailedRanges);
 
   const fetchQueueItems = useCallback(
     (ranges: ListRange[], itemIds: number[]) => {
@@ -50,21 +59,45 @@ export const useRangeBasedQueueItemFetching = ({
       }
       const cachedItemIds = queueApi.util.selectCachedArgsForQuery(store.getState(), 'getQueueItem');
       const uncachedItemIds = getUncachedItemIds(itemIds, cachedItemIds, ranges);
-      if (uncachedItemIds.length === 0) {
-        return;
+      if (uncachedItemIds.length > 0) {
+        getQueueItemDTOsByItemIds({ item_ids: uncachedItemIds })
+          .unwrap()
+          .then(resetRetryBudget)
+          .catch(() => {
+            // This bulk fetch is the ONLY fetcher for these rows: `QueueItemAtPosition` consumes
+            // the cache with `skip: isUninitialized`, so a row whose DTO never arrived does not
+            // fetch for itself. Hand the ranges to the bounded retry so they are restored after a
+            // backoff — otherwise a transient failure leaves placeholders until the user happens
+            // to scroll.
+            onFetchFailure(ranges);
+          });
       }
-      getQueueItemDTOsByItemIds({ item_ids: uncachedItemIds });
-      setPendingRanges([]);
+      // Clear unconditionally. Returning early without clearing (the previous behaviour when
+      // everything was already cached) let ranges accumulate for the lifetime of the list,
+      // growing the scan on every subsequent pass.
+      //
+      // Clear with a stable reference. `pendingRanges` is a dependency of the effect that calls
+      // this function, so a fresh `[]` — a new identity every time — re-runs the effect, which
+      // re-arms the throttle, which calls this again. The old early return happened to prevent
+      // that while everything was cached, so the loop only ran while items were genuinely
+      // uncached; clearing on both paths means the stable reference is now what stops it.
+      setPendingRanges(EMPTY_ARRAY);
     },
-    [enabled, getQueueItemDTOsByItemIds, store]
+    [enabled, getQueueItemDTOsByItemIds, onFetchFailure, resetRetryBudget, store]
   );
 
   const throttledFetchQueueItems = useThrottledCallback(fetchQueueItems, 500);
 
-  const onRangeChanged = useCallback((range: ListRange) => {
-    setLastRange(range);
-    setPendingRanges((prev) => [...prev, range]);
-  }, []);
+  const onRangeChanged = useCallback(
+    (range: ListRange) => {
+      // A new range report is fresh user input — restart the retry budget so a list that gave up
+      // after sustained failure resumes retrying as the user scrolls.
+      resetRetryBudget();
+      setLastRange(range);
+      setPendingRanges((prev) => [...prev, range]);
+    },
+    [resetRetryBudget]
+  );
 
   useEffect(() => {
     const combinedRanges = lastRange ? [...pendingRanges, lastRange] : pendingRanges;
