@@ -25,6 +25,7 @@ from invokeai.app.services.external_generation.providers import (
     SeedreamProvider,
 )
 from invokeai.app.services.external_generation.startup import sync_configured_external_starter_models
+from invokeai.app.services.files.files_disk import DiskFileService
 from invokeai.app.services.gallery.gallery_default import SqliteGalleryService
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
 from invokeai.app.services.image_moves.image_moves_default import ImageMoveService
@@ -118,6 +119,7 @@ class ApiDependencies:
             raise ValueError("Output folder is not set")
 
         image_files = DiskImageFileStorage(f"{output_folder}/images")
+        files = DiskFileService(output_folder / "files", max_file_size=config.max_file_upload_size_bytes)
         video_files = DiskVideoFileStorage(f"{output_folder}/videos")
 
         model_images_folder = config.models_path
@@ -219,6 +221,7 @@ class ApiDependencies:
             bulk_download=bulk_download,
             configuration=configuration,
             events=events,
+            files=files,
             image_files=image_files,
             image_moves=image_moves,
             image_records=image_records,
