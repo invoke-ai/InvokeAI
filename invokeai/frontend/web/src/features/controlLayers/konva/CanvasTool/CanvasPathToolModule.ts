@@ -3,7 +3,12 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasToolModule';
 import { addCoords, getPrefixedId, offsetCoord } from 'features/controlLayers/konva/util';
-import type { CanvasBezierPathState, CanvasEntityIdentifier, Coordinate } from 'features/controlLayers/store/types';
+import type {
+  CanvasBezierPathState,
+  CanvasEntityIdentifier,
+  Coordinate,
+  Tool,
+} from 'features/controlLayers/store/types';
 import { getBezierPathState } from 'features/controlLayers/store/util';
 import type { BezierPointType } from 'features/controlLayers/util/bezierPath';
 import {
@@ -199,7 +204,7 @@ export class CanvasPathToolModule extends CanvasModuleBase {
       existingSession.entityIdentifier.id === entityIdentifier.id &&
       existingSession.entityIdentifier.type === entityIdentifier.type
     ) {
-      this.parent.$tool.set('path');
+      this.activatePathTool();
       this.render();
       return;
     }
@@ -218,8 +223,7 @@ export class CanvasPathToolModule extends CanvasModuleBase {
       activeHandle: null,
       dragTarget: null,
     });
-    this.parent.$toolBuffer.set(null);
-    this.parent.$tool.set('path');
+    this.activatePathTool();
     this.render();
   };
 
@@ -253,7 +257,7 @@ export class CanvasPathToolModule extends CanvasModuleBase {
 
   onToolChanged = () => {
     const tool = this.parent.$tool.get();
-    if (tool !== 'path' && !this.isTemporaryToolSwitch(tool, this.parent.$toolBuffer.get())) {
+    if (tool !== 'path' && !this.isTemporaryToolSwitch(tool, this.parent.$baseTool.get())) {
       if (this.hasActiveEditSession()) {
         this.acceptEditSession();
       }
@@ -267,7 +271,7 @@ export class CanvasPathToolModule extends CanvasModuleBase {
 
   render = () => {
     const tool = this.parent.$tool.get();
-    const isTemporaryToolSwitch = this.isTemporaryToolSwitch(tool, this.parent.$toolBuffer.get());
+    const isTemporaryToolSwitch = this.isTemporaryToolSwitch(tool, this.parent.$baseTool.get());
 
     if (tool !== 'path' && !isTemporaryToolSwitch) {
       this.hideCreatePreview();
@@ -664,8 +668,13 @@ export class CanvasPathToolModule extends CanvasModuleBase {
     this.konva.editHandlesGroup.destroyChildren();
   };
 
-  private isTemporaryToolSwitch = (tool: string, toolBuffer: string | null) => {
-    return toolBuffer === 'path' && (tool === 'view' || tool === 'colorPicker' || tool === 'path');
+  private activatePathTool = () => {
+    this.parent.setBaseTool('path');
+    this.parent.clearTemporaryToolHotkeys();
+  };
+
+  private isTemporaryToolSwitch = (tool: Tool, baseTool: Tool) => {
+    return baseTool === 'path' && (tool === 'view' || tool === 'colorPicker' || tool === 'path');
   };
 
   private resetCreateState = () => {

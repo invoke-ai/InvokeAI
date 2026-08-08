@@ -890,7 +890,7 @@ export class CanvasToolModule extends CanvasModuleBase {
           toolToCancel = 'path';
         } else if (
           (tool === 'view' || tool === 'colorPicker') &&
-          this.$toolBuffer.get() === 'path' &&
+          this.$baseTool.get() === 'path' &&
           this.tools.path.hasActiveSession()
         ) {
           toolToCancel = 'path';
@@ -927,13 +927,13 @@ export class CanvasToolModule extends CanvasModuleBase {
       const tool = this.$tool.get();
       const isPathQuickSwitch =
         (tool === 'view' || tool === 'colorPicker') &&
-        this.$toolBuffer.get() === 'path' &&
+        this.$baseTool.get() === 'path' &&
         this.tools.path.hasActiveSession();
       if ((tool === 'path' || isPathQuickSwitch) && this.tools.path.hasActiveSession()) {
         e.preventDefault();
         this.tools.path.commit();
         if (isPathQuickSwitch) {
-          this.revertToolBuffer();
+          this.clearTemporaryToolHotkeys();
         }
         return;
       }
