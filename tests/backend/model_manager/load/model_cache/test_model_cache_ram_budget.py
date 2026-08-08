@@ -271,13 +271,17 @@ def test_get_vram_in_use_queries_this_caches_execution_device(mock_logger):
 
 
 def test_max_vram_cache_reserves_per_operation_working_memory(mock_logger):
-    """An explicit cache cap must still leave room for decode/diffusion activations."""
+    """An explicit cache cap must still leave room for decode/diffusion activations.
+
+    The capped-branch arithmetic is device-independent, so use a CPU cache to keep this test
+    runnable on CI hosts without a CUDA driver.
+    """
     cache = ModelCache(
         execution_device_working_mem_gb=3.0,
         enable_partial_loading=True,
         keep_ram_copy_of_weights=True,
         max_vram_cache_size_gb=16.0,
-        execution_device="cuda",
+        execution_device="cpu",
         storage_device="cpu",
         logger=mock_logger,
     )
