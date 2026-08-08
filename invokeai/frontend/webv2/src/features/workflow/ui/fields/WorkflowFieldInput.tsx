@@ -9,17 +9,20 @@ import {
   galleryItems,
   galleryTransfers,
   type GalleryBoard,
+  type GalleryItem,
 } from '@features/gallery';
 import { getSelectedGalleryImageFromValues, getSelectedGalleryItemFromValues } from '@features/gallery/contracts';
 import { invalidateGallery } from '@features/gallery/queries';
 import { galleryImageUrls, galleryVideoUrls } from '@features/gallery/utility';
 import { SCHEDULER_OPTIONS } from '@features/generation/settings';
+import { isInvocationNode } from '@features/workflow/contracts';
 import {
   getWorkflowMediaFieldDropId,
   getWorkflowMediaFieldDropItem,
   type WorkflowMediaKind,
 } from '@features/workflow/ui/fields/mediaFieldDnd';
 import { useWorkflowProjectSelector, useWorkflowUi } from '@features/workflow/ui/WorkflowUiContext';
+import { getResolvedWorkflowEdges } from '@features/workflow/utility';
 import {
   assertAccountScopeCurrent,
   captureAccountScope,
@@ -36,6 +39,7 @@ import {
   parseHexColor,
   ResizableTextarea,
   Select,
+  Slider,
   toaster,
 } from '@platform/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -61,6 +65,8 @@ export const getWorkflowSelectedGalleryItem = getSelectedGalleryItemFromValues;
 export interface WorkflowFieldInputProps {
   id?: string;
   invalid?: boolean;
+  /** Owning invocation node, when known — lets widgets read sibling fields (e.g. the frame scrubber's companion video). */
+  nodeId?: string;
   template: FieldInputTemplate;
   value: unknown;
   onChange: (value: unknown) => void;
@@ -553,7 +559,7 @@ const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputPr
   // editor's widget shows the same). Best-effort: the preview works from the
   // name alone, so a failed lookup just drops the badge.
   const { data: mediaItem } = useQuery({
-    enabled: mediaName !== null,
+    enabled: mediaName !== null && mediaName !== '',
     queryFn: ({ signal }) => galleryItems.resolve({ kind, name: mediaName ?? '' }, signal),
     queryKey: ['workflow-media-field-item', kind, mediaName],
     retry: false,
@@ -693,6 +699,198 @@ const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputPr
 };
 
 /**
+ * Convention shared with the legacy editor: a `video-frame-index` field's
+ * source video lives on a sibling field named `video` on the same node.
+ */
+const COMPANION_VIDEO_FIELD_NAME = 'video';
+
+/**
+ * Integer input for `ui_component=video-frame-index` fields (`frame_index` on
+ * Frame from Video; `start_frame`/`end_frame` on Frame Range from Video): the
+ * standard number input plus a live frame preview and a scrubber slider, all
+ * writing the same field value. The preview is a muted `<video>` element
+ * seeked to `frame / fps` — browsers display the frame natively without a
+ * canvas roundtrip.
+ *
+ * Degrades to the plain number input (plus a hint) when the companion video
+ * field is unset/connection-driven or the video has no probed frame rate.
+ */
+const VideoFrameIndexInput = (props: WorkflowFieldInputProps) => {
+  const { nodeId, onChange, value } = props;
+
+  // A connected `video` field keeps its stored value in the document, so the
+  // sibling value alone would preview a stale video while invoke uses the
+  // upstream one. Resolved edges are the same "connected" signal the editor
+  // and Linear panel use to hide the video widget itself.
+  const isVideoConnected = useWorkflowProjectSelector(
+    (project) =>
+      nodeId !== undefined &&
+      getResolvedWorkflowEdges(project.projectGraph.nodes, project.projectGraph.edges).some(
+        (edge) => edge.target === nodeId && edge.targetHandle === COMPANION_VIDEO_FIELD_NAME
+      )
+  );
+  const siblingVideoName = useWorkflowProjectSelector((project) => {
+    const node = nodeId ? project.projectGraph.nodes.find((candidate) => candidate.id === nodeId) : undefined;
+
+    if (!node || !isInvocationNode(node)) {
+      return null;
+    }
+
+    const sibling = node.data.inputs[COMPANION_VIDEO_FIELD_NAME]?.value as Record<string, unknown> | undefined;
+
+    return typeof sibling?.video_name === 'string' && sibling.video_name !== '' ? sibling.video_name : null;
+  });
+  const videoName = isVideoConnected ? null : siblingVideoName;
+
+  // Same query key as the media widget's badge lookup, so the two share a cache
+  // entry when a frame field sits next to a populated video field (the common case).
+  const { data, isError } = useQuery({
+    enabled: videoName !== null,
+    queryFn: ({ signal }) => galleryItems.resolve({ kind: 'video', name: videoName ?? '' }, signal),
+    queryKey: ['workflow-media-field-item', 'video', videoName],
+    retry: false,
+    staleTime: 60_000,
+  });
+  // Rebind: useQuery's NoInfer-wrapped `data` defeats discriminant narrowing.
+  const videoItem: GalleryItem | undefined = data;
+  const video = videoItem && videoItem.kind === 'video' && videoItem.name === videoName ? videoItem : null;
+
+  // Frame count is the slider's upper bound. duration*fps can be off-by-one for
+  // VFR containers, but the slider is for visual scrubbing — the backend
+  // re-resolves indices against the authoritative decoder count at invoke time.
+  const fps = video?.fps ?? null;
+  const frameCount =
+    video && fps && video.durationSeconds > 0 ? Math.max(1, Math.round(video.durationSeconds * fps)) : null;
+
+  // Resolve negative indices (-1 = last frame) for display only — the field
+  // value is preserved verbatim so users can still type "-1" and have the
+  // backend resolve it against the actual frame count.
+  const numericValue = typeof value === 'number' && Number.isFinite(value) ? value : 0;
+  const resolvedIndex =
+    frameCount === null
+      ? 0
+      : Math.max(0, Math.min(frameCount - 1, numericValue < 0 ? frameCount + numericValue : numericValue));
+
+  return (
+    <Flex direction="column" gap="1" w="full">
+      <NumericInput {...props} />
+      {video && fps !== null && frameCount !== null ? (
+        <FrameScrubber
+          fps={fps}
+          frameCount={frameCount}
+          resolvedIndex={resolvedIndex}
+          videoUrl={video.fullUrl}
+          onChange={onChange}
+        />
+      ) : (
+        <Flex borderStyle="dashed" borderWidth="1px" justifyContent="center" px="2" py="2" rounded="sm">
+          <Text color="fg.subtle" fontSize="xs" textAlign="center">
+            {isVideoConnected
+              ? 'Frame preview unavailable while the video comes from a graph connection.'
+              : videoName === null
+                ? "Set this node's Video field to preview frames."
+                : isError
+                  ? 'Frame preview unavailable — the video could not be loaded (it may have been deleted).'
+                  : video === null
+                    ? 'Loading frame preview…'
+                    : 'Frame preview unavailable — the video has no probed frame rate.'}
+          </Text>
+        </Flex>
+      )}
+    </Flex>
+  );
+};
+
+const FRAME_SLIDER_ARIA_LABEL = ['Frame'];
+const FRAME_VIDEO_STYLE = { height: '100%', objectFit: 'contain', width: '100%' } as const;
+
+const FrameScrubber = ({
+  fps,
+  frameCount,
+  onChange,
+  resolvedIndex,
+  videoUrl,
+}: {
+  fps: number;
+  frameCount: number;
+  onChange: (value: unknown) => void;
+  resolvedIndex: number;
+  videoUrl: string;
+}) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Seek whenever the resolved index changes. The half-frame nudge lands the
+  // seek inside the frame's display window — some codecs decode the exact
+  // boundary as black on first paint without it.
+  useEffect(() => {
+    const el = videoRef.current;
+
+    if (!el) {
+      return;
+    }
+
+    const setTime = () => {
+      try {
+        el.currentTime = (resolvedIndex + 0.5) / fps;
+      } catch {
+        // Some browsers throw when seeking an element that isn't ready; the
+        // preview keeps its previous frame and the next effect run re-seeks.
+      }
+    };
+
+    if (el.readyState >= 1) {
+      setTime();
+    } else {
+      el.addEventListener('loadedmetadata', setTime, { once: true });
+
+      return () => el.removeEventListener('loadedmetadata', setTime);
+    }
+  }, [fps, resolvedIndex, videoUrl]);
+
+  const onSliderChange = useCallback(
+    ({ value: next }: { value: number[] }) => {
+      if (next[0] !== undefined) {
+        onChange(next[0]);
+      }
+    },
+    [onChange]
+  );
+  const sliderValue = useMemo(() => [resolvedIndex], [resolvedIndex]);
+
+  return (
+    <Flex className="nodrag" direction="column" gap="1" w="full">
+      <Box borderWidth="1px" h="32" overflow="hidden" position="relative" rounded="sm" w="full">
+        <video ref={videoRef} muted playsInline preload="auto" src={videoUrl} style={FRAME_VIDEO_STYLE} />
+        <Badge
+          bottom="1"
+          fontVariantNumeric="tabular-nums"
+          insetInlineEnd="1"
+          pointerEvents="none"
+          position="absolute"
+          size="xs"
+          variant="solid"
+        >
+          {`${resolvedIndex} / ${frameCount - 1}`}
+        </Badge>
+      </Box>
+      {/* A single-frame video would give the slider min === max, which zag renders as NaN% CSS. */}
+      {frameCount > 1 ? (
+        <Slider
+          aria-label={FRAME_SLIDER_ARIA_LABEL}
+          max={frameCount - 1}
+          min={0}
+          size="sm"
+          step={1}
+          value={sliderValue}
+          withThumbTooltip
+          onValueChange={onSliderChange}
+        />
+      ) : null}
+    </Flex>
+  );
+};
+
+/**
  * Workflow `ColorField` values carry alpha as a `[0, 255]` integer, unlike
  * every other color in the app (and unlike `RgbaColor`, whose alpha is a unit
  * float). The scaling stays local to this adapter rather than pushing a second
@@ -752,6 +950,11 @@ export const WorkflowFieldInput = (props: WorkflowFieldInputProps) => {
     case 'StringField':
       return <StringInput {...props} />;
     case 'IntegerField':
+      if (props.template.uiComponent === 'video-frame-index' && props.template.type.cardinality === 'SINGLE') {
+        return <VideoFrameIndexInput {...props} />;
+      }
+
+      return <NumericInput {...props} />;
     case 'FloatField':
       return <NumericInput {...props} />;
     case 'BooleanField':

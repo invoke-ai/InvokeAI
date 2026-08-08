@@ -27,11 +27,12 @@ vi.mock('@features/gallery', () => ({
 }));
 
 const galleryValues: Record<string, unknown> = {};
-const projectSnapshot = { galleryValues, id: 'project-1' };
+const graphNodes: unknown[] = [];
+const graphEdges: unknown[] = [];
+const projectSnapshot = { galleryValues, id: 'project-1', projectGraph: { edges: graphEdges, nodes: graphNodes } };
 
 vi.mock('@features/workflow/ui/WorkflowUiContext', () => ({
-  useWorkflowProjectSelector: (selector: (project: { galleryValues: Record<string, unknown> }) => unknown) =>
-    selector(projectSnapshot),
+  useWorkflowProjectSelector: (selector: (project: typeof projectSnapshot) => unknown) => selector(projectSnapshot),
   useWorkflowUi: () => ({ project: { getSnapshot: () => projectSnapshot } }),
 }));
 
@@ -47,6 +48,25 @@ const VIDEO_TEMPLATE = {
   title: 'Video',
   type: { name: 'VideoField' },
 } as unknown as FieldInputTemplate;
+
+const FRAME_INDEX_TEMPLATE = {
+  name: 'frame_index',
+  title: 'Frame Index',
+  type: { cardinality: 'SINGLE', name: 'IntegerField' },
+  uiComponent: 'video-frame-index',
+} as unknown as FieldInputTemplate;
+
+const makeFrameNode = (videoValue: { video_name: string } | undefined) => ({
+  data: {
+    inputs: {
+      frame_index: { label: '', name: 'frame_index', value: -1 },
+      video: { label: '', name: 'video', value: videoValue },
+    },
+    type: 'video_frame_extract',
+  },
+  id: 'frame-node',
+  type: 'invocation',
+});
 
 const SELECTED_GALLERY_VIDEO = {
   boardId: 'none',
@@ -76,6 +96,8 @@ beforeEach(() => {
   resolveItemMock.mockResolvedValue(SELECTED_GALLERY_VIDEO);
   queryClient.clear();
   delete galleryValues.selectedImage;
+  graphNodes.length = 0;
+  graphEdges.length = 0;
 });
 
 afterEach(async () => {
@@ -85,13 +107,18 @@ afterEach(async () => {
 
 const queryClient = new QueryClient();
 
-const renderField = async (template: FieldInputTemplate, value: unknown, onChange: (value: unknown) => void) => {
+const renderField = async (
+  template: FieldInputTemplate,
+  value: unknown,
+  onChange: (value: unknown) => void,
+  nodeId?: string
+) => {
   await act(() => {
     root.render(
       <ChakraProvider value={system}>
         <QueryClientProvider client={queryClient}>
           <DndContext>
-            <WorkflowFieldInput template={template} value={value} onChange={onChange} />
+            <WorkflowFieldInput nodeId={nodeId} template={template} value={value} onChange={onChange} />
           </DndContext>
         </QueryClientProvider>
       </ChakraProvider>
@@ -217,6 +244,118 @@ describe('WorkflowFieldInput media inputs', () => {
     });
     expect(uploadVideoMock).toHaveBeenCalledTimes(1);
     expect(uploadVideoMock.mock.calls[0]?.[1]).toBe('none');
+  });
+
+  it('renders the frame scrubber for video-frame-index integer fields', async () => {
+    resolveItemMock.mockResolvedValue({ ...SELECTED_GALLERY_VIDEO, fps: 30 });
+    graphNodes.push(makeFrameNode({ video_name: 'clip.mp4' }));
+
+    // Default of -1 (= last frame) resolves against duration * fps = 150 frames.
+    await renderField(FRAME_INDEX_TEMPLATE, -1, vi.fn(), 'frame-node');
+
+    await vi.waitFor(() => {
+      expect(host.querySelector('video')?.src).toContain('/api/v1/videos/i/clip.mp4/full');
+    });
+    expect(host.textContent).toContain('149 / 149');
+    expect(host.querySelector('input[type="number"]')).not.toBeNull();
+    expect(host.querySelector('[role="slider"]')).not.toBeNull();
+  });
+
+  it('scrubs frames with the slider, writing the resolved index to the field', async () => {
+    resolveItemMock.mockResolvedValue({ ...SELECTED_GALLERY_VIDEO, fps: 30 });
+    graphNodes.push(makeFrameNode({ video_name: 'clip.mp4' }));
+    const onChange = vi.fn();
+
+    await renderField(FRAME_INDEX_TEMPLATE, 10, onChange, 'frame-node');
+
+    await vi.waitFor(() => {
+      expect(host.querySelector('[role="slider"]')).not.toBeNull();
+    });
+
+    const thumb = host.querySelector<HTMLElement>('[role="slider"]')!;
+
+    thumb.focus();
+    await act(() => thumb.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' })));
+    expect(onChange).toHaveBeenCalledWith(11);
+  });
+
+  it('falls back to a hint when the companion video field is unset', async () => {
+    graphNodes.push(makeFrameNode(undefined));
+
+    await renderField(FRAME_INDEX_TEMPLATE, 0, vi.fn(), 'frame-node');
+
+    expect(host.querySelector('input[type="number"]')).not.toBeNull();
+    expect(host.querySelector('video')).toBeNull();
+    expect(host.textContent).toContain("Set this node's Video field to preview frames.");
+  });
+
+  it('falls back to a hint when the video has no probed frame rate', async () => {
+    // SELECTED_GALLERY_VIDEO has no fps, so frames cannot be mapped onto time.
+    graphNodes.push(makeFrameNode({ video_name: 'clip.mp4' }));
+
+    await renderField(FRAME_INDEX_TEMPLATE, 0, vi.fn(), 'frame-node');
+
+    await vi.waitFor(() => {
+      expect(host.textContent).toContain('no probed frame rate');
+    });
+    expect(host.querySelector('video')).toBeNull();
+  });
+
+  it('ignores the stored video value while the video field is connection-driven', async () => {
+    resolveItemMock.mockResolvedValue({ ...SELECTED_GALLERY_VIDEO, fps: 30 });
+    graphNodes.push(makeFrameNode({ video_name: 'clip.mp4' }), {
+      data: { inputs: {}, type: 'video' },
+      id: 'upstream',
+      type: 'invocation',
+    });
+    graphEdges.push({
+      id: 'e1',
+      source: 'upstream',
+      sourceHandle: 'video',
+      target: 'frame-node',
+      targetHandle: 'video',
+    });
+
+    await renderField(FRAME_INDEX_TEMPLATE, 0, vi.fn(), 'frame-node');
+
+    expect(host.textContent).toContain('comes from a graph connection');
+    expect(host.querySelector('video')).toBeNull();
+    expect(resolveItemMock).not.toHaveBeenCalled();
+  });
+
+  it('shows the preview without a slider for a single-frame video', async () => {
+    // min === max would render a broken (NaN%) zag slider.
+    resolveItemMock.mockResolvedValue({ ...SELECTED_GALLERY_VIDEO, durationSeconds: 0.02, fps: 30 });
+    graphNodes.push(makeFrameNode({ video_name: 'clip.mp4' }));
+
+    await renderField(FRAME_INDEX_TEMPLATE, 0, vi.fn(), 'frame-node');
+
+    await vi.waitFor(() => {
+      expect(host.querySelector('video')).not.toBeNull();
+    });
+    expect(host.textContent).toContain('0 / 0');
+    expect(host.querySelector('[role="slider"]')).toBeNull();
+  });
+
+  it('reports a deleted video instead of a frame-rate story', async () => {
+    resolveItemMock.mockRejectedValue(new Error('404'));
+    graphNodes.push(makeFrameNode({ video_name: 'gone.mp4' }));
+
+    await renderField(FRAME_INDEX_TEMPLATE, 0, vi.fn(), 'frame-node');
+
+    await vi.waitFor(() => {
+      expect(host.textContent).toContain('could not be loaded');
+    });
+    expect(host.querySelector('video')).toBeNull();
+  });
+
+  it('treats an empty-string video name as unset without firing a lookup', async () => {
+    graphNodes.push(makeFrameNode({ video_name: '' }));
+
+    await renderField(FRAME_INDEX_TEMPLATE, 0, vi.fn(), 'frame-node');
+
+    expect(host.textContent).toContain("Set this node's Video field to preview frames.");
+    expect(resolveItemMock).not.toHaveBeenCalled();
   });
 
   it('keeps the image field on the image upload path', async () => {
