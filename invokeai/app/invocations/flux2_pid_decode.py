@@ -203,7 +203,12 @@ class Flux2PiDDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
         pid_info = context.models.load(self.pid_decoder.decoder)
         # The working-memory estimate scales with the OUTPUT pixel count, so it must see the PACKED latent
         # (spatial H/16), not the unpacked one - otherwise it over-reserves by 4x.
-        estimated_working_memory = estimate_pid_decode_working_memory(packed, BaseModelType.Flux2)
+        # Read once: the estimate and the decode must agree, or the cache reserves headroom for a
+        # peak that will not happen (or too little for one that will).
+        pid_memory_optimization = context.config.get().pid_memory_optimization
+        estimated_working_memory = estimate_pid_decode_working_memory(
+            packed, BaseModelType.Flux2, pid_memory_optimization
+        )
         with pid_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, pid_net):
             if not isinstance(pid_net, PidNet):
                 raise TypeError(f"Expected PidNet for PiD decoder, got {type(pid_net).__name__}.")
@@ -226,7 +231,11 @@ class Flux2PiDDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
                 latent=denorm_latent,
                 caption_embs=caption_embs,
                 caption_mask=caption_mask,
-                config=PiDDecodeConfig(num_inference_steps=self.num_inference_steps, seed=self.seed),
+                config=PiDDecodeConfig(
+                    num_inference_steps=self.num_inference_steps,
+                    seed=self.seed,
+                    pid_memory_optimization=pid_memory_optimization,
+                ),
             )
 
         TorchDevice.empty_cache()

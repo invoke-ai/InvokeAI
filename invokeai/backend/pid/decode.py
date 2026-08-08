@@ -27,6 +27,9 @@ from torch import Tensor
 
 from invokeai.backend.model_manager.taxonomy import BaseModelType
 from invokeai.backend.pid._src.networks.pid_net import PidNet
+from invokeai.backend.util.logging import InvokeAILogger
+
+_PID_ACTIVATION_CHUNK_SIZE = 1024
 
 # ---------------------------------------------------------------------------
 # Network hyperparameters per backbone
@@ -122,7 +125,7 @@ PID_MODEL_MAX_LENGTH: int = 300
 
 # Working-memory (activation) estimate for the PiD decode, mirroring `estimate_vae_working_memory_*` (see #8414).
 # PiD runs a multi-step pixel-diffusion in float32 at the full super-resolved output resolution, so its peak
-# activation memory scales with the OUTPUT pixel count.
+# activation memory scales with the total OUTPUT pixel count across the batch.
 #
 # This is ONLY the activation headroom reserved for the decode itself - it does NOT do the heavy lifting of
 # evicting the main transformer/encoders (the nodes call context.models.offload_all_from_vram() for that before
@@ -131,13 +134,34 @@ PID_MODEL_MAX_LENGTH: int = 300
 # ~4GB at a 2048px output is a small headroom above the 3GB default. Experimentally-tunable; calibrate to peak.
 _PID_DECODE_WORKING_MEMORY_SCALING_CONSTANT = 250
 
+# The same estimate for `pid_memory_optimization=True`. Chunking bounds the per-block activations to a fixed
+# working set, so the peak stops being a pure multiple of the output size: it is a smaller per-pixel term plus a
+# constant for the chunk working set (constant because `_PID_ACTIVATION_CHUNK_SIZE` is fixed).
+#
+# Measured peaks on an RTX 4090 (fp32 PidNet, bf16 autocast, 4 steps, B=1), against U = out_h * out_w * 4 bytes:
+#   1024px  509 MiB (127.2 * U)   1536px  934 MiB (103.8 * U)   2048px  1533 MiB (95.8 * U)
+# Least-squares fit: 85.3 * U + 167 MiB. The constants below carry ~15% headroom over that fit.
+#
+# Keeping the unoptimized constant here would be the bug the flag is supposed to avoid: the cache takes
+# max(this_estimate, device_working_mem_gb) and subtracts it from the weight budget, so reserving 4GB for a decode
+# that peaks at 1.5GB withholds VRAM that PidNet could have stayed resident in - exactly the partial-load-to-CPU
+# outcome the comment above warns about, on the low-VRAM systems this feature exists for.
+_PID_DECODE_CHUNKED_SCALING_CONSTANT = 95
+_PID_DECODE_CHUNKED_FIXED_BYTES = 224 * 2**20
 
-def estimate_pid_decode_working_memory(latent: Tensor, backbone: BaseModelType) -> int:
+
+def estimate_pid_decode_working_memory(
+    latent: Tensor, backbone: BaseModelType, pid_memory_optimization: bool = False
+) -> int:
     """Estimate the working (activation) memory in bytes for a PiD decode of *latent*.
 
-    The decoded image is ``latent_spatial * sr_scale * latent_spatial_down_factor`` pixels per side. PidNet runs
-    in float32 (see ``model_loaders/pid_decoder.py``), so the element size is 4 bytes. Returns 0 for unsupported
-    backbones so callers fall back to the cache's default working-memory reservation.
+    Each decoded image is ``latent_spatial * sr_scale * latent_spatial_down_factor`` pixels per side. PidNet
+    runs in float32 (see ``model_loaders/pid_decoder.py``), so the element size is 4 bytes. The per-pixel term
+    covers every image in the latent batch. Returns 0 for unsupported backbones so callers fall back to the
+    cache's default working-memory reservation.
+
+    ``pid_memory_optimization`` must mirror the flag passed to :class:`PiDDecodeConfig` for the same decode -
+    otherwise the cache reserves headroom for a peak that will not happen.
     """
     per_backbone = _PER_BACKBONE.get(backbone)
     if per_backbone is None:
@@ -146,7 +170,17 @@ def estimate_pid_decode_working_memory(latent: Tensor, backbone: BaseModelType) 
     out_h = int(latent.shape[-2]) * total_up
     out_w = int(latent.shape[-1]) * total_up
     element_size = 4  # PidNet runs in float32 (see model_loaders/pid_decoder.py)
-    return int(out_h * out_w * element_size * _PID_DECODE_WORKING_MEMORY_SCALING_CONSTANT)
+    batch_size = int(latent.shape[0])
+    output_bytes = batch_size * out_h * out_w * element_size
+    unoptimized = int(output_bytes * _PID_DECODE_WORKING_MEMORY_SCALING_CONSTANT)
+    if not pid_memory_optimization:
+        return unoptimized
+    chunked = int(output_bytes * _PID_DECODE_CHUNKED_SCALING_CONSTANT + _PID_DECODE_CHUNKED_FIXED_BYTES)
+    # The fixed term is the chunk working set, so it only exists once chunking actually engages -
+    # below `_PID_ACTIVATION_CHUNK_SIZE` patch tokens the pixel blocks run unchunked and the peak is
+    # the unoptimized one. Without this clamp a small output would be *charged* for a working set it
+    # never allocates, and the optimized estimate could exceed the unoptimized one.
+    return min(chunked, unoptimized)
 
 
 def build_pid_net(backbone: BaseModelType) -> PidNet:
@@ -225,9 +259,32 @@ def _get_t_list(device: torch.device, *, num_steps: Optional[int] = None) -> Ten
     return t
 
 
-def _velocity_to_x0(x_t: Tensor, net_output: Tensor, t: Tensor) -> Tensor:
-    """Convert the network's velocity prediction back to x0 at time *t*."""
+def _velocity_to_x0(x_t: Tensor, net_output: Tensor, t: Tensor, *, pid_memory_optimization: bool = False) -> Tensor:
+    """Convert the network's velocity prediction back to x0 at time *t*.
+
+    The optimized branch is a genuine precision reduction, not just a cheaper spelling, so it is worth
+    being explicit about what it buys. Measured on an RTX 4090 (B=1, 3xHxW, ``x_t`` fp32 / ``net_output``
+    bf16), transient peak for this call alone:
+
+    ======  ==========  ==============  ==============
+    size    fp64 (dflt)  fused fp64      fused fp32
+    ======  ==========  ==============  ==============
+    1024px  72 MiB      72 MiB          24 MiB
+    2048px  288 MiB     288 MiB         96 MiB
+    ======  ==========  ==============  ==============
+
+    Fusing the multiply-subtract in fp64 is bit-identical to the default expression but frees nothing,
+    so the 192 MiB at 2048px is bought entirely with precision: ``max|diff| = 4.8e-07`` per call against
+    the fp64 result. That is ~8.6% of the 2.2 GiB the flag saves overall, and the 4-step SDE sampler
+    amplifies the per-call error into a visible-in-numbers-only image delta (see the tolerance contract
+    in ``tests/backend/pid/test_pid_chunked_equivalence.py``). It stays under the same flag because a
+    user who opted into "trade quality for VRAM" wants both parts; it is documented here, in the setting
+    description and in the docs so nobody has to rediscover that this option is not output-preserving.
+    """
     s = [x_t.shape[0]] + [1] * (x_t.ndim - 1)
+    if pid_memory_optimization:
+        t_shaped = t.float().view(*s)
+        return torch.addcmul(x_t.float(), net_output.float(), t_shaped, value=-1).to(x_t.dtype)
     t_shaped = t.double().view(*s)
     return (x_t.double() - t_shaped * net_output.double()).to(x_t.dtype)
 
@@ -245,6 +302,7 @@ def _student_sample_loop(
     sample_type: str = "sde",
     autocast_dtype: Optional[torch.dtype] = None,
     generator: Optional[torch.Generator] = None,
+    pid_memory_optimization: bool = False,
 ) -> Tensor:
     """Few-step distilled sampler.
 
@@ -279,9 +337,10 @@ def _student_sample_loop(
                 lq_video_or_image=None,
                 lq_latent=lq_latent,
                 degrade_sigma=degrade_sigma,
+                activation_chunk_size=_PID_ACTIVATION_CHUNK_SIZE if pid_memory_optimization else None,
             )
         if t_next.item() > 0:
-            x0_pred = _velocity_to_x0(x, v_pred, t_cur_batch)
+            x0_pred = _velocity_to_x0(x, v_pred, t_cur_batch, pid_memory_optimization=pid_memory_optimization)
             eps_infer = torch.randn(
                 x0_pred.shape,
                 device=x0_pred.device,
@@ -297,7 +356,7 @@ def _student_sample_loop(
             else:
                 x = (1.0 - t_next_b) * x0_pred + t_next_b * eps_infer
         else:
-            x = _velocity_to_x0(x, v_pred, t_cur_batch)
+            x = _velocity_to_x0(x, v_pred, t_cur_batch, pid_memory_optimization=pid_memory_optimization)
     return x
 
 
@@ -322,6 +381,7 @@ class PiDDecodeConfig:
     # from_clean upscale path passes the LDM scheduler's per-step sigma here.
     degrade_sigma: float | list[float] | Tensor = 0.0
     seed: int = 0
+    pid_memory_optimization: bool = False
     student_t_list: list[float] = field(default_factory=lambda: list(_STUDENT_T_LIST))
 
 
@@ -415,6 +475,21 @@ class PiDDecoder:
 
         t_list = _get_t_list(device, num_steps=cfg.num_inference_steps)
 
+        if cfg.pid_memory_optimization:
+            # The setting is server-level and never reaches image metadata, so this log line is the
+            # only record that a decode ran optimized - and the only feedback the user gets that a
+            # yaml-only, restart-required knob took effect. It also reports whether chunking really
+            # engaged: below the chunk size the pixel blocks run unchunked and only the sampler-math
+            # change applies.
+            patch_tokens = batch_size * (img_h // self.net.patch_size) * (img_w // self.net.patch_size)
+            engaged = patch_tokens > _PID_ACTIVATION_CHUNK_SIZE
+            InvokeAILogger.get_logger(__name__).info(
+                f"PiD memory optimization enabled for a {img_w}x{img_h} decode: "
+                f"{patch_tokens} patch tokens vs chunk size {_PID_ACTIVATION_CHUNK_SIZE} "
+                f"({'chunked' if engaged else 'below the chunk size, activations run unchunked'}), "
+                "float32 sampler intermediates. Output differs slightly from an unoptimized decode."
+            )
+
         self.net.eval()
         x0 = _student_sample_loop(
             self.net,
@@ -427,6 +502,7 @@ class PiDDecoder:
             sample_type=cfg.sample_type,
             autocast_dtype=autocast_dtype,
             generator=gen,
+            pid_memory_optimization=cfg.pid_memory_optimization,
         )
         return x0.clamp(-1, 1)
 
