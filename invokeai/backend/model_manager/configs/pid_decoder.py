@@ -26,6 +26,7 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelType,
     PiDDecoderVariantType,
 )
+from invokeai.backend.pid.state_dict_utils import pid_net_keys
 
 # Marker substring produced by `PidNet.lq_proj` (see
 # invokeai/backend/pid/_src/networks/pid_net.py). The pretrained PixDiT_T2I
@@ -40,31 +41,25 @@ def _looks_like_pid_decoder(state_dict: dict[str | int, Any]) -> bool:
     return any(isinstance(k, str) and _PID_MARKER_SUBSTRING in k for k in state_dict)
 
 
-# NVIDIA's official `.pth` checkpoints keep PidDistillModel's `net.` prefix, and carry the other distill
-# submodules alongside the student. Mirrors `_strip_net_prefix` in
-# invokeai/backend/model_manager/load/model_loaders/pid_decoder.py, which is what the loader actually
-# feeds to `load_pid_decoder`.
-_NET_PREFIX = "net."
-
-
-def _pid_net_keys(state_dict: dict[str | int, Any]) -> set[str]:
-    """The checkpoint's keys as PidNet will see them (i.e. with the `net.` prefix stripped)."""
-    return {k[len(_NET_PREFIX) :] if k.startswith(_NET_PREFIX) else k for k in state_dict if isinstance(k, str)}
-
-
-def _raise_if_lq_projection_incomplete(state_dict: dict[str | int, Any], base: BaseModelType) -> None:
+def _raise_if_lq_projection_incomplete(state_dict: dict[str | int, Any], base: BaseModelType | None) -> None:
     """Reject a checkpoint that carries only part of the LQ projection.
 
     A single `lq_proj.*` key is not evidence of a usable decoder: models are built under
     `skip_torch_weight_init()`, so every weight the checkpoint does not supply stays uninitialised
     memory (`load_pid_decoder` therefore rejects missing keys too). Catching it here means an
     incomplete file is reported at install time instead of decoding to garbage or NaNs later.
+
+    `base` is None before the backbone is known, in which case the backbone-independent key set is
+    used. That call has to come first: the backbone is read from `lq_proj.latent_proj.0.weight`, so
+    a file missing exactly that weight would otherwise be reported as "cannot determine backbone" —
+    true, but not the reason, and not the message the install flow promises for a truncated file.
     """
     # Imported lazily: it pulls in the vendored PiD network stack, which model identification
     # otherwise has no reason to load.
-    from invokeai.backend.pid.decode import required_lq_proj_keys
+    from invokeai.backend.pid.decode import common_required_lq_proj_keys, required_lq_proj_keys
 
-    missing = sorted(required_lq_proj_keys(base) - _pid_net_keys(state_dict))
+    expected = required_lq_proj_keys(base) if base is not None else common_required_lq_proj_keys()
+    missing = sorted(expected - pid_net_keys(state_dict))
     if missing:
         raise NotAMatchError(
             f"PiD checkpoint is missing {len(missing)} of the LQ projection weights required by PidNet "
@@ -197,6 +192,10 @@ class PiDDecoder_Checkpoint_Config_Base(Checkpoint_Config_Base):
         if not _looks_like_pid_decoder(state_dict):
             raise NotAMatchError("state dict does not look like a PiD decoder (no 'lq_proj.*' keys)")
 
+        # Completeness first, backbone second — the backbone is read from one of the LQ weights, so a
+        # truncated file must be reported as truncated rather than as an unidentifiable backbone.
+        _raise_if_lq_projection_incomplete(state_dict, None)
+
         # Reject checkpoints whose network shape InvokeAI's build_pid_net cannot construct (e.g. NVIDIA's
         # v1.5 decoders use lq_hidden_dim=1024) at identification time, instead of accepting them and
         # failing with a size-mismatch deep inside the decode.
@@ -218,7 +217,9 @@ class PiDDecoder_Checkpoint_Config_Base(Checkpoint_Config_Base):
         cls._validate_base(mod, state_dict, name=name, had_base_override=had_base_override)
 
         base: BaseModelType = cls.model_fields["base"].default
-        # Only a complete LQ projection is loadable — see `_raise_if_lq_projection_incomplete`.
+        # Re-checked against this backbone's own key set. Today that is the same 71 keys for every
+        # backbone, so this is a no-op — it is here so the check does not quietly weaken to the
+        # intersection if a future backbone adds LQ parameters of its own.
         _raise_if_lq_projection_incomplete(state_dict, base)
 
         variant = override_fields.pop("variant", None) or _variant_from_name(name, base)

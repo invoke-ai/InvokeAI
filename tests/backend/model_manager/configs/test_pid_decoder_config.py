@@ -126,6 +126,30 @@ class TestIncompleteLqProjection:
             with pytest.raises(NotAMatchError, match="LQ projection weights"):
                 PiDDecoder_Checkpoint_FLUX_Config.from_model_on_disk(mod, dict(_OVERRIDE_FIELDS))
 
+    def test_truncation_is_reported_as_truncation_even_without_the_diagnostic_weight(self) -> None:
+        """The backbone is read from `lq_proj.latent_proj.0.weight`, so a file truncated past *that*
+        weight used to fail with "cannot determine backbone" — accurate, but not the reason, and not
+        the message the install flow promises for a truncated checkpoint. Completeness is therefore
+        checked before the backbone, against the backbone-independent key set."""
+        sd = {f"{_NET_PREFIX}lq_proj.latent_proj.1.weight": _FakeShapeTensor(1)}
+        fields = {k: v for k, v in _OVERRIDE_FIELDS.items() if k != "base"}
+        with TemporaryDirectory() as tmpdir:
+            # No directory name and no base override: nothing but the weights identifies this file.
+            mod = _mock_mod(Path(tmpdir), sd)
+            with pytest.raises(NotAMatchError, match="missing 71 of the LQ projection weights"):
+                PiDDecoder_Checkpoint_FLUX_Config.from_model_on_disk(mod, dict(fields))
+
+    def test_distill_only_submodules_do_not_count_as_lq_weights(self) -> None:
+        """`net_ema.*` shadows PidNet's own parameter names. The loader drops those submodules, so
+        identification has to as well — otherwise a checkpoint carrying only the EMA copy would look
+        complete here and then fail in `load_pid_decoder`."""
+        sd = {f"net_ema.{k}": _FakeShapeTensor(1) for k in required_lq_proj_keys(BaseModelType.Flux)}
+        sd[f"{_NET_PREFIX}{_LATENT_PROJ_KEY}"] = _FakeShapeTensor(512, 16, 3, 3)
+        with TemporaryDirectory() as tmpdir:
+            mod = _mock_mod(Path(tmpdir), sd)
+            with pytest.raises(NotAMatchError, match="LQ projection weights"):
+                PiDDecoder_Checkpoint_FLUX_Config.from_model_on_disk(mod, dict(_OVERRIDE_FIELDS))
+
 
 class TestBackboneFromInstallSource:
     """FLUX.1, SD3 and Qwen-Image PiD decoders are architecturally identical (16 latent channels), so the

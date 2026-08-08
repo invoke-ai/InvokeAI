@@ -184,6 +184,14 @@ def required_lq_proj_keys(backbone: BaseModelType) -> frozenset[str]:
 
     Derived from a throwaway `LQProjection2D` built with the real structural counts but tiny feature
     dims, so it stays in step with the vendored network instead of duplicating a hand-written list.
+
+    The probe is built on the meta device and inside a forked RNG state. Only parameter *names* are
+    read, but constructing the module normally would run every `reset_parameters()` and so consume
+    the global CPU RNG — during *model identification*, of all things. An install would then shift
+    the seedless random stream by an amount that depends on how many candidate files were probed,
+    making later unseeded randomness depend on install order. Meta construction allocates nothing;
+    the fork is the belt to that suspenders, since it holds regardless of what the vendored module
+    does in its constructor.
     """
     if backbone not in _PER_BACKBONE:
         raise ValueError(
@@ -192,23 +200,42 @@ def required_lq_proj_keys(backbone: BaseModelType) -> frozenset[str]:
     kwargs = {**_PID_SR4X_BASE, **_PER_BACKBONE[backbone]}
     patch_depth = int(kwargs["patch_depth"])
     interval = int(kwargs["lq_interval"])
-    probe = LQProjection2D(
-        in_channels=int(kwargs["lq_in_channels"]),
-        latent_channels=int(kwargs["lq_latent_channels"]),
-        hidden_dim=_LQ_PROBE_DIM,
-        out_dim=_LQ_PROBE_DIM,
-        patch_size=int(kwargs["patch_size"]),
-        sr_scale=int(kwargs["sr_scale"]),
-        latent_spatial_down_factor=int(kwargs["latent_spatial_down_factor"]),
-        num_res_blocks=_LQ_NUM_RES_BLOCKS_DEFAULT,
-        # Mirrors PidNet.__init__: one injection point every `lq_interval` patch blocks.
-        num_outputs=(patch_depth + interval - 1) // interval,
-        gate_type=str(kwargs["lq_gate_type"]),
-        interval=interval,
-        zero_init=bool(kwargs["zero_init_lq"]),
-        pit_output=bool(kwargs["pit_lq_inject"]),
-    )
+    with torch.random.fork_rng(devices=[]), torch.device("meta"):
+        probe = LQProjection2D(
+            in_channels=int(kwargs["lq_in_channels"]),
+            latent_channels=int(kwargs["lq_latent_channels"]),
+            hidden_dim=_LQ_PROBE_DIM,
+            out_dim=_LQ_PROBE_DIM,
+            patch_size=int(kwargs["patch_size"]),
+            sr_scale=int(kwargs["sr_scale"]),
+            latent_spatial_down_factor=int(kwargs["latent_spatial_down_factor"]),
+            num_res_blocks=_LQ_NUM_RES_BLOCKS_DEFAULT,
+            # Mirrors PidNet.__init__: one injection point every `lq_interval` patch blocks.
+            num_outputs=(patch_depth + interval - 1) // interval,
+            gate_type=str(kwargs["lq_gate_type"]),
+            interval=interval,
+            zero_init=bool(kwargs["zero_init_lq"]),
+            pit_output=bool(kwargs["pit_lq_inject"]),
+        )
     return frozenset(f"lq_proj.{k}" for k in probe.state_dict())
+
+
+@lru_cache(maxsize=None)
+def common_required_lq_proj_keys() -> frozenset[str]:
+    """The `lq_proj.*` keys required by *every* supported backbone.
+
+    Identification needs to judge an LQ projection *before* it knows which backbone the checkpoint
+    belongs to — the backbone is read from `lq_proj.latent_proj.0.weight`, which is itself one of
+    the keys a truncated file may be missing. Checking the per-backbone set first is therefore
+    circular: a file missing that one weight fails with "cannot determine backbone" instead of the
+    accurate "incomplete LQ projection".
+
+    Parameter names depend only on the structural counts, which `_PER_BACKBONE` does not vary — so
+    today this intersection *is* every backbone's full set (`test_pid_decode.py` pins that). Taking
+    the intersection rather than assuming it keeps the check correct if a future backbone diverges:
+    it can then only under-report, never reject a valid checkpoint.
+    """
+    return frozenset.intersection(*(required_lq_proj_keys(b) for b in _PER_BACKBONE))
 
 
 def load_pid_decoder(state_dict: dict[str, Tensor], backbone: BaseModelType) -> PidNet:

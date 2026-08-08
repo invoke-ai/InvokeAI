@@ -9,8 +9,10 @@ from invokeai.backend.model_manager.taxonomy import BaseModelType
 from invokeai.backend.pid._src.networks.pid_net import PidNet
 from invokeai.backend.pid.decode import (
     _LQ_NUM_RES_BLOCKS_DEFAULT,
+    _PER_BACKBONE,
     _get_t_list,
     assert_pid_decoder_matches_base,
+    common_required_lq_proj_keys,
     load_pid_decoder,
     required_lq_proj_keys,
 )
@@ -89,6 +91,29 @@ class TestRequiredLqProjKeys:
     def test_unsupported_backbone_raises(self) -> None:
         with pytest.raises(ValueError, match="not supported"):
             required_lq_proj_keys(BaseModelType.StableDiffusion1)
+
+    def test_probing_does_not_consume_the_global_rng(self) -> None:
+        """The probe builds a real module only to read parameter names. Constructing it normally
+        runs every `reset_parameters()`, which draws from the global CPU RNG — during *model
+        identification*. Later unseeded randomness would then depend on how many candidate files
+        were probed, i.e. on install order."""
+        torch.manual_seed(0)
+        control = torch.rand(4)
+
+        torch.manual_seed(0)
+        required_lq_proj_keys.cache_clear()
+        required_lq_proj_keys(BaseModelType.Flux)
+        after = torch.rand(4)
+
+        assert torch.equal(control, after), "identification must not advance the global RNG"
+
+    def test_common_key_set_is_every_backbones_key_set(self) -> None:
+        """Identification checks completeness before it knows the backbone, using the intersection.
+        While the per-backbone sets are identical, that check is exactly as strong as the specific
+        one — this pins the assumption so a diverging backbone shows up here rather than as a
+        silently weakened install-time check."""
+        for backbone in _PER_BACKBONE:
+            assert common_required_lq_proj_keys() == required_lq_proj_keys(backbone)
 
 
 class TestLoadPidDecoderRejectsPartialCheckpoints:
