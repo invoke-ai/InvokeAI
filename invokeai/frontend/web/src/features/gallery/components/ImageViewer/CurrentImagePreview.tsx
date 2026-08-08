@@ -1,11 +1,13 @@
 import { Box, Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
+import { useMediaUrl } from 'features/auth/store/mediaCookieRefresh';
 import { CanvasAlertsInvocationProgress } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsInvocationProgress';
 import { DndImage } from 'features/dnd/DndImage';
 import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer/ImageMetadataViewer';
 import NextPrevItemButtons from 'features/gallery/components/NextPrevItemButtons';
 import { useNextPrevItemNavigation } from 'features/gallery/components/useNextPrevItemNavigation';
+import { autoSwitchedImages } from 'features/gallery/store/autoSwitchedImages';
 import { selectLastSelectedItem } from 'features/gallery/store/gallerySelectors';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
@@ -48,6 +50,20 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
   const previousRenderedImageNameRef = useRef<string | null>(null);
   const selectedImageRevealTimeoutId = useRef(0);
 
+  // The reveal gate below deliberately preloads the *thumbnail*, not the full-resolution image. The
+  // progress overlay covers this element until onLoadImage fires, so gating on the multi-megabyte
+  // `/full` response would hold a stale latent preview on screen for that entire download on a slow
+  // connection. The 256px thumbnail is roughly 100x smaller and is typically higher resolution than
+  // the preview it replaces; DndImage renders it via Chakra's `fallbackSrc` and swaps the full image
+  // in, in place, once that finishes loading.
+  //
+  // The URL must go through useMediaUrl so it is byte-identical to the one DndImage requests. The
+  // media cookie version is a query parameter, so a mismatch is a different key and the bytes are
+  // fetched twice (measured: 2 requests mismatched vs 1 matched). Note the reuse here is the
+  // document's list of available images, which is keyed by URL and is not the HTTP cache — it still
+  // holds in multiuser mode, where images are served `Cache-Control: private, no-store`.
+  const previewSrc = useMediaUrl(imageDTO?.thumbnail_url);
+
   useEffect(() => {
     if (!selectedImageName) {
       setImageToRender(null);
@@ -65,9 +81,13 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
         return;
       }
       setImageToRender(imageDTO);
+      // Resolve the progress overlay as soon as the thumbnail settles — on success *or* error.
+      // Relying on DndImage's onLoad alone leaves the overlay stuck whenever the image fails to
+      // load, because Chakra reports that as onError instead.
+      onLoadImage();
     };
 
-    if (typeof window === 'undefined') {
+    if (typeof window === 'undefined' || !previewSrc) {
       onReady();
       return;
     }
@@ -76,7 +96,7 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
 
     preloader.onload = onReady;
     preloader.onerror = onReady;
-    preloader.src = imageDTO.image_url;
+    preloader.src = previewSrc;
 
     if (preloader.complete) {
       onReady();
@@ -87,7 +107,7 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
       preloader.onload = null;
       preloader.onerror = null;
     };
-  }, [imageDTO, imageToRender?.image_name, selectedImageName]);
+  }, [imageDTO, imageToRender?.image_name, onLoadImage, previewSrc, selectedImageName]);
 
   const hasProgressImage = progressImage !== null;
 
@@ -95,6 +115,14 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
     const renderedImageName = imageToRender?.image_name ?? null;
     const previousRenderedImageName = previousRenderedImageNameRef.current;
     previousRenderedImageNameRef.current = renderedImageName;
+
+    // Consume on every change of the rendered image, not only when the reveal conditions below
+    // hold — in the common case the auto-switched image renders with no progress showing, and an
+    // entry left behind would suppress a genuine user selection of the same image later.
+    const wasAutoSwitchedTo =
+      renderedImageName !== null &&
+      renderedImageName !== previousRenderedImageName &&
+      autoSwitchedImages.consume(renderedImageName);
 
     window.clearTimeout(selectedImageRevealTimeoutId.current);
 
@@ -110,6 +138,16 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
     }
 
     if (previousRenderedImageName === null || previousRenderedImageName === renderedImageName) {
+      return;
+    }
+
+    // The reveal exists to make a mid-generation *user* selection visible. An auto-switch to a
+    // just-finished image can land here late — after the next generation's first progress event
+    // has already reset $isProgressImageResolving — and must not flash the previous result over
+    // the live preview. The set(false) is required: the clearTimeout above already cancelled any
+    // running reveal's timer, so returning with the atom still true would wedge the reveal on.
+    if (wasAutoSwitchedTo) {
+      $isTemporarilyShowingSelectedImage.set(false);
       return;
     }
 

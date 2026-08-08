@@ -733,7 +733,6 @@ export type UploadVideoArg = {
 export type GalleryItem = S['GalleryItem'];
 /** @knipignore Consumed by gallery wiring in Phase 4. */
 export type GalleryItemKind = S['GalleryItemKind'];
-/** @knipignore Consumed by gallery wiring in Phase 4. */
 export type GalleryItemRef = S['GalleryItemRef'];
 /** @knipignore Consumed by gallery wiring in Phase 4. */
 export type GalleryItemNamesResult = S['GalleryItemNamesResult'];
