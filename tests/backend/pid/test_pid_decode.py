@@ -1,10 +1,19 @@
-"""Regression tests for the PiD distill schedule and decoder/base validation."""
+"""Regression tests for the PiD distill schedule, decoder/base validation and checkpoint completeness."""
+
+import inspect
 
 import pytest
 import torch
 
 from invokeai.backend.model_manager.taxonomy import BaseModelType
-from invokeai.backend.pid.decode import _get_t_list, assert_pid_decoder_matches_base
+from invokeai.backend.pid._src.networks.pid_net import PidNet
+from invokeai.backend.pid.decode import (
+    _LQ_NUM_RES_BLOCKS_DEFAULT,
+    _get_t_list,
+    assert_pid_decoder_matches_base,
+    load_pid_decoder,
+    required_lq_proj_keys,
+)
 
 _CPU = torch.device("cpu")
 
@@ -49,3 +58,70 @@ def test_mismatched_decoder_base_is_rejected() -> None:
 def test_z_image_node_accepts_flux_decoder() -> None:
     """Z-Image reuses the FLUX decoder, so its node passes node_base=FLUX and accepts a FLUX decoder."""
     assert_pid_decoder_matches_base(BaseModelType.Flux, BaseModelType.Flux, node_title="Z-Image PiD Decode")
+
+
+class TestRequiredLqProjKeys:
+    """`required_lq_proj_keys` probes a tiny LQProjection2D; these guard the values it feeds it."""
+
+    def test_probe_uses_pid_nets_res_block_default(self) -> None:
+        """The probe repeats PidNet's `lq_num_res_blocks` default, which `_PID_SR4X_BASE` does not carry."""
+        assert inspect.signature(PidNet.__init__).parameters["lq_num_res_blocks"].default == (
+            _LQ_NUM_RES_BLOCKS_DEFAULT
+        )
+
+    def test_covers_every_lq_submodule(self) -> None:
+        keys = required_lq_proj_keys(BaseModelType.Flux)
+        assert all(k.startswith("lq_proj.") for k in keys)
+        # Latent projection convs, one output head + one gate per injection point (patch_depth 14 /
+        # lq_interval 2 = 7). The image branch is disabled (lq_in_channels=0), so it must not appear.
+        assert "lq_proj.latent_proj.0.weight" in keys
+        assert sum(k.endswith(".weight") and ".output_heads." in k for k in keys) == 7
+        assert sum(k.endswith(".log_alpha") for k in keys) == 7
+        assert not any(".image_conv." in k for k in keys)
+
+    def test_is_identical_across_backbones(self) -> None:
+        """Only tensor *shapes* differ per backbone; the key names must not, or identification would
+        need per-backbone handling."""
+        flux = required_lq_proj_keys(BaseModelType.Flux)
+        for backbone in (BaseModelType.Flux2, BaseModelType.StableDiffusion3, BaseModelType.StableDiffusionXL):
+            assert required_lq_proj_keys(backbone) == flux
+
+    def test_unsupported_backbone_raises(self) -> None:
+        with pytest.raises(ValueError, match="not supported"):
+            required_lq_proj_keys(BaseModelType.StableDiffusion1)
+
+
+class TestLoadPidDecoderRejectsPartialCheckpoints:
+    """Loaders run under `skip_torch_weight_init()`, so any key the checkpoint omits stays uninitialised
+    memory. `load_pid_decoder` must therefore refuse a partial state dict instead of decoding garbage."""
+
+    class _TinyNet(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.lq_proj = torch.nn.Linear(2, 2)
+            self.blocks = torch.nn.Linear(2, 2)
+
+    @pytest.fixture
+    def tiny_net(self, monkeypatch: pytest.MonkeyPatch) -> "TestLoadPidDecoderRejectsPartialCheckpoints._TinyNet":
+        """Stand in for the (multi-GB) real PidNet — only load_state_dict's bookkeeping is under test."""
+        net = self._TinyNet()
+        monkeypatch.setattr("invokeai.backend.pid.decode.build_pid_net", lambda backbone: net)
+        return net
+
+    def test_complete_state_dict_loads(self, tiny_net: torch.nn.Module) -> None:
+        assert load_pid_decoder(dict(tiny_net.state_dict()), BaseModelType.Flux) is tiny_net
+
+    def test_missing_lq_keys_are_rejected(self, tiny_net: torch.nn.Module) -> None:
+        sd = {k: v for k, v in tiny_net.state_dict().items() if not k.startswith("lq_proj.")}
+        with pytest.raises(RuntimeError, match="LQ projection is incomplete"):
+            load_pid_decoder(sd, BaseModelType.Flux)
+
+    def test_missing_backbone_keys_are_rejected(self, tiny_net: torch.nn.Module) -> None:
+        sd = {k: v for k, v in tiny_net.state_dict().items() if k != "blocks.weight"}
+        with pytest.raises(RuntimeError, match="missing 1 keys"):
+            load_pid_decoder(sd, BaseModelType.Flux)
+
+    def test_unexpected_keys_are_rejected(self, tiny_net: torch.nn.Module) -> None:
+        sd = dict(tiny_net.state_dict()) | {"not_a_pid_key": torch.zeros(1)}
+        with pytest.raises(RuntimeError, match="unexpected keys"):
+            load_pid_decoder(sd, BaseModelType.Flux)
