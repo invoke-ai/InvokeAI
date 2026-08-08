@@ -15,6 +15,7 @@ import { FormElementEditModeContent } from 'features/nodes/components/sidePanel/
 import { FormElementEditModeHeader } from 'features/nodes/components/sidePanel/builder/FormElementEditModeHeader';
 import { HeadingElement } from 'features/nodes/components/sidePanel/builder/HeadingElement';
 import { NodeFieldElement } from 'features/nodes/components/sidePanel/builder/NodeFieldElement';
+import { NodeSettingElement } from 'features/nodes/components/sidePanel/builder/NodeSettingElement';
 import { TextElement } from 'features/nodes/components/sidePanel/builder/TextElement';
 import { useElement } from 'features/nodes/components/sidePanel/builder/use-element';
 import { selectFormRootElement } from 'features/nodes/store/selectors';
@@ -26,6 +27,7 @@ import {
   isDividerElement,
   isHeadingElement,
   isNodeFieldElement,
+  isNodeSettingElement,
   isTextElement,
   ROOT_CONTAINER_CLASS_NAME,
 } from 'features/nodes/types/workflow';
@@ -306,6 +308,10 @@ const FormElementComponent = memo(({ id }: { id: string }) => {
 
   if (isNodeFieldElement(el)) {
     return <NodeFieldElement key={id} id={id} />;
+  }
+
+  if (isNodeSettingElement(el)) {
+    return <NodeSettingElement key={id} id={id} />;
   }
 
   if (isDividerElement(el)) {

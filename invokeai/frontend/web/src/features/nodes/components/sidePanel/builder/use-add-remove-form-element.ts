@@ -2,8 +2,13 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useInputFieldInstance } from 'features/nodes/hooks/useInputFieldInstance';
 import { useInputFieldTemplateOrThrow } from 'features/nodes/hooks/useInputFieldTemplateOrThrow';
 import { formElementAdded, formElementRemoved } from 'features/nodes/store/nodesSlice';
-import { buildSelectWorkflowFormNodeElement, selectFormRootElementId } from 'features/nodes/store/selectors';
-import { buildNodeFieldElement } from 'features/nodes/types/workflow';
+import {
+  buildSelectWorkflowFormNodeElement,
+  buildSelectWorkflowFormNodeSettingElement,
+  selectFormRootElementId,
+} from 'features/nodes/store/selectors';
+import type { NodeSettingName } from 'features/nodes/types/workflow';
+import { buildNodeFieldElement, buildNodeSettingElement } from 'features/nodes/types/workflow';
 import { useCallback, useMemo } from 'react';
 
 export const useAddRemoveFormElement = (nodeId: string, fieldName: string) => {
@@ -43,4 +48,35 @@ export const useAddRemoveFormElement = (nodeId: string, fieldName: string) => {
   }, [workflowFormNodeElement, dispatch]);
 
   return { isAddedToRoot, addNodeFieldToRoot, removeNodeFieldFromRoot };
+};
+
+export const useAddRemoveNodeSettingFormElement = (nodeId: string, setting: NodeSettingName) => {
+  const dispatch = useAppDispatch();
+  const rootElementId = useAppSelector(selectFormRootElementId);
+  const selectWorkflowFormNodeSettingElement = useMemo(
+    () => buildSelectWorkflowFormNodeSettingElement(nodeId, setting),
+    [nodeId, setting]
+  );
+  const workflowFormNodeSettingElement = useAppSelector(selectWorkflowFormNodeSettingElement);
+  const isAddedToRoot = useMemo(() => {
+    return !!workflowFormNodeSettingElement;
+  }, [workflowFormNodeSettingElement]);
+
+  const addNodeSettingToRoot = useCallback(() => {
+    const element = buildNodeSettingElement(nodeId, setting);
+    dispatch(formElementAdded({ element, parentId: rootElementId }));
+  }, [nodeId, setting, dispatch, rootElementId]);
+
+  const removeNodeSettingFromRoot = useCallback(() => {
+    if (!workflowFormNodeSettingElement) {
+      return;
+    }
+    dispatch(
+      formElementRemoved({
+        id: workflowFormNodeSettingElement.id,
+      })
+    );
+  }, [workflowFormNodeSettingElement, dispatch]);
+
+  return { isAddedToRoot, addNodeSettingToRoot, removeNodeSettingFromRoot };
 };
