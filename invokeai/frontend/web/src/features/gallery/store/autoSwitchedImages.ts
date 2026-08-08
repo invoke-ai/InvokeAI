@@ -13,7 +13,7 @@
  * Recording the image name at dispatch and consuming it on the selection's first render
  * distinguishes the two without depending on event timing.
  */
-export type AutoSwitchedImageRegistry = {
+type AutoSwitchedImageRegistry = {
   /** Records that the gallery is auto-switching to this image. */
   record: (imageName: string) => void;
   /**
