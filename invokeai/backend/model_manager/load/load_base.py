@@ -143,6 +143,19 @@ class LoadedModelWithoutConfig:
         with MODEL_LOAD_LOCK.read_lock():
             return cached_model.repair_required_tensors_on_compute_device()
 
+    def unload_from_vram(self, vram_bytes_to_free: int, keep_required_weights_in_vram: bool = False) -> int:
+        """Unload model weights through the cache's failure-safe path.
+
+        The model may be partially resident. The caller must keep its model handle
+        alive while unloading; the cache entry can be evicted independently.
+        """
+        with MODEL_LOAD_LOCK.read_lock():
+            return self._cache.unload_model_from_vram(
+                self._cache_record,
+                vram_bytes_to_free,
+                keep_required_weights_in_vram=keep_required_weights_in_vram,
+            )
+
 
 class LoadedModel(LoadedModelWithoutConfig):
     """Context manager object that mediates transfer from RAM<->VRAM."""

@@ -307,7 +307,7 @@ class TestWanDenoiseShapes:
             swapper.close()
 
         loaded.model_on_device.assert_called_once_with(working_mem_bytes=working_mem_bytes)
-        cached_model.partial_unload_from_vram.assert_called_once_with(3 * 2**30, keep_required_weights_in_vram=True)
+        loaded.unload_from_vram.assert_called_once_with(3 * 2**30, keep_required_weights_in_vram=True)
 
     def test_cfg_doubles_transformer_calls(self, fake_model_root) -> None:
         """With cfg_scale != 1.0 and a negative prompt, each step runs the model twice."""

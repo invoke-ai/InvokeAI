@@ -234,6 +234,7 @@ class TestWanInvocationsRequestWorkingMemory:
 
     def test_latents_to_video_streams_decode_chunks_directly_to_mp4(self):
         vae = _mock_wan_vae()
+        vae.use_tiling = True  # Simulate a prior Anima tiled decode on the shared VAE.
         vae_info = _mock_vae_info(vae)
         mock_context = self._video_context(vae_info, t_lat=2)
         mock_context.config.get.return_value.wan_memory_optimization = True
@@ -268,6 +269,7 @@ class TestWanInvocationsRequestWorkingMemory:
         mock_decode_chunks.assert_called_once()
         assert writer.append_data.call_count == 5
         writer.close.assert_called_once()
+        vae.disable_tiling.assert_called_once()
         vae.decode.assert_not_called()
 
     def test_latents_to_video_falls_back_to_tiling_when_estimate_exceeds_vram(self):
