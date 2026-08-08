@@ -1,6 +1,5 @@
 # All nodes in this file are originally pulled from https://github.com/dwringer/composition-nodes
 
-import os
 from ast import literal_eval as tuple_from_string
 from functools import reduce
 from io import BytesIO
@@ -29,10 +28,10 @@ from invokeai.backend.image_util.color_conversion import (
     srgb_from_okhsv,
 )
 from invokeai.backend.image_util.composition import (
-    CIELAB_TO_UPLAB_ICC_PATH,
     MAX_FLOAT,
     equivalent_achromatic_lightness,
     gamut_clip_tensor,
+    get_uplab_profile,
     remove_nans,
     srgb_from_linear_srgb,
     tensor_from_pil_image,
@@ -118,8 +117,7 @@ class InvokeAdjustImageHuePlusInvocation(BaseInvocation, WithMetadata, WithBoard
         if self.preserve_lightness or (space == "lch") or (space == "uplab"):
             profile_srgb = ImageCms.createProfile("sRGB")
             if space == "uplab":
-                with open(CIELAB_TO_UPLAB_ICC_PATH, "rb") as f:
-                    profile_uplab = ImageCms.getOpenProfile(f)
+                profile_uplab = get_uplab_profile()
             if profile_uplab is None:
                 profile_lab = ImageCms.createProfile("LAB", colorTemp=6500)
             else:
@@ -465,8 +463,7 @@ class InvokeImageBlendInvocation(BaseInvocation, WithMetadata, WithBoard):
         if (from_mode.lower() == "rgb") or (to_mode.lower() == "rgb"):
             profile_srgb = ImageCms.createProfile("sRGB")
         if (from_mode.lower() == "uplab") or (to_mode.lower() == "uplab"):
-            if os.path.isfile("CIELab_to_UPLab.icc"):
-                profile_uplab = ImageCms.getOpenProfile("CIELab_to_UPLab.icc")
+            profile_uplab = get_uplab_profile()
         if (from_mode.lower() in ["lab", "cielab", "uplab"]) or (to_mode.lower() in ["lab", "cielab", "uplab"]):
             if profile_uplab is None:
                 profile_lab = ImageCms.createProfile("LAB", colorTemp=6500)

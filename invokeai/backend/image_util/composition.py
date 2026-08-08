@@ -7,12 +7,13 @@
 # Copyright (c) 2023 Darren Ringer <dwringer@gmail.com>
 # Parts based on Oklab: Copyright (c) 2021 Bj�rn Ottosson <https://bottosson.github.io/>
 # HSL code based on CPython: Copyright (c) 2001-2023 Python Software Foundation; All Rights Reserved
+import importlib.resources
 from math import pi as PI
-from pathlib import Path
 
 import torch
-from PIL import Image
+from PIL import Image, ImageCms
 
+from invokeai.backend.image_util import assets
 from invokeai.backend.image_util.color_conversion import (
     gamut_clip_tensor,
 )
@@ -23,8 +24,11 @@ from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_t
 
 MAX_FLOAT = torch.finfo(torch.tensor(1.0).dtype).max
 
+
 # CIE Lab to Uniform Perceptual Lab profile is copyright © 2003 Bruce Justin Lindbloom. All rights reserved. <http://www.brucelindbloom.com>
-CIELAB_TO_UPLAB_ICC_PATH = Path(__file__).parent / "assets" / "CIELab_to_UPLab.icc"
+def get_uplab_profile():
+    with importlib.resources.open_binary(assets, "CIELab_to_UPLab.icc") as icc:
+        return ImageCms.getOpenProfile(icc)
 
 
 def equivalent_achromatic_lightness(lch_tensor: torch.Tensor):
