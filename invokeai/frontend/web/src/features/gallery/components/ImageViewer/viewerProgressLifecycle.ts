@@ -1,0 +1,207 @@
+import type { ProgressImage as ProgressImageType } from 'features/nodes/types/common';
+import type { MapStore, WritableAtom } from 'nanostores';
+import type { S } from 'services/api/types';
+
+/** Live progress for a single in-flight session (queue item). Used to tile the viewer when several
+ * sessions run concurrently (multi-GPU). Only items that have produced a preview image are tracked.
+ * `seq` orders data by most recent update, so the shared single-image preview can be handed to the
+ * freshest remaining session when its current owner terminates. */
+export type ViewerProgressDatum = {
+  itemId: number;
+  seq: number;
+  progressEvent: S['InvocationProgressEvent'];
+  progressImage: ProgressImageType;
+};
+
+export type ViewerProgressDataMap = Record<number, ViewerProgressDatum | undefined>;
+
+/** The subset of LRUCache the lifecycle needs — kept minimal so tests can pass a plain Map. */
+type FinishedQueueItemIds = {
+  has: (itemId: number) => boolean;
+  set: (itemId: number, value: boolean) => unknown;
+};
+
+export type ViewerProgressStores = {
+  $progressEvent: WritableAtom<S['InvocationProgressEvent'] | null>;
+  $progressImage: WritableAtom<ProgressImageType | null>;
+  /** Per-session progress, keyed by queue item id. Drives the tiled multi-session preview. */
+  $progressData: MapStore<ViewerProgressDataMap>;
+  $isProgressImageResolving: WritableAtom<boolean>;
+  /** Finished queue items, tracked so trailing progress events cannot repopulate the preview. */
+  finishedQueueItemIds: FinishedQueueItemIds;
+};
+
+const pickLatestDatum = (data: ViewerProgressDataMap): ViewerProgressDatum | null => {
+  let latest: ViewerProgressDatum | null = null;
+  for (const datum of Object.values(data)) {
+    if (datum !== undefined && (latest === null || datum.seq > latest.seq)) {
+      latest = datum;
+    }
+  }
+  return latest;
+};
+
+/**
+ * The store-side lifecycle of the image viewer's live-preview state, factored out of the React
+ * provider so it can be unit tested. The provider owns the socket subscriptions and the
+ * ownership/scope checks on incoming events; every store mutation happens here.
+ *
+ * The state it manages:
+ * - `$progressData`: one entry per session with a preview image (the tiled multi-session view).
+ * - `$progressEvent` / `$progressImage`: the shared single-image preview, owned by the session
+ *   that most recently reported progress.
+ */
+export const createViewerProgressLifecycle = (stores: ViewerProgressStores) => {
+  const { $progressEvent, $progressImage, $progressData, $isProgressImageResolving, finishedQueueItemIds } = stores;
+  let seq = 0;
+  // Whether the final gallery image's onLoad should clear the retained preview — the tail end of
+  // the "resolve" illusion for a completed session (see onTerminal / onFinalImageLoaded).
+  let clearProgressOnFinalImageLoad = false;
+
+  const clearAll = (): void => {
+    clearProgressOnFinalImageLoad = false;
+    $isProgressImageResolving.set(false);
+    $progressEvent.set(null);
+    $progressImage.set(null);
+    $progressData.set({});
+  };
+
+  /** Record a progress event. Returns false if the item already finished (event ignored). */
+  const recordProgress = (data: S['InvocationProgressEvent']): boolean => {
+    if (finishedQueueItemIds.has(data.item_id)) {
+      return false;
+    }
+    clearProgressOnFinalImageLoad = false;
+    $isProgressImageResolving.set(false);
+    $progressEvent.set(data);
+    if (data.image) {
+      $progressImage.set(data.image);
+      // Track per-session so the viewer can tile concurrent sessions (multi-GPU).
+      $progressData.setKey(data.item_id, {
+        itemId: data.item_id,
+        seq: ++seq,
+        progressEvent: data,
+        progressImage: data.image,
+      });
+    }
+    return true;
+  };
+
+  /** Handle a terminal status for a queue item. Returns false if it already finished (ignored). */
+  const onTerminal = (data: S['QueueItemStatusChangedEvent'], autoSwitch: boolean): boolean => {
+    if (finishedQueueItemIds.has(data.item_id)) {
+      return false;
+    }
+    finishedQueueItemIds.set(data.item_id, true);
+    // Remove this session's tile from the multi-session preview as soon as it reaches a terminal
+    // state. The single-image "resolve" illusion below is handled separately via onLoadImage.
+    $progressData.setKey(data.item_id, undefined);
+    // The shared $progressEvent/$progressImage globals may currently hold a DIFFERENT session's
+    // latest preview (multi-GPU). Only the item that owns them may replace or clear them —
+    // otherwise canceling item A would blank item B's still-running preview until B's next image
+    // event.
+    const globalProgressEvent = $progressEvent.get();
+    if (globalProgressEvent !== null && globalProgressEvent.item_id !== data.item_id) {
+      return true;
+    }
+    const successor = pickLatestDatum($progressData.get());
+    if (successor !== null) {
+      // The terminated item owned the shared preview, but other sessions are still generating:
+      // hand the preview to the most recently updated one immediately. The tiled view only renders
+      // with more than one active session, so once a single session remains it is displayed
+      // through these globals — leaving them cleared (or parked on the finished session's stale
+      // frame via the resolve illusion) would hide a still-running preview. This applies to every
+      // terminal status, including successful completion with auto-switch.
+      clearProgressOnFinalImageLoad = false;
+      $isProgressImageResolving.set(false);
+      $progressEvent.set(successor.progressEvent);
+      $progressImage.set(successor.progressImage);
+      return true;
+    }
+    // Completed queue items have the progress event cleared by the onLoadImage callback. This allows the viewer to
+    // create the illusion of the progress image "resolving" into the final image. If we cleared the progress image
+    // now, there would be a flicker where the progress image disappears before the final image appears, and the
+    // last-selected gallery image should be shown for a brief moment.
+    //
+    // When gallery auto-switch is disabled, we do not need to create this illusion, because we are not going to
+    // switch to the final image automatically. In this case, we clear the progress image immediately.
+    //
+    // We also clear the progress image if the queue item is canceled or failed, as there is no final image to show.
+    if (
+      data.status === 'canceled' ||
+      data.status === 'failed' ||
+      !autoSwitch ||
+      // When the origin is 'canvas' and destination is 'canvas' (without a ':<session id>' suffix), that means the
+      // image is going to be added to the staging area. In this case, we need to clear the progress image else it
+      // will be stuck on the viewer.
+      (data.origin === 'canvas' && data.destination !== 'canvas')
+    ) {
+      clearProgressOnFinalImageLoad = false;
+      $isProgressImageResolving.set(false);
+      $progressEvent.set(null);
+      $progressImage.set(null);
+    } else {
+      clearProgressOnFinalImageLoad = true;
+      $isProgressImageResolving.set(true);
+    }
+    return true;
+  };
+
+  /**
+   * The final gallery image finished loading. If a completed session's "resolve" illusion is
+   * pending, this is its tail end: the retained preview is cleared so the final image shows.
+   * A no-op otherwise (e.g. when the preview was handed to a still-running session).
+   */
+  const onFinalImageLoaded = (): void => {
+    if (!clearProgressOnFinalImageLoad) {
+      return;
+    }
+    clearProgressOnFinalImageLoad = false;
+    $isProgressImageResolving.set(false);
+    $progressEvent.set(null);
+    $progressImage.set(null);
+  };
+
+  /**
+   * Handle a queue-cleared event. A clear deletes queue items without emitting a per-item terminal
+   * status event for every one of them (a worker claimed mid-clear is stopped only by this event),
+   * so the tracked previews must be dropped here. Which items were deleted depends on the event's
+   * scope (mirroring workflowExecutionCoordinator.onQueueCleared): an unscoped clear (user_id=null
+   * — an admin or single-user clear) deleted every item; a clear scoped to the current user
+   * deleted all of this client's items; another user's scoped clear — received in full by admins
+   * or as the sanitized user_id="redacted" broadcast by everyone else — deleted none of this
+   * client's items, and this store only ever tracks the client's own items.
+   *
+   * Returns whether the clear applied to this client's previews.
+   */
+  const onQueueCleared = (data: S['QueueClearedEvent'], currentUserId: string | null): boolean => {
+    const clearedUserId = data.user_id ?? null;
+    if (clearedUserId !== null && clearedUserId !== currentUserId) {
+      return false;
+    }
+    // Mark every tracked session finished so a trailing invocation_progress event from a worker
+    // that the clear is still stopping cannot repopulate the preview.
+    for (const datum of Object.values($progressData.get())) {
+      if (datum !== undefined) {
+        finishedQueueItemIds.set(datum.itemId, true);
+      }
+    }
+    const globalProgressEvent = $progressEvent.get();
+    if (globalProgressEvent !== null) {
+      finishedQueueItemIds.set(globalProgressEvent.item_id, true);
+    }
+    clearAll();
+    return true;
+  };
+
+  /**
+   * Drop all preview state without marking items finished. For socket disconnection and socket
+   * replacement (auth-token/user change): the tracked sessions belong to the old connection and
+   * will never emit another terminal event on this one.
+   */
+  const reset = (): void => {
+    clearAll();
+  };
+
+  return { onFinalImageLoaded, onQueueCleared, onTerminal, recordProgress, reset };
+};
