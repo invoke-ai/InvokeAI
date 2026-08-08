@@ -98,8 +98,11 @@ dependencies = [
   "PyWavelets",
 
   # Semantic image index (image map / semantic search).
-  # numba is a umap-learn transitive; guard its range because numba releases
-  # tighten numpy bounds and this project pins numpy<2.0.
+  # numba is a umap-learn transitive, pinned to the range this stack has been
+  # exercised against rather than for numpy compatibility: every release from
+  # 0.59 to at least 0.63 accepts the numpy 1.26.x resolved under numpy<2.0
+  # above (0.62 widened its floor back to >=1.22). Raise the ceiling once a
+  # newer numba has been run against the image map, not just resolved.
   "umap-learn~=0.5.7",
   "scikit-learn~=1.5",
   "numba>=0.59,<0.62",
