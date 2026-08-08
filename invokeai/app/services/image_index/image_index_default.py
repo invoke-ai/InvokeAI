@@ -25,12 +25,29 @@ if TYPE_CHECKING:
 # A batch of PIL images in, an (N, dim) float32 embedding matrix out.
 EncodeFn = Callable[[list[Image.Image]], np.ndarray]
 
+
+def _is_cpu_override(override: Optional[str]) -> bool:
+    """True if `image_index_device` asks for CPU mode.
+
+    `cpu` is the only meaningful value; the config documents every other value as ignored.
+    Compared as a normalized string rather than via `torch.device`, which raises on anything
+    that is not a valid device spec — including near-misses like `CPU`.
+    """
+    return override is not None and override.strip().lower() == "cpu"
+
+
 # How long the worker sleeps between generation-idle checks and empty-queue polls.
 _POLL_SECONDS = 1.0
 
-# An image is retried this many times (transient failures: OOM, file locks,
-# model briefly unavailable) before being marked permanently failed.
+# An image is retried this many times before being marked permanently failed. This bounds
+# per-image badness only — a corrupt file, an unreadable image, an embedding that cannot be
+# normalized. Failures of the machinery (the encoder, the database) never consume this budget;
+# see _record_systemic_failure.
 _MAX_ATTEMPTS = 3
+
+# Consecutive systemic failures back off exponentially from _POLL_SECONDS up to this ceiling,
+# so an outage that lasts hours does not retry at 1 Hz while still recovering promptly.
+_MAX_BACKOFF_SECONDS = 60.0
 
 
 def warm_up_attention(config: "InvokeAIAppConfig", logger: "Logger") -> None:
@@ -48,9 +65,12 @@ def warm_up_attention(config: "InvokeAIAppConfig", logger: "Logger") -> None:
     if not config.image_index_enabled:
         return
     try:
-        device = (
-            torch.device(config.image_index_device) if config.image_index_device else TorchDevice.choose_torch_device()
-        )
+        # Mirrors ImageIndexService._cpu_mode: `cpu` selects CPU mode, anything else is
+        # ignored rather than parsed as a device, so a bad value cannot decide where — or
+        # whether — the warm-up runs.
+        if _is_cpu_override(config.image_index_device):
+            return
+        device = TorchDevice.choose_torch_device()
         if device.type != "cuda":
             return
         query = torch.zeros((1, 1, 8, 8), device=device, dtype=torch.float16)
@@ -89,6 +109,9 @@ class ImageIndexService(ImageIndexServiceBase):
         # the backfill loop spin forever. Transient failures get retried.
         self._attempts: dict[str, int] = {}
         self._failed: set[str] = set()
+        # Consecutive failures of the machinery rather than of any image. Drives the retry
+        # backoff and is reset by the first batch that stores anything. Worker-thread only.
+        self._systemic_failures = 0
         self._stop_event = threading.Event()
         self._backfill_pending = threading.Event()
         # Set by the image-service callbacks when counts changed; the worker
@@ -127,6 +150,15 @@ class ImageIndexService(ImageIndexServiceBase):
             # a prior worker that outlived its stop() join.
             invoker.services.logger.warning("Image index service started twice; ignoring the second start")
             return
+
+        device_override = config.image_index_device
+        if device_override and not _is_cpu_override(device_override):
+            # Ignored, as documented — but silently ignoring a near-miss like `CPU` leaves the
+            # operator believing indexing runs on the CPU when it is following the model cache.
+            invoker.services.logger.warning(
+                f"image_index_device={device_override!r} is not understood and is being ignored; "
+                "only 'cpu' selects CPU mode"
+            )
 
         if self._encode_fn_override is not None:
             self._encode_fn = self._encode_fn_override
@@ -249,8 +281,11 @@ class ImageIndexService(ImageIndexServiceBase):
                     self._backfill_pending.set()
                     # Back off after a failed batch so a systemic failure
                     # (broken model, OOM loop) cannot spin hot through the
-                    # backlog re-fetching the same names.
-                    self._stop_event.wait(_POLL_SECONDS)
+                    # backlog re-fetching the same names. The delay grows with
+                    # consecutive systemic failures: images are no longer
+                    # retired by an outage, so without this an outage would
+                    # retry the same batch at 1 Hz for as long as it lasts.
+                    self._stop_event.wait(self._backoff_seconds())
             except Exception:
                 logger.exception("Unexpected error in the image index worker")
                 # Whatever was in flight may have skipped its accounting, so
@@ -319,12 +354,12 @@ class ImageIndexService(ImageIndexServiceBase):
                 embeddings = np.asarray(self._encode_fn(images), dtype=EMBEDDING_DTYPE)
             except Exception:
                 logger.exception(f"Image index: failed to embed a batch of {len(loaded_names)} images")
-                self._record_failure(loaded_names)
+                self._attribute_batch_failure("the encoder raised", loaded_names)
                 return False
 
             if embeddings.ndim != 2 or embeddings.shape[0] != len(loaded_names):
                 logger.error(f"Image index: encoder returned shape {embeddings.shape} for {len(loaded_names)} images")
-                self._record_failure(loaded_names)
+                self._attribute_batch_failure("the encoder returned an unusable result", loaded_names)
                 return False
 
             # L2-normalize so cosine similarity is a plain dot product downstream. The norm is
@@ -366,19 +401,76 @@ class ImageIndexService(ImageIndexServiceBase):
                     # update) must stop counting against the failed total.
                     self._failed.discard(name)
             except Exception:
-                # A raise here (e.g. "database is locked") must still route
-                # the unstored names through the failure path, or they linger
-                # unembedded — with pending stuck above zero — until restart.
+                # A raise here (e.g. "database is locked") is a property of the database, not of
+                # any image, so it is systemic: the unstored names stay pending and are retried
+                # rather than being charged an attempt each.
                 logger.exception(f"Image index: failed to store embeddings for a batch of {len(loaded_names)} images")
-                self._record_failure([name for name in loaded_names if name not in stored])
+                self._record_systemic_failure(
+                    "storing embeddings failed", [name for name in loaded_names if name not in stored]
+                )
                 return False
             finally:
                 self._record_owner_pokes(stored)
+                if stored:
+                    # Anything stored proves the encoder and the database are both working, so
+                    # the outage (if there was one) is over and the backoff resets.
+                    self._systemic_failures = 0
             return len(loaded_names) == len(image_names)
         finally:
             # Always release the batch from the dedup set — a name stuck in
             # _pending can never be re-enqueued by callbacks.
             self._forget_pending(image_names)
+
+    def _attribute_batch_failure(self, reason: str, image_names: list[str]) -> None:
+        """Charge a whole-batch embedding failure to the images or to the machinery."""
+        if self._encoder_is_healthy():
+            # The encoder works on a trivial image, so something about these images is what
+            # broke it. Charge them, so a poisonous one is quarantined after _MAX_ATTEMPTS and
+            # stops blocking the rest of the backlog.
+            self._record_failure(image_names)
+        else:
+            self._record_systemic_failure(reason, image_names)
+
+    def _encoder_is_healthy(self) -> bool:
+        """Probe the encoder with a trivial image to tell a broken encoder from bad input.
+
+        This is the discriminator the whole failure-attribution scheme rests on. A batch that
+        fails to embed says nothing on its own about *why*: the model may be uninstalled, or one
+        image in the batch may be corrupt. Repetition cannot separate the two — a real outage
+        and a poisonous image both fail every time — so the encoder is asked directly.
+
+        A healthy encoder means the batch failed because of its contents, and the images are
+        charged an attempt so a bad one is eventually quarantined and the backfill can move past
+        it. An unhealthy one means the machinery is down, and the images must not be charged.
+        """
+        assert self._encode_fn is not None
+        try:
+            probe = np.asarray(self._encode_fn([Image.new("RGB", (16, 16))]), dtype=EMBEDDING_DTYPE)
+        except Exception:
+            return False
+        return probe.ndim == 2 and probe.shape[0] == 1 and probe.shape[1] > 0
+
+    def _record_systemic_failure(self, reason: str, image_names: list[str]) -> None:
+        """Record a failure of the machinery: back off, but charge no image for it.
+
+        `_MAX_ATTEMPTS` exists so one bad file cannot spin the backfill forever. Charging an
+        outage against that budget instead retires every image the outage touched, and because
+        nothing clears `_failed` but a successful embed, restoring the model would not bring
+        them back — only a restart would. The images stay pending here, so the sweep retries
+        them once the machinery recovers, and `pending` keeps telling the truth meanwhile.
+        """
+        assert self._invoker is not None
+        self._systemic_failures += 1
+        self._invoker.services.logger.warning(
+            f"Image index: {reason}; leaving {len(image_names)} image(s) pending for retry "
+            f"(consecutive failures: {self._systemic_failures})"
+        )
+
+    def _backoff_seconds(self) -> float:
+        if self._systemic_failures <= 0:
+            return _POLL_SECONDS
+        # Cap the exponent before the shift so a long outage cannot overflow it.
+        return min(_POLL_SECONDS * (2 ** min(self._systemic_failures - 1, 16)), _MAX_BACKOFF_SECONDS)
 
     def _record_failure(self, image_names: list[str]) -> None:
         """Count a failure; move an image to the permanent-failure set only after repeated attempts."""
@@ -399,7 +491,7 @@ class ImageIndexService(ImageIndexServiceBase):
         generation; embedding on the GPU mid-generation would thrash both.
         """
         assert self._invoker is not None
-        if self._device().type == "cpu":
+        if self._cpu_mode():
             return
         session_queue = self._invoker.services.session_queue
         if session_queue is None:
@@ -466,25 +558,47 @@ class ImageIndexService(ImageIndexServiceBase):
 
     def _resolve_model_config(self, model_name: str) -> Optional["AnyModelConfig"]:
         assert self._invoker is not None
+        if not model_name:
+            # `search_by_attr` drops the name predicate for a falsy name and would return every
+            # installed model of the type, so an empty config value would silently adopt an
+            # arbitrary one — and then `start()` discards every embedding computed by the model
+            # the user actually meant. `_model_not_installed_message` guards this too.
+            return None
         store = self._invoker.services.model_manager.store
         for model_type in (ModelType.CLIPVision, ModelType.SigLIP):
             configs = store.search_by_attr(model_name=model_name, model_type=model_type)
+            if not configs:
+                continue
+            # Names are not unique (the UNIQUE(name, base, type) constraint is gone), and
+            # `search_by_attr` orders by type/base/name/format — so for two otherwise identical
+            # rows the tiebreak is insertion order, and reinstalling one moves the winner. That
+            # changes the model hash, and `start()` then discards every embedding computed under
+            # the old one. Order by key instead: stable across reinstalls of the same set.
+            chosen = min(configs, key=lambda config: config.key)
             if len(configs) > 1:
-                # Names are not unique. A different pick after a reinstall
-                # changes the model hash and discards the whole index.
                 self._invoker.services.logger.warning(
                     f"Multiple {model_type.value} models named '{model_name}' are installed; "
-                    f"using '{configs[0].key}' for the image index"
+                    f"using '{chosen.key}' for the image index"
                 )
-            if configs:
-                return configs[0]
+            return chosen
         return None
 
-    def _device(self) -> torch.device:
+    def _cpu_mode(self) -> bool:
+        """True when embeddings should be computed on a service-local CPU copy of the model.
+
+        Both callers only ever ask whether this is CPU mode — the GPU path follows whatever
+        device the model cache picked. So the override is never turned into a `torch.device`:
+        `image_index_device` is a free-form config string with no validator, and
+        `torch.device("CPU")` raises. Building one here put the worker in a permanent
+        exception loop on a typo, bypassing the `_MAX_ATTEMPTS` bound because it raised before
+        any batch was attempted.
+        """
         override = self._invoker.services.configuration.image_index_device if self._invoker else None
-        if override:
-            return torch.device(override)
-        return TorchDevice.choose_torch_device()
+        if _is_cpu_override(override):
+            return True
+        # Any other value is ignored, as the config documents. Fall back to the auto-chosen
+        # device so a CPU-only host still gets CPU mode.
+        return TorchDevice.choose_torch_device().type == "cpu"
 
     def _model_abs_path(self) -> Path:
         assert self._invoker is not None
@@ -528,7 +642,7 @@ class ImageIndexService(ImageIndexServiceBase):
         assert self._invoker is not None
         assert self._model_config is not None
 
-        if self._device().type == "cpu":
+        if self._cpu_mode():
             # CPU mode exists to avoid touching the model cache (and VRAM) at
             # all, so it keeps its own RAM-resident copy of the model.
             if self._cpu_model is None:

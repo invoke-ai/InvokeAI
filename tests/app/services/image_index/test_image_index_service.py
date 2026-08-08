@@ -10,7 +10,12 @@ from PIL import Image
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.events.events_common import ImageIndexStatusEvent, ImageIndexUpdatedEvent
-from invokeai.app.services.image_index.image_index_default import ImageIndexService
+from invokeai.app.services.image_index.image_index_default import (
+    _MAX_ATTEMPTS,
+    _MAX_BACKOFF_SECONDS,
+    _POLL_SECONDS,
+    ImageIndexService,
+)
 from invokeai.app.services.image_index.image_index_records_sqlite import ImageIndexRecordsSqlite
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
@@ -32,6 +37,12 @@ def _wait_until(predicate: Callable[[], bool], timeout: float = 10.0) -> None:
             return
         time.sleep(0.02)
     raise AssertionError("Condition not met within timeout")
+
+
+def _unit_vec() -> np.ndarray:
+    """A storable embedding: float32, finite, non-zero."""
+    v = np.ones(DIM, dtype=np.float32)
+    return v / np.linalg.norm(v)
 
 
 def _fake_encode(images: list[Image.Image]) -> np.ndarray:
@@ -69,11 +80,14 @@ def _make_invoker(
     index_records: ImageIndexRecordsSqlite,
     enabled: bool = True,
     image_records: SqliteImageRecordStorage | None = None,
+    device: str | None = "cpu",
+    session_queue: object | None = None,
+    model_manager: object | None = None,
 ) -> SimpleNamespace:
     config = InvokeAIAppConfig(
         use_memory_db=True,
         image_index_enabled=enabled,
-        image_index_device="cpu",
+        image_index_device=device,
         image_index_batch_size=4,
     )
     services = SimpleNamespace(
@@ -83,8 +97,8 @@ def _make_invoker(
         image_records=image_records,
         image_index_records=index_records,
         events=TestEventService(),
-        session_queue=None,
-        model_manager=None,
+        session_queue=session_queue,
+        model_manager=model_manager,
     )
     return SimpleNamespace(services=services)
 
@@ -271,7 +285,7 @@ def test_model_not_installed_message_flags_same_name_wrong_type() -> None:
     assert "is not installed" in message
 
 
-def test_bad_encoder_output_marks_batch_failed(
+def test_broken_encoder_leaves_images_pending_rather_than_quarantined(
     image_records: SqliteImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
@@ -280,11 +294,141 @@ def test_bad_encoder_output_marks_batch_failed(
     try:
         _save_image(image_records, "a.png")
         service.start(_make_invoker(images_service, index_records))
-        _wait_until(lambda: not service._backfill_pending.is_set())
+        _wait_until(lambda: service._systemic_failures > 0)
+
         assert index_records.count_index_status(MODEL_ID).embedded == 0
-        assert "a.png" in service._failed
+        # NOT quarantined. A broken encoder is a fault of the machinery, and `_MAX_ATTEMPTS`
+        # bounds per-image badness only. Retiring the image here would be a lie about the image
+        # and — since nothing but a successful embed clears `_failed` — would survive the
+        # encoder being fixed, leaving the index short until a restart.
+        assert "a.png" not in service._failed
+        assert service.get_status().pending == 1
     finally:
         service.stop()
+
+
+def test_index_recovers_from_an_encoder_outage_without_a_restart(
+    image_records: SqliteImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+) -> None:
+    """The point of separating systemic from per-image failure.
+
+    An outage lasting more than `_MAX_ATTEMPTS` sweeps used to retire every image it touched.
+    Nothing but a successful embed clears `_failed`, so the images stayed dead after the model
+    came back and only a process restart recovered them. They must now come back on their own.
+    """
+    outage = {"active": True}
+
+    def encode(images: list[Image.Image]) -> np.ndarray:
+        if outage["active"]:
+            raise RuntimeError("model is not installed")
+        return _fake_encode(images)
+
+    service = ImageIndexService(encode_fn=encode, model_id=MODEL_ID)
+    try:
+        for i in range(6):
+            _save_image(image_records, f"img-{i}.png")
+        service.start(_make_invoker(images_service, index_records))
+
+        # Outlast _MAX_ATTEMPTS sweeps, which is what used to retire the images.
+        _wait_until(lambda: service._systemic_failures > _MAX_ATTEMPTS, timeout=15.0)
+        assert service._failed == set()
+        assert service._attempts == {}
+        assert index_records.count_index_status(MODEL_ID).embedded == 0
+
+        outage["active"] = False
+
+        _wait_until(lambda: index_records.count_index_status(MODEL_ID).embedded == 6, timeout=30.0)
+        assert service._failed == set()
+        assert service.get_status().pending == 0
+        # The backoff must unwind too, or the next transient blip would start at the ceiling.
+        assert service._systemic_failures == 0
+    finally:
+        service.stop()
+
+
+def test_sustained_storage_failure_does_not_quarantine_images(
+    image_records: SqliteImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+) -> None:
+    """A database that is down is no more the images' fault than a missing model is.
+
+    "database is locked" outlasting `_MAX_ATTEMPTS` sweeps must not retire the images, for the
+    same reason an encoder outage must not: `_failed` would survive the database recovering.
+    """
+    outage = {"active": True}
+    real_upsert = index_records.upsert_embedding
+
+    def flaky_upsert(name: str, model_id: str, embedding: np.ndarray) -> None:
+        if outage["active"]:
+            raise RuntimeError("database is locked")
+        real_upsert(name, model_id, embedding)
+
+    index_records.upsert_embedding = flaky_upsert  # type: ignore[method-assign]
+
+    service = ImageIndexService(encode_fn=_fake_encode, model_id=MODEL_ID)
+    try:
+        for i in range(3):
+            _save_image(image_records, f"img-{i}.png")
+        service.start(_make_invoker(images_service, index_records))
+
+        _wait_until(lambda: service._systemic_failures > _MAX_ATTEMPTS, timeout=15.0)
+        assert service._failed == set()
+        assert service._attempts == {}
+
+        outage["active"] = False
+
+        _wait_until(lambda: index_records.count_index_status(MODEL_ID).embedded == 3, timeout=30.0)
+        assert service._failed == set()
+    finally:
+        service.stop()
+
+
+def test_batch_failure_is_charged_to_the_images_when_the_encoder_is_healthy(
+    image_records: SqliteImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+) -> None:
+    """The other half: a poisonous image must still be quarantined so the backlog can advance.
+
+    Not charging the images would be just as wrong in the other direction — one image the
+    encoder chokes on would block the sweep forever, since backfill always returns it first.
+    The encoder is probed with a trivial image to tell the two situations apart.
+    """
+
+    def encode(images: list[Image.Image]) -> np.ndarray:
+        # Healthy for the one-image probe, broken for any real batch.
+        if len(images) == 1 and images[0].size == (16, 16):
+            return _fake_encode(images)
+        raise RuntimeError("cannot encode these images")
+
+    service = ImageIndexService(encode_fn=encode, model_id=MODEL_ID)
+    try:
+        for i in range(2):
+            _save_image(image_records, f"img-{i}.png")
+        service.start(_make_invoker(images_service, index_records))
+
+        _wait_until(lambda: len(service._failed) == 2, timeout=20.0)
+        # Charged to the images, not to the machinery.
+        assert service._systemic_failures == 0
+        # And the index settles rather than retrying them forever.
+        _wait_until(lambda: service.get_status().pending == 0, timeout=15.0)
+    finally:
+        service.stop()
+
+
+def test_systemic_backoff_grows_and_is_capped(service: ImageIndexService) -> None:
+    service._systemic_failures = 0
+    assert service._backoff_seconds() == _POLL_SECONDS
+    service._systemic_failures = 1
+    assert service._backoff_seconds() == _POLL_SECONDS
+    service._systemic_failures = 3
+    assert service._backoff_seconds() == _POLL_SECONDS * 4
+    # Capped, and no overflow for an outage that lasts a very long time.
+    service._systemic_failures = 10_000
+    assert service._backoff_seconds() == _MAX_BACKOFF_SECONDS
 
 
 def test_zero_norm_embedding_fails_only_its_own_image(
@@ -317,6 +461,163 @@ def test_zero_norm_embedding_fails_only_its_own_image(
         assert "b-good.png" not in service._failed
     finally:
         service.stop()
+
+
+def test_start_discards_only_other_models_embeddings(
+    image_records: SqliteImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+) -> None:
+    """The one destructive operation in the service: prove what it does and does not delete.
+
+    `start()` prunes embeddings computed by a previously-configured model. If it ever pruned
+    the current model's rows the whole index would be silently rebuilt from scratch on every
+    boot, and if it pruned nothing the index would accumulate dead rows forever.
+    """
+    _save_image(image_records, "a.png")
+    index_records.upsert_embedding("a.png", MODEL_ID, _unit_vec())
+    index_records.upsert_embedding("a.png", "stale-model-hash", _unit_vec())
+    assert index_records.get_embeddings(["a.png"], "stale-model-hash")[0] == ["a.png"]
+
+    service = ImageIndexService(encode_fn=_fake_encode, model_id=MODEL_ID)
+    try:
+        service.start(_make_invoker(images_service, index_records))
+        _wait_until(lambda: not service._backfill_pending.is_set())
+
+        assert index_records.get_embeddings(["a.png"], "stale-model-hash")[0] == []
+        assert index_records.get_embeddings(["a.png"], MODEL_ID)[0] == ["a.png"]
+    finally:
+        service.stop()
+
+
+def test_disabled_service_does_not_discard_embeddings(
+    image_records: SqliteImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+) -> None:
+    """Turning the feature off must not destroy an index built while it was on."""
+    _save_image(image_records, "a.png")
+    index_records.upsert_embedding("a.png", "stale-model-hash", _unit_vec())
+
+    service = ImageIndexService(encode_fn=_fake_encode, model_id=MODEL_ID)
+    try:
+        service.start(_make_invoker(images_service, index_records, enabled=False))
+        assert index_records.get_embeddings(["a.png"], "stale-model-hash")[0] == ["a.png"]
+    finally:
+        service.stop()
+
+
+def test_worker_waits_for_generation_to_finish_when_not_on_cpu(
+    image_records: SqliteImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+) -> None:
+    """The VRAM contract: off the CPU path, embedding must pause while a generation runs.
+
+    Every other test sets device='cpu' and session_queue=None, so `_wait_for_idle_generation`
+    returns at its first statement and this contract is never exercised.
+    """
+    queue_status = SimpleNamespace(in_progress=1)
+    session_queue = SimpleNamespace(get_queue_status=lambda queue_id: queue_status)
+
+    service = ImageIndexService(encode_fn=_fake_encode, model_id=MODEL_ID)
+    try:
+        _save_image(image_records, "a.png")
+        service.start(_make_invoker(images_service, index_records, device=None, session_queue=session_queue))
+
+        # Generation in progress: the worker must hold off rather than embed.
+        time.sleep(0.5)
+        assert index_records.count_index_status(MODEL_ID).embedded == 0
+
+        queue_status.in_progress = 0
+        _wait_until(lambda: index_records.count_index_status(MODEL_ID).embedded == 1, timeout=15.0)
+    finally:
+        service.stop()
+
+
+def test_generation_wait_does_not_block_shutdown(
+    image_records: SqliteImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+) -> None:
+    """A generation that never ends must not stop the worker from honouring stop()."""
+    session_queue = SimpleNamespace(get_queue_status=lambda queue_id: SimpleNamespace(in_progress=1))
+
+    service = ImageIndexService(encode_fn=_fake_encode, model_id=MODEL_ID)
+    _save_image(image_records, "a.png")
+    service.start(_make_invoker(images_service, index_records, device=None, session_queue=session_queue))
+    time.sleep(0.2)
+
+    started = time.monotonic()
+    service.stop()
+    assert time.monotonic() - started < 5.0
+    assert service._worker is not None and not service._worker.is_alive()
+
+
+def test_unparseable_device_is_ignored_rather_than_wedging_the_worker(
+    image_records: SqliteImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+) -> None:
+    """`image_index_device` is free-form config with no validator.
+
+    A near-miss like 'CPU' used to be handed to torch.device(), which raises — inside the
+    worker loop, before any batch was attempted, so the _MAX_ATTEMPTS bound never applied and
+    the worker spun on the same exception forever with pending stuck above zero.
+    """
+    service = ImageIndexService(encode_fn=_fake_encode, model_id=MODEL_ID)
+    try:
+        _save_image(image_records, "a.png")
+        service.start(_make_invoker(images_service, index_records, device="CPU"))
+        _wait_until(lambda: index_records.count_index_status(MODEL_ID).embedded == 1, timeout=15.0)
+        assert service.get_status().pending == 0
+    finally:
+        service.stop()
+
+
+def test_empty_model_name_does_not_resolve_to_an_arbitrary_model(
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+) -> None:
+    """`search_by_attr` drops its name predicate for a falsy name.
+
+    Without a guard an empty `image_index_model` adopts whichever model happens to sort first
+    and then discards every embedding computed by the model the user actually configured.
+    """
+    installed = SimpleNamespace(key="some-key", name="clip-vit-large-patch14", hash="some-hash")
+    store = SimpleNamespace(search_by_attr=lambda model_name, model_type: [installed])
+    model_manager = SimpleNamespace(store=store)
+
+    service = ImageIndexService()
+    service._invoker = _make_invoker(images_service, index_records, model_manager=model_manager)
+
+    assert service._resolve_model_config("") is None
+    # Sanity: the same store does resolve a real name, so the None above is the guard talking
+    # and not simply an empty store.
+    assert service._resolve_model_config("clip-vit-large-patch14") is installed
+
+
+def test_duplicate_model_names_resolve_deterministically(
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+) -> None:
+    """Two models can share a name, and the pick must not move when one is reinstalled.
+
+    `search_by_attr` breaks ties by insertion order, so reinstalling a duplicate flips which
+    config wins. That changes the model hash, and `start()` then discards every embedding
+    computed under the previous one — the whole index, silently.
+    """
+    a = SimpleNamespace(key="key-a", name="clip-vit-large-patch14", hash="hash-a")
+    b = SimpleNamespace(key="key-b", name="clip-vit-large-patch14", hash="hash-b")
+
+    def resolve(order: list[SimpleNamespace]) -> SimpleNamespace:
+        store = SimpleNamespace(search_by_attr=lambda model_name, model_type: list(order))
+        service = ImageIndexService()
+        service._invoker = _make_invoker(images_service, index_records, model_manager=SimpleNamespace(store=store))
+        return service._resolve_model_config("clip-vit-large-patch14")
+
+    # Same set, either insertion order — the winner must not move.
+    assert resolve([a, b]).key == resolve([b, a]).key == "key-a"
 
 
 def test_status_event_emitted(
