@@ -3,6 +3,8 @@ import { readFileSync } from 'node:fs';
 const deployTarget = process.env.DEPLOY_TARGET ?? 'custom';
 const base = deployTarget === 'ghpages' ? '/InvokeAI' : '';
 const withBase = (path) => `${base}${path}`;
+const siteUrl = (path) =>
+  deployTarget === 'ghpages' ? `https://invoke-ai.github.io${base}${path}` : `https://invoke.ai${path}`;
 
 const expectations = [
   {
@@ -11,8 +13,14 @@ const expectations = [
       `href="${withBase('/_astro/')}`,
       `src="${withBase('/_astro/')}`,
       `href="${withBase('/start-here/installation/')}`,
+      // The "Get Invoke" button is a root-relative href on an MDX component rather than a plain
+      // markdown link, which is an easy way to lose the base prefix.
+      `href="${withBase('/download/')}"`,
     ],
-    excludes: deployTarget === 'custom' ? ['href="/InvokeAI/', 'src="/InvokeAI/'] : ['href="/_astro/', 'src="/_astro/'],
+    excludes:
+      deployTarget === 'custom'
+        ? ['href="/InvokeAI/', 'src="/InvokeAI/']
+        : ['href="/_astro/', 'src="/_astro/', 'href="/download/"'],
   },
   {
     file: 'contributing/index.html',
@@ -44,6 +52,31 @@ const expectations = [
         ],
   },
 ];
+
+for (const locale of ['de', 'es', 'hi']) {
+  expectations.push({
+    file: `${locale}/start-here/installation/index.html`,
+    includes: [
+      `<html lang="${locale}"`,
+      `hreflang="${locale}" href="${siteUrl(`/${locale}/start-here/installation/`)}`,
+      `href="${withBase(`/${locale}/start-here/system-requirements/`)}`,
+      'href="https://crowdin.com/project/invoke"',
+      'data-pagefind-body',
+    ],
+    excludes: [
+      `href="${withBase(`/${locale}/${locale}/`)}`,
+      `href="${withBase('/start-here/system-requirements/')}"`,
+    ],
+  });
+
+  // Fallback rendering is asserted against a page outside crowdin.yml's scope, so it stays
+  // untranslated for good. Asserting it on a translatable page would turn the first Crowdin
+  // import into a red build.
+  expectations.push({
+    file: `${locale}/contributing/translations/index.html`,
+    includes: [`<html lang="${locale}"`, 'lang="en" dir="ltr"'],
+  });
+}
 
 const errors = [];
 

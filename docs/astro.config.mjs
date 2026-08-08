@@ -7,6 +7,8 @@ import starlightLinksValidator from 'starlight-links-validator';
 import starlightLlmsText from 'starlight-llms-txt';
 import starlightChangelogs from 'starlight-changelogs';
 import { rehypePrefixBaseToRootLinks } from './plugins/rehype-prefix-base-to-root-links.mjs';
+import { remarkLocalizeContent } from './plugins/remark-localize-content.mjs';
+import { LOCALE_EXEMPT_PATHS } from './src/lib/link-localization.mjs';
 import starlightContextualMenu from 'starlight-contextual-menu';
 
 // Configs
@@ -34,6 +36,7 @@ export default defineConfig({
   site,
   base: base || undefined,
   markdown: {
+    remarkPlugins: [[remarkLocalizeContent, { locales: ['de', 'es', 'hi'] }]],
     rehypePlugins: [[rehypePrefixBaseToRootLinks, { base }]],
   },
   integrations: [
@@ -41,6 +44,9 @@ export default defineConfig({
       // Content
       title: {
         en: 'InvokeAI Documentation',
+        de: 'InvokeAI-Dokumentation',
+        es: 'Documentación de InvokeAI',
+        hi: 'InvokeAI दस्तावेज़',
       },
       logo: {
         src: './src/assets/invoke-icon-wide.svg',
@@ -58,6 +64,18 @@ export default defineConfig({
           label: 'English',
           lang: 'en',
         },
+        de: {
+          label: 'Deutsch',
+          lang: 'de',
+        },
+        es: {
+          label: 'Español',
+          lang: 'es',
+        },
+        hi: {
+          label: 'हिन्दी',
+          lang: 'hi',
+        },
       },
       social: socialConfig,
       tableOfContents: {
@@ -73,12 +91,22 @@ export default defineConfig({
         ThemeProvider: './src/lib/components/ForceDarkTheme.astro',
         ThemeSelect: './src/lib/components/EmptyComponent.astro',
         Footer: './src/lib/components/Footer.astro',
+        EditLink: './src/lib/components/EditLink.astro',
+        MarkdownContent: './src/lib/components/MarkdownContent.astro',
         PageFrame: './src/layouts/PageFrameExtended.astro',
       },
       plugins: [
         starlightLinksValidator({
           errorOnRelativeLinks: false,
           errorOnLocalLinks: false,
+          // Only part of the docs tree is translated, and pages within it land one Crowdin batch
+          // at a time, so a localized page linking to a page that only exists as Starlight
+          // fallback content is the normal case rather than a broken link.
+          errorOnFallbackPages: false,
+          // The validator only knows content collection routes, not the custom Astro pages in
+          // src/pages/. Derived from the shared exemption list so a new custom page only has to
+          // be registered in one place, and base-aware because links are emitted with the base.
+          exclude: LOCALE_EXEMPT_PATHS.flatMap((path) => [`${base}${path}`, `${base}${path}/`]),
         }),
         starlightLlmsText(),
         starlightChangelogs(),
