@@ -270,6 +270,45 @@ def test_get_vram_in_use_queries_this_caches_execution_device(mock_logger):
             cache.shutdown()
 
 
+def test_max_vram_cache_reserves_per_operation_working_memory(mock_logger):
+    """An explicit cache cap must still leave room for decode/diffusion activations.
+
+    The capped-branch arithmetic is device-independent, so use a CPU cache to keep this test
+    runnable on CI hosts without a CUDA driver.
+    """
+    cache = ModelCache(
+        execution_device_working_mem_gb=3.0,
+        enable_partial_loading=True,
+        keep_ram_copy_of_weights=True,
+        max_vram_cache_size_gb=16.0,
+        execution_device="cpu",
+        storage_device="cpu",
+        logger=mock_logger,
+    )
+    try:
+        with patch.object(cache, "_get_vram_in_use", return_value=2 * GB):
+            assert cache._get_vram_available(working_mem_bytes=5 * GB) == 9 * GB
+    finally:
+        cache.shutdown()
+
+
+def test_loaded_model_unload_drops_cache_entry_when_move_fails(mock_logger):
+    """A failed expert trim must not leave a half-moved model cache hit."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    try:
+        cache.put("broken", DummyModule())
+        record = cache.get("broken")
+        loaded_model = LoadedModelWithoutConfig(cache_record=record, cache=cache)
+        with patch.object(record.cached_model, "full_unload_from_vram", side_effect=RuntimeError("move failed")):
+            with pytest.raises(RuntimeError, match="move failed"):
+                loaded_model.unload_from_vram(1)
+        assert "broken" not in cache._cached_models
+    finally:
+        cache.shutdown()
+
+
 def test_cuda_cache_init_queries_total_vram_without_mem_get_info(mock_logger):
     """CUDA cache sizing must not call the VRAM-holding mem_get_info API during idle startup."""
     import torch

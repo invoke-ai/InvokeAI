@@ -32,15 +32,26 @@ enable_partial_loading: false
 
 ## Details and fine-tuning
 
-Low-VRAM mode involves 4 features, each of which can be configured or fine-tuned:
+Low-VRAM mode involves 6 features, each of which can be configured or fine-tuned:
 
 - Partial model loading (`enable_partial_loading`)
 - PyTorch CUDA allocator config (`pytorch_cuda_alloc_conf`)
 - Dynamic RAM and VRAM cache sizes (`max_cache_ram_gb`, `max_cache_vram_gb`)
 - Working memory (`device_working_mem_gb`)
 - Keeping a RAM weight copy (`keep_ram_copy_of_weights`)
+- Wan video memory optimization (`wan_memory_optimization`)
 
 Read on to learn about these features and understand how to fine-tune them for your system and use-cases.
+
+### Wan video memory optimization
+
+Wan video generation has an additional opt-in memory optimization:
+
+```yaml
+wan_memory_optimization: true
+```
+
+This limits resident Wan transformer weights to about 2 GiB and streams remaining layers from RAM. It also chunks pointwise transformer activations, compacts TI2V per-token timestep conditioning, and streams untiled VAE decode chunks directly to MP4. It reduces peak VRAM during both denoise and decode, but generation can be substantially slower and requires enough system RAM for offloaded weights. Spatially tiled VAE decode continues to use its existing full-tile path.
 
 ### Partial model loading
 
@@ -101,7 +112,7 @@ max_cache_vram_gb: 16
 ```
 
 :::caution[Max safe value for `max_cache_vram_gb`]
-  Most users should not manually configure the `max_cache_vram_gb`. This configuration value takes precedence over the `device_working_mem_gb` and any operations that explicitly reserve additional working memory (e.g. VAE decode). As such, manually configuring it increases the likelihood of encountering out-of-memory errors.
+  Most users should not manually configure the `max_cache_vram_gb`. This configuration value caps model-cache residency; `device_working_mem_gb` and operation-specific reservations (e.g. VAE decode) are still subtracted from that cap. A cap below the active working-memory reservation can force aggressive model offloading.
 
   For users who wish to configure `max_cache_vram_gb`, the max safe value can be determined by subtracting `device_working_mem_gb` from your GPU's VRAM. As described below, the default for `device_working_mem_gb` is 3GB.
 
