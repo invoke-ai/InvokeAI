@@ -5155,6 +5155,18 @@
               "title": "Image Name"
             },
             "description": "The name of the image to delete"
+          },
+          {
+            "name": "delete_starred",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Whether to allow deletion of starred images",
+              "default": true,
+              "title": "Delete Starred"
+            },
+            "description": "Whether to allow deletion of starred images"
           }
         ],
         "responses": {
@@ -5722,6 +5734,25 @@
         "summary": "Delete Uncategorized Images",
         "description": "Deletes all uncategorized images owned by the current user (or all if admin)",
         "operationId": "delete_uncategorized_images",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "delete_starred",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Whether to allow deletion of starred images",
+              "default": true,
+              "title": "Delete Starred"
+            },
+            "description": "Whether to allow deletion of starred images"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -5732,13 +5763,18 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
+        }
       }
     },
     "/api/v1/images/star": {
@@ -6249,6 +6285,18 @@
               "title": "Video Name"
             },
             "description": "The name of the video to delete"
+          },
+          {
+            "name": "delete_starred",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Whether to allow deletion of starred videos",
+              "default": true,
+              "title": "Delete Starred"
+            },
+            "description": "Whether to allow deletion of starred videos"
           }
         ],
         "responses": {
@@ -6385,7 +6433,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/VideoNamesBatch"
+                "$ref": "#/components/schemas/DeleteVideosBatch"
               }
             }
           },
@@ -6426,6 +6474,25 @@
         "summary": "Delete Uncategorized Videos",
         "description": "Deletes all uncategorized videos owned by the current user (or all if admin).\n\nMirrors ``delete_uncategorized_images`` so the \"Delete All Uncategorized\nImages/Videos\" board action covers both media kinds.",
         "operationId": "delete_uncategorized_videos",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "delete_starred",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Whether to allow deletion of starred videos",
+              "default": true,
+              "title": "Delete Starred"
+            },
+            "description": "Whether to allow deletion of starred videos"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -6436,13 +6503,18 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
+        }
       }
     },
     "/api/v1/videos/i/{video_name}/metadata": {
@@ -7955,6 +8027,18 @@
               "title": "Include Images"
             },
             "description": "Permanently delete all images and videos on the board"
+          },
+          {
+            "name": "delete_starred",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Whether to allow deletion of starred media",
+              "default": true,
+              "title": "Delete Starred"
+            },
+            "description": "Whether to allow deletion of starred media"
           }
         ],
         "responses": {
@@ -15764,6 +15848,12 @@
             "type": "array",
             "title": "Image Names",
             "description": "The list of names of images to delete"
+          },
+          "delete_starred": {
+            "type": "boolean",
+            "title": "Delete Starred",
+            "description": "Whether to allow deletion of starred images",
+            "default": true
           }
         },
         "type": "object",
@@ -23701,6 +23791,22 @@
             "type": "array",
             "title": "Failed Videos",
             "description": "The names of videos that could not be deleted and became uncategorized."
+          },
+          "starred_images_skipped": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Starred Images Skipped",
+            "description": "The names of starred images that were protected and became uncategorized."
+          },
+          "starred_videos_skipped": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Starred Videos Skipped",
+            "description": "The names of starred videos that were protected and became uncategorized."
           }
         },
         "type": "object",
@@ -23745,6 +23851,14 @@
             "type": "array",
             "title": "Failed Images",
             "description": "The names of authorized images that could not be deleted"
+          },
+          "starred_skipped": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Starred Skipped",
+            "description": "The names of starred images that were skipped because deletion protection was enabled"
           }
         },
         "type": "object",
@@ -23791,6 +23905,29 @@
         "title": "DeleteOrphanedModelsResponse",
         "description": "Response from deleting orphaned models."
       },
+      "DeleteVideosBatch": {
+        "properties": {
+          "video_names": {
+            "items": {
+              "type": "string",
+              "maxLength": 255
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Video Names",
+            "description": "The list of video names to process"
+          },
+          "delete_starred": {
+            "type": "boolean",
+            "title": "Delete Starred",
+            "description": "Whether to allow deletion of starred videos",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": ["video_names"],
+        "title": "DeleteVideosBatch"
+      },
       "DeleteVideosResult": {
         "properties": {
           "affected_boards": {
@@ -23816,6 +23953,14 @@
             "type": "array",
             "title": "Failed Videos",
             "description": "The names of videos that were not deleted"
+          },
+          "starred_skipped": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Starred Skipped",
+            "description": "The names of starred videos that were skipped because deletion protection was enabled"
           }
         },
         "type": "object",

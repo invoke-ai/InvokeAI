@@ -4826,6 +4826,12 @@ export type components = {
              * @description The list of names of images to delete
              */
             image_names: string[];
+            /**
+             * Delete Starred
+             * @description Whether to allow deletion of starred images
+             * @default true
+             */
+            delete_starred?: boolean;
         };
         /** Body_do_hf_login */
         Body_do_hf_login: {
@@ -9033,6 +9039,16 @@ export type components = {
              * @description The names of videos that could not be deleted and became uncategorized.
              */
             failed_videos?: string[];
+            /**
+             * Starred Images Skipped
+             * @description The names of starred images that were protected and became uncategorized.
+             */
+            starred_images_skipped?: string[];
+            /**
+             * Starred Videos Skipped
+             * @description The names of starred videos that were protected and became uncategorized.
+             */
+            starred_videos_skipped?: string[];
         };
         /**
          * DeleteByDestinationResult
@@ -9062,6 +9078,11 @@ export type components = {
              * @description The names of authorized images that could not be deleted
              */
             failed_images?: string[];
+            /**
+             * Starred Skipped
+             * @description The names of starred images that were skipped because deletion protection was enabled
+             */
+            starred_skipped?: string[];
         };
         /**
          * DeleteOrphanedModelsRequest
@@ -9092,6 +9113,20 @@ export type components = {
                 [key: string]: string;
             };
         };
+        /** DeleteVideosBatch */
+        DeleteVideosBatch: {
+            /**
+             * Video Names
+             * @description The list of video names to process
+             */
+            video_names: string[];
+            /**
+             * Delete Starred
+             * @description Whether to allow deletion of starred videos
+             * @default true
+             */
+            delete_starred?: boolean;
+        };
         /** DeleteVideosResult */
         DeleteVideosResult: {
             /**
@@ -9109,6 +9144,11 @@ export type components = {
              * @description The names of videos that were not deleted
              */
             failed_videos: string[];
+            /**
+             * Starred Skipped
+             * @description The names of starred videos that were skipped because deletion protection was enabled
+             */
+            starred_skipped?: string[];
         };
         /**
          * Denoise - SD1.5, SDXL
@@ -43588,7 +43628,10 @@ export interface operations {
     };
     delete_image: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Whether to allow deletion of starred images */
+                delete_starred?: boolean;
+            };
             header?: never;
             path: {
                 /** @description The name of the image to delete */
@@ -43948,7 +43991,10 @@ export interface operations {
     };
     delete_uncategorized_images: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Whether to allow deletion of starred images */
+                delete_starred?: boolean;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -43962,6 +44008,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeleteImagesResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -44264,7 +44319,10 @@ export interface operations {
     };
     delete_video: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Whether to allow deletion of starred videos */
+                delete_starred?: boolean;
+            };
             header?: never;
             path: {
                 /** @description The name of the video to delete */
@@ -44339,7 +44397,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["VideoNamesBatch"];
+                "application/json": components["schemas"]["DeleteVideosBatch"];
             };
         };
         responses: {
@@ -44365,7 +44423,10 @@ export interface operations {
     };
     delete_uncategorized_videos: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Whether to allow deletion of starred videos */
+                delete_starred?: boolean;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -44379,6 +44440,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeleteVideosResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -45038,6 +45108,8 @@ export interface operations {
             query?: {
                 /** @description Permanently delete all images and videos on the board */
                 include_images?: boolean | null;
+                /** @description Whether to allow deletion of starred media */
+                delete_starred?: boolean;
             };
             header?: never;
             path: {

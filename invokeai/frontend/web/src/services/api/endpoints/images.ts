@@ -107,11 +107,13 @@ export const imagesApi = api.injectEndpoints({
     }),
     deleteImage: build.mutation<
       paths['/api/v1/images/i/{image_name}']['delete']['responses']['200']['content']['application/json'],
-      paths['/api/v1/images/i/{image_name}']['delete']['parameters']['path']
+      paths['/api/v1/images/i/{image_name}']['delete']['parameters']['path'] &
+        NonNullable<paths['/api/v1/images/i/{image_name}']['delete']['parameters']['query']>
     >({
-      query: ({ image_name }) => ({
+      query: ({ image_name, delete_starred }) => ({
         url: buildImagesUrl(`i/${image_name}`),
         method: 'DELETE',
+        params: { delete_starred },
       }),
       invalidatesTags: (result) => {
         if (!result) {
@@ -152,9 +154,9 @@ export const imagesApi = api.injectEndpoints({
     }),
     deleteUncategorizedImages: build.mutation<
       paths['/api/v1/images/uncategorized']['delete']['responses']['200']['content']['application/json'],
-      void
+      NonNullable<paths['/api/v1/images/uncategorized']['delete']['parameters']['query']> | void
     >({
-      query: () => ({ url: buildImagesUrl('uncategorized'), method: 'DELETE' }),
+      query: (params) => ({ url: buildImagesUrl('uncategorized'), method: 'DELETE', params: params ?? undefined }),
       invalidatesTags: (result) => {
         if (!result) {
           return [];
@@ -292,7 +294,8 @@ export const imagesApi = api.injectEndpoints({
     }),
     deleteBoard: build.mutation<
       paths['/api/v1/boards/{board_id}']['delete']['responses']['200']['content']['application/json'],
-      paths['/api/v1/boards/{board_id}']['delete']['parameters']['path']
+      paths['/api/v1/boards/{board_id}']['delete']['parameters']['path'] &
+        NonNullable<paths['/api/v1/boards/{board_id}']['delete']['parameters']['query']>
     >({
       query: ({ board_id }) => ({ url: buildBoardsUrl(board_id), method: 'DELETE' }),
       invalidatesTags: (result) => [
@@ -327,12 +330,13 @@ export const imagesApi = api.injectEndpoints({
 
     deleteBoardAndImages: build.mutation<
       paths['/api/v1/boards/{board_id}']['delete']['responses']['200']['content']['application/json'],
-      paths['/api/v1/boards/{board_id}']['delete']['parameters']['path']
+      paths['/api/v1/boards/{board_id}']['delete']['parameters']['path'] &
+        NonNullable<paths['/api/v1/boards/{board_id}']['delete']['parameters']['query']>
     >({
-      query: ({ board_id }) => ({
+      query: ({ board_id, delete_starred }) => ({
         url: buildBoardsUrl(board_id),
         method: 'DELETE',
-        params: { include_images: true },
+        params: { include_images: true, delete_starred },
       }),
       // The backend now also cascade-deletes videos on the board, so the unified gallery
       // and the video list both need invalidation in addition to the board tag.
@@ -351,6 +355,8 @@ export const imagesApi = api.injectEndpoints({
         ...getTagsToInvalidateForVideoMutation(result?.deleted_videos ?? []),
         ...getTagsToInvalidateForImageMutation(result?.failed_images ?? []),
         ...getTagsToInvalidateForVideoMutation(result?.failed_videos ?? []),
+        ...getTagsToInvalidateForImageMutation(result?.starred_images_skipped ?? []),
+        ...getTagsToInvalidateForVideoMutation(result?.starred_videos_skipped ?? []),
       ],
     }),
     addImageToBoard: build.mutation<

@@ -23,7 +23,12 @@ import type { NodesState } from 'features/nodes/store/types';
 import { isImageFieldCollectionInputInstance, isImageFieldInputInstance } from 'features/nodes/types/field';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { selectUpscaleSlice, type UpscaleState } from 'features/parameters/store/upscaleSlice';
-import { selectSystemShouldConfirmOnDelete } from 'features/system/store/systemSlice';
+import {
+  selectSystemShouldConfirmOnDelete,
+  selectSystemShouldProtectStarredMedia,
+} from 'features/system/store/systemSlice';
+import { toast } from 'features/toast/toast';
+import { t } from 'i18next';
 import { atom } from 'nanostores';
 import { useMemo } from 'react';
 import { imagesApi } from 'services/api/endpoints/images';
@@ -90,16 +95,38 @@ export const handleDeletions = async (image_names: string[], store: AppStore) =>
     // cache will have shifted, so the index computed afterwards would be wrong.
     const galleryItemNames = selectCachedGalleryItemNames(state);
     const lastSelected = selectLastSelectedItem(state);
+    const shouldConfirmOnDelete = selectSystemShouldConfirmOnDelete(state);
+    const shouldProtectStarredMedia = selectSystemShouldProtectStarredMedia(state);
     const lastSelectedIndex =
       lastSelected && image_names.includes(lastSelected) ? galleryItemNames.indexOf(lastSelected) : -1;
 
     const result = await dispatch(
-      imagesApi.endpoints.deleteImages.initiate({ image_names }, { track: false })
+      imagesApi.endpoints.deleteImages.initiate(
+        { image_names, delete_starred: !shouldProtectStarredMedia },
+        { track: false }
+      )
     ).unwrap();
     // Only the images the server confirmed deleted count: a partial failure means the
     // survivor still exists, so the selection must not jump away from it and it remains
     // a valid replacement candidate. Mirrors deleteVideoModal/store/state.ts.
     const deletedNames = new Set(result.deleted_images);
+    const failedImages = result.failed_images ?? [];
+    const starredSkipped = result.starred_skipped ?? [];
+
+    if (failedImages.length > 0) {
+      toast({
+        status: 'warning',
+        title: t('toast.mediaDeleteFailed'),
+        description: t('toast.mediaDeletePartial', { count: failedImages.length }),
+      });
+    }
+    if (shouldConfirmOnDelete && starredSkipped.length > 0) {
+      toast({
+        status: 'warning',
+        title: t('toast.starredMediaProtected'),
+        description: t('toast.starredMediaProtectedDesc', { count: starredSkipped.length }),
+      });
+    }
 
     if (intersection(getState().gallery.selection, [...deletedNames]).length > 0) {
       if (lastSelected && !deletedNames.has(lastSelected)) {
@@ -125,7 +152,11 @@ export const handleDeletions = async (image_names: string[], store: AppStore) =>
       deleteRasterLayerImages(state, dispatch, image_name);
     }
   } catch {
-    // no-op
+    toast({
+      status: 'error',
+      title: t('toast.mediaDeleteFailed'),
+      description: t('toast.mediaDeleteFailedDesc'),
+    });
   }
 };
 
