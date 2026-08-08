@@ -143,6 +143,21 @@ def test_working_memory_estimate_keeps_a_fixed_term_for_the_chunk_working_set() 
     assert large > 2 * small, "the per-pixel term has been lost"
 
 
+def test_working_memory_estimate_accounts_for_every_image_in_the_batch() -> None:
+    """The decoder accepts batched latents, so reserving only one image's activations can OOM.
+
+    The optimized estimate has one fixed chunk working set plus a per-output-pixel term. Doubling the
+    batch must therefore increase the estimate, but by less than 2x because the fixed term is shared.
+    """
+    single = estimate_pid_decode_working_memory(torch.zeros(1, 16, 64, 64), BaseModelType.Flux, True)
+    batched = estimate_pid_decode_working_memory(torch.zeros(2, 16, 64, 64), BaseModelType.Flux, True)
+    single_unoptimized = estimate_pid_decode_working_memory(torch.zeros(1, 16, 64, 64), BaseModelType.Flux)
+    batched_unoptimized = estimate_pid_decode_working_memory(torch.zeros(2, 16, 64, 64), BaseModelType.Flux)
+
+    assert single < batched < 2 * single
+    assert batched_unoptimized == 2 * single_unoptimized
+
+
 def test_working_memory_estimate_never_exceeds_the_unoptimized_one() -> None:
     """Below the chunk size the pixel blocks run unchunked, so the fixed chunk-working-set term must
     not be charged: a small output would otherwise reserve *more* with the optimization enabled than

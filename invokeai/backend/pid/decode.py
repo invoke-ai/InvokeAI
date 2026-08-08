@@ -125,7 +125,7 @@ PID_MODEL_MAX_LENGTH: int = 300
 
 # Working-memory (activation) estimate for the PiD decode, mirroring `estimate_vae_working_memory_*` (see #8414).
 # PiD runs a multi-step pixel-diffusion in float32 at the full super-resolved output resolution, so its peak
-# activation memory scales with the OUTPUT pixel count.
+# activation memory scales with the total OUTPUT pixel count across the batch.
 #
 # This is ONLY the activation headroom reserved for the decode itself - it does NOT do the heavy lifting of
 # evicting the main transformer/encoders (the nodes call context.models.offload_all_from_vram() for that before
@@ -155,9 +155,10 @@ def estimate_pid_decode_working_memory(
 ) -> int:
     """Estimate the working (activation) memory in bytes for a PiD decode of *latent*.
 
-    The decoded image is ``latent_spatial * sr_scale * latent_spatial_down_factor`` pixels per side. PidNet runs
-    in float32 (see ``model_loaders/pid_decoder.py``), so the element size is 4 bytes. Returns 0 for unsupported
-    backbones so callers fall back to the cache's default working-memory reservation.
+    Each decoded image is ``latent_spatial * sr_scale * latent_spatial_down_factor`` pixels per side. PidNet
+    runs in float32 (see ``model_loaders/pid_decoder.py``), so the element size is 4 bytes. The per-pixel term
+    covers every image in the latent batch. Returns 0 for unsupported backbones so callers fall back to the
+    cache's default working-memory reservation.
 
     ``pid_memory_optimization`` must mirror the flag passed to :class:`PiDDecodeConfig` for the same decode -
     otherwise the cache reserves headroom for a peak that will not happen.
@@ -169,7 +170,8 @@ def estimate_pid_decode_working_memory(
     out_h = int(latent.shape[-2]) * total_up
     out_w = int(latent.shape[-1]) * total_up
     element_size = 4  # PidNet runs in float32 (see model_loaders/pid_decoder.py)
-    output_bytes = out_h * out_w * element_size
+    batch_size = int(latent.shape[0])
+    output_bytes = batch_size * out_h * out_w * element_size
     unoptimized = int(output_bytes * _PID_DECODE_WORKING_MEMORY_SCALING_CONSTANT)
     if not pid_memory_optimization:
         return unoptimized
