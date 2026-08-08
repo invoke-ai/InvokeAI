@@ -10402,6 +10402,11 @@ export type components = {
             /** System Prompt */
             system_prompt?: string | null;
             /**
+             * Seed
+             * @description Seed for reproducible text generation
+             */
+            seed?: number | null;
+            /**
              * Task Id
              * @description Client-supplied task ID used to correlate socket progress events to this request
              */
@@ -10411,6 +10416,8 @@ export type components = {
         ExpandPromptResponse: {
             /** Expanded Prompt */
             expanded_prompt: string;
+            /** Seed */
+            seed: number;
             /** Error */
             error?: string | null;
         };

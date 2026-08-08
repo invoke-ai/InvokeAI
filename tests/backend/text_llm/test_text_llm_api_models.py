@@ -21,6 +21,7 @@ class TestExpandPromptRequest:
         req = ExpandPromptRequest(prompt="a cat", model_key="abc-123")
         assert req.max_tokens == 300
         assert req.system_prompt is None
+        assert req.seed is None
 
     def test_max_tokens_upper_bound(self):
         """max_tokens should be capped at 2048."""
@@ -42,6 +43,11 @@ class TestExpandPromptRequest:
         req = ExpandPromptRequest(prompt="a cat", model_key="abc-123", system_prompt="Be brief.")
         assert req.system_prompt == "Be brief."
 
+    def test_seed_range(self):
+        assert ExpandPromptRequest(prompt="a cat", model_key="abc-123", seed=42).seed == 42
+        with pytest.raises(ValidationError):
+            ExpandPromptRequest(prompt="a cat", model_key="abc-123", seed=-1)
+
 
 class TestImageToPromptRequest:
     def test_defaults(self):
@@ -55,19 +61,20 @@ class TestImageToPromptRequest:
 
 class TestExpandPromptResponse:
     def test_success_response(self):
-        resp = ExpandPromptResponse(expanded_prompt="A detailed scene")
+        resp = ExpandPromptResponse(expanded_prompt="A detailed scene", seed=42)
         assert resp.expanded_prompt == "A detailed scene"
+        assert resp.seed == 42
         assert resp.error is None
 
     def test_error_response(self):
-        resp = ExpandPromptResponse(expanded_prompt="", error="Model failed")
+        resp = ExpandPromptResponse(expanded_prompt="", seed=42, error="Model failed")
         assert resp.error == "Model failed"
 
 
 def test_expand_prompt_uses_fresh_seed() -> None:
     model_config = MagicMock(type=ModelType.TextLLM, path="model")
     model = MagicMock()
-    model.parameters.return_value = iter([torch.nn.Parameter(torch.zeros(1))])
+    model.parameters.side_effect = lambda: iter([torch.nn.Parameter(torch.zeros(1))])
     loaded_model = MagicMock()
     loaded_model.model_on_device.return_value.__enter__.return_value = (None, model)
     services = MagicMock()
@@ -82,6 +89,9 @@ def test_expand_prompt_uses_fresh_seed() -> None:
         patch("invokeai.app.api.routers.utilities.TextLLMPipeline") as pipeline_class,
     ):
         pipeline_class.return_value.run.return_value = "expanded"
-        assert _run_expand_prompt("cat", "model", 10, None, None, "user") == "expanded"
+        assert _run_expand_prompt("cat", "model", 10, None, None, None, "user") == ("expanded", 123)
+        assert pipeline_class.return_value.run.call_args.kwargs["seed"] == 123
 
-    assert pipeline_class.return_value.run.call_args.kwargs["seed"] == 123
+        pipeline_class.return_value.run.reset_mock()
+        assert _run_expand_prompt("cat", "model", 10, None, 456, None, "user") == ("expanded", 456)
+        assert pipeline_class.return_value.run.call_args.kwargs["seed"] == 456
