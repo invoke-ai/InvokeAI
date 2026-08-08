@@ -238,12 +238,19 @@ def test_pipeline_seeds_real_causal_lm_generation_end_to_end():
 @pytest.mark.skipif(not torch.backends.mps.is_available(), reason="MPS is unavailable")
 def test_seeded_multinomial_is_repeatable_on_mps():
     """MPS uses the CPU generator fallback and returns samples on the MPS device."""
-    probabilities = torch.ones(100, device="mps")
-
-    with _SeededMultinomialMode(seed=42):
-        first = torch.multinomial(probabilities, num_samples=10, replacement=True)
-    with _SeededMultinomialMode(seed=42):
-        second = probabilities.multinomial(num_samples=10, replacement=True)
+    try:
+        torch.mps.empty_cache()
+        probabilities = torch.ones(16, device="mps")
+        with _SeededMultinomialMode(seed=42):
+            first = torch.multinomial(probabilities, num_samples=4, replacement=True)
+        with _SeededMultinomialMode(seed=42):
+            second = probabilities.multinomial(num_samples=4, replacement=True)
+    except RuntimeError as e:
+        if "mps backend out of memory" in str(e).lower():
+            pytest.skip("MPS does not have enough memory for this test")
+        raise
+    finally:
+        torch.mps.empty_cache()
 
     assert first.device.type == "mps"
     assert torch.equal(first.cpu(), second.cpu())
