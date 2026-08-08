@@ -1422,7 +1422,11 @@ export type paths = {
         };
         /**
          * Get Image Names
-         * @description Gets ordered list of image names with metadata for optimistic updates
+         * @deprecated
+         * @description Gets ordered list of image names with metadata for optimistic updates.
+         *
+         *     Deprecated: use `GET /v1/gallery/item_names`, which returns images and videos interleaved
+         *     in one ordered list. This image-only endpoint predates the polymorphic gallery.
          */
         get: operations["get_image_names"];
         put?: never;
@@ -1663,7 +1667,11 @@ export type paths = {
         };
         /**
          * Get Video Names
+         * @deprecated
          * @description Gets ordered list of video names with metadata for optimistic updates.
+         *
+         *     Deprecated: use `GET /v1/gallery/item_names`, which returns images and videos interleaved
+         *     in one ordered list. This video-only endpoint predates the polymorphic gallery.
          */
         get: operations["get_video_names"];
         put?: never;
@@ -1746,6 +1754,29 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/gallery/item_names": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Gallery Item Names
+         * @description Returns the ordered flat list of item names — used to drive virtualized gallery selection.
+         *
+         *     Names are polymorphic: image and video names are interleaved by `created_at`. A name ending
+         *     in `.mp4` is a video.
+         */
+        get: operations["list_gallery_item_names"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/gallery/items/names": {
         parameters: {
             query?: never;
@@ -1755,7 +1786,12 @@ export type paths = {
         };
         /**
          * Get Gallery Item Names
+         * @deprecated
          * @description Returns an ordered (kind, name) list — used to drive virtualized gallery selection.
+         *
+         *     Deprecated: use `GET /v1/gallery/item_names`, which returns the same order as a flat name
+         *     list. The `kind` discriminator here costs a model per row — ~800ms on a 200k-item library —
+         *     for a value callers already derive from the file extension.
          */
         get: operations["get_gallery_item_names"];
         put?: never;
@@ -1931,8 +1967,11 @@ export type paths = {
         };
         /**
          * List Virtual Board Image Names By Date
-         * @description Gets ordered image names for a specific date. Image-only; kept for API compatibility —
-         *     the UI uses the polymorphic `/by_date/{date}/item_names` endpoint.
+         * @deprecated
+         * @description Gets ordered image names for a specific date. Image-only.
+         *
+         *     Deprecated: use `GET /v1/gallery/item_names?created_date=<date>`, which covers images and
+         *     videos in one ordered list.
          */
         get: operations["list_virtual_board_image_names_by_date"];
         put?: never;
@@ -1952,7 +1991,11 @@ export type paths = {
         };
         /**
          * List Virtual Board Item Names By Date
+         * @deprecated
          * @description Gets ordered polymorphic (image + video) item refs for a specific date.
+         *
+         *     Deprecated: use `GET /v1/gallery/item_names?created_date=<date>`, which returns the same
+         *     order as a flat name list instead of one model per item.
          */
         get: operations["list_virtual_board_item_names_by_date"];
         put?: never;
@@ -2354,6 +2397,26 @@ export type paths = {
          * @description Gets queue items for the specified queue item ids. Maintains order of item ids.
          */
         post: operations["get_queue_items_by_item_ids"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/queue/{queue_id}/item_summaries_by_ids": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Get Queue Item Summaries By Ids
+         * @description Gets lightweight queue item summaries for specified IDs in requested order.
+         */
+        post: operations["get_queue_item_summaries_by_ids"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4892,6 +4955,14 @@ export type components = {
              */
             image_names: string[];
         };
+        /** Body_get_queue_item_summaries_by_ids */
+        Body_get_queue_item_summaries_by_ids: {
+            /**
+             * Item Ids
+             * @description Object containing list of queue item ids to fetch summaries for
+             */
+            item_ids: number[];
+        };
         /** Body_get_queue_items_by_item_ids */
         Body_get_queue_items_by_item_ids: {
             /**
@@ -4904,7 +4975,6 @@ export type components = {
         Body_import_style_presets: {
             /**
              * File
-             * Format: binary
              * @description The file to import
              */
             file: Blob;
@@ -4962,7 +5032,6 @@ export type components = {
         Body_set_workflow_thumbnail: {
             /**
              * Image
-             * Format: binary
              * @description The image file to upload
              */
             image: Blob;
@@ -4985,10 +5054,7 @@ export type components = {
         };
         /** Body_update_model_image */
         Body_update_model_image: {
-            /**
-             * Image
-             * Format: binary
-             */
+            /** Image */
             image: Blob;
         };
         /** Body_update_style_preset */
@@ -5019,10 +5085,7 @@ export type components = {
         };
         /** Body_upload_image */
         Body_upload_image: {
-            /**
-             * File
-             * Format: binary
-             */
+            /** File */
             file: Blob;
             /**
              * Resize To
@@ -5038,10 +5101,7 @@ export type components = {
         };
         /** Body_upload_video */
         Body_upload_video: {
-            /**
-             * File
-             * Format: binary
-             */
+            /** File */
             file: Blob;
             /**
              * Metadata
@@ -14009,8 +14069,37 @@ export type components = {
          */
         GalleryItemKind: "image" | "video";
         /**
+         * GalleryItemNames
+         * @description Ordered flat list of gallery item names plus counts for optimistic UI.
+         *
+         *     Names are polymorphic — images and videos are interleaved by `created_at`. The kind of a
+         *     given name is its file extension (`.mp4` is a video), which is how every consumer already
+         *     discriminates. Mirrors the shape of the image-only `ImageNamesResult`.
+         */
+        GalleryItemNames: {
+            /**
+             * Item Names
+             * @description Ordered list of image and video names.
+             */
+            item_names: string[];
+            /**
+             * Starred Count
+             * @description Number of starred items (when starred_first=True).
+             */
+            starred_count: number;
+            /**
+             * Total Count
+             * @description Total number of items matching the query.
+             */
+            total_count: number;
+        };
+        /**
          * GalleryItemNamesResult
          * @description Ordered list of gallery item references plus counts for optimistic UI.
+         *
+         *     Deprecated in favour of :class:`GalleryItemNames`. Wrapping every name in an object to
+         *     carry a `kind` discriminator costs ~800ms of model construction on a 200k-item library,
+         *     for a field callers derive from the filename extension anyway.
          */
         GalleryItemNamesResult: {
             /**
@@ -33968,6 +34057,78 @@ export type components = {
             /** @description The workflow associated with this queue item */
             workflow?: components["schemas"]["WorkflowWithoutID"] | null;
         };
+        /**
+         * SessionQueueItemSummary
+         * @description Queue item fields needed to render the queue list.
+         */
+        SessionQueueItemSummary: {
+            /**
+             * Item Id
+             * @description The identifier of the session queue item
+             */
+            item_id: number;
+            /**
+             * Created At
+             * @description When this queue item was created
+             */
+            created_at: string;
+            /**
+             * Status
+             * @description The status of this queue item
+             * @enum {string}
+             */
+            status: "pending" | "in_progress" | "waiting" | "completed" | "failed" | "canceled";
+            /**
+             * Device
+             * @description The device that processed this queue item, e.g. 'cuda:1'
+             */
+            device?: string | null;
+            /**
+             * Started At
+             * @description When this queue item was started
+             */
+            started_at: string | null;
+            /**
+             * Completed At
+             * @description When this queue item was completed
+             */
+            completed_at: string | null;
+            /**
+             * Origin
+             * @description The origin of this queue item
+             */
+            origin: string | null;
+            /**
+             * Destination
+             * @description The destination of this queue item
+             */
+            destination: string | null;
+            /**
+             * Batch Id
+             * @description The ID of the batch associated with this queue item
+             */
+            batch_id: string;
+            /**
+             * User Id
+             * @description The ID of the user who created this queue item
+             */
+            user_id: string;
+            /**
+             * User Display Name
+             * @description The display name of the user who created this queue item
+             */
+            user_display_name: string | null;
+            /**
+             * User Email
+             * @description The email of the user who created this queue item
+             */
+            user_email: string | null;
+            /**
+             * Field Values
+             * @description The batch field values used for this queue item
+             */
+            field_values: components["schemas"]["NodeFieldValue"][] | null;
+        };
         /** SessionQueueStatus */
         SessionQueueStatus: {
             /**
@@ -38125,6 +38286,10 @@ export type components = {
             msg: string;
             /** Error Type */
             type: string;
+            /** Input */
+            input?: unknown;
+            /** Context */
+            ctx?: Record<string, never>;
         };
         /** VideoBoardArg */
         VideoBoardArg: {
@@ -44883,6 +45048,52 @@ export interface operations {
             };
         };
     };
+    list_gallery_item_names: {
+        parameters: {
+            query?: {
+                /** @description The origin of items to list. */
+                origin?: components["schemas"]["ResourceOrigin"] | null;
+                /** @description The categories to include. Shared between images and videos. */
+                categories?: components["schemas"]["ImageCategory"][] | null;
+                /** @description Whether to list intermediate items. */
+                is_intermediate?: boolean | null;
+                /** @description The board id to filter by. Use 'none' to find items without a board. */
+                board_id?: string | null;
+                /** @description Restrict to items created on this ISO date, e.g. '2026-03-18'. Used by date-based virtual boards. */
+                created_date?: string | null;
+                /** @description The order of sort */
+                order_dir?: components["schemas"]["SQLiteDirection"];
+                /** @description Whether to sort by starred items first */
+                starred_first?: boolean;
+                /** @description The term to search for */
+                search_term?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GalleryItemNames"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_gallery_item_names: {
         parameters: {
             query?: {
@@ -46082,6 +46293,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SessionQueueItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_queue_item_summaries_by_ids: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The queue id to perform this operation on */
+                queue_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Body_get_queue_item_summaries_by_ids"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionQueueItemSummary"][];
                 };
             };
             /** @description Validation Error */

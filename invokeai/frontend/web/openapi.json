@@ -5923,8 +5923,9 @@
       "get": {
         "tags": ["images"],
         "summary": "Get Image Names",
-        "description": "Gets ordered list of image names with metadata for optimistic updates",
+        "description": "Gets ordered list of image names with metadata for optimistic updates.\n\nDeprecated: use `GET /v1/gallery/item_names`, which returns images and videos interleaved\nin one ordered list. This image-only endpoint predates the polymorphic gallery.",
         "operationId": "get_image_names",
+        "deprecated": true,
         "security": [
           {
             "HTTPBearer": []
@@ -6972,8 +6973,9 @@
       "get": {
         "tags": ["videos"],
         "summary": "Get Video Names",
-        "description": "Gets ordered list of video names with metadata for optimistic updates.",
+        "description": "Gets ordered list of video names with metadata for optimistic updates.\n\nDeprecated: use `GET /v1/gallery/item_names`, which returns images and videos interleaved\nin one ordered list. This video-only endpoint predates the polymorphic gallery.",
         "operationId": "get_video_names",
+        "deprecated": true,
         "security": [
           {
             "HTTPBearer": []
@@ -7475,12 +7477,184 @@
         }
       }
     },
+    "/api/v1/gallery/item_names": {
+      "get": {
+        "tags": ["gallery"],
+        "summary": "List Gallery Item Names",
+        "description": "Returns the ordered flat list of item names \u2014 used to drive virtualized gallery selection.\n\nNames are polymorphic: image and video names are interleaved by `created_at`. A name ending\nin `.mp4` is a video.",
+        "operationId": "list_gallery_item_names",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "origin",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ResourceOrigin"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The origin of items to list.",
+              "title": "Origin"
+            },
+            "description": "The origin of items to list."
+          },
+          {
+            "name": "categories",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ImageCategory"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The categories to include. Shared between images and videos.",
+              "title": "Categories"
+            },
+            "description": "The categories to include. Shared between images and videos."
+          },
+          {
+            "name": "is_intermediate",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Whether to list intermediate items.",
+              "title": "Is Intermediate"
+            },
+            "description": "Whether to list intermediate items."
+          },
+          {
+            "name": "board_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The board id to filter by. Use 'none' to find items without a board.",
+              "title": "Board Id"
+            },
+            "description": "The board id to filter by. Use 'none' to find items without a board."
+          },
+          {
+            "name": "created_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Restrict to items created on this ISO date, e.g. '2026-03-18'. Used by date-based virtual boards.",
+              "title": "Created Date"
+            },
+            "description": "Restrict to items created on this ISO date, e.g. '2026-03-18'. Used by date-based virtual boards."
+          },
+          {
+            "name": "order_dir",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SQLiteDirection",
+              "description": "The order of sort",
+              "default": "DESC"
+            },
+            "description": "The order of sort"
+          },
+          {
+            "name": "starred_first",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Whether to sort by starred items first",
+              "default": true,
+              "title": "Starred First"
+            },
+            "description": "Whether to sort by starred items first"
+          },
+          {
+            "name": "search_term",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The term to search for",
+              "title": "Search Term"
+            },
+            "description": "The term to search for"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GalleryItemNames"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/gallery/items/names": {
       "get": {
         "tags": ["gallery"],
         "summary": "Get Gallery Item Names",
-        "description": "Returns an ordered (kind, name) list \u2014 used to drive virtualized gallery selection.",
+        "description": "Returns an ordered (kind, name) list \u2014 used to drive virtualized gallery selection.\n\nDeprecated: use `GET /v1/gallery/item_names`, which returns the same order as a flat name\nlist. The `kind` discriminator here costs a model per row \u2014 ~800ms on a 200k-item library \u2014\nfor a value callers already derive from the file extension.",
         "operationId": "get_gallery_item_names",
+        "deprecated": true,
         "security": [
           {
             "HTTPBearer": []
@@ -8283,8 +8457,9 @@
       "get": {
         "tags": ["virtual_boards"],
         "summary": "List Virtual Board Image Names By Date",
-        "description": "Gets ordered image names for a specific date. Image-only; kept for API compatibility \u2014\nthe UI uses the polymorphic `/by_date/{date}/item_names` endpoint.",
+        "description": "Gets ordered image names for a specific date. Image-only.\n\nDeprecated: use `GET /v1/gallery/item_names?created_date=<date>`, which covers images and\nvideos in one ordered list.",
         "operationId": "list_virtual_board_image_names_by_date",
+        "deprecated": true,
         "security": [
           {
             "HTTPBearer": []
@@ -8393,8 +8568,9 @@
       "get": {
         "tags": ["virtual_boards"],
         "summary": "List Virtual Board Item Names By Date",
-        "description": "Gets ordered polymorphic (image + video) item refs for a specific date.",
+        "description": "Gets ordered polymorphic (image + video) item refs for a specific date.\n\nDeprecated: use `GET /v1/gallery/item_names?created_date=<date>`, which returns the same\norder as a flat name list instead of one model per item.",
         "operationId": "list_virtual_board_item_names_by_date",
+        "deprecated": true,
         "security": [
           {
             "HTTPBearer": []
@@ -9419,6 +9595,68 @@
                     "$ref": "#/components/schemas/SessionQueueItem"
                   },
                   "title": "Response 200 Get Queue Items By Item Ids"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/queue/{queue_id}/item_summaries_by_ids": {
+      "post": {
+        "tags": ["queue"],
+        "summary": "Get Queue Item Summaries By Ids",
+        "description": "Gets lightweight queue item summaries for specified IDs in requested order.",
+        "operationId": "get_queue_item_summaries_by_ids",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "queue_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The queue id to perform this operation on",
+              "title": "Queue Id"
+            },
+            "description": "The queue id to perform this operation on"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_get_queue_item_summaries_by_ids"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SessionQueueItemSummary"
+                  },
+                  "title": "Response 200 Get Queue Item Summaries By Ids"
                 }
               }
             }
@@ -15725,7 +15963,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "format": "binary"
+                "contentMediaType": "application/octet-stream"
               },
               {
                 "type": "null"
@@ -15884,6 +16122,21 @@
         "required": ["image_names"],
         "title": "Body_get_images_by_names"
       },
+      "Body_get_queue_item_summaries_by_ids": {
+        "properties": {
+          "item_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Item Ids",
+            "description": "Object containing list of queue item ids to fetch summaries for"
+          }
+        },
+        "type": "object",
+        "required": ["item_ids"],
+        "title": "Body_get_queue_item_summaries_by_ids"
+      },
       "Body_get_queue_items_by_item_ids": {
         "properties": {
           "item_ids": {
@@ -15903,7 +16156,7 @@
         "properties": {
           "file": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "File",
             "description": "The file to import"
           }
@@ -15993,7 +16246,7 @@
         "properties": {
           "image": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "Image",
             "description": "The image file to upload"
           }
@@ -16036,7 +16289,7 @@
         "properties": {
           "image": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "Image"
           }
         },
@@ -16050,7 +16303,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "format": "binary"
+                "contentMediaType": "application/octet-stream"
               },
               {
                 "type": "null"
@@ -16096,7 +16349,7 @@
         "properties": {
           "file": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "File"
           },
           "resize_to": {
@@ -16133,7 +16386,7 @@
         "properties": {
           "file": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "File"
           },
           "metadata": {
@@ -33600,6 +33853,32 @@
         "title": "GalleryItemKind",
         "description": "Discriminator for polymorphic gallery items."
       },
+      "GalleryItemNames": {
+        "properties": {
+          "item_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Item Names",
+            "description": "Ordered list of image and video names."
+          },
+          "starred_count": {
+            "type": "integer",
+            "title": "Starred Count",
+            "description": "Number of starred items (when starred_first=True)."
+          },
+          "total_count": {
+            "type": "integer",
+            "title": "Total Count",
+            "description": "Total number of items matching the query."
+          }
+        },
+        "type": "object",
+        "required": ["item_names", "starred_count", "total_count"],
+        "title": "GalleryItemNames",
+        "description": "Ordered flat list of gallery item names plus counts for optimistic UI.\n\nNames are polymorphic \u2014 images and videos are interleaved by `created_at`. The kind of a\ngiven name is its file extension (`.mp4` is a video), which is how every consumer already\ndiscriminates. Mirrors the shape of the image-only `ImageNamesResult`."
+      },
       "GalleryItemNamesResult": {
         "properties": {
           "items": {
@@ -33624,7 +33903,7 @@
         "type": "object",
         "required": ["items", "starred_count", "total_count"],
         "title": "GalleryItemNamesResult",
-        "description": "Ordered list of gallery item references plus counts for optimistic UI."
+        "description": "Ordered list of gallery item references plus counts for optimistic UI.\n\nDeprecated in favour of :class:`GalleryItemNames`. Wrapping every name in an object to\ncarry a `kind` discriminator costs ~800ms of model construction on a 200k-item library,\nfor a field callers derive from the filename extension anyway."
       },
       "GalleryItemRef": {
         "properties": {
@@ -78974,6 +79253,168 @@
         "title": "SessionQueueItem",
         "description": "Session queue item without the full graph. Used for serialization."
       },
+      "SessionQueueItemSummary": {
+        "properties": {
+          "item_id": {
+            "type": "integer",
+            "title": "Item Id",
+            "description": "The identifier of the session queue item"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Created At",
+            "description": "When this queue item was created"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "in_progress", "waiting", "completed", "failed", "canceled"],
+            "title": "Status",
+            "description": "The status of this queue item"
+          },
+          "device": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device",
+            "description": "The device that processed this queue item, e.g. 'cuda:1'"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At",
+            "description": "When this queue item was started"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At",
+            "description": "When this queue item was completed"
+          },
+          "origin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin",
+            "description": "The origin of this queue item"
+          },
+          "destination": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination",
+            "description": "The destination of this queue item"
+          },
+          "batch_id": {
+            "type": "string",
+            "title": "Batch Id",
+            "description": "The ID of the batch associated with this queue item"
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id",
+            "description": "The ID of the user who created this queue item"
+          },
+          "user_display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Display Name",
+            "description": "The display name of the user who created this queue item"
+          },
+          "user_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Email",
+            "description": "The email of the user who created this queue item"
+          },
+          "field_values": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/NodeFieldValue"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field Values",
+            "description": "The batch field values used for this queue item"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item_id",
+          "created_at",
+          "status",
+          "started_at",
+          "completed_at",
+          "origin",
+          "destination",
+          "batch_id",
+          "user_id",
+          "user_display_name",
+          "user_email",
+          "field_values"
+        ],
+        "title": "SessionQueueItemSummary",
+        "description": "Queue item fields needed to render the queue list."
+      },
       "SessionQueueStatus": {
         "properties": {
           "queue_id": {
@@ -86453,6 +86894,13 @@
           "type": {
             "type": "string",
             "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
           }
         },
         "type": "object",

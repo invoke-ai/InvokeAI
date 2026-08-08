@@ -4,10 +4,14 @@ from datetime import datetime
 
 import pytest
 
-from invokeai.app.api.routers.session_queue import sanitize_queue_item_for_user
+from invokeai.app.api.routers.session_queue import sanitize_queue_item_for_user, sanitize_queue_item_summary_for_user
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
 from invokeai.app.invocations.fields import InputField, OutputField
-from invokeai.app.services.session_queue.session_queue_common import NodeFieldValue, SessionQueueItem
+from invokeai.app.services.session_queue.session_queue_common import (
+    NodeFieldValue,
+    SessionQueueItem,
+    SessionQueueItemSummary,
+)
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
 from invokeai.app.services.shared.invocation_context import InvocationContext
 
@@ -189,3 +193,23 @@ def test_sanitize_system_user_item_for_admin(sample_session_queue_item):
     assert result.field_values is not None
     assert len(result.field_values) == 1
     assert len(result.session.graph.nodes) == 1
+
+
+def test_sanitize_queue_item_summary_for_different_user(sample_session_queue_item: SessionQueueItem) -> None:
+    summary = SessionQueueItemSummary(**sample_session_queue_item.model_dump())
+
+    result = sanitize_queue_item_summary_for_user(summary, current_user_id="different_user", is_admin=False)
+
+    assert result.item_id == summary.item_id
+    assert result.created_at == summary.created_at
+    assert result.status == summary.status
+    assert result.started_at == summary.started_at
+    assert result.completed_at == summary.completed_at
+    assert result.device is None
+    assert result.origin is None
+    assert result.destination is None
+    assert result.batch_id == "redacted"
+    assert result.user_id == "redacted"
+    assert result.user_display_name is None
+    assert result.user_email is None
+    assert result.field_values is None

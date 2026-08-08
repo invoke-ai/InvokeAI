@@ -313,6 +313,32 @@ class SessionQueueItem(BaseModel):
     )
 
 
+class SessionQueueItemSummary(BaseModel):
+    """Queue item fields needed to render the queue list."""
+
+    item_id: int = Field(description="The identifier of the session queue item")
+    created_at: Union[datetime.datetime, str] = Field(description="When this queue item was created")
+    status: QUEUE_ITEM_STATUS = Field(description="The status of this queue item")
+    device: Optional[str] = Field(
+        default=None,
+        description="The device that processed this queue item, e.g. 'cuda:1'",
+    )
+    started_at: Optional[Union[datetime.datetime, str]] = Field(description="When this queue item was started")
+    completed_at: Optional[Union[datetime.datetime, str]] = Field(description="When this queue item was completed")
+    origin: str | None = Field(description="The origin of this queue item")
+    destination: str | None = Field(description="The destination of this queue item")
+    batch_id: str = Field(description="The ID of the batch associated with this queue item")
+    user_id: str = Field(description="The ID of the user who created this queue item")
+    user_display_name: Optional[str] = Field(description="The display name of the user who created this queue item")
+    user_email: Optional[str] = Field(description="The email of the user who created this queue item")
+    field_values: Optional[list[NodeFieldValue]] = Field(description="The batch field values used for this queue item")
+
+    @classmethod
+    def queue_item_summary_from_dict(cls, queue_item_dict: dict) -> "SessionQueueItemSummary":
+        queue_item_dict["field_values"] = get_field_values(queue_item_dict)
+        return cls(**queue_item_dict)
+
+
 # endregion Queue Items
 
 # region Query Results
