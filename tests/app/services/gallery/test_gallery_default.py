@@ -15,6 +15,10 @@ Covers JPPhoto's code-review findings (PR #9163):
    ``list_item_names`` so virtual boards cover both kinds.
 """
 
+from collections.abc import Callable
+from types import SimpleNamespace
+from typing import TypeVar
+
 import pytest
 
 from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
@@ -25,6 +29,8 @@ from invokeai.app.services.gallery.gallery_common import GalleryItemKind
 from invokeai.app.services.gallery.gallery_default import SqliteGalleryService
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
+from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.urls.urls_default import LocalUrlService
 from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.fixtures.sqlite_database import create_mock_sqlite_database
@@ -35,8 +41,10 @@ def services():
     config = InvokeAIAppConfig(use_memory_db=True)
     logger = InvokeAILogger.get_logger(config=config)
     db = create_mock_sqlite_database(config, logger)
+    gallery = SqliteGalleryService(db=db)
+    gallery.start(SimpleNamespace(services=SimpleNamespace(urls=LocalUrlService())))  # type: ignore[arg-type]
     return {
-        "gallery": SqliteGalleryService(db=db),
+        "gallery": gallery,
         "images": SqliteImageRecordStorage(db=db),
         "videos": SqliteVideoRecordStorage(db=db),
         "boards": SqliteBoardRecordStorage(db=db),
@@ -45,11 +53,16 @@ def services():
     }
 
 
-def _save_image(store: SqliteImageRecordStorage, name: str, user_id: str) -> None:
+def _save_image(
+    store: SqliteImageRecordStorage,
+    name: str,
+    user_id: str,
+    category: ImageCategory = ImageCategory.GENERAL,
+) -> None:
     store.save(
         image_name=name,
         image_origin=ResourceOrigin.INTERNAL,
-        image_category=ImageCategory.GENERAL,
+        image_category=category,
         width=64,
         height=64,
         has_workflow=False,
@@ -58,11 +71,16 @@ def _save_image(store: SqliteImageRecordStorage, name: str, user_id: str) -> Non
     )
 
 
-def _save_video(store: SqliteVideoRecordStorage, name: str, user_id: str) -> None:
+def _save_video(
+    store: SqliteVideoRecordStorage,
+    name: str,
+    user_id: str,
+    category: ImageCategory = ImageCategory.GENERAL,
+) -> None:
     store.save(
         video_name=name,
         video_origin=ResourceOrigin.INTERNAL,
-        video_category=ImageCategory.GENERAL,
+        video_category=category,
         width=64,
         height=64,
         duration=1.0,
@@ -71,6 +89,22 @@ def _save_video(store: SqliteVideoRecordStorage, name: str, user_id: str) -> Non
         is_intermediate=False,
         user_id=user_id,
     )
+
+
+T = TypeVar("T")
+
+
+def _capture_plan(services, call: Callable[[], T], statement_marker: str) -> tuple[T, str, list[str]]:
+    db = services["images"]._db
+    statements: list[str] = []
+    db._conn.set_trace_callback(statements.append)
+    try:
+        result = call()
+    finally:
+        db._conn.set_trace_callback(None)
+    statement = next(statement for statement in statements if statement_marker in statement)
+    details = [row[3] for row in db._conn.execute(f"EXPLAIN QUERY PLAN {statement}").fetchall()]
+    return result, statement, details
 
 
 @pytest.fixture
@@ -239,7 +273,11 @@ class TestGetBoardMediaSummaries:
                 ("intermediate.mp4",),
             )
 
-        summaries = services["gallery"].get_board_media_summaries([populated.board_id, empty.board_id])
+        summaries, _, details = _capture_plan(
+            services,
+            lambda: services["gallery"].get_board_media_summaries([populated.board_id, empty.board_id]),
+            "ROW_NUMBER() OVER",
+        )
 
         assert summaries[populated.board_id].image_count == 1
         assert summaries[populated.board_id].video_count == 1
@@ -250,6 +288,170 @@ class TestGetBoardMediaSummaries:
         assert summaries[empty.board_id].video_count == 0
         assert summaries[empty.board_id].cover_image_name is None
         assert summaries[empty.board_id].cover_video_name is None
+        assert next(i for i, detail in enumerate(details) if "board_images" in detail) < next(
+            i for i, detail in enumerate(details) if "images" in detail and "board_images" not in detail
+        )
+        assert next(i for i, detail in enumerate(details) if "board_videos" in detail) < next(
+            i for i, detail in enumerate(details) if "videos" in detail and "board_videos" not in detail
+        )
+
+
+class TestGalleryQueryPlans:
+    def test_default_name_list_omits_membership_join_and_query_hints(self, services) -> None:
+        _save_image(services["images"], "image.png", user_id="alice")
+        _save_video(services["videos"], "video.mp4", user_id="alice")
+
+        result, statement, _ = _capture_plan(
+            services,
+            lambda: services["gallery"].list_item_names(
+                categories=[ImageCategory.GENERAL],
+                is_intermediate=False,
+                is_admin=True,
+            ),
+            "UNION ALL",
+        )
+
+        assert {(item.kind, item.name) for item in result.items} == {
+            (GalleryItemKind.IMAGE, "image.png"),
+            (GalleryItemKind.VIDEO, "video.mp4"),
+        }
+        assert result.total_count == 2
+        assert result.starred_count == 0
+        assert "LEFT JOIN board_images" not in statement
+        assert "INDEXED BY" not in statement
+        assert "NOT INDEXED" not in statement
+
+    @pytest.mark.parametrize(
+        "kwargs",
+        [
+            {"search_term": "does-not-match"},
+            {"user_id": "alice", "is_admin": False},
+            {"user_id": "alice", "is_admin": False, "order_dir": SQLiteDirection.Ascending},
+            {"user_id": "alice", "is_admin": False, "starred_first": False},
+        ],
+    )
+    def test_name_shapes_do_not_force_indexes(self, services, kwargs) -> None:
+        _save_image(services["images"], "image.png", user_id="alice")
+
+        _, statement, _ = _capture_plan(
+            services,
+            lambda: services["gallery"].list_item_names(
+                categories=[ImageCategory.GENERAL],
+                is_intermediate=False,
+                **kwargs,
+            ),
+            "UNION ALL",
+        )
+
+        assert "INDEXED BY" not in statement
+        assert "NOT INDEXED" not in statement
+
+    def test_explicit_board_starts_from_mixed_membership(self, services) -> None:
+        board = services["boards"].save("Small", "alice")
+        _save_image(services["images"], "image.png", user_id="alice")
+        _save_video(services["videos"], "video.mp4", user_id="alice")
+        _save_image(services["images"], "outside.png", user_id="alice")
+        services["board_images"].add_image_to_board(board.board_id, "image.png")
+        services["board_videos"].add_video_to_board(board.board_id, "video.mp4")
+
+        result, _, details = _capture_plan(
+            services,
+            lambda: services["gallery"].list_item_names(
+                board_id=board.board_id,
+                categories=[ImageCategory.GENERAL],
+                is_intermediate=False,
+            ),
+            "UNION ALL",
+        )
+
+        assert {(item.kind, item.name) for item in result.items} == {
+            (GalleryItemKind.IMAGE, "image.png"),
+            (GalleryItemKind.VIDEO, "video.mp4"),
+        }
+        assert next(i for i, detail in enumerate(details) if "board_images" in detail) < next(
+            i for i, detail in enumerate(details) if "images" in detail and "board_images" not in detail
+        )
+        assert next(i for i, detail in enumerate(details) if "board_videos" in detail) < next(
+            i for i, detail in enumerate(details) if "videos" in detail and "board_videos" not in detail
+        )
+
+    def test_asset_category_keeps_mixed_result_shape(self, services) -> None:
+        _save_image(services["images"], "asset.png", user_id="alice", category=ImageCategory.CONTROL)
+        _save_video(services["videos"], "asset.mp4", user_id="alice", category=ImageCategory.CONTROL)
+        _save_image(services["images"], "general.png", user_id="alice")
+
+        result, statement, _ = _capture_plan(
+            services,
+            lambda: services["gallery"].list_item_names(
+                categories=[ImageCategory.CONTROL],
+                is_intermediate=False,
+                is_admin=True,
+            ),
+            "UNION ALL",
+        )
+
+        assert {(item.kind, item.name) for item in result.items} == {
+            (GalleryItemKind.IMAGE, "asset.png"),
+            (GalleryItemKind.VIDEO, "asset.mp4"),
+        }
+        assert result.total_count == 2
+        assert "INDEXED BY" not in statement
+        assert "NOT INDEXED" not in statement
+
+        _, non_admin_statement, _ = _capture_plan(
+            services,
+            lambda: services["gallery"].list_item_names(
+                categories=[ImageCategory.CONTROL],
+                is_intermediate=False,
+                user_id="alice",
+                is_admin=False,
+            ),
+            "UNION ALL",
+        )
+        assert "INDEXED BY" not in non_admin_statement
+        assert "NOT INDEXED" not in non_admin_statement
+
+    def test_paginated_item_path_keeps_result_shape_and_avoids_gallery_index(self, services) -> None:
+        _save_image(services["images"], "image.png", user_id="alice")
+        _save_video(services["videos"], "video.mp4", user_id="alice")
+
+        result, statement, _ = _capture_plan(
+            services,
+            lambda: services["gallery"].list_items(
+                offset=1,
+                limit=1,
+                categories=[ImageCategory.GENERAL],
+                is_intermediate=False,
+                is_admin=True,
+            ),
+            "UNION ALL",
+        )
+
+        assert result.offset == 1
+        assert result.limit == 1
+        assert result.total == 2
+        assert len(result.items) == 1
+        assert result.items[0].kind in {GalleryItemKind.IMAGE, GalleryItemKind.VIDEO}
+        assert result.items[0].full_url
+        assert "LEFT JOIN board_images" in statement
+        assert "INDEXED BY" not in statement
+        assert "NOT INDEXED" not in statement
+
+    def test_board_image_count_starts_from_membership(self, services) -> None:
+        board = services["boards"].save("Small", "alice")
+        _save_image(services["images"], "image.png", user_id="alice")
+        services["board_images"].add_image_to_board(board.board_id, "image.png")
+
+        count, _, details = _capture_plan(
+            services,
+            lambda: services["board_images"].get_image_count_for_board(board.board_id),
+            "SELECT COUNT(*)",
+        )
+
+        assert count == 1
+        assert next(i for i, detail in enumerate(details) if "board_images" in detail) < next(
+            i for i, detail in enumerate(details) if "images" in detail and "board_images" not in detail
+        )
 
 
 class TestOrderingTieBreakers:

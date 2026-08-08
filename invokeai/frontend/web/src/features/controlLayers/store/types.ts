@@ -817,7 +817,7 @@ const zPidMode = z.enum(['off', 'fit', 'native']);
 export type PidMode = z.infer<typeof zPidMode>;
 
 export const zParamsState = z.object({
-  _version: z.literal(4),
+  _version: z.literal(5),
   maskBlur: z.number(),
   maskBlurMethod: zParameterMaskBlurMethod,
   canvasCoherenceMode: zParameterCanvasCoherenceMode,
@@ -832,11 +832,15 @@ export const zParamsState = z.object({
   guidance: zParameterGuidance,
   img2imgStrength: zParameterStrength,
   optimizedDenoisingEnabled: z.boolean(),
-  hiDiffusionEnabled: z.boolean(),
-  hiDiffusionRauNetEnabled: z.boolean(),
-  hiDiffusionWindowAttnEnabled: z.boolean(),
-  hiDiffusionT1Ratio: z.number(),
-  hiDiffusionT2Ratio: z.number(),
+  // Added after the `_version` 3 -> 4 bump, so while 4 was current no migration step could seed them
+  // — a blob already at v4 matched no branch in the chain. Without defaults they are required, and
+  // every persisted blob in existence fails the parse in `migrate()`, wiping the user's whole params
+  // slice on upgrade. The defaults are still what covers the current tier, which has no step either.
+  hiDiffusionEnabled: z.boolean().default(false),
+  hiDiffusionRauNetEnabled: z.boolean().default(true),
+  hiDiffusionWindowAttnEnabled: z.boolean().default(true),
+  hiDiffusionT1Ratio: z.number().default(0.4),
+  hiDiffusionT2Ratio: z.number().default(0.0),
   iterations: z.number(),
   scheduler: zParameterScheduler,
   fluxScheduler: zParameterFluxScheduler,
@@ -897,17 +901,27 @@ export const zParamsState = z.object({
   animaScheduler: zParameterAnimaScheduler,
   animaLLLiteModel: zModelIdentifierField.nullable().default(null), // Optional: ControlNet-LLLite inpaint adapter for Anima
   animaLLLiteWeight: z.number().min(-10).max(10).default(1),
-  // Flux2 Klein model components - uses Qwen3 instead of CLIP+T5
-  kleinVaeModel: zParameterVAEModel.nullable(), // Optional: Separate FLUX.2 VAE for Klein
+  // FLUX.2 VAE shared by Klein and [dev] — both use the same 32-channel AutoencoderKLFlux2 pool,
+  // so a single slot avoids losing the selection when switching a GGUF between the two.
+  flux2VaeModel: zParameterVAEModel.nullable(), // Optional: Separate FLUX.2 VAE (Klein + [dev])
+  // Flux2 Klein text encoder - uses Qwen3 instead of CLIP+T5
   kleinQwen3EncoderModel: zModelIdentifierField.nullable(), // Optional: Separate Qwen3 Encoder for Klein
+  // Flux2 [dev] text encoder - uses Mistral Small 3.1 (24B)
+  flux2DevMistralEncoderModel: zModelIdentifierField.nullable(), // Optional: Standalone Mistral encoder for [dev]
   // PiD (Pixel Diffusion Decoder) - optional 4x super-resolution decode replacing the VAE decode.
   // - 'off':    regular VAE decode
   // - 'fit':    PiD decodes 4x internally, then downscales back to the bbox (compositing-safe; works in canvas/inpaint)
   // - 'native': PiD's full 4x output IS the result; the user-facing dimensions are the target, generation runs at target / 4
-  pidMode: zPidMode,
-  pidDecoderModel: zModelIdentifierField.nullable(), // PiD decoder checkpoint (matched to the main model's base)
-  gemma2EncoderModel: zModelIdentifierField.nullable(), // Gemma-2 caption encoder required by PiD
-  pidSteps: z.number().int().min(1).max(4), // PiD distill steps: student schedule has only 4 transitions, so 1-4
+  // These four landed *after* the `_version` 3 -> 4 bump, so for as long as 4 was the current
+  // version no migration step could reach them: a blob already at v4 (dev builds from that window)
+  // matched no branch in the chain. They carry zod defaults for the same reason the ERNIE-Image
+  // fields above do — without one they would be required, and their absence would fail the parse in
+  // `migrate()` and wipe the whole slice. That is the rule for any field added after the last bump,
+  // which is why it still applies now that the v4 -> v5 step also seeds these.
+  pidMode: zPidMode.default('off'),
+  pidDecoderModel: zModelIdentifierField.nullable().default(null), // PiD decoder checkpoint (matched to the main model's base)
+  gemma2EncoderModel: zModelIdentifierField.nullable().default(null), // Gemma-2 caption encoder required by PiD
+  pidSteps: z.number().int().min(1).max(4).default(4), // PiD distill steps: student schedule has only 4 transitions, so 1-4
   // Qwen Image Edit model components - GGUF transformer needs a Diffusers source for VAE/encoder
   qwenImageComponentSource: zParameterModel.nullable(), // Diffusers model providing VAE + text encoder
   qwenImageVaeModel: zParameterVAEModel.nullable(), // Optional: Standalone Qwen Image VAE checkpoint
@@ -951,7 +965,7 @@ export const zParamsState = z.object({
 });
 export type ParamsState = z.infer<typeof zParamsState>;
 export const getInitialParamsState = (): ParamsState => ({
-  _version: 4,
+  _version: 5,
   maskBlur: 16,
   maskBlurMethod: 'box',
   canvasCoherenceMode: 'Gaussian Blur',
@@ -1023,8 +1037,9 @@ export const getInitialParamsState = (): ParamsState => ({
   animaScheduler: 'euler',
   animaLLLiteModel: null,
   animaLLLiteWeight: 1,
-  kleinVaeModel: null,
+  flux2VaeModel: null,
   kleinQwen3EncoderModel: null,
+  flux2DevMistralEncoderModel: null,
   pidMode: 'off',
   pidDecoderModel: null,
   gemma2EncoderModel: null,
