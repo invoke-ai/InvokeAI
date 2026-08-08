@@ -321,9 +321,9 @@ class EventServiceBase:
 
     # region Image index
 
-    def emit_image_index_status(self, total: int, embedded: int, pending: int) -> None:
+    def emit_image_index_status(self, total: int, embedded: int, pending: int, failed: int = 0) -> None:
         """Emitted when the image embedding index makes progress"""
-        self.dispatch(ImageIndexStatusEvent.build(total=total, embedded=embedded, pending=pending))
+        self.dispatch(ImageIndexStatusEvent.build(total=total, embedded=embedded, pending=pending, failed=failed))
 
     def emit_image_index_updated(self, user_id: str) -> None:
         """Emitted to one user when their images were just (re)embedded"""

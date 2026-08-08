@@ -884,10 +884,17 @@ class ImageIndexStatusEvent(ImageIndexEventBase):
     total: int = Field(description="Number of gallery images eligible for embedding")
     embedded: int = Field(description="Number of eligible images that have an embedding")
     pending: int = Field(description="Number of eligible images awaiting embedding")
+    failed: int = Field(
+        default=0,
+        description=(
+            "Eligible images that repeatedly failed to embed and were given up on. Excluded from "
+            "`pending`, so `total != embedded` with `pending == 0` means this many were skipped."
+        ),
+    )
 
     @classmethod
-    def build(cls, total: int, embedded: int, pending: int) -> "ImageIndexStatusEvent":
-        return cls(total=total, embedded=embedded, pending=pending)
+    def build(cls, total: int, embedded: int, pending: int, failed: int = 0) -> "ImageIndexStatusEvent":
+        return cls(total=total, embedded=embedded, pending=pending, failed=failed)
 
 
 @payload_schema.register

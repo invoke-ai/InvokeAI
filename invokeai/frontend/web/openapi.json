@@ -40892,9 +40892,15 @@
             "description": "Number of eligible images awaiting embedding",
             "title": "Pending",
             "type": "integer"
+          },
+          "failed": {
+            "default": 0,
+            "description": "Eligible images that repeatedly failed to embed and were given up on. Excluded from `pending`, so `total != embedded` with `pending == 0` means this many were skipped.",
+            "title": "Failed",
+            "type": "integer"
           }
         },
-        "required": ["timestamp", "total", "embedded", "pending"],
+        "required": ["timestamp", "total", "embedded", "pending", "failed"],
         "title": "ImageIndexStatusEvent",
         "type": "object"
       },

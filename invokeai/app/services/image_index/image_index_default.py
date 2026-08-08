@@ -510,8 +510,12 @@ class ImageIndexService(ImageIndexServiceBase):
         status = self.get_status()
         if status is None:
             return
+        # `failed` travels with the counts because it is the only thing that explains a
+        # settled index that is not complete: `pending` excludes failures, so without it a
+        # consumer sees pending == 0 with embedded < total and cannot tell "done" from
+        # "gave up on some".
         self._invoker.services.events.emit_image_index_status(
-            total=status.total, embedded=status.embedded, pending=status.pending
+            total=status.total, embedded=status.embedded, pending=status.pending, failed=status.failed
         )
 
     def _record_owner_pokes(self, image_names: list[str]) -> None:

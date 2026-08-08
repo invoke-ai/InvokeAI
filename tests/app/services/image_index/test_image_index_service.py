@@ -307,6 +307,40 @@ def test_broken_encoder_leaves_images_pending_rather_than_quarantined(
         service.stop()
 
 
+def test_status_event_reports_failures_so_a_settled_index_is_not_mistaken_for_complete(
+    image_records: SqliteImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+) -> None:
+    """`pending` excludes failures, so on its own it cannot express "gave up on some".
+
+    Without `failed` in the event, a client sees pending == 0 with embedded < total and has no
+    way to tell a finished index from one that quietly skipped images — it would render
+    "complete" over a gallery with holes.
+    """
+
+    def get_pil_image(image_name: str) -> Image.Image:
+        if image_name == "bad.png":
+            raise FileNotFoundError(image_name)
+        return Image.new("RGB", (16, 16), "purple")
+
+    images_service.get_pil_image = get_pil_image  # type: ignore[method-assign]
+
+    service = ImageIndexService(encode_fn=_fake_encode, model_id=MODEL_ID)
+    try:
+        _save_image(image_records, "good.png")
+        _save_image(image_records, "bad.png")
+        invoker = _make_invoker(images_service, index_records)
+        service.start(invoker)
+
+        _wait_until(lambda: any(e.failed == 1 and e.pending == 0 for e in _status_events(invoker)), timeout=20.0)
+        settled = [e for e in _status_events(invoker) if e.pending == 0][-1]
+        # The three numbers together are what make the state legible.
+        assert (settled.total, settled.embedded, settled.failed) == (2, 1, 1)
+    finally:
+        service.stop()
+
+
 def test_index_recovers_from_an_encoder_outage_without_a_restart(
     image_records: SqliteImageRecordStorage,
     images_service: ImageService,

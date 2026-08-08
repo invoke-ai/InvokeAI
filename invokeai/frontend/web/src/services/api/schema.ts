@@ -17065,6 +17065,12 @@ export type components = {
              * @description Number of eligible images awaiting embedding
              */
             pending: number;
+            /**
+             * Failed
+             * @description Eligible images that repeatedly failed to embed and were given up on. Excluded from `pending`, so `total != embedded` with `pending == 0` means this many were skipped.
+             * @default 0
+             */
+            failed: number;
         };
         /**
          * ImageIndexUpdatedEvent
