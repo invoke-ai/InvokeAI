@@ -1,5 +1,7 @@
 """Tests for the image index records service: embedding storage, eligibility, access scoping, projections."""
 
+import sqlite3
+
 import numpy as np
 import pytest
 
@@ -13,7 +15,10 @@ from invokeai.app.services.image_index.image_index_common import (
     coords_to_blob,
     embedding_to_blob,
 )
-from invokeai.app.services.image_index.image_index_records_sqlite import ImageIndexRecordsSqlite
+from invokeai.app.services.image_index.image_index_records_sqlite import (
+    _IN_CLAUSE_CHUNK,
+    ImageIndexRecordsSqlite,
+)
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
@@ -103,6 +108,68 @@ def test_embedding_blob_rejects_bad_shapes() -> None:
         blob_to_embedding(embedding_to_blob(_vec(1)), DIM + 1)
 
 
+def test_embedding_blob_rejects_non_finite_values() -> None:
+    # A NaN/inf row poisons every similarity and projection computation it later lands in, and
+    # cannot be attributed after the fact — so it must be refused at the boundary.
+    for bad in (np.nan, np.inf, -np.inf):
+        v = _vec(1)
+        v[0] = bad
+        with pytest.raises(ValueError, match="NaN or infinite"):
+            embedding_to_blob(v)
+
+    # A float64 magnitude that overflows when narrowed to float32 is the same defect, arriving
+    # via dtype conversion rather than as a literal inf.
+    with pytest.raises(ValueError, match="NaN or infinite"):
+        embedding_to_blob(np.array([1e40] * DIM, dtype=np.float64))
+
+
+def test_embedding_blob_rejects_zero_length() -> None:
+    # dim=0 stores cleanly but then fails every batch it appears in, because get_embeddings
+    # requires one consistent dim across the result set.
+    with pytest.raises(ValueError, match="zero-length"):
+        embedding_to_blob(np.zeros(0, dtype=np.float32))
+
+
+def test_embedding_blob_rejects_all_zero_vector() -> None:
+    # Not L2-normalizable, and it yields NaN in every cosine similarity it takes part in.
+    with pytest.raises(ValueError, match="all-zero"):
+        embedding_to_blob(np.zeros(DIM, dtype=np.float32))
+
+    # Same defect arriving by underflow: float64 components too small to survive the narrowing.
+    with pytest.raises(ValueError, match="all-zero"):
+        embedding_to_blob(np.full(DIM, 1e-320, dtype=np.float64))
+
+
+def test_embedding_blob_rejects_non_floating_dtypes() -> None:
+    # These must raise the documented ValueError, not TypeError from the cast or a silent
+    # coercion that stores meaningless numbers.
+    for bad in (
+        np.zeros(2, dtype=[("a", "f4"), ("b", "f4")]),
+        np.array([1 + 1j, 2 + 0j], dtype=np.complex128),
+        np.arange(DIM, dtype=np.int64),
+        np.ones(DIM, dtype=bool),
+    ):
+        with pytest.raises(ValueError, match="floating-point"):
+            embedding_to_blob(bad)
+
+
+def test_embedding_blob_survives_global_numpy_error_state() -> None:
+    # A process-wide np.seterr must not turn the documented ValueError into FloatingPointError.
+    old = np.seterr(all="raise")
+    try:
+        with pytest.raises(ValueError, match="NaN or infinite"):
+            embedding_to_blob(np.array([1e40] * DIM, dtype=np.float64))
+        with pytest.raises(ValueError, match="all-zero"):
+            embedding_to_blob(np.full(DIM, 1e-320, dtype=np.float64))
+    finally:
+        np.seterr(**old)
+
+
+def test_embedding_blob_narrows_float64_input() -> None:
+    v64 = (np.arange(DIM, dtype=np.float64) + 1.0) / 10.0
+    assert np.array_equal(blob_to_embedding(embedding_to_blob(v64), DIM), v64.astype(np.float32))
+
+
 def test_coords_blob_roundtrip_and_validation() -> None:
     coords = np.arange(10, dtype=np.float32).reshape(5, 2)
     assert np.array_equal(blob_to_coords(coords_to_blob(coords), 5), coords)
@@ -168,16 +235,42 @@ def test_get_embeddings_empty_input_and_no_matches(
 def test_get_embeddings_chunks_large_requests(
     image_records: SqliteImageRecordStorage, index_records: ImageIndexRecordsSqlite
 ) -> None:
-    # More names than one IN-clause chunk (500) to exercise the chunked path.
-    count = 501
+    # Straddle the IN-clause chunk boundary so the multi-chunk path really runs. Derived from
+    # the constant rather than hardcoded, so raising the chunk size cannot silently reduce this
+    # to a single-chunk test.
+    count = _IN_CLAUSE_CHUNK + 1
     for i in range(count):
         _save_image(image_records, f"img-{i:04d}.png")
         index_records.upsert_embedding(f"img-{i:04d}.png", MODEL_ID, _vec(i))
 
-    requested = [f"img-{i:04d}.png" for i in range(count)]
+    # Reverse order: SQLite would return each chunk in its own order, so this fails unless the
+    # implementation reorders results back to the caller's sequence within every chunk.
+    requested = [f"img-{i:04d}.png" for i in reversed(range(count))]
     names, matrix = index_records.get_embeddings(requested, MODEL_ID)
     assert names == requested
     assert matrix.shape == (count, DIM)
+    # Rows must still align with the names after chunking and reordering.
+    assert np.array_equal(matrix[0], _vec(count - 1))
+    assert np.array_equal(matrix[-1], _vec(0))
+
+
+def test_get_embeddings_rejects_inconsistent_dims(
+    image_records: SqliteImageRecordStorage, index_records: ImageIndexRecordsSqlite, db: SqliteDatabase
+) -> None:
+    # The ABC promises a failure on mixed dims under one model_id. Write a short vector behind
+    # the service's back, since upsert_embedding alone cannot produce the inconsistency.
+    _save_image(image_records, "a.png")
+    _save_image(image_records, "b.png")
+    index_records.upsert_embedding("a.png", MODEL_ID, _vec(1))
+    short = np.ones(DIM // 2, dtype=np.float32)
+    with db.transaction() as cursor:
+        cursor.execute(
+            "INSERT INTO image_embeddings (image_name, model_id, dim, embedding) VALUES (?, ?, ?, ?);",
+            ("b.png", MODEL_ID, DIM // 2, embedding_to_blob(short)),
+        )
+
+    with pytest.raises(ValueError, match="Inconsistent embedding dims"):
+        index_records.get_embeddings(["a.png", "b.png"], MODEL_ID)
 
 
 def test_get_embeddings_deduplicates_input_names(
@@ -204,6 +297,34 @@ def test_set_projection_for_deleted_user_is_noop(index_records: ImageIndexRecord
         "no-such-user", MODEL_ID, "hash-1", "{}", ["a.png"], np.zeros((1, 2), dtype=np.float32)
     )
     assert index_records.get_projection("no-such-user", MODEL_ID) is None
+
+
+def test_skipped_write_raises_nothing_and_leaves_the_connection_usable(
+    image_records: SqliteImageRecordStorage, index_records: ImageIndexRecordsSqlite, db: SqliteDatabase
+) -> None:
+    # The missing-parent case is handled by `WHERE EXISTS`, not by provoking and swallowing an
+    # IntegrityError. That matters because `db.transaction()` commits/rolls back the whole
+    # shared connection: a swallowed error would leave the connection mid-statement-failure, and
+    # an escaping one would roll back. Neither may happen, and the next write must still work.
+    index_records.upsert_embedding("gone.png", MODEL_ID, _vec(1))
+    index_records.set_projection(
+        "no-such-user", MODEL_ID, "hash-1", "{}", ["a.png"], np.zeros((1, 2), dtype=np.float32)
+    )
+
+    assert db._conn.in_transaction is False
+
+    _save_image(image_records, "real.png")
+    index_records.upsert_embedding("real.png", MODEL_ID, _vec(2))
+    assert index_records.get_embeddings(["real.png"], MODEL_ID)[0] == ["real.png"]
+
+
+def test_skipped_write_does_not_raise_integrity_error(index_records: ImageIndexRecordsSqlite) -> None:
+    # Pin the mechanism, not just the outcome: if the guard regressed to relying on the foreign
+    # key, this would raise instead of no-opping.
+    try:
+        index_records.upsert_embedding("gone.png", MODEL_ID, _vec(1))
+    except sqlite3.IntegrityError as exc:  # pragma: no cover - the assertion is the point
+        pytest.fail(f"missing-parent write must be a no-op, not an IntegrityError: {exc}")
 
 
 def test_delete_embedding_removes_all_models(
@@ -261,13 +382,41 @@ def test_list_unembedded_skips_ineligible_and_embedded(
     assert unembedded == ["eligible.png"]
 
 
-def test_list_unembedded_respects_limit(
-    image_records: SqliteImageRecordStorage, index_records: ImageIndexRecordsSqlite
+def test_list_unembedded_respects_limit_and_returns_oldest_first(
+    image_records: SqliteImageRecordStorage, index_records: ImageIndexRecordsSqlite, db: SqliteDatabase
 ) -> None:
+    # `created_at` has millisecond resolution, so five back-to-back saves almost always tie and
+    # the `image_name ASC` tie-break alone decides the result — which would let a reversed
+    # `created_at` ordering pass unnoticed. Stamp distinct timestamps in the *reverse* of
+    # alphabetical order so the two orderings disagree and only `created_at` can satisfy this.
     for i in range(5):
         _save_image(image_records, f"img-{i}.png")
+    with db.transaction() as cursor:
+        for i in range(5):
+            cursor.execute(
+                "UPDATE images SET created_at = ? WHERE image_name = ?;",
+                (f"2026-01-0{5 - i} 00:00:00.000", f"img-{i}.png"),
+            )
 
-    assert len(index_records.list_unembedded_image_names(MODEL_ID, limit=3)) == 3
+    batch = index_records.list_unembedded_image_names(MODEL_ID, limit=3)
+
+    # Which three matters, not just how many: backfill walks oldest-first, and a reversed order
+    # would silently re-scan the newest images forever while the oldest never got embedded.
+    assert batch == ["img-4.png", "img-3.png", "img-2.png"]
+
+
+def test_list_unembedded_rejects_negative_limit(index_records: ImageIndexRecordsSqlite) -> None:
+    # SQLite reads a negative LIMIT as unbounded, which would turn a bounded backfill batch into
+    # a full-table load.
+    with pytest.raises(ValueError, match="non-negative"):
+        index_records.list_unembedded_image_names(MODEL_ID, limit=-1)
+
+
+def test_list_unembedded_zero_limit_returns_nothing(
+    image_records: SqliteImageRecordStorage, index_records: ImageIndexRecordsSqlite
+) -> None:
+    _save_image(image_records, "a.png")
+    assert index_records.list_unembedded_image_names(MODEL_ID, limit=0) == []
 
 
 def test_count_index_status(image_records: SqliteImageRecordStorage, index_records: ImageIndexRecordsSqlite) -> None:
@@ -418,18 +567,76 @@ def test_accessible_images_excludes_archived_boards(
     assert index_records.list_accessible_embedded_images(None, MODEL_ID) == ["own-unboarded.png"]
 
 
-def test_accessible_images_deduplicates_multi_board_images(
+def test_accessible_images_returns_boarded_images_once(
     image_records: SqliteImageRecordStorage,
     board_records: SqliteBoardRecordStorage,
     board_image_records: SqliteBoardImageRecordStorage,
     index_records: ImageIndexRecordsSqlite,
 ) -> None:
+    # `board_images` has PRIMARY KEY (image_name), so an image is on at most one board and the
+    # board join cannot multiply rows. This pins that the join stays single-valued: if
+    # board_images ever became many-to-many, the result would duplicate and the scope hash
+    # (derived from this list) would change without the accessible set changing.
     _save_image(image_records, "a.png")
     index_records.upsert_embedding("a.png", MODEL_ID, _vec(1))
     board_a = board_records.save("A", SYSTEM_USER_ID).board_id
     board_image_records.add_image_to_board(board_a, "a.png")
 
     assert index_records.list_accessible_embedded_images(SYSTEM_USER_ID, MODEL_ID) == ["a.png"]
+
+
+def test_accessible_images_are_filtered_by_model_id(
+    image_records: SqliteImageRecordStorage,
+    board_records: SqliteBoardRecordStorage,
+    board_image_records: SqliteBoardImageRecordStorage,
+    index_records: ImageIndexRecordsSqlite,
+    other_user_id: str,
+) -> None:
+    # The scope hash is derived from this listing while the embedding matrix is fetched by
+    # model_id. If the listing ignored model_id, a model switch would put images into the scope
+    # whose embeddings get_embeddings cannot return, desynchronizing names from coordinates.
+    _save_image(image_records, "current.png")
+    _save_image(image_records, "stale.png")
+    index_records.upsert_embedding("current.png", MODEL_ID, _vec(1))
+    index_records.upsert_embedding("stale.png", OTHER_MODEL_ID, _vec(2))
+
+    shared = board_records.save("Shared", SYSTEM_USER_ID).board_id
+    board_records.update(shared, BoardChanges(board_visibility=BoardVisibility.Shared))
+    board_image_records.add_image_to_board(shared, "current.png")
+    board_image_records.add_image_to_board(shared, "stale.png")
+
+    # Every scope must apply the filter, not just the owner's.
+    assert index_records.list_accessible_embedded_images(SYSTEM_USER_ID, MODEL_ID) == ["current.png"]
+    assert index_records.list_accessible_embedded_images(other_user_id, MODEL_ID) == ["current.png"]
+    assert index_records.list_accessible_embedded_images(None, MODEL_ID) == ["current.png"]
+    assert index_records.list_accessible_embedded_images(None, OTHER_MODEL_ID) == ["stale.png"]
+
+
+def test_accessible_images_exclude_individually_shared_archived_board(
+    image_records: SqliteImageRecordStorage,
+    board_records: SqliteBoardRecordStorage,
+    board_image_records: SqliteBoardImageRecordStorage,
+    index_records: ImageIndexRecordsSqlite,
+    db: SqliteDatabase,
+    other_user_id: str,
+) -> None:
+    # Archiving is tested for visibility-shared boards; the shared_boards grant is a separate
+    # branch of the access clause and must be archived-gated too.
+    _save_image(image_records, "granted.png")
+    index_records.upsert_embedding("granted.png", MODEL_ID, _vec(1))
+    board_id = board_records.save("Private", SYSTEM_USER_ID).board_id
+    board_image_records.add_image_to_board(board_id, "granted.png")
+    with db.transaction() as cursor:
+        cursor.execute(
+            "INSERT INTO shared_boards (board_id, user_id) VALUES (?, ?);",
+            (board_id, other_user_id),
+        )
+
+    assert index_records.list_accessible_embedded_images(other_user_id, MODEL_ID) == ["granted.png"]
+
+    board_records.update(board_id, BoardChanges(archived=True))
+
+    assert index_records.list_accessible_embedded_images(other_user_id, MODEL_ID) == []
 
 
 # --- Projections ---

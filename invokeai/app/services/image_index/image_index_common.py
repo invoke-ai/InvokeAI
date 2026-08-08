@@ -34,10 +34,39 @@ class ProjectionRecord(BaseModel):
 
 
 def embedding_to_blob(embedding: np.ndarray) -> bytes:
-    """Serialize a 1-D embedding vector to bytes for BLOB storage."""
+    """Serialize a 1-D embedding vector to bytes for BLOB storage.
+
+    The vector is stored as float32; a float64 input is narrowed. Callers are responsible for
+    L2-normalizing — this only rejects vectors that could not have been normalized, because a
+    non-finite value silently poisons every similarity and projection computation that later
+    touches the same batch, with no way to attribute it after the fact.
+    """
     if embedding.ndim != 1:
         raise ValueError(f"Expected a 1-D embedding, got shape {embedding.shape}")
-    return np.ascontiguousarray(embedding, dtype=EMBEDDING_DTYPE).tobytes()
+    if embedding.shape[0] == 0:
+        # A zero-dim row would be stored with dim=0 and then fail every batch it appears in,
+        # because `get_embeddings` requires one consistent dim across the result set.
+        raise ValueError("Refusing to store a zero-length embedding")
+    if not np.issubdtype(embedding.dtype, np.floating):
+        # Checked before the cast, which would otherwise raise TypeError (not the documented
+        # ValueError) on a structured dtype, and would silently discard the imaginary part of a
+        # complex one.
+        raise ValueError(f"Expected a floating-point embedding, got dtype {embedding.dtype}")
+    with np.errstate(all="ignore"):
+        # Narrowing can overflow to inf or underflow to zero; both are reported below as
+        # ValueError. Suppressing every flag here keeps that true even if some caller has set
+        # `np.seterr(all="raise")` process-wide, which would otherwise surface as
+        # FloatingPointError and break this function's documented contract.
+        narrowed = np.ascontiguousarray(embedding, dtype=EMBEDDING_DTYPE)
+    if not np.isfinite(narrowed).all():
+        # Also catches a float64 magnitude that overflows to inf when narrowed to float32.
+        raise ValueError("Embedding contains NaN or infinite values")
+    if not narrowed.any():
+        # All-zero cannot be an L2-normalized vector. It arrives either from an encoder failure
+        # or from float64 components that underflowed to zero when narrowed, and it produces
+        # NaN in every cosine similarity it takes part in.
+        raise ValueError("Refusing to store an all-zero embedding; it cannot be L2-normalized")
+    return narrowed.tobytes()
 
 
 def blob_to_embedding(blob: bytes, dim: int) -> np.ndarray:

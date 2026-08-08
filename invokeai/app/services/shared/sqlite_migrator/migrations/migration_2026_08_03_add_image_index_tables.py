@@ -11,8 +11,17 @@ each gallery image plus a cached 2D UMAP projection per user:
   so staleness is detected by re-deriving it, never by bookkeeping.
 
 The DDL uses IF NOT EXISTS so databases that acquired these tables from a
-pre-rename build of this feature (which shipped them as a numeric migration)
-no-op cleanly.
+pre-rename build of this feature (commit `b3f46181d`, which shipped them as
+`migration_34`) re-run it harmlessly.
+
+That build burned the `migration_34` id, though, and this migration cannot
+undo that on its own: the affected database records `migration_34` as applied,
+so the migrator skips this fork's real `migration_34` and never creates the
+image-subfolder move tables. Repairing that is
+`migration_2026_08_08_repair_image_subfolder_move_tables`, which has to be a
+separate migration because it recreates tables this one has no business
+owning. Do not weaken that migration on the assumption that this one covers
+the case — it does not.
 """
 
 import sqlite3

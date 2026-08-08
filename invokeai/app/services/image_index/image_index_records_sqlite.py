@@ -1,5 +1,4 @@
 import json
-import sqlite3
 
 import numpy as np
 
@@ -17,6 +16,7 @@ from invokeai.app.services.image_index.image_index_records_base import ImageInde
 from invokeai.app.services.image_records.image_records_common import ImageCategory
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from invokeai.backend.util.logging import InvokeAILogger
 
 # SQLite's default variable limit is 999; stay well under it when chunking IN clauses.
 _IN_CLAUSE_CHUNK = 500
@@ -35,36 +35,44 @@ class ImageIndexRecordsSqlite(ImageIndexRecordsBase):
     def __init__(self, db: SqliteDatabase) -> None:
         super().__init__()
         self._db = db
+        self._logger = InvokeAILogger.get_logger(self.__class__.__name__)
 
     def start(self, invoker: Invoker) -> None:
         self._invoker = invoker
 
     def upsert_embedding(self, image_name: str, model_id: str, embedding: np.ndarray) -> None:
         blob = embedding_to_blob(embedding)
-        try:
-            with self._db.transaction() as cursor:
-                cursor.execute(
-                    """--sql
-                    INSERT INTO image_embeddings (image_name, model_id, dim, embedding)
-                    VALUES (?, ?, ?, ?)
-                    ON CONFLICT (image_name, model_id)
-                    DO UPDATE SET dim = excluded.dim, embedding = excluded.embedding;
-                    """,
-                    (image_name, model_id, embedding.shape[0], blob),
-                )
-        except sqlite3.IntegrityError:
-            # The image was deleted between being scheduled and embedded (the
-            # FK parent is gone). Its embedding is pointless; drop it silently.
-            pass
+        with self._db.transaction() as cursor:
+            # The image may be deleted between being scheduled and embedded, in which case the
+            # embedding is pointless and this is a no-op. `WHERE EXISTS` rather than catching the
+            # foreign-key IntegrityError: the guard and the insert are one atomic statement, and
+            # no exception is raised on the expected race, so nothing can leave the transaction
+            # in a state the caller did not ask for. An IntegrityError from here now means a
+            # genuine bug and is allowed to propagate.
+            cursor.execute(
+                """--sql
+                INSERT INTO image_embeddings (image_name, model_id, dim, embedding)
+                SELECT ?, ?, ?, ?
+                WHERE EXISTS (SELECT 1 FROM images WHERE images.image_name = ?)
+                ON CONFLICT (image_name, model_id)
+                DO UPDATE SET dim = excluded.dim, embedding = excluded.embedding;
+                """,
+                (image_name, model_id, embedding.shape[0], blob, image_name),
+            )
+            if cursor.rowcount == 0:
+                self._logger.debug(f"Skipped embedding for missing image {image_name}")
 
     def get_embeddings(self, image_names: list[str], model_id: str) -> tuple[list[str], np.ndarray]:
         # Dedupe while preserving order so repeated input names cannot
         # double-count rows in downstream projection/similarity math.
         image_names = list(dict.fromkeys(image_names))
         found_names: list[str] = []
-        vectors: list[np.ndarray] = []
-        dim: int | None = None
+        raw: list[tuple[int, bytes]] = []
 
+        # Only the reads happen under the transaction. Deserialization and validation are done
+        # afterwards so a malformed row raises outside it: `transaction()` rolls the shared
+        # connection back on any exception, which would be an unpleasant side effect of what the
+        # caller asked to be a read.
         with self._db.transaction() as cursor:
             for start in range(0, len(image_names), _IN_CLAUSE_CHUNK):
                 chunk = image_names[start : start + _IN_CLAUSE_CHUNK]
@@ -80,15 +88,18 @@ class ImageIndexRecordsSqlite(ImageIndexRecordsBase):
                 rows = {row[0]: (row[1], row[2]) for row in cursor.fetchall()}
                 # Preserve the caller's ordering within each chunk.
                 for name in chunk:
-                    if name not in rows:
-                        continue
-                    row_dim, blob = rows[name]
-                    if dim is None:
-                        dim = row_dim
-                    elif row_dim != dim:
-                        raise ValueError(f"Inconsistent embedding dims for model {model_id}: found {row_dim} and {dim}")
-                    found_names.append(name)
-                    vectors.append(blob_to_embedding(blob, row_dim))
+                    if name in rows:
+                        found_names.append(name)
+                        raw.append(rows[name])
+
+        dim: int | None = None
+        vectors: list[np.ndarray] = []
+        for row_dim, blob in raw:
+            if dim is None:
+                dim = row_dim
+            elif row_dim != dim:
+                raise ValueError(f"Inconsistent embedding dims for model {model_id}: found {row_dim} and {dim}")
+            vectors.append(blob_to_embedding(blob, row_dim))
 
         if not vectors:
             return [], np.empty((0, 0), dtype=EMBEDDING_DTYPE)
@@ -114,6 +125,10 @@ class ImageIndexRecordsSqlite(ImageIndexRecordsBase):
             return cursor.rowcount
 
     def list_unembedded_image_names(self, model_id: str, limit: int) -> list[str]:
+        if limit < 0:
+            # SQLite reads a negative LIMIT as unbounded, which would turn a backfill batch into
+            # a full-table load. Fail on a miscomputed limit instead of silently doing that.
+            raise ValueError(f"limit must be non-negative, got {limit}")
         with self._db.transaction() as cursor:
             cursor.execute(
                 f"""--sql
@@ -243,26 +258,27 @@ class ImageIndexRecordsSqlite(ImageIndexRecordsBase):
         if len(image_names) != coords.shape[0]:
             raise ValueError(f"Got {len(image_names)} image names but {coords.shape[0]} coordinate rows")
         blob = coords_to_blob(coords)
-        try:
-            with self._db.transaction() as cursor:
-                cursor.execute(
-                    """--sql
-                    INSERT INTO image_projections (user_id, model_id, scope_hash, params, point_count, image_names, coords)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                    ON CONFLICT (user_id, model_id)
-                    DO UPDATE SET
-                      scope_hash = excluded.scope_hash,
-                      params = excluded.params,
-                      point_count = excluded.point_count,
-                      image_names = excluded.image_names,
-                      coords = excluded.coords;
-                    """,
-                    (user_id, model_id, scope_hash, params, len(image_names), json.dumps(image_names), blob),
-                )
-        except sqlite3.IntegrityError:
-            # The user was deleted while their projection was being computed;
-            # there is nobody left to serve it to.
-            pass
+        with self._db.transaction() as cursor:
+            # No-op if the user was deleted while their projection was being computed; there is
+            # nobody left to serve it to. Guarded by `WHERE EXISTS` for the same reason as in
+            # `upsert_embedding`.
+            cursor.execute(
+                """--sql
+                INSERT INTO image_projections (user_id, model_id, scope_hash, params, point_count, image_names, coords)
+                SELECT ?, ?, ?, ?, ?, ?, ?
+                WHERE EXISTS (SELECT 1 FROM users WHERE users.user_id = ?)
+                ON CONFLICT (user_id, model_id)
+                DO UPDATE SET
+                  scope_hash = excluded.scope_hash,
+                  params = excluded.params,
+                  point_count = excluded.point_count,
+                  image_names = excluded.image_names,
+                  coords = excluded.coords;
+                """,
+                (user_id, model_id, scope_hash, params, len(image_names), json.dumps(image_names), blob, user_id),
+            )
+            if cursor.rowcount == 0:
+                self._logger.debug(f"Skipped projection for missing user {user_id}")
 
     def delete_projection(self, user_id: str, model_id: str) -> None:
         with self._db.transaction() as cursor:

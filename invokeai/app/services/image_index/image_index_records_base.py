@@ -14,6 +14,12 @@ class ImageIndexRecordsBase(ABC):
 
     Only "gallery" images are indexed: non-intermediate images in the
     `general` category.
+
+    Every method here is its own unit of work and must not be called from inside another
+    service's open transaction. `SqliteDatabase.transaction()` commits and rolls back the whole
+    shared connection rather than using savepoints, so a nested call either commits the outer
+    transaction's work early (on success) or discards it (on failure). No caller in the tree
+    nests these today; keep it that way.
     """
 
     @abstractmethod
@@ -25,6 +31,10 @@ class ImageIndexRecordsBase(ABC):
 
         All embeddings stored under one model_id must share the same dim;
         `get_embeddings` fails on a result set with inconsistent dims.
+
+        Raises ValueError on a vector that could not be a normalized embedding — empty, all
+        zero, non-floating dtype, or containing NaN/inf — since any of those poisons every
+        batch it later appears in.
         """
         pass
 
@@ -38,6 +48,10 @@ class ImageIndexRecordsBase(ABC):
             A tuple of (found_names, matrix) where matrix has shape
             (len(found_names), dim) and rows align with found_names. Images
             without a stored embedding are silently omitted.
+
+            When nothing matches, the matrix is empty with shape (0, 0): no row was read, so
+            there is no dim to report. Callers that need the dim must get it elsewhere rather
+            than from `matrix.shape[1]`.
         """
         pass
 
@@ -72,9 +86,13 @@ class ImageIndexRecordsBase(ABC):
     def list_accessible_embedded_images(self, user_id: str | None, model_id: str) -> list[str]:
         """List embedded images the user can access, sorted by image name.
 
-        A user can access their own images, images on shared or public boards,
-        and images on boards individually shared with them (shared_boards).
-        Pass user_id=None for the admin scope (every embedded image).
+        A user can access their own unboarded images, images on boards they own, images on
+        shared or public boards, and images on boards individually shared with them
+        (shared_boards). Pass user_id=None for the admin scope.
+
+        Images on an archived board are excluded from every scope, including the admin one,
+        matching the gallery's "all" listing. So the admin scope is every embedded image that
+        is not archived, not literally every embedded image.
 
         The sorted result is the input to the projection scope hash, so the
         ordering here must stay stable.
