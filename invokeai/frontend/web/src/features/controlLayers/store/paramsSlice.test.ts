@@ -624,6 +624,7 @@ const RELEASE_PARAMS_KEYS = {
   f10d2a4f5a: {
     version: 5,
     keys: [
+      '_version',
       'animaLLLiteModel',
       'animaLLLiteWeight',
       'animaQwen3EncoderModel',
@@ -719,7 +720,6 @@ const RELEASE_PARAMS_KEYS = {
       'upscaleScheduler',
       'vae',
       'vaePrecision',
-      '_version',
       'wanComponentSource',
       'wanGuidanceScaleLowNoise',
       'wanT5EncoderModel',
@@ -738,6 +738,31 @@ const RELEASE_PARAMS_KEYS = {
 } as const satisfies Record<string, { version: number; keys: readonly string[] }>;
 
 /**
+ * Values for fixture keys that have since been removed from `zParamsState`, so a blob can still
+ * reproduce them.
+ *
+ * `buildReleaseBlob` sources its values from `getInitialParamsState()`, which by definition only
+ * knows today's keys. Without this table a fixture key that leaves the schema is dropped from the
+ * blob *silently*, and the fixture quietly stops reproducing the shape the build actually persisted
+ * — which in turn stops exercising whatever migration step reads that key. That is not theoretical:
+ * `kleinVaeModel` left the schema when the v4 -> v5 step folded it into `flux2VaeModel`, and it is
+ * the input to that fold. The guard test below fails on any fixture key that is in neither the
+ * current schema nor this table, so the next removal has to be a decision rather than an accident.
+ */
+const REMOVED_SCHEMA_KEY_VALUES: Record<string, unknown> = {
+  // Folded into `flux2VaeModel` and deleted by the v4 -> v5 step.
+  kleinVaeModel: null,
+  // The pre-merge FLUX.2 [dev] branch's VAE slot, folded into `flux2VaeModel` by the same step.
+  flux2DevVaeModel: null,
+  // The v0-era second prompt box, dropped when prompt concatenation was removed.
+  positivePrompt2: '',
+  negativePrompt2: '',
+  shouldConcatPrompts: true,
+  // Present in v6.13.0 only, removed before v6.13.7.
+  animaT5EncoderModel: null,
+};
+
+/**
  * Build a blob shaped exactly like the one the given build persisted: current initial values, but
  * restricted to the keys that build's schema actually had.
  */
@@ -748,6 +773,8 @@ const buildReleaseBlob = (release: keyof typeof RELEASE_PARAMS_KEYS, overrides: 
   for (const key of keys) {
     if (key in initial) {
       blob[key] = initial[key];
+    } else if (key in REMOVED_SCHEMA_KEY_VALUES) {
+      blob[key] = REMOVED_SCHEMA_KEY_VALUES[key];
     }
   }
   if (version === 0) {
@@ -763,6 +790,76 @@ const buildReleaseBlob = (release: keyof typeof RELEASE_PARAMS_KEYS, overrides: 
   }
   return { ...blob, ...overrides };
 };
+
+const probeModel = (key: string, base: string, type: string) => ({ key, hash: `${key}-hash`, name: key, base, type });
+
+/**
+ * Keys added to `zParamsState` after `1aeb05bbf0` bumped `_version` to 4, which reach users only via
+ * a zod default. A tier that is current has no migration step by definition, so this is the only
+ * route available to anything added after the most recent bump.
+ */
+const POST_V4_BUMP_DEFAULTED_KEYS = [
+  'pidMode',
+  'pidDecoderModel',
+  'gemma2EncoderModel',
+  'pidSteps',
+  'hiDiffusionEnabled',
+  'hiDiffusionRauNetEnabled',
+  'hiDiffusionWindowAttnEnabled',
+  'hiDiffusionT1Ratio',
+  'hiDiffusionT2Ratio',
+] as const satisfies readonly (keyof typeof zParamsState.shape)[];
+
+/**
+ * Every seed in the version steps written conditionally (`state.X = state.X ?? V`), paired with a
+ * valid value that differs from what the seed would write.
+ *
+ * The `??` is the whole point of those lines: the field landed in the schema *before* the version
+ * bump that seeds it, so a blob written by a dev build in that window already carries a real user
+ * value, and an unconditional assignment would silently reset it. That is a one-field data loss per
+ * key, invisible unless something probes the key specifically — so every conditional seed gets a
+ * row here. `tier` is the fixture whose `_version` the seeding step consumes.
+ */
+const CONDITIONAL_SEED_PROBES: {
+  tier: keyof typeof RELEASE_PARAMS_KEYS;
+  key: keyof typeof zParamsState.shape;
+  value: unknown;
+}[] = [
+  // v2 -> v3
+  { tier: 'v6.7.0', key: 'fluxScheduler', value: 'lcm' },
+  { tier: 'v6.7.0', key: 'zImageScheduler', value: 'lcm' },
+  { tier: 'v6.7.0', key: 'colorCompensation', value: true },
+  { tier: 'v6.7.0', key: 'zImageVaeModel', value: probeModel('z-vae', 'z-image', 'vae') },
+  { tier: 'v6.7.0', key: 'zImageQwen3EncoderModel', value: probeModel('z-enc', 'z-image', 'main') },
+  { tier: 'v6.7.0', key: 'zImageQwen3SourceModel', value: probeModel('z-src', 'z-image', 'main') },
+  { tier: 'v6.7.0', key: 'fluxDypePreset', value: 'auto' },
+  { tier: 'v6.7.0', key: 'fluxDypeScale', value: 3.5 },
+  { tier: 'v6.7.0', key: 'fluxDypeExponent', value: 3.5 },
+  { tier: 'v6.7.0', key: 'zImageShift', value: 3.0 },
+  { tier: 'v6.7.0', key: 'zImageSeedVarianceEnabled', value: true },
+  { tier: 'v6.7.0', key: 'zImageSeedVarianceStrength', value: 0.3 },
+  { tier: 'v6.7.0', key: 'zImageSeedVarianceRandomizePercent', value: 75 },
+  { tier: 'v6.7.0', key: 'animaVaeModel', value: probeModel('anima-vae', 'anima', 'vae') },
+  { tier: 'v6.7.0', key: 'animaQwen3EncoderModel', value: probeModel('anima-enc', 'anima', 'main') },
+  { tier: 'v6.7.0', key: 'animaScheduler', value: 'dpmpp_2m' },
+  { tier: 'v6.7.0', key: 'kleinQwen3EncoderModel', value: probeModel('klein-enc', 'flux2', 'main') },
+  { tier: 'v6.7.0', key: 'qwenImageComponentSource', value: probeModel('qwen-src', 'qwen-image', 'main') },
+  { tier: 'v6.7.0', key: 'qwenImageQuantization', value: 'int8' },
+  { tier: 'v6.7.0', key: 'qwenImageShift', value: 3.0 },
+  // v3 -> v4
+  { tier: 'v6.13.7', key: 'wanTransformerLowNoise', value: probeModel('wan-low', 'wan', 'main') },
+  { tier: 'v6.13.7', key: 'wanComponentSource', value: probeModel('wan-src', 'wan', 'main') },
+  { tier: 'v6.13.7', key: 'wanVaeModel', value: probeModel('wan-vae', 'wan', 'vae') },
+  { tier: 'v6.13.7', key: 'wanT5EncoderModel', value: probeModel('wan-t5', 'wan', 'main') },
+  { tier: 'v6.13.7', key: 'wanGuidanceScaleLowNoise', value: 3.5 },
+  // v4 -> v5
+  { tier: '1aeb05bbf0', key: 'flux2VaeModel', value: probeModel('flux2-vae', 'flux2', 'vae') },
+  { tier: '1aeb05bbf0', key: 'flux2DevMistralEncoderModel', value: probeModel('mistral', 'flux2', 'main') },
+  { tier: '1aeb05bbf0', key: 'pidMode', value: 'native' },
+  { tier: '1aeb05bbf0', key: 'pidDecoderModel', value: probeModel('pid-dec', 'flux', 'main') },
+  { tier: '1aeb05bbf0', key: 'gemma2EncoderModel', value: probeModel('gemma2', 'flux', 'main') },
+  { tier: '1aeb05bbf0', key: 'pidSteps', value: 2 },
+];
 
 /**
  * `dimensions` in the shape the given build persisted it: `{ rect: { x, y, width, height },
@@ -1019,12 +1116,26 @@ describe('paramsSliceConfig persisted state migration', () => {
     // This deliberately runs the version steps *without* going through migrate(), because
     // repairParamsState() would otherwise repair the omission and hide it. The safety net is there
     // to protect users from a forgotten seed; this test is what stops one being merged.
+    //
+    // Scope limit worth knowing: fixture values all come from getInitialParamsState(), so this
+    // covers *missing* keys, not keys whose persisted value a tightened schema would now reject.
+    // Tightening a nested schema (an item in `positivePromptHistory`, say) still costs that whole
+    // top-level key via `reset`, and no fixture here would notice. Realistic per-key persisted
+    // values would be needed to close that, which is a bigger change than this suite.
     for (const release of Object.keys(RELEASE_PARAMS_KEYS) as (keyof typeof RELEASE_PARAMS_KEYS)[]) {
       const { version } = RELEASE_PARAMS_KEYS[release];
       const blob = buildReleaseBlob(release);
 
       applyParamsVersionMigrations(blob);
-      const { backfilled } = repairParamsState(blob);
+      const { backfilled, reset } = repairParamsState(blob);
+
+      // The steps must not leave a value the schema rejects either — a half-applied migration that
+      // writes a malformed value costs the user that field, silently.
+      expect(
+        reset,
+        `The version steps left these keys holding a value that fails its own field schema, on a ` +
+          `blob written at ${release}. Each costs the user that field on upgrade.`
+      ).toEqual([]);
 
       expect(
         backfilled,
@@ -1037,6 +1148,31 @@ describe('paramsSliceConfig persisted state migration', () => {
               `the migration chain. Upgrading from ${release} would throw in zParamsState.parse() and wipe the ` +
               `user's whole params slice. Give each key a zod default, or seed it in the _version ` +
               `${version} migration step.`
+      ).toEqual([]);
+    }
+  });
+
+  it('reproduces every fixture key, including those since removed from the schema', () => {
+    // `buildReleaseBlob` can only source values it knows about, so a fixture key that is neither in
+    // the current schema nor in REMOVED_SCHEMA_KEY_VALUES is dropped from the blob without a word.
+    // The fixture then still *looks* faithful — the key is right there in the table — while having
+    // quietly stopped exercising whatever step consumes it. Fail instead, so removing a key from
+    // zParamsState forces a decision about the fixtures that name it.
+    const initial = getInitialParamsState() as unknown as Record<string, unknown>;
+
+    for (const release of Object.keys(RELEASE_PARAMS_KEYS) as (keyof typeof RELEASE_PARAMS_KEYS)[]) {
+      const { keys } = RELEASE_PARAMS_KEYS[release];
+      const blob = buildReleaseBlob(release);
+      const dropped = (keys as readonly string[]).filter(
+        (key) => !(key in initial) && !(key in REMOVED_SCHEMA_KEY_VALUES) && !(key in blob)
+      );
+
+      expect(
+        dropped,
+        `The ${release} fixture lists these keys, but they are neither in the current zParamsState nor ` +
+          `in REMOVED_SCHEMA_KEY_VALUES, so buildReleaseBlob silently omits them and the fixture no ` +
+          `longer reproduces the blob that build persisted. Add each to REMOVED_SCHEMA_KEY_VALUES with ` +
+          `the value that build wrote, or drop it from the fixture if it never existed.`
       ).toEqual([]);
     }
   });
@@ -1238,50 +1374,27 @@ describe('paramsSliceConfig persisted state migration', () => {
     expect(result.positivePrompt).toBe('a fluffy cat');
   });
 
-  it('preserves post-v3 values already present in a dev-build v2 blob', () => {
-    expect(migrate).toBeDefined();
+  it.each(CONDITIONAL_SEED_PROBES)(
+    'preserves a persisted $key rather than reseeding it (dev-build $tier blob)',
+    ({ tier, key, value }) => {
+      expect(migrate).toBeDefined();
 
-    // v2 blobs written by dev builds after each field landed already carry the keys, possibly with
-    // real values — the conditional seeds must not clobber them.
-    const v2State = buildReleaseBlob('v6.7.0', {
-      fluxScheduler: 'heun',
-      colorCompensation: true,
-      fluxDypePreset: 'auto',
-      qwenImageQuantization: 'int8',
-      qwenImageShift: 3.0,
-      zImageSeedVarianceEnabled: true,
-    });
+      // Pin the probe itself, or this test goes quietly inert: the value has to satisfy the field's
+      // own schema, and it has to differ from what the step would seed — otherwise "preserved" and
+      // "clobbered" look identical and an unconditional assignment slips through.
+      expect(zParamsState.shape[key].safeParse(value).success).toBe(true);
+      const reseeded = migrate?.(buildReleaseBlob(tier)) as Record<string, unknown>;
+      expect(reseeded[key]).not.toEqual(value);
 
-    const result = migrate?.(v2State) as ReturnType<typeof getInitialParamsState>;
+      const blob = buildReleaseBlob(tier, { [key]: value, positivePrompt: 'a fluffy cat' });
 
-    expect(result.fluxScheduler).toBe('heun');
-    expect(result.colorCompensation).toBe(true);
-    expect(result.fluxDypePreset).toBe('auto');
-    expect(result.qwenImageQuantization).toBe('int8');
-    expect(result.qwenImageShift).toBe(3.0);
-    expect(result.zImageSeedVarianceEnabled).toBe(true);
-  });
+      const result = migrate?.(blob) as Record<string, unknown>;
 
-  it('preserves Wan values already present in a dev-build v3 blob', () => {
-    expect(migrate).toBeDefined();
-
-    const initial = getInitialParamsState();
-    const wanVae = { key: 'wan-vae', hash: 'h', name: 'Wan VAE', base: 'wan', type: 'vae' };
-    // v3 blobs written by dev builds after the Wan merge already carry the keys, possibly with
-    // real values — the conditional seeds must not clobber them.
-    const v3State: Record<string, unknown> = {
-      ...initial,
-      _version: 3,
-      wanVaeModel: wanVae,
-      wanGuidanceScaleLowNoise: 3.5,
-    };
-
-    const result = migrate?.(v3State) as ReturnType<typeof getInitialParamsState>;
-
-    expect(result._version).toBe(5);
-    expect((result.wanVaeModel as { key: string } | null)?.key).toBe('wan-vae');
-    expect(result.wanGuidanceScaleLowNoise).toBe(3.5);
-  });
+      expect(result[key]).toEqual(value);
+      // The rest of the slice has to come through too — a reset here would be the whole-slice wipe.
+      expect(result.positivePrompt).toBe('a fluffy cat');
+    }
+  );
 
   it('fills the fields added after the v4 bump from their zod defaults', () => {
     expect(migrate).toBeDefined();
@@ -1299,10 +1412,20 @@ describe('paramsSliceConfig persisted state migration', () => {
     applyParamsVersionMigrations(blob);
     expect(blob._version).toBe(5);
 
-    // Deliberately parsed directly rather than through migrate(). The repair pass would backfill
-    // these from getInitialParamsState() to the very same values, so going through migrate() cannot
-    // tell the version steps and the zod defaults apart from the safety net catching their absence —
-    // the assertions would hold with both reverted.
+    // The value assertions below cannot, on their own, prove the defaults exist: three mechanisms
+    // produce the identical values, so any two can hide the third being reverted. Parsing directly
+    // rather than through migrate() rules out the repair pass, but not the v4 -> v5 step, which
+    // seeds all four PiD fields. Pin the property itself — carrying a default is exactly what lets a
+    // field survive on a tier with no step, and it is the thing the current tier depends on.
+    for (const key of POST_V4_BUMP_DEFAULTED_KEYS) {
+      expect(
+        zParamsState.shape[key].safeParse(undefined).success,
+        `${key} was added after the _version 4 bump and must carry a zod default: the current tier ` +
+          `has no migration step by definition, so a required key there fails the parse in migrate() ` +
+          `and wipes the user's whole params slice.`
+      ).toBe(true);
+    }
+
     const result = zParamsState.parse(blob);
 
     expect(result.pidMode).toBe('off');
