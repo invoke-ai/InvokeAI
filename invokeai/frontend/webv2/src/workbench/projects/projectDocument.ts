@@ -73,6 +73,82 @@ export const normalizeLegacyProjectDocument = (data: Record<string, unknown>): R
   };
 };
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const patchGalleryValues = (
+  values: Record<string, unknown>,
+  boardId: string,
+  selectBoard: boolean
+): Record<string, unknown> => ({
+  ...values,
+  projectBoardId: boardId,
+  ...(selectBoard ? { selectedBoardId: boardId } : {}),
+});
+
+/**
+ * Write the server's board id into a project document's gallery state.
+ *
+ * The server owns the project-to-board relationship; `projectBoardId` in the document is only a
+ * cache of it. Every path that learns the authoritative id — hydrating a record, creating a
+ * project, importing one, duplicating one, forking a conflicted one — comes through here, so there
+ * is one place that decides what "the project's board" means in a document.
+ *
+ * `selectBoard` distinguishes the two cases. A project the user is meeting for the first time
+ * should also be *pointed* at its board; one being re-hydrated should keep whatever destination
+ * the user last chose, which `getGallerySelectedBoardId` resolves separately.
+ *
+ * Both widget shapes are patched — the current `widgetInstances` map and the `widgetStates.gallery`
+ * one older builds wrote — and a document with neither is returned untouched rather than having a
+ * shape invented for it.
+ */
+export const applyAuthoritativeProjectBoard = (
+  projectDocument: Record<string, unknown>,
+  boardId: string,
+  options: { selectBoard: boolean }
+): Record<string, unknown> => {
+  let hasChanged = false;
+  const next: Record<string, unknown> = { ...projectDocument };
+
+  const instances = projectDocument.widgetInstances;
+  if (isRecord(instances)) {
+    const nextInstances: Record<string, unknown> = {};
+
+    for (const [instanceId, instance] of Object.entries(instances)) {
+      const state = isRecord(instance) ? instance.state : null;
+
+      if (!isRecord(instance) || instance.typeId !== 'gallery' || !isRecord(state)) {
+        nextInstances[instanceId] = instance;
+        continue;
+      }
+
+      const values = isRecord(state.values) ? state.values : {};
+
+      nextInstances[instanceId] = {
+        ...instance,
+        state: { ...state, values: patchGalleryValues(values, boardId, options.selectBoard) },
+      };
+      hasChanged = true;
+    }
+
+    next.widgetInstances = nextInstances;
+  }
+
+  const states = projectDocument.widgetStates;
+  if (isRecord(states) && isRecord(states.gallery)) {
+    const gallery = states.gallery;
+    const values = isRecord(gallery.values) ? gallery.values : {};
+
+    next.widgetStates = {
+      ...states,
+      gallery: { ...gallery, values: patchGalleryValues(values, boardId, options.selectBoard) },
+    };
+    hasChanged = true;
+  }
+
+  return hasChanged ? next : projectDocument;
+};
+
 /**
  * The minimum a document must carry to be a project at all. A document that
  * fails this can never rehydrate, so callers that only need to reject junk

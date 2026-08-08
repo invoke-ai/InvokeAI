@@ -22,6 +22,7 @@ import { submitActiveInvocation } from '@workbench/activeInvocationSubmission';
 import { createLayoutPresetActivator, loadLayoutPresetWidgets } from '@workbench/layoutPresetActivation';
 import { builtInLayoutPresetDescriptors, getLayoutPreset } from '@workbench/layoutPresets';
 import { toggleCommandPalette } from '@workbench/palette/paletteStore';
+import { getWorkbenchPreferences } from '@workbench/settings/store';
 import { openProjectSwitcher } from '@workbench/shell/topbar/projectSwitcherStore';
 import { openWidgetPlacement } from '@workbench/widgetPlacementCommands';
 import { getWidgetsForRegion } from '@workbench/widgetRegistry';
@@ -307,20 +308,12 @@ export const useRegisterFirstPartyCommands = () => {
         title: 'Next prompt history item',
       }),
       commandApi.register({
-        handler: () =>
-          adjustFocusedPromptAttention(
-            'increment',
-            queries.getSnapshot().activeProject.settings.preferNumericAttentionStyle
-          ),
+        handler: () => adjustFocusedPromptAttention('increment', getWorkbenchPreferences().preferNumericAttentionStyle),
         id: 'app.promptWeightUp',
         title: 'Increase prompt weight',
       }),
       commandApi.register({
-        handler: () =>
-          adjustFocusedPromptAttention(
-            'decrement',
-            queries.getSnapshot().activeProject.settings.preferNumericAttentionStyle
-          ),
+        handler: () => adjustFocusedPromptAttention('decrement', getWorkbenchPreferences().preferNumericAttentionStyle),
         id: 'app.promptWeightDown',
         title: 'Decrease prompt weight',
       }),

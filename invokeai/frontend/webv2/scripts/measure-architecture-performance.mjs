@@ -386,20 +386,79 @@ const runSample = async (browser, fixture, sample) => {
       }
 
       await projectSwitcher.click();
+      const newProjectSave = page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/v1/projects/',
+        { timeout: 10_000 }
+      );
       await page.getByRole('menuitem', { exact: true, name: /new project/i }).click();
       await page.waitForFunction(
         (name) => document.querySelector('button[aria-label^="Switch project."]')?.textContent?.trim() !== name,
         originalProjectName
       );
+      // A new tab is server-backed on its first autosave. Let that response assign its board and
+      // reach a paint before timing the unrelated switch back; otherwise the sample randomly
+      // includes the reconciliation depending on where the 500 ms autosave lands.
+      const newProjectSaveResponse = await newProjectSave;
+      await newProjectSaveResponse.finished();
+      await page.evaluate(
+        () =>
+          new Promise((resolvePaint) => {
+            requestAnimationFrame(() => requestAnimationFrame(resolvePaint));
+          })
+      );
       await projectSwitcher.click();
       const originalProject = page.getByRole('menuitemradio').filter({ hasText: originalProjectName });
       await originalProject.waitFor({ timeout: 10_000 });
-      const projectSwitchStart = performance.now();
+      const projectSwitchInteractionMark = `invokeai:interaction:${fixture.id}:${fixture.stateProfile}:project-switch`;
+      const projectSwitchReadyMark = `invokeai:ready:${fixture.id}:${fixture.stateProfile}:project-switch`;
+      await page.evaluate(
+        ({ interactionMarkName, originalName, readyMarkName }) => {
+          performance.clearMarks(interactionMarkName);
+          performance.clearMarks(readyMarkName);
+
+          const projectSwitcher = document.querySelector('button[aria-label^="Switch project."]');
+          if (!projectSwitcher) {
+            throw new Error('Project switcher trigger is missing.');
+          }
+
+          const markReadyWhenProjectCommits = () => {
+            if (projectSwitcher.getAttribute('aria-label') !== `Switch project. Current project: ${originalName}`) {
+              return;
+            }
+
+            performance.mark(readyMarkName);
+            observer.disconnect();
+          };
+          const observer = new MutationObserver(markReadyWhenProjectCommits);
+          observer.observe(projectSwitcher, { attributes: true, childList: true, subtree: true });
+          document.addEventListener(
+            'pointerdown',
+            () => {
+              performance.mark(interactionMarkName);
+            },
+            { capture: true, once: true }
+          );
+        },
+        {
+          interactionMarkName: projectSwitchInteractionMark,
+          originalName: originalProjectName,
+          readyMarkName: projectSwitchReadyMark,
+        }
+      );
       await originalProject.click();
-      await page
-        .getByRole('button', { exact: true, name: `Switch project. Current project: ${originalProjectName}` })
-        .waitFor({ timeout: 10_000 });
-      projectSwitchMs = performance.now() - projectSwitchStart;
+      await waitForSemanticMark(page, projectSwitchReadyMark);
+      projectSwitchMs = await page.evaluate(
+        ({ interactionMarkName, readyMarkName }) => {
+          const start = performance.getEntriesByName(interactionMarkName, 'mark').at(-1);
+          const end = performance.getEntriesByName(readyMarkName, 'mark').at(-1);
+          return start && end ? Math.max(0, end.startTime - start.startTime) : null;
+        },
+        { interactionMarkName: projectSwitchInteractionMark, readyMarkName: projectSwitchReadyMark }
+      );
+      if (projectSwitchMs === null) {
+        throw new Error(`${fixture.id}/${fixture.stateProfile} did not record a project-switch interaction.`);
+      }
     }
 
     await waitForWidgetRequests(fixture, scripts);

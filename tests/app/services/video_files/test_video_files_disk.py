@@ -45,6 +45,23 @@ def test_save_writes_video_and_sidecar(storage: DiskVideoFileStorage, tmp_path: 
     assert storage.get_workflow(VIDEO_NAME) is None  # sidecar readable, workflow not set
 
 
+def test_save_with_move_source_false_leaves_the_source_intact(storage: DiskVideoFileStorage, tmp_path: Path):
+    """Copying a video the server already owns must not consume it.
+
+    ``save()`` moves by default because every generation and upload hands it a temp file. But
+    ``POST /videos/copy`` passes the *source's own* managed path, so a move there deletes the
+    original project's video and leaves its record pointing at nothing.
+    """
+    source = _make_source(tmp_path)
+    original_bytes = source.read_bytes()
+
+    storage.save(source_path=source, video_name=VIDEO_NAME, move_source=False)
+
+    assert source.exists()
+    assert source.read_bytes() == original_bytes
+    assert storage.get_path(VIDEO_NAME).read_bytes() == original_bytes
+
+
 def test_save_failure_after_move_removes_all_destination_files(
     storage: DiskVideoFileStorage, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):

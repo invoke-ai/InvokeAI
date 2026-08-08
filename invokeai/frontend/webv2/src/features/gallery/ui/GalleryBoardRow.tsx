@@ -19,7 +19,6 @@ import { getBoardCounts } from './galleryStateView';
 export const GalleryBoardRow = ({
   board,
   isMenuOpen,
-  isProjectBoard,
   isSelected,
   loadedItemBoardIds,
   onOpenMenu,
@@ -28,7 +27,6 @@ export const GalleryBoardRow = ({
   board: GalleryBoard;
   /** Its own menu is showing, so the trigger must not fade out from under it. */
   isMenuOpen?: boolean;
-  isProjectBoard: boolean;
   isSelected: boolean;
   loadedItemBoardIds: ReadonlyMap<GalleryItemKey, string>;
   /** Omitted for date rows, which have no board actions. */
@@ -143,7 +141,7 @@ export const GalleryBoardRow = ({
         onContextMenu={onOpenMenu ? handleContextMenu : undefined}
         onSelect={handleSelect}
       >
-        {isProjectBoard ? (
+        {board.projectId !== null ? (
           <Badge colorPalette={isSelected ? undefined : 'accent'} flexShrink={0} size="xs" variant="subtle">
             {t('common.project')}
           </Badge>

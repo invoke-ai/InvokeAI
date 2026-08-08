@@ -30,6 +30,7 @@ import type {
   WorkbenchNotificationKind,
   WorkbenchState,
 } from '@workbench/projectContracts';
+import type { ProjectRecoveredIdentity } from '@workbench/projects/projectFlush';
 import type { ProjectSettings } from '@workbench/settings/contracts';
 import type {
   WidgetFailure,
@@ -321,7 +322,19 @@ type WorkbenchReducerAction =
   | { type: 'undoProjectChange' }
   | { type: 'redoProjectChange' }
   | { type: 'hydrateWorkbench'; state: WorkbenchState }
-  | { type: 'reconcileProjectConflict'; projectId: string; serverProject: Project; recoveredProject: Project }
+  | {
+      type: 'reconcileProjectConflict';
+      projectId: string;
+      serverProject: Project;
+      recoveredProject: Project;
+      recoveredIdentity: ProjectRecoveredIdentity;
+    }
+  | {
+      type: 'reconcileDeletedProject';
+      projectId: string;
+      recoveredProject: Project;
+      recoveredIdentity: ProjectRecoveredIdentity;
+    }
   | { type: 'autosaveStarted' }
   | { type: 'autosaveSucceeded'; savedAt: string }
   | { type: 'autosaveFailed'; error: string }
@@ -1315,6 +1328,58 @@ export const normalizeWorkbenchProject = (project: Project): Project => {
     widgetInstances,
   };
 };
+
+/**
+ * Write the server's board id into a *hydrated* project's gallery state.
+ *
+ * Patching the document before rehydration is not enough on its own. A project saved by a build
+ * that never opened its Gallery widget — or one whose document predates widget instances entirely —
+ * has no gallery values for the patch to land in, and the instance the reducer creates during
+ * normalization arrives afterwards, empty. Such a project would then show the placeholder board row
+ * forever and route nothing at its own board, which is the one thing the server is authoritative
+ * about.
+ *
+ * Applied after normalization, so the instance exists. A project whose layout has no gallery widget
+ * at all is returned untouched: there is nothing to tell.
+ */
+export const withAuthoritativeProjectBoard = (project: Project, boardId: string): Project =>
+  updateProjectWidgetValues(project, 'gallery', (values) =>
+    values.projectBoardId === boardId ? values : { ...values, projectBoardId: boardId }
+  );
+
+/**
+ * The project a recovery fork should become, preferring live content over the snapshot.
+ *
+ * A fork is created by the sync engine from the document it was *pushing* — serialized when the
+ * save began. By the time the answer comes back, anything typed since is newer than that snapshot
+ * and is what the person is looking at. Adopting the snapshot would therefore delete precisely the
+ * edits the fork exists to rescue, and do it in the case the mechanism is most likely to fire: a
+ * save is stale exactly when a keystroke landed while it was in flight.
+ *
+ * So the live project is re-labelled instead. The server-side fork already holds the older document
+ * under this identity, and the sync entry recorded for it says as much, so the next push sees a
+ * difference and sends the current content up its revision chain. Nothing is lost and nothing has
+ * to be merged.
+ *
+ * The snapshot is still the answer when there is no live project — a tab closed while the save was
+ * in flight — because then it is the only copy of that work left anywhere local.
+ */
+const recoverProjectUnderNewIdentity = (
+  localProject: Project | undefined,
+  snapshotProject: Project,
+  identity: ProjectRecoveredIdentity
+): Project =>
+  normalizeWorkbenchProject(
+    localProject
+      ? {
+          ...localProject,
+          id: identity.id,
+          name: identity.name,
+          recoveredAt: identity.recoveredAt,
+          recoveryOf: identity.recoveryOf,
+        }
+      : snapshotProject
+  );
 
 const clampPanelSize = (region: WidgetRegion, sizePx: number): number => {
   if (region === 'bottom') {
@@ -3608,9 +3673,13 @@ export const __workbenchReducerInternal = (
       // continue in the recovered fork — which stays the active project when
       // the user was looking at it.
       const normalizedServerProject = normalizeWorkbenchProject(action.serverProject);
-      const recoveredProject = normalizeWorkbenchProject(action.recoveredProject);
       const localProject = state.projects.find((project) => project.id === action.projectId);
       const hasOriginal = localProject !== undefined;
+      const recoveredProject = recoverProjectUnderNewIdentity(
+        localProject,
+        action.recoveredProject,
+        action.recoveredIdentity
+      );
       // The server document replaces the local one under the SAME project id, so a
       // live engine mirroring that id may hold pixel history for the outgoing
       // document. Bump the revision past both sides so the mirror treats the swap
@@ -3641,6 +3710,35 @@ export const __workbenchReducerInternal = (
         createNotification({
           kind: 'info',
           message: `"${serverProject.name}" was changed elsewhere. Your local edits continue in "${recoveredProject.name}" — manage recoveries in the Project panel.`,
+          title: 'Project recovered',
+        })
+      );
+    }
+    case 'reconcileDeletedProject': {
+      // The project was deleted on another device while this one held unsaved edits. Unlike a
+      // revision conflict there is no server version to adopt — the deletion is the server's
+      // answer. Re-creating the id would undo it everywhere, so the local edits continue under a
+      // fresh identity and the original simply goes.
+      const localProject = state.projects.find((project) => project.id === action.projectId);
+      const hasOriginal = localProject !== undefined;
+      const recoveredProject = recoverProjectUnderNewIdentity(
+        localProject,
+        action.recoveredProject,
+        action.recoveredIdentity
+      );
+      const projects = hasOriginal
+        ? state.projects.map((project) => (project.id === action.projectId ? recoveredProject : project))
+        : [...state.projects, recoveredProject];
+
+      return addNotification(
+        {
+          ...state,
+          activeProjectId: state.activeProjectId === action.projectId ? recoveredProject.id : state.activeProjectId,
+          projects,
+        },
+        createNotification({
+          kind: 'info',
+          message: `That project was deleted elsewhere. Your edits — including anything typed since — continue in "${recoveredProject.name}".`,
           title: 'Project recovered',
         })
       );
