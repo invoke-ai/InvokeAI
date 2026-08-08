@@ -6,6 +6,7 @@ from typing import Callable
 
 import numpy as np
 import pytest
+import torch
 from PIL import Image
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
@@ -22,6 +23,7 @@ from invokeai.app.services.image_records.image_records_sqlite import SqliteImage
 from invokeai.app.services.images.images_common import image_record_to_dto
 from invokeai.app.services.images.images_default import ImageService
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.fixtures.sqlite_database import create_mock_sqlite_database
 from tests.test_nodes import TestEventService
@@ -108,6 +110,18 @@ def service() -> ImageIndexService:
     svc = ImageIndexService(encode_fn=_fake_encode, model_id=MODEL_ID)
     yield svc
     svc.stop()
+
+
+@pytest.fixture
+def accelerator_host(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Pretend the host has a non-CPU device.
+
+    With no `image_index_device` override, CPU mode is decided by autodetection, so on a
+    CPU-only machine — every linux-cpu and windows-cpu CI runner — the generation wait is
+    skipped entirely. Tests covering that wait have to pin the device or they assert nothing
+    there while still passing.
+    """
+    monkeypatch.setattr(TorchDevice, "choose_torch_device", staticmethod(lambda: torch.device("cuda")))
 
 
 def _save_image(
@@ -545,6 +559,7 @@ def test_worker_waits_for_generation_to_finish_when_not_on_cpu(
     image_records: SqliteImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
+    accelerator_host: None,
 ) -> None:
     """The VRAM contract: off the CPU path, embedding must pause while a generation runs.
 
@@ -573,6 +588,7 @@ def test_generation_wait_does_not_block_shutdown(
     image_records: SqliteImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
+    accelerator_host: None,
 ) -> None:
     """A generation that never ends must not stop the worker from honouring stop()."""
     session_queue = SimpleNamespace(get_queue_status=lambda queue_id: SimpleNamespace(in_progress=1))
