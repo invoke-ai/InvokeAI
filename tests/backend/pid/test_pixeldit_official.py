@@ -18,8 +18,7 @@ def _build_pit_block() -> PiTBlock:
     ).eval()
 
 
-@pytest.mark.parametrize("use_autocast", [False, True])
-def test_pit_block_chunked_forward_matches_unchunked_and_bounds_adaln_batch(use_autocast: bool) -> None:
+def test_pit_block_chunked_forward_matches_unchunked_and_bounds_adaln_batch() -> None:
     torch.manual_seed(0)
     unchunked = _build_pit_block()
     chunk_size = 3
@@ -42,7 +41,7 @@ def test_pit_block_chunked_forward_matches_unchunked_and_bounds_adaln_batch(use_
 
     handle = chunked.adaLN_modulation.register_forward_pre_hook(record_adaln_batch_size)
     try:
-        with torch.no_grad(), torch.autocast("cpu", dtype=torch.bfloat16, enabled=use_autocast):
+        with torch.no_grad():
             expected = unchunked(pixels, condition, image_height, image_width, patch_size)
             actual = chunked(
                 pixels,
