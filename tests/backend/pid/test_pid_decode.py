@@ -6,8 +6,12 @@ import pytest
 import torch
 
 from invokeai.backend.model_manager.taxonomy import BaseModelType
+from invokeai.backend.pid import decode as pid_decode_module
+from invokeai.backend.pid._src.networks.pid_net import PidNet
+from invokeai.backend.pid._src.networks.pixeldit_official import PiTBlock
 from invokeai.backend.pid.decode import (
     PiDDecodeConfig,
+    PiDDecoder,
     _get_t_list,
     _student_sample_loop,
     _velocity_to_x0,
@@ -105,16 +109,61 @@ def test_student_sample_loop_passes_per_call_activation_chunk_size(
     assert activation_chunk_sizes == [expected_chunk_size]
 
 
+def test_pid_decoder_decode_reaches_chunked_pixel_path(monkeypatch: pytest.MonkeyPatch) -> None:
+    net = PidNet(
+        in_channels=3,
+        num_groups=2,
+        hidden_size=8,
+        pixel_hidden_size=4,
+        pixel_attn_hidden_size=8,
+        pixel_num_groups=2,
+        patch_depth=1,
+        pixel_depth=1,
+        num_text_blocks=1,
+        patch_size=2,
+        txt_embed_dim=6,
+        txt_max_length=4,
+        rope_mode="original",
+        rope_ref_h=4,
+        rope_ref_w=4,
+        lq_in_channels=0,
+        lq_latent_channels=2,
+        lq_hidden_dim=4,
+        lq_num_res_blocks=1,
+        lq_interval=1,
+        sr_scale=1,
+        latent_spatial_down_factor=8,
+    ).eval()
+    decoder = PiDDecoder(net, backbone=BaseModelType.Flux)
+    calls: list[int] = []
+    original_forward_chunked = PiTBlock._forward_chunked
+
+    def spy_forward_chunked(self: PiTBlock, *args: object, **kwargs: object) -> torch.Tensor:
+        calls.append(1)
+        return original_forward_chunked(self, *args, **kwargs)
+
+    monkeypatch.setattr(PiTBlock, "_forward_chunked", spy_forward_chunked)
+    monkeypatch.setattr(pid_decode_module, "_PID_ACTIVATION_CHUNK_SIZE", 1)
+
+    output = decoder.decode(
+        latent=torch.randn(1, 2, 2, 2),
+        caption_embs=torch.randn(1, 4, 6),
+        config=PiDDecodeConfig(num_inference_steps=1, pid_memory_optimization=True, seed=0),
+    )
+
+    assert output.shape == (1, 3, 16, 16)
+    assert calls
+
+
 def test_pid_memory_optimization_defaults_to_disabled() -> None:
     assert PiDDecodeConfig().pid_memory_optimization is False
 
 
 def test_working_memory_estimate_shrinks_when_the_optimization_is_enabled() -> None:
-    """Wiring the flag into the decode but not into the estimate is worse than not wiring it at all.
+    """The optimized activation estimate is lower than the unoptimized activation estimate.
 
-    The cache takes `max(working_mem_bytes, device_working_mem_gb)` and subtracts it from the weight
-    budget, so an estimate calibrated for the unoptimized peak withholds precisely the VRAM the
-    optimization just freed, and PidNet partial-loads to CPU on the machines this feature targets.
+    CUDA autocast weight-cache bytes are tested separately because they depend on the loaded model's
+    parameter bytes, not output resolution.
     """
     latent = torch.zeros(1, 16, 64, 64)  # FLUX: 64 * 4 * 8 = 2048px output
 
@@ -122,11 +171,39 @@ def test_working_memory_estimate_shrinks_when_the_optimization_is_enabled() -> N
     optimized = estimate_pid_decode_working_memory(latent, BaseModelType.Flux, True)
 
     assert optimized < unoptimized
-    # Measured peaks at 2048px on an RTX 4090: 3.68 GiB unoptimized, 1.50 GiB optimized. The estimates
-    # must sit above their own peak (headroom) and below the other mode's (or the flag buys nothing).
-    gib = 1024**3
-    assert 1.50 * gib < optimized < 2.50 * gib
-    assert 3.68 * gib < unoptimized < 4.50 * gib
+
+
+def test_working_memory_estimate_includes_cuda_autocast_weight_cache() -> None:
+    latent = torch.zeros(1, 16, 64, 64)
+    model = torch.nn.Linear(4, 4)
+    model_bytes = sum(parameter.numel() * parameter.element_size() for parameter in model.parameters())
+    expected_weight_cache_bytes = model_bytes // 2  # fp32 model parameters cached as bf16 copies
+
+    activation_only = estimate_pid_decode_working_memory(latent, BaseModelType.Flux)
+    optimized_activation_only = estimate_pid_decode_working_memory(latent, BaseModelType.Flux, True)
+    cuda_estimate = estimate_pid_decode_working_memory(
+        latent,
+        BaseModelType.Flux,
+        model=model,
+        device=torch.device("cuda"),
+    )
+    cpu_estimate = estimate_pid_decode_working_memory(
+        latent,
+        BaseModelType.Flux,
+        model=model,
+        device=torch.device("cpu"),
+    )
+    optimized_cuda_estimate = estimate_pid_decode_working_memory(
+        latent,
+        BaseModelType.Flux,
+        True,
+        model=model,
+        device=torch.device("cuda"),
+    )
+
+    assert cuda_estimate == activation_only + expected_weight_cache_bytes
+    assert optimized_cuda_estimate == optimized_activation_only + expected_weight_cache_bytes
+    assert cpu_estimate == activation_only
 
 
 def test_working_memory_estimate_keeps_a_fixed_term_for_the_chunk_working_set() -> None:

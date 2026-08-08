@@ -123,15 +123,16 @@ PID_NEGATIVE_PROMPT: str = (
 PID_MODEL_MAX_LENGTH: int = 300
 
 
-# Working-memory (activation) estimate for the PiD decode, mirroring `estimate_vae_working_memory_*` (see #8414).
+# Working-memory estimate for the PiD decode, mirroring `estimate_vae_working_memory_*` (see #8414).
 # PiD runs a multi-step pixel-diffusion in float32 at the full super-resolved output resolution, so its peak
-# activation memory scales with the total OUTPUT pixel count across the batch.
+# activation memory scales with the total OUTPUT pixel count across the batch. CUDA autocast also caches bf16
+# copies of the fp32 PidNet weights; that model-sized term is added from the loaded model below.
 #
-# This is ONLY the activation headroom reserved for the decode itself - it does NOT do the heavy lifting of
-# evicting the main transformer/encoders (the nodes call context.models.offload_all_from_vram() for that before
-# loading PidNet). It must therefore stay modest: the cache uses max(this_estimate, device_working_mem_gb=3GB),
-# and an over-large value pushes the working set negative and forces PidNet to partial-load onto the CPU (slow).
-# ~4GB at a 2048px output is a small headroom above the 3GB default. Experimentally-tunable; calibrate to peak.
+# This is working-memory headroom reserved for the decode itself - it does NOT do the heavy lifting of evicting
+# the main transformer/encoders (the nodes call context.models.offload_all_from_vram() for that before loading
+# PidNet). It includes activation headroom plus the CUDA autocast weight-cache term when a model is supplied.
+# The cache uses max(this_estimate, device_working_mem_gb=3GB), and an over-large value pushes the working set
+# negative and forces PidNet to partial-load onto the CPU (slow). Experimentally-tunable; calibrate to peak.
 _PID_DECODE_WORKING_MEMORY_SCALING_CONSTANT = 250
 
 # The same estimate for `pid_memory_optimization=True`. Chunking bounds the per-block activations to a fixed
@@ -140,24 +141,33 @@ _PID_DECODE_WORKING_MEMORY_SCALING_CONSTANT = 250
 #
 # Measured peaks on an RTX 4090 (fp32 PidNet, bf16 autocast, 4 steps, B=1), against U = out_h * out_w * 4 bytes:
 #   1024px  509 MiB (127.2 * U)   1536px  934 MiB (103.8 * U)   2048px  1533 MiB (95.8 * U)
-# Least-squares fit: 85.3 * U + 167 MiB. The constants below carry ~15% headroom over that fit.
+# Least-squares fit: 85.3 * U + 167 MiB. The earlier 95 * U + 224 MiB calibration carried ~15% headroom
+# over that fit at the measured sizes.
+# The fit underestimates the larger, default-cache path; 120 * U + 224 MiB keeps a small safety margin
+# over the measured 2048px-4096px peaks after the bf16 weight-cache term is added below.
 #
 # Keeping the unoptimized constant here would be the bug the flag is supposed to avoid: the cache takes
 # max(this_estimate, device_working_mem_gb) and subtracts it from the weight budget, so reserving 4GB for a decode
 # that peaks at 1.5GB withholds VRAM that PidNet could have stayed resident in - exactly the partial-load-to-CPU
 # outcome the comment above warns about, on the low-VRAM systems this feature exists for.
-_PID_DECODE_CHUNKED_SCALING_CONSTANT = 95
+_PID_DECODE_CHUNKED_SCALING_CONSTANT = 120
 _PID_DECODE_CHUNKED_FIXED_BYTES = 224 * 2**20
 
 
 def estimate_pid_decode_working_memory(
-    latent: Tensor, backbone: BaseModelType, pid_memory_optimization: bool = False
+    latent: Tensor,
+    backbone: BaseModelType,
+    pid_memory_optimization: bool = False,
+    *,
+    model: Optional[torch.nn.Module] = None,
+    device: Optional[torch.device] = None,
 ) -> int:
-    """Estimate the working (activation) memory in bytes for a PiD decode of *latent*.
+    """Estimate the working memory in bytes for a PiD decode of *latent*.
 
     Each decoded image is ``latent_spatial * sr_scale * latent_spatial_down_factor`` pixels per side. PidNet
     runs in float32 (see ``model_loaders/pid_decoder.py``), so the element size is 4 bytes. The per-pixel term
-    covers every image in the latent batch. Returns 0 for unsupported backbones so callers fall back to the
+    covers every image in the latent batch. When a CUDA model is supplied, the estimate also includes the bf16
+    autocast cache for its fp32 parameters. Returns 0 for unsupported backbones so callers fall back to the
     cache's default working-memory reservation.
 
     ``pid_memory_optimization`` must mirror the flag passed to :class:`PiDDecodeConfig` for the same decode -
@@ -172,14 +182,30 @@ def estimate_pid_decode_working_memory(
     element_size = 4  # PidNet runs in float32 (see model_loaders/pid_decoder.py)
     batch_size = int(latent.shape[0])
     output_bytes = batch_size * out_h * out_w * element_size
-    unoptimized = int(output_bytes * _PID_DECODE_WORKING_MEMORY_SCALING_CONSTANT)
+    autocast_weight_cache_bytes = 0
+    if model is not None and device is not None and device.type == "cuda":
+        # CUDA autocast caches fp32 parameters as bf16 tensors for the duration of the autocast context.
+        # PidNet is intentionally kept in fp32; see PiDDecoderLoader._load_model().
+        autocast_weight_cache_bytes = sum(
+            parameter.numel() * 2  # bfloat16 element size
+            for parameter in model.parameters()
+            if parameter.dtype == torch.float32
+        )
+    unoptimized = int(output_bytes * _PID_DECODE_WORKING_MEMORY_SCALING_CONSTANT) + autocast_weight_cache_bytes
     if not pid_memory_optimization:
         return unoptimized
-    chunked = int(output_bytes * _PID_DECODE_CHUNKED_SCALING_CONSTANT + _PID_DECODE_CHUNKED_FIXED_BYTES)
-    # The fixed term is the chunk working set, so it only exists once chunking actually engages -
-    # below `_PID_ACTIVATION_CHUNK_SIZE` patch tokens the pixel blocks run unchunked and the peak is
-    # the unoptimized one. Without this clamp a small output would be *charged* for a working set it
-    # never allocates, and the optimized estimate could exceed the unoptimized one.
+    patch_size = int(_PID_SR4X_BASE["patch_size"])
+    patch_tokens = batch_size * (out_h // patch_size) * (out_w // patch_size)
+    if patch_tokens <= _PID_ACTIVATION_CHUNK_SIZE:
+        # The pixel blocks take the unchunked path at and below the threshold.
+        return unoptimized
+    chunked = (
+        int(output_bytes * _PID_DECODE_CHUNKED_SCALING_CONSTANT + _PID_DECODE_CHUNKED_FIXED_BYTES)
+        + autocast_weight_cache_bytes
+    )
+    # The fixed term makes the calibrated chunked formula temporarily greater than the unoptimized
+    # formula just after chunking engages. Keep the unoptimized estimate until the formulas cross;
+    # after that point the chunked estimate is the lower (optimized) reservation.
     return min(chunked, unoptimized)
 
 

@@ -199,7 +199,11 @@ class QwenImagePiDDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
         # peak that will not happen (or too little for one that will).
         pid_memory_optimization = context.config.get().pid_memory_optimization
         estimated_working_memory = estimate_pid_decode_working_memory(
-            latents, BaseModelType.QwenImage, pid_memory_optimization
+            latents,
+            BaseModelType.QwenImage,
+            pid_memory_optimization,
+            model=pid_info.model,
+            device=pid_info.compute_device,
         )
         with pid_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, pid_net):
             if not isinstance(pid_net, PidNet):

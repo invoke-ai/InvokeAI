@@ -69,6 +69,14 @@ def test_pid_node_estimates_working_memory_for_the_same_mode_it_decodes_in(modul
             f"{module_path.name}:{call.lineno} estimates working memory without {_FLAG}; "
             "the cache would reserve the unoptimized peak and withhold the VRAM the flag frees."
         )
+        assert any(kw.arg == "model" for kw in call.keywords), (
+            f"{module_path.name}:{call.lineno} estimates working memory without the loaded model; "
+            "CUDA autocast weight-cache memory would be omitted from the reservation."
+        )
+        assert any(kw.arg == "device" for kw in call.keywords), (
+            f"{module_path.name}:{call.lineno} estimates working memory without the compute device; "
+            "the CUDA-only autocast weight-cache term could be applied on the wrong device."
+        )
 
 
 @pytest.mark.parametrize("module_path", _modules_constructing_a_decode_config(), ids=lambda p: p.stem)
