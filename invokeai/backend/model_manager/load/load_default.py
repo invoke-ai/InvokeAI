@@ -29,6 +29,7 @@ from invokeai.backend.model_manager.taxonomy import (
 )
 from invokeai.backend.quantization.fp8_scaled import count_fp8_weights, should_keep_fp8_weights
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.fp8 import FP8_COMPUTE_DTYPE_ATTR, set_fp8_compute_dtype
 
 # Layer classes that benefit from FP8 storage. Mirrors diffusers'
 # `_GO_LC_SUPPORTED_PYTORCH_LAYERS` so the plain-nn.Module fallback path makes the same
@@ -289,6 +290,12 @@ class ModelLoader(ModelLoaderBase):
         if not self._should_use_fp8(config, submodel_type):
             return model
 
+        # The cast is not idempotent: on a second pass the first parameter is already fp8, so the
+        # compute dtype below would be derived as float8. The marker is set by
+        # `_apply_fp8_to_nn_module`, so its presence means this model has already been cast.
+        if isinstance(model, torch.nn.Module) and getattr(model, FP8_COMPUTE_DTYPE_ATTR, None) is not None:
+            return model
+
         # A checkpoint that already ships fp8 weights is running (or is about to run) on the fp8
         # tensor cores. Layerwise casting would install hooks that restore the compute dtype before
         # every forward, so `CustomLinear._can_use_fp8_matmul` would no longer see an fp8 weight and
@@ -359,7 +366,14 @@ class ModelLoader(ModelLoaderBase):
         hooks installed here would upcast them *without* applying that scale — a silently wrong
         weight. Casting only the remainder lets a partly-quantized checkpoint (fp8 language model,
         bf16 visual tower) end up fully fp8-resident.
+
+        Records the compute dtype on the model. After the cast, `model.dtype` reports the float8
+        storage dtype, which must never be used to create or cast tensors — torch has no arithmetic
+        kernels for it (see `get_model_compute_dtype`). The marker is set here rather than at the
+        call sites so a new caller cannot forget it.
         """
+        set_fp8_compute_dtype(model, compute_dtype)
+
         for module_name, module in model.named_modules():
             if not isinstance(module, _FP8_SUPPORTED_PYTORCH_LAYERS):
                 continue

@@ -637,7 +637,13 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
                             if block_size > 1:
                                 # Repeat scale along this dimension to match weight shape
                                 scale = scale.repeat_interleave(block_size, dim=dim)
-                sd[weight_key] = weight_float * scale
+                # Multiply in float32 for precision, but store the compute dtype immediately so the
+                # *whole model* is never materialized in float32. Keeping every dequantized weight as
+                # float32 until the caller's later cast quadruples the per-parameter cost (4 bytes vs
+                # 1 on disk) and dominates the cold-load RAM peak — enough to swap a 32 GB machine.
+                # Same fix as in the FLUX.2 and Krea-2 loaders.
+                sd[weight_key] = (weight_float * scale).to(model_dtype)
+                del weight_float
                 dequantized_count += 1
 
         if dequantized_count > 0:

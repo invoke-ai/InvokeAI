@@ -2,7 +2,7 @@
 """Class for Krea-2 model loading in InvokeAI."""
 
 from pathlib import Path
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 import accelerate
 from transformers import AutoConfig, AutoTokenizer
@@ -39,6 +39,10 @@ from invokeai.backend.quantization.fp8_scaled import (
 )
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
 from invokeai.backend.util.devices import TorchDevice
+
+if TYPE_CHECKING:
+    # torch is imported lazily inside the helpers below; this is annotations-only.
+    import torch
 
 
 def _normalize_qwen3vl_rope_config(config: Any) -> Any:
@@ -102,12 +106,23 @@ def _is_native_krea2_format(sd: dict[str, Any]) -> bool:
     )
 
 
-def _dequantize_scaled_fp8(sd: dict[str, Any]) -> dict[str, Any]:
+def _dequantize_scaled_fp8(sd: dict[str, Any], dtype: "torch.dtype") -> dict[str, Any]:
     """Dequantize ComfyUI 'scaled fp8' weights: ``dequant = weight.float() * weight_scale``.
 
     Each quantized layer stores an fp8 ``<name>.weight`` plus a (usually scalar) ``<name>.weight_scale``.
-    Returns a new dict with the weights dequantized to float and the ``.weight_scale`` keys removed.
-    No-op if there are no scale keys.
+    Returns a new dict with the weights dequantized and the ``.weight_scale`` keys removed. No-op if
+    there are no scale keys.
+
+    The multiply runs in float32 for precision, but each result is stored as ``dtype`` immediately so
+    the *whole model* is never materialized in float32. Krea-2's ~12 GB fp8 checkpoint would otherwise
+    peak at ~50 GB of RAM (4 bytes/param) before the caller's later bf16 cast brings it down to ~25 GB,
+    which puts a 32 GB machine into swap during a cold load. This mirrors the same fix already applied
+    to the FLUX.2 loader.
+
+    ``dtype`` is required on purpose. It used to default to bfloat16, which is wrong on a device where
+    ``choose_bfloat16_safe_dtype`` picks float16: the weights would land in bf16 and then take a second
+    rounding step on the caller's later float16 cast. Callers already know the compute dtype, so there
+    is no reason to guess one here.
     """
     import torch
 
@@ -120,7 +135,8 @@ def _dequantize_scaled_fp8(sd: dict[str, Any]) -> dict[str, Any]:
         if weight_key in out:
             weight = torch.as_tensor(_to_plain_tensor(out[weight_key])).float()
             scale = torch.as_tensor(_to_plain_tensor(out[scale_key])).float()
-            out[weight_key] = weight * scale
+            out[weight_key] = (weight * scale).to(dtype)
+            del weight
         del out[scale_key]
     return out
 
@@ -387,6 +403,9 @@ class Krea2CheckpointModel(ModelLoader):
             raise TypeError(f"Expected Main_Checkpoint_Krea2_Config, got {type(config).__name__}.")
         model_path = Path(config.path)
 
+        target_device = TorchDevice.choose_torch_device()
+        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+
         sd = load_file(model_path)
         metadata = _read_safetensors_metadata(model_path, self._logger)
         sd = _strip_comfyui_prefix(sd)
@@ -407,9 +426,6 @@ class Krea2CheckpointModel(ModelLoader):
             path_map = _remap_native_layer_paths(layer_hints.keys())
             layer_hints = {path_map.get(name, name): hints for name, hints in layer_hints.items()}
 
-        target_device = TorchDevice.choose_torch_device()
-        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
-
         # ComfyUI 'scaled fp8' checkpoints (fp8 weight + .weight_scale, optionally .input_scale).
         fp8_layers = extract_fp8_scaled_layers(sd, layer_hints=layer_hints)
         if fp8_layers and not is_fp8_matmul_enabled():
@@ -417,6 +433,7 @@ class Krea2CheckpointModel(ModelLoader):
             # fp8 matmul would halve VRAM but run slower, so both are tied to the same setting.
             dequantize_fp8_scaled(sd, fp8_layers, model_dtype)
             fp8_layers = {}
+
 
         with accelerate.init_empty_weights():
             model = Krea2Transformer2DModel(**KREA2_TRANSFORMER_CONFIG)
@@ -780,6 +797,8 @@ class Qwen3VLEncoderCheckpointLoader(ModelLoader):
         # halves the encoder's resident VRAM (~8.9GB bf16 -> ~4.4GB), which avoids partial-load thrashing
         # when it shares the GPU with a large transformer.
         if source_is_fp8 and self._torch_device.type == "cuda":
+            # `model.dtype` now reports the float8 storage dtype; `_apply_fp8_to_nn_module` records
+            # the real compute dtype so callers can recover it via `get_model_compute_dtype`.
             self._apply_fp8_to_nn_module(model, storage_dtype=torch.float8_e4m3fn, compute_dtype=model_dtype)
             self._logger.info(
                 f"FP8 layerwise casting enabled for Qwen3-VL encoder '{config.name}' "

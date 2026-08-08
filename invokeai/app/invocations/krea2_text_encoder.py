@@ -47,6 +47,7 @@ _KREA2_SUFFIX = "<|im_end|>\n<|im_start|>assistant\n"
     category="conditioning",
     version="1.1.0",
     classification=Classification.Prototype,
+    idle_gpu_offloadable=True,
 )
 class Krea2TextEncoderInvocation(BaseInvocation):
     """Encodes a text prompt for Krea-2 using the Qwen3-VL text encoder.
