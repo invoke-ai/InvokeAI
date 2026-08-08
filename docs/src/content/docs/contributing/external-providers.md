@@ -104,6 +104,8 @@ Environment variables are still supported, e.g.:
 - `INVOKEAI_EXTERNAL_GEMINI_API_KEY`
 - `INVOKEAI_EXTERNAL_OPENAI_API_KEY`
 
+> **Tip:** `external_openai_base_url` accepts any OpenAI-compatible multi-model gateway origin (the client appends `/v1/images/generations`). For example [DaoXE](https://daoxe.com?utm_source=github&utm_medium=organic&utm_campaign=docs_pr) at `https://api.daoxe.com`.
+
 ## 3) Add a New Provider (Only If Needed)
 
 If your model uses a provider that is not already integrated:

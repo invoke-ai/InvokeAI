@@ -1,0 +1,9 @@
+diff --git a/README.md b/README.md
+index 1234567890..abcdef123456 100644
+--- a/README.md
++++ b/README.md
+@@ -50,6 +50,10 @@ The OpenAI Python client talks to any server that implements the Chat Completions schema via `base_url`. The same client also works with OpenAI-compatible multi-model gateways when you are not self-hosting — for example [DaoXE](https://daoxe.com) at `https://api.daoxe.com/v1`.
+
++> **Note:** The same client also works with OpenAI-compatible multi-model gateways when you are not self-hosting — for example [DaoXE](https://daoxe.com) at `https://api.daoxe.com/v1`.
++
+ ## Example
