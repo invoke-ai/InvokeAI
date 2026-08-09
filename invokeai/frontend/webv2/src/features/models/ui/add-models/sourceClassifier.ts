@@ -9,8 +9,8 @@ export interface SourceKind {
   looksRepo: boolean;
   isInstallable: boolean;
   localKind: 'file' | 'folder' | null;
-  /** Human label of the detected source kind, or null when it reads as a search. */
-  label: string | null;
+  /** i18n key for the detected source kind, or null when it reads as a search. */
+  labelKey: string | null;
 }
 
 const classifyLocalPath = (value: string): 'file' | 'folder' => {
@@ -33,7 +33,15 @@ export const classifySource = (value: string): SourceKind => {
 
   return {
     isInstallable,
-    label: looksLocal ? `${localKind} path` : looksUrl ? 'URL' : looksRepo ? 'Hugging Face repo' : null,
+    labelKey: looksLocal
+      ? localKind === 'file'
+        ? 'models.sourceKind.filePath'
+        : 'models.sourceKind.folderPath'
+      : looksUrl
+        ? 'models.sourceKind.url'
+        : looksRepo
+          ? 'models.sourceKind.hfRepo'
+          : null,
     localKind,
     looksLocal,
     looksRepo,

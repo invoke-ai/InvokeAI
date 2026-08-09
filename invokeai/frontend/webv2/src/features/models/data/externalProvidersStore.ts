@@ -23,6 +23,7 @@ export interface ExternalProvidersSnapshot {
   /** null = not fetched yet. */
   configs: ExternalProviderConfig[] | null;
   status: 'idle' | 'loading' | 'loaded' | 'error';
+  /** Failure message when one exists; `status` is the failure signal. The UI supplies the translated fallback. */
   error: string | null;
 }
 
@@ -58,7 +59,7 @@ export const refreshExternalProviders = (): Promise<void> => {
     .catch((error: unknown) => {
       if (isAccountScopeCurrent(owner)) {
         store.patchSnapshot({
-          error: error instanceof Error ? error.message : 'Failed to load external providers.',
+          error: error instanceof Error ? error.message : null,
           status: store.getSnapshot().configs ? 'loaded' : 'error',
         });
       }

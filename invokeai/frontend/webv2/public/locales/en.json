@@ -1079,6 +1079,12 @@
     },
     "sortBy": "Sort By",
     "source": "Source",
+    "sourceKind": {
+      "filePath": "file path",
+      "folderPath": "folder path",
+      "hfRepo": "Hugging Face repo",
+      "url": "URL"
+    },
     "sourceUrl": "Source URL",
     "sourceUrlHelp": "Model page or download URL.",
     "statusCancelled": "Cancelled",

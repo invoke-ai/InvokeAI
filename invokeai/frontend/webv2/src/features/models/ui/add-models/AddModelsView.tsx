@@ -334,7 +334,7 @@ export const AddModelsView = () => {
                 <Text as="span" color="fg.muted" fontWeight="600">
                   {t('models.pull')}
                 </Text>{' '}
-                {t('models.toInstallFrom', { source: kind.label })}
+                {t('models.toInstallFrom', { source: kind.labelKey ? t(kind.labelKey) : '' })}
               </Text>
             )}
             {kind.localKind === 'file' ? (
