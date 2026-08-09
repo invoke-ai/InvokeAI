@@ -6,6 +6,8 @@ import torch
 from invokeai.backend.minimax_h3.packing import (
     align_num_frames,
     audio_latent_num_frames,
+    resolve_canvas_size,
+    resolve_lowres_canvas_size,
     video_latent_num_frames,
 )
 from invokeai.backend.minimax_h3.sampling import build_denoise_state, validate_num_frames
@@ -50,6 +52,39 @@ class TestFrameGrid:
         # 40 latents/s at 24 fps.
         assert audio_latent_num_frames(24) == 40
         assert audio_latent_num_frames(124) == round(124 / 24 * 40)
+
+
+class TestLowresCanvasResolution:
+    # The native short-edge-768 policy is covered by tests/app/invocations/test_minimax_h3_ideal_dimensions.py.
+
+    def test_lowres_pins_the_long_edge(self):
+        # Same aspect inputs, but the LONG edge is fixed at 768.
+        assert resolve_lowres_canvas_size(1, 1) == (768, 768)
+        # 2:3 portrait -> 512x768 (the user-facing "small test render" case).
+        assert resolve_lowres_canvas_size(800, 1200) == (768, 512)
+        assert resolve_lowres_canvas_size(1200, 800) == (512, 768)
+        # 16:9 -> short edge 432 rounds to the nearest multiple of 32 (448).
+        assert resolve_lowres_canvas_size(16, 9) == (448, 768)
+        assert resolve_lowres_canvas_size(9, 16) == (768, 448)
+
+    def test_lowres_never_exceeds_the_highres_area(self):
+        for w, h in ((1, 1), (16, 9), (9, 16), (2, 3), (4, 1), (1, 4), (1024, 1000)):
+            lo_h, lo_w = resolve_lowres_canvas_size(w, h)
+            hi_h, hi_w = resolve_canvas_size(w, h)
+            assert lo_h * lo_w <= hi_h * hi_w
+            assert lo_h % 32 == 0 and lo_w % 32 == 0
+
+    def test_extreme_aspect_ratios_stay_on_grid(self):
+        # 4:1 is the limit of the supported envelope; 768/4 = 192 divides the grid exactly (6 * 32).
+        assert resolve_lowres_canvas_size(4, 1) == (192, 768)
+        assert resolve_lowres_canvas_size(1, 4) == (768, 192)
+
+    def test_invalid_aspects_rejected_by_both_presets(self):
+        for fn in (resolve_canvas_size, resolve_lowres_canvas_size):
+            with pytest.raises(ValueError, match="positive"):
+                fn(0, 100)
+            with pytest.raises(ValueError, match="1:4"):
+                fn(9, 1)
 
 
 def _build_state(seed: int, with_keyframe: bool = False):

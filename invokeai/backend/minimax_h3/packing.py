@@ -126,6 +126,19 @@ class MiniMaxH3PackedSequence:
     num_condition_audio_rows: int
 
 
+def _validated_aspect_ratio(aspect_width: float, aspect_height: float) -> float:
+    """Validate an aspect pair against H3's 1:4 – 4:1 envelope and return width/height."""
+    if aspect_width <= 0 or aspect_height <= 0:
+        raise ValueError(f"The aspect ratio must be positive, got {aspect_width}:{aspect_height}.")
+
+    ratio = aspect_width / aspect_height
+    if not MINIMAX_H3_MIN_ASPECT_RATIO <= ratio <= MINIMAX_H3_MAX_ASPECT_RATIO:
+        raise ValueError(
+            f"MiniMax-H3 supports aspect ratios from 1:4 to 4:1, got {aspect_width}:{aspect_height} ({ratio:g})."
+        )
+    return ratio
+
+
 def resolve_canvas_size(aspect_width: float, aspect_height: float) -> tuple[int, int]:
     r"""
     Resolve a display aspect ratio into a MiniMax-H3 canvas.
@@ -141,14 +154,7 @@ def resolve_canvas_size(aspect_width: float, aspect_height: float) -> tuple[int,
     Returns:
         `tuple[int, int]`: the `(height, width)` of the canvas.
     """
-    if aspect_width <= 0 or aspect_height <= 0:
-        raise ValueError(f"The aspect ratio must be positive, got {aspect_width}:{aspect_height}.")
-
-    ratio = aspect_width / aspect_height
-    if not MINIMAX_H3_MIN_ASPECT_RATIO <= ratio <= MINIMAX_H3_MAX_ASPECT_RATIO:
-        raise ValueError(
-            f"MiniMax-H3 supports aspect ratios from 1:4 to 4:1, got {aspect_width}:{aspect_height} ({ratio:g})."
-        )
+    ratio = _validated_aspect_ratio(aspect_width, aspect_height)
 
     if ratio >= 1.0:
         width, height = MINIMAX_H3_SHORT_EDGE * ratio, float(MINIMAX_H3_SHORT_EDGE)
@@ -159,6 +165,34 @@ def resolve_canvas_size(aspect_width: float, aspect_height: float) -> tuple[int,
     if area > MINIMAX_H3_MAX_PIXELS:
         scale = (MINIMAX_H3_MAX_PIXELS / area) ** 0.5
         width, height = width * scale, height * scale
+
+    multiple = MINIMAX_H3_CANVAS_MULTIPLE
+    return max(multiple, round(height / multiple) * multiple), max(multiple, round(width / multiple) * multiple)
+
+
+def resolve_lowres_canvas_size(aspect_width: float, aspect_height: float) -> tuple[int, int]:
+    r"""
+    Resolve a display aspect ratio into a reduced-size MiniMax-H3 canvas with a 768 px LONG edge.
+
+    This is not a released H3 canvas family: the model was trained for a 768 short edge
+    (see :func:`resolve_canvas_size`). Pinning the long edge instead yields a canvas with roughly half the pixels
+    for non-square ratios — useful for fast preview/test renders at some cost in fidelity. The short edge follows
+    the aspect ratio and both axes are rounded to the nearest multiple of 32; the area always sits far below the
+    `768 * 1344` cap, so no cap scaling is applied. Only the ratio of the two arguments matters.
+
+    Args:
+        aspect_width (`float`): Width of the target ratio.
+        aspect_height (`float`): Height of the target ratio.
+
+    Returns:
+        `tuple[int, int]`: the `(height, width)` of the canvas.
+    """
+    ratio = _validated_aspect_ratio(aspect_width, aspect_height)
+
+    if ratio >= 1.0:
+        width, height = float(MINIMAX_H3_SHORT_EDGE), MINIMAX_H3_SHORT_EDGE / ratio
+    else:
+        width, height = MINIMAX_H3_SHORT_EDGE * ratio, float(MINIMAX_H3_SHORT_EDGE)
 
     multiple = MINIMAX_H3_CANVAS_MULTIPLE
     return max(multiple, round(height / multiple) * multiple), max(multiple, round(width / multiple) * multiple)

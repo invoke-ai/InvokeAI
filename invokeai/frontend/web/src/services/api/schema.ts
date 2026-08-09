@@ -27945,12 +27945,15 @@ export type components = {
          * MiniMax H3 Ideal Dimensions
          * @description Ideal dimensions for MiniMax H3 from a source image's aspect ratio.
          *
-         *     Applies the released pipeline's canvas policy: short edge 768, soft area cap of
-         *     768x1344, both axes rounded to the nearest multiple of 32. Only the aspect ratio of
-         *     the inputs matters. Aspect ratios beyond 1:4 / 4:1 are rejected. Wire from ``Image
-         *     Primitive``'s width/height outputs and into the width/height of ``Prompt - MiniMax
-         *     H3``, ``Frame Conditioning - MiniMax H3`` and ``Denoise - MiniMax H3`` (all three
-         *     must share the same canvas).
+         *     "768 highres" applies the released pipeline's canvas policy: short edge 768, soft
+         *     area cap of 768x1344. "768 lowres" pins the LONG edge to 768 instead, giving a
+         *     canvas with roughly half the pixels for non-square ratios (e.g. a 2:3 source becomes
+         *     512x768 instead of 768x1152) — faster and cheaper, at some cost in fidelity since it
+         *     is below the model's training resolution. Both presets round each axis to the
+         *     nearest multiple of 32. Only the aspect ratio of the inputs matters. Aspect ratios
+         *     beyond 1:4 / 4:1 are rejected. Wire from ``Image Primitive``'s width/height outputs
+         *     and into the width/height of ``Prompt - MiniMax H3``, ``Frame Conditioning - MiniMax
+         *     H3`` and ``Denoise - MiniMax H3`` (all three must share the same canvas).
          */
         MiniMaxH3IdealDimensionsInvocation: {
             /**
@@ -27982,6 +27985,13 @@ export type components = {
              * @default 1024
              */
             height?: number;
+            /**
+             * Target Resolution
+             * @description Canvas preset. '768 highres' is H3's native policy (short edge 768, soft cap 768x1344). '768 lowres' pins the long edge to 768 for smaller, faster test renders (e.g. 512x768 from a 2:3 source) at some cost in fidelity.
+             * @default 768 highres
+             * @enum {string}
+             */
+            target_resolution?: "768 highres" | "768 lowres";
             /**
              * type
              * @default minimax_h3_ideal_dimensions
