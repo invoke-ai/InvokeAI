@@ -315,25 +315,25 @@ class SDNQTensor(torch.Tensor):
         Returns:
             Dequantized tensor with compute_dtype.
         """
-        # Debug logging for first few tensors
+        # Debug logging for the first few tensors. Gated on the log level as well as the count: the
+        # `min()`/`max()` calls below are device syncs, and this runs on the hot dequantize path.
+        # Nothing here goes to stdout — that would bypass the app's log level, format and handlers.
         tensor_id = id(self)
-        should_log = tensor_id not in SDNQTensor._logged_tensors and len(SDNQTensor._logged_tensors) < 5
+        should_log = (
+            tensor_id not in SDNQTensor._logged_tensors
+            and len(SDNQTensor._logged_tensors) < 5
+            and logger.isEnabledFor(logging.DEBUG)
+        )
         if should_log:
             SDNQTensor._logged_tensors.add(tensor_id)
-            print(
-                f"[SDNQ] dequantize: type={self._quantization_type.value}, "
-                f"weight_shape={self.quantized_data.shape}, weight_dtype={self.quantized_data.dtype}, "
-                f"scale_shape={self._scale.shape}, zp={self._zero_point is not None}, "
-                f"svd={self.has_svd}, group_size={self._group_size}"
-            )
-            logger.info(
+            logger.debug(
                 f"SDNQ dequantize: type={self._quantization_type.value}, "
                 f"weight_shape={self.quantized_data.shape}, weight_dtype={self.quantized_data.dtype}, "
                 f"scale_shape={self._scale.shape}, scale_range=[{self._scale.min():.6f}, {self._scale.max():.6f}], "
                 f"zp={self._zero_point is not None}, svd={self.has_svd}, group_size={self._group_size}"
             )
             if self._zero_point is not None:
-                logger.info(
+                logger.debug(
                     f"  zero_point_shape={self._zero_point.shape}, "
                     f"zp_range=[{self._zero_point.min():.6f}, {self._zero_point.max():.6f}]"
                 )

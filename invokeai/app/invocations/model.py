@@ -37,6 +37,26 @@ def is_self_contained_sdnq_pipeline(config: AnyModelConfig) -> bool:
     return _REQUIRED_PIPELINE_SUBMODELS.issubset(submodels.keys())
 
 
+# FLUX.1 needs two text encoders, so its pipelines must additionally ship the T5 pair on top of the
+# CLIP one above. A FLUX.2 / Z-Image pipeline is complete without them.
+_REQUIRED_FLUX1_PIPELINE_SUBMODELS = _REQUIRED_PIPELINE_SUBMODELS | {
+    SubModelType.TextEncoder2,
+    SubModelType.Tokenizer2,
+}
+
+
+def is_self_contained_sdnq_flux1_pipeline(config: AnyModelConfig) -> bool:
+    """True if `config` is an SDNQ FLUX.1 pipeline that ships every component the graph needs:
+    transformer, VAE, CLIP (text_encoder + tokenizer) and T5 (text_encoder_2 + tokenizer_2).
+
+    Stricter than `is_self_contained_sdnq_pipeline`, which describes the single-encoder pipelines.
+    A FLUX.1 folder missing the T5 pair still needs an external T5 selected."""
+    if getattr(config, "format", None) != ModelFormat.SDNQQuantized:
+        return False
+    submodels = getattr(config, "submodels", None) or {}
+    return _REQUIRED_FLUX1_PIPELINE_SUBMODELS.issubset(submodels.keys())
+
+
 class ModelIdentifierField(BaseModel):
     key: str = Field(description="The model's unique key")
     hash: str = Field(description="The model's BLAKE3 hash")

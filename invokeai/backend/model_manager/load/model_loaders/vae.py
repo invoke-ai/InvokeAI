@@ -327,6 +327,8 @@ class VAELoader(GenericDiffusersLoader):
         model.eval()
         return model
 
+    # NOTE: keep the `.eval()` at the end of this method in step with `_load_qwen_image_vae` above —
+    # both build the module by hand instead of via `from_pretrained`, which would have done it.
     def _load_sdnq_vae(self, model_path: Path) -> AnyModel:
         """Load SDNQ-quantized VAE with on-the-fly dequantization."""
         # Find the safetensors source. Prefer a single canonical file; otherwise hand the whole
@@ -347,4 +349,5 @@ class VAELoader(GenericDiffusersLoader):
         # state dict is expected — a missing key would leave a required parameter on the meta device.
         missing, unexpected = model.load_state_dict(sd, strict=False, assign=True)
         raise_on_incomplete_sdnq_load("SDNQ VAE", missing, unexpected)
+        model.eval()
         return model

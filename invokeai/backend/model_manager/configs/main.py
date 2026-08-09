@@ -2243,6 +2243,22 @@ _SDNQ_PIPELINE_TEXT_ENCODER_CLASS_NAMES = _SDNQ_LOADABLE_QWEN_ARCHITECTURES
 # config and at least one weight file; the tokenizer folder carries no weights, only its vocab/config.
 _COMPONENT_CONFIG_FILENAMES = ("config.json", "model_index.json")
 _COMPONENT_WEIGHT_SUFFIXES = (".safetensors", ".bin", ".pt", ".pth", ".ckpt", ".gguf")
+# Submodel slots that ship vocab/config only. They need no weight file, and nothing can be
+# mis-instantiated against them, so they are also exempt from the declared-class requirement.
+_WEIGHTLESS_SUBMODEL_TYPES = frozenset({SubModelType.Tokenizer, SubModelType.Tokenizer2})
+
+# FLUX.1 SDNQ pipeline components, keyed by the class name `model_index.json` advertises. The value
+# is the slot it fills, the model type recorded for it, and the class names the component's own config
+# may declare — the tokenizers list both spellings transformers writes.
+_SDNQ_FLUX1_COMPONENT_BY_CLASS_NAME: dict[str, tuple[SubModelType, ModelType, set[str]]] = {
+    "FluxTransformer2DModel": (SubModelType.Transformer, ModelType.Main, {"FluxTransformer2DModel"}),
+    "CLIPTextModel": (SubModelType.TextEncoder, ModelType.CLIPEmbed, {"CLIPTextModel"}),
+    "T5EncoderModel": (SubModelType.TextEncoder2, ModelType.T5Encoder, {"T5EncoderModel"}),
+    "AutoencoderKL": (SubModelType.VAE, ModelType.VAE, {"AutoencoderKL"}),
+    "CLIPTokenizer": (SubModelType.Tokenizer, ModelType.CLIPEmbed, {"CLIPTokenizer", "CLIPTokenizerFast"}),
+    "T5TokenizerFast": (SubModelType.Tokenizer2, ModelType.T5Encoder, {"T5Tokenizer", "T5TokenizerFast"}),
+    "T5Tokenizer": (SubModelType.Tokenizer2, ModelType.T5Encoder, {"T5Tokenizer", "T5TokenizerFast"}),
+}
 _TOKENIZER_FILENAMES = (
     "tokenizer.json",
     "tokenizer_config.json",
@@ -2333,7 +2349,9 @@ def _sdnq_component_dir_is_populated(component_path: Path, submodel_type: SubMod
     if not component_path.is_dir():
         return False
 
-    if submodel_type is SubModelType.Tokenizer:
+    # Both tokenizer slots are weightless — FLUX.1 pipelines carry a CLIP tokenizer plus a T5
+    # `tokenizer_2`, and requiring weights of either would reject every real one.
+    if submodel_type in _WEIGHTLESS_SUBMODEL_TYPES:
         return any((component_path / name).is_file() for name in _TOKENIZER_FILENAMES)
 
     has_config = any((component_path / name).is_file() for name in _COMPONENT_CONFIG_FILENAMES)
@@ -2369,7 +2387,12 @@ class Main_SDNQ_Diffusers_Flux2_Config(Main_Config_Base, Config_Base):
 
         variant = override_fields.get("variant") or cls._get_variant_or_raise(mod)
         repo_variant = override_fields.get("repo_variant") or cls._get_repo_variant(mod)
-        submodels = override_fields.get("submodels") or cls._get_submodels(mod)
+        # Submodels are always rediscovered from disk, never replayed from a serialized config. A
+        # persisted map records what existed at install time, so a component deleted since would
+        # still be reported present and the pipeline still "self-contained" — and the failure would
+        # surface only when a loader opens a folder that is gone. The filesystem is the authority.
+        override_fields = {k: v for k, v in override_fields.items() if k != "submodels"}
+        submodels = cls._get_submodels(mod)
 
         return cls(**override_fields, variant=variant, repo_variant=repo_variant, submodels=submodels)
 
@@ -2479,7 +2502,7 @@ class Main_SDNQ_Diffusers_Flux2_Config(Main_Config_Base, Config_Base):
             if not _sdnq_component_matches_advertised_class(
                 component_path,
                 accepted_class_names,
-                require_declaration=submodel_type is not SubModelType.Tokenizer,
+                require_declaration=submodel_type not in _WEIGHTLESS_SUBMODEL_TYPES,
             ):
                 continue
 
@@ -2519,7 +2542,12 @@ class Main_SDNQ_Diffusers_ZImage_Config(Main_Config_Base, Config_Base):
 
         repo_variant = override_fields.get("repo_variant") or cls._get_repo_variant(mod)
 
-        submodels = override_fields.get("submodels") or cls._get_submodels(mod)
+        # Submodels are always rediscovered from disk, never replayed from a serialized config. A
+        # persisted map records what existed at install time, so a component deleted since would
+        # still be reported present and the pipeline still "self-contained" — and the failure would
+        # surface only when a loader opens a folder that is gone. The filesystem is the authority.
+        override_fields = {k: v for k, v in override_fields.items() if k != "submodels"}
+        submodels = cls._get_submodels(mod)
 
         return cls(**override_fields, variant=variant, repo_variant=repo_variant, submodels=submodels)
 
@@ -2612,7 +2640,7 @@ class Main_SDNQ_Diffusers_ZImage_Config(Main_Config_Base, Config_Base):
             if not _sdnq_component_matches_advertised_class(
                 component_path,
                 accepted_class_names,
-                require_declaration=submodel_type is not SubModelType.Tokenizer,
+                require_declaration=submodel_type not in _WEIGHTLESS_SUBMODEL_TYPES,
             ):
                 continue
 
@@ -2668,7 +2696,12 @@ class Main_SDNQ_Diffusers_FLUX_Config(Main_Config_Base, Config_Base):
 
         repo_variant = override_fields.get("repo_variant") or cls._get_repo_variant(mod)
 
-        submodels = override_fields.get("submodels") or cls._get_submodels(mod)
+        # Submodels are always rediscovered from disk, never replayed from a serialized config. A
+        # persisted map records what existed at install time, so a component deleted since would
+        # still be reported present and the pipeline still "self-contained" — and the failure would
+        # surface only when a loader opens a folder that is gone. The filesystem is the authority.
+        override_fields = {k: v for k, v in override_fields.items() if k != "submodels"}
+        submodels = cls._get_submodels(mod)
 
         return cls(**override_fields, variant=variant, repo_variant=repo_variant, submodels=submodels)
 
@@ -2743,45 +2776,30 @@ class Main_SDNQ_Diffusers_FLUX_Config(Main_Config_Base, Config_Base):
             if class_name is None:
                 continue
 
-            match class_name:
-                case "FluxTransformer2DModel":
-                    submodels[SubModelType.Transformer] = SubmodelDefinition(
-                        path_or_prefix=(mod.path / key).resolve().as_posix(),
-                        model_type=ModelType.Main,
-                        variant=None,
-                    )
-                case "CLIPTextModel":
-                    submodels[SubModelType.TextEncoder] = SubmodelDefinition(
-                        path_or_prefix=(mod.path / key).resolve().as_posix(),
-                        model_type=ModelType.CLIPEmbed,
-                        variant=None,
-                    )
-                case "T5EncoderModel":
-                    submodels[SubModelType.TextEncoder2] = SubmodelDefinition(
-                        path_or_prefix=(mod.path / key).resolve().as_posix(),
-                        model_type=ModelType.T5Encoder,
-                        variant=None,
-                    )
-                case "AutoencoderKL":
-                    submodels[SubModelType.VAE] = SubmodelDefinition(
-                        path_or_prefix=(mod.path / key).resolve().as_posix(),
-                        model_type=ModelType.VAE,
-                        variant=None,
-                    )
-                case "CLIPTokenizer":
-                    submodels[SubModelType.Tokenizer] = SubmodelDefinition(
-                        path_or_prefix=(mod.path / key).resolve().as_posix(),
-                        model_type=ModelType.CLIPEmbed,
-                        variant=None,
-                    )
-                case "T5TokenizerFast" | "T5Tokenizer":
-                    submodels[SubModelType.Tokenizer2] = SubmodelDefinition(
-                        path_or_prefix=(mod.path / key).resolve().as_posix(),
-                        model_type=ModelType.T5Encoder,
-                        variant=None,
-                    )
-                case _:
-                    pass
+            resolved = _SDNQ_FLUX1_COMPONENT_BY_CLASS_NAME.get(class_name)
+            if resolved is None:
+                continue
+            submodel_type, model_type, accepted_class_names = resolved
+
+            # Same two guards as the FLUX.2 / Z-Image pipelines: the index advertises what a pipeline
+            # *should* have, so a partial download keeps a complete index over missing or empty
+            # folders, and the advertised class is a claim about the folder rather than a fact.
+            # Without these, a half-downloaded pipeline looks complete until generation time.
+            component_path = mod.path / key
+            if not _sdnq_component_dir_is_populated(component_path, submodel_type):
+                continue
+            if not _sdnq_component_matches_advertised_class(
+                component_path,
+                accepted_class_names,
+                require_declaration=submodel_type not in _WEIGHTLESS_SUBMODEL_TYPES,
+            ):
+                continue
+
+            submodels[submodel_type] = SubmodelDefinition(
+                path_or_prefix=component_path.resolve().as_posix(),
+                model_type=model_type,
+                variant=None,
+            )
 
         return submodels
 

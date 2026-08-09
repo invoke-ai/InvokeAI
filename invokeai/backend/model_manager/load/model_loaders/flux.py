@@ -83,7 +83,24 @@ from invokeai.backend.model_manager.util.model_util import (
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
 from invokeai.backend.quantization.gguf.utils import TORCH_COMPATIBLE_QTYPES
 from invokeai.backend.quantization.sdnq.loaders import raise_on_incomplete_sdnq_load, sdnq_sd_loader
+from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.backend.util.silence_warnings import SilenceWarnings
+
+logger = InvokeAILogger.get_logger(__name__)
+
+
+def _in_eval_mode(model: AnyModel) -> AnyModel:
+    """Put a freshly built module tree into inference mode.
+
+    `from_pretrained` calls `.eval()` on what it returns; the SDNQ loaders below do not use it — they
+    build the module with `init_empty_weights` and then `load_state_dict`, which leaves `training`
+    True. Anything dropout- or norm-sensitive in the tree would then behave as if training. Non-module
+    returns (tokenizers) pass through untouched.
+    """
+    if isinstance(model, torch.nn.Module):
+        model.eval()
+    return model
+
 
 try:
     from invokeai.backend.quantization.bnb_llm_int8 import quantize_model_llm_int8
@@ -1576,13 +1593,15 @@ class FluxSDNQDiffusersModel(ModelLoader):
         config: AnyModelConfig,
         submodel_type: Optional[SubModelType] = None,
     ) -> AnyModel:
-        print(
-            f"[SDNQ] FluxSDNQDiffusersModel._load_model called with config={type(config).__name__}, submodel={submodel_type}"
+        logger.debug(
+            "[SDNQ] FluxSDNQDiffusersModel._load_model called with config=%s, submodel=%s",
+            type(config).__name__,
+            submodel_type,
         )
         # Handle single-file SDNQ checkpoint (Main_SDNQ_FLUX_Config)
         if isinstance(config, Main_SDNQ_FLUX_Config):
             if submodel_type == SubModelType.Transformer:
-                return self._load_sdnq_transformer_checkpoint(config)
+                return _in_eval_mode(self._load_sdnq_transformer_checkpoint(config))
             raise ValueError(
                 f"Only Transformer submodels are supported for checkpoint format. Received: {submodel_type}"
             )
@@ -1594,22 +1613,33 @@ class FluxSDNQDiffusersModel(ModelLoader):
         if submodel_type is None:
             raise ValueError("A submodel type must be provided when loading main pipelines.")
 
+        # Prefer the path discovery actually found. `model_index.json` names its components with
+        # arbitrary keys, and identification records the key it saw — but reconstructing
+        # `model_path / submodel_type.value` here assumes the key always equals the slot name. A
+        # pipeline whose index calls its CLIP encoder something else is then discovered fine and
+        # loaded from a folder that does not exist. Fall back to the conventional name when a config
+        # predates submodel discovery.
         model_path = Path(config.path)
-        submodel_path = model_path / submodel_type.value
+        discovered = (config.submodels or {}).get(submodel_type)
+        submodel_path = Path(discovered.path_or_prefix) if discovered else model_path / submodel_type.value
 
+        # Every branch goes through `_in_eval_mode`: these loaders build their modules by hand
+        # (`init_empty_weights` + `load_state_dict`) rather than through `from_pretrained`, which
+        # would have called `.eval()` itself, so the modules arrive in training mode and any
+        # dropout / batch-norm in the tree would stay active during inference.
         match submodel_type:
             case SubModelType.Transformer:
-                return self._load_sdnq_transformer(submodel_path, config)
+                return _in_eval_mode(self._load_sdnq_transformer(submodel_path, config))
             case SubModelType.TextEncoder:
-                return self._load_text_encoder(submodel_path)
+                return _in_eval_mode(self._load_text_encoder(submodel_path))
             case SubModelType.TextEncoder2:
-                return self._load_text_encoder_2(submodel_path)
+                return _in_eval_mode(self._load_text_encoder_2(submodel_path))
             case SubModelType.Tokenizer:
                 return CLIPTokenizer.from_pretrained(submodel_path, local_files_only=True)
             case SubModelType.Tokenizer2:
                 return T5Tokenizer.from_pretrained(submodel_path, max_length=512, local_files_only=True)
             case SubModelType.VAE:
-                return self._load_vae(submodel_path)
+                return _in_eval_mode(self._load_vae(submodel_path))
             case _:
                 raise ValueError(f"Unsupported submodel type: {submodel_type}")
 
@@ -1631,7 +1661,7 @@ class FluxSDNQDiffusersModel(ModelLoader):
 
     def _load_sdnq_transformer(self, transformer_path: Path, config: Main_SDNQ_Diffusers_FLUX_Config) -> AnyModel:
         """Load SDNQ-quantized transformer from diffusers folder."""
-        print(f"[SDNQ] _load_sdnq_transformer called for {transformer_path}")
+        logger.debug("[SDNQ] _load_sdnq_transformer called for %s", transformer_path)
         with accelerate.init_empty_weights():
             model = Flux(get_flux_transformers_params(config.variant))
 

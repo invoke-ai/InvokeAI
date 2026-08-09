@@ -1,9 +1,19 @@
 """SDNQ (SD.Next Quantization) utility functions and enums."""
 
+import logging
 from enum import Enum
 from typing import Optional
 
 import torch
+
+from invokeai.backend.util.logging import InvokeAILogger
+
+logger = InvokeAILogger.get_logger(__name__)
+
+# How many elements the one-shot uint4 diagnostic may look at. Every figure it reports is otherwise a
+# full-tensor reduction over a weight that can be gigabytes — a device sync and a real cost paid on
+# the first dequantization of every model, for output nobody reads unless they are debugging.
+_DIAGNOSTIC_SAMPLE_SIZE = 1024
 
 
 class SDNQQuantizationType(str, Enum):
@@ -238,23 +248,37 @@ def dequantize_uint4_per_group(
     zp_f = zero_point.to(dtype)
     dequantized = weight_grouped * scale_f + zp_f
 
-    # Diagnostic logging (once)
-    if not _uint4_diagnostic_done:
+    # One-shot diagnostic, gated on the log level *before* computing anything: the reductions below
+    # cost more than the dequantization they describe. Bounded to a fixed-size sample so that even
+    # with debug logging on, the diagnostic does not scale with the tensor.
+    if not _uint4_diagnostic_done and logger.isEnabledFor(logging.DEBUG):
         _uint4_diagnostic_done = True
-        print("[SDNQ uint4] Diagnostic:")
-        print(f"  packed_weight: shape={packed_weight.shape}, dtype={packed_weight.dtype}")
-        print(f"  unpacked: min={unpacked.min().item()}, max={unpacked.max().item()}, unique={len(unpacked.unique())}")
-        print(f"  scale: shape={scale.shape}, dtype={scale.dtype}, range=[{scale.min():.6f}, {scale.max():.6f}]")
-        print(
-            f"  zero_point: shape={zero_point.shape}, dtype={zero_point.dtype}, range=[{zero_point.min():.6f}, {zero_point.max():.6f}]"
+        unpacked_sample = unpacked.flatten()[:_DIAGNOSTIC_SAMPLE_SIZE]
+        dequantized_sample = dequantized.flatten()[:_DIAGNOSTIC_SAMPLE_SIZE]
+        logger.debug(
+            "[SDNQ uint4] packed_weight: shape=%s dtype=%s | group_size=%d num_groups=%d\n"
+            "  scale: shape=%s dtype=%s | zero_point: shape=%s dtype=%s\n"
+            "  unpacked (first %d): min=%s max=%s unique=%d\n"
+            "  zero_point sample: %s\n"
+            "  dequantized (first %d): min=%s max=%s sample=%s",
+            tuple(packed_weight.shape),
+            packed_weight.dtype,
+            group_size,
+            num_groups,
+            tuple(scale.shape),
+            scale.dtype,
+            tuple(zero_point.shape),
+            zero_point.dtype,
+            unpacked_sample.numel(),
+            unpacked_sample.min().item(),
+            unpacked_sample.max().item(),
+            len(unpacked_sample.unique()),
+            zero_point.flatten()[:10].tolist(),
+            dequantized_sample.numel(),
+            dequantized_sample.min().item(),
+            dequantized_sample.max().item(),
+            dequantized_sample[:10].tolist(),
         )
-        print(f"  group_size={group_size}, num_groups={num_groups}")
-        # Sample values
-        zp_sample = zero_point.flatten()[:10].tolist()
-        print(f"  zero_point sample: {zp_sample}")
-        sample_dequant = dequantized.flatten()[:10].tolist()
-        print(f"  dequantized sample: {sample_dequant}")
-        print(f"  dequantized range: [{dequantized.min():.6f}, {dequantized.max():.6f}]")
 
     # Reshape back to original shape
     return dequantized.view(original_shape)

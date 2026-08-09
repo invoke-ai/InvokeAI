@@ -21,17 +21,21 @@ from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 
 
 def _safetensors_dir_has_sdnq_keys(directory) -> bool:
-    """Return True if any safetensors file in ``directory`` looks SDNQ-quantized (weight + matching scale)."""
+    """Return True if the safetensors in ``directory`` look SDNQ-quantized (weight + matching scale).
+
+    The pair is resolved across the *whole* directory rather than within each file. Sharding splits a
+    checkpoint by tensor order, so ``<name>.weight`` and its ``<name>.scale`` routinely land in
+    different shards; matching per file reports such a checkpoint as unquantized whenever it carries
+    no ``quantization_config.json`` marker to fall back on.
+    """
+    keys: set[str] = set()
     for st_file in sorted(directory.glob("*.safetensors")):
         try:
             with safe_open(st_file, framework="pt") as f:
-                keys = set(f.keys())
+                keys.update(f.keys())
         except Exception:
             continue
-        for key in keys:
-            if key.endswith(".weight") and f"{key[:-7]}.scale" in keys:
-                return True
-    return False
+    return any(key.endswith(".weight") and f"{key[: -len('.weight')]}.scale" in keys for key in keys)
 
 
 class T5Encoder_T5Encoder_Config(Config_Base):

@@ -32645,7 +32645,8 @@
             "description": "T5 tokenizer and text encoder",
             "field_kind": "input",
             "input": "any",
-            "orig_required": true,
+            "orig_default": null,
+            "orig_required": false,
             "title": "T5 Encoder",
             "ui_model_type": ["t5_encoder"]
           },
@@ -32662,7 +32663,8 @@
             "description": "CLIP Embed loader",
             "field_kind": "input",
             "input": "any",
-            "orig_required": true,
+            "orig_default": null,
+            "orig_required": false,
             "title": "CLIP Embed",
             "ui_model_type": ["clip_embed"]
           },
@@ -32679,7 +32681,8 @@
             "description": "VAE model to load",
             "field_kind": "input",
             "input": "any",
-            "orig_required": true,
+            "orig_default": null,
+            "orig_required": false,
             "title": "VAE",
             "ui_model_base": ["flux"],
             "ui_model_type": ["vae"]
@@ -32696,7 +32699,7 @@
         "tags": ["model", "flux"],
         "title": "Main Model - FLUX",
         "type": "object",
-        "version": "1.0.7",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/FluxModelLoaderOutput"
         }

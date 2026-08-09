@@ -364,7 +364,8 @@ def sdnq_sd_loader(
     source_desc = (
         str(safetensors_files[0]) if len(safetensors_files) == 1 else f"{len(safetensors_files)} shards in {model_path}"
     )
-    print(f"[SDNQ] Loaded {sdnq_count} quantized tensors, {regular_count} regular tensors from {source_desc}")
+    # Logged, not printed: stdout bypasses the app's log level, format and handlers, and this line
+    # already went to the logger on the next call anyway.
     logger.info(f"SDNQ loader: {sdnq_count} quantized tensors, {regular_count} regular tensors from {source_desc}")
 
     gc.collect()

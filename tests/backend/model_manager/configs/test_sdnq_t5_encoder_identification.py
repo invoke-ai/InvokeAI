@@ -108,3 +108,38 @@ def test_standalone_bundle_without_tokenizer_is_rejected(tmp_path: Path):
     with pytest.raises(NotAMatchError):
         T5Encoder_SDNQ_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS, "path": root.as_posix()})
     assert T5Encoder_SDNQ_Config.resolve_tokenizer_dir(root) is None
+
+
+def _write_sharded_t5_encoder_dir(te_dir: Path, *, split_the_pair: bool) -> None:
+    """A sharded SDNQ T5 encoder with **no** quantization marker, so identification has to rely on the
+    weight/scale key heuristic alone.
+
+    With ``split_the_pair`` the weight and its scale land in different shards, which is what sharding
+    by tensor order actually does — nothing keeps a pair together.
+    """
+    te_dir.mkdir(parents=True, exist_ok=True)
+    (te_dir / "config.json").write_text(json.dumps({"architectures": ["T5EncoderModel"]}), encoding="utf-8")
+
+    weight = {"encoder.block.0.layer.0.SelfAttention.q.weight": torch.zeros(64, 32, dtype=torch.uint8)}
+    scale = {"encoder.block.0.layer.0.SelfAttention.q.scale": torch.zeros(64, 1, dtype=torch.float32)}
+    other = {"encoder.block.1.layer.0.SelfAttention.q.weight": torch.zeros(64, 32, dtype=torch.uint8)}
+
+    if split_the_pair:
+        save_file(weight, str(te_dir / "model-00001-of-00002.safetensors"))
+        save_file(scale, str(te_dir / "model-00002-of-00002.safetensors"))
+    else:
+        save_file({**weight, **scale}, str(te_dir / "model-00001-of-00002.safetensors"))
+        save_file(other, str(te_dir / "model-00002-of-00002.safetensors"))
+
+
+@pytest.mark.parametrize("split_the_pair", [False, True])
+def test_sharded_sdnq_encoder_is_identified_even_when_the_pair_straddles_shards(tmp_path: Path, split_the_pair: bool):
+    """Matching weight/scale per file rejected a valid checkpoint whenever sharding separated them."""
+    root = tmp_path / f"sharded-{'split' if split_the_pair else 'together'}"
+    root.mkdir(parents=True, exist_ok=True)
+    _write_sharded_t5_encoder_dir(root / "text_encoder_2", split_the_pair=split_the_pair)
+    _write_tokenizer_dir(root / "tokenizer_2")
+
+    config = T5Encoder_SDNQ_Config.from_model_on_disk(ModelOnDisk(root), {**_REQUIRED_FIELDS, "path": root.as_posix()})
+
+    assert config is not None
