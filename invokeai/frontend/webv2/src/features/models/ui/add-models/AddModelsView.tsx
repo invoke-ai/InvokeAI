@@ -1,10 +1,13 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
-import type { ModelSortField } from '@features/models/core/library';
 import type { StarterModel } from '@features/models/core/types';
 
 import { Box, Checkbox, Flex, HStack, Icon, Input, InputGroup, Stack, Text } from '@chakra-ui/react';
-import { getModelBaseLabel } from '@features/models/core/baseIdentity';
 import { collectBases, collectTypes } from '@features/models/core/library';
+import {
+  DEFAULT_STARTER_MODEL_FILTERS,
+  filterStarterModels,
+  type StarterModelFilters,
+} from '@features/models/core/starters';
 import { getHuggingFaceModels, scanFolderForModels } from '@features/models/data/api';
 import {
   ensureExternalProvidersLoaded,
@@ -35,30 +38,10 @@ import { HuggingFaceFiles } from './HuggingFaceFiles';
 import { ScanResults } from './ScanResults';
 import { SelectedBundleBar } from './SelectedBundleBar';
 import { classifySource } from './sourceClassifier';
-import { DEFAULT_STARTER_MODEL_FILTERS, StarterFilterMenu, type StarterModelFilters } from './StarterFilterMenu';
+import { StarterFilterMenu } from './StarterFilterMenu';
 import { StarterList } from './StarterList';
 import { getStarterBundleInstallSources, getStarterModelInstallSources } from './starterModelInstallSources';
 import { useInstallActions } from './useInstallActions';
-
-interface IndexedStarterModel {
-  index: number;
-  model: StarterModel;
-}
-
-const compareStarterModels = (a: IndexedStarterModel, b: IndexedStarterModel, field: ModelSortField): number => {
-  switch (field) {
-    case 'default':
-      return a.index - b.index;
-    case 'name':
-      return a.model.name.localeCompare(b.model.name, undefined, { sensitivity: 'base' });
-    case 'base':
-      return getModelBaseLabel(a.model.base).localeCompare(getModelBaseLabel(b.model.base));
-    case 'format':
-      return String(a.model.format ?? '').localeCompare(String(b.model.format ?? ''));
-    case 'size':
-      return 0;
-  }
-};
 
 /**
  * One box to add any model. The same field searches the curated starter
@@ -139,25 +122,10 @@ export const AddModelsView = () => {
   const availableStarterBases = useMemo(() => collectBases(sourceModels), [sourceModels]);
   const availableStarterTypes = useMemo(() => collectTypes(sourceModels), [sourceModels]);
 
-  const filteredModels = useMemo(() => {
-    const terms = deferredTrimmed.toLowerCase().split(/\s+/).filter(Boolean);
-    const directionFactor = starterFilters.sortDirection === 'desc' ? -1 : 1;
-
-    return sourceModels
-      .map((model, index) => ({ index, model }))
-      .filter(({ model }) => {
-        const haystack =
-          `${model.name} ${model.description} ${model.base} ${model.type} ${model.format ?? ''} ${model.variant ?? ''}`.toLowerCase();
-
-        return (
-          (starterFilters.typeFilter === null || model.type === starterFilters.typeFilter) &&
-          (starterFilters.baseFilter === null || model.base === starterFilters.baseFilter) &&
-          terms.every((term) => haystack.includes(term))
-        );
-      })
-      .sort((a, b) => compareStarterModels(a, b, starterFilters.sortField) * directionFactor)
-      .map(({ model }) => model);
-  }, [deferredTrimmed, sourceModels, starterFilters]);
+  const filteredModels = useMemo(
+    () => filterStarterModels(sourceModels, starterFilters, deferredTrimmed),
+    [deferredTrimmed, sourceModels, starterFilters]
+  );
 
   const queueSources = async (entries: StarterInstallSource[], owner: AccountScope): Promise<number> => {
     let queued = 0;
