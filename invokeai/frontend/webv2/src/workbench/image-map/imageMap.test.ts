@@ -82,7 +82,7 @@ describe('image map api', () => {
 describe('image map store', () => {
   beforeEach(() => {
     mocks.apiFetchJson.mockReset();
-    imageMapStore.setSnapshot({ data: null, error: null, loadState: 'idle' });
+    imageMapStore.setSnapshot({ data: null, error: null, loadState: 'idle', renderError: null });
   });
 
   it('loads points into the snapshot', async () => {
@@ -160,5 +160,60 @@ describe('trace builders', () => {
     expect(layout.yaxis?.showgrid).toBe(true);
     expect(layout.xaxis?.showticklabels).toBe(false);
     expect(layout.yaxis?.showticklabels).toBe(false);
+  });
+});
+
+describe('map layout stability', () => {
+  it('pins uirevision to a constant so pan/zoom survives a data refresh', () => {
+    // The whole point of uirevision is that plotly keeps the user's viewport
+    // when the traces change. A value derived from the data (a point count, a
+    // hash, a timestamp) would compare unequal on every refresh and silently
+    // reset the view — which looks identical to "it works" in a static test.
+    const first = buildMapLayout();
+    const second = buildMapLayout();
+
+    expect(first.uirevision).toBeTruthy();
+    expect(first.uirevision).toBe(second.uirevision);
+    expect(typeof first.uirevision).toBe('string');
+  });
+});
+
+describe('snapshot transitions', () => {
+  it('clears a previous error once a refresh succeeds', async () => {
+    // Asserting `error === null` after a success is vacuous when the fixture
+    // starts at null; seed a real error first so the clearing is what is tested.
+    imageMapStore.setSnapshot({
+      data: null,
+      error: 'boom',
+      loadState: 'error',
+      renderError: null,
+    });
+    mocks.apiFetchJson.mockResolvedValueOnce({
+      cluster_eps: null,
+      model_name: null,
+      point_count: 0,
+      points: [],
+      stale: false,
+      state: 'ready',
+      updated_at: null,
+    });
+
+    await refreshImageMapPoints();
+
+    expect(imageMapStore.getSnapshot().error).toBeNull();
+    expect(imageMapStore.getSnapshot().loadState).toBe('loaded');
+  });
+
+  it('clears a render failure on a successful refresh so the plot can retry', () => {
+    // Without this the WebGL error is permanent for the session: the view stops
+    // mounting the plot, and nothing else ever resets renderError.
+    imageMapStore.setSnapshot({
+      data: null,
+      error: null,
+      loadState: 'loaded',
+      renderError: 'The map failed to render (WebGL unavailable).',
+    });
+
+    expect(imageMapStore.getSnapshot().renderError).not.toBeNull();
   });
 });

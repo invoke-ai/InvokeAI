@@ -50,10 +50,19 @@ const ImageMapPlot = () => {
         });
       })
       .catch(() => {
-        // WebGL context creation can fail (blocked GPU, context exhaustion);
-        // an unhandled rejection would bypass the widget failure boundary, so
-        // surface it through the store's error state instead.
-        imageMapStore.patchSnapshot({ error: 'The map failed to render (WebGL unavailable).', loadState: 'error' });
+        if (disposed) {
+          // Symmetry with the .then above: a rejection arriving after unmount
+          // must not write a global error on behalf of a dead component.
+          return;
+        }
+
+        // WebGL context creation can fail (blocked GPU, context exhaustion).
+        // Reported as renderError, not the generic error: the data is fine, it
+        // is the canvas that is not, so the view has to stop trying to render
+        // the plot. Signalling this through `error`/`loadState` alone did
+        // nothing, because the view prefers a non-empty point set over any
+        // error and would just mount this same failing plot again.
+        imageMapStore.patchSnapshot({ renderError: 'The map failed to render (WebGL unavailable).' });
       });
 
     return () => {

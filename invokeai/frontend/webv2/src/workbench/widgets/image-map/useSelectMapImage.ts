@@ -1,6 +1,15 @@
 import { galleryImages, legacyGeneratedImageToGalleryItem } from '@features/gallery';
 import { useWorkbenchCommands } from '@workbench/WorkbenchContext';
-import { useCallback, useRef } from 'react';
+import { useCallback } from 'react';
+
+/**
+ * Module-scoped, deliberately: the thing being guarded — the gallery selection —
+ * is global, so the counter has to be too. A `useRef` is per-mount, which leaves
+ * a hole whenever the widget unmounts with a hydrate in flight (switching the
+ * right-panel tab away and back): the abandoned closure compares against its own
+ * dead ref, still passes, and overwrites the newer mount's selection.
+ */
+let selectionSequence = 0;
 
 /**
  * Turns a map point's image name into the current gallery selection. The map
@@ -13,18 +22,17 @@ import { useCallback, useRef } from 'react';
  */
 export const useSelectMapImage = (): ((imageName: string) => void) => {
   const commands = useWorkbenchCommands();
-  const sequenceRef = useRef(0);
 
   return useCallback(
     (imageName: string) => {
-      const sequence = ++sequenceRef.current;
+      const sequence = ++selectionSequence;
 
       galleryImages
         .resolveMany([imageName])
         .then((images) => {
           const image = images.at(0);
 
-          if (!image || sequence !== sequenceRef.current) {
+          if (!image || sequence !== selectionSequence) {
             return;
           }
 

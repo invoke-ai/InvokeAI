@@ -18,11 +18,25 @@ const handleRefresh = () => {
  * selects that image in the gallery (and so in Preview).
  */
 export const ImageMapWidgetView = (_props: WidgetViewProps) => {
-  const { data, error, loadState } = imageMapStore.useSnapshot();
+  const { data, error, loadState, renderError } = imageMapStore.useSnapshot();
 
   useEffect(() => {
     ensureImageMapLoaded();
   }, []);
+
+  // Checked before the plot: this is the canvas failing, not a fetch, so
+  // re-mounting the plot would just fail again and render an empty box with no
+  // way out. A successful refresh clears it and lets the plot retry.
+  if (renderError) {
+    return (
+      <CenteredMessage
+        actionLabel="Retry"
+        detail={renderError}
+        onAction={handleRefresh}
+        title="Image map unavailable"
+      />
+    );
+  }
 
   // A working map beats a full-screen error: when a refresh fails but prior
   // points exist, keep showing them (the next successful refresh recovers).
@@ -38,7 +52,7 @@ export const ImageMapWidgetView = (_props: WidgetViewProps) => {
     );
   }
 
-  if (loadState === 'error') {
+  if (loadState === 'error' && !data) {
     return (
       <CenteredMessage
         actionLabel="Retry"
@@ -82,6 +96,17 @@ export const ImageMapWidgetView = (_props: WidgetViewProps) => {
           </Button>
         </Stack>
       </Center>
+    );
+  }
+
+  if (loadState === 'error') {
+    return (
+      <CenteredMessage
+        actionLabel="Retry"
+        detail={error ?? 'Failed to load the image map.'}
+        onAction={handleRefresh}
+        title="Image map unavailable"
+      />
     );
   }
 

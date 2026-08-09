@@ -20,12 +20,20 @@ export interface ImageMapSnapshot {
   data: ImageMapPoints | null;
   loadState: 'idle' | 'loading' | 'loaded' | 'error';
   error: string | null;
+  /**
+   * The plot canvas itself failed (WebGL unavailable). Distinct from `error`,
+   * which means a fetch failed: with `error` the cached points are still worth
+   * showing, whereas here there is nothing that can draw them, so the view must
+   * stop mounting the plot and say so.
+   */
+  renderError: string | null;
 }
 
 const EMPTY_IMAGE_MAP_SNAPSHOT: ImageMapSnapshot = {
   data: null,
   error: null,
   loadState: 'idle',
+  renderError: null,
 };
 
 export const imageMapStore = createExternalStore<ImageMapSnapshot>(EMPTY_IMAGE_MAP_SNAPSHOT);
@@ -59,7 +67,10 @@ export const refreshImageMapPoints = (): Promise<void> => {
         return;
       }
 
-      imageMapStore.patchSnapshot({ data, error: null, loadState: 'loaded' });
+      // renderError is cleared too: a retry is the user's way out of a
+      // transient WebGL failure, so a fresh point set must get a fresh attempt
+      // at drawing rather than staying stuck on the previous canvas failure.
+      imageMapStore.patchSnapshot({ data, error: null, loadState: 'loaded', renderError: null });
     })
     .catch((error: unknown) => {
       if (!isAccountScopeCurrent(owner)) {
