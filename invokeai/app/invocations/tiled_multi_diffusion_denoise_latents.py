@@ -1,6 +1,6 @@
 import copy
 from contextlib import ExitStack
-from typing import Iterator, Tuple
+from typing import Iterator
 
 import torch
 from diffusers.models.unets.unet_2d_condition import UNet2DConditionModel
@@ -22,7 +22,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import UNetField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.patches.layer_patcher import LayerPatcher
+from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.stable_diffusion.diffusers_pipeline import ControlNetData, PipelineIntermediateState
 from invokeai.backend.stable_diffusion.multi_diffusion_pipeline import (
@@ -35,6 +35,7 @@ from invokeai.backend.tiles.tiles import (
 )
 from invokeai.backend.tiles.utils import TBLR
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.fp8 import get_model_compute_dtype
 
 
 def crop_controlnet_data(control_data: ControlNetData, latent_region: TBLR) -> ControlNetData:
@@ -193,25 +194,30 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
             context.util.sd_step_callback(state, unet_config.base)
 
         # Prepare an iterator that yields the UNet's LoRA models and their weights.
-        def _lora_loader() -> Iterator[Tuple[ModelPatchRaw, float]]:
+        def _lora_loader() -> Iterator[PatchSpec]:
             for lora in self.unet.loras:
                 lora_info = context.models.load(lora.lora)
                 assert isinstance(lora_info.model, ModelPatchRaw)
-                yield (lora_info.model, lora.weight)
-                del lora_info
+                yield (lora_info.model, lora.weight, lora_info.model_in_ram())
 
         device = TorchDevice.choose_torch_device()
         with (
             ExitStack() as exit_stack,
             context.models.load(self.unet.unet) as unet,
             LayerPatcher.apply_smart_model_patches(
-                model=unet, patches=_lora_loader(), prefix="lora_unet_", dtype=unet.dtype
+                # NOT unet.dtype: with fp8 storage that is the float8 storage dtype, which has no
+                # arithmetic kernels (see get_model_compute_dtype).
+                model=unet,
+                patches=_lora_loader(),
+                prefix="lora_unet_",
+                dtype=get_model_compute_dtype(unet),
             ),
         ):
             assert isinstance(unet, UNet2DConditionModel)
-            latents = latents.to(device=device, dtype=unet.dtype)
+            unet_dtype = get_model_compute_dtype(unet)
+            latents = latents.to(device=device, dtype=unet_dtype)
             if noise is not None:
-                noise = noise.to(device=device, dtype=unet.dtype)
+                noise = noise.to(device=device, dtype=unet_dtype)
             scheduler = get_scheduler(
                 context=context,
                 scheduler_info=self.unet.scheduler,
@@ -227,7 +233,7 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
                 positive_conditioning_field=self.positive_conditioning,
                 negative_conditioning_field=self.negative_conditioning,
                 device=device,
-                dtype=unet.dtype,
+                dtype=unet_dtype,
                 latent_height=latent_tile_height,
                 latent_width=latent_tile_width,
                 cfg_scale=self.cfg_scale,

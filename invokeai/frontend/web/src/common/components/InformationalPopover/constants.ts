@@ -6,6 +6,7 @@ export type Feature =
   | 'fluxDypePreset'
   | 'fluxDypeScale'
   | 'fluxDypeExponent'
+  | 'pidMode'
   | 'hrf'
   | 'paramNegativeConditioning'
   | 'paramPositiveConditioning'
@@ -13,6 +14,12 @@ export type Feature =
   | 'seedVarianceEnhancer'
   | 'seedVarianceStrength'
   | 'seedVarianceRandomizePercent'
+  | 'krea2ConditioningRebalance'
+  | 'krea2RebalanceMultiplier'
+  | 'krea2RebalanceWeights'
+  | 'krea2SeedVarianceEnhancer'
+  | 'krea2SeedVarianceStrength'
+  | 'krea2SeedVarianceRandomizePercent'
   | 'compositingMaskBlur'
   | 'compositingBlurMethod'
   | 'compositingCoherencePass'
@@ -68,6 +75,11 @@ export type Feature =
   | 'scaleBeforeProcessing'
   | 'seamlessTilingXAxis'
   | 'seamlessTilingYAxis'
+  | 'hidiffusion'
+  | 'hidiffusionRauNet'
+  | 'hidiffusionWindowAttn'
+  | 'hidiffusionT1Ratio'
+  | 'hidiffusionT2Ratio'
   | 'colorCompensation'
   | 'upscaleModel'
   | 'scale'
@@ -102,6 +114,10 @@ export const POPOVER_DATA: { [key in Feature]?: PopoverData } = {
   },
   fluxDypeExponent: {
     placement: 'right',
+  },
+  pidMode: {
+    placement: 'right',
+    href: 'https://github.com/nv-tlabs/PiD',
   },
   inpainting: {
     href: 'https://support.invoke.ai/support/solutions/articles/151000096702-inpainting-outpainting-and-bounding-box',
@@ -235,6 +251,13 @@ export const POPOVER_DATA: { [key in Feature]?: PopoverData } = {
   seamlessTilingYAxis: {
     href: 'https://support.invoke.ai/support/solutions/articles/151000178161-advanced-settings',
   },
+  hidiffusion: {
+    href: 'https://github.com/megvii-research/HiDiffusion',
+  },
+  hidiffusionRauNet: {},
+  hidiffusionWindowAttn: {},
+  hidiffusionT1Ratio: {},
+  hidiffusionT2Ratio: {},
 } as const;
 
 export const OPEN_DELAY = 1000; // in milliseconds

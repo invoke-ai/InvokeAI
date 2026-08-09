@@ -14,7 +14,7 @@ import type {
   CanvasState,
 } from 'features/controlLayers/store/types';
 import type { BaseModelType } from 'features/nodes/types/common';
-import { getGridSize, getOptimalDimension } from 'features/parameters/util/optimalDimension';
+import { getGridSize, getOptimalDimension, getPidScale } from 'features/parameters/util/optimalDimension';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
@@ -76,7 +76,7 @@ export const selectHasEntities = createSelector(selectEntityCountAll, (count) =>
  */
 export const selectOptimalDimension = createSelector(selectParamsSlice, (params): number => {
   const modelBase = params.model?.base as BaseModelType | undefined;
-  return getOptimalDimension(modelBase ?? null);
+  return getOptimalDimension(modelBase ?? null, getPidScale(params.pidMode));
 });
 
 /**
@@ -84,7 +84,7 @@ export const selectOptimalDimension = createSelector(selectParamsSlice, (params)
  */
 export const selectGridSize = createSelector(selectParamsSlice, (params): number => {
   const modelBase = params.model?.base as BaseModelType | undefined;
-  return getGridSize(modelBase ?? null);
+  return getGridSize(modelBase ?? null, getPidScale(params.pidMode));
 });
 
 /**
