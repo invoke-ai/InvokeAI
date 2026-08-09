@@ -128,7 +128,7 @@ export const handleKrea2Components: ModelHandler = (models, state, dispatch) => 
   }
 };
 
-export const handleMiniMaxH3Overrides: ModelHandler = (models, state, dispatch) => {
+const handleMiniMaxH3Overrides: ModelHandler = (models, state, dispatch) => {
   // The MiniMax H3 single-file transformer / text-encoder overrides are optional (null = use the
   // main folder's submodels), so never auto-select - but a selection whose model was uninstalled
   // must be cleared, or it passes the components-only readiness gate and fails at invoke time.
