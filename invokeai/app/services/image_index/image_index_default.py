@@ -279,20 +279,33 @@ class ImageIndexService(ImageIndexServiceBase):
                         break
                     ok = self._process_batch(batch)
                     self._emit_status()
-                    if not ok:
-                        # Re-sweep so queue-sourced images that failed
-                        # transiently are retried to _MAX_ATTEMPTS instead of
-                        # lingering unembedded until the next restart.
-                        self._backfill_pending.set()
-                        # Back off after a failed batch so a systemic failure
-                        # (broken model, OOM loop) cannot spin hot through the
-                        # backlog re-fetching the same names. The delay grows
-                        # with consecutive systemic failures: images are no
-                        # longer retired by an outage, so without this an
-                        # outage would retry the same batch at 1 Hz for as
-                        # long as it lasts.
-                        self._stop_event.wait(self._backoff_seconds())
-                    continue
+                    if ok:
+                        continue
+                    # Re-sweep so queue-sourced images that failed
+                    # transiently are retried to _MAX_ATTEMPTS instead of
+                    # lingering unembedded until the next restart.
+                    self._backfill_pending.set()
+                    # Back off after a failed batch so a systemic failure
+                    # (broken model, OOM loop) cannot spin hot through the
+                    # backlog re-fetching the same names. The delay grows
+                    # with consecutive systemic failures: images are no
+                    # longer retired by an outage, so without this an
+                    # outage would retry the same batch at 1 Hz for as
+                    # long as it lasts.
+                    self._stop_event.wait(self._backoff_seconds())
+                    if not self._systemic_failures:
+                        # Per-image failures retire after _MAX_ATTEMPTS, so the
+                        # backlog drains and quiescence arrives on its own.
+                        continue
+                    # A systemic failure charges no image, by design — which
+                    # means this same batch reappears on every pass and
+                    # quiescence never comes. Fall through to the projection
+                    # work below rather than skipping it for the duration of
+                    # the outage: a projection reads only already-stored
+                    # embeddings, so it needs no encoder and is still correct
+                    # while embedding is stalled. Without this the image map
+                    # reports "computing" forever over a gallery that is in
+                    # fact embedded.
                 if self._pending_pokes and not self._backfill_pending.is_set():
                     # The index just went quiescent: poke each owner whose
                     # images were embedded since the last flush. Deferred to
@@ -523,12 +536,42 @@ class ImageIndexService(ImageIndexServiceBase):
         records = self._invoker.services.image_index_records
 
         scope_user = None if all_images else user_id
-        names = records.list_accessible_embedded_images(scope_user, self._model_id)
-        found_names, matrix = records.get_embeddings(names, self._model_id)
+        try:
+            names = records.list_accessible_embedded_images(scope_user, self._model_id)
+            found_names, matrix = records.get_embeddings(names, self._model_id)
+        except Exception:
+            # The DB reads are as failure-prone as the fit ("database is
+            # locked" is a designed-for condition here), and the job was
+            # already popped from the dedup map. Re-queue it rather than let
+            # the generic worker handler swallow it: /refresh has already
+            # answered `enqueued: true`, and a client waiting on
+            # image_map_projection_ready would otherwise wait forever.
+            logger.exception(f"Image map: could not read embeddings for user '{user_id}'; re-queueing")
+            self._requeue_projection(user_id, all_images)
+            return
+
+        current_hash = scope_hash(self._model_id, names)
+        cached = records.get_projection(user_id, self._model_id)
+        if cached is not None and cached.scope_hash == current_hash:
+            # Nothing the projection depends on has changed, and the fit is
+            # seeded, so recomputing would burn minutes of single-threaded CPU
+            # to arrive at identical coordinates. Still emit, so a client that
+            # asked for a refresh hears that its request was honoured.
+            self._invoker.services.events.emit_image_map_projection_ready(
+                user_id=user_id, point_count=cached.point_count
+            )
+            return
+
         try:
             coords = compute_umap(matrix)
             if coords.shape[0] != len(found_names):
                 raise RuntimeError(f"projection produced {coords.shape[0]} points for {len(found_names)} images")
+            if not np.isfinite(coords).all():
+                # A NaN reaching the cache makes /points raise inside sklearn
+                # on every request, and the cache is only replaced when the
+                # scope hash changes — so it would 500 that user indefinitely.
+                # Treat it as a failed fit and take the empty-cache path.
+                raise RuntimeError("projection produced non-finite coordinates")
         except Exception:
             logger.exception(f"Image map: UMAP projection failed for user '{user_id}' ({len(found_names)} points)")
             # Cache an empty projection under the CURRENT scope hash. Serving
@@ -541,15 +584,27 @@ class ImageIndexService(ImageIndexServiceBase):
         # Hash the scope the projection was computed against (on failure the
         # empty cache still claims the current scope, so staleness detection —
         # not client polling — decides when to retry).
-        records.set_projection(
-            user_id,
-            self._model_id,
-            scope_hash(self._model_id, names),
-            projection_params(n_points=len(found_names)),
-            found_names,
-            coords,
-        )
+        try:
+            records.set_projection(
+                user_id,
+                self._model_id,
+                current_hash,
+                projection_params(n_points=len(found_names)),
+                found_names,
+                coords,
+            )
+        except Exception:
+            # Same reasoning as the read above: the fit is done but unsaved, so
+            # re-queue rather than drop it and leave /refresh's promise unmet.
+            logger.exception(f"Image map: could not cache the projection for user '{user_id}'; re-queueing")
+            self._requeue_projection(user_id, all_images)
+            return
         self._invoker.services.events.emit_image_map_projection_ready(user_id=user_id, point_count=len(found_names))
+
+    def _requeue_projection(self, user_id: str, all_images: bool) -> None:
+        """Put a popped job back, without clobbering a newer request for that user."""
+        with self._projection_lock:
+            self._projection_requests.setdefault(user_id, all_images)
 
     def _wait_for_idle_generation(self) -> None:
         """Block until no generation is in progress, unless embedding on CPU.

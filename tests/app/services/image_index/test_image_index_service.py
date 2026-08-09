@@ -1,9 +1,11 @@
 """Tests for the image index worker service, using an injected fake encoder (no models/GPU)."""
 
+import inspect
 import threading
 import time
 from types import SimpleNamespace
 from typing import Callable
+from unittest.mock import patch
 
 import numpy as np
 import pytest
@@ -12,6 +14,7 @@ from PIL import Image
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.events.events_common import ImageIndexStatusEvent, ImageIndexUpdatedEvent
+from invokeai.app.services.image_index import image_index_default
 from invokeai.app.services.image_index.image_index_default import (
     _MAX_ATTEMPTS,
     _MAX_BACKOFF_SECONDS,
@@ -951,7 +954,6 @@ def test_projection_failure_caches_empty_result_instead_of_looping(
     service: ImageIndexService,
     monkeypatch,
 ) -> None:
-    from invokeai.app.services.image_index import image_index_default
     from invokeai.app.services.image_index.projection import scope_hash
 
     def broken_umap(embeddings, seed=42):
@@ -986,3 +988,161 @@ def test_projection_request_dedup_is_last_writer_wins(service: ImageIndexService
     assert service.request_projection("system", all_images=True) is True
     assert service.request_projection("system", all_images=False) is True
     assert service._projection_requests == {"system": False}
+
+
+def test_systemic_embedding_outage_does_not_starve_projections(
+    image_records: SqliteImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+) -> None:
+    """The emergent interaction between "never retire on a systemic failure" and
+    "projections only at quiescence".
+
+    A systemic failure charges no image, by design, so the same batch is returned on every
+    pass and quiescence never arrives. If projections only ran in the quiescent branch, an
+    outage would make the image map report "computing" forever over images that ARE embedded —
+    and the projection needs no encoder, so there is no reason for it to wait.
+    """
+    embedded_ok = _unit_vec()
+
+    def broken_encode(images: list[Image.Image]) -> np.ndarray:
+        raise RuntimeError("model is gone")
+
+    service = ImageIndexService(encode_fn=broken_encode, model_id=MODEL_ID)
+    try:
+        # One image already embedded (the projection has something to work with) and one that
+        # can never embed while the encoder is down.
+        _save_image(image_records, "done.png")
+        _save_image(image_records, "stuck.png")
+        index_records.upsert_embedding("done.png", MODEL_ID, embedded_ok)
+
+        service.start(_make_invoker(images_service, index_records))
+        _wait_until(lambda: service._systemic_failures >= 1, timeout=20.0)
+
+        assert service.request_projection("system") is True
+
+        # The projection must land despite embedding being permanently stalled.
+        _wait_until(lambda: index_records.get_projection("system", MODEL_ID) is not None, timeout=30.0)
+        record = index_records.get_projection("system", MODEL_ID)
+        assert record is not None
+        assert record.image_names == ["done.png"]
+        # And the outage is still an outage: no image was retired to make this happen.
+        assert service._failed == set()
+        assert service._systemic_failures >= 1
+    finally:
+        service.stop()
+
+
+def test_projection_request_is_requeued_when_the_database_read_fails(
+    image_records: SqliteImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+) -> None:
+    """The job is popped from the dedup map before the work runs.
+
+    A raise outside the fit's own try unwinds to the generic worker handler, which knows
+    nothing about projections — so the request would be dropped after /refresh had already
+    answered `enqueued: true`, and an event-driven client would wait forever.
+    """
+    calls = {"n": 0}
+    real_list = index_records.list_accessible_embedded_images
+
+    def flaky_list(user_id, model_id):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("database is locked")
+        return real_list(user_id, model_id)
+
+    index_records.list_accessible_embedded_images = flaky_list  # type: ignore[method-assign]
+
+    service = ImageIndexService(encode_fn=_fake_encode, model_id=MODEL_ID)
+    try:
+        for i in range(3):
+            _save_image(image_records, f"img-{i}.png")
+        service.start(_make_invoker(images_service, index_records))
+        _wait_until(lambda: not service._backfill_pending.is_set())
+
+        service.request_projection("system")
+
+        # Retried rather than dropped: the projection still lands.
+        _wait_until(lambda: index_records.get_projection("system", MODEL_ID) is not None, timeout=30.0)
+        assert calls["n"] >= 2
+    finally:
+        service.stop()
+
+
+def test_unchanged_scope_does_not_recompute_the_projection(
+    image_records: SqliteImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+) -> None:
+    """Repeat requests over an unchanged gallery must not re-run the fit.
+
+    The fit is seeded, so recomputing burns minutes of single-threaded worker CPU to produce
+    identical coordinates — and a client that refetches on `projection_ready` would drive it
+    in a loop.
+    """
+    fits = {"n": 0}
+    real_umap = image_index_default.compute_umap
+
+    def counting_umap(matrix: np.ndarray) -> np.ndarray:
+        fits["n"] += 1
+        return real_umap(matrix)
+
+    service = ImageIndexService(encode_fn=_fake_encode, model_id=MODEL_ID)
+    try:
+        for i in range(3):
+            _save_image(image_records, f"img-{i}.png")
+        service.start(_make_invoker(images_service, index_records))
+        _wait_until(lambda: not service._backfill_pending.is_set())
+
+        with patch.object(image_index_default, "compute_umap", counting_umap):
+            service.request_projection("system")
+            _wait_until(lambda: index_records.get_projection("system", MODEL_ID) is not None, timeout=30.0)
+            assert fits["n"] == 1
+
+            for _ in range(3):
+                service.request_projection("system")
+                _wait_until(lambda: not service._projection_requests, timeout=30.0)
+
+            assert fits["n"] == 1, "unchanged scope must reuse the cached projection"
+
+        # A real scope change still recomputes. The callback is what enqueues work — writing
+        # the row alone leaves the backfill unarmed, so the worker would never see it.
+        _save_image(image_records, "new.png")
+        images_service._on_changed(_dto_for(image_records, "new.png"))
+        _wait_until(lambda: index_records.get_embeddings(["new.png"], MODEL_ID)[0] == ["new.png"], timeout=30.0)
+        with patch.object(image_index_default, "compute_umap", counting_umap):
+            service.request_projection("system")
+            _wait_until(lambda: fits["n"] == 2, timeout=30.0)
+    finally:
+        service.stop()
+
+
+def test_failed_batch_uses_the_escalating_backoff(service: ImageIndexService) -> None:
+    """Pin the CALL SITE, not just the helper.
+
+    `_backoff_seconds()` is unit-tested on its own, but reverting the worker's failed-batch
+    wait to a fixed `_POLL_SECONDS` — the single most plausible way to lose this in a
+    hand-resolved rebase conflict — was previously invisible to the suite.
+    """
+    source = inspect.getsource(ImageIndexService._worker_loop)
+    assert "self._stop_event.wait(self._backoff_seconds())" in source
+    assert "self._stop_event.wait(_POLL_SECONDS)" not in source.split("except Exception")[0]
+
+
+def test_projection_job_is_popped_before_running(service: ImageIndexService) -> None:
+    """A job left in the dedup map turns the worker into an infinite recompute loop.
+
+    Nothing else stops it: with the scope-hash short-circuit the fit is skipped, but the
+    `projection_ready` emit would still fire on every pass.
+    """
+    service._model_id = MODEL_ID
+    with service._projection_lock:
+        service._projection_requests["u1"] = False
+
+    job = service._next_projection_job()
+
+    assert job == ("u1", False)
+    assert service._projection_requests == {}, "the job must be removed when it is taken"
+    assert service._next_projection_job() is None

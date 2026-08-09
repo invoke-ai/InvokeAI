@@ -119,6 +119,12 @@ def adaptive_cluster_eps(coords: np.ndarray, min_samples: int = DEFAULT_CLUSTER_
 # default could produce, and far below OOM territory.
 MAX_NEIGHBOR_PAIRS = 50_000_000
 
+# Hard lower bound for the budget shrink. A fully coincident map can never fit
+# the pair budget at any positive eps, so the shrink needs a floor to
+# terminate; compute_clusters skips clustering when the budget is still
+# unmet here rather than letting DBSCAN allocate.
+MIN_BUDGETED_EPS = 1e-6
+
 
 def _shrink_eps_to_pair_budget(coords: np.ndarray, eps: float) -> float:
     """Shrink eps until DBSCAN's neighbor-pair count fits MAX_NEIGHBOR_PAIRS.
@@ -133,10 +139,13 @@ def _shrink_eps_to_pair_budget(coords: np.ndarray, eps: float) -> float:
     from sklearn.neighbors import KDTree
 
     tree = KDTree(coords)
-    for _ in range(12):
+    # Iterate until the budget is met rather than a fixed count: 12 rounds of
+    # 0.7 only covers a 71x reduction, and a tight blob can need far more.
+    # Bounded below by MIN_BUDGETED_EPS so a fully coincident map terminates.
+    while eps > MIN_BUDGETED_EPS:
         pairs = int(tree.query_radius(coords, r=eps, count_only=True).sum())
         if pairs <= MAX_NEIGHBOR_PAIRS:
-            break
+            return eps
         eps *= 0.7
     return eps
 
@@ -161,9 +170,13 @@ def resolve_cluster_eps(
     span = float(np.ptp(coords, axis=0).max()) if coords.shape[0] > 1 else 0.0
     if span > 0:
         eps = min(eps, span * MAX_EPS_SPAN_FRACTION)
-    # Floor at the API's lower bound (ge=0.01), again for pass-back validity.
-    # Only degenerate near-coincident maps clamp below it.
-    return max(_shrink_eps_to_pair_budget(coords, eps), 0.01)
+    # Floor at the API's lower bound (ge=0.01) for pass-back validity, but do
+    # it BEFORE the budget shrink, never after: applied afterwards it silently
+    # re-inflated eps past the neighbor-pair budget the shrink had just
+    # computed, which is how a near-coincident map reached 400M pairs against
+    # a 50M budget (~4GB). The budget bounds memory and therefore wins; an eps
+    # below the API's floor is a cosmetic pass-back wart, an OOM is not.
+    return _shrink_eps_to_pair_budget(coords, max(eps, 0.01))
 
 
 def compute_clusters(
@@ -187,6 +200,16 @@ def compute_clusters(
     eps = resolve_cluster_eps(coords, eps, min_samples)
 
     from sklearn.cluster import DBSCAN
+    from sklearn.neighbors import KDTree
+
+    if coords.shape[0] > 1:
+        # The shrink bottoms out at MIN_BUDGETED_EPS, which a fully coincident
+        # map cannot satisfy at any positive radius. Skip clustering rather
+        # than hand DBSCAN a neighborhood it would materialize into GBs — same
+        # response shape as the MAX_CLUSTERED_POINTS skip above.
+        pairs = int(KDTree(coords).query_radius(coords, r=eps, count_only=True).sum())
+        if pairs > MAX_NEIGHBOR_PAIRS:
+            return np.full((coords.shape[0],), -1, dtype=np.int64)
 
     return DBSCAN(eps=eps, min_samples=min_samples).fit(coords).labels_
 
