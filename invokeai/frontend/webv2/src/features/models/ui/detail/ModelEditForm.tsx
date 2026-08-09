@@ -2,7 +2,7 @@
 import type { ModelConfig, PredictionType } from '@features/models/core/types';
 
 import { createListCollection, HStack, Input, Stack, Text, Textarea } from '@chakra-ui/react';
-import { getModelBaseLabel } from '@features/models/core/baseIdentity';
+import { getModelBaseLabel, isKnownModelBase, KNOWN_MODEL_BASES } from '@features/models/core/baseIdentity';
 import { modelEditSchema, type ModelEditFormValues } from '@features/models/core/schemas';
 import { getModelTypeLabel, MODEL_CATEGORIES } from '@features/models/core/taxonomy';
 import { updateModel } from '@features/models/data/api';
@@ -16,22 +16,6 @@ import {
 import { Button, Field, Select } from '@platform/ui';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-
-const KNOWN_BASES = [
-  'sd-1',
-  'sd-2',
-  'sd-3',
-  'sdxl',
-  'sdxl-refiner',
-  'flux',
-  'flux2',
-  'cogview4',
-  'qwen-image',
-  'z-image',
-  'anima',
-  'any',
-  'unknown',
-];
 
 const MODEL_TYPE_COLLECTION = createListCollection({
   items: MODEL_CATEGORIES.map((category) => ({ label: getModelTypeLabel(category.type), value: category.type })),
@@ -64,7 +48,9 @@ export const ModelEditForm = ({
   });
 
   const baseCollection = useMemo(() => {
-    const bases = KNOWN_BASES.includes(String(model.base)) ? KNOWN_BASES : [String(model.base), ...KNOWN_BASES];
+    const bases: readonly string[] = isKnownModelBase(model.base)
+      ? KNOWN_MODEL_BASES
+      : [String(model.base), ...KNOWN_MODEL_BASES];
 
     return createListCollection({
       items: bases.map((base) => ({ label: getModelBaseLabel(base), value: base })),
@@ -213,4 +199,3 @@ export const ModelEditForm = ({
     </Stack>
   );
 };
-/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
