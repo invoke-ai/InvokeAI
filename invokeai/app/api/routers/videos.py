@@ -346,6 +346,10 @@ async def upload_video(
             pass
 
 
+# Declared sync (`def`, not `async def`) so FastAPI runs it in the threadpool: every call
+# below is blocking SQLite/filesystem work, which would stall the event loop — and with it
+# every other request and socket event — for the duration of the delete. The batch
+# siblings below are sync for the same reason.
 @videos_router.delete("/i/{video_name}", operation_id="delete_video", response_model=DeleteVideosResult)
 def delete_video(
     current_user: CurrentUserOrDefault,
@@ -451,6 +455,7 @@ def delete_uncategorized_videos(
     )
 
 
+# Sync for the same reason as delete_video: the update is a blocking SQLite write.
 @videos_router.patch("/i/{video_name}", operation_id="update_video", response_model=VideoDTO)
 def update_video(
     current_user: CurrentUserOrDefault,

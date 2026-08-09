@@ -27,10 +27,12 @@ from invokeai.app.api.routers.videos import (
     VideoNamesBatch,
     _is_mp4_file,
     delete_uncategorized_videos,
+    delete_video,
     delete_videos_from_list,
     get_video_thumbnail,
     star_videos_in_list,
     unstar_videos_in_list,
+    update_video,
 )
 from invokeai.app.api_app import app
 from invokeai.app.services.invoker import Invoker
@@ -931,4 +933,20 @@ def test_delete_uncategorized_videos_is_offloaded_by_fastapi() -> None:
     ],
 )
 def test_video_batch_mutations_are_offloaded_by_fastapi(handler: Any) -> None:
+    assert not inspect.iscoroutinefunction(handler)
+
+
+@pytest.mark.parametrize(
+    "handler",
+    [
+        delete_video,
+        update_video,
+    ],
+)
+def test_single_video_mutations_are_offloaded_by_fastapi(handler: Any) -> None:
+    """Single-item mutations do blocking SQLite/disk work, same as their batch siblings.
+
+    Declared ``async def``, they would run that work directly on the event loop and stall
+    every other request and socket event until the delete/update finished.
+    """
     assert not inspect.iscoroutinefunction(handler)
