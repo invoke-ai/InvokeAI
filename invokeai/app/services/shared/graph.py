@@ -526,6 +526,24 @@ class _ExecutionMaterializer:
             key=lambda exec_node_id: (self._state._get_iteration_path(exec_node_id), exec_node_id),
         )
 
+    def _get_iterator_input_iteration_paths(
+        self, iterator_node_id: str, visited: Optional[set[str]] = None
+    ) -> set[tuple[int, ...]]:
+        if visited is None:
+            visited = set()
+        if iterator_node_id in visited:
+            return set()
+        visited.add(iterator_node_id)
+
+        iteration_paths: set[tuple[int, ...]] = set()
+        for edge in self._state.graph._get_input_edges(iterator_node_id, COLLECTION_FIELD):
+            source_node_id = edge.source.node_id
+            prepared_nodes = self._get_ordered_prepared_nodes_for_source(source_node_id)
+            iteration_paths.update(self._state._get_iteration_path(prepared_id) for prepared_id in prepared_nodes)
+            if not prepared_nodes and isinstance(self._state.graph.get_node(source_node_id), IterateInvocation):
+                iteration_paths.update(self._get_iterator_input_iteration_paths(source_node_id, visited))
+        return iteration_paths
+
     def _get_collect_candidate_group_keys(self, edge: Edge) -> set[tuple[int, ...]]:
         source_node_id = edge.source.node_id
         iterator_node_ids = self.get_node_iterators(source_node_id)
@@ -535,15 +553,23 @@ class _ExecutionMaterializer:
         group_depth = len(iterator_node_ids)
         if edge.destination.field == ITEM_FIELD:
             group_depth = max(group_depth - 1, 0)
+
+        group_keys: set[tuple[int, ...]] = set()
+        for iterator_node_id in iterator_node_ids:
+            prepared_nodes = self._get_ordered_prepared_nodes_for_source(iterator_node_id)
+            if prepared_nodes:
+                group_keys.update(
+                    iteration_path[:group_depth]
+                    for prepared_id in prepared_nodes
+                    if len(iteration_path := self._state._get_iteration_path(prepared_id)) >= group_depth
+                )
+            group_keys.update(self._get_iterator_input_iteration_paths(iterator_node_id))
+
+        if group_keys:
+            return group_keys
         if group_depth == 0:
             return {()}
-
-        return {
-            iteration_path[:group_depth]
-            for iterator_node_id in iterator_node_ids
-            for prepared_id in self._get_ordered_prepared_nodes_for_source(iterator_node_id)
-            if len(iteration_path := self._state._get_iteration_path(prepared_id)) >= group_depth
-        }
+        return set()
 
     def _get_collect_iteration_mapping_groups(
         self, input_edges: list[Edge]
