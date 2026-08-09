@@ -706,7 +706,15 @@ class DefaultSessionProcessor(SessionProcessorBase):
 
                     if device_pin_needed:
                         assert worker.device is not None
-                        _set_torch_current_device(worker.device)
+                        # Called directly rather than via _set_torch_current_device(): that helper
+                        # skips the pin when the backend reports unavailable, which is right for the
+                        # idle-GPU borrow (devices there can be configured or faked for a backend
+                        # this process cannot initialise) but would silently drop the pin this
+                        # deferral exists to perform.
+                        if worker.device.type == "cuda":
+                            torch.cuda.set_device(worker.device)
+                        else:
+                            torch.xpu.set_device(worker.device)
                         device_pin_needed = False
 
                     # A cancellation can race the claim: it may have marked the row terminal before
