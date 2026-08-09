@@ -23,24 +23,27 @@ from invokeai.app.services.virtual_boards.virtual_boards_common import VirtualSu
 
 
 class SqliteImageRecordStorage(ImageRecordStorageBase):
+    # Conservative bound on bound parameters per statement. SQLITE_MAX_VARIABLE_NUMBER defaults to
+    # 999 on SQLite builds older than 3.32, and an image library can hold far more intermediates.
+    _MAX_SQL_VARIABLES = 500
+
     def __init__(self, db: SqliteDatabase) -> None:
         super().__init__()
         self._db = db
 
     def get(self, image_name: str) -> ImageRecord:
+        # A query failure means the database is unavailable, not that the image is missing. Reporting
+        # it as "not found" makes callers (and the routes above them) delete live images from view.
         with self._db.transaction() as cursor:
-            try:
-                cursor.execute(
-                    f"""--sql
-                    SELECT {IMAGE_DTO_COLS} FROM images
-                    WHERE image_name = ?;
-                    """,
-                    (image_name,),
-                )
+            cursor.execute(
+                f"""--sql
+                SELECT {IMAGE_DTO_COLS} FROM images
+                WHERE image_name = ?;
+                """,
+                (image_name,),
+            )
 
-                result = cast(Optional[sqlite3.Row], cursor.fetchone())
-            except sqlite3.Error as e:
-                raise ImageRecordNotFoundException from e
+            result = cast(Optional[sqlite3.Row], cursor.fetchone())
 
         if not result:
             raise ImageRecordNotFoundException
@@ -62,20 +65,17 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             return cast(Optional[str], dict(result).get("user_id"))
 
     def get_metadata(self, image_name: str) -> Optional[MetadataField]:
+        # As in get(): a query failure is a database fault, not a missing record.
         with self._db.transaction() as cursor:
-            try:
-                cursor.execute(
-                    """--sql
-                    SELECT metadata FROM images
-                    WHERE image_name = ?;
-                    """,
-                    (image_name,),
-                )
+            cursor.execute(
+                """--sql
+                SELECT metadata FROM images
+                WHERE image_name = ?;
+                """,
+                (image_name,),
+            )
 
-                result = cast(Optional[sqlite3.Row], cursor.fetchone())
-
-            except sqlite3.Error as e:
-                raise ImageRecordNotFoundException from e
+            result = cast(Optional[sqlite3.Row], cursor.fetchone())
 
             if not result:
                 raise ImageRecordNotFoundException
@@ -316,6 +316,45 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             )
             result = cast(list[sqlite3.Row], cursor.fetchall())
         return [(r[0], r[1]) for r in result]
+
+    def delete_intermediates_by_names(self, image_names: list[str]) -> tuple[list[str], list[str]]:
+        """Deletes the named image records, skipping any that are no longer intermediates.
+
+        The ``is_intermediate`` predicate rides on the DELETE itself rather than on a preceding
+        SELECT, so an image promoted out of intermediate status keeps its record however the
+        promotion interleaves with this call. (Python's legacy sqlite3 transaction control opens a
+        transaction only before a write, so a SELECT here holds no read lock to rely on.)
+
+        Returns ``(deleted, retained)``: the names whose records this call removed, and the names
+        whose records are still present because they are no longer intermediates. Names whose
+        records were already gone appear in neither list — the caller must not restore their files.
+        """
+        deleted: list[str] = []
+        retained: list[str] = []
+        try:
+            with self._db.transaction() as cursor:
+                # Chunked to stay under SQLITE_MAX_VARIABLE_NUMBER; every chunk runs inside the one
+                # transaction above.
+                for start in range(0, len(image_names), self._MAX_SQL_VARIABLES):
+                    chunk = image_names[start : start + self._MAX_SQL_VARIABLES]
+                    placeholders = ",".join("?" for _ in chunk)
+                    select_query = f"SELECT image_name FROM images WHERE image_name IN ({placeholders})"
+
+                    cursor.execute(select_query, chunk)
+                    present_before = {cast(str, r[0]) for r in cursor.fetchall()}
+                    cursor.execute(
+                        f"DELETE FROM images WHERE image_name IN ({placeholders}) AND is_intermediate = TRUE",
+                        chunk,
+                    )
+                    cursor.execute(select_query, chunk)
+                    present_after = {cast(str, r[0]) for r in cursor.fetchall()}
+
+                    deleted.extend(name for name in chunk if name in present_before and name not in present_after)
+                    retained.extend(name for name in chunk if name in present_after)
+        except sqlite3.Error as e:
+            # The try wraps the context manager so a failure in its commit is reported too.
+            raise ImageRecordDeleteException from e
+        return deleted, retained
 
     def save(
         self,

@@ -371,10 +371,27 @@ class ImageService(ImageServiceABC):
             self.__invoker.services.logger.error(f"Problem deleting image records and files: {str(e)}")
             raise e
 
+    def _record_still_exists(self, image_name: str) -> bool:
+        """Whether an image record is still present, erring towards "yes".
+
+        Used to decide whether staged files must be restored. A restore is only correct while the
+        record is live; if we cannot tell, restoring is the safer error, because leftover files can
+        be cleaned up later but files purged against a live record are gone.
+        """
+        try:
+            self.__invoker.services.image_records.get(image_name)
+            return True
+        except ImageRecordNotFoundException:
+            return False
+        except Exception as e:
+            self.__invoker.services.logger.error(f"Could not confirm whether {image_name} still exists: {e}")
+            return True
+
     def delete_intermediates(self) -> int:
-        # All-or-nothing transaction: stage every file first, then delete the records in
-        # one operation, then purge the stages. Any staging or database failure rolls
-        # back every staged file so records always point at accessible files.
+        # All-or-nothing transaction: stage every file first, then delete the records in one
+        # operation, then purge the stages. Any staging or database failure rolls back every staged
+        # file, so a live record's files are never destroyed — though a failed rollback leaves them
+        # in the staging dir until startup recovery restores them.
         try:
             image_name_subfolder_pairs = self.__invoker.services.image_records.get_intermediates()
             staged_deletes: list[tuple[str, object]] = []
@@ -384,7 +401,14 @@ class ImageService(ImageServiceABC):
                         image_name, image_subfolder=image_subfolder
                     )
                     staged_deletes.append((image_name, token))
-                self.__invoker.services.image_records.delete_many([name for name, _ in staged_deletes])
+                # Deletion is conditional on the row still being an intermediate. An image can be
+                # promoted out of intermediate status between the snapshot above and this call, and
+                # such an image must keep both its record and its files.
+                deleted, retained = self.__invoker.services.image_records.delete_intermediates_by_names(
+                    [name for name, _ in staged_deletes]
+                )
+                deleted_names = set(deleted)
+                retained_names = set(retained)
             except Exception:
                 for image_name, token in staged_deletes:
                     try:
@@ -394,14 +418,30 @@ class ImageService(ImageServiceABC):
                             f"Failed to restore staged image files for {image_name}: {rollback_error}"
                         )
                 raise
-            for _, token in staged_deletes:
+            deleted_image_names: list[str] = []
+            for image_name, token in staged_deletes:
+                # Only a record that is still there earns a restore. A name in neither list had its
+                # record removed by someone else while we held its files, and a retained record can
+                # still be deleted while this loop works through the other names — restoring either
+                # would strand the files on disk with no record and no staging dir to recover from.
+                # Re-checking here shrinks that window from the whole loop to a single lookup.
+                if image_name in retained_names and self._record_still_exists(image_name):
+                    try:
+                        self.__invoker.services.image_files.rollback_delete(token)
+                    except Exception as rollback_error:
+                        self.__invoker.services.logger.error(
+                            f"Failed to restore staged image files for {image_name}: {rollback_error}"
+                        )
+                    continue
                 try:
                     self.__invoker.services.image_files.commit_delete(token)
                 except Exception as cleanup_error:
                     self.__invoker.services.logger.error(f"Failed to purge staged image files: {cleanup_error}")
-            for image_name, _ in staged_deletes:
+                if image_name in deleted_names:
+                    deleted_image_names.append(image_name)
+            for image_name in deleted_image_names:
                 self._on_deleted(image_name)
-            return len(staged_deletes)
+            return len(deleted_image_names)
         except ImageRecordDeleteException:
             self.__invoker.services.logger.error("Failed to delete image records")
             raise

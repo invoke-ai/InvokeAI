@@ -5,12 +5,19 @@ get_many(), and get_intermediates() against a real (in-memory) SQLite database,
 and that get_many()/get_image_names() enforce per-user ownership isolation.
 """
 
+import sqlite3
+
 import pytest
 
 from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
 from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
-from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+from invokeai.app.services.image_records.image_records_common import (
+    ImageCategory,
+    ImageRecordChanges,
+    ImageRecordNotFoundException,
+    ResourceOrigin,
+)
 from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.backend.util.logging import InvokeAILogger
@@ -134,15 +141,158 @@ class TestGetIntermediatesSubfolder:
         record = store.get("tmp.png")
         assert record.image_subfolder == "x"
 
-    def test_intermediates_are_deleted_via_delete_many(self, store: SqliteImageRecordStorage) -> None:
+    def test_intermediates_are_deleted_via_delete_intermediates_by_names(self, store: SqliteImageRecordStorage) -> None:
         _save(store, "tmp.png", subfolder="x", is_intermediate=True)
         pairs = store.get_intermediates()
-        store.delete_many([name for name, _ in pairs])
+        deleted, retained = store.delete_intermediates_by_names([name for name, _ in pairs])
 
-        from invokeai.app.services.image_records.image_records_common import ImageRecordNotFoundException
-
+        assert deleted == ["tmp.png"]
+        assert retained == []
         with pytest.raises(ImageRecordNotFoundException):
             store.get("tmp.png")
+
+
+class TestQueryFaultsAreNotNotFound:
+    """A failing query means the database is unavailable, not that the image is missing.
+
+    Reporting a query fault as "not found" propagates all the way to the API, where it becomes a 404
+    and tells the frontend to drop a live image from its cache.
+    """
+
+    def _break_the_images_table(self, store: SqliteImageRecordStorage) -> None:
+        store._db._conn.execute("ALTER TABLE images RENAME TO images_moved;")
+
+    def test_get_raises_the_db_error_not_not_found(self, store: SqliteImageRecordStorage) -> None:
+        _save(store, "live.png")
+        self._break_the_images_table(store)
+
+        with pytest.raises(sqlite3.Error):
+            store.get("live.png")
+
+    def test_get_metadata_raises_the_db_error_not_not_found(self, store: SqliteImageRecordStorage) -> None:
+        _save(store, "live.png")
+        self._break_the_images_table(store)
+
+        with pytest.raises(sqlite3.Error):
+            store.get_metadata("live.png")
+
+    def test_missing_row_still_raises_not_found(self, store: SqliteImageRecordStorage) -> None:
+        """The genuine not-found path is untouched."""
+        with pytest.raises(ImageRecordNotFoundException):
+            store.get("never-existed.png")
+        with pytest.raises(ImageRecordNotFoundException):
+            store.get_metadata("never-existed.png")
+
+
+class TestDeleteIntermediatesByNames:
+    """delete_intermediates_by_names() deletes only rows that are still intermediates."""
+
+    def test_promoted_image_keeps_its_record(self, store: SqliteImageRecordStorage) -> None:
+        """An image promoted out of intermediate status after the snapshot must survive."""
+        _save(store, "tmp.png", subfolder="x", is_intermediate=True)
+        _save(store, "promoted.png", subfolder="x", is_intermediate=True)
+        snapshot = [name for name, _ in store.get_intermediates()]
+        assert set(snapshot) == {"tmp.png", "promoted.png"}
+
+        # Simulate the race: the image stops being an intermediate between the snapshot and delete.
+        store.update("promoted.png", ImageRecordChanges(is_intermediate=False))
+
+        deleted, retained = store.delete_intermediates_by_names(snapshot)
+
+        assert deleted == ["tmp.png"]
+        assert retained == ["promoted.png"]
+        assert store.get("promoted.png").is_intermediate is False
+        with pytest.raises(ImageRecordNotFoundException):
+            store.get("tmp.png")
+
+    def test_promotion_interleaved_inside_the_call_keeps_the_record(self, store: SqliteImageRecordStorage) -> None:
+        """The is_intermediate predicate must ride on the DELETE, not on a preceding SELECT.
+
+        Python's legacy sqlite3 transaction control opens a transaction only before a write, so a
+        SELECT inside this method holds no read lock. A writer that promotes an image after that
+        SELECT but before the DELETE must still not lose its record.
+        """
+        _save(store, "tmp.png", is_intermediate=True)
+        _save(store, "promoted.png", is_intermediate=True)
+        snapshot = [name for name, _ in store.get_intermediates()]
+
+        # Promote from inside the call, between the first SELECT and the DELETE.
+        real_execute = store._db._conn.execute
+        promoted = False
+
+        def trace(statement: str) -> None:
+            nonlocal promoted
+            # The trace fires when a statement *begins*, so hooking the first SELECT would promote
+            # before that SELECT reads anything — indistinguishable from promoting up front. Hooking
+            # the DELETE puts the promotion after the SELECT has already seen the row as an
+            # intermediate, which is the interleaving that a SELECT-then-unconditional-DELETE
+            # implementation gets wrong.
+            if not promoted and statement.strip().upper().startswith("DELETE FROM IMAGES"):
+                promoted = True
+                real_execute("UPDATE images SET is_intermediate = 0 WHERE image_name = 'promoted.png'")
+
+        store._db._conn.set_trace_callback(trace)
+        try:
+            deleted, retained = store.delete_intermediates_by_names(snapshot)
+        finally:
+            store._db._conn.set_trace_callback(None)
+
+        assert promoted, "the interleaved promotion never ran; the test proves nothing"
+        assert deleted == ["tmp.png"]
+        assert retained == ["promoted.png"]
+        assert store.get("promoted.png").is_intermediate is False
+
+    def test_unknown_and_empty_names_are_no_ops(self, store: SqliteImageRecordStorage) -> None:
+        _save(store, "keep.png", is_intermediate=False)
+
+        assert store.delete_intermediates_by_names([]) == ([], [])
+        # "gone.png" has no record at all, so it is neither deleted nor retained; "keep.png" exists
+        # but is not an intermediate, so it is retained.
+        assert store.delete_intermediates_by_names(["gone.png", "keep.png"]) == ([], ["keep.png"])
+        assert store.get("keep.png").image_name == "keep.png"
+
+    def test_more_names_than_sql_variable_limit(self, store: SqliteImageRecordStorage) -> None:
+        """Chunking must not lose rows: exercise a name list spanning several chunks."""
+        chunk = SqliteImageRecordStorage._MAX_SQL_VARIABLES
+        names = [f"tmp{i:05d}.png" for i in range(chunk * 2 + 7)]
+        for name in names:
+            _save(store, name, is_intermediate=True)
+        # One image in the middle chunk is promoted and must survive.
+        survivor = names[chunk + 3]
+        store.update(survivor, ImageRecordChanges(is_intermediate=False))
+
+        deleted, retained = store.delete_intermediates_by_names(names)
+
+        assert set(deleted) == set(names) - {survivor}
+        assert retained == [survivor]
+        assert store.get(survivor).is_intermediate is False
+        assert store.get_intermediates() == []
+
+    def test_chunking_stays_within_the_declared_variable_limit(self, store: SqliteImageRecordStorage) -> None:
+        """No statement may bind more parameters than the declared limit."""
+        chunk = SqliteImageRecordStorage._MAX_SQL_VARIABLES
+        names = [f"tmp{i:05d}.png" for i in range(chunk * 2 + 7)]
+        for name in names:
+            _save(store, name, is_intermediate=True)
+
+        # The trace callback reports statements with their parameters already expanded, so count the
+        # bound image names in each one rather than the placeholders.
+        widest = 0
+
+        def trace(statement: str) -> None:
+            nonlocal widest
+            if "images WHERE image_name IN (" in statement:
+                widest = max(widest, statement.count(".png"))
+
+        store._db._conn.set_trace_callback(trace)
+        try:
+            store.delete_intermediates_by_names(names)
+        finally:
+            store._db._conn.set_trace_callback(None)
+
+        # 999 is the SQLITE_MAX_VARIABLE_NUMBER default on builds older than 3.32. Asserting the
+        # literal rather than _MAX_SQL_VARIABLES keeps the test meaningful if that constant is raised.
+        assert 0 < widest <= 999
 
 
 class TestOwnershipFilteringOmittedBoard:

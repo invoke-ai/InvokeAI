@@ -75,6 +75,16 @@ class ImageRecordStorageBase(ABC):
         pass
 
     @abstractmethod
+    def delete_intermediates_by_names(self, image_names: list[str]) -> tuple[list[str], list[str]]:
+        """Deletes the named image records, skipping any that are no longer intermediates.
+
+        Returns ``(deleted, retained)``: the names whose records were removed, and the names whose
+        records are still present because they are no longer intermediates. Names whose records were
+        already gone appear in neither list, so a caller holding their files must not restore them.
+        """
+        pass
+
+    @abstractmethod
     def get_intermediates_count(self, user_id: Optional[str] = None) -> int:
         """Gets a count of intermediate images. If user_id is provided, only counts that user's intermediates."""
         pass

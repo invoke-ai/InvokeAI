@@ -293,6 +293,58 @@ def test_delete_image_not_found_returns_404(
     assert response.json()["detail"] == "Image not found"
 
 
+def test_delete_image_lookup_failure_returns_500_not_404(
+    monkeypatch: Any, mock_invoker: Invoker, tmp_path: Path, client: TestClient
+) -> None:
+    """A DTO lookup that fails for a reason other than a missing record is a 500, not a 404.
+
+    Reporting it as 404 would tell the frontend the image is gone and drop a live item from its cache.
+    """
+    storage = prepare_delete_image_test(monkeypatch, mock_invoker, tmp_path)
+    _save_deletable_image(mock_invoker, storage, "del.png")
+
+    def failing_get_dto(image_name: str):
+        raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr(mock_invoker.services.images, "get_dto", failing_get_dto)
+
+    response = client.delete("/api/v1/images/i/del.png")
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == "Failed to delete image"
+    # Nothing was touched: the record and its files are intact.
+    assert storage.get_path("del.png").exists()
+    assert mock_invoker.services.image_records.get("del.png").image_name == "del.png"
+
+
+def test_delete_image_db_fault_during_lookup_returns_500_not_404(
+    monkeypatch: Any, mock_invoker: Invoker, tmp_path: Path, client: TestClient
+) -> None:
+    """A database fault while reading the record is a 500, driven through the real record store.
+
+    The store used to convert every ``sqlite3.Error`` into ``ImageRecordNotFoundException``, which
+    made a database fault indistinguishable from a missing image and produced a 404 for a live one.
+    This drives the real store rather than stubbing it, so the store's translation is what is under
+    test — stubbing ``get`` would bypass the very code that used to be wrong.
+    """
+    storage = prepare_delete_image_test(monkeypatch, mock_invoker, tmp_path)
+    _save_deletable_image(mock_invoker, storage, "del.png")
+
+    # Break the table out from under the query. Any sqlite3.Error would do; this one is deterministic.
+    records = mock_invoker.services.image_records
+    records._db._conn.execute("ALTER TABLE images RENAME TO images_moved;")
+    try:
+        response = client.delete("/api/v1/images/i/del.png")
+    finally:
+        records._db._conn.execute("ALTER TABLE images_moved RENAME TO images;")
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == "Failed to delete image"
+    # The image is still there once the database recovers.
+    assert records.get("del.png").image_name == "del.png"
+    assert storage.get_path("del.png").exists()
+
+
 def test_delete_image_db_failure_returns_500_and_restores_files(
     monkeypatch: Any, mock_invoker: Invoker, tmp_path: Path, client: TestClient
 ) -> None:

@@ -27,6 +27,7 @@ from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
     ImageNamesResult,
     ImageRecordChanges,
+    ImageRecordNotFoundException,
     ResourceOrigin,
 )
 from invokeai.app.services.images.images_common import (
@@ -213,8 +214,12 @@ async def delete_image(
     # success and dropped the item from its cache even though the record was still live.
     try:
         image_dto = ApiDependencies.invoker.services.images.get_dto(image_name)
-    except Exception:
+    except ImageRecordNotFoundException:
         raise HTTPException(status_code=404, detail="Image not found")
+    except Exception:
+        # A record/URL/board lookup failure for an image that does exist is a server fault, not a
+        # missing image — reporting it as 404 would tell the frontend to drop a live item.
+        raise HTTPException(status_code=500, detail="Failed to delete image")
 
     board_id = image_dto.board_id or "none"
     try:
