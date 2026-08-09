@@ -11,8 +11,8 @@ import { CheckIcon, SlidersHorizontalIcon } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export interface ModelFilterSortOption {
-  field: ModelSortField;
+export interface ModelFilterSortOption<Field extends ModelSortField = ModelSortField> {
+  field: Field;
   labelKey: string;
 }
 
@@ -25,8 +25,12 @@ export const SORT_FIELD_OPTIONS: readonly ModelFilterSortOption[] = [
   { field: 'format', labelKey: 'models.sort.format' },
 ];
 
-/** Shared taxonomy filter + sort menu for installed and starter model lists. */
-export const ModelFilterMenu = ({
+/**
+ * Shared taxonomy filter + sort menu for installed and starter model lists.
+ * Generic over the sort-field subset so a menu fed a narrowed `sortFields`
+ * list reports only those fields to `onSortChange`.
+ */
+export const ModelFilterMenu = <Field extends ModelSortField>({
   ariaLabel,
   availableBases,
   availableTypes,
@@ -38,7 +42,7 @@ export const ModelFilterMenu = ({
   onTypeFilterChange,
   sortDirection,
   sortField,
-  sortFields = SORT_FIELD_OPTIONS,
+  sortFields,
   typeAllChecked,
   typeAllLabel,
   typeFilter,
@@ -50,17 +54,19 @@ export const ModelFilterMenu = ({
   extraTypeItems?: ReactNode;
   isActive: boolean;
   onBaseFilterChange: (base: string | null) => void;
-  onSortChange: (field: ModelSortField, direction: 'asc' | 'desc') => void;
+  onSortChange: (field: Field, direction: 'asc' | 'desc') => void;
   onTypeFilterChange: (type: ModelTaxonomyType | null) => void;
   sortDirection: 'asc' | 'desc';
-  sortField: ModelSortField;
-  sortFields?: readonly ModelFilterSortOption[];
+  sortField: Field;
+  sortFields: readonly ModelFilterSortOption<Field>[];
   typeAllChecked?: boolean;
   typeAllLabel?: string;
   typeFilter: ModelTaxonomyType | null;
 }) => {
   const { t } = useTranslation();
   const resolvedTypeAllLabel = typeAllLabel ?? t('models.allModels');
+  // Safe to widen: the menu only reports fields drawn from `sortFields`.
+  const reportSort = onSortChange as (field: ModelSortField, direction: 'asc' | 'desc') => void;
 
   return (
     <Menu.Root closeOnSelect={false} positioning={{ placement: 'bottom-end' }}>
@@ -118,7 +124,7 @@ export const ModelFilterMenu = ({
                   labelKey={labelKey}
                   sortDirection={sortDirection}
                   sortField={sortField}
-                  onSortChange={onSortChange}
+                  onSortChange={reportSort}
                 />
               ))}
             </Menu.ItemGroup>

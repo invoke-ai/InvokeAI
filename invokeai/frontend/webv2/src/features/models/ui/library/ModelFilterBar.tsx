@@ -3,7 +3,7 @@ import type { ModelLibraryFilters, ModelSortField } from '@features/models/core/
 import type { ModelTaxonomyType } from '@features/models/core/types';
 
 import { HStack, Icon, Input, InputGroup } from '@chakra-ui/react';
-import { FilterMenuItem, ModelFilterMenu } from '@features/models/ui/shared/ModelFilterMenu';
+import { FilterMenuItem, ModelFilterMenu, SORT_FIELD_OPTIONS } from '@features/models/ui/shared/ModelFilterMenu';
 import { SearchIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -81,6 +81,7 @@ export const ModelFilterBar = ({
         isActive={isFiltering(filters)}
         sortDirection={filters.sortDirection}
         sortField={filters.sortField}
+        sortFields={SORT_FIELD_OPTIONS}
         typeAllChecked={filters.typeFilter === null && !filters.missingOnly}
         typeFilter={filters.typeFilter}
         onBaseFilterChange={handleBaseFilterChange}

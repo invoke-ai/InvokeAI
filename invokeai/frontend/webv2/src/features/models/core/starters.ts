@@ -5,12 +5,15 @@ import { getModelBaseLabel } from './baseIdentity';
 
 /** Pure filter/sort for the starter-models catalog; the installed-library twin is `library.ts`. */
 
+/** Starter models have no local files, so `size` is not a meaningful sort. */
+export type StarterSortField = Exclude<ModelSortField, 'size'>;
+
 export interface StarterModelFilters {
   /** null = all types. */
   typeFilter: ModelTaxonomyType | null;
   /** null = all bases. */
   baseFilter: string | null;
-  sortField: ModelSortField;
+  sortField: StarterSortField;
   sortDirection: 'asc' | 'desc';
 }
 
@@ -26,7 +29,7 @@ interface IndexedStarterModel {
   model: StarterModel;
 }
 
-const compareStarterModels = (a: IndexedStarterModel, b: IndexedStarterModel, field: ModelSortField): number => {
+const compareStarterModels = (a: IndexedStarterModel, b: IndexedStarterModel, field: StarterSortField): number => {
   switch (field) {
     case 'default':
       return a.index - b.index;
@@ -36,9 +39,6 @@ const compareStarterModels = (a: IndexedStarterModel, b: IndexedStarterModel, fi
       return getModelBaseLabel(a.model.base).localeCompare(getModelBaseLabel(b.model.base));
     case 'format':
       return String(a.model.format ?? '').localeCompare(String(b.model.format ?? ''));
-    case 'size':
-      // Starter models have no local files, so size is not a meaningful sort.
-      return 0;
   }
 };
 

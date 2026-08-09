@@ -1,12 +1,14 @@
-import type { StarterModelFilters } from '@features/models/core/starters';
+import type { StarterModelFilters, StarterSortField } from '@features/models/core/starters';
 import type { ModelTaxonomyType } from '@features/models/core/types';
+import type { ModelFilterSortOption } from '@features/models/ui/shared/ModelFilterMenu';
 
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import { ModelFilterMenu, SORT_FIELD_OPTIONS } from '@features/models/ui/shared/ModelFilterMenu';
 import { useTranslation } from 'react-i18next';
 
-// Starter models have no local files, so size is not a meaningful sort.
-const STARTER_SORT_FIELDS = SORT_FIELD_OPTIONS.filter((option) => option.field !== 'size');
+const STARTER_SORT_FIELDS = SORT_FIELD_OPTIONS.filter(
+  (option): option is ModelFilterSortOption<StarterSortField> => option.field !== 'size'
+);
 
 const isFiltering = (filters: StarterModelFilters): boolean =>
   filters.typeFilter !== null || filters.baseFilter !== null;
