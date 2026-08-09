@@ -41,6 +41,7 @@ export const ExternalProviderKeyCards = ({ onError }: { onError: (title: string,
   const { t } = useTranslation();
   const configs = useExternalProvidersSelector((snapshot) => snapshot.configs);
   const loadError = useExternalProvidersSelector((snapshot) => snapshot.error);
+  const status = useExternalProvidersSelector((snapshot) => snapshot.status);
 
   useMountEffect(() => {
     ensureExternalProvidersLoaded().catch(() => {
@@ -48,10 +49,12 @@ export const ExternalProviderKeyCards = ({ onError }: { onError: (title: string,
     });
   });
 
-  if (loadError !== null && (configs === null || configs.length === 0)) {
+  // Only a settled failure renders as an error — a retry in flight after a
+  // remount shows nothing rather than the previous attempt's stale message.
+  if (status === 'error') {
     return (
       <Text color="fg.error" fontSize="2xs">
-        {t('models.externalProvidersUnavailable', { error: loadError })}
+        {t('models.externalProvidersUnavailable', { error: loadError ?? t('models.failedToLoadExternalProviders') })}
       </Text>
     );
   }
