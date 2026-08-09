@@ -92,6 +92,12 @@ python -c "import torch; print(torch.xpu.is_available(), torch.xpu.device_count(
 
 :::note[Integrated GPUs]
   Level Zero enumerates your CPU's integrated GPU alongside any discrete Arc card. Invoke excludes integrated GPUs from automatic device selection when a discrete GPU is present. To use one anyway, name it explicitly in the `generation_devices` setting.
+
+  An integrated GPU shares its memory with the CPU, so Invoke does not keep a second RAM copy of a model's weights there — that copy would double each model's footprint against the same memory. `keep_ram_copy_of_weights` is ignored on such a device, and a warning says so once. Partial loading still applies, so device residency stays bounded.
+:::
+
+:::note[Both an Nvidia and an Intel GPU?]
+  Automatic device selection prefers CUDA: if any Nvidia GPU is visible, `auto` enumerates only those and your Arc card is left unused. Name it explicitly to generate on it, e.g. `generation_devices: [xpu:0]`.
 :::
 
 :::caution[Free VRAM reporting]
