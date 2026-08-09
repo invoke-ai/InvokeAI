@@ -18,12 +18,14 @@ from invokeai.app.invocations.fields import (
     ColorField,
     ConditioningField,
     DenoiseMaskField,
+    ErnieImageConditioningField,
     FieldDescriptions,
     FluxConditioningField,
     Ideogram4ConditioningField,
     ImageField,
     Input,
     InputField,
+    Krea2ConditioningField,
     LatentsField,
     OutputField,
     QwenImageConditioningField,
@@ -493,6 +495,17 @@ class ZImageConditioningOutput(BaseInvocationOutput):
         return cls(conditioning=ZImageConditioningField(conditioning_name=conditioning_name))
 
 
+@invocation_output("ernie_image_conditioning_output")
+class ErnieImageConditioningOutput(BaseInvocationOutput):
+    """Base class for nodes that output an ERNIE-Image text conditioning tensor."""
+
+    conditioning: ErnieImageConditioningField = OutputField(description=FieldDescriptions.cond)
+
+    @classmethod
+    def build(cls, conditioning_name: str) -> "ErnieImageConditioningOutput":
+        return cls(conditioning=ErnieImageConditioningField(conditioning_name=conditioning_name))
+
+
 @invocation_output("ideogram4_conditioning_output")
 class Ideogram4ConditioningOutput(BaseInvocationOutput):
     """Base class for nodes that output an Ideogram 4 text conditioning tensor."""
@@ -513,6 +526,17 @@ class QwenImageConditioningOutput(BaseInvocationOutput):
     @classmethod
     def build(cls, conditioning_name: str) -> "QwenImageConditioningOutput":
         return cls(conditioning=QwenImageConditioningField(conditioning_name=conditioning_name))
+
+
+@invocation_output("krea2_conditioning_output")
+class Krea2ConditioningOutput(BaseInvocationOutput):
+    """Base class for nodes that output a Krea-2 conditioning tensor."""
+
+    conditioning: Krea2ConditioningField = OutputField(description=FieldDescriptions.cond)
+
+    @classmethod
+    def build(cls, conditioning_name: str, mask: TensorField | None = None) -> "Krea2ConditioningOutput":
+        return cls(conditioning=Krea2ConditioningField(conditioning_name=conditioning_name, mask=mask))
 
 
 @invocation_output("anima_conditioning_output")

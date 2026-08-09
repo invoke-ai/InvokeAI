@@ -70,8 +70,17 @@ export const IMAGE_METADATA_ACTION_HANDLERS: ImageMetadataActionHandler[] = [
   ImageMetadataHandlers.Ideogram4Caption,
   ImageMetadataHandlers.CanvasLayers,
   ImageMetadataHandlers.RefImages,
-  ImageMetadataHandlers.KleinVAEModel,
+  ImageMetadataHandlers.Flux2VAEModel,
   ImageMetadataHandlers.KleinQwen3EncoderModel,
+  ImageMetadataHandlers.Flux2DevMistralEncoderModel,
+  ImageMetadataHandlers.Krea2VAEModel,
+  ImageMetadataHandlers.Krea2Qwen3VlEncoderModel,
+  ImageMetadataHandlers.Krea2SeedVarianceEnabled,
+  ImageMetadataHandlers.Krea2SeedVarianceStrength,
+  ImageMetadataHandlers.Krea2SeedVarianceRandomizePercent,
+  ImageMetadataHandlers.Krea2RebalanceEnabled,
+  ImageMetadataHandlers.Krea2RebalanceMultiplier,
+  ImageMetadataHandlers.Krea2RebalanceWeights,
   ImageMetadataHandlers.LoRAs,
 ];
 

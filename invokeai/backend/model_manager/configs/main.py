@@ -12,6 +12,7 @@ from invokeai.backend.model_manager.configs.base import (
     SubmodelDefinition,
 )
 from invokeai.backend.model_manager.configs.clip_embed import get_clip_variant_type_from_config
+from invokeai.backend.model_manager.configs.flux2_variant import flux2_variant_from_context_dim
 from invokeai.backend.model_manager.configs.identification_utils import (
     NotAMatchError,
     common_config_paths,
@@ -27,6 +28,7 @@ from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     Flux2VariantType,
     FluxVariantType,
+    Krea2VariantType,
     ModelFormat,
     ModelType,
     ModelVariantType,
@@ -71,7 +73,10 @@ class MainModelDefaultSettings(BaseModel):
         | ModelVariantType
         | WanVariantType
         | ZImageVariantType
+        | Krea2VariantType
         | None = None,
+        name: str | None = None,
+        path: str | None = None,
     ) -> Self | None:
         match base:
             case BaseModelType.StableDiffusion1:
@@ -89,6 +94,19 @@ class MainModelDefaultSettings(BaseModel):
                 else:
                     # Turbo (distilled) uses fewer steps, no CFG
                     return cls(steps=9, cfg_scale=1.0, width=1024, height=1024)
+            case BaseModelType.ErnieImage:
+                # ERNIE-Image-Turbo (distilled) uses fewer steps and CFG=1.0. The two checkpoints
+                # share an architecture and config, so there is nothing on disk to discriminate on
+                # and no Turbo variant is modeled. Fall back to the name, and also the install
+                # directory's own name so that renaming the model in the install dialog doesn't lose
+                # the Turbo defaults. Only the leaf name is matched: an in-place install records an
+                # absolute path, and an unrelated ancestor directory (e.g. /mnt/turbo-nvme/models/)
+                # must not silently give the base model Turbo's 8 steps and CFG 1.0.
+                path_name = Path(path).name if path else None
+                haystack = " ".join(part for part in (name, path_name) if part).lower()
+                if "turbo" in haystack:
+                    return cls(steps=8, cfg_scale=1.0, width=1024, height=1024)
+                return cls(steps=50, cfg_scale=4.0, width=1024, height=1024)
             case BaseModelType.Anima:
                 return cls(steps=35, cfg_scale=4.5, width=1024, height=1024)
             case BaseModelType.Ideogram4:
@@ -97,7 +115,10 @@ class MainModelDefaultSettings(BaseModel):
                 return cls(steps=48, cfg_scale=7.0, width=1024, height=1024)
             case BaseModelType.Flux2:
                 # Different defaults based on variant
-                if variant in (Flux2VariantType.Klein4BBase, Flux2VariantType.Klein9BBase):
+                if variant == Flux2VariantType.Dev:
+                    # FLUX.2 [dev] is guidance-distilled (recommended guidance=3.5, 28 steps, CFG disabled)
+                    return cls(steps=28, cfg_scale=1.0, guidance=3.5, width=1024, height=1024)
+                elif variant in (Flux2VariantType.Klein4BBase, Flux2VariantType.Klein9BBase):
                     # Undistilled base models need more steps
                     return cls(steps=28, cfg_scale=1.0, width=1024, height=1024)
                 else:
@@ -105,6 +126,14 @@ class MainModelDefaultSettings(BaseModel):
                     return cls(steps=4, cfg_scale=1.0, width=1024, height=1024)
             case BaseModelType.QwenImage:
                 return cls(steps=40, cfg_scale=4.0, width=1024, height=1024)
+            case BaseModelType.Krea2:
+                # Krea-2-Raw (Base, undistilled) needs more steps and CFG; Turbo (distilled) uses 8
+                # steps with CFG disabled. cfg_scale has a floor of 1 (ge=1); 1.0 means "no guidance".
+                if variant == Krea2VariantType.Base:
+                    # Diffusers' Krea-2 guidance 4.5 uses cond + 4.5 * (cond - uncond), which is
+                    # equivalent to InvokeAI's standard CFG convention at scale 5.5.
+                    return cls(steps=28, cfg_scale=5.5, width=1024, height=1024)
+                return cls(steps=8, cfg_scale=1.0, width=1024, height=1024)
             case BaseModelType.Wan:
                 # Wan 2.2 recommended defaults differ by variant.
                 if variant == WanVariantType.TI2V_5B:
@@ -204,6 +233,77 @@ def _has_z_image_keys(state_dict: dict[str | int, Any]) -> bool:
                 return True
 
     return False
+
+
+def _get_krea2_variant_from_name(name: str) -> Krea2VariantType:
+    """Guess the Krea-2 variant from a single-file/GGUF filename.
+
+    Turbo and Raw (Base) share the identical transformer architecture, so a single-file checkpoint
+    cannot be distinguished from its weights. Filenames with a "raw"/"base" token (e.g. "Krea-2-Raw",
+    "krea2_base_q4") indicate the undistilled Base model; everything else defaults to the distilled
+    Turbo. The user can override the variant in the model manager.
+    """
+    lowered = name.lower()
+    # "turbo" is a strong positive signal for the distilled checkpoint and wins outright, so a Turbo file
+    # whose name merely *contains* "base"/"raw" as a substring (e.g. "baseline", "database", "raw_export")
+    # is not misread as Base.
+    if "turbo" in lowered:
+        return Krea2VariantType.Turbo
+    # Otherwise match "raw"/"base" only as a whole token delimited by non-alphanumeric separators
+    # ("-", "_", ".") - not as an arbitrary substring.
+    tokens = re.split(r"[^a-z0-9]+", lowered)
+    if "raw" in tokens or "base" in tokens:
+        return Krea2VariantType.Base
+    return Krea2VariantType.Turbo
+
+
+def _has_krea2_keys(state_dict: dict[str | int, Any]) -> bool:
+    """Check if state dict contains Krea-2 (Krea2Transformer2DModel) transformer keys.
+
+    Krea-2's single-stream MMDiT has a distinctive text-fusion stage; the ``text_fusion.``
+    prefix (with ``layerwise_blocks`` / ``refiner_blocks`` / ``projector``) is unique to it.
+    Returns True only for Krea-2 main models, not LoRAs.
+    """
+    # The text-fusion stage is unique to Krea-2. Diffusers naming uses `text_fusion`/`time_mod_proj`;
+    # the native/ComfyUI GGUF conversion uses the compact `txtfusion`/`tproj` names instead.
+    krea2_specific_keys = {
+        "text_fusion",  # text-fusion stage (diffusers naming) - unique to Krea-2
+        "txtfusion",  # text-fusion stage (native/ComfyUI GGUF naming)
+        "time_mod_proj",  # timestep modulation projection (diffusers)
+    }
+    # Corroborating image-input signals: `img_in` (diffusers) / `first` (native), or the timestep
+    # modulation projection (`tproj` native).
+    krea2_corroborating_keys = {"img_in", "first", "tproj"}
+
+    lora_suffixes = (
+        ".lora_down.weight",
+        ".lora_up.weight",
+        ".lora_A.weight",
+        ".lora_B.weight",
+        ".dora_scale",
+        ".alpha",
+    )
+
+    # If any key has a LoRA suffix, this is a LoRA, not a main model.
+    for key in state_dict.keys():
+        if isinstance(key, int):
+            continue
+        if key.endswith(lora_suffixes):
+            return False
+
+    has_text_fusion = False
+    has_corroborator = False
+    for key in state_dict.keys():
+        if isinstance(key, int):
+            continue
+        # Handle both direct keys and ComfyUI-style (model.diffusion_model.*) keys.
+        key_parts = key.split(".")
+        if any(part in krea2_specific_keys for part in key_parts):
+            has_text_fusion = True
+        if any(part in krea2_corroborating_keys for part in key_parts):
+            has_corroborator = True
+    # Require the distinctive text-fusion stage; the image-input key is a corroborating signal.
+    return has_text_fusion and has_corroborator
 
 
 class Main_SD_Checkpoint_Config_Base(Checkpoint_Config_Base, Main_Config_Base):
@@ -368,9 +468,10 @@ def _filename_suggests_base(name: str) -> bool:
 def _get_flux2_variant(state_dict: dict[str | int, Any]) -> Flux2VariantType | None:
     """Determine FLUX.2 variant from state dict.
 
-    Distinguishes between Klein 4B and Klein 9B based on context embedding dimension:
+    Distinguishes between variants based on context embedding dimension:
     - Klein 4B: context_in_dim = 7680 (3 × Qwen3-4B hidden_size 2560)
     - Klein 9B: context_in_dim = 12288 (3 × Qwen3-8B hidden_size 4096)
+    - Dev:      context_in_dim = 15360 (3 × Mistral Small 3.1 hidden_size 5120)
 
     Note: Klein 9B (distilled) and Klein 9B Base (undistilled) have identical architectures
     and cannot be distinguished from the state dict alone. This function defaults to Klein9B
@@ -380,10 +481,6 @@ def _get_flux2_variant(state_dict: dict[str | int, Any]) -> Flux2VariantType | N
     - BFL format: txt_in.weight (context embedder)
     - Diffusers format: context_embedder.weight
     """
-    # Context dimensions for each variant
-    KLEIN_4B_CONTEXT_DIM = 7680  # 3 × 2560
-    KLEIN_9B_CONTEXT_DIM = 12288  # 3 × 4096
-
     # Check context_embedder to determine variant
     # Support both BFL format (txt_in.weight) and diffusers format (context_embedder.weight)
     context_keys = {
@@ -406,14 +503,12 @@ def _get_flux2_variant(state_dict: dict[str | int, Any]) -> Flux2VariantType | N
                 continue
             if len(shape) >= 2:
                 context_in_dim = shape[1]
-                # Determine variant based on context dimension
-                if context_in_dim == KLEIN_9B_CONTEXT_DIM:
-                    # Default to Klein9B - callers use filename heuristics to detect Klein9BBase
-                    return Flux2VariantType.Klein9B
-                elif context_in_dim == KLEIN_4B_CONTEXT_DIM:
-                    # Default to Klein4B - callers use filename heuristics to detect Klein4BBase
-                    return Flux2VariantType.Klein4B
-                elif context_in_dim > 4096:
+                # Determine variant based on context dimension. Callers use filename
+                # heuristics to upgrade Klein4B/Klein9B to their Base variants.
+                variant = flux2_variant_from_context_dim(context_in_dim)
+                if variant is not None:
+                    return variant
+                if context_in_dim > 4096:
                     # Unknown FLUX.2 variant, default to 4B
                     return Flux2VariantType.Klein4B
 
@@ -849,7 +944,7 @@ class Main_Diffusers_FLUX_Config(Diffusers_Config_Base, Main_Config_Base, Config
 
 
 class Main_Diffusers_Flux2_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
-    """Model config for FLUX.2 models in diffusers format (e.g. FLUX.2 Klein)."""
+    """Model config for FLUX.2 models in diffusers format (FLUX.2 Klein and FLUX.2 [dev])."""
 
     base: Literal[BaseModelType.Flux2] = Field(BaseModelType.Flux2)
     variant: Flux2VariantType = Field()
@@ -860,11 +955,28 @@ class Main_Diffusers_Flux2_Config(Diffusers_Config_Base, Main_Config_Base, Confi
 
         raise_for_override_fields(cls, override_fields)
 
+        # A FLUX.2 *main* model is a full diffusers pipeline: a `model_index.json` at
+        # the root, or at least the transformer packaged as a `transformer/` subfolder.
+        # A loose transformer-only checkout — just the contents of `transformer/`, with
+        # a root `config.json` whose `_class_name` is `Flux2Transformer2DModel` — is NOT
+        # a usable main model: the loader unconditionally appends `vae/` / `text_encoder/`
+        # subfolders that don't exist and fails with an OSError mid-queue. Reject that
+        # layout here so it falls through to a non-main classification instead of
+        # registering as a broken pipeline. (The standalone `transformer/` still matches
+        # via the pipeline layout below when it ships inside a full folder.)
+        if not (mod.path / "model_index.json").exists() and not (mod.path / "transformer").exists():
+            raise NotAMatchError(
+                "directory is not a full FLUX.2 pipeline (no model_index.json and no transformer/ subfolder); "
+                "a loose transformer-only checkout cannot be used as a FLUX.2 main model"
+            )
+
         # Check for FLUX.2-specific pipeline class names
         raise_for_class_name(
             common_config_paths(mod.path),
             {
                 "Flux2KleinPipeline",
+                "Flux2Pipeline",
+                "Flux2Transformer2DModel",
             },
         )
 
@@ -882,34 +994,37 @@ class Main_Diffusers_Flux2_Config(Diffusers_Config_Base, Main_Config_Base, Confi
     def _get_variant_or_raise(cls, mod: ModelOnDisk) -> Flux2VariantType:
         """Determine the FLUX.2 variant from the transformer config.
 
-        FLUX.2 Klein uses Qwen3 text encoder with larger joint_attention_dim:
-        - Klein 4B/4B Base: joint_attention_dim = 7680 (3×Qwen3-4B hidden size)
-        - Klein 9B/9B Base: joint_attention_dim = 12288 (3×Qwen3-8B hidden size)
+        FLUX.2 variants are distinguished by joint_attention_dim (= 3 × text encoder hidden_size):
+        - Klein 4B/4B Base: 7680 (3 × Qwen3-4B 2560)
+        - Klein 9B/9B Base: 12288 (3 × Qwen3-8B 4096)
+        - Dev:              15360 (3 × Mistral Small 3.1 5120)
 
-        Distilled and Base variants share identical architectures. We use a filename heuristic to detect Base models.
+        Klein distilled and Base variants share identical architectures; the Base variant
+        is detected by a filename heuristic.
         """
-        KLEIN_4B_CONTEXT_DIM = 7680  # 3 × 2560
-        KLEIN_9B_CONTEXT_DIM = 12288  # 3 × 4096
-
-        transformer_config = get_config_dict_or_raise(mod.path / "transformer" / "config.json")
+        # Try transformer/config.json first (full pipeline), fall back to root config.json
+        # (loose transformer-only checkouts).
+        transformer_config_path = mod.path / "transformer" / "config.json"
+        root_config_path = mod.path / "config.json"
+        if transformer_config_path.exists():
+            transformer_config = get_config_dict_or_raise(transformer_config_path)
+        else:
+            transformer_config = get_config_dict_or_raise(root_config_path)
 
         joint_attention_dim = transformer_config.get("joint_attention_dim", 4096)
 
-        # Determine variant based on joint_attention_dim
-        if joint_attention_dim == KLEIN_9B_CONTEXT_DIM:
-            if _filename_suggests_base(mod.name):
-                return Flux2VariantType.Klein9BBase
-            return Flux2VariantType.Klein9B
-        elif joint_attention_dim == KLEIN_4B_CONTEXT_DIM:
-            if _filename_suggests_base(mod.name):
-                return Flux2VariantType.Klein4BBase
+        # Determine variant based on joint_attention_dim (= context_in_dim).
+        variant = flux2_variant_from_context_dim(joint_attention_dim)
+        if variant is None:
+            # Unknown or FLUX.1-sized joint_attention_dim — default to Klein 4B.
             return Flux2VariantType.Klein4B
-        elif joint_attention_dim > 4096:
-            # Unknown FLUX.2 variant, default to 4B
-            return Flux2VariantType.Klein4B
-
-        # Default to 4B
-        return Flux2VariantType.Klein4B
+        # Klein 4B/9B share their architecture with the corresponding Base variant; use the
+        # filename heuristic to distinguish. Dev has no Base variant.
+        if variant is Flux2VariantType.Klein9B and _filename_suggests_base(mod.name):
+            return Flux2VariantType.Klein9BBase
+        if variant is Flux2VariantType.Klein4B and _filename_suggests_base(mod.name):
+            return Flux2VariantType.Klein4BBase
+        return variant
 
 
 class Main_SD_Diffusers_Config_Base(Diffusers_Config_Base, Main_Config_Base):
@@ -1330,6 +1445,120 @@ class Main_Diffusers_Ideogram4_Config(Diffusers_Config_Base, Main_Config_Base, C
             **override_fields,
             repo_variant=repo_variant,
         )
+
+
+class Main_Diffusers_Krea2_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for Krea-2 diffusers models (Krea-2-Turbo)."""
+
+    base: Literal[BaseModelType.Krea2] = Field(BaseModelType.Krea2)
+    variant: Krea2VariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        # This check implies the base type - no further validation needed.
+        raise_for_class_name(
+            common_config_paths(mod.path),
+            {
+                "Krea2Pipeline",
+            },
+        )
+
+        variant = override_fields.pop("variant", None) or cls._get_variant(mod)
+
+        repo_variant = override_fields.pop("repo_variant", None) or cls._get_repo_variant_or_raise(mod)
+
+        return cls(
+            **override_fields,
+            variant=variant,
+            repo_variant=repo_variant,
+        )
+
+    @classmethod
+    def _get_variant(cls, mod: ModelOnDisk) -> Krea2VariantType:
+        """Determine the Krea-2 variant from the pipeline-level ``is_distilled`` flag.
+
+        Krea-2-Turbo sets ``is_distilled=true`` in model_index.json (distilled, 8 steps, CFG off);
+        Krea-2-Raw sets ``is_distilled=false`` (undistilled Base, more steps, CFG on). The transformer
+        architectures are identical, so this flag is the only reliable discriminator.
+        """
+        # model_index.json was already validated by the class-name check in from_model_on_disk, so a
+        # read/parse failure here is a genuine identification error and is allowed to propagate rather
+        # than being silently registered as Turbo (which would give a Raw model the wrong defaults).
+        config = get_config_dict_or_raise(mod.path / "model_index.json")
+        if config.get("is_distilled", False) is False:
+            return Krea2VariantType.Base
+        return Krea2VariantType.Turbo
+
+
+class Main_Checkpoint_Krea2_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for Krea-2 single-file checkpoint models (safetensors, etc)."""
+
+    base: Literal[BaseModelType.Krea2] = Field(default=BaseModelType.Krea2)
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+    variant: Krea2VariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        if mod.path.suffix.lower() != ".safetensors":
+            raise NotAMatchError(f"expected a .safetensors file, got {mod.path.suffix or '(no suffix)'}")
+
+        cls._validate_looks_like_krea2_model(mod)
+
+        cls._validate_does_not_look_like_gguf_quantized(mod)
+
+        variant = override_fields.pop("variant", None) or _get_krea2_variant_from_name(mod.path.name)
+
+        return cls(**override_fields, variant=variant)
+
+    @classmethod
+    def _validate_looks_like_krea2_model(cls, mod: ModelOnDisk) -> None:
+        if not _has_krea2_keys(mod.load_state_dict()):
+            raise NotAMatchError("state dict does not look like a Krea-2 model")
+
+    @classmethod
+    def _validate_does_not_look_like_gguf_quantized(cls, mod: ModelOnDisk) -> None:
+        if _has_ggml_tensors(mod.load_state_dict()):
+            raise NotAMatchError("state dict looks like GGUF quantized")
+
+
+class Main_GGUF_Krea2_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for GGUF-quantized Krea-2 transformer models (single-file)."""
+
+    base: Literal[BaseModelType.Krea2] = Field(default=BaseModelType.Krea2)
+    format: Literal[ModelFormat.GGUFQuantized] = Field(default=ModelFormat.GGUFQuantized)
+    variant: Krea2VariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        cls._validate_looks_like_krea2_model(mod)
+
+        cls._validate_looks_like_gguf_quantized(mod)
+
+        variant = override_fields.pop("variant", None) or _get_krea2_variant_from_name(mod.path.name)
+
+        return cls(**override_fields, variant=variant)
+
+    @classmethod
+    def _validate_looks_like_krea2_model(cls, mod: ModelOnDisk) -> None:
+        if not _has_krea2_keys(mod.load_state_dict()):
+            raise NotAMatchError("state dict does not look like a Krea-2 model")
+
+    @classmethod
+    def _validate_looks_like_gguf_quantized(cls, mod: ModelOnDisk) -> None:
+        if not _has_ggml_tensors(mod.load_state_dict()):
+            raise NotAMatchError("state dict does not look like GGUF quantized")
 
 
 class Main_Diffusers_QwenImage_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
@@ -1782,3 +2011,32 @@ class Main_Checkpoint_Anima_Config(Checkpoint_Config_Base, Main_Config_Base, Con
         has_anima_keys = _has_anima_keys(mod.load_state_dict())
         if not has_anima_keys:
             raise NotAMatchError("state dict does not look like an Anima model")
+
+
+class Main_Diffusers_ErnieImage_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for ERNIE-Image diffusers models (ERNIE-Image, ERNIE-Image-Turbo)."""
+
+    base: Literal[BaseModelType.ErnieImage] = Field(BaseModelType.ErnieImage)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+        raise_for_override_fields(cls, override_fields)
+
+        raise_for_class_name(
+            common_config_paths(mod.path),
+            {"ErnieImagePipeline"},
+        )
+
+        repo_variant = override_fields.get("repo_variant") or cls._get_repo_variant_or_raise(mod)
+
+        return cls(
+            **override_fields,
+            repo_variant=repo_variant,
+        )
+
+
+# NOTE: There is deliberately no `Main_Checkpoint_ErnieImage_Config`. Single-file ERNIE-Image
+# checkpoints cannot be loaded yet (only the full diffusers pipeline layout is supported), and a
+# config that matches on install but raises on first generate would leave a permanently broken
+# entry in the Model Manager. Add it together with the checkpoint loader.
