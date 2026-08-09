@@ -60,6 +60,13 @@ class MaybeEmptyIntegerCollectionTestInvocation(BaseInvocation):
         return IntegerCollectionTestInvocationOutput(collection=[self.value])
 
 
+class EmptyOrTwoIntegerCollectionTestInvocation(BaseInvocation):
+    value: int = InputField(default=0)
+
+    def invoke(self, context: InvocationContext) -> IntegerCollectionTestInvocationOutput:
+        return IntegerCollectionTestInvocationOutput(collection=[] if self.value == 0 else [0, 1])
+
+
 class IntegerCollectionPassthroughTestInvocation(BaseInvocation):
     collection: list[int] = InputField(default=[])
 
@@ -1329,6 +1336,38 @@ def test_graph_chained_collectors_preserve_outer_iteration_scope(always_empty: b
     assert sorted(state.results[node_id].collection for node_id in collect_b_ids) == expected
     outer_collect_id = next(iter(state.source_prepared_mapping["outer_collect"]))
     assert state.results[outer_collect_id].collection == expected
+
+
+def test_graph_chained_collectors_preserve_ragged_empty_scope():
+    graph = Graph()
+    graph.add_node(RangeInvocation(id="source", start=0, stop=2, step=1))
+    graph.add_node(IterateInvocation(id="outer_iter"))
+    graph.add_node(EmptyOrTwoIntegerCollectionTestInvocation(id="middle_map"))
+    graph.add_node(IterateInvocation(id="middle_iter"))
+    graph.add_node(IntegerCollectionFromItemTestInvocation(id="inner_map"))
+    graph.add_node(IterateInvocation(id="inner_iter"))
+    graph.add_node(AddInvocation(id="body", b=0))
+    graph.add_node(CollectInvocation(id="collect_a"))
+    graph.add_node(IntegerCollectionPassthroughTestInvocation(id="per_x"))
+    graph.add_node(CollectInvocation(id="top_collect"))
+
+    graph.add_edge(create_edge("source", "collection", "outer_iter", "collection"))
+    graph.add_edge(create_edge("outer_iter", "item", "middle_map", "value"))
+    graph.add_edge(create_edge("middle_map", "collection", "middle_iter", "collection"))
+    graph.add_edge(create_edge("middle_iter", "item", "inner_map", "value"))
+    graph.add_edge(create_edge("inner_map", "collection", "inner_iter", "collection"))
+    graph.add_edge(create_edge("inner_iter", "item", "body", "a"))
+    graph.add_edge(create_edge("body", "value", "collect_a", "item"))
+    graph.add_edge(create_edge("collect_a", "collection", "per_x", "collection"))
+    graph.add_edge(create_edge("per_x", "collection", "top_collect", "item"))
+
+    state = GraphExecutionState(graph=graph)
+    execute_all_nodes(state)
+
+    top_collect_ids = state.source_prepared_mapping["top_collect"]
+    assert sorted(state._get_iteration_path(node_id) for node_id in top_collect_ids) == [()]
+    top_collect_id = next(iter(top_collect_ids))
+    assert state.results[top_collect_id].collection == [[], [0, 1], [10, 11]]
 
 
 def test_graph_collector_reuses_outer_collection_input_for_each_nested_iterator_group():
