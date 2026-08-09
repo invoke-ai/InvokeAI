@@ -1,5 +1,5 @@
 import type { QueueItem } from '@features/queue/core/historyTypes';
-import type { QueueBackendPort } from '@features/queue/core/types';
+import type { QueueBackendInvocation, QueueBackendPort, QueueResultImage } from '@features/queue/core/types';
 
 import { buildQueueItemOrigin } from '@features/queue/data/events';
 import { describe, expect, it, vi } from 'vitest';
@@ -144,12 +144,18 @@ describe('queue runtime video board routing', () => {
   const createHarness = (options: {
     getResultVideoNames: QueueBackendPort['getResultVideoNames'];
     galleryBoardId?: string | null;
+    getResultImages?: QueueBackendPort['getResultImages'];
+    /** Nodes of the compiled submission graph — media values here mark run INPUTS. */
+    graphNodes?: Record<string, QueueBackendInvocation>;
   }) => {
     const queueItem = createPendingQueueItem();
     queueItem.snapshot.destination = 'gallery';
     queueItem.snapshot.galleryBoardId = options.galleryBoardId === undefined ? 'board-1' : options.galleryBoardId;
     queueItem.snapshot.filterIntermediateResults = true;
     delete (queueItem.snapshot as { resultNodeIds?: unknown }).resultNodeIds;
+    if (options.graphNodes && queueItem.snapshot.backendSubmission.kind !== 'invalid') {
+      queueItem.snapshot.backendSubmission.graph.nodes = options.graphNodes;
+    }
     const project = { id: 'project-1', queue: { items: [queueItem] } };
     const backend: QueueBackendPort = {
       cancelCurrentItem: vi.fn(),
@@ -163,7 +169,7 @@ describe('queue runtime video board routing', () => {
       enqueueGenerate: vi.fn(),
       enqueueWorkflow: vi.fn(),
       getItem: vi.fn(),
-      getResultImages: vi.fn().mockResolvedValue([]),
+      getResultImages: options.getResultImages ?? vi.fn().mockResolvedValue([]),
       getResultVideoNames: options.getResultVideoNames,
       // The backend already accepted and completed this run before "reload": reconcile
       // adopts it and settles immediately, driving both settlement paths without sockets.
@@ -282,6 +288,66 @@ describe('queue runtime video board routing', () => {
     expect(destinations.addImagesToGalleryBoard).not.toHaveBeenCalled();
     expect(destinations.addVideosToGalleryBoard).not.toHaveBeenCalled();
     expect(getResultVideoNames).not.toHaveBeenCalled();
+
+    runtime.dispose();
+  });
+
+  const resultImage = (imageName: string): QueueResultImage => ({
+    height: 512,
+    imageName,
+    imageUrl: `http://test/i/${imageName}`,
+    isIntermediate: false,
+    queuedAt: '2026-07-17T00:00:00.000Z',
+    sourceQueueItemId: 'local-queue-item',
+    thumbnailUrl: `http://test/t/${imageName}`,
+    width: 512,
+  });
+
+  it('never routes an input image echoed into the results (first-frame keyframe)', async () => {
+    // The i2v workflow's `image` primitive echoes the uploaded keyframe into
+    // session.results as a non-intermediate output; only the generated image may
+    // reach the board or the recorded results.
+    const { commands, destinations, runtime } = createHarness({
+      getResultImages: vi.fn().mockResolvedValue([resultImage('keyframe.png'), resultImage('generated.png')]),
+      getResultVideoNames: vi.fn().mockResolvedValue([]),
+      graphNodes: {
+        first_frame: { id: 'first_frame', image: { image_name: 'keyframe.png' }, type: 'image' },
+      },
+    });
+
+    runtime.start();
+
+    await vi.waitFor(() => {
+      expect(destinations.addImagesToGalleryBoard).toHaveBeenCalledWith('board-1', ['generated.png']);
+      expect(commands.routeResults).toHaveBeenCalledWith(
+        expect.objectContaining({ images: [expect.objectContaining({ imageName: 'generated.png' })] })
+      );
+    });
+    expect(destinations.addImagesToGalleryBoard).not.toHaveBeenCalledWith(
+      'board-1',
+      expect.arrayContaining(['keyframe.png'])
+    );
+
+    runtime.dispose();
+  });
+
+  it('never routes an input video echoed into the results (extend-video source clip)', async () => {
+    const { destinations, runtime } = createHarness({
+      getResultVideoNames: vi.fn().mockResolvedValue(['source.mp4', 'extended.mp4']),
+      graphNodes: {
+        source_clip: { id: 'source_clip', type: 'video', video: { video_name: 'source.mp4' } },
+      },
+    });
+
+    runtime.start();
+
+    await vi.waitFor(() => {
+      expect(destinations.addVideosToGalleryBoard).toHaveBeenCalledWith('board-1', ['extended.mp4']);
+    });
+    expect(destinations.addVideosToGalleryBoard).not.toHaveBeenCalledWith(
+      'board-1',
+      expect.arrayContaining(['source.mp4'])
+    );
 
     runtime.dispose();
   });

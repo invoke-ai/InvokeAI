@@ -8,6 +8,7 @@ import type {
 } from '@features/queue/core/types';
 import type { BackendConnectionStatus } from '@platform/transport/types';
 
+import { collectGraphInputMediaNames } from '@features/queue/core/graphInputMedia';
 import { isQueuePromptSeedBehaviour } from '@features/queue/core/promptBatch';
 import { shouldSubmitPendingQueueItem } from '@features/queue/core/submissionRules';
 import {
@@ -73,6 +74,16 @@ const toErrorMessage = (error: unknown): string =>
 
 export const getQueueItemResultImageOptions = (queueItem: QueueItem): QueueResultImageOptions | undefined => {
   return queueItem.snapshot.resultNodeIds ? { resultNodeIds: queueItem.snapshot.resultNodeIds } : undefined;
+};
+
+/**
+ * The compiled backend graph this item submitted, or undefined for legacy/invalid
+ * snapshots. Used to recognize input passthroughs among collected results — see
+ * `collectGraphInputMediaNames`.
+ */
+const getQueueItemCompiledGraph = (queueItem: QueueItem): unknown => {
+  const submission = (queueItem.snapshot as Partial<QueueItem['snapshot']>).backendSubmission;
+  return submission && typeof submission === 'object' && 'graph' in submission ? submission.graph : undefined;
 };
 
 export const createQueueItemBackendSubmission = (
@@ -249,7 +260,10 @@ export const createQueueRuntime = ({
       const namesPerItem = await Promise.all(
         deliverableItemIds.map((backendItemId) => backend.getResultVideoNames(backendItemId, options))
       );
-      const videoNames = [...new Set(namesPerItem.flat())];
+      // A video primitive echoes the run's INPUT video into session.results (e.g. the
+      // source clip of an extend-video workflow) — exclude it like input images.
+      const inputMedia = collectGraphInputMediaNames(getQueueItemCompiledGraph(queueItem));
+      const videoNames = [...new Set(namesPerItem.flat())].filter((name) => !inputMedia.videoNames.has(name));
 
       if (videoNames.length === 0 || !isActive()) {
         return;
@@ -268,14 +282,22 @@ export const createQueueRuntime = ({
     }
   };
 
-  /** Drop intermediates when the item asks for it, then land what remains on its destination. */
+  /**
+   * Drop input passthroughs and (when the item asks) intermediates, then land what
+   * remains on the item's destination. Session results include every node's output,
+   * so a media primitive echoes the run's INPUT image under its original name — e.g.
+   * the first-frame keyframe of an image-to-video workflow — and routing it would
+   * board-attach the user's source image on every run.
+   */
   const deliverVisibleImages = async (
     queueItem: QueueItem,
     allImages: QueueResultImage[]
   ): Promise<QueueResultImage[]> => {
+    const inputMedia = collectGraphInputMediaNames(getQueueItemCompiledGraph(queueItem));
+    const producedImages = allImages.filter((image) => !inputMedia.imageNames.has(image.imageName));
     const images = queueItem.snapshot.filterIntermediateResults
-      ? allImages.filter((image) => !image.isIntermediate)
-      : allImages;
+      ? producedImages.filter((image) => !image.isIntermediate)
+      : producedImages;
 
     await addImagesToDestination(
       queueItem,
