@@ -1,6 +1,7 @@
 """Default SQLite implementation of user service."""
 
 import sqlite3
+from collections.abc import Sequence
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -17,6 +18,10 @@ from invokeai.app.services.users.users_common import (
     UserDTO,
     UserUpdateRequest,
 )
+
+# Bound-parameter chunk size for `get_many`. SQLite's SQLITE_MAX_VARIABLE_NUMBER is 32766
+# on modern builds but 999 on older ones; stay under the smaller limit.
+USER_LOOKUP_CHUNK_SIZE = 900
 
 
 class UserService(UserServiceBase):
@@ -91,6 +96,41 @@ class UserService(UserServiceBase):
             last_login_at=datetime.fromisoformat(row[7]) if row[7] else None,
             token_epoch=int(row[8]),
         )
+
+    def get_many(self, user_ids: Sequence[str]) -> dict[str, UserDTO]:
+        """Get users by ID, keyed by user_id. Unknown ids are absent from the result."""
+        unique_ids = list(dict.fromkeys(user_ids))
+        if not unique_ids:
+            return {}
+
+        users: dict[str, UserDTO] = {}
+        # Chunked so a caller with many distinct owners can't exceed SQLite's bound-parameter
+        # limit (999 on builds predating 3.32).
+        for start in range(0, len(unique_ids), USER_LOOKUP_CHUNK_SIZE):
+            chunk = unique_ids[start : start + USER_LOOKUP_CHUNK_SIZE]
+            placeholders = ",".join("?" for _ in chunk)
+            with self._db.transaction() as cursor:
+                cursor.execute(
+                    f"""
+                    SELECT user_id, email, display_name, is_admin, is_active, created_at, updated_at, last_login_at
+                    FROM users
+                    WHERE user_id IN ({placeholders})
+                    """,
+                    chunk,
+                )
+                rows = cursor.fetchall()
+            for row in rows:
+                users[row[0]] = UserDTO(
+                    user_id=row[0],
+                    email=row[1],
+                    display_name=row[2],
+                    is_admin=bool(row[3]),
+                    is_active=bool(row[4]),
+                    created_at=datetime.fromisoformat(row[5]),
+                    updated_at=datetime.fromisoformat(row[6]),
+                    last_login_at=datetime.fromisoformat(row[7]) if row[7] else None,
+                )
+        return users
 
     def get_by_email(self, email: str) -> UserDTO | None:
         """Get user by email."""
