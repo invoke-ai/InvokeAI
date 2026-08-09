@@ -769,10 +769,6 @@
                 "title": "Shapes Tool",
                 "desc": "Select the shapes tool."
             },
-            "selectPathTool": {
-                "title": "Path Tool",
-                "desc": "Select the path tool."
-            },
             "selectLassoTool": {
                 "title": "Lasso Tool",
                 "desc": "Select the lasso tool."
@@ -810,8 +806,8 @@
                 "desc": "Switch between the last two selected layers. If a layer is bookmarked, always switch between it and the last non-bookmarked layer."
             },
             "deleteSelected": {
-                "title": "Delete Layer",
-                "desc": "Delete the selected layer."
+                "title": "Delete Layer / Active Spline",
+                "desc": "Delete the active spline in Vector Edit mode; otherwise delete the selected layer."
             },
             "resetSelected": {
                 "title": "Reset Layer",
@@ -3205,7 +3201,13 @@
             "corner": "Corner",
             "smooth": "Smooth",
             "symmetric": "Symmetric",
-            "traceAll": "Trace All Paths"
+            "smoothPath": "Smooth Path",
+            "smoothSelectedPoints": "Selected Points",
+            "deleteActivePathHint": "Delete active spline",
+            "traceWidth": "Trace Width",
+            "traceAll": "Trace All Paths",
+            "fillClosedPaths": "Fill Closed Paths",
+            "createInpaintMask": "Create Inpaint Mask"
         },
         "lasso": {
             "freehand": "Freehand",
@@ -3214,7 +3216,10 @@
         },
         "shape": {
             "rect": "Rect",
-            "oval": "Oval"
+            "oval": "Oval",
+            "vectorPolygon": "Polygon / Polyline",
+            "vectorPolygonHint": "Click to add points. Click the first point to close, or press Enter or double-click to keep it open.",
+            "vectorFreehandHint": "Drag to draw an open vector path."
         },
         "modifierHints": {
             "keys": {

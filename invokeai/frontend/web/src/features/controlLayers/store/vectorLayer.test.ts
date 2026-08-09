@@ -20,7 +20,12 @@ import {
   vectorLayerTransformed,
   vectorPathAdded,
 } from './canvasSlice';
-import { buildSelectHasObjects, selectAllEntities, selectCanvasMetadata } from './selectors';
+import {
+  buildSelectHasObjects,
+  selectAllEntities,
+  selectAllRenderableEntities,
+  selectCanvasMetadata,
+} from './selectors';
 import { getInitialCanvasState, zCanvasMetadata, zCanvasState } from './types';
 import { getVectorLayerState } from './util';
 
@@ -66,6 +71,13 @@ describe('vector layer integration', () => {
     });
     expect(layer?.id).toMatch(/^vector_layer/);
     expect(state.selectedEntityIdentifier).toEqual({ id: layer?.id, type: 'vector_layer' });
+  });
+
+  it('counts an empty vector layer as a renderable canvas entity', () => {
+    const state = getInitialCanvasState();
+    state.vectorLayers.entities.push(getVectorLayerState('vector-layer-a'));
+
+    expect(selectAllRenderableEntities(state)).toContainEqual(state.vectorLayers.entities[0]);
   });
 
   it('adds a bezier path to an existing vector layer', () => {

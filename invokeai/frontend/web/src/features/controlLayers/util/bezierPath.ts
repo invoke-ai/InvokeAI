@@ -1,4 +1,4 @@
-import type { CanvasBezierPointState, Coordinate } from 'features/controlLayers/store/types';
+import type { CanvasBezierPointState, Coordinate, Rect } from 'features/controlLayers/store/types';
 
 type RenderableBezierPoint = Pick<CanvasBezierPointState, 'anchor' | 'inHandle' | 'outHandle'>;
 type BezierPointHandleType = 'inHandle' | 'outHandle';
@@ -10,7 +10,13 @@ type BezierPathSegmentHit = {
   distance: number;
 };
 
+type CubicBezierSegment = [Coordinate, Coordinate, Coordinate, Coordinate];
+
 const DEFAULT_BEZIER_PATH_SAMPLES_PER_SEGMENT = 24;
+const ELLIPSE_BEZIER_CONTROL_POINT_RATIO = (4 * (Math.sqrt(2) - 1)) / 3;
+const BEZIER_FIT_EPSILON = 1e-12;
+const SMOOTH_HANDLE_MAX_SEGMENT_RATIO = 2 / 3;
+const CENTRIPETAL_CATMULL_ROM_ALPHA = 0.5;
 
 const formatCoordinate = (coordinate: Coordinate) => `${coordinate.x} ${coordinate.y}`;
 const getDistance = (a: Coordinate, b: Coordinate) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -18,6 +24,18 @@ const lerpCoordinate = (a: Coordinate, b: Coordinate, t: number): Coordinate => 
   x: a.x + (b.x - a.x) * t,
   y: a.y + (b.y - a.y) * t,
 });
+const addCoordinate = (a: Coordinate, b: Coordinate): Coordinate => ({ x: a.x + b.x, y: a.y + b.y });
+const subtractCoordinate = (a: Coordinate, b: Coordinate): Coordinate => ({ x: a.x - b.x, y: a.y - b.y });
+const scaleCoordinate = (coordinate: Coordinate, scale: number): Coordinate => ({
+  x: coordinate.x * scale,
+  y: coordinate.y * scale,
+});
+const dotCoordinates = (a: Coordinate, b: Coordinate): number => a.x * b.x + a.y * b.y;
+const normalizeCoordinate = (coordinate: Coordinate): Coordinate => {
+  const length = Math.hypot(coordinate.x, coordinate.y);
+  return length <= BEZIER_FIT_EPSILON ? { x: 0, y: 0 } : scaleCoordinate(coordinate, 1 / length);
+};
+const getSquaredDistance = (a: Coordinate, b: Coordinate): number => (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
 const normalizeHandle = (anchor: Coordinate, handle: Coordinate): Coordinate | null =>
   anchor.x === handle.x && anchor.y === handle.y ? null : handle;
 const mirrorHandle = (anchor: Coordinate, handle: Coordinate): Coordinate => ({
@@ -208,6 +226,446 @@ export const anchorsToBezierPoints = (anchors: Coordinate[]): CanvasBezierPointS
     outHandle: null,
     type: 'corner',
   }));
+};
+
+const evaluateCubicBezier = (segment: CubicBezierSegment, t: number): Coordinate => {
+  const [p0, p1, p2, p3] = segment;
+  const mt = 1 - t;
+  const mt2 = mt * mt;
+  const t2 = t * t;
+
+  return {
+    x: mt2 * mt * p0.x + 3 * mt2 * t * p1.x + 3 * mt * t2 * p2.x + t2 * t * p3.x,
+    y: mt2 * mt * p0.y + 3 * mt2 * t * p1.y + 3 * mt * t2 * p2.y + t2 * t * p3.y,
+  };
+};
+
+const evaluateCubicBezierDerivative = (segment: CubicBezierSegment, t: number): Coordinate => {
+  const [p0, p1, p2, p3] = segment;
+  const mt = 1 - t;
+
+  return scaleCoordinate(
+    addCoordinate(
+      addCoordinate(
+        scaleCoordinate(subtractCoordinate(p1, p0), mt * mt),
+        scaleCoordinate(subtractCoordinate(p2, p1), 2 * mt * t)
+      ),
+      scaleCoordinate(subtractCoordinate(p3, p2), t * t)
+    ),
+    3
+  );
+};
+
+const evaluateCubicBezierSecondDerivative = (segment: CubicBezierSegment, t: number): Coordinate => {
+  const [p0, p1, p2, p3] = segment;
+  const first = addCoordinate(subtractCoordinate(p2, scaleCoordinate(p1, 2)), p0);
+  const second = addCoordinate(subtractCoordinate(p3, scaleCoordinate(p2, 2)), p1);
+  return scaleCoordinate(addCoordinate(scaleCoordinate(first, 1 - t), scaleCoordinate(second, t)), 6);
+};
+
+const chordLengthParameterize = (points: Coordinate[], first: number, last: number): number[] => {
+  const parameters = [0];
+  for (let i = first + 1; i <= last; i += 1) {
+    const previous = points[i - 1];
+    const current = points[i];
+    if (!previous || !current) {
+      continue;
+    }
+    parameters.push((parameters.at(-1) ?? 0) + Math.sqrt(getSquaredDistance(previous, current)));
+  }
+
+  const totalLength = parameters.at(-1) ?? 0;
+  if (totalLength <= BEZIER_FIT_EPSILON) {
+    return parameters.map((_, index) => index / Math.max(1, parameters.length - 1));
+  }
+  return parameters.map((parameter) => parameter / totalLength);
+};
+
+const generateBezierSegment = (
+  points: Coordinate[],
+  first: number,
+  last: number,
+  parameters: number[],
+  leftTangent: Coordinate,
+  rightTangent: Coordinate
+): CubicBezierSegment => {
+  const start = points[first];
+  const end = points[last];
+  if (!start || !end) {
+    throw new Error('Cannot fit a Bezier segment without endpoints');
+  }
+
+  let c00 = 0;
+  let c01 = 0;
+  let c11 = 0;
+  let x0 = 0;
+  let x1 = 0;
+
+  for (let i = 0; i <= last - first; i += 1) {
+    const point = points[first + i];
+    const parameter = parameters[i];
+    if (!point || parameter === undefined) {
+      continue;
+    }
+
+    const mt = 1 - parameter;
+    const b0 = mt ** 3;
+    const b1 = 3 * parameter * mt ** 2;
+    const b2 = 3 * parameter ** 2 * mt;
+    const b3 = parameter ** 3;
+    const a1 = scaleCoordinate(leftTangent, b1);
+    const a2 = scaleCoordinate(rightTangent, b2);
+    const basePoint = addCoordinate(scaleCoordinate(start, b0 + b1), scaleCoordinate(end, b2 + b3));
+    const residual = subtractCoordinate(point, basePoint);
+
+    c00 += dotCoordinates(a1, a1);
+    c01 += dotCoordinates(a1, a2);
+    c11 += dotCoordinates(a2, a2);
+    x0 += dotCoordinates(a1, residual);
+    x1 += dotCoordinates(a2, residual);
+  }
+
+  const determinant = c00 * c11 - c01 * c01;
+  let alphaLeft = determinant === 0 ? 0 : (x0 * c11 - x1 * c01) / determinant;
+  let alphaRight = determinant === 0 ? 0 : (c00 * x1 - c01 * x0) / determinant;
+  const segmentLength = Math.sqrt(getSquaredDistance(start, end));
+  const minimumAlpha = segmentLength * 1e-6;
+
+  if (alphaLeft < minimumAlpha || alphaRight < minimumAlpha) {
+    alphaLeft = segmentLength / 3;
+    alphaRight = segmentLength / 3;
+  }
+
+  return [
+    start,
+    addCoordinate(start, scaleCoordinate(leftTangent, alphaLeft)),
+    addCoordinate(end, scaleCoordinate(rightTangent, alphaRight)),
+    end,
+  ];
+};
+
+const getMaximumBezierFitError = (
+  points: Coordinate[],
+  first: number,
+  last: number,
+  segment: CubicBezierSegment,
+  parameters: number[]
+): { error: number; splitPoint: number } => {
+  let maximumError = 0;
+  let splitPoint = Math.floor((first + last) / 2);
+
+  for (let i = first + 1; i < last; i += 1) {
+    const point = points[i];
+    const parameter = parameters[i - first];
+    if (!point || parameter === undefined) {
+      continue;
+    }
+    const error = getSquaredDistance(evaluateCubicBezier(segment, parameter), point);
+    if (error > maximumError) {
+      maximumError = error;
+      splitPoint = i;
+    }
+  }
+
+  return { error: maximumError, splitPoint };
+};
+
+const reparameterizeBezierFit = (
+  points: Coordinate[],
+  first: number,
+  parameters: number[],
+  segment: CubicBezierSegment
+): number[] => {
+  return parameters.map((parameter, index) => {
+    const point = points[first + index];
+    if (!point) {
+      return parameter;
+    }
+
+    const curvePoint = evaluateCubicBezier(segment, parameter);
+    const firstDerivative = evaluateCubicBezierDerivative(segment, parameter);
+    const secondDerivative = evaluateCubicBezierSecondDerivative(segment, parameter);
+    const difference = subtractCoordinate(curvePoint, point);
+    const denominator = dotCoordinates(firstDerivative, firstDerivative) + dotCoordinates(difference, secondDerivative);
+    if (Math.abs(denominator) <= BEZIER_FIT_EPSILON) {
+      return parameter;
+    }
+    return Math.max(0, Math.min(1, parameter - dotCoordinates(difference, firstDerivative) / denominator));
+  });
+};
+
+const fitCubicBezierSegments = (
+  points: Coordinate[],
+  first: number,
+  last: number,
+  leftTangent: Coordinate,
+  rightTangent: Coordinate,
+  maximumErrorSquared: number,
+  segments: CubicBezierSegment[]
+) => {
+  const start = points[first];
+  const end = points[last];
+  if (!start || !end) {
+    return;
+  }
+
+  if (last - first === 1) {
+    const handleLength = Math.sqrt(getSquaredDistance(start, end)) / 3;
+    segments.push([
+      start,
+      addCoordinate(start, scaleCoordinate(leftTangent, handleLength)),
+      addCoordinate(end, scaleCoordinate(rightTangent, handleLength)),
+      end,
+    ]);
+    return;
+  }
+
+  let parameters = chordLengthParameterize(points, first, last);
+  let segment = generateBezierSegment(points, first, last, parameters, leftTangent, rightTangent);
+  let fit = getMaximumBezierFitError(points, first, last, segment, parameters);
+
+  if (fit.error <= maximumErrorSquared) {
+    segments.push(segment);
+    return;
+  }
+
+  if (fit.error <= maximumErrorSquared * 4) {
+    for (let i = 0; i < 4; i += 1) {
+      parameters = reparameterizeBezierFit(points, first, parameters, segment);
+      segment = generateBezierSegment(points, first, last, parameters, leftTangent, rightTangent);
+      fit = getMaximumBezierFitError(points, first, last, segment, parameters);
+      if (fit.error <= maximumErrorSquared) {
+        segments.push(segment);
+        return;
+      }
+    }
+  }
+
+  const splitPoint = fit.splitPoint;
+  const beforeSplit = points[splitPoint - 1];
+  const afterSplit = points[splitPoint + 1];
+  if (!beforeSplit || !afterSplit) {
+    return;
+  }
+  const centerTangent = normalizeCoordinate(subtractCoordinate(beforeSplit, afterSplit));
+
+  fitCubicBezierSegments(points, first, splitPoint, leftTangent, centerTangent, maximumErrorSquared, segments);
+  fitCubicBezierSegments(
+    points,
+    splitPoint,
+    last,
+    scaleCoordinate(centerTangent, -1),
+    rightTangent,
+    maximumErrorSquared,
+    segments
+  );
+};
+
+export const fitPolylineToBezierPoints = (
+  inputPoints: Coordinate[],
+  maximumError: number
+): CanvasBezierPointState[] => {
+  const points = inputPoints.filter((point, index) => {
+    const previous = inputPoints[index - 1];
+    return !previous || getSquaredDistance(point, previous) > BEZIER_FIT_EPSILON;
+  });
+  const firstPoint = points[0];
+  const secondPoint = points[1];
+  const lastPoint = points.at(-1);
+  const penultimatePoint = points.at(-2);
+  if (!firstPoint || !secondPoint || !lastPoint || !penultimatePoint) {
+    return [];
+  }
+
+  const segments: CubicBezierSegment[] = [];
+  fitCubicBezierSegments(
+    points,
+    0,
+    points.length - 1,
+    normalizeCoordinate(subtractCoordinate(secondPoint, firstPoint)),
+    normalizeCoordinate(subtractCoordinate(penultimatePoint, lastPoint)),
+    Math.max(maximumError, BEZIER_FIT_EPSILON) ** 2,
+    segments
+  );
+  const firstSegment = segments[0];
+  if (!firstSegment) {
+    return [];
+  }
+
+  const bezierPoints: CanvasBezierPointState[] = [
+    {
+      anchor: firstSegment[0],
+      inHandle: null,
+      outHandle: normalizeHandle(firstSegment[0], firstSegment[1]),
+      type: 'smooth',
+    },
+  ];
+
+  for (const segment of segments) {
+    const previousPoint = bezierPoints.at(-1);
+    if (!previousPoint) {
+      continue;
+    }
+    previousPoint.outHandle = normalizeHandle(previousPoint.anchor, segment[1]);
+    bezierPoints.push({
+      anchor: segment[3],
+      inHandle: normalizeHandle(segment[3], segment[2]),
+      outHandle: null,
+      type: 'smooth',
+    });
+  }
+
+  return bezierPoints;
+};
+
+export const rectToBezierPoints = (rect: Rect): CanvasBezierPointState[] => {
+  const { x, y, width, height } = rect;
+  return anchorsToBezierPoints([
+    { x, y },
+    { x: x + width, y },
+    { x: x + width, y: y + height },
+    { x, y: y + height },
+  ]);
+};
+
+export const ovalToBezierPoints = (rect: Rect): CanvasBezierPointState[] => {
+  const radiusX = rect.width / 2;
+  const radiusY = rect.height / 2;
+  const centerX = rect.x + radiusX;
+  const centerY = rect.y + radiusY;
+  const controlOffsetX = radiusX * ELLIPSE_BEZIER_CONTROL_POINT_RATIO;
+  const controlOffsetY = radiusY * ELLIPSE_BEZIER_CONTROL_POINT_RATIO;
+
+  return [
+    {
+      anchor: { x: centerX, y: rect.y },
+      inHandle: { x: centerX - controlOffsetX, y: rect.y },
+      outHandle: { x: centerX + controlOffsetX, y: rect.y },
+      type: 'symmetric',
+    },
+    {
+      anchor: { x: rect.x + rect.width, y: centerY },
+      inHandle: { x: rect.x + rect.width, y: centerY - controlOffsetY },
+      outHandle: { x: rect.x + rect.width, y: centerY + controlOffsetY },
+      type: 'symmetric',
+    },
+    {
+      anchor: { x: centerX, y: rect.y + rect.height },
+      inHandle: { x: centerX + controlOffsetX, y: rect.y + rect.height },
+      outHandle: { x: centerX - controlOffsetX, y: rect.y + rect.height },
+      type: 'symmetric',
+    },
+    {
+      anchor: { x: rect.x, y: centerY },
+      inHandle: { x: rect.x, y: centerY + controlOffsetY },
+      outHandle: { x: rect.x, y: centerY - controlOffsetY },
+      type: 'symmetric',
+    },
+  ];
+};
+
+const getSmoothTangent = (
+  previousAnchor: Coordinate | null,
+  anchor: Coordinate,
+  nextAnchor: Coordinate | null
+): Coordinate => {
+  const previousDistance = previousAnchor ? getDistance(previousAnchor, anchor) : 0;
+  const nextDistance = nextAnchor ? getDistance(anchor, nextAnchor) : 0;
+  const previousInterval = previousDistance ** CENTRIPETAL_CATMULL_ROM_ALPHA;
+  const nextInterval = nextDistance ** CENTRIPETAL_CATMULL_ROM_ALPHA;
+
+  if (previousAnchor && nextAnchor && previousInterval > BEZIER_FIT_EPSILON && nextInterval > BEZIER_FIT_EPSILON) {
+    const tangent = addCoordinate(
+      subtractCoordinate(
+        scaleCoordinate(subtractCoordinate(anchor, previousAnchor), 1 / previousInterval),
+        scaleCoordinate(subtractCoordinate(nextAnchor, previousAnchor), 1 / (previousInterval + nextInterval))
+      ),
+      scaleCoordinate(subtractCoordinate(nextAnchor, anchor), 1 / nextInterval)
+    );
+    return tangent;
+  }
+
+  if (nextAnchor && nextInterval > BEZIER_FIT_EPSILON) {
+    return scaleCoordinate(subtractCoordinate(nextAnchor, anchor), 1 / nextInterval);
+  }
+
+  if (previousAnchor && previousInterval > BEZIER_FIT_EPSILON) {
+    return scaleCoordinate(subtractCoordinate(anchor, previousAnchor), 1 / previousInterval);
+  }
+
+  return { x: 0, y: 0 };
+};
+
+const getSmoothTurningAngle = (
+  previousAnchor: Coordinate | null,
+  anchor: Coordinate,
+  nextAnchor: Coordinate | null
+): number => {
+  if (!previousAnchor || !nextAnchor) {
+    return 0;
+  }
+
+  const incomingDirection = normalizeCoordinate(subtractCoordinate(anchor, previousAnchor));
+  const outgoingDirection = normalizeCoordinate(subtractCoordinate(nextAnchor, anchor));
+  const directionDot = Math.max(-1, Math.min(1, dotCoordinates(incomingDirection, outgoingDirection)));
+  return Math.acos(directionDot);
+};
+
+const getCircularArcHandleLength = (segmentLength: number, turningAngle: number): number => {
+  const cosine = Math.cos(turningAngle / 4);
+  const circularArcLength = segmentLength / (3 * cosine * cosine);
+  return Math.min(circularArcLength, segmentLength * SMOOTH_HANDLE_MAX_SEGMENT_RATIO);
+};
+
+export const smoothBezierPathPoints = (
+  points: CanvasBezierPointState[],
+  isClosed: boolean
+): CanvasBezierPointState[] => {
+  if (points.length < 2) {
+    return points.map((point) => ({ ...point }));
+  }
+
+  const lastPointIndex = points.length - 1;
+
+  return points.map((point, pointIndex) => {
+    if (point.type === 'symmetric' && point.inHandle && point.outHandle) {
+      return { ...point };
+    }
+
+    const previousPoint = isClosed ? points[(pointIndex - 1 + points.length) % points.length] : points[pointIndex - 1];
+    const nextPoint = isClosed ? points[(pointIndex + 1) % points.length] : points[pointIndex + 1];
+    const previousAnchor = previousPoint?.anchor ?? null;
+    const nextAnchor = nextPoint?.anchor ?? null;
+    const tangentDirection = normalizeCoordinate(getSmoothTangent(previousAnchor, point.anchor, nextAnchor));
+    const turningAngle = getSmoothTurningAngle(previousAnchor, point.anchor, nextAnchor);
+    const inHandleLength = getCircularArcHandleLength(
+      previousAnchor ? getDistance(point.anchor, previousAnchor) : 0,
+      turningAngle
+    );
+    const outHandleLength = getCircularArcHandleLength(
+      nextAnchor ? getDistance(point.anchor, nextAnchor) : 0,
+      turningAngle
+    );
+
+    return {
+      ...point,
+      inHandle:
+        !isClosed && pointIndex === 0
+          ? null
+          : normalizeHandle(point.anchor, {
+              x: point.anchor.x - tangentDirection.x * inHandleLength,
+              y: point.anchor.y - tangentDirection.y * inHandleLength,
+            }),
+      outHandle:
+        !isClosed && pointIndex === lastPointIndex
+          ? null
+          : normalizeHandle(point.anchor, {
+              x: point.anchor.x + tangentDirection.x * outHandleLength,
+              y: point.anchor.y + tangentDirection.y * outHandleLength,
+            }),
+      type: 'smooth',
+    };
+  });
 };
 
 export const evaluateBezierSegment = (

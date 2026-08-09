@@ -12,6 +12,7 @@ import type {
   CanvasRasterLayerState,
   CanvasRegionalGuidanceState,
   CanvasState,
+  CanvasVectorLayerState,
 } from 'features/controlLayers/store/types';
 import type { BaseModelType } from 'features/nodes/types/common';
 import { getGridSize, getOptimalDimension, getPidScale } from 'features/parameters/util/optimalDimension';
@@ -250,15 +251,23 @@ export function selectAllEntities(state: CanvasState): CanvasEntityState[] {
  * - Control layers
  * - Inpaint masks
  * - Regional guidance
+ * - Vector layers
  */
 export function selectAllRenderableEntities(
   state: CanvasState
-): (CanvasRasterLayerState | CanvasControlLayerState | CanvasInpaintMaskState | CanvasRegionalGuidanceState)[] {
+): (
+  | CanvasRasterLayerState
+  | CanvasControlLayerState
+  | CanvasInpaintMaskState
+  | CanvasRegionalGuidanceState
+  | CanvasVectorLayerState
+)[] {
   return [
     ...state.rasterLayers.entities,
     ...state.controlLayers.entities,
     ...state.inpaintMasks.entities,
     ...state.regionalGuidance.entities,
+    ...state.vectorLayers.entities,
   ];
 }
 

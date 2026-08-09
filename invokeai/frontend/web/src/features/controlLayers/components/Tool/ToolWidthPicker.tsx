@@ -62,6 +62,10 @@ function formatSliderValue(value: number) {
   return `${String(mapSliderValueToRawValue(value))} px`;
 }
 
+function formatCompactSliderValue(value: number) {
+  return String(mapSliderValueToRawValue(value));
+}
+
 const marks = [
   mapRawValueToSliderValue(1),
   mapRawValueToSliderValue(50),
@@ -87,6 +91,8 @@ const getInputValueFromEvent = (
 };
 
 interface ToolWidthPickerComponentProps {
+  ariaLabel?: string;
+  isCompact?: boolean;
   localValue: number;
   onChangeSlider: (value: number) => void;
   onChangeInput: (value: number) => void;
@@ -99,6 +105,8 @@ interface ToolWidthPickerComponentProps {
 const DropDownToolWidthPickerComponent = memo(
   ({
     localValue,
+    ariaLabel,
+    isCompact,
     onChangeSlider,
     onChangeInput,
     onKeyDown,
@@ -119,6 +127,7 @@ const DropDownToolWidthPickerComponent = memo(
         <FormControl w="min-content" gap={2} overflow="hidden">
           <PopoverAnchor>
             <NumberInput
+              size={isCompact ? 'sm' : undefined}
               variant="outline"
               display="flex"
               alignItems="center"
@@ -127,7 +136,7 @@ const DropDownToolWidthPickerComponent = memo(
               value={localValue}
               onChange={onChangeNumberInput}
               onBlur={onBlur}
-              w={76}
+              w={isCompact ? 72 : 76}
               format={formatPx}
               defaultValue={50}
               onKeyDown={onKeyDown}
@@ -135,7 +144,7 @@ const DropDownToolWidthPickerComponent = memo(
               onPointerUpCapture={onPointerUpCapture}
               clampValueOnBlur={false}
             >
-              <NumberInputField _focusVisible={{ zIndex: 0 }} title="" paddingInlineEnd={7} />
+              <NumberInputField _focusVisible={{ zIndex: 0 }} aria-label={ariaLabel} title="" paddingInlineEnd={7} />
               <PopoverTrigger>
                 <IconButton
                   aria-label={t('common.openSlider')}
@@ -176,6 +185,8 @@ DropDownToolWidthPickerComponent.displayName = 'DropDownToolWidthPickerComponent
 const SliderToolWidthPickerComponent = memo(
   ({
     localValue,
+    ariaLabel,
+    isCompact,
     onChangeSlider,
     onChangeInput,
     onKeyDown,
@@ -184,9 +195,11 @@ const SliderToolWidthPickerComponent = memo(
     onBlur,
   }: ToolWidthPickerComponentProps) => {
     return (
-      <Flex w={SLIDER_VS_DROPDOWN_CONTAINER_WIDTH_THRESHOLD} gap={4}>
+      <Flex w={isCompact ? 'full' : SLIDER_VS_DROPDOWN_CONTAINER_WIDTH_THRESHOLD} minW={0} gap={isCompact ? 2 : 4}>
         <CompositeSlider
-          w={200}
+          w={isCompact ? undefined : 200}
+          minW={0}
+          flex={isCompact ? 1 : undefined}
           h="unset"
           min={0}
           max={100}
@@ -194,11 +207,13 @@ const SliderToolWidthPickerComponent = memo(
           onChange={onChangeSlider}
           defaultValue={sliderDefaultValue}
           marks={marks}
-          formatValue={formatSliderValue}
+          formatValue={isCompact ? formatCompactSliderValue : formatSliderValue}
           alwaysShowMarks
         />
         <CompositeNumberInput
-          w={28}
+          aria-label={ariaLabel}
+          w={isCompact ? 20 : 28}
+          flexShrink={0}
           variant="outline"
           min={1}
           max={600}
@@ -220,31 +235,66 @@ SliderToolWidthPickerComponent.displayName = 'SliderToolWidthPickerComponent';
 const selectBrushWidth = createSelector(selectCanvasSettingsSlice, (settings) => settings.brushWidth);
 const selectEraserWidth = createSelector(selectCanvasSettingsSlice, (settings) => settings.eraserWidth);
 
-export const ToolWidthPicker = memo(() => {
+type ToolWidthPickerProps = {
+  ariaLabel?: string;
+  mode?: 'tool' | 'trace';
+};
+
+type ToolWidthHotkeysProps = {
+  decrement: () => void;
+  increment: () => void;
+  isEnabled: boolean;
+};
+
+const ToolWidthHotkeys = memo(({ decrement, increment, isEnabled }: ToolWidthHotkeysProps) => {
+  useRegisteredHotkeys({
+    id: 'decrementToolWidth',
+    category: 'canvas',
+    callback: decrement,
+    options: { enabled: isEnabled },
+    dependencies: [decrement, isEnabled],
+  });
+  useRegisteredHotkeys({
+    id: 'incrementToolWidth',
+    category: 'canvas',
+    callback: increment,
+    options: { enabled: isEnabled },
+    dependencies: [increment, isEnabled],
+  });
+
+  return null;
+});
+
+ToolWidthHotkeys.displayName = 'ToolWidthHotkeys';
+
+export const ToolWidthPicker = memo(({ ariaLabel, mode = 'tool' }: ToolWidthPickerProps) => {
   const ref = useRef<HTMLDivElement>(null);
   const dispatch = useAppDispatch();
   const isBrushSelected = useToolIsSelected('brush');
   const isEraserSelected = useToolIsSelected('eraser');
-  const isToolSelected = useMemo(() => {
-    return isBrushSelected || isEraserSelected;
-  }, [isBrushSelected, isEraserSelected]);
+  const usesBrushWidth = isBrushSelected || mode === 'trace';
+  const usesEraserWidth = isEraserSelected;
   const brushWidth = useAppSelector(selectBrushWidth);
   const eraserWidth = useAppSelector(selectEraserWidth);
   const width = useMemo(() => {
-    if (isBrushSelected) {
+    if (usesBrushWidth) {
       return brushWidth;
     }
-    if (isEraserSelected) {
+    if (usesEraserWidth) {
       return eraserWidth;
     }
     return 0;
-  }, [isBrushSelected, isEraserSelected, brushWidth, eraserWidth]);
+  }, [usesBrushWidth, usesEraserWidth, brushWidth, eraserWidth]);
   const [localValue, setLocalValue] = useState(width);
-  const [componentType, setComponentType] = useState<'slider' | 'dropdown' | null>(null);
+  const [componentType, setComponentType] = useState<'slider' | 'dropdown' | null>(mode === 'trace' ? 'slider' : null);
   const isTypingRef = useRef(false);
   const inputPollRef = useRef<number | null>(null);
 
   useEffect(() => {
+    if (mode === 'trace') {
+      setComponentType('slider');
+      return;
+    }
     const el = ref.current;
     if (!el) {
       return;
@@ -263,17 +313,17 @@ export const ToolWidthPicker = memo(() => {
     return () => {
       observer.disconnect();
     };
-  }, []);
+  }, [mode]);
 
   const onValueChange = useCallback(
     (value: number) => {
-      if (isBrushSelected) {
+      if (usesBrushWidth) {
         dispatch(settingsBrushWidthChanged(value));
-      } else if (isEraserSelected) {
+      } else if (usesEraserWidth) {
         dispatch(settingsEraserWidthChanged(value));
       }
     },
-    [isBrushSelected, isEraserSelected, dispatch]
+    [usesBrushWidth, usesEraserWidth, dispatch]
   );
 
   const onChange = useCallback(
@@ -434,25 +484,15 @@ export const ToolWidthPicker = memo(() => {
     };
   }, [stopPollingInput]);
 
-  useRegisteredHotkeys({
-    id: 'decrementToolWidth',
-    category: 'canvas',
-    callback: decrement,
-    options: { enabled: isToolSelected },
-    dependencies: [decrement, isToolSelected],
-  });
-  useRegisteredHotkeys({
-    id: 'incrementToolWidth',
-    category: 'canvas',
-    callback: increment,
-    options: { enabled: isToolSelected },
-    dependencies: [increment, isToolSelected],
-  });
-
   return (
     <Flex ref={ref} alignItems="center" flexGrow={1} flexShrink={1} minW={0}>
+      {mode === 'tool' && (
+        <ToolWidthHotkeys decrement={decrement} increment={increment} isEnabled={isBrushSelected || isEraserSelected} />
+      )}
       {componentType === 'slider' && (
         <SliderToolWidthPickerComponent
+          ariaLabel={ariaLabel}
+          isCompact={mode === 'trace'}
           localValue={localValue}
           onChangeSlider={onChangeSlider}
           onChangeInput={onChangeInput}
@@ -464,6 +504,8 @@ export const ToolWidthPicker = memo(() => {
       )}
       {componentType === 'dropdown' && (
         <DropDownToolWidthPickerComponent
+          ariaLabel={ariaLabel}
+          isCompact={mode === 'trace'}
           localValue={localValue}
           onChangeSlider={onChangeSlider}
           onChangeInput={onChangeInput}

@@ -19,6 +19,7 @@ import {
   getBezierPointPullHandleType,
   setBezierPointHandle,
   setBezierPointType,
+  smoothBezierPathPoints,
   splitBezierSegmentAt,
 } from 'features/controlLayers/util/bezierPath';
 import Konva from 'konva';
@@ -34,6 +35,7 @@ type CanvasPathToolModuleConfig = {
   HANDLE_RADIUS_PX: number;
   HANDLE_STROKE_WIDTH_PX: number;
   HANDLE_LINE_WIDTH_PX: number;
+  HANDLE_PULL_INTENT_THRESHOLD_PX: number;
   PATH_HIT_TOLERANCE_PX: number;
   PREVIEW_STROKE_COLOR: string;
   PREVIEW_STROKE_WIDTH_PX: number;
@@ -42,26 +44,48 @@ type CanvasPathToolModuleConfig = {
   EDIT_PATH_STROKE_COLOR: string;
   EDIT_ACTIVE_POINT_FILL: string;
   EDIT_ACTIVE_POINT_STROKE: string;
+  EDIT_SELECTED_POINT_FILL: string;
+  EDIT_SELECTED_POINT_STROKE: string;
   EDIT_INACTIVE_POINT_FILL: string;
   EDIT_INACTIVE_POINT_STROKE: string;
   EDIT_HANDLE_FILL: string;
   EDIT_HANDLE_STROKE: string;
   EDIT_HANDLE_LINE: string;
+  EDIT_SELECTION_RECT_FILL: string;
+  EDIT_SELECTION_RECT_STROKE: string;
 };
 
 type PathHandleType = 'inHandle' | 'outHandle';
+type PointSelectionMode = 'replace' | 'add' | 'subtract';
 
 type CanvasPathEditDragTarget =
   | { pathId: string; pointIndex: number; type: 'anchor' }
+  | {
+      pathId: string;
+      pointIndex: number;
+      type: 'anchorOrHandle';
+      missingHandleType: PathHandleType;
+      startPointer: Coordinate;
+    }
   | { pathId: string; pointIndex: number; type: 'pullHandles'; handleType: PathHandleType | null }
-  | { pathId: string; pointIndex: number; type: PathHandleType };
+  | { pathId: string; pointIndex: number; type: PathHandleType }
+  | {
+      pathId: string;
+      type: 'selectionRect';
+      start: Coordinate;
+      end: Coordinate;
+      mode: PointSelectionMode;
+      initialSelectedPointIndices: number[];
+    };
 
 type CanvasPathEditSession = {
   id: string;
   entityIdentifier: CanvasEntityIdentifier<'vector_layer'>;
+  previousBaseTool: Tool;
   snapshotPaths: CanvasBezierPathState[];
   activePathId: string | null;
   activePointIndex: number | null;
+  selectedPointIndices: number[];
   activeHandle: PathHandleType | null;
   dragTarget: CanvasPathEditDragTarget | null;
 };
@@ -74,6 +98,7 @@ const DEFAULT_CONFIG: CanvasPathToolModuleConfig = {
   HANDLE_RADIUS_PX: 3.5,
   HANDLE_STROKE_WIDTH_PX: 1.5,
   HANDLE_LINE_WIDTH_PX: 1,
+  HANDLE_PULL_INTENT_THRESHOLD_PX: 3,
   PATH_HIT_TOLERANCE_PX: 10,
   PREVIEW_STROKE_COLOR: 'rgba(90, 175, 255, 1)',
   PREVIEW_STROKE_WIDTH_PX: 1.5,
@@ -82,11 +107,15 @@ const DEFAULT_CONFIG: CanvasPathToolModuleConfig = {
   EDIT_PATH_STROKE_COLOR: 'rgba(90, 175, 255, 1)',
   EDIT_ACTIVE_POINT_FILL: 'rgba(90, 175, 255, 1)',
   EDIT_ACTIVE_POINT_STROKE: 'rgba(255, 255, 255, 1)',
+  EDIT_SELECTED_POINT_FILL: 'rgba(90, 175, 255, 0.55)',
+  EDIT_SELECTED_POINT_STROKE: 'rgba(255, 255, 255, 0.9)',
   EDIT_INACTIVE_POINT_FILL: 'rgba(255, 255, 255, 0.95)',
   EDIT_INACTIVE_POINT_STROKE: 'rgba(90, 175, 255, 1)',
   EDIT_HANDLE_FILL: 'rgba(255, 255, 255, 1)',
   EDIT_HANDLE_STROKE: 'rgba(90, 175, 255, 1)',
   EDIT_HANDLE_LINE: 'rgba(90, 175, 255, 0.75)',
+  EDIT_SELECTION_RECT_FILL: 'rgba(90, 175, 255, 0.12)',
+  EDIT_SELECTION_RECT_STROKE: 'rgba(90, 175, 255, 0.9)',
 };
 
 const getDistance = (a: Coordinate, b: Coordinate) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -112,6 +141,7 @@ export class CanvasPathToolModule extends CanvasModuleBase {
     previewPath: Konva.Path;
     previewAnchorsGroup: Konva.Group;
     editPath: Konva.Path;
+    editSelectionRect: Konva.Rect;
     editAnchorsGroup: Konva.Group;
     editHandlesGroup: Konva.Group;
   };
@@ -155,6 +185,14 @@ export class CanvasPathToolModule extends CanvasModuleBase {
         visible: false,
         perfectDrawEnabled: false,
       }),
+      editSelectionRect: new Konva.Rect({
+        name: `${this.type}:edit_selection_rect`,
+        listening: false,
+        visible: false,
+        fill: this.config.EDIT_SELECTION_RECT_FILL,
+        stroke: this.config.EDIT_SELECTION_RECT_STROKE,
+        perfectDrawEnabled: false,
+      }),
       editAnchorsGroup: new Konva.Group({
         name: `${this.type}:edit_anchors_group`,
         listening: false,
@@ -171,6 +209,7 @@ export class CanvasPathToolModule extends CanvasModuleBase {
       this.konva.previewPath,
       this.konva.previewAnchorsGroup,
       this.konva.editPath,
+      this.konva.editSelectionRect,
       this.konva.editHandlesGroup,
       this.konva.editAnchorsGroup
     );
@@ -209,17 +248,20 @@ export class CanvasPathToolModule extends CanvasModuleBase {
       return;
     }
 
+    const previousBaseTool = existingSession?.previousBaseTool ?? this.getPreviousBaseTool();
     if (existingSession) {
-      this.acceptEditSession();
+      this.acceptEditSession(false);
     }
 
     this.resetCreateState();
     this.$editSession.set({
       id: getPrefixedId('path_edit_session'),
       entityIdentifier,
+      previousBaseTool,
       snapshotPaths: deepClone(adapter.state.paths),
       activePathId: adapter.state.paths[0]?.id ?? null,
       activePointIndex: null,
+      selectedPointIndices: [],
       activeHandle: null,
       dragTarget: null,
     });
@@ -227,8 +269,38 @@ export class CanvasPathToolModule extends CanvasModuleBase {
     this.render();
   };
 
-  acceptEditSession = () => {
+  acceptEditSession = (restoreTool = true) => {
+    const session = this.$editSession.get();
     this.$editSession.set(null);
+    if (session && restoreTool) {
+      this.restorePreviousTool(session.previousBaseTool);
+    }
+    this.render();
+  };
+
+  resetEditSession = () => {
+    const session = this.$editSession.get();
+    if (!session) {
+      return;
+    }
+
+    const paths = deepClone(session.snapshotPaths);
+    const activePathId = paths.some((path) => path.id === session.activePathId)
+      ? session.activePathId
+      : (paths[0]?.id ?? null);
+    this.manager.stateApi.replaceVectorPaths({
+      entityIdentifier: session.entityIdentifier,
+      paths,
+      undoGroup: session.id,
+    });
+    this.$editSession.set({
+      ...session,
+      activePathId,
+      activePointIndex: null,
+      selectedPointIndices: [],
+      activeHandle: null,
+      dragTarget: null,
+    });
     this.render();
   };
 
@@ -255,11 +327,94 @@ export class CanvasPathToolModule extends CanvasModuleBase {
     this.render();
   };
 
+  smoothActivePath = () => {
+    const session = this.$editSession.get();
+    const activeEntity = this.getEditSessionAdapter();
+    if (!session || !activeEntity || !session.activePathId) {
+      return;
+    }
+
+    const nextPaths = deepClone(activeEntity.state.paths);
+    const path = nextPaths.find((candidate) => candidate.id === session.activePathId);
+    if (!path || path.points.length < 2) {
+      return;
+    }
+
+    path.points = smoothBezierPathPoints(path.points, path.isClosed);
+    this.manager.stateApi.replaceVectorPaths({
+      entityIdentifier: session.entityIdentifier,
+      paths: nextPaths,
+      undoGroup: session.id,
+    });
+    this.render();
+  };
+
+  smoothSelectedPoints = () => {
+    const session = this.$editSession.get();
+    const activeEntity = this.getEditSessionAdapter();
+    if (!session || !activeEntity || !session.activePathId || session.selectedPointIndices.length === 0) {
+      return;
+    }
+
+    const nextPaths = deepClone(activeEntity.state.paths);
+    const path = nextPaths.find((candidate) => candidate.id === session.activePathId);
+    if (!path || path.points.length < 2) {
+      return;
+    }
+
+    const smoothedPoints = smoothBezierPathPoints(path.points, path.isClosed);
+    for (const pointIndex of session.selectedPointIndices) {
+      const smoothedPoint = smoothedPoints[pointIndex];
+      if (smoothedPoint) {
+        path.points[pointIndex] = smoothedPoint;
+      }
+    }
+
+    this.manager.stateApi.replaceVectorPaths({
+      entityIdentifier: session.entityIdentifier,
+      paths: nextPaths,
+      undoGroup: session.id,
+    });
+    this.render();
+  };
+
+  deleteActivePath = () => {
+    const session = this.$editSession.get();
+    const activeEntity = this.getEditSessionAdapter();
+    if (!session || !activeEntity || !session.activePathId) {
+      return;
+    }
+
+    const deletedPathIndex = activeEntity.state.paths.findIndex((path) => path.id === session.activePathId);
+    if (deletedPathIndex === -1) {
+      return;
+    }
+
+    const nextPaths = deepClone(activeEntity.state.paths);
+    nextPaths.splice(deletedPathIndex, 1);
+    const nextActivePath = nextPaths[Math.min(deletedPathIndex, nextPaths.length - 1)] ?? null;
+
+    this.manager.stateApi.replaceVectorPaths({
+      entityIdentifier: session.entityIdentifier,
+      paths: nextPaths,
+      undoGroup: session.id,
+    });
+    this.$editSession.set({
+      ...session,
+      activePathId: nextActivePath?.id ?? null,
+      activePointIndex: null,
+      selectedPointIndices: [],
+      activeHandle: null,
+      dragTarget: null,
+    });
+    this.render();
+  };
+
   onToolChanged = () => {
     const tool = this.parent.$tool.get();
     if (tool !== 'path' && !this.isTemporaryToolSwitch(tool, this.parent.$baseTool.get())) {
       if (this.hasActiveEditSession()) {
-        this.acceptEditSession();
+        this.acceptEditSession(false);
       }
       this.resetCreateState();
     }
@@ -462,6 +617,7 @@ export class CanvasPathToolModule extends CanvasModuleBase {
       undoGroup: session.id,
     });
     this.$editSession.set(null);
+    this.restorePreviousTool(session.previousBaseTool);
     this.render();
   };
 
@@ -596,17 +752,42 @@ export class CanvasPathToolModule extends CanvasModuleBase {
     const handleStrokeWidth = this.manager.stage.unscale(this.config.HANDLE_STROKE_WIDTH_PX);
     const handleLineWidth = this.manager.stage.unscale(this.config.HANDLE_LINE_WIDTH_PX);
 
+    if (session.dragTarget?.type === 'selectionRect' && session.dragTarget.pathId === activePath.id) {
+      const start = addCoords(session.dragTarget.start, entityPosition);
+      const end = addCoords(session.dragTarget.end, entityPosition);
+      this.konva.editSelectionRect.setAttrs({
+        x: Math.min(start.x, end.x),
+        y: Math.min(start.y, end.y),
+        width: Math.abs(end.x - start.x),
+        height: Math.abs(end.y - start.y),
+        strokeWidth: this.manager.stage.unscale(1),
+        dash: [this.manager.stage.unscale(4), this.manager.stage.unscale(3)],
+        visible: true,
+      });
+    } else {
+      this.konva.editSelectionRect.visible(false);
+    }
+
     this.konva.editAnchorsGroup.destroyChildren();
     activePath.points.forEach((point, pointIndex) => {
       const isActivePoint = pointIndex === session.activePointIndex;
+      const isSelectedPoint = session.selectedPointIndices.includes(pointIndex);
       const stagePoint = addCoords(point.anchor, entityPosition);
       this.konva.editAnchorsGroup.add(
         new Konva.Circle({
           x: stagePoint.x,
           y: stagePoint.y,
           radius: anchorRadius,
-          fill: isActivePoint ? this.config.EDIT_ACTIVE_POINT_FILL : this.config.EDIT_INACTIVE_POINT_FILL,
-          stroke: isActivePoint ? this.config.EDIT_ACTIVE_POINT_STROKE : this.config.EDIT_INACTIVE_POINT_STROKE,
+          fill: isActivePoint
+            ? this.config.EDIT_ACTIVE_POINT_FILL
+            : isSelectedPoint
+              ? this.config.EDIT_SELECTED_POINT_FILL
+              : this.config.EDIT_INACTIVE_POINT_FILL,
+          stroke: isActivePoint
+            ? this.config.EDIT_ACTIVE_POINT_STROKE
+            : isSelectedPoint
+              ? this.config.EDIT_SELECTED_POINT_STROKE
+              : this.config.EDIT_INACTIVE_POINT_STROKE,
           strokeWidth: anchorStrokeWidth,
           listening: false,
           perfectDrawEnabled: false,
@@ -616,12 +797,20 @@ export class CanvasPathToolModule extends CanvasModuleBase {
     this.konva.editAnchorsGroup.visible(activePath.points.length > 0);
 
     this.konva.editHandlesGroup.destroyChildren();
-    const activePoint = session.activePointIndex !== null ? activePath.points[session.activePointIndex] : null;
-    if (activePoint) {
-      const anchor = addCoords(activePoint.anchor, entityPosition);
+    const handlePointIndices = [...session.selectedPointIndices];
+    if (session.activePointIndex !== null && !handlePointIndices.includes(session.activePointIndex)) {
+      handlePointIndices.push(session.activePointIndex);
+    }
+    handlePointIndices.forEach((pointIndex) => {
+      const bezierPoint = activePath.points[pointIndex];
+      if (!bezierPoint) {
+        return;
+      }
+
+      const anchor = addCoords(bezierPoint.anchor, entityPosition);
       const handles: Array<{ type: PathHandleType; point: Coordinate | null }> = [
-        { type: 'inHandle', point: activePoint.inHandle ? addCoords(activePoint.inHandle, entityPosition) : null },
-        { type: 'outHandle', point: activePoint.outHandle ? addCoords(activePoint.outHandle, entityPosition) : null },
+        { type: 'inHandle', point: bezierPoint.inHandle ? addCoords(bezierPoint.inHandle, entityPosition) : null },
+        { type: 'outHandle', point: bezierPoint.outHandle ? addCoords(bezierPoint.outHandle, entityPosition) : null },
       ];
 
       handles.forEach(({ point }) => {
@@ -650,8 +839,8 @@ export class CanvasPathToolModule extends CanvasModuleBase {
           })
         );
       });
-    }
-    this.konva.editHandlesGroup.visible(Boolean(activePoint));
+    });
+    this.konva.editHandlesGroup.visible(handlePointIndices.length > 0);
   };
 
   private hideCreatePreview = () => {
@@ -662,6 +851,7 @@ export class CanvasPathToolModule extends CanvasModuleBase {
 
   private hideEditOverlay = () => {
     this.konva.editPath.visible(false);
+    this.konva.editSelectionRect.visible(false);
     this.konva.editAnchorsGroup.visible(false);
     this.konva.editAnchorsGroup.destroyChildren();
     this.konva.editHandlesGroup.visible(false);
@@ -670,6 +860,19 @@ export class CanvasPathToolModule extends CanvasModuleBase {
 
   private activatePathTool = () => {
     this.parent.setBaseTool('path');
+    this.parent.clearTemporaryToolHotkeys();
+  };
+
+  private getPreviousBaseTool = (): Tool => {
+    const baseTool = this.parent.$baseTool.get();
+    return baseTool === 'path' ? 'rect' : baseTool;
+  };
+
+  private restorePreviousTool = (tool: Tool) => {
+    if (this.parent.$baseTool.get() !== 'path') {
+      return;
+    }
+    this.parent.setBaseTool(tool);
     this.parent.clearTemporaryToolHotkeys();
   };
 
@@ -701,22 +904,28 @@ export class CanvasPathToolModule extends CanvasModuleBase {
     const activePath =
       activeEntity.state.paths.find((path) => path.id === session.activePathId) ?? activeEntity.state.paths[0] ?? null;
 
-    if (activePath && session.activePointIndex !== null) {
-      const handleHit = this.findHandleHit(activePath, session.activePointIndex, point, handleHitRadius);
-      if (handleHit) {
-        const activePoint = activePath.points[session.activePointIndex];
-        if (!activePoint) {
-          return;
+    if (activePath) {
+      const handlePointIndices = [
+        ...(session.activePointIndex === null ? [] : [session.activePointIndex]),
+        ...session.selectedPointIndices.filter((pointIndex) => pointIndex !== session.activePointIndex),
+      ];
+      for (const pointIndex of handlePointIndices) {
+        const handleHit = this.findHandleHit(activePath, pointIndex, point, handleHitRadius);
+        if (!handleHit) {
+          continue;
         }
 
         this.$editSession.set({
           ...session,
           activePathId: activePath.id,
-          activePointIndex: session.activePointIndex,
+          activePointIndex: pointIndex,
+          selectedPointIndices: session.selectedPointIndices.includes(pointIndex)
+            ? session.selectedPointIndices
+            : [pointIndex],
           activeHandle: handleHit,
           dragTarget: {
             pathId: activePath.id,
-            pointIndex: session.activePointIndex,
+            pointIndex,
             type: handleHit,
           },
         });
@@ -734,29 +943,51 @@ export class CanvasPathToolModule extends CanvasModuleBase {
 
       const clickedPath = activeEntity.state.paths.find((path) => path.id === anchorHit.pathId);
       const clickedPoint = clickedPath?.points[anchorHit.pointIndex];
+      const isPointSelected =
+        session.activePathId === anchorHit.pathId && session.selectedPointIndices.includes(anchorHit.pointIndex);
       const shouldPullHandles =
         Boolean(clickedPoint) &&
         session.activePathId === anchorHit.pathId &&
         session.activePointIndex === anchorHit.pointIndex &&
+        session.selectedPointIndices.length <= 1 &&
         !clickedPoint?.inHandle &&
         !clickedPoint?.outHandle;
-      const dragTarget: CanvasPathEditDragTarget = shouldPullHandles
-        ? {
-            pathId: anchorHit.pathId,
-            pointIndex: anchorHit.pointIndex,
-            type: 'pullHandles',
-            handleType: null,
-          }
-        : {
-            pathId: anchorHit.pathId,
-            pointIndex: anchorHit.pointIndex,
-            type: 'anchor',
-          };
+      const missingCornerHandleType =
+        clickedPath && clickedPoint ? this.getMissingCornerHandleType(clickedPath, anchorHit.pointIndex) : null;
+      let dragTarget: CanvasPathEditDragTarget;
+      if (shouldPullHandles) {
+        dragTarget = {
+          pathId: anchorHit.pathId,
+          pointIndex: anchorHit.pointIndex,
+          type: 'pullHandles',
+          handleType: null,
+        };
+      } else if (
+        missingCornerHandleType &&
+        session.activePathId === anchorHit.pathId &&
+        session.activePointIndex === anchorHit.pointIndex &&
+        session.selectedPointIndices.length <= 1
+      ) {
+        dragTarget = {
+          pathId: anchorHit.pathId,
+          pointIndex: anchorHit.pointIndex,
+          type: 'anchorOrHandle',
+          missingHandleType: missingCornerHandleType,
+          startPointer: point,
+        };
+      } else {
+        dragTarget = {
+          pathId: anchorHit.pathId,
+          pointIndex: anchorHit.pointIndex,
+          type: 'anchor',
+        };
+      }
 
       this.$editSession.set({
         ...session,
         activePathId: anchorHit.pathId,
         activePointIndex: anchorHit.pointIndex,
+        selectedPointIndices: isPointSelected ? session.selectedPointIndices : [anchorHit.pointIndex],
         activeHandle: null,
         dragTarget,
       });
@@ -778,6 +1009,7 @@ export class CanvasPathToolModule extends CanvasModuleBase {
             ...session,
             activePathId: activePath.id,
             activePointIndex: insertedPointIndex,
+            selectedPointIndices: [insertedPointIndex],
             activeHandle: null,
             dragTarget: {
               pathId: activePath.id,
@@ -797,6 +1029,7 @@ export class CanvasPathToolModule extends CanvasModuleBase {
         ...session,
         activePathId: pathHit.pathId,
         activePointIndex: null,
+        selectedPointIndices: [],
         activeHandle: null,
         dragTarget: null,
       });
@@ -804,16 +1037,40 @@ export class CanvasPathToolModule extends CanvasModuleBase {
       return;
     }
 
+    if (!activePath) {
+      this.$editSession.set({
+        ...session,
+        activePointIndex: null,
+        selectedPointIndices: [],
+        activeHandle: null,
+        dragTarget: null,
+      });
+      this.render();
+      return;
+    }
+
+    const selectionMode: PointSelectionMode =
+      e.evt.ctrlKey || e.evt.metaKey ? 'subtract' : e.evt.shiftKey ? 'add' : 'replace';
+    const initialSelectedPointIndices = session.activePathId === activePath.id ? session.selectedPointIndices : [];
     this.$editSession.set({
       ...session,
-      activePointIndex: null,
+      activePathId: activePath.id,
+      activePointIndex: selectionMode === 'replace' ? null : session.activePointIndex,
+      selectedPointIndices: selectionMode === 'replace' ? [] : initialSelectedPointIndices,
       activeHandle: null,
-      dragTarget: null,
+      dragTarget: {
+        pathId: activePath.id,
+        type: 'selectionRect',
+        start: point,
+        end: point,
+        mode: selectionMode,
+        initialSelectedPointIndices,
+      },
     });
     this.render();
   };
 
-  private onEditPointerMove = (evt: PointerEvent) => {
+  private onEditPointerMove = (_evt: PointerEvent) => {
     const session = this.$editSession.get();
     const activeEntity = this.getEditSessionAdapter();
     const cursorPos = this.parent.$cursorPos.get();
@@ -822,42 +1079,110 @@ export class CanvasPathToolModule extends CanvasModuleBase {
       return;
     }
 
+    const dragTarget = session.dragTarget;
     const point = this.getEntityRelativePoint(cursorPos.relative, activeEntity.state.position);
     const nextPaths = deepClone(activeEntity.state.paths);
-    const path = nextPaths.find((candidate) => candidate.id === session.dragTarget?.pathId);
-    const bezierPoint = path?.points[session.dragTarget.pointIndex];
+    const path = nextPaths.find((candidate) => candidate.id === dragTarget.pathId);
+    if (dragTarget.type === 'selectionRect') {
+      if (!path) {
+        return;
+      }
+
+      const hitPointIndices = this.getPointIndicesInSelectionRect(path, dragTarget.start, point);
+      const selectedPointIndices = this.applyPointSelection(
+        dragTarget.initialSelectedPointIndices,
+        hitPointIndices,
+        dragTarget.mode
+      );
+      const activePointIndex =
+        session.activePointIndex !== null && selectedPointIndices.includes(session.activePointIndex)
+          ? session.activePointIndex
+          : (selectedPointIndices.at(-1) ?? null);
+
+      this.$editSession.set({
+        ...session,
+        activePointIndex,
+        selectedPointIndices,
+        activeHandle: null,
+        dragTarget: { ...dragTarget, end: point },
+      });
+      this.render();
+      return;
+    }
+
+    const bezierPoint = path?.points[dragTarget.pointIndex];
     if (!path || !bezierPoint) {
       return;
     }
     let nextSession: CanvasPathEditSession | null = null;
-
-    if (session.dragTarget.type === 'anchor') {
+    const moveAnchorPoints = (pointIndices: number[]) => {
       const dx = point.x - bezierPoint.anchor.x;
       const dy = point.y - bezierPoint.anchor.y;
-      bezierPoint.anchor = point;
-      if (bezierPoint.inHandle) {
-        bezierPoint.inHandle = { x: bezierPoint.inHandle.x + dx, y: bezierPoint.inHandle.y + dy };
+      for (const pointIndex of pointIndices) {
+        const selectedPoint = path.points[pointIndex];
+        if (!selectedPoint) {
+          continue;
+        }
+        selectedPoint.anchor = { x: selectedPoint.anchor.x + dx, y: selectedPoint.anchor.y + dy };
+        if (selectedPoint.inHandle) {
+          selectedPoint.inHandle = { x: selectedPoint.inHandle.x + dx, y: selectedPoint.inHandle.y + dy };
+        }
+        if (selectedPoint.outHandle) {
+          selectedPoint.outHandle = { x: selectedPoint.outHandle.x + dx, y: selectedPoint.outHandle.y + dy };
+        }
       }
-      if (bezierPoint.outHandle) {
-        bezierPoint.outHandle = { x: bezierPoint.outHandle.x + dx, y: bezierPoint.outHandle.y + dy };
+    };
+
+    if (dragTarget.type === 'anchor') {
+      const pointIndices = session.selectedPointIndices.includes(dragTarget.pointIndex)
+        ? session.selectedPointIndices
+        : [dragTarget.pointIndex];
+      moveAnchorPoints(pointIndices);
+    } else if (dragTarget.type === 'anchorOrHandle') {
+      const dragDistance = getDistance(dragTarget.startPointer, point);
+      if (dragDistance < this.manager.stage.unscale(this.config.HANDLE_PULL_INTENT_THRESHOLD_PX)) {
+        return;
       }
-    } else if (session.dragTarget.type === 'pullHandles') {
+
+      if (this.getShouldPullMissingCornerHandle(bezierPoint, dragTarget.missingHandleType, point)) {
+        setBezierPointHandle(bezierPoint, dragTarget.missingHandleType, point);
+        nextSession = {
+          ...session,
+          activeHandle: dragTarget.missingHandleType,
+          dragTarget: {
+            pathId: dragTarget.pathId,
+            pointIndex: dragTarget.pointIndex,
+            type: dragTarget.missingHandleType,
+          },
+        };
+      } else {
+        moveAnchorPoints([dragTarget.pointIndex]);
+        nextSession = {
+          ...session,
+          activeHandle: null,
+          dragTarget: {
+            pathId: dragTarget.pathId,
+            pointIndex: dragTarget.pointIndex,
+            type: 'anchor',
+          },
+        };
+      }
+    } else if (dragTarget.type === 'pullHandles') {
       const handleType =
-        session.dragTarget.handleType ??
-        getBezierPointPullHandleType(path.points, path.isClosed, session.dragTarget.pointIndex, point);
+        dragTarget.handleType ?? getBezierPointPullHandleType(path.points, path.isClosed, dragTarget.pointIndex, point);
       setBezierPointHandle(bezierPoint, handleType, point);
-      if (!session.dragTarget.handleType) {
+      if (!dragTarget.handleType) {
         nextSession = {
           ...session,
           activeHandle: handleType,
           dragTarget: {
-            ...session.dragTarget,
+            ...dragTarget,
             handleType,
           },
         };
       }
     } else {
-      setBezierPointHandle(bezierPoint, session.dragTarget.type, point);
+      setBezierPointHandle(bezierPoint, dragTarget.type, point);
     }
 
     this.manager.stateApi.replaceVectorPaths({
@@ -868,10 +1193,7 @@ export class CanvasPathToolModule extends CanvasModuleBase {
     if (nextSession) {
       this.$editSession.set(nextSession);
     }
-
-    if (evt.shiftKey && session.dragTarget.type === 'anchor') {
-      this.render();
-    }
+    this.render();
   };
 
   private clearEditDragTarget = () => {
@@ -882,6 +1204,42 @@ export class CanvasPathToolModule extends CanvasModuleBase {
 
     this.$editSession.set({ ...session, dragTarget: null });
     this.render();
+  };
+
+  private getPointIndicesInSelectionRect = (
+    path: CanvasBezierPathState,
+    start: Coordinate,
+    end: Coordinate
+  ): number[] => {
+    const minX = Math.min(start.x, end.x);
+    const maxX = Math.max(start.x, end.x);
+    const minY = Math.min(start.y, end.y);
+    const maxY = Math.max(start.y, end.y);
+
+    const pointIndices: number[] = [];
+    path.points.forEach((point, pointIndex) => {
+      if (point.anchor.x >= minX && point.anchor.x <= maxX && point.anchor.y >= minY && point.anchor.y <= maxY) {
+        pointIndices.push(pointIndex);
+      }
+    });
+    return pointIndices;
+  };
+
+  private applyPointSelection = (
+    initialPointIndices: number[],
+    hitPointIndices: number[],
+    mode: PointSelectionMode
+  ): number[] => {
+    if (mode === 'replace') {
+      return hitPointIndices;
+    }
+
+    const hitPointIndexSet = new Set(hitPointIndices);
+    if (mode === 'subtract') {
+      return initialPointIndices.filter((pointIndex) => !hitPointIndexSet.has(pointIndex));
+    }
+
+    return [...new Set([...initialPointIndices, ...hitPointIndices])].sort((a, b) => a - b);
   };
 
   private findAnchorHit = (
@@ -921,6 +1279,57 @@ export class CanvasPathToolModule extends CanvasModuleBase {
 
     const hit = bestHit;
     return { pathId: hit.pathId, pointIndex: hit.pointIndex };
+  };
+
+  private getMissingCornerHandleType = (path: CanvasBezierPathState, pointIndex: number): PathHandleType | null => {
+    const point = path.points[pointIndex];
+    if (!point || point.type !== 'corner') {
+      return null;
+    }
+
+    const editableHandleTypes: PathHandleType[] = [];
+    if (path.isClosed || pointIndex > 0) {
+      editableHandleTypes.push('inHandle');
+    }
+    if (path.isClosed || pointIndex < path.points.length - 1) {
+      editableHandleTypes.push('outHandle');
+    }
+
+    const existingHandleTypes = editableHandleTypes.filter((handleType) => point[handleType] !== null);
+    const missingHandleTypes = editableHandleTypes.filter((handleType) => point[handleType] === null);
+    if (existingHandleTypes.length !== 1 || missingHandleTypes.length !== 1) {
+      return null;
+    }
+    return missingHandleTypes[0] ?? null;
+  };
+
+  private getShouldPullMissingCornerHandle = (
+    point: CanvasBezierPathState['points'][number],
+    missingHandleType: PathHandleType,
+    pointer: Coordinate
+  ): boolean => {
+    const existingHandle = point[missingHandleType === 'inHandle' ? 'outHandle' : 'inHandle'];
+    if (!existingHandle) {
+      return true;
+    }
+
+    const existingVector = {
+      x: existingHandle.x - point.anchor.x,
+      y: existingHandle.y - point.anchor.y,
+    };
+    const dragVector = {
+      x: pointer.x - point.anchor.x,
+      y: pointer.y - point.anchor.y,
+    };
+    const existingLength = Math.hypot(existingVector.x, existingVector.y);
+    const dragLength = Math.hypot(dragVector.x, dragVector.y);
+    if (existingLength === 0 || dragLength === 0) {
+      return true;
+    }
+
+    const directionDotProduct =
+      (existingVector.x * dragVector.x + existingVector.y * dragVector.y) / (existingLength * dragLength);
+    return directionDotProduct < -0.25;
   };
 
   private findHandleHit = (
@@ -1004,6 +1413,7 @@ export class CanvasPathToolModule extends CanvasModuleBase {
         ...session,
         activePathId: pathId,
         activePointIndex: pointIndex,
+        selectedPointIndices: [pointIndex],
         activeHandle: null,
         dragTarget: null,
       });
@@ -1023,6 +1433,7 @@ export class CanvasPathToolModule extends CanvasModuleBase {
       ...session,
       activePathId: pathId,
       activePointIndex: nextActivePointIndex,
+      selectedPointIndices: nextActivePointIndex === null ? [] : [nextActivePointIndex],
       activeHandle: null,
       dragTarget: null,
     });

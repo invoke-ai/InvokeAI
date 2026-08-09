@@ -309,7 +309,7 @@ export class CanvasToolModule extends CanvasModuleBase {
     const selectedEntityAdapter = this.manager.stateApi.getSelectedEntityAdapter();
     const isVectorLayerDrawTool =
       selectedEntityAdapter?.state.type === 'vector_layer' &&
-      (tool === 'brush' || tool === 'eraser' || tool === 'rect' || tool === 'gradient');
+      (tool === 'brush' || tool === 'eraser' || tool === 'gradient');
 
     if (this.manager.stage.getIsZoomDragging()) {
       stage.setCursor(ZOOM_DRAG_CURSOR);
@@ -494,7 +494,10 @@ export class CanvasToolModule extends CanvasModuleBase {
       return true;
     }
 
-    if (tool === 'path') {
+    const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
+    const isVectorDrawingTool = tool === 'path' || (tool === 'rect' && selectedEntity?.state.type === 'vector_layer');
+
+    if (isVectorDrawingTool) {
       if (this.manager.$isBusy.get()) {
         return false;
       }
@@ -503,7 +506,6 @@ export class CanvasToolModule extends CanvasModuleBase {
         return false;
       }
 
-      const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
       if (!selectedEntity || selectedEntity.state.type !== 'vector_layer') {
         return false;
       }
@@ -535,8 +537,6 @@ export class CanvasToolModule extends CanvasModuleBase {
       return false;
     }
 
-    const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
-
     if (!selectedEntity) {
       return false;
     }
@@ -555,7 +555,7 @@ export class CanvasToolModule extends CanvasModuleBase {
 
     if (
       selectedEntity.state.type === 'vector_layer' &&
-      (tool === 'brush' || tool === 'eraser' || tool === 'rect' || tool === 'gradient')
+      (tool === 'brush' || tool === 'eraser' || tool === 'gradient')
     ) {
       return false;
     }
@@ -925,6 +925,18 @@ export class CanvasToolModule extends CanvasModuleBase {
 
     if (e.key === 'Enter') {
       const tool = this.$tool.get();
+      const isShapesQuickSwitch =
+        (tool === 'view' || tool === 'colorPicker') &&
+        this.$baseTool.get() === 'rect' &&
+        this.tools.rect.hasOpenVectorPolygonSession();
+      if ((tool === 'rect' || isShapesQuickSwitch) && this.tools.rect.hasOpenVectorPolygonSession()) {
+        e.preventDefault();
+        void this.tools.rect.commitOpenPolygon();
+        if (isShapesQuickSwitch) {
+          this.clearTemporaryToolHotkeys();
+        }
+        return;
+      }
       const isPathQuickSwitch =
         (tool === 'view' || tool === 'colorPicker') &&
         this.$baseTool.get() === 'path' &&
