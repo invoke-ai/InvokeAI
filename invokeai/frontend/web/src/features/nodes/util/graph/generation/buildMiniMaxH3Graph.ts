@@ -32,7 +32,7 @@ const MINIMAX_H3_FPS = 24;
  * for the still-image output mode. */
 const MINIMAX_H3_MIN_VIDEO_FRAMES = 124;
 const MINIMAX_H3_MAX_VIDEO_FRAMES = 345;
-const MINIMAX_H3_IMAGE_FRAMES = 5;
+const MINIMAX_H3_IMAGE_FRAMES = '5' as const;
 
 /**
  * Snap a duration in seconds to the nearest legal MiniMax H3 frame count (17n+5), clamped to
@@ -173,7 +173,8 @@ export const buildMiniMaxH3Graph = async (arg: GraphBuilderArg): Promise<GraphBu
     g.updateNode(denoise, {
       width: originalSize.width,
       height: originalSize.height,
-      num_frames,
+      // The node takes the frame count as a grid-aligned choice value, not a free integer.
+      num_frames: `${num_frames}` as Invocation<'minimax_h3_denoise'>['num_frames'],
     });
     // The keyframe vision context is prepared on the same canvas as the condition rows.
     g.updateNode(posCond, {

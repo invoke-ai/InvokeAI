@@ -27781,10 +27781,11 @@ export type components = {
             height?: number;
             /**
              * Number of Frames
-             * @description Number of output frames at the fixed 24 fps. Must be of the form 17n+5 (5, 22, ..., 124, ...); durations must stay within 5-15 s, except exactly 5 frames for a still image.
+             * @description Number of output frames at the fixed 24 fps. Only the video VAE's 17n+5 grid points are offered: 90 (3.75 s) through 345 (14.38 s), plus the single 5-frame block used by the still-image path. The model was trained for 5-15 s, so counts below 124 are usable but off-distribution - handy for quick test renders.
              * @default 124
+             * @enum {string}
              */
-            num_frames?: number;
+            num_frames?: "5" | "90" | "107" | "124" | "141" | "158" | "175" | "192" | "209" | "226" | "243" | "260" | "277" | "294" | "311" | "328" | "345";
             /**
              * Steps
              * @description Number of denoising steps (sigma grid points, terminal included: N steps = N-1 model evaluations).

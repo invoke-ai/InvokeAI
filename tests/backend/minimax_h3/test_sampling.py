@@ -4,6 +4,7 @@ import pytest
 import torch
 
 from invokeai.backend.minimax_h3.packing import (
+    MINIMAX_H3_VIDEO_FRAME_CHOICES,
     align_num_frames,
     audio_latent_num_frames,
     resolve_canvas_size,
@@ -15,8 +16,9 @@ from invokeai.backend.minimax_h3.sampling import build_denoise_state, validate_n
 
 class TestFrameGrid:
     def test_legal_frame_counts_pass(self):
-        # 345 = 17*20+5 (14.375 s) is the longest legal clip: 362 rounds past the 15 s cap.
-        for n in (5, 124, 141, 345):
+        # 90 (3.75 s) is the accepted floor for video; 345 = 17*20+5 (14.375 s) is the longest legal
+        # clip, since 362 rounds past the 15 s cap.
+        for n in (5, 90, 107, 124, 141, 345):
             validate_num_frames(n)
 
     def test_misaligned_frame_counts_rejected(self):
@@ -25,17 +27,28 @@ class TestFrameGrid:
         with pytest.raises(ValueError, match="17"):
             validate_num_frames(121)
 
-    def test_durations_outside_window_rejected(self):
-        # 22/39/107 frames are grid-aligned but below the 5 s floor (and not the still path).
-        for n in (22, 39, 107):
-            with pytest.raises(ValueError, match="seconds"):
+    def test_frame_counts_outside_the_accepted_range_rejected(self):
+        # 22/39/56/73 are grid-aligned but below the 90-frame floor (and not the still path).
+        for n in (22, 39, 56, 73):
+            with pytest.raises(ValueError, match="frames on the 17n"):
                 validate_num_frames(n)
         # 362 = 17*21+5 is aligned but 15.083 s > 15 s.
-        with pytest.raises(ValueError, match="seconds"):
+        with pytest.raises(ValueError, match="frames on the 17n"):
             validate_num_frames(362)
 
     def test_still_image_minimum_allowed(self):
         validate_num_frames(5)
+
+    def test_every_offered_choice_validates(self):
+        # The node's dropdown is built from this tuple; nothing in it may be rejected at invoke time.
+        assert MINIMAX_H3_VIDEO_FRAME_CHOICES[0] == 90
+        assert MINIMAX_H3_VIDEO_FRAME_CHOICES[-1] == 345
+        for n in MINIMAX_H3_VIDEO_FRAME_CHOICES:
+            validate_num_frames(n)
+
+    def test_choices_are_exactly_the_grid_points_in_range(self):
+        expected = tuple(n for n in range(90, 361) if n % 17 == 5)
+        assert MINIMAX_H3_VIDEO_FRAME_CHOICES == expected
 
     def test_align_num_frames(self):
         assert align_num_frames(121) == 124

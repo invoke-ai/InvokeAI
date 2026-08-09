@@ -59,10 +59,23 @@ MINIMAX_H3_MAX_ASPECT_RATIO = 4
 MINIMAX_H3_MIN_DURATION = 5.0
 MINIMAX_H3_MAX_DURATION = 15.0
 
+# The released model targets the 5-15 s window above, but shorter grid-aligned clips render and are useful as fast
+# test passes. 90 frames (3.75 s) is the floor we accept for video requests; below that only the 5-frame
+# still-image block is meaningful.
+MINIMAX_H3_MIN_VIDEO_FRAMES = 90
+
 # The video VAE encodes 17 pixel frames per chunk and drops the 3 trailing latent frames of every chunk, so
 # `17 * n + 5` pixel frames map to `5 * n + 2` latent frames.
 MINIMAX_H3_FRAMES_PER_CHUNK = 17
 MINIMAX_H3_LATENTS_PER_CHUNK = 5
+
+# Every legal video frame count, i.e. the `17n + 5` grid points from the accepted floor up to the 15 s ceiling
+# (90 ... 345). The nodes offer exactly these as a choice list, so a request can never miss the grid.
+MINIMAX_H3_VIDEO_FRAME_CHOICES = tuple(
+    n
+    for n in range(MINIMAX_H3_MIN_VIDEO_FRAMES, int(MINIMAX_H3_MAX_DURATION * MINIMAX_H3_FPS) + 1)
+    if n % MINIMAX_H3_FRAMES_PER_CHUNK == MINIMAX_H3_LATENTS_PER_CHUNK
+)
 
 # The pixel convention of the video VAE: ImageNet-normalized RGB over a `[0, 1]` base range.
 MINIMAX_H3_PIXEL_MEAN = (0.485, 0.456, 0.406)

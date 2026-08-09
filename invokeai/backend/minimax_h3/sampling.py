@@ -24,7 +24,7 @@ from invokeai.backend.minimax_h3.packing import (
     MINIMAX_H3_KEYFRAME_NOISE_AUG,
     MINIMAX_H3_LATENTS_PER_CHUNK,
     MINIMAX_H3_MAX_DURATION,
-    MINIMAX_H3_MIN_DURATION,
+    MINIMAX_H3_MIN_VIDEO_FRAMES,
     MiniMaxH3PackedSequence,
     build_packed_sequence,
     build_row_timesteps,
@@ -54,9 +54,10 @@ MINIMAX_H3_STILL_NUM_FRAMES = 5
 def validate_num_frames(num_frames: int) -> None:
     """Reject frame counts the FL2VA checkpoint cannot generate.
 
-    Valid values are ``17 * n + 5`` (the video VAE's chunk grid). The resulting duration must
-    lie in the released model's 5-15 s window — except for the single-block minimum of 5 frames,
-    which is allowed as the still-image (frame-extraction) path.
+    Valid values are ``17 * n + 5`` (the video VAE's chunk grid), from 90 frames (3.75 s — below
+    the released 5 s training window, but accepted for fast test renders) up to the model's 15 s
+    ceiling — except for the single-block minimum of 5 frames, which is allowed as the
+    still-image (frame-extraction) path.
     """
     if num_frames % MINIMAX_H3_FRAMES_PER_CHUNK != MINIMAX_H3_LATENTS_PER_CHUNK:
         raise ValueError(
@@ -66,12 +67,13 @@ def validate_num_frames(num_frames: int) -> None:
     if num_frames == MINIMAX_H3_STILL_NUM_FRAMES:
         return
     duration = num_frames / MINIMAX_H3_FPS
-    if not MINIMAX_H3_MIN_DURATION <= duration <= MINIMAX_H3_MAX_DURATION:
+    if num_frames < MINIMAX_H3_MIN_VIDEO_FRAMES or duration > MINIMAX_H3_MAX_DURATION:
         raise ValueError(
-            f"MiniMax H3 generates between {MINIMAX_H3_MIN_DURATION:g} and {MINIMAX_H3_MAX_DURATION:g} "
-            f"seconds at {MINIMAX_H3_FPS} fps ({int(MINIMAX_H3_MIN_DURATION * MINIMAX_H3_FPS)}-"
-            f"{int(MINIMAX_H3_MAX_DURATION * MINIMAX_H3_FPS)} frames on the 17n+5 grid), or exactly "
-            f"{MINIMAX_H3_STILL_NUM_FRAMES} frames for a still image; got {num_frames}."
+            f"MiniMax H3 video requests must be between {MINIMAX_H3_MIN_VIDEO_FRAMES} and "
+            f"{int(MINIMAX_H3_MAX_DURATION * MINIMAX_H3_FPS)} frames on the 17n+5 grid "
+            f"({MINIMAX_H3_MIN_VIDEO_FRAMES / MINIMAX_H3_FPS:g}-{MINIMAX_H3_MAX_DURATION:g} seconds at "
+            f"{MINIMAX_H3_FPS} fps), or exactly {MINIMAX_H3_STILL_NUM_FRAMES} frames for a still image; "
+            f"got {num_frames}."
         )
 
 

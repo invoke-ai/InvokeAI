@@ -66032,15 +66032,52 @@
             "type": "integer"
           },
           "num_frames": {
-            "default": 124,
-            "description": "Number of output frames at the fixed 24 fps. Must be of the form 17n+5 (5, 22, ..., 124, ...); durations must stay within 5-15 s, except exactly 5 frames for a still image.",
+            "default": "124",
+            "description": "Number of output frames at the fixed 24 fps. Only the video VAE's 17n+5 grid points are offered: 90 (3.75 s) through 345 (14.38 s), plus the single 5-frame block used by the still-image path. The model was trained for 5-15 s, so counts below 124 are usable but off-distribution - handy for quick test renders.",
+            "enum": [
+              "5",
+              "90",
+              "107",
+              "124",
+              "141",
+              "158",
+              "175",
+              "192",
+              "209",
+              "226",
+              "243",
+              "260",
+              "277",
+              "294",
+              "311",
+              "328",
+              "345"
+            ],
             "field_kind": "input",
             "input": "any",
-            "minimum": 5,
-            "orig_default": 124,
+            "orig_default": "124",
             "orig_required": false,
             "title": "Number of Frames",
-            "type": "integer"
+            "type": "string",
+            "ui_choice_labels": {
+              "107": "107 frames - 4.46 s",
+              "124": "124 frames - 5.17 s",
+              "141": "141 frames - 5.88 s",
+              "158": "158 frames - 6.58 s",
+              "175": "175 frames - 7.29 s",
+              "192": "192 frames - 8.00 s",
+              "209": "209 frames - 8.71 s",
+              "226": "226 frames - 9.42 s",
+              "243": "243 frames - 10.12 s",
+              "260": "260 frames - 10.83 s",
+              "277": "277 frames - 11.54 s",
+              "294": "294 frames - 12.25 s",
+              "311": "311 frames - 12.96 s",
+              "328": "328 frames - 13.67 s",
+              "345": "345 frames - 14.38 s",
+              "5": "5 - still image only",
+              "90": "90 frames - 3.75 s"
+            }
           },
           "steps": {
             "default": 50,
@@ -66075,7 +66112,7 @@
         "tags": ["latents", "video", "audio", "minimax"],
         "title": "Denoise - MiniMax H3",
         "type": "object",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "output": {
           "$ref": "#/components/schemas/MiniMaxH3DenoiseOutput"
         }
