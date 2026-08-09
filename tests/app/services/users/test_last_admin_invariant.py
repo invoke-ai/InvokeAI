@@ -46,7 +46,8 @@ def db() -> SqliteDatabase:
             is_active BOOLEAN NOT NULL DEFAULT TRUE,
             created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
             updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
-            last_login_at DATETIME
+            last_login_at DATETIME,
+            token_epoch INTEGER NOT NULL DEFAULT 0
         );
     """)
     db._conn.commit()
