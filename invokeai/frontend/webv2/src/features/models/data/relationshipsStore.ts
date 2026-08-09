@@ -28,11 +28,20 @@ export interface ModelRelationshipsSnapshot {
 const EMPTY_RELATIONSHIPS_SNAPSHOT: ModelRelationshipsSnapshot = { relatedKeysByModelKey: {} };
 const store = createExternalStore<ModelRelationshipsSnapshot>(EMPTY_RELATIONSHIPS_SNAPSHOT);
 
+/**
+ * A fetch may only write its result while it is still the promise in this map.
+ * Evicting a key therefore both invalidates its inflight GET and unblocks the
+ * dedupe so a follow-up fetch genuinely starts.
+ */
 const inflightByKey = new Map<string, Promise<void>>();
+
+/** Keys whose last settled fetch rejected; `ensure` revalidates these. */
+const failedFetchKeys = new Set<string>();
 
 registerAccountOwnedResource({
   clear: () => {
     inflightByKey.clear();
+    failedFetchKeys.clear();
     store.setSnapshot(EMPTY_RELATIONSHIPS_SNAPSHOT);
   },
   name: 'model-relationships',
@@ -54,15 +63,21 @@ const fetchRelatedKeys = (modelKey: string): Promise<void> => {
   const owner = captureAccountScope();
   const fetch = getRelatedModelKeys(modelKey, owner.signal)
     .then((keys) => {
-      if (isAccountScopeCurrent(owner)) {
+      if (isAccountScopeCurrent(owner) && inflightByKey.get(modelKey) === fetch) {
+        failedFetchKeys.delete(modelKey);
         setEntry(modelKey, keys);
       }
     })
     .catch((error: unknown) => {
       // Leave an empty entry so consumers stop showing a spinner, but still
       // reject so callers that care (the detail pane) can surface the error.
-      if (isAccountScopeCurrent(owner) && store.getSnapshot().relatedKeysByModelKey[modelKey] === undefined) {
-        setEntry(modelKey, []);
+      // A superseded fetch writes nothing and does not mark the key failed.
+      if (isAccountScopeCurrent(owner) && inflightByKey.get(modelKey) === fetch) {
+        failedFetchKeys.add(modelKey);
+
+        if (store.getSnapshot().relatedKeysByModelKey[modelKey] === undefined) {
+          setEntry(modelKey, []);
+        }
       }
       throw error;
     })
@@ -76,9 +91,12 @@ const fetchRelatedKeys = (modelKey: string): Promise<void> => {
   return fetch;
 };
 
-/** Fetch once per key; concurrent callers share one request. Cache-first. */
+/**
+ * Fetch once per key; concurrent callers share one request. Cache-first,
+ * except that a key whose last fetch failed is revalidated on the next call.
+ */
 export const ensureRelatedModelKeysLoaded = (modelKey: string): Promise<void> => {
-  if (store.getSnapshot().relatedKeysByModelKey[modelKey] !== undefined) {
+  if (store.getSnapshot().relatedKeysByModelKey[modelKey] !== undefined && !failedFetchKeys.has(modelKey)) {
     return inflightByKey.get(modelKey) ?? Promise.resolve();
   }
 
@@ -117,13 +135,30 @@ const patchBothDirections = (modelKey: string, otherKey: string, patch: EntryPat
   }
 };
 
+/**
+ * Apply a successful mutation to the cache: patch the entries that exist, and
+ * for any key with a GET inflight, evict it (a request issued before the
+ * mutation is stale) and refetch so the entry converges on server truth. This
+ * also covers a link made while the entry's first fetch is still inflight —
+ * the refetch was issued after the POST, so it includes the new link.
+ */
+const commitMutation = (modelKey: string, otherKey: string, patch: EntryPatch): void => {
+  patchBothDirections(modelKey, otherKey, patch);
+
+  for (const key of [modelKey, otherKey]) {
+    if (inflightByKey.delete(key)) {
+      void fetchRelatedKeys(key).catch(() => {});
+    }
+  }
+};
+
 export const linkModels = async (modelKey: string, otherKey: string): Promise<void> => {
   const owner = captureAccountScope();
 
   await addModelRelationship(modelKey, otherKey, owner.signal);
 
   if (isAccountScopeCurrent(owner)) {
-    patchBothDirections(modelKey, otherKey, (entry, other) => (entry.includes(other) ? entry : [...entry, other]));
+    commitMutation(modelKey, otherKey, (entry, other) => (entry.includes(other) ? entry : [...entry, other]));
   }
 };
 
@@ -133,12 +168,18 @@ export const unlinkModels = async (modelKey: string, otherKey: string): Promise<
   await removeModelRelationship(modelKey, otherKey, owner.signal);
 
   if (isAccountScopeCurrent(owner)) {
-    patchBothDirections(modelKey, otherKey, (entry, other) => entry.filter((key) => key !== other));
+    commitMutation(modelKey, otherKey, (entry, other) => entry.filter((key) => key !== other));
   }
 };
 
 /** Drop deleted models' entries and scrub their keys from the remaining ones. */
 export const removeModelsFromRelationships = (keys: readonly string[]): void => {
+  for (const key of keys) {
+    // A late GET for a deleted model must not resurrect its entry or retry.
+    inflightByKey.delete(key);
+    failedFetchKeys.delete(key);
+  }
+
   const removed = new Set(keys);
   const next: Record<string, readonly string[]> = {};
 

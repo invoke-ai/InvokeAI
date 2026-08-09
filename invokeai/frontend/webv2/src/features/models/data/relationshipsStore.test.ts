@@ -69,6 +69,85 @@ describe('relationships store', () => {
     expect(store.getRelationshipsSnapshot().relatedKeysByModelKey).toEqual({ a: ['c'], c: ['a'] });
   });
 
+  it('discards a stale refresh that resolves after a link and keeps the patched entry', async () => {
+    let resolveStale: ((keys: string[]) => void) | undefined;
+    api.getRelatedModelKeys
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveStale = resolve;
+        })
+      )
+      .mockResolvedValueOnce(['b']);
+    const store = await import('./relationshipsStore');
+    store.setRelationshipsSnapshotForTests({ relatedKeysByModelKey: { a: [], b: [] } });
+
+    const staleRefresh = store.refreshRelatedModelKeys('a').catch(() => {});
+    await store.linkModels('a', 'b');
+
+    expect(store.getRelationshipsSnapshot().relatedKeysByModelKey).toEqual({ a: ['b'], b: ['a'] });
+    // The mutation evicted the stale GET, which unblocked the dedupe for a fresh one.
+    expect(api.getRelatedModelKeys.mock.calls.filter(([key]) => key === 'a')).toHaveLength(2);
+
+    await Promise.resolve();
+    resolveStale?.(['stale']);
+    await staleRefresh;
+
+    expect(store.getRelationshipsSnapshot().relatedKeysByModelKey['a']).toEqual(['b']);
+  });
+
+  it('link during the initial load ends with the entry present and containing the linked key', async () => {
+    let resolveStale: ((keys: string[]) => void) | undefined;
+    api.getRelatedModelKeys
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveStale = resolve;
+        })
+      )
+      .mockResolvedValueOnce(['b']);
+    const store = await import('./relationshipsStore');
+
+    const initialLoad = store.ensureRelatedModelKeysLoaded('a').catch(() => {});
+    await store.linkModels('a', 'b');
+
+    resolveStale?.([]);
+    await initialLoad;
+
+    expect(store.getRelationshipsSnapshot().relatedKeysByModelKey['a']).toEqual(['b']);
+  });
+
+  it('refetches a key whose fetch failed on the next ensure and clears the flag on success', async () => {
+    api.getRelatedModelKeys.mockRejectedValueOnce(new Error('outage')).mockResolvedValueOnce(['b']);
+    const store = await import('./relationshipsStore');
+
+    await expect(store.ensureRelatedModelKeysLoaded('a')).rejects.toThrow('outage');
+    expect(store.getRelationshipsSnapshot().relatedKeysByModelKey).toEqual({ a: [] });
+
+    await store.ensureRelatedModelKeysLoaded('a');
+    expect(store.getRelationshipsSnapshot().relatedKeysByModelKey).toEqual({ a: ['b'] });
+
+    await store.ensureRelatedModelKeysLoaded('a');
+    expect(api.getRelatedModelKeys).toHaveBeenCalledTimes(2);
+  });
+
+  it("a removed model's late fetch cannot resurrect its entry", async () => {
+    let resolveLate: ((keys: string[]) => void) | undefined;
+    api.getRelatedModelKeys.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveLate = resolve;
+      })
+    );
+    const store = await import('./relationshipsStore');
+
+    const lateFetch = store.ensureRelatedModelKeysLoaded('a').catch(() => {});
+    store.removeModelsFromRelationships(['a']);
+
+    resolveLate?.(['b']);
+    await lateFetch;
+
+    expect(store.getRelationshipsSnapshot().relatedKeysByModelKey).toEqual({});
+    expect(api.getRelatedModelKeys).toHaveBeenCalledTimes(1);
+  });
+
   it('clears the cache and inflight requests on account switch', async () => {
     const account = await import('@platform/state/accountLifecycle');
     account.accountLifecycle.activate('user-a');
