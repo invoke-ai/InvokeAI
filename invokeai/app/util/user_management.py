@@ -21,6 +21,17 @@ _root_help = (
     "or $HOME/invokeai."
 )
 
+# These commands write to the database from their own process, so they cannot raise the
+# in-process event that makes a running server re-authorize immediately. What the server
+# derives from the database per request — REST authorization, queue-item execution, media
+# reads and saves — changes the moment this commits. What it caches does not: an already
+# open socket keeps the rooms it joined at connect time until the server's periodic
+# revalidation sweep notices (see SOCKET_REVALIDATION_INTERVAL_SECONDS in api/sockets.py).
+_LIVE_SERVER_NOTE = (
+    "   ℹ️  A running server applies this to new requests immediately; already-open\n"
+    "      connections are re-checked within about a minute."
+)
+
 # ---------------------------------------------------------------------------
 # useradd
 # ---------------------------------------------------------------------------
@@ -202,6 +213,7 @@ def _delete_user_interactive() -> bool:
 
         user_service.delete(user.user_id)
         print("\n✅ User deleted successfully!")
+        print(_LIVE_SERVER_NOTE)
         return True
 
     except ValueError as e:
@@ -247,6 +259,7 @@ def _delete_user_cli(email: str, force: bool = False) -> bool:
 
         user_service.delete(user.user_id)
         print("✅ User deleted successfully!")
+        print(_LIVE_SERVER_NOTE)
         return True
 
     except ValueError as e:
@@ -476,6 +489,8 @@ def _modify_user_interactive() -> bool:
         print(f"   Display Name: {updated_user.display_name or '(not set)'}")
         print(f"   Admin: {'Yes' if updated_user.is_admin else 'No'}")
         print(f"   Active: {'Yes' if updated_user.is_active else 'No'}")
+        if password is not None or is_admin is not None:
+            print(_LIVE_SERVER_NOTE)
         return True
 
     except ValueError as e:
@@ -532,6 +547,8 @@ def _modify_user_cli(
         print(f"   Display Name: {updated_user.display_name or '(not set)'}")
         print(f"   Admin: {'Yes' if updated_user.is_admin else 'No'}")
         print(f"   Active: {'Yes' if updated_user.is_active else 'No'}")
+        if password is not None or is_admin is not None:
+            print(_LIVE_SERVER_NOTE)
         return True
 
     except ValueError as e:

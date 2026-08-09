@@ -75,9 +75,20 @@ async def lifespan(app: FastAPI):
     )
     logger.handle(record)
 
-    yield
-    # Shut down threads
-    ApiDependencies.shutdown()
+    # Re-derive open sockets' authorization from the database on a timer. This is what
+    # catches user changes made by another process — the `invoke-usermod` / `invoke-userdel`
+    # CLIs — which cannot raise an in-process event. `socket_io` is created further down
+    # this module and is bound by the time the app is served.
+    socket_io.start()
+
+    try:
+        yield
+    finally:
+        # In a `finally` so an exception propagating into the generator cannot leave the
+        # sweep running against a half-torn-down process, or skip the thread shutdown.
+        socket_io.stop()
+        # Shut down threads
+        ApiDependencies.shutdown()
 
 
 # Create the app

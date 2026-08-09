@@ -1,11 +1,13 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
+import asyncio
 from collections.abc import Collection
 from typing import Any
 
 from fastapi import FastAPI
 from pydantic import BaseModel
 from socketio import ASGIApp, AsyncServer
+from starlette.concurrency import run_in_threadpool
 
 from invokeai.app.services.auth.token_service import verify_token
 from invokeai.app.services.config.config_default import get_config
@@ -56,6 +58,14 @@ from invokeai.app.services.events.events_common import (
 from invokeai.backend.util.logging import InvokeAILogger
 
 logger = InvokeAILogger.get_logger()
+
+# How often open sockets are re-derived from the database. Route handlers emit
+# `user_access_changed` the moment they mutate a user, so in-process changes are already
+# immediate; this sweep exists for mutations this process never sees — the `invoke-usermod`
+# / `invoke-userdel` CLIs run against the database file from a *separate* process, so no
+# in-process event can be raised for them. It bounds how long a socket can outlive the
+# authorization it was granted under. See `SocketIO._revalidate_socket_users`.
+SOCKET_REVALIDATION_INTERVAL_SECONDS = 30.0
 
 
 class QueueSubscriptionEvent(BaseModel):
@@ -129,6 +139,9 @@ class SocketIO:
 
         # Track user information for each socket connection
         self._socket_users: dict[str, dict[str, Any]] = {}
+
+        # Periodic re-derivation of that cached state from the database; see `start`.
+        self._revalidation_task: asyncio.Task[None] | None = None
 
         # Set up authentication middleware
         self._sio.on("connect", handler=self._handle_connect)
@@ -254,6 +267,108 @@ class SocketIO:
             del self._socket_users[sid]
             logger.debug(f"Socket {sid} disconnected and cleaned up")
 
+    def start(self) -> None:
+        """Start background work. Called from the app's startup hook.
+
+        Not started in `__init__`: this object is constructed at import time, where there
+        is no running event loop to attach a task to.
+        """
+        if self._revalidation_task is None or self._revalidation_task.done():
+            self._revalidation_task = asyncio.create_task(self._revalidation_loop())
+
+    def stop(self) -> None:
+        """Cancel background work. Called from the app's shutdown hook."""
+        if self._revalidation_task is not None:
+            self._revalidation_task.cancel()
+            self._revalidation_task = None
+
+    async def _revalidation_loop(self) -> None:
+        """Re-derive every open socket's authorization from the database, periodically."""
+        while True:
+            await asyncio.sleep(SOCKET_REVALIDATION_INTERVAL_SECONDS)
+            if not self._socket_users:
+                continue
+            try:
+                await self._revalidate_socket_users()
+            except Exception:
+                logger.exception("Error revalidating socket authorization")
+
+    async def _revalidate_socket_users(self) -> None:
+        """Emit `user_access_changed` for any connected user whose cached state is stale.
+
+        The room membership and `is_admin` flag a socket carries are established at connect
+        time and refreshed by `_handle_user_access_changed`, which fires on an in-process
+        event. Nothing in this process emits that event for a change made by another
+        process — `invoke-usermod --no-admin` and `invoke-userdel` open the database
+        directly — so without this sweep a demoted administrator's socket would sit in the
+        admin room until it happened to reconnect. REST is unaffected either way: every
+        request re-reads the record.
+
+        Rather than adjusting rooms here, differences are published as the same event the
+        route handlers emit. That keeps one implementation of "what a change to this user
+        means" — sockets re-authorize *and* the session processor cancels the user's running
+        items — instead of a second copy that drifts from the first.
+
+        A lookup that fails leaves the socket alone and is retried on the next sweep. That
+        is the opposite of the queue gate's fail-closed policy, deliberately: nothing runs
+        on the user's behalf because a socket stays open for another interval, whereas
+        tearing down every live session on a transient database error would be an outage
+        this sweep caused by itself — and `_handle_connect` fails closed, so the clients
+        would not get back in.
+
+        Scope: only users with an open socket are swept, which leaves one gap. An
+        out-of-process deletion of a user with no socket does not reach
+        `DefaultSessionProcessor._on_user_access_changed`, so a *single-node* graph of
+        theirs that is already running — the one case no other gate re-checks — runs to
+        completion. It cannot persist anything: the save gates in `invocation_context`
+        re-read the record and raise `PermissionError`. The cost is the wasted node.
+        """
+        if not self._is_multiuser_enabled():
+            return
+
+        from invokeai.app.api.dependencies import ApiDependencies
+
+        services = ApiDependencies.invoker.services
+
+        # One lookup per distinct user, not per socket: a user with several tabs open is
+        # the common case, and every socket of a user gets the same answer.
+        cached_by_user: dict[str, list[dict[str, Any]]] = {}
+        for info in list(self._socket_users.values()):
+            cached_by_user.setdefault(info["user_id"], []).append(info)
+
+        for user_id, cached_infos in cached_by_user.items():
+            try:
+                user = await run_in_threadpool(services.users.get, user_id)
+            except Exception:
+                logger.warning(f"Could not revalidate socket user {user_id}; will retry", exc_info=True)
+                continue
+
+            if user is None:
+                # Deleted. `_handle_user_access_changed` only reads `is_active` on this
+                # path, so the other fields just need to be inert.
+                is_admin, is_active, token_epoch = False, False, 0
+            else:
+                is_admin, is_active, token_epoch = user.is_admin, user.is_active, user.token_epoch
+
+            # Staleness is judged against *every* socket of the user, not a representative
+            # one. They need not agree: a session that reconnected after a password change
+            # holds the current epoch while the superseded session is still connected under
+            # the old one, and sampling only the first would find nothing to do and leave
+            # the revoked socket in place.
+            if is_active and all(
+                is_admin == cached.get("is_admin") and token_epoch == cached.get("token_epoch", 0)
+                for cached in cached_infos
+            ):
+                continue
+
+            logger.info(f"Revalidation found stale socket authorization for user {user_id}; re-authorizing")
+            services.events.emit_user_access_changed(
+                user_id=user_id,
+                is_admin=is_admin,
+                is_active=is_active,
+                token_epoch=token_epoch,
+            )
+
     async def _handle_user_access_changed(self, event: FastAPIEvent[UserAccessChangedEvent]) -> None:
         """Re-authorize a user's open sockets when their role or active status changes.
 
@@ -274,8 +389,34 @@ class SocketIO:
         - Demoted: leave the admin room and update the cached ``is_admin`` so
           ``_handle_sub_queue`` cannot re-add it.
         - Promoted: join the admin room, matching the DB-derived REST behavior.
+
+        The event is a trigger; the record is re-read here and *that* is what is applied,
+        the same way ``DefaultSessionProcessor._on_user_access_changed`` does. Handlers are
+        dispatched as independent tasks, and the revalidation sweep's payload is a snapshot
+        taken before an await — so an event can arrive already superseded. Acting on it
+        would then re-grant the admin room to someone just demoted, or disconnect the
+        replacement session a password change had just issued, and nothing would correct
+        either until the next sweep. A read that fails leaves the event standing: it is
+        evidence of a committed change that the re-read could not contradict.
         """
         _, event_data = event
+        is_admin, is_active, token_epoch = event_data.is_admin, event_data.is_active, event_data.token_epoch
+        try:
+            from invokeai.app.api.dependencies import ApiDependencies
+
+            user = await run_in_threadpool(ApiDependencies.invoker.services.users.get, event_data.user_id)
+        except Exception:
+            logger.warning(
+                f"Could not re-read user {event_data.user_id} while re-authorizing its sockets; "
+                "honoring the access-changed event",
+                exc_info=True,
+            )
+        else:
+            if user is None:
+                is_admin, is_active, token_epoch = False, False, 0
+            else:
+                is_admin, is_active, token_epoch = user.is_admin, user.is_active, user.token_epoch
+
         affected_sids = [sid for sid, info in self._socket_users.items() if info.get("user_id") == event_data.user_id]
         for sid in affected_sids:
             # `affected_sids` is a snapshot, and `disconnect()` below yields to the event
@@ -289,16 +430,16 @@ class SocketIO:
             info = self._socket_users.get(sid)
             if info is None:
                 continue
-            if not event_data.is_active:
+            if not is_active:
                 logger.info(f"Disconnecting socket {sid}: user {event_data.user_id} deactivated or deleted")
                 await self._sio.disconnect(sid)
                 continue
-            if info.get("token_epoch", 0) != event_data.token_epoch:
+            if info.get("token_epoch", 0) != token_epoch:
                 logger.info(f"Disconnecting socket {sid}: user {event_data.user_id} revoked its earlier sessions")
                 await self._sio.disconnect(sid)
                 continue
-            info["is_admin"] = event_data.is_admin
-            if event_data.is_admin:
+            info["is_admin"] = is_admin
+            if is_admin:
                 await self._sio.enter_room(sid, "admin")
                 logger.info(f"Socket {sid} joined admin room: user {event_data.user_id} promoted")
             else:
