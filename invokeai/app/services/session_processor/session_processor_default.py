@@ -630,15 +630,12 @@ class DefaultSessionProcessor(SessionProcessorBase):
             return
         # A single user may have items running on several workers concurrently, so
         # cancel every match rather than stopping at the first.
-        item_ids: list[int] = []
+        queue_items: list[SessionQueueItem] = []
         for worker in self._workers:
             queue_item = worker.queue_item
             if queue_item is not None and queue_item.user_id == event_data.user_id:
-                self._invoker.services.logger.warning(
-                    f"Canceling queue item {queue_item.item_id}: owner {queue_item.user_id} was deactivated or deleted"
-                )
-                item_ids.append(queue_item.item_id)
-        if not item_ids:
+                queue_items.append(queue_item)
+        if not queue_items:
             return
 
         # Run the cancellations in a thread. `cancel_queue_item` walks the workflow-call
@@ -652,10 +649,23 @@ class DefaultSessionProcessor(SessionProcessorBase):
         # a cancel event set while the row is still non-terminal is treated as a stale
         # signal from a previous item and cleared (see the guard after dequeue), which
         # would discard this cancellation.
+        # Re-read the owner at the point of decision rather than trusting the event.
+        # Handlers are dispatched as independent tasks, so a deactivate immediately
+        # followed by a reactivate can leave this one parked here while the second event
+        # has already come and gone (it returns early above) — cancelling then would kill
+        # a running item of an account the database says is active, with nothing to undo
+        # it. `queue_owner_is_active` is the same gate the dequeue and between-node checks
+        # use, including its fail-to-active policy for a failed lookup: skipping is safe
+        # because the between-node gate re-checks at the very next node.
         def _cancel_all() -> None:
-            for item_id in item_ids:
+            for item in queue_items:
+                if queue_owner_is_active(self._invoker.services, item):
+                    continue
+                self._invoker.services.logger.warning(
+                    f"Canceling queue item {item.item_id}: owner {item.user_id} was deactivated or deleted"
+                )
                 with suppress(SessionQueueItemNotFoundError):
-                    self._invoker.services.session_queue.cancel_queue_item(item_id)
+                    self._invoker.services.session_queue.cancel_queue_item(item.item_id)
 
         await run_in_threadpool(_cancel_all)
 

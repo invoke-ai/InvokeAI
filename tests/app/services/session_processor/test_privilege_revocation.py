@@ -192,6 +192,32 @@ class TestUserAccessChangedCancelsCurrentItem:
 
         assert sorted(c.args[0] for c in services.session_queue.cancel_queue_item.call_args_list) == [11, 13]
 
+    @pytest.mark.anyio
+    async def test_reactivation_before_the_cancel_lands_spares_the_item(self) -> None:
+        """The owner is re-read at the point of decision rather than trusted from the event.
+
+        Each event is dispatched as its own task, so a deactivate immediately followed by a
+        reactivate can leave the first handler still parked while the second has come and
+        gone (it returns early). Cancelling on the stale snapshot would kill a running item
+        of an account the database says is active, and nothing undoes a cancellation.
+        """
+        services = _services(users_by_id={"user-1": _active("user-1")})
+        processor = self._processor(services, _queue_item(user_id="user-1", item_id=11))
+
+        await processor._on_user_access_changed(self._event("user-1", is_active=False))
+
+        services.session_queue.cancel_queue_item.assert_not_called()
+
+    @pytest.mark.anyio
+    async def test_single_user_mode_does_not_cancel(self) -> None:
+        """Ownership is not enforced anywhere else in single-user mode either."""
+        services = _services(multiuser=False)
+        processor = self._processor(services, _queue_item(user_id="user-1", item_id=11))
+
+        await processor._on_user_access_changed(self._event("user-1", is_active=False))
+
+        services.session_queue.cancel_queue_item.assert_not_called()
+
 
 @pytest.fixture
 def anyio_backend() -> str:
