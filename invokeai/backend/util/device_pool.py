@@ -18,9 +18,19 @@ To enforce the rule, each generation device has one lock used for *both* roles:
   encoder runs on the worker's own GPU instead.
 
 Because borrows are non-blocking try-acquires and a session only ever blocking-acquires its *own*
-device lock, there is no lock-ordering cycle — the design is deadlock-free. The only cost is that,
-in the startup race where a borrow wins the lock a moment before the lent GPU's own session starts,
-that session waits out the (short) encoder node before beginning.
+device lock, there is no lock-ordering cycle — the design is deadlock-free. The cost is that, in the
+startup race where a borrow wins the lock a moment before the lent GPU's own session starts, that
+session waits out the whole borrowed node before beginning.
+
+Note that "the whole borrowed node" includes the encoder's *model load*. Caches are per-device, so
+the first borrow of a given GPU always cold-loads the encoder into that GPU's cache — seconds, not
+milliseconds. Subsequent borrows of the same GPU hit that cache (borrow selection is sticky for this
+reason), so the stall amortizes. Keep that in mind before marking a node ``idle_gpu_offloadable``:
+the cost is bounded by how long the node runs, and a node that does substantial work *per execution*
+— an autoregressive ``generate()`` loop, say — makes the stall recur on every generation instead of
+amortizing away. When a node has both kinds of work, splitting it is the way out:
+``ernie_image_prompt_enhancer`` is a separate, deliberately un-offloadable node for this reason, so
+that ``ernie_image_text_encoder`` can stay offloadable.
 """
 
 import threading
