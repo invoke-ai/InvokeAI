@@ -62,7 +62,7 @@ from invokeai.backend.model_manager.configs.t5_encoder import (
     T5Encoder_T5Encoder_Config,
 )
 from invokeai.backend.model_manager.configs.vae import VAE_Checkpoint_Config_Base, VAE_Checkpoint_Flux2_Config
-from invokeai.backend.model_manager.load.load_default import ModelLoader
+from invokeai.backend.model_manager.load.load_default import ModelLoader, resolve_submodel_path
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.load.model_loaders.flux2_state_dict_utils import (
     convert_flux2_bfl_to_diffusers,
@@ -87,19 +87,6 @@ from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 
 logger = InvokeAILogger.get_logger(__name__)
-
-
-def _in_eval_mode(model: AnyModel) -> AnyModel:
-    """Put a freshly built module tree into inference mode.
-
-    `from_pretrained` calls `.eval()` on what it returns; the SDNQ loaders below do not use it — they
-    build the module with `init_empty_weights` and then `load_state_dict`, which leaves `training`
-    True. Anything dropout- or norm-sensitive in the tree would then behave as if training. Non-module
-    returns (tokenizers) pass through untouched.
-    """
-    if isinstance(model, torch.nn.Module):
-        model.eval()
-    return model
 
 
 try:
@@ -1208,7 +1195,11 @@ class Flux2SDNQCheckpointModel(ModelLoader):
         from diffusers import Flux2Transformer2DModel
 
         model_path = Path(config.path)
-        transformer_path = model_path / "transformer" if (model_path / "transformer").is_dir() else model_path
+        transformer_path = resolve_submodel_path(
+            config,
+            SubModelType.Transformer,
+            model_path / "transformer" if (model_path / "transformer").is_dir() else model_path,
+        )
 
         with accelerate.init_empty_weights():
             model = Flux2Transformer2DModel.from_config(
@@ -1225,7 +1216,7 @@ class Flux2SDNQCheckpointModel(ModelLoader):
     def _load_text_encoder(self, config: Main_SDNQ_Diffusers_Flux2_Config) -> AnyModel:
         from transformers import AutoConfig, Qwen3ForCausalLM
 
-        te_dir = Path(config.path) / "text_encoder"
+        te_dir = resolve_submodel_path(config, SubModelType.TextEncoder, Path(config.path) / "text_encoder")
         te_config = AutoConfig.from_pretrained(te_dir, local_files_only=True)
         with accelerate.init_empty_weights():
             model = Qwen3ForCausalLM(te_config)
@@ -1243,7 +1234,7 @@ class Flux2SDNQCheckpointModel(ModelLoader):
     def _load_tokenizer(self, config: Main_SDNQ_Diffusers_Flux2_Config) -> AnyModel:
         from transformers import AutoTokenizer
 
-        tok_dir = Path(config.path) / "tokenizer"
+        tok_dir = resolve_submodel_path(config, SubModelType.Tokenizer, Path(config.path) / "tokenizer")
         return AutoTokenizer.from_pretrained(tok_dir, local_files_only=True)
 
     def _load_vae(self, config: Main_SDNQ_Diffusers_Flux2_Config) -> AnyModel:
@@ -1251,7 +1242,7 @@ class Flux2SDNQCheckpointModel(ModelLoader):
         # plain bf16 in this pipeline (the VAE itself isn't SDNQ-quantized).
         from diffusers import AutoencoderKL, AutoencoderKLFlux2
 
-        vae_dir = Path(config.path) / "vae"
+        vae_dir = resolve_submodel_path(config, SubModelType.VAE, Path(config.path) / "vae")
         # Pick the right class based on what the on-disk config.json declares.
         try:
             cls_name = AutoencoderKL.load_config(vae_dir, local_files_only=True).get("_class_name", "")
@@ -1601,7 +1592,7 @@ class FluxSDNQDiffusersModel(ModelLoader):
         # Handle single-file SDNQ checkpoint (Main_SDNQ_FLUX_Config)
         if isinstance(config, Main_SDNQ_FLUX_Config):
             if submodel_type == SubModelType.Transformer:
-                return _in_eval_mode(self._load_sdnq_transformer_checkpoint(config))
+                return self._load_sdnq_transformer_checkpoint(config)
             raise ValueError(
                 f"Only Transformer submodels are supported for checkpoint format. Received: {submodel_type}"
             )
@@ -1620,26 +1611,24 @@ class FluxSDNQDiffusersModel(ModelLoader):
         # loaded from a folder that does not exist. Fall back to the conventional name when a config
         # predates submodel discovery.
         model_path = Path(config.path)
-        discovered = (config.submodels or {}).get(submodel_type)
-        submodel_path = Path(discovered.path_or_prefix) if discovered else model_path / submodel_type.value
+        submodel_path = resolve_submodel_path(config, submodel_type, model_path / submodel_type.value)
 
-        # Every branch goes through `_in_eval_mode`: these loaders build their modules by hand
-        # (`init_empty_weights` + `load_state_dict`) rather than through `from_pretrained`, which
-        # would have called `.eval()` itself, so the modules arrive in training mode and any
-        # dropout / batch-norm in the tree would stay active during inference.
+        # These branches build their modules by hand (`init_empty_weights` + `load_state_dict`)
+        # rather than through `from_pretrained`, so they arrive in training mode — `put_in_eval_mode`
+        # in `load_default._load_and_cache` is what puts every loaded model into inference mode.
         match submodel_type:
             case SubModelType.Transformer:
-                return _in_eval_mode(self._load_sdnq_transformer(submodel_path, config))
+                return self._load_sdnq_transformer(submodel_path, config)
             case SubModelType.TextEncoder:
-                return _in_eval_mode(self._load_text_encoder(submodel_path))
+                return self._load_text_encoder(submodel_path)
             case SubModelType.TextEncoder2:
-                return _in_eval_mode(self._load_text_encoder_2(submodel_path))
+                return self._load_text_encoder_2(submodel_path)
             case SubModelType.Tokenizer:
                 return CLIPTokenizer.from_pretrained(submodel_path, local_files_only=True)
             case SubModelType.Tokenizer2:
                 return T5Tokenizer.from_pretrained(submodel_path, max_length=512, local_files_only=True)
             case SubModelType.VAE:
-                return _in_eval_mode(self._load_vae(submodel_path))
+                return self._load_vae(submodel_path)
             case _:
                 raise ValueError(f"Unsupported submodel type: {submodel_type}")
 

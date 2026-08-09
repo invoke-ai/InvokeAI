@@ -111,6 +111,27 @@ The headline differences:
 
 For low VRAM (~6–8 GB), GGUF Q4 is still the best fit. For 12–16 GB cards that can host a FLUX-class model, SDNQ is the simplest "install one thing, get a working pipeline" option.
 
+## Using a pipeline without standalone components
+
+A complete SDNQ pipeline supplies its own encoders and VAE, so you can leave the standalone model
+pickers empty — the **T5 Encoder**, **CLIP Embed** and **VAE** fields for FLUX.1, and the equivalent
+fields for FLUX.2 Klein and Z-Image. Select the pipeline as your main model and generate; Invoke
+resolves each component from the install.
+
+"Complete" means the install actually ships every component, not that its `model_index.json`
+advertises them. Invoke checks each component folder at install time and records only the ones that
+are really there, hold weights their loader can read, and whose own config declares the class the
+index claims. So a partial or interrupted download is *not* treated as self-contained, and the
+standalone pickers stay required — which is the behaviour you want, because the alternative is a
+failure at generation time.
+
+If you do select a standalone component, it wins over the bundled one. That is the way to override,
+for example, an SDNQ pipeline's VAE with a full-precision one.
+
+Models that are not pipeline-shaped — single-file SDNQ checkpoints, GGUF, BnB — have nothing to
+resolve from and still require the standalone selections. Invoke names every missing component at
+once rather than reporting them one at a time.
+
 ## Troubleshooting
 
 ### "Non-diffusers FLUX.2 Klein models require a standalone Qwen3 Encoder" (Invoke button greyed out)

@@ -24,7 +24,7 @@ from invokeai.backend.model_manager.configs.qwen3_encoder import (
     Qwen3Encoder_SDNQ_Config,
     Qwen3Encoder_SDNQ_Folder_Config,
 )
-from invokeai.backend.model_manager.load.load_default import ModelLoader
+from invokeai.backend.model_manager.load.load_default import ModelLoader, resolve_submodel_path
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
 from invokeai.backend.model_manager.taxonomy import (
@@ -150,7 +150,7 @@ class ZImageDiffusersModel(GenericDiffusersLoader):
             raise Exception("A submodel type must be provided when loading main pipelines.")
 
         model_path = Path(config.path)
-        submodel_path = model_path / submodel_type.value
+        submodel_path = resolve_submodel_path(config, submodel_type, model_path / submodel_type.value)
 
         # Check if submodel folder has SDNQ quantization - if so, use SDNQ loader
         if self._is_sdnq_folder(submodel_path):
@@ -621,7 +621,7 @@ class ZImageSDNQCheckpointModel(ModelLoader):
     def _load_text_encoder(self, config: Main_SDNQ_Diffusers_ZImage_Config) -> AnyModel:
         from transformers import AutoConfig, Qwen3ForCausalLM
 
-        te_dir = Path(config.path) / "text_encoder"
+        te_dir = resolve_submodel_path(config, SubModelType.TextEncoder, Path(config.path) / "text_encoder")
         target_device = TorchDevice.choose_torch_device()
         compute_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
 
@@ -642,13 +642,13 @@ class ZImageSDNQCheckpointModel(ModelLoader):
         return model
 
     def _load_tokenizer(self, config: Main_SDNQ_Diffusers_ZImage_Config) -> AnyModel:
-        tok_dir = Path(config.path) / "tokenizer"
+        tok_dir = resolve_submodel_path(config, SubModelType.Tokenizer, Path(config.path) / "tokenizer")
         return AutoTokenizer.from_pretrained(tok_dir, local_files_only=True)
 
     def _load_vae(self, config: Main_SDNQ_Diffusers_ZImage_Config) -> AnyModel:
         from diffusers import AutoencoderKL
 
-        vae_dir = Path(config.path) / "vae"
+        vae_dir = resolve_submodel_path(config, SubModelType.VAE, Path(config.path) / "vae")
         return AutoencoderKL.from_pretrained(vae_dir, local_files_only=True)
 
     def _load_from_singlefile(
@@ -719,7 +719,11 @@ class ZImageSDNQCheckpointModel(ModelLoader):
         # into transformer/ directly. The pipeline-level Main config has its own path at the root.
         # Either way, locate the transformer/config.json + safetensors.
         model_path = Path(config.path)
-        transformer_path = model_path / "transformer" if (model_path / "transformer").is_dir() else model_path
+        transformer_path = resolve_submodel_path(
+            config,
+            SubModelType.Transformer,
+            model_path / "transformer" if (model_path / "transformer").is_dir() else model_path,
+        )
 
         target_device = TorchDevice.choose_torch_device()
         compute_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)

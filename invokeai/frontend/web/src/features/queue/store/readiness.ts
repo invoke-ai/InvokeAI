@@ -46,7 +46,11 @@ import { atom, computed } from 'nanostores';
 import { useEffect } from 'react';
 import { selectFlux2DevDiffusersModels, selectFlux2DiffusersModels } from 'services/api/hooks/modelsByType';
 import type { MainOrExternalModelConfig } from 'services/api/types';
-import { isExternalApiModelConfig, isSelfContainedSDNQPipeline } from 'services/api/types';
+import {
+  isExternalApiModelConfig,
+  isSelfContainedSDNQFlux1Pipeline,
+  isSelfContainedSDNQPipeline,
+} from 'services/api/types';
 import { $isConnected } from 'services/events/stores';
 
 /**
@@ -288,14 +292,20 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
   } else if (isExternalApiModelConfig(model)) {
     // external models don't require local sub-models
   } else if (model.base === 'flux') {
-    if (!params.t5EncoderModel) {
-      reasons.push({ content: i18n.t('parameters.invoke.noT5EncoderModelSelected') });
-    }
-    if (!params.clipEmbedModel) {
-      reasons.push({ content: i18n.t('parameters.invoke.noCLIPEmbedModelSelected') });
-    }
-    if (!params.fluxVAE) {
-      reasons.push({ content: i18n.t('parameters.invoke.noFLUXVAEModelSelected') });
+    // A complete SDNQ FLUX.1 pipeline install ships its own T5, CLIP and VAE, and the model loader
+    // node falls back to them, so requiring the standalone selections here would keep that path
+    // unreachable from the UI. Anything else (single-file, GGUF, BnB) still needs all three.
+    const mainSuppliesComponents = isSelfContainedSDNQFlux1Pipeline(model);
+    if (!mainSuppliesComponents) {
+      if (!params.t5EncoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noT5EncoderModelSelected') });
+      }
+      if (!params.clipEmbedModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noCLIPEmbedModelSelected') });
+      }
+      if (!params.fluxVAE) {
+        reasons.push({ content: i18n.t('parameters.invoke.noFLUXVAEModelSelected') });
+      }
     }
     if (params.pidMode !== 'off') {
       if (!params.pidDecoderModel) {
@@ -703,14 +713,20 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   } else if (isExternalApiModelConfig(model)) {
     // external models don't require local sub-models
   } else if (model.base === 'flux') {
-    if (!params.t5EncoderModel) {
-      reasons.push({ content: i18n.t('parameters.invoke.noT5EncoderModelSelected') });
-    }
-    if (!params.clipEmbedModel) {
-      reasons.push({ content: i18n.t('parameters.invoke.noCLIPEmbedModelSelected') });
-    }
-    if (!params.fluxVAE) {
-      reasons.push({ content: i18n.t('parameters.invoke.noFLUXVAEModelSelected') });
+    // A complete SDNQ FLUX.1 pipeline install ships its own T5, CLIP and VAE, and the model loader
+    // node falls back to them, so requiring the standalone selections here would keep that path
+    // unreachable from the UI. Anything else (single-file, GGUF, BnB) still needs all three.
+    const mainSuppliesComponents = isSelfContainedSDNQFlux1Pipeline(model);
+    if (!mainSuppliesComponents) {
+      if (!params.t5EncoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noT5EncoderModelSelected') });
+      }
+      if (!params.clipEmbedModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noCLIPEmbedModelSelected') });
+      }
+      if (!params.fluxVAE) {
+        reasons.push({ content: i18n.t('parameters.invoke.noFLUXVAEModelSelected') });
+      }
     }
 
     const { bbox } = canvas;

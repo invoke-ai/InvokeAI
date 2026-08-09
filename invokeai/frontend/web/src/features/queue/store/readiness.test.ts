@@ -622,3 +622,66 @@ describe('Ideogram 4 readiness checks - canvas tab', () => {
     expect(hasReasonWith(reasons, 'rgReferenceImagesNotSupported')).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// FLUX.1: a complete SDNQ pipeline supplies its own T5 / CLIP / VAE
+// ---------------------------------------------------------------------------
+
+const flux1SdnqPipelineModel = {
+  key: 'flux1-sdnq-pipeline',
+  hash: 'flux1-sdnq-hash',
+  name: 'FLUX.1 dev SDNQ',
+  base: 'flux',
+  type: 'main',
+  format: 'sdnq_quantized',
+  variant: 'dev',
+  submodels: {
+    transformer: {},
+    vae: {},
+    text_encoder: {},
+    tokenizer: {},
+    text_encoder_2: {},
+    tokenizer_2: {},
+  },
+} as unknown as MainModelConfig;
+
+const flux1SingleFileModel = {
+  key: 'flux1-gguf',
+  hash: 'flux1-gguf-hash',
+  name: 'FLUX.1 dev GGUF',
+  base: 'flux',
+  type: 'main',
+  format: 'gguf_quantized',
+  variant: 'dev',
+} as unknown as MainModelConfig;
+
+const flux1ComponentReasons = (reasons: { content: string }[]) =>
+  reasons.filter(
+    (r) =>
+      r.content.includes('noT5EncoderModelSelected') ||
+      r.content.includes('noCLIPEmbedModelSelected') ||
+      r.content.includes('noFLUXVAEModelSelected')
+  );
+
+describe('FLUX.1 readiness – self-contained SDNQ pipeline', () => {
+  it('does not demand standalone T5 / CLIP / VAE when the pipeline ships them', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(buildGenerateTabArg({ model: flux1SdnqPipelineModel }));
+
+    expect(flux1ComponentReasons(reasons)).toEqual([]);
+  });
+
+  it('still demands all three for a single-file FLUX.1 model', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(buildGenerateTabArg({ model: flux1SingleFileModel }));
+
+    expect(flux1ComponentReasons(reasons)).toHaveLength(3);
+  });
+
+  it('still demands them when the pipeline is missing its T5 pair', () => {
+    const { text_encoder_2: _te2, tokenizer_2: _tok2, ...withoutT5 } = flux1SdnqPipelineModel.submodels!;
+    const partial = { ...flux1SdnqPipelineModel, submodels: withoutT5 } as unknown as MainModelConfig;
+
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(buildGenerateTabArg({ model: partial }));
+
+    expect(flux1ComponentReasons(reasons)).toHaveLength(3);
+  });
+});

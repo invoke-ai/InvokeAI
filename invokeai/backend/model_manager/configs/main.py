@@ -2243,6 +2243,10 @@ _SDNQ_PIPELINE_TEXT_ENCODER_CLASS_NAMES = _SDNQ_LOADABLE_QWEN_ARCHITECTURES
 # config and at least one weight file; the tokenizer folder carries no weights, only its vocab/config.
 _COMPONENT_CONFIG_FILENAMES = ("config.json", "model_index.json")
 _COMPONENT_WEIGHT_SUFFIXES = (".safetensors", ".bin", ".pt", ".pth", ".ckpt", ".gguf")
+# ...but a *quantized* component is read by `sdnq_sd_loader`, which globs `*.safetensors` and raises
+# when it finds none. Anything else in an SDNQ folder is not a weight that component can be loaded
+# from, so accepting it would record a submodel the loader is guaranteed to choke on.
+_SDNQ_COMPONENT_WEIGHT_SUFFIXES = (".safetensors",)
 # Submodel slots that ship vocab/config only. They need no weight file, and nothing can be
 # mis-instantiated against them, so they are also exempt from the declared-class requirement.
 _WEIGHTLESS_SUBMODEL_TYPES = frozenset({SubModelType.Tokenizer, SubModelType.Tokenizer2})
@@ -2345,6 +2349,12 @@ def _sdnq_component_dir_is_populated(component_path: Path, submodel_type: SubMod
     a submodel makes is_self_contained_sdnq_pipeline() report the pipeline as complete. Readiness then
     permits generation and the invocations select the main model as the component source, and the
     failure only surfaces when the loader tries to read the empty vae/ text_encoder/ tokenizer/ folder.
+
+    "Files its loader needs" is per component, not one list for all of them. A quantized component
+    goes through `sdnq_sd_loader`, which globs `*.safetensors` and raises if it finds none, so a
+    `.gguf` or `.bin` there is not a usable weight however well-formed the folder otherwise looks.
+    An unquantized component (typically the VAE, which SDNQ exports leave in bfloat16) is loaded with
+    `from_pretrained` and may legitimately ship any of the formats diffusers reads.
     """
     if not component_path.is_dir():
         return False
@@ -2354,10 +2364,11 @@ def _sdnq_component_dir_is_populated(component_path: Path, submodel_type: SubMod
     if submodel_type in _WEIGHTLESS_SUBMODEL_TYPES:
         return any((component_path / name).is_file() for name in _TOKENIZER_FILENAMES)
 
-    has_config = any((component_path / name).is_file() for name in _COMPONENT_CONFIG_FILENAMES)
-    has_weights = any(
-        entry.is_file() and entry.suffix in _COMPONENT_WEIGHT_SUFFIXES for entry in component_path.iterdir()
+    accepted_suffixes = (
+        _SDNQ_COMPONENT_WEIGHT_SUFFIXES if _is_sdnq_folder(component_path) else _COMPONENT_WEIGHT_SUFFIXES
     )
+    has_config = any((component_path / name).is_file() for name in _COMPONENT_CONFIG_FILENAMES)
+    has_weights = any(entry.is_file() and entry.suffix in accepted_suffixes for entry in component_path.iterdir())
     return has_config and has_weights
 
 

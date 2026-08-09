@@ -1,11 +1,11 @@
-"""SDNQ hygiene: diagnostics must not cost anything when nobody is listening, and hand-built
-modules must come back in inference mode.
+"""SDNQ diagnostics must not cost anything when nobody is listening.
 
-Both are cheap to get wrong and invisible in normal use. The uint4 diagnostic ran full-tensor
-reductions (and a `unique()` sort) on the first dequantization of every model and wrote to stdout,
-bypassing the app's log level and handlers. The SDNQ loaders build their modules with
-`init_empty_weights` + `load_state_dict` rather than `from_pretrained`, so nothing called `.eval()`
-for them and any dropout / norm in the tree stayed in training mode during inference.
+The uint4 diagnostic ran full-tensor reductions (and a `unique()` sort) on the first dequantization
+of every model, and wrote to stdout — bypassing the app's log level, format and handlers. It is now
+gated on the log level before computing anything, and bounded to a fixed-size sample.
+
+Eval mode lives in `tests/backend/model_manager/load/test_load_default_helpers.py`: it applies to
+every loader, not to SDNQ specifically.
 """
 
 import logging
@@ -13,7 +13,6 @@ import logging
 import pytest
 import torch
 
-from invokeai.backend.model_manager.load.model_loaders.flux import _in_eval_mode
 from invokeai.backend.quantization.sdnq import utils as sdnq_utils
 
 
@@ -74,22 +73,3 @@ def test_the_uint4_diagnostic_runs_once_and_is_bounded_by_a_fixed_sample(monkeyp
     reported_counts = [arg for arg in emitted[0] if isinstance(arg, int)]
     assert big.numel() not in reported_counts
     assert sdnq_utils._DIAGNOSTIC_SAMPLE_SIZE in reported_counts
-
-
-def test_sdnq_loaders_return_modules_in_eval_mode() -> None:
-    """`_in_eval_mode` is what every SDNQ branch of the FLUX loader funnels through."""
-    module = torch.nn.Sequential(torch.nn.Linear(2, 2), torch.nn.Dropout(0.5))
-    module.train()
-    assert module.training
-
-    returned = _in_eval_mode(module)
-
-    assert returned is module
-    assert all(not child.training for child in module.modules())
-
-
-def test_in_eval_mode_passes_non_modules_through() -> None:
-    """Tokenizers are not nn.Modules and must not be touched."""
-    sentinel = object()
-
-    assert _in_eval_mode(sentinel) is sentinel  # type: ignore[arg-type]

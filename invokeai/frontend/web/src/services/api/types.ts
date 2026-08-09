@@ -559,13 +559,39 @@ const SDNQ_PIPELINE_REQUIRED_SUBMODELS = ['transformer', 'vae', 'text_encoder', 
  * by the backend after graph construction.
  */
 export const isSelfContainedSDNQPipeline = (config: AnyModelConfig): boolean => {
+  return hasSubmodels(config, SDNQ_PIPELINE_REQUIRED_SUBMODELS);
+};
+
+/**
+ * FLUX.1 drives two text encoders, so a pipeline install can only replace the standalone components
+ * if it also ships the T5 pair on top of the CLIP one. Mirrors
+ * `_REQUIRED_FLUX1_PIPELINE_SUBMODELS` / `is_self_contained_sdnq_flux1_pipeline()` in
+ * `invokeai/app/invocations/model.py`; if the two disagree, the UI either blocks a model the node
+ * would have accepted or builds a graph the node then rejects.
+ */
+const SDNQ_FLUX1_PIPELINE_REQUIRED_SUBMODELS = [
+  ...SDNQ_PIPELINE_REQUIRED_SUBMODELS,
+  'text_encoder_2',
+  'tokenizer_2',
+] as const;
+
+const hasSubmodels = (config: AnyModelConfig, required: readonly string[]): boolean => {
   const submodels = (config as { submodels?: unknown }).submodels;
   if (typeof submodels !== 'object' || submodels === null) {
     return false;
   }
-  return SDNQ_PIPELINE_REQUIRED_SUBMODELS.every((submodel) =>
-    Boolean((submodels as Record<string, unknown>)[submodel])
-  );
+  return required.every((submodel) => Boolean((submodels as Record<string, unknown>)[submodel]));
+};
+
+/**
+ * True for a FLUX.1 SDNQ pipeline that ships every component the FLUX graph needs, so the
+ * standalone T5 / CLIP / VAE selections are not required.
+ */
+export const isSelfContainedSDNQFlux1Pipeline = (config: AnyModelConfig): boolean => {
+  if ((config as { format?: unknown }).format !== 'sdnq_quantized') {
+    return false;
+  }
+  return hasSubmodels(config, SDNQ_FLUX1_PIPELINE_REQUIRED_SUBMODELS);
 };
 
 export const isZImageDiffusersMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {

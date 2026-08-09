@@ -423,3 +423,58 @@ def test_sdnq_pipeline_tokenizer_without_a_declared_class_is_still_recorded(tmp_
     config = factory.from_model_on_disk(_mod(root), {**_REQUIRED_FIELDS, "path": root.as_posix()})
 
     _assert_complete_pipeline(config)
+
+
+@pytest.mark.parametrize("suffix", [".gguf", ".bin", ".pt"])
+@pytest.mark.parametrize(
+    ("factory", "root_name"),
+    [
+        (Main_SDNQ_Diffusers_Flux2_Config, "flux2-nonsafetensors-encoder"),
+        (Main_SDNQ_Diffusers_ZImage_Config, "zimage-nonsafetensors-encoder"),
+    ],
+)
+def test_a_quantized_component_without_safetensors_is_not_recorded(
+    tmp_path: Path, factory, root_name: str, suffix: str
+):
+    """`sdnq_sd_loader` globs `*.safetensors` and raises when it finds none.
+
+    A folder that declares the right class and holds a `.gguf`/`.bin` looks populated to a generic
+    file check, so the pipeline was recorded as self-contained and the failure moved to load time.
+    """
+    maker = _make_flux2_pipeline if factory is Main_SDNQ_Diffusers_Flux2_Config else _make_zimage_pipeline
+    root = maker(tmp_path / f"{root_name}{suffix}", "Qwen3ForCausalLM")
+
+    encoder = root / "text_encoder"
+    (encoder / "model.safetensors").unlink()
+    # Marking it SDNQ is what routes it to the safetensors-only loader.
+    (encoder / "quantization_config.json").write_text(json.dumps({"quant_method": "sdnq"}), encoding="utf-8")
+    (encoder / f"model{suffix}").write_bytes(b"\x00")
+
+    config = factory.from_model_on_disk(_mod(root), {**_REQUIRED_FIELDS, "path": root.as_posix()})
+
+    assert config.submodels is not None
+    assert SubModelType.TextEncoder not in config.submodels
+    assert not is_self_contained_sdnq_pipeline(config)
+
+
+@pytest.mark.parametrize(
+    ("factory", "root_name"),
+    [
+        (Main_SDNQ_Diffusers_Flux2_Config, "flux2-bin-vae"),
+        (Main_SDNQ_Diffusers_ZImage_Config, "zimage-bin-vae"),
+    ],
+)
+def test_an_unquantized_component_may_still_ship_a_non_safetensors_weight(tmp_path: Path, factory, root_name: str):
+    """SDNQ exports leave the VAE unquantized; it goes through `from_pretrained`, which reads more
+    than safetensors. Narrowing every component to safetensors would reject those pipelines."""
+    maker = _make_flux2_pipeline if factory is Main_SDNQ_Diffusers_Flux2_Config else _make_zimage_pipeline
+    root = maker(tmp_path / root_name, "Qwen3ForCausalLM")
+
+    vae = root / "vae"
+    (vae / "model.safetensors").unlink()
+    (vae / "diffusion_pytorch_model.bin").write_bytes(b"\x00")  # no quantization_config.json here
+
+    config = factory.from_model_on_disk(_mod(root), {**_REQUIRED_FIELDS, "path": root.as_posix()})
+
+    assert config.submodels is not None
+    assert SubModelType.VAE in config.submodels
