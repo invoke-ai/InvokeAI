@@ -2,12 +2,12 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 827351,
+        "brotliBytes": 827257,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 825814,
+        "gzipBytes": 826867,
         "imageRawBytes": 156376,
-        "initialRawBytes": 1921492,
+        "initialRawBytes": 1921094,
         "largestAssetRawBytes": 746170,
         "otherAssetRawBytes": 0,
         "ownedRawBytes": 66295,
@@ -274,12 +274,12 @@
         ]
       },
       "limits": {
-        "brotliBytes": 835625,
+        "brotliBytes": 835530,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 834073,
+        "gzipBytes": 835136,
         "imageRawBytes": 157940,
-        "initialRawBytes": 1940707,
+        "initialRawBytes": 1940305,
         "largestAssetRawBytes": 753632,
         "otherAssetRawBytes": 0,
         "ownedRawBytes": 66295,
@@ -292,15 +292,15 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1011265,
+        "brotliBytes": 1011158,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1006842,
+        "gzipBytes": 1008506,
         "imageRawBytes": 156376,
-        "initialRawBytes": 2477671,
+        "initialRawBytes": 2477274,
         "largestAssetRawBytes": 746170,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 113648,
+        "ownedRawBytes": 113649,
         "requestCount": 79,
         "scriptRequestCount": 63,
         "sourceOwners": [
@@ -798,15 +798,15 @@
         ]
       },
       "limits": {
-        "brotliBytes": 1021378,
+        "brotliBytes": 1021270,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 1016911,
+        "gzipBytes": 1018592,
         "imageRawBytes": 157940,
-        "initialRawBytes": 2502448,
+        "initialRawBytes": 2502047,
         "largestAssetRawBytes": 753632,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 113648,
+        "ownedRawBytes": 113649,
         "requestCount": 79,
         "scriptRequestCount": 63
       },
@@ -815,7 +815,7 @@
       "source": "src/app/WorkbenchApp.tsx"
     }
   },
-  "capturedAt": "2026-08-08",
+  "capturedAt": "2026-08-09",
   "developmentInvalidation": {
     "platformUiBarrel": {
       "specifier": "@platform/ui",
