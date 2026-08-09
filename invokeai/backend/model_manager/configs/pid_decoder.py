@@ -15,6 +15,7 @@ from pydantic import Field
 
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Config_Base
 from invokeai.backend.model_manager.configs.identification_utils import (
+    InvalidMatchError,
     NotAMatchError,
     raise_for_override_fields,
     raise_if_not_file,
@@ -41,7 +42,7 @@ def _looks_like_pid_decoder(state_dict: dict[str | int, Any]) -> bool:
     return any(isinstance(k, str) and _PID_MARKER_SUBSTRING in k for k in state_dict)
 
 
-def _raise_if_lq_projection_incomplete(state_dict: dict[str | int, Any], base: BaseModelType | None) -> None:
+def _raise_if_lq_projection_incomplete(state_dict: dict[str | int, Any]) -> None:
     """Reject a checkpoint that carries only part of the LQ projection.
 
     A single `lq_proj.*` key is not evidence of a usable decoder: models are built under
@@ -49,21 +50,21 @@ def _raise_if_lq_projection_incomplete(state_dict: dict[str | int, Any], base: B
     memory (`load_pid_decoder` therefore rejects missing keys too). Catching it here means an
     incomplete file is reported at install time instead of decoding to garbage or NaNs later.
 
-    `base` is None before the backbone is known, in which case the backbone-independent key set is
-    used. That call has to come first: the backbone is read from `lq_proj.latent_proj.0.weight`, so
-    a file missing exactly that weight would otherwise be reported as "cannot determine backbone" —
-    true, but not the reason, and not the message the install flow promises for a truncated file.
+    The rejection is an `InvalidMatchError`, not a `NotAMatchError`: this file has already shown
+    itself to be a PiD checkpoint, so classification must not shrug and register it as an unknown
+    model. `required_lq_proj_keys()` is one contract for every backbone, so this needs no backbone
+    and can therefore run before the backbone is known — which it has to, since the backbone is read
+    from `lq_proj.latent_proj.0.weight` and that weight is itself one a truncated file may lack.
     """
     # Imported lazily: it pulls in the vendored PiD network stack, which model identification
     # otherwise has no reason to load.
-    from invokeai.backend.pid.decode import common_required_lq_proj_keys, required_lq_proj_keys
+    from invokeai.backend.pid.decode import required_lq_proj_keys
 
-    expected = required_lq_proj_keys(base) if base is not None else common_required_lq_proj_keys()
-    missing = sorted(expected - pid_net_keys(state_dict))
+    missing = sorted(required_lq_proj_keys() - pid_net_keys(state_dict))
     if missing:
-        raise NotAMatchError(
+        raise InvalidMatchError(
             f"PiD checkpoint is missing {len(missing)} of the LQ projection weights required by PidNet "
-            f"(e.g. {missing[:3]}); the file is incomplete or is not a PiD super-resolution decoder"
+            f"(e.g. {missing[:3]}); the file is incomplete and cannot be used as a PiD decoder"
         )
 
 
@@ -192,19 +193,22 @@ class PiDDecoder_Checkpoint_Config_Base(Checkpoint_Config_Base):
         if not _looks_like_pid_decoder(state_dict):
             raise NotAMatchError("state dict does not look like a PiD decoder (no 'lq_proj.*' keys)")
 
-        # Completeness first, backbone second — the backbone is read from one of the LQ weights, so a
-        # truncated file must be reported as truncated rather than as an unidentifiable backbone.
-        _raise_if_lq_projection_incomplete(state_dict, None)
-
-        # Reject checkpoints whose network shape InvokeAI's build_pid_net cannot construct (e.g. NVIDIA's
-        # v1.5 decoders use lq_hidden_dim=1024) at identification time, instead of accepting them and
-        # failing with a size-mismatch deep inside the decode.
+        # Architecture before completeness. A v1.5 checkpoint is intact, just built to a shape InvokeAI
+        # cannot construct — it must be reported as unsupported (and stay a plain no-match, so it can
+        # still be registered as an unknown model) rather than be judged against the legacy key set and
+        # hard-rejected as truncated. Ordering it first costs the completeness check nothing: the hidden
+        # dim is read from `lq_proj.latent_proj.0.weight`, so a file truncated past that weight yields
+        # None here and falls straight through to the check below.
         lq_hidden_dim = _lq_hidden_dim_from_state_dict(state_dict)
         if lq_hidden_dim is not None and lq_hidden_dim != _SUPPORTED_LQ_HIDDEN_DIM:
             raise NotAMatchError(
                 f"PiD decoder has lq_proj hidden dim {lq_hidden_dim}, but InvokeAI only supports the legacy "
                 f"{_SUPPORTED_LQ_HIDDEN_DIM}-dim architecture (NVIDIA's v1.5 checkpoints are not yet supported)."
             )
+
+        # Completeness before the backbone — the backbone is read from one of the LQ weights, so a
+        # truncated file must be reported as truncated rather than as an unidentifiable backbone.
+        _raise_if_lq_projection_incomplete(state_dict)
 
         # A direct single-file install stores the checkpoint as `<uuid>/model_ema_bf16.pth`, dropping
         # NVIDIA's `…official_sd3_distill…` directory name. The install source (an HF path or URL)
@@ -217,11 +221,6 @@ class PiDDecoder_Checkpoint_Config_Base(Checkpoint_Config_Base):
         cls._validate_base(mod, state_dict, name=name, had_base_override=had_base_override)
 
         base: BaseModelType = cls.model_fields["base"].default
-        # Re-checked against this backbone's own key set. Today that is the same 71 keys for every
-        # backbone, so this is a no-op — it is here so the check does not quietly weaken to the
-        # intersection if a future backbone adds LQ parameters of its own.
-        _raise_if_lq_projection_incomplete(state_dict, base)
-
         variant = override_fields.pop("variant", None) or _variant_from_name(name, base)
         return cls(**override_fields, variant=variant)
 

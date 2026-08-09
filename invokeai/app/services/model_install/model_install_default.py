@@ -1146,6 +1146,11 @@ class ModelInstallService(ModelInstallServiceBase):
 
         if result.config is None:
             self._logger.error(f"Could not identify model for {model_path}, detailed results: {result.details}")
+            # A model that was recognised and then rejected as unusable (e.g. a truncated checkpoint)
+            # comes with a specific reason. Report that instead of "could not identify", which would be
+            # both wrong and useless to whoever has to work out why the install failed.
+            if invalid := result.invalid_matches:
+                raise InvalidModelConfigException(f"Model at {model_path} cannot be used: {invalid[0]}")
             raise InvalidModelConfigException(f"Could not identify model for {model_path}")
         elif isinstance(result.config, Unknown_Config):
             self._logger.error(f"Could not identify model for {model_path}, detailed results: {result.details}")

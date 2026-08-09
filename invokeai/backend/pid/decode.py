@@ -176,11 +176,8 @@ _LQ_NUM_RES_BLOCKS_DEFAULT = 4
 
 
 @lru_cache(maxsize=None)
-def required_lq_proj_keys(backbone: BaseModelType) -> frozenset[str]:
-    """Names (relative to PidNet) of every `lq_proj.*` parameter a built PidNet expects.
-
-    Used by the model-manager config to reject a checkpoint that carries only *some* of the LQ
-    projection — see `load_pid_decoder` for why a partial LQ projection is not loadable.
+def _probe_lq_proj_keys(backbone: BaseModelType) -> frozenset[str]:
+    """Names (relative to PidNet) of every `lq_proj.*` parameter a PidNet built for *backbone* expects.
 
     Derived from a throwaway `LQProjection2D` built with the real structural counts but tiny feature
     dims, so it stays in step with the vendored network instead of duplicating a hand-written list.
@@ -192,6 +189,8 @@ def required_lq_proj_keys(backbone: BaseModelType) -> frozenset[str]:
     making later unseeded randomness depend on install order. Meta construction allocates nothing;
     the fork is the belt to that suspenders, since it holds regardless of what the vendored module
     does in its constructor.
+
+    Callers want :func:`required_lq_proj_keys` — the one contract these all agree on.
     """
     if backbone not in _PER_BACKBONE:
         raise ValueError(
@@ -220,22 +219,26 @@ def required_lq_proj_keys(backbone: BaseModelType) -> frozenset[str]:
     return frozenset(f"lq_proj.{k}" for k in probe.state_dict())
 
 
+# The backbone the key contract is probed from. `_PER_BACKBONE` overrides only `lq_latent_channels`
+# and `latent_spatial_down_factor`; both change tensor *shapes*, neither adds or removes a parameter,
+# so one probe describes every backbone.
+_KEY_CONTRACT_BACKBONE = BaseModelType.Flux
+
+
 @lru_cache(maxsize=None)
-def common_required_lq_proj_keys() -> frozenset[str]:
-    """The `lq_proj.*` keys required by *every* supported backbone.
+def required_lq_proj_keys() -> frozenset[str]:
+    """The `lq_proj.*` key contract every supported backbone's PidNet shares.
 
-    Identification needs to judge an LQ projection *before* it knows which backbone the checkpoint
-    belongs to — the backbone is read from `lq_proj.latent_proj.0.weight`, which is itself one of
-    the keys a truncated file may be missing. Checking the per-backbone set first is therefore
-    circular: a file missing that one weight fails with "cannot determine backbone" instead of the
-    accurate "incomplete LQ projection".
+    One contract, not one per backbone. Used by the model-manager config to reject a checkpoint that
+    carries only *some* of the LQ projection — see `load_pid_decoder` for why a partial LQ projection
+    is not loadable — and it has to hold before the backbone is known, since the backbone is read from
+    `lq_proj.latent_proj.0.weight`, which is itself one of the keys a truncated file may be missing.
 
-    Parameter names depend only on the structural counts, which `_PER_BACKBONE` does not vary — so
-    today this intersection *is* every backbone's full set (`test_pid_decode.py` pins that). Taking
-    the intersection rather than assuming it keeps the check correct if a future backbone diverges:
-    it can then only under-report, never reject a valid checkpoint.
+    `test_pid_decode.py` probes every backbone and pins that they all agree, so a future backbone that
+    does add LQ parameters of its own fails there — loudly, and while it is being added — instead of
+    silently weakening this check.
     """
-    return frozenset.intersection(*(required_lq_proj_keys(b) for b in _PER_BACKBONE))
+    return _probe_lq_proj_keys(_KEY_CONTRACT_BACKBONE)
 
 
 def load_pid_decoder(state_dict: dict[str, Tensor], backbone: BaseModelType) -> PidNet:

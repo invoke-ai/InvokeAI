@@ -11,8 +11,8 @@ from invokeai.backend.pid.decode import (
     _LQ_NUM_RES_BLOCKS_DEFAULT,
     _PER_BACKBONE,
     _get_t_list,
+    _probe_lq_proj_keys,
     assert_pid_decoder_matches_base,
-    common_required_lq_proj_keys,
     load_pid_decoder,
     required_lq_proj_keys,
 )
@@ -72,7 +72,7 @@ class TestRequiredLqProjKeys:
         )
 
     def test_covers_every_lq_submodule(self) -> None:
-        keys = required_lq_proj_keys(BaseModelType.Flux)
+        keys = required_lq_proj_keys()
         assert all(k.startswith("lq_proj.") for k in keys)
         # Latent projection convs, one output head + one gate per injection point (patch_depth 14 /
         # lq_interval 2 = 7). The image branch is disabled (lq_in_channels=0), so it must not appear.
@@ -81,16 +81,17 @@ class TestRequiredLqProjKeys:
         assert sum(k.endswith(".log_alpha") for k in keys) == 7
         assert not any(".image_conv." in k for k in keys)
 
-    def test_is_identical_across_backbones(self) -> None:
-        """Only tensor *shapes* differ per backbone; the key names must not, or identification would
-        need per-backbone handling."""
-        flux = required_lq_proj_keys(BaseModelType.Flux)
-        for backbone in (BaseModelType.Flux2, BaseModelType.StableDiffusion3, BaseModelType.StableDiffusionXL):
-            assert required_lq_proj_keys(backbone) == flux
+    def test_one_contract_holds_for_every_backbone(self) -> None:
+        """`required_lq_proj_keys()` is backbone-independent because `_PER_BACKBONE` varies only tensor
+        *shapes*. Identification relies on that — it checks completeness before it knows the backbone —
+        so a backbone that ever adds LQ parameters of its own has to fail here, while it is being
+        added, rather than silently weakening the install-time check."""
+        for backbone in _PER_BACKBONE:
+            assert _probe_lq_proj_keys(backbone) == required_lq_proj_keys(), backbone
 
     def test_unsupported_backbone_raises(self) -> None:
         with pytest.raises(ValueError, match="not supported"):
-            required_lq_proj_keys(BaseModelType.StableDiffusion1)
+            _probe_lq_proj_keys(BaseModelType.StableDiffusion1)
 
     def test_probing_does_not_consume_the_global_rng(self) -> None:
         """The probe builds a real module only to read parameter names. Constructing it normally
@@ -102,18 +103,11 @@ class TestRequiredLqProjKeys:
 
         torch.manual_seed(0)
         required_lq_proj_keys.cache_clear()
-        required_lq_proj_keys(BaseModelType.Flux)
+        _probe_lq_proj_keys.cache_clear()
+        required_lq_proj_keys()
         after = torch.rand(4)
 
         assert torch.equal(control, after), "identification must not advance the global RNG"
-
-    def test_common_key_set_is_every_backbones_key_set(self) -> None:
-        """Identification checks completeness before it knows the backbone, using the intersection.
-        While the per-backbone sets are identical, that check is exactly as strong as the specific
-        one — this pins the assumption so a diverging backbone shows up here rather than as a
-        silently weakened install-time check."""
-        for backbone in _PER_BACKBONE:
-            assert common_required_lq_proj_keys() == required_lq_proj_keys(backbone)
 
 
 class TestLoadPidDecoderRejectsPartialCheckpoints:

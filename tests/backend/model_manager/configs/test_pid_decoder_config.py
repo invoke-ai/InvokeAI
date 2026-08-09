@@ -6,7 +6,8 @@ Covers the three things identification has to get right before a checkpoint reac
   decoders use lq_hidden_dim=1024 (plus PiT injection, scalar gates, ...), which cannot be loaded into
   it, so such a checkpoint must be rejected here instead of crashing with a size mismatch mid-decode.
 - Completeness: models are built under `skip_torch_weight_init()`, so a checkpoint that carries only
-  part of the LQ projection would leave uninitialised Conv/Linear weights and decode to garbage.
+  part of the LQ projection would leave uninitialised Conv/Linear weights and decode to garbage. Such
+  a file must be rejected outright rather than fall through to the factory's `Unknown_Config`.
 - Variant: the record's resolution preset, including the direct single-file install case where the
   name carries no `res2k` / `res2kto4k` marker at all.
 """
@@ -17,7 +18,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from invokeai.backend.model_manager.configs.identification_utils import NotAMatchError
+from invokeai.backend.model_manager.configs.factory import ModelConfigFactory
+from invokeai.backend.model_manager.configs.identification_utils import InvalidMatchError, NotAMatchError
 from invokeai.backend.model_manager.configs.pid_decoder import (
     PiDDecoder_Checkpoint_FLUX_Config,
     PiDDecoder_Checkpoint_QwenImage_Config,
@@ -25,6 +27,7 @@ from invokeai.backend.model_manager.configs.pid_decoder import (
     PiDDecoder_Checkpoint_SDXL_Config,
     _lq_hidden_dim_from_state_dict,
 )
+from invokeai.backend.model_manager.configs.unknown import Unknown_Config
 from invokeai.backend.model_manager.taxonomy import BaseModelType, PiDDecoderVariantType
 from invokeai.backend.pid.decode import required_lq_proj_keys
 
@@ -56,9 +59,7 @@ _LATENT_PROJ_KEY = "lq_proj.latent_proj.0.weight"
 def _pid_state_dict(lq_hidden_dim: int, latent_channels: int = 16) -> dict[str, object]:
     """A complete PiD-looking state dict: every LQ projection weight PidNet expects, plus the
     diagnostic input Conv shaped for the given hidden dim / latent channel count."""
-    sd: dict[str, object] = {
-        f"{_NET_PREFIX}{k}": _FakeShapeTensor(1) for k in required_lq_proj_keys(BaseModelType.Flux)
-    }
+    sd: dict[str, object] = {f"{_NET_PREFIX}{k}": _FakeShapeTensor(1) for k in required_lq_proj_keys()}
     sd[f"{_NET_PREFIX}{_LATENT_PROJ_KEY}"] = _FakeShapeTensor(lq_hidden_dim, latent_channels, 3, 3)
     return sd
 
@@ -83,7 +84,14 @@ def _mock_mod(root: Path, state_dict: dict[str, object], dir_name: str | None = 
 
 
 def test_v1_5_checkpoint_is_rejected_at_identification() -> None:
-    """A 1024-dim (v1.5) checkpoint must be rejected, not accepted and crashed on later."""
+    """A 1024-dim (v1.5) checkpoint must be rejected, not accepted and crashed on later.
+
+    A plain `NotAMatchError`, deliberately: the file is intact, InvokeAI just cannot build its shape,
+    so it should still be registrable as an unknown model. Only a *broken* file is fatal (see
+    `TestTruncatedCheckpointIsNeverRegistered`). It is also why the hidden-dim check runs before the
+    completeness check — judged against the legacy key set, a v1.5 file would be misreported as
+    truncated, and would then be hard-rejected on top of it.
+    """
     with TemporaryDirectory() as tmpdir:
         mod = _mock_mod(Path(tmpdir), _pid_state_dict(1024))
         with pytest.raises(NotAMatchError, match="lq_proj hidden dim 1024"):
@@ -100,7 +108,12 @@ def test_legacy_512_checkpoint_is_accepted() -> None:
 
 
 class TestIncompleteLqProjection:
-    """A single `lq_proj` key is not evidence of a usable decoder — every LQ weight must be present."""
+    """A single `lq_proj` key is not evidence of a usable decoder — every LQ weight must be present.
+
+    These rejections are `InvalidMatchError`, not `NotAMatchError`: the file has already identified
+    itself as a PiD checkpoint, so it must not fall through to the factory's `Unknown_Config` fallback
+    (see `TestTruncatedCheckpointIsNeverRegistered`).
+    """
 
     @pytest.mark.parametrize(
         "dropped",
@@ -115,7 +128,7 @@ class TestIncompleteLqProjection:
         del sd[f"{_NET_PREFIX}{dropped}"]
         with TemporaryDirectory() as tmpdir:
             mod = _mock_mod(Path(tmpdir), sd)
-            with pytest.raises(NotAMatchError, match="missing 1 of the LQ projection weights"):
+            with pytest.raises(InvalidMatchError, match="missing 1 of the LQ projection weights"):
                 PiDDecoder_Checkpoint_FLUX_Config.from_model_on_disk(mod, dict(_OVERRIDE_FIELDS))
 
     def test_marker_key_alone_is_not_enough(self) -> None:
@@ -123,32 +136,73 @@ class TestIncompleteLqProjection:
         sd = {f"{_NET_PREFIX}{_LATENT_PROJ_KEY}": _FakeShapeTensor(512, 16, 3, 3)}
         with TemporaryDirectory() as tmpdir:
             mod = _mock_mod(Path(tmpdir), sd)
-            with pytest.raises(NotAMatchError, match="LQ projection weights"):
+            with pytest.raises(InvalidMatchError, match="LQ projection weights"):
                 PiDDecoder_Checkpoint_FLUX_Config.from_model_on_disk(mod, dict(_OVERRIDE_FIELDS))
 
     def test_truncation_is_reported_as_truncation_even_without_the_diagnostic_weight(self) -> None:
         """The backbone is read from `lq_proj.latent_proj.0.weight`, so a file truncated past *that*
         weight used to fail with "cannot determine backbone" — accurate, but not the reason, and not
         the message the install flow promises for a truncated checkpoint. Completeness is therefore
-        checked before the backbone, against the backbone-independent key set."""
+        checked before the backbone, against the single backbone-independent key contract."""
         sd = {f"{_NET_PREFIX}lq_proj.latent_proj.1.weight": _FakeShapeTensor(1)}
         fields = {k: v for k, v in _OVERRIDE_FIELDS.items() if k != "base"}
         with TemporaryDirectory() as tmpdir:
             # No directory name and no base override: nothing but the weights identifies this file.
             mod = _mock_mod(Path(tmpdir), sd)
-            with pytest.raises(NotAMatchError, match="missing 71 of the LQ projection weights"):
+            with pytest.raises(InvalidMatchError, match="missing 71 of the LQ projection weights"):
                 PiDDecoder_Checkpoint_FLUX_Config.from_model_on_disk(mod, dict(fields))
 
     def test_distill_only_submodules_do_not_count_as_lq_weights(self) -> None:
         """`net_ema.*` shadows PidNet's own parameter names. The loader drops those submodules, so
         identification has to as well — otherwise a checkpoint carrying only the EMA copy would look
         complete here and then fail in `load_pid_decoder`."""
-        sd = {f"net_ema.{k}": _FakeShapeTensor(1) for k in required_lq_proj_keys(BaseModelType.Flux)}
+        sd = {f"net_ema.{k}": _FakeShapeTensor(1) for k in required_lq_proj_keys()}
         sd[f"{_NET_PREFIX}{_LATENT_PROJ_KEY}"] = _FakeShapeTensor(512, 16, 3, 3)
         with TemporaryDirectory() as tmpdir:
             mod = _mock_mod(Path(tmpdir), sd)
-            with pytest.raises(NotAMatchError, match="LQ projection weights"):
+            with pytest.raises(InvalidMatchError, match="LQ projection weights"):
                 PiDDecoder_Checkpoint_FLUX_Config.from_model_on_disk(mod, dict(_OVERRIDE_FIELDS))
+
+
+class TestTruncatedCheckpointIsNeverRegistered:
+    """Rejecting a truncated checkpoint in the config class is only half the job.
+
+    Every config class signals "not mine" with `NotAMatchError`, which the factory collects and then,
+    with `allow_unknown_models` (default: true), papers over by returning `Unknown_Config`. A file that
+    identified itself as a PiD decoder and was then found to be incomplete would therefore still be
+    installed — as an unknown model, with a database record, failing only when something tried to load
+    it. `InvalidMatchError` is what makes the rejection stick.
+    """
+
+    def _write_partial_pid_checkpoint(self, root: Path) -> Path:
+        """A file carrying a single `lq_proj.*` weight: enough to be recognised, far from loadable.
+
+        Written as a `.pth`, the format NVIDIA actually ships, so this goes through the same
+        pickle-scan-and-`torch.load` path a real truncated download would.
+        """
+        import torch
+
+        path = root / "model_ema_bf16.pth"
+        torch.save({f"{_NET_PREFIX}lq_proj.latent_proj.1.weight": torch.zeros(1)}, path)
+        return path
+
+    def test_factory_returns_no_config_even_with_allow_unknown(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            path = self._write_partial_pid_checkpoint(Path(tmpdir))
+            result = ModelConfigFactory.from_model_on_disk(path, allow_unknown=True)
+
+        assert result.config is None, "a recognised-but-broken checkpoint must not be registered"
+        assert not any(isinstance(r, Unknown_Config) for r in result.details.values())
+
+    def test_the_rejection_reason_survives_for_the_installer_to_report(self) -> None:
+        """`_probe` raises with this text, so the user is told the file is incomplete rather than the
+        misleading "could not identify model"."""
+        with TemporaryDirectory() as tmpdir:
+            path = self._write_partial_pid_checkpoint(Path(tmpdir))
+            result = ModelConfigFactory.from_model_on_disk(path, allow_unknown=True)
+
+        assert result.invalid_matches
+        assert "LQ projection weights" in str(result.invalid_matches[0])
 
 
 class TestBackboneFromInstallSource:
