@@ -2,7 +2,7 @@ import type { ModelConfig } from '@features/models/core/types';
 
 import { describe, expect, it } from 'vitest';
 
-import { getFieldsForModel, supportsFp8Storage } from './DefaultSettingsSection';
+import { getFieldsForModel, supportsFp8Storage } from './defaultSettingsFields';
 
 const model = (base: string, type: string): Pick<ModelConfig, 'base' | 'type'> =>
   ({ base, type }) as Pick<ModelConfig, 'base' | 'type'>;

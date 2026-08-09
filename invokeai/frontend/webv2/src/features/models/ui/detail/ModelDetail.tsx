@@ -14,7 +14,8 @@ import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SiHuggingface } from 'react-icons/si';
 
-import { DefaultSettingsSection, supportsDefaultSettings, type DefaultSettingsModel } from './DefaultSettingsSection';
+import { supportsDefaultSettings, type DefaultSettingsModel } from './defaultSettingsFields';
+import { DefaultSettingsSection } from './DefaultSettingsSection';
 import { MissingFileBadge, ModelBaseBadge, ModelFormatBadge } from './ModelBadges';
 import { ModelEditForm } from './ModelEditForm';
 import { ModelImageUpload } from './ModelImageUpload';
