@@ -1083,11 +1083,16 @@ def test_unchanged_scope_does_not_recompute_the_projection(
     in a loop.
     """
     fits = {"n": 0}
-    real_umap = image_index_default.compute_umap
 
     def counting_umap(matrix: np.ndarray) -> np.ndarray:
+        # A stub, not the real fit: phase two runs at 4 points, past compute_umap's
+        # small-N PCA fallback, and the first real UMAP fit JIT-compiles numba —
+        # which can outlive stop()'s 10s join. The abandoned worker then fits
+        # concurrently with a later test's own fit, which aborts the process
+        # (SIGABRT on macOS). This test's claim is about WHETHER the fit runs,
+        # never about its output.
         fits["n"] += 1
-        return real_umap(matrix)
+        return np.zeros((matrix.shape[0], 2), dtype=np.float32)
 
     service = ImageIndexService(encode_fn=_fake_encode, model_id=MODEL_ID)
     try:
@@ -1115,6 +1120,12 @@ def test_unchanged_scope_does_not_recompute_the_projection(
         with patch.object(image_index_default, "compute_umap", counting_umap):
             service.request_projection("system")
             _wait_until(lambda: fits["n"] == 2, timeout=30.0)
+            # The fit-entry count races the store; wait for the stored row so
+            # stop() joins an idle worker instead of abandoning a live one.
+            _wait_until(
+                lambda: (r := index_records.get_projection("system", MODEL_ID)) is not None and r.point_count == 4,
+                timeout=30.0,
+            )
     finally:
         service.stop()
 
