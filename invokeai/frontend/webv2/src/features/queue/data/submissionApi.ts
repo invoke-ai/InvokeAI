@@ -176,3 +176,40 @@ export const getResultImages = async (
   assertAccountScopeCurrent(owner);
   return images.filter((image): image is QueueResultImage => image !== null);
 };
+
+const collectResultVideoNames = (queueItem: QueueServerItemDTO, options?: QueueResultImageOptions): string[] => {
+  const videoNames = new Set<string>();
+  const results = queueItem.session?.results ?? {};
+  const preparedSourceMapping = queueItem.session?.prepared_source_mapping ?? {};
+  const resultValues = options?.resultNodeIds
+    ? Object.entries(results)
+        .filter(([nodeId]) => options.resultNodeIds?.includes(preparedSourceMapping[nodeId] ?? nodeId))
+        .map(([, result]) => result)
+    : Object.values(results);
+
+  for (const result of resultValues) {
+    if (!result || typeof result !== 'object') {
+      continue;
+    }
+
+    // VideoOutput shape: { video: { video_name }, width, height, ... }.
+    const videoName = (result as { video?: { video_name?: unknown } }).video?.video_name;
+    if (typeof videoName === 'string') {
+      videoNames.add(videoName);
+    }
+  }
+
+  return [...videoNames];
+};
+
+/**
+ * The names of the videos a completed backend item produced. Videos need no DTO
+ * hydration here — the queue runtime only routes them onto the destination board.
+ */
+export const getResultVideoNames = async (itemId: number, options?: QueueResultImageOptions): Promise<string[]> => {
+  const owner = captureAccountScope();
+  const item = await getQueueItem(itemId, owner.signal);
+
+  assertAccountScopeCurrent(owner);
+  return collectResultVideoNames(item, options);
+};

@@ -27,6 +27,18 @@ export const QueueRuntimeAdapter = () => {
           await galleryOrganization.addToBoard(boardId, imageNames, owner.signal);
           assertAccountScopeCurrent(owner);
         },
+        addVideosToGalleryBoard: async (boardId, videoNames) => {
+          assertAccountScopeCurrent(owner);
+          const { galleryItemOrganization } = await import('@features/gallery');
+
+          assertAccountScopeCurrent(owner);
+          await galleryItemOrganization.moveToBoard(
+            videoNames.map((name) => ({ kind: 'video' as const, name })),
+            boardId,
+            owner.signal
+          );
+          assertAccountScopeCurrent(owner);
+        },
       },
       ensureTemplatesLoaded: ensureInvocationTemplatesLoaded,
       history: {

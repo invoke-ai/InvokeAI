@@ -36,6 +36,7 @@ const template: InvocationTemplate = {
       uiComponent: 'textarea',
       uiHidden: false,
       uiModelBase: null,
+      uiModelFormat: null,
       uiModelType: null,
       uiOrder: null,
     },

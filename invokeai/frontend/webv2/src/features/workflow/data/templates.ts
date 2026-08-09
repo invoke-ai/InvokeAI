@@ -234,6 +234,7 @@ const buildInputTemplate = (name: string, property: JsonObject, type: FieldType)
         : null,
     uiHidden: property.ui_hidden === true,
     uiModelBase: getStringArrayOrNull(property.ui_model_base),
+    uiModelFormat: getStringArrayOrNull(property.ui_model_format),
     uiModelType: getStringArrayOrNull(property.ui_model_type),
     uiOrder: getNumberOrNull(property.ui_order),
   };

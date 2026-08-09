@@ -274,9 +274,16 @@ const ModelIdentifierInput = ({ id, invalid, onChange, template, value }: Workfl
     typeof (value as { key?: unknown } | null)?.key === 'string' ? (value as { key: string }).key : null;
   const modelTypes = (template.uiModelType ?? DEFAULT_MODEL_TYPES) as ModelTaxonomyType[];
   const allowedBases = template.uiModelBase;
+  // ui_model_format narrows further within a base/type — e.g. a loader's main-model field
+  // that accepts only diffusers-folder installs while its override fields take the
+  // single-file checkpoints. Offering the wrong format here would enqueue a graph that
+  // fails deep inside the model loader instead of at selection time.
+  const allowedFormats = template.uiModelFormat;
   const filter = useCallback(
-    (model: ModelConfig) => (allowedBases ? allowedBases.includes(model.base) : true),
-    [allowedBases]
+    (model: ModelConfig) =>
+      (allowedBases ? allowedBases.includes(model.base) : true) &&
+      (allowedFormats ? allowedFormats.includes(model.format) : true),
+    [allowedBases, allowedFormats]
   );
   const onModelChange = useCallback(
     (model: ModelConfig | null) =>
@@ -290,7 +297,7 @@ const ModelIdentifierInput = ({ id, invalid, onChange, template, value }: Workfl
     <Suspense fallback={MODEL_SELECT_FALLBACK}>
       <ModelSelect
         className="nodrag nowheel"
-        filter={allowedBases ? filter : undefined}
+        filter={allowedBases || allowedFormats ? filter : undefined}
         id={id ? `${id}-model-combobox` : undefined}
         invalid={invalid}
         isClearable={false}

@@ -23,6 +23,7 @@ import { getApiErrorMessage } from '@platform/transport/http';
 
 export interface QueueResultDestinationPort {
   addImagesToGalleryBoard(boardId: string, imageNames: string[]): Promise<void>;
+  addVideosToGalleryBoard(boardId: string, videoNames: string[]): Promise<void>;
 }
 
 export interface QueueRuntime {
@@ -203,6 +204,38 @@ export const createQueueRuntime = ({
     }
   };
 
+  /**
+   * Land result videos on the destination board, like images. Videos are born
+   * unassigned server-side (the compiled graph carries no board unless a node
+   * sets one explicitly), so without this step every generated video sits in
+   * Uncategorized regardless of the active board. Only names are fetched — the
+   * gallery hydrates the video itself on its own refresh. Re-attaching a video
+   * that another settlement path already routed is a no-op server-side.
+   */
+  const addResultVideosToDestination = async (queueItem: QueueItem, backendItemIds: number[]): Promise<void> => {
+    if (!isActive() || queueItem.snapshot.destination !== 'gallery' || backendItemIds.length === 0) {
+      return;
+    }
+
+    const boardId = queueItem.snapshot.galleryBoardId;
+
+    if (!boardId || boardId === 'none') {
+      return;
+    }
+
+    const options = getQueueItemResultImageOptions(queueItem);
+    const namesPerItem = await Promise.all(
+      backendItemIds.map((backendItemId) => backend.getResultVideoNames(backendItemId, options))
+    );
+    const videoNames = [...new Set(namesPerItem.flat())];
+
+    if (videoNames.length === 0 || !isActive()) {
+      return;
+    }
+
+    await destinations.addVideosToGalleryBoard(boardId, videoNames);
+  };
+
   /** Drop intermediates when the item asks for it, then land what remains on its destination. */
   const deliverVisibleImages = async (
     queueItem: QueueItem,
@@ -237,6 +270,9 @@ export const createQueueRuntime = ({
       }
 
       const images = await deliverVisibleImages(queueItem, allImages);
+      // The live path routes videos per backend item (routeBackendItemResults); this covers
+      // resumed/adopted runs, where only the persisted ids are available.
+      await addResultVideosToDestination(queueItem, queueItem.backendItemIds ?? []);
 
       if (!isActive()) {
         return;
@@ -283,6 +319,7 @@ export const createQueueRuntime = ({
       }
 
       const visibleImages = await deliverVisibleImages(queueItem, images);
+      await addResultVideosToDestination(queueItem, [backendItemId]);
 
       if (!isActive()) {
         return;

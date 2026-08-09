@@ -44,6 +44,7 @@ const createTemplate = (outputType: FieldType = single('IntegerField')): Invocat
       uiComponent: null,
       uiHidden: false,
       uiModelBase: null,
+      uiModelFormat: null,
       uiModelType: null,
       uiOrder: null,
     },

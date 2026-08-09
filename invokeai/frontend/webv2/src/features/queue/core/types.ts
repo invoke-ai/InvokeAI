@@ -248,6 +248,8 @@ export interface QueueBackendPort extends QueueFeatureCommands {
     queuedAt: string,
     options?: QueueResultImageOptions
   ): Promise<QueueResultImage[]>;
+  /** Names of the videos a completed backend item produced (no DTO hydration needed). */
+  getResultVideoNames(itemId: number, options?: QueueResultImageOptions): Promise<string[]>;
   listItems(): Promise<QueueBackendItem[]>;
   readCurrent(scope?: QueueQueryScope, signal?: AbortSignal): Promise<QueueItemReadModel | null>;
   readItemIds(order: 'asc' | 'desc', scope?: QueueQueryScope, signal?: AbortSignal): Promise<QueueItemIdsReadModel>;

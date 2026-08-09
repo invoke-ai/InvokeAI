@@ -70,6 +70,7 @@ describe('queue runtime', () => {
       enqueueWorkflow: vi.fn(),
       getItem: vi.fn(),
       getResultImages: vi.fn(),
+      getResultVideoNames: vi.fn().mockResolvedValue([]),
       listItems,
       on: vi.fn(() => vi.fn()),
       onConnectionChange: vi.fn((listener) => {
@@ -101,7 +102,7 @@ describe('queue runtime', () => {
     };
     const runtime = createQueueRuntime({
       backend,
-      destinations: { addImagesToGalleryBoard: vi.fn() },
+      destinations: { addImagesToGalleryBoard: vi.fn(), addVideosToGalleryBoard: vi.fn() },
       ensureTemplatesLoaded: vi.fn(),
       history: {
         commands,
