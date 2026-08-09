@@ -407,7 +407,9 @@
         "noTextLLMInstalledDescription": "Prompt expansion needs a Text LLM (causal language model). We recommend Qwen2.5-1.5B-Instruct (~3 GB) — small, fast, and available as a starter model.",
         "noVisionModelInstalledTitle": "No vision model installed",
         "noVisionModelInstalledDescription": "Image-to-prompt needs a vision-language model (e.g. LLaVA Onevision). The 0.5B starter (~1 GB) is the lightweight default.",
-        "openModelManager": "Open Model Manager"
+        "openModelManager": "Open Model Manager",
+        "llmTaskLoadingModel": "Loading model…",
+        "llmTaskGenerating": "Generating…"
     },
     "queue": {
         "queue": "Queue",
@@ -741,7 +743,7 @@
             },
             "selectBboxTool": {
                 "title": "Bbox Tool",
-                "desc": "Select the bounding box tool."
+                "desc": "Tap to select the bounding box tool, or hold to use it temporarily."
             },
             "decrementToolWidth": {
                 "title": "Decrement Tool Width",
@@ -1066,6 +1068,11 @@
         "seedreamOptimizePrompt": "Seedream Optimize Prompt",
         "guidance": "Guidance",
         "height": "Height",
+        "hiDiffusion": "HiDiffusion",
+        "hiDiffusionRauNet": "HiDiffusion: RAU-Net",
+        "hiDiffusionWindowAttn": "HiDiffusion: Window Attention",
+        "hiDiffusionT1Ratio": "HiDiffusion: T1 Ratio",
+        "hiDiffusionT2Ratio": "HiDiffusion: T2 Ratio",
         "imageDetails": "Image Details",
         "imageDimensions": "Image Dimensions",
         "imageSize": "Image Size",
@@ -1081,6 +1088,7 @@
         "noRecallParameters": "No parameters to recall found",
         "parameterSet": "Parameter {{parameter}} set",
         "parsingFailed": "Parsing Failed",
+        "mistralEncoder": "Mistral Encoder",
         "positivePrompt": "Positive Prompt",
         "qwen3Encoder": "Qwen3 Encoder",
         "qwen3Source": "Qwen3 Source",
@@ -1394,8 +1402,16 @@
         "selectModelToView": "Select a model to view its details",
         "typePhraseHere": "Type phrase here",
         "t5Encoder": "T5 Encoder",
+        "gemma2Encoder": "Gemma-2 Encoder",
+        "pidDecoder": "PiD Decoder",
+        "pidMode": "PiD Decode",
+        "pidModeOff": "Off",
+        "pidModeFit": "On (Fit to size)",
+        "pidModeNative": "On (Native 4×)",
+        "pidSteps": "PiD Steps",
         "qwen3Encoder": "Qwen3 Encoder",
         "qwenVLEncoder": "Qwen2.5-VL Encoder",
+        "mistralEncoder": "Mistral Encoder",
         "qwen3VLEncoder": "Qwen3-VL Encoder",
         "animaVae": "VAE",
         "animaVaePlaceholder": "Select Anima-compatible VAE",
@@ -1421,6 +1437,12 @@
         "flux2KleinQwen3Encoder": "Qwen3 Encoder (optional)",
         "flux2KleinQwen3EncoderPlaceholder": "From diffusers model",
         "flux2KleinQwen3EncoderNoModelPlaceholder": "No diffusers model available",
+        "flux2DevVae": "FLUX.2 [dev] VAE",
+        "flux2DevVaePlaceholder": "Auto (from Diffusers source)",
+        "flux2DevVaeNoModelPlaceholder": "Select a FLUX.2 VAE model",
+        "flux2DevMistralEncoder": "FLUX.2 [dev] Mistral Encoder",
+        "flux2DevMistralEncoderPlaceholder": "Auto (from Diffusers source)",
+        "flux2DevMistralEncoderNoModelPlaceholder": "Select a Mistral text encoder",
         "qwenImageComponentSource": "VAE/Encoder Source (Diffusers)",
         "qwenImageComponentSourcePlaceholder": "GGUF models require this unless a standalone VAE & Encoder is installed",
         "qwenImageVae": "VAE",
@@ -1708,6 +1730,11 @@
         "cfgScale": "CFG Scale",
         "cfgRescaleMultiplier": "CFG Rescale Multiplier",
         "clipSkip": "CLIP Skip",
+        "hiDiffusion": "HiDiffusion",
+        "hiDiffusionRauNet": "HiDiffusion: RAU-Net",
+        "hiDiffusionWindowAttn": "HiDiffusion: Window Attention",
+        "hiDiffusionT1Ratio": "HiDiffusion: T1 Ratio",
+        "hiDiffusionT2Ratio": "HiDiffusion: T2 Ratio",
         "coherenceMode": "Mode",
         "coherenceEdgeSize": "Edge Size",
         "coherenceMinDenoise": "Min Denoise",
@@ -1754,10 +1781,16 @@
             "noStartingFrameImage": "No starting frame image",
             "noT5EncoderModelSelected": "No T5 Encoder model selected for FLUX generation",
             "noFLUXVAEModelSelected": "No VAE model selected for FLUX generation",
+            "noPidDecoderModelSelected": "No PiD decoder model selected",
+            "noGemma2EncoderModelSelected": "No Gemma-2 encoder model selected (required by PiD)",
+            "pidScaleBeforeProcessingMustBeOff": "Turn off Scale Before Processing (set it to None) to use PiD decode",
+            "pidIncompatibleWithRefiner": "PiD decode is not compatible with the SDXL Refiner. Disable one of them.",
             "noCLIPEmbedModelSelected": "No CLIP Embed model selected for FLUX generation",
             "noQwen3EncoderModelSelected": "No Qwen3 Encoder model selected for FLUX2 Klein generation",
             "noFlux2KleinVaeModelSelected": "No VAE selected. Non-diffusers FLUX.2 Klein models require a standalone VAE",
             "noFlux2KleinQwen3EncoderModelSelected": "No Qwen3 Encoder selected. Non-diffusers FLUX.2 Klein models require a standalone Qwen3 Encoder",
+            "noFlux2DevVaeModelSelected": "No VAE selected. Non-diffusers FLUX.2 [dev] models require a standalone FLUX.2 VAE",
+            "noFlux2DevMistralEncoderModelSelected": "No Mistral Encoder selected. Non-diffusers FLUX.2 [dev] models require a standalone Mistral text encoder",
             "noQwenImageComponentSourceSelected": "GGUF Qwen Image models require a Diffusers Component Source for VAE/encoder",
             "noWanComponentSourceSelected": "GGUF Wan 2.2 models require a Diffusers Component Source for VAE/encoder",
             "noZImageVaeSourceSelected": "No VAE source: Select VAE (FLUX) or Qwen3 Source model",
@@ -1801,6 +1834,7 @@
         "scaledHeight": "Scaled H",
         "scaledWidth": "Scaled W",
         "scheduler": "Scheduler",
+        "ernieImagePromptEnhancer": "Prompt Enhancer",
         "dypePreset": "DyPE",
         "dypeScale": "DyPE λs",
         "dypeExponent": "DyPE λt",
@@ -2099,6 +2133,8 @@
         "imagenIncompatibleGenerationMode": "Google {{model}} supports Text to Image only. Use other models for Image to Image, Inpainting and Outpainting tasks.",
         "chatGPT4oIncompatibleGenerationMode": "ChatGPT 4o supports Text to Image and Image to Image only. Use other models Inpainting and Outpainting tasks.",
         "fluxKontextIncompatibleGenerationMode": "FLUX Kontext does not support generation from images placed on the canvas. Re-try using the Reference Image section and disable any Raster Layers.",
+        "pidUnsupportedMode": "PiD decode currently supports Text to Image and Image to Image only. Disable PiD for Inpaint/Outpaint.",
+        "pidScaleBeforeProcessingOff": "Turn off Scale Before Processing (set it to None) to use PiD decode.",
         "problemUnpublishingWorkflow": "Problem Unpublishing Workflow",
         "problemUnpublishingWorkflowDescription": "There was a problem unpublishing the workflow. Please try again.",
         "workflowUnpublished": "Workflow Unpublished",
@@ -2115,6 +2151,41 @@
         "invalidBboxDesc": "The bounding box has no valid dimensions"
     },
     "popovers": {
+        "hidiffusion": {
+            "heading": "HiDiffusion",
+            "paragraphs": [
+                "Enables HiDiffusion denoising for higher-resolution generation.",
+                "Try at 1536px or higher for the most visible effect."
+            ]
+        },
+        "hidiffusionRauNet": {
+            "heading": "HiDiffusion: RAU-Net",
+            "paragraphs": [
+                "Enables RAU-Net blocks used by HiDiffusion.",
+                "Can improve structure and detail at higher resolutions."
+            ]
+        },
+        "hidiffusionWindowAttn": {
+            "heading": "HiDiffusion: Window Attention",
+            "paragraphs": [
+                "Enables windowed attention used by HiDiffusion.",
+                "Can boost local detail, but may affect global coherence."
+            ]
+        },
+        "hidiffusionT1Ratio": {
+            "heading": "HiDiffusion: T1 Ratio",
+            "paragraphs": [
+                "Controls the early switch point for HiDiffusion (T1).",
+                "Lower values switch earlier; higher values preserve global structure longer."
+            ]
+        },
+        "hidiffusionT2Ratio": {
+            "heading": "HiDiffusion: T2 Ratio",
+            "paragraphs": [
+                "Controls the late switch point for HiDiffusion (T2).",
+                "Higher values keep window attention active longer."
+            ]
+        },
         "clipSkip": {
             "heading": "CLIP Skip",
             "paragraphs": [
@@ -2164,6 +2235,15 @@
                 "2.0: Recommended for 4K+ resolutions. Aggressive schedule that transitions quickly to clean up artifacts.",
                 "1.0: Good starting point for ~2K-3K resolutions.",
                 "0.5: Gentler schedule for resolutions just above native (1024px)."
+            ]
+        },
+        "pidMode": {
+            "heading": "PiD Decode (Super-Resolution Decoder)",
+            "paragraphs": [
+                "PiD replaces the standard VAE decode with NVIDIA's Pixel Diffusion Decoder, a diffusion-based 4x super-resolution decoder. It requires a PiD decoder model and a Gemma-2 caption encoder.",
+                "Fit: generate at your chosen resolution, PiD decodes it 4x, then downscales back to that size - extra detail at the same output size, and it composites onto the canvas (works for Image to Image too).",
+                "Native (4x): your dimensions are the 4x target. Generation runs at a quarter of them (e.g. 512 -> 2048) and PiD's full 4x output is used directly. The PiD decoders are trained for 2K output (512px sources), with 2K-to-4K variants for 4K.",
+                "Because PiD's diffusion decode reconstructs detail, you can usually lower the generation Steps to save time. 'Scale Before Processing' must be set to None while PiD is enabled."
             ]
         },
         "seedVarianceEnhancer": {
@@ -3523,6 +3603,25 @@
         "togglePromptPreviews": "Toggle Prompt Previews",
         "selectPreset": "Select Style Preset",
         "noMatchingPresets": "No matching presets"
+    },
+    "systemPrompts": {
+        "systemPrompt": "System Prompt",
+        "selectSystemPrompt": "Select system prompt...",
+        "manageSystemPrompts": "Manage system prompts",
+        "newSystemPrompt": "New System Prompt",
+        "editSystemPrompt": "Edit System Prompt",
+        "name": "Name",
+        "content": "Content",
+        "contentPlaceholder": "Enter the system prompt that instructs the LLM how to expand the user's prompt...",
+        "deletePrompt": "Delete System Prompt",
+        "deletePromptConfirm": "Are you sure you want to delete this system prompt? This cannot be undone.",
+        "promptDeleted": "System prompt deleted",
+        "unableToDeletePrompt": "Unable to delete system prompt",
+        "unableToSavePrompt": "Unable to save system prompt",
+        "noPromptsYet": "No system prompts yet. Create one to get started.",
+        "systemBadge": "System",
+        "sharedBadge": "Shared",
+        "shareWithEveryone": "Share with everyone (visible to all users)"
     },
     "ui": {
         "tabs": {

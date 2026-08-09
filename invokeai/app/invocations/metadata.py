@@ -166,6 +166,7 @@ GENERATION_MODES = Literal[
     "z_image_img2img",
     "z_image_inpaint",
     "z_image_outpaint",
+    "ernie_image_txt2img",
     "ideogram4_txt2img",
     "qwen_image_txt2img",
     "qwen_image_img2img",
@@ -192,7 +193,7 @@ GENERATION_MODES = Literal[
     title="Core Metadata",
     tags=["metadata"],
     category="metadata",
-    version="2.1.0",
+    version="2.2.0",
     classification=Classification.Internal,
 )
 class CoreMetadataInvocation(BaseInvocation):
@@ -246,6 +247,12 @@ class CoreMetadataInvocation(BaseInvocation):
     qwen3_encoder: Optional[ModelIdentifierField] = InputField(
         default=None,
         description="The Qwen3 text encoder model used for Z-Image inference",
+    )
+    # FLUX.2 [dev] uses a Mistral text encoder where FLUX.2 Klein uses Qwen3, so it needs its own slot
+    # rather than reusing `qwen3_encoder` - the two are never both present on one image.
+    mistral_encoder: Optional[ModelIdentifierField] = InputField(
+        default=None,
+        description="The Mistral text encoder model used for FLUX.2 [dev] inference",
     )
     # Ideogram 4 assembles its structured JSON caption at generation time (ideogram4_caption_builder),
     # so this is a declared field rather than a static extra: the graph wires the builder's output to it

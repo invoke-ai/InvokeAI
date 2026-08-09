@@ -27,7 +27,7 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custo
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
     apply_custom_layers_to_model,
 )
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, SubModelType
 
 
 def _make_loader(device: str = "cuda") -> ModelLoader:
@@ -81,6 +81,24 @@ def test_should_use_fp8_returns_false_for_main_without_fp8():
 def test_should_use_fp8_returns_false_on_cpu():
     loader = _make_loader(device="cpu")
     assert loader._should_use_fp8(_make_config(ModelType.Main, fp8=True)) is False
+
+
+@pytest.mark.parametrize(
+    "submodel_type",
+    [SubModelType.PromptEnhancer, SubModelType.PromptEnhancerTokenizer],
+)
+def test_should_use_fp8_excludes_prompt_enhancer(submodel_type: SubModelType):
+    """The ERNIE-Image prompt enhancer is a causal LM driven by `generate()` — one full forward per
+    generated token, so layerwise casting pays the bf16<->fp8 round trip on every token of the
+    rewritten prompt, on top of fp8 rounding a model whose whole job is text quality. It must be
+    excluded like the text encoders, even though the parent Main config has `fp8_storage=true`.
+    """
+    loader = _make_loader(device="cuda")
+    config = _make_config(ModelType.Main, fp8=True, base=BaseModelType.ErnieImage)
+    assert loader._should_use_fp8(config, submodel_type) is False
+    # Sanity: the same config *does* opt the transformer in, so the assertion above is about the
+    # submodel exclusion and not about the config failing to enable fp8 at all.
+    assert loader._should_use_fp8(config, SubModelType.Transformer) is True
 
 
 class _RaisingModule(torch.nn.Module):

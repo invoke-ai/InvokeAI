@@ -35,6 +35,7 @@ from invokeai.backend.tiles.tiles import (
 )
 from invokeai.backend.tiles.utils import TBLR
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.fp8 import get_model_compute_dtype
 
 
 def crop_controlnet_data(control_data: ControlNetData, latent_region: TBLR) -> ControlNetData:
@@ -204,13 +205,19 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
             ExitStack() as exit_stack,
             context.models.load(self.unet.unet) as unet,
             LayerPatcher.apply_smart_model_patches(
-                model=unet, patches=_lora_loader(), prefix="lora_unet_", dtype=unet.dtype
+                # NOT unet.dtype: with fp8 storage that is the float8 storage dtype, which has no
+                # arithmetic kernels (see get_model_compute_dtype).
+                model=unet,
+                patches=_lora_loader(),
+                prefix="lora_unet_",
+                dtype=get_model_compute_dtype(unet),
             ),
         ):
             assert isinstance(unet, UNet2DConditionModel)
-            latents = latents.to(device=device, dtype=unet.dtype)
+            unet_dtype = get_model_compute_dtype(unet)
+            latents = latents.to(device=device, dtype=unet_dtype)
             if noise is not None:
-                noise = noise.to(device=device, dtype=unet.dtype)
+                noise = noise.to(device=device, dtype=unet_dtype)
             scheduler = get_scheduler(
                 context=context,
                 scheduler_info=self.unet.scheduler,
@@ -226,7 +233,7 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
                 positive_conditioning_field=self.positive_conditioning,
                 negative_conditioning_field=self.negative_conditioning,
                 device=device,
-                dtype=unet.dtype,
+                dtype=unet_dtype,
                 latent_height=latent_tile_height,
                 latent_width=latent_tile_width,
                 cfg_scale=self.cfg_scale,

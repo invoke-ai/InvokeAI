@@ -1,0 +1,218 @@
+"""ERNIE-Image denoising loop.
+
+A direct re-implementation of the denoise loop in
+`diffusers.pipelines.ernie_image.ErnieImagePipeline.__call__`, factored out so
+InvokeAI can drive the transformer with its own scheduling, CFG, and inpainting
+machinery instead of going through the upstream pipeline as a black box.
+"""
+
+import inspect
+import math
+from typing import Any, Callable, Optional
+
+import torch
+from tqdm import tqdm
+
+from invokeai.backend.ernie_image.sampling_utils import unpatchify_latents
+from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
+from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
+
+
+def denoise(
+    model: torch.nn.Module,
+    img: torch.Tensor,
+    text_bth: torch.Tensor,
+    text_lens: torch.Tensor,
+    timesteps: list[float],
+    step_callback: Callable[[PipelineIntermediateState], None],
+    cfg_scale: list[float],
+    neg_text_bth: Optional[torch.Tensor] = None,
+    neg_text_lens: Optional[torch.Tensor] = None,
+    scheduler: Any = None,
+    inpaint_extension: Optional[RectifiedFlowInpaintExtension] = None,
+    init_latents: Optional[torch.Tensor] = None,
+    generator: Optional[torch.Generator] = None,
+) -> torch.Tensor:
+    """Run the ERNIE-Image denoise loop.
+
+    Args:
+        model: `ErnieImageTransformer2DModel` from diffusers.
+        img: Patched latents `[B, 128, H/2, W/2]` (already 2x2-patchified, BN-normalized
+            if coming from VAE encode -- see `sampling_utils`). When `init_latents` is given
+            this is the *noise* to blend into them, not the starting sample.
+        text_bth: Padded text embeddings `[B, Tmax, text_in_dim]` for the positive prompt.
+        text_lens: Actual lengths of each prompt's text encoding `[B]`.
+        timesteps: Sigma schedule (descending, in [0,1]). Length = num_steps + 1; the final
+            entry is the target sigma after the last step.
+        step_callback: Progress callback.
+        cfg_scale: Per-step CFG scales (length matches `len(timesteps) - 1` or shorter --
+            shorter values are clamped).
+        neg_text_bth / neg_text_lens: Negative-prompt conditioning, required when any CFG
+            scale is not 1.0.
+        scheduler: Optional FlowMatch* scheduler. If None, falls back to manual Euler over
+            the supplied sigmas.
+        inpaint_extension: Optional inpainting helper that merges the noised init latents
+            into the prediction at each step.
+        init_latents: Optional clean image-to-image latents to blend with `img` at the loop's
+            first sigma. The blend happens here rather than in the caller because only this
+            function knows the *post-shift* sigma: `timesteps` carries raw schedule values and
+            the scheduler applies its `shift` inside `set_timesteps`.
+        generator: RNG for stochastic schedulers. `FlowMatchLCMScheduler.step` re-noises the
+            sample every step, so without this it would draw from the global RNG and the same
+            seed would produce a different image on every run.
+
+    Returns:
+        Denoised, still-patched latents `[B, 128, H/2, W/2]`. Caller is responsible for
+        BN-denormalization and unpatchify before VAE decode.
+    """
+    total_steps = len(timesteps) - 1
+    use_scheduler = scheduler is not None
+
+    # ERNIE-Image's transformer uses standard sinusoidal time embeddings (`Timesteps(...)` from
+    # diffusers) which expect timesteps in `[0, num_train_timesteps]`. Sigmas are in [0, 1].
+    # The model gets `sigma * model_timestep_scale`; sigma stays in [0, 1] for the Euler math.
+    model_timestep_scale = float(scheduler.config.num_train_timesteps) if use_scheduler else 1000.0
+
+    if use_scheduler:
+        set_timesteps_sig = inspect.signature(scheduler.set_timesteps)
+        if "sigmas" in set_timesteps_sig.parameters:
+            # Hand the scheduler the *whole* window -- terminal sigma included -- and then drop the
+            # extra zero it unconditionally appends. Passing `timesteps[:-1]` instead would let that
+            # appended zero stand in for the requested end sigma, so `denoising_end < 1.0` would
+            # silently run a full denoise in fewer, coarser steps rather than stopping early.
+            # Truncating (instead of patching the last sigma by hand) keeps the scheduler's own
+            # `shift` applied to the terminal sigma, which manual math here would get wrong.
+            scheduler.set_timesteps(sigmas=list(timesteps), device=img.device)
+            scheduler.sigmas = scheduler.sigmas[:-1]
+            scheduler.timesteps = scheduler.timesteps[:-1]
+        else:
+            # FlowMatchHeunDiscreteScheduler.set_timesteps only takes a step count and derives its
+            # own sigmas, so a partial-denoise range cannot be honored. Refuse instead of silently
+            # running a full denoise with the wrong schedule.
+            if not (math.isclose(timesteps[0], 1.0) and math.isclose(timesteps[-1], 0.0, abs_tol=1e-6)):
+                raise ValueError(
+                    f"{type(scheduler).__name__} does not accept an explicit sigma schedule, so it cannot honor "
+                    "denoising_start/denoising_end. Use the euler or lcm scheduler for partial denoising."
+                )
+            scheduler.set_timesteps(num_inference_steps=len(timesteps) - 1, device=img.device)
+
+        if init_latents is not None:
+            # `scheduler.sigmas[0]` is the *shifted* first sigma; `timesteps[0]` is the raw one.
+            # Blending at the raw value would build a sample at one sigma and then tell the first
+            # model call it is at another. Equivalent to `scheduler.scale_noise`, spelled out
+            # because it has to agree with the Euler math below.
+            img = _blend_init_latents(init_latents, img, float(scheduler.sigmas[0]))
+
+        # Higher-order solvers evaluate the model more than once per requested step (Heun's
+        # `set_timesteps(N)` yields 2N-1 timesteps), so drive progress off the actual iteration
+        # count rather than the requested step count.
+        total_steps = len(scheduler.timesteps)
+
+        pbar = tqdm(total=total_steps, desc="ERNIE-Image denoising")
+        for step_index in range(total_steps):
+            timestep = scheduler.timesteps[step_index]
+            # The scheduler's timestep is already in `[0, num_train_timesteps]`; pass directly.
+            t_model = timestep.item()
+            t_vec = torch.full((img.shape[0],), t_model, dtype=img.dtype, device=img.device)
+
+            pred = _forward(model, img, t_vec, text_bth, text_lens)
+            step_cfg = cfg_scale[min(step_index, len(cfg_scale) - 1)]
+            if not math.isclose(step_cfg, 1.0):
+                if neg_text_bth is None or neg_text_lens is None:
+                    raise ValueError("Negative conditioning is required when cfg_scale != 1.0")
+                neg_pred = _forward(model, img, t_vec, neg_text_bth, neg_text_lens)
+                pred = neg_pred + step_cfg * (pred - neg_pred)
+
+            # `generator` matters for stochastic schedulers (LCM re-noises every step). Euler and
+            # Heun accept it too and only consult it when `s_churn > 0`, which is 0 on this path.
+            img = scheduler.step(model_output=pred, timestep=timestep, sample=img, generator=generator).prev_sample
+
+            t_prev = scheduler.sigmas[step_index + 1].item() if step_index + 1 < len(scheduler.sigmas) else 0.0
+            if inpaint_extension is not None:
+                img = inpaint_extension.merge_intermediate_latents_with_init_latents(img, t_prev)
+
+            pbar.update(1)
+            # Predicted x0 estimate, unpatched so the preview decoder can use standard
+            # 32-channel latent RGB factors. `img` has already been stepped to `t_prev`, so the
+            # x0 estimate must use `t_prev` (using the pre-step sigma would over-subtract).
+            preview = unpatchify_latents(img - t_prev * pred)
+            step_callback(
+                PipelineIntermediateState(
+                    step=step_index + 1,
+                    order=1,
+                    total_steps=total_steps,
+                    timestep=int(t_model),
+                    latents=preview,
+                ),
+            )
+        pbar.close()
+        return img
+
+    # Manual Euler over the supplied sigmas. This mirrors the upstream pipeline when no
+    # explicit scheduler is configured. No scheduler means no `shift`, so the raw first sigma
+    # is the right one to blend at here.
+    if init_latents is not None:
+        img = _blend_init_latents(init_latents, img, float(timesteps[0]))
+
+    pbar = tqdm(total=total_steps, desc="ERNIE-Image denoising")
+    for i in range(total_steps):
+        t_curr = timesteps[i]
+        t_next = timesteps[i + 1]
+        # Sigmas are [0, 1]; scale up to the model's training-timestep range.
+        t_vec = torch.full((img.shape[0],), t_curr * model_timestep_scale, dtype=img.dtype, device=img.device)
+
+        pred = _forward(model, img, t_vec, text_bth, text_lens)
+        step_cfg = cfg_scale[min(i, len(cfg_scale) - 1)]
+        if not math.isclose(step_cfg, 1.0):
+            if neg_text_bth is None or neg_text_lens is None:
+                raise ValueError("Negative conditioning is required when cfg_scale != 1.0")
+            neg_pred = _forward(model, img, t_vec, neg_text_bth, neg_text_lens)
+            pred = neg_pred + step_cfg * (pred - neg_pred)
+
+        # Standard rectified-flow Euler step in sigma space.
+        img = img + (t_next - t_curr) * pred
+
+        if inpaint_extension is not None:
+            img = inpaint_extension.merge_intermediate_latents_with_init_latents(img, t_next)
+
+        pbar.update(1)
+        # `img` has already been stepped to `t_next`, so the x0 estimate uses `t_next`.
+        preview = unpatchify_latents(img - t_next * pred)
+        step_callback(
+            PipelineIntermediateState(
+                step=i + 1,
+                order=1,
+                total_steps=total_steps,
+                timestep=int(t_curr * 1000),
+                latents=preview,
+            ),
+        )
+    pbar.close()
+    return img
+
+
+def _blend_init_latents(init_latents: torch.Tensor, noise: torch.Tensor, sigma: float) -> torch.Tensor:
+    """Rectified-flow forward process: place clean latents at `sigma` on the noise path.
+
+    The loop assumes its starting sample already sits at the first sigma, so image-to-image init
+    latents have to be noised to get there. Passing them through clean would tell the model the
+    sample is at `sigma` when it is really at 0.
+    """
+    return sigma * noise + (1.0 - sigma) * init_latents
+
+
+def _forward(
+    model: torch.nn.Module,
+    img: torch.Tensor,
+    t_vec: torch.Tensor,
+    text_bth: torch.Tensor,
+    text_lens: torch.Tensor,
+) -> torch.Tensor:
+    out = model(
+        hidden_states=img,
+        timestep=t_vec,
+        text_bth=text_bth,
+        text_lens=text_lens,
+        return_dict=False,
+    )
+    return out[0] if isinstance(out, tuple) else out
