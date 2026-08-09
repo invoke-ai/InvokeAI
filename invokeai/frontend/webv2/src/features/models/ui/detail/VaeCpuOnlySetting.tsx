@@ -3,13 +3,10 @@ import type { ModelConfig } from '@features/models/core/types';
 import { Stack, Switch, Text } from '@chakra-ui/react';
 import { updateModel } from '@features/models/data/api';
 import { patchModelInStore, replaceModelInStore } from '@features/models/data/modelsStore';
-import {
-  assertAccountScopeCurrent,
-  captureAccountScope,
-  isAccountScopeCurrent,
-} from '@platform/state/accountLifecycle';
+import { useScopedAction } from '@features/models/ui/shared/useScopedAction';
+import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { getApiErrorMessage } from '@platform/transport/http';
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export type VaeCpuOnlyModel = Pick<ModelConfig, 'cpu_only' | 'key' | 'name'>;
@@ -27,7 +24,7 @@ export const VaeCpuOnlySetting = ({
   onSaved: () => void;
 }) => {
   const { t } = useTranslation();
-  const [isPending, setIsPending] = useState(false);
+  const { isBusy: isPending, run } = useScopedAction();
 
   const handleCheckedChange = useCallback(
     async (details: { checked: boolean }) => {
@@ -35,33 +32,26 @@ export const VaeCpuOnlySetting = ({
         return;
       }
 
-      const owner = captureAccountScope();
       const previousCpuOnly = model.cpu_only;
       const cpuOnly = details.checked ? true : null;
 
-      setIsPending(true);
       patchModelInStore(model.key, { cpu_only: cpuOnly });
 
-      try {
-        const updated = await updateModel(model.key, { cpu_only: cpuOnly }, owner.signal);
+      await run(
+        async (owner) => {
+          const updated = await updateModel(model.key, { cpu_only: cpuOnly }, owner.signal);
 
-        assertAccountScopeCurrent(owner);
-        replaceModelInStore(updated);
-        onSaved();
-      } catch (error) {
-        if (!isAccountScopeCurrent(owner)) {
-          return;
+          assertAccountScopeCurrent(owner);
+          replaceModelInStore(updated);
+          onSaved();
+        },
+        (_message, error) => {
+          patchModelInStore(model.key, { cpu_only: previousCpuOnly });
+          onError(getApiErrorMessage(error, t('models.failedToSaveVaeCpuSetting')));
         }
-
-        patchModelInStore(model.key, { cpu_only: previousCpuOnly });
-        onError(getApiErrorMessage(error, t('models.failedToSaveVaeCpuSetting')));
-      } finally {
-        if (isAccountScopeCurrent(owner)) {
-          setIsPending(false);
-        }
-      }
+      );
     },
-    [isPending, model.cpu_only, model.key, onError, onSaved, t]
+    [isPending, model.cpu_only, model.key, onError, onSaved, run, t]
   );
 
   return (

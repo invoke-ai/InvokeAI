@@ -7,6 +7,7 @@ import { removeModelsFromRelationships } from '@features/models/data/relationshi
 import { MaintenanceMenu } from '@features/models/ui/library/MaintenanceMenu';
 import { ModelFilterBar } from '@features/models/ui/library/ModelFilterBar';
 import { ModelLibraryList } from '@features/models/ui/library/ModelLibraryList';
+import { useScopedAction } from '@features/models/ui/shared/useScopedAction';
 import {
   openModelDetail,
   pruneModelsUiKeys,
@@ -15,11 +16,7 @@ import {
   useModelsUiSelector,
 } from '@features/models/ui/uiStore';
 import { useNotify } from '@features/models/ui/useModelsNotify';
-import {
-  assertAccountScopeCurrent,
-  captureAccountScope,
-  isAccountScopeCurrent,
-} from '@platform/state/accountLifecycle';
+import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { Button, IconButton, ConfirmDialog } from '@platform/ui';
 import { Trash2Icon, XIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
@@ -45,6 +42,7 @@ export const LibraryColumn = () => {
       left.selectedKeys === right.selectedKeys
   );
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
+  const { run } = useScopedAction();
 
   const availableTypes = useMemo(() => collectTypes(models), [models]);
   const availableBases = useMemo(() => collectBases(models), [models]);
@@ -52,38 +50,38 @@ export const LibraryColumn = () => {
   const handleToggleSelected = useCallback((modelKey: string) => toggleModelSelection(modelKey), []);
 
   const handleBulkDelete = async () => {
-    const owner = captureAccountScope();
     const keys = [...selectedKeys];
 
-    try {
-      const result = await bulkDeleteModels(keys, owner.signal);
+    await run(
+      async (owner) => {
+        const result = await bulkDeleteModels(keys, owner.signal);
 
-      assertAccountScopeCurrent(owner);
-      removeModelsFromStore(result.deleted);
-      removeModelsFromRelationships(result.deleted);
-      pruneModelsUiKeys(result.deleted);
-      updateModelsUi({ selectedKeys: new Set(result.failed.map((failure) => failure.key)) });
+        assertAccountScopeCurrent(owner);
+        removeModelsFromStore(result.deleted);
+        removeModelsFromRelationships(result.deleted);
+        pruneModelsUiKeys(result.deleted);
+        updateModelsUi({ selectedKeys: new Set(result.failed.map((failure) => failure.key)) });
 
-      if (result.failed.length > 0) {
-        notify.error(
-          t('models.someCouldNotBeDeleted'),
-          t('models.bulkDeletePartialDescription', {
-            deleted: result.deleted.length,
-            error: result.failed[0]?.error ?? '',
-            failed: result.failed.length,
-          })
-        );
-      } else {
-        notify.success(t('models.deleted'), t('models.deletedDescription', { count: result.deleted.length }));
+        if (result.failed.length > 0) {
+          notify.error(
+            t('models.someCouldNotBeDeleted'),
+            t('models.bulkDeletePartialDescription', {
+              deleted: result.deleted.length,
+              error: result.failed[0]?.error ?? '',
+              failed: result.failed.length,
+            })
+          );
+        } else {
+          notify.success(t('models.deleted'), t('models.deletedDescription', { count: result.deleted.length }));
+        }
+      },
+      (message) => {
+        notify.error(t('models.bulkDeleteFailed'), message);
+        // The scope is current when onError runs, so the default capture inside
+        // refreshModels targets the same account the failed call did.
+        void refreshModels();
       }
-    } catch (error) {
-      if (!isAccountScopeCurrent(owner)) {
-        return;
-      }
-
-      notify.error(t('models.bulkDeleteFailed'), error instanceof Error ? error.message : String(error));
-      void refreshModels(owner);
-    }
+    );
   };
 
   return (

@@ -5,6 +5,7 @@ import { Checkbox, Dialog, Flex, Icon, Menu, Portal, Spinner, Stack, Text } from
 import { formatBytes } from '@features/models/core/taxonomy';
 import { deleteOrphanedModels, emptyModelCache, getOrphanedModels } from '@features/models/data/api';
 import { refreshModels } from '@features/models/data/modelsStore';
+import { useScopedAction } from '@features/models/ui/shared/useScopedAction';
 import { useNotify } from '@features/models/ui/useModelsNotify';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import {
@@ -25,23 +26,18 @@ export const MaintenanceMenu = () => {
   const { t } = useTranslation();
   const notify = useNotify();
   const [isSyncDialogOpen, setIsSyncDialogOpen] = useState(false);
+  const { run } = useScopedAction();
 
-  const handleEmptyCache = async () => {
-    const owner = captureAccountScope();
+  const handleEmptyCache = () =>
+    run(
+      async (owner) => {
+        await emptyModelCache(owner.signal);
 
-    try {
-      await emptyModelCache(owner.signal);
-
-      assertAccountScopeCurrent(owner);
-      notify.success(t('models.cacheEmptied'));
-    } catch (error) {
-      if (!isAccountScopeCurrent(owner)) {
-        return;
-      }
-
-      notify.error(t('models.failedToEmptyCache'), error instanceof Error ? error.message : String(error));
-    }
-  };
+        assertAccountScopeCurrent(owner);
+        notify.success(t('models.cacheEmptied'));
+      },
+      (message) => notify.error(t('models.failedToEmptyCache'), message)
+    );
 
   const handleRefresh = () => {
     const owner = captureAccountScope();
@@ -88,7 +84,7 @@ const OrphanedModelsDialog = ({ onClose }: { onClose: () => void }) => {
   const [loadError, setLoadError] = useState<string | null>(null);
   // Nothing pre-selected: deleting files on disk must be an explicit choice.
   const [selectedPaths, setSelectedPaths] = useState<ReadonlySet<string>>(new Set());
-  const [isDeleting, setIsDeleting] = useState(false);
+  const { isBusy: isDeleting, run } = useScopedAction();
 
   useMountEffect(() => {
     const owner = captureAccountScope();
@@ -125,47 +121,35 @@ const OrphanedModelsDialog = ({ onClose }: { onClose: () => void }) => {
     });
   };
 
-  const handleDelete = async () => {
-    const owner = captureAccountScope();
+  const handleDelete = () =>
+    run(
+      async (owner) => {
+        const result = await deleteOrphanedModels([...selectedPaths], owner.signal);
 
-    setIsDeleting(true);
+        assertAccountScopeCurrent(owner);
+        const errorCount = Object.keys(result.errors).length;
 
-    try {
-      const result = await deleteOrphanedModels([...selectedPaths], owner.signal);
+        if (errorCount > 0) {
+          notify.error(
+            t('models.orphanedCleanup'),
+            t('models.orphanedCleanupPartialDescription', {
+              deleted: result.deleted.length,
+              error: Object.values(result.errors)[0],
+              failed: errorCount,
+            })
+          );
+        } else {
+          notify.success(
+            t('models.orphanedCleanup'),
+            t('models.orphanedDeletedDescription', { count: result.deleted.length })
+          );
+        }
 
-      assertAccountScopeCurrent(owner);
-      const errorCount = Object.keys(result.errors).length;
-
-      if (errorCount > 0) {
-        notify.error(
-          t('models.orphanedCleanup'),
-          t('models.orphanedCleanupPartialDescription', {
-            deleted: result.deleted.length,
-            error: Object.values(result.errors)[0],
-            failed: errorCount,
-          })
-        );
-      } else {
-        notify.success(
-          t('models.orphanedCleanup'),
-          t('models.orphanedDeletedDescription', { count: result.deleted.length })
-        );
-      }
-
-      void refreshModels(owner);
-      onClose();
-    } catch (error) {
-      if (!isAccountScopeCurrent(owner)) {
-        return;
-      }
-
-      notify.error(t('models.orphanedCleanupFailed'), error instanceof Error ? error.message : String(error));
-    } finally {
-      if (isAccountScopeCurrent(owner)) {
-        setIsDeleting(false);
-      }
-    }
-  };
+        void refreshModels(owner);
+        onClose();
+      },
+      (message) => notify.error(t('models.orphanedCleanupFailed'), message)
+    );
 
   const totalSelectedBytes =
     orphans?.filter((orphan) => selectedPaths.has(orphan.path)).reduce((sum, orphan) => sum + orphan.size_bytes, 0) ??

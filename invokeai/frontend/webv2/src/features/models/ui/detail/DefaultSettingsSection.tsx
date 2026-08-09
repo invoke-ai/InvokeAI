@@ -6,11 +6,8 @@ import { createListCollection, Grid, HStack, Icon, NumberInput, Stack, Switch, T
 import { loraDefaultSettingsSchema, mainDefaultSettingsSchema } from '@features/models/core/schemas';
 import { updateModel } from '@features/models/data/api';
 import { replaceModelInStore } from '@features/models/data/modelsStore';
-import {
-  assertAccountScopeCurrent,
-  captureAccountScope,
-  isAccountScopeCurrent,
-} from '@platform/state/accountLifecycle';
+import { useScopedAction } from '@features/models/ui/shared/useScopedAction';
+import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { Button, Combobox, FieldLabel, Panel, Select } from '@platform/ui';
 import { MoveHorizontalIcon } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
@@ -345,7 +342,7 @@ export const DefaultSettingsSection = ({
     source: model.default_settings,
   }));
   const [error, setError] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
+  const { isBusy: isSaving, run } = useScopedAction();
   const isDraftCurrent = draft.modelKey === model.key && draft.source === model.default_settings;
   const savedSettingsDraft = useMemo(() => ({ ...model.default_settings }), [model.default_settings]);
   const settings = isDraftCurrent ? draft.settings : savedSettingsDraft;
@@ -368,7 +365,6 @@ export const DefaultSettingsSection = ({
   };
 
   const handleSave = async () => {
-    const owner = captureAccountScope();
     const validationError = validateDefaults(model, settings, t);
 
     if (validationError) {
@@ -376,25 +372,17 @@ export const DefaultSettingsSection = ({
       return;
     }
 
-    setIsSaving(true);
+    await run(
+      async (owner) => {
+        const updated = await updateModel(model.key, { default_settings: settings }, owner.signal);
 
-    try {
-      const updated = await updateModel(model.key, { default_settings: settings }, owner.signal);
-
-      assertAccountScopeCurrent(owner);
-      replaceModelInStore(updated);
-      onSaved();
-    } catch (saveError) {
-      if (!isAccountScopeCurrent(owner)) {
-        return;
-      }
-
-      onError(saveError instanceof Error ? saveError.message : t('models.failedToSaveDefaults'));
-    } finally {
-      if (isAccountScopeCurrent(owner)) {
-        setIsSaving(false);
-      }
-    }
+        assertAccountScopeCurrent(owner);
+        replaceModelInStore(updated);
+        onSaved();
+      },
+      (_message, saveError) =>
+        onError(saveError instanceof Error ? saveError.message : t('models.failedToSaveDefaults'))
+    );
   };
 
   return (

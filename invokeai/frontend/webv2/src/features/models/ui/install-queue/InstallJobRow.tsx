@@ -11,15 +11,11 @@ import {
   resumeModelInstall,
 } from '@features/models/data/api';
 import { isActiveInstallStatus, refreshInstalls, replaceInstallJob } from '@features/models/data/installsStore';
-import {
-  assertAccountScopeCurrent,
-  captureAccountScope,
-  isAccountScopeCurrent,
-} from '@platform/state/accountLifecycle';
+import { useScopedAction } from '@features/models/ui/shared/useScopedAction';
+import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { useConnectionStatusSelector } from '@platform/transport/connectionStore';
 import { IconButton, Tooltip } from '@platform/ui';
 import { PauseIcon, PlayIcon, RotateCcwIcon, TriangleAlertIcon, XIcon } from 'lucide-react';
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { InstallJobProgress } from './InstallJobProgress';
@@ -36,7 +32,7 @@ export const InstallJobRow = ({
   onError: (title: string, message: string) => void;
 }) => {
   const { t } = useTranslation();
-  const [isActing, setIsActing] = useState(false);
+  const { isBusy: isActing, run } = useScopedAction();
   const connectionStatus = useConnectionStatusSelector((snapshot) => snapshot.status);
   const badge = STATUS_BADGES[job.status] ?? { label: job.status, palette: 'gray' };
   const sourceLabel = getInstallSourceLabel(job.source);
@@ -47,32 +43,20 @@ export const InstallJobRow = ({
   );
   const showDisconnected = connectionStatus !== 'connected' && isActiveInstallStatus(job.status);
 
-  const runAction = async (action: (signal: AbortSignal) => Promise<unknown>, failureTitle: string) => {
-    const owner = captureAccountScope();
+  const runAction = (action: (signal: AbortSignal) => Promise<unknown>, failureTitle: string) =>
+    run(
+      async (owner) => {
+        const result = await action(owner.signal);
 
-    setIsActing(true);
-
-    try {
-      const result = await action(owner.signal);
-
-      assertAccountScopeCurrent(owner);
-      if (result && typeof result === 'object' && 'id' in (result as ModelInstallJob)) {
-        replaceInstallJob(result as ModelInstallJob);
-      } else {
-        await refreshInstalls(owner);
-      }
-    } catch (actionError) {
-      if (!isAccountScopeCurrent(owner)) {
-        return;
-      }
-
-      onError(failureTitle, actionError instanceof Error ? actionError.message : String(actionError));
-    } finally {
-      if (isAccountScopeCurrent(owner)) {
-        setIsActing(false);
-      }
-    }
-  };
+        assertAccountScopeCurrent(owner);
+        if (result && typeof result === 'object' && 'id' in (result as ModelInstallJob)) {
+          replaceInstallJob(result as ModelInstallJob);
+        } else {
+          await refreshInstalls(owner);
+        }
+      },
+      (message) => onError(failureTitle, message)
+    );
 
   return (
     <Stack
