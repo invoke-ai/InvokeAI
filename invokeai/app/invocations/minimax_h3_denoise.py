@@ -32,6 +32,7 @@ from invokeai.app.invocations.model import MiniMaxH3TransformerField
 from invokeai.app.services.session_processor.session_processor_common import CanceledException
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.minimax_h3.denoise import denoise
+from invokeai.backend.minimax_h3.int8_convrot import Int8ConvrotLinear
 from invokeai.backend.minimax_h3.packing import (
     MINIMAX_H3_CANVAS_MULTIPLE,
     MiniMaxH3PackedSequence,
@@ -39,6 +40,11 @@ from invokeai.backend.minimax_h3.packing import (
     unpack_audio_tokens,
     unpatchify_video_tokens,
     video_latent_num_frames,
+)
+from invokeai.backend.minimax_h3.pruned_adaln_lora import (
+    MINIMAX_H3_SILU_TEMB_GRID_URL,
+    MiniMaxH3SiluTembGrid,
+    apply_minimax_h3_pruned_adaln_lora_patches,
 )
 from invokeai.backend.minimax_h3.sampling import (
     MINIMAX_H3_PATCH_SIZE,
@@ -49,8 +55,18 @@ from invokeai.backend.minimax_h3.sampling import (
 )
 from invokeai.backend.minimax_h3.taehv_decoder import TAEH3_PREVIEW_MODEL_URL, TAEH3Decoder
 from invokeai.backend.minimax_h3.transformer_minimax_h3 import MiniMaxH3Transformer3DModel
+from invokeai.backend.minimax_h3.transformer_minimax_h3_pruned import MiniMaxH3PrunedTransformer3DModel
 from invokeai.backend.model_manager.load.load_base import LoadedModelWithoutConfig
 from invokeai.backend.model_manager.taxonomy import BaseModelType
+from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
+from invokeai.backend.patches.layers.lora_layer import LoRALayer
+from invokeai.backend.patches.lora_conversions.minimax_h3_lora_constants import (
+    MINIMAX_H3_LORA_TRANSFORMER_PREFIX,
+)
+from invokeai.backend.patches.lora_conversions.minimax_h3_lora_conversion_utils import (
+    is_minimax_h3_adaln_layer_path,
+)
+from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import MiniMaxH3ConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
@@ -74,7 +90,7 @@ class MiniMaxH3DenoiseOutput(BaseInvocationOutput):
     title="Denoise - MiniMax H3",
     tags=["latents", "video", "audio", "minimax"],
     category="latents",
-    version="1.1.0",
+    version="1.2.0",
     classification=Classification.Prototype,
 )
 class MiniMaxH3DenoiseInvocation(BaseInvocation):
@@ -120,7 +136,7 @@ class MiniMaxH3DenoiseInvocation(BaseInvocation):
     seed: int = InputField(default=0, description="Randomness seed for reproducibility.")
 
     @staticmethod
-    def _estimate_working_memory(layout: MiniMaxH3PackedSequence) -> int:
+    def _estimate_working_memory(layout: MiniMaxH3PackedSequence, num_loras: int = 0) -> int:
         """Estimate peak transformer activation memory (bytes) so the model cache reserves enough headroom.
 
         The 61.7 GiB bf16 transformer is partially loaded on most cards; without this hint the cache
@@ -145,6 +161,11 @@ class MiniMaxH3DenoiseInvocation(BaseInvocation):
         if bool((layout.token_tags < 0).any()):
             estimated += 5 * layout.sequence_length**2
         estimated += 2 * GB
+        if num_loras > 0:
+            # Sidecar-patched layers (quantized bases) transiently hold a second copy of their
+            # output for the low-rank residual — up to ~2.1 GiB bf16 for the fused-SwiGLU
+            # ff.net.0.proj over a ~38k-row sequence — plus the on-device patch tensors.
+            estimated += int(2.5 * GB)
         return estimated
 
     @staticmethod
@@ -271,8 +292,31 @@ class MiniMaxH3DenoiseInvocation(BaseInvocation):
 
             return step_callback
 
-        estimated_working_memory = self._estimate_working_memory(state.layout)
+        estimated_working_memory = self._estimate_working_memory(state.layout, num_loras=len(self.transformer.loras))
         transformer_info = context.models.load(self.transformer.transformer)
+
+        # LoRA patches are materialized (RAM cache) before any VRAM locks. On the AdaLN-pruned
+        # transformer the AdaLN layers cannot be weight patches (their 2688-dim input space was
+        # collapsed into the curve table) and are split off for run-time re-injection, which
+        # additionally needs the precomputed silu(t_emb) grid.
+        lora_patch_specs = self._materialize_lora_patches(context)
+        adaln_patches: list[tuple[str, LoRALayer, float]] = []
+        if isinstance(transformer_info.model, MiniMaxH3PrunedTransformer3DModel):
+            lora_patch_specs, adaln_patches = self._split_pruned_adaln_patches(lora_patch_specs)
+        grid_info: LoadedModelWithoutConfig | None = None
+        if adaln_patches:
+            try:
+                grid_info = context.models.load_remote_model(
+                    MINIMAX_H3_SILU_TEMB_GRID_URL, MiniMaxH3SiluTembGrid.load_model
+                )
+            except Exception as e:
+                raise RuntimeError(
+                    "This LoRA updates MiniMax H3's AdaLN time conditioning, which on the pruned "
+                    "transformer requires the precomputed silu(t_emb) grid (a one-time ~5.5 MB "
+                    f"download) — and fetching it failed: {e}. Retry with network access, or use "
+                    "the full (non-pruned) transformer."
+                ) from e
+
         # The preview decoder's cache record is created after the transformer's RAM load (whose
         # make_room could otherwise drop the unlocked 23 MB record) and locked before the
         # transformer's VRAM lock, so the partial load accounts for it. Previews are strictly
@@ -292,10 +336,39 @@ class MiniMaxH3DenoiseInvocation(BaseInvocation):
                     )
             step_callback = make_step_callback(preview_decoder)
 
-            _, transformer = stack.enter_context(
+            # Like the preview decoder: the tiny grid is locked before the transformer's VRAM
+            # lock so the partial load accounts for it.
+            silu_temb_grid: torch.Tensor | None = None
+            if grid_info is not None:
+                grid_model = stack.enter_context(grid_info)
+                assert isinstance(grid_model, MiniMaxH3SiluTembGrid)
+                silu_temb_grid = grid_model.grid
+
+            (cached_weights, transformer) = stack.enter_context(
                 transformer_info.model_on_device(working_mem_bytes=estimated_working_memory)
             )
             assert isinstance(transformer, MiniMaxH3Transformer3DModel)
+
+            if lora_patch_specs or adaln_patches:
+                # Quantized (int8-convrot) layers cannot take direct weight patches; route every
+                # patched module through the sidecar path when any are present. bf16 models keep
+                # the faster direct patching.
+                force_sidecar = any(isinstance(m, Int8ConvrotLinear) for m in transformer.modules())
+                stack.enter_context(
+                    LayerPatcher.apply_smart_model_patches(
+                        model=transformer,
+                        patches=lora_patch_specs,
+                        prefix=MINIMAX_H3_LORA_TRANSFORMER_PREFIX,
+                        dtype=torch.bfloat16,
+                        cached_weights=cached_weights,
+                        force_sidecar_patching=force_sidecar,
+                    )
+                )
+            if adaln_patches:
+                assert silu_temb_grid is not None
+                stack.enter_context(
+                    apply_minimax_h3_pruned_adaln_lora_patches(transformer, adaln_patches, silu_temb_grid)
+                )
             context.util.signal_progress("Denoising MiniMax H3 audio-video")
             # steps counts sigma grid points (terminal included) -> steps-1 model evaluations.
             progress = tqdm(total=len(state.timesteps), desc=f"Denoising MiniMax H3 ({self.num_frames} frames)")
@@ -337,3 +410,49 @@ class MiniMaxH3DenoiseInvocation(BaseInvocation):
             height=self.height,
             num_frames=self.num_frames,
         )
+
+    def _materialize_lora_patches(self, context: InvocationContext) -> list[PatchSpec]:
+        """Load every LoRA on the transformer field into (patch, weight, cache-pin) specs."""
+        patch_specs: list[PatchSpec] = []
+        for lora in self.transformer.loras:
+            lora_info = context.models.load(lora.lora)
+            if not isinstance(lora_info.model, ModelPatchRaw):
+                raise TypeError(
+                    f"Expected ModelPatchRaw for LoRA '{lora.lora.key}', got {type(lora_info.model).__name__}."
+                )
+            patch_specs.append((lora_info.model, lora.weight, lora_info.model_in_ram()))
+        return patch_specs
+
+    @staticmethod
+    def _split_pruned_adaln_patches(
+        patch_specs: list[PatchSpec],
+    ) -> tuple[list[PatchSpec], list[tuple[str, LoRALayer, float]]]:
+        """Split AdaLN layers out of each patch for run-time re-injection (pruned models only).
+
+        Returns rebuilt backbone patch specs (cache pins preserved — LayerPatcher holds them for
+        the full patched window, keeping the AdaLN layers' tensors pinned in RAM too) and the
+        ``(layer_path, layer, weight)`` triples for
+        ``apply_minimax_h3_pruned_adaln_lora_patches``.
+        """
+        backbone_specs: list[PatchSpec] = []
+        adaln_patches: list[tuple[str, LoRALayer, float]] = []
+        prefix = MINIMAX_H3_LORA_TRANSFORMER_PREFIX
+        for spec in patch_specs:
+            patch, patch_weight = spec[0], spec[1]
+            backbone_layers = {}
+            for layer_key, layer in patch.layers.items():
+                layer_path = layer_key[len(prefix) :] if layer_key.startswith(prefix) else layer_key
+                if is_minimax_h3_adaln_layer_path(layer_path):
+                    if not isinstance(layer, LoRALayer):
+                        raise ValueError(
+                            f"AdaLN layer {layer_path!r} is a {type(layer).__name__}; only plain LoRA "
+                            "layers can be re-injected on the AdaLN-pruned transformer."
+                        )
+                    adaln_patches.append((layer_path, layer, patch_weight))
+                else:
+                    backbone_layers[layer_key] = layer
+            backbone_patch = ModelPatchRaw(layers=backbone_layers)
+            backbone_specs.append(
+                (backbone_patch, patch_weight, spec[2]) if len(spec) == 3 else (backbone_patch, patch_weight)
+            )
+        return backbone_specs, adaln_patches
