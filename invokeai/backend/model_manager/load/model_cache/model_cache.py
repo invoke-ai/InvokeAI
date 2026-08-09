@@ -274,6 +274,15 @@ def _has_dedicated_vram(device: torch.device) -> bool:
     return False
 
 
+def _is_integrated_xpu(device: torch.device) -> bool:
+    """Whether ``device`` is an Intel integrated GPU, i.e. one whose VRAM *is* system RAM.
+
+    Narrower than ``not _has_dedicated_vram()``: CPU and MPS also share memory, but their
+    keep-RAM-copy behaviour is long-standing and out of scope here.
+    """
+    return device.type == "xpu" and xpu_device_is_integrated(device) is True
+
+
 class ModelCache:
     """A cache for managing models in memory.
 
@@ -352,6 +361,9 @@ class ModelCache:
         self._ram_budget = ram_budget
         self._enable_partial_loading = enable_partial_loading
         self._keep_ram_copy_of_weights = keep_ram_copy_of_weights
+        # Notices already emitted, keyed by (topic, device), so each is logged once rather than
+        # on every model load.
+        self._warned_once: set[tuple[str, str]] = set()
         self._execution_device_working_mem_gb = execution_device_working_mem_gb
         self._execution_device: torch.device = torch.device(execution_device)
         self._storage_device: torch.device = torch.device(storage_device)
@@ -615,18 +627,44 @@ class ModelCache:
         # Use the provided execution device, or fall back to the cache's default
         effective_execution_device = execution_device if execution_device is not None else self._execution_device
 
-        # Partial loading only makes sense on devices with dedicated VRAM (CUDA, discrete XPU).
+        # Partial loading needs a device whose residency is worth bounding.
         # - When running on CPU, there is no 'loading' to do.
         # - When running on MPS, memory is shared with the CPU, so the default OS memory management already handles this
-        #   well. An Intel integrated GPU has the same topology and is excluded for the same reason.
+        #   well.
+        # - An Intel integrated GPU shares memory the same way, but is deliberately included: it is the only bounded
+        #   loading path there. partial_load_to_vram() respects vram_available, whereas the full-load path ignores it
+        #   ("no choice but to try and fit it all"), and on Linux that overshoot is an uncatchable OOM-kill rather than
+        #   a degraded load. Combined with keep_ram_copy=False below, streaming moves weights rather than copying them.
         running_with_dedicated_vram = _has_dedicated_vram(effective_execution_device)
+        supports_partial_loading = running_with_dedicated_vram or _is_integrated_xpu(effective_execution_device)
+
+        # On an integrated GPU the "VRAM" copy and the RAM copy are the same DRAM, so keeping a RAM
+        # copy makes every resident model cost twice its size: full_load_to_vram() copies each
+        # tensor (`.to(device, copy=True)`) while the CPU state dict stays live. Dropping the copy
+        # turns that into a move -- steady-state 1x, with a transient peak of one tensor -- and the
+        # unload path already restores weights by moving them back when there is no CPU copy.
+        #
+        # Scoped to integrated XPU on purpose: CPU and MPS share memory too, but their behaviour
+        # here predates this and is left alone.
+        keep_ram_copy = self._keep_ram_copy_of_weights and not _is_integrated_xpu(effective_execution_device)
+
+        # Overriding a setting the user turned on is worth saying once, rather than leaving someone
+        # to wonder why it made no difference.
+        if self._keep_ram_copy_of_weights and _is_integrated_xpu(effective_execution_device):
+            self._warn_once(
+                "keep_ram_copy",
+                effective_execution_device,
+                f"`keep_ram_copy_of_weights` is enabled but is being ignored on {effective_execution_device}: "
+                "it is an integrated GPU, whose VRAM is system RAM, so a RAM copy would double each model's "
+                "footprint against the same memory. Weights are moved rather than copied.",
+            )
 
         # Wrap model.
-        if isinstance(model, torch.nn.Module) and running_with_dedicated_vram and self._enable_partial_loading:
+        if isinstance(model, torch.nn.Module) and supports_partial_loading and self._enable_partial_loading:
             wrapped_model = CachedModelWithPartialLoad(
                 model,
                 effective_execution_device,
-                keep_ram_copy=self._keep_ram_copy_of_weights,
+                keep_ram_copy=keep_ram_copy,
                 shared_store=self._shared_cpu_weights,
                 cache_key=key,
             )
@@ -635,7 +673,7 @@ class ModelCache:
                 model,
                 effective_execution_device,
                 size,
-                keep_ram_copy=self._keep_ram_copy_of_weights,
+                keep_ram_copy=keep_ram_copy,
                 shared_store=self._shared_cpu_weights,
                 cache_key=key,
             )
@@ -685,6 +723,18 @@ class ModelCache:
             # self here would be worse than useless: _make_room_internal already evicted
             # everything unlocked, so the only entry a self-reconcile could ever claim is the
             # model just admitted — evicting it out from under its own loader.)
+
+    def _warn_once(self, topic: str, device: torch.device, message: str) -> None:
+        """Log `message` the first time `topic` arises for `device`.
+
+        Undecorated on purpose: only ever called from put(), which already holds the cache lock
+        and records activity.
+        """
+        key = (topic, str(device))
+        if key in self._warned_once:
+            return
+        self._warned_once.add(key)
+        self._logger.warning(message)
 
     def cached_model_keys(self) -> set[str]:
         """Return the base model keys of every model currently resident in this cache.
@@ -1078,6 +1128,27 @@ class ModelCache:
                 return cache_entry.cached_model.partial_load_to_vram(vram_available)
             elif isinstance(cache_entry.cached_model, CachedModelOnlyFullLoad):  # type: ignore
                 # Partial load is not supported, so we have not choice but to try and fit it all into VRAM.
+                #
+                # On an integrated GPU that gamble is not survivable: "VRAM" is system RAM, so
+                # overshooting means the kernel OOM-killer delivers SIGKILL and the process dies with
+                # no exception to catch and nothing useful in the log. vram_available there is read
+                # from actual free system memory, so it is worth trusting -- refuse up front and
+                # leave the caller an error it can act on. Devices with their own VRAM keep the
+                # try-anyway behaviour, where the failure is a catchable allocator error.
+                #
+                # MPS shares memory the same way and would benefit from the same guard, but macOS
+                # degrades differently (compressed memory, a large default swap) and changing Mac
+                # behaviour is out of scope here.
+                model_bytes = cache_entry.cached_model.total_bytes()
+                device = cache_entry.cached_model.compute_device
+                if _is_integrated_xpu(device) and model_bytes > vram_available:
+                    raise torch.OutOfMemoryError(
+                        f"Cannot load model '{cache_entry.key}' onto {device}: it needs "
+                        f"{model_bytes / MB:.2f}MB but only {vram_available / MB:.2f}MB is available. "
+                        f"{device} shares memory with the CPU, and models are loaded onto it in full, "
+                        "so proceeding would exhaust system memory. Free up RAM, use a smaller or more "
+                        "heavily quantized model, or lower `device_working_mem_gb`."
+                    )
                 return cache_entry.cached_model.full_load_to_vram()
             else:
                 raise ValueError(f"Unsupported cached model type: {type(cache_entry.cached_model)}")
