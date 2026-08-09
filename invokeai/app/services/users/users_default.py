@@ -8,13 +8,15 @@ from invokeai.app.services.auth.password_utils import hash_password, validate_pa
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.users.users_base import UserServiceBase
 from invokeai.app.services.users.users_common import (
+    LAST_ADMIN_DETAIL,
+    SYSTEM_USER_ID,
+    SYSTEM_USER_PROTECTED_DETAIL,
     LastAdministratorError,
+    SystemUserProtectedError,
     UserCreateRequest,
     UserDTO,
     UserUpdateRequest,
 )
-
-LAST_ADMIN_DETAIL = "Cannot remove the last administrator"
 
 
 class UserService(UserServiceBase):
@@ -125,6 +127,10 @@ class UserService(UserServiceBase):
         if user is None:
             raise ValueError(f"User {user_id} not found")
 
+        self._assert_system_user_protected(
+            user_id, is_admin=changes.is_admin, is_active=changes.is_active, password=changes.password
+        )
+
         # Validate password if provided
         if changes.password is not None:
             if strict_password_checking:
@@ -185,6 +191,8 @@ class UserService(UserServiceBase):
         user = self.get(user_id)
         if user is None:
             raise ValueError(f"User {user_id} not found")
+
+        self._assert_system_user_protected(user_id, is_deleting=True)
 
         with self._db.transaction() as cursor:
             # See the note in `update`: the guard and the write share one write-locked
@@ -342,3 +350,38 @@ class UserService(UserServiceBase):
         count_row = cursor.fetchone()
         if (int(count_row[0]) if count_row else 0) <= 1:
             raise LastAdministratorError(LAST_ADMIN_DETAIL)
+
+    def _assert_system_user_protected(
+        self,
+        user_id: str,
+        *,
+        is_deleting: bool = False,
+        is_admin: bool | None = None,
+        is_active: bool | None = None,
+        password: str | None = None,
+    ) -> None:
+        """Reject changes to the ``system`` account that no legitimate operation needs.
+
+        The system row owns every board, image, workflow, and queue item carried over from
+        before multiuser support. Deleting or deactivating it strands all of that: queued
+        items are rejected at dequeue and media reads and saves raise ``PermissionError``.
+
+        Promotion and password-setting are refused for a different reason. The system row
+        is active but has an empty password hash, so it can never authenticate — yet
+        ``count_admins()`` and ``has_admin()`` count any active admin row. Promoting it
+        therefore inflates the administrator count with an administrator nobody can log in
+        as, which is enough to satisfy the last-admin guard while the real administrator is
+        demoted, leaving the instance with no usable administration and no way back in.
+        Keeping the system row permanently non-admin is what makes that count mean
+        "administrators who can actually log in". Giving it a password would turn the owner
+        of all pre-multiuser content into a login account, which is the same hole from the
+        other end.
+
+        Lives in the service rather than only in the routes so the ``invoke-usermod`` /
+        ``invoke-userdel`` CLIs, which construct :class:`UserService` directly, are covered
+        too — the same reasoning that moved the last-admin invariant down here.
+        """
+        if user_id != SYSTEM_USER_ID:
+            return
+        if is_deleting or is_active is False or is_admin is True or password is not None:
+            raise SystemUserProtectedError(SYSTEM_USER_PROTECTED_DETAIL)

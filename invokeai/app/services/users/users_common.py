@@ -117,9 +117,28 @@ class UserUpdateRequest(BaseModel):
     is_active: bool | None = Field(default=None, description="Whether user account should be active")
 
 
+LAST_ADMIN_DETAIL = "Cannot remove the last administrator"
+
+
 class LastAdministratorError(ValueError):
     """Raised when a change would leave the instance with no active administrator.
 
     Subclasses :class:`ValueError` so that callers which already map service-layer
     ``ValueError`` to a 400 keep working unchanged.
+    """
+
+
+# Owner of everything that predates multiuser support (created by migration_27). Not a
+# login account: it has an empty password hash and is hidden from the user list.
+SYSTEM_USER_ID = "system"
+SYSTEM_USER_PROTECTED_DETAIL = (
+    "The system user cannot be deleted, deactivated, promoted to administrator, or given a password"
+)
+
+
+class SystemUserProtectedError(ValueError):
+    """Raised when a change would delete, disable, or weaponize the ``system`` account.
+
+    Subclasses :class:`ValueError` for the same reason as
+    :class:`LastAdministratorError`.
     """

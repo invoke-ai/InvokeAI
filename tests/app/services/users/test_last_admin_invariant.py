@@ -24,7 +24,9 @@ import pytest
 
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.users.users_common import (
+    SYSTEM_USER_ID,
     LastAdministratorError,
+    SystemUserProtectedError,
     UserCreateRequest,
     UserUpdateRequest,
 )
@@ -234,6 +236,90 @@ def test_concurrent_delete_and_demotion_cannot_remove_both_admins(users: UserSer
 
     assert users.count_admins() == 1
     assert sum(isinstance(e, LastAdministratorError) for e in errors) == 1
+
+
+# endregion
+
+# region the system account
+
+
+def _seed_system_user(db: SqliteDatabase) -> None:
+    """The row migration_27 creates: active, non-admin, and with an empty password hash."""
+    db._conn.execute(
+        """
+        INSERT INTO users (user_id, email, display_name, password_hash, is_admin, is_active)
+        VALUES ('system', 'system@system.invokeai', 'System', '', FALSE, TRUE);
+        """
+    )
+    db._conn.commit()
+
+
+def test_the_system_user_cannot_be_promoted(db: SqliteDatabase, users: UserService) -> None:
+    """`count_admins()` counts admin rows, but the invariant that matters is "an admin who
+    can log in". The system row is active and can never authenticate — it has no password —
+    so promoting it would inflate the count with an unusable administrator, which is enough
+    to walk the last-admin guard past the real one:
+
+        PATCH /auth/users/system      {"is_admin": true}   -> count_admins() 1 -> 2
+        PATCH /auth/users/{real}      {"is_admin": false}  -> allowed, count 2 -> 1
+        login as system                                    -> 401, empty password hash
+
+    leaving the instance with no usable administration and no authenticated way back.
+    """
+    _seed_system_user(db)
+    admin = _make(users, "admin@test.com", is_admin=True)
+
+    with pytest.raises(SystemUserProtectedError):
+        users.update(SYSTEM_USER_ID, UserUpdateRequest(is_admin=True), strict_password_checking=False)
+
+    assert users.count_admins() == 1
+
+    # And with the first step refused, the second is still blocked.
+    with pytest.raises(LastAdministratorError):
+        users.update(admin, UserUpdateRequest(is_admin=False), strict_password_checking=False)
+
+
+def test_the_system_user_cannot_be_given_a_password(db: SqliteDatabase, users: UserService) -> None:
+    """The other end of the same hole: a password turns the owner of every pre-multiuser
+    board, image, and workflow into a login account."""
+    _seed_system_user(db)
+
+    with pytest.raises(SystemUserProtectedError):
+        users.update(SYSTEM_USER_ID, UserUpdateRequest(password=PASSWORD), strict_password_checking=False)
+
+    assert users.authenticate("system@system.invokeai", PASSWORD) is None
+
+
+def test_the_system_user_cannot_be_deleted_or_deactivated(db: SqliteDatabase, users: UserService) -> None:
+    """The routes already refuse both, but `invoke-userdel` / `invoke-usermod` construct
+    this service directly and never reach a route — the same reason the last-admin guard
+    lives here."""
+    _seed_system_user(db)
+
+    with pytest.raises(SystemUserProtectedError):
+        users.delete(SYSTEM_USER_ID)
+    with pytest.raises(SystemUserProtectedError):
+        users.update(SYSTEM_USER_ID, UserUpdateRequest(is_active=False), strict_password_checking=False)
+
+    system = users.get(SYSTEM_USER_ID)
+    assert system is not None and system.is_active is True
+
+
+def test_renaming_the_system_user_is_allowed(db: SqliteDatabase, users: UserService) -> None:
+    """Not a blanket lock on the row — only the changes that would make it dangerous."""
+    _seed_system_user(db)
+
+    updated = users.update(SYSTEM_USER_ID, UserUpdateRequest(display_name="Renamed"), strict_password_checking=False)
+
+    assert updated.display_name == "Renamed"
+
+
+def test_the_system_error_is_a_value_error(db: SqliteDatabase, users: UserService) -> None:
+    """Same reason as the last-admin error: existing route and CLI handlers catch ValueError."""
+    _seed_system_user(db)
+
+    with pytest.raises(ValueError):
+        users.delete(SYSTEM_USER_ID)
 
 
 # endregion

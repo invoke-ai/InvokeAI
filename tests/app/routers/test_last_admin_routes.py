@@ -87,3 +87,59 @@ def test_demoting_an_admin_when_another_exists_succeeds(
     assert r.status_code == status.HTTP_200_OK, r.text
     assert r.json()["is_admin"] is False
     assert mock_invoker.services.users.count_admins() == 1
+
+
+def test_updating_an_unknown_user_returns_404(
+    enable_multiuser: Any, client: TestClient, admin_token: str, mock_invoker: Invoker
+) -> None:
+    """`get_user` and `delete_user` 404 for an unknown id; this endpoint documents the same
+    contract but used to fall through to the service's "User ... not found" as a 400."""
+    r = client.patch("/api/v1/auth/users/does-not-exist", headers=_auth(admin_token), json={"display_name": "x"})
+
+    assert r.status_code == status.HTTP_404_NOT_FOUND, r.text
+
+
+def test_promoting_the_system_user_cannot_launder_away_the_last_admin(
+    enable_multiuser: Any, client: TestClient, admin_token: str, mock_invoker: Invoker
+) -> None:
+    """The system row is active but has an empty password hash, so it can never log in.
+    Promoting it would raise `count_admins()` to 2 — enough for the last-admin guard to
+    allow the real administrator to be demoted, leaving nobody able to administer the
+    instance and `/auth/setup` still closed."""
+    users = mock_invoker.services.users
+    admin_id = _admin_id(mock_invoker)
+
+    promote = client.patch("/api/v1/auth/users/system", headers=_auth(admin_token), json={"is_admin": True})
+
+    assert promote.status_code == status.HTTP_400_BAD_REQUEST, promote.text
+    assert users.count_admins() == 1
+
+    demote = client.patch(f"/api/v1/auth/users/{admin_id}", headers=_auth(admin_token), json={"is_admin": False})
+
+    assert demote.status_code == status.HTTP_400_BAD_REQUEST, demote.text
+    assert users.count_admins() == 1
+
+
+def test_setting_a_password_on_the_system_user_returns_400(
+    enable_multiuser: Any, client: TestClient, admin_token: str, mock_invoker: Invoker
+) -> None:
+    """Otherwise the owner of every pre-multiuser board, image, and workflow becomes a
+    login account."""
+    r = client.patch("/api/v1/auth/users/system", headers=_auth(admin_token), json={"password": "SystemPass123"})
+
+    assert r.status_code == status.HTTP_400_BAD_REQUEST, r.text
+
+    login = client.post(
+        "/api/v1/auth/login",
+        json={"email": "system@system.invokeai", "password": "SystemPass123", "remember_me": False},
+    )
+    assert login.status_code != status.HTTP_200_OK
+
+
+def test_deleting_the_system_user_returns_400(
+    enable_multiuser: Any, client: TestClient, admin_token: str, mock_invoker: Invoker
+) -> None:
+    r = client.delete("/api/v1/auth/users/system", headers=_auth(admin_token))
+
+    assert r.status_code == status.HTTP_400_BAD_REQUEST, r.text
+    assert mock_invoker.services.users.get("system") is not None

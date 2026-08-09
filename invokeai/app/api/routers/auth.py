@@ -23,6 +23,9 @@ from invokeai.app.services.auth.token_service import (
     get_token_remaining_seconds,
 )
 from invokeai.app.services.users.users_common import (
+    LAST_ADMIN_DETAIL,
+    SYSTEM_USER_ID,
+    SYSTEM_USER_PROTECTED_DETAIL,
     UserCreateRequest,
     UserDTO,
     UserUpdateRequest,
@@ -34,11 +37,6 @@ auth_router = APIRouter(prefix="/v1/auth", tags=["authentication"])
 # Token expiration constants (in days)
 TOKEN_EXPIRATION_NORMAL = 1  # 1 day for normal login
 TOKEN_EXPIRATION_REMEMBER_ME = 7  # 7 days for "remember me" login
-
-# Owner of everything that predates multiuser support (created by migration_27). Not a
-# login account: it has an empty password hash and is hidden from the user list.
-SYSTEM_USER_ID = "system"
-SYSTEM_USER_PROTECTED_DETAIL = "The system user cannot be deleted or deactivated"
 
 
 def _issue_replacement_token(http_request: Request, response: Response, user: UserDTO, remember_me: bool) -> None:
@@ -565,19 +563,27 @@ async def update_user(
         The updated user
 
     Raises:
-        HTTPException: 400 if password is weak, or if the change would remove the
-            last administrator
+        HTTPException: 400 if password is weak, if the change would remove the last
+            administrator, or if it targets the protected system account
         HTTPException: 404 if user not found
     """
     user_service = ApiDependencies.invoker.services.users
     config = ApiDependencies.invoker.services.configuration
     before = user_service.get(user_id)
+    # Match `get_user`/`delete_user`, which 404 for an unknown id. Without this the request
+    # falls through to the service's `ValueError("User ... not found")` and the route's
+    # `except ValueError` reports it as a 400, contradicting this endpoint's own contract.
+    if before is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     # The system user owns everything migrated from before multiuser support. Deactivating
     # it would strand that content: its queue items stop at the dequeue gate, and reads and
-    # saves against system-owned media raise PermissionError. It is not a login account, so
-    # there is no reason to disable it.
-    if user_id == SYSTEM_USER_ID and request.is_active is False:
+    # saves against system-owned media raise PermissionError. Promoting it or giving it a
+    # password is refused for a different reason — see `_assert_system_user_protected`,
+    # which is the backstop this friendly message fronts.
+    if user_id == SYSTEM_USER_ID and (
+        request.is_active is False or request.is_admin is True or request.password is not None
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=SYSTEM_USER_PROTECTED_DETAIL,
@@ -589,15 +595,14 @@ async def update_user(
     # to zero, which re-opens the unauthenticated `/auth/setup` endpoint to any caller.
     # `delete_user` guards the same invariant.
     if (
-        before is not None
-        and before.is_admin
+        before.is_admin
         and before.is_active
         and (request.is_admin is False or request.is_active is False)
         and user_service.count_admins() <= 1
     ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot remove the last administrator",
+            detail=LAST_ADMIN_DETAIL,
         )
 
     try:
@@ -616,7 +621,7 @@ async def update_user(
     # instead of persisting until reconnect or token expiry. A password reset bumps
     # the epoch without touching is_admin/is_active, and must drop the target's open
     # sockets too, so it is part of this condition.
-    if before is not None and (
+    if (
         before.is_admin != updated.is_admin
         or before.is_active != updated.is_active
         or before.token_epoch != updated.token_epoch
@@ -631,7 +636,10 @@ async def update_user(
     # An admin resetting their *own* password would otherwise lock themselves out: the
     # epoch bump kills the token that authenticated this request, and the sliding-window
     # middleware correctly refuses to refresh a revoked one. Mirror what /auth/me does.
-    if request.password is not None and updated.user_id == current_user.user_id:
+    # An admin who deactivated themselves in the same request gets nothing: the token
+    # would be rejected on its next use anyway, and setting the media cookie for an
+    # account this request just disabled advertises a session that does not exist.
+    if request.password is not None and updated.user_id == current_user.user_id and updated.is_active:
         _issue_replacement_token(http_request, response, updated, current_user.remember_me)
 
     return updated
@@ -669,11 +677,13 @@ async def delete_user(
             detail=SYSTEM_USER_PROTECTED_DETAIL,
         )
 
-    # Prevent deleting the last active admin
+    # Prevent deleting the last active admin. Same wording as the service backstop: this
+    # pre-check can lose a race and let the service reject the delete instead, and one
+    # endpoint should not report one condition two different ways.
     if user.is_admin and user.is_active and user_service.count_admins() <= 1:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot delete the last administrator",
+            detail=LAST_ADMIN_DETAIL,
         )
 
     try:
