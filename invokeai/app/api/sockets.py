@@ -278,15 +278,26 @@ class SocketIO:
         _, event_data = event
         affected_sids = [sid for sid, info in self._socket_users.items() if info.get("user_id") == event_data.user_id]
         for sid in affected_sids:
+            # `affected_sids` is a snapshot, and `disconnect()` below yields to the event
+            # loop while it flushes the packet — the socket's own disconnect handler then
+            # removes it from `_socket_users`. Re-look-up rather than re-index: a socket
+            # that dropped (client, ping timeout, or an interleaved event for the same
+            # user) would otherwise raise KeyError here and abandon re-authorization for
+            # every remaining sid in the loop, leaving them on stale privileges with no
+            # retry. Nothing observes the failure either — the dispatcher runs this
+            # handler as a bare task.
+            info = self._socket_users.get(sid)
+            if info is None:
+                continue
             if not event_data.is_active:
                 logger.info(f"Disconnecting socket {sid}: user {event_data.user_id} deactivated or deleted")
                 await self._sio.disconnect(sid)
                 continue
-            if self._socket_users[sid].get("token_epoch", 0) != event_data.token_epoch:
+            if info.get("token_epoch", 0) != event_data.token_epoch:
                 logger.info(f"Disconnecting socket {sid}: user {event_data.user_id} revoked its earlier sessions")
                 await self._sio.disconnect(sid)
                 continue
-            self._socket_users[sid]["is_admin"] = event_data.is_admin
+            info["is_admin"] = event_data.is_admin
             if event_data.is_admin:
                 await self._sio.enter_room(sid, "admin")
                 logger.info(f"Socket {sid} joined admin room: user {event_data.user_id} promoted")

@@ -8,6 +8,7 @@ indefinitely; a demoted admin could also reconnect with an old token and rejoin 
 admin room.
 """
 
+import asyncio
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -201,6 +202,62 @@ class TestUserAccessChangedHandler:
         assert "sid-other" not in disconnected
         socketio._sio.leave_room.assert_not_awaited()
         assert socketio._socket_users["sid-admin"]["is_admin"] is True
+
+    @pytest.mark.anyio
+    async def test_a_socket_dropping_mid_loop_does_not_abandon_the_rest(self) -> None:
+        """The real `disconnect` awaits I/O and then runs the disconnect handler, which
+        removes the socket from `_socket_users`. Any socket that goes away during that
+        yield — its own client dropping, a ping timeout, or a second event for the same
+        user — must not stop the loop: the remaining sockets would keep the privileges
+        this handler exists to revoke, silently, since the dispatcher runs it as a bare
+        task with nothing to observe the failure.
+        """
+        socketio = self._connected_socketio()
+        socketio._socket_users["sid-user-c"] = {"user_id": "user-1", "is_admin": True, "token_epoch": 0}
+
+        async def disconnect(sid: str) -> None:
+            # Stand in for the packet flush: yield, and drop an as-yet-unvisited socket
+            # of the same user while suspended, as a client disconnect would.
+            await asyncio.sleep(0)
+            socketio._socket_users.pop("sid-user-b", None)
+            await socketio._handle_disconnect(sid)
+
+        socketio._sio.disconnect = AsyncMock(side_effect=disconnect)
+        event = UserAccessChangedEvent.build(user_id="user-1", is_admin=False, is_active=False)
+
+        await socketio._handle_user_access_changed(("user_access_changed", event))
+
+        # sid-user-a is disconnected first and takes sid-user-b with it; sid-user-c must
+        # still be reached rather than left connected on revoked credentials.
+        disconnected = {call.args[0] for call in socketio._sio.disconnect.await_args_list}
+        assert disconnected == {"sid-user-a", "sid-user-c"}
+        assert "sid-user-c" not in socketio._socket_users
+
+    @pytest.mark.anyio
+    async def test_demotion_survives_a_socket_dropping_mid_loop(self) -> None:
+        """Same interleaving on the demotion path, where an abandoned socket is worse: it
+        stays in the admin room *and* keeps a cached is_admin of True, which
+        `_handle_sub_queue` would use to re-add it on the next subscription."""
+        socketio = self._connected_socketio()
+        socketio._socket_users = {
+            "sid-a": {"user_id": "admin-1", "is_admin": True, "token_epoch": 0},
+            "sid-b": {"user_id": "admin-1", "is_admin": True, "token_epoch": 1},
+            "sid-c": {"user_id": "admin-1", "is_admin": True, "token_epoch": 0},
+        }
+
+        async def disconnect(sid: str) -> None:
+            await asyncio.sleep(0)
+            socketio._socket_users.pop("sid-b", None)
+            await socketio._handle_disconnect(sid)
+
+        socketio._sio.disconnect = AsyncMock(side_effect=disconnect)
+        # Epoch 1: sid-a and sid-c hold superseded tokens, sid-b is current.
+        event = UserAccessChangedEvent.build(user_id="admin-1", is_admin=False, is_active=True, token_epoch=1)
+
+        await socketio._handle_user_access_changed(("user_access_changed", event))
+
+        disconnected = {call.args[0] for call in socketio._sio.disconnect.await_args_list}
+        assert disconnected == {"sid-a", "sid-c"}
 
 
 class TestTokenEpochOnSockets:
