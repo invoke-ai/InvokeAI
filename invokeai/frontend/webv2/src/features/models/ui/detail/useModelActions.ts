@@ -2,6 +2,7 @@ import type { ModelConfig } from '@features/models/core/types';
 
 import { convertModelToDiffusers, deleteModel, reidentifyModel } from '@features/models/data/api';
 import { removeModelsFromStore, replaceModelInStore } from '@features/models/data/modelsStore';
+import { removeModelsFromRelationships } from '@features/models/data/relationshipsStore';
 import { pruneModelsUiKeys } from '@features/models/ui/uiStore';
 import { useNotify } from '@features/models/ui/useModelsNotify';
 import {
@@ -30,6 +31,7 @@ export const useModelActions = () => {
 
         assertAccountScopeCurrent(owner);
         removeModelsFromStore([model.key]);
+        removeModelsFromRelationships([model.key]);
         pruneModelsUiKeys([model.key]);
         notify.success('Model deleted', model.name);
       } catch (error) {

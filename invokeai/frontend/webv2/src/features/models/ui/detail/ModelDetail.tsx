@@ -3,6 +3,7 @@ import type { ModelConfig } from '@features/models/core/types';
 
 import { DataList, HStack, Icon, Menu, Portal, Separator, Stack, Text } from '@chakra-ui/react';
 import { isConvertibleToDiffusers } from '@features/models/core/baseIdentity';
+import { isLinkableType } from '@features/models/core/relationships';
 import { formatBytes } from '@features/models/core/taxonomy';
 import { useModelsSelector } from '@features/models/data/modelsStore';
 import { useNotify } from '@features/models/ui/useModelsNotify';
@@ -23,7 +24,6 @@ import { useModelActions } from './useModelActions';
 import { supportsVaeCpuOnlySetting, VaeCpuOnlySetting } from './VaeCpuOnlySetting';
 
 const TRIGGER_PHRASE_TYPES = new Set(['main', 'lora', 'embedding']);
-const RELATED_MODEL_TYPES = new Set(['main', 'lora']);
 const EMPTY_TRIGGER_PHRASES: readonly string[] = [];
 
 type ModelDetailShellModel = Pick<ModelConfig, 'key' | 'type'>;
@@ -153,7 +153,7 @@ export const ModelDetail = ({
         </>
       ) : null}
 
-      {RELATED_MODEL_TYPES.has(model.type) ? (
+      {isLinkableType(model.type) ? (
         <>
           <Separator borderColor="border.subtle" />
           <RelatedModelsSectionContainer modelKey={model.key} />
@@ -415,9 +415,9 @@ const RelatedModelsSectionContainer = memo(function RelatedModelsSectionContaine
     (snapshot) => {
       const candidate = snapshot.models.find((model) => model.key === modelKey);
 
-      return candidate ? { base: candidate.base, key: candidate.key } : null;
+      return candidate ? { base: candidate.base, key: candidate.key, type: candidate.type } : null;
     },
-    (left, right) => left?.key === right?.key && left?.base === right?.base
+    (left, right) => left?.key === right?.key && left?.base === right?.base && left?.type === right?.type
   );
   const handleSectionError = useCallback(
     (message: string) => notify.error(t('models.modelManager'), message),

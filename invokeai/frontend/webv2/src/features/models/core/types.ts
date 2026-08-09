@@ -45,6 +45,7 @@ export type ModelTaxonomyType =
   | 'qwen_vl_encoder'
   | 'qwen3_vl_encoder'
   | 'wan_t5_encoder'
+  | 'mistral_encoder'
   | 'gemma2_encoder'
   | 'pid_decoder'
   | 'siglip'

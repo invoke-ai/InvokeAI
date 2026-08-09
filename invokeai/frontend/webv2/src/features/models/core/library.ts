@@ -44,7 +44,7 @@ export interface ModelPickerOptions {
   excludeKeys?: ReadonlySet<string>;
   /** Extra predicate supplied by the owning form, e.g. base compatibility. */
   filter?: (model: ModelConfig) => boolean;
-  modelTypes: ModelTaxonomyType[];
+  modelTypes: readonly ModelTaxonomyType[];
   /** Models linked to the current selection, floated to the top of their group. */
   relatedKeys?: ReadonlySet<string>;
   searchTerm: string;

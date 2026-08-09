@@ -1,34 +1,25 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
-import type { ModelConfig, ModelTaxonomyType } from '@features/models/core/types';
+import type { ModelConfig } from '@features/models/core/types';
 
 import { Badge, Icon, Spinner, Stack, Text } from '@chakra-ui/react';
 import { getModelBaseColorPalette, getModelBaseLabel } from '@features/models/core/baseIdentity';
+import { isBaseCompatible, LINKABLE_TYPES } from '@features/models/core/relationships';
 import { getModelTypeLabel } from '@features/models/core/taxonomy';
-import { addModelRelationship, getRelatedModelKeys, removeModelRelationship } from '@features/models/data/api';
 import { useModelsSelector } from '@features/models/data/modelsStore';
+import {
+  linkModels,
+  refreshRelatedModelKeys,
+  unlinkModels,
+  useRelatedModelKeys,
+} from '@features/models/data/relationshipsStore';
 import { ModelSelect } from '@features/models/ui/components';
 import { SourceListItem } from '@features/models/ui/shared/SourceListItem';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import {
-  assertAccountScopeCurrent,
-  captureAccountScope,
-  isAccountScopeCurrent,
-} from '@platform/state/accountLifecycle';
+import { isAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
 import { IconButton, FieldLabel, Tooltip } from '@platform/ui';
 import { Link2OffIcon } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
-/** Types offered when linking related models, grouped in one picker. */
-const LINKABLE_TYPES: ModelTaxonomyType[] = [
-  'main',
-  'lora',
-  'embedding',
-  'vae',
-  'controlnet',
-  't2i_adapter',
-  'ip_adapter',
-];
 
 /**
  * Bidirectional "related models" links — e.g. attach the LoRAs and VAE that
@@ -37,7 +28,7 @@ const LINKABLE_TYPES: ModelTaxonomyType[] = [
  * once; linked models render as rows with an unlink action.
  */
 interface RelatedModelsSectionProps {
-  model: Pick<ModelConfig, 'base' | 'key'>;
+  model: Pick<ModelConfig, 'base' | 'key' | 'type'>;
   onError: (message: string) => void;
 }
 
@@ -48,29 +39,17 @@ export const RelatedModelsSection = (props: RelatedModelsSectionProps) => (
 const RelatedModelsForModel = ({ model, onError }: RelatedModelsSectionProps) => {
   const { t } = useTranslation();
   const models = useModelsSelector((snapshot) => snapshot.models);
-  const [relatedKeys, setRelatedKeys] = useState<string[] | null>(null);
+  const relatedKeys = useRelatedModelKeys(model.key);
   const [isMutating, setIsMutating] = useState(false);
 
   useMountEffect(() => {
     const owner = captureAccountScope();
-    let isMounted = true;
 
-    getRelatedModelKeys(model.key, owner.signal)
-      .then((keys) => {
-        if (isMounted && isAccountScopeCurrent(owner)) {
-          setRelatedKeys(keys);
-        }
-      })
-      .catch((error: unknown) => {
-        if (isMounted && isAccountScopeCurrent(owner)) {
-          setRelatedKeys([]);
-          onError(error instanceof Error ? error.message : t('models.failedToLoadRelatedModels'));
-        }
-      });
-
-    return () => {
-      isMounted = false;
-    };
+    refreshRelatedModelKeys(model.key).catch((error: unknown) => {
+      if (isAccountScopeCurrent(owner)) {
+        onError(error instanceof Error ? error.message : t('models.failedToLoadRelatedModels'));
+      }
+    });
   });
 
   const relatedModels = useMemo(() => {
@@ -91,10 +70,7 @@ const RelatedModelsForModel = ({ model, onError }: RelatedModelsSectionProps) =>
     setIsMutating(true);
 
     try {
-      await addModelRelationship(model.key, target.key, owner.signal);
-
-      assertAccountScopeCurrent(owner);
-      setRelatedKeys((current) => [...(current ?? []), target.key]);
+      await linkModels(model.key, target.key);
     } catch (error) {
       if (!isAccountScopeCurrent(owner)) {
         return;
@@ -114,10 +90,7 @@ const RelatedModelsForModel = ({ model, onError }: RelatedModelsSectionProps) =>
     setIsMutating(true);
 
     try {
-      await removeModelRelationship(model.key, key, owner.signal);
-
-      assertAccountScopeCurrent(owner);
-      setRelatedKeys((current) => (current ?? []).filter((existing) => existing !== key));
+      await unlinkModels(model.key, key);
     } catch (error) {
       if (!isAccountScopeCurrent(owner)) {
         return;
@@ -141,7 +114,7 @@ const RelatedModelsForModel = ({ model, onError }: RelatedModelsSectionProps) =>
       </Stack>
       <ModelSelect
         excludeKeys={excludeKeys}
-        filter={(candidate) => candidate.base === model.base || candidate.base === 'any' || model.base === 'any'}
+        filter={(candidate) => isBaseCompatible(model, candidate)}
         modelTypes={LINKABLE_TYPES}
         placeholder={t('models.searchCompatibleToLink')}
         showManagerButton={false}

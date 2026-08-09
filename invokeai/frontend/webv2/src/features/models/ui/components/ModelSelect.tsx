@@ -6,8 +6,9 @@ import { Badge, Box, HStack, Icon, Image, Popover, Portal, Spacer, Stack, Text }
 import { getModelBaseColorPalette, getModelBaseLabel, getModelBaseLongLabel } from '@features/models/core/baseIdentity';
 import { getModelPickerGroups } from '@features/models/core/library';
 import { formatBytes, getModelTypeLabel, getModelTypePluralLabel } from '@features/models/core/taxonomy';
-import { getModelImageUrl, getRelatedModelKeys } from '@features/models/data/api';
+import { getModelImageUrl } from '@features/models/data/api';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models/data/modelsStore';
+import { ensureRelatedModelKeysLoaded, useRelatedModelKeys } from '@features/models/data/relationshipsStore';
 import { useModelsUi } from '@features/models/ui/ModelsUiContext';
 import { setPickerCompactView, useModelsUiSelector } from '@features/models/ui/uiStore';
 import { useMountEffect } from '@platform/react/useMountEffect';
@@ -54,7 +55,7 @@ export const ModelSelect = ({
   id?: string;
   invalid?: boolean;
   isClearable?: boolean;
-  modelTypes: ModelTaxonomyType[];
+  modelTypes: readonly ModelTaxonomyType[];
   onChange: (model: ModelConfig | null) => void;
   placeholder?: string;
   showManagerButton?: boolean;
@@ -71,11 +72,23 @@ export const ModelSelect = ({
 
   const pickerId = id ?? `models:${modelTypes.join('+')}`;
   const isCompact = useModelsUiSelector((snapshot) => snapshot.pickerCompactViews[pickerId] ?? false);
-  const relatedKeys = useRelatedModelKeys(isOpen ? value : null);
+  const relatedKeyList = useRelatedModelKeys(isOpen ? value : null);
+  const relatedKeys = useMemo<ReadonlySet<string>>(
+    () => (relatedKeyList ? new Set(relatedKeyList) : EMPTY_KEYS),
+    [relatedKeyList]
+  );
 
   useMountEffect(() => {
     void ensureModelsLoaded();
   });
+
+  useEffect(() => {
+    if (isOpen && value) {
+      // A missing relationship list is not worth surfacing; the picker just
+      // loses its pinning.
+      ensureRelatedModelKeysLoaded(value).catch(() => {});
+    }
+  }, [isOpen, value]);
 
   if (disabled !== lastDisabled) {
     setLastDisabled(disabled);
@@ -327,34 +340,6 @@ const matchesModel = (model: ModelConfig, searchTerm: string): boolean => {
   const haystack = `${model.name} ${model.base} ${model.type} ${model.description ?? ''}`.toLowerCase();
 
   return terms.every((term) => haystack.includes(term));
-};
-
-const useRelatedModelKeys = (modelKey: string | null): ReadonlySet<string> => {
-  const [relatedKeys, setRelatedKeys] = useState<ReadonlySet<string>>(EMPTY_KEYS);
-
-  useEffect(() => {
-    if (!modelKey) {
-      setRelatedKeys(EMPTY_KEYS);
-      return;
-    }
-
-    const controller = new AbortController();
-
-    getRelatedModelKeys(modelKey, controller.signal)
-      .then((keys) => {
-        if (!controller.signal.aborted) {
-          setRelatedKeys(new Set(keys));
-        }
-      })
-      .catch(() => {
-        // A missing relationship list is not worth surfacing; the picker just
-        // loses its pinning.
-      });
-
-    return () => controller.abort();
-  }, [modelKey]);
-
-  return relatedKeys;
 };
 
 const CompactViewToggle = ({ isCompact, pickerId }: { isCompact: boolean; pickerId: string }) => {
