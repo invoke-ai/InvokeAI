@@ -204,13 +204,13 @@ class TestUserAccessChangedHandler:
         assert socketio._socket_users["sid-admin"]["is_admin"] is True
 
     @pytest.mark.anyio
-    async def test_a_socket_dropping_mid_loop_does_not_abandon_the_rest(self) -> None:
-        """The real `disconnect` awaits I/O and then runs the disconnect handler, which
-        removes the socket from `_socket_users`. Any socket that goes away during that
-        yield — its own client dropping, a ping timeout, or a second event for the same
-        user — must not stop the loop: the remaining sockets would keep the privileges
-        this handler exists to revoke, silently, since the dispatcher runs it as a bare
-        task with nothing to observe the failure.
+    async def test_a_socket_dropping_mid_loop_is_skipped_not_redisconnected(self) -> None:
+        """A socket that goes away while the loop is suspended is skipped on its turn.
+
+        The deactivation branch never indexed `_socket_users`, so it did not raise on a
+        mid-loop removal — see `test_demotion_survives_a_socket_dropping_mid_loop` for the
+        branch that did. What this pins is the weaker half: the loop's snapshot is not
+        treated as still-live, so an already-disconnected socket is not disconnected twice.
         """
         socketio = self._connected_socketio()
         socketio._socket_users["sid-user-c"] = {"user_id": "user-1", "is_admin": True, "token_epoch": 0}
