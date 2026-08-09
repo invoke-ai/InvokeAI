@@ -1,4 +1,6 @@
-import type { ModelFileFormat, ModelInstallJob, ModelTaxonomyType } from './types';
+import type { ModelFileFormat, ModelTaxonomyType } from './types';
+
+import { toTitleCase } from './strings';
 
 /**
  * Display metadata for the model taxonomy. Open-union friendly: unknown bases,
@@ -38,9 +40,6 @@ export const MODEL_CATEGORIES: CategoryDefinition[] = [
 ];
 
 const categoryByType = new Map(MODEL_CATEGORIES.map((category) => [category.type, category]));
-
-const toTitleCase = (value: string): string =>
-  value.replaceAll(/[_-]+/g, ' ').replace(/\w\S*/g, (word) => word.charAt(0).toUpperCase() + word.slice(1));
 
 export const getModelTypeLabel = (type: ModelTaxonomyType): string =>
   categoryByType.get(type)?.label ?? toTitleCase(type);
@@ -95,11 +94,27 @@ export const formatBytes = (bytes: number | null | undefined): string => {
   return `${unitIndex === 0 ? value : value.toFixed(1)} ${BYTE_UNITS[unitIndex]}`;
 };
 
-/** Human-readable source for an install job (string or structured source). */
-export const getInstallSourceLabel = (source: ModelInstallJob['source']): string => {
+/**
+ * Human-readable source for an install job or install socket payload. Accepts
+ * `unknown` so untyped socket payloads and typed job sources produce the SAME
+ * string — active-install matching compares these labels.
+ */
+export const getInstallSourceLabel = (source: unknown): string => {
   if (typeof source === 'string') {
     return source;
   }
 
-  return source.repo_id ?? source.url ?? source.path ?? JSON.stringify(source);
+  if (source && typeof source === 'object') {
+    const record = source as Record<string, unknown>;
+
+    for (const field of ['repo_id', 'url', 'path'] as const) {
+      const value = record[field];
+
+      if (typeof value === 'string') {
+        return value;
+      }
+    }
+  }
+
+  return 'model';
 };

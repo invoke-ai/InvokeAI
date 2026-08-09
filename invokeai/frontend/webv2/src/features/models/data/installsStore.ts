@@ -1,5 +1,6 @@
 import type { ModelInstallJob, ModelInstallStatus } from '@features/models/core/types';
 
+import { getInstallSourceLabel } from '@features/models/core/taxonomy';
 import {
   type AccountScope,
   captureAccountScope,
@@ -167,24 +168,6 @@ interface ModelInstallSocketPayload {
   config?: { name?: string } | null;
 }
 
-const describeSource = (source: unknown): string => {
-  if (typeof source === 'string') {
-    return source;
-  }
-
-  if (source && typeof source === 'object') {
-    const record = source as Record<string, unknown>;
-
-    for (const field of ['repo_id', 'url', 'path']) {
-      if (typeof record[field] === 'string') {
-        return record[field];
-      }
-    }
-  }
-
-  return 'model';
-};
-
 export const MODEL_INSTALL_SOCKET_EVENTS = [
   'model_install_started',
   'model_install_download_started',
@@ -237,7 +220,7 @@ export const handleModelInstallSocketEvent = (
       jobId: data.id,
       kind: 'completed',
       modelName: data.config?.name ?? null,
-      source: describeSource(data.source),
+      source: getInstallSourceLabel(data.source),
     });
     void refreshModels();
     refreshStartersIfLoaded();
@@ -247,7 +230,7 @@ export const handleModelInstallSocketEvent = (
       jobId: data.id,
       kind: 'error',
       modelName: null,
-      source: describeSource(data.source),
+      source: getInstallSourceLabel(data.source),
     });
   } else if (event === 'model_install_cancelled') {
     recordOutcome({
@@ -255,7 +238,7 @@ export const handleModelInstallSocketEvent = (
       jobId: data.id,
       kind: 'cancelled',
       modelName: null,
-      source: describeSource(data.source),
+      source: getInstallSourceLabel(data.source),
     });
   }
 
@@ -283,7 +266,7 @@ const getActiveInstallSources = (jobs: ModelInstallJob[]): ReadonlySet<string> =
   new Set(
     jobs
       .filter((job) => isActiveInstallStatus(job.status) || job.status === 'paused')
-      .map((job) => describeSource(job.source))
+      .map((job) => getInstallSourceLabel(job.source))
   );
 
 export const useActiveInstallSources = (): ReadonlySet<string> =>

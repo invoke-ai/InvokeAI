@@ -1,5 +1,7 @@
 import type { ModelBase, ModelConfig } from './types';
 
+import { toTitleCase } from './strings';
+
 // Model-base identity registry: labels, colors, and scalar display facts only.
 // Generation behavior keyed by base lives in @features/generation/settings.
 
@@ -116,9 +118,6 @@ export const MODEL_BASES = {
 export type KnownModelBase = keyof typeof MODEL_BASES;
 
 export const KNOWN_MODEL_BASES = Object.keys(MODEL_BASES) as KnownModelBase[];
-
-const toTitleCase = (value: string): string =>
-  value.replaceAll(/[_-]+/g, ' ').replace(/\w\S*/g, (word) => word[0].toUpperCase() + word.slice(1));
 
 // Unknown bases are display-safe here, but generation support is decided in baseGenerationPolicies.ts.
 export const getModelBaseInfo = (base: ModelBase): ModelBaseInfo =>
