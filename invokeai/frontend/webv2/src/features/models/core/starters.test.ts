@@ -63,12 +63,24 @@ describe('filterStarterModels', () => {
     ]);
   });
 
-  it('sorts by base label, not raw base id', () => {
-    // Labels: FLUX, SD 1.x, SDXL — alphabetical by label.
+  it('sorts by base', () => {
+    // Note: label order and raw-id order coincide for every registry base, so
+    // this cannot distinguish the two — it pins the ordering, not the source.
     expect(
       filterStarterModels(catalog, { ...DEFAULT_STARTER_MODEL_FILTERS, sortField: 'base' as const }, '').map(
         (m) => m.base
       )
     ).toEqual(['flux', 'sd-1', 'sdxl']);
+  });
+
+  it('sorts unknown bases deterministically via their fallback labels', () => {
+    // 'zeta-arch' has no registry entry; its display label is "Zeta Arch".
+    const withUnknown = [...catalog, createStarter({ base: 'zeta-arch', name: 'Zeta Model' })];
+
+    expect(
+      filterStarterModels(withUnknown, { ...DEFAULT_STARTER_MODEL_FILTERS, sortField: 'base' as const }, '').map(
+        (m) => m.base
+      )
+    ).toEqual(['flux', 'sd-1', 'sdxl', 'zeta-arch']);
   });
 });
