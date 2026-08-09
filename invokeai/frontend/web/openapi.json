@@ -375,7 +375,7 @@
       "patch": {
         "tags": ["authentication"],
         "summary": "Update User",
-        "description": "Update a user. Requires admin privileges.\n\nResetting a password revokes the target's existing sessions. An admin resetting\ntheir own password receives a replacement token in ``X-Refreshed-Token`` so they\nare not signed out by their own action.\n\nArgs:\n    user_id: The user ID\n    request: Fields to update\n\nReturns:\n    The updated user\n\nRaises:\n    HTTPException: 400 if password is weak, or if the change would remove the\n        last administrator\n    HTTPException: 404 if user not found",
+        "description": "Update a user. Requires admin privileges.\n\nResetting a password revokes the target's existing sessions. An admin resetting\ntheir own password receives a replacement token in ``X-Refreshed-Token`` so they\nare not signed out by their own action.\n\nArgs:\n    user_id: The user ID\n    request: Fields to update\n\nReturns:\n    The updated user\n\nRaises:\n    HTTPException: 400 if password is weak, if the change would remove the last\n        administrator, or if it targets the protected system account\n    HTTPException: 404 if user not found",
         "operationId": "update_user_api_v1_auth_users__user_id__patch",
         "security": [
           {
