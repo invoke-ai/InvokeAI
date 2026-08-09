@@ -224,8 +224,15 @@ def _iter_video_frames_unbounded(
     video_path: Path,
     timeout: float = VIDEO_DECODE_TIMEOUT_SECONDS,
     is_canceled: Optional[Callable[[], bool]] = None,
+    first_frame_timeout: Optional[float] = None,
 ) -> Iterator[np.ndarray]:
-    """Streams decoded frames from an isolated worker with bounded memory and wait time."""
+    """Streams decoded frames from an isolated worker with bounded memory and wait time.
+
+    ``timeout`` bounds decoder *inactivity*: it is restarted after every frame, so a long
+    video is not killed for being long. ``first_frame_timeout`` overrides that budget for
+    the first frame only, letting a caller that already spent part of the budget waiting
+    for capacity charge that wait against the same deadline instead of granting a fresh one.
+    """
     proc = _spawn_worker(
         "stream",
         str(video_path),
@@ -286,7 +293,7 @@ def _iter_video_frames_unbounded(
     stderr_reader = threading.Thread(target=drain_stderr, name="video-stderr-reader", daemon=True)
     reader.start()
     stderr_reader.start()
-    deadline = time.monotonic() + timeout
+    deadline = time.monotonic() + (timeout if first_frame_timeout is None else first_frame_timeout)
     try:
         while True:
             if is_canceled is not None and is_canceled():
@@ -349,7 +356,18 @@ def iter_video_frames(
                 if slot.acquire(timeout=min(0.1, remaining)):
                     acquired.append(slot)
                     break
-        yield from _iter_video_frames_unbounded(video_path, timeout, is_canceled)
+        # Charge the capacity wait against the same deadline as the first frame, the way
+        # _run_worker does. Handing the decoder a fresh full timeout here would let a
+        # caller that waited just under `timeout` for a slot block for nearly 2 * timeout
+        # before failing — twice the bound the callers (upload probing, node decodes)
+        # believe they are enforcing. Later frames still get a full `timeout` each: after
+        # the first frame the budget is an inactivity bound, not a queueing one.
+        yield from _iter_video_frames_unbounded(
+            video_path,
+            timeout,
+            is_canceled,
+            first_frame_timeout=max(0.0, capacity_deadline - time.monotonic()),
+        )
     finally:
         for slot in reversed(acquired):
             slot.release()
