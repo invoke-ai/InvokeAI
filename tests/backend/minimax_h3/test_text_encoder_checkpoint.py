@@ -242,8 +242,10 @@ def test_te_converted_keys_match_real_model_exactly() -> None:
             parent,
             module_name.rsplit(".", 1)[1],
             Int8ConvrotLinear(
-                weight=torch.zeros(weight.shape, dtype=torch.int8),
-                weight_scale=torch.zeros(weight.shape[0], 1),
+                # Meta tensors: only keys and shapes are compared below, and real int8 zeros at the
+                # 32B model's shapes allocate ~24 GB - enough to get a CI runner OOM-killed.
+                weight=torch.zeros(weight.shape, dtype=torch.int8, device="meta"),
+                weight_scale=torch.zeros(weight.shape[0], 1, device="meta"),
                 convrot=True,
             ),
         )
