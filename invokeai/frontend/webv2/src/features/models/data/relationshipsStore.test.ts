@@ -148,6 +148,64 @@ describe('relationships store', () => {
     expect(api.getRelatedModelKeys).toHaveBeenCalledTimes(1);
   });
 
+  it('a link that settles after its model was deleted does not resurrect it', async () => {
+    let resolveLink: (() => void) | undefined;
+    api.addModelRelationship.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        resolveLink = resolve;
+      })
+    );
+    const store = await import('./relationshipsStore');
+    store.setRelationshipsSnapshotForTests({ relatedKeysByModelKey: { a: [], b: [] } });
+
+    const link = store.linkModels('a', 'b');
+    store.removeModelsFromRelationships(['b']);
+
+    resolveLink?.();
+    await link;
+
+    expect(store.getRelationshipsSnapshot().relatedKeysByModelKey).toEqual({ a: [] });
+  });
+
+  it('a link that settles after a newer unlink of the same pair does not re-add it', async () => {
+    let resolveLink: (() => void) | undefined;
+    api.addModelRelationship.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        resolveLink = resolve;
+      })
+    );
+    const store = await import('./relationshipsStore');
+    store.setRelationshipsSnapshotForTests({ relatedKeysByModelKey: { a: [], b: [] } });
+
+    const link = store.linkModels('a', 'b');
+    // The unlink is issued from the other side of the pair and settles first.
+    await store.unlinkModels('b', 'a');
+
+    resolveLink?.();
+    await link;
+
+    expect(store.getRelationshipsSnapshot().relatedKeysByModelKey).toEqual({ a: [], b: [] });
+  });
+
+  it('an unlink that settles after a newer link does not clobber it', async () => {
+    let resolveUnlink: (() => void) | undefined;
+    api.removeModelRelationship.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        resolveUnlink = resolve;
+      })
+    );
+    const store = await import('./relationshipsStore');
+    store.setRelationshipsSnapshotForTests({ relatedKeysByModelKey: { a: ['b'], b: ['a'] } });
+
+    const unlink = store.unlinkModels('a', 'b');
+    await store.linkModels('a', 'b');
+
+    resolveUnlink?.();
+    await unlink;
+
+    expect(store.getRelationshipsSnapshot().relatedKeysByModelKey).toEqual({ a: ['b'], b: ['a'] });
+  });
+
   it('clears the cache and inflight requests on account switch', async () => {
     const account = await import('@platform/state/accountLifecycle');
     account.accountLifecycle.activate('user-a');
