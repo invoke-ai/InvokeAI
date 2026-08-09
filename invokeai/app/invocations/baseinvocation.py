@@ -279,7 +279,11 @@ class BaseInvocation(ABC, BaseModel):
     """Whether this node's entire execution may be temporarily re-pinned to an idle GPU when
     `offload_text_encoders_to_idle_gpus` is enabled in multi-GPU mode. Only set this to True on nodes
     that exclusively load encoder model(s), run a forward pass, and store their result on the CPU —
-    i.e. nodes that do no work tied to the session's own GPU. Set via the `@invocation` decorator."""
+    i.e. nodes that do no work tied to the session's own GPU. Set via the `@invocation` decorator.
+
+    Weigh the node's runtime before setting this: the borrow holds the lent GPU's exclusive-use lock
+    for the *whole* node — model load included — and a session dequeued onto that GPU blocks until it
+    is released. See `invokeai/backend/util/device_pool.py`."""
 
     UIConfig: ClassVar[UIConfigBase]
 

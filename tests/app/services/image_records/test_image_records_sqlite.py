@@ -44,11 +44,12 @@ def _save(
     subfolder: str = "",
     is_intermediate: bool = False,
     user_id: str | None = None,
+    category: ImageCategory = ImageCategory.GENERAL,
 ) -> None:
     store.save(
         image_name=name,
         image_origin=ResourceOrigin.INTERNAL,
-        image_category=ImageCategory.GENERAL,
+        image_category=category,
         width=64,
         height=64,
         has_workflow=False,
@@ -56,6 +57,18 @@ def _save(
         image_subfolder=subfolder,
         user_id=user_id,
     )
+
+
+def _capture_names_plan(store: SqliteImageRecordStorage, **kwargs):
+    statements: list[str] = []
+    store._db._conn.set_trace_callback(statements.append)
+    try:
+        result = store.get_image_names(**kwargs)
+    finally:
+        store._db._conn.set_trace_callback(None)
+    statement = next(statement for statement in statements if "SELECT images.image_name" in statement)
+    details = [row[3] for row in store._db._conn.execute(f"EXPLAIN QUERY PLAN {statement}").fetchall()]
+    return result, statement, details
 
 
 class TestImageSubfolderRoundTrip:
@@ -269,3 +282,81 @@ class TestOwnershipFilteringOmittedBoard:
         result = image_store.get_image_names(board_id="none", user_id="user1", is_admin=False)
 
         assert result.image_names == ["u1-uncat.png"]
+
+
+class TestGetImageNamesQueryPlans:
+    def test_default_category_query_has_no_forced_index(self, store: SqliteImageRecordStorage) -> None:
+        _save(store, "image.png", user_id="alice")
+
+        result, statement, _ = _capture_names_plan(
+            store,
+            categories=[ImageCategory.GENERAL],
+            is_intermediate=False,
+            is_admin=True,
+        )
+
+        assert result.image_names == ["image.png"]
+        assert "LEFT JOIN board_images" not in statement
+        assert "INDEXED BY" not in statement
+        assert "NOT INDEXED" not in statement
+
+    @pytest.mark.parametrize(
+        "kwargs",
+        [
+            {"search_term": "does-not-match"},
+            {"user_id": "alice", "is_admin": False},
+            {"user_id": "alice", "is_admin": False, "starred_first": False},
+            {"user_id": "alice", "is_admin": False, "order_dir": SQLiteDirection.Ascending},
+        ],
+    )
+    def test_query_shapes_do_not_force_indexes(
+        self,
+        store: SqliteImageRecordStorage,
+        kwargs,
+    ) -> None:
+        _save(store, "image.png", user_id="alice")
+
+        _, statement, _ = _capture_names_plan(
+            store,
+            categories=[ImageCategory.GENERAL],
+            is_intermediate=False,
+            **kwargs,
+        )
+
+        assert "LEFT JOIN board_images" not in statement
+        assert "INDEXED BY" not in statement
+        assert "NOT INDEXED" not in statement
+
+    def test_none_board_uses_anti_membership_filter(self, stores) -> None:
+        image_store, board_store, board_image_store = stores
+        _save(image_store, "boarded.png", user_id="alice")
+        _save(image_store, "unboarded.png", user_id="alice")
+        board = board_store.save("Board", "alice")
+        board_image_store.add_image_to_board(board.board_id, "boarded.png")
+
+        result, statement, _ = _capture_names_plan(
+            image_store,
+            board_id="none",
+            user_id="alice",
+            is_admin=False,
+            starred_first=False,
+        )
+
+        assert result.image_names == ["unboarded.png"]
+        assert "NOT EXISTS" in statement
+        assert "LEFT JOIN board_images" not in statement
+
+    def test_nonadmin_asset_query_has_no_forced_index(self, store: SqliteImageRecordStorage) -> None:
+        _save(store, "asset.png", user_id="alice", category=ImageCategory.CONTROL)
+
+        result, statement, _ = _capture_names_plan(
+            store,
+            categories=[ImageCategory.CONTROL],
+            is_intermediate=False,
+            user_id="alice",
+            is_admin=False,
+        )
+
+        assert result.image_names == ["asset.png"]
+        assert "INDEXED BY" not in statement
+        assert "NOT INDEXED" not in statement
