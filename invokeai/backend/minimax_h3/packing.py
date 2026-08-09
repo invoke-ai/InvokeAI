@@ -193,9 +193,7 @@ def video_latent_num_frames(num_frames: int) -> int:
     """
     if num_frames % MINIMAX_H3_FRAMES_PER_CHUNK != MINIMAX_H3_LATENTS_PER_CHUNK:
         raise ValueError(f"`num_frames` must be of the form 17 * n + 5, got {num_frames}.")
-    return (
-        num_frames - MINIMAX_H3_LATENTS_PER_CHUNK
-    ) // MINIMAX_H3_FRAMES_PER_CHUNK * MINIMAX_H3_LATENTS_PER_CHUNK + 2
+    return (num_frames - MINIMAX_H3_LATENTS_PER_CHUNK) // MINIMAX_H3_FRAMES_PER_CHUNK * MINIMAX_H3_LATENTS_PER_CHUNK + 2
 
 
 def audio_latent_num_frames(num_frames: int) -> int:

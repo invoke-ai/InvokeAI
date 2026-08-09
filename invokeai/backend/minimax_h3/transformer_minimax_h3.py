@@ -147,9 +147,7 @@ class MiniMaxH3AdaLayerNormOut(nn.Module):
         shift, scale = self.linear(nn.functional.silu(temb).to(self.linear.weight.dtype)).chunk(2, dim=-1)
         # The modulation itself stays at the block stack's precision; `forward` casts to the output heads' dtype.
         hidden_states = self.norm(hidden_states)
-        return hidden_states * (1.0 + scale.index_select(0, timestep_indices)) + shift.index_select(
-            0, timestep_indices
-        )
+        return hidden_states * (1.0 + scale.index_select(0, timestep_indices)) + shift.index_select(0, timestep_indices)
 
 
 class MiniMaxH3AttnProcessor:
