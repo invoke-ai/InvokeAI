@@ -2,7 +2,7 @@
 import type { ModelConfig, PredictionType } from '@features/models/core/types';
 
 import { createListCollection, HStack, Input, Stack, Text, Textarea } from '@chakra-ui/react';
-import { getModelBaseLabel, isKnownModelBase, KNOWN_MODEL_BASES } from '@features/models/core/baseIdentity';
+import { getModelBaseLabel, KNOWN_MODEL_BASES } from '@features/models/core/baseIdentity';
 import { modelEditSchema, type ModelEditFormValues } from '@features/models/core/schemas';
 import { getModelTypeLabel, MODEL_CATEGORIES } from '@features/models/core/taxonomy';
 import { updateModel } from '@features/models/data/api';
@@ -16,6 +16,10 @@ import {
 import { Button, Field, Select } from '@platform/ui';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+
+// `external` is the hosted-provider sentinel; assigning it to a local model
+// would misroute it across the app, so the edit form never offers it.
+const ASSIGNABLE_BASES: readonly string[] = KNOWN_MODEL_BASES.filter((base) => base !== 'external');
 
 const MODEL_TYPE_COLLECTION = createListCollection({
   items: MODEL_CATEGORIES.map((category) => ({ label: getModelTypeLabel(category.type), value: category.type })),
@@ -48,9 +52,9 @@ export const ModelEditForm = ({
   });
 
   const baseCollection = useMemo(() => {
-    const bases: readonly string[] = isKnownModelBase(model.base)
-      ? KNOWN_MODEL_BASES
-      : [String(model.base), ...KNOWN_MODEL_BASES];
+    const bases: readonly string[] = ASSIGNABLE_BASES.includes(String(model.base))
+      ? ASSIGNABLE_BASES
+      : [String(model.base), ...ASSIGNABLE_BASES];
 
     return createListCollection({
       items: bases.map((base) => ({ label: getModelBaseLabel(base), value: base })),
