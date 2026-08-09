@@ -649,18 +649,32 @@ class DefaultSessionProcessor(SessionProcessorBase):
         # a cancel event set while the row is still non-terminal is treated as a stale
         # signal from a previous item and cleared (see the guard after dequeue), which
         # would discard this cancellation.
-        # Re-read the owner at the point of decision rather than trusting the event.
+        # Re-read the owner at the point of decision rather than trusting the event alone.
         # Handlers are dispatched as independent tasks, so a deactivate immediately
         # followed by a reactivate can leave this one parked here while the second event
         # has already come and gone (it returns early above) — cancelling then would kill
         # a running item of an account the database says is active, with nothing to undo
-        # it. `queue_owner_is_active` is the same gate the dequeue and between-node checks
-        # use, including its fail-to-active policy for a failed lookup: skipping is safe
-        # because the between-node gate re-checks at the very next node.
+        # it.
+        #
+        # Unlike the dequeue and between-node gates, a failed read here does NOT fail to
+        # "active". Those gates re-run at the next node; this handler is the only thing
+        # that stops a *single-node* graph, which is checked once before it starts and
+        # never again. The event is itself evidence of a committed deactivation, so when
+        # the re-read cannot contradict it, the event stands.
         def _cancel_all() -> None:
             for item in queue_items:
-                if queue_owner_is_active(self._invoker.services, item):
-                    continue
+                if not self._invoker.services.configuration.multiuser:
+                    return
+                try:
+                    owner = self._invoker.services.users.get(item.user_id)
+                except Exception:
+                    self._invoker.services.logger.warning(
+                        f"Could not re-verify owner {item.user_id} of queue item {item.item_id}; "
+                        "honoring the access-changed event and canceling"
+                    )
+                else:
+                    if owner is not None and owner.is_active:
+                        continue
                 self._invoker.services.logger.warning(
                     f"Canceling queue item {item.item_id}: owner {item.user_id} was deactivated or deleted"
                 )

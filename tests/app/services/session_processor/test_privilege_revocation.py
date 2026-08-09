@@ -218,6 +218,24 @@ class TestUserAccessChangedCancelsCurrentItem:
 
         services.session_queue.cancel_queue_item.assert_not_called()
 
+    @pytest.mark.anyio
+    async def test_a_failed_re_read_still_cancels(self) -> None:
+        """The dequeue and between-node gates fail to "active" on a read error because they
+        re-run at the next node. This handler has no next node to fall back on — a
+        single-node graph is checked once, before it starts — so a read that cannot
+        contradict the event must not override it either."""
+        services = _services()
+
+        def explode(user_id: str) -> None:
+            raise RuntimeError("database is locked")
+
+        services.users.get = explode
+        processor = self._processor(services, _queue_item(user_id="user-1", item_id=11))
+
+        await processor._on_user_access_changed(self._event("user-1", is_active=False))
+
+        services.session_queue.cancel_queue_item.assert_called_once_with(11)
+
 
 @pytest.fixture
 def anyio_backend() -> str:
