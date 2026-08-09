@@ -32,12 +32,20 @@ export const QueueRuntimeAdapter = () => {
           const { galleryItemOrganization } = await import('@features/gallery');
 
           assertAccountScopeCurrent(owner);
-          await galleryItemOrganization.moveToBoard(
+          const result = await galleryItemOrganization.moveToBoard(
             videoNames.map((name) => ({ kind: 'video' as const, name })),
             boardId,
             owner.signal
           );
           assertAccountScopeCurrent(owner);
+          // The video transport confirms per item and never throws on non-fatal errors;
+          // surface unconfirmed refs so the queue runtime can record the failure instead
+          // of leaving the videos silently in Uncategorized (e.g. board deleted mid-run).
+          if (result.failed.length > 0) {
+            throw new Error(
+              `${result.failed.length} of ${videoNames.length} video(s) could not be added to the board.`
+            );
+          }
         },
       },
       ensureTemplatesLoaded: ensureInvocationTemplatesLoaded,

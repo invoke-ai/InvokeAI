@@ -211,9 +211,27 @@ export const createQueueRuntime = ({
    * Uncategorized regardless of the active board. Only names are fetched — the
    * gallery hydrates the video itself on its own refresh. Re-attaching a video
    * that another settlement path already routed is a no-op server-side.
+   *
+   * Board attachment is cosmetic categorization: the run itself succeeded, so a
+   * failure here (transient fetch error, board deleted mid-run) is recorded as a
+   * queue-results error and NEVER thrown — throwing from the run-settlement path
+   * would mark a completed generation "failed" and skip recording its images.
    */
-  const addResultVideosToDestination = async (queueItem: QueueItem, backendItemIds: number[]): Promise<void> => {
-    if (!isActive() || queueItem.snapshot.destination !== 'gallery' || backendItemIds.length === 0) {
+  const addResultVideosToDestination = async (
+    projectId: string,
+    queueItem: QueueItem,
+    backendItemIds: number[]
+  ): Promise<void> => {
+    // Skip ids whose backend items were cancelled — their partial videos are not
+    // deliverable results (mirrors waitForResults filtering images to completed
+    // outcomes). The persisted set can miss a cancellation from the current
+    // session on the resumed path; the residual is a best-effort attach of an
+    // already-rendered video, not a correctness problem.
+    const deliverableItemIds = backendItemIds.filter(
+      (backendItemId) => !queueItem.cancelledBackendItemIds?.includes(backendItemId)
+    );
+
+    if (!isActive() || queueItem.snapshot.destination !== 'gallery' || deliverableItemIds.length === 0) {
       return;
     }
 
@@ -223,17 +241,31 @@ export const createQueueRuntime = ({
       return;
     }
 
-    const options = getQueueItemResultImageOptions(queueItem);
-    const namesPerItem = await Promise.all(
-      backendItemIds.map((backendItemId) => backend.getResultVideoNames(backendItemId, options))
-    );
-    const videoNames = [...new Set(namesPerItem.flat())];
+    try {
+      const imageOptions = getQueueItemResultImageOptions(queueItem);
+      const options = queueItem.snapshot.filterIntermediateResults
+        ? { ...imageOptions, excludeIntermediate: true }
+        : imageOptions;
+      const namesPerItem = await Promise.all(
+        deliverableItemIds.map((backendItemId) => backend.getResultVideoNames(backendItemId, options))
+      );
+      const videoNames = [...new Set(namesPerItem.flat())];
 
-    if (videoNames.length === 0 || !isActive()) {
-      return;
+      if (videoNames.length === 0 || !isActive()) {
+        return;
+      }
+
+      await destinations.addVideosToGalleryBoard(boardId, videoNames);
+    } catch (error) {
+      if (isActive()) {
+        commands.recordError({
+          area: 'queue-results',
+          message: toErrorMessage(error),
+          namespace: 'queue',
+          projectId,
+        });
+      }
     }
-
-    await destinations.addVideosToGalleryBoard(boardId, videoNames);
   };
 
   /** Drop intermediates when the item asks for it, then land what remains on its destination. */
@@ -256,7 +288,12 @@ export const createQueueRuntime = ({
   const routeRunResults = async (
     coordinator: QueueCoordinator,
     projectId: string,
-    queueItem: QueueItem
+    queueItem: QueueItem,
+    // The store is immutable and `queueItem` is a pre-submission closure, so callers must
+    // pass the run's backend item ids explicitly (enqueue result / reconcile outcome /
+    // persisted ids) — reading queueItem.backendItemIds here would always see undefined
+    // on the fresh-submit and adopted paths.
+    backendItemIds: number[]
   ): Promise<void> => {
     try {
       const allImages = await coordinator.waitForResults(
@@ -270,9 +307,10 @@ export const createQueueRuntime = ({
       }
 
       const images = await deliverVisibleImages(queueItem, allImages);
-      // The live path routes videos per backend item (routeBackendItemResults); this covers
-      // resumed/adopted runs, where only the persisted ids are available.
-      await addResultVideosToDestination(queueItem, queueItem.backendItemIds ?? []);
+      // The live path also routes videos per backend item as each completes
+      // (routeBackendItemResults); this run-end pass is the retry/backstop and the only
+      // coverage for items completed in a previous session. Never throws.
+      await addResultVideosToDestination(projectId, queueItem, backendItemIds);
 
       if (!isActive()) {
         return;
@@ -319,7 +357,8 @@ export const createQueueRuntime = ({
       }
 
       const visibleImages = await deliverVisibleImages(queueItem, images);
-      await addResultVideosToDestination(queueItem, [backendItemId]);
+      // Never throws — a board-attach hiccup must not block routePartialResults below.
+      await addResultVideosToDestination(projectId, queueItem, [backendItemId]);
 
       if (!isActive()) {
         return;
@@ -419,7 +458,7 @@ export const createQueueRuntime = ({
         });
         void backend.resumeProcessor().catch(() => undefined);
 
-        return routeRunResults(coordinator, project.id, queueItem);
+        return routeRunResults(coordinator, project.id, queueItem, itemIds);
       })
       .catch((error: unknown) => {
         if (isActive()) {
@@ -518,10 +557,10 @@ export const createQueueRuntime = ({
                 projectId: project.id,
                 queueItemId: queueItem.id,
               });
-              void routeRunResults(coordinator, project.id, queueItem);
+              void routeRunResults(coordinator, project.id, queueItem, outcome.backendItemIds);
               break;
             case 'resumed':
-              void routeRunResults(coordinator, project.id, queueItem);
+              void routeRunResults(coordinator, project.id, queueItem, queueItem.backendItemIds ?? []);
               break;
             case 'missing':
               commands.setStatus({

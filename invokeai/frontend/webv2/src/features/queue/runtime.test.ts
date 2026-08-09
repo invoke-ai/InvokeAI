@@ -139,3 +139,150 @@ describe('queue runtime', () => {
     runtime.dispose();
   });
 });
+
+describe('queue runtime video board routing', () => {
+  const createHarness = (options: {
+    getResultVideoNames: QueueBackendPort['getResultVideoNames'];
+    galleryBoardId?: string | null;
+  }) => {
+    const queueItem = createPendingQueueItem();
+    queueItem.snapshot.destination = 'gallery';
+    queueItem.snapshot.galleryBoardId = options.galleryBoardId === undefined ? 'board-1' : options.galleryBoardId;
+    queueItem.snapshot.filterIntermediateResults = true;
+    delete (queueItem.snapshot as { resultNodeIds?: unknown }).resultNodeIds;
+    const project = { id: 'project-1', queue: { items: [queueItem] } };
+    const backend: QueueBackendPort = {
+      cancelCurrentItem: vi.fn(),
+      cancelItem: vi.fn(),
+      cancelQueueItems: vi.fn(),
+      cancelQueueItemsByBatchIds: vi.fn(),
+      cancelScopedItems: vi.fn(),
+      clearFailedItems: vi.fn(),
+      clearItems: vi.fn(),
+      emit: vi.fn(),
+      enqueueGenerate: vi.fn(),
+      enqueueWorkflow: vi.fn(),
+      getItem: vi.fn(),
+      getResultImages: vi.fn().mockResolvedValue([]),
+      getResultVideoNames: options.getResultVideoNames,
+      // The backend already accepted and completed this run before "reload": reconcile
+      // adopts it and settles immediately, driving both settlement paths without sockets.
+      listItems: vi.fn().mockResolvedValue([
+        {
+          batchId: 'backend-batch',
+          id: 77,
+          origin: buildQueueItemOrigin(queueItem.id, project.id),
+          status: 'completed',
+        },
+      ]),
+      on: vi.fn(() => vi.fn()),
+      onConnectionChange: vi.fn(() => vi.fn()),
+      pauseProcessor: vi.fn(),
+      readCurrent: vi.fn().mockResolvedValue(null),
+      readItemIds: vi.fn().mockResolvedValue({ itemIds: [], totalCount: 0 }),
+      readItemsById: vi.fn().mockResolvedValue([]),
+      readNext: vi.fn().mockResolvedValue(null),
+      readStatus: vi.fn().mockResolvedValue({
+        processor: { isProcessing: false, isStarted: true },
+        queue: {
+          canceled: 0,
+          completed: 0,
+          failed: 0,
+          inProgress: 0,
+          pending: 0,
+          queueId: 'default',
+          total: 0,
+          waiting: 0,
+        },
+      }),
+      resumeProcessor: vi.fn(),
+      retryItems: vi.fn(),
+    };
+    const commands: QueueHistoryCommands = {
+      markBackendCancelled: vi.fn(),
+      markBackendSubmitted: ({ backendBatchId, backendItemIds }) => {
+        queueItem.backendBatchId = backendBatchId;
+        queueItem.backendItemIds = backendItemIds;
+        queueItem.status = 'running';
+      },
+      recordError: vi.fn(),
+      refreshBackendData: vi.fn(),
+      routePartialResults: vi.fn(),
+      routeResults: vi.fn(),
+      setConnectionStatus: vi.fn(),
+      setStatus: vi.fn(),
+    };
+    const destinations = { addImagesToGalleryBoard: vi.fn(), addVideosToGalleryBoard: vi.fn() };
+    const runtime = createQueueRuntime({
+      backend,
+      destinations,
+      ensureTemplatesLoaded: vi.fn(),
+      history: {
+        commands,
+        getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
+        subscribe: vi.fn(() => vi.fn()),
+      },
+      modelLoads: { completed: vi.fn(), reset: vi.fn(), started: vi.fn() },
+      nodeExecution: {
+        clearAll: vi.fn(),
+        completed: vi.fn(),
+        failed: vi.fn(),
+        progress: vi.fn(),
+        settleRunning: vi.fn(),
+        started: vi.fn(),
+      },
+    });
+
+    return { commands, destinations, runtime };
+  };
+
+  it('lands result videos on the enqueue-time board, excluding intermediates', async () => {
+    const getResultVideoNames = vi.fn().mockResolvedValue(['clip-1.mp4']);
+    const { destinations, runtime } = createHarness({ getResultVideoNames });
+
+    runtime.start();
+
+    await vi.waitFor(() => {
+      expect(destinations.addVideosToGalleryBoard).toHaveBeenCalledWith('board-1', ['clip-1.mp4']);
+    });
+    // filterIntermediateResults on the snapshot maps to the video-side intermediate filter.
+    expect(getResultVideoNames).toHaveBeenCalledWith(77, expect.objectContaining({ excludeIntermediate: true }));
+
+    runtime.dispose();
+  });
+
+  it('records a video-routing failure without failing the completed run', async () => {
+    const getResultVideoNames = vi.fn().mockRejectedValue(new Error('transient 502'));
+    const { commands, destinations, runtime } = createHarness({ getResultVideoNames });
+
+    runtime.start();
+
+    await vi.waitFor(() => {
+      // The run still settles and records its results...
+      expect(commands.routeResults).toHaveBeenCalled();
+      // ...with the board-attach hiccup recorded, not fatal.
+      expect(commands.recordError).toHaveBeenCalledWith(expect.objectContaining({ area: 'queue-results' }));
+    });
+    expect(commands.setStatus).not.toHaveBeenCalledWith(expect.objectContaining({ status: 'failed' }));
+    expect(destinations.addVideosToGalleryBoard).not.toHaveBeenCalled();
+
+    runtime.dispose();
+  });
+
+  it('skips the board attach entirely when no board was active at enqueue', async () => {
+    const getResultVideoNames = vi.fn().mockResolvedValue(['clip-1.mp4']);
+    const { commands, destinations, runtime } = createHarness({ galleryBoardId: null, getResultVideoNames });
+
+    runtime.start();
+
+    // Wait for full settlement first so the negative assertions below are meaningful.
+    await vi.waitFor(() => {
+      expect(commands.routeResults).toHaveBeenCalled();
+    });
+    expect(destinations.addImagesToGalleryBoard).not.toHaveBeenCalled();
+    expect(destinations.addVideosToGalleryBoard).not.toHaveBeenCalled();
+    expect(getResultVideoNames).not.toHaveBeenCalled();
+
+    runtime.dispose();
+  });
+});
