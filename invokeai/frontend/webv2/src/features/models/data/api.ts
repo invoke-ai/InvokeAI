@@ -179,39 +179,6 @@ export const emptyModelCache = async (signal?: AbortSignal): Promise<void> => {
   await request(`${MODELS_BASE}/empty_model_cache`, { method: 'POST', signal });
 };
 
-/** Model relationships: bidirectional "related model" links between configs. */
-
-const RELATIONSHIPS_BASE = '/api/v1/model_relationships';
-
-export const getRelatedModelKeys = (key: string, signal?: AbortSignal): Promise<string[]> =>
-  requestJson<string[]>(`${RELATIONSHIPS_BASE}/i/${encodeURIComponent(key)}`, { signal });
-
-export const addModelRelationship = async (
-  modelKey1: string,
-  modelKey2: string,
-  signal?: AbortSignal
-): Promise<void> => {
-  await request(`${RELATIONSHIPS_BASE}/`, {
-    body: JSON.stringify({ model_key_1: modelKey1, model_key_2: modelKey2 }),
-    headers: { 'Content-Type': 'application/json' },
-    method: 'POST',
-    signal,
-  });
-};
-
-export const removeModelRelationship = async (
-  modelKey1: string,
-  modelKey2: string,
-  signal?: AbortSignal
-): Promise<void> => {
-  await request(`${RELATIONSHIPS_BASE}/`, {
-    body: JSON.stringify({ model_key_1: modelKey1, model_key_2: modelKey2 }),
-    headers: { 'Content-Type': 'application/json' },
-    method: 'DELETE',
-    signal,
-  });
-};
-
 /** External image-provider credentials (OpenAI, Gemini, ...). */
 
 const EXTERNAL_PROVIDERS_BASE = '/api/v1/app/external_providers';

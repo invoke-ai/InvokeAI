@@ -6,7 +6,7 @@ const api = vi.hoisted(() => ({
   removeModelRelationship: vi.fn(),
 }));
 
-vi.mock('./api', () => api);
+vi.mock('./relationshipsApi', () => api);
 
 describe('relationships store', () => {
   beforeEach(() => {

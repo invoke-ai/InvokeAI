@@ -18,10 +18,7 @@ const api = vi.hoisted(() => ({
   removeModelRelationship: vi.fn(),
 }));
 
-vi.mock('@features/models/data/api', async (importOriginal) => ({
-  ...((await importOriginal()) as Record<string, unknown>),
-  ...api,
-}));
+vi.mock('@features/models/data/relationshipsApi', () => api);
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

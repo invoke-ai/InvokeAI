@@ -8,10 +8,10 @@ import { getModelPickerGroups } from '@features/models/core/library';
 import { formatBytes, getModelTypeLabel, getModelTypePluralLabel } from '@features/models/core/taxonomy';
 import { getModelImageUrl } from '@features/models/data/api';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models/data/modelsStore';
-import { ensureRelatedModelKeysLoaded, useRelatedModelKeys } from '@features/models/data/relationshipsStore';
 import { useModelsUi } from '@features/models/ui/ModelsUiContext';
 import { setPickerCompactView, useModelsUiSelector } from '@features/models/ui/uiStore';
 import { useMountEffect } from '@platform/react/useMountEffect';
+import { areArraysEqual } from '@platform/state/selectors';
 import { Button, CloseButton, IconButton, Tooltip } from '@platform/ui';
 import { Picker } from '@platform/ui/Picker';
 import { Link } from '@tanstack/react-router';
@@ -33,6 +33,53 @@ const EMPTY_BASES: ReadonlySet<string> = new Set();
 const EMPTY_KEYS: ReadonlySet<string> = new Set();
 
 const getOptionId = (model: ModelConfig): string => model.key;
+
+/**
+ * Related-model pinning for an open picker. The generation form mounts
+ * pickers during the editor's initial paint, so the relationships store must
+ * stay out of the eager graph (the architecture browser budget) — it is
+ * imported on first open and subscribed to manually instead of via its hook.
+ */
+const useLazyRelatedModelKeys = (modelKey: string | null): readonly string[] | null => {
+  const [relatedKeys, setRelatedKeys] = useState<readonly string[] | null>(null);
+
+  useEffect(() => {
+    if (modelKey === null) {
+      setRelatedKeys(null);
+      return;
+    }
+
+    let disposed = false;
+    let unsubscribe: (() => void) | undefined;
+
+    void import('@features/models/data/relationshipsStore').then((relationships) => {
+      if (disposed) {
+        return;
+      }
+
+      const read = (): void => {
+        const entry = relationships.getRelationshipsSnapshot().relatedKeysByModelKey[modelKey] ?? null;
+        setRelatedKeys((previous) =>
+          previous !== null && entry !== null && areArraysEqual(previous, entry) ? previous : entry
+        );
+      };
+
+      unsubscribe = relationships.subscribeToRelationships(read);
+      read();
+      // A missing relationship list is not worth surfacing; the picker just
+      // loses its pinning.
+      relationships.ensureRelatedModelKeysLoaded(modelKey).catch(() => {});
+    });
+
+    return () => {
+      disposed = true;
+      unsubscribe?.();
+      setRelatedKeys(null);
+    };
+  }, [modelKey]);
+
+  return relatedKeys;
+};
 
 export const ModelSelect = ({
   className,
@@ -74,7 +121,7 @@ export const ModelSelect = ({
 
   const pickerId = id ?? `models:${modelTypes.join('+')}`;
   const isCompact = useModelsUiSelector((snapshot) => snapshot.pickerCompactViews[pickerId] ?? false);
-  const relatedKeyList = useRelatedModelKeys(isOpen ? value : null);
+  const relatedKeyList = useLazyRelatedModelKeys(isOpen ? value : null);
   const relatedKeys = useMemo<ReadonlySet<string>>(
     () => (relatedKeyList ? new Set(relatedKeyList) : EMPTY_KEYS),
     [relatedKeyList]
@@ -83,14 +130,6 @@ export const ModelSelect = ({
   useMountEffect(() => {
     void ensureModelsLoaded();
   });
-
-  useEffect(() => {
-    if (isOpen && value) {
-      // A missing relationship list is not worth surfacing; the picker just
-      // loses its pinning.
-      ensureRelatedModelKeysLoaded(value).catch(() => {});
-    }
-  }, [isOpen, value]);
 
   if (disabled !== lastDisabled) {
     setLastDisabled(disabled);
