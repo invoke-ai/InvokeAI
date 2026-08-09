@@ -607,12 +607,7 @@
             "nodeId": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
             "fieldName": "num_frames"
           },
-          "showDescription": true,
-          "settings": {
-            "type": "integer-field-config",
-            "showShuffle": false,
-            "component": "number-input"
-          }
+          "showDescription": true
         }
       },
       "node-field-h3-steps": {

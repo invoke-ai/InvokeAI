@@ -105,7 +105,7 @@ assert set(get_args(MiniMaxH3NumFrames)) == {
 }, "MiniMaxH3NumFrames is out of sync with the 17n+5 frame grid."
 
 MINIMAX_H3_NUM_FRAMES_LABELS: dict[str, str] = {
-    str(MINIMAX_H3_STILL_NUM_FRAMES): f"{MINIMAX_H3_STILL_NUM_FRAMES} - still image only",
+    str(MINIMAX_H3_STILL_NUM_FRAMES): f"{MINIMAX_H3_STILL_NUM_FRAMES} frames - still image only",
     **{str(n): f"{n} frames - {n / MINIMAX_H3_FPS:.2f} s" for n in MINIMAX_H3_VIDEO_FRAME_CHOICES},
 }
 

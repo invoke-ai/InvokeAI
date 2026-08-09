@@ -57,7 +57,9 @@ def test_labels_cover_every_choice_and_name_the_duration():
     }
     assert MINIMAX_H3_NUM_FRAMES_LABELS["124"] == "124 frames - 5.17 s"
     assert MINIMAX_H3_NUM_FRAMES_LABELS["90"] == "90 frames - 3.75 s"
-    assert "still image" in MINIMAX_H3_NUM_FRAMES_LABELS["5"]
+    assert MINIMAX_H3_NUM_FRAMES_LABELS["5"] == "5 frames - still image only"
+    # Every label opens with "<count> frames" so the list reads consistently in the dropdown.
+    assert all(label.startswith(f"{key} frames") for key, label in MINIMAX_H3_NUM_FRAMES_LABELS.items())
 
 
 def test_choices_appear_in_the_generated_json_schema():
