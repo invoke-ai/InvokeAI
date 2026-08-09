@@ -2,11 +2,11 @@
     "common": {
         "hotkeysLabel": "Atajos de teclado",
         "languagePickerLabel": "Selector de idioma",
-        "reportBugLabel": "Reportar errores",
+        "reportBugLabel": "Reportar fallos",
         "settingsLabel": "Ajustes",
         "img2img": "Imagen a Imagen",
         "nodes": "Flujos de trabajo",
-        "upload": "Subir imagen",
+        "upload": "Subir",
         "load": "Cargar",
         "statusDisconnected": "Desconectado",
         "githubLabel": "Github",
@@ -19,14 +19,14 @@
         "cancel": "Cancelar",
         "linear": "Lineal",
         "random": "Aleatorio",
-        "openInNewTab": "Abrir en una nueva pestaña",
+        "openInNewTab": "Abrir en una pestaña nueva",
         "dontAskMeAgain": "No me preguntes de nuevo",
         "areYouSure": "¿Estas seguro?",
         "batch": "Administrador de lotes",
         "modelManager": "Administrador de modelos",
         "communityLabel": "Comunidad",
         "direction": "Dirección",
-        "ai": "Ia",
+        "ai": "ia",
         "add": "Añadir",
         "auto": "Automático",
         "copyError": "Error $t(gallery.copy)",
@@ -40,7 +40,7 @@
         "delete": "Borrar",
         "copy": "Copiar",
         "beta": "Beta",
-        "on": "En",
+        "on": "Encender",
         "aboutDesc": "¿Utilizas Invoke para trabajar? Mira aquí:",
         "installed": "Instalado",
         "green": "Verde",
@@ -51,8 +51,7 @@
         "somethingWentWrong": "Algo salió mal",
         "selected": "Seleccionado",
         "tab": "Tabulador",
-        "positivePrompt": "Prompt Positivo",
-        "negativePrompt": "Prompt Negativo",
+        "negativePrompt": "Entrada negativa",
         "error": "Error",
         "format": "formato",
         "unknown": "Desconocido",
@@ -71,7 +70,7 @@
         "unknownError": "Error Desconocido",
         "blue": "Azul",
         "clipboard": "Portapapeles",
-        "loadingImage": "Cargando la imagen",
+        "loadingImage": "Cargando Imagen",
         "inpaint": "inpaint",
         "ipAdapter": "Adaptador IP",
         "t2iAdapter": "Adaptador T2I",
@@ -79,22 +78,87 @@
         "openInViewer": "Abrir en el visor",
         "off": "Apagar",
         "generating": "Generando",
-        "ok": "De acuerdo",
+        "ok": "Aceptar",
         "placeholderSelectAModel": "Seleccionar un modelo",
         "reset": "Restablecer",
         "none": "Ninguno",
         "new": "Nuevo",
         "dontShowMeThese": "No mostrar estos",
-        "loadingModel": "Cargando el modelo",
+        "loadingModel": "Cargando Modelo",
         "view": "Ver",
         "edit": "Editar",
-        "safetensors": "Safetensors",
+        "safetensors": "Tensores de seguridad",
         "toResolve": "Para resolver",
-        "outpaint": "outpaint",
-        "simple": "Sencillo",
+        "outpaint": "pintar",
+        "simple": "Único",
         "close": "Cerrar",
         "board": "Tablero",
-        "crop": "Cortar"
+        "crop": "Cortar",
+        "collapseAll": "Colapsar todo",
+        "selectYourModel": "Seleccione Su Modelo",
+        "editName": "Editar nombre",
+        "error_withCount_one": "{{count}} error",
+        "error_withCount_many": "{{count}} errores",
+        "error_withCount_other": "{{count}} errores",
+        "expandAll": "Expandir Todo",
+        "model_withCount_one": "{{count}} modelo",
+        "model_withCount_many": "{{count}} modelos",
+        "model_withCount_other": "{{count}} modelos",
+        "hex": "Hex",
+        "fitView": "Ver ajuste",
+        "goTo": "Ir",
+        "imageFailedToLoad": "Incapaz de Cargar Imagen",
+        "localSystem": "Sistema Local",
+        "minimize": "Minimizar",
+        "next": "Siguiente",
+        "noMatchingItems": "Sin elementos coincidentes",
+        "notifications": "Notificaciones",
+        "openSlider": "Abrir deslizador",
+        "json": "JSON",
+        "noMatches": "No coincide",
+        "noOptions": "Sin opciones",
+        "previous": "Anterior",
+        "removeFromCollection": "Quitar de la Colección",
+        "resetView": "Restablecer Vista",
+        "saveChanges": "Guardar cambios",
+        "saveToAssets": "Guardar a Activos",
+        "settings": "Ajustes",
+        "toggleRgbHex": "Conmute RGB/HEX",
+        "notInstalled": "No $t(common.installed)",
+        "unpin": "Desprender",
+        "userGuideLabel": "Guía de Usuario",
+        "zoomIn": "Ampliar",
+        "zoomOut": "Alejar",
+        "prevPage": "Página Anterior",
+        "nextPage": "Página Siguiente",
+        "clear": "Purgar",
+        "warnings": "Avisos",
+        "start": "Inicio",
+        "count": "Conteo",
+        "step": "Paso",
+        "end": "Final",
+        "min": "Mín",
+        "max": "Máx",
+        "search": "Buscar",
+        "values": "Valores",
+        "resetToDefaults": "Restablecer a Predeterminados",
+        "seed": "Semilla",
+        "combinatorial": "Combinatorio",
+        "layout": "Disposición",
+        "row": "Fila",
+        "column": "Columna",
+        "value": "Valor",
+        "label": "Etiqueta",
+        "systemInformation": "Información del Sistema",
+        "compactView": "Vista Compacta",
+        "fullView": "Vista Completa",
+        "options_withCount_one": "{{count}} opción",
+        "options_withCount_many": "{{count}} opciones",
+        "options_withCount_other": "{{count}} opciones",
+        "prompt": "Entrada",
+        "positivePrompt": "Entrada positiva",
+        "removeNegativePrompt": "Retirar entrada negativa",
+        "addNegativePrompt": "Añadir entrada negativa"
     },
     "gallery": {
         "galleryImageSize": "Tamaño de la imagen",
@@ -104,7 +168,7 @@
         "deleteImage_many": "Eliminar {{count}} Imágenes",
         "deleteImage_other": "Eliminar {{count}} Imágenes",
         "deleteImagePermanent": "Las imágenes eliminadas no se pueden restaurar.",
-        "autoAssignBoardOnClick": "Asignar automática tableros al hacer clic",
+        "autoAssignBoardOnClick": "Auto-asignar tablero",
         "gallery": "Galería",
         "noImageSelected": "Sin imágenes seleccionadas",
         "bulkDownloadRequestFailed": "Error al preparar la descarga",
@@ -132,7 +196,7 @@
         "image": "imagen",
         "compareHelp4": "Presione <Kbd> Z </Kbd> o <Kbd> Esc </Kbd> para salir.",
         "viewerImage": "Ver imagen",
-        "dropOrUpload": "$t(gallery.drop) o cargar",
+        "dropOrUpload": "Soltar o subir",
         "displaySearch": "Buscar imagen",
         "download": "Descargar",
         "exitBoardSearch": "Finalizar búsqueda",
@@ -140,22 +204,37 @@
         "featuresWillReset": "Si elimina esta imagen, dichas funciones se restablecerán inmediatamente.",
         "loading": "Cargando",
         "newestFirst": "La más nueva primero",
-        "unstarImage": "Dejar de ser favorita",
+        "unstarImage": "Sin estrella",
         "bulkDownloadRequestedDesc": "Su solicitud de descarga se está preparando. Esto puede tardar unos minutos.",
         "hover": "Desplazar",
         "compareHelp1": "Mantenga presionada la tecla <Kbd> Alt </Kbd> mientras hace clic en una imagen de la galería o utiliza las teclas de flecha para cambiar la imagen de comparación.",
         "stretchToFit": "Estirar para encajar",
         "exitCompare": "Salir de la comparación",
-        "starImage": "Imágenes favoritas",
+        "starImage": "Estella",
         "dropToUpload": "$t(gallery.drop) para cargar",
         "slider": "Deslizador",
-        "assetsTab": "Archivos que has cargado para utilizarlos en tus proyectos.",
-        "imagesTab": "Imágenes que ha creado y guardado en Invoke.",
+        "assetsTab": "Archivos que has subido para utilizar en tus proyectos.",
+        "imagesTab": "Imágenes que ha creado y guardado en Invocación.",
         "compareImage": "Comparar imagen",
         "boardsSettings": "Ajustes de los tableros",
         "imagesSettings": "Configuración de imágenes de la galería",
         "compareHelp3": "Presione <Kbd> C </Kbd> para intercambiar las imágenes comparadas.",
-        "showArchivedBoards": "Mostrar paneles archivados"
+        "showArchivedBoards": "Mostrar paneles archivados",
+        "jump": "Omitir",
+        "loadingGallery": "Cargando galería…",
+        "loadingMetadata": "Cargando metadatos…",
+        "noImagesFound": "Ninguna imagen encontrada",
+        "usePagedGalleryView": "Utilizar Vista de Galería Paginada",
+        "noImagesInGallery": "Ninguna Imagen a Exhibir",
+        "unableToLoad": "No es capaz de cargar la Galería",
+        "bulkDownloadReady": "Descarga preparada",
+        "clickToDownload": "Pulse aquí para descargar",
+        "selectAnImageToCompare": "Seleccione una Imagen para Comparar",
+        "openViewer": "Abrir Visor",
+        "closeViewer": "Cerrar Visor",
+        "useForPromptGeneration": "Utiliza para generación de solicitud",
+        "images": "Imágenes",
+        "assets": "Activos"
     },
     "modelManager": {
         "modelManager": "Gestor de Modelos",
@@ -207,7 +286,17 @@
         "advanced": "Avanzado",
         "clipGEmbed": "Incrustar CLIP-G",
         "cancel": "Cancelar",
-        "clipLEmbed": "Incrustar CLIP-L"
+        "clipLEmbed": "Incrustar CLIP-L",
+        "noDefaultSettings": "Sin ajustes por defecto configurados para este modelo. Visite el Gesto de Modelo para añadir ajustes por defecto.",
+        "defaultSettings": "Ajustes por defecto",
+        "defaultSettingsSaved": "Ajustes por defecto guardados",
+        "defaultSettingsOutOfSync": "Algunos ajustes no coinciden con lo predeterminado del modelo:",
+        "restoreDefaultSettings": "Pulse para utilizar los ajustes por defecto del modelo.",
+        "usingDefaultSettings": "Utilizar los ajustes por defecto del modelo",
+        "externalInstallDefaults": "Auto-instalar modelos del inicializador",
+        "externalBaseUrlHelper": "Sustituye la URL base del API por defecto si es necesario.",
+        "sortDefault": "Por defecto",
+        "externalDefaults": "Externos por defecto"
     },
     "parameters": {
         "images": "Imágenes",
@@ -246,7 +335,13 @@
         "clipSkip": "Omitir el CLIP",
         "maskBlur": "Desenfoque de máscara",
         "patchmatchDownScaleSize": "Reducir a escala",
-        "coherenceMode": "Modo"
+        "coherenceMode": "Modo",
+        "inputFidelityOptions": {
+            "default": "Predeterminado"
+        },
+        "thinkingLevelOptions": {
+            "default": "Predeterminado"
+        }
     },
     "settings": {
         "models": "Modelos",
@@ -287,7 +382,6 @@
         "baseModelChangedCleared_many": "Borrados o desactivados {{count}} submodelos incompatibles",
         "baseModelChangedCleared_other": "Borrados o desactivados {{count}} submodelos incompatibles",
         "addedToUncategorized": "Añadido a los activos del tablero $t(boards.uncategorized)",
-        "imagesWillBeAddedTo": "Las imágenes subidas se añadirán a los activos del panel {{boardName}}.",
         "layerCopiedToClipboard": "Capa copiada en el portapapeles"
     },
     "accessibility": {
@@ -304,7 +398,7 @@
         "submitSupportTicket": "Enviar Ticket de Soporte",
         "toggleRightPanel": "Activar o desactivar el panel derecho (G)",
         "toggleLeftPanel": "Activar o desactivar el panel izquierdo (T)",
-        "uploadImages": "Cargar imagen(es)"
+        "uploadImages": "Subir Imágenes"
     },
     "nodes": {
         "zoomInNodes": "Acercar",
@@ -315,7 +409,11 @@
         "reloadNodeTemplates": "Recargar las plantillas de nodos",
         "loadWorkflow": "Cargar el flujo de trabajo",
         "downloadWorkflow": "Descargar el flujo de trabajo en un archivo JSON",
-        "boardAccessError": "No se puede encontrar el panel {{board_id}}, se está restableciendo al valor predeterminado"
+        "boardAccessError": "No se puede encontrar el panel {{board_id}}, se está restableciendo al valor predeterminado",
+        "savedWorkflowDefaultBadge": "Por defecto",
+        "resetToDefaultValue": "Restablecer a valor por defecto",
+        "imageAccessError": "No es capaz de encontrar imagen {{image_name}}, restableciendo a predeterminado",
+        "modelAccessError": "No es posible encontrar modelo {{key}}, estableciendo a predeterminado"
     },
     "boards": {
         "autoAddBoard": "Agregar panel automáticamente",
@@ -336,7 +434,7 @@
         "move": "Mover",
         "menuItemAutoAdd": "Agregar automáticamente a este panel",
         "searchBoard": "Buscando paneles…",
-        "topMessage": "Este panel contiene imágenes utilizadas en las siguientes funciones:",
+        "topMessage": "Esta selección contiene imágenes utilizadas en las siguientes funciones:",
         "downloadBoard": "Descargar panel",
         "deleteBoardOnly": "Borrar solo el panel",
         "myBoard": "Mi panel",
@@ -353,7 +451,7 @@
         "archiveBoard": "Archivar panel",
         "archived": "Archivado",
         "selectedForAutoAdd": "Seleccionado para agregar automáticamente",
-        "unarchiveBoard": "Desarchivar el panel",
+        "unarchiveBoard": "Desarchivar panel",
         "noBoards": "No hay paneles {{boardType}}",
         "shared": "Paneles compartidos",
         "deletedPrivateBoardsCannotbeRestored": "Los paneles eliminados no se pueden restaurar. Al elegir \"Eliminar solo el panel\", las imágenes se colocarán en un estado privado y sin categoría para el creador de la imagen.",
@@ -370,7 +468,17 @@
         "deletedImagesCannotBeRestored": "Las imágenes eliminadas no pueden ser restauradas.",
         "hideBoards": "Ocultar tableros",
         "locateInGalery": "Ubicar en galeria",
-        "viewBoards": "Ver paneles"
+        "viewBoards": "Ver paneles",
+        "visibilityPublic": "Público",
+        "visibilityShared": "Compartido",
+        "visibilityPrivate": "Privado",
+        "setVisibilityPrivate": "Establecer Privado",
+        "setVisibilityShared": "Establecer Compartido",
+        "setVisibilityPublic": "Establecer Público",
+        "setBoardVisibility": "Establecer visibilidad de tablero",
+        "visibilityBadgeShared": "Tablero compartido",
+        "visibilityBadgePublic": "Tablero público",
+        "updateBoardVisibilityError": "Error al actualizar visibilidad de tablero"
     },
     "accordions": {
         "compositing": {
@@ -403,6 +511,13 @@
             "upscaling": "Upscaling",
             "gallery": "Galería",
             "upscalingTab": "$t(ui.tabs.upscaling) $t(common.tab)"
+        },
+        "launchpad": {
+            "upscaling": {
+                "creativityAndStructure": {
+                    "title": "Creatividad y estructura predeterminadas"
+                }
+            }
         }
     },
     "queue": {
@@ -411,11 +526,11 @@
         "batchQueuedDesc_one": "Se agregó {{count}} sesión a {{direction}} la cola",
         "batchQueuedDesc_many": "Se agregaron {{count}} sesiones a {{direction}} la cola",
         "batchQueuedDesc_other": "Se agregaron {{count}} sesiones a {{direction}} la cola",
-        "clearQueueAlertDialog": "Al vaciar la cola se cancela inmediatamente cualquier elemento de procesamiento y se vaciará la cola por completo. Los filtros pendientes se cancelarán.",
+        "clearQueueAlertDialog": "Al vaciar la cola se cancela inmediatamente cualquier elemento de procesamiento y se vaciará la cola por completo. Los filtros pendientes serán cancelados y el Zona de Preparación de Lienzos será restablecido.",
         "time": "Tiempo",
         "clearFailed": "Error al vaciar la cola",
         "cancelFailed": "Error al cancelar el elemento",
-        "resumeFailed": "Error al reanudar el proceso",
+        "resumeFailed": "Problema de Procesador Reanudado",
         "pause": "Pausar",
         "pauseTooltip": "Pausar el proceso",
         "cancelBatchSucceeded": "Lote cancelado",
@@ -425,7 +540,7 @@
         "pauseFailed": "Error al pausar el proceso",
         "status": "Estado",
         "origin": "Origen",
-        "destination": "Destino",
+        "destination": "Dest",
         "generations_one": "Generación",
         "generations_many": "Generaciones",
         "generations_other": "Generaciones",
@@ -435,7 +550,7 @@
         "cancelBatch": "Cancelar lote",
         "openQueue": "Abrir la cola",
         "completed": "Completado",
-        "enqueueing": "Añadir lotes a la cola",
+        "enqueueing": "Lote en cola",
         "clear": "Limpiar",
         "pauseSucceeded": "Proceso pausado",
         "resumeSucceeded": "Proceso reanudado",
@@ -478,7 +593,33 @@
         "prompts_one": "Prompt",
         "prompts_many": "Prompts",
         "prompts_other": "Prompts",
-        "prune": "Eliminar"
+        "prune": "Eliminar",
+        "queueActionsMenu": "Menú de acciones de la cola",
+        "queueItem": "Elemento de Cola",
+        "cancelAllExceptCurrentQueueItemAlertDialog": "Cancelar todos los elementos de la cola excepto el actual detendrá ítemes pendientes pero concederá el que esté en proceso para que finalice.",
+        "cancelAllExceptCurrentQueueItemAlertDialog2": "¿Seguro que desea cancelar todos los elementos de cola pendiente?",
+        "cancelAllExceptCurrent": "Cancelar Todo Excepto en Actual",
+        "cancelAllExceptCurrentTooltip": "Cancelar todo excepto ítem actual",
+        "cancelFailedAccessDenied": "Problema al cancelar ítem: acceso denegado",
+        "retrySucceeded": "Ítem reintentado",
+        "retryFailed": "Problema al reintentar elemento",
+        "confirm": "Confirmar",
+        "clearFailedAccessDenied": "Problema vaciando cola: acceso denegado",
+        "retryItem": "Reintentar elemento",
+        "credits": "Reconocimientos",
+        "waiting": "Flujo de trabajo «A la espera de un heredero»",
+        "paused": "Pausado",
+        "user": "Usuario",
+        "batchFieldValues": "Valor del campo del lote",
+        "fieldValuesHidden": "<Oculto>",
+        "cannotViewDetails": "No tienes permiso para ver los detalles de esta elemento de cola",
+        "batchSize": "Tamaño del lote",
+        "createdAt": "Creado en",
+        "completedAt": "Completado en",
+        "sortColumn": "Ordenar columna",
+        "sortBy": "Ordena por {{column}}",
+        "sortOrderAscending": "Ascendente",
+        "sortOrderDescending": "Descendente"
     },
     "controlLayers": {
         "layer_one": "Capa",
@@ -488,10 +629,9 @@
     },
     "whatsNew": {
         "readReleaseNotes": "Leer las notas de la versión",
-        "watchRecentReleaseVideos": "Ver videos de versiones recientes",
         "whatsNewInInvoke": "Novedades en Invoke",
         "items": [
-            "<StrongComponent>SD 3.5</StrongComponent>: compatibilidad con SD 3.5 Medium y Large."
+            "Tipos de modelo nuevo: Imagen Qwen, Editar image Qwen, Anima."
         ]
     },
     "invocationCache": {
@@ -517,12 +657,43 @@
             "enabled": "Corrección de alta resolución activada",
             "strength": "Forzar la corrección de alta resolución",
             "method": "Método de corrección de alta resolución"
-        }
+        },
+        "upscaleMethod": "Método de Alta Gama",
+        "enableHrf": "Habilitar reparación de resolución alta"
     },
     "prompt": {
-        "addPromptTrigger": "Añadir activador de los avisos",
-        "compatibleEmbeddings": "Incrustaciones compatibles",
-        "noMatchingTriggers": "No hay activadores coincidentes"
+        "addPromptTrigger": "Añadir activador de entrada",
+        "compatibleEmbeddings": "Embebidos compatibles",
+        "noMatchingTriggers": "Sin activadores coincidentes",
+        "generateFromImage": "Generar entrada a partir de imagen",
+        "expandCurrentPrompt": "Ampliar la entrada actual",
+        "uploadImageForPromptGeneration": "Subir imagen para la generación de entrada",
+        "expandingPrompt": "Ampliando entrada...",
+        "resultTitle": "Expansión de entrada completa",
+        "resultSubtitle": "Elija como manejar la entrada ampliada:",
+        "replace": "Remplazar",
+        "insert": "Insertar",
+        "discard": "Descartar",
+        "noPromptHistory": "No hay historia de entrada registrada.",
+        "noMatchingPrompts": "No coincide entradas en el histórico.",
+        "toSwitchBetweenPrompts": "para cambiar entre entradas.",
+        "promptHistory": "Historia de entrada",
+        "clearHistory": "Borrar historial",
+        "searchPrompts": "Buscar...",
+        "imageToPrompt": "Imagen para entrada",
+        "selectVisionModel": "Selecciona modelo de visión...",
+        "changeImage": "Cambiar imagen",
+        "uploadImage": "Subir imagen",
+        "expand": "Expandir",
+        "noVisionModelInstalledTitle": "Ningún modelo de visión instalado",
+        "noVisionModelInstalledDescription": "Imagen-a-entrada necesita un modelo de visión-idioma (p.e. LLaVA Onevision). El iniciador 0.5B (~1 GB) es el ligero por defecto.",
+        "openModelManager": "Abrir Gestor de Modelo",
+        "usePrompt": "Utilizar entrada",
+        "generatePrompt": "Generar entrada",
+        "expandPromptWithLLM": "Alargar entrada con LLM",
+        "expandPrompt": "Alargar entrada",
+        "selectTextLLM": "Seleccionar LLM de texto…",
+        "noTextLLMInstalledTitle": "Ningún texto LLM instalado"
     },
     "hotkeys": {
         "hotkeys": "Atajo del teclado",
@@ -556,8 +727,8 @@
                 "title": "Mover"
             },
             "selectRectTool": {
-                "title": "Rectángulo",
-                "desc": "Selecciona la herramienta Rectángulo."
+                "title": "Herramienta de formas",
+                "desc": "Selecciona la herramienta de formas."
             },
             "decrementToolWidth": {
                 "title": "Reducir el ancho de la herramienta",
@@ -639,6 +810,26 @@
             "quickSwitch": {
                 "desc": "Cambiar entre las dos últimas capas seleccionadas. Si una capa está seleccionada, cambia siempre entre ella y la última capa no seleccionada.",
                 "title": "Cambio rápido de capa"
+            },
+            "setFillColorsToDefault": {
+                "title": "Establece colores por defecto",
+                "desc": "Establece los colores de la herramienta actual por defecto."
+            },
+            "selectLassoTool": {
+                "title": "Herr. Lasso",
+                "desc": "Selecciona la herramienta lasso."
+            },
+            "mergeDown": {
+                "title": "Unir capa inferior",
+                "desc": "Une la capa seleccionada a la capa directamente debajo de ella."
+            },
+            "mergeVisible": {
+                "title": "Unir todas las capas visibles",
+                "desc": "Une todas las capas visibles del tipo de capa seleccionado."
+            },
+            "toggleFillColor": {
+                "title": "Conmuta color relleno",
+                "desc": "Conmuta el relleno de color de la herramienta actual"
             }
         },
         "app": {
@@ -698,6 +889,17 @@
             "resetPanelLayout": {
                 "title": "Reiniciar la posición del panel",
                 "desc": "Restablece los paneles izquierdo y derecho a su tamaño y disposición por defecto."
+            },
+            "promptWeightUp": {
+                "title": "Incrementar ponderación de selección de solicitud"
+            },
+            "promptWeightDown": {
+                "title": "Decrementar ponderación de selección de solicitud"
+            },
+            "selectGenerateTab": {
+                "title": "Selecciona la lengüeta generada",
+                "desc": "Selecciona la lengüeta generada.",
+                "key": "1"
             }
         },
         "workflows": {
@@ -819,7 +1021,32 @@
         },
         "searchHotkeys": "Buscar teclas de acceso rápido",
         "noHotkeysFound": "Sin teclas de acceso rápido",
-        "clearSearch": "Limpiar la búsqueda"
+        "clearSearch": "Limpiar la búsqueda",
+        "editMode": "Editar Modo",
+        "viewMode": "Vista de Modo",
+        "editHotkey": "Editar Atajo",
+        "addHotkey": "Añadir Atajo",
+        "resetToDefault": "Restablecer a Predeterminado",
+        "resetAll": "Restablecer todo a predeterminado",
+        "resetAllConfirmation": "¿Seguro que desea restablecer todos los atajos a su valor por defecto? Esto no puede ser deshecho.",
+        "enterHotkeys": "Introduzca los atajos, separados por comas",
+        "save": "Guardar",
+        "cancel": "Cancelar",
+        "modifiers": "Modificadores",
+        "syntaxHelp": "Ayuda Sintáctica",
+        "combineWith": "Combinar con +",
+        "multipleHotkeys": "Múltiples atajos con coma",
+        "validKeys": "Teclas válidas",
+        "help": "Ayuda",
+        "noHotkeysRecorded": "Ninguna tecla de atajo registrada aún",
+        "pressKeys": "Pulse teclas…",
+        "setHotkey": "ESTABLECER",
+        "setAnother": "ESTABLECER OTRA",
+        "removeLastHotkey": "Quitar último atajo de tecla",
+        "clearAll": "Vaciar todo",
+        "duplicateWarning": "Esta tecla de atajo ya está registrada",
+        "conflictWarning": "ya está utilizada por «{{hotkeyTitle}}»",
+        "thisHotkey": "este tecla atajo"
     },
     "metadata": {
         "guidance": "Orientación",
@@ -892,7 +1119,8 @@
             "rememberMe": "Recordarme por 7 días",
             "signIn": "Iniciar sesión",
             "signingIn": "Iniciando sesión...",
-            "loginFailed": "Inicio de sesión fallido. Por favor revise sus credenciales."
+            "loginFailed": "Inicio de sesión fallido. Por favor revise sus credenciales.",
+            "sessionExpired": "Sus credenciales se han caducado. Inicie sesión nuevamente para continuar."
         },
         "setup": {
             "title": "Bienvenido a InvokeAI",
@@ -976,5 +1204,42 @@
             "moderate": "Contraseña moderada",
             "strong": "Contraseña fuerte"
         }
+    },
+    "models": {
+        "defaultVAE": "IVA por defecto"
+    },
+    "popovers": {
+        "fluxDypeScale": {
+            "paragraphs": [
+                null,
+                "Predeterminado: 2'0. Intervalo: 0'0-8'0."
+            ]
+        },
+        "tileSize": {
+            "paragraphs": [
+                null,
+                "Modelos SD1.5 predeterminado a 768, mientras modelos SDXL por defecto a 1024. Reduce tamaño de azulejo si encuentra incidencias de memoria."
+            ]
+        },
+        "tileOverlap": {
+            "paragraphs": [
+                null,
+                "El valor por defecto de 128 palabras bien para muchos casos, pero puede tan solo basados en su necesidad específica y restricciones de memoria."
+            ]
+        }
+    },
+    "workflows": {
+        "defaultWorkflows": "Flujos de trabajos predeterminados",
+        "builder": {
+            "warningWorkflowHasNoPublishableInputFields": "No publica campos de entrada seleccionado; publicado flujo de trabajo ejecutará con solo valores predeterminados"
+        }
+    },
+    "stylePresets": {
+        "defaultTemplates": "Plantillas predeterminadas"
+    },
+    "modelCache": {
+        "clear": "Vaciar caché modelo",
+        "clearSucceeded": "Caché modelo vaciado",
+        "clearFailed": "Problema al vaciar caché de modelo"
     }
 }

@@ -1,13 +1,15 @@
 import type { FormLabelProps } from '@invoke-ai/ui-library';
-import { Box, Flex, FormControlGroup, SimpleGrid, StandaloneAccordion } from '@invoke-ai/ui-library';
+import { Flex, FormControlGroup, SimpleGrid, StandaloneAccordion } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import {
   selectIsAnima,
+  selectIsErnieImage,
   selectIsExternal,
   selectIsFLUX,
   selectIsFlux2,
+  selectIsFlux2Dev,
   selectIsIdeogram4,
   selectIsKrea2,
   selectIsQwenImage,
@@ -23,13 +25,22 @@ import ParamCLIPEmbedModelSelect from 'features/parameters/components/Advanced/P
 import ParamCLIPGEmbedModelSelect from 'features/parameters/components/Advanced/ParamCLIPGEmbedModelSelect';
 import ParamCLIPLEmbedModelSelect from 'features/parameters/components/Advanced/ParamCLIPLEmbedModelSelect';
 import ParamClipSkip from 'features/parameters/components/Advanced/ParamClipSkip';
+import ParamFlux2DevModelSelect from 'features/parameters/components/Advanced/ParamFlux2DevModelSelect';
 import ParamFlux2KleinModelSelect from 'features/parameters/components/Advanced/ParamFlux2KleinModelSelect';
+import {
+  ParamHiDiffusionRauNetToggle,
+  ParamHiDiffusionT1Ratio,
+  ParamHiDiffusionT2Ratio,
+  ParamHiDiffusionToggle,
+  ParamHiDiffusionWindowAttnToggle,
+} from 'features/parameters/components/Advanced/ParamHiDiffusionToggle';
 import ParamKrea2ModelSelects from 'features/parameters/components/Advanced/ParamKrea2ModelSelects';
 import ParamQwenImageComponentSourceSelect from 'features/parameters/components/Advanced/ParamQwenImageComponentSourceSelect';
 import ParamQwenImageQuantization from 'features/parameters/components/Advanced/ParamQwenImageQuantization';
 import ParamT5EncoderModelSelect from 'features/parameters/components/Advanced/ParamT5EncoderModelSelect';
 import ParamWanModelSelects from 'features/parameters/components/Advanced/ParamWanModelSelects';
 import ParamZImageQwen3VaeModelSelect from 'features/parameters/components/Advanced/ParamZImageQwen3VaeModelSelect';
+import ParamErnieImagePromptEnhancer from 'features/parameters/components/Core/ParamErnieImagePromptEnhancer';
 import ParamIdeogram4ColorPalette from 'features/parameters/components/Core/ParamIdeogram4ColorPalette';
 import ParamIdeogram4GuidanceScale from 'features/parameters/components/Core/ParamIdeogram4GuidanceScale';
 import ParamIdeogram4Mu from 'features/parameters/components/Core/ParamIdeogram4Mu';
@@ -58,12 +69,14 @@ export const AdvancedSettingsAccordion = memo(() => {
   const { currentData: vaeConfig } = useGetModelConfigQuery(vaeKey ?? skipToken);
   const isFLUX = useAppSelector(selectIsFLUX);
   const isFlux2 = useAppSelector(selectIsFlux2);
+  const isFlux2Dev = useAppSelector(selectIsFlux2Dev);
   const isSD3 = useAppSelector(selectIsSD3);
   const isZImage = useAppSelector(selectIsZImage);
   const isIdeogram4 = useAppSelector(selectIsIdeogram4);
   const isExternal = useAppSelector(selectIsExternal);
   const isQwenImage = useAppSelector(selectIsQwenImage);
   const isAnima = useAppSelector(selectIsAnima);
+  const isErnieImage = useAppSelector(selectIsErnieImage);
   const isKrea2 = useAppSelector(selectIsKrea2);
   const isWan = useAppSelector(selectIsWan);
 
@@ -103,6 +116,9 @@ export const AdvancedSettingsAccordion = memo(() => {
             if (params.seamlessXAxis || params.seamlessYAxis) {
               badges.push('seamless');
             }
+            if (params.hiDiffusionEnabled) {
+              badges.push('HiDiffusion');
+            }
           }
 
           return badges;
@@ -124,7 +140,7 @@ export const AdvancedSettingsAccordion = memo(() => {
   return (
     <StandaloneAccordion label={t('accordions.advanced.title')} badges={badges} isOpen={isOpen} onToggle={onToggle}>
       <Flex gap={4} alignItems="center" p={4} flexDir="column" data-testid="advanced-settings-accordion">
-        {!isZImage && !isAnima && !isFlux2 && !isQwenImage && !isKrea2 && !isWan && !isIdeogram4 && (
+        {!isZImage && !isAnima && !isFlux2 && !isQwenImage && !isErnieImage && !isKrea2 && !isWan && !isIdeogram4 && (
           <Flex gap={4} w="full">
             {isFLUX ? <ParamFLUXVAEModelSelect /> : <ParamVAEModelSelect />}
             {!isFLUX && !isSD3 && <ParamVAEPrecision />}
@@ -136,6 +152,7 @@ export const AdvancedSettingsAccordion = memo(() => {
           !isZImage &&
           !isQwenImage &&
           !isAnima &&
+          !isErnieImage &&
           !isKrea2 &&
           !isWan &&
           !isIdeogram4 && (
@@ -149,9 +166,12 @@ export const AdvancedSettingsAccordion = memo(() => {
                   <SimpleGrid columns={2} spacing={4} w="full">
                     <ParamSeamlessXAxis />
                     <ParamSeamlessYAxis />
+                    <ParamHiDiffusionToggle />
                     <ParamColorCompensation />
-                    {/* Empty box for visual alignment. Replace with new option when needed. */}
-                    <Box />
+                    <ParamHiDiffusionRauNetToggle />
+                    <ParamHiDiffusionWindowAttnToggle />
+                    <ParamHiDiffusionT1Ratio />
+                    <ParamHiDiffusionT2Ratio />
                   </SimpleGrid>
                 </FormControlGroup>
               </Flex>
@@ -163,9 +183,14 @@ export const AdvancedSettingsAccordion = memo(() => {
             <ParamCLIPEmbedModelSelect />
           </FormControlGroup>
         )}
-        {isFlux2 && (
+        {isFlux2 && !isFlux2Dev && (
           <FormControlGroup>
             <ParamFlux2KleinModelSelect />
+          </FormControlGroup>
+        )}
+        {isFlux2Dev && (
+          <FormControlGroup>
+            <ParamFlux2DevModelSelect />
           </FormControlGroup>
         )}
         {isSD3 && (
@@ -189,6 +214,11 @@ export const AdvancedSettingsAccordion = memo(() => {
         {isAnima && (
           <FormControlGroup>
             <ParamAnimaModelSelect />
+          </FormControlGroup>
+        )}
+        {isErnieImage && (
+          <FormControlGroup formLabelProps={formLabelProps}>
+            <ParamErnieImagePromptEnhancer />
           </FormControlGroup>
         )}
         {isKrea2 && (

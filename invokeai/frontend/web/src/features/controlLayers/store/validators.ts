@@ -101,6 +101,21 @@ export const getRegionalGuidanceWarnings = (
       }
     }
 
+    if (model.base === 'krea-2') {
+      // Krea-2's canvas graph currently exposes positive regional text only. The denoise node supports
+      // masked negative conditioning in workflows, but canvas auto-negative and regional reference images
+      // require graph integrations that Krea-2 does not provide.
+      if (entity.negativePrompt !== null) {
+        warnings.push(WARNINGS.RG_NEGATIVE_PROMPT_NOT_SUPPORTED);
+      }
+      if (entity.autoNegative) {
+        warnings.push(WARNINGS.RG_AUTO_NEGATIVE_NOT_SUPPORTED);
+      }
+      if (entity.referenceImages.length > 0) {
+        warnings.push(WARNINGS.RG_REFERENCE_IMAGES_NOT_SUPPORTED);
+      }
+    }
+
     if (model.base === 'ideogram-4') {
       // Ideogram 4 regions contribute only a positive prompt + bbox to the structured caption
       // (see collectIdeogram4PromptInputs). Negative prompts, auto-negative and reference images are
