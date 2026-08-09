@@ -8,6 +8,7 @@ with every mutation.
 """
 
 import logging
+from datetime import timedelta
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -17,7 +18,7 @@ from fastapi.testclient import TestClient
 
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api_app import app
-from invokeai.app.services.auth.token_service import verify_token
+from invokeai.app.services.auth.token_service import TokenData, create_access_token, verify_token
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.events.events_common import UserAccessChangedEvent
 from invokeai.app.services.invocation_services import InvocationServices
@@ -355,6 +356,43 @@ class TestSystemUserIsProtected:
         system = mock_invoker.services.users.get("system")
         assert system is not None
         assert system.is_active is True
+
+    def test_a_token_claiming_the_system_account_is_refused(
+        self, client: TestClient, mock_invoker: Invoker, admin_token: str
+    ) -> None:
+        """Closing the login hole does not reach a token already in the wild.
+
+        An instance that set a password on the system row through the old
+        `PATCH /auth/users/system` and logged in holds a JWT that survives the upgrade:
+        the row is deliberately kept active and its epoch still matches, so nothing else
+        rejects it, and the sliding-window middleware would renew it indefinitely. It
+        grants read/write over every board, image, workflow, and queue item carried over
+        from before multiuser support, so `resolve_authorized_user` refuses the id itself.
+        """
+        _save_image(mock_invoker, "system-owned-img", "system")
+        system_token = create_access_token(
+            TokenData(user_id="system", email="system@system.invokeai", is_admin=False),
+            timedelta(days=1),
+        )
+
+        assert client.get("/api/v1/auth/me", headers=_auth(system_token)).status_code == (status.HTTP_401_UNAUTHORIZED)
+        r = client.get("/api/v1/images/i/system-owned-img", headers=_auth(system_token))
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+        assert "X-Refreshed-Token" not in r.headers
+
+    def test_an_admin_token_claiming_the_system_account_is_refused(self, client: TestClient, admin_token: str) -> None:
+        """The refusal is on the id, so forging the admin claim does not help either."""
+        system_token = create_access_token(
+            TokenData(user_id="system", email="system@system.invokeai", is_admin=True),
+            timedelta(days=1),
+        )
+
+        r = client.post(
+            "/api/v1/auth/users",
+            json={"email": "new@test.com", "display_name": "New", "password": "TestPass123", "is_admin": True},
+            headers=_auth(system_token),
+        )
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_ordinary_user_deletion_still_works(
         self, client: TestClient, mock_invoker: Invoker, admin_token: str

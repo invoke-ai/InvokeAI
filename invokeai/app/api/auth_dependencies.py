@@ -7,6 +7,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.auth.token_service import TokenData, verify_token
+from invokeai.app.services.users.users_common import SYSTEM_USER_ID
 from invokeai.backend.util.logging import logging
 
 if TYPE_CHECKING:
@@ -33,8 +34,9 @@ def resolve_authorized_user(token_data: TokenData) -> "UserDTO | None":
     site, and a check added to some copies but not others is indistinguishable from no
     check at all on the paths that were missed.
 
-    A token is honored when all three hold:
+    A token is honored when all four hold:
 
+    - it does not claim the internal ``system`` account,
     - the account still exists,
     - it is active,
     - and the token carries the account's current revocation epoch. Any mismatch counts
@@ -44,6 +46,22 @@ def resolve_authorized_user(token_data: TokenData) -> "UserDTO | None":
 
     Raises whatever the user service raises; callers that must fail closed should catch.
     """
+    # `system` owns everything carried over from before multiuser support, and is not a
+    # login account: `UserService.authenticate` refuses it and the migration clears any
+    # password left on the row. Neither of those reaches a token that was *already issued*
+    # — on an instance that set a password through the old `PATCH /auth/users/system` hole
+    # and logged in before it was closed, the JWT survives the upgrade, and nothing else
+    # here would reject it: the row is deliberately kept active and its epoch still
+    # matches, so the sliding-window middleware would renew it indefinitely. Refusing the
+    # id is what actually ends those sessions, and it holds for databases that applied an
+    # earlier revision of the migration too.
+    #
+    # Single-user mode, where everything legitimately runs as `system`, never reaches here:
+    # its dependencies synthesize the TokenData and return before resolving anything (see
+    # `get_current_user_or_default`, `get_current_media_user_or_default`, and
+    # `_identify_video_upload_user`). So this refuses only real, minted tokens.
+    if token_data.user_id == SYSTEM_USER_ID:
+        return None
     user = ApiDependencies.invoker.services.users.get(token_data.user_id)
     if user is None or not user.is_active:
         return None

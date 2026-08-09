@@ -257,6 +257,16 @@ class UserService(UserServiceBase):
         if row is None:
             return None
 
+        # The system account is not a login account. It owns everything migrated from
+        # before multiuser support, so a token bearing `user_id="system"` reads and writes
+        # all of it — and `_assert_system_user_protected` only stops a password being set
+        # from *now on*. An instance that set one through the old hole still carries a
+        # usable hash, and the migration that clears it cannot reach a row damaged by
+        # direct SQL afterwards. Refusing here makes "system cannot authenticate" hold
+        # regardless of what the row contains.
+        if row[0] == SYSTEM_USER_ID:
+            return None
+
         password_hash = row[3]
         if not verify_password(password, password_hash):
             return None

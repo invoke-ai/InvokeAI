@@ -22,6 +22,7 @@ from logging import Logger
 
 import pytest
 
+from invokeai.app.services.auth.password_utils import hash_password
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.users.users_common import (
     SYSTEM_USER_ID,
@@ -312,6 +313,33 @@ def test_renaming_the_system_user_is_allowed(db: SqliteDatabase, users: UserServ
     updated = users.update(SYSTEM_USER_ID, UserUpdateRequest(display_name="Renamed"), strict_password_checking=False)
 
     assert updated.display_name == "Renamed"
+
+
+def test_a_system_row_carrying_a_password_still_cannot_log_in(db: SqliteDatabase, users: UserService) -> None:
+    """The guard above only stops a password being set *from now on*.
+
+    An instance that set one through the old `PATCH /auth/users/system` hole still carries
+    a usable hash, and its email is fixed and public — so the hash is a standing login for
+    the account that owns every pre-multiuser board, image, workflow, and queue item. The
+    migration clears it, but migrations run once and cannot reach a row damaged afterwards
+    by direct SQL, so `authenticate` refuses the account outright whatever the row holds.
+    """
+    _seed_system_user(db)
+    db._conn.execute(
+        "UPDATE users SET password_hash = ? WHERE user_id = 'system'",
+        (hash_password(PASSWORD),),
+    )
+    db._conn.commit()
+
+    assert users.authenticate("system@system.invokeai", PASSWORD) is None
+
+
+def test_refusing_the_system_account_does_not_block_other_logins(db: SqliteDatabase, users: UserService) -> None:
+    """The refusal is keyed on the user id, not on anything a real account shares."""
+    _seed_system_user(db)
+    _make(users, "real@test.com", is_admin=False)
+
+    assert users.authenticate("real@test.com", PASSWORD) is not None
 
 
 def test_the_system_error_is_a_value_error(db: SqliteDatabase, users: UserService) -> None:

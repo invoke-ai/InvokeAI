@@ -129,7 +129,9 @@ class LastAdministratorError(ValueError):
 
 
 # Owner of everything that predates multiuser support (created by migration_27). Not a
-# login account: it has an empty password hash and is hidden from the user list.
+# login account: it is seeded with an empty password hash, `UserService.authenticate`
+# refuses it outright whatever the row holds, `resolve_authorized_user` refuses any token
+# already carrying it, and it is hidden from the user list.
 SYSTEM_USER_ID = "system"
 SYSTEM_USER_PROTECTED_DETAIL = (
     "The system user cannot be deleted, deactivated, promoted to administrator, or given a password"
