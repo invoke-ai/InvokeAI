@@ -4,6 +4,7 @@ import type { RelatableModel } from './relationships';
 import type { ModelBase, ModelTaxonomyType } from './types';
 
 import {
+  CROSS_BASE_ALLOWANCES,
   hasLinkableBase,
   isBaseCompatible,
   isLinkableType,
@@ -21,6 +22,45 @@ describe('isBaseCompatible', () => {
 
   it('rejects differing concrete bases', () => {
     expect(isBaseCompatible(model('sdxl', 'main'), model('flux'))).toBe(false);
+  });
+
+  it('allows curated cross-base helpers with their consuming bases', () => {
+    // z_image_model_loader takes a FLUX VAE; krea2_model_loader takes Qwen-Image or Anima VAEs.
+    expect(isBaseCompatible(model('z-image', 'main'), model('flux', 'vae'))).toBe(true);
+    expect(isBaseCompatible(model('krea-2', 'main'), model('qwen-image', 'vae'))).toBe(true);
+    expect(isBaseCompatible(model('krea-2', 'main'), model('anima', 'vae'))).toBe(true);
+    // flux2_klein_model_loader takes a FLUX VAE; anima_model_loader takes Wan/Qwen-Image/FLUX VAEs.
+    expect(isBaseCompatible(model('flux2', 'main'), model('flux', 'vae'))).toBe(true);
+    expect(isBaseCompatible(model('anima', 'main'), model('wan', 'vae'))).toBe(true);
+    expect(isBaseCompatible(model('anima', 'main'), model('qwen-image', 'vae'))).toBe(true);
+    expect(isBaseCompatible(model('anima', 'main'), model('flux', 'vae'))).toBe(true);
+    // z_image_pid_decode reuses the FLUX PiD decoder.
+    expect(isBaseCompatible(model('z-image', 'main'), model('flux', 'pid_decoder'))).toBe(true);
+  });
+
+  it('limits cross-base allowances to the helper type and cited pairs', () => {
+    // The allowance belongs to the VAE type, not to the base pair.
+    expect(isBaseCompatible(model('z-image', 'main'), model('flux', 'lora'))).toBe(false);
+    expect(isBaseCompatible(model('z-image', 'main'), model('flux', 'main'))).toBe(false);
+    // No loader feeds an SD-3 VAE to a Z-Image pipeline.
+    expect(isBaseCompatible(model('z-image', 'main'), model('sd-3', 'vae'))).toBe(false);
+    // Only the FLUX decoder is shared; other PiD pairings must match exactly.
+    expect(isBaseCompatible(model('qwen-image', 'main'), model('flux', 'pid_decoder'))).toBe(false);
+    expect(isBaseCompatible(model('sdxl', 'main'), model('sdxl', 'pid_decoder'))).toBe(true);
+  });
+
+  it('is symmetric for every cross-base entry', () => {
+    for (const [type, byBase] of Object.entries(CROSS_BASE_ALLOWANCES)) {
+      for (const [helperBase, hosts] of Object.entries(byBase ?? {})) {
+        for (const hostBase of hosts ?? []) {
+          const helper = model(helperBase as ModelBase, type as ModelTaxonomyType);
+          const host = model(hostBase, 'main');
+
+          expect(isBaseCompatible(helper, host)).toBe(true);
+          expect(isBaseCompatible(host, helper)).toBe(true);
+        }
+      }
+    }
   });
 
   it('does not treat the null Any base as a universal wildcard', () => {
@@ -88,5 +128,12 @@ describe('LINKABLE_TYPES', () => {
     }
     expect(LINKABLE_TYPES).toContain('main');
     expect(isLinkableType('onnx')).toBe(false);
+  });
+
+  it('includes the concrete-based helper types the backend loaders consume', () => {
+    // flux_control_lora_loader, flux_redux, and pid_decoder_loader.
+    expect(isLinkableType('control_lora')).toBe(true);
+    expect(isLinkableType('flux_redux')).toBe(true);
+    expect(isLinkableType('pid_decoder')).toBe(true);
   });
 });

@@ -47,6 +47,31 @@ export const NULL_BASE_ALLOWANCES: Readonly<Partial<Record<ModelTaxonomyType, Re
 };
 
 /**
+ * Curated cross-base allowances for concrete-based helper types: helper base
+ * mapped to the host bases whose pipelines consume it. Same sourcing rule as
+ * `NULL_BASE_ALLOWANCES` — each entry cites the backend invocation(s).
+ */
+export const CROSS_BASE_ALLOWANCES: Readonly<
+  Partial<Record<ModelTaxonomyType, Readonly<Partial<Record<ModelBase, ReadonlySet<ModelBase>>>>>>
+> = {
+  /** The 16-channel VAEs are shared across backbones. */
+  vae: {
+    /** krea2_model_loader (accepts QwenImage and Anima VAEs). */
+    anima: new Set(['krea-2']),
+    /** z_image_model_loader; flux2_klein_model_loader; anima_model_loader ("A FLUX VAE can also be used"). */
+    flux: new Set(['anima', 'flux2', 'z-image']),
+    /** krea2_model_loader; anima_model_loader ("Wan 2.1 / QwenImage VAE"). */
+    'qwen-image': new Set(['anima', 'krea-2']),
+    /** anima_model_loader ("Wan 2.1 / QwenImage VAE"). */
+    wan: new Set(['anima']),
+  },
+  /** z_image_pid_decode reuses the FLUX decoder (assert_pid_decoder_matches_base). */
+  pid_decoder: {
+    flux: new Set(['z-image']),
+  },
+};
+
+/**
  * Types offered when linking related models. The concrete-based helper types,
  * plus every `any`-based type with a curated allowance.
  */
@@ -56,8 +81,11 @@ export const LINKABLE_TYPES: readonly ModelTaxonomyType[] = [
   'embedding',
   'vae',
   'controlnet',
+  'control_lora',
   't2i_adapter',
   'ip_adapter',
+  'flux_redux',
+  'pid_decoder',
   ...(Object.keys(NULL_BASE_ALLOWANCES) as ModelTaxonomyType[]),
 ];
 
@@ -78,14 +106,18 @@ const isAllowedHelperFor = (helper: RelatableModel, host: RelatableModel): boole
   !NULL_BASES.has(String(host.base)) &&
   (NULL_BASE_ALLOWANCES[helper.type]?.has(host.base) ?? false);
 
+const isAllowedCrossBaseHelperFor = (helper: RelatableModel, host: RelatableModel): boolean =>
+  CROSS_BASE_ALLOWANCES[helper.type]?.[helper.base]?.has(host.base) ?? false;
+
 /**
  * Symmetric base-compatibility for related-model links: concrete bases must
- * match exactly; a null base never wildcards — an `any`-based model links only
- * to concrete bases its type has a curated allowance for.
+ * match exactly unless the helper's type has a curated cross-base allowance;
+ * a null base never wildcards — an `any`-based model links only to concrete
+ * bases its type has a curated allowance for.
  */
 export const isBaseCompatible = (a: RelatableModel, b: RelatableModel): boolean => {
   if (!NULL_BASES.has(String(a.base)) && !NULL_BASES.has(String(b.base))) {
-    return a.base === b.base;
+    return a.base === b.base || isAllowedCrossBaseHelperFor(a, b) || isAllowedCrossBaseHelperFor(b, a);
   }
 
   return isAllowedHelperFor(a, b) || isAllowedHelperFor(b, a);
