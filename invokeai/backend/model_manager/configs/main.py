@@ -2291,7 +2291,9 @@ def _sdnq_component_declared_classes(component_path: Path) -> set[str]:
     return declared
 
 
-def _sdnq_component_matches_advertised_class(component_path: Path, accepted_class_names: set[str]) -> bool:
+def _sdnq_component_matches_advertised_class(
+    component_path: Path, accepted_class_names: set[str], *, require_declaration: bool
+) -> bool:
     """True if the component's own config agrees with the class `model_index.json` advertises for it.
 
     `model_index.json` records what a pipeline *claims* each component is, and that claim is what
@@ -2301,11 +2303,22 @@ def _sdnq_component_matches_advertised_class(component_path: Path, accepted_clas
     only surfaces at generation time, when the loader builds a Qwen3ForCausalLM against a state dict
     that cannot satisfy it.
 
-    A component that declares no class at all is accepted, so repos whose component configs omit
-    these keys keep working — the same leniency as `Qwen3Encoder_SDNQ_Config._validate_is_qwen3_encoder`.
+    With `require_declaration`, a component that declares *nothing* is rejected too, not just one that
+    contradicts. Silence is not evidence: "some config.json plus some weight file" is exactly the
+    shape an unrelated model has, so accepting it re-opens the hole for every component whose config
+    happens to omit the key. `save_pretrained` writes `_class_name` (diffusers) or `architectures`
+    (transformers) for anything it saves, so a weight-bearing component that names no class is not a
+    normally-produced one. Set it for those; the tokenizer stays lenient because it carries no weights
+    (nothing can be mis-instantiated against it) and `tokenizer_class` is less consistently written.
+
+    Rejecting here is not fatal to the install: the component is left unrecorded, the pipeline is
+    simply not self-contained, and the user wires that component up explicitly — which is the correct
+    outcome for a folder we cannot confirm.
     """
     declared = _sdnq_component_declared_classes(component_path)
-    return not declared or bool(declared & accepted_class_names)
+    if not declared:
+        return not require_declaration
+    return bool(declared & accepted_class_names)
 
 
 def _sdnq_component_dir_is_populated(component_path: Path, submodel_type: SubModelType) -> bool:
@@ -2463,7 +2476,11 @@ class Main_SDNQ_Diffusers_Flux2_Config(Main_Config_Base, Config_Base):
 
             # Populated is not the same as correct: the index's class name is a claim about the
             # folder, not a fact. Require the component's own config to agree before recording it.
-            if not _sdnq_component_matches_advertised_class(component_path, accepted_class_names):
+            if not _sdnq_component_matches_advertised_class(
+                component_path,
+                accepted_class_names,
+                require_declaration=submodel_type is not SubModelType.Tokenizer,
+            ):
                 continue
 
             submodels[submodel_type] = SubmodelDefinition(
@@ -2592,7 +2609,11 @@ class Main_SDNQ_Diffusers_ZImage_Config(Main_Config_Base, Config_Base):
                 continue
 
             # ...and whose own config agrees with the class the index advertises for it.
-            if not _sdnq_component_matches_advertised_class(component_path, accepted_class_names):
+            if not _sdnq_component_matches_advertised_class(
+                component_path,
+                accepted_class_names,
+                require_declaration=submodel_type is not SubModelType.Tokenizer,
+            ):
                 continue
 
             submodels[submodel_type] = SubmodelDefinition(

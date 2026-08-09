@@ -44,10 +44,14 @@ _ENCODER_CLASSES = ["Qwen3ForCausalLM"]
 _UNLOADABLE_ENCODER_CLASSES = ["Qwen2ForCausalLM", "Qwen2VLForConditionalGeneration"]
 
 
-def _write_sdnq_transformer(root: Path, transformer_config: dict) -> None:
+def _write_sdnq_transformer(root: Path, transformer_config: dict, class_name: str = "Flux2Transformer2DModel") -> None:
     transformer_dir = root / "transformer"
     transformer_dir.mkdir()
-    (transformer_dir / "config.json").write_text(json.dumps(transformer_config), encoding="utf-8")
+    # Real diffusers component configs carry `_class_name` (save_config writes it). Discovery requires
+    # a weight-bearing component to name itself, so the fixture must too.
+    (transformer_dir / "config.json").write_text(
+        json.dumps({"_class_name": class_name, **transformer_config}), encoding="utf-8"
+    )
     (transformer_dir / "quantization_config.json").write_text(json.dumps({"quant_method": "sdnq"}), encoding="utf-8")
     save_file(
         {
@@ -64,6 +68,15 @@ def _write_sdnq_transformer(root: Path, transformer_config: dict) -> None:
 _PIPELINE_COMPONENT_DIRS = ("vae", "text_encoder", "tokenizer")
 
 
+# What each component's own config declares about itself, as `save_pretrained` would write it:
+# `architectures` for transformers models, `_class_name` for diffusers ones. `AutoencoderKL` is
+# accepted for both pipelines (FLUX.2 also allows the `AutoencoderKLFlux2` spelling).
+_COMPONENT_SELF_DECLARED_CONFIG = {
+    "vae": {"_class_name": "AutoencoderKL"},
+    "text_encoder": {"architectures": ["Qwen3ForCausalLM"]},
+}
+
+
 def _write_component_dirs(
     root: Path, components: tuple[str, ...] = _PIPELINE_COMPONENT_DIRS, *, populated: bool = True
 ) -> None:
@@ -72,6 +85,10 @@ def _write_component_dirs(
     With ``populated=True`` each folder gets the files its loader needs (config + weights, or the
     tokenizer's config for the weightless tokenizer folder). ``populated=False`` creates the bare
     directories an interrupted download leaves behind — discovery must not record those.
+
+    The weight-bearing configs name their own class, because that is what a real `save_pretrained`
+    writes and what discovery now requires: "some config plus some weights" is the shape an unrelated
+    model has too, so it is no longer accepted on its own.
     """
     for name in components:
         component_dir = root / name
@@ -79,10 +96,14 @@ def _write_component_dirs(
         if not populated:
             continue
         if name == "tokenizer":
-            (component_dir / "tokenizer_config.json").write_text(json.dumps({}), encoding="utf-8")
+            (component_dir / "tokenizer_config.json").write_text(
+                json.dumps({"tokenizer_class": "Qwen2TokenizerFast"}), encoding="utf-8"
+            )
             (component_dir / "tokenizer.json").write_text(json.dumps({}), encoding="utf-8")
             continue
-        (component_dir / "config.json").write_text(json.dumps({}), encoding="utf-8")
+        (component_dir / "config.json").write_text(
+            json.dumps(_COMPONENT_SELF_DECLARED_CONFIG.get(name, {})), encoding="utf-8"
+        )
         save_file({"weight": torch.zeros(4, 4, dtype=torch.float32)}, str(component_dir / "model.safetensors"))
 
 
@@ -355,19 +376,49 @@ def test_sdnq_pipeline_with_a_mismatched_vae_folder_is_not_self_contained(tmp_pa
 
 
 @pytest.mark.parametrize(
-    ("factory", "root_name"),
+    ("factory", "root_name", "component"),
     [
-        (Main_SDNQ_Diffusers_Flux2_Config, "flux2-undeclared-components"),
-        (Main_SDNQ_Diffusers_ZImage_Config, "zimage-undeclared-components"),
+        (Main_SDNQ_Diffusers_Flux2_Config, "flux2-undeclared-encoder", "text_encoder"),
+        (Main_SDNQ_Diffusers_ZImage_Config, "zimage-undeclared-encoder", "text_encoder"),
+        (Main_SDNQ_Diffusers_Flux2_Config, "flux2-undeclared-vae", "vae"),
+        (Main_SDNQ_Diffusers_ZImage_Config, "zimage-undeclared-vae", "vae"),
     ],
 )
-def test_sdnq_pipeline_with_components_that_declare_no_class_is_still_self_contained(
-    tmp_path: Path, factory, root_name: str
+def test_sdnq_pipeline_with_a_weight_bearing_component_that_names_no_class_is_not_self_contained(
+    tmp_path: Path, factory, root_name: str, component: str
 ):
-    """The check is strict on mismatch, lenient on silence: a component config that names no class at
-    all is accepted, so repos whose component configs omit `_class_name`/`architectures` still load."""
+    """Silence is not evidence.
+
+    "Some config.json plus some weight file" is exactly the shape an unrelated model has, so a
+    weight-bearing component that names no class cannot be confirmed and must not be recorded.
+    Accepting it would leave the hole open for every mismatched component whose config happens to
+    omit the key — which is the reviewer's "any directory containing a config file and weight file".
+    """
     maker = _make_flux2_pipeline if factory is Main_SDNQ_Diffusers_Flux2_Config else _make_zimage_pipeline
     root = maker(tmp_path / root_name, "Qwen3ForCausalLM")
+    (root / component / "config.json").write_text(json.dumps({"hidden_size": 2560}), encoding="utf-8")
+
+    config = factory.from_model_on_disk(_mod(root), {**_REQUIRED_FIELDS, "path": root.as_posix()})
+
+    submodel = SubModelType.TextEncoder if component == "text_encoder" else SubModelType.VAE
+    assert config.submodels is not None
+    assert submodel not in config.submodels
+    assert not is_self_contained_sdnq_pipeline(config)
+
+
+@pytest.mark.parametrize(
+    ("factory", "root_name"),
+    [
+        (Main_SDNQ_Diffusers_Flux2_Config, "flux2-undeclared-tokenizer"),
+        (Main_SDNQ_Diffusers_ZImage_Config, "zimage-undeclared-tokenizer"),
+    ],
+)
+def test_sdnq_pipeline_tokenizer_without_a_declared_class_is_still_recorded(tmp_path: Path, factory, root_name: str):
+    """The tokenizer stays lenient: it carries no weights, so nothing can be mis-instantiated against
+    it, and `tokenizer_class` is less consistently written than `_class_name`/`architectures`."""
+    maker = _make_flux2_pipeline if factory is Main_SDNQ_Diffusers_Flux2_Config else _make_zimage_pipeline
+    root = maker(tmp_path / root_name, "Qwen3ForCausalLM")
+    (root / "tokenizer" / "tokenizer_config.json").write_text(json.dumps({}), encoding="utf-8")
 
     config = factory.from_model_on_disk(_mod(root), {**_REQUIRED_FIELDS, "path": root.as_posix()})
 
