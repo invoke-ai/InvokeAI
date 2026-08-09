@@ -1,7 +1,7 @@
 """
 This module defines a singleton object, "invisible_watermark" that
 wraps the invisible watermark model. It respects the global "invisible_watermark"
-configuration variable, that allows the watermarking to be supressed.
+configuration variable, that allows the watermarking to be suppressed.
 """
 
 import cv2
