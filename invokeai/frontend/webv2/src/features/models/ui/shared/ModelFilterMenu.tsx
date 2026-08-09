@@ -16,12 +16,13 @@ export interface ModelFilterSortOption {
   labelKey: string;
 }
 
-const DEFAULT_SORT_FIELDS: ModelFilterSortOption[] = [
-  { field: 'default', labelKey: 'models.sortDefault' },
-  { field: 'name', labelKey: 'models.sortName' },
-  { field: 'base', labelKey: 'models.sortBase' },
-  { field: 'size', labelKey: 'models.sortSize' },
-  { field: 'format', labelKey: 'models.sortFormat' },
+/** The one source of sort options; derive narrower menus by filtering. */
+export const SORT_FIELD_OPTIONS: readonly ModelFilterSortOption[] = [
+  { field: 'default', labelKey: 'models.sort.default' },
+  { field: 'name', labelKey: 'models.sort.name' },
+  { field: 'base', labelKey: 'models.sort.base' },
+  { field: 'size', labelKey: 'models.sort.size' },
+  { field: 'format', labelKey: 'models.sort.format' },
 ];
 
 /** Shared taxonomy filter + sort menu for installed and starter model lists. */
@@ -37,7 +38,7 @@ export const ModelFilterMenu = ({
   onTypeFilterChange,
   sortDirection,
   sortField,
-  sortFields = DEFAULT_SORT_FIELDS,
+  sortFields = SORT_FIELD_OPTIONS,
   typeAllChecked,
   typeAllLabel,
   typeFilter,
@@ -253,4 +254,3 @@ const SortFilterMenuItem = memo(function SortFilterMenuItem({
     />
   );
 });
-/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */

@@ -1040,12 +1040,7 @@
       "name": "Name",
       "size": "Size"
     },
-    "sortBase": "Base",
     "sortBy": "Sort By",
-    "sortDefault": "Default",
-    "sortFormat": "Format",
-    "sortName": "Name",
-    "sortSize": "Size",
     "source": "Source",
     "sourceUrl": "Source URL",
     "sourceUrlHelp": "Model page or download URL.",
