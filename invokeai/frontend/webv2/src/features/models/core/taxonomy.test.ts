@@ -38,12 +38,15 @@ describe('getInstallSourceLabel', () => {
 
 describe('label fallbacks', () => {
   it('title-cases unknown open-union values', () => {
-    expect(getModelTypeLabel('mistral_encoder')).toBe('Mistral Encoder');
+    expect(getModelTypeLabel('some_new_type')).toBe('Some New Type');
     expect(getModelFormatLabel('some_new-format')).toBe('Some New Format');
   });
 
   it('prefers curated labels for known values', () => {
     expect(getModelTypeLabel('lora')).toBe('LoRA');
+    expect(getModelTypeLabel('qwen3_vl_encoder')).toBe('Qwen3 VL Encoder');
+    expect(getModelTypeLabel('gemma2_encoder')).toBe('Gemma 2 Encoder');
+    expect(getModelTypeLabel('pid_decoder')).toBe('PiD Decoder');
     expect(getModelFormatLabel('gguf_quantized')).toBe('GGUF');
   });
 });
