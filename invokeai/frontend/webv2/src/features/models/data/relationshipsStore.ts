@@ -15,9 +15,9 @@ import { addModelRelationship, getRelatedModelKeys, removeModelRelationship } fr
  *
  * The backend's batch endpoint (`POST /model_relationships/batch`) is
  * deliberately unused — it returns a flat de-duplicated union across the input
- * keys, which cannot populate a per-key cache. Parallel single-key fetches via
- * `ensureManyRelatedModelKeysLoaded` provide batch loading with attributable
- * results.
+ * keys, which cannot populate a per-key cache. Per-key fetches through
+ * `ensureRelatedModelKeysLoaded` stay attributable and dedupe on the inflight
+ * map.
  */
 
 export interface ModelRelationshipsSnapshot {
@@ -106,11 +106,6 @@ export const ensureRelatedModelKeysLoaded = (modelKey: string): Promise<void> =>
 /** Stale-while-revalidate: any cached entry keeps rendering while it refetches. */
 export const refreshRelatedModelKeys = (modelKey: string): Promise<void> => fetchRelatedKeys(modelKey);
 
-/** Parallel per-key ensure for multi-model surfaces; shares the inflight map. */
-export const ensureManyRelatedModelKeysLoaded = async (modelKeys: readonly string[]): Promise<void> => {
-  await Promise.all(modelKeys.map((key) => ensureRelatedModelKeysLoaded(key)));
-};
-
 type EntryPatch = (entry: readonly string[], otherKey: string) => readonly string[];
 
 /** Links are bidirectional: apply the patch to both cached directions. */
@@ -195,8 +190,6 @@ export const removeModelsFromRelationships = (keys: readonly string[]): void => 
 };
 
 export const getRelationshipsSnapshot = (): ModelRelationshipsSnapshot => store.getSnapshot();
-
-export const useRelationshipsSelector = store.useSelector;
 
 /** Related keys for one model; `null` means not fetched yet (or no model). */
 export const useRelatedModelKeys = (modelKey: string | null): readonly string[] | null =>
