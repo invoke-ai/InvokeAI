@@ -508,9 +508,14 @@ def test_xpu_mem_get_info_unknown_total_raises():
     Returning (0, 0) would make ModelCache._get_vram_available collapse to a constant
     -working_mem budget for the life of the process (the vram_allocated term cancels
     against _get_vram_in_use), silently forcing per-layer autocast forever.
+
+    Sysman is stubbed unavailable so the total_memory tier is the one under test. Without
+    that stub this passes only where Level Zero cannot answer -- and fails on exactly the
+    Intel hardware the probe exists for, where Sysman returns before total_memory is read.
     """
     with (
         patch.object(torch.xpu, "mem_get_info", side_effect=RuntimeError(), create=True),
+        patch("invokeai.backend.util.devices.xpu_memory_info", return_value=None),
         patch.object(torch.xpu, "get_device_properties", side_effect=RuntimeError("unreadable"), create=True),
         patch.object(torch.xpu, "memory_reserved", side_effect=RuntimeError(), create=True),
     ):
