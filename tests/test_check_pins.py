@@ -210,8 +210,8 @@ def test_patch_pin_is_rejected_for_being_a_patch_pin(repo_copy: Path, capsys: py
     assert check_pins.main(repo_copy) == 1
     stderr = capsys.readouterr().err
     assert "a patch component is deliberately not accepted" in stderr
-    # Not the bare word "classifiers" - that appears in the advice footer printed on every failure.
-    assert "classifiers declare support only for" not in stderr
+    # The shape is already wrong, so the classifier advisory has nothing useful to add.
+    assert "warning" not in stderr
 
 
 def _drop_python_classifiers(repo: Path) -> None:
@@ -221,34 +221,87 @@ def _drop_python_classifiers(repo: Path) -> None:
     path.write_text(updated)
 
 
-def test_python_not_in_classifiers_fails(repo_copy: Path, capsys: pytest.CaptureFixture[str]):
-    """requires-python allows 3.11, but the project only ships classifiers for 3.12. The pin
-    has to name a version this project actually claims to support."""
+def test_pin_allowed_by_requires_python_passes_without_a_classifier(
+    repo_copy: Path, capsys: pytest.CaptureFixture[str]
+):
+    """requires-python is ">=3.11, <3.13", so 3.11 is a legal pin whether or not a 3.11
+    classifier exists. Classifiers are optional and informational, so they must not veto it."""
     pins = _read_pins(repo_copy)
     pins["python"] = "3.11"
     _write_pins(repo_copy, pins)
 
+    assert check_pins.main(repo_copy) == 0
+    # Mentioned, but only as advice.
+    assert "warning: pins.json python is '3.11'" in capsys.readouterr().err
+
+
+def test_unmentioned_pin_is_a_warning_not_an_error(repo_copy: Path, capsys: pytest.CaptureFixture[str]):
+    """The advisory names the classifier to add and says why it is not fatal."""
+    pins = _read_pins(repo_copy)
+    pins["python"] = "3.11"
+    _write_pins(repo_copy, pins)
+
+    check_pins.main(repo_copy)
+    stderr = capsys.readouterr().err
+    assert "Programming Language :: Python :: 3.11" in stderr
+    assert "out of sync" not in stderr  # the failure banner
+
+
+def test_leading_zero_classifier_does_not_count_as_mentioning_the_pin(
+    repo_copy: Path, capsys: pytest.CaptureFixture[str]
+):
+    """'Programming Language :: Python :: 3.012' is not a trove classifier, so PyPI shows no
+    3.12 support. Normalizing it to (3, 12) would silence the advisory - so 3.11 is declared
+    alongside it, leaving the advisory something to report against."""
+    _drop_python_classifiers(repo_copy)
+    path = repo_copy / "pyproject.toml"
+    added = "  'Programming Language :: Python :: 3.012',\n  'Programming Language :: Python :: 3.11',\n"
+    path.write_text(path.read_text().replace("classifiers = [\n", f"classifiers = [\n{added}", 1))
+
+    assert check_pins.main(repo_copy) == 0
+    # The pin is 3.12, and 3.11 is the only version really declared.
+    assert "they list 3.11)" in capsys.readouterr().err
+
+
+def test_advisory_is_still_printed_on_a_failing_run(repo_copy: Path, capsys: pytest.CaptureFixture[str]):
+    """The warning loop runs after the errors are printed, not instead of them: a wrong pin and
+    an unmentioned pin are usually the same edit, so both belong in the same output."""
+    pins = _read_pins(repo_copy)
+    pins["python"] = "3.11"
+    pins["torchIndexUrl"]["linux"]["rocm"] = "https://download.pytorch.org/whl/rocm6.3"
+    _write_pins(repo_copy, pins)
+
     assert check_pins.main(repo_copy) == 1
-    assert "classifiers declare support only for" in capsys.readouterr().err
+    stderr = capsys.readouterr().err
+    assert "torchIndexUrl.linux.rocm" in stderr
+    assert "warning: pins.json python is '3.11'" in stderr
 
 
-def test_unreal_version_inside_an_open_ended_requires_python_fails(repo_copy: Path):
-    """The hole the classifier check exists to close: with no upper bound in requires-python,
-    a version that no interpreter has would otherwise satisfy every clause."""
+def test_pin_named_by_the_classifiers_warns_about_nothing(repo_copy: Path, capsys: pytest.CaptureFixture[str]):
+    """The checked-in state: 3.12 is pinned and 3.12 is classified, so there is nothing to say."""
+    assert check_pins.main(repo_copy) == 0
+    assert "warning" not in capsys.readouterr().err
+
+
+def test_unreal_version_inside_an_open_ended_requires_python_is_not_caught(repo_copy: Path):
+    """Documenting the deliberate gap: with no upper bound in requires-python there is no
+    normative metadata left to reject '3.99' with. Gating on classifiers would catch it, but at
+    the cost of rejecting legal pins - see test_pin_allowed_by_requires_python_passes_*."""
     _set_requires_python(repo_copy, ">=3.11")
     pins = _read_pins(repo_copy)
     pins["python"] = "3.99"
     _write_pins(repo_copy, pins)
 
-    assert check_pins.main(repo_copy) == 1
+    assert check_pins.main(repo_copy) == 0
 
 
-def test_missing_python_classifiers_fails(repo_copy: Path, capsys: pytest.CaptureFixture[str]):
-    """Deleting the classifiers must not silently downgrade the pin check to requires-python only."""
+def test_missing_python_classifiers_is_not_a_failure(repo_copy: Path, capsys: pytest.CaptureFixture[str]):
+    """classifiers is optional in PEP 621. Its absence says nothing about the pin, so it is not
+    a finding - not even a warning."""
     _drop_python_classifiers(repo_copy)
 
-    assert check_pins.main(repo_copy) == 1
-    assert "no 'Programming Language :: Python :: X.Y' classifier" in capsys.readouterr().err
+    assert check_pins.main(repo_copy) == 0
+    assert "warning" not in capsys.readouterr().err
 
 
 @pytest.mark.parametrize(
@@ -260,6 +313,10 @@ def test_missing_python_classifiers_fails(repo_copy: Path, capsys: pytest.Captur
         "Programming Language :: Python :: 3.1.4",  # ditto
         "Programming Language :: Python :: 3.12 ",  # trailing space
         "Programming Language :: Python :: Implementation :: CPython",
+        # Not trove classifiers. Reading either as a declaration of 3.12 support would silence
+        # the advisory in exactly the case it exists to name.
+        "Programming Language :: Python :: 3.012",
+        "Programming Language :: Python :: 03.12",
     ],
 )
 def test_classifier_is_not_read_as_a_version(repo_copy: Path, classifier: str):
@@ -281,13 +338,13 @@ def test_duplicate_classifiers_are_reported_once(repo_copy: Path):
 
 @pytest.mark.parametrize("literal", ["3", "true", '"3.12"', "{}", "[3.12]", "[[]]", "[]"])
 def test_malformed_classifiers_do_not_raise(repo_copy: Path, literal: str):
-    """A non-list, or a list of non-strings, must be reported rather than blowing up - the
-    same tolerance requires-python already gets."""
+    """A non-list, or a list of non-strings, must not blow up the checker. Since classifiers no
+    longer gate anything, a malformed one costs only the advisory."""
     path = repo_copy / "pyproject.toml"
     path.write_text(re.sub(r"(?ms)^classifiers = \[.*?^\]$", f"classifiers = {literal}", path.read_text()))
     assert "classifiers = [\n" not in (repo_copy / "pyproject.toml").read_text()
 
-    assert check_pins.main(repo_copy) == 1
+    assert check_pins.main(repo_copy) == 0
 
 
 def test_missing_project_table_does_not_raise(repo_copy: Path):
@@ -304,29 +361,37 @@ def test_missing_project_table_does_not_raise(repo_copy: Path):
 
 
 def test_absurdly_long_classifier_version_does_not_mask_url_drift(repo_copy: Path, capsys: pytest.CaptureFixture[str]):
-    """int() refuses to parse a string of more than 4300 digits. An unbounded classifier
-    pattern would let one reach _parse_version and raise straight out of check_python,
-    taking the torchIndexUrl checks with it."""
+    """A 4400-digit "version" is not a version. Nothing converts classifier text to int any
+    more, so this can no longer raise - but the classifier code shares main() with the
+    torchIndexUrl reporting, this run must still name the drift, and an unbounded pattern
+    would quote all 4400 digits back at the reader in the advisory."""
+    digits = "9" * 4400
+    absurd = f"  'Programming Language :: Python :: {digits}.0',\n"
+    # 3.11 gives the advisory something real to list; the pin is 3.12.
+    real = "  'Programming Language :: Python :: 3.11',\n"
+    _drop_python_classifiers(repo_copy)
     path = repo_copy / "pyproject.toml"
-    absurd = "Programming Language :: Python :: " + "9" * 4400 + ".0"
-    path.write_text(path.read_text().replace("classifiers = [\n", f"classifiers = [\n  '{absurd}',\n", 1))
+    path.write_text(path.read_text().replace("classifiers = [\n", f"classifiers = [\n{absurd}{real}", 1))
     pins = _read_pins(repo_copy)
     pins["torchIndexUrl"]["linux"]["rocm"] = "https://download.pytorch.org/whl/rocm6.3"
     _write_pins(repo_copy, pins)
 
     assert check_pins.main(repo_copy) == 1
-    assert "torchIndexUrl.linux.rocm" in capsys.readouterr().err
+    stderr = capsys.readouterr().err
+    assert "torchIndexUrl.linux.rocm" in stderr
+    assert "they list 3.11)" in stderr
+    assert digits not in stderr
 
 
-def test_dynamic_classifiers_are_reported_as_such(repo_copy: Path, capsys: pytest.CaptureFixture[str]):
-    """PEP 621 lets the build backend supply classifiers. The checker can't read them, and must
-    say so rather than claiming none are declared."""
+def test_dynamic_classifiers_are_not_a_failure(repo_copy: Path, capsys: pytest.CaptureFixture[str]):
+    """PEP 621 lets the build backend supply classifiers. The checker can't read them - which is
+    fine now that it doesn't gate on them."""
     _drop_python_classifiers(repo_copy)
     path = repo_copy / "pyproject.toml"
     path.write_text(re.sub(r'(?m)^dynamic = \["version"\]$', 'dynamic = ["version", "classifiers"]', path.read_text()))
 
-    assert check_pins.main(repo_copy) == 1
-    assert "project.dynamic" in capsys.readouterr().err
+    assert check_pins.main(repo_copy) == 0
+    assert "warning" not in capsys.readouterr().err
 
 
 @pytest.mark.parametrize("value", [None, "3.12", ["3.12"], 5])
