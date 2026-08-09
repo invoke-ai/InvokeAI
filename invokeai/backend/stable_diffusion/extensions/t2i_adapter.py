@@ -13,6 +13,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import Condit
 from invokeai.backend.stable_diffusion.extension_callback_type import ExtensionCallbackType
 from invokeai.backend.stable_diffusion.extensions.base import ExtensionBase, callback
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.fp8 import get_model_compute_dtype
 
 if TYPE_CHECKING:
     from invokeai.app.invocations.model import ModelIdentifierField
@@ -91,7 +92,7 @@ class T2IAdapterExt(ExtensionBase):
             height=input_height,
             num_channels=model.config["in_channels"],
             device=TorchDevice.choose_torch_device(),
-            dtype=model.dtype,
+            dtype=get_model_compute_dtype(model),
             resize_mode=self._resize_mode,
         )
 
