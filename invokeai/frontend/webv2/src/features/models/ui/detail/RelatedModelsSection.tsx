@@ -3,7 +3,7 @@ import type { ModelConfig } from '@features/models/core/types';
 
 import { Badge, Icon, Spinner, Stack, Text } from '@chakra-ui/react';
 import { getModelBaseColorPalette, getModelBaseLabel } from '@features/models/core/baseIdentity';
-import { isBaseCompatible, LINKABLE_TYPES } from '@features/models/core/relationships';
+import { hasLinkableBase, isBaseCompatible, LINKABLE_TYPES } from '@features/models/core/relationships';
 import { getModelTypeLabel } from '@features/models/core/taxonomy';
 import { useModelsSelector } from '@features/models/data/modelsStore';
 import {
@@ -109,26 +109,35 @@ const RelatedModelsForModel = ({ model, onError }: RelatedModelsSectionProps) =>
     }
   };
 
+  // A subject whose base can never match a candidate (external/unknown, or an
+  // any-based type with no allowance) keeps its persisted links manageable but
+  // gets no add-picker — it would be a permanently empty combobox.
+  const canAddLinks = hasLinkableBase(model);
+
   return (
     <Stack gap="2">
       <Stack gap="0.5">
         <FieldLabel>{t('models.relatedModels')}</FieldLabel>
-        <Text color="fg.subtle" fontSize="2xs">
-          {t('models.relatedModelsHelp')}
-        </Text>
+        {canAddLinks ? (
+          <Text color="fg.subtle" fontSize="2xs">
+            {t('models.relatedModelsHelp')}
+          </Text>
+        ) : null}
       </Stack>
-      <ModelSelect
-        excludeKeys={excludeKeys}
-        filter={(candidate) => isBaseCompatible(model, candidate)}
-        modelTypes={LINKABLE_TYPES}
-        placeholder={t('models.searchCompatibleToLink')}
-        showManagerButton={false}
-        size="sm"
-        value={null}
-        onChange={(target) => {
-          void handleAdd(target);
-        }}
-      />
+      {canAddLinks ? (
+        <ModelSelect
+          excludeKeys={excludeKeys}
+          filter={(candidate) => isBaseCompatible(model, candidate)}
+          modelTypes={LINKABLE_TYPES}
+          placeholder={t('models.searchCompatibleToLink')}
+          showManagerButton={false}
+          size="sm"
+          value={null}
+          onChange={(target) => {
+            void handleAdd(target);
+          }}
+        />
+      ) : null}
       {relatedKeys === null ? (
         <Spinner color="fg.subtle" size="xs" />
       ) : relatedModels.length === 0 ? (

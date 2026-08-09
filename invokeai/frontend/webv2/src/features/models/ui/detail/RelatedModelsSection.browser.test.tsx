@@ -76,17 +76,20 @@ describe('RelatedModelsSection', () => {
     setRelationshipsSnapshotForTests({ relatedKeysByModelKey: {} });
   });
 
-  const renderSection = async () => {
+  const renderSection = async (model: Parameters<typeof RelatedModelsSection>[0]['model'] = SECTION_MODEL) => {
     await act(() => {
       root.render(
         <ChakraProvider value={system}>
           <ModelsUiProvider adapter={MODELS_UI_ADAPTER}>
-            <RelatedModelsSection model={SECTION_MODEL} onError={vi.fn()} />
+            <RelatedModelsSection model={model} onError={vi.fn()} />
           </ModelsUiProvider>
         </ChakraProvider>
       );
     });
+  };
 
+  const renderSectionAndOpenPicker = async () => {
+    await renderSection();
     await act(() => host.querySelector<HTMLButtonElement>('[aria-haspopup="listbox"]')?.click());
     await expect.poll(() => document.querySelectorAll('[role="option"]').length).toBeGreaterThan(0);
   };
@@ -95,7 +98,7 @@ describe('RelatedModelsSection', () => {
     [...document.querySelectorAll('[role="option"]')].map((option) => option.textContent ?? '');
 
   it('offers only base-compatible candidates for a flux main', async () => {
-    await renderSection();
+    await renderSectionAndOpenPicker();
 
     const options = optionTexts().join(' ');
 
@@ -109,7 +112,7 @@ describe('RelatedModelsSection', () => {
   });
 
   it('links a model and renders it without refetching', async () => {
-    await renderSection();
+    await renderSectionAndOpenPicker();
 
     const t5Option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find((option) =>
       option.textContent?.includes('T5 XXL')
@@ -122,5 +125,16 @@ describe('RelatedModelsSection', () => {
     // The shared store patch renders the row; no second fetch happens.
     await expect.poll(() => host.textContent).toContain('T5 XXL');
     expect(api.getRelatedModelKeys).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows persisted links but no picker for an unlinkable base', async () => {
+    api.getRelatedModelKeys.mockResolvedValue(['flux-main']);
+    await renderSection({ base: 'external', key: 'gpt-image', type: 'main' });
+
+    // The wildcard-era link renders with its unlink affordance...
+    await expect.poll(() => host.textContent).toContain('FLUX Dev');
+    expect(host.querySelector('[aria-label*="unlinkNamed"]')).not.toBeNull();
+    // ...but an external-base subject can never match, so no add-picker.
+    expect(host.querySelector('[aria-haspopup="listbox"]')).toBeNull();
   });
 });

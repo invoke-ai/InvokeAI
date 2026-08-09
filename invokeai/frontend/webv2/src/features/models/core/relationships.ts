@@ -65,6 +65,14 @@ const LINKABLE_TYPE_SET: ReadonlySet<ModelTaxonomyType> = new Set(LINKABLE_TYPES
 
 export const isLinkableType = (type: ModelTaxonomyType): boolean => LINKABLE_TYPE_SET.has(type);
 
+/**
+ * Whether any candidate could ever be compatible with this model: a concrete
+ * base, or an `any` base whose type has a curated allowance. `external` and
+ * `unknown` subjects can never take new links.
+ */
+export const hasLinkableBase = (model: RelatableModel): boolean =>
+  !NULL_BASES.has(String(model.base)) || (model.base === 'any' && NULL_BASE_ALLOWANCES[model.type] !== undefined);
+
 const isAllowedHelperFor = (helper: RelatableModel, host: RelatableModel): boolean =>
   helper.base === 'any' &&
   !NULL_BASES.has(String(host.base)) &&

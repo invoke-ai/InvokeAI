@@ -3,7 +3,13 @@ import { describe, expect, it } from 'vitest';
 import type { RelatableModel } from './relationships';
 import type { ModelBase, ModelTaxonomyType } from './types';
 
-import { isBaseCompatible, isLinkableType, LINKABLE_TYPES, NULL_BASE_ALLOWANCES } from './relationships';
+import {
+  hasLinkableBase,
+  isBaseCompatible,
+  isLinkableType,
+  LINKABLE_TYPES,
+  NULL_BASE_ALLOWANCES,
+} from './relationships';
 
 const model = (base: ModelBase, type: ModelTaxonomyType = 'lora'): RelatableModel => ({ base, type });
 
@@ -62,6 +68,16 @@ describe('isBaseCompatible', () => {
 
   it('never links two null-base models', () => {
     expect(isBaseCompatible(model('any', 't5_encoder'), model('any', 'clip_embed'))).toBe(false);
+  });
+});
+
+describe('hasLinkableBase', () => {
+  it('accepts concrete bases and allowanced any-based helpers only', () => {
+    expect(hasLinkableBase(model('sdxl', 'main'))).toBe(true);
+    expect(hasLinkableBase(model('any', 't5_encoder'))).toBe(true);
+    expect(hasLinkableBase(model('any', 'spandrel_image_to_image'))).toBe(false);
+    expect(hasLinkableBase(model('external', 'main'))).toBe(false);
+    expect(hasLinkableBase(model('unknown', 'main'))).toBe(false);
   });
 });
 
