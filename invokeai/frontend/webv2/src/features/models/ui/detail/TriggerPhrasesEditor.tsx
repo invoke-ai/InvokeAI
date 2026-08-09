@@ -150,7 +150,7 @@ export const TriggerPhrasesEditor = ({
         </Wrap>
       ) : (
         <Text color="fg.subtle" fontSize="2xs">
-          No trigger phrases yet.
+          {t('models.noTriggerPhrasesYet')}
         </Text>
       )}
     </Field>

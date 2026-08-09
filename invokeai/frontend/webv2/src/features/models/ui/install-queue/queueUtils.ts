@@ -2,15 +2,16 @@ import type { ModelInstallJob, ModelInstallStatus } from '@features/models/core/
 
 import { getInstallSourceLabel } from '@features/models/core/taxonomy';
 
-export const STATUS_BADGES: Record<ModelInstallStatus, { label: string; palette: string }> = {
-  cancelled: { label: 'Cancelled', palette: 'gray' },
-  completed: { label: 'Installed', palette: 'green' },
-  downloading: { label: 'Downloading', palette: 'blue' },
-  downloads_done: { label: 'Downloaded', palette: 'blue' },
-  error: { label: 'Failed', palette: 'red' },
-  paused: { label: 'Paused', palette: 'orange' },
-  running: { label: 'Installing', palette: 'blue' },
-  waiting: { label: 'Waiting', palette: 'gray' },
+/** Labels are i18n keys — translate with `t(labelKey)` at the render site. */
+export const STATUS_BADGES: Record<ModelInstallStatus, { labelKey: string; palette: string }> = {
+  cancelled: { labelKey: 'models.statusCancelled', palette: 'gray' },
+  completed: { labelKey: 'models.installed', palette: 'green' },
+  downloading: { labelKey: 'models.statusDownloading', palette: 'blue' },
+  downloads_done: { labelKey: 'models.statusDownloaded', palette: 'blue' },
+  error: { labelKey: 'common.failed', palette: 'red' },
+  paused: { labelKey: 'models.statusPaused', palette: 'orange' },
+  running: { labelKey: 'models.installing', palette: 'blue' },
+  waiting: { labelKey: 'models.statusWaiting', palette: 'gray' },
 };
 
 export const getInstallJobDisplayName = (job: ModelInstallJob): string =>

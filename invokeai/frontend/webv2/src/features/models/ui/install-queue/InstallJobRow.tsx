@@ -34,7 +34,11 @@ export const InstallJobRow = ({
   const { t } = useTranslation();
   const { isBusy: isActing, run } = useScopedAction();
   const connectionStatus = useConnectionStatusSelector((snapshot) => snapshot.status);
-  const badge = STATUS_BADGES[job.status] ?? { label: job.status, palette: 'gray' };
+  // The Record is total for typed statuses; the fallback guards unknown
+  // statuses from an untyped backend payload.
+  const badge = STATUS_BADGES[job.status] as { labelKey: string; palette: string } | undefined;
+  const badgeLabel = badge ? t(badge.labelKey) : job.status;
+  const badgePalette = badge?.palette ?? 'gray';
   const sourceLabel = getInstallSourceLabel(job.source);
   const displayName = getInstallJobDisplayName(job);
   // Parts the backend could not resume (or that errored) need a manual restart.
@@ -76,8 +80,8 @@ export const InstallJobRow = ({
             <Icon as={TriangleAlertIcon} boxSize="3" color="fg.warning" flexShrink={0} />
           </Tooltip>
         ) : null}
-        <Badge colorPalette={badge.palette} flexShrink={0} fontSize="2xs" size="sm" variant="surface">
-          {badge.label}
+        <Badge colorPalette={badgePalette} flexShrink={0} fontSize="2xs" size="sm" variant="surface">
+          {badgeLabel}
         </Badge>
         <HStack flexShrink={0} gap="0.5">
           {job.status === 'downloading' ? (

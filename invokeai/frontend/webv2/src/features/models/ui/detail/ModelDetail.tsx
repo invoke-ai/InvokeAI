@@ -121,6 +121,7 @@ export const ModelDetail = ({
   onBack?: () => void;
   onDeleted: () => void;
 }) => {
+  const { t } = useTranslation();
   const model = useModelsSelector((snapshot) => selectModelShell(snapshot.models, modelKey));
 
   if (!model) {
@@ -128,7 +129,7 @@ export const ModelDetail = ({
       <Stack align="start" gap="2" p="1">
         {onBack ? <BackButton onBack={onBack} /> : null}
         <Text color="fg.subtle" fontSize="xs">
-          This model is no longer in the library.
+          {t('models.modelNoLongerInLibrary')}
         </Text>
       </Stack>
     );

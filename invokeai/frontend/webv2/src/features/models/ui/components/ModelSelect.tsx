@@ -27,6 +27,7 @@ import {
   XIcon,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const EMPTY_BASES: ReadonlySet<string> = new Set();
 const EMPTY_KEYS: ReadonlySet<string> = new Set();
@@ -62,6 +63,7 @@ export const ModelSelect = ({
   size?: 'xs' | 'sm' | 'md';
   value: string | null;
 }) => {
+  const { t } = useTranslation();
   const { enableModelDescriptions } = useModelsUi();
   const models = useModelsSelector((snapshot) => snapshot.models);
   const loadError = useModelsSelector((snapshot) => snapshot.error);
@@ -117,19 +119,19 @@ export const ModelSelect = ({
   const selectedModel = useMemo(() => models.find((model) => model.key === value) ?? null, [models, value]);
   const hasMixedTypes = useMemo(() => new Set(candidates.map((model) => model.type)).size > 1, [candidates]);
   const scopeLabel =
-    modelTypes.length === 1 ? getModelTypePluralLabel(modelTypes[0] ?? 'main').toLowerCase() : 'models';
+    modelTypes.length === 1 ? getModelTypePluralLabel(modelTypes[0] ?? 'main').toLowerCase() : t('models.scopeModels');
 
   const pickerGroups = useMemo<PickerGroup<ModelConfig>[]>(
     () =>
       groups.map((group) => ({
         colorPalette: getModelBaseColorPalette(group.base),
-        getCountLabel: (count) => `${count} ${count === 1 ? 'model' : 'models'}`,
+        getCountLabel: (count) => t('models.modelCount', { count }),
         id: group.key,
         name: getModelBaseLongLabel(group.base),
         options: group.models,
         shortName: getModelBaseLabel(group.base),
       })),
-    [groups]
+    [groups, t]
   );
 
   const closeAndReset = () => {
@@ -224,7 +226,7 @@ export const ModelSelect = ({
                 <ModelButtonContent model={selectedModel} />
               ) : (
                 <Text as="span" color="fg.subtle" fontSize="xs" minW="0" truncate>
-                  {placeholder ?? `Select ${scopeLabel}…`}
+                  {placeholder ?? t('models.scopeSelect', { scope: scopeLabel })}
                 </Text>
               )}
               {canClear ? null : <Icon as={ChevronDownIcon} boxSize="3" flexShrink={0} />}
@@ -232,7 +234,7 @@ export const ModelSelect = ({
           </Popover.Trigger>
           {canClear ? (
             <CloseButton
-              aria-label="Clear selected model"
+              aria-label={t('models.clearSelectedModel')}
               disabled={disabled}
               insetEnd="1"
               position="absolute"
@@ -264,19 +266,19 @@ export const ModelSelect = ({
               p="0"
             >
               <Picker<ModelConfig>
-                emptyMessage={`No compatible ${scopeLabel} installed.`}
+                emptyMessage={t('models.scopeNoCompatibleInstalled', { scope: scopeLabel })}
                 getOptionId={getOptionId}
                 groups={pickerGroups}
                 isCompact={isCompact}
                 isMatch={matchesModel}
-                listLabel={`Available ${scopeLabel}`}
+                listLabel={t('models.scopeAvailable', { scope: scopeLabel })}
                 noMatchesMessage={
                   selectedBases.size > 0
-                    ? `No ${scopeLabel} match the selected bases.`
-                    : `No ${scopeLabel} match your search.`
+                    ? t('models.scopeNoMatchBases', { scope: scopeLabel })
+                    : t('models.scopeNoMatchSearch', { scope: scopeLabel })
                 }
                 renderOption={renderOption}
-                searchPlaceholder={`Search ${scopeLabel}…`}
+                searchPlaceholder={t('models.scopeSearch', { scope: scopeLabel })}
                 searchSlot={
                   <>
                     <CompactViewToggle isCompact={isCompact} pickerId={pickerId} />
@@ -287,20 +289,20 @@ export const ModelSelect = ({
                 statusSlot={
                   loadStatus === 'idle' || loadStatus === 'loading' ? (
                     <Text color="fg.subtle" fontSize="2xs" p="2">
-                      Loading models…
+                      {t('models.loadingModels')}
                     </Text>
                   ) : loadStatus === 'error' ? (
                     <Stack alignItems="start" gap="1.5" p="2">
                       <Text color="fg.error" fontSize="2xs">
-                        {loadError ?? 'Failed to load models.'}
+                        {loadError ?? t('models.failedToLoadModels')}
                       </Text>
                       <Button size="2xs" variant="outline" onClick={() => void ensureModelsLoaded()}>
-                        Retry
+                        {t('common.retry')}
                       </Button>
                     </Stack>
                   ) : candidates.length === 0 ? (
                     <Text color="fg.subtle" fontSize="2xs" p="2">
-                      No compatible {scopeLabel} installed.
+                      {t('models.scopeNoCompatibleInstalled', { scope: scopeLabel })}
                     </Text>
                   ) : undefined
                 }
@@ -312,7 +314,7 @@ export const ModelSelect = ({
                       ))}
                       <Spacer />
                       <IconButton
-                        aria-label="Reset base filters"
+                        aria-label={t('models.resetBaseFilters')}
                         flexShrink={0}
                         opacity={selectedBases.size === 0 ? 0.5 : undefined}
                         pointerEvents={selectedBases.size === 0 ? 'none' : undefined}
@@ -343,7 +345,8 @@ const matchesModel = (model: ModelConfig, searchTerm: string): boolean => {
 };
 
 const CompactViewToggle = ({ isCompact, pickerId }: { isCompact: boolean; pickerId: string }) => {
-  const label = isCompact ? 'Full rows' : 'Compact rows';
+  const { t } = useTranslation();
+  const label = isCompact ? t('models.fullRows') : t('models.compactRows');
   const handleClick = useCallback(() => setPickerCompactView(pickerId, !isCompact), [isCompact, pickerId]);
 
   return (
@@ -363,12 +366,13 @@ const CompactViewToggle = ({ isCompact, pickerId }: { isCompact: boolean; picker
 };
 
 const ModelManagerLinkButton = () => {
+  const { t } = useTranslation();
   const { managerProjectId } = useModelsUi();
   const search = useMemo(() => ({ project: managerProjectId ?? undefined }), [managerProjectId]);
 
   return (
-    <Tooltip content="Manage models" showArrow>
-      <IconButton aria-label="Manage models" asChild flexShrink={0} size="xs" variant="ghost">
+    <Tooltip content={t('models.manageModels')} showArrow>
+      <IconButton aria-label={t('models.manageModels')} asChild flexShrink={0} size="xs" variant="ghost">
         <Link search={search} to="/models">
           <BoxIcon />
         </Link>
@@ -443,6 +447,7 @@ const ModelOptionContent = ({
   showType: boolean;
   state: PickerOptionState;
 }) => {
+  const { t } = useTranslation();
   const showDetail = !state.isCompact;
 
   return (
@@ -461,8 +466,14 @@ const ModelOptionContent = ({
       <Stack flex="1" gap="0" minW="0">
         <HStack gap="1.5" minW="0">
           {isRelated ? (
-            <Tooltip content="Linked to the current selection">
-              <Icon as={LinkIcon} aria-label="Linked model" boxSize="3" color="accent.solid" flexShrink={0} />
+            <Tooltip content={t('models.linkedToCurrentSelection')}>
+              <Icon
+                as={LinkIcon}
+                aria-label={t('models.linkedModel')}
+                boxSize="3"
+                color="accent.solid"
+                flexShrink={0}
+              />
             </Tooltip>
           ) : null}
           <Text fontSize="xs" minW="0" truncate>

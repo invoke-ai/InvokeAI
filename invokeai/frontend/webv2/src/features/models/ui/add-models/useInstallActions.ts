@@ -8,6 +8,7 @@ import {
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 /**
  * Shared install entry point: queues an install job, optimistically adds it to
@@ -17,6 +18,7 @@ import { useCallback, useState } from 'react';
  * of a toast per model; failures always notify.
  */
 export const useInstallActions = () => {
+  const { t } = useTranslation();
   const notify = useNotify();
   const [pendingSources, setPendingSources] = useState<ReadonlySet<string>>(new Set());
 
@@ -39,7 +41,7 @@ export const useInstallActions = () => {
         addInstallJob(job);
 
         if (!options?.silent) {
-          notify.success('Model install queued', request.source);
+          notify.success(t('models.modelInstallQueued'), request.source);
         }
 
         return true;
@@ -48,7 +50,7 @@ export const useInstallActions = () => {
           return false;
         }
 
-        notify.error('Model install failed to start', error instanceof Error ? error.message : String(error));
+        notify.error(t('models.modelInstallFailedToStart'), error instanceof Error ? error.message : String(error));
 
         return false;
       } finally {
@@ -63,7 +65,7 @@ export const useInstallActions = () => {
         }
       }
     },
-    [notify]
+    [notify, t]
   );
 
   return { install, pendingSources };
