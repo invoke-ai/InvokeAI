@@ -2,7 +2,7 @@
 title: LLM Prompt Tools
 sidebar:
   order: 3
-lastUpdated: 2026-08-08
+lastUpdated: 2026-08-09
 ---
 
 InvokeAI includes two built-in tools that use local language models to help you write better prompts. Both tools appear as small buttons in the top-right corner of the positive prompt area and are only visible when you have a compatible model installed.
@@ -57,3 +57,5 @@ The workflow editor provides **Text LLM** and **Text LLM (with System Prompt Pre
 Using the same seed reproduces sampling when the model, prompt, settings, hardware, and software versions remain the same. Results may differ across devices or software versions. The prompt area's **Expand Prompt** tool chooses a fresh seed for each request so repeated expansions can vary.
 
 API callers can pass an optional seed to **Expand Prompt**; the response returns the effective seed for replay.
+
+When a saved `1.0.0` Text LLM workflow is migrated, its new seed defaults to `0`, so repeated runs become deterministic. Connect a random integer node to **seed** if the workflow should vary between runs.

@@ -13,7 +13,7 @@ import pytest
 
 from invokeai.app.invocations.fields import SystemPromptField
 from invokeai.app.invocations.model import ModelIdentifierField
-from invokeai.app.invocations.text_llm import TextLLMWithPresetInvocation
+from invokeai.app.invocations.text_llm import TextLLMInvocation, TextLLMWithPresetInvocation
 from invokeai.app.services.system_prompt_records.system_prompt_records_common import (
     SystemPromptNotFoundError,
 )
@@ -28,6 +28,26 @@ def _make_invocation(prompt_id: str = "test-id") -> TextLLMWithPresetInvocation:
         max_tokens=50,
         seed=123,
     )
+
+
+def test_plain_text_llm_node_passes_seed_to_llm() -> None:
+    inv = TextLLMInvocation(
+        id="test-node",
+        prompt="a cat",
+        system_prompt="system instruction",
+        text_llm_model=ModelIdentifierField(key="dummy", hash="x", name="dummy", base="any", type="text_llm"),
+        max_tokens=50,
+        seed=321,
+    )
+
+    with patch("invokeai.app.invocations.text_llm._run_text_llm", return_value="expanded") as mock_run:
+        result = inv.invoke(MagicMock())
+
+    assert result.value == "expanded"
+    assert mock_run.call_args.kwargs["prompt"] == "a cat"
+    assert mock_run.call_args.kwargs["system_prompt"] == "system instruction"
+    assert mock_run.call_args.kwargs["max_tokens"] == 50
+    assert mock_run.call_args.kwargs["seed"] == 321
 
 
 def _make_context(

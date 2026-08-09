@@ -31,8 +31,15 @@ PROGRESS_EMIT_INTERVAL = 0.1
 
 
 _seeded_multinomial_state = threading.local()
-_original_torch_multinomial = torch.multinomial
-_original_tensor_multinomial = torch.Tensor.multinomial
+
+
+def _get_original_multinomial(multinomial):
+    """Unwrap a prior InvokeAI patch so module reloads do not stack wrappers."""
+    return getattr(multinomial, "_invokeai_original_multinomial", multinomial)
+
+
+_original_torch_multinomial = _get_original_multinomial(torch.multinomial)
+_original_tensor_multinomial = _get_original_multinomial(torch.Tensor.multinomial)
 
 
 class _SeededMultinomialMode:
@@ -69,7 +76,7 @@ def _sample_with_seed(input: torch.Tensor, args: tuple, kwargs: dict, original_m
         one_shot = mode is not None
 
     try:
-        if mode is None or kwargs.get("generator") is not None:
+        if mode is None or (kwargs.get("generator") is not None and not one_shot):
             return original_multinomial(input, *args, **kwargs)
 
         kwargs = dict(kwargs)
@@ -84,7 +91,7 @@ def _sample_with_seed(input: torch.Tensor, args: tuple, kwargs: dict, original_m
         return output.to(input.device)
     finally:
         if one_shot:
-            del _seeded_multinomial_state.next_mode
+            _seeded_multinomial_state.__dict__.pop("next_mode", None)
 
 
 def _seeded_torch_multinomial(input: torch.Tensor, *args, **kwargs) -> torch.Tensor:
@@ -93,6 +100,10 @@ def _seeded_torch_multinomial(input: torch.Tensor, *args, **kwargs) -> torch.Ten
 
 def _seeded_tensor_multinomial(input: torch.Tensor, *args, **kwargs) -> torch.Tensor:
     return _sample_with_seed(input, args, kwargs, _original_tensor_multinomial)
+
+
+_seeded_torch_multinomial._invokeai_original_multinomial = _original_torch_multinomial
+_seeded_tensor_multinomial._invokeai_original_multinomial = _original_tensor_multinomial
 
 
 class _SeededMultinomialProcessor(LogitsProcessor):
@@ -109,8 +120,10 @@ class _SeededMultinomialProcessor(LogitsProcessor):
 # Transformers calls torch.multinomial directly today, while Tensor.multinomial is a supported
 # equivalent used by other callers. Install wrappers once so ordinary calls pay only a small
 # thread-local check; model forward operators are untouched.
-torch.multinomial = _seeded_torch_multinomial
-torch.Tensor.multinomial = _seeded_tensor_multinomial
+if torch.multinomial is not _seeded_torch_multinomial:
+    torch.multinomial = _seeded_torch_multinomial
+if torch.Tensor.multinomial is not _seeded_tensor_multinomial:
+    torch.Tensor.multinomial = _seeded_tensor_multinomial
 
 
 class TextLLMPipeline:
