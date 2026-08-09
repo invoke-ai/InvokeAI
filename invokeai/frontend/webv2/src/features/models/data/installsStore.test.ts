@@ -120,3 +120,24 @@ describe('model install event interpretation', () => {
     expect(store.getInstallsSnapshot()).toEqual({ error: null, jobs: [], status: 'idle' });
   });
 });
+
+describe('getInstallSourceLabel', () => {
+  it('passes strings through and extracts structured source fields in order', async () => {
+    const store = await import('./installsStore');
+
+    expect(store.getInstallSourceLabel('https://example.com/model.safetensors')).toBe(
+      'https://example.com/model.safetensors'
+    );
+    expect(store.getInstallSourceLabel({ repo_id: 'owner/repo', url: 'https://x' })).toBe('owner/repo');
+    expect(store.getInstallSourceLabel({ url: 'https://x' })).toBe('https://x');
+    expect(store.getInstallSourceLabel({ path: '/models/x' })).toBe('/models/x');
+  });
+
+  it('falls back to a generic label for unrecognized payloads', async () => {
+    const store = await import('./installsStore');
+
+    expect(store.getInstallSourceLabel({ something: 'else' })).toBe('model');
+    expect(store.getInstallSourceLabel(undefined)).toBe('model');
+    expect(store.getInstallSourceLabel(42)).toBe('model');
+  });
+});

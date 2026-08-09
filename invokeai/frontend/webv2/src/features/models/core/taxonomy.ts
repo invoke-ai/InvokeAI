@@ -1,6 +1,6 @@
 import type { ModelFileFormat, ModelTaxonomyType } from './types';
 
-import { toTitleCase } from './strings';
+import { toTitleCase } from './baseIdentity';
 
 /**
  * Display metadata for the model taxonomy. Open-union friendly: unknown bases,
@@ -97,29 +97,4 @@ export const formatBytes = (bytes: number | null | undefined): string => {
   }
 
   return `${unitIndex === 0 ? value : value.toFixed(1)} ${BYTE_UNITS[unitIndex]}`;
-};
-
-/**
- * Human-readable source for an install job or install socket payload. Accepts
- * `unknown` so untyped socket payloads and typed job sources produce the SAME
- * string — active-install matching compares these labels.
- */
-export const getInstallSourceLabel = (source: unknown): string => {
-  if (typeof source === 'string') {
-    return source;
-  }
-
-  if (source && typeof source === 'object') {
-    const record = source as Record<string, unknown>;
-
-    for (const field of ['repo_id', 'url', 'path'] as const) {
-      const value = record[field];
-
-      if (typeof value === 'string') {
-        return value;
-      }
-    }
-  }
-
-  return 'model';
 };

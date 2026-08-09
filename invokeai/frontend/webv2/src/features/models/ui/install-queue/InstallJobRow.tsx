@@ -2,7 +2,6 @@
 import type { ModelInstallJob } from '@features/models/core/types';
 
 import { Badge, HStack, Icon, Stack, Text } from '@chakra-ui/react';
-import { getInstallSourceLabel } from '@features/models/core/taxonomy';
 import {
   cancelModelInstall,
   pauseModelInstall,
@@ -10,7 +9,12 @@ import {
   restartModelInstallFile,
   resumeModelInstall,
 } from '@features/models/data/api';
-import { isActiveInstallStatus, refreshInstalls, replaceInstallJob } from '@features/models/data/installsStore';
+import {
+  getInstallSourceLabel,
+  isActiveInstallStatus,
+  refreshInstalls,
+  replaceInstallJob,
+} from '@features/models/data/installsStore';
 import { useScopedAction } from '@features/models/ui/shared/useScopedAction';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { useConnectionStatusSelector } from '@platform/transport/connectionStore';

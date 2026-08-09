@@ -1,6 +1,6 @@
 import type { ModelInstallJob, ModelInstallStatus } from '@features/models/core/types';
 
-import { getInstallSourceLabel } from '@features/models/core/taxonomy';
+import { getInstallSourceLabel } from '@features/models/data/installsStore';
 
 /** Labels are i18n keys — translate with `t(labelKey)` at the render site. */
 export const STATUS_BADGES: Record<ModelInstallStatus, { labelKey: string; palette: string }> = {

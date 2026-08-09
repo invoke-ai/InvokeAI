@@ -1,9 +1,11 @@
 import type { ModelBase, ModelConfig } from './types';
 
-import { toTitleCase } from './strings';
-
 // Model-base identity registry: labels, colors, and scalar display facts only.
 // Generation behavior keyed by base lives in @features/generation/settings.
+
+/** Fallback display casing for open-union taxonomy values ("t5_encoder" -> "T5 Encoder"). */
+export const toTitleCase = (value: string): string =>
+  value.replaceAll(/[_-]+/g, ' ').replace(/\w\S*/g, (word) => word.charAt(0).toUpperCase() + word.slice(1));
 
 export type ModelBaseColorPalette = 'blue' | 'cyan' | 'gray' | 'green' | 'orange' | 'pink' | 'purple' | 'red' | 'teal';
 

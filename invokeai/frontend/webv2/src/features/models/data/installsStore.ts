@@ -1,6 +1,5 @@
 import type { ModelInstallJob, ModelInstallStatus } from '@features/models/core/types';
 
-import { getInstallSourceLabel } from '@features/models/core/taxonomy';
 import {
   type AccountScope,
   captureAccountScope,
@@ -42,6 +41,33 @@ export interface InstallOutcome {
   source: string;
   error: string | null;
 }
+
+/**
+ * Human-readable source for an install job or install socket payload. Accepts
+ * `unknown` so untyped socket payloads and typed job sources produce the SAME
+ * string — active-install matching compares these labels. Lives here rather
+ * than in `core/taxonomy` so the eagerly-loaded data layer does not pull the
+ * taxonomy module out of the lazy UI chunks (the initial-graph byte budget).
+ */
+export const getInstallSourceLabel = (source: unknown): string => {
+  if (typeof source === 'string') {
+    return source;
+  }
+
+  if (source && typeof source === 'object') {
+    const record = source as Record<string, unknown>;
+
+    for (const field of ['repo_id', 'url', 'path'] as const) {
+      const value = record[field];
+
+      if (typeof value === 'string') {
+        return value;
+      }
+    }
+  }
+
+  return 'model';
+};
 
 const REFRESH_COALESCE_MS = 250;
 const OUTCOME_LIMIT = 16;
