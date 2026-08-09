@@ -1,6 +1,7 @@
 /** owner/repo with optional :variant[:path] qualifiers - the HF repo shape. */
 const HF_REPO_PATTERN = /^[\w.-]+\/[\w.-]+(:[\w./-]*)*$/;
-const FILE_EXTENSION_PATTERN = /\.[A-Za-z0-9]{1,10}$/;
+// 12 covers the longest real model extension, ".safetensors" (11 letters).
+const FILE_EXTENSION_PATTERN = /\.[A-Za-z0-9]{1,12}$/;
 
 export interface SourceKind {
   looksLocal: boolean;
