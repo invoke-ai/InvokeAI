@@ -44,12 +44,17 @@ const RelatedModelsForModel = ({ model, onError }: RelatedModelsSectionProps) =>
 
   useMountEffect(() => {
     const owner = captureAccountScope();
+    let isMounted = true;
 
     refreshRelatedModelKeys(model.key).catch((error: unknown) => {
-      if (isAccountScopeCurrent(owner)) {
+      if (isMounted && isAccountScopeCurrent(owner)) {
         onError(error instanceof Error ? error.message : t('models.failedToLoadRelatedModels'));
       }
     });
+
+    return () => {
+      isMounted = false;
+    };
   });
 
   const relatedModels = useMemo(() => {

@@ -80,9 +80,22 @@ export const AddModelsView = () => {
 
   useMountEffect(() => {
     ensureStartersLoaded();
+
+    const owner = captureAccountScope();
+    let isMounted = true;
+
     ensureExternalProvidersLoaded().catch((error: unknown) => {
-      notify.error(t('models.externalProviderKeysUnavailable'), error instanceof Error ? error.message : String(error));
+      if (isMounted && isAccountScopeCurrent(owner)) {
+        notify.error(
+          t('models.externalProviderKeysUnavailable'),
+          error instanceof Error ? error.message : String(error)
+        );
+      }
     });
+
+    return () => {
+      isMounted = false;
+    };
   });
 
   const trimmed = query.trim();
