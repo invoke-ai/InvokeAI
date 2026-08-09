@@ -19,23 +19,30 @@ export const NULL_BASES: ReadonlySet<string> = new Set(['any', 'external', 'unkn
 
 /**
  * Curated allowances: `any`-based helper types mapped to the concrete bases
- * whose pipelines actually consume them, per the backend model loaders.
+ * whose pipelines actually consume them. Each entry cites the backend
+ * invocation(s) that take the helper as an input — configs over- and
+ * under-state real usage, so invocations are the source of truth here.
  */
 export const NULL_BASE_ALLOWANCES: Readonly<Partial<Record<ModelTaxonomyType, ReadonlySet<ModelBase>>>> = {
   /** CLIP text encoders (flux_model_loader, sd3_model_loader). */
   clip_embed: new Set(['flux', 'sd-3']),
-  /** IP-adapter image encoders (ip_adapter config bases). */
-  clip_vision: new Set(['flux', 'sd-1', 'sd-2', 'sdxl']),
-  /** PiD decoder captioning (pid_decoder config bases; prototype). */
-  gemma2_encoder: new Set(['flux', 'flux2', 'qwen-image', 'sd-3', 'sdxl']),
+  /** IP-adapter image encoders (ip_adapter accepts sd-1/sdxl only; flux_ip_adapter). */
+  clip_vision: new Set(['flux', 'sd-1', 'sdxl']),
+  /** PiD decode (flux/flux2/qwen_image/z_image_pid_decode; sd-3/sdxl pid_decoder configs; prototype). */
+  gemma2_encoder: new Set(['flux', 'flux2', 'qwen-image', 'sd-3', 'sdxl', 'z-image']),
   /** FLUX.2 dev text encoder (flux2_dev_model_loader). */
   mistral_encoder: new Set(['flux2']),
+  /** anima_model_loader, flux2_klein_model_loader, z_image_model_loader. */
   qwen3_encoder: new Set(['anima', 'flux2', 'z-image']),
+  /** krea2_model_loader. */
   qwen3_vl_encoder: new Set(['krea-2']),
+  /** qwen_image_model_loader. */
   qwen_vl_encoder: new Set(['qwen-image']),
   /** FLUX Redux image encoder (flux_redux). */
   siglip: new Set(['flux']),
+  /** flux_model_loader, sd3_model_loader. */
   t5_encoder: new Set(['flux', 'sd-3']),
+  /** wan_model_loader. */
   wan_t5_encoder: new Set(['wan']),
 };
 

@@ -37,6 +37,10 @@ describe('isBaseCompatible', () => {
     expect(isBaseCompatible(model('any', 'siglip'), model('flux', 'main'))).toBe(true);
     expect(isBaseCompatible(model('any', 'clip_vision'), model('sdxl', 'main'))).toBe(true);
     expect(isBaseCompatible(model('any', 'mistral_encoder'), model('flux2', 'main'))).toBe(true);
+    // Z-Image PiD decode consumes a standalone Gemma2 encoder.
+    expect(isBaseCompatible(model('any', 'gemma2_encoder'), model('z-image', 'main'))).toBe(true);
+    // No pipeline feeds a CLIP Vision model to an SD2 main.
+    expect(isBaseCompatible(model('any', 'clip_vision'), model('sd-2', 'main'))).toBe(false);
   });
 
   it('is symmetric for every curated entry', () => {
@@ -47,7 +51,7 @@ describe('isBaseCompatible', () => {
 
       const helper = model('any', type as ModelTaxonomyType);
 
-      for (const base of ['sd-1', 'sdxl', 'flux', 'flux2', 'wan', 'qwen-image'] as const) {
+      for (const base of ['sd-1', 'sd-2', 'sd-3', 'sdxl', 'flux', 'flux2', 'wan', 'qwen-image', 'z-image'] as const) {
         const host = model(base, 'main');
 
         expect(isBaseCompatible(helper, host)).toBe(bases.has(base));
