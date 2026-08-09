@@ -6,6 +6,9 @@ These tests quantize a known weight the same way and pin that our dequantization
 recovers it, so the loader can never silently mis-rotate.
 """
 
+import sys
+
+import pytest
 import torch
 
 from invokeai.backend.minimax_h3.int8_convrot import (
@@ -101,6 +104,15 @@ def test_parse_comfy_quant_marker() -> None:
     assert marker == {"format": "int8_tensorwise", "convrot": True, "convrot_groupsize": 256}
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    # torch's CPU bf16 kernels dispatch on the host ISA, and the Windows CI fleet is mixed
+    # hardware: on some runners this exact call crashes the interpreter with an illegal
+    # instruction (0xC000001D) inside the dequant matmul. Same commit passes on a re-run with a
+    # different runner, so it is the machine, not the code. The bf16 contract below is still
+    # covered on Linux and macOS, and the dequant path only runs on a GPU in practice.
+    reason="torch CPU bf16 matmul faults on some Windows CI runners (illegal instruction)",
+)
 def test_int8_convrot_linear_bf16_path_tracks_fp32_reference() -> None:
     """Dequant + derotation run in the input dtype; on bf16 the scale-multiply rounding must
     stay within ~2% relative of the exact fp32 dequantization path."""
