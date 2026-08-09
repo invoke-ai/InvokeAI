@@ -141,26 +141,32 @@ class SlidingWindowTokenMiddleware(BaseHTTPMiddleware):
 
                     token_data = verify_token(token)
                     if token_data is not None:
-                        # The user lookup is a synchronous SQLite query behind a
-                        # process-wide lock; run it off the event loop so a contended
-                        # lock (e.g. generation-result writes) can't stall every
-                        # concurrent request from inside this per-mutation middleware.
-                        # Refresh only for a user that still exists and is active, and mint
-                        # the new token from the *database* record — not the old token's
-                        # claims. Otherwise a demoted administrator's stale is_admin claim
-                        # (and the media cookie carrying it) would be renewed indefinitely
-                        # by their own mutations, and a deactivated user could keep an
-                        # active session alive.
-                        user = await run_in_threadpool(ApiDependencies.invoker.services.users.get, token_data.user_id)
-                        if user is None or not user.is_active:
+                        # Decide through `resolve_authorized_user` rather than re-deriving
+                        # "is this token still honored" here. This middleware used to carry
+                        # its own copy of the exists/active/epoch checks, and a copy is how
+                        # a rule added later — the refusal of the internal `system` id —
+                        # reaches every other entry point but not this one, leaving a token
+                        # nothing will accept being renewed indefinitely anyway.
+                        #
+                        # Never refresh a token that is no longer honored. This runs after
+                        # the route, so an authenticated route has already rejected it — but
+                        # an unauthenticated route returning 2xx with a stale Bearer header
+                        # still reaches here, and minting from the current record would
+                        # launder a revoked token into a valid one.
+                        #
+                        # The lookup inside is a synchronous SQLite query behind a
+                        # process-wide lock; run it off the event loop so a contended lock
+                        # (e.g. generation-result writes) can't stall every concurrent
+                        # request from inside this per-mutation middleware.
+                        from invokeai.app.api.auth_dependencies import resolve_authorized_user
+
+                        user = await run_in_threadpool(resolve_authorized_user, token_data)
+                        if user is None:
                             return response
-                        # Never refresh a revoked token. This runs after the route, so an
-                        # authenticated route has already rejected it — but an unauthenticated
-                        # route returning 2xx with a stale Bearer header still reaches here,
-                        # and minting from the current record would launder the revoked token
-                        # into a valid one.
-                        if token_data.token_epoch != user.token_epoch:
-                            return response
+                        # Mint the replacement from the *database* record, not the old
+                        # token's claims: otherwise a demoted administrator's stale is_admin
+                        # claim (and the media cookie carrying it) would be renewed
+                        # indefinitely by their own mutations.
                         # Use the remember_me claim from the token to determine the
                         # correct refresh duration. This avoids the bug where a 7-day
                         # token with <24h remaining would be silently downgraded to 1 day.

@@ -433,3 +433,32 @@ class TestSlidingWindowMultiuserRevalidation:
         refreshed = verify_token(response.headers["X-Refreshed-Token"])
         assert refreshed is not None
         assert refreshed.remember_me is True
+
+    def test_a_system_token_is_never_refreshed(self, monkeypatch: pytest.MonkeyPatch):
+        """The middleware must decide through `resolve_authorized_user`, not its own copy.
+
+        The `system` row is deliberately active with an untouched epoch, so a middleware
+        carrying its own exists/active/epoch checks would keep minting replacements for a
+        token every other entry point refuses — an indefinitely renewed session waiting for
+        one consumer to trust the token without re-checking the id.
+        """
+        from types import SimpleNamespace
+
+        _patch_user_record(
+            monkeypatch,
+            SimpleNamespace(
+                user_id="system", email="system@system.invokeai", is_admin=False, is_active=True, token_epoch=0
+            ),
+        )
+        app = _create_test_app()
+        client = TestClient(app)
+        token = create_access_token(
+            TokenData(user_id="system", email="system@system.invokeai", is_admin=False),
+            timedelta(days=1),
+        )
+
+        response = client.post("/test", headers={"Authorization": f"Bearer {token}"})
+
+        assert response.status_code == 200
+        assert "X-Refreshed-Token" not in response.headers
+        assert response.cookies.get("invokeai_media_token") is None
