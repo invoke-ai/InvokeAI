@@ -1787,6 +1787,17 @@ minimax_h3_int8_transformer = StarterModel(
     format=ModelFormat.Checkpoint,
     dependencies=[minimax_h3_components, minimax_h3_int8_text_encoder],
 )
+
+minimax_h3_turbo_lora = StarterModel(
+    name="MiniMax H3 Turbo LoRA",
+    base=BaseModelType.MiniMaxH3,
+    source="larryvrh/MiniMax-H3-Turbo-Lora::minimax_h3_turbo_v4_step600_ema.safetensors",
+    description="Step-distillation LoRA for MiniMax H3 (Apache 2.0): renders video+audio in 4-8 "
+    "denoising steps instead of ~50. Apply at strength 1.0 and lower Steps to 6-8. Works with the "
+    "full and the pruned int8 transformers.",
+    type=ModelType.LoRA,
+    format=ModelFormat.LyCORIS,
+)
 # endregion
 
 alibabacloud_wan26_t2i = StarterModel(
@@ -2292,6 +2303,7 @@ STARTER_MODELS: list[StarterModel] = [
     minimax_h3_int8_transformer,
     minimax_h3_int8_text_encoder,
     minimax_h3_components,
+    minimax_h3_turbo_lora,
     gemini_flash_image,
     gemini_pro_image_preview,
     gemini_3_1_flash_image_preview,
