@@ -1291,14 +1291,14 @@ def test_graph_consumer_with_direct_iterator_and_empty_collector_preserves_outer
     ("always_empty", "expected"),
     [(True, [[], []]), (False, [[0, 1], [10, 11]]), (None, [[], [1]])],
 )
-def test_graph_chained_collectors_preserve_outer_iteration_scope(
-    always_empty: bool | None, expected: list[list[int]]
-):
+def test_graph_chained_collectors_preserve_outer_iteration_scope(always_empty: bool | None, expected: list[list[int]]):
     graph = Graph()
     graph.add_node(RangeInvocation(id="outer_range", start=0, stop=2, step=1))
     graph.add_node(IterateInvocation(id="outer_iter"))
     if always_empty is not False:
-        graph.add_node(MaybeEmptyIntegerCollectionTestInvocation(id="inner_collection", always_empty=always_empty is True))
+        graph.add_node(
+            MaybeEmptyIntegerCollectionTestInvocation(id="inner_collection", always_empty=always_empty is True)
+        )
     else:
         graph.add_node(IntegerCollectionFromItemTestInvocation(id="inner_collection"))
     graph.add_node(IterateInvocation(id="inner_iter"))
