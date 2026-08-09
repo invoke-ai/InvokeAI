@@ -15,6 +15,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from invokeai.app.services.session_processor import session_processor_default
 from invokeai.app.services.session_processor.session_processor_default import (
     DefaultSessionProcessor,
     DefaultSessionRunner,
@@ -76,6 +77,42 @@ class TestQueueOwnerIsActive:
         services = _services(users_by_id={})
         assert queue_owner_is_active(services, _queue_item()) is False
 
+    def test_an_unreadable_owner_is_refused(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Failing open here would make unknown database state executable.
+
+        The account may have been deactivated a moment ago; nothing else stands between
+        that and GPU time spent on its behalf. Failing closed costs a still-valid user a
+        cancellation, which is retryable.
+        """
+        monkeypatch.setattr(session_processor_default, "OWNER_LOOKUP_RETRY_SECONDS", 0)
+        services = _services()
+        attempts = []
+
+        def explode(user_id: str) -> None:
+            attempts.append(user_id)
+            raise RuntimeError("database is locked")
+
+        services.users.get = explode
+
+        assert queue_owner_is_active(services, _queue_item()) is False
+        assert len(attempts) == session_processor_default.OWNER_LOOKUP_ATTEMPTS
+
+    def test_a_transient_read_failure_is_retried_not_refused(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A busy-timeout under write contention must not cost the user their queued work."""
+        monkeypatch.setattr(session_processor_default, "OWNER_LOOKUP_RETRY_SECONDS", 0)
+        services = _services()
+        answers = iter([RuntimeError("database is locked"), _active("user-1")])
+
+        def flaky(user_id: str):
+            answer = next(answers)
+            if isinstance(answer, Exception):
+                raise answer
+            return answer
+
+        services.users.get = flaky
+
+        assert queue_owner_is_active(services, _queue_item()) is True
+
 
 class TestDequeueRejection:
     """Items whose owner was deactivated while pending are canceled at dequeue and
@@ -122,6 +159,20 @@ class TestDequeueRejection:
         processor = self._processor(services)
 
         assert processor._cancel_queue_item_if_owner_inactive(_queue_item()) is True
+
+    def test_unreadable_owner_item_is_canceled(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """An owner the database cannot answer for does not get to run."""
+        monkeypatch.setattr(session_processor_default, "OWNER_LOOKUP_RETRY_SECONDS", 0)
+        services = _services()
+
+        def explode(user_id: str) -> None:
+            raise RuntimeError("database is locked")
+
+        services.users.get = explode
+        processor = self._processor(services)
+
+        assert processor._cancel_queue_item_if_owner_inactive(_queue_item()) is True
+        services.session_queue.cancel_queue_item.assert_called_once_with(7)
 
 
 class TestUserAccessChangedCancelsCurrentItem:
@@ -220,10 +271,11 @@ class TestUserAccessChangedCancelsCurrentItem:
 
     @pytest.mark.anyio
     async def test_a_failed_re_read_still_cancels(self) -> None:
-        """The dequeue and between-node gates fail to "active" on a read error because they
-        re-run at the next node. This handler has no next node to fall back on — a
-        single-node graph is checked once, before it starts — so a read that cannot
-        contradict the event must not override it either."""
+        """A read that cannot contradict the event must not override it.
+
+        The gates fail closed on an unreadable database too, but this handler has the
+        stronger claim: it is the only thing that stops a single-node graph, which is
+        checked once before it starts and never again."""
         services = _services()
 
         def explode(user_id: str) -> None:
@@ -265,6 +317,31 @@ class TestRunnerStopsBetweenNodes:
         answers = iter([_active("user-1"), _inactive("user-1"), _inactive("user-1")])
         services = _services()
         services.users = SimpleNamespace(get=lambda user_id: next(answers))
+        runner = self._runner_with_services(services)
+        executed = []
+        runner.run_node = lambda invocation, queue_item: executed.append(invocation.id)  # type: ignore[method-assign]
+        queue_item = self._multi_node_queue_item([node1, node2])
+
+        runner._run_session_loop(queue_item)
+
+        assert executed == ["n1"]
+        services.session_queue.cancel_queue_item.assert_called_once_with(21)
+
+    def test_an_unreadable_owner_stops_later_nodes(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A deactivation the database can no longer be asked about still stops the run."""
+        monkeypatch.setattr(session_processor_default, "OWNER_LOOKUP_RETRY_SECONDS", 0)
+        node1, node2 = SimpleNamespace(id="n1"), SimpleNamespace(id="n2")
+        # Active for the first check; afterwards the record cannot be read at all.
+        answered = []
+
+        def flaky(user_id: str):
+            answered.append(user_id)
+            if len(answered) == 1:
+                return _active("user-1")
+            raise RuntimeError("database is locked")
+
+        services = _services()
+        services.users = SimpleNamespace(get=flaky)
         runner = self._runner_with_services(services)
         executed = []
         runner.run_node = lambda invocation, queue_item: executed.append(invocation.id)  # type: ignore[method-assign]

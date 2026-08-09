@@ -1,4 +1,5 @@
 import gc
+import time
 import traceback
 from contextlib import contextmanager, suppress
 from threading import BoundedSemaphore, Thread
@@ -43,6 +44,13 @@ from invokeai.app.util.profiler import Profiler
 from invokeai.backend.util.device_pool import GENERATION_DEVICE_POOL
 from invokeai.backend.util.devices import TorchDevice
 
+# A failed owner lookup is retried before the item is refused, so that a transient error
+# — a busy-timeout on the shared SQLite connection under multi-GPU write contention, say —
+# does not cost the user their queued work. Both call sites run on a worker thread, so the
+# wait between attempts blocks nothing else.
+OWNER_LOOKUP_ATTEMPTS = 3
+OWNER_LOOKUP_RETRY_SECONDS = 0.25
+
 
 def queue_owner_is_active(services: InvocationServices, queue_item: SessionQueueItem) -> bool:
     """Whether the queue item's owner is still permitted to execute work.
@@ -63,23 +71,36 @@ def queue_owner_is_active(services: InvocationServices, queue_item: SessionQueue
     have no such exemption: the item would burn GPU time and then fail at the first
     `context.images.save()`. Better to reject it at dequeue.
 
-    A failed lookup is treated as active. This runs between nodes on a path with no
-    exception handling of its own, so letting a transient error (e.g. a busy-timeout
-    on the shared SQLite connection under multi-GPU write contention) escape would
-    abandon the session without its normal teardown. Denying execution on a failed
-    read would also revoke privileges the database never actually revoked; the next
-    node boundary re-checks, and the dequeue gate catches the item on its next run.
+    A lookup that keeps failing is treated as *not* authorized, after
+    ``OWNER_LOOKUP_ATTEMPTS`` tries. Returning "active" on an unreadable database would
+    make unknown state executable: the account may well have been deactivated a moment
+    ago, and this gate is what stands between that and GPU time spent on its behalf.
+    Failing closed costs a still-valid user a cancellation instead — recoverable, since
+    canceled items can be retried, and only reachable when the database has been
+    unreadable across every attempt, by which point the instance has larger problems.
+    The exception is swallowed rather than raised for the same reason as before: this
+    runs between nodes on a path with no exception handling of its own, and letting it
+    escape would abandon the session without its normal teardown.
     """
     if not services.configuration.multiuser:
         return True
-    try:
-        user = services.users.get(queue_item.user_id)
-    except Exception:
-        services.logger.warning(
-            f"Could not verify owner {queue_item.user_id} of queue item {queue_item.item_id}; allowing execution"
-        )
-        return True
-    return user is not None and user.is_active
+    for attempt in range(OWNER_LOOKUP_ATTEMPTS):
+        try:
+            user = services.users.get(queue_item.user_id)
+        except Exception:
+            services.logger.warning(
+                f"Could not verify owner {queue_item.user_id} of queue item {queue_item.item_id} "
+                f"(attempt {attempt + 1}/{OWNER_LOOKUP_ATTEMPTS})",
+                exc_info=True,
+            )
+            if attempt + 1 < OWNER_LOOKUP_ATTEMPTS:
+                time.sleep(OWNER_LOOKUP_RETRY_SECONDS)
+            continue
+        return user is not None and user.is_active
+    services.logger.error(
+        f"Could not verify owner {queue_item.user_id} of queue item {queue_item.item_id}; refusing execution"
+    )
+    return False
 
 
 class DefaultSessionRunner(SessionRunnerBase):
@@ -147,7 +168,8 @@ class DefaultSessionRunner(SessionRunnerBase):
             # why execution stopped.
             if not queue_owner_is_active(self._services, queue_item):
                 self._services.logger.warning(
-                    f"Canceling queue item {queue_item.item_id}: owner {queue_item.user_id} is deactivated or deleted"
+                    f"Canceling queue item {queue_item.item_id}: owner {queue_item.user_id} is deactivated, "
+                    "deleted, or could not be verified"
                 )
                 with suppress(SessionQueueItemNotFoundError):
                     self._services.session_queue.cancel_queue_item(queue_item.item_id)
@@ -656,11 +678,11 @@ class DefaultSessionProcessor(SessionProcessorBase):
         # a running item of an account the database says is active, with nothing to undo
         # it.
         #
-        # Unlike the dequeue and between-node gates, a failed read here does NOT fail to
-        # "active". Those gates re-run at the next node; this handler is the only thing
-        # that stops a *single-node* graph, which is checked once before it starts and
-        # never again. The event is itself evidence of a committed deactivation, so when
-        # the re-read cannot contradict it, the event stands.
+        # A failed read fails closed here too, and for a stronger reason than at the
+        # dequeue and between-node gates: this handler is the only thing that stops a
+        # *single-node* graph, which is checked once before it starts and never again.
+        # The event is itself evidence of a committed deactivation, so when the re-read
+        # cannot contradict it, the event stands.
         def _cancel_all() -> None:
             for item in queue_items:
                 if not self._invoker.services.configuration.multiuser:
@@ -731,14 +753,15 @@ class DefaultSessionProcessor(SessionProcessorBase):
         return image_moves is not None and image_moves.is_maintenance_active()
 
     def _cancel_queue_item_if_owner_inactive(self, queue_item: SessionQueueItem) -> bool:
-        """Cancel a dequeued item whose owner is deactivated or deleted.
+        """Cancel a dequeued item whose owner is deactivated, deleted, or unverifiable.
 
         Returns True if the item was rejected (canceled) and must not be executed.
         """
         if queue_owner_is_active(self._invoker.services, queue_item):
             return False
         self._invoker.services.logger.warning(
-            f"Canceling queue item {queue_item.item_id}: owner {queue_item.user_id} is deactivated or deleted"
+            f"Canceling queue item {queue_item.item_id}: owner {queue_item.user_id} is deactivated, "
+            "deleted, or could not be verified"
         )
         with suppress(SessionQueueItemNotFoundError):
             self._invoker.services.session_queue.cancel_queue_item(queue_item.item_id)
