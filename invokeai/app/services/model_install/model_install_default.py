@@ -1125,6 +1125,14 @@ class ModelInstallService(ModelInstallServiceBase):
             except DuplicateModelException:
                 # In case a duplicate models sneaks by, we will ignore this error - we "found" the model
                 pass
+            except InvalidModelConfigException as e:
+                # A file we cannot register at all - unidentifiable with allow_unknown_models off, or
+                # recognised and rejected as unusable (e.g. a truncated checkpoint). ModelSearch already
+                # contains anything this callback raises, so startup survives either way; handling it
+                # here makes that a property of the scan rather than of the caller, and says which file
+                # was skipped and why.
+                self._logger.warning(f"Skipping {model_path.name}: {e}")
+                return False
             return True
 
         self._logger.info(f"Scanning {self._app_config.models_path} for orphaned models")
@@ -1145,13 +1153,15 @@ class ModelInstallService(ModelInstallServiceBase):
         )
 
         if result.config is None:
-            self._logger.error(f"Could not identify model for {model_path}, detailed results: {result.details}")
             # A model that was recognised and then rejected as unusable (e.g. a truncated checkpoint)
             # comes with a specific reason. Report that instead of "could not identify", which would be
             # both wrong and useless to whoever has to work out why the install failed.
             if invalid := result.invalid_matches:
-                raise InvalidModelConfigException(f"Model at {model_path} cannot be used: {invalid[0]}")
-            raise InvalidModelConfigException(f"Could not identify model for {model_path}")
+                reason = f"Model at {model_path} cannot be used: {invalid[0]}"
+            else:
+                reason = f"Could not identify model for {model_path}"
+            self._logger.error(f"{reason}, detailed results: {result.details}")
+            raise InvalidModelConfigException(reason)
         elif isinstance(result.config, Unknown_Config):
             self._logger.error(f"Could not identify model for {model_path}, detailed results: {result.details}")
 

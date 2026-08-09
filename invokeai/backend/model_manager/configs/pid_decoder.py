@@ -50,11 +50,9 @@ def _raise_if_lq_projection_incomplete(state_dict: dict[str | int, Any]) -> None
     memory (`load_pid_decoder` therefore rejects missing keys too). Catching it here means an
     incomplete file is reported at install time instead of decoding to garbage or NaNs later.
 
-    The rejection is an `InvalidMatchError`, not a `NotAMatchError`: this file has already shown
-    itself to be a PiD checkpoint, so classification must not shrug and register it as an unknown
-    model. `required_lq_proj_keys()` is one contract for every backbone, so this needs no backbone
-    and can therefore run before the backbone is known — which it has to, since the backbone is read
-    from `lq_proj.latent_proj.0.weight` and that weight is itself one a truncated file may lack.
+    `required_lq_proj_keys()` is one contract for every backbone, so this needs no backbone and can
+    therefore run before the backbone is known — which it has to, since the backbone is read from
+    `lq_proj.latent_proj.0.weight` and that weight is itself one a truncated file may lack.
     """
     # Imported lazily: it pulls in the vendored PiD network stack, which model identification
     # otherwise has no reason to load.
@@ -116,6 +114,22 @@ def _lq_hidden_dim_from_state_dict(state_dict: dict[str | int, Any]) -> int | No
     return None
 
 
+def _raise_if_architecture_unsupported(state_dict: dict[str | int, Any]) -> None:
+    """Reject a PiD decoder whose network shape `build_pid_net` cannot construct.
+
+    Runs before the completeness check so the diagnosis is the accurate one: a v1.5 checkpoint is
+    intact, and judging it against the legacy key set would report it as truncated. Ordering it first
+    costs completeness nothing — the hidden dim comes from `lq_proj.latent_proj.0.weight`, so a file
+    truncated past that weight yields None here and falls straight through.
+    """
+    lq_hidden_dim = _lq_hidden_dim_from_state_dict(state_dict)
+    if lq_hidden_dim is not None and lq_hidden_dim != _SUPPORTED_LQ_HIDDEN_DIM:
+        raise InvalidMatchError(
+            f"PiD decoder has lq_proj hidden dim {lq_hidden_dim}, but InvokeAI only supports the legacy "
+            f"{_SUPPORTED_LQ_HIDDEN_DIM}-dim architecture (NVIDIA's v1.5 checkpoints are not yet supported)."
+        )
+
+
 def _name_for_matching(mod: ModelOnDisk) -> str:
     """Searchable name for backbone/variant heuristics.
 
@@ -153,6 +167,34 @@ _SINGLE_VARIANT_BACKBONES: dict[BaseModelType, PiDDecoderVariantType] = {
     BaseModelType.StableDiffusionXL: PiDDecoderVariantType.Res2kTo4k_Sr4x,
     BaseModelType.QwenImage: PiDDecoderVariantType.Res2kTo4k_Sr4x,
 }
+
+
+def _raise_if_no_backbone_can_accept(state_dict: dict[str | int, Any], name: str) -> None:
+    """Reject a PiD decoder that none of the five backbone configs could ever claim.
+
+    The counterpart to `_validate_base`, and the reason the two are separate. `_validate_base` decides
+    *which* backbone a checkpoint belongs to and says "not this one" with `NotAMatchError` — four of
+    the five classes are meant to say that about every valid checkpoint. The checks here are
+    backbone-independent, so all five would raise them for the same reason, leaving the file with no
+    match at all and letting the factory register it through the `Unknown_Config` fallback: a PiD
+    decoder on record as a model nothing can load. They are therefore `InvalidMatchError`.
+    """
+    channels = _latent_channels_from_state_dict(state_dict)
+    if channels is not None:
+        if channels not in _LATENT_CHANNELS_TO_BASES:
+            raise InvalidMatchError(
+                f"PiD checkpoint has {channels} latent channels; no supported backbone uses this "
+                "(supported: 4 for SDXL, 16 for FLUX.1/SD3/Qwen-Image, 128 for FLUX.2)"
+            )
+        return
+
+    # The diagnostic weight is present (completeness has run) but is not a 4D conv, so the backbone
+    # can only come from the name. Nothing else is left to try.
+    if _backbone_from_filename(name) is None:
+        raise InvalidMatchError(
+            "cannot determine PiD decoder backbone from weights or filename "
+            "(expected one of: flux, flux2, sd3, sdxl, qwen-image)"
+        )
 
 
 def _variant_from_name(name: str, base: BaseModelType) -> PiDDecoderVariantType:
@@ -193,27 +235,18 @@ class PiDDecoder_Checkpoint_Config_Base(Checkpoint_Config_Base):
         if not _looks_like_pid_decoder(state_dict):
             raise NotAMatchError("state dict does not look like a PiD decoder (no 'lq_proj.*' keys)")
 
-        # Architecture before completeness. A v1.5 checkpoint is intact, just built to a shape InvokeAI
-        # cannot construct — it must be reported as unsupported (and stay a plain no-match, so it can
-        # still be registered as an unknown model) rather than be judged against the legacy key set and
-        # hard-rejected as truncated. Ordering it first costs the completeness check nothing: the hidden
-        # dim is read from `lq_proj.latent_proj.0.weight`, so a file truncated past that weight yields
-        # None here and falls straight through to the check below.
-        lq_hidden_dim = _lq_hidden_dim_from_state_dict(state_dict)
-        if lq_hidden_dim is not None and lq_hidden_dim != _SUPPORTED_LQ_HIDDEN_DIM:
-            raise NotAMatchError(
-                f"PiD decoder has lq_proj hidden dim {lq_hidden_dim}, but InvokeAI only supports the legacy "
-                f"{_SUPPORTED_LQ_HIDDEN_DIM}-dim architecture (NVIDIA's v1.5 checkpoints are not yet supported)."
-            )
-
-        # Completeness before the backbone — the backbone is read from one of the LQ weights, so a
-        # truncated file must be reported as truncated rather than as an unidentifiable backbone.
-        _raise_if_lq_projection_incomplete(state_dict)
-
         # A direct single-file install stores the checkpoint as `<uuid>/model_ema_bf16.pth`, dropping
         # NVIDIA's `…official_sd3_distill…` directory name. The install source (an HF path or URL)
         # survives intact, so it is matched alongside the on-disk name for both backbone and variant.
         name = f"{override_fields.get('source') or ''} {_name_for_matching(mod)}"
+
+        # Everything from here to `_validate_base` is backbone-independent: each of these rejects a file
+        # *every* PiD config class would reject for the same reason, which is exactly the case the plain
+        # no-match signal cannot carry — no class matches, and the factory registers the file through its
+        # `Unknown_Config` fallback. See `_raise_if_no_backbone_can_accept`.
+        _raise_if_architecture_unsupported(state_dict)
+        _raise_if_lq_projection_incomplete(state_dict)
+        _raise_if_no_backbone_can_accept(state_dict, name)
 
         # Whether the caller explicitly pinned a base (e.g. a starter-model install passes base=sd-3).
         # In the ambiguous 16-channel FLUX.1/SD3 case this override is trusted when the name is silent.
@@ -245,18 +278,18 @@ class PiDDecoder_Checkpoint_Config_Base(Checkpoint_Config_Base):
         (e.g. a starter-model install). In the ambiguous 16ch case, a trusted
         override wins over the FLUX.1 default — the last resort for a checkpoint
         whose name says nothing at all.
+
+        Every rejection here is a `NotAMatchError` and only ever means "not *this*
+        backbone" — the reasons that would rule out all five live in
+        ``_raise_if_no_backbone_can_accept``, which ``from_model_on_disk`` runs first.
         """
         name = name if name is not None else _name_for_matching(mod)
         expected_base = cls.model_fields["base"].default
         channels = _latent_channels_from_state_dict(state_dict)
 
         if channels is not None:
-            candidate_bases = _LATENT_CHANNELS_TO_BASES.get(channels)
-            if candidate_bases is None:
-                raise NotAMatchError(
-                    f"PiD checkpoint has {channels} latent channels; no supported backbone uses this "
-                    "(supported: 4 for SDXL, 16 for FLUX.1/SD3/Qwen-Image, 128 for FLUX.2)"
-                )
+            # Guaranteed present: an unsupported channel count was rejected outright before this ran.
+            candidate_bases = _LATENT_CHANNELS_TO_BASES[channels]
             if expected_base not in candidate_bases:
                 raise NotAMatchError(f"latent channels={channels} do not match backbone {expected_base}")
             if len(candidate_bases) > 1:
@@ -273,13 +306,9 @@ class PiDDecoder_Checkpoint_Config_Base(Checkpoint_Config_Base):
                     raise NotAMatchError("ambiguous 16-channel PiD checkpoint; defaulting to FLUX.1")
             return
 
-        # No diagnostic weight (unexpected) → fall back to name-only matching.
+        # No diagnostic weight (unexpected) → name-only matching. A name that identifies no backbone
+        # at all was already rejected outright, so this cannot be None.
         inferred_base = _backbone_from_filename(name)
-        if inferred_base is None:
-            raise NotAMatchError(
-                "cannot determine PiD decoder backbone from weights or filename "
-                "(expected one of: flux, flux2, sd3, sdxl, qwen-image)"
-            )
         if inferred_base is not expected_base:
             raise NotAMatchError(f"backbone is {inferred_base}, not {expected_base}")
 

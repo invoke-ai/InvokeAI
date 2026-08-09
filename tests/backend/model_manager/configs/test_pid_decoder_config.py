@@ -86,15 +86,21 @@ def _mock_mod(root: Path, state_dict: dict[str, object], dir_name: str | None = 
 def test_v1_5_checkpoint_is_rejected_at_identification() -> None:
     """A 1024-dim (v1.5) checkpoint must be rejected, not accepted and crashed on later.
 
-    A plain `NotAMatchError`, deliberately: the file is intact, InvokeAI just cannot build its shape,
-    so it should still be registrable as an unknown model. Only a *broken* file is fatal (see
-    `TestTruncatedCheckpointIsNeverRegistered`). It is also why the hidden-dim check runs before the
-    completeness check — judged against the legacy key set, a v1.5 file would be misreported as
-    truncated, and would then be hard-rejected on top of it.
+    The architecture check runs before the completeness check so the diagnosis is the accurate one:
+    judged against the legacy key set, an intact v1.5 file would be reported as truncated.
     """
     with TemporaryDirectory() as tmpdir:
         mod = _mock_mod(Path(tmpdir), _pid_state_dict(1024))
-        with pytest.raises(NotAMatchError, match="lq_proj hidden dim 1024"):
+        with pytest.raises(InvalidMatchError, match="lq_proj hidden dim 1024"):
+            PiDDecoder_Checkpoint_FLUX_Config.from_model_on_disk(mod, dict(_OVERRIDE_FIELDS))
+
+
+def test_unsupported_latent_channel_count_is_rejected() -> None:
+    """No backbone uses 32 latent channels, so all five configs reject it for the same reason — which
+    is exactly the case a plain no-match cannot carry, since it leaves the file to `Unknown_Config`."""
+    with TemporaryDirectory() as tmpdir:
+        mod = _mock_mod(Path(tmpdir), _pid_state_dict(512, latent_channels=32))
+        with pytest.raises(InvalidMatchError, match="32 latent channels"):
             PiDDecoder_Checkpoint_FLUX_Config.from_model_on_disk(mod, dict(_OVERRIDE_FIELDS))
 
 
@@ -164,45 +170,85 @@ class TestIncompleteLqProjection:
                 PiDDecoder_Checkpoint_FLUX_Config.from_model_on_disk(mod, dict(_OVERRIDE_FIELDS))
 
 
-class TestTruncatedCheckpointIsNeverRegistered:
-    """Rejecting a truncated checkpoint in the config class is only half the job.
+def _write_pid_checkpoint(root: Path, state_dict: dict[str, object]) -> Path:
+    """Write a state dict as a real `.pth`, the format NVIDIA ships, so the factory reaches it through
+    the same pickle-scan-and-`torch.load` path a real download would."""
+    import torch
+
+    path = root / "model_ema_bf16.pth"
+    torch.save(state_dict, path)
+    return path
+
+
+def _real_pid_state_dict(lq_hidden_dim: int = 512, latent_channels: int = 16) -> dict[str, object]:
+    """`_pid_state_dict` with tensors that can actually be serialised."""
+    import torch
+
+    sd: dict[str, object] = {f"{_NET_PREFIX}{k}": torch.zeros(1) for k in required_lq_proj_keys()}
+    sd[f"{_NET_PREFIX}{_LATENT_PROJ_KEY}"] = torch.zeros(lq_hidden_dim, latent_channels, 3, 3)
+    return sd
+
+
+class TestUnusableCheckpointIsNeverRegistered:
+    """Rejecting an unusable checkpoint in the config class is only half the job.
 
     Every config class signals "not mine" with `NotAMatchError`, which the factory collects and then,
     with `allow_unknown_models` (default: true), papers over by returning `Unknown_Config`. A file that
-    identified itself as a PiD decoder and was then found to be incomplete would therefore still be
-    installed — as an unknown model, with a database record, failing only when something tried to load
-    it. `InvalidMatchError` is what makes the rejection stick.
+    identified itself as a PiD decoder and was then found unusable would therefore still be installed —
+    as an unknown model, with a database record, failing only when something tried to load it.
+    `InvalidMatchError` is what makes the rejection stick, and every reason that would rule out *all
+    five* backbone configs has to raise it, not just the truncation case.
     """
 
-    def _write_partial_pid_checkpoint(self, root: Path) -> Path:
-        """A file carrying a single `lq_proj.*` weight: enough to be recognised, far from loadable.
-
-        Written as a `.pth`, the format NVIDIA actually ships, so this goes through the same
-        pickle-scan-and-`torch.load` path a real truncated download would.
-        """
+    def _partial(self) -> dict[str, object]:
+        """A single `lq_proj.*` weight: enough to be recognised, far from loadable."""
         import torch
 
-        path = root / "model_ema_bf16.pth"
-        torch.save({f"{_NET_PREFIX}lq_proj.latent_proj.1.weight": torch.zeros(1)}, path)
-        return path
+        return {f"{_NET_PREFIX}lq_proj.latent_proj.1.weight": torch.zeros(1)}
 
-    def test_factory_returns_no_config_even_with_allow_unknown(self) -> None:
+    def _truncated_v1_5(self) -> dict[str, object]:
+        """Both wrong at once. The architecture check fires first, so this is the case where an
+        unsupported-but-not-fatal verdict would let a *truncated* file through to Unknown_Config."""
+        sd = _real_pid_state_dict(lq_hidden_dim=1024)
+        del sd[f"{_NET_PREFIX}lq_proj.output_heads.3.weight"]
+        return sd
+
+    def _intact_v1_5(self) -> dict[str, object]:
+        return _real_pid_state_dict(lq_hidden_dim=1024)
+
+    def _unsupported_latent_channels(self) -> dict[str, object]:
+        return _real_pid_state_dict(latent_channels=32)
+
+    @pytest.mark.parametrize(
+        ("case", "expected_reason"),
+        [
+            ("_partial", "LQ projection weights"),
+            ("_truncated_v1_5", "lq_proj hidden dim 1024"),
+            ("_intact_v1_5", "lq_proj hidden dim 1024"),
+            ("_unsupported_latent_channels", "32 latent channels"),
+        ],
+    )
+    def test_factory_returns_no_config_even_with_allow_unknown(self, case: str, expected_reason: str) -> None:
         with TemporaryDirectory() as tmpdir:
-            path = self._write_partial_pid_checkpoint(Path(tmpdir))
+            path = _write_pid_checkpoint(Path(tmpdir), getattr(self, case)())
             result = ModelConfigFactory.from_model_on_disk(path, allow_unknown=True)
 
-        assert result.config is None, "a recognised-but-broken checkpoint must not be registered"
+        assert result.config is None, "a recognised-but-unusable checkpoint must not be registered"
         assert not any(isinstance(r, Unknown_Config) for r in result.details.values())
+        # The reason survives for `_probe` to report, so the user is told what is actually wrong
+        # instead of the misleading "could not identify model".
+        assert result.invalid_matches
+        assert expected_reason in str(result.invalid_matches[0])
 
-    def test_the_rejection_reason_survives_for_the_installer_to_report(self) -> None:
-        """`_probe` raises with this text, so the user is told the file is incomplete rather than the
-        misleading "could not identify model"."""
+    def test_a_valid_checkpoint_still_identifies(self) -> None:
+        """The counterweight: none of the above may make a real decoder harder to install."""
         with TemporaryDirectory() as tmpdir:
-            path = self._write_partial_pid_checkpoint(Path(tmpdir))
+            path = _write_pid_checkpoint(Path(tmpdir), _real_pid_state_dict())
             result = ModelConfigFactory.from_model_on_disk(path, allow_unknown=True)
 
-        assert result.invalid_matches
-        assert "LQ projection weights" in str(result.invalid_matches[0])
+        assert result.config is not None
+        assert not result.invalid_matches
+        assert result.config.base is BaseModelType.Flux
 
 
 class TestBackboneFromInstallSource:
