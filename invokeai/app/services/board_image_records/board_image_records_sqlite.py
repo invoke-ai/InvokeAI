@@ -169,7 +169,9 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
                 f"""--sql
                     SELECT COUNT(*)
                     FROM board_images
-                    INNER JOIN images ON board_images.image_name = images.image_name
+                    -- Keep work proportional to this board's membership instead of allowing
+                    -- the gallery index to make images the outer loop for this query.
+                    CROSS JOIN images ON board_images.image_name = images.image_name
                     WHERE images.is_intermediate = FALSE AND images.image_category IN ( {placeholders} )
                     AND board_images.board_id = ?;
                     """,
@@ -188,7 +190,9 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
                 f"""--sql
                     SELECT COUNT(*)
                     FROM board_images
-                    INNER JOIN images ON board_images.image_name = images.image_name
+                    -- Keep work proportional to this board's membership instead of allowing
+                    -- the gallery index to make images the outer loop for this query.
+                    CROSS JOIN images ON board_images.image_name = images.image_name
                     WHERE images.is_intermediate = FALSE AND images.image_category IN ( {placeholders} )
                     AND board_images.board_id = ?;
                     """,

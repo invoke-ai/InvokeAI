@@ -1164,9 +1164,13 @@ class ModelCache:
         #   the default value if desired.
 
         # Lookup the total VRAM size for the CUDA execution device.
+        # This runs at startup (one ModelCache is built per generation device before any request is
+        # served), and torch.cuda.mem_get_info() would create a CUDA context that permanently holds
+        # ~100-300 MiB of VRAM in an otherwise idle process. cudaGetDeviceProperties reports the same
+        # total without creating a context (#9413).
         total_cuda_vram_bytes: int | None = None
         if self._execution_device.type == "cuda":
-            _, total_cuda_vram_bytes = torch.cuda.mem_get_info(self._execution_device)
+            total_cuda_vram_bytes = torch.cuda.get_device_properties(self._execution_device).total_memory
 
         # Apply heuristic 1.
         # ------------------
