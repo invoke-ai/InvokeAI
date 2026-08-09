@@ -142,6 +142,31 @@ def test_h3_probe_requires_lora_suffixes():
     assert not accepted, f"H3 probe wrongly accepted a non-LoRA state dict: {result}"
 
 
+def test_h3_probe_rejects_lycoris_variants():
+    # LoKR/LoHA/DoRA cannot be applied across H3's fused qkv/SwiGLU tensors — admitting them
+    # would install a model that crashes (or silently corrupts) at generation time.
+    lokr = {
+        "blocks.0.attn.qkv_proj.lokr_w1": torch.zeros(64, 64),
+        "blocks.0.attn.qkv_proj.lokr_w2": torch.zeros(252, 84),
+    }
+    accepted, result = _probe(LoRA_LyCORIS_MiniMaxH3_Config, lokr)
+    assert not accepted, f"H3 probe wrongly accepted a LoKR file: {result}"
+
+    dora = _h3_turbo_keys()
+    dora["blocks.0.attn.qkv_proj.dora_scale"] = torch.zeros(3 * 5376, 1)
+    accepted, result = _probe(LoRA_LyCORIS_MiniMaxH3_Config, dora)
+    assert not accepted, f"H3 probe wrongly accepted a DoRA file: {result}"
+
+
+def test_h3_probe_rejects_nested_prefixes():
+    # A nested prefix (diffusion_model.transformer.blocks...) survives the converter's single
+    # prefix-strip as a nonexistent module path — the LoRA would apply zero layers. Detection
+    # is anchored so such files are rejected instead of silently no-opping.
+    sd = _h3_turbo_keys("diffusion_model.transformer.")
+    accepted, result = _probe(LoRA_LyCORIS_MiniMaxH3_Config, sd)
+    assert not accepted, f"H3 probe wrongly accepted nested-prefix keys: {result}"
+
+
 def test_h3_probe_rejects_already_diffusers_keys():
     # v1 supports the published native layout only; diffusers-style transformer_blocks keys
     # are deliberately rejected rather than half-converted.

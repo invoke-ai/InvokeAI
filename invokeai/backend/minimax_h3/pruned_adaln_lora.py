@@ -31,6 +31,7 @@ from typing import Iterator
 import torch
 
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
+from invokeai.backend.util import InvokeAILogger
 
 # The silu(t_emb) grid published with the Turbo LoRA's ComfyUI node (Apache 2.0),
 # pinned to a commit for reproducibility. ~5.5 MB; fetched once via
@@ -157,24 +158,36 @@ def apply_minimax_h3_pruned_adaln_lora_patches(
 
         return linear_hook
 
+    logger = InvokeAILogger.get_logger(__name__)
     handles: list[torch.utils.hooks.RemovableHandle] = []
     try:
         for layer_path, layer, patch_weight in adaln_patches:
             if layer.mid is not None or layer.bias is not None:
                 raise ValueError(f"AdaLN LoRA layer {layer_path!r} has unsupported mid/bias tensors.")
+            # Architecture mismatches (unresolvable path, wrong dims) warn and skip the layer —
+            # the same policy the LayerPatcher applies to backbone layers, so a partially
+            # incompatible LoRA degrades identically on both routes instead of hard-failing
+            # only when the AdaLN half is the incompatible one.
             if layer.down.shape[1] != MINIMAX_H3_TIME_EMBED_DIM:
-                raise ValueError(
-                    f"AdaLN LoRA layer {layer_path!r} expects a {layer.down.shape[1]}-dim input; the "
-                    f"H3 silu(t_emb) space is {MINIMAX_H3_TIME_EMBED_DIM}-dim. This LoRA does not "
-                    "target MiniMax H3's time conditioning."
+                logger.warning(
+                    f"Skipping AdaLN LoRA layer '{layer_path}': it expects a {layer.down.shape[1]}-dim "
+                    f"input, but the H3 silu(t_emb) space is {MINIMAX_H3_TIME_EMBED_DIM}-dim. This LoRA "
+                    "may be incompatible with this model architecture."
                 )
-            linear = transformer.get_submodule(layer_path)
+                continue
+            try:
+                linear = transformer.get_submodule(layer_path)
+            except AttributeError:
+                logger.warning(f"Failed to find module for AdaLN LoRA layer: {layer_path}")
+                continue
             out_features = getattr(linear, "out_features", None)
             if out_features is not None and layer.up.shape[0] != out_features:
-                raise ValueError(
-                    f"AdaLN LoRA layer {layer_path!r} produces {layer.up.shape[0]} outputs but the "
-                    f"target projection has {out_features}."
+                logger.warning(
+                    f"Skipping AdaLN LoRA layer '{layer_path}' due to shape mismatch: the target "
+                    f"projection has {out_features} outputs, the LoRA produces {layer.up.shape[0]}. "
+                    "This LoRA may be incompatible with this model architecture."
                 )
+                continue
             handles.append(
                 linear.register_forward_hook(make_linear_hook(layer_path, _AdalnLoRADelta(layer, patch_weight)))
             )

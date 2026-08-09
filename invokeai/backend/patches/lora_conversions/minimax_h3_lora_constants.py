@@ -27,8 +27,12 @@ import re
 # resolve patches against the loaded transformer's parameter paths.
 MINIMAX_H3_LORA_TRANSFORMER_PREFIX = "lora_transformer-"
 
-# Optional prefixes seen on PEFT-style keys.
-_PEFT_PREFIX_RE = r"(?:^|(?:diffusion_model|transformer|base_model\.model\.transformer)\.)"
+# Optional prefixes seen on PEFT-style keys. Anchored to the key start so detection admits
+# exactly what the converter's single prefix-strip can handle — an unanchored alternative
+# would also match nested prefixes like ``diffusion_model.transformer.blocks...``, which the
+# probe would then admit but the converter would map onto nonexistent module paths (the LoRA
+# would silently apply zero layers).
+_PEFT_PREFIX_RE = r"^(?:(?:diffusion_model|transformer|base_model\.model\.transformer)\.)?"
 
 # Submodules the H3 transformer exposes for LoRA, in the checkpoint's native naming.
 # ``attn.qkv_proj`` (a fused projection under a bare ``attn.``) and ``adaln_proj.linear``
@@ -53,6 +57,26 @@ _NON_H3_ANTI_RES = (
     re.compile(r"diffusion_model\.layers\.\d+\."),  # Z-Image
     re.compile(r"mlp[\._]layer|adaln_modulation"),  # Anima/Cosmos
 )
+
+# LyCORIS variants the H3 pipeline does NOT support: LoKR/LoHA cannot be row-split across the
+# fused qkv/SwiGLU tensors (a Kronecker/Hadamard factorization does not distribute over row
+# slices), and DoRA's per-output-row magnitudes would need the same split/swap treatment plus
+# original-weight access that the int8 sidecar path cannot provide. Rejecting these at probe
+# time turns a would-be generation-time crash (or silent half-swap corruption) into a clear
+# install-time "not supported".
+_UNSUPPORTED_H3_VARIANT_SUFFIXES = (
+    ".lokr_w1",
+    ".lokr_w2",
+    ".hada_w1_a",
+    ".hada_w2_a",
+    ".dora_scale",
+)
+
+
+def has_unsupported_minimax_h3_lora_variant_keys(str_keys: list[str]) -> bool:
+    """True if the state dict carries LyCORIS-variant tensors (LoKR/LoHA/DoRA) that the H3
+    conversion pipeline cannot apply to the fused transformer layers."""
+    return any(k.endswith(suffix) for k in str_keys for suffix in _UNSUPPORTED_H3_VARIANT_SUFFIXES)
 
 
 def has_minimax_h3_lora_keys(str_keys: list[str]) -> bool:

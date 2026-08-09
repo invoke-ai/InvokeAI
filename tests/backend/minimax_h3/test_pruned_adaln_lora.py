@@ -141,28 +141,52 @@ def test_missing_timestep_fails_loudly():
             transformer(torch.randn(1, CURVE_DIM))
 
 
-def test_rejects_wrong_input_dim():
+def test_architecture_mismatches_warn_and_skip():
+    """Wrong input dim, wrong output dim, and unresolvable paths degrade like the
+    LayerPatcher's backbone policy (warn + skip), not a hard failure — while compatible
+    layers in the same patch list still apply."""
     transformer = _StubPrunedTransformer()
-    bad_layer = LoRALayer(
+    grid = _make_grid()
+    good_layer = _make_lora(seed=40)
+    wrong_input = LoRALayer(
         up=torch.randn(OUT_FEATURES, RANK), mid=None, down=torch.randn(RANK, 64), alpha=None, bias=None
     )
-    with pytest.raises(ValueError, match="does not target MiniMax H3"):
-        with apply_minimax_h3_pruned_adaln_lora_patches(
-            transformer, [("norm_out.linear", bad_layer, 1.0)], _make_grid()
-        ):
-            pass
-
-
-def test_rejects_output_dim_mismatch():
-    transformer = _StubPrunedTransformer()
-    bad_layer = LoRALayer(
+    wrong_output = LoRALayer(
         up=torch.randn(OUT_FEATURES + 1, RANK),
         mid=None,
         down=torch.randn(RANK, MINIMAX_H3_TIME_EMBED_DIM),
         alpha=None,
         bias=None,
     )
-    with pytest.raises(ValueError, match="produces .* outputs"):
+
+    curve_temb = torch.randn(1, CURVE_DIM)
+    timestep = torch.tensor([0.5])
+    base_block, base_out = transformer(curve_temb, timestep=timestep)
+
+    patches = [
+        ("norm_out.linear", wrong_input, 1.0),
+        ("norm_out.linear", wrong_output, 1.0),
+        ("transformer_blocks.7.adaln_proj.linear", good_layer, 1.0),  # out-of-range block
+        ("transformer_blocks.0.adaln_proj.linear", good_layer, 1.0),
+    ]
+    with apply_minimax_h3_pruned_adaln_lora_patches(transformer, patches, grid):
+        got_block, got_out = transformer(curve_temb, timestep=timestep)
+
+    # Only the one compatible layer applied; every mismatch was skipped.
+    assert torch.allclose(got_block, base_block + _expected_delta(grid, good_layer, 1.0, timestep), atol=1e-5)
+    assert torch.equal(got_out, base_out)
+
+
+def test_rejects_mid_or_bias_tensors():
+    transformer = _StubPrunedTransformer()
+    bad_layer = LoRALayer(
+        up=torch.randn(OUT_FEATURES, RANK),
+        mid=None,
+        down=torch.randn(RANK, MINIMAX_H3_TIME_EMBED_DIM),
+        alpha=None,
+        bias=torch.randn(OUT_FEATURES),
+    )
+    with pytest.raises(ValueError, match="mid/bias"):
         with apply_minimax_h3_pruned_adaln_lora_patches(
             transformer, [("norm_out.linear", bad_layer, 1.0)], _make_grid()
         ):

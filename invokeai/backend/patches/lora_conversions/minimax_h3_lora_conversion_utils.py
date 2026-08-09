@@ -37,6 +37,7 @@ from invokeai.backend.patches.lora_conversions.minimax_h3_lora_constants import 
     MINIMAX_H3_LORA_TRANSFORMER_PREFIX,
     has_minimax_h3_lora_keys,
     has_non_minimax_h3_architecture_keys,
+    has_unsupported_minimax_h3_lora_variant_keys,
 )
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 
@@ -90,6 +91,17 @@ def lora_model_from_minimax_h3_state_dict(
     (``transformer_blocks.N.attn.to_q`` etc.) prefixed with
     ``MINIMAX_H3_LORA_TRANSFORMER_PREFIX``.
     """
+    # The probe rejects these at install time; this guard covers state dicts that reach the
+    # converter through other paths. LoKR/LoHA factorizations cannot be row-split across the
+    # fused qkv/SwiGLU tensors, and DoRA's per-output-row magnitudes would be silently
+    # mis-applied by the half-swap below.
+    str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
+    if has_unsupported_minimax_h3_lora_variant_keys(str_keys):
+        raise ValueError(
+            "MiniMax H3 LoRAs must be plain low-rank (lora_A/lora_B); LoKR/LoHA/DoRA variants are not "
+            "supported on H3's fused transformer layers."
+        )
+
     layers: dict[str, BaseLayerPatch] = {}
 
     for raw_layer_path, layer_dict in _group_by_layer(state_dict).items():
@@ -165,8 +177,6 @@ def _normalize_lora_param_names(layer_dict: dict[str, torch.Tensor], alpha: floa
             values["alpha"] = torch.tensor(alpha)
         if "alpha" in layer_dict:
             values["alpha"] = layer_dict["alpha"]
-        if "dora_scale" in layer_dict:
-            values["dora_scale"] = layer_dict["dora_scale"]
         return values
     return layer_dict
 

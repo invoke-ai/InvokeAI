@@ -178,6 +178,22 @@ def test_format_detection():
     assert not is_state_dict_likely_in_minimax_h3_format(polluted)
 
 
+def test_rejects_lycoris_variant_tensors():
+    # The probe rejects these at install; the converter guard covers other entry paths. Without
+    # it, DoRA's per-output-row magnitudes would be silently mis-applied by the SwiGLU half-swap.
+    sd = _make_turbo_style_state_dict()
+    sd["blocks.0.mlp.fc1.dora_scale"] = torch.zeros(2 * FFN, 1)
+    with pytest.raises(ValueError, match="plain low-rank"):
+        lora_model_from_minimax_h3_state_dict(sd)
+
+
+def test_nested_prefix_is_not_detected():
+    # Anchored detection: a nested prefix would survive the single prefix-strip and convert to
+    # nonexistent module paths, so it must not be detected as H3 in the first place.
+    assert not is_state_dict_likely_in_minimax_h3_format(_make_turbo_style_state_dict("diffusion_model.transformer."))
+    assert not is_state_dict_likely_in_minimax_h3_format(_make_turbo_style_state_dict("unet.diffusion_model."))
+
+
 def test_rejects_malformed_fused_tensors():
     sd = {
         "blocks.0.attn.qkv_proj.lora_A.weight": torch.zeros(RANK, HIDDEN),
