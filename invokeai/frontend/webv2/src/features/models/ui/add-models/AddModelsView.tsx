@@ -5,8 +5,13 @@ import type { StarterModel } from '@features/models/core/types';
 import { Box, Checkbox, Flex, HStack, Icon, Input, InputGroup, Stack, Text } from '@chakra-ui/react';
 import { getModelBaseLabel } from '@features/models/core/baseIdentity';
 import { collectBases, collectTypes } from '@features/models/core/library';
-import { getExternalProviderConfigs, getHuggingFaceModels, scanFolderForModels } from '@features/models/data/api';
+import { getHuggingFaceModels, scanFolderForModels } from '@features/models/data/api';
+import {
+  ensureExternalProvidersLoaded,
+  useExternalProvidersSelector,
+} from '@features/models/data/externalProvidersStore';
 import { ensureStartersLoaded, useStartersSelector } from '@features/models/data/startersStore';
+import { useScopedAction } from '@features/models/ui/shared/useScopedAction';
 import { updateModelsUi, useModelsUiSelector } from '@features/models/ui/uiStore';
 import { useNotify } from '@features/models/ui/useModelsNotify';
 import { useMountEffect } from '@platform/react/useMountEffect';
@@ -77,45 +82,24 @@ export const AddModelsView = () => {
   const [accessToken, setAccessToken] = useState('');
   const [inplace, setInplace] = useState(true);
   const [selectedBundleName, setSelectedBundleName] = useState<string | null>(null);
-  const [isPulling, setIsPulling] = useState(false);
-  const [isScanning, setIsScanning] = useState(false);
+  const { isBusy: isPulling, run: runPull } = useScopedAction();
+  const { isBusy: isScanning, run: runScan } = useScopedAction();
   const [installingBundle, setInstallingBundle] = useState<string | null>(null);
-  const [configuredExternalProviders, setConfiguredExternalProviders] = useState<ReadonlySet<string>>(() => new Set());
+  const providerConfigs = useExternalProvidersSelector((snapshot) => snapshot.configs);
+  const configuredExternalProviders = useMemo<ReadonlySet<string>>(
+    () =>
+      new Set(
+        (providerConfigs ?? []).filter((config) => config.api_key_configured).map((config) => config.provider_id)
+      ),
+    [providerConfigs]
+  );
   const [starterFilters, setStarterFilters] = useState<StarterModelFilters>(DEFAULT_STARTER_MODEL_FILTERS);
 
   useMountEffect(() => {
     ensureStartersLoaded();
-  });
-
-  useMountEffect(() => {
-    const owner = captureAccountScope();
-    let isMounted = true;
-
-    getExternalProviderConfigs(owner.signal)
-      .then((configs) => {
-        if (!isMounted || !isAccountScopeCurrent(owner)) {
-          return;
-        }
-
-        setConfiguredExternalProviders(
-          new Set(configs.filter((config) => config.api_key_configured).map((config) => config.provider_id))
-        );
-      })
-      .catch((error) => {
-        if (!isMounted || !isAccountScopeCurrent(owner)) {
-          return;
-        }
-
-        setConfiguredExternalProviders(new Set());
-        notify.error(
-          t('models.externalProviderKeysUnavailable'),
-          error instanceof Error ? error.message : String(error)
-        );
-      });
-
-    return () => {
-      isMounted = false;
-    };
+    ensureExternalProvidersLoaded().catch((error: unknown) => {
+      notify.error(t('models.externalProviderKeysUnavailable'), error instanceof Error ? error.message : String(error));
+    });
   });
 
   const trimmed = query.trim();
@@ -237,90 +221,68 @@ export const AddModelsView = () => {
       return;
     }
 
-    const owner = captureAccountScope();
+    await runPull(
+      async (owner) => {
+        if (kind.looksRepo) {
+          const lookup = await getHuggingFaceModels(trimmed, owner.signal);
 
-    setIsPulling(true);
+          assertAccountScopeCurrent(owner);
+          if (lookup.is_diffusers) {
+            updateModelsUi({ hfLookup: null });
 
-    try {
-      if (kind.looksRepo) {
-        const lookup = await getHuggingFaceModels(trimmed, owner.signal);
+            if ((await install({ accessToken: token, source: trimmed })) && isAccountScopeCurrent(owner)) {
+              setQuery('');
+            }
 
-        assertAccountScopeCurrent(owner);
-        if (lookup.is_diffusers) {
-          updateModelsUi({ hfLookup: null });
-
-          if ((await install({ accessToken: token, source: trimmed })) && isAccountScopeCurrent(owner)) {
-            setQuery('');
+            return;
           }
 
-          return;
-        }
+          if (!lookup.urls || lookup.urls.length === 0) {
+            notify.error(t('models.noModelFilesFoundTitle'), t('models.noInstallableModelFiles'));
 
-        if (!lookup.urls || lookup.urls.length === 0) {
-          notify.error(t('models.noModelFilesFoundTitle'), t('models.noInstallableModelFiles'));
-
-          return;
-        }
-
-        // A single-file repo has nothing to choose from — install it directly,
-        // mirroring the diffusers path, instead of showing a one-row list.
-        const [onlyUrl] = lookup.urls;
-
-        if (lookup.urls.length === 1 && onlyUrl) {
-          updateModelsUi({ hfLookup: null });
-
-          if ((await install({ accessToken: token, source: onlyUrl })) && isAccountScopeCurrent(owner)) {
-            setQuery('');
+            return;
           }
 
+          // A single-file repo has nothing to choose from — install it directly,
+          // mirroring the diffusers path, instead of showing a one-row list.
+          const [onlyUrl] = lookup.urls;
+
+          if (lookup.urls.length === 1 && onlyUrl) {
+            updateModelsUi({ hfLookup: null });
+
+            if ((await install({ accessToken: token, source: onlyUrl })) && isAccountScopeCurrent(owner)) {
+              setQuery('');
+            }
+
+            return;
+          }
+
+          updateModelsUi({ hfLookup: { repo: trimmed, urls: lookup.urls } });
+
           return;
         }
 
-        updateModelsUi({ hfLookup: { repo: trimmed, urls: lookup.urls } });
-
-        return;
-      }
-
-      if (
-        (await install({ accessToken: token, inplace: kind.looksLocal ? inplace : undefined, source: trimmed })) &&
-        isAccountScopeCurrent(owner)
-      ) {
-        setQuery('');
-      }
-    } catch (error) {
-      if (!isAccountScopeCurrent(owner)) {
-        return;
-      }
-
-      notify.error(t('models.installFailed'), error instanceof Error ? error.message : String(error));
-    } finally {
-      if (isAccountScopeCurrent(owner)) {
-        setIsPulling(false);
-      }
-    }
+        if (
+          (await install({ accessToken: token, inplace: kind.looksLocal ? inplace : undefined, source: trimmed })) &&
+          isAccountScopeCurrent(owner)
+        ) {
+          setQuery('');
+        }
+      },
+      (message) => notify.error(t('models.installFailed'), message)
+    );
   };
 
   const handleScan = async () => {
-    const owner = captureAccountScope();
+    await runScan(
+      async (owner) => {
+        const results = await scanFolderForModels(trimmed, owner.signal);
 
-    setIsScanning(true);
-
-    try {
-      const results = await scanFolderForModels(trimmed, owner.signal);
-
-      assertAccountScopeCurrent(owner);
-      updateModelsUi({ scan: { path: trimmed, results } });
-    } catch (error) {
-      if (!isAccountScopeCurrent(owner)) {
-        return;
-      }
-
-      notify.error(t('models.scanFailed'), error instanceof Error ? error.message : String(error));
-    } finally {
-      if (isAccountScopeCurrent(owner)) {
-        setIsScanning(false);
-      }
-    }
+        assertAccountScopeCurrent(owner);
+        updateModelsUi({ scan: { path: trimmed, results } });
+      },
+      (message) => notify.error(t('models.scanFailed'), message)
+    );
   };
 
   return (
