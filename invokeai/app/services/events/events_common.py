@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, ClassVar, Coroutine, Generic, Optional, Protocol, TypeAlias, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar, Coroutine, Generic, Literal, Optional, Protocol, TypeAlias, TypeVar
 
 from fastapi_events.handlers.local import local_handler
 from fastapi_events.registry.payload_schema import registry as payload_schema
@@ -138,6 +138,10 @@ class InvocationProgressEvent(InvocationEventBase):
     image: ProgressImage | None = Field(
         default=None, description="An image representing the current state of the progress"
     )
+    device: str | None = Field(
+        default=None,
+        description="The device processing this session, e.g. 'cuda:1' (set only when running on a CUDA GPU)",
+    )
 
     @classmethod
     def build(
@@ -148,6 +152,19 @@ class InvocationProgressEvent(InvocationEventBase):
         percentage: float | None = None,
         image: ProgressImage | None = None,
     ) -> "InvocationProgressEvent":
+        # Report the GPU executing the session. Prefer the queue item's persisted device: the
+        # thread-local session device is temporarily re-pinned to a borrowed idle GPU during
+        # offloaded encoder nodes, and using it here would make the UI's device badge jump to the
+        # borrowed GPU and back within a single queue item.
+        device: str | None = queue_item.device if queue_item.device and queue_item.device.startswith("cuda") else None
+        if device is None:
+            # Legacy single-device mode tags queue items with device=None; fall back to the worker
+            # thread's pinned device (set via TorchDevice.set_session_device()).
+            from invokeai.backend.util.devices import TorchDevice
+
+            session_device = TorchDevice.get_session_device()
+            device = str(session_device) if session_device is not None and session_device.type == "cuda" else None
+
         return cls(
             queue_id=queue_item.queue_id,
             item_id=queue_item.item_id,
@@ -161,6 +178,7 @@ class InvocationProgressEvent(InvocationEventBase):
             percentage=percentage,
             image=image,
             message=message,
+            device=device,
         )
 
 
@@ -792,6 +810,51 @@ class BulkDownloadErrorEvent(BulkDownloadEventBase):
             error=error,
             user_id=user_id,
         )
+
+
+class LLMTaskEventBase(EventBase):
+    """Base class for LLM utility task events (expand-prompt, image-to-prompt).
+
+    These events are correlated to a specific HTTP request via a client-supplied
+    task_id and routed privately to the originating user so partial prompt content
+    is not broadcast.
+    """
+
+    task_id: str = Field(description="Client-supplied task ID correlating events to a single request")
+    user_id: str = Field(default="system", description="ID of the user who initiated the task")
+
+
+@payload_schema.register
+class LLMTaskProgressEvent(LLMTaskEventBase):
+    """Event model for llm_task_progress"""
+
+    __event_name__ = "llm_task_progress"
+
+    phase: Literal["loading_model", "generating"] = Field(description="Which phase of the task is in progress")
+    message: str = Field(description="A short message describing the current phase")
+    percentage: float | None = Field(
+        default=None, ge=0, le=1, description="Progress fraction in [0, 1]; omit for indeterminate progress"
+    )
+    current_tokens: int | None = Field(default=None, description="Number of tokens generated so far (generating phase)")
+    total_tokens: int | None = Field(
+        default=None, description="Max tokens the request will generate (generating phase)"
+    )
+
+
+@payload_schema.register
+class LLMTaskCompleteEvent(LLMTaskEventBase):
+    """Event model for llm_task_complete"""
+
+    __event_name__ = "llm_task_complete"
+
+
+@payload_schema.register
+class LLMTaskErrorEvent(LLMTaskEventBase):
+    """Event model for llm_task_error"""
+
+    __event_name__ = "llm_task_error"
+
+    error: str = Field(description="The error message")
 
 
 @payload_schema.register

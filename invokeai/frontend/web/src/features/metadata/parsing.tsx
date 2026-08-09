@@ -10,12 +10,16 @@ import { loraAllDeleted, loraRecalled } from 'features/controlLayers/store/loras
 import {
   animaQwen3EncoderModelSelected,
   animaVaeModelSelected,
+  flux2DevMistralEncoderModelSelected,
+  flux2VaeModelSelected,
   geminiTemperatureChanged,
   geminiThinkingLevelChanged,
   heightChanged,
   imageSizeChanged,
+  isValidKrea2RebalanceWeights,
   kleinQwen3EncoderModelSelected,
-  kleinVaeModelSelected,
+  krea2Qwen3VlEncoderModelSelected,
+  krea2VaeModelSelected,
   negativePromptChanged,
   openaiBackgroundChanged,
   openaiInputFidelityChanged,
@@ -39,12 +43,23 @@ import {
   setFluxDypeScale,
   setFluxScheduler,
   setGuidance,
+  setHiDiffusionEnabled,
+  setHiDiffusionRauNetEnabled,
+  setHiDiffusionT1Ratio,
+  setHiDiffusionT2Ratio,
+  setHiDiffusionWindowAttnEnabled,
   setIdeogram4ColorPalette,
   setIdeogram4GuidanceScale,
   setIdeogram4Mu,
   setIdeogram4SamplerPreset,
   setIdeogram4Steps,
   setImg2imgStrength,
+  setKrea2RebalanceEnabled,
+  setKrea2RebalanceMultiplier,
+  setKrea2RebalanceWeights,
+  setKrea2SeedVarianceEnabled,
+  setKrea2SeedVarianceRandomizePercent,
+  setKrea2SeedVarianceStrength,
   setRefinerCFGScale,
   setRefinerNegativeAestheticScore,
   setRefinerPositiveAestheticScore,
@@ -162,6 +177,12 @@ const MetadataPrimitiveValue = ({ value }: { value: string | number | boolean | 
 
 const getProperty = (obj: unknown, path: string): unknown => {
   return get(obj, path) as unknown;
+};
+
+const assertMetadataModelBase = (metadata: unknown, expectedBase: string, handlerType: string): void => {
+  const rawModel = getProperty(metadata, 'model');
+  const modelBase = (rawModel as { base?: unknown } | undefined)?.base;
+  assert(modelBase === expectedBase, `${handlerType} handler only works with ${expectedBase} metadata`);
 };
 
 type UnparsedData = {
@@ -409,19 +430,33 @@ const CLIPSkip: SingleMetadataHandler<ParameterCLIPSkip> = {
 const Guidance: SingleMetadataHandler<ParameterGuidance> = {
   [SingleMetadataKey]: true,
   type: 'Guidance',
-  parse: (metadata, _store) => {
-    // Legacy FLUX.2 images may still carry a `guidance` field, but guidance_embeds
-    // is inert for all current Klein variants. Reject parsing for FLUX.2 metadata
-    // so the handler is skipped on both display and recall - avoids leaking a stale
-    // value into the shared guidance param (which is still used by FLUX.1).
+  parse: async (metadata, store) => {
+    // guidance_embeds is inert for FLUX.2 Klein but genuinely consumed by FLUX.2 [dev]
+    // (the graph sets guidance_embeds=True and passes the recorded guidance). So reject
+    // only for non-dev FLUX.2: this displays and recalls the value for [dev] while never
+    // leaking a stale value into the shared guidance param for Klein (shared with FLUX.1).
+    // Resolve the image's own model to read its variant; if it can't be resolved (e.g.
+    // uninstalled), fall back to skipping — same safe behavior as before for Klein.
     const rawModel = getProperty(metadata, 'model');
     const modelBase = (rawModel as { base?: unknown } | undefined)?.base;
     if (modelBase === 'flux2') {
-      throw new Error('Guidance is not used for FLUX.2 Klein models.');
+      let isDev = false;
+      try {
+        const config = await resolveModel(
+          rawModel as { key: string; hash?: string; name: string; base: string; type: string },
+          store
+        );
+        isDev = 'variant' in config && config.variant === 'dev';
+      } catch {
+        isDev = false;
+      }
+      if (!isDev) {
+        throw new Error('Guidance is not used for FLUX.2 Klein models.');
+      }
     }
     const raw = getProperty(metadata, 'guidance');
     const parsed = zParameterGuidance.parse(raw);
-    return Promise.resolve(parsed);
+    return parsed;
   },
   recall: (value, store) => {
     store.dispatch(setGuidance(value));
@@ -682,6 +717,96 @@ const SeamlessY: SingleMetadataHandler<ParameterSeamlessY> = {
   ValueComponent: ({ value }: SingleMetadataValueProps<ParameterSeamlessY>) => <MetadataPrimitiveValue value={value} />,
 };
 //#endregion SeamlessY
+
+//#region HiDiffusion
+const HiDiffusion: SingleMetadataHandler<boolean> = {
+  [SingleMetadataKey]: true,
+  type: 'HiDiffusion',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'hidiffusion');
+    const parsed = raw === undefined ? false : z.boolean().parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(setHiDiffusionEnabled(value));
+  },
+  i18nKey: 'metadata.hiDiffusion',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<boolean>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion HiDiffusion
+
+//#region HiDiffusionRAUNet
+const HiDiffusionRauNet: SingleMetadataHandler<boolean> = {
+  [SingleMetadataKey]: true,
+  type: 'HiDiffusionRauNet',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'hidiffusion_raunet');
+    const parsed = z.boolean().parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(setHiDiffusionRauNetEnabled(value));
+  },
+  i18nKey: 'metadata.hiDiffusionRauNet',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<boolean>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion HiDiffusionRAUNet
+
+//#region HiDiffusionWindowAttn
+const HiDiffusionWindowAttn: SingleMetadataHandler<boolean> = {
+  [SingleMetadataKey]: true,
+  type: 'HiDiffusionWindowAttn',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'hidiffusion_window_attn');
+    const parsed = z.boolean().parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(setHiDiffusionWindowAttnEnabled(value));
+  },
+  i18nKey: 'metadata.hiDiffusionWindowAttn',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<boolean>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion HiDiffusionWindowAttn
+
+//#region HiDiffusionT1Ratio
+const HiDiffusionT1Ratio: SingleMetadataHandler<number> = {
+  [SingleMetadataKey]: true,
+  type: 'HiDiffusionT1Ratio',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'hidiffusion_t1_ratio');
+    const parsed = z.number().parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(setHiDiffusionT1Ratio(value));
+  },
+  i18nKey: 'metadata.hiDiffusionT1Ratio',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<number>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion HiDiffusionT1Ratio
+
+//#region HiDiffusionT2Ratio
+const HiDiffusionT2Ratio: SingleMetadataHandler<number> = {
+  [SingleMetadataKey]: true,
+  type: 'HiDiffusionT2Ratio',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'hidiffusion_t2_ratio');
+    const parsed = z.number().parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(setHiDiffusionT2Ratio(value));
+  },
+  i18nKey: 'metadata.hiDiffusionT2Ratio',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<number>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion HiDiffusionT2Ratio
 
 //#region ZImageSeedVarianceEnabled
 const ZImageSeedVarianceEnabled: SingleMetadataHandler<boolean> = {
@@ -1366,9 +1491,12 @@ const VAEModel: SingleMetadataHandler<ParameterVAEModel> = {
     const parsed = await parseModelIdentifier(raw, store, 'vae');
     assert(parsed.type === 'vae');
     assert(isCompatibleWithMainModel(parsed, store));
-    // Z-Image and FLUX.2 Klein have dedicated VAE handlers; avoid rendering a duplicate row.
+    // Z-Image, FLUX.2 Klein and Krea-2 have dedicated VAE handlers; avoid rendering a duplicate row.
     const base = selectBase(store.getState());
-    assert(base !== 'z-image' && base !== 'flux2', 'VAEModel handler does not apply to Z-Image or FLUX.2 Klein');
+    assert(
+      base !== 'z-image' && base !== 'flux2' && base !== 'krea-2',
+      'VAEModel handler does not apply to Z-Image, FLUX.2 Klein or Krea-2'
+    );
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
@@ -1479,6 +1607,185 @@ const ZImageQwen3SourceModel: SingleMetadataHandler<ModelIdentifierField> = {
 };
 //#endregion ZImageQwen3SourceModel
 
+//#region Krea2VAEModel
+const Krea2VAEModel: SingleMetadataHandler<ModelIdentifierField> = {
+  [SingleMetadataKey]: true,
+  type: 'Krea2VAEModel',
+  parse: async (metadata, store) => {
+    assertMetadataModelBase(metadata, 'krea-2', 'Krea2VAEModel');
+    const raw = getProperty(metadata, 'vae');
+    const parsed = await parseModelIdentifier(raw, store, 'vae');
+    assert(parsed.type === 'vae');
+    assert(parsed.base === 'qwen-image' || parsed.base === 'anima', 'Krea2VAEModel requires a Qwen Image or Anima VAE');
+    // Only recall if the current main model is Krea-2 (its VAE dropdown differs from other bases).
+    const base = selectBase(store.getState());
+    assert(base === 'krea-2', 'Krea2VAEModel handler only works with Krea-2 models');
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(krea2VaeModelSelected(value));
+  },
+  i18nKey: 'metadata.vae',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField>) => (
+    <MetadataPrimitiveValue value={`${value.name} (${value.base.toUpperCase()})`} />
+  ),
+};
+//#endregion Krea2VAEModel
+
+//#region Krea2Qwen3VlEncoderModel
+const Krea2Qwen3VlEncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
+  [SingleMetadataKey]: true,
+  type: 'Krea2Qwen3VlEncoderModel',
+  parse: async (metadata, store) => {
+    assertMetadataModelBase(metadata, 'krea-2', 'Krea2Qwen3VlEncoderModel');
+    const raw = getProperty(metadata, 'qwen3_vl_encoder');
+    const parsed = await parseModelIdentifier(raw, store, 'qwen3_vl_encoder');
+    assert(parsed.type === 'qwen3_vl_encoder');
+    const base = selectBase(store.getState());
+    assert(base === 'krea-2', 'Krea2Qwen3VlEncoderModel handler only works with Krea-2 models');
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(krea2Qwen3VlEncoderModelSelected(value));
+  },
+  i18nKey: 'metadata.krea2Qwen3VlEncoder',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField>) => (
+    <MetadataPrimitiveValue value={`${value.name} (${value.base.toUpperCase()})`} />
+  ),
+};
+//#endregion Krea2Qwen3VlEncoderModel
+
+//#region Krea2SeedVarianceEnabled
+const Krea2SeedVarianceEnabled: SingleMetadataHandler<boolean> = {
+  [SingleMetadataKey]: true,
+  type: 'Krea2SeedVarianceEnabled',
+  parse: (metadata, store) => {
+    // Only applies to Krea-2 models, and only when the field is actually present — otherwise recalling
+    // an unrelated/older image would silently clear the user's current enhancer state. (A synchronous
+    // throw here is turned into a rejected promise by the parse runner, skipping the handler.)
+    assert(selectBase(store.getState()) === 'krea-2', 'Krea2SeedVarianceEnabled handler only applies to Krea-2 models');
+    assertMetadataModelBase(metadata, 'krea-2', 'Krea2SeedVarianceEnabled');
+    const raw = getProperty(metadata, 'krea2_seed_variance_enabled');
+    return Promise.resolve(z.boolean().parse(raw));
+  },
+  recall: (value, store) => {
+    store.dispatch(setKrea2SeedVarianceEnabled(value));
+  },
+  i18nKey: 'metadata.seedVarianceEnabled',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<boolean>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion Krea2SeedVarianceEnabled
+
+//#region Krea2SeedVarianceStrength
+const Krea2SeedVarianceStrength: SingleMetadataHandler<number> = {
+  [SingleMetadataKey]: true,
+  type: 'Krea2SeedVarianceStrength',
+  parse: (metadata, store) => {
+    assert(
+      selectBase(store.getState()) === 'krea-2',
+      'Krea2SeedVarianceStrength handler only applies to Krea-2 models'
+    );
+    assertMetadataModelBase(metadata, 'krea-2', 'Krea2SeedVarianceStrength');
+    const raw = getProperty(metadata, 'krea2_seed_variance_strength');
+    // Strength is a multiplier of the embedding std, capped at 2 (matches the invocation + param state).
+    return Promise.resolve(z.number().min(0).max(2).parse(raw));
+  },
+  recall: (value, store) => {
+    store.dispatch(setKrea2SeedVarianceStrength(value));
+  },
+  i18nKey: 'metadata.seedVarianceStrength',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<number>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion Krea2SeedVarianceStrength
+
+//#region Krea2SeedVarianceRandomizePercent
+const Krea2SeedVarianceRandomizePercent: SingleMetadataHandler<number> = {
+  [SingleMetadataKey]: true,
+  type: 'Krea2SeedVarianceRandomizePercent',
+  parse: (metadata, store) => {
+    assert(
+      selectBase(store.getState()) === 'krea-2',
+      'Krea2SeedVarianceRandomizePercent handler only applies to Krea-2 models'
+    );
+    assertMetadataModelBase(metadata, 'krea-2', 'Krea2SeedVarianceRandomizePercent');
+    const raw = getProperty(metadata, 'krea2_seed_variance_randomize_percent');
+    // 0 is the valid "disabled" value (matches the slider, param state, and invocation); reject negatives.
+    return Promise.resolve(z.number().min(0).max(100).parse(raw));
+  },
+  recall: (value, store) => {
+    store.dispatch(setKrea2SeedVarianceRandomizePercent(value));
+  },
+  i18nKey: 'metadata.seedVarianceRandomizePercent',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<number>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion Krea2SeedVarianceRandomizePercent
+
+//#region Krea2RebalanceEnabled
+const Krea2RebalanceEnabled: SingleMetadataHandler<boolean> = {
+  [SingleMetadataKey]: true,
+  type: 'Krea2RebalanceEnabled',
+  parse: (metadata, store) => {
+    assert(selectBase(store.getState()) === 'krea-2', 'Krea2RebalanceEnabled handler only applies to Krea-2 models');
+    assertMetadataModelBase(metadata, 'krea-2', 'Krea2RebalanceEnabled');
+    const raw = getProperty(metadata, 'krea2_rebalance_enabled');
+    return Promise.resolve(z.boolean().parse(raw));
+  },
+  recall: (value, store) => {
+    store.dispatch(setKrea2RebalanceEnabled(value));
+  },
+  i18nKey: 'metadata.krea2RebalanceEnabled',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<boolean>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion Krea2RebalanceEnabled
+
+//#region Krea2RebalanceMultiplier
+const Krea2RebalanceMultiplier: SingleMetadataHandler<number> = {
+  [SingleMetadataKey]: true,
+  type: 'Krea2RebalanceMultiplier',
+  parse: (metadata, store) => {
+    assert(selectBase(store.getState()) === 'krea-2', 'Krea2RebalanceMultiplier handler only applies to Krea-2 models');
+    assertMetadataModelBase(metadata, 'krea-2', 'Krea2RebalanceMultiplier');
+    const raw = getProperty(metadata, 'krea2_rebalance_multiplier');
+    return Promise.resolve(z.number().min(0).max(20).parse(raw));
+  },
+  recall: (value, store) => {
+    store.dispatch(setKrea2RebalanceMultiplier(value));
+  },
+  i18nKey: 'metadata.krea2RebalanceMultiplier',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<number>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion Krea2RebalanceMultiplier
+
+//#region Krea2RebalanceWeights
+const Krea2RebalanceWeights: SingleMetadataHandler<string> = {
+  [SingleMetadataKey]: true,
+  type: 'Krea2RebalanceWeights',
+  parse: (metadata, store) => {
+    assert(selectBase(store.getState()) === 'krea-2', 'Krea2RebalanceWeights handler only applies to Krea-2 models');
+    assertMetadataModelBase(metadata, 'krea-2', 'Krea2RebalanceWeights');
+    const raw = getProperty(metadata, 'krea2_rebalance_weights');
+    // Only recall a string the backend rebalance node would actually accept (exactly 12 finite numbers),
+    // so recalling stale/garbage metadata can't dispatch state that later fails at generation time.
+    return Promise.resolve(
+      z.string().refine(isValidKrea2RebalanceWeights, 'expected exactly 12 finite comma-separated numbers').parse(raw)
+    );
+  },
+  recall: (value, store) => {
+    store.dispatch(setKrea2RebalanceWeights(value));
+  },
+  i18nKey: 'metadata.krea2RebalanceWeights',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<string>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion Krea2RebalanceWeights
+
 //#region AnimaVAEModel
 const AnimaVAEModel: SingleMetadataHandler<ModelIdentifierField> = {
   [SingleMetadataKey]: true,
@@ -1525,21 +1832,25 @@ const AnimaQwen3EncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
 };
 //#endregion AnimaQwen3EncoderModel
 
-//#region KleinVAEModel
-const KleinVAEModel: SingleMetadataHandler<ModelIdentifierField> = {
+//#region Flux2VAEModel
+/**
+ * FLUX.2 Klein and FLUX.2 [dev] share a single VAE slot (`flux2VaeModel`) and the same
+ * `metadata.vae` field — both draw from the 32-channel AutoencoderKLFlux2 pool — so one
+ * handler covers both variants and no dev/Klein disambiguation is needed on recall.
+ */
+const Flux2VAEModel: SingleMetadataHandler<ModelIdentifierField> = {
   [SingleMetadataKey]: true,
-  type: 'KleinVAEModel',
+  type: 'Flux2VAEModel',
   parse: async (metadata, store) => {
     const raw = getProperty(metadata, 'vae');
     const parsed = await parseModelIdentifier(raw, store, 'vae');
     assert(parsed.type === 'vae');
-    // Only recall if the current main model is FLUX.2 Klein
     const base = selectBase(store.getState());
-    assert(base === 'flux2', 'KleinVAEModel handler only works with FLUX.2 Klein models');
-    return Promise.resolve(parsed);
+    assert(base === 'flux2', 'Flux2VAEModel handler only works with FLUX.2 models');
+    return parsed;
   },
   recall: (value, store) => {
-    store.dispatch(kleinVaeModelSelected(value));
+    store.dispatch(flux2VaeModelSelected(value));
   },
   i18nKey: 'metadata.vae',
   LabelComponent: MetadataLabel,
@@ -1547,7 +1858,7 @@ const KleinVAEModel: SingleMetadataHandler<ModelIdentifierField> = {
     <MetadataPrimitiveValue value={`${value.name} (${value.base.toUpperCase()})`} />
   ),
 };
-//#endregion KleinVAEModel
+//#endregion Flux2VAEModel
 
 //#region KleinQwen3EncoderModel
 const KleinQwen3EncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
@@ -1557,7 +1868,8 @@ const KleinQwen3EncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
     const raw = getProperty(metadata, 'qwen3_encoder');
     const parsed = await parseModelIdentifier(raw, store, 'qwen3_encoder');
     assert(parsed.type === 'qwen3_encoder');
-    // Only recall if the current main model is FLUX.2 Klein
+    // qwen3_encoder is Klein-only metadata; dev never writes it. Just gate on
+    // base. (parseModelIdentifier already rejects when the field is absent.)
     const base = selectBase(store.getState());
     assert(base === 'flux2', 'KleinQwen3EncoderModel handler only works with FLUX.2 Klein models');
     return Promise.resolve(parsed);
@@ -1572,6 +1884,31 @@ const KleinQwen3EncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
   ),
 };
 //#endregion KleinQwen3EncoderModel
+
+//#region Flux2DevMistralEncoderModel
+const Flux2DevMistralEncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
+  [SingleMetadataKey]: true,
+  type: 'Flux2DevMistralEncoderModel',
+  parse: async (metadata, store) => {
+    const raw = getProperty(metadata, 'mistral_encoder');
+    const parsed = await parseModelIdentifier(raw, store, 'mistral_encoder');
+    assert(parsed.type === 'mistral_encoder');
+    // mistral_encoder is dev-only metadata; Klein never writes it. Just gate on
+    // base. (parseModelIdentifier already rejects when the field is absent.)
+    const base = selectBase(store.getState());
+    assert(base === 'flux2', 'Flux2DevMistralEncoderModel handler only works with FLUX.2 models');
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(flux2DevMistralEncoderModelSelected(value));
+  },
+  i18nKey: 'metadata.mistralEncoder',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField>) => (
+    <MetadataPrimitiveValue value={`${value.name} (${value.base.toUpperCase()})`} />
+  ),
+};
+//#endregion Flux2DevMistralEncoderModel
 
 //#region LoRAs
 const LoRAs: CollectionMetadataHandler<LoRA[]> = {
@@ -1956,6 +2293,11 @@ export const ImageMetadataHandlers = {
   DenoisingStrength,
   SeamlessX,
   SeamlessY,
+  HiDiffusion,
+  HiDiffusionRauNet,
+  HiDiffusionWindowAttn,
+  HiDiffusionT1Ratio,
+  HiDiffusionT2Ratio,
   RefinerModel,
   RefinerSteps,
   RefinerCFGScale,
@@ -1973,11 +2315,20 @@ export const ImageMetadataHandlers = {
   ZImageQwen3SourceModel,
   AnimaVAEModel,
   AnimaQwen3EncoderModel,
-  KleinVAEModel,
+  Flux2VAEModel,
   KleinQwen3EncoderModel,
+  Flux2DevMistralEncoderModel,
   ZImageSeedVarianceEnabled,
   ZImageSeedVarianceStrength,
   ZImageSeedVarianceRandomizePercent,
+  Krea2VAEModel,
+  Krea2Qwen3VlEncoderModel,
+  Krea2SeedVarianceEnabled,
+  Krea2SeedVarianceStrength,
+  Krea2SeedVarianceRandomizePercent,
+  Krea2RebalanceEnabled,
+  Krea2RebalanceMultiplier,
+  Krea2RebalanceWeights,
   QwenImageComponentSource,
   QwenImageVaeModel,
   QwenImageQwenVLEncoderModel,

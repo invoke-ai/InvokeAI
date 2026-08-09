@@ -12,7 +12,7 @@ LoRA iteration) live in ``wan_denoise`` and are imported here.
 """
 
 from contextlib import ExitStack
-from typing import Callable, Iterable, Optional, Tuple
+from typing import Callable, Iterable, Optional
 
 import torch
 from tqdm import tqdm
@@ -36,7 +36,7 @@ from invokeai.app.invocations.wan_denoise import (
 )
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, WanVariantType
-from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
+from invokeai.backend.patches.layer_patcher import PatchSpec
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import WanConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
@@ -282,10 +282,10 @@ class WanVideoDenoiseInvocation(BaseInvocation):
         high_is_quantized = high_config.format == ModelFormat.GGUFQuantized
         low_is_quantized = low_config.format == ModelFormat.GGUFQuantized if low_config is not None else False
 
-        def high_lora_factory() -> Iterable[Tuple[ModelPatchRaw, float]]:
+        def high_lora_factory() -> Iterable[PatchSpec]:
             return proxy._lora_iterator(context, high_loras)
 
-        def low_lora_factory() -> Iterable[Tuple[ModelPatchRaw, float]]:
+        def low_lora_factory() -> Iterable[PatchSpec]:
             return proxy._lora_iterator(context, low_loras)
 
         with ExitStack() as exit_stack:
