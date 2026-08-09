@@ -474,7 +474,10 @@
             "label": "",
             "description": ""
           },
-          "end_image": { "name": "end_image", "label": "" },
+          "end_image": {
+            "name": "end_image",
+            "label": ""
+          },
           "vae": {
             "name": "vae",
             "label": "",
@@ -585,7 +588,7 @@
       "type": "invocation",
       "data": {
         "id": "4b32c22b-679d-4d5e-a167-c3309265fcd9",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",
@@ -741,7 +744,7 @@
       "type": "invocation",
       "data": {
         "id": "52e0f43e-0593-4ba6-bb50-df63464a6189",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",
