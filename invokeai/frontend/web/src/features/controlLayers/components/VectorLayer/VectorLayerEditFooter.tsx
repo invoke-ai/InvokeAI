@@ -13,6 +13,8 @@ import {
 import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
+import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
+import { useEntityTypeIsHidden } from 'features/controlLayers/hooks/useEntityTypeIsHidden';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { BezierPointType } from 'features/controlLayers/util/bezierPath';
 import { useHotkeyData } from 'features/system/components/HotkeysModal/useHotkeyData';
@@ -31,6 +33,26 @@ export const VectorLayerEditFooter = memo(() => {
   const hotkeysData = useHotkeyData();
   const [smoothTarget, setSmoothTarget] = useState<'path' | 'selected'>('path');
   const editSession = useStore(canvasManager.tool.tools.path.$editSession);
+  const isBusy = useCanvasIsBusy();
+  const isVectorLayerTypeHidden = useEntityTypeIsHidden('vector_layer');
+  const isEditSessionEntityMutable = useAppSelector((state) => {
+    if (!editSession) {
+      return false;
+    }
+
+    const canvas = selectCanvasSlice(state);
+    const selectedEntityIdentifier = canvas.selectedEntityIdentifier;
+    if (
+      !selectedEntityIdentifier ||
+      selectedEntityIdentifier.id !== editSession.entityIdentifier.id ||
+      selectedEntityIdentifier.type !== editSession.entityIdentifier.type
+    ) {
+      return false;
+    }
+
+    const layer = canvas.vectorLayers.entities.find((entity) => entity.id === editSession.entityIdentifier.id);
+    return Boolean(layer?.isEnabled && !layer.isLocked);
+  });
   const activePointType = useAppSelector((state) => {
     if (!editSession || !editSession.activePathId || editSession.activePointIndex === null) {
       return null;
@@ -97,6 +119,7 @@ export const VectorLayerEditFooter = memo(() => {
     return null;
   }
 
+  const canMutateEditSession = isEditSessionEntityMutable && !isBusy && !isVectorLayerTypeHidden;
   const deletePathKeys = hotkeysData.canvas.hotkeys.deleteSelected?.platformKeys[0] ?? ['Delete'];
 
   return (
@@ -110,7 +133,7 @@ export const VectorLayerEditFooter = memo(() => {
           <Kbd fontSize="xs">{deletePathKeys.join('+')}</Kbd>
         </Flex>
       </Flex>
-      <FormControl isDisabled={!activePointType}>
+      <FormControl isDisabled={!activePointType || !canMutateEditSession}>
         <FormLabel m={0}>{t('controlLayers.vectorEdit.pointType')}</FormLabel>
         <RadioGroup value={activePointType ?? undefined} onChange={onPointTypeChange} size="sm">
           <Flex alignItems="center" gap={4} color="base.300" wrap="wrap">
@@ -129,7 +152,9 @@ export const VectorLayerEditFooter = memo(() => {
       <Flex w="full" alignItems="center" gap={4}>
         <Button
           onClick={onSmoothPath}
-          isDisabled={smoothTarget === 'selected' ? !canSmoothSelectedPoints : !canSmoothActivePath}
+          isDisabled={
+            !canMutateEditSession || (smoothTarget === 'selected' ? !canSmoothSelectedPoints : !canSmoothActivePath)
+          }
           variant="ghost"
           size="sm"
           minW="unset"
@@ -142,7 +167,7 @@ export const VectorLayerEditFooter = memo(() => {
         </Radio>
       </Flex>
       <ButtonGroup isAttached={false} size="sm" w="full" justifyContent="flex-end">
-        <Button onClick={onReset} variant="ghost">
+        <Button onClick={onReset} isDisabled={!canMutateEditSession} variant="ghost">
           {t('common.reset')}
         </Button>
         <Button onClick={onApply} variant="ghost">

@@ -223,6 +223,44 @@ export class CanvasPathToolModule extends CanvasModuleBase {
     return Boolean(this.$editSession.get());
   };
 
+  getCanStartEdit = (entityIdentifier: CanvasEntityIdentifier<'vector_layer'>): boolean => {
+    const adapter = this.manager.getAdapter(entityIdentifier);
+    return Boolean(
+      adapter &&
+      adapter.state.type === 'vector_layer' &&
+      adapter.state.paths.length > 0 &&
+      !this.manager.$isBusy.get() &&
+      !adapter.$isDisabled.get() &&
+      !adapter.$isEntityTypeHidden.get() &&
+      !adapter.$isLocked.get()
+    );
+  };
+
+  getCanMutateEditSession = (): boolean => {
+    const session = this.$editSession.get();
+    if (!session || this.manager.$isBusy.get()) {
+      return false;
+    }
+
+    const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
+    if (
+      !selectedEntity ||
+      selectedEntity.entityIdentifier.id !== session.entityIdentifier.id ||
+      selectedEntity.entityIdentifier.type !== session.entityIdentifier.type
+    ) {
+      return false;
+    }
+
+    const adapter = this.manager.getAdapter(session.entityIdentifier);
+    return Boolean(
+      adapter &&
+      adapter.state.type === 'vector_layer' &&
+      !adapter.$isDisabled.get() &&
+      !adapter.$isEntityTypeHidden.get() &&
+      !adapter.$isLocked.get()
+    );
+  };
+
   hasActiveEditDragSession = (): boolean => {
     return Boolean(this.$editSession.get()?.dragTarget);
   };
@@ -233,7 +271,7 @@ export class CanvasPathToolModule extends CanvasModuleBase {
 
   startEdit = (entityIdentifier: CanvasEntityIdentifier<'vector_layer'>) => {
     const adapter = this.manager.getAdapter(entityIdentifier);
-    if (!adapter || adapter.state.type !== 'vector_layer' || adapter.state.paths.length === 0) {
+    if (!adapter || adapter.state.type !== 'vector_layer' || !this.getCanStartEdit(entityIdentifier)) {
       return;
     }
 
@@ -280,7 +318,7 @@ export class CanvasPathToolModule extends CanvasModuleBase {
 
   resetEditSession = () => {
     const session = this.$editSession.get();
-    if (!session) {
+    if (!session || !this.getCanMutateEditSession()) {
       return;
     }
 
@@ -593,7 +631,7 @@ export class CanvasPathToolModule extends CanvasModuleBase {
 
   private getEditSessionAdapter = () => {
     const session = this.$editSession.get();
-    if (!session) {
+    if (!session || !this.getCanMutateEditSession()) {
       return null;
     }
 

@@ -498,6 +498,10 @@ export class CanvasToolModule extends CanvasModuleBase {
     const isVectorDrawingTool = tool === 'path' || (tool === 'rect' && selectedEntity?.state.type === 'vector_layer');
 
     if (isVectorDrawingTool) {
+      if (tool === 'path' && this.tools.path.hasActiveEditSession()) {
+        return this.tools.path.getCanMutateEditSession();
+      }
+
       if (this.manager.$isBusy.get()) {
         return false;
       }

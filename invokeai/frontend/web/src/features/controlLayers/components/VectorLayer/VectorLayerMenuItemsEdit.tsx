@@ -3,6 +3,8 @@ import { useStore } from '@nanostores/react';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useEntityAdapterSafe } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
+import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
+import { useEntityTypeIsHidden } from 'features/controlLayers/hooks/useEntityTypeIsHidden';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPencilSimpleLineBold } from 'react-icons/pi';
@@ -12,6 +14,8 @@ export const VectorLayerMenuItemsEdit = memo(() => {
   const canvasManager = useCanvasManager();
   const entityIdentifier = useEntityIdentifierContext('vector_layer');
   const adapter = useEntityAdapterSafe(entityIdentifier);
+  const isBusy = useCanvasIsBusy();
+  const isVectorLayerTypeHidden = useEntityTypeIsHidden('vector_layer');
   const editSession = useStore(canvasManager.tool.tools.path.$editSession);
   const onClick = useCallback(() => {
     canvasManager.tool.tools.path.startEdit(entityIdentifier);
@@ -29,7 +33,14 @@ export const VectorLayerMenuItemsEdit = memo(() => {
     <MenuItem
       onClick={onClick}
       icon={<PiPencilSimpleLineBold />}
-      isDisabled={adapter.state.paths.length === 0 || isEditingThisLayer}
+      isDisabled={
+        adapter.state.paths.length === 0 ||
+        !adapter.state.isEnabled ||
+        adapter.state.isLocked ||
+        isVectorLayerTypeHidden ||
+        isBusy ||
+        isEditingThisLayer
+      }
     >
       {t('common.edit')}
     </MenuItem>

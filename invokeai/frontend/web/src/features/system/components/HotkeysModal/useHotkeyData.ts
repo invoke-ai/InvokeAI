@@ -1,4 +1,5 @@
 import { useAppSelector } from 'app/store/storeHooks';
+import { useIsCanvasPathEditSessionActive } from 'features/controlLayers/hooks/useIsCanvasPathEditSessionActive';
 import { useIsUncommittedCanvasTextSessionActive } from 'features/controlLayers/hooks/useIsUncommittedCanvasTextSessionActive';
 import {
   canonicalizeHotkeyString,
@@ -15,6 +16,8 @@ import { useTranslation } from 'react-i18next';
 import { assert } from 'tsafe';
 
 type HotkeyCategory = 'app' | 'canvas' | 'viewer' | 'gallery' | 'workflows';
+
+export const getIsHotkeyAllowedDuringCanvasPathEdit = (category: HotkeyCategory): boolean => category === 'canvas';
 
 export { IS_MAC_OS } from 'features/system/components/HotkeysModal/hotkeyStrings';
 
@@ -255,6 +258,7 @@ type UseRegisteredHotkeysArg = {
  * A wrapper around `useHotkeys` that adds a handler for a registered hotkey.
  */
 export const useRegisteredHotkeys = ({ id, category, callback, options, dependencies }: UseRegisteredHotkeysArg) => {
+  const isCanvasPathEditSessionActive = useIsCanvasPathEditSessionActive();
   const isUncommittedCanvasTextSessionActive = useIsUncommittedCanvasTextSessionActive();
   const hotkeysData = useHotkeyData();
   const data = useMemo(() => {
@@ -284,13 +288,17 @@ export const useRegisteredHotkeys = ({ id, category, callback, options, dependen
         if (isUncommittedCanvasTextSessionActive()) {
           return false;
         }
+        // Keep path-editing hotkeys active, but prevent shortcuts from acting on another app region.
+        if (isCanvasPathEditSessionActive() && !getIsHotkeyAllowedDuringCanvasPathEdit(category)) {
+          return false;
+        }
         if (typeof _options.enabled === 'function') {
           return _options.enabled(event, hotkeysEvent);
         }
         return _options.enabled ?? true;
       },
     } satisfies Options;
-  }, [_options, isUncommittedCanvasTextSessionActive]);
+  }, [_options, category, isCanvasPathEditSessionActive, isUncommittedCanvasTextSessionActive]);
 
   return useHotkeys(data.hotkeys, callback, _optionsWithCanvasTextGuard, dependencies);
 };

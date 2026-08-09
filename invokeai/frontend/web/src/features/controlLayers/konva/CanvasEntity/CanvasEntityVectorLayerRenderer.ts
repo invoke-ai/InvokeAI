@@ -1,3 +1,4 @@
+import { debounce } from 'es-toolkit/compat';
 import { CanvasEntityObjectRenderer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityObjectRenderer';
 import { areStageAttrsGonnaExplode } from 'features/controlLayers/konva/util';
 import { buildBezierPathData } from 'features/controlLayers/util/bezierPath';
@@ -5,8 +6,13 @@ import Konva from 'konva';
 
 const VECTOR_PATH_STROKE = 'rgba(90, 175, 255, 1)';
 const VECTOR_PATH_STROKE_WIDTH_PX = 1.5;
+const VECTOR_PATH_RECT_RECALC_DEBOUNCE_MS = 100;
 
 export class CanvasEntityVectorLayerRenderer extends CanvasEntityObjectRenderer {
+  private requestRectCalculation = debounce(() => {
+    void this.parent.transformer.requestRectCalculation();
+  }, VECTOR_PATH_RECT_RECALC_DEBOUNCE_MS);
+
   constructor(...args: ConstructorParameters<typeof CanvasEntityObjectRenderer>) {
     super(...args);
 
@@ -17,9 +23,11 @@ export class CanvasEntityVectorLayerRenderer extends CanvasEntityObjectRenderer 
         }
         if (stageAttrs.scale !== oldStageAttrs.scale) {
           this.syncPathStrokeWidths();
+          this.requestRectCalculation();
         }
       })
     );
+    this.subscriptions.add(() => this.requestRectCalculation.cancel());
   }
 
   render = (): Promise<boolean> => {
