@@ -35,9 +35,6 @@ export const listMissingModels = async (signal?: AbortSignal): Promise<ModelConf
 export const getModelsDir = (signal?: AbortSignal): Promise<string> =>
   requestJson<string>(`${MODELS_BASE}/models_dir`, { signal });
 
-export const getModel = (key: string): Promise<ModelConfig> =>
-  requestJson<ModelConfig>(`${MODELS_BASE}/i/${encodeURIComponent(key)}`);
-
 export const updateModel = (key: string, changes: ModelRecordChanges, signal?: AbortSignal): Promise<ModelConfig> =>
   requestJson<ModelConfig>(`${MODELS_BASE}/i/${encodeURIComponent(key)}`, {
     body: JSON.stringify(changes),

@@ -1,53 +1,13 @@
 import { z } from 'zod';
 
 /**
- * Zod schemas backing every model-manager form. All user input is validated
- * through these before touching the API, so error states are consistent and
- * the API layer can assume well-formed values.
+ * Zod schemas for the model-manager forms with structured validation (edit,
+ * default settings, trigger phrases). User input goes through these before
+ * touching the API, so error states are consistent and the API layer can
+ * assume well-formed values.
  */
 
 const trimmed = z.string().trim();
-
-/** URL, HuggingFace repo id, or absolute local path. */
-export const installSourceSchema = z.object({
-  accessToken: trimmed.optional(),
-  inplace: z.boolean(),
-  source: trimmed
-    .min(1, 'Enter a URL, HuggingFace repo id, or local path.')
-    .refine(
-      (value) => !value.includes(' ') || value.startsWith('/') || /^[A-Za-z]:[\\/]/.test(value),
-      'URLs and repo ids cannot contain spaces.'
-    ),
-});
-
-export type InstallSourceFormValues = z.infer<typeof installSourceSchema>;
-
-/** `owner/name` with optional `:variant[:path]` qualifiers. */
-export const huggingFaceRepoSchema = z.object({
-  repo: trimmed
-    .min(1, 'Enter a HuggingFace repo id.')
-    .regex(/^[\w.-]+\/[\w.-]+(:[\w./-]*)*$/, 'Expected an owner/repo id, e.g. black-forest-labs/FLUX.1-dev.'),
-});
-
-export type HuggingFaceRepoFormValues = z.infer<typeof huggingFaceRepoSchema>;
-
-export const scanFolderSchema = z.object({
-  path: trimmed.min(1, 'Enter an absolute folder path on the server.'),
-});
-
-export type ScanFolderFormValues = z.infer<typeof scanFolderSchema>;
-
-export const hfTokenSchema = z.object({
-  token: trimmed.min(1, 'Paste a HuggingFace access token.'),
-});
-
-export type HFTokenFormValues = z.infer<typeof hfTokenSchema>;
-
-export const civitaiKeySchema = z.object({
-  key: trimmed.min(1, 'Paste a Civitai API key.'),
-});
-
-export type CivitaiKeyFormValues = z.infer<typeof civitaiKeySchema>;
 
 export const modelEditSchema = z.object({
   base: trimmed.min(1, 'Base architecture is required.'),
