@@ -10,11 +10,13 @@ import {
   zParameterCLIPGEmbedModel,
   zParameterCLIPLEmbedModel,
   zParameterControlLoRAModel,
+  zParameterErnieImageScheduler,
   zParameterFluxDypeExponent,
   zParameterFluxDypePreset,
   zParameterFluxDypeScale,
   zParameterFluxScheduler,
   zParameterGuidance,
+  zParameterIdeogram4SamplerPreset,
   zParameterImageDimension,
   zParameterMaskBlurMethod,
   zParameterModel,
@@ -226,6 +228,8 @@ const zCanvasBrushLineWithPressureState = z.object({
    */
   points: zPointsWithPressure,
   color: zRgbaColor,
+  pressureAffectsWidth: z.boolean().default(true),
+  pressureAffectsOpacity: z.boolean().default(false),
   clip: zRect.nullable(),
   globalCompositeOperation: z.string().optional(),
 });
@@ -251,6 +255,7 @@ const zCanvasEraserLineWithPressureState = z.object({
    * Points with pressure are in the format [x1, y1, pressure1, x2, y2, pressure2, ...]
    */
   points: zPointsWithPressure,
+  pressureAffectsWidth: z.boolean().default(true),
   clip: zRect.nullable(),
 });
 export type CanvasEraserLineWithPressureState = z.infer<typeof zCanvasEraserLineWithPressureState>;
@@ -424,6 +429,15 @@ const zQwenImageReferenceImageConfig = z.object({
 });
 export type QwenImageReferenceImageConfig = z.infer<typeof zQwenImageReferenceImageConfig>;
 
+// Wan 2.2 I2V uses the model's own VAE to encode a single reference image -
+// no separate adapter model needed. Only consumed by the I2V variant of Wan
+// 2.2 (A14B). T2V / TI2V variants ignore the ref image at graph build time.
+const zWanReferenceImageConfig = z.object({
+  type: z.literal('wan_reference_image'),
+  image: zCroppableImageWithDims.nullable(),
+});
+export type WanReferenceImageConfig = z.infer<typeof zWanReferenceImageConfig>;
+
 const zCanvasEntityBase = z.object({
   id: zId,
   name: zName,
@@ -440,6 +454,7 @@ export const zRefImageState = z.object({
     zFluxKontextReferenceImageConfig,
     zFlux2ReferenceImageConfig,
     zQwenImageReferenceImageConfig,
+    zWanReferenceImageConfig,
   ]),
 });
 export type RefImageState = z.infer<typeof zRefImageState>;
@@ -460,6 +475,9 @@ export const isFlux2ReferenceImageConfig = (config: RefImageState['config']): co
 export const isQwenImageReferenceImageConfig = (
   config: RefImageState['config']
 ): config is QwenImageReferenceImageConfig => config.type === 'qwen_image_reference_image';
+
+export const isWanReferenceImageConfig = (config: RefImageState['config']): config is WanReferenceImageConfig =>
+  config.type === 'wan_reference_image';
 
 const zFillStyle = z.enum(['solid', 'grid', 'crosshatch', 'diagonal', 'horizontal', 'vertical']);
 export type FillStyle = z.infer<typeof zFillStyle>;
@@ -795,8 +813,11 @@ const zPositivePromptHistory = z
 export const zInfillMethod = z.enum(['patchmatch', 'lama', 'cv2', 'color', 'tile']);
 export type InfillMethod = z.infer<typeof zInfillMethod>;
 
+const zPidMode = z.enum(['off', 'fit', 'native']);
+export type PidMode = z.infer<typeof zPidMode>;
+
 export const zParamsState = z.object({
-  _version: z.literal(3),
+  _version: z.literal(5),
   maskBlur: z.number(),
   maskBlurMethod: zParameterMaskBlurMethod,
   canvasCoherenceMode: zParameterCanvasCoherenceMode,
@@ -811,6 +832,15 @@ export const zParamsState = z.object({
   guidance: zParameterGuidance,
   img2imgStrength: zParameterStrength,
   optimizedDenoisingEnabled: z.boolean(),
+  // Added after the `_version` 3 -> 4 bump, so while 4 was current no migration step could seed them
+  // — a blob already at v4 matched no branch in the chain. Without defaults they are required, and
+  // every persisted blob in existence fails the parse in `migrate()`, wiping the user's whole params
+  // slice on upgrade. The defaults are still what covers the current tier, which has no step either.
+  hiDiffusionEnabled: z.boolean().default(false),
+  hiDiffusionRauNetEnabled: z.boolean().default(true),
+  hiDiffusionWindowAttnEnabled: z.boolean().default(true),
+  hiDiffusionT1Ratio: z.number().default(0.4),
+  hiDiffusionT2Ratio: z.number().default(0.0),
   iterations: z.number(),
   scheduler: zParameterScheduler,
   fluxScheduler: zParameterFluxScheduler,
@@ -819,6 +849,19 @@ export const zParamsState = z.object({
   fluxDypeExponent: zParameterFluxDypeExponent,
   zImageScheduler: zParameterZImageScheduler,
   zImageShift: z.number().min(0).max(3).nullable(),
+  // Defaults make these resilient to rehydration of persisted state saved before the fields existed.
+  ernieImageScheduler: zParameterErnieImageScheduler.default('euler'),
+  ernieImageUsePromptEnhancer: z.boolean().default(true),
+  ideogram4SamplerPreset: zParameterIdeogram4SamplerPreset.default('V4_QUALITY_48'),
+  // Optional advanced overrides of the Ideogram 4 sampler preset (null = use the preset's value).
+  // Backend requires steps >= 2 (a polish and a main step). `.catch(null)` normalizes a stale/invalid
+  // persisted or recalled value (e.g. 1 from an older build) to null (= use preset) instead of letting an
+  // out-of-range value reach the graph or breaking the whole persisted params slice on rehydrate.
+  ideogram4Steps: z.number().int().min(2).max(100).nullable().catch(null).default(null),
+  ideogram4GuidanceScale: z.number().min(1).max(20).nullable().default(null),
+  ideogram4Mu: z.number().min(-4).max(4).nullable().default(null),
+  // Hex colors (#RRGGBB) injected into the JSON caption's style_description.color_palette.
+  ideogram4ColorPalette: z.array(z.string()).default([]),
   upscaleScheduler: zParameterScheduler,
   upscaleCfgScale: zParameterCFGScale,
   seed: zParameterSeed,
@@ -858,19 +901,55 @@ export const zParamsState = z.object({
   animaScheduler: zParameterAnimaScheduler,
   animaLLLiteModel: zModelIdentifierField.nullable().default(null), // Optional: ControlNet-LLLite inpaint adapter for Anima
   animaLLLiteWeight: z.number().min(-10).max(10).default(1),
-  // Flux2 Klein model components - uses Qwen3 instead of CLIP+T5
-  kleinVaeModel: zParameterVAEModel.nullable(), // Optional: Separate FLUX.2 VAE for Klein
+  // FLUX.2 VAE shared by Klein and [dev] — both use the same 32-channel AutoencoderKLFlux2 pool,
+  // so a single slot avoids losing the selection when switching a GGUF between the two.
+  flux2VaeModel: zParameterVAEModel.nullable(), // Optional: Separate FLUX.2 VAE (Klein + [dev])
+  // Flux2 Klein text encoder - uses Qwen3 instead of CLIP+T5
   kleinQwen3EncoderModel: zModelIdentifierField.nullable(), // Optional: Separate Qwen3 Encoder for Klein
+  // Flux2 [dev] text encoder - uses Mistral Small 3.1 (24B)
+  flux2DevMistralEncoderModel: zModelIdentifierField.nullable(), // Optional: Standalone Mistral encoder for [dev]
+  // PiD (Pixel Diffusion Decoder) - optional 4x super-resolution decode replacing the VAE decode.
+  // - 'off':    regular VAE decode
+  // - 'fit':    PiD decodes 4x internally, then downscales back to the bbox (compositing-safe; works in canvas/inpaint)
+  // - 'native': PiD's full 4x output IS the result; the user-facing dimensions are the target, generation runs at target / 4
+  // These four landed *after* the `_version` 3 -> 4 bump, so for as long as 4 was the current
+  // version no migration step could reach them: a blob already at v4 (dev builds from that window)
+  // matched no branch in the chain. They carry zod defaults for the same reason the ERNIE-Image
+  // fields above do — without one they would be required, and their absence would fail the parse in
+  // `migrate()` and wipe the whole slice. That is the rule for any field added after the last bump,
+  // which is why it still applies now that the v4 -> v5 step also seeds these.
+  pidMode: zPidMode.default('off'),
+  pidDecoderModel: zModelIdentifierField.nullable().default(null), // PiD decoder checkpoint (matched to the main model's base)
+  gemma2EncoderModel: zModelIdentifierField.nullable().default(null), // Gemma-2 caption encoder required by PiD
+  pidSteps: z.number().int().min(1).max(4).default(4), // PiD distill steps: student schedule has only 4 transitions, so 1-4
   // Qwen Image Edit model components - GGUF transformer needs a Diffusers source for VAE/encoder
   qwenImageComponentSource: zParameterModel.nullable(), // Diffusers model providing VAE + text encoder
   qwenImageVaeModel: zParameterVAEModel.nullable(), // Optional: Standalone Qwen Image VAE checkpoint
   qwenImageQwenVLEncoderModel: zModelIdentifierField.nullable(), // Optional: Standalone Qwen2.5-VL encoder
   qwenImageQuantization: z.enum(['none', 'int8', 'nf4']), // BitsAndBytes quantization for Qwen VL encoder
   qwenImageShift: z.number().nullable(), // Sigma schedule shift override (e.g. 3.0 for Lightning LoRAs)
+  // Wan 2.2 model components — A14B GGUF needs a paired second-expert transformer
+  // plus a Diffusers source for VAE/T5 unless standalone VAE/encoder models are wired.
+  wanTransformerLowNoise: zParameterModel.nullable(), // A14B GGUF only: second-expert transformer
+  wanComponentSource: zParameterModel.nullable(), // Diffusers Wan model providing VAE + UMT5-XXL
+  wanVaeModel: zParameterVAEModel.nullable(), // Optional: Standalone Wan VAE checkpoint
+  wanT5EncoderModel: zModelIdentifierField.nullable(), // Optional: Standalone UMT5-XXL encoder
+  wanGuidanceScaleLowNoise: z.number().nullable(), // Optional: separate CFG for low-noise expert (A14B). null = same as primary
   // Z-Image Seed Variance Enhancer settings
   zImageSeedVarianceEnabled: z.boolean(),
   zImageSeedVarianceStrength: z.number().min(0).max(2),
   zImageSeedVarianceRandomizePercent: z.number().min(1).max(100),
+  // Krea-2 standalone submodels (optional; used when the transformer is a single-file checkpoint/GGUF
+  // that has no bundled VAE / Qwen3-VL encoder. When null, they are extracted from the diffusers model.)
+  krea2VaeModel: zParameterVAEModel.nullable(),
+  krea2Qwen3VlEncoderModel: zModelIdentifierField.nullable(),
+  // Krea-2 conditioning enhancers (optional; both default off so stock behaviour is unchanged)
+  krea2SeedVarianceEnabled: z.boolean(),
+  krea2SeedVarianceStrength: z.number().min(0).max(2),
+  krea2SeedVarianceRandomizePercent: z.number().min(0).max(100),
+  krea2RebalanceEnabled: z.boolean(),
+  krea2RebalanceMultiplier: z.number().min(0).max(20),
+  krea2RebalanceWeights: z.string(),
   imageSize: z.string().nullable().default(null),
   // OpenAI-specific external options
   openaiQuality: z.enum(['auto', 'high', 'medium', 'low']).default('auto'),
@@ -886,7 +965,7 @@ export const zParamsState = z.object({
 });
 export type ParamsState = z.infer<typeof zParamsState>;
 export const getInitialParamsState = (): ParamsState => ({
-  _version: 3,
+  _version: 5,
   maskBlur: 16,
   maskBlurMethod: 'box',
   canvasCoherenceMode: 'Gaussian Blur',
@@ -901,6 +980,11 @@ export const getInitialParamsState = (): ParamsState => ({
   guidance: 4,
   img2imgStrength: 0.75,
   optimizedDenoisingEnabled: true,
+  hiDiffusionEnabled: false,
+  hiDiffusionRauNetEnabled: true,
+  hiDiffusionWindowAttnEnabled: true,
+  hiDiffusionT1Ratio: 0.4,
+  hiDiffusionT2Ratio: 0.0,
   iterations: 1,
   scheduler: 'dpmpp_3m_k',
   fluxScheduler: 'euler',
@@ -909,6 +993,13 @@ export const getInitialParamsState = (): ParamsState => ({
   fluxDypeExponent: 2.0,
   zImageScheduler: 'euler',
   zImageShift: null,
+  ernieImageScheduler: 'euler',
+  ernieImageUsePromptEnhancer: true,
+  ideogram4SamplerPreset: 'V4_QUALITY_48',
+  ideogram4Steps: null,
+  ideogram4GuidanceScale: null,
+  ideogram4Mu: null,
+  ideogram4ColorPalette: [],
   upscaleScheduler: 'kdpm_2',
   upscaleCfgScale: 2,
   seed: 0,
@@ -946,16 +1037,34 @@ export const getInitialParamsState = (): ParamsState => ({
   animaScheduler: 'euler',
   animaLLLiteModel: null,
   animaLLLiteWeight: 1,
-  kleinVaeModel: null,
+  flux2VaeModel: null,
   kleinQwen3EncoderModel: null,
+  flux2DevMistralEncoderModel: null,
+  pidMode: 'off',
+  pidDecoderModel: null,
+  gemma2EncoderModel: null,
+  pidSteps: 4,
   qwenImageComponentSource: null,
   qwenImageVaeModel: null,
   qwenImageQwenVLEncoderModel: null,
   qwenImageQuantization: 'none' as const,
   qwenImageShift: null,
+  wanTransformerLowNoise: null,
+  wanComponentSource: null,
+  wanVaeModel: null,
+  wanT5EncoderModel: null,
+  wanGuidanceScaleLowNoise: null,
   zImageSeedVarianceEnabled: false,
   zImageSeedVarianceStrength: 0.1,
   zImageSeedVarianceRandomizePercent: 50,
+  krea2VaeModel: null,
+  krea2Qwen3VlEncoderModel: null,
+  krea2SeedVarianceEnabled: false,
+  krea2SeedVarianceStrength: 0.1,
+  krea2SeedVarianceRandomizePercent: 50,
+  krea2RebalanceEnabled: false,
+  krea2RebalanceMultiplier: 4,
+  krea2RebalanceWeights: '1.0,1.0,1.0,1.0,1.0,1.0,1.0,2.5,5.0,1.1,4.0,1.0',
   imageSize: null,
   openaiQuality: 'auto',
   openaiBackground: 'auto',

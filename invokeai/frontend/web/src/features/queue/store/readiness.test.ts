@@ -48,7 +48,7 @@ const flux2GGUF9BModel = {
   variant: 'klein_9b',
 } as unknown as MainModelConfig;
 
-const kleinVaeModel = { key: 'vae', name: 'VAE', base: 'flux2', type: 'vae' };
+const flux2VaeModel = { key: 'vae', name: 'VAE', base: 'flux2', type: 'vae' };
 const kleinQwen3Model = { key: 'qwen3', name: 'Qwen3', base: 'flux2', type: 'qwen3_encoder' };
 
 const baseDynamicPrompts: DynamicPromptsState = {
@@ -69,7 +69,7 @@ const baseRefImages: RefImagesState = {
 
 const baseParams = {
   positivePrompt: 'test',
-  kleinVaeModel: null,
+  flux2VaeModel: null,
   kleinQwen3EncoderModel: null,
 } as unknown as ParamsState;
 
@@ -77,16 +77,17 @@ const baseParams = {
 
 const buildGenerateTabArg = (overrides: {
   model?: MainModelConfig | null;
-  kleinVaeModel?: unknown;
+  flux2VaeModel?: unknown;
   kleinQwen3EncoderModel?: unknown;
   hasFlux2DiffusersVaeSource?: boolean;
   hasFlux2DiffusersQwen3Source?: boolean;
+  hasFlux2DevDiffusersSource?: boolean;
 }) => ({
   isConnected: true,
   model: overrides.model ?? flux2DiffusersModel,
   params: {
     ...baseParams,
-    kleinVaeModel: overrides.kleinVaeModel ?? null,
+    flux2VaeModel: overrides.flux2VaeModel ?? null,
     kleinQwen3EncoderModel: overrides.kleinQwen3EncoderModel ?? null,
   } as unknown as ParamsState,
   refImages: baseRefImages,
@@ -94,14 +95,16 @@ const buildGenerateTabArg = (overrides: {
   dynamicPrompts: baseDynamicPrompts,
   hasFlux2DiffusersVaeSource: overrides.hasFlux2DiffusersVaeSource ?? false,
   hasFlux2DiffusersQwen3Source: overrides.hasFlux2DiffusersQwen3Source ?? false,
+  hasFlux2DevDiffusersSource: overrides.hasFlux2DevDiffusersSource ?? false,
 });
 
 const buildCanvasTabArg = (overrides: {
   model?: MainModelConfig | null;
-  kleinVaeModel?: unknown;
+  flux2VaeModel?: unknown;
   kleinQwen3EncoderModel?: unknown;
   hasFlux2DiffusersVaeSource?: boolean;
   hasFlux2DiffusersQwen3Source?: boolean;
+  hasFlux2DevDiffusersSource?: boolean;
 }) => ({
   isConnected: true,
   model: overrides.model ?? flux2DiffusersModel,
@@ -118,7 +121,7 @@ const buildCanvasTabArg = (overrides: {
   },
   params: {
     ...baseParams,
-    kleinVaeModel: overrides.kleinVaeModel ?? null,
+    flux2VaeModel: overrides.flux2VaeModel ?? null,
     kleinQwen3EncoderModel: overrides.kleinQwen3EncoderModel ?? null,
   } as unknown as ParamsState,
   refImages: baseRefImages,
@@ -131,6 +134,7 @@ const buildCanvasTabArg = (overrides: {
   canvasIsSelectingObject: false,
   hasFlux2DiffusersVaeSource: overrides.hasFlux2DiffusersVaeSource ?? false,
   hasFlux2DiffusersQwen3Source: overrides.hasFlux2DiffusersQwen3Source ?? false,
+  hasFlux2DevDiffusersSource: overrides.hasFlux2DevDiffusersSource ?? false,
 });
 
 const hasFlux2VaeReason = (reasons: { content: string }[]) =>
@@ -168,7 +172,7 @@ describe('FLUX.2 Klein readiness checks – generate tab', () => {
 
   it('errors only for Qwen3 when GGUF model with standalone VAE but no Qwen3 and no diffusers source', () => {
     const reasons = getReasonsWhyCannotEnqueueGenerateTab(
-      buildGenerateTabArg({ model: flux2GGUF4BModel, kleinVaeModel: kleinVaeModel })
+      buildGenerateTabArg({ model: flux2GGUF4BModel, flux2VaeModel: flux2VaeModel })
     );
     expect(hasFlux2VaeReason(reasons)).toBe(false);
     expect(hasFlux2Qwen3Reason(reasons)).toBe(true);
@@ -186,7 +190,7 @@ describe('FLUX.2 Klein readiness checks – generate tab', () => {
     const reasons = getReasonsWhyCannotEnqueueGenerateTab(
       buildGenerateTabArg({
         model: flux2GGUF4BModel,
-        kleinVaeModel: kleinVaeModel,
+        flux2VaeModel: flux2VaeModel,
         kleinQwen3EncoderModel: kleinQwen3Model,
       })
     );
@@ -250,7 +254,7 @@ describe('FLUX.2 Klein readiness checks – canvas tab', () => {
     const reasons = getReasonsWhyCannotEnqueueCanvasTab(
       buildCanvasTabArg({
         model: flux2GGUF4BModel,
-        kleinVaeModel: kleinVaeModel,
+        flux2VaeModel: flux2VaeModel,
         kleinQwen3EncoderModel: kleinQwen3Model,
       }) as never
     );
@@ -268,5 +272,212 @@ describe('FLUX.2 Klein readiness checks – canvas tab', () => {
     );
     expect(hasFlux2VaeReason(reasons)).toBe(false);
     expect(hasFlux2Qwen3Reason(reasons)).toBe(true);
+  });
+});
+
+// --- PiD Native-mode scaled-grid validation (SD3 / SDXL / Z-Image) ---
+// In Native mode the Canvas bbox is the 4x target and is generated at bbox/4, so the bbox must be a
+// multiple of grid*4 (SD3/Z-Image grid 16 -> 64, SDXL grid 8 -> 32). Without validation an off-grid bbox
+// silently becomes a smaller generation. FLUX/FLUX.2/Qwen already validated this; these tests cover the
+// three bases whose checks previously omitted it.
+
+const sd3Model = {
+  key: 'sd3',
+  hash: 'h',
+  name: 'SD3',
+  base: 'sd-3',
+  type: 'main',
+  format: 'diffusers',
+} as unknown as MainModelConfig;
+const sdxlModel = {
+  key: 'sdxl',
+  hash: 'h',
+  name: 'SDXL',
+  base: 'sdxl',
+  type: 'main',
+  format: 'diffusers',
+} as unknown as MainModelConfig;
+const zImageModel = {
+  key: 'zimg',
+  hash: 'h',
+  name: 'Z-Image',
+  base: 'z-image',
+  type: 'main',
+  format: 'diffusers',
+} as unknown as MainModelConfig;
+
+const buildPidCanvasArg = (model: MainModelConfig, bboxSide: number) => ({
+  isConnected: true,
+  model,
+  canvas: {
+    bbox: {
+      scaleMethod: 'none',
+      rect: { width: bboxSide, height: bboxSide },
+      scaledSize: { width: bboxSide, height: bboxSide },
+    },
+    controlLayers: { entities: [] },
+    regionalGuidance: { entities: [] },
+    rasterLayers: { entities: [] },
+    inpaintMasks: { entities: [] },
+  },
+  params: {
+    ...baseParams,
+    // Satisfy the non-grid PiD requirements so only the grid reason (if any) remains under test.
+    pidMode: 'native',
+    pidDecoderModel: { key: 'dec', name: 'decoder', base: model.base === 'z-image' ? 'flux' : model.base },
+    gemma2EncoderModel: { key: 'gem', name: 'gemma', base: 'any' },
+    refinerModel: null,
+    zImageVaeModel: { key: 'zvae', name: 'zvae', base: 'z-image', type: 'vae' },
+    zImageQwen3SourceModel: { key: 'zsrc', name: 'zsrc', base: 'z-image', type: 'main' },
+    zImageQwen3EncoderModel: null,
+  } as unknown as ParamsState,
+  refImages: baseRefImages,
+  loras: [],
+  dynamicPrompts: baseDynamicPrompts,
+  canvasIsFiltering: false,
+  canvasIsTransforming: false,
+  canvasIsRasterizing: false,
+  canvasIsCompositing: false,
+  canvasIsSelectingObject: false,
+  hasFlux2DiffusersVaeSource: false,
+  hasFlux2DiffusersQwen3Source: false,
+});
+
+const hasBboxGridReason = (reasons: { content: string }[]) =>
+  reasons.some(
+    (r) => r.content.includes('modelIncompatibleBboxWidth') || r.content.includes('modelIncompatibleBboxHeight')
+  );
+
+describe('PiD Native scaled-grid readiness – canvas tab', () => {
+  it.each([
+    ['SD3', sd3Model],
+    ['SDXL', sdxlModel],
+    ['Z-Image', zImageModel],
+  ] as const)('blocks an off-grid 1040px bbox in Native mode for %s', (_label, model) => {
+    const reasons = getReasonsWhyCannotEnqueueCanvasTab(buildPidCanvasArg(model, 1040) as never);
+    expect(hasBboxGridReason(reasons)).toBe(true);
+  });
+
+  it.each([
+    ['SD3', sd3Model],
+    ['SDXL', sdxlModel],
+    ['Z-Image', zImageModel],
+  ] as const)('allows an on-grid 1024px bbox in Native mode for %s', (_label, model) => {
+    const reasons = getReasonsWhyCannotEnqueueCanvasTab(buildPidCanvasArg(model, 1024) as never);
+    expect(hasBboxGridReason(reasons)).toBe(false);
+  });
+});
+
+const ideogram4Model = {
+  key: 'ideogram-4',
+  hash: 'h',
+  name: 'Ideogram 4',
+  base: 'ideogram-4',
+  type: 'main',
+  format: 'diffusers',
+} as unknown as MainModelConfig;
+
+const buildIdeogram4CanvasArg = (canvasOverrides: {
+  bbox?: { width: number; height: number };
+  rasterLayers?: unknown[];
+  inpaintMasks?: unknown[];
+  regionalGuidance?: unknown[];
+}) => ({
+  ...buildCanvasTabArg({ model: ideogram4Model }),
+  canvas: {
+    bbox: {
+      scaleMethod: 'none',
+      rect: canvasOverrides.bbox ?? { width: 1024, height: 1024 },
+      scaledSize: canvasOverrides.bbox ?? { width: 1024, height: 1024 },
+    },
+    controlLayers: { entities: [] },
+    regionalGuidance: { entities: canvasOverrides.regionalGuidance ?? [] },
+    rasterLayers: { entities: canvasOverrides.rasterLayers ?? [] },
+    inpaintMasks: { entities: canvasOverrides.inpaintMasks ?? [] },
+  },
+});
+
+const hasReasonWith = (reasons: { content: string }[], key: string) => reasons.some((r) => r.content.includes(key));
+
+describe('Ideogram 4 readiness checks - canvas tab', () => {
+  it('blocks a bbox whose width is not a multiple of 16', () => {
+    const reasons = getReasonsWhyCannotEnqueueCanvasTab(
+      buildIdeogram4CanvasArg({ bbox: { width: 1025, height: 1024 } }) as never
+    );
+    expect(hasReasonWith(reasons, 'modelIncompatibleBboxWidth')).toBe(true);
+  });
+
+  it('allows a bbox that is a multiple of 16', () => {
+    const reasons = getReasonsWhyCannotEnqueueCanvasTab(
+      buildIdeogram4CanvasArg({ bbox: { width: 1024, height: 1024 } }) as never
+    );
+    expect(hasReasonWith(reasons, 'modelIncompatibleBbox')).toBe(false);
+  });
+
+  it('blocks an enabled raster layer with content (Ideogram 4 is txt2img only)', () => {
+    const reasons = getReasonsWhyCannotEnqueueCanvasTab(
+      buildIdeogram4CanvasArg({
+        rasterLayers: [{ id: 'r1', isEnabled: true, type: 'raster_layer', objects: [{}] }],
+      }) as never
+    );
+    expect(hasReasonWith(reasons, 'ideogram4Txt2ImgOnly')).toBe(true);
+  });
+
+  it('blocks an enabled inpaint mask with content', () => {
+    const reasons = getReasonsWhyCannotEnqueueCanvasTab(
+      buildIdeogram4CanvasArg({
+        inpaintMasks: [{ id: 'm1', isEnabled: true, type: 'inpaint_mask', objects: [{}] }],
+      }) as never
+    );
+    expect(hasReasonWith(reasons, 'ideogram4Txt2ImgOnly')).toBe(true);
+  });
+
+  it('does not block an empty (fully transparent) enabled raster layer', () => {
+    const reasons = getReasonsWhyCannotEnqueueCanvasTab(
+      buildIdeogram4CanvasArg({
+        rasterLayers: [{ id: 'r1', isEnabled: true, type: 'raster_layer', objects: [] }],
+      }) as never
+    );
+    expect(hasReasonWith(reasons, 'ideogram4Txt2ImgOnly')).toBe(false);
+  });
+
+  it('warns a regional guidance layer whose only input is a negative prompt', () => {
+    const reasons = getReasonsWhyCannotEnqueueCanvasTab(
+      buildIdeogram4CanvasArg({
+        regionalGuidance: [
+          {
+            id: 'rg1',
+            isEnabled: true,
+            type: 'regional_guidance',
+            objects: [{}],
+            positivePrompt: null,
+            negativePrompt: 'no cats',
+            autoNegative: false,
+            referenceImages: [],
+          },
+        ],
+      }) as never
+    );
+    expect(hasReasonWith(reasons, 'rgNegativePromptNotSupported')).toBe(true);
+  });
+
+  it('warns a regional guidance layer whose only input is a reference image', () => {
+    const reasons = getReasonsWhyCannotEnqueueCanvasTab(
+      buildIdeogram4CanvasArg({
+        regionalGuidance: [
+          {
+            id: 'rg1',
+            isEnabled: true,
+            type: 'regional_guidance',
+            objects: [{}],
+            positivePrompt: null,
+            negativePrompt: null,
+            autoNegative: false,
+            referenceImages: [{ id: 'ri1', config: { model: null, image: null } }],
+          },
+        ],
+      }) as never
+    );
+    expect(hasReasonWith(reasons, 'rgReferenceImagesNotSupported')).toBe(true);
   });
 });

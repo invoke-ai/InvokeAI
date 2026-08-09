@@ -207,6 +207,7 @@ describe('validateWorkflow', () => {
       workflow: getWorkflow(),
       templates: { img_resize, main_model_loader },
       checkImageAccess: resolveFalse,
+      checkVideoAccess: resolveTrue,
       checkBoardAccess: resolveTrue,
       checkModelAccess: resolveTrue,
     });
@@ -219,6 +220,7 @@ describe('validateWorkflow', () => {
       workflow: getWorkflow(),
       templates: { img_resize, main_model_loader },
       checkImageAccess: resolveTrue,
+      checkVideoAccess: resolveTrue,
       checkBoardAccess: resolveFalse,
       checkModelAccess: resolveTrue,
     });
@@ -230,6 +232,7 @@ describe('validateWorkflow', () => {
       workflow: getWorkflow(),
       templates: { img_resize, main_model_loader },
       checkImageAccess: resolveTrue,
+      checkVideoAccess: resolveTrue,
       checkBoardAccess: resolveTrue,
       checkModelAccess: resolveFalse,
     });
@@ -271,6 +274,7 @@ describe('validateWorkflow', () => {
         },
         templates: { img_resize, main_model_loader, workflow_return },
         checkImageAccess: resolveTrue,
+        checkVideoAccess: resolveTrue,
         checkBoardAccess: resolveTrue,
         checkModelAccess: resolveTrue,
       })
@@ -293,6 +297,7 @@ describe('validateWorkflow', () => {
       workflow,
       templates: { img_resize, main_model_loader },
       checkImageAccess: resolveTrue,
+      checkVideoAccess: resolveTrue,
       checkBoardAccess: resolveTrue,
       checkModelAccess: resolveTrue,
     });
@@ -317,6 +322,7 @@ describe('validateWorkflow', () => {
       workflow,
       templates: { img_resize, main_model_loader },
       checkImageAccess: resolveTrue,
+      checkVideoAccess: resolveTrue,
       checkBoardAccess: resolveTrue,
       checkModelAccess: resolveTrue,
     });
@@ -353,6 +359,7 @@ describe('validateWorkflow', () => {
       workflow,
       templates: { img_resize, main_model_loader },
       checkImageAccess: resolveTrue,
+      checkVideoAccess: resolveTrue,
       checkBoardAccess: resolveTrue,
       checkModelAccess: resolveTrue,
     });
@@ -378,6 +385,7 @@ describe('validateWorkflow', () => {
       workflow,
       templates: { img_resize, main_model_loader },
       checkImageAccess: resolveTrue,
+      checkVideoAccess: resolveTrue,
       checkBoardAccess: resolveTrue,
       checkModelAccess: resolveTrue,
     });
@@ -403,6 +411,7 @@ describe('validateWorkflow', () => {
       workflow,
       templates: { img_resize, main_model_loader },
       checkImageAccess: resolveTrue,
+      checkVideoAccess: resolveTrue,
       checkBoardAccess: resolveTrue,
       checkModelAccess: resolveTrue,
     });
@@ -428,6 +437,7 @@ describe('validateWorkflow', () => {
       workflow,
       templates: { img_resize, main_model_loader, image_collection: imageCollectionTemplate },
       checkImageAccess: resolveTrue,
+      checkVideoAccess: resolveTrue,
       checkBoardAccess: resolveTrue,
       checkModelAccess: resolveTrue,
     });
@@ -455,6 +465,7 @@ describe('validateWorkflow', () => {
       workflow,
       templates: { img_resize, main_model_loader, image_collection: imageCollectionTemplate },
       checkImageAccess: resolveTrue,
+      checkVideoAccess: resolveTrue,
       checkBoardAccess: resolveTrue,
       checkModelAccess: resolveTrue,
     });
@@ -480,6 +491,7 @@ describe('validateWorkflow', () => {
       workflow,
       templates: { img_resize, main_model_loader, image_collection: imageCollectionTemplate },
       checkImageAccess: resolveTrue,
+      checkVideoAccess: resolveTrue,
       checkBoardAccess: resolveTrue,
       checkModelAccess: resolveTrue,
     });
@@ -519,6 +531,7 @@ describe('validateWorkflow', () => {
       workflow,
       templates: { add, call_saved_workflow },
       checkImageAccess: resolveTrue,
+      checkVideoAccess: resolveTrue,
       checkBoardAccess: resolveTrue,
       checkModelAccess: resolveTrue,
       getWorkflow: (workflowId) => {
@@ -583,5 +596,107 @@ describe('validateWorkflow', () => {
     expect(refreshedCallNode.data.inputs['saved_workflow_input::child-add::a']?.value).toBe(99);
     expect(refreshedCallNode.data.inputs['saved_workflow_input::child-add::b']?.value).toBe(2);
     expect(refreshedCallNode.data.dynamicInputTemplates['saved_workflow_input::child-add::b']).toBeDefined();
+  });
+
+  // Regression for PR #9162: `core_metadata` accepts undeclared extras (pydantic `extra='allow'`).
+  // These must round-trip without producing "missing field template" load warnings.
+  const core_metadata: InvocationTemplate = {
+    title: 'Core Metadata',
+    type: 'core_metadata',
+    version: '2.1.0',
+    tags: ['metadata'],
+    description: 'Collects core generation metadata into a MetadataField',
+    outputType: 'metadata_output',
+    // Empty inputs: every input on the node below is an undeclared extra, which is exactly what
+    // core_metadata accepts. This keeps the template minimal while exercising the extra path.
+    inputs: {},
+    outputs: {},
+    useCache: true,
+    nodePack: 'invokeai',
+    classification: 'internal',
+    category: 'metadata',
+  };
+
+  const getCoreMetadataWorkflow = (): WorkflowV3 => ({
+    name: '',
+    author: '',
+    description: '',
+    version: '',
+    contact: '',
+    tags: '',
+    notes: '',
+    exposedFields: [],
+    form: getDefaultForm(),
+    meta: { version: '4.0.0', category: 'user' },
+    nodes: [
+      {
+        id: 'core_metadata-1',
+        type: 'invocation',
+        data: {
+          id: 'core_metadata-1',
+          type: 'core_metadata',
+          version: '2.1.0',
+          label: '',
+          notes: '',
+          isOpen: true,
+          isIntermediate: true,
+          useCache: true,
+          nodePack: 'invokeai',
+          dynamicInputTemplates: {},
+          inputs: {
+            generation_mode: { name: 'generation_mode', label: '', description: '', value: 'z_image_txt2img' },
+            // Undeclared extra - not in the template. Must be preserved without a warning.
+            z_image_seed_variance_enabled: {
+              name: 'z_image_seed_variance_enabled',
+              label: '',
+              description: '',
+              value: false,
+            },
+          },
+        },
+        position: { x: 0, y: 0 },
+      },
+    ],
+    edges: [],
+  });
+
+  it('should not warn about undeclared extras on core_metadata and should preserve them', async () => {
+    const validationResult = await validateWorkflow({
+      workflow: getCoreMetadataWorkflow(),
+      templates: { core_metadata },
+      checkImageAccess: resolveTrue,
+      checkVideoAccess: resolveTrue,
+      checkBoardAccess: resolveTrue,
+      checkModelAccess: resolveTrue,
+    });
+
+    expect(validationResult.warnings).toEqual([]);
+    expect(get(validationResult, 'workflow.nodes[0].data.inputs.z_image_seed_variance_enabled.value')).toBe(false);
+  });
+
+  it('should still warn about undeclared inputs on nodes that do NOT accept extras', async () => {
+    const workflow = getWorkflow();
+    // main_model_loader does not accept extras - an undeclared input must produce a warning.
+    const node = workflow.nodes[0];
+    if (!node || node.type !== 'invocation') {
+      throw new Error('expected an invocation node');
+    }
+    node.data.inputs.bogus_extra = {
+      name: 'bogus_extra',
+      label: '',
+      description: '',
+      value: 'should-warn',
+    };
+
+    const validationResult = await validateWorkflow({
+      workflow,
+      templates: { img_resize, main_model_loader },
+      checkImageAccess: resolveTrue,
+      checkVideoAccess: resolveTrue,
+      checkBoardAccess: resolveTrue,
+      checkModelAccess: resolveTrue,
+    });
+
+    expect(validationResult.warnings.length).toBe(1);
   });
 });

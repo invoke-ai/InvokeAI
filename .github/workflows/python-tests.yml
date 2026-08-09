@@ -58,7 +58,7 @@ jobs:
             github-env: $env:GITHUB_ENV
     name: 'py${{ matrix.python-version }}: ${{ matrix.platform }}'
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15 # expected run time: 2-6 min, depending on platform
+    timeout-minutes: 30 # expected run time: 10-16 min, depending on platform
     env:
       PIP_USE_PEP517: '1'
 
@@ -83,6 +83,9 @@ jobs:
               - 'invokeai/**'
               - '!invokeai/frontend/web/**'
               - 'tests/**'
+              # tests/ covers a few of these (e.g. test_check_pins.py, test_docs_json_export.py)
+              - 'scripts/**'
+              - 'pins.json'
 
       - name: setup uv
         if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}

@@ -88,7 +88,7 @@ export class CanvasEntityBufferObjectRenderer extends CanvasModuleBase {
         if (this.hasBuffer() && !this.manager.$isBusy.get()) {
           const isTemporaryShapesToolSwitch = shouldPreserveSuspendableShapesSession(
             this.manager.tool.$tool.get(),
-            this.manager.tool.$toolBuffer.get(),
+            this.manager.tool.$baseTool.get(),
             this.manager.tool.tools.rect.hasSuspendableSession()
           );
 
@@ -287,6 +287,9 @@ export class CanvasEntityBufferObjectRenderer extends CanvasModuleBase {
     }
 
     // Move the buffer to the persistent objects group/renderers
+    if (this.renderer instanceof CanvasObjectBrushLineWithPressure) {
+      this.renderer.finalizePressureImage();
+    }
     this.parent.renderer.adoptObjectRenderer(this.renderer);
 
     if (pushToState) {
