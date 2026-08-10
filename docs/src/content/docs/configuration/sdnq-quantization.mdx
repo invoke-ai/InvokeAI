@@ -150,3 +150,5 @@ Historically this has been caused by missing key-permutation steps in the diffus
 ### "no safetensors files found" or "size mismatch for weight"
 
 You probably pointed InvokeAI at the wrong subfolder — SDNQ pipelines are installed as the **whole repo root** (the folder that contains `model_index.json`), not at `transformer/` directly. The Model Manager's "Add Folder" flow expects the pipeline root.
+
+If the path is right, check that the quantized components actually ship `.safetensors`: Invoke's SDNQ reader only reads that format, so a `transformer/` or `text_encoder/` holding `.bin` or `.gguf` weights is not counted as present and the pipeline is reported as incomplete. Published SDNQ repos ship safetensors throughout; this normally only shows up on a hand-converted model.

@@ -258,9 +258,25 @@ class ModelLoader(ModelLoaderBase):
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
     ) -> int:
         """Get the size of the model on disk."""
+        # Size the folder the model will actually be loaded from. This has to track
+        # `resolve_submodel_path`, or a pipeline whose index calls its CLIP encoder `clip_encoder`
+        # gets sized at the non-existent `text_encoder/` — 0 bytes — and `make_room()` reserves
+        # nothing before a multi-GB component is read. The conventional case is unchanged: only a
+        # component recorded somewhere other than its slot name takes the branch below.
+        subfolder = submodel_type.value if submodel_type else None
+        if submodel_type is not None:
+            conventional = model_path / submodel_type.value
+            resolved = resolve_submodel_path(config, submodel_type, conventional)
+            if resolved != conventional:
+                try:
+                    subfolder = resolved.relative_to(model_path).as_posix()
+                except ValueError:
+                    # Recorded outside this model's directory — size that directory directly.
+                    model_path, subfolder = resolved, None
+
         return calc_model_size_by_fs(
             model_path=model_path,
-            subfolder=submodel_type.value if submodel_type else None,
+            subfolder=subfolder,
             variant=config.repo_variant if isinstance(config, Diffusers_Config_Base) else None,
         )
 

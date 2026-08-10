@@ -2254,6 +2254,13 @@ _WEIGHTLESS_SUBMODEL_TYPES = frozenset({SubModelType.Tokenizer, SubModelType.Tok
 # FLUX.1 SDNQ pipeline components, keyed by the class name `model_index.json` advertises. The value
 # is the slot it fills, the model type recorded for it, and the class names the component's own config
 # may declare — the tokenizers list both spellings transformers writes.
+# Slots whose SDNQ loader calls `sdnq_sd_loader` unconditionally, so the component must ship
+# safetensors whatever its folder declares. FLUX.2 and Z-Image build their transformer and Qwen3
+# text encoder that way; FLUX.1 does so only for the transformer, because its CLIP / T5 / VAE
+# branch on `_is_sdnq_folder` and fall back to `from_pretrained`.
+_SDNQ_PIPELINE_ALWAYS_SDNQ_LOADED = frozenset({SubModelType.Transformer, SubModelType.TextEncoder})
+_SDNQ_FLUX1_ALWAYS_SDNQ_LOADED = frozenset({SubModelType.Transformer})
+
 _SDNQ_FLUX1_COMPONENT_BY_CLASS_NAME: dict[str, tuple[SubModelType, ModelType, set[str]]] = {
     "FluxTransformer2DModel": (SubModelType.Transformer, ModelType.Main, {"FluxTransformer2DModel"}),
     "CLIPTextModel": (SubModelType.TextEncoder, ModelType.CLIPEmbed, {"CLIPTextModel"}),
@@ -2341,7 +2348,11 @@ def _sdnq_component_matches_advertised_class(
     return bool(declared & accepted_class_names)
 
 
-def _sdnq_component_dir_is_populated(component_path: Path, submodel_type: SubModelType) -> bool:
+def _sdnq_component_dir_is_populated(
+    component_path: Path,
+    submodel_type: SubModelType,
+    always_sdnq_loaded: frozenset[SubModelType] = frozenset(),
+) -> bool:
     """True if `component_path` holds the files the component's loader needs.
 
     An existing-but-empty folder is not enough: an interrupted download leaves the component
@@ -2350,11 +2361,18 @@ def _sdnq_component_dir_is_populated(component_path: Path, submodel_type: SubMod
     permits generation and the invocations select the main model as the component source, and the
     failure only surfaces when the loader tries to read the empty vae/ text_encoder/ tokenizer/ folder.
 
-    "Files its loader needs" is per component, not one list for all of them. A quantized component
-    goes through `sdnq_sd_loader`, which globs `*.safetensors` and raises if it finds none, so a
-    `.gguf` or `.bin` there is not a usable weight however well-formed the folder otherwise looks.
-    An unquantized component (typically the VAE, which SDNQ exports leave in bfloat16) is loaded with
-    `from_pretrained` and may legitimately ship any of the formats diffusers reads.
+    "Files its loader needs" is per component, not one list for all of them. `sdnq_sd_loader` globs
+    `*.safetensors` and raises if it finds none, so a `.gguf` or `.bin` in a component it reads is
+    not a usable weight however well-formed the folder otherwise looks. A component loaded with
+    `from_pretrained` instead — typically the VAE, which SDNQ exports leave in bfloat16 — may
+    legitimately ship any of the formats diffusers reads.
+
+    Which of the two applies is a property of the *loader*, not of the folder. `always_sdnq_loaded`
+    names the slots whose loader calls `sdnq_sd_loader` unconditionally: FLUX.2 and Z-Image do that
+    for the transformer and text encoder, FLUX.1 only for the transformer (its CLIP / T5 / VAE
+    branch on the folder marker). Relying on `quantization_config.json` alone was not enough — a
+    component carrying SDNQ weight/scale keys but no marker file reads as unquantized, so a `.bin`
+    passed discovery and then failed in the loader that was always going to use `sdnq_sd_loader`.
     """
     if not component_path.is_dir():
         return False
@@ -2364,9 +2382,8 @@ def _sdnq_component_dir_is_populated(component_path: Path, submodel_type: SubMod
     if submodel_type in _WEIGHTLESS_SUBMODEL_TYPES:
         return any((component_path / name).is_file() for name in _TOKENIZER_FILENAMES)
 
-    accepted_suffixes = (
-        _SDNQ_COMPONENT_WEIGHT_SUFFIXES if _is_sdnq_folder(component_path) else _COMPONENT_WEIGHT_SUFFIXES
-    )
+    read_by_sdnq_loader = submodel_type in always_sdnq_loaded or _is_sdnq_folder(component_path)
+    accepted_suffixes = _SDNQ_COMPONENT_WEIGHT_SUFFIXES if read_by_sdnq_loader else _COMPONENT_WEIGHT_SUFFIXES
     has_config = any((component_path / name).is_file() for name in _COMPONENT_CONFIG_FILENAMES)
     has_weights = any(entry.is_file() and entry.suffix in accepted_suffixes for entry in component_path.iterdir())
     return has_config and has_weights
@@ -2505,7 +2522,7 @@ class Main_SDNQ_Diffusers_Flux2_Config(Main_Config_Base, Config_Base):
             # (is_self_contained_sdnq_pipeline) and the loaders later request fixed vae/ text_encoder/
             # tokenizer/ subfolders that have nothing to load.
             component_path = mod.path / key
-            if not _sdnq_component_dir_is_populated(component_path, submodel_type):
+            if not _sdnq_component_dir_is_populated(component_path, submodel_type, _SDNQ_PIPELINE_ALWAYS_SDNQ_LOADED):
                 continue
 
             # Populated is not the same as correct: the index's class name is a claim about the
@@ -2644,7 +2661,7 @@ class Main_SDNQ_Diffusers_ZImage_Config(Main_Config_Base, Config_Base):
             # the files its loader needs, so a partial download with a complete model_index.json isn't
             # mis-classified as a self-contained SDNQ pipeline.
             component_path = mod.path / key
-            if not _sdnq_component_dir_is_populated(component_path, submodel_type):
+            if not _sdnq_component_dir_is_populated(component_path, submodel_type, _SDNQ_PIPELINE_ALWAYS_SDNQ_LOADED):
                 continue
 
             # ...and whose own config agrees with the class the index advertises for it.
@@ -2797,7 +2814,7 @@ class Main_SDNQ_Diffusers_FLUX_Config(Main_Config_Base, Config_Base):
             # folders, and the advertised class is a claim about the folder rather than a fact.
             # Without these, a half-downloaded pipeline looks complete until generation time.
             component_path = mod.path / key
-            if not _sdnq_component_dir_is_populated(component_path, submodel_type):
+            if not _sdnq_component_dir_is_populated(component_path, submodel_type, _SDNQ_FLUX1_ALWAYS_SDNQ_LOADED):
                 continue
             if not _sdnq_component_matches_advertised_class(
                 component_path,

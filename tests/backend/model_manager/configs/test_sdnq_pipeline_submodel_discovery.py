@@ -478,3 +478,35 @@ def test_an_unquantized_component_may_still_ship_a_non_safetensors_weight(tmp_pa
 
     assert config.submodels is not None
     assert SubModelType.VAE in config.submodels
+
+
+@pytest.mark.parametrize("suffix", [".gguf", ".bin"])
+@pytest.mark.parametrize(
+    ("factory", "root_name"),
+    [
+        (Main_SDNQ_Diffusers_Flux2_Config, "flux2-unmarked-encoder"),
+        (Main_SDNQ_Diffusers_ZImage_Config, "zimage-unmarked-encoder"),
+    ],
+)
+def test_a_component_the_loader_always_reads_with_sdnq_needs_safetensors_even_without_a_marker(
+    tmp_path: Path, factory, root_name: str, suffix: str
+):
+    """`quantization_config.json` is not what decides this — the loader is.
+
+    FLUX.2 and Z-Image build their Qwen3 text encoder with `sdnq_sd_loader` unconditionally. A
+    component carrying SDNQ weight/scale keys but no marker file reads as unquantized, so a `.bin`
+    or `.gguf` used to pass discovery and then fail in a loader that was always going to want
+    safetensors.
+    """
+    maker = _make_flux2_pipeline if factory is Main_SDNQ_Diffusers_Flux2_Config else _make_zimage_pipeline
+    root = maker(tmp_path / f"{root_name}{suffix}", "Qwen3ForCausalLM")
+
+    encoder = root / "text_encoder"
+    (encoder / "model.safetensors").unlink()
+    (encoder / f"model{suffix}").write_bytes(b"\x00")  # SDNQ-shaped content, but no marker file
+
+    config = factory.from_model_on_disk(_mod(root), {**_REQUIRED_FIELDS, "path": root.as_posix()})
+
+    assert config.submodels is not None
+    assert SubModelType.TextEncoder not in config.submodels
+    assert not is_self_contained_sdnq_pipeline(config)
