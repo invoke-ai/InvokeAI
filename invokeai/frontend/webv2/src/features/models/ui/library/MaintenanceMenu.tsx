@@ -12,8 +12,9 @@ import {
   assertAccountScopeCurrent,
   captureAccountScope,
   isAccountScopeCurrent,
+  type AccountScope,
 } from '@platform/state/accountLifecycle';
-import { Button, CloseButton, IconButton, MenuContent, Panel } from '@platform/ui';
+import { Button, CloseButton, ConfirmDialog, IconButton, MenuContent, Panel } from '@platform/ui';
 import { BrushCleaningIcon, FolderSearchIcon, MoreHorizontalIcon, RefreshCcwIcon } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -26,6 +27,7 @@ export const MaintenanceMenu = () => {
   const { t } = useTranslation();
   const notify = useNotify();
   const [isSyncDialogOpen, setIsSyncDialogOpen] = useState(false);
+  const [isEmptyCacheConfirmOpen, setIsEmptyCacheConfirmOpen] = useState(false);
   // Separate instances: run ignores re-entry, and a slow cache emptying must
   // not swallow a refresh (or vice versa).
   const { run: runEmptyCache } = useScopedAction();
@@ -79,7 +81,7 @@ export const MaintenanceMenu = () => {
                 <Icon as={FolderSearchIcon} boxSize="3.5" />
                 <Menu.ItemText fontSize="xs">{t('models.cleanupOrphaned')}</Menu.ItemText>
               </Menu.Item>
-              <Menu.Item value="empty-cache" onClick={() => void handleEmptyCache()}>
+              <Menu.Item value="empty-cache" onClick={() => setIsEmptyCacheConfirmOpen(true)}>
                 <Icon as={BrushCleaningIcon} boxSize="3.5" />
                 <Menu.ItemText fontSize="xs">{t('models.emptyCache')}</Menu.ItemText>
               </Menu.Item>
@@ -88,6 +90,17 @@ export const MaintenanceMenu = () => {
         </Portal>
       </Menu.Root>
       {isSyncDialogOpen ? <OrphanedModelsDialog onClose={() => setIsSyncDialogOpen(false)} /> : null}
+      <ConfirmDialog
+        body={t('models.emptyCacheConfirmBody')}
+        confirmLabel={t('models.emptyCache')}
+        isDestructive={false}
+        isOpen={isEmptyCacheConfirmOpen}
+        title={t('models.emptyCacheConfirmTitle')}
+        onClose={() => setIsEmptyCacheConfirmOpen(false)}
+        onConfirm={async () => {
+          await handleEmptyCache();
+        }}
+      />
     </>
   );
 };
@@ -101,25 +114,22 @@ const OrphanedModelsDialog = ({ onClose }: { onClose: () => void }) => {
   const [selectedPaths, setSelectedPaths] = useState<ReadonlySet<string>>(new Set());
   const { isBusy: isDeleting, run } = useScopedAction();
 
+  const loadOrphans = async (owner: AccountScope): Promise<void> => {
+    try {
+      const result = await getOrphanedModels(owner.signal);
+
+      if (isAccountScopeCurrent(owner)) {
+        setOrphans(result);
+      }
+    } catch (error) {
+      if (isAccountScopeCurrent(owner)) {
+        setLoadError(error instanceof Error ? error.message : t('models.failedToScanOrphaned'));
+      }
+    }
+  };
+
   useMountEffect(() => {
-    const owner = captureAccountScope();
-    let isMounted = true;
-
-    getOrphanedModels(owner.signal)
-      .then((result) => {
-        if (isMounted && isAccountScopeCurrent(owner)) {
-          setOrphans(result);
-        }
-      })
-      .catch((error: unknown) => {
-        if (isMounted && isAccountScopeCurrent(owner)) {
-          setLoadError(error instanceof Error ? error.message : t('models.failedToScanOrphaned'));
-        }
-      });
-
-    return () => {
-      isMounted = false;
-    };
+    void loadOrphans(captureAccountScope());
   });
 
   const togglePath = (path: string) => {
@@ -144,6 +154,8 @@ const OrphanedModelsDialog = ({ onClose }: { onClose: () => void }) => {
         assertAccountScopeCurrent(owner);
         const errorCount = Object.keys(result.errors).length;
 
+        void refreshModels(owner);
+
         if (errorCount > 0) {
           notify.error(
             t('models.orphanedCleanup'),
@@ -153,14 +165,21 @@ const OrphanedModelsDialog = ({ onClose }: { onClose: () => void }) => {
               failed: errorCount,
             })
           );
-        } else {
-          notify.success(
-            t('models.orphanedCleanup'),
-            t('models.orphanedDeletedDescription', { count: result.deleted.length })
-          );
+          // Keep the dialog open on the rescanned remainder so the user can
+          // see which paths are left and retry.
+          const deleted = new Set(result.deleted);
+
+          setSelectedPaths((current) => new Set([...current].filter((path) => !deleted.has(path))));
+          setOrphans(null);
+          await loadOrphans(owner);
+
+          return;
         }
 
-        void refreshModels(owner);
+        notify.success(
+          t('models.orphanedCleanup'),
+          t('models.orphanedDeletedDescription', { count: result.deleted.length })
+        );
         onClose();
       },
       (message) => notify.error(t('models.orphanedCleanupFailed'), message)

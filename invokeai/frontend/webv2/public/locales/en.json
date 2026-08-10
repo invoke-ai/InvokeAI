@@ -1025,6 +1025,8 @@
     "press": "Press",
     "pruneFailed": "Prune failed",
     "pull": "Pull",
+    "emptyCacheConfirmBody": "Unloads all models from RAM and VRAM. The next generation reloads them from disk.",
+    "emptyCacheConfirmTitle": "Empty model cache?",
     "queueActionFailed": "Queue action failed",
     "queueActionPartialDescription": "{{failed}} of {{total}} failed: {{error}}",
     "refreshFailed": "Failed to refresh models",
