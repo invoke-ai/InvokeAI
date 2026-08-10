@@ -1,5 +1,6 @@
 import type {
   BulkDeleteModelsResponse,
+  BulkReidentifyModelsResponse,
   DeleteOrphanedModelsResponse,
   FoundModel,
   HFTokenStatus,
@@ -57,6 +58,15 @@ export const bulkDeleteModels = (keys: string[], signal?: AbortSignal): Promise<
 /** Re-probe the model files to refresh auto-detected base/type/format. */
 export const reidentifyModel = (key: string, signal?: AbortSignal): Promise<ModelConfig> =>
   requestJson<ModelConfig>(`${MODELS_BASE}/i/${encodeURIComponent(key)}/reidentify`, { method: 'POST', signal });
+
+/** Re-probe many models; returns keys only, so callers must refresh the library for the new configs. */
+export const bulkReidentifyModels = (keys: string[], signal?: AbortSignal): Promise<BulkReidentifyModelsResponse> =>
+  requestJson<BulkReidentifyModelsResponse>(`${MODELS_BASE}/i/bulk_reidentify`, {
+    body: JSON.stringify({ keys }),
+    headers: { 'Content-Type': 'application/json' },
+    method: 'POST',
+    signal,
+  });
 
 export const convertModelToDiffusers = (key: string, signal?: AbortSignal): Promise<ModelConfig> =>
   requestJson<ModelConfig>(`${MODELS_BASE}/convert/${encodeURIComponent(key)}`, { method: 'PUT', signal });

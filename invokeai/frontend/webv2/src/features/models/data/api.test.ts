@@ -111,3 +111,21 @@ describe('account-owned model requests', () => {
     );
   });
 });
+
+describe('bulkReidentifyModels', () => {
+  it('POSTs the key list as JSON and forwards the abort signal', async () => {
+    mocks.apiFetchJson.mockReset().mockResolvedValue({ failed: [], succeeded: ['a', 'b'] });
+    const { bulkReidentifyModels } = await import('./api');
+    const controller = new AbortController();
+
+    const result = await bulkReidentifyModels(['a', 'b'], controller.signal);
+
+    expect(mocks.apiFetchJson).toHaveBeenCalledWith('/api/v2/models/i/bulk_reidentify', {
+      body: JSON.stringify({ keys: ['a', 'b'] }),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+      signal: controller.signal,
+    });
+    expect(result).toEqual({ failed: [], succeeded: ['a', 'b'] });
+  });
+});

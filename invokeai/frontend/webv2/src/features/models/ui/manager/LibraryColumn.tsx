@@ -1,7 +1,7 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import { Box, Flex, HStack, Icon, Separator, Text } from '@chakra-ui/react';
 import { collectBases, collectTypes, filterModels } from '@features/models/core/library';
-import { bulkDeleteModels } from '@features/models/data/api';
+import { bulkDeleteModels, bulkReidentifyModels } from '@features/models/data/api';
 import { refreshModels, removeModelsFromStore, useModelsSelector } from '@features/models/data/modelsStore';
 import { removeModelsFromRelationships } from '@features/models/data/relationshipsStore';
 import { refreshStartersIfLoaded } from '@features/models/data/startersStore';
@@ -19,7 +19,7 @@ import {
 import { useNotify } from '@features/models/ui/useModelsNotify';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { Button, IconButton, ConfirmDialog } from '@platform/ui';
-import { Trash2Icon, XIcon } from 'lucide-react';
+import { RefreshCcwIcon, Trash2Icon, XIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -44,7 +44,11 @@ export const LibraryColumn = () => {
       left.selectedKeys === right.selectedKeys
   );
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
+  const [isBulkReidentifyOpen, setIsBulkReidentifyOpen] = useState(false);
+  // Separate instances: run ignores re-entry, so sharing one would let a slow
+  // re-identify swallow a delete.
   const { run } = useScopedAction();
+  const { run: runReidentify } = useScopedAction();
 
   const availableTypes = useMemo(() => collectTypes(models), [models]);
   const availableBases = useMemo(() => collectBases(models), [models]);
@@ -102,6 +106,40 @@ export const LibraryColumn = () => {
         // refreshModels targets the same account the failed call did.
         void refreshModels();
       }
+    );
+  };
+
+  const handleBulkReidentify = async () => {
+    const keys = [...selectedKeys];
+
+    await runReidentify(
+      async (owner) => {
+        const result = await bulkReidentifyModels(keys, owner.signal);
+
+        assertAccountScopeCurrent(owner);
+        // The endpoint returns keys only; the refreshed library carries the
+        // re-detected configs.
+        await refreshModels(owner);
+        assertAccountScopeCurrent(owner);
+        updateModelsUi({ selectedKeys: new Set(result.failed.map((failure) => failure.key)) });
+
+        if (result.failed.length > 0) {
+          notify.error(
+            t('models.someCouldNotBeReidentified'),
+            t('models.bulkReidentifyPartialDescription', {
+              error: result.failed[0]?.error ?? '',
+              failed: result.failed.length,
+              succeeded: result.succeeded.length,
+            })
+          );
+        } else {
+          notify.success(
+            t('models.reidentified'),
+            t('models.reidentifiedDescription', { count: result.succeeded.length })
+          );
+        }
+      },
+      (message) => notify.error(t('models.bulkReidentifyFailed'), message)
     );
   };
 
@@ -169,6 +207,10 @@ export const LibraryColumn = () => {
               {t('models.selectAllCount', { count: filteredKeys.length })}
             </Button>
           ) : null}
+          <Button size="2xs" variant="outline" onClick={() => setIsBulkReidentifyOpen(true)}>
+            <Icon as={RefreshCcwIcon} boxSize="3" />
+            {t('models.reidentifySelected')}
+          </Button>
           <Button colorPalette="red" size="2xs" variant="solid" onClick={() => setIsBulkDeleteOpen(true)}>
             <Icon as={Trash2Icon} boxSize="3" />
             {t('common.delete')}
@@ -192,6 +234,15 @@ export const LibraryColumn = () => {
         title={t('models.deleteSelectedTitle')}
         onClose={() => setIsBulkDeleteOpen(false)}
         onConfirm={handleBulkDelete}
+      />
+      <ConfirmDialog
+        body={t('models.bulkReidentifyBody', { count: selectedKeys.size })}
+        confirmLabel={t('models.bulkReidentifyConfirm', { count: selectedKeys.size })}
+        isDestructive={false}
+        isOpen={isBulkReidentifyOpen}
+        title={t('models.bulkReidentifyTitle')}
+        onClose={() => setIsBulkReidentifyOpen(false)}
+        onConfirm={handleBulkReidentify}
       />
     </Flex>
   );

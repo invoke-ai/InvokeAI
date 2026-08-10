@@ -252,6 +252,11 @@ export interface BulkDeleteModelsResponse {
   failed: { key: string; error: string }[];
 }
 
+export interface BulkReidentifyModelsResponse {
+  succeeded: string[];
+  failed: { key: string; error: string }[];
+}
+
 export interface DeleteOrphanedModelsResponse {
   deleted: string[];
   errors: Record<string, string>;
