@@ -50,6 +50,15 @@ class IntegerCollectionFromItemTestInvocation(BaseInvocation):
         return IntegerCollectionTestInvocationOutput(collection=[base, base + 1])
 
 
+class IntegerCollectionWithBranchingTestInvocation(BaseInvocation):
+    value: int = InputField(default=0)
+    branch_count: int = InputField(default=2)
+
+    def invoke(self, context: InvocationContext) -> IntegerCollectionTestInvocationOutput:
+        base = self.value * 10
+        return IntegerCollectionTestInvocationOutput(collection=[base + branch for branch in range(self.branch_count)])
+
+
 class MaybeEmptyIntegerCollectionTestInvocation(BaseInvocation):
     value: int = InputField(default=0)
     always_empty: bool = InputField(default=False)
@@ -1365,9 +1374,58 @@ def test_graph_chained_collectors_preserve_ragged_empty_scope():
     execute_all_nodes(state)
 
     top_collect_ids = state.source_prepared_mapping["top_collect"]
-    assert sorted(state._get_iteration_path(node_id) for node_id in top_collect_ids) == [()]
-    top_collect_id = next(iter(top_collect_ids))
-    assert state.results[top_collect_id].collection == [[], [0, 1], [10, 11]]
+    top_collect_results = {
+        state._get_iteration_path(node_id): state.results[node_id].collection for node_id in top_collect_ids
+    }
+    assert top_collect_results == {(0,): [[]], (1,): [[0, 1], [10, 11]]}
+
+
+@pytest.mark.parametrize(("levels", "branch_count"), [(3, 2), (4, 2), (5, 1), (6, 1), (7, 1)])
+def test_graph_chained_collectors_preserve_all_iteration_scopes(levels: int, branch_count: int):
+    graph = Graph()
+    graph.add_node(RangeInvocation(id="source", start=0, stop=2, step=1))
+    graph.add_node(IterateInvocation(id="iter_0"))
+    for level in range(1, levels):
+        graph.add_node(IntegerCollectionWithBranchingTestInvocation(id=f"map_{level}", branch_count=branch_count))
+        graph.add_node(IterateInvocation(id=f"iter_{level}"))
+    graph.add_node(AddInvocation(id="body", b=0))
+
+    graph.add_edge(create_edge("source", "collection", "iter_0", "collection"))
+    for level in range(1, levels):
+        graph.add_edge(create_edge(f"iter_{level - 1}", "item", f"map_{level}", "value"))
+        graph.add_edge(create_edge(f"map_{level}", "collection", f"iter_{level}", "collection"))
+    graph.add_edge(create_edge(f"iter_{levels - 1}", "item", "body", "a"))
+
+    previous_node_id = "body"
+    previous_field = "value"
+    for level in reversed(range(levels)):
+        collect_id = f"collect_{level}"
+        graph.add_node(CollectInvocation(id=collect_id))
+        graph.add_edge(create_edge(previous_node_id, previous_field, collect_id, "item"))
+        previous_node_id = collect_id
+        previous_field = "collection"
+
+    state = GraphExecutionState(graph=graph)
+    execute_all_nodes(state)
+
+    def paths(depth: int) -> list[tuple[int, ...]]:
+        if depth == 0:
+            return [()]
+        branch_level = depth - 1
+        branch_options = range(2) if branch_level == 0 else range(branch_count)
+        return [prefix + (branch,) for prefix in paths(depth - 1) for branch in branch_options]
+
+    def expected_collection(level: int, prefix: tuple[int, ...]):
+        branch_options = range(2) if level == 0 else range(branch_count)
+        if level == levels - 1:
+            return [int("".join(map(str, prefix + (branch,)))) for branch in branch_options]
+        return [expected_collection(level + 1, prefix + (branch,)) for branch in branch_options]
+
+    for level in range(levels):
+        prepared_ids = state.source_prepared_mapping[f"collect_{level}"]
+        actual = {state._get_iteration_path(node_id): state.results[node_id].collection for node_id in prepared_ids}
+        expected = {prefix: expected_collection(level, prefix) for prefix in paths(level)}
+        assert actual == expected
 
 
 def test_graph_collector_reuses_outer_collection_input_for_each_nested_iterator_group():

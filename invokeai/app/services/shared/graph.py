@@ -514,14 +514,12 @@ class _ExecutionMaterializer:
         self._state._try_resolve_if_node(exec_node_id)
         self._state._enqueue_if_ready(exec_node_id)
 
-    def _get_collect_iteration_group_key(self, edge: Edge) -> tuple[int, ...]:
+    def _get_collect_iteration_group_key(self, edge: Edge, sibling_depth: Optional[int] = None) -> tuple[int, ...]:
         path = self._state._get_iteration_path(edge.source.node_id)
         if edge.destination.field == ITEM_FIELD:
-            source_node_id = self._state.prepared_source_mapping[edge.source.node_id]
-            if self._get_collect_source_iterator_ids(source_node_id):
-                return path[:-1]
-            # No active iterator means the path is inherited from a collector boundary; keep it global.
-            return ()
+            # Ragged siblings need the deepest path to identify their shared outer group.
+            depth = len(path) if sibling_depth is None else sibling_depth
+            return path[: max(depth - 1, 0)]
         return path
 
     def _get_collect_source_iterator_ids(self, source_node_id: str) -> list[str]:
@@ -578,12 +576,15 @@ class _ExecutionMaterializer:
         for edge in input_edges:
             group_keys.update(self._get_collect_candidate_group_keys(edge))
             prepared_nodes = self._get_ordered_prepared_nodes_for_source(edge.source.node_id)
+            sibling_depth = max(
+                (len(self._state._get_iteration_path(prepared_id)) for prepared_id in prepared_nodes), default=0
+            )
             for prepared_id in prepared_nodes:
                 prepared_edge = Edge(
                     source=EdgeConnection(node_id=prepared_id, field=edge.source.field),
                     destination=edge.destination,
                 )
-                group_key = self._get_collect_iteration_group_key(prepared_edge)
+                group_key = self._get_collect_iteration_group_key(prepared_edge, sibling_depth)
                 group_keys.add(group_key)
                 prepared_inputs.append(
                     (prepared_edge, edge.source.node_id, prepared_id, self._state._get_iteration_path(prepared_id))
