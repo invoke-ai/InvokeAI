@@ -1023,6 +1023,7 @@
     "pruneFailed": "Prune failed",
     "pull": "Pull",
     "queueActionFailed": "Queue action failed",
+    "queueActionPartialDescription": "{{failed}} of {{total}} failed: {{error}}",
     "refreshList": "Refresh model list",
     "reidentify": "Re-identify model",
     "reidentifyFailed": "Re-identify failed",

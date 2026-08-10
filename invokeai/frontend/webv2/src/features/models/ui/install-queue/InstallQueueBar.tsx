@@ -13,7 +13,7 @@ import {
   refreshInstalls,
   useInstallsSelector,
 } from '@features/models/data/installsStore';
-import { useScopedAction } from '@features/models/ui/shared/useScopedAction';
+import { getErrorMessage, useScopedAction } from '@features/models/ui/shared/useScopedAction';
 import { setQueueExpanded, useModelsUiSelector } from '@features/models/ui/uiStore';
 import { useNotify } from '@features/models/ui/useModelsNotify';
 import { useMountEffect } from '@platform/react/useMountEffect';
@@ -66,10 +66,24 @@ export const InstallQueueBar = () => {
     ) =>
       run(
         async (owner) => {
-          await Promise.all(targets.map((job) => call(job.id, owner.signal)));
+          // allSettled: one failed job must not hide the others' outcomes,
+          // and the requests that succeeded still deserve a fresh list.
+          const results = await Promise.allSettled(targets.map((job) => call(job.id, owner.signal)));
           assertAccountScopeCurrent(owner);
           await refreshInstalls(owner);
           assertAccountScopeCurrent(owner);
+
+          const failures = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected');
+          if (failures.length > 0) {
+            notify.error(
+              t('models.queueActionFailed'),
+              t('models.queueActionPartialDescription', {
+                error: getErrorMessage(failures[0]!.reason),
+                failed: failures.length,
+                total: targets.length,
+              })
+            );
+          }
         },
         (message) => {
           notify.error(t('models.queueActionFailed'), message);

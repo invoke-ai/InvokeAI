@@ -59,6 +59,9 @@ export const InstallJobRow = ({
         assertAccountScopeCurrent(owner);
         if (result && typeof result === 'object' && 'id' in (result as ModelInstallJob)) {
           replaceInstallJob(result as ModelInstallJob);
+          // A coalesced refresh already in flight can clobber the optimistic
+          // row with a stale snapshot; revalidating converges on server truth.
+          void refreshInstalls(owner);
         } else {
           await refreshInstalls(owner);
         }
