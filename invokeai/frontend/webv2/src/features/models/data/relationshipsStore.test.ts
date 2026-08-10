@@ -1,3 +1,5 @@
+import type { ModelConfig } from '@features/models/core/types';
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const api = vi.hoisted(() => ({
@@ -226,5 +228,58 @@ describe('relationships store', () => {
     await userAFetch;
 
     expect(store.getRelationshipsSnapshot().relatedKeysByModelKey).toEqual({});
+  });
+});
+
+describe('relationships pruning from library snapshots', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    api.getRelatedModelKeys.mockReset();
+  });
+
+  const model = (key: string) => ({ key, name: key }) as ModelConfig;
+
+  it('drops entries for models missing from the next loaded snapshot and scrubs siblings', async () => {
+    const store = await import('./relationshipsStore');
+    const models = await import('./modelsStore');
+
+    models.setModelsSnapshotForTests({ models: [model('a'), model('b'), model('c')], status: 'loaded' });
+    store.setRelationshipsSnapshotForTests({ relatedKeysByModelKey: { a: ['b'], b: ['a', 'c'], c: ['b'] } });
+
+    models.setModelsSnapshotForTests({ models: [model('b'), model('c')], status: 'loaded' });
+
+    expect(store.getRelationshipsSnapshot().relatedKeysByModelKey).toEqual({ b: ['c'], c: ['b'] });
+  });
+
+  it('does not prune from non-loaded snapshots or before a first loaded baseline', async () => {
+    const store = await import('./relationshipsStore');
+    const models = await import('./modelsStore');
+
+    store.setRelationshipsSnapshotForTests({ relatedKeysByModelKey: { a: ['b'], b: ['a'] } });
+
+    // First loaded snapshot only establishes the baseline.
+    models.setModelsSnapshotForTests({ models: [model('b')], status: 'loaded' });
+    expect(store.getRelationshipsSnapshot().relatedKeysByModelKey).toEqual({ a: ['b'], b: ['a'] });
+
+    // A loading patch must not prune either.
+    models.setModelsSnapshotForTests({ models: [], status: 'loading' });
+    expect(store.getRelationshipsSnapshot().relatedKeysByModelKey).toEqual({ a: ['b'], b: ['a'] });
+  });
+
+  it('lets a pruned model recover once the server answers for its key again', async () => {
+    const store = await import('./relationshipsStore');
+    const models = await import('./modelsStore');
+
+    models.setModelsSnapshotForTests({ models: [model('a'), model('b')], status: 'loaded' });
+    store.setRelationshipsSnapshotForTests({ relatedKeysByModelKey: { a: ['b'], b: ['a'] } });
+    models.setModelsSnapshotForTests({ models: [model('b')], status: 'loaded' });
+    expect(store.getRelationshipsSnapshot().relatedKeysByModelKey).toEqual({ b: [] });
+
+    // Reinstalled: the library lists it again and a fetch succeeds.
+    models.setModelsSnapshotForTests({ models: [model('a'), model('b')], status: 'loaded' });
+    api.getRelatedModelKeys.mockResolvedValueOnce(['b']);
+    await store.ensureRelatedModelKeysLoaded('a');
+
+    expect(store.getRelationshipsSnapshot().relatedKeysByModelKey).toEqual({ a: ['b'], b: [] });
   });
 });

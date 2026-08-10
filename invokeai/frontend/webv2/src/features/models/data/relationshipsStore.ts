@@ -1,3 +1,5 @@
+import type { ModelConfig } from '@features/models/core/types';
+
 import {
   captureAccountScope,
   isAccountScopeCurrent,
@@ -6,6 +8,7 @@ import {
 import { createExternalStore } from '@platform/state/externalStore';
 import { areArraysEqual } from '@platform/state/selectors';
 
+import { getModelsSnapshot, subscribeModels } from './modelsStore';
 import { addModelRelationship, getRelatedModelKeys, removeModelRelationship } from './relationshipsApi';
 
 /**
@@ -62,9 +65,40 @@ registerAccountOwnedResource({
     failedFetchKeys.clear();
     latestPairMutation.clear();
     removedKeys.clear();
+    lastLoadedModels = null;
     store.setSnapshot(EMPTY_RELATIONSHIPS_SNAPSHOT);
   },
   name: 'model-relationships',
+});
+
+/**
+ * Library-driven pruning: when a loaded library snapshot no longer contains a
+ * model we hold an entry for (deleted by another surface, or gone after a
+ * refresh), drop the entry and scrub the key from siblings. Entries for
+ * still-present models stay cache-first; freshness of links edited elsewhere
+ * is out of scope by design. This store subscribes to the library — not the
+ * other way around — so the eagerly-loaded modelsStore never pulls this lazy
+ * chunk into the entry graph.
+ */
+let lastLoadedModels: readonly ModelConfig[] | null = null;
+
+subscribeModels(() => {
+  const { models, status } = getModelsSnapshot();
+
+  if (status !== 'loaded' || models === lastLoadedModels) {
+    return;
+  }
+
+  if (lastLoadedModels !== null) {
+    const presentKeys = new Set(models.map((model) => model.key));
+    const removed = lastLoadedModels.filter((model) => !presentKeys.has(model.key)).map((model) => model.key);
+
+    if (removed.length > 0) {
+      removeModelsFromRelationships(removed);
+    }
+  }
+
+  lastLoadedModels = models;
 });
 
 const setEntry = (modelKey: string, keys: readonly string[]): void => {
