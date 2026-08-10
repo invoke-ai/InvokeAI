@@ -993,6 +993,7 @@
     "modelUpdated": "Model updated",
     "noInstallableModelFiles": "This HuggingFace repo has no installable model files.",
     "noInstallsDescription": "Model installs appear here while they download and import.",
+    "noExternalProviders": "No external model providers are available on this server.",
     "noInstallsYet": "No installs yet",
     "noModelFilesFound": "No model files found in {{path}}.",
     "noModelFilesFoundTitle": "No model files found",

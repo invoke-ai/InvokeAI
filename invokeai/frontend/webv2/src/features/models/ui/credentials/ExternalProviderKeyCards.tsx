@@ -59,6 +59,16 @@ export const ExternalProviderKeyCards = ({ onError }: { onError: (title: string,
     );
   }
 
+  // A server with no external providers is a normal state, not a blank one.
+  // Nothing renders while loading — no flicker on the happy path.
+  if (status === 'loaded' && (configs ?? []).length === 0) {
+    return (
+      <Text color="fg.subtle" fontSize="2xs">
+        {t('models.noExternalProviders')}
+      </Text>
+    );
+  }
+
   return (
     <>
       {(configs ?? []).map((config) => {
