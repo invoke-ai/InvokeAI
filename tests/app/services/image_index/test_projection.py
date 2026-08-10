@@ -169,3 +169,53 @@ def test_projection_params_is_stable_json() -> None:
     assert json.loads(projection_params(n_points=5))["n_neighbors"] == 4
     assert json.loads(projection_params(n_points=1))["n_neighbors"] == 1
     assert projection_params(n_points=100) == projection_params(n_points=100)
+
+
+def test_cluster_at_eps_clusters_at_exactly_the_eps_it_is_given(monkeypatch) -> None:
+    """The router resolves eps once so it can report the effective value, then clusters.
+
+    Routing that value back through compute_clusters would resolve it a SECOND time —
+    re-running the k-distance fit and the whole KD-tree budget shrink (measured at ~65%
+    of a 50k-point request), and re-applying the 0.01 floor, which re-inflates a
+    budget-shrunk eps onto a different shrink grid so the number reported to the client
+    is not the number DBSCAN used.
+    """
+    import invokeai.app.services.image_index.projection as projection
+
+    calls = {"resolve": 0}
+    real_resolve = projection.resolve_cluster_eps
+
+    def counting_resolve(*args, **kwargs):
+        calls["resolve"] += 1
+        return real_resolve(*args, **kwargs)
+
+    monkeypatch.setattr(projection, "resolve_cluster_eps", counting_resolve)
+
+    captured: dict[str, float] = {}
+    import sklearn.cluster
+
+    real_dbscan = sklearn.cluster.DBSCAN
+
+    def recording_dbscan(*args, **kwargs):
+        captured["eps"] = kwargs["eps"]
+        return real_dbscan(*args, **kwargs)
+
+    monkeypatch.setattr(sklearn.cluster, "DBSCAN", recording_dbscan)
+
+    coords = _blob_coords()
+    resolved = real_resolve(coords, None, 2)
+
+    projection.cluster_at_eps(coords, resolved, 2)
+    assert calls["resolve"] == 0, "clustering at an already-resolved eps must not resolve again"
+    assert captured["eps"] == resolved, "DBSCAN must run at exactly the eps the caller reports"
+
+    # compute_clusters keeps resolving for callers that pass a raw/None eps.
+    projection.compute_clusters(coords, eps=None, min_samples=2)
+    assert calls["resolve"] == 1
+
+
+def _blob_coords() -> np.ndarray:
+    rng = np.random.default_rng(3)
+    return np.concatenate([rng.standard_normal((20, 2)) * 0.1 + offset for offset in ([0, 0], [5, 5])]).astype(
+        np.float32
+    )

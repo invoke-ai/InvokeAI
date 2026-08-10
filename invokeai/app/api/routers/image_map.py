@@ -12,6 +12,7 @@ from invokeai.app.services.image_index.image_index_common import ImageIndexStatu
 from invokeai.app.services.image_index.projection import (
     DEFAULT_CLUSTER_MIN_SAMPLES,
     MAX_CLUSTERED_POINTS,
+    cluster_at_eps,
     compute_clusters,
     resolve_cluster_eps,
     scope_hash,
@@ -141,11 +142,24 @@ async def get_image_map_points(
         if not current_names:
             return ImageMapPointsResponse(points=[], state="empty", stale=False, point_count=0)
         enqueued = services.image_index.request_projection(user_id, all_images=is_admin)
-        return ImageMapPointsResponse(points=[], state="computing" if enqueued else "empty", stale=True, point_count=0)
+        # stale means "a recompute is pending"; when nothing could be enqueued
+        # (the indexer is not running) nothing is pending, and a client that
+        # polls on stale would wait forever.
+        return ImageMapPointsResponse(
+            points=[], state="computing" if enqueued else "empty", stale=enqueued, point_count=0
+        )
 
     stale = record.scope_hash != scope_hash(model_id, current_names)
+    retrying = False
     if stale:
         services.image_index.request_projection(user_id, all_images=is_admin)
+    elif record.point_count == 0 and current_names:
+        # An empty projection over a gallery that HAS embedded images is a
+        # failed fit, not a result — and it is stamped with the current scope,
+        # so staleness will never ask for it again. Request the recompute; the
+        # service grants one retry per scope per process, so a transient
+        # failure heals here while a permanent one cannot spin.
+        retrying = services.image_index.request_projection(user_id, all_images=is_admin)
 
     # Serve only points still in the user's current accessible set, so images
     # un-shared (or deleted) since the projection was computed never leak out
@@ -158,21 +172,40 @@ async def get_image_map_points(
         mask = np.fromiter(
             (name in accessible for name in record.image_names), dtype=bool, count=len(record.image_names)
         )
+        # Drop non-finite rows as well. A NaN cannot be serialized as valid
+        # JSON, so one corrupt coordinate would fail the whole response — and
+        # rows written before the projection writer grew its isfinite guard are
+        # still out there in existing databases.
+        mask &= np.isfinite(record.coords).all(axis=1)
         visible_names = [name for name, keep in zip(record.image_names, mask, strict=True) if keep]
         visible_coords = record.coords[mask]
-        resolved_eps = (
-            resolve_cluster_eps(visible_coords, eps, min_samples)
-            if 0 < visible_coords.shape[0] <= MAX_CLUSTERED_POINTS
-            else None
-        )
-        labels = compute_clusters(visible_coords, eps=resolved_eps, min_samples=min_samples)
+        try:
+            if 0 < visible_coords.shape[0] <= MAX_CLUSTERED_POINTS:
+                resolved_eps = resolve_cluster_eps(visible_coords, eps, min_samples)
+                # cluster_at_eps, not compute_clusters: the latter re-resolves
+                # what was just resolved, and the second pass re-applies the
+                # 0.01 floor to a budget-shrunk eps — so the value reported
+                # here would not be the value DBSCAN used.
+                labels = cluster_at_eps(visible_coords, resolved_eps, min_samples)
+            else:
+                resolved_eps = None
+                labels = compute_clusters(visible_coords, eps=eps, min_samples=min_samples)
+        except Exception:
+            # Clustering is a presentation detail; the coordinates are the
+            # data. sklearn raises on a non-finite cached row (which a build
+            # predating the writer's isfinite guard could have left behind),
+            # and an unhandled raise here 500s this user on EVERY request until
+            # their gallery changes. Serve the map unclustered instead.
+            services.logger.exception(f"Image map: clustering failed for user '{user_id}'; serving points unclustered")
+            resolved_eps = None
+            labels = np.full((visible_coords.shape[0],), -1, dtype=np.int64)
         return [
             ImageMapPoint(x=float(x), y=float(y), image_name=name, cluster=int(label))
             for name, (x, y), label in zip(visible_names, visible_coords, labels, strict=True)
         ], resolved_eps
 
     points, resolved_eps = await asyncio.to_thread(build_points)
-    state: ImageMapState = "ready" if points else "empty"
+    state: ImageMapState = "ready" if points else ("computing" if retrying else "empty")
     return ImageMapPointsResponse(
         points=points,
         state=state,

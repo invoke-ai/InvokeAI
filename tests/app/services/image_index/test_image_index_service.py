@@ -608,6 +608,91 @@ def test_generation_wait_does_not_block_shutdown(
     assert service._worker is not None and not service._worker.is_alive()
 
 
+def test_projection_does_not_wait_for_an_in_progress_generation(
+    image_records: SqliteImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+    accelerator_host: None,
+) -> None:
+    """A projection reads stored embeddings only — no encoder, no GPU — so it has no
+    reason to queue behind a generation the way an embed does.
+
+    The worker parks in _wait_for_idle_generation as soon as ONE image is pending, and
+    that wait is unbounded, so ordering the projection after it made /points report
+    "computing" for the entire length of a run. Every other projection test builds its
+    invoker with device='cpu'/session_queue=None, where the wait returns immediately —
+    which is why this was invisible to the suite.
+    """
+    session_queue = SimpleNamespace(get_queue_status=lambda queue_id: SimpleNamespace(in_progress=1))
+
+    service = ImageIndexService(encode_fn=_fake_encode, model_id=MODEL_ID)
+    try:
+        # One image already embedded (so the projection has input) and one that cannot
+        # be embedded while the generation holds the GPU (so the worker parks).
+        _save_image(image_records, "done.png")
+        index_records.upsert_embedding("done.png", MODEL_ID, _unit_vec())
+        _save_image(image_records, "waiting.png")
+
+        service.start(_make_invoker(images_service, index_records, device=None, session_queue=session_queue))
+        assert service.request_projection("system") is True
+
+        # The generation never ends; the projection must land anyway.
+        _wait_until(lambda: index_records.get_projection("system", MODEL_ID) is not None, timeout=20.0)
+        record = index_records.get_projection("system", MODEL_ID)
+        assert record is not None
+        assert record.image_names == ["done.png"]
+        # And the embed really is still parked behind the generation.
+        assert index_records.get_embeddings(["waiting.png"], MODEL_ID)[0] == []
+    finally:
+        service.stop()
+
+
+def test_a_partially_stored_batch_still_counts_its_systemic_failure(
+    image_records: SqliteImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+) -> None:
+    """`if stored: self._systemic_failures = 0` ran in a `finally`, i.e. AFTER the
+    handler that had just counted the failure.
+
+    So a batch whose first write succeeded and whose second hit "database is locked" —
+    the exact contention this code designs for — erased the outage it had just recorded.
+    That flattened the escalating backoff to a 1 Hz retry loop and, because the
+    projection fall-through keys on the same counter, skipped projections for the whole
+    contention window. Both existing systemic-failure tests fail EVERY write, so
+    `stored` is always empty and this branch was never reached.
+    """
+    service = ImageIndexService(encode_fn=_fake_encode, model_id=MODEL_ID)
+    try:
+        for name in ("stored.png", "locked.png"):
+            _save_image(image_records, name)
+
+        real_upsert = index_records.upsert_embedding
+
+        def flaky_upsert(image_name, model_id, embedding):
+            if image_name == "stored.png":
+                return real_upsert(image_name, model_id, embedding)
+            raise RuntimeError("database is locked")
+
+        index_records.upsert_embedding = flaky_upsert  # type: ignore[method-assign]
+        # Drive one batch directly, with no worker running: through the worker the
+        # counter also climbs on later all-failing batches, so the assertion below
+        # would hold with or without the fix.
+        service._invoker = _make_invoker(images_service, index_records)
+        service._model_id = MODEL_ID
+        service._encode_fn = _fake_encode
+
+        assert service._process_batch(["stored.png", "locked.png"]) is False
+
+        assert service._systemic_failures == 1, "a partial store must not erase the outage it just recorded"
+        # The half that stored is still stored, and no image was charged an attempt.
+        assert index_records.get_embeddings(["stored.png"], MODEL_ID)[0] == ["stored.png"]
+        assert service._failed == set()
+        assert service._attempts == {}
+    finally:
+        service.stop()
+
+
 def test_unparseable_device_is_ignored_rather_than_wedging_the_worker(
     image_records: SqliteImageRecordStorage,
     images_service: ImageService,
@@ -974,6 +1059,52 @@ def test_projection_failure_caches_empty_result_instead_of_looping(
     # clients see "empty" rather than re-enqueueing a doomed recompute forever.
     accessible = index_records.list_accessible_embedded_images(None, MODEL_ID)
     assert record.scope_hash == scope_hash(MODEL_ID, accessible)
+
+    # ...but "not stale" must not mean "never again". Asserting only the state
+    # above is what let the failure become terminal: the stamped hash plus the
+    # unchanged-scope short-circuit meant no later request could ever displace
+    # the empty row, so one transient fit failure blanked the map until the
+    # gallery changed — across restarts, since the row is in SQLite.
+    monkeypatch.setattr(image_index_default, "compute_umap", lambda matrix, seed=42: np.zeros((matrix.shape[0], 2)))
+    service.request_projection("system")
+
+    _wait_until(lambda: (r := index_records.get_projection("system", MODEL_ID)) is not None and r.point_count == 1)
+
+
+def test_a_permanently_failing_projection_is_retried_once_not_every_request(
+    image_records: SqliteImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+    service: ImageIndexService,
+    monkeypatch,
+) -> None:
+    """The other half of the bargain: recovering from a transient failure must not
+    turn a permanent one into a fit per request, which is what the empty-cache
+    stamp was protecting against in the first place."""
+    fits = {"n": 0}
+
+    def broken_umap(embeddings, seed=42):
+        fits["n"] += 1
+        raise RuntimeError("synthetic UMAP failure")
+
+    monkeypatch.setattr(image_index_default, "compute_umap", broken_umap)
+    _save_image(image_records, "a.png")
+    service.start(_make_invoker(images_service, index_records))
+    _wait_until(lambda: not service._backfill_pending.is_set())
+
+    service.request_projection("system")
+    _wait_until(lambda: index_records.get_projection("system", MODEL_ID) is not None, timeout=15)
+    assert fits["n"] == 1
+
+    # The retry is spent on the second request; every request after it must
+    # short-circuit rather than re-enter the doomed fit.
+    for _ in range(4):
+        service.request_projection("system")
+        _wait_until(lambda: not service._projection_requests, timeout=15)
+
+    _wait_until(lambda: fits["n"] == 2, timeout=15)
+    time.sleep(0.5)
+    assert fits["n"] == 2, "a permanently failing scope must be retried once per process, not per request"
 
 
 def test_projection_request_dedup_is_last_writer_wins(service: ImageIndexService) -> None:

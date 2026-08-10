@@ -197,7 +197,26 @@ def compute_clusters(
     if coords.shape[0] > MAX_CLUSTERED_POINTS:
         return np.full((coords.shape[0],), -1, dtype=np.int64)
 
-    eps = resolve_cluster_eps(coords, eps, min_samples)
+    return cluster_at_eps(coords, resolve_cluster_eps(coords, eps, min_samples), min_samples)
+
+
+def cluster_at_eps(
+    coords: np.ndarray,
+    eps: float,
+    min_samples: int = DEFAULT_CLUSTER_MIN_SAMPLES,
+) -> np.ndarray:
+    """DBSCAN at an eps `resolve_cluster_eps` has ALREADY produced.
+
+    Split out so a caller that needs to report the effective eps can resolve it
+    once and cluster at exactly that value. Passing a resolved eps back into
+    compute_clusters instead would re-resolve it — and since resolution floors
+    at 0.01 before applying the neighbour-pair budget, a budget-shrunk eps comes
+    back out different, so the reported value would not be the one used.
+    """
+    if coords.shape[0] == 0:
+        return np.empty((0,), dtype=np.int64)
+    if coords.shape[0] > MAX_CLUSTERED_POINTS:
+        return np.full((coords.shape[0],), -1, dtype=np.int64)
 
     from sklearn.cluster import DBSCAN
     from sklearn.neighbors import KDTree
