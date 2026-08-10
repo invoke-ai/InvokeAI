@@ -9,7 +9,7 @@ import { useModelsSelector } from '@features/models/data/modelsStore';
 import { useNotify } from '@features/models/ui/useModelsNotify';
 import { areArraysEqual } from '@platform/state/selectors';
 import { Button, IconButton, ConfirmDialog, MenuContent } from '@platform/ui';
-import { ArrowLeftIcon, MoreHorizontalIcon, PencilIcon, RefreshCcwIcon, Trash2Icon } from 'lucide-react';
+import { MoreHorizontalIcon, PencilIcon, RefreshCcwIcon, Trash2Icon } from 'lucide-react';
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SiHuggingface } from 'react-icons/si';
@@ -108,26 +108,15 @@ const areTriggerPhrasesModelsEqual = (left: TriggerPhrasesModel | null, right: T
  * Full detail pane for one model: identity (view/edit), per-model default
  * settings, related models, trigger phrases, and lifecycle actions (convert,
  * re-identify, delete). Mount keyed by model key so per-model form state never
- * leaks between models. `density="panel"` tightens the side-panel drill-in.
+ * leaks between models.
  */
-export const ModelDetail = ({
-  density = 'full',
-  modelKey,
-  onBack,
-  onDeleted,
-}: {
-  density?: 'panel' | 'full';
-  modelKey: string;
-  onBack?: () => void;
-  onDeleted: () => void;
-}) => {
+export const ModelDetail = ({ modelKey, onDeleted }: { modelKey: string; onDeleted: () => void }) => {
   const { t } = useTranslation();
   const model = useModelsSelector((snapshot) => selectModelShell(snapshot.models, modelKey));
 
   if (!model) {
     return (
       <Stack align="start" gap="2" p="1">
-        {onBack ? <BackButton onBack={onBack} /> : null}
         <Text color="fg.subtle" fontSize="xs">
           {t('models.modelNoLongerInLibrary')}
         </Text>
@@ -136,10 +125,8 @@ export const ModelDetail = ({
   }
 
   return (
-    <Stack gap={density === 'panel' ? '3' : '4'} pb="4">
-      {onBack ? <BackButton onBack={onBack} /> : null}
-
-      <ModelIdentitySectionContainer density={density} modelKey={model.key} onDeleted={onDeleted} />
+    <Stack gap="4" pb="4">
+      <ModelIdentitySectionContainer modelKey={model.key} onDeleted={onDeleted} />
 
       {supportsVaeCpuOnlySetting(model) ? (
         <>
@@ -173,18 +160,15 @@ export const ModelDetail = ({
 };
 
 interface ModelIdentitySectionProps {
-  density: 'panel' | 'full';
   isMissing: boolean;
   model: ModelIdentityModel;
   onDeleted: () => void;
 }
 
 const ModelIdentitySectionContainer = memo(function ModelIdentitySectionContainer({
-  density,
   modelKey,
   onDeleted,
 }: {
-  density: 'panel' | 'full';
   modelKey: string;
   onDeleted: () => void;
 }) {
@@ -195,11 +179,10 @@ const ModelIdentitySectionContainer = memo(function ModelIdentitySectionContaine
     return null;
   }
 
-  return <ModelIdentitySection density={density} isMissing={isMissing} model={model} onDeleted={onDeleted} />;
+  return <ModelIdentitySection isMissing={isMissing} model={model} onDeleted={onDeleted} />;
 });
 
 const ModelIdentitySection = memo(function ModelIdentitySection({
-  density,
   isMissing,
   model,
   onDeleted,
@@ -258,7 +241,7 @@ const ModelIdentitySection = memo(function ModelIdentitySection({
           }}
         />
       ) : (
-        <ModelAttributes density={density} model={model} />
+        <ModelAttributes model={model} />
       )}
     </>
   );
@@ -436,20 +419,9 @@ const RelatedModelsSectionContainer = memo(function RelatedModelsSectionContaine
   return <RelatedModelsSection model={model} onError={handleSectionError} />;
 });
 
-const BackButton = ({ onBack }: { onBack: () => void }) => {
-  const { t } = useTranslation();
-
-  return (
-    <Button alignSelf="start" size="2xs" variant="ghost" onClick={onBack}>
-      <Icon as={ArrowLeftIcon} boxSize="3" />
-      {t('models.allModels')}
-    </Button>
-  );
-};
-
 const isAbsolutePath = (path: string): boolean => path.startsWith('/') || /^[A-Za-z]:[\\/]/.test(path);
 
-const ModelAttributes = ({ density, model }: { density: 'panel' | 'full'; model: ModelIdentityModel }) => {
+const ModelAttributes = ({ model }: { model: ModelIdentityModel }) => {
   const { t } = useTranslation();
   const modelsDir = useModelsSelector((snapshot) => snapshot.modelsDir);
   // Managed models store paths relative to the models directory; show the
@@ -467,7 +439,7 @@ const ModelAttributes = ({ density, model }: { density: 'panel' | 'full'; model:
   ];
 
   return (
-    <DataList.Root gap="2.5" orientation={density === 'panel' ? 'vertical' : 'horizontal'} size="sm" variant="subtle">
+    <DataList.Root gap="2.5" orientation="horizontal" size="sm" variant="subtle">
       {attributes.map((attribute) => (
         <DataList.Item key={attribute.label}>
           <DataList.ItemLabel color="fg.subtle" fontSize="2xs" minW="8rem" textTransform="uppercase">

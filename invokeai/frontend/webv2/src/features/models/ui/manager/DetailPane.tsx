@@ -97,7 +97,7 @@ const DetailTab = ({ modelKey }: { modelKey: string | null }) => {
 
   return (
     <Scrollable h="full" label={t('models.details')} minH="0" p="3">
-      <ModelDetail key={modelKey} density="full" modelKey={modelKey} onDeleted={handleDeleted} />
+      <ModelDetail key={modelKey} modelKey={modelKey} onDeleted={handleDeleted} />
     </Scrollable>
   );
 };
