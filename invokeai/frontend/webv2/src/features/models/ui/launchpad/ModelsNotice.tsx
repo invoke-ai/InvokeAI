@@ -4,11 +4,11 @@ import { Flex, Icon, Spinner, Stack, Text, Wrap } from '@chakra-ui/react';
 import { ensureInstallsLoaded, isActiveInstallStatus, useInstallsSelector } from '@features/models/data/installsStore';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models/data/modelsStore';
 import { ensureStartersLoaded, useStartersSelector } from '@features/models/data/startersStore';
-import { getStarterBundleInstallSources } from '@features/models/ui/add-models/starterModelInstallSources';
-import { useInstallActions } from '@features/models/ui/add-models/useInstallActions';
+import { openAddModelsWithBundle } from '@features/models/ui/uiStore';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { Button } from '@platform/ui/Button';
-import { BoxIcon } from 'lucide-react';
+import { useNavigate } from '@tanstack/react-router';
+import { ArrowRightIcon, BoxIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -106,17 +106,19 @@ const StarterBundles = ({ bundles }: { bundles: Record<string, StarterModelBundl
 };
 
 const StarterBundleButton = ({ bundle, bundleKey }: { bundle: StarterModelBundle; bundleKey: string }) => {
-  const { install } = useInstallActions();
+  const navigate = useNavigate();
 
-  const handleInstall = useCallback(() => {
-    for (const source of getStarterBundleInstallSources(bundle)) {
-      void install({ config: source.config, source: source.source }, { silent: true });
-    }
-  }, [bundle, install]);
+  // Opens the bundle in the model manager rather than installing blind — the
+  // user sees what the pack contains and installs from there.
+  const handleOpen = useCallback(() => {
+    openAddModelsWithBundle(bundle.name || bundleKey);
+    void navigate({ to: '/models' });
+  }, [bundle.name, bundleKey, navigate]);
 
   return (
-    <Button size="xs" variant="outline" onClick={handleInstall}>
+    <Button size="xs" variant="outline" onClick={handleOpen}>
       {bundle.name || bundleKey}
+      <Icon as={ArrowRightIcon} boxSize="3" color="fg.muted" />
     </Button>
   );
 };

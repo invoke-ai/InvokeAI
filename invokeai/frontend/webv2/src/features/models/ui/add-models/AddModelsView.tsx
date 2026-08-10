@@ -56,15 +56,21 @@ export const AddModelsView = () => {
   const loadError = useStartersSelector((snapshot) => snapshot.error);
   const response = useStartersSelector((snapshot) => snapshot.response);
   const status = useStartersSelector((snapshot) => snapshot.status);
-  const { hfLookup, scan } = useModelsUiSelector(
-    (snapshot) => ({ hfLookup: snapshot.hfLookup, scan: snapshot.scan }),
-    (left, right) => left.hfLookup === right.hfLookup && left.scan === right.scan
+  const { hfLookup, scan, selectedBundleName } = useModelsUiSelector(
+    (snapshot) => ({
+      hfLookup: snapshot.hfLookup,
+      scan: snapshot.scan,
+      selectedBundleName: snapshot.selectedBundleName,
+    }),
+    (left, right) =>
+      left.hfLookup === right.hfLookup &&
+      left.scan === right.scan &&
+      left.selectedBundleName === right.selectedBundleName
   );
 
   const [query, setQuery] = useState('');
   const [accessToken, setAccessToken] = useState('');
   const [inplace, setInplace] = useState(true);
-  const [selectedBundleName, setSelectedBundleName] = useState<string | null>(null);
   const { isBusy: isPulling, run: runPull } = useScopedAction();
   const { isBusy: isScanning, run: runScan } = useScopedAction();
   const [installingBundle, setInstallingBundle] = useState<string | null>(null);
@@ -368,7 +374,7 @@ export const AddModelsView = () => {
                   />
                 ) : undefined
               }
-              onSelect={setSelectedBundleName}
+              onSelect={(name) => updateModelsUi({ selectedBundleName: name })}
             />
 
             {selectedBundle ? (

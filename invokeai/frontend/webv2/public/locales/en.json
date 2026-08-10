@@ -957,7 +957,7 @@
     "launchpad": {
       "installing_one": "{{count}} model installing…",
       "installing_other": "{{count}} models installing…",
-      "noModelsDescription": "Invoke needs at least one model before it can generate. Install a starter bundle to get going.",
+      "noModelsDescription": "Invoke needs at least one model before it can generate. Pick a starter bundle to see what's inside and install it from the model manager.",
       "noModelsTitle": "No models installed",
       "starterBundles": "Starter bundles"
     },
