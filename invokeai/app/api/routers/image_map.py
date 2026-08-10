@@ -1,4 +1,7 @@
 import asyncio
+import threading
+import time
+from collections import OrderedDict
 from typing import Literal, Optional
 
 import numpy as np
@@ -104,6 +107,63 @@ def _scope(current_user) -> tuple[str, bool]:
     return current_user.user_id, current_user.is_admin
 
 
+# A recompute takes minutes on any gallery large enough for this to matter, so
+# refusing a second request inside this window costs a caller nothing — while a
+# loop of them would otherwise pin the single index worker for every user and
+# fan an event into every connected admin's socket per iteration.
+MIN_REFRESH_INTERVAL_SECONDS = 10.0
+
+_refresh_claims: dict[str, float] = {}
+# Guards both module-level caches below. Held only for dict work, never across
+# clustering or a DB call.
+_state_lock = threading.Lock()
+
+
+def _claim_refresh_slot(user_id: str) -> bool:
+    """Whether this user may enqueue a refresh now, claiming their interval if so."""
+    now = time.monotonic()
+    with _state_lock:
+        # Prune on write: entries older than the window can never throttle
+        # anyone, so this keeps the map to users who refreshed recently rather
+        # than one entry per user who ever has.
+        for uid, claimed_at in list(_refresh_claims.items()):
+            if now - claimed_at >= MIN_REFRESH_INTERVAL_SECONDS:
+                del _refresh_claims[uid]
+        if user_id in _refresh_claims:
+            return False
+        _refresh_claims[user_id] = now
+        return True
+
+
+def _release_refresh_slot(user_id: str) -> None:
+    with _state_lock:
+        _refresh_claims.pop(user_id, None)
+
+
+# /points is polled, and between polls its inputs almost never change, so the
+# clustering it repeats is usually identical work. Caching the labels turns the
+# steady state into a dict lookup; the entries are int64 label arrays (~400KB at
+# the 50k-point clustering cap), so a handful of them costs a few MB.
+_CLUSTER_CACHE_ENTRIES = 8
+_cluster_cache: "OrderedDict[tuple[str, str, Optional[str], Optional[float], int], tuple[np.ndarray, Optional[float]]]" = OrderedDict()
+
+
+def _cluster_cache_get(key) -> Optional[tuple[np.ndarray, Optional[float]]]:
+    with _state_lock:
+        hit = _cluster_cache.get(key)
+        if hit is not None:
+            _cluster_cache.move_to_end(key)
+        return hit
+
+
+def _cluster_cache_put(key, value: tuple[np.ndarray, Optional[float]]) -> None:
+    with _state_lock:
+        _cluster_cache[key] = value
+        _cluster_cache.move_to_end(key)
+        while len(_cluster_cache) > _CLUSTER_CACHE_ENTRIES:
+            _cluster_cache.popitem(last=False)
+
+
 @image_map_router.get("/points", operation_id="get_image_map_points", response_model=ImageMapPointsResponse)
 async def get_image_map_points(
     current_user: CurrentUserOrDefault,
@@ -149,7 +209,8 @@ async def get_image_map_points(
             points=[], state="computing" if enqueued else "empty", stale=enqueued, point_count=0
         )
 
-    stale = record.scope_hash != scope_hash(model_id, current_names)
+    current_hash = scope_hash(model_id, current_names)
+    stale = record.scope_hash != current_hash
     retrying = False
     if stale:
         services.image_index.request_projection(user_id, all_images=is_admin)
@@ -179,6 +240,21 @@ async def get_image_map_points(
         mask &= np.isfinite(record.coords).all(axis=1)
         visible_names = [name for name, keep in zip(record.image_names, mask, strict=True) if keep]
         visible_coords = record.coords[mask]
+
+        # Every input to the clustering is pinned by this key: which projection
+        # row (its own scope hash plus updated_at, which moves on every rewrite),
+        # which subset of it this user can currently see (current_hash), and the
+        # two DBSCAN parameters. user_id is in the key too, so one user's labels
+        # can never be served to another even if the rest collides.
+        cache_key = (user_id, record.scope_hash, record.updated_at, current_hash, eps, min_samples)
+        cached_labels = _cluster_cache_get(cache_key)
+        if cached_labels is not None:
+            labels, resolved_eps = cached_labels
+            return [
+                ImageMapPoint(x=float(x), y=float(y), image_name=name, cluster=int(label))
+                for name, (x, y), label in zip(visible_names, visible_coords, labels, strict=True)
+            ], resolved_eps
+
         try:
             if 0 < visible_coords.shape[0] <= MAX_CLUSTERED_POINTS:
                 resolved_eps = resolve_cluster_eps(visible_coords, eps, min_samples)
@@ -199,6 +275,11 @@ async def get_image_map_points(
             services.logger.exception(f"Image map: clustering failed for user '{user_id}'; serving points unclustered")
             resolved_eps = None
             labels = np.full((visible_coords.shape[0],), -1, dtype=np.int64)
+        else:
+            # Only a real result is cached: caching the degraded all-noise
+            # fallback would make a one-off failure stick for as long as the
+            # entry survives.
+            _cluster_cache_put(cache_key, (labels, resolved_eps))
         return [
             ImageMapPoint(x=float(x), y=float(y), image_name=name, cluster=int(label))
             for name, (x, y), label in zip(visible_names, visible_coords, labels, strict=True)
@@ -225,7 +306,17 @@ async def get_image_map_points(
 async def refresh_image_map(current_user: CurrentUserOrDefault) -> ImageMapRefreshResponse:
     """Requests a recompute of the current user's image map projection."""
     user_id, is_admin = _scope(current_user)
+    if not _claim_refresh_slot(user_id):
+        # Throttled, not failed: `enqueued` already means "was this accepted",
+        # so a client needs no new status code or field to understand it.
+        return ImageMapRefreshResponse(enqueued=False)
+
     enqueued = ApiDependencies.invoker.services.image_index.request_projection(user_id, all_images=is_admin)
+    if not enqueued:
+        # Nothing was actually queued (the indexer is not running), so this
+        # request must not consume the user's interval — otherwise a client
+        # polling through a restart is locked out of the first real refresh.
+        _release_refresh_slot(user_id)
     return ImageMapRefreshResponse(enqueued=enqueued)
 
 

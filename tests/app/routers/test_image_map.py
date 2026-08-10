@@ -425,3 +425,149 @@ def test_cluster_labels_computed_only_over_accessible_points(
 
     assert [p["image_name"] for p in body["points"]] == ["p1.png", "p2.png", "far.png"]
     assert {p["cluster"] for p in body["points"]} == {-1}
+
+
+# --- Refresh throttling and clustering reuse ---
+
+
+@pytest.fixture(autouse=True)
+def _reset_image_map_router_state():
+    """The throttle and cluster cache are module state, so they outlive a test."""
+    from invokeai.app.api.routers import image_map as image_map_router_module
+
+    image_map_router_module._refresh_claims.clear()
+    image_map_router_module._cluster_cache.clear()
+    yield
+    image_map_router_module._refresh_claims.clear()
+    image_map_router_module._cluster_cache.clear()
+
+
+def test_refresh_is_throttled_per_user(
+    mock_invoker: Invoker, image_index_service: FakeImageIndexService, client: TestClient
+) -> None:
+    from invokeai.app.api.routers import image_map as image_map_router_module
+
+    assert client.post("/api/v1/image_map/refresh").json()["enqueued"] is True
+    # A recompute takes minutes; a second request inside the window is refused
+    # without reaching the single shared index worker at all.
+    for _ in range(5):
+        assert client.post("/api/v1/image_map/refresh").json()["enqueued"] is False
+    assert len(image_index_service.projection_requests) == 1
+
+    # Once the interval has passed the next request is accepted again.
+    image_map_router_module._refresh_claims[SYSTEM_USER_ID] -= image_map_router_module.MIN_REFRESH_INTERVAL_SECONDS + 1
+    assert client.post("/api/v1/image_map/refresh").json()["enqueued"] is True
+    assert len(image_index_service.projection_requests) == 2
+
+
+def test_refresh_throttle_is_not_consumed_when_nothing_was_enqueued(
+    mock_invoker: Invoker, image_index_service: FakeImageIndexService, client: TestClient
+) -> None:
+    """A refused enqueue (indexer down) must not lock the user out of the next real one."""
+    image_index_service._model_id = None
+
+    assert client.post("/api/v1/image_map/refresh").json()["enqueued"] is False
+
+    image_index_service._model_id = MODEL_ID
+    assert client.post("/api/v1/image_map/refresh").json()["enqueued"] is True
+
+
+def test_refresh_throttle_does_not_gate_the_points_recovery_path(
+    mock_invoker: Invoker, image_index_service: FakeImageIndexService, client: TestClient
+) -> None:
+    """/points enqueues the one-shot retry of a failed projection.
+
+    Throttling inside request_projection instead of the route would suppress that
+    recovery, so a failed fit would go back to being permanent.
+    """
+    _seed_embedded_image(mock_invoker, "a.png")
+    # An empty projection over a non-empty gallery: the shape a failed fit leaves.
+    _seed_projection(mock_invoker, SYSTEM_USER_ID, [], np.empty((0, 2), dtype=np.float32))
+
+    assert client.post("/api/v1/image_map/refresh").json()["enqueued"] is True
+    before = len(image_index_service.projection_requests)
+    body = client.get("/api/v1/image_map/points").json()
+
+    assert len(image_index_service.projection_requests) == before + 1
+    assert body["state"] == "computing"
+
+
+def test_repeat_points_requests_reuse_the_clustering(monkeypatch, mock_invoker: Invoker, client: TestClient) -> None:
+    """/points is polled, and between polls nothing it clusters has changed."""
+    from invokeai.app.api.routers import image_map as image_map_router_module
+
+    calls = {"n": 0}
+    real_cluster = image_map_router_module.cluster_at_eps
+
+    def counting_cluster(coords, eps, min_samples):
+        calls["n"] += 1
+        return real_cluster(coords, eps, min_samples)
+
+    monkeypatch.setattr(image_map_router_module, "cluster_at_eps", counting_cluster)
+
+    names = ["a.png", "b.png", "c.png", "d.png"]
+    for name in names:
+        _seed_embedded_image(mock_invoker, name)
+    coords = np.array([[0.0, 0.0], [0.4, 0.0], [30.0, 30.0], [30.4, 30.0]], dtype=np.float32)
+    _seed_projection(mock_invoker, SYSTEM_USER_ID, names, coords)
+
+    first = client.get("/api/v1/image_map/points", params={"eps": 0.5, "min_samples": 2}).json()
+    for _ in range(4):
+        repeat = client.get("/api/v1/image_map/points", params={"eps": 0.5, "min_samples": 2}).json()
+        assert repeat["points"] == first["points"]
+        assert repeat["cluster_eps"] == first["cluster_eps"]
+    assert calls["n"] == 1, "identical repeat polls must not recluster"
+
+    # Every clustering input is part of the key.
+    client.get("/api/v1/image_map/points", params={"eps": 0.05, "min_samples": 2}).json()
+    assert calls["n"] == 2, "a different eps must recluster"
+    client.get("/api/v1/image_map/points", params={"eps": 0.5, "min_samples": 3}).json()
+    assert calls["n"] == 3, "a different min_samples must recluster"
+
+    # A recomputed projection (same scope, new coordinates) must not be served
+    # from the entry the previous one left behind.
+    _seed_projection(mock_invoker, SYSTEM_USER_ID, names, coords[::-1].copy())
+    reprojected = client.get("/api/v1/image_map/points", params={"eps": 0.5, "min_samples": 2}).json()
+    assert calls["n"] == 4, "a rewritten projection must recluster"
+    assert reprojected["points"] != first["points"]
+
+
+def test_cluster_cache_is_bounded(monkeypatch, mock_invoker: Invoker, client: TestClient) -> None:
+    from invokeai.app.api.routers import image_map as image_map_router_module
+
+    names = ["a.png", "b.png", "c.png", "d.png"]
+    for name in names:
+        _seed_embedded_image(mock_invoker, name)
+    _seed_projection(
+        mock_invoker,
+        SYSTEM_USER_ID,
+        names,
+        np.array([[0.0, 0.0], [0.4, 0.0], [30.0, 30.0], [30.4, 30.0]], dtype=np.float32),
+    )
+
+    # Distinct eps values are distinct keys; the cache must not grow per request.
+    for i in range(image_map_router_module._CLUSTER_CACHE_ENTRIES * 3):
+        client.get("/api/v1/image_map/points", params={"eps": 0.1 + i * 0.01, "min_samples": 2})
+
+    assert len(image_map_router_module._cluster_cache) == image_map_router_module._CLUSTER_CACHE_ENTRIES
+
+
+def test_cluster_cache_never_serves_one_users_labels_to_another(
+    multiuser, mock_invoker: Invoker, client: TestClient
+) -> None:
+    """user_id is in the cache key, so a collision on every other component still cannot cross users."""
+    user1_id = _create_user(mock_invoker, "cacheuser1@test.com")
+    user2_id = _create_user(mock_invoker, "cacheuser2@test.com")
+    user1_headers = _login(client, "cacheuser1@test.com")
+    user2_headers = _login(client, "cacheuser2@test.com")
+
+    _seed_embedded_image(mock_invoker, "mine.png", user_id=user1_id)
+    _seed_embedded_image(mock_invoker, "theirs.png", user_id=user2_id)
+    _seed_projection(mock_invoker, user1_id, ["mine.png"], np.array([[0.0, 0.0]], dtype=np.float32))
+    _seed_projection(mock_invoker, user2_id, ["theirs.png"], np.array([[0.0, 0.0]], dtype=np.float32))
+
+    first = client.get("/api/v1/image_map/points", headers=user1_headers).json()
+    second = client.get("/api/v1/image_map/points", headers=user2_headers).json()
+
+    assert [p["image_name"] for p in first["points"]] == ["mine.png"]
+    assert [p["image_name"] for p in second["points"]] == ["theirs.png"]
