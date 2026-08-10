@@ -647,20 +647,20 @@ def test_projection_does_not_wait_for_an_in_progress_generation(
         service.stop()
 
 
-def test_a_partially_stored_batch_still_counts_its_systemic_failure(
+def test_a_partially_stored_batch_does_not_escalate_the_backoff(
     image_records: SqliteImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
 ) -> None:
-    """`if stored: self._systemic_failures = 0` ran in a `finally`, i.e. AFTER the
-    handler that had just counted the failure.
+    """A batch that stores ANYTHING resets the systemic-failure counter, even though the
+    batch also failed.
 
-    So a batch whose first write succeeded and whose second hit "database is locked" —
-    the exact contention this code designs for — erased the outage it had just recorded.
-    That flattened the escalating backoff to a 1 Hz retry loop and, because the
-    projection fall-through keys on the same counter, skipped projections for the whole
-    contention window. Both existing systemic-failure tests fail EVERY write, so
-    `stored` is always empty and this branch was never reached.
+    The counter exists to stop a hot retry loop when NO progress is possible. A batch that
+    stored an image is making progress: the backlog drains and quiescence arrives on its
+    own, so escalating is wrong. Counting these instead — reachable by moving the reset off
+    the `finally` — leaves no reset path at all while every batch partially fails, which
+    walks the wait up to its 60s ceiling while the index is still working. That is worse
+    under mild write contention than the flat 1Hz retry it would be correcting.
     """
     service = ImageIndexService(encode_fn=_fake_encode, model_id=MODEL_ID)
     try:
@@ -675,17 +675,17 @@ def test_a_partially_stored_batch_still_counts_its_systemic_failure(
             raise RuntimeError("database is locked")
 
         index_records.upsert_embedding = flaky_upsert  # type: ignore[method-assign]
-        # Drive one batch directly, with no worker running: through the worker the
-        # counter also climbs on later all-failing batches, so the assertion below
-        # would hold with or without the fix.
         service._invoker = _make_invoker(images_service, index_records)
         service._model_id = MODEL_ID
         service._encode_fn = _fake_encode
 
-        assert service._process_batch(["stored.png", "locked.png"]) is False
+        # Several rounds: the escalation this guards against is cumulative.
+        for _ in range(8):
+            assert service._process_batch(["stored.png", "locked.png"]) is False
 
-        assert service._systemic_failures == 1, "a partial store must not erase the outage it just recorded"
-        # The half that stored is still stored, and no image was charged an attempt.
+        assert service._systemic_failures == 0, "progress must clear the outage counter"
+        assert service._backoff_seconds() == _POLL_SECONDS, "a draining index must not back off"
+        # The half that stored is stored, and no image was charged an attempt.
         assert index_records.get_embeddings(["stored.png"], MODEL_ID)[0] == ["stored.png"]
         assert service._failed == set()
         assert service._attempts == {}

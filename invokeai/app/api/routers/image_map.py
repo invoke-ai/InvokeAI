@@ -211,16 +211,32 @@ async def get_image_map_points(
 
     current_hash = scope_hash(model_id, current_names)
     stale = record.scope_hash != current_hash
+
+    # Computed once, here, because the retry decision below depends on it: a row
+    # can carry point_count > 0 and still contribute nothing, if every one of
+    # its coordinates is non-finite. Deciding on the cached count instead left
+    # exactly that row serving "empty, not stale" with nothing ever asking for a
+    # recompute — the same terminal blankness this retry exists to remove.
+    accessible = set(current_names)
+    visible_mask = np.fromiter(
+        (name in accessible for name in record.image_names), dtype=bool, count=len(record.image_names)
+    )
+    # A NaN cannot be serialized as valid JSON, so one corrupt coordinate would
+    # fail the whole response; rows written before the projection writer grew
+    # its isfinite guard are still out there in existing databases.
+    visible_mask &= np.isfinite(record.coords).all(axis=1)
+
     retrying = False
     if stale:
         services.image_index.request_projection(user_id, all_images=is_admin)
-    elif record.point_count == 0 and current_names:
-        # An empty projection over a gallery that HAS embedded images is a
-        # failed fit, not a result — and it is stamped with the current scope,
-        # so staleness will never ask for it again. Request the recompute; the
-        # service grants one retry per scope per process, so a transient
-        # failure heals here while a permanent one cannot spin.
-        retrying = services.image_index.request_projection(user_id, all_images=is_admin)
+    elif current_names and not visible_mask.any():
+        # Nothing servable over a gallery that HAS embedded images: a failed
+        # fit, not a result — and it is stamped with the current scope, so
+        # staleness will never ask for it again. `failed_scope` makes the
+        # service refuse this once the scope's single retry is spent, so a
+        # permanent failure settles into an honest "empty" instead of a
+        # request/event cycle driven by every poll.
+        retrying = services.image_index.request_projection(user_id, all_images=is_admin, failed_scope=current_hash)
 
     # Serve only points still in the user's current accessible set, so images
     # un-shared (or deleted) since the projection was computed never leak out
@@ -229,17 +245,8 @@ async def get_image_map_points(
     # image leak its existence (and be wrong besides). The clustering and
     # response assembly are CPU-bound, so they run off the event loop.
     def build_points() -> tuple[list[ImageMapPoint], Optional[float]]:
-        accessible = set(current_names)
-        mask = np.fromiter(
-            (name in accessible for name in record.image_names), dtype=bool, count=len(record.image_names)
-        )
-        # Drop non-finite rows as well. A NaN cannot be serialized as valid
-        # JSON, so one corrupt coordinate would fail the whole response — and
-        # rows written before the projection writer grew its isfinite guard are
-        # still out there in existing databases.
-        mask &= np.isfinite(record.coords).all(axis=1)
-        visible_names = [name for name, keep in zip(record.image_names, mask, strict=True) if keep]
-        visible_coords = record.coords[mask]
+        visible_names = [name for name, keep in zip(record.image_names, visible_mask, strict=True) if keep]
+        visible_coords = record.coords[visible_mask]
 
         # Every input to the clustering is pinned by this key: which projection
         # row (its own scope hash plus updated_at, which moves on every rewrite),

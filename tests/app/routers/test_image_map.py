@@ -39,6 +39,7 @@ class FakeImageIndexService(ImageIndexServiceBase):
     def __init__(self, model_id: str | None = MODEL_ID) -> None:
         self._model_id = model_id
         self.projection_requests: list[tuple[str, bool]] = []
+        self.spent_failed_scopes: set[str] = set()
 
     @property
     def model_id(self) -> str | None:
@@ -49,9 +50,14 @@ class FakeImageIndexService(ImageIndexServiceBase):
             return None
         return ImageIndexStatus(total=5, embedded=3)
 
-    def request_projection(self, user_id: str, all_images: bool = False) -> bool:
+    def request_projection(self, user_id: str, all_images: bool = False, failed_scope: str | None = None) -> bool:
         if self._model_id is None:
             return False
+        # Mirrors the real service: a failed scope gets one retry, then refuses.
+        if failed_scope is not None:
+            if failed_scope in self.spent_failed_scopes:
+                return False
+            self.spent_failed_scopes.add(failed_scope)
         self.projection_requests.append((user_id, all_images))
         return True
 
@@ -571,3 +577,48 @@ def test_cluster_cache_never_serves_one_users_labels_to_another(
 
     assert [p["image_name"] for p in first["points"]] == ["mine.png"]
     assert [p["image_name"] for p in second["points"]] == ["theirs.png"]
+
+
+def test_a_spent_retry_stops_points_from_asking_again(
+    mock_invoker: Invoker, image_index_service: FakeImageIndexService, client: TestClient
+) -> None:
+    """The client listens for projection_ready and refetches on it.
+
+    So a /points that requests a recompute on every poll closes a cycle with the
+    worker's unconditional emit: request -> short-circuit -> emit -> refetch ->
+    request, at the worker's poll rate for the life of the process. Passing the
+    failed scope lets the service refuse once the retry is spent, which breaks it.
+    """
+    _seed_embedded_image(mock_invoker, "a.png")
+    # An empty projection over a non-empty gallery: the shape a failed fit leaves.
+    _seed_projection(mock_invoker, SYSTEM_USER_ID, [], np.empty((0, 2), dtype=np.float32))
+
+    first = client.get("/api/v1/image_map/points").json()
+    assert first["state"] == "computing", "the one retry is requested"
+    assert len(image_index_service.projection_requests) == 1
+
+    for _ in range(5):
+        later = client.get("/api/v1/image_map/points").json()
+        assert later["state"] == "empty", "a spent retry must settle into an honest empty"
+    assert len(image_index_service.projection_requests) == 1, "no further recomputes may be requested"
+
+
+def test_an_all_non_finite_projection_is_not_permanently_blank(
+    mock_invoker: Invoker, image_index_service: FakeImageIndexService, client: TestClient
+) -> None:
+    """point_count > 0 while every coordinate is NaN — what a database written before
+    the writer's isfinite guard can still hold.
+
+    Deciding the retry on the cached count rather than on what is actually servable
+    left this row serving "empty, not stale" with nothing ever asking for a recompute.
+    """
+    names = ["a.png", "b.png"]
+    for name in names:
+        _seed_embedded_image(mock_invoker, name)
+    _seed_projection(mock_invoker, SYSTEM_USER_ID, names, np.full((2, 2), np.nan, dtype=np.float32))
+
+    body = client.get("/api/v1/image_map/points").json()
+
+    assert body["points"] == []
+    assert body["state"] == "computing", "a row with nothing servable must ask for a recompute"
+    assert [user for user, _ in image_index_service.projection_requests] == [SYSTEM_USER_ID]

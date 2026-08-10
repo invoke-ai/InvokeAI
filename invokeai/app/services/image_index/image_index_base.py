@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Optional
 
 from invokeai.app.services.image_index.image_index_common import ImageIndexStatus
 
@@ -24,7 +25,7 @@ class ImageIndexServiceBase(ABC):
         pass
 
     @abstractmethod
-    def request_projection(self, user_id: str, all_images: bool = False) -> bool:
+    def request_projection(self, user_id: str, all_images: bool = False, failed_scope: Optional[str] = None) -> bool:
         """Ask the worker to (re)compute a user's image map projection.
 
         Requests are deduplicated per user; the projection runs after any
@@ -35,6 +36,10 @@ class ImageIndexServiceBase(ABC):
             user_id: The user whose projection cache to update.
             all_images: Compute over every embedded image (admin scope)
                 rather than the user's accessible set.
+            failed_scope: The scope hash of a cached projection the caller
+                believes to be a failed fit. The request is refused once that
+                scope's single retry has been used, so a caller that asks on
+                every poll cannot drive an endless request/event cycle.
 
         Returns:
             True if the request was accepted (or already pending); False if
