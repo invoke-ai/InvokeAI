@@ -12,6 +12,7 @@ import {
   animaVaeModelSelected,
   flux2DevMistralEncoderModelSelected,
   flux2VaeModelSelected,
+  fluxVAESelected,
   geminiTemperatureChanged,
   geminiThinkingLevelChanged,
   heightChanged,
@@ -91,7 +92,7 @@ import {
 import { refImagesRecalled } from 'features/controlLayers/store/refImagesSlice';
 import type { CanvasMetadata, LoRA, RefImageState } from 'features/controlLayers/store/types';
 import { zCanvasMetadata, zCanvasReferenceImageState_OLD, zRefImageState } from 'features/controlLayers/store/types';
-import type { ModelIdentifierField, ModelType } from 'features/nodes/types/common';
+import type { BaseModelType, ModelIdentifierField, ModelType } from 'features/nodes/types/common';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { zModelIdentifier } from 'features/nodes/types/v2/common';
 import { modelSelected } from 'features/parameters/store/actions';
@@ -1482,6 +1483,26 @@ const MainModel: SingleMetadataHandler<ParameterModel> = {
 };
 //#endregion MainModel
 
+/**
+ * Bases with their own VAE slot in paramsSlice plus a dedicated handler, which nonetheless write to the
+ * shared `metadata.vae` field. The generic VAEModel handler must not fire for them, else the metadata
+ * panel renders a duplicate VAE row and "recall all" additionally writes into the (for those bases dead)
+ * `params.vae` slot.
+ *
+ * When adding a base here: a dedicated handler dispatching into the correct slot MUST exist, and it MUST
+ * be listed in IMAGE_METADATA_ACTION_HANDLERS - otherwise the row disappears without replacement.
+ *
+ * qwen-image and wan are deliberately absent: they write `qwen_image_vae` / `wan_vae_model` and never
+ * collide with this handler in the first place.
+ */
+const BASES_WITH_DEDICATED_VAE_HANDLER: ReadonlySet<BaseModelType> = new Set([
+  'flux', // Flux1VAEModel  -> params.fluxVAE
+  'z-image', // ZImageVAEModel -> params.zImageVaeModel
+  'flux2', // Flux2VAEModel  -> params.flux2VaeModel (Klein + [dev])
+  'krea-2', // Krea2VAEModel  -> params.krea2VaeModel
+  'anima', // AnimaVAEModel  -> params.animaVaeModel
+]);
+
 //#region VAEModel
 const VAEModel: SingleMetadataHandler<ParameterVAEModel> = {
   [SingleMetadataKey]: true,
@@ -1491,11 +1512,10 @@ const VAEModel: SingleMetadataHandler<ParameterVAEModel> = {
     const parsed = await parseModelIdentifier(raw, store, 'vae');
     assert(parsed.type === 'vae');
     assert(isCompatibleWithMainModel(parsed, store));
-    // Z-Image, FLUX.2 Klein and Krea-2 have dedicated VAE handlers; avoid rendering a duplicate row.
     const base = selectBase(store.getState());
     assert(
-      base !== 'z-image' && base !== 'flux2' && base !== 'krea-2',
-      'VAEModel handler does not apply to Z-Image, FLUX.2 Klein or Krea-2'
+      !base || !BASES_WITH_DEDICATED_VAE_HANDLER.has(base),
+      `VAEModel handler does not apply to base "${base}" - it has a dedicated VAE handler`
     );
     return Promise.resolve(parsed);
   },
@@ -1510,14 +1530,48 @@ const VAEModel: SingleMetadataHandler<ParameterVAEModel> = {
 };
 //#endregion VAEModel
 
-//#region Qwen3EncoderModel
-const Qwen3EncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
+//#region Flux1VAEModel
+/**
+ * FLUX.1 keeps its VAE in a dedicated slot (`params.fluxVAE`, read by buildFLUXGraph) but records it in
+ * the shared `metadata.vae` field. Without this handler the generic VAEModel would recall it into
+ * `params.vae`, which no FLUX graph ever reads - the recall looked like it worked but had no effect.
+ */
+const Flux1VAEModel: SingleMetadataHandler<ModelIdentifierField> = {
   [SingleMetadataKey]: true,
-  type: 'Qwen3EncoderModel',
+  type: 'Flux1VAEModel',
+  parse: async (metadata, store) => {
+    const raw = getProperty(metadata, 'vae');
+    const parsed = await parseModelIdentifier(raw, store, 'vae');
+    assert(parsed.type === 'vae');
+    assert(parsed.base === 'flux', 'Flux1VAEModel requires a FLUX VAE');
+    const base = selectBase(store.getState());
+    assert(base === 'flux', 'Flux1VAEModel handler only works with FLUX.1 models');
+    return parsed;
+  },
+  recall: (value, store) => {
+    store.dispatch(fluxVAESelected(value));
+  },
+  i18nKey: 'metadata.vae',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField>) => (
+    <MetadataPrimitiveValue value={`${value.name} (${value.base.toUpperCase()})`} />
+  ),
+};
+//#endregion Flux1VAEModel
+
+//#region ZImageQwen3EncoderModel
+const ZImageQwen3EncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
+  [SingleMetadataKey]: true,
+  type: 'ZImageQwen3EncoderModel',
   parse: async (metadata, store) => {
     const raw = getProperty(metadata, 'qwen3_encoder');
     const parsed = await parseModelIdentifier(raw, store, 'qwen3_encoder');
     assert(parsed.type === 'qwen3_encoder');
+    // `qwen3_encoder` is a shared field: Z-Image, Anima and FLUX.2 Klein all write it, each into a
+    // different slot. The encoder itself cannot disambiguate them (Klein and Z-Image encoders both
+    // satisfy isQwen3EncoderModelConfig), so gate on the currently selected base instead.
+    const base = selectBase(store.getState());
+    assert(base === 'z-image', 'ZImageQwen3EncoderModel handler only works with Z-Image models');
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
@@ -1531,7 +1585,7 @@ const Qwen3EncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
     <MetadataPrimitiveValue value={`${value.name} (${value.base.toUpperCase()})`} />
   ),
 };
-//#endregion Qwen3EncoderModel
+//#endregion ZImageQwen3EncoderModel
 
 //#region T5EncoderModel
 const T5EncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
@@ -1791,9 +1845,15 @@ const AnimaVAEModel: SingleMetadataHandler<ModelIdentifierField> = {
   [SingleMetadataKey]: true,
   type: 'AnimaVAEModel',
   parse: async (metadata, store) => {
+    // Check provenance: `vae` is a shared field (SD/SDXL/SD3/FLUX/FLUX.2/Krea-2/Z-Image write it too).
+    // Without this, a Krea-2 image recalled while Anima is selected would push its Qwen-Image VAE into
+    // the Anima slot.
+    assertMetadataModelBase(metadata, 'anima', 'AnimaVAEModel');
     const raw = getProperty(metadata, 'vae');
     const parsed = await parseModelIdentifier(raw, store, 'vae');
     assert(parsed.type === 'vae');
+    // isAnimaVAEModelConfig (services/api/types.ts) is base-driven, so this assert is meaningful here.
+    assert(parsed.base === 'anima', 'AnimaVAEModel requires an Anima VAE');
     const base = selectBase(store.getState());
     assert(base === 'anima', 'AnimaVAEModel handler only works with Anima models');
     return Promise.resolve(parsed);
@@ -1814,9 +1874,14 @@ const AnimaQwen3EncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
   [SingleMetadataKey]: true,
   type: 'AnimaQwen3EncoderModel',
   parse: async (metadata, store) => {
+    // Check provenance: `qwen3_encoder` is also written by Z-Image and FLUX.2 Klein.
+    assertMetadataModelBase(metadata, 'anima', 'AnimaQwen3EncoderModel');
     const raw = getProperty(metadata, 'qwen3_encoder');
     const parsed = await parseModelIdentifier(raw, store, 'qwen3_encoder');
     assert(parsed.type === 'qwen3_encoder');
+    // Deliberately no `parsed.base` assert: Anima encoders are identified by `variant` (qwen3_06b), not
+    // by base - see isAnimaQwen3EncoderModelConfig. The provenance check above already guarantees the
+    // value came out of buildAnimaGraph, i.e. out of selectAnimaQwen3EncoderModels.
     const base = selectBase(store.getState());
     assert(base === 'anima', 'AnimaQwen3EncoderModel handler only works with Anima models');
     return Promise.resolve(parsed);
@@ -2309,7 +2374,8 @@ export const ImageMetadataHandlers = {
   // Scheduler must be after MainModel so that base-dependent logic (z-image scheduler) works correctly
   Scheduler,
   VAEModel,
-  Qwen3EncoderModel,
+  Flux1VAEModel,
+  ZImageQwen3EncoderModel,
   T5EncoderModel,
   ZImageVAEModel,
   ZImageQwen3SourceModel,
