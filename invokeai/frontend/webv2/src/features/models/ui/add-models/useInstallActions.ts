@@ -68,5 +68,30 @@ export const useInstallActions = () => {
     [notify, t]
   );
 
-  return { install, pendingSources };
+  /**
+   * Queue many installs sequentially and silently; returns how many were
+   * accepted so the caller can emit one summary. Failures still toast
+   * individually via `install`'s error path.
+   */
+  const installMany = useCallback(
+    async (requests: InstallModelRequest[]): Promise<number> => {
+      const owner = captureAccountScope();
+      let queued = 0;
+
+      for (const request of requests) {
+        if (!isAccountScopeCurrent(owner)) {
+          break;
+        }
+
+        if (await install(request, { silent: true })) {
+          queued += 1;
+        }
+      }
+
+      return queued;
+    },
+    [install]
+  );
+
+  return { install, installMany, pendingSources };
 };

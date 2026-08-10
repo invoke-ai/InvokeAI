@@ -8,7 +8,7 @@ import {
   filterStarterModels,
   type StarterModelFilters,
 } from '@features/models/core/starters';
-import { getHuggingFaceModels, scanFolderForModels } from '@features/models/data/api';
+import { getHuggingFaceModels, scanFolderForModels, type InstallModelRequest } from '@features/models/data/api';
 import {
   ensureExternalProvidersLoaded,
   useExternalProvidersSelector,
@@ -22,15 +22,12 @@ import {
   assertAccountScopeCurrent,
   captureAccountScope,
   isAccountScopeCurrent,
-  type AccountScope,
 } from '@platform/state/accountLifecycle';
 import { Button, Scrollable, Tooltip } from '@platform/ui';
 import { DownloadIcon, FileIcon, FolderIcon, FolderSearchIcon, LinkIcon, SearchIcon } from 'lucide-react';
 import { useDeferredValue, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SiHuggingface } from 'react-icons/si';
-
-import type { StarterInstallSource } from './starterModelInstallSources';
 
 import { AccessTokenPopover } from './AccessTokenPopover';
 import { BundleChips } from './BundleChips';
@@ -52,7 +49,7 @@ import { useInstallActions } from './useInstallActions';
 export const AddModelsView = () => {
   const { t } = useTranslation();
   const notify = useNotify();
-  const { install, pendingSources } = useInstallActions();
+  const { install, installMany, pendingSources } = useInstallActions();
   const loadError = useStartersSelector((snapshot) => snapshot.error);
   const response = useStartersSelector((snapshot) => snapshot.response);
   const status = useStartersSelector((snapshot) => snapshot.status);
@@ -146,27 +143,10 @@ export const AddModelsView = () => {
     [deferredTrimmed, sourceModels, starterFilters]
   );
 
-  const queueSources = async (entries: StarterInstallSource[], owner: AccountScope): Promise<number> => {
-    let queued = 0;
-
-    for (const { config, source } of entries) {
-      if (!isAccountScopeCurrent(owner)) {
-        break;
-      }
-
-      if (await install({ config, source }, { silent: true })) {
-        queued += 1;
-      }
-    }
-
-    return queued;
-  };
-
   const installStarter = async (model: StarterModel) => {
     const owner = captureAccountScope();
-    const queued = await queueSources(
-      getStarterModelInstallSources(model, { dependencySourcesToSkip: selectedBundleSources }),
-      owner
+    const queued = await installMany(
+      getStarterModelInstallSources(model, { dependencySourcesToSkip: selectedBundleSources })
     );
 
     if (queued > 0 && isAccountScopeCurrent(owner)) {
@@ -188,7 +168,7 @@ export const AddModelsView = () => {
     setInstallingBundle(bundle.name);
 
     try {
-      const queued = await queueSources(getStarterBundleInstallSources(bundle), owner);
+      const queued = await installMany(getStarterBundleInstallSources(bundle));
 
       if (queued > 0 && isAccountScopeCurrent(owner)) {
         notify.success(
@@ -200,6 +180,18 @@ export const AddModelsView = () => {
       if (isAccountScopeCurrent(owner)) {
         setInstallingBundle(null);
       }
+    }
+  };
+
+  // Install-all from a results panel: silent per-model queueing with one
+  // summary toast, the same shape the bundle path uses — never a toast per
+  // file for a 40-file repo.
+  const installAllSources = async (requests: InstallModelRequest[]) => {
+    const owner = captureAccountScope();
+    const queued = await installMany(requests);
+
+    if (queued > 0 && isAccountScopeCurrent(owner)) {
+      notify.success(t('models.installAllQueued'), t('models.installAllQueuedDescription', { count: queued }));
     }
   };
 
@@ -397,6 +389,9 @@ export const AddModelsView = () => {
                 pendingSources={pendingSources}
                 onClear={() => updateModelsUi({ hfLookup: null })}
                 onInstall={(url) => void install({ accessToken: token, source: url })}
+                onInstallAll={(urls) =>
+                  void installAllSources(urls.map((url) => ({ accessToken: token, source: url })))
+                }
               />
             ) : null}
 
@@ -407,6 +402,7 @@ export const AddModelsView = () => {
                 scan={scan}
                 onClear={() => updateModelsUi({ scan: null })}
                 onInstall={(path) => void install({ inplace, source: path })}
+                onInstallAll={(paths) => void installAllSources(paths.map((path) => ({ inplace, source: path })))}
                 onSetInplace={setInplace}
               />
             ) : null}

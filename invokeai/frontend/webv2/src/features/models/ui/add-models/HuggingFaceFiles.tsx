@@ -13,11 +13,14 @@ export const HuggingFaceFiles = ({
   lookup,
   onClear,
   onInstall,
+  onInstallAll,
   pendingSources,
 }: {
   lookup: HFLookupState;
   onClear: () => void;
   onInstall: (url: string) => void;
+  /** Bulk path: the parent queues silently and emits one summary toast. */
+  onInstallAll: (urls: string[]) => void;
   pendingSources: ReadonlySet<string>;
 }) => {
   const { t } = useTranslation();
@@ -35,9 +38,7 @@ export const HuggingFaceFiles = ({
   }, [deferredFilter, lookup.urls]);
 
   const installAll = () => {
-    for (const url of filteredUrls) {
-      onInstall(url);
-    }
+    onInstallAll(filteredUrls);
   };
 
   return (

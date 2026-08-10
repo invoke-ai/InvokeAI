@@ -15,6 +15,7 @@ export const ScanResults = ({
   inplace,
   onClear,
   onInstall,
+  onInstallAll,
   onSetInplace,
   pendingSources,
   scan,
@@ -22,6 +23,8 @@ export const ScanResults = ({
   inplace: boolean;
   onClear: () => void;
   onInstall: (path: string) => void;
+  /** Bulk path: the parent queues silently and emits one summary toast. */
+  onInstallAll: (paths: string[]) => void;
   onSetInplace: (inplace: boolean) => void;
   pendingSources: ReadonlySet<string>;
   scan: { path: string; results: FoundModel[] };
@@ -44,9 +47,7 @@ export const ScanResults = ({
   const installable = filteredResults.filter((result) => !result.is_installed);
 
   const installAll = () => {
-    for (const result of installable) {
-      onInstall(result.path);
-    }
+    onInstallAll(installable.map((result) => result.path));
   };
 
   if (scan.results.length === 0) {
