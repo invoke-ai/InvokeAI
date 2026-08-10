@@ -868,8 +868,11 @@
       "preprocessor": "Chosen automatically per image",
       "scheduler": "App default: euler_a",
       "steps": "App default: 30",
+      "vae": "Uses the compatible default VAE",
       "vaePrecision": "App default: fp16",
       "weight": "App default: 0.75",
+      "weightMax": "Slider default: 2",
+      "weightMin": "Slider default: -1",
       "width": "App default: 1024"
     },
     "defaultFields": {
@@ -881,11 +884,15 @@
       "preprocessor": "Preprocessor",
       "scheduler": "Scheduler",
       "steps": "Steps",
+      "vae": "VAE",
       "vaePrecision": "VAE Precision",
       "weight": "Weight",
+      "weightMax": "Weight Max",
+      "weightMin": "Weight Min",
       "width": "Width"
     },
     "defaultSettings": "Default Settings",
+    "defaultVae": "Default VAE",
     "defaultSettingsHelp": "Applied automatically when this model is selected. Off = use the app default.",
     "defaultSettingsSaved": "Default settings saved",
     "deleteBody": "Delete \"{{name}}\"? The database record is removed, and the model files are deleted if they live inside the InvokeAI models directory.",

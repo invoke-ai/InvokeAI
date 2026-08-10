@@ -4,6 +4,7 @@ import type { AnyModelDefaultSettings } from '@features/models/core/types';
 import { createListCollection, Grid, HStack, Icon, NumberInput, Stack, Switch, Text } from '@chakra-ui/react';
 import { updateModel } from '@features/models/data/api';
 import { replaceModelInStore } from '@features/models/data/modelsStore';
+import { ModelSelect } from '@features/models/ui/components/ModelSelect';
 import { useScopedAction } from '@features/models/ui/shared/useScopedAction';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { Button, Combobox, FieldLabel, Panel, Select } from '@platform/ui';
@@ -32,6 +33,8 @@ interface FieldControlProps {
   control: DefaultSettingsControl;
   disabled: boolean;
   label: string;
+  /** Base of the model being edited, for same-base model pickers. */
+  modelBase: string;
   setValue: (value: unknown) => void;
   value: unknown;
 }
@@ -40,7 +43,8 @@ interface FieldControlProps {
 const buildCollection = (options: readonly string[]) =>
   createListCollection({ items: options.map((option) => ({ label: option, value: option })) });
 
-const FieldControl = ({ control, disabled, label, setValue, value }: FieldControlProps) => {
+const FieldControl = ({ control, disabled, label, modelBase, setValue, value }: FieldControlProps) => {
+  const { t } = useTranslation();
   const selectCollection = useMemo(
     () => (control.kind === 'select' ? buildCollection(control.options) : null),
     [control]
@@ -116,6 +120,24 @@ const FieldControl = ({ control, disabled, label, setValue, value }: FieldContro
         size="sm"
         value={typeof value === 'string' ? value : null}
         onValueChange={setValue}
+      />
+    );
+  }
+
+  if (control.kind === 'model') {
+    return (
+      <ModelSelect
+        disabled={disabled}
+        filter={(candidate) => !control.sameBase || String(candidate.base) === modelBase}
+        isClearable
+        modelTypes={control.modelTypes}
+        placeholder={t(control.placeholderKey)}
+        showManagerButton={false}
+        size="sm"
+        // The 'default' sentinel renders as the placeholder: the toggle is on
+        // but no specific model is pinned.
+        value={typeof value === 'string' && value !== 'default' ? value : null}
+        onChange={(selected) => setValue(selected ? selected.key : 'default')}
       />
     );
   }
@@ -236,6 +258,7 @@ export const DefaultSettingsSection = ({
                   control={field.control}
                   disabled={!isEnabled}
                   label={t(field.labelKey)}
+                  modelBase={String(model.base)}
                   setValue={(nextValue) => setFieldValue(field.key, nextValue)}
                   value={isEnabled ? value : field.defaultValue}
                 />

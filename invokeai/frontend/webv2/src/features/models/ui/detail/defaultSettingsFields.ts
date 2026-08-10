@@ -1,4 +1,4 @@
-import type { AnyModelDefaultSettings, ModelConfig } from '@features/models/core/types';
+import type { AnyModelDefaultSettings, ModelConfig, ModelTaxonomyType } from '@features/models/core/types';
 import type { TFunction } from 'i18next';
 
 import { loraDefaultSettingsSchema, mainDefaultSettingsSchema } from '@features/models/core/schemas';
@@ -70,7 +70,15 @@ const PREPROCESSORS = [
 export type DefaultSettingsControl =
   | { kind: 'number'; max?: number; min?: number; step?: number }
   | { kind: 'select'; options: readonly string[] }
-  | { kind: 'combobox'; options: readonly string[] };
+  | { kind: 'combobox'; options: readonly string[] }
+  | {
+      kind: 'model';
+      modelTypes: readonly ModelTaxonomyType[];
+      /** Restrict candidates to the edited model's base. */
+      sameBase: boolean;
+      /** Placeholder shown for the backend's 'default' sentinel. */
+      placeholderKey: string;
+    };
 
 export interface FieldSpec {
   key: keyof AnyModelDefaultSettings;
@@ -104,6 +112,15 @@ const FP8_STORAGE_FIELD: FieldSpec = {
 };
 
 const MAIN_FIELDS: FieldSpec[] = [
+  {
+    control: { kind: 'model', modelTypes: ['vae'], placeholderKey: 'models.defaultVae', sameBase: true },
+    // The backend sentinel for "the compatible default VAE" — what legacy
+    // writes when the toggle is on but no specific model is picked.
+    defaultValue: 'default',
+    inheritLabelKey: 'models.defaultFieldInherited.vae',
+    key: 'vae',
+    labelKey: 'models.defaultFields.vae',
+  },
   {
     control: { kind: 'combobox', options: SCHEDULERS },
     defaultValue: 'euler_a',
@@ -170,6 +187,20 @@ const LORA_FIELDS: FieldSpec[] = [
     key: 'weight',
     labelKey: 'models.defaultFields.weight',
   },
+  {
+    control: { kind: 'number', max: 10, min: -10, step: 0.05 },
+    defaultValue: -1,
+    inheritLabelKey: 'models.defaultFieldInherited.weightMin',
+    key: 'weight_min',
+    labelKey: 'models.defaultFields.weightMin',
+  },
+  {
+    control: { kind: 'number', max: 10, min: -10, step: 0.05 },
+    defaultValue: 2,
+    inheritLabelKey: 'models.defaultFieldInherited.weightMax',
+    key: 'weight_max',
+    labelKey: 'models.defaultFields.weightMax',
+  },
 ];
 
 const CONTROL_ADAPTER_FIELDS: FieldSpec[] = [
@@ -224,6 +255,7 @@ export const validateDefaults = (
       height: settings.height ?? null,
       scheduler: settings.scheduler ?? null,
       steps: settings.steps ?? null,
+      vae: settings.vae ?? null,
       vaePrecision: settings.vae_precision ?? null,
       width: settings.width ?? null,
     });
@@ -232,7 +264,11 @@ export const validateDefaults = (
   }
 
   if (model.type === 'lora') {
-    const result = loraDefaultSettingsSchema.safeParse({ weight: settings.weight ?? null });
+    const result = loraDefaultSettingsSchema.safeParse({
+      weight: settings.weight ?? null,
+      weightMax: settings.weight_max ?? null,
+      weightMin: settings.weight_min ?? null,
+    });
 
     return result.success ? null : (result.error.issues[0]?.message ?? t('models.invalidDefaultSettings'));
   }

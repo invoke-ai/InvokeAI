@@ -44,6 +44,9 @@ export const mainDefaultSettingsSchema = z.object({
   ),
   scheduler: trimmed.nullable(),
   steps: optionalBoundedNumber(1, 10000, 'Steps'),
+  // A VAE model key, or the backend sentinel 'default' for "the compatible
+  // default VAE"; null inherits the app-level setting.
+  vae: trimmed.min(1, 'Choose a VAE or turn the field off.').nullable(),
   vaePrecision: z.enum(['fp16', 'fp32']).nullable(),
   width: optionalBoundedNumber(64, 8192, 'Width').refine(
     (value) => value === null || value % 8 === 0,
@@ -53,9 +56,37 @@ export const mainDefaultSettingsSchema = z.object({
 
 export type MainDefaultSettingsFormValues = z.infer<typeof mainDefaultSettingsSchema>;
 
-export const loraDefaultSettingsSchema = z.object({
-  weight: optionalBoundedNumber(-10, 10, 'Weight'),
-});
+// Mirrors the backend validator (configs/lora.py): the effective slider range
+// falls back to [-1, 2], min must stay below max, and an enabled weight must
+// sit inside the effective range — otherwise the save 409s.
+export const loraDefaultSettingsSchema = z
+  .object({
+    weight: optionalBoundedNumber(-10, 10, 'Weight'),
+    weightMax: optionalBoundedNumber(-10, 10, 'Weight max'),
+    weightMin: optionalBoundedNumber(-10, 10, 'Weight min'),
+  })
+  .superRefine((values, context) => {
+    const effectiveMin = values.weightMin ?? -1;
+    const effectiveMax = values.weightMax ?? 2;
+
+    if (effectiveMin >= effectiveMax) {
+      context.addIssue({
+        code: 'custom',
+        message: `Weight min (${effectiveMin}) must be less than weight max (${effectiveMax}).`,
+        path: ['weightMin'],
+      });
+
+      return;
+    }
+
+    if (values.weight !== null && (values.weight < effectiveMin || values.weight > effectiveMax)) {
+      context.addIssue({
+        code: 'custom',
+        message: `Weight (${values.weight}) must be within [${effectiveMin}, ${effectiveMax}].`,
+        path: ['weight'],
+      });
+    }
+  });
 
 export type LoraDefaultSettingsFormValues = z.infer<typeof loraDefaultSettingsSchema>;
 

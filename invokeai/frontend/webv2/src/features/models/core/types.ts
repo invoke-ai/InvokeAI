@@ -99,6 +99,8 @@ export interface MainModelDefaultSettings {
 
 export interface LoraModelDefaultSettings {
   weight?: number | null;
+  weight_min?: number | null;
+  weight_max?: number | null;
 }
 
 export interface ControlAdapterDefaultSettings {
