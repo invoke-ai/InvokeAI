@@ -230,6 +230,12 @@ export const handleModelInstallSocketEvent = (
     return;
   }
 
+  if (event === 'model_install_complete' || event === 'model_install_error' || event === 'model_install_cancelled') {
+    // The settled job stays listed until "Clear finished", but its byte
+    // progress is dead weight the moment it stops downloading.
+    progressByJobId.delete(data.id);
+  }
+
   if (event === 'model_install_complete') {
     recordOutcome({
       error: null,

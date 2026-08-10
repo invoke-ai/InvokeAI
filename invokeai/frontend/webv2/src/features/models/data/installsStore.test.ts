@@ -28,6 +28,17 @@ beforeEach(() => {
 });
 
 describe('model install event interpretation', () => {
+  it("prunes a job's transient progress when it settles", async () => {
+    const store = await import('./installsStore');
+
+    store.handleModelInstallSocketEvent('model_install_download_progress', { bytes: 25, id: 7, total_bytes: 100 });
+    expect(store.getInstallProgress(7)).toEqual({ bytes: 25, totalBytes: 100 });
+
+    store.handleModelInstallSocketEvent('model_install_complete', { config: {}, id: 7, source: 'org/model' });
+
+    expect(store.getInstallProgress(7)).toBeNull();
+  });
+
   it('projects download progress immediately and coalesces the REST refresh', async () => {
     const store = await import('./installsStore');
 
