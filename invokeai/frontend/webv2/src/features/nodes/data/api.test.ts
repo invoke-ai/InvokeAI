@@ -51,13 +51,15 @@ describe('custom node data adapter', () => {
     });
   });
 
-  it('forwards account cancellation to node reloads', async () => {
+  it('forwards account cancellation to node reloads and returns the status body', async () => {
+    adapter.requestJson.mockResolvedValue({ status: 'No custom nodes directory found.' });
     const { reloadCustomNodes } = await import('./api');
     const controller = new AbortController();
 
-    await reloadCustomNodes(controller.signal);
-
-    expect(adapter.request).toHaveBeenCalledWith('/api/v2/custom_nodes/reload', {
+    await expect(reloadCustomNodes(controller.signal)).resolves.toEqual({
+      status: 'No custom nodes directory found.',
+    });
+    expect(adapter.requestJson).toHaveBeenCalledWith('/api/v2/custom_nodes/reload', {
       method: 'POST',
       signal: controller.signal,
     });

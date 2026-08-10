@@ -1211,6 +1211,7 @@
     "recentActivitySummary_one": "{{count}} recent activity",
     "recentActivitySummary_other": "{{count}} recent activities",
     "reloadFailed": "Reload failed",
+    "reloadNotice": "Custom nodes reload",
     "reloading": "Reloading",
     "scanFolderDescription": "Add node packs directly to the custom nodes directory, then reload nodes. InvokeAI scans this folder on startup and reload.",
     "searchPacks": "Search node packs",

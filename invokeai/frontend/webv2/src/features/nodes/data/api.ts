@@ -5,7 +5,7 @@ import { browserNodesDataPort } from './transport';
 /** REST client for the custom nodes manager (`/api/v2/custom_nodes`). */
 
 const CUSTOM_NODES_BASE = '/api/v2/custom_nodes';
-const { request, requestJson } = browserNodesDataPort;
+const { requestJson } = browserNodesDataPort;
 
 export interface InstallNodePackResponse {
   name: string;
@@ -38,6 +38,6 @@ export const uninstallCustomNodePack = (packName: string, signal?: AbortSignal):
     signal,
   });
 
-export const reloadCustomNodes = async (signal?: AbortSignal): Promise<void> => {
-  await request(`${CUSTOM_NODES_BASE}/reload`, { method: 'POST', signal });
-};
+/** The body's status is prose (e.g. "No custom nodes directory found.") — callers must not assume success. */
+export const reloadCustomNodes = (signal?: AbortSignal): Promise<{ status: string }> =>
+  requestJson<{ status: string }>(`${CUSTOM_NODES_BASE}/reload`, { method: 'POST', signal });
