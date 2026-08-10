@@ -7,6 +7,7 @@ import {
   registerAccountOwnedResource,
 } from '@platform/state/accountLifecycle';
 import { createExternalStore, createKeyedTransientStore } from '@platform/state/externalStore';
+import { createTrailingSingleFlight } from '@platform/state/singleFlight';
 
 import { listModelInstalls } from './api';
 import { refreshModels } from './modelsStore';
@@ -81,7 +82,7 @@ let nextOutcomeId = 1;
 
 const progressByJobId = createKeyedTransientStore<number, InstallDownloadProgress>();
 
-let inflightRefresh: Promise<void> | null = null;
+const refreshFlight = createTrailingSingleFlight();
 let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
 registerAccountOwnedResource({
@@ -91,7 +92,7 @@ registerAccountOwnedResource({
       refreshTimer = null;
     }
 
-    inflightRefresh = null;
+    refreshFlight.reset();
     nextOutcomeId = 1;
     progressByJobId.clear();
     outcomesStore.setSnapshot(EMPTY_INSTALL_OUTCOMES);
@@ -100,48 +101,37 @@ registerAccountOwnedResource({
   name: 'model-installs',
 });
 
-export const refreshInstalls = (owner: AccountScope = captureAccountScope()): Promise<void> => {
-  if (inflightRefresh) {
-    return inflightRefresh;
-  }
+export const refreshInstalls = (owner: AccountScope = captureAccountScope()): Promise<void> =>
+  refreshFlight.run(() => {
+    store.patchSnapshot({ status: store.getSnapshot().status === 'loaded' ? 'loaded' : 'loading' });
 
-  store.patchSnapshot({ status: store.getSnapshot().status === 'loaded' ? 'loaded' : 'loading' });
-
-  const refresh = listModelInstalls(owner.signal)
-    .then((jobs) => {
-      if (!isAccountScopeCurrent(owner)) {
-        return;
-      }
-
-      const activeJobIds = new Set(jobs.map((job) => job.id));
-
-      for (const [jobId] of progressByJobId.entries()) {
-        if (!activeJobIds.has(jobId)) {
-          progressByJobId.delete(jobId);
+    return listModelInstalls(owner.signal)
+      .then((jobs) => {
+        if (!isAccountScopeCurrent(owner)) {
+          return;
         }
-      }
 
-      store.patchSnapshot({ error: null, jobs, status: 'loaded' });
-    })
-    .catch((error: unknown) => {
-      if (!isAccountScopeCurrent(owner)) {
-        return;
-      }
+        const activeJobIds = new Set(jobs.map((job) => job.id));
 
-      store.patchSnapshot({
-        error: error instanceof Error ? error.message : 'Failed to load install queue.',
-        status: store.getSnapshot().jobs.length > 0 ? 'loaded' : 'error',
+        for (const [jobId] of progressByJobId.entries()) {
+          if (!activeJobIds.has(jobId)) {
+            progressByJobId.delete(jobId);
+          }
+        }
+
+        store.patchSnapshot({ error: null, jobs, status: 'loaded' });
+      })
+      .catch((error: unknown) => {
+        if (!isAccountScopeCurrent(owner)) {
+          return;
+        }
+
+        store.patchSnapshot({
+          error: error instanceof Error ? error.message : 'Failed to load install queue.',
+          status: store.getSnapshot().jobs.length > 0 ? 'loaded' : 'error',
+        });
       });
-    })
-    .finally(() => {
-      if (inflightRefresh === refresh) {
-        inflightRefresh = null;
-      }
-    });
-
-  inflightRefresh = refresh;
-  return inflightRefresh;
-};
+  });
 
 export const ensureInstallsLoaded = (): void => {
   if (store.getSnapshot().status === 'idle') {

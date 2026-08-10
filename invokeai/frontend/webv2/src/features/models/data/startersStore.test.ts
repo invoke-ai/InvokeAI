@@ -12,18 +12,21 @@ describe('starters store', () => {
     api.getStarterModels.mockReset();
   });
 
-  it('dedupes concurrent refreshes and keeps the catalog on later failures', async () => {
+  it('dedupes concurrent refreshes and keeps the catalog when the trailing rerun fails', async () => {
     api.getStarterModels.mockResolvedValueOnce(response).mockRejectedValueOnce(new Error('outage'));
     const store = await import('./startersStore');
 
     const first = store.refreshStarters();
+    // Joining mid-flight shares the request and queues one trailing rerun.
     expect(store.refreshStarters()).toBe(first);
     await first;
-    expect(store.getStartersSnapshot()).toMatchObject({ error: null, response, status: 'loaded' });
+    expect(store.getStartersSnapshot()).toMatchObject({ response, status: 'loaded' });
 
-    await store.refreshStarters();
-    expect(store.getStartersSnapshot()).toMatchObject({ error: 'outage', response, status: 'loaded' });
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
     expect(api.getStarterModels).toHaveBeenCalledTimes(2);
+    expect(store.getStartersSnapshot()).toMatchObject({ error: 'outage', response, status: 'loaded' });
   });
 
   it('ensures once and revalidates only when already loaded', async () => {

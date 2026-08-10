@@ -75,7 +75,12 @@ describe('model install event interpretation', () => {
     const first = deferred<Array<{ id: number; source: string; status: 'waiting' }>>();
     const second = deferred<Array<{ id: number; source: string; status: 'waiting' }>>();
 
-    dependencies.listModelInstalls.mockReset().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    dependencies.listModelInstalls
+      .mockReset()
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise)
+      // The join during the replacement flight queues a trailing rerun.
+      .mockResolvedValueOnce([{ id: 2, source: 'new/account', status: 'waiting' }]);
 
     const store = await import('./installsStore');
     const { accountLifecycle } = await import('@platform/state/accountLifecycle');
@@ -96,12 +101,41 @@ describe('model install event interpretation', () => {
 
     second.resolve([{ id: 2, source: 'new/account', status: 'waiting' }]);
     await currentRefresh;
+    await vi.advanceTimersByTimeAsync(0);
 
+    expect(dependencies.listModelInstalls).toHaveBeenCalledTimes(3);
     expect(store.getInstallsSnapshot()).toEqual({
       error: null,
       jobs: [{ id: 2, source: 'new/account', status: 'waiting' }],
       status: 'loaded',
     });
+  });
+
+  it('re-fetches once more when a refresh lands while another is in flight', async () => {
+    const stale = deferred<Array<{ id: number; source: string; status: string }>>();
+
+    dependencies.listModelInstalls
+      .mockReset()
+      .mockReturnValueOnce(stale.promise)
+      .mockResolvedValueOnce([{ id: 1, source: 'org/model', status: 'completed' }]);
+
+    const store = await import('./installsStore');
+
+    // First completion schedules the coalesced refresh, which starts and hangs.
+    store.handleModelInstallSocketEvent('model_install_complete', { config: {}, id: 1, source: 'org/model' });
+    await vi.advanceTimersByTimeAsync(250);
+    expect(dependencies.listModelInstalls).toHaveBeenCalledTimes(1);
+
+    // Second completion's refresh joins the in-flight request...
+    store.handleModelInstallSocketEvent('model_install_complete', { config: {}, id: 1, source: 'org/model' });
+    await vi.advanceTimersByTimeAsync(250);
+
+    // ...so when the stale response lands, one trailing re-fetch brings the fresh list.
+    stale.resolve([{ id: 1, source: 'org/model', status: 'running' }]);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(dependencies.listModelInstalls).toHaveBeenCalledTimes(2);
+    expect(store.getInstallsSnapshot().jobs).toEqual([{ id: 1, source: 'org/model', status: 'completed' }]);
   });
 
   it('ignores socket events owned by an expired account scope', async () => {

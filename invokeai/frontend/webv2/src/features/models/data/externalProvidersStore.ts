@@ -4,6 +4,7 @@ import {
   registerAccountOwnedResource,
 } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
+import { createTrailingSingleFlight } from '@platform/state/singleFlight';
 
 import {
   getExternalProviderConfigs,
@@ -30,50 +31,39 @@ export interface ExternalProvidersSnapshot {
 const EMPTY_EXTERNAL_PROVIDERS_SNAPSHOT: ExternalProvidersSnapshot = { configs: null, error: null, status: 'idle' };
 const store = createExternalStore<ExternalProvidersSnapshot>(EMPTY_EXTERNAL_PROVIDERS_SNAPSHOT);
 
-let inflightRefresh: Promise<void> | null = null;
+const refreshFlight = createTrailingSingleFlight();
 
 registerAccountOwnedResource({
   clear: () => {
-    inflightRefresh = null;
+    refreshFlight.reset();
     store.setSnapshot(EMPTY_EXTERNAL_PROVIDERS_SNAPSHOT);
   },
   name: 'external-providers',
 });
 
 /** Re-fetch the configs; rejects on failure (after recording it) so callers can toast. */
-export const refreshExternalProviders = (): Promise<void> => {
-  if (inflightRefresh) {
-    return inflightRefresh;
-  }
+export const refreshExternalProviders = (): Promise<void> =>
+  refreshFlight.run(() => {
+    const owner = captureAccountScope();
 
-  const owner = captureAccountScope();
+    store.patchSnapshot({ status: store.getSnapshot().configs ? 'loaded' : 'loading' });
 
-  store.patchSnapshot({ status: store.getSnapshot().configs ? 'loaded' : 'loading' });
-
-  const refresh = getExternalProviderConfigs(owner.signal)
-    .then((configs) => {
-      if (isAccountScopeCurrent(owner)) {
-        store.patchSnapshot({ configs, error: null, status: 'loaded' });
-      }
-    })
-    .catch((error: unknown) => {
-      if (isAccountScopeCurrent(owner)) {
-        store.patchSnapshot({
-          error: error instanceof Error ? error.message : null,
-          status: store.getSnapshot().configs ? 'loaded' : 'error',
-        });
-      }
-      throw error;
-    })
-    .finally(() => {
-      if (inflightRefresh === refresh) {
-        inflightRefresh = null;
-      }
-    });
-
-  inflightRefresh = refresh;
-  return inflightRefresh;
-};
+    return getExternalProviderConfigs(owner.signal)
+      .then((configs) => {
+        if (isAccountScopeCurrent(owner)) {
+          store.patchSnapshot({ configs, error: null, status: 'loaded' });
+        }
+      })
+      .catch((error: unknown) => {
+        if (isAccountScopeCurrent(owner)) {
+          store.patchSnapshot({
+            error: error instanceof Error ? error.message : null,
+            status: store.getSnapshot().configs ? 'loaded' : 'error',
+          });
+        }
+        throw error;
+      });
+  });
 
 /** Fetch on first use; callers share the request and can catch its failure. */
 export const ensureExternalProvidersLoaded = (): Promise<void> => {
@@ -83,7 +73,7 @@ export const ensureExternalProvidersLoaded = (): Promise<void> => {
     return refreshExternalProviders();
   }
 
-  return inflightRefresh ?? Promise.resolve();
+  return refreshFlight.inflight() ?? Promise.resolve();
 };
 
 const replaceConfigInStore = (next: ExternalProviderConfig): void => {

@@ -7,6 +7,7 @@ import {
   registerAccountOwnedResource,
 } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
+import { createTrailingSingleFlight } from '@platform/state/singleFlight';
 
 import { getModelsDir, listMissingModels, listModels } from './api';
 
@@ -43,64 +44,53 @@ const EMPTY_MODELS_SNAPSHOT: ModelsSnapshot = {
 };
 const store = createExternalStore<ModelsSnapshot>(EMPTY_MODELS_SNAPSHOT);
 
-let inflightRefresh: Promise<void> | null = null;
+const refreshFlight = createTrailingSingleFlight();
 
 registerAccountOwnedResource({
   clear: () => {
-    inflightRefresh = null;
+    refreshFlight.reset();
     store.setSnapshot(EMPTY_MODELS_SNAPSHOT);
   },
   name: 'models-library',
 });
 
-/** Re-fetch the library; concurrent calls share one request. */
-export const refreshModels = (owner: AccountScope = captureAccountScope()): Promise<void> => {
-  if (inflightRefresh) {
-    return inflightRefresh;
-  }
+/** Re-fetch the library; concurrent calls share one request, and a call made mid-flight queues one trailing rerun. */
+export const refreshModels = (owner: AccountScope = captureAccountScope()): Promise<void> =>
+  refreshFlight.run(() => {
+    store.patchSnapshot({ status: store.getSnapshot().status === 'loaded' ? 'loaded' : 'loading' });
 
-  store.patchSnapshot({ status: store.getSnapshot().status === 'loaded' ? 'loaded' : 'loading' });
+    return Promise.all([
+      listModels(owner.signal),
+      // Missing-file detection is best-effort; never fail the whole library.
+      listMissingModels(owner.signal).catch(() => [] as ModelConfig[]),
+      // Static server config: fetched once, best-effort.
+      store.getSnapshot().modelsDir ?? getModelsDir(owner.signal).catch(() => null),
+    ])
+      .then(([models, missingModels, modelsDir]) => {
+        if (!isAccountScopeCurrent(owner)) {
+          return;
+        }
 
-  const refresh = Promise.all([
-    listModels(owner.signal),
-    // Missing-file detection is best-effort; never fail the whole library.
-    listMissingModels(owner.signal).catch(() => [] as ModelConfig[]),
-    // Static server config: fetched once, best-effort.
-    store.getSnapshot().modelsDir ?? getModelsDir(owner.signal).catch(() => null),
-  ])
-    .then(([models, missingModels, modelsDir]) => {
-      if (!isAccountScopeCurrent(owner)) {
-        return;
-      }
+        store.patchSnapshot({
+          error: null,
+          missingModelKeys:
+            missingModels.length > 0 ? new Set(missingModels.map((model) => model.key)) : EMPTY_MISSING_KEYS,
+          models,
+          modelsDir,
+          status: 'loaded',
+        });
+      })
+      .catch((error: unknown) => {
+        if (!isAccountScopeCurrent(owner)) {
+          return;
+        }
 
-      store.patchSnapshot({
-        error: null,
-        missingModelKeys:
-          missingModels.length > 0 ? new Set(missingModels.map((model) => model.key)) : EMPTY_MISSING_KEYS,
-        models,
-        modelsDir,
-        status: 'loaded',
+        store.patchSnapshot({
+          error: error instanceof Error ? error.message : 'Failed to load models.',
+          status: store.getSnapshot().models.length > 0 ? 'loaded' : 'error',
+        });
       });
-    })
-    .catch((error: unknown) => {
-      if (!isAccountScopeCurrent(owner)) {
-        return;
-      }
-
-      store.patchSnapshot({
-        error: error instanceof Error ? error.message : 'Failed to load models.',
-        status: store.getSnapshot().models.length > 0 ? 'loaded' : 'error',
-      });
-    })
-    .finally(() => {
-      if (inflightRefresh === refresh) {
-        inflightRefresh = null;
-      }
-    });
-
-  inflightRefresh = refresh;
-  return inflightRefresh;
-};
+  });
 
 /** Fetch on first use or retry after an error; callers share and can await the request. */
 export const ensureModelsLoaded = (): Promise<void> => {
@@ -110,7 +100,7 @@ export const ensureModelsLoaded = (): Promise<void> => {
     return refreshModels();
   }
 
-  return inflightRefresh ?? Promise.resolve();
+  return refreshFlight.inflight() ?? Promise.resolve();
 };
 
 export const getModelsSnapshot = (): ModelsSnapshot => store.getSnapshot();

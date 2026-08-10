@@ -6,6 +6,7 @@ import {
   registerAccountOwnedResource,
 } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
+import { createTrailingSingleFlight } from '@platform/state/singleFlight';
 
 import { getStarterModels } from './api';
 
@@ -24,51 +25,40 @@ export interface StartersSnapshot {
 const EMPTY_STARTERS_SNAPSHOT: StartersSnapshot = { error: null, response: null, status: 'idle' };
 const store = createExternalStore<StartersSnapshot>(EMPTY_STARTERS_SNAPSHOT);
 
-let inflightRefresh: Promise<void> | null = null;
+const refreshFlight = createTrailingSingleFlight();
 
 registerAccountOwnedResource({
   clear: () => {
-    inflightRefresh = null;
+    refreshFlight.reset();
     store.setSnapshot(EMPTY_STARTERS_SNAPSHOT);
   },
   name: 'starter-models',
 });
 
-export const refreshStarters = (): Promise<void> => {
-  if (inflightRefresh) {
-    return inflightRefresh;
-  }
+export const refreshStarters = (): Promise<void> =>
+  refreshFlight.run(() => {
+    const owner = captureAccountScope();
+    store.patchSnapshot({ status: store.getSnapshot().response ? 'loaded' : 'loading' });
 
-  const owner = captureAccountScope();
-  store.patchSnapshot({ status: store.getSnapshot().response ? 'loaded' : 'loading' });
+    return getStarterModels(owner.signal)
+      .then((response) => {
+        if (!isAccountScopeCurrent(owner)) {
+          return;
+        }
 
-  const refresh = getStarterModels(owner.signal)
-    .then((response) => {
-      if (!isAccountScopeCurrent(owner)) {
-        return;
-      }
+        store.patchSnapshot({ error: null, response, status: 'loaded' });
+      })
+      .catch((error: unknown) => {
+        if (!isAccountScopeCurrent(owner)) {
+          return;
+        }
 
-      store.patchSnapshot({ error: null, response, status: 'loaded' });
-    })
-    .catch((error: unknown) => {
-      if (!isAccountScopeCurrent(owner)) {
-        return;
-      }
-
-      store.patchSnapshot({
-        error: error instanceof Error ? error.message : 'Failed to load starter models.',
-        status: store.getSnapshot().response ? 'loaded' : 'error',
+        store.patchSnapshot({
+          error: error instanceof Error ? error.message : 'Failed to load starter models.',
+          status: store.getSnapshot().response ? 'loaded' : 'error',
+        });
       });
-    })
-    .finally(() => {
-      if (inflightRefresh === refresh) {
-        inflightRefresh = null;
-      }
-    });
-
-  inflightRefresh = refresh;
-  return inflightRefresh;
-};
+  });
 
 export const ensureStartersLoaded = (): void => {
   if (store.getSnapshot().status === 'idle') {

@@ -49,6 +49,19 @@ describe('models store loading', () => {
     const account = await import('@platform/state/accountLifecycle');
     account.accountLifecycle.activate('user-a');
     const modelsStore = await import('./modelsStore');
+    const modelB: ModelConfig = {
+      base: 'sdxl',
+      description: null,
+      file_size: 1,
+      format: 'checkpoint',
+      hash: 'hash-b',
+      key: 'model-b',
+      name: 'Model B',
+      path: 'model-b.safetensors',
+      source: 'model-b.safetensors',
+      source_type: 'path',
+      type: 'main',
+    } as ModelConfig;
     let resolveA: ((value: ModelConfig[]) => void) | undefined;
     let resolveB: ((value: ModelConfig[]) => void) | undefined;
     api.listModels
@@ -61,7 +74,9 @@ describe('models store loading', () => {
         new Promise((resolve) => {
           resolveB = resolve;
         })
-      );
+      )
+      // The join during user B's flight queues a trailing rerun.
+      .mockResolvedValueOnce([modelB]);
     const userARefresh = modelsStore.refreshModels();
 
     account.accountLifecycle.invalidate();
@@ -72,23 +87,16 @@ describe('models store loading', () => {
     await userARefresh;
     expect(modelsStore.refreshModels()).toBe(userBRefresh);
 
-    resolveB?.([
-      {
-        base: 'sdxl',
-        description: null,
-        file_size: 1,
-        format: 'checkpoint',
-        hash: 'hash-b',
-        key: 'model-b',
-        name: 'Model B',
-        path: 'model-b.safetensors',
-        source: 'model-b.safetensors',
-        source_type: 'path',
-        type: 'main',
-      },
-    ]);
+    resolveB?.([modelB]);
     await userBRefresh;
 
+    expect(modelsStore.getModelsSnapshot().models.map((model) => model.key)).toEqual(['model-b']);
+
+    // The mid-flight join re-fetches once more after the shared flight settles.
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+    expect(api.listModels).toHaveBeenCalledTimes(3);
     expect(modelsStore.getModelsSnapshot().models.map((model) => model.key)).toEqual(['model-b']);
   });
 });
