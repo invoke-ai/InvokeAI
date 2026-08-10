@@ -124,7 +124,7 @@ export const AddNodesView = () => {
   };
 
   return (
-    <Scrollable h="full" label={t('nodes.addNodes')} minH="0" pr="1">
+    <Scrollable h="full" label={t('nodes.addNodes')} minH="0" p="3">
       <Stack gap="4" maxW="44rem">
         <Alert.Root borderRadius="md" size="sm" status="warning" variant="surface">
           <Alert.Indicator />
