@@ -1,15 +1,16 @@
 import { Alert, Box, HStack, Icon, Input, Stack, Text } from '@chakra-ui/react';
 import { installCustomNodePack } from '@features/nodes/data/api';
-import { addCustomNodeInstallLogEntry } from '@features/nodes/data/installLogStore';
+import { addCustomNodeInstallLogEntry, updateCustomNodeInstallLogEntry } from '@features/nodes/data/installLogStore';
 import { refreshCustomNodePacks, useCustomNodesSelector } from '@features/nodes/data/nodesStore';
 import { updateNodesUi, useNodesUiSelector, type AddNodesTab } from '@features/nodes/ui/nodesUiStore';
+import { useNotify } from '@features/nodes/ui/useNodesNotify';
 import {
   assertAccountScopeCurrent,
   captureAccountScope,
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
 import { getApiErrorMessage } from '@platform/transport/http';
-import { Button, Field, Scrollable, Tabs, toaster } from '@platform/ui';
+import { Button, Field, Scrollable, Tabs } from '@platform/ui';
 import { FolderOpenIcon, GitBranchIcon } from 'lucide-react';
 import { useCallback, useState, type ChangeEvent, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -60,6 +61,7 @@ export const AddNodesView = () => {
 
 const InstallFromGitForm = () => {
   const { t } = useTranslation();
+  const notify = useNotify();
   const [source, setSource] = useState('');
   const [isInstalling, setIsInstalling] = useState(false);
   const trimmedSource = source.trim();
@@ -72,47 +74,60 @@ const InstallFromGitForm = () => {
     const owner = captureAccountScope();
 
     setIsInstalling(true);
-    addCustomNodeInstallLogEntry({ name: trimmedSource, status: 'installing' });
+    // Resolved in place below so the activity badge settles with the install.
+    const logEntry = addCustomNodeInstallLogEntry({ name: trimmedSource, status: 'installing' });
 
     try {
       const result = await installCustomNodePack(trimmedSource, owner.signal);
 
       assertAccountScopeCurrent(owner);
       if (result.success) {
-        addCustomNodeInstallLogEntry({ message: result.message, name: result.name, status: 'completed' });
+        updateCustomNodeInstallLogEntry(logEntry.id, {
+          message: result.message,
+          name: result.name,
+          status: 'completed',
+        });
+        notify.success(
+          t('nodes.installComplete'),
+          result.workflows_imported > 0
+            ? t('nodes.installCompleteWithWorkflows', { count: result.workflows_imported, name: result.name })
+            : result.name
+        );
         setSource('');
         await refreshCustomNodePacks(owner);
         assertAccountScopeCurrent(owner);
 
         if (result.requires_dependencies) {
-          toaster.create({
-            description: t('nodes.dependenciesRequiredDescription', {
+          // Sticky: this demands a manual pip install + restart; a toast that
+          // expires quietly buries the instruction.
+          notify.warning(
+            t('nodes.dependenciesRequired'),
+            t('nodes.dependenciesRequiredDescription', {
               dependencyFile: result.dependency_file ?? 'requirements.txt',
               name: result.name,
             }),
-            title: t('nodes.dependenciesRequired'),
-            type: 'warning',
-          });
+            { sticky: true }
+          );
         }
       } else {
-        addCustomNodeInstallLogEntry({ message: result.message, name: result.name, status: 'error' });
+        updateCustomNodeInstallLogEntry(logEntry.id, { message: result.message, name: result.name, status: 'error' });
+        notify.error(t('nodes.installFailedTitle'), result.message);
       }
     } catch (error) {
       if (!isAccountScopeCurrent(owner)) {
         return;
       }
 
-      addCustomNodeInstallLogEntry({
-        message: getApiErrorMessage(error, t('nodes.installFailed')),
-        name: trimmedSource,
-        status: 'error',
-      });
+      const message = getApiErrorMessage(error, t('nodes.installFailed'));
+
+      updateCustomNodeInstallLogEntry(logEntry.id, { message, status: 'error' });
+      notify.error(t('nodes.installFailedTitle'), message);
     } finally {
       if (isAccountScopeCurrent(owner)) {
         setIsInstalling(false);
       }
     }
-  }, [t, trimmedSource]);
+  }, [notify, t, trimmedSource]);
   const handleSourceChange = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => setSource(event.currentTarget.value),
     []
