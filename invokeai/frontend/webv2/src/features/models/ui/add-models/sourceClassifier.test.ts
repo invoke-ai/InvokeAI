@@ -21,6 +21,7 @@ describe('classifySource', () => {
     'owner/repo:fp16',
     'owner/repo:fp16:path/to/file.safetensors',
     'owner.name/repo-name',
+    'stabilityai/stable-diffusion-2.1',
   ])('classifies %s as a HuggingFace repo', (value) => {
     expect(classifySource(value)).toMatchObject({
       isInstallable: true,
@@ -47,4 +48,17 @@ describe('classifySource', () => {
   it.each(['juggernaut', 'flux dev', 'owner/repo with spaces', ''])('treats %j as a search term', (value) => {
     expect(classifySource(value)).toMatchObject({ isInstallable: false, labelKey: null, localKind: null });
   });
+
+  // Relative paths satisfy the repo shape but are not installable sources.
+  it.each(['models/juggernaut.safetensors', 'checkpoints/model.ckpt', './owner/repo', '../models/foo.gguf'])(
+    'treats the relative path %s as a search term, not a repo',
+    (value) => {
+      expect(classifySource(value)).toMatchObject({
+        isInstallable: false,
+        labelKey: null,
+        localKind: null,
+        looksRepo: false,
+      });
+    }
+  );
 });
