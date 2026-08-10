@@ -8,7 +8,7 @@ consumers see exactly the same keys.
 
 import torch
 
-from invokeai.backend.pid.state_dict_utils import has_net_prefix, pid_net_keys, strip_net_prefix
+from invokeai.backend.pid.state_dict_utils import has_net_prefix, pid_net_shapes, strip_net_prefix
 
 
 class TestStripNetPrefix:
@@ -42,7 +42,7 @@ class TestStripNetPrefix:
         assert set(strip_net_prefix({"net.lq_proj.a": torch.zeros(1), 0: torch.zeros(1)})) == {"lq_proj.a"}
 
 
-class TestPidNetKeys:
+class TestPidNetShapes:
     def test_matches_strip_net_prefix_exactly(self) -> None:
         """The whole point of the shared module: identification's view and the loader's view of a
         checkpoint's key space cannot differ."""
@@ -52,7 +52,28 @@ class TestPidNetKeys:
             "discriminator.y": torch.zeros(1),
             "blocks.0.weight": torch.zeros(1),
         }
-        assert pid_net_keys(sd) == set(strip_net_prefix(sd))
+        assert pid_net_shapes(sd).keys() == strip_net_prefix(sd).keys()
+
+    def test_carries_shapes(self) -> None:
+        assert pid_net_shapes({"net.lq_proj.latent_proj.0.weight": torch.zeros(512, 16, 3, 3)}) == {
+            "lq_proj.latent_proj.0.weight": (512, 16, 3, 3)
+        }
+        # 0-dim parameters are real: PidNet's gate modules carry scalar `log_alpha`s.
+        assert pid_net_shapes({"net.lq_proj.gate_modules.0.log_alpha": torch.zeros(())}) == {
+            "lq_proj.gate_modules.0.log_alpha": ()
+        }
+
+    def test_a_value_with_no_shape_is_reported_as_none(self) -> None:
+        """A checkpoint can hold arbitrary objects. One sitting under a PidNet parameter name is
+        malformed, which identification reports — not an AttributeError mid-probe."""
+        assert pid_net_shapes({"net.lq_proj.a": "not a tensor"}) == {"lq_proj.a": None}
+
+    def test_the_ema_copy_cannot_be_read_as_the_students_weight(self) -> None:
+        """Identification used to find the discriminator weight by *suffix* over the raw dict, so a
+        checkpoint carrying only the EMA copy had `net_ema.lq_proj.latent_proj.0.weight` read as the
+        student's. Looking it up by name in the normalised map cannot do that."""
+        sd = {"net.blocks.0.weight": torch.zeros(1), "net_ema.lq_proj.latent_proj.0.weight": torch.zeros(512, 16, 3, 3)}
+        assert "lq_proj.latent_proj.0.weight" not in pid_net_shapes(sd)
 
 
 class TestHasNetPrefix:

@@ -18,16 +18,17 @@ repository for the source of truth.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from contextlib import nullcontext
 from dataclasses import dataclass, field
 from functools import lru_cache
+from types import MappingProxyType
 from typing import Optional
 
 import torch
 from torch import Tensor
 
 from invokeai.backend.model_manager.taxonomy import BaseModelType
-from invokeai.backend.pid._src.networks.lq_projection_2d import LQProjection2D
 from invokeai.backend.pid._src.networks.pid_net import PidNet
 
 # ---------------------------------------------------------------------------
@@ -165,80 +166,41 @@ def build_pid_net(backbone: BaseModelType) -> PidNet:
     return PidNet(**kwargs)
 
 
-# Feature width used by the `lq_proj` key-name probe below. Parameter *names* depend only on the
-# structural counts (which branches exist, how many res blocks, how many injection points), never on
-# the tensor dims, so the probe can be built with an 8-wide feature map and costs nothing.
-_LQ_PROBE_DIM = 8
+# The one PidNet parameter whose shape depends on the backbone: a Conv2d whose in-channels are the
+# backbone's latent channel count (4 SDXL / 16 FLUX.1, SD3, Qwen-Image / 128 FLUX.2). Every other
+# parameter is name- and shape-identical across all five, which is what lets model identification
+# hold a checkpoint to one contract before it knows which backbone the checkpoint is for.
+BACKBONE_DISCRIMINATOR_KEY = "lq_proj.latent_proj.0.weight"
 
-# PidNet's own default for `lq_num_res_blocks` — not part of `_PID_SR4X_BASE`, so the probe has to
-# repeat it. `test_pid_decode.py` asserts the two stay in sync.
-_LQ_NUM_RES_BLOCKS_DEFAULT = 4
-
-
-@lru_cache(maxsize=None)
-def _probe_lq_proj_keys(backbone: BaseModelType) -> frozenset[str]:
-    """Names (relative to PidNet) of every `lq_proj.*` parameter a PidNet built for *backbone* expects.
-
-    Derived from a throwaway `LQProjection2D` built with the real structural counts but tiny feature
-    dims, so it stays in step with the vendored network instead of duplicating a hand-written list.
-
-    The probe is built on the meta device and inside a forked RNG state. Only parameter *names* are
-    read, but constructing the module normally would run every `reset_parameters()` and so consume
-    the global CPU RNG — during *model identification*, of all things. An install would then shift
-    the seedless random stream by an amount that depends on how many candidate files were probed,
-    making later unseeded randomness depend on install order. Meta construction allocates nothing;
-    the fork is the belt to that suspenders, since it holds regardless of what the vendored module
-    does in its constructor.
-
-    Callers want :func:`required_lq_proj_keys` — the one contract these all agree on.
-    """
-    if backbone not in _PER_BACKBONE:
-        raise ValueError(
-            f"PiD decoder backbone {backbone!r} is not supported. Expected one of: {list(_PER_BACKBONE.keys())}."
-        )
-    kwargs = {**_PID_SR4X_BASE, **_PER_BACKBONE[backbone]}
-    patch_depth = int(kwargs["patch_depth"])
-    interval = int(kwargs["lq_interval"])
-    with torch.random.fork_rng(devices=[]), torch.device("meta"):
-        probe = LQProjection2D(
-            in_channels=int(kwargs["lq_in_channels"]),
-            latent_channels=int(kwargs["lq_latent_channels"]),
-            hidden_dim=_LQ_PROBE_DIM,
-            out_dim=_LQ_PROBE_DIM,
-            patch_size=int(kwargs["patch_size"]),
-            sr_scale=int(kwargs["sr_scale"]),
-            latent_spatial_down_factor=int(kwargs["latent_spatial_down_factor"]),
-            num_res_blocks=_LQ_NUM_RES_BLOCKS_DEFAULT,
-            # Mirrors PidNet.__init__: one injection point every `lq_interval` patch blocks.
-            num_outputs=(patch_depth + interval - 1) // interval,
-            gate_type=str(kwargs["lq_gate_type"]),
-            interval=interval,
-            zero_init=bool(kwargs["zero_init_lq"]),
-            pit_output=bool(kwargs["pit_lq_inject"]),
-        )
-    return frozenset(f"lq_proj.{k}" for k in probe.state_dict())
-
-
-# The backbone the key contract is probed from. `_PER_BACKBONE` overrides only `lq_latent_channels`
-# and `latent_spatial_down_factor`; both change tensor *shapes*, neither adds or removes a parameter,
-# so one probe describes every backbone.
+# The backbone the contract is probed from. Any of the five would do — see the docstring below.
 _KEY_CONTRACT_BACKBONE = BaseModelType.Flux
 
 
 @lru_cache(maxsize=None)
-def required_lq_proj_keys() -> frozenset[str]:
-    """The `lq_proj.*` key contract every supported backbone's PidNet shares.
+def required_pid_net_shapes(backbone: BaseModelType = _KEY_CONTRACT_BACKBONE) -> Mapping[str, tuple[int, ...]]:
+    """Every parameter `PidNet` expects, mapped to its shape.
 
-    One contract, not one per backbone. Used by the model-manager config to reject a checkpoint that
-    carries only *some* of the LQ projection — see `load_pid_decoder` for why a partial LQ projection
-    is not loadable — and it has to hold before the backbone is known, since the backbone is read from
-    `lq_proj.latent_proj.0.weight`, which is itself one of the keys a truncated file may be missing.
+    This is the contract `load_pid_decoder` enforces — set equality on the keys, plus the shape
+    agreement `load_state_dict` demands — so model identification can accept precisely the files the
+    loader accepts rather than a superset it will later refuse. Checking a subset is not a milder
+    version of the same thing: loaders run under `skip_torch_weight_init()`, so a weight the
+    checkpoint does not supply is uninitialised memory rather than a default.
 
-    `test_pid_decode.py` probes every backbone and pins that they all agree, so a future backbone that
-    does add LQ parameters of its own fails there — loudly, and while it is being added — instead of
-    silently weakening this check.
+    Derived from the vendored network itself instead of a hand-written list, and built on the meta
+    device inside a forked RNG state. Meta construction allocates nothing (~0.3 MB, ~250 ms once per
+    process, cached); the fork is the belt to those braces, since it holds regardless of what the
+    vendored constructors do. Identification must not advance the global RNG — an install would
+    otherwise shift the seedless stream by an amount that depends on how many candidate files were
+    probed, making later unseeded randomness depend on install order.
+
+    ``backbone`` exists for `test_pid_decode.py`, which pins that the key set is identical across all
+    five and that `BACKBONE_DISCRIMINATOR_KEY` is the only shape that varies. Identification itself
+    must use the default: it has to validate a checkpoint *before* it can know the backbone, since
+    the backbone is read from one of the weights the contract is there to require.
     """
-    return _probe_lq_proj_keys(_KEY_CONTRACT_BACKBONE)
+    with torch.random.fork_rng(devices=[]), torch.device("meta"):
+        net = build_pid_net(backbone)
+    return MappingProxyType({k: tuple(v.shape) for k, v in net.state_dict().items()})
 
 
 def load_pid_decoder(state_dict: dict[str, Tensor], backbone: BaseModelType) -> PidNet:
@@ -589,6 +551,7 @@ def assert_pid_decoder_matches_base(decoder_base: BaseModelType, node_base: Base
 
 
 __all__ = [
+    "BACKBONE_DISCRIMINATOR_KEY",
     "PID_CHI_PROMPT",
     "PID_MODEL_MAX_LENGTH",
     "PID_NEGATIVE_PROMPT",
@@ -598,5 +561,5 @@ __all__ = [
     "build_pid_net",
     "encode_caption_for_pid",
     "load_pid_decoder",
-    "required_lq_proj_keys",
+    "required_pid_net_shapes",
 ]

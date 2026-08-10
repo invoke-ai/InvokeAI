@@ -50,14 +50,27 @@ def strip_net_prefix(state_dict: dict[Any, T]) -> dict[str, T]:
 
     A checkpoint with no `net.` prefix is already in that space and is returned untouched — the
     distill-only filter is not applied there, because without the prefix there is no evidence this
-    is a distill serialisation, and a stray `discriminator.*` key should reach the loader's
-    "unexpected keys" check rather than be silently dropped.
+    is a distill serialisation, and a stray `discriminator.*` key should reach the unexpected-key
+    checks (identification's and the loader's) rather than be silently dropped.
     """
     if not has_net_prefix(state_dict):
         return state_dict  # type: ignore[return-value]
     return {nk: v for k, v in state_dict.items() if (nk := _normalized_key(k)) is not None}
 
 
-def pid_net_keys(state_dict: dict[Any, Any]) -> set[str]:
-    """The checkpoint's keys as `PidNet` will see them. Mirrors :func:`strip_net_prefix` exactly."""
-    return set(strip_net_prefix(state_dict))
+def pid_net_shapes(state_dict: dict[Any, Any]) -> dict[str, tuple[int, ...] | None]:
+    """The checkpoint's keys as `PidNet` will see them, each mapped to its tensor's shape.
+
+    Mirrors :func:`strip_net_prefix` exactly. The value is None for anything carrying no ``.shape``:
+    a checkpoint is free to hold arbitrary objects, and one sitting under a PidNet parameter name is
+    malformed rather than grounds for an AttributeError mid-identification.
+
+    Identification works from this rather than from the raw dict so that a weight is found by *name*
+    and not by suffix. Suffix-matching the raw dict reads `net_ema.lq_proj.latent_proj.0.weight` as
+    the backbone discriminator when a checkpoint carries only the EMA copy — the very submodule
+    :func:`strip_net_prefix` exists to drop.
+    """
+    return {
+        k: (tuple(shape) if (shape := getattr(v, "shape", None)) is not None else None)
+        for k, v in strip_net_prefix(state_dict).items()
+    }

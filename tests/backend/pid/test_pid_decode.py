@@ -1,20 +1,18 @@
 """Regression tests for the PiD distill schedule, decoder/base validation and checkpoint completeness."""
 
-import inspect
+import math
 
 import pytest
 import torch
 
 from invokeai.backend.model_manager.taxonomy import BaseModelType
-from invokeai.backend.pid._src.networks.pid_net import PidNet
 from invokeai.backend.pid.decode import (
-    _LQ_NUM_RES_BLOCKS_DEFAULT,
     _PER_BACKBONE,
+    BACKBONE_DISCRIMINATOR_KEY,
     _get_t_list,
-    _probe_lq_proj_keys,
     assert_pid_decoder_matches_base,
     load_pid_decoder,
-    required_lq_proj_keys,
+    required_pid_net_shapes,
 )
 
 _CPU = torch.device("cpu")
@@ -62,52 +60,62 @@ def test_z_image_node_accepts_flux_decoder() -> None:
     assert_pid_decoder_matches_base(BaseModelType.Flux, BaseModelType.Flux, node_title="Z-Image PiD Decode")
 
 
-class TestRequiredLqProjKeys:
-    """`required_lq_proj_keys` probes a tiny LQProjection2D; these guard the values it feeds it."""
+class TestRequiredPidNetShapes:
+    """The contract model identification holds a checkpoint to, probed from a meta `PidNet`."""
 
-    def test_probe_uses_pid_nets_res_block_default(self) -> None:
-        """The probe repeats PidNet's `lq_num_res_blocks` default, which `_PID_SR4X_BASE` does not carry."""
-        assert inspect.signature(PidNet.__init__).parameters["lq_num_res_blocks"].default == (
-            _LQ_NUM_RES_BLOCKS_DEFAULT
-        )
-
-    def test_covers_every_lq_submodule(self) -> None:
-        keys = required_lq_proj_keys()
-        assert all(k.startswith("lq_proj.") for k in keys)
-        # Latent projection convs, one output head + one gate per injection point (patch_depth 14 /
+    def test_covers_the_whole_network(self) -> None:
+        shapes = required_pid_net_shapes()
+        lq = {k for k in shapes if k.startswith("lq_proj.")}
+        # The LQ projection is a small fraction of the net: checking only it (as identification once
+        # did) leaves the 385 backbone weights to be discovered missing at load time.
+        assert len(lq) == 71
+        assert len(shapes) - len(lq) == 385
+        # Latent projection conv, one output head + one gate per injection point (patch_depth 14 /
         # lq_interval 2 = 7). The image branch is disabled (lq_in_channels=0), so it must not appear.
-        assert "lq_proj.latent_proj.0.weight" in keys
-        assert sum(k.endswith(".weight") and ".output_heads." in k for k in keys) == 7
-        assert sum(k.endswith(".log_alpha") for k in keys) == 7
-        assert not any(".image_conv." in k for k in keys)
+        assert shapes[BACKBONE_DISCRIMINATOR_KEY] == (512, 16, 3, 3)
+        assert sum(k.endswith(".weight") and ".output_heads." in k for k in lq) == 7
+        assert sum(k.endswith(".log_alpha") for k in lq) == 7
+        assert not any(".image_conv." in k for k in lq)
 
     def test_one_contract_holds_for_every_backbone(self) -> None:
-        """`required_lq_proj_keys()` is backbone-independent because `_PER_BACKBONE` varies only tensor
-        *shapes*. Identification relies on that — it checks completeness before it knows the backbone —
-        so a backbone that ever adds LQ parameters of its own has to fail here, while it is being
-        added, rather than silently weakening the install-time check."""
+        """Identification validates a checkpoint *before* it can know the backbone, so it probes one
+        canonical backbone and applies that contract to all five. This pins what makes that sound:
+        the key names never vary, and `BACKBONE_DISCRIMINATOR_KEY` is the only shape that does. A
+        backbone that ever varies anything else has to fail here, while it is being added, rather
+        than silently weakening the install-time check."""
+        canonical = required_pid_net_shapes()
         for backbone in _PER_BACKBONE:
-            assert _probe_lq_proj_keys(backbone) == required_lq_proj_keys(), backbone
+            per_backbone = required_pid_net_shapes(backbone)
+            assert per_backbone.keys() == canonical.keys(), backbone
+            differing = {k for k in canonical if per_backbone[k] != canonical[k]}
+            assert differing <= {BACKBONE_DISCRIMINATOR_KEY}, (backbone, differing)
+            # And it varies in exactly the dimension identification reads the backbone from.
+            assert per_backbone[BACKBONE_DISCRIMINATOR_KEY][1] == _PER_BACKBONE[backbone]["lq_latent_channels"]
 
     def test_unsupported_backbone_raises(self) -> None:
         with pytest.raises(ValueError, match="not supported"):
-            _probe_lq_proj_keys(BaseModelType.StableDiffusion1)
+            required_pid_net_shapes(BaseModelType.StableDiffusion1)
 
     def test_probing_does_not_consume_the_global_rng(self) -> None:
-        """The probe builds a real module only to read parameter names. Constructing it normally
-        runs every `reset_parameters()`, which draws from the global CPU RNG — during *model
-        identification*. Later unseeded randomness would then depend on how many candidate files
-        were probed, i.e. on install order."""
+        """The probe builds a real PidNet only to read parameter names and shapes. Constructing one
+        normally runs every `reset_parameters()`, which draws from the global CPU RNG — during
+        *model identification*. Later unseeded randomness would then depend on how many candidate
+        files were probed, i.e. on install order."""
         torch.manual_seed(0)
         control = torch.rand(4)
 
         torch.manual_seed(0)
-        required_lq_proj_keys.cache_clear()
-        _probe_lq_proj_keys.cache_clear()
-        required_lq_proj_keys()
+        required_pid_net_shapes.cache_clear()
+        required_pid_net_shapes()
         after = torch.rand(4)
 
         assert torch.equal(control, after), "identification must not advance the global RNG"
+
+    def test_the_contract_is_too_large_to_build_for_real(self) -> None:
+        """Why the probe must stay on the meta device: the network it describes is ~5.5 GB in
+        float32. Model identification builds one for every PiD-looking file it is handed."""
+        elements = sum(math.prod(shape) for shape in required_pid_net_shapes().values())
+        assert elements * 4 > 5 * 1024**3
 
 
 class TestLoadPidDecoderRejectsPartialCheckpoints:
