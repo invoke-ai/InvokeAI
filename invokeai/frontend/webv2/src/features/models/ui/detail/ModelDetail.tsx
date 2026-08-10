@@ -331,8 +331,9 @@ const ModelDetailActions = ({
         title={t('models.deleteModel')}
         onClose={() => setPendingAction(null)}
         onConfirm={async () => {
-          await remove(model);
-          onDeleted();
+          if (await remove(model)) {
+            onDeleted();
+          }
         }}
       />
       {/* Destructive styling: the original checkpoint file is replaced. */}
@@ -342,7 +343,9 @@ const ModelDetailActions = ({
         isOpen={pendingAction === 'convert'}
         title={t('models.convertToDiffusers')}
         onClose={() => setPendingAction(null)}
-        onConfirm={() => convert(model)}
+        onConfirm={async () => {
+          await convert(model);
+        }}
       />
     </HStack>
   );

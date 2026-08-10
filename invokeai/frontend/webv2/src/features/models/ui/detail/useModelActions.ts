@@ -20,13 +20,16 @@ type ModelActionTarget = Pick<ModelConfig, 'key' | 'name'>;
 export const useModelActions = () => {
   const { t } = useTranslation();
   const notify = useNotify();
-  // None of these actions surface a busy flag, so one shared instance's `run`
-  // covers all three and its isBusy is simply ignored.
-  const { run } = useScopedAction();
+  // Separate instances: `run` ignores calls while its own action is in
+  // flight, so sharing one would let a slow convert swallow a remove.
+  // The busy flags stay unused.
+  const { run: runRemove } = useScopedAction();
+  const { run: runConvert } = useScopedAction();
+  const { run: runReidentify } = useScopedAction();
 
   const remove = useCallback(
     (model: ModelActionTarget) =>
-      run(
+      runRemove(
         async (owner) => {
           await deleteModel(model.key, owner.signal);
 
@@ -38,12 +41,12 @@ export const useModelActions = () => {
         },
         (message) => notify.error(t('models.deleteFailed'), message)
       ),
-    [notify, run, t]
+    [notify, runRemove, t]
   );
 
   const convert = useCallback(
     (model: ModelActionTarget) =>
-      run(
+      runConvert(
         async (owner) => {
           const converted = await convertModelToDiffusers(model.key, owner.signal);
 
@@ -53,12 +56,12 @@ export const useModelActions = () => {
         },
         (message) => notify.error(t('models.conversionFailed'), message)
       ),
-    [notify, run, t]
+    [notify, runConvert, t]
   );
 
   const reidentify = useCallback(
     (model: ModelActionTarget) =>
-      run(
+      runReidentify(
         async (owner) => {
           const identified = await reidentifyModel(model.key, owner.signal);
 
@@ -68,7 +71,7 @@ export const useModelActions = () => {
         },
         (message) => notify.error(t('models.reidentifyFailed'), message)
       ),
-    [notify, run, t]
+    [notify, runReidentify, t]
   );
 
   return { convert, reidentify, remove };

@@ -113,7 +113,7 @@ const ExternalProviderKeyCard = ({
   const runProviderAction = (
     action: () => Promise<ExternalProviderConfig>,
     onSuccess?: (next: ExternalProviderConfig, owner: AccountScope) => void
-  ): Promise<void> =>
+  ): Promise<boolean> =>
     run(
       async (owner) => {
         const nextConfig = await action();
