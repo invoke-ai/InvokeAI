@@ -64,7 +64,10 @@ class Flux2KleinModelLoaderOutput(BaseInvocationOutput):
     title="Main Model - Flux2 Klein",
     tags=["model", "flux", "klein", "qwen3"],
     category="model",
-    version="1.0.0",
+    # 1.1.0: the Qwen3 Source input dropped its `ui_model_format=Diffusers` pin so SDNQ pipelines are
+    # offered too, and the loader falls back to a self-contained main model for VAE / Qwen3. A node
+    # serialized against 1.0.0 carries the old field contract, so the version has to move with it.
+    version="1.1.0",
     classification=Classification.Prototype,
 )
 class Flux2KleinModelLoaderInvocation(BaseInvocation):

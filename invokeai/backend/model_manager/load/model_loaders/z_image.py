@@ -35,6 +35,7 @@ from invokeai.backend.model_manager.taxonomy import (
     SubModelType,
 )
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
+from invokeai.backend.quantization.sdnq.detection import is_sdnq_folder
 from invokeai.backend.quantization.sdnq.loaders import raise_on_incomplete_sdnq_load, sdnq_sd_loader
 from invokeai.backend.qwen3.qwen3_tokenizer import load_bundled_qwen3_tokenizer
 from invokeai.backend.util.devices import TorchDevice
@@ -184,16 +185,11 @@ class ZImageDiffusersModel(GenericDiffusersLoader):
         return result
 
     def _is_sdnq_folder(self, folder_path: Path) -> bool:
-        """Check if a folder contains SDNQ-quantized model weights."""
-        import json
+        """Check if a folder contains SDNQ-quantized model weights.
 
-        quant_config_path = folder_path / "quantization_config.json"
-        if quant_config_path.exists():
-            with open(quant_config_path, "r", encoding="utf-8") as f:
-                quant_config = json.load(f)
-            if quant_config.get("quant_method") == "sdnq":
-                return True
-        return False
+        Shared detector, so this dispatch agrees with identification about markerless exports.
+        """
+        return is_sdnq_folder(folder_path)
 
     def _load_sdnq_text_encoder(self, text_encoder_path: Path) -> AnyModel:
         """Load SDNQ-quantized text encoder from folder."""

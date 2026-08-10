@@ -1,13 +1,11 @@
 # Copyright (c) 2024, Lincoln D. Stein and the InvokeAI Development Team
 """Class for VAE model loading in InvokeAI."""
 
-import json
 from pathlib import Path
 from typing import Optional
 
 import accelerate
 from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
-from safetensors import safe_open
 
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.configs.vae import (
@@ -26,36 +24,17 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelType,
     SubModelType,
 )
+from invokeai.backend.quantization.sdnq.detection import is_sdnq_folder
 from invokeai.backend.quantization.sdnq.loaders import raise_on_incomplete_sdnq_load, sdnq_sd_loader
 
 
 def _is_sdnq_vae_folder(path: Path) -> bool:
     """Check if a VAE folder contains SDNQ-quantized weights.
 
-    Handles arbitrarily named and sharded safetensors directories, matching what the shared
-    sdnq_sd_loader() can actually load: a VAE using standard shard files such as
-    ``diffusion_pytorch_model-00001-of-00002.safetensors`` must still be detected.
+    Shared detector: marker file first, then the weight/scale key pair unioned across shards, so a
+    sharded or markerless export is recognized the same way identification recognizes it.
     """
-    # Strongest signal: the SDNQ marker file (also covers sharded exports).
-    quant_config_path = path / "quantization_config.json"
-    if quant_config_path.exists():
-        try:
-            with open(quant_config_path, "r", encoding="utf-8") as f:
-                if json.load(f).get("quant_method") == "sdnq":
-                    return True
-        except (json.JSONDecodeError, OSError):
-            pass
-
-    # Fallback: union the keys across every safetensors shard and look for a weight + scale pair. A
-    # weight and its scale can live in different shards, so we must consider all shards together.
-    all_keys: set[str] = set()
-    for shard in sorted(path.glob("*.safetensors")):
-        try:
-            with safe_open(shard, framework="pt", device="cpu") as f:
-                all_keys.update(f.keys())
-        except Exception:
-            continue
-    return any(key.endswith(".weight") and f"{key[:-7]}.scale" in all_keys for key in all_keys)
+    return is_sdnq_folder(path)
 
 
 # Architectural defaults for the Wan 2.2-VAE (TI2V-5B). Verbatim from the

@@ -25,7 +25,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_SDNQ_Diffusers_Flux2_Config,
     Main_SDNQ_Diffusers_ZImage_Config,
 )
-from invokeai.backend.model_manager.taxonomy import SubModelType
+from invokeai.backend.model_manager.taxonomy import Flux2VariantType, SubModelType
 
 _REQUIRED_FIELDS = {
     "hash": "blake3:fakehash",
@@ -510,3 +510,71 @@ def test_a_component_the_loader_always_reads_with_sdnq_needs_safetensors_even_wi
     assert config.submodels is not None
     assert SubModelType.TextEncoder not in config.submodels
     assert not is_self_contained_sdnq_pipeline(config)
+
+
+# --- FLUX.2 variant identification ---
+# `_get_variant_or_raise` compared the transformer geometry by hand and had no [dev] branch, so a
+# [dev] pipeline fell into the `else` and was silently identified as Klein4B. Reading the geometry
+# through `flux2_variant.py` — the source of truth the checkpoint / diffusers / LoRA paths already
+# use — makes it identify as itself. Supporting [dev] SDNQ pipelines end to end is separate work.
+
+_FLUX2_DEV_TRANSFORMER_CONFIG = {
+    # 3 x Mistral Small 3.1 5120, and 48 heads x 128 head_dim -> see configs/flux2_variant.py
+    "joint_attention_dim": 15360,
+    "attention_head_dim": 128,
+    "num_attention_heads": 48,
+}
+
+
+def _make_flux2_dev_pipeline(root: Path, *, encoder_class: str = "Mistral3ForConditionalGeneration") -> Path:
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "model_index.json").write_text(
+        json.dumps(
+            {
+                "_class_name": "Flux2Pipeline",
+                "transformer": ["diffusers", "Flux2Transformer2DModel"],
+                "text_encoder": ["transformers", encoder_class],
+                "tokenizer": ["transformers", "LlamaTokenizerFast"],
+                "vae": ["diffusers", "AutoencoderKLFlux2"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    _write_sdnq_transformer(root, _FLUX2_DEV_TRANSFORMER_CONFIG)
+
+    for name, declared in (
+        ("vae", {"_class_name": "AutoencoderKL"}),
+        ("text_encoder", {"architectures": [encoder_class]}),
+    ):
+        folder = root / name
+        folder.mkdir(exist_ok=True)
+        (folder / "config.json").write_text(json.dumps(declared), encoding="utf-8")
+        save_file({"weight": torch.zeros(4, 4)}, str(folder / "model.safetensors"))
+    tokenizer = root / "tokenizer"
+    tokenizer.mkdir(exist_ok=True)
+    (tokenizer / "tokenizer_config.json").write_text(
+        json.dumps({"tokenizer_class": "LlamaTokenizerFast"}), encoding="utf-8"
+    )
+    (tokenizer / "tokenizer.json").write_text(json.dumps({}), encoding="utf-8")
+    return root
+
+
+def test_an_sdnq_flux2_dev_pipeline_is_identified_as_dev_not_klein(tmp_path: Path) -> None:
+    root = _make_flux2_dev_pipeline(tmp_path / "flux2-dev")
+
+    config = Main_SDNQ_Diffusers_Flux2_Config.from_model_on_disk(
+        _mod(root), {**_REQUIRED_FIELDS, "path": root.as_posix()}
+    )
+
+    assert config.variant is Flux2VariantType.Dev
+
+
+def test_a_klein_pipeline_is_still_identified_as_klein(tmp_path: Path) -> None:
+    """Guard against the Dev branch swallowing the Klein geometries."""
+    root = _make_flux2_pipeline(tmp_path / "flux2-klein-still", "Qwen3ForCausalLM")
+
+    config = Main_SDNQ_Diffusers_Flux2_Config.from_model_on_disk(
+        _mod(root), {**_REQUIRED_FIELDS, "path": root.as_posix()}
+    )
+
+    assert config.variant is Flux2VariantType.Klein4B

@@ -29954,7 +29954,7 @@
         "tags": ["model", "flux", "klein", "qwen3"],
         "title": "Main Model - Flux2 Klein",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/Flux2KleinModelLoaderOutput"
         }
@@ -92783,7 +92783,7 @@
         "tags": ["model", "z-image"],
         "title": "Main Model - Z-Image",
         "type": "object",
-        "version": "3.0.0",
+        "version": "3.1.0",
         "output": {
           "$ref": "#/components/schemas/ZImageModelLoaderOutput"
         }

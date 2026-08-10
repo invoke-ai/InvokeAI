@@ -82,6 +82,7 @@ from invokeai.backend.model_manager.util.model_util import (
 )
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
 from invokeai.backend.quantization.gguf.utils import TORCH_COMPATIBLE_QTYPES
+from invokeai.backend.quantization.sdnq.detection import is_sdnq_folder
 from invokeai.backend.quantization.sdnq.loaders import raise_on_incomplete_sdnq_load, sdnq_sd_loader
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.backend.util.silence_warnings import SilenceWarnings
@@ -1559,20 +1560,9 @@ class FluxReduxModelLoader(ModelLoader):
         return model
 
 
-def _is_sdnq_folder(folder_path: Path) -> bool:
-    """Check if a folder contains SDNQ-quantized model weights."""
-    import json
-
-    quant_config_path = folder_path / "quantization_config.json"
-    if quant_config_path.exists():
-        try:
-            with open(quant_config_path, "r", encoding="utf-8") as f:
-                quant_config = json.load(f)
-            if quant_config.get("quant_method") == "sdnq":
-                return True
-        except (json.JSONDecodeError, OSError):
-            pass
-    return False
+# Re-exported from the shared detector: the loader's dispatch and identification must agree about
+# what counts as an SDNQ folder, including markerless exports.
+_is_sdnq_folder = is_sdnq_folder
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.Main, format=ModelFormat.SDNQQuantized)

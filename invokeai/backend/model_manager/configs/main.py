@@ -12,7 +12,10 @@ from invokeai.backend.model_manager.configs.base import (
     SubmodelDefinition,
 )
 from invokeai.backend.model_manager.configs.clip_embed import get_clip_variant_type_from_config
-from invokeai.backend.model_manager.configs.flux2_variant import flux2_variant_from_context_dim
+from invokeai.backend.model_manager.configs.flux2_variant import (
+    flux2_variant_from_context_dim,
+    flux2_variant_from_hidden_size,
+)
 from invokeai.backend.model_manager.configs.identification_utils import (
     NotAMatchError,
     common_config_paths,
@@ -41,6 +44,7 @@ from invokeai.backend.model_manager.taxonomy import (
     ZImageVariantType,
 )
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+from invokeai.backend.quantization.sdnq.detection import is_sdnq_folder
 from invokeai.backend.quantization.sdnq.sdnq_tensor import SDNQTensor
 from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
 
@@ -2238,6 +2242,7 @@ _QWEN_TOKENIZER_CLASS_NAMES = {"Qwen2Tokenizer", "Qwen2TokenizerFast"}
 # complete even though the loader would fail, so discovery narrows to the loadable Qwen3 set.
 _SDNQ_PIPELINE_TEXT_ENCODER_CLASS_NAMES = _SDNQ_LOADABLE_QWEN_ARCHITECTURES
 
+
 # Files a pipeline component folder must actually ship to be loadable. Weight-bearing components
 # (transformer / text_encoder / vae) are loaded with a `from_pretrained`-style call that needs both a
 # config and at least one weight file; the tokenizer folder carries no weights, only its vocab/config.
@@ -2449,19 +2454,22 @@ class Main_SDNQ_Diffusers_Flux2_Config(Main_Config_Base, Config_Base):
         """Determine the Flux2 variant from the transformer config + filename heuristic."""
         transformer_config = get_config_dict_or_raise(mod.path / "transformer" / "config.json")
 
+        # Read the geometry through `flux2_variant.py`, the single source of truth the checkpoint,
+        # diffusers and LoRA paths already use. Hand-rolling the comparison here is what made every
+        # SDNQ pipeline a Klein: [dev]'s 15360 / 6144 matched no branch and fell into the `else`,
+        # so a [dev] pipeline was silently identified as Klein4B rather than as itself.
+        joint_attention_dim = transformer_config.get("joint_attention_dim")
         hidden_size = transformer_config.get("attention_head_dim", 128) * transformer_config.get(
             "num_attention_heads", 24
         )
-        joint_attention_dim = transformer_config.get("joint_attention_dim", 7680)
+        variant = (
+            (flux2_variant_from_context_dim(joint_attention_dim) if joint_attention_dim is not None else None)
+            or flux2_variant_from_hidden_size(hidden_size)
+            or Flux2VariantType.Klein4B
+        )
 
-        # Klein 4B uses Qwen3-4B encoder → joint_attention_dim = 3 × 2560 = 7680
-        # Klein 9B uses Qwen3-8B encoder → joint_attention_dim = 3 × 4096 = 12288
-        # hidden_size 3072 → 4B variant, 4096 → 9B variant
-        if hidden_size == 4096 or joint_attention_dim == 12288:
-            variant = Flux2VariantType.Klein9B
-        else:
-            variant = Flux2VariantType.Klein4B
-
+        # Base variants are architecturally identical to their distilled counterpart, so only the
+        # name separates them. [dev] has no base counterpart and is left alone.
         if _filename_suggests_base(mod.name):
             if variant == Flux2VariantType.Klein9B:
                 return Flux2VariantType.Klein9BBase
@@ -2682,19 +2690,12 @@ class Main_SDNQ_Diffusers_ZImage_Config(Main_Config_Base, Config_Base):
 
 
 def _is_sdnq_folder(folder_path: Path) -> bool:
-    """Check if a folder contains SDNQ-quantized model weights by checking quantization_config.json."""
-    import json
+    """Check if a folder contains SDNQ-quantized model weights.
 
-    quant_config_path = folder_path / "quantization_config.json"
-    if quant_config_path.exists():
-        try:
-            with open(quant_config_path, "r", encoding="utf-8") as f:
-                quant_config = json.load(f)
-            if quant_config.get("quant_method") == "sdnq":
-                return True
-        except (json.JSONDecodeError, OSError):
-            pass
-    return False
+    Delegates to the shared detector so identification and the loaders cannot disagree about a
+    markerless export — see `invokeai.backend.quantization.sdnq.detection`.
+    """
+    return is_sdnq_folder(folder_path)
 
 
 class Main_SDNQ_Diffusers_FLUX_Config(Main_Config_Base, Config_Base):

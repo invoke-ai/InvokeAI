@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import Any, Literal, Optional, Self
 
 from pydantic import Field
-from safetensors import safe_open
 
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Config_Base
 from invokeai.backend.model_manager.configs.identification_utils import (
@@ -18,24 +17,16 @@ from invokeai.backend.model_manager.configs.identification_utils import (
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+from invokeai.backend.quantization.sdnq.detection import folder_has_sdnq_keys
 
 
 def _safetensors_dir_has_sdnq_keys(directory) -> bool:
     """Return True if the safetensors in ``directory`` look SDNQ-quantized (weight + matching scale).
 
-    The pair is resolved across the *whole* directory rather than within each file. Sharding splits a
-    checkpoint by tensor order, so ``<name>.weight`` and its ``<name>.scale`` routinely land in
-    different shards; matching per file reports such a checkpoint as unquantized whenever it carries
-    no ``quantization_config.json`` marker to fall back on.
+    Thin alias over the shared detector's key check — the pair is resolved across the union of all
+    shards, since sharding routinely separates a weight from its scale.
     """
-    keys: set[str] = set()
-    for st_file in sorted(directory.glob("*.safetensors")):
-        try:
-            with safe_open(st_file, framework="pt") as f:
-                keys.update(f.keys())
-        except Exception:
-            continue
-    return any(key.endswith(".weight") and f"{key[: -len('.weight')]}.scale" in keys for key in keys)
+    return folder_has_sdnq_keys(directory)
 
 
 class T5Encoder_T5Encoder_Config(Config_Base):
