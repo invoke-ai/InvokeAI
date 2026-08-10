@@ -627,6 +627,17 @@ describe('Ideogram 4 readiness checks - canvas tab', () => {
 // FLUX.1: a complete SDNQ pipeline supplies its own T5 / CLIP / VAE
 // ---------------------------------------------------------------------------
 
+// `submodels` is not on MainModelConfig (the generated schema doesn't carry the SDNQ variants), so
+// keep the map as its own const rather than reading it back through the cast.
+const flux1PipelineSubmodels = {
+  transformer: {},
+  vae: {},
+  text_encoder: {},
+  tokenizer: {},
+  text_encoder_2: {},
+  tokenizer_2: {},
+};
+
 const flux1SdnqPipelineModel = {
   key: 'flux1-sdnq-pipeline',
   hash: 'flux1-sdnq-hash',
@@ -635,14 +646,7 @@ const flux1SdnqPipelineModel = {
   type: 'main',
   format: 'sdnq_quantized',
   variant: 'dev',
-  submodels: {
-    transformer: {},
-    vae: {},
-    text_encoder: {},
-    tokenizer: {},
-    text_encoder_2: {},
-    tokenizer_2: {},
-  },
+  submodels: flux1PipelineSubmodels,
 } as unknown as MainModelConfig;
 
 const flux1SingleFileModel = {
@@ -677,7 +681,7 @@ describe('FLUX.1 readiness – self-contained SDNQ pipeline', () => {
   });
 
   it('still demands them when the pipeline is missing its T5 pair', () => {
-    const { text_encoder_2: _te2, tokenizer_2: _tok2, ...withoutT5 } = flux1SdnqPipelineModel.submodels!;
+    const { text_encoder_2: _te2, tokenizer_2: _tok2, ...withoutT5 } = flux1PipelineSubmodels;
     const partial = { ...flux1SdnqPipelineModel, submodels: withoutT5 } as unknown as MainModelConfig;
 
     const reasons = getReasonsWhyCannotEnqueueGenerateTab(buildGenerateTabArg({ model: partial }));
