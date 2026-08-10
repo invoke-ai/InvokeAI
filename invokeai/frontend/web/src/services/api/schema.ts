@@ -31007,7 +31007,7 @@ export type components = {
             tiled?: boolean;
             /**
              * Tile Size
-             * @description The tile size for VAE tiling in pixels (image space). If set to 0, the default tile size for the model will be used. Larger tile sizes generally produce better results at the cost of higher memory usage.
+             * @description The tile size for VAE tiling in pixels (image space). If set to 0, the default tile size for the model will be used. Larger tile sizes generally produce better results at the cost of higher memory usage. Values between 1 and 64 are raised to 64.
              * @default 0
              */
             tile_size?: number;
@@ -31080,7 +31080,7 @@ export type components = {
             tiled?: boolean;
             /**
              * Tile Size
-             * @description The tile size for VAE tiling in pixels (image space). If set to 0, the default tile size for the model will be used. Larger tile sizes generally produce better results at the cost of higher memory usage.
+             * @description The tile size for VAE tiling in pixels (image space). If set to 0, the default tile size for the model will be used. Larger tile sizes generally produce better results at the cost of higher memory usage. Values between 1 and 64 are raised to 64.
              * @default 0
              */
             tile_size?: number;

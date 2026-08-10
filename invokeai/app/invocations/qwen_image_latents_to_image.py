@@ -1,5 +1,3 @@
-from contextlib import nullcontext
-
 import torch
 from einops import rearrange
 from PIL import Image
@@ -16,7 +14,12 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import VAEField
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.krea2.vae_compat import as_qwen_image_vae
+from invokeai.backend.krea2.vae_compat import (
+    QWEN_IMAGE_VAE_MIN_TILE_SIZE,
+    as_qwen_image_vae,
+    patch_qwen_image_vae_tiling,
+    resolve_qwen_image_vae_tile_size,
+)
 from invokeai.backend.stable_diffusion.extensions.seamless import SeamlessExt
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_qwen_image
@@ -38,7 +41,12 @@ class QwenImageLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard)
     tiled: bool = InputField(default=False, description=FieldDescriptions.tiled)
     # NOTE: tile_size = 0 is a special value meaning "use the model's default", matching the
     # SD/SDXL l2i node. `int | None` is avoided because the workflow UI does not handle it well.
-    tile_size: int = InputField(default=0, multiple_of=8, description=FieldDescriptions.vae_tile_size)
+    tile_size: int = InputField(
+        default=0,
+        multiple_of=8,
+        description=f"{FieldDescriptions.vae_tile_size} Values between 1 and "
+        f"{QWEN_IMAGE_VAE_MIN_TILE_SIZE} are raised to {QWEN_IMAGE_VAE_MIN_TILE_SIZE}.",
+    )
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ImageOutput:
@@ -50,11 +58,10 @@ class QwenImageLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard)
         # matches the tiles the VAE will actually use. Without this the estimate stays at the
         # full-frame figure (~21 GB at 2560x1440 on CUDA) and tiling frees nothing: the VAE is
         # bounded, but the cache still evicts other models to honour the reservation.
-        effective_tile_size = None
-        if tiled:
-            effective_tile_size = (
-                self.tile_size if self.tile_size > 0 else getattr(vae_info.model, "tile_sample_min_height", 256)
-            )
+        # Resolved against a constant rather than the module's current tile_sample_min_height, which a
+        # previous invocation (including the Anima decode node, which shares this VAE instance) may
+        # have overwritten.
+        effective_tile_size = resolve_qwen_image_vae_tile_size(self.tile_size) if tiled else None
         # NOTE: vae_info.model may be an AutoencoderKLWan (a native-layout qwen_image_vae single file is
         # classified with the Anima base); it is reinterpreted as AutoencoderKLQwenImage inside the
         # model_on_device context below. The working-memory estimate only reads tensor shape + element
@@ -81,15 +88,9 @@ class QwenImageLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard)
                 # large outputs that would exceed VRAM even after offloading the transformer/text
                 # encoder. For normal sizes, leave it off (faster, no tile blending) — the reserved
                 # working memory offloads other models so the full-frame decode fits.
-                if tiled:
-                    if self.tile_size > 0:
-                        vae.enable_tiling(tile_sample_min_height=self.tile_size, tile_sample_min_width=self.tile_size)
-                    else:
-                        vae.enable_tiling()
-                else:
-                    vae.disable_tiling()
-
-                tiling_context = nullcontext()
+                # The tiling state is scoped to this block: the VAE module belongs to the model cache
+                # and is shared with later invocations (and with the Anima decode node).
+                tiling_context = patch_qwen_image_vae_tiling(vae, effective_tile_size)
 
                 TorchDevice.empty_cache()
 

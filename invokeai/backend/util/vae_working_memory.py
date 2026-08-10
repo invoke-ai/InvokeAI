@@ -180,7 +180,10 @@ def estimate_vae_working_memory_qwen_image(
     bounded by a single tile instead, so the estimate must follow suit — otherwise the cache keeps
     reserving the full-frame figure (~11.8 GB for a 2560x1440 encode on CUDA) and tiling buys
     nothing. Mirrors ``estimate_vae_working_memory_wan``: one tile plus 25% for the tile overlap,
-    plus the full RGB image, which stays resident on the execution device either way.
+    plus the pixel-space buffers, which stay resident on the execution device either way.
+
+    ``tile_size`` is the resolved tile size (the nodes' 0 sentinel already substituted), and assumes
+    the 4:3 tile-to-stride ratio applied by ``patch_qwen_image_vae_tiling``.
     """
     latent_scale_factor_for_operation = LATENT_SCALE_FACTOR if operation == "decode" else 1
 
@@ -221,8 +224,17 @@ def estimate_vae_working_memory_qwen_image(
     if tile_size is not None and tile_size > 0:
         # Bounded by one tile (plus overlap) rather than the full frame.
         working_memory = tile_size * tile_size * element_size * scaling_constant * 1.25
-        # The full RGB image is the encode input / decode output and stays resident regardless.
-        working_memory += 3 * h * w * element_size
+        # The full RGB image is the encode input / decode output and stays resident regardless. Unlike
+        # the per-tile term this scales with the output area, so it is the term that decides whether the
+        # estimate still holds at the resolutions tiling exists for.
+        #
+        # `tiled_decode` holds several pixel-space copies at once: every decoded tile in `rows`
+        # ((tile_min / tile_stride)^2 ~ 1.8 frames at the 4:3 ratio the nodes set), the blended and
+        # cropped `result_rows` (~1 frame) and the final `torch.cat` output (~1 frame). Measured at
+        # ~5 frames on a 2560x1440 fp16 decode. Encode consumes its input image without duplicating it,
+        # and accumulates only latents (16 channels at 1/64 the area — negligible).
+        image_copies = 5 if operation == "decode" else 1
+        working_memory += image_copies * 3 * h * w * element_size
     else:
         working_memory = h * w * element_size * scaling_constant
 
