@@ -1024,6 +1024,7 @@
     "pull": "Pull",
     "queueActionFailed": "Queue action failed",
     "queueActionPartialDescription": "{{failed}} of {{total}} failed: {{error}}",
+    "refreshFailed": "Failed to refresh models",
     "refreshList": "Refresh model list",
     "reidentify": "Re-identify model",
     "reidentifyFailed": "Re-identify failed",

@@ -4,7 +4,7 @@ import type { OrphanedModelInfo } from '@features/models/core/types';
 import { Checkbox, Dialog, Flex, Icon, Menu, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
 import { formatBytes } from '@features/models/core/taxonomy';
 import { deleteOrphanedModels, emptyModelCache, getOrphanedModels } from '@features/models/data/api';
-import { refreshModels } from '@features/models/data/modelsStore';
+import { getModelsSnapshot, refreshModels } from '@features/models/data/modelsStore';
 import { useScopedAction } from '@features/models/ui/shared/useScopedAction';
 import { useNotify } from '@features/models/ui/useModelsNotify';
 import { useMountEffect } from '@platform/react/useMountEffect';
@@ -26,10 +26,13 @@ export const MaintenanceMenu = () => {
   const { t } = useTranslation();
   const notify = useNotify();
   const [isSyncDialogOpen, setIsSyncDialogOpen] = useState(false);
-  const { run } = useScopedAction();
+  // Separate instances: run ignores re-entry, and a slow cache emptying must
+  // not swallow a refresh (or vice versa).
+  const { run: runEmptyCache } = useScopedAction();
+  const { run: runRefresh } = useScopedAction();
 
   const handleEmptyCache = () =>
-    run(
+    runEmptyCache(
       async (owner) => {
         await emptyModelCache(owner.signal);
 
@@ -39,11 +42,23 @@ export const MaintenanceMenu = () => {
       (message) => notify.error(t('models.failedToEmptyCache'), message)
     );
 
-  const handleRefresh = () => {
-    const owner = captureAccountScope();
+  const handleRefresh = () =>
+    runRefresh(
+      async (owner) => {
+        await refreshModels(owner);
 
-    void refreshModels(owner);
-  };
+        assertAccountScopeCurrent(owner);
+        // refreshModels records failures in the snapshot instead of
+        // rejecting (background refreshes stay silent by design); an
+        // explicit user refresh still deserves a failure toast.
+        const { error } = getModelsSnapshot();
+
+        if (error !== null) {
+          throw new Error(error);
+        }
+      },
+      (message) => notify.error(t('models.refreshFailed'), message)
+    );
 
   return (
     <>
@@ -56,7 +71,7 @@ export const MaintenanceMenu = () => {
         <Portal>
           <Menu.Positioner>
             <MenuContent minW="14rem">
-              <Menu.Item value="refresh" onClick={handleRefresh}>
+              <Menu.Item value="refresh" onClick={() => void handleRefresh()}>
                 <Icon as={RefreshCcwIcon} boxSize="3.5" />
                 <Menu.ItemText fontSize="xs">{t('models.refreshList')}</Menu.ItemText>
               </Menu.Item>
