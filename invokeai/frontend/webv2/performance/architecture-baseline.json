@@ -2,17 +2,17 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 829867,
+        "brotliBytes": 830433,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 829435,
+        "gzipBytes": 830077,
         "imageRawBytes": 156376,
-        "initialRawBytes": 1926812,
+        "initialRawBytes": 1927437,
         "largestAssetRawBytes": 746170,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 66502,
-        "requestCount": 38,
-        "scriptRequestCount": 22,
+        "ownedRawBytes": 66629,
+        "requestCount": 41,
+        "scriptRequestCount": 25,
         "sourceOwners": [
           "package:@ark-ui/react",
           "package:@chakra-ui/react",
@@ -279,17 +279,17 @@
         ]
       },
       "limits": {
-        "brotliBytes": 838166,
+        "brotliBytes": 838738,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 837730,
+        "gzipBytes": 838378,
         "imageRawBytes": 157940,
-        "initialRawBytes": 1946081,
+        "initialRawBytes": 1946712,
         "largestAssetRawBytes": 753632,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 66502,
-        "requestCount": 38,
-        "scriptRequestCount": 22
+        "ownedRawBytes": 66629,
+        "requestCount": 41,
+        "scriptRequestCount": 25
       },
       "owner": "app",
       "remediationTicket": "set-performance-budgets",
@@ -297,17 +297,17 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1013829,
+        "brotliBytes": 1014369,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1011067,
+        "gzipBytes": 1011775,
         "imageRawBytes": 156376,
-        "initialRawBytes": 2483086,
+        "initialRawBytes": 2484075,
         "largestAssetRawBytes": 746170,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 113950,
-        "requestCount": 82,
-        "scriptRequestCount": 66,
+        "ownedRawBytes": 114347,
+        "requestCount": 85,
+        "scriptRequestCount": 69,
         "sourceOwners": [
           "package:@ark-ui/react",
           "package:@chakra-ui/react",
@@ -808,17 +808,17 @@
         ]
       },
       "limits": {
-        "brotliBytes": 1023968,
+        "brotliBytes": 1024513,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 1021178,
+        "gzipBytes": 1021893,
         "imageRawBytes": 157940,
-        "initialRawBytes": 2507917,
+        "initialRawBytes": 2508916,
         "largestAssetRawBytes": 753632,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 113950,
-        "requestCount": 82,
-        "scriptRequestCount": 66
+        "ownedRawBytes": 114347,
+        "requestCount": 85,
+        "scriptRequestCount": 69
       },
       "owner": "workbench",
       "remediationTicket": "deepen-widget-registry-loading",
