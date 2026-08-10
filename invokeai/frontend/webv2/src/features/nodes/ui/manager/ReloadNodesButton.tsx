@@ -1,7 +1,7 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-function-as-prop */
 import { Icon } from '@chakra-ui/react';
 import { reloadCustomNodes } from '@features/nodes/data/api';
-import { refreshCustomNodePacks } from '@features/nodes/data/nodesStore';
+import { getCustomNodesSnapshot, refreshCustomNodePacks } from '@features/nodes/data/nodesStore';
 import { useNotify } from '@features/nodes/ui/useNodesNotify';
 import { useScopedAction } from '@platform/react/useScopedAction';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
@@ -23,6 +23,18 @@ export const ReloadNodesButton = () => {
         assertAccountScopeCurrent(owner);
         await refreshCustomNodePacks(owner);
         assertAccountScopeCurrent(owner);
+
+        // The store records refetch failures without dropping loaded packs,
+        // so the stale list keeps rendering; the reload's own toast must not
+        // celebrate over it. (Reload is the only refresh affordance — a
+        // separate "refresh list" action would just duplicate this one.)
+        const { error: refreshError } = getCustomNodesSnapshot();
+
+        if (refreshError !== null) {
+          notify.error(t('nodes.refreshFailed'), refreshError);
+
+          return;
+        }
 
         // The backend reports the outcome as prose (custom_nodes.py). Only
         // its success phrasing earns a green toast; anything else — like

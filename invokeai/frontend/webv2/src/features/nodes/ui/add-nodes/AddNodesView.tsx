@@ -13,8 +13,8 @@ import { useNotify } from '@features/nodes/ui/useNodesNotify';
 import { useScopedAction } from '@platform/react/useScopedAction';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { getApiErrorMessage } from '@platform/transport/http';
-import { Button, Field, Scrollable } from '@platform/ui';
-import { FolderOpenIcon } from 'lucide-react';
+import { Button, Field, IconButton, Scrollable } from '@platform/ui';
+import { ClipboardCopyIcon, FolderOpenIcon } from 'lucide-react';
 import { useMemo, type ChangeEvent, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -114,6 +114,15 @@ export const AddNodesView = () => {
     );
   };
 
+  const handleCopyPath = async (path: string) => {
+    try {
+      await navigator.clipboard.writeText(path);
+      notify.success(t('nodes.pathCopied'));
+    } catch {
+      notify.error(t('common.couldNotCopy'));
+    }
+  };
+
   const handleSourceChange = (event: ChangeEvent<HTMLInputElement>) =>
     updateNodesUi({ installSource: event.currentTarget.value });
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -157,9 +166,19 @@ export const AddNodesView = () => {
           </Text>
           {customNodesPath ? (
             <Box bg="bg.subtle" borderColor="border.subtle" borderWidth="1px" p="3" rounded="md">
-              <Text color="fg.muted" fontSize="2xs" fontWeight="600" textTransform="uppercase">
-                {t('nodes.nodesDirectory')}
-              </Text>
+              <HStack justify="space-between">
+                <Text color="fg.muted" fontSize="2xs" fontWeight="600" textTransform="uppercase">
+                  {t('nodes.nodesDirectory')}
+                </Text>
+                <IconButton
+                  aria-label={t('nodes.copyPath')}
+                  size="2xs"
+                  variant="ghost"
+                  onClick={() => void handleCopyPath(customNodesPath)}
+                >
+                  <Icon as={ClipboardCopyIcon} boxSize="3" />
+                </IconButton>
+              </HStack>
               <Text fontFamily="mono" fontSize="xs" mt="1" overflowWrap="anywhere">
                 {customNodesPath}
               </Text>
