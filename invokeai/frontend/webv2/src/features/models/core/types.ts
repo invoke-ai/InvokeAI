@@ -144,6 +144,7 @@ export interface ModelConfig {
 /** Body for PATCH `/api/v2/models/i/{key}` — all fields optional. */
 export interface ModelRecordChanges {
   name?: string;
+  path?: string;
   description?: string | null;
   source_url?: string | null;
   base?: ModelBase;

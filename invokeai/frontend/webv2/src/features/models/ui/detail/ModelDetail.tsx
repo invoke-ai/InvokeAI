@@ -1,9 +1,11 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import type { ModelConfig } from '@features/models/core/types';
+import type { ReactNode } from 'react';
 
 import { DataList, HStack, Icon, Menu, Portal, Separator, Stack, Text } from '@chakra-ui/react';
 import { isConvertibleToDiffusers } from '@features/models/core/baseIdentity';
 import { isLinkableType } from '@features/models/core/relationships';
+import { isAbsoluteModelPath } from '@features/models/core/schemas';
 import { formatBytes } from '@features/models/core/taxonomy';
 import { useModelsSelector } from '@features/models/data/modelsStore';
 import { useNotify } from '@features/models/ui/useModelsNotify';
@@ -21,6 +23,7 @@ import { ModelEditForm } from './ModelEditForm';
 import { ModelImageUpload } from './ModelImageUpload';
 import { RelatedModelsSection } from './RelatedModelsSection';
 import { MemoizedTriggerPhrasesEditor } from './TriggerPhrasesEditor';
+import { UpdatePathDialog } from './UpdatePathDialog';
 import { useModelActions } from './useModelActions';
 import { supportsVaeCpuOnlySetting, VaeCpuOnlySetting } from './VaeCpuOnlySetting';
 
@@ -243,7 +246,7 @@ const ModelIdentitySection = memo(function ModelIdentitySection({
           }}
         />
       ) : (
-        <ModelAttributes model={model} />
+        <ModelAttributes isMissing={isMissing} model={model} />
       )}
     </>
   );
@@ -421,37 +424,56 @@ const RelatedModelsSectionContainer = memo(function RelatedModelsSectionContaine
   return <RelatedModelsSection model={model} onError={handleSectionError} />;
 });
 
-const isAbsolutePath = (path: string): boolean => path.startsWith('/') || /^[A-Za-z]:[\\/]/.test(path);
-
-const ModelAttributes = ({ model }: { model: ModelIdentityModel }) => {
+const ModelAttributes = ({ isMissing, model }: { isMissing: boolean; model: ModelIdentityModel }) => {
   const { t } = useTranslation();
   const modelsDir = useModelsSelector((snapshot) => snapshot.modelsDir);
+  const [isPathDialogOpen, setIsPathDialogOpen] = useState(false);
   // Managed models store paths relative to the models directory; show the
   // resolved absolute path so it can be found on disk.
   const fullPath =
-    isAbsolutePath(model.path) || !modelsDir ? model.path : `${modelsDir.replace(/\/+$/, '')}/${model.path}`;
+    isAbsoluteModelPath(model.path) || !modelsDir ? model.path : `${modelsDir.replace(/\/+$/, '')}/${model.path}`;
+  // In-place installs (absolute paths) may be repointed after the file moves;
+  // a missing model gets the affordance too — that is exactly when it helps.
+  const canUpdatePath = isAbsoluteModelPath(model.path) || isMissing;
 
-  const attributes: { label: string; value: string }[] = [
+  const attributes: { action?: ReactNode; label: string; value: string }[] = [
     { label: t('models.fileSize'), value: formatBytes(model.file_size) },
     { label: t('models.variant'), value: model.variant ?? '—' },
     { label: t('models.predictionType'), value: model.prediction_type ?? '—' },
     { label: t('models.hash'), value: model.hash },
-    { label: t('models.path'), value: fullPath },
+    {
+      action: canUpdatePath ? (
+        <IconButton
+          aria-label={t('models.updatePath')}
+          size="2xs"
+          variant="ghost"
+          onClick={() => setIsPathDialogOpen(true)}
+        >
+          <Icon as={PencilIcon} boxSize="3" />
+        </IconButton>
+      ) : undefined,
+      label: t('models.path'),
+      value: fullPath,
+    },
     { label: t('models.source'), value: model.source },
   ];
 
   return (
-    <DataList.Root gap="2.5" orientation="horizontal" size="sm" variant="subtle">
-      {attributes.map((attribute) => (
-        <DataList.Item key={attribute.label}>
-          <DataList.ItemLabel color="fg.subtle" fontSize="2xs" minW="8rem" textTransform="uppercase">
-            {attribute.label}
-          </DataList.ItemLabel>
-          <DataList.ItemValue fontSize="2xs" overflowWrap="anywhere">
-            {attribute.value}
-          </DataList.ItemValue>
-        </DataList.Item>
-      ))}
-    </DataList.Root>
+    <>
+      <DataList.Root gap="2.5" orientation="horizontal" size="sm" variant="subtle">
+        {attributes.map((attribute) => (
+          <DataList.Item key={attribute.label}>
+            <DataList.ItemLabel color="fg.subtle" fontSize="2xs" minW="8rem" textTransform="uppercase">
+              {attribute.label}
+            </DataList.ItemLabel>
+            <DataList.ItemValue alignItems="center" display="flex" fontSize="2xs" gap="1" overflowWrap="anywhere">
+              {attribute.value}
+              {attribute.action ?? null}
+            </DataList.ItemValue>
+          </DataList.Item>
+        ))}
+      </DataList.Root>
+      {isPathDialogOpen ? <UpdatePathDialog model={model} onClose={() => setIsPathDialogOpen(false)} /> : null}
+    </>
   );
 };

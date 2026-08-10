@@ -90,6 +90,19 @@ export const loraDefaultSettingsSchema = z
 
 export type LoraDefaultSettingsFormValues = z.infer<typeof loraDefaultSettingsSchema>;
 
+/** POSIX (/x), Windows drive (C:\ or C:/), or UNC (\\server) — the shapes in-place installs record. */
+export const isAbsoluteModelPath = (path: string): boolean =>
+  path.startsWith('/') || path.startsWith('\\\\') || /^[A-Za-z]:[\\/]/.test(path);
+
+/**
+ * Replacement path for a relocated model. Only absolute paths are accepted:
+ * managed models store paths relative to the models directory and must not be
+ * relocated this way.
+ */
+export const modelPathSchema = trimmed
+  .min(1, 'Path is required.')
+  .refine(isAbsoluteModelPath, 'Must be an absolute path.');
+
 export const triggerPhraseSchema = trimmed
   .min(1, 'Trigger phrase cannot be empty.')
   .max(200, 'Keep trigger phrases under 200 characters.');
