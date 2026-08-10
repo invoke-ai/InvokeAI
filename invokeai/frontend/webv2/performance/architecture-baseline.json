@@ -2,17 +2,17 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 827257,
+        "brotliBytes": 829867,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 826867,
+        "gzipBytes": 829435,
         "imageRawBytes": 156376,
-        "initialRawBytes": 1921094,
+        "initialRawBytes": 1926812,
         "largestAssetRawBytes": 746170,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 66295,
-        "requestCount": 35,
-        "scriptRequestCount": 19,
+        "ownedRawBytes": 66502,
+        "requestCount": 38,
+        "scriptRequestCount": 22,
         "sourceOwners": [
           "package:@ark-ui/react",
           "package:@chakra-ui/react",
@@ -150,12 +150,17 @@
           "source:src/features/identity/ui/useIdentityNotify.ts",
           "source:src/features/models/core/baseIdentity.ts",
           "source:src/features/models/data/api.ts",
+          "source:src/features/models/data/installsStore.ts",
           "source:src/features/models/data/modelLoadStore.ts",
           "source:src/features/models/data/modelsStore.ts",
+          "source:src/features/models/data/startersStore.ts",
           "source:src/features/models/data/transport.ts",
           "source:src/features/models/index.ts",
+          "source:src/features/models/ui/ModelInstallRuntime.tsx",
           "source:src/features/models/ui/ModelsPage.tsx",
           "source:src/features/models/ui/ModelsUiContext.tsx",
+          "source:src/features/models/ui/useInstallOutcomeToasts.ts",
+          "source:src/features/models/ui/useModelsNotify.ts",
           "source:src/features/nodes/core/catalog.ts",
           "source:src/features/nodes/data/api.ts",
           "source:src/features/nodes/data/nodeExecutionStore.ts",
@@ -274,17 +279,17 @@
         ]
       },
       "limits": {
-        "brotliBytes": 835530,
+        "brotliBytes": 838166,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 835136,
+        "gzipBytes": 837730,
         "imageRawBytes": 157940,
-        "initialRawBytes": 1940305,
+        "initialRawBytes": 1946081,
         "largestAssetRawBytes": 753632,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 66295,
-        "requestCount": 35,
-        "scriptRequestCount": 19
+        "ownedRawBytes": 66502,
+        "requestCount": 38,
+        "scriptRequestCount": 22
       },
       "owner": "app",
       "remediationTicket": "set-performance-budgets",
@@ -292,17 +297,17 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1011158,
+        "brotliBytes": 1013829,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1008506,
+        "gzipBytes": 1011067,
         "imageRawBytes": 156376,
-        "initialRawBytes": 2477274,
+        "initialRawBytes": 2483086,
         "largestAssetRawBytes": 746170,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 113649,
-        "requestCount": 79,
-        "scriptRequestCount": 63,
+        "ownedRawBytes": 113950,
+        "requestCount": 82,
+        "scriptRequestCount": 66,
         "sourceOwners": [
           "package:@ark-ui/react",
           "package:@chakra-ui/react",
@@ -507,12 +512,17 @@
           "source:src/features/identity/ui/useIdentityNotify.ts",
           "source:src/features/models/core/baseIdentity.ts",
           "source:src/features/models/data/api.ts",
+          "source:src/features/models/data/installsStore.ts",
           "source:src/features/models/data/modelLoadStore.ts",
           "source:src/features/models/data/modelsStore.ts",
+          "source:src/features/models/data/startersStore.ts",
           "source:src/features/models/data/transport.ts",
           "source:src/features/models/index.ts",
+          "source:src/features/models/ui/ModelInstallRuntime.tsx",
           "source:src/features/models/ui/ModelsPage.tsx",
           "source:src/features/models/ui/ModelsUiContext.tsx",
+          "source:src/features/models/ui/useInstallOutcomeToasts.ts",
+          "source:src/features/models/ui/useModelsNotify.ts",
           "source:src/features/nodes/core/catalog.ts",
           "source:src/features/nodes/data/api.ts",
           "source:src/features/nodes/data/nodeExecutionStore.ts",
@@ -798,24 +808,24 @@
         ]
       },
       "limits": {
-        "brotliBytes": 1021270,
+        "brotliBytes": 1023968,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 1018592,
+        "gzipBytes": 1021178,
         "imageRawBytes": 157940,
-        "initialRawBytes": 2502047,
+        "initialRawBytes": 2507917,
         "largestAssetRawBytes": 753632,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 113649,
-        "requestCount": 79,
-        "scriptRequestCount": 63
+        "ownedRawBytes": 113950,
+        "requestCount": 82,
+        "scriptRequestCount": 66
       },
       "owner": "workbench",
       "remediationTicket": "deepen-widget-registry-loading",
       "source": "src/app/WorkbenchApp.tsx"
     }
   },
-  "capturedAt": "2026-08-09",
+  "capturedAt": "2026-08-10",
   "developmentInvalidation": {
     "platformUiBarrel": {
       "specifier": "@platform/ui",
@@ -860,7 +870,9 @@
       "src/features/queue/ui/launchpad/QueueStatusBand.tsx",
       "src/workbench/launchpad/home/livePanels.ts"
     ],
-    "editorForbiddenInitialChunkNames": ["ag-psd"],
+    "editorForbiddenInitialChunkNames": [
+      "ag-psd"
+    ],
     "inactiveWidgetGateOwner": "deepen-widget-registry-loading"
   }
 }
