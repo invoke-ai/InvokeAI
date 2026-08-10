@@ -1,6 +1,7 @@
 """Regression tests for the PiD distill schedule, decoder/base validation and checkpoint completeness."""
 
 import math
+from typing import Any
 
 import pytest
 import torch
@@ -151,4 +152,13 @@ class TestLoadPidDecoderRejectsPartialCheckpoints:
     def test_unexpected_keys_are_rejected(self, tiny_net: torch.nn.Module) -> None:
         sd = dict(tiny_net.state_dict()) | {"not_a_pid_key": torch.zeros(1)}
         with pytest.raises(RuntimeError, match="unexpected keys"):
+            load_pid_decoder(sd, BaseModelType.Flux)
+
+    def test_non_string_keys_are_rejected_before_torch_sees_them(self, tiny_net: torch.nn.Module) -> None:
+        """A bare checkpoint keeps whatever keys the `.pth` was pickled with (see `strip_net_prefix`),
+        so one need not be a string. `nn.Module.load_state_dict` calls `.startswith()` on every key and
+        raises `AttributeError` on a non-string one — from inside torch, before it reports anything —
+        so `load_pid_decoder` has to catch it first and say what is actually wrong with the file."""
+        sd: dict[Any, torch.Tensor] = dict(tiny_net.state_dict()) | {1: torch.zeros(1)}
+        with pytest.raises(RuntimeError, match="1 keys that are not strings"):
             load_pid_decoder(sd, BaseModelType.Flux)

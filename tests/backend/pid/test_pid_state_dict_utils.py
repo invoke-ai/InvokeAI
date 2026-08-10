@@ -45,9 +45,10 @@ class TestStripNetPrefix:
         """The other half of the pass-through, and the reason the result is not `dict[str, T]`.
 
         A prefixed checkpoint has its non-string keys filtered out by the rename above; a bare one is
-        returned as-is, so callers get whatever the `.pth` was pickled with. That is deliberate —
-        `PidNet.load_state_dict` counts such a key as unexpected, so identification must see it too —
-        but it means a caller that sorts the key set has to tolerate mixed types.
+        returned as-is, so callers get whatever the `.pth` was pickled with. Dropping them would hide
+        a malformed file from the checks meant to catch it — but it does put the burden on both
+        consumers, neither of which may assume the key type: identification sorts its key reports with
+        `key=str`, and `load_pid_decoder` rejects non-strings before torch can trip over them.
         """
         sd = {"lq_proj.a": torch.zeros(1), 0: torch.zeros(1)}
         assert set(strip_net_prefix(sd)) == {"lq_proj.a", 0}

@@ -55,9 +55,12 @@ def strip_net_prefix(state_dict: dict[Any, T]) -> dict[Any, T]:
 
     That pass-through is why the result is not `dict[str, T]`. A `.pth` unpickles to whatever it
     contains, so a bare checkpoint can hand back keys that are not strings, and they are kept on
-    purpose: `PidNet.load_state_dict` counts them as unexpected, so identification has to see them
-    too or it would accept a file the loader refuses. Callers must not assume the key type —
-    notably, sorting such a key set raises `TypeError`.
+    purpose: dropping them would hide a malformed file from the checks that exist to catch it.
+
+    Both consumers therefore have to cope with a key type they cannot assume. `nn.Module.load_state_dict`
+    calls `.startswith()` on every key and raises `AttributeError` on a non-string one, so
+    `load_pid_decoder` rejects those before it hands anything to torch; and sorting a mixed key set
+    raises `TypeError`, so identification sorts its key reports with ``key=str``.
     """
     if not has_net_prefix(state_dict):
         return state_dict

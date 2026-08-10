@@ -23,7 +23,7 @@ from contextlib import nullcontext
 from dataclasses import dataclass, field
 from functools import lru_cache
 from types import MappingProxyType
-from typing import Optional
+from typing import Any, Optional
 
 import torch
 from torch import Tensor
@@ -203,7 +203,7 @@ def required_pid_net_shapes(backbone: BaseModelType = _KEY_CONTRACT_BACKBONE) ->
     return MappingProxyType({k: tuple(v.shape) for k, v in net.state_dict().items()})
 
 
-def load_pid_decoder(state_dict: dict[str, Tensor], backbone: BaseModelType) -> PidNet:
+def load_pid_decoder(state_dict: dict[Any, Tensor], backbone: BaseModelType) -> PidNet:
     """Instantiate a PidNet for *backbone* and populate it with *state_dict*.
 
     The state dict is expected to be the model-manager loader's output, i.e.
@@ -212,6 +212,19 @@ def load_pid_decoder(state_dict: dict[str, Tensor], backbone: BaseModelType) -> 
     returned net.
     """
     net = build_pid_net(backbone)
+
+    # A `.pth` unpickles to whatever it contains, and a bare (un-prefixed) checkpoint reaches here
+    # with its keys untouched — see `strip_net_prefix`. `nn.Module.load_state_dict` calls
+    # `.startswith()` on every key, so a non-string one raises AttributeError from inside torch
+    # before any of the reporting below runs. Reject it here instead, so a malformed checkpoint gets
+    # the same kind of message as every other unusable one.
+    if not_strings := sorted((k for k in state_dict if not isinstance(k, str)), key=str):
+        raise RuntimeError(
+            f"PiD checkpoint has {len(not_strings)} keys that are not strings and so cannot name a "
+            f"PidNet parameter: {not_strings[:5]}"
+            + (f" (+ {len(not_strings) - 5} more)" if len(not_strings) > 5 else "")
+        )
+
     # strict=False so we can report missing and unexpected keys separately; both are fatal. The model
     # cache builds loaders under `skip_torch_weight_init()`, which no-ops every `reset_parameters()`,
     # so a key the checkpoint does not supply is left as uninitialised memory rather than a sane
