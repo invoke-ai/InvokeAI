@@ -6,7 +6,7 @@ import pytest
 
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.users.users_common import UserCreateRequest, UserUpdateRequest
-from invokeai.app.services.users.users_default import UserService
+from invokeai.app.services.users.users_default import USER_LOOKUP_CHUNK_SIZE, UserService
 
 
 @pytest.fixture
@@ -270,3 +270,40 @@ def test_list_users(user_service: UserService):
 
     limited_users = user_service.list_users(limit=2)
     assert len(limited_users) == 2
+
+
+def test_get_many_returns_users_keyed_by_id(user_service: UserService):
+    """Batch lookup: dedups input, keys by user_id, and omits unknown ids."""
+    created = [
+        user_service.create(
+            UserCreateRequest(
+                email=f"batch{index}@example.com",
+                display_name=f"Batch User {index}",
+                password="TestPassword123",
+            )
+        )
+        for index in range(3)
+    ]
+
+    requested = [created[0].user_id, created[1].user_id, created[0].user_id, "does-not-exist"]
+    users = user_service.get_many(requested)
+
+    assert set(users) == {created[0].user_id, created[1].user_id}
+    assert users[created[0].user_id].email == "batch0@example.com"
+    assert users[created[1].user_id].display_name == "Batch User 1"
+
+
+def test_get_many_with_no_ids_returns_empty(user_service: UserService):
+    assert user_service.get_many([]) == {}
+
+
+def test_get_many_chunks_beyond_sqlite_parameter_limit(user_service: UserService):
+    """More ids than SQLite's bound-parameter limit must not raise."""
+    user = user_service.create(
+        UserCreateRequest(email="chunked@example.com", display_name="Chunked", password="TestPassword123")
+    )
+    ids = [f"missing-{index}" for index in range(USER_LOOKUP_CHUNK_SIZE * 2 + 5)] + [user.user_id]
+
+    users = user_service.get_many(ids)
+
+    assert set(users) == {user.user_id}
