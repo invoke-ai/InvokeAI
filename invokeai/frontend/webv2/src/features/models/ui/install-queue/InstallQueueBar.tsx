@@ -124,7 +124,7 @@ export const InstallQueueBar = () => {
 
   const summary =
     activeJobs.length > 0
-      ? `${getInstallJobDisplayName(activeJobs[0]!)}${activeJobs.length > 1 ? t('models.plusMore', { count: activeJobs.length - 1 }) : ''}`
+      ? `${getInstallJobDisplayName(activeJobs[0]!)}${activeJobs.length > 1 ? t('common.plusMore', { count: activeJobs.length - 1 }) : ''}`
       : jobs.length > 0
         ? t('models.installJobSummary', { count: jobs.length })
         : t('models.noInstallsYet');
