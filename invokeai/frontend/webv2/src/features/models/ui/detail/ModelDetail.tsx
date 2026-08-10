@@ -21,6 +21,7 @@ import { DefaultSettingsSection } from './DefaultSettingsSection';
 import { MissingFileBadge, ModelBaseBadge, ModelFormatBadge } from './ModelBadges';
 import { ModelEditForm } from './ModelEditForm';
 import { ModelImageUpload } from './ModelImageUpload';
+import { ModelSettingsMenuItems } from './ModelSettingsMenuItems';
 import { RelatedModelsSection } from './RelatedModelsSection';
 import { MemoizedTriggerPhrasesEditor } from './TriggerPhrasesEditor';
 import { UpdatePathDialog } from './UpdatePathDialog';
@@ -311,6 +312,7 @@ const ModelDetailActions = ({
                 <Icon as={RefreshCcwIcon} boxSize="3.5" />
                 <Menu.ItemText fontSize="xs">{t('models.reidentify')}</Menu.ItemText>
               </Menu.Item>
+              <ModelSettingsMenuItems modelKey={model.key} />
               <Menu.Separator />
               <Menu.Item color="fg.error" value="delete" onClick={() => setPendingAction('delete')}>
                 <Icon as={Trash2Icon} boxSize="3.5" />
