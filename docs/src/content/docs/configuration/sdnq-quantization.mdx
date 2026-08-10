@@ -59,7 +59,9 @@ To install a different SDNQ model from HuggingFace:
 For very large SDNQ models, you can also pre-download with `huggingface-cli` and then point InvokeAI at the local folder via **Add Model** → **Folder**.
 :::
 
-InvokeAI auto-detects the SDNQ format from `transformer/quantization_config.json` (the `quant_method: "sdnq"` marker). The Model Manager shows the format as **sdnq** in the model badge once installed.
+InvokeAI auto-detects the SDNQ format from `transformer/quantization_config.json` (the `quant_method: "sdnq"` marker). Exports that ship no marker are still recognized, by the shape of the weights themselves — an SDNQ tensor stores a `<name>.weight` alongside a matching `<name>.scale`, and the pair is found even when sharding puts the two in different files. The Model Manager shows the format as **sdnq** in the model badge once installed.
+
+The transformer also has to hold weights the SDNQ reader can actually open (`.safetensors`). A folder with a config and a marker but no readable weight file is rejected at install rather than accepted and then failing on the first generation.
 
 ## What gets quantized
 

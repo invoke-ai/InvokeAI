@@ -21,6 +21,7 @@ import torch
 from safetensors.torch import save_file
 
 from invokeai.app.invocations.model import is_self_contained_sdnq_pipeline
+from invokeai.backend.model_manager.configs.identification_utils import NotAMatchError
 from invokeai.backend.model_manager.configs.main import (
     Main_SDNQ_Diffusers_Flux2_Config,
     Main_SDNQ_Diffusers_ZImage_Config,
@@ -578,3 +579,48 @@ def test_a_klein_pipeline_is_still_identified_as_klein(tmp_path: Path) -> None:
     )
 
     assert config.variant is Flux2VariantType.Klein4B
+
+
+# --- Identification must not accept a transformer the loader cannot read ---
+# `_validate_has_sdnq_transformer` checked only that the folder *looked* SDNQ. Discovery then left
+# `Transformer` out of `submodels` (no readable weights), but the config was still created — so the
+# model installed and the failure surfaced when a loader opened the transformer path to generate.
+
+
+@pytest.mark.parametrize(
+    ("factory", "root_name"),
+    [
+        (Main_SDNQ_Diffusers_Flux2_Config, "flux2-weightless-transformer"),
+        (Main_SDNQ_Diffusers_ZImage_Config, "zimage-weightless-transformer"),
+    ],
+)
+def test_a_transformer_with_a_marker_but_no_weights_is_rejected(tmp_path: Path, factory, root_name: str):
+    maker = _make_flux2_pipeline if factory is Main_SDNQ_Diffusers_Flux2_Config else _make_zimage_pipeline
+    root = maker(tmp_path / root_name, "Qwen3ForCausalLM")
+
+    # Config and SDNQ marker stay; the weights go away.
+    for weight in (root / "transformer").glob("*.safetensors"):
+        weight.unlink()
+
+    with pytest.raises(NotAMatchError):
+        factory.from_model_on_disk(_mod(root), {**_REQUIRED_FIELDS, "path": root.as_posix()})
+
+
+@pytest.mark.parametrize(
+    ("factory", "root_name"),
+    [
+        (Main_SDNQ_Diffusers_Flux2_Config, "flux2-nonsafetensors-transformer"),
+        (Main_SDNQ_Diffusers_ZImage_Config, "zimage-nonsafetensors-transformer"),
+    ],
+)
+def test_a_transformer_whose_only_weight_is_unreadable_is_rejected(tmp_path: Path, factory, root_name: str):
+    """`sdnq_sd_loader` reads safetensors only, so a `.bin` transformer is not loadable either."""
+    maker = _make_flux2_pipeline if factory is Main_SDNQ_Diffusers_Flux2_Config else _make_zimage_pipeline
+    root = maker(tmp_path / root_name, "Qwen3ForCausalLM")
+
+    for weight in (root / "transformer").glob("*.safetensors"):
+        weight.unlink()
+    (root / "transformer" / "diffusion_pytorch_model.bin").write_bytes(b"\x00")
+
+    with pytest.raises(NotAMatchError):
+        factory.from_model_on_disk(_mod(root), {**_REQUIRED_FIELDS, "path": root.as_posix()})

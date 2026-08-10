@@ -2263,8 +2263,11 @@ _WEIGHTLESS_SUBMODEL_TYPES = frozenset({SubModelType.Tokenizer, SubModelType.Tok
 # safetensors whatever its folder declares. FLUX.2 and Z-Image build their transformer and Qwen3
 # text encoder that way; FLUX.1 does so only for the transformer, because its CLIP / T5 / VAE
 # branch on `_is_sdnq_folder` and fall back to `from_pretrained`.
-_SDNQ_PIPELINE_ALWAYS_SDNQ_LOADED = frozenset({SubModelType.Transformer, SubModelType.TextEncoder})
-_SDNQ_FLUX1_ALWAYS_SDNQ_LOADED = frozenset({SubModelType.Transformer})
+# The transformer is read with `sdnq_sd_loader` in every SDNQ pipeline, which is why it is also the
+# slot identification validates before accepting the folder as one.
+_SDNQ_TRANSFORMER_ONLY = frozenset({SubModelType.Transformer})
+_SDNQ_PIPELINE_ALWAYS_SDNQ_LOADED = _SDNQ_TRANSFORMER_ONLY | {SubModelType.TextEncoder}
+_SDNQ_FLUX1_ALWAYS_SDNQ_LOADED = _SDNQ_TRANSFORMER_ONLY
 
 _SDNQ_FLUX1_COMPONENT_BY_CLASS_NAME: dict[str, tuple[SubModelType, ModelType, set[str]]] = {
     "FluxTransformer2DModel": (SubModelType.Transformer, ModelType.Main, {"FluxTransformer2DModel"}),
@@ -2449,6 +2452,14 @@ class Main_SDNQ_Diffusers_Flux2_Config(Main_Config_Base, Config_Base):
         if not _is_sdnq_folder(transformer_path):
             raise NotAMatchError("transformer is not SDNQ quantized")
 
+        # ...and it must actually be loadable. A marker (or SDNQ-shaped config) over a folder with no
+        # weight file the loader can read is not a pipeline: discovery would leave `Transformer` out
+        # of `submodels` while this check still said "yes, SDNQ pipeline", so the model installed and
+        # only failed when a loader opened the transformer path at generation time. Same predicate
+        # discovery uses, so identification and discovery cannot disagree about the transformer.
+        if not _sdnq_component_dir_is_populated(transformer_path, SubModelType.Transformer, _SDNQ_TRANSFORMER_ONLY):
+            raise NotAMatchError("transformer folder holds no weights its loader can read")
+
     @classmethod
     def _get_variant_or_raise(cls, mod: ModelOnDisk) -> Flux2VariantType:
         """Determine the Flux2 variant from the transformer config + filename heuristic."""
@@ -2619,6 +2630,14 @@ class Main_SDNQ_Diffusers_ZImage_Config(Main_Config_Base, Config_Base):
         if not _is_sdnq_folder(transformer_path):
             raise NotAMatchError("transformer is not SDNQ quantized")
 
+        # ...and it must actually be loadable. A marker (or SDNQ-shaped config) over a folder with no
+        # weight file the loader can read is not a pipeline: discovery would leave `Transformer` out
+        # of `submodels` while this check still said "yes, SDNQ pipeline", so the model installed and
+        # only failed when a loader opened the transformer path at generation time. Same predicate
+        # discovery uses, so identification and discovery cannot disagree about the transformer.
+        if not _sdnq_component_dir_is_populated(transformer_path, SubModelType.Transformer, _SDNQ_TRANSFORMER_ONLY):
+            raise NotAMatchError("transformer folder holds no weights its loader can read")
+
     @classmethod
     def _get_repo_variant(cls, mod: ModelOnDisk) -> ModelRepoVariant:
         weight_files = list(mod.path.glob("**/*.safetensors"))
@@ -2754,6 +2773,14 @@ class Main_SDNQ_Diffusers_FLUX_Config(Main_Config_Base, Config_Base):
 
         if not _is_sdnq_folder(transformer_path):
             raise NotAMatchError("transformer is not SDNQ quantized")
+
+        # ...and it must actually be loadable. A marker (or SDNQ-shaped config) over a folder with no
+        # weight file the loader can read is not a pipeline: discovery would leave `Transformer` out
+        # of `submodels` while this check still said "yes, SDNQ pipeline", so the model installed and
+        # only failed when a loader opened the transformer path at generation time. Same predicate
+        # discovery uses, so identification and discovery cannot disagree about the transformer.
+        if not _sdnq_component_dir_is_populated(transformer_path, SubModelType.Transformer, _SDNQ_TRANSFORMER_ONLY):
+            raise NotAMatchError("transformer folder holds no weights its loader can read")
 
     @classmethod
     def _get_variant_or_raise(cls, mod: ModelOnDisk) -> FluxVariantType:
