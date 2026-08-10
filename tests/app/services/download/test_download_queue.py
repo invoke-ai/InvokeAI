@@ -9,7 +9,7 @@ from typing import Any, Generator, Optional
 import pytest
 from pydantic.networks import AnyHttpUrl
 from requests.sessions import Session
-from requests_testadapter import TestAdapter
+from requests_testadapter import TestAdapter, TestSession
 
 from invokeai.app.services.config import get_config
 from invokeai.app.services.config.config_default import URLRegexTokenPair
@@ -79,6 +79,111 @@ def test_errors(tmp_path: Path, mm2_session: Session) -> None:
     assert jobs_dict["http://www.civitai.com/models/missing"].status == DownloadJobStatus.COMPLETED
     assert jobs_dict["http://www.civitai.com/models/missing"].total_bytes == 0
     queue.stop()
+
+
+@pytest.mark.timeout(timeout=10, method="thread")
+def test_completed_resume_with_416_promotes_in_progress_file(tmp_path: Path) -> None:
+    source = AnyHttpUrl("https://test.com/complete.safetensors")
+    content = b"complete"
+    destination = tmp_path / "complete.safetensors"
+    in_progress_path = destination.with_name(destination.name + ".downloading")
+    in_progress_path.write_bytes(content)
+
+    session = TestSession()
+    session.mount(
+        str(source),
+        TestAdapter(b"", status=416, headers={"Content-Range": f"bytes */{len(content)}"}),
+    )
+    completed_files: list[bool] = []
+    queue = DownloadQueueService(requests_session=session)
+    queue.start()
+    try:
+        job = queue.download(
+            source=source,
+            dest=destination,
+            on_complete=lambda completed_job: completed_files.append(completed_job.download_path.exists()),
+        )
+        queue.join()
+    finally:
+        queue.stop()
+
+    assert job.status == DownloadJobStatus.COMPLETED
+    assert destination.read_bytes() == content
+    assert not in_progress_path.exists()
+    assert completed_files == [True]
+
+
+@pytest.mark.timeout(timeout=10, method="thread")
+def test_headerless_416_falls_back_to_recorded_size(tmp_path: Path) -> None:
+    source = AnyHttpUrl("https://test.com/headerless.safetensors")
+    content = b"complete"
+    destination = tmp_path / "headerless.safetensors"
+    in_progress_path = destination.with_name(destination.name + ".downloading")
+    in_progress_path.write_bytes(content)
+
+    session = TestSession()
+    session.mount(str(source), TestAdapter(b"", status=416))
+    queue = DownloadQueueService(requests_session=session)
+    queue.start()
+    try:
+        job = DownloadJob(source=source, dest=destination, expected_total_bytes=len(content))
+        queue.submit_download_job(job)
+        queue.join()
+    finally:
+        queue.stop()
+
+    assert job.status == DownloadJobStatus.COMPLETED
+    assert destination.read_bytes() == content
+    assert not in_progress_path.exists()
+
+
+@pytest.mark.timeout(timeout=10, method="thread")
+def test_headerless_416_without_recorded_size_pauses(tmp_path: Path) -> None:
+    source = AnyHttpUrl("https://test.com/unknown.safetensors")
+    destination = tmp_path / "unknown.safetensors"
+    in_progress_path = destination.with_name(destination.name + ".downloading")
+    in_progress_path.write_bytes(b"who knows")
+
+    session = TestSession()
+    session.mount(str(source), TestAdapter(b"", status=416))
+    queue = DownloadQueueService(requests_session=session)
+    queue.start()
+    try:
+        job = queue.download(source=source, dest=destination)
+        queue.join()
+    finally:
+        queue.stop()
+
+    assert job.status == DownloadJobStatus.PAUSED
+    assert job.resume_required
+    assert not destination.exists()
+    assert in_progress_path.exists()
+
+
+@pytest.mark.timeout(timeout=10, method="thread")
+def test_mismatched_416_resume_keeps_in_progress_file(tmp_path: Path) -> None:
+    source = AnyHttpUrl("https://test.com/stale.safetensors")
+    destination = tmp_path / "stale.safetensors"
+    in_progress_path = destination.with_name(destination.name + ".downloading")
+    in_progress_path.write_bytes(b"stale data")
+
+    session = TestSession()
+    session.mount(
+        str(source),
+        TestAdapter(b"", status=416, headers={"Content-Range": "bytes */8"}),
+    )
+    queue = DownloadQueueService(requests_session=session)
+    queue.start()
+    try:
+        job = queue.download(source=source, dest=destination)
+        queue.join()
+    finally:
+        queue.stop()
+
+    assert job.status == DownloadJobStatus.PAUSED
+    assert job.resume_required
+    assert not destination.exists()
+    assert in_progress_path.exists()
 
 
 @pytest.mark.timeout(timeout=10, method="thread")
