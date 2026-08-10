@@ -2,6 +2,7 @@
 import type { NodePackInfo } from '@features/nodes/core/catalog';
 
 import { Badge, Box, Flex, HStack, Icon, Spinner, Stack, Text } from '@chakra-ui/react';
+import { isProblemPack } from '@features/nodes/core/library';
 import { useNodePackActions } from '@features/nodes/ui/shared/useNodePackActions';
 import { ensureInvocationTemplatesLoaded, useInvocationTemplatesSelector } from '@features/workflow/react';
 import { Button, ConfirmDialog } from '@platform/ui';
@@ -49,10 +50,21 @@ export const NodePackDetail = ({ onUninstalled, pack }: { onUninstalled: () => v
             {pack.path}
           </Text>
           <HStack gap="1.5" wrap="wrap">
-            <Badge colorPalette="blue" fontSize="2xs" variant="surface">
-              {t('nodes.nodeCount', { count: pack.nodeCount })}
-            </Badge>
+            {isProblemPack(pack) ? (
+              <Badge colorPalette="orange" fontSize="2xs" variant="surface">
+                {t('nodes.noNodesRegistered')}
+              </Badge>
+            ) : (
+              <Badge colorPalette="blue" fontSize="2xs" variant="surface">
+                {t('nodes.nodeCount', { count: pack.nodeCount })}
+              </Badge>
+            )}
           </HStack>
+          {isProblemPack(pack) ? (
+            <Text color="fg.muted" fontSize="2xs">
+              {t('nodes.noNodesRegisteredHint')}
+            </Text>
+          ) : null}
         </Stack>
         <UninstallButton onUninstalled={onUninstalled} pack={pack} />
       </HStack>

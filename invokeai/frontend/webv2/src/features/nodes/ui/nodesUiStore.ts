@@ -1,3 +1,4 @@
+import { DEFAULT_NODE_PACK_FILTERS, type NodePackFilters } from '@features/nodes/core/library';
 import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
 
@@ -14,9 +15,9 @@ export interface NodesUiSnapshot {
   activeTab: NodesManagerTab;
   activePackName: string | null;
   activityExpanded: boolean;
+  filters: NodePackFilters;
   /** Typed install source; survives the detail tabs unmounting their content. */
   installSource: string;
-  searchTerm: string;
 }
 
 const INITIAL_NODES_UI_SNAPSHOT: NodesUiSnapshot = {
@@ -25,8 +26,8 @@ const INITIAL_NODES_UI_SNAPSHOT: NodesUiSnapshot = {
   activeTab: 'add',
   activePackName: null,
   activityExpanded: false,
+  filters: { ...DEFAULT_NODE_PACK_FILTERS },
   installSource: '',
-  searchTerm: '',
 };
 
 const store = createExternalStore<NodesUiSnapshot>(INITIAL_NODES_UI_SNAPSHOT);

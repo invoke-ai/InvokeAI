@@ -5,7 +5,7 @@ import { NodePackList } from '@features/nodes/ui/library/NodePackList';
 import { openNodePackDetail, updateNodesUi, useNodesUiSelector } from '@features/nodes/ui/nodesUiStore';
 import { useTranslation } from 'react-i18next';
 
-import { HEADER_MIN_HEIGHT, PACK_LIBRARY_WIDTH } from './layoutConstants';
+import { HEADER_MIN_HEIGHT, LIBRARY_WIDTH } from './layoutConstants';
 import { NodesMaintenanceMenu } from './NodesMaintenanceMenu';
 import { ReloadNodesButton } from './ReloadNodesButton';
 
@@ -13,21 +13,13 @@ import { ReloadNodesButton } from './ReloadNodesButton';
 export const LibraryColumn = () => {
   const { t } = useTranslation();
   const activePackName = useNodesUiSelector((snapshot) => snapshot.activePackName);
-  const searchTerm = useNodesUiSelector((snapshot) => snapshot.searchTerm);
+  const filters = useNodesUiSelector((snapshot) => snapshot.filters);
   const error = useCustomNodesSelector((snapshot) => snapshot.error);
   const nodePacks = useCustomNodesSelector((snapshot) => snapshot.nodePacks);
   const status = useCustomNodesSelector((snapshot) => snapshot.status);
 
   return (
-    <Flex
-      borderEndWidth={1}
-      direction="column"
-      flexShrink={0}
-      h="full"
-      minH="0"
-      position="relative"
-      w={PACK_LIBRARY_WIDTH}
-    >
+    <Flex borderEndWidth={1} direction="column" flexShrink={0} h="full" minH="0" position="relative" w={LIBRARY_WIDTH}>
       <HStack align="center" borderBottomWidth={1} flexShrink={0} gap="2" minH={HEADER_MIN_HEIGHT} px="3">
         <Text fontSize="sm" fontWeight="700">
           {t('nodes.nodePacks')}
@@ -44,10 +36,10 @@ export const LibraryColumn = () => {
       <NodePackList
         activePackName={activePackName}
         error={error}
+        filters={filters}
         packs={nodePacks}
-        searchTerm={searchTerm}
         status={status}
-        onSearchChange={(value) => updateNodesUi({ searchTerm: value })}
+        onFiltersChange={(next) => updateNodesUi({ filters: next })}
         onSelect={openNodePackDetail}
         onUninstalled={(packName) => {
           if (activePackName === packName) {
