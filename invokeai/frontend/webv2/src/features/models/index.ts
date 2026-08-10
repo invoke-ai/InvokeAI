@@ -22,5 +22,6 @@ export {
   type ModelLoadActivitySink,
   type ModelLoadInfo,
 } from './data/modelLoadStore';
+export { ModelInstallRuntime } from './ui/ModelInstallRuntime';
 export { ModelsPage } from './ui/ModelsPage';
 export { ModelsUiProvider, type ModelsUiAdapter } from './ui/ModelsUiContext';
