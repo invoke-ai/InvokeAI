@@ -1,6 +1,7 @@
 """Abstract base class for user service."""
 
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 
 from invokeai.app.services.users.users_common import UserCreateRequest, UserDTO, UserUpdateRequest
 
@@ -34,6 +35,18 @@ class UserServiceBase(ABC):
 
         Returns:
             UserDTO if found, None otherwise
+        """
+        pass
+
+    @abstractmethod
+    def get_many(self, user_ids: Sequence[str]) -> dict[str, UserDTO]:
+        """Get several users at once.
+
+        Args:
+            user_ids: The user IDs to look up. Duplicates are collapsed.
+
+        Returns:
+            A dict keyed by user_id; ids with no matching user are absent.
         """
         pass
 
