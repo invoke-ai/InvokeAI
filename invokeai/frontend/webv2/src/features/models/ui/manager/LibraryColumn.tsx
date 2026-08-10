@@ -4,6 +4,7 @@ import { collectBases, collectTypes } from '@features/models/core/library';
 import { bulkDeleteModels } from '@features/models/data/api';
 import { refreshModels, removeModelsFromStore, useModelsSelector } from '@features/models/data/modelsStore';
 import { removeModelsFromRelationships } from '@features/models/data/relationshipsStore';
+import { refreshStartersIfLoaded } from '@features/models/data/startersStore';
 import { MaintenanceMenu } from '@features/models/ui/library/MaintenanceMenu';
 import { ModelFilterBar } from '@features/models/ui/library/ModelFilterBar';
 import { ModelLibraryList } from '@features/models/ui/library/ModelLibraryList';
@@ -61,6 +62,10 @@ export const LibraryColumn = () => {
         removeModelsFromRelationships(result.deleted);
         pruneModelsUiKeys(result.deleted);
         updateModelsUi({ selectedKeys: new Set(result.failed.map((failure) => failure.key)) });
+        if (result.deleted.length > 0) {
+          // A deleted starter must lose its "Installed" badge in Add Models.
+          refreshStartersIfLoaded();
+        }
 
         if (result.failed.length > 0) {
           notify.error(

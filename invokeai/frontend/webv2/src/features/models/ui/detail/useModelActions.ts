@@ -3,6 +3,7 @@ import type { ModelConfig } from '@features/models/core/types';
 import { convertModelToDiffusers, deleteModel, reidentifyModel } from '@features/models/data/api';
 import { removeModelsFromStore, replaceModelInStore } from '@features/models/data/modelsStore';
 import { removeModelsFromRelationships } from '@features/models/data/relationshipsStore';
+import { refreshStartersIfLoaded } from '@features/models/data/startersStore';
 import { useScopedAction } from '@features/models/ui/shared/useScopedAction';
 import { pruneModelsUiKeys } from '@features/models/ui/uiStore';
 import { useNotify } from '@features/models/ui/useModelsNotify';
@@ -37,6 +38,8 @@ export const useModelActions = () => {
           removeModelsFromStore([model.key]);
           removeModelsFromRelationships([model.key]);
           pruneModelsUiKeys([model.key]);
+          // A deleted starter must lose its "Installed" badge in Add Models.
+          refreshStartersIfLoaded();
           notify.success(t('models.modelDeleted'), model.name);
         },
         (message) => notify.error(t('models.deleteFailed'), message)
