@@ -3,9 +3,9 @@ import type { NodePackInfo } from '@features/nodes/core/catalog';
 
 import { Badge, Box, Flex, HStack, Icon, Spinner, Stack, Text } from '@chakra-ui/react';
 import { isProblemPack } from '@features/nodes/core/library';
-import { useNodePackActions } from '@features/nodes/ui/shared/useNodePackActions';
+import { UninstallPackDialog } from '@features/nodes/ui/shared/UninstallPackDialog';
 import { ensureInvocationTemplatesLoaded, useInvocationTemplatesSelector } from '@features/workflow/react';
-import { Button, ConfirmDialog } from '@platform/ui';
+import { Button } from '@platform/ui';
 import { EmptyState } from '@platform/ui/EmptyState';
 import { BlocksIcon, TriangleAlertIcon, Trash2Icon } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -99,40 +99,18 @@ export const NodePackDetail = ({ onUninstalled, pack }: { onUninstalled: () => v
 
 const UninstallButton = ({ onUninstalled, pack }: { onUninstalled: () => void; pack: NodePackInfo }) => {
   const { t } = useTranslation();
-  const { uninstall } = useNodePackActions();
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  const [isUninstalling, setIsUninstalling] = useState(false);
-
-  const handleUninstall = async () => {
-    setIsUninstalling(true);
-
-    try {
-      await uninstall(pack, onUninstalled);
-    } finally {
-      setIsUninstalling(false);
-    }
-  };
 
   return (
     <>
-      <Button
-        colorPalette="red"
-        flexShrink={0}
-        loading={isUninstalling}
-        size="xs"
-        variant="outline"
-        onClick={() => setIsConfirmOpen(true)}
-      >
+      <Button colorPalette="red" flexShrink={0} size="xs" variant="outline" onClick={() => setIsConfirmOpen(true)}>
         <Icon as={Trash2Icon} boxSize="3" />
         {t('nodes.uninstall')}
       </Button>
-      <ConfirmDialog
-        body={t('nodes.uninstallBody')}
-        confirmLabel={t('nodes.uninstallPack')}
-        isOpen={isConfirmOpen}
-        title={t('nodes.uninstallTitle', { name: pack.name })}
+      <UninstallPackDialog
+        pack={isConfirmOpen ? pack : null}
         onClose={() => setIsConfirmOpen(false)}
-        onConfirm={handleUninstall}
+        onUninstalled={onUninstalled}
       />
     </>
   );

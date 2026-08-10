@@ -65,3 +65,23 @@ describe('custom node data adapter', () => {
     });
   });
 });
+
+describe('getPackWorkflowCount', () => {
+  it('queries the pack tag and extracts its count', async () => {
+    adapter.requestJson.mockResolvedValue({ 'node-pack:my-pack': 3 });
+    const { getPackWorkflowCount } = await import('./api');
+    const controller = new AbortController();
+
+    await expect(getPackWorkflowCount('my-pack', controller.signal)).resolves.toBe(3);
+    expect(adapter.requestJson).toHaveBeenCalledWith('/api/v1/workflows/counts_by_tag?tags=node-pack%3Amy-pack', {
+      signal: controller.signal,
+    });
+  });
+
+  it('returns zero when the tag is absent from the response', async () => {
+    adapter.requestJson.mockResolvedValue({});
+    const { getPackWorkflowCount } = await import('./api');
+
+    await expect(getPackWorkflowCount('my-pack')).resolves.toBe(0);
+  });
+});

@@ -41,3 +41,20 @@ export const uninstallCustomNodePack = (packName: string, signal?: AbortSignal):
 /** The body's status is prose (e.g. "No custom nodes directory found.") — callers must not assume success. */
 export const reloadCustomNodes = (signal?: AbortSignal): Promise<{ status: string }> =>
   requestJson<{ status: string }>(`${CUSTOM_NODES_BASE}/reload`, { method: 'POST', signal });
+
+/**
+ * Workflows imported by a pack, counted by its `node-pack:<name>` tag. A
+ * best-effort number for the uninstall confirmation: uninstall deletes by the
+ * manifest-recorded IDs, while this counts by tag, so retagged workflows can
+ * make the two diverge slightly. (Calling the workflows router from here
+ * follows the models feature's relationshipsApi precedent.)
+ */
+export const getPackWorkflowCount = async (packName: string, signal?: AbortSignal): Promise<number> => {
+  const tag = `node-pack:${packName}`;
+  const counts = await requestJson<Record<string, number>>(
+    `/api/v1/workflows/counts_by_tag?tags=${encodeURIComponent(tag)}`,
+    { signal }
+  );
+
+  return counts[tag] ?? 0;
+};

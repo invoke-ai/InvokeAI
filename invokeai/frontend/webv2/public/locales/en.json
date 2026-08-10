@@ -1238,8 +1238,14 @@
     "tryDifferentSearch": "Try a different search.",
     "uninstall": "Uninstall",
     "uninstallBody": "Remove this pack from the custom nodes directory? A restart is required for removal to fully apply.",
+    "uninstallBodyWithWorkflows_one": "Remove this pack from the custom nodes directory? {{count}} workflow imported by this pack will also be deleted. A restart is required for removal to fully apply.",
+    "uninstallBodyWithWorkflows_other": "Remove this pack from the custom nodes directory? {{count}} workflows imported by this pack will also be deleted. A restart is required for removal to fully apply.",
+    "uninstallFailed": "Uninstall failed",
     "uninstallPack": "Uninstall Node Pack",
     "uninstallTitle": "Uninstall {{name}}?",
+    "uninstalledDescription": "Restart InvokeAI for node removal to take full effect.",
+    "uninstalledTitle": "Node pack uninstalled",
+    "couldNotUninstall": "Could not uninstall the node pack.",
     "uninstalled": "Uninstalled"
   },
   "launchpad": {
