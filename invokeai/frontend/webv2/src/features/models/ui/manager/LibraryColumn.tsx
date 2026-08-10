@@ -1,6 +1,6 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import { Box, Flex, HStack, Icon, Separator, Text } from '@chakra-ui/react';
-import { collectBases, collectTypes } from '@features/models/core/library';
+import { collectBases, collectTypes, filterModels } from '@features/models/core/library';
 import { bulkDeleteModels } from '@features/models/data/api';
 import { refreshModels, removeModelsFromStore, useModelsSelector } from '@features/models/data/modelsStore';
 import { removeModelsFromRelationships } from '@features/models/data/relationshipsStore';
@@ -30,7 +30,8 @@ export const LibraryColumn = () => {
   const { t } = useTranslation();
   const notify = useNotify();
   const models = useModelsSelector((snapshot) => snapshot.models);
-  const missingCount = useModelsSelector((snapshot) => snapshot.missingModelKeys.size);
+  const missingModelKeys = useModelsSelector((snapshot) => snapshot.missingModelKeys);
+  const missingCount = missingModelKeys.size;
   const { activeModelKey, filters, selectedKeys } = useModelsUiSelector(
     (snapshot) => ({
       activeModelKey: snapshot.activeModelKey,
@@ -47,6 +48,21 @@ export const LibraryColumn = () => {
 
   const availableTypes = useMemo(() => collectTypes(models), [models]);
   const availableBases = useMemo(() => collectBases(models), [models]);
+  // The same filter logic the list renders with, so "Select all" matches
+  // exactly what the user sees (search, type/base, missing-only).
+  const filteredKeys = useMemo(
+    () => filterModels(models, filters, missingModelKeys).map((model) => model.key),
+    [filters, missingModelKeys, models]
+  );
+  const hasUnselectedFiltered = useMemo(
+    () => filteredKeys.some((key) => !selectedKeys.has(key)),
+    [filteredKeys, selectedKeys]
+  );
+  const handleSelectAllFiltered = useCallback(() => {
+    // Union: selections made under a previous filter survive, so the delete
+    // confirm always shows the true total.
+    updateModelsUi({ selectedKeys: new Set([...selectedKeys, ...filteredKeys]) });
+  }, [filteredKeys, selectedKeys]);
   const handleActivate = useCallback((modelKey: string) => openModelDetail(modelKey), []);
   const handleToggleSelected = useCallback((modelKey: string) => toggleModelSelection(modelKey), []);
 
@@ -148,6 +164,11 @@ export const LibraryColumn = () => {
             {t('models.selectedCount', { count: selectedKeys.size })}
           </Text>
           <Separator borderColor="border.subtle" h="5" orientation="vertical" />
+          {hasUnselectedFiltered ? (
+            <Button size="2xs" variant="ghost" onClick={handleSelectAllFiltered}>
+              {t('models.selectAllCount', { count: filteredKeys.length })}
+            </Button>
+          ) : null}
           <Button colorPalette="red" size="2xs" variant="solid" onClick={() => setIsBulkDeleteOpen(true)}>
             <Icon as={Trash2Icon} boxSize="3" />
             {t('common.delete')}
