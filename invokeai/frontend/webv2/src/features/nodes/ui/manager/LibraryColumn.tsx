@@ -1,11 +1,12 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
-import { Box, Flex, HStack, Text } from '@chakra-ui/react';
+import { Flex, HStack, Text } from '@chakra-ui/react';
 import { useCustomNodesSelector } from '@features/nodes/data/nodesStore';
 import { NodePackList } from '@features/nodes/ui/library/NodePackList';
 import { openNodePackDetail, updateNodesUi, useNodesUiSelector } from '@features/nodes/ui/nodesUiStore';
 import { useTranslation } from 'react-i18next';
 
 import { HEADER_MIN_HEIGHT, PACK_LIBRARY_WIDTH } from './layoutConstants';
+import { NodesMaintenanceMenu } from './NodesMaintenanceMenu';
 import { ReloadNodesButton } from './ReloadNodesButton';
 
 /** Persistent custom-node pack list, matching the model manager's library column. */
@@ -34,9 +35,10 @@ export const LibraryColumn = () => {
         <Text color="fg.muted" fontSize="xs">
           {nodePacks.length}
         </Text>
-        <Box ms="auto">
+        <HStack gap="0.5" ms="auto">
           <ReloadNodesButton />
-        </Box>
+          <NodesMaintenanceMenu />
+        </HStack>
       </HStack>
 
       <NodePackList
