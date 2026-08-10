@@ -3,9 +3,10 @@ import type { NodePackInfo } from '@features/nodes/core/catalog';
 
 import { Badge, Flex, Icon, Input, InputGroup, Spinner, Stack, Text } from '@chakra-ui/react';
 import { refreshCustomNodePacks } from '@features/nodes/data/nodesStore';
+import { openNodesManagerTab } from '@features/nodes/ui/nodesUiStore';
 import { Button, Row, Scrollable } from '@platform/ui';
 import { EmptyState } from '@platform/ui/EmptyState';
-import { BlocksIcon, PackageOpenIcon, SearchIcon, TriangleAlertIcon } from 'lucide-react';
+import { ArrowRightIcon, BlocksIcon, PackageOpenIcon, SearchIcon, TriangleAlertIcon } from 'lucide-react';
 import { useDeferredValue, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -87,13 +88,23 @@ export const NodePackList = ({
             description={t('nodes.noPacksDescription')}
             icon={<Icon as={PackageOpenIcon} />}
             title={t('nodes.noPacks')}
-          />
+          >
+            <Button size="sm" onClick={() => openNodesManagerTab('add')}>
+              {t('nodes.addNodes')}
+              <Icon as={ArrowRightIcon} />
+            </Button>
+          </EmptyState>
         ) : filtered.length === 0 ? (
           <EmptyState
             description={t('nodes.tryDifferentSearch')}
             icon={<Icon as={SearchIcon} />}
             title={t('nodes.noPacksMatch')}
-          />
+          >
+            <Button size="sm" variant="outline" onClick={() => openNodesManagerTab('add')}>
+              {t('nodes.addNodes')}
+              <Icon as={ArrowRightIcon} />
+            </Button>
+          </EmptyState>
         ) : (
           <Stack gap="1" minW="0" p="1" px="3" w="full">
             {filtered.map((pack) => (

@@ -80,6 +80,10 @@ export const ensureCustomNodePacksLoaded = (): Promise<void> => {
 
 export const getCustomNodesSnapshot = (): CustomNodesSnapshot => store.getSnapshot();
 
+export const setCustomNodesSnapshotForTests = (next: Partial<CustomNodesSnapshot>): void => {
+  store.patchSnapshot(next);
+};
+
 export const removeCustomNodePackFromStore = (packName: string): void => {
   store.patchSnapshot({ nodePacks: store.getSnapshot().nodePacks.filter((pack) => pack.name !== packName) });
 };
