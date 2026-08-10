@@ -199,3 +199,39 @@ describe('collect helpers', () => {
     ).toEqual(['sd-1', 'flux', 'external', 'unknown']);
   });
 });
+
+describe('sort fields', () => {
+  it('sorts by path with direction applied', () => {
+    const pathModels = [
+      createModel({ key: 'p1', path: '/models/zeta.safetensors' }),
+      createModel({ key: 'p2', path: '/loras/alpha.safetensors' }),
+      createModel({ key: 'p3', path: '/models/beta.safetensors' }),
+    ];
+
+    const asc = filterModels(
+      pathModels,
+      { ...DEFAULT_LIBRARY_FILTERS, sortDirection: 'asc', sortField: 'path' },
+      NO_MISSING
+    ).map((m) => m.key);
+
+    expect(asc).toEqual(['p2', 'p3', 'p1']);
+
+    const desc = filterModels(
+      pathModels,
+      { ...DEFAULT_LIBRARY_FILTERS, sortDirection: 'desc', sortField: 'path' },
+      NO_MISSING
+    ).map((m) => m.key);
+
+    expect(desc).toEqual(['p1', 'p3', 'p2']);
+  });
+
+  it('sorts by type in category-rank order, then name', () => {
+    const sorted = filterModels(
+      library,
+      { ...DEFAULT_LIBRARY_FILTERS, sortDirection: 'asc', sortField: 'type' },
+      NO_MISSING
+    ).map((m) => m.type);
+
+    expect(sorted).toEqual(['main', 'main', 'lora', 'vae']);
+  });
+});

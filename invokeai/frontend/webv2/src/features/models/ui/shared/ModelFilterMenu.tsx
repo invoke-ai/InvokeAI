@@ -21,8 +21,10 @@ export const SORT_FIELD_OPTIONS: readonly ModelFilterSortOption[] = [
   { field: 'default', labelKey: 'models.sort.default' },
   { field: 'name', labelKey: 'models.sort.name' },
   { field: 'base', labelKey: 'models.sort.base' },
+  { field: 'type', labelKey: 'models.sort.type' },
   { field: 'size', labelKey: 'models.sort.size' },
   { field: 'format', labelKey: 'models.sort.format' },
+  { field: 'path', labelKey: 'models.sort.path' },
 ];
 
 /**

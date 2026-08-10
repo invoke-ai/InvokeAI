@@ -42,10 +42,14 @@ type ModelIdentityModel = Pick<
   | 'file_size'
   | 'format'
   | 'hash'
+  | 'image_encoder_model_id'
   | 'key'
   | 'name'
   | 'path'
   | 'prediction_type'
+  | 'provider_id'
+  | 'provider_model_id'
+  | 'repo_variant'
   | 'source'
   | 'source_url'
   | 'type'
@@ -73,10 +77,14 @@ const selectModelIdentity = (models: readonly ModelConfig[], modelKey: string): 
         file_size: model.file_size,
         format: model.format,
         hash: model.hash,
+        image_encoder_model_id: model.image_encoder_model_id,
         key: model.key,
         name: model.name,
         path: model.path,
         prediction_type: model.prediction_type,
+        provider_id: model.provider_id,
+        provider_model_id: model.provider_model_id,
+        repo_variant: model.repo_variant,
         source: model.source,
         source_url: model.source_url,
         type: model.type,
@@ -456,6 +464,18 @@ const ModelAttributes = ({ isMissing, model }: { isMissing: boolean; model: Mode
       value: fullPath,
     },
     { label: t('models.source'), value: model.source },
+    // Format-specific attrs; truthiness also skips repo_variant's '' default.
+    ...(model.format === 'diffusers' && model.repo_variant
+      ? [{ label: t('models.repoVariant'), value: model.repo_variant }]
+      : []),
+    ...(model.format === 'checkpoint' && model.config_path
+      ? [{ label: t('models.configPath'), value: model.config_path }]
+      : []),
+    ...(model.image_encoder_model_id
+      ? [{ label: t('models.imageEncoderModelId'), value: model.image_encoder_model_id }]
+      : []),
+    ...(model.provider_id ? [{ label: t('models.providerId'), value: model.provider_id }] : []),
+    ...(model.provider_model_id ? [{ label: t('models.providerModelId'), value: model.provider_model_id }] : []),
   ];
 
   return (

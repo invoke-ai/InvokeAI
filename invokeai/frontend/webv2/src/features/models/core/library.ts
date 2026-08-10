@@ -8,7 +8,7 @@ import { getModelCategoryRank, getModelTypePluralLabel } from './taxonomy';
  * the list views stay thin and this logic is unit-testable.
  */
 
-export type ModelSortField = 'default' | 'name' | 'base' | 'size' | 'format';
+export type ModelSortField = 'default' | 'name' | 'base' | 'size' | 'format' | 'type' | 'path';
 
 export interface ModelLibraryFilters {
   searchTerm: string;
@@ -93,6 +93,13 @@ const compareBySortField = (a: ModelConfig, b: ModelConfig, field: ModelSortFiel
       return a.file_size - b.file_size;
     case 'format':
       return String(a.format).localeCompare(String(b.format));
+    case 'type':
+      return (
+        getModelCategoryRank(a.type) - getModelCategoryRank(b.type) ||
+        a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+      );
+    case 'path':
+      return a.path.localeCompare(b.path);
   }
 };
 

@@ -138,6 +138,13 @@ export interface ModelConfig {
   trigger_phrases?: string[] | null;
   default_settings?: AnyModelDefaultSettings | null;
   submodels?: Record<string, unknown> | null;
+  /** Diffusers-format repos: precision sub-folder variant; '' = default. */
+  repo_variant?: string | null;
+  /** InvokeAI-format IP adapters: the paired image encoder's model id. */
+  image_encoder_model_id?: string;
+  /** External API models. */
+  provider_id?: string;
+  provider_model_id?: string;
   [key: string]: unknown;
 }
 
