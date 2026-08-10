@@ -16,6 +16,7 @@ import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SiHuggingface } from 'react-icons/si';
 
+import { CpuOnlySetting, supportsCpuOnlySetting } from './CpuOnlySetting';
 import { supportsDefaultSettings, type DefaultSettingsModel } from './defaultSettingsFields';
 import { DefaultSettingsSection } from './DefaultSettingsSection';
 import { MissingFileBadge, ModelBaseBadge, ModelFormatBadge } from './ModelBadges';
@@ -26,14 +27,13 @@ import { RelatedModelsSection } from './RelatedModelsSection';
 import { MemoizedTriggerPhrasesEditor } from './TriggerPhrasesEditor';
 import { UpdatePathDialog } from './UpdatePathDialog';
 import { useModelActions } from './useModelActions';
-import { supportsVaeCpuOnlySetting, VaeCpuOnlySetting } from './VaeCpuOnlySetting';
 
 const TRIGGER_PHRASE_TYPES = new Set(['main', 'lora', 'embedding']);
 const EMPTY_TRIGGER_PHRASES: readonly string[] = [];
 
 type ModelDetailShellModel = Pick<ModelConfig, 'key' | 'type'>;
 type TriggerPhrasesModel = Pick<ModelConfig, 'key' | 'trigger_phrases'>;
-type VaeCpuOnlyModel = Pick<ModelConfig, 'cpu_only' | 'key' | 'name' | 'type'>;
+type CpuOnlyModel = Pick<ModelConfig, 'cpu_only' | 'key' | 'name' | 'type'>;
 type ModelIdentityModel = Pick<
   ModelConfig,
   | 'base'
@@ -109,7 +109,7 @@ const selectTriggerPhrasesModel = (models: readonly ModelConfig[], modelKey: str
   return model ? { key: model.key, trigger_phrases: model.trigger_phrases } : null;
 };
 
-const selectVaeCpuOnlyModel = (models: readonly ModelConfig[], modelKey: string): VaeCpuOnlyModel | null => {
+const selectCpuOnlyModel = (models: readonly ModelConfig[], modelKey: string): CpuOnlyModel | null => {
   const model = findModel(models, modelKey);
 
   return model ? { cpu_only: model.cpu_only, key: model.key, name: model.name, type: model.type } : null;
@@ -142,10 +142,10 @@ export const ModelDetail = ({ modelKey, onDeleted }: { modelKey: string; onDelet
     <Stack gap="4" pb="4">
       <ModelIdentitySectionContainer modelKey={model.key} onDeleted={onDeleted} />
 
-      {supportsVaeCpuOnlySetting(model) ? (
+      {supportsCpuOnlySetting(model) ? (
         <>
           <Separator borderColor="border.subtle" />
-          <VaeCpuOnlySettingContainer modelKey={model.key} />
+          <CpuOnlySettingContainer modelKey={model.key} />
         </>
       ) : null}
 
@@ -371,20 +371,20 @@ const DefaultSettingsSectionContainer = memo(function DefaultSettingsSectionCont
   );
 });
 
-const VaeCpuOnlySettingContainer = memo(function VaeCpuOnlySettingContainer({ modelKey }: { modelKey: string }) {
+const CpuOnlySettingContainer = memo(function CpuOnlySettingContainer({ modelKey }: { modelKey: string }) {
   const notify = useNotify();
   const { t } = useTranslation();
-  const model = useModelsSelector((snapshot) => selectVaeCpuOnlyModel(snapshot.models, modelKey));
+  const model = useModelsSelector((snapshot) => selectCpuOnlyModel(snapshot.models, modelKey));
 
-  if (!model || !supportsVaeCpuOnlySetting(model)) {
+  if (!model || !supportsCpuOnlySetting(model)) {
     return null;
   }
 
   return (
-    <VaeCpuOnlySetting
+    <CpuOnlySetting
       model={model}
-      onError={(message) => notify.error(t('models.failedToSaveVaeCpuSetting'), message)}
-      onSaved={() => notify.success(t('models.vaeCpuSettingSaved'), model.name)}
+      onError={(message) => notify.error(t('models.failedToSaveCpuSetting'), message)}
+      onSaved={() => notify.success(t('models.cpuSettingSaved'), model.name)}
     />
   );
 });
