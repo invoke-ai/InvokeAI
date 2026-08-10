@@ -92,6 +92,24 @@ export const EDITABLE_MODEL_FORMATS: readonly string[] = Object.keys(FORMAT_LABE
   (format) => format !== 'unknown' && format !== 'external_api'
 );
 
+/**
+ * External page for a model's install source: the URL itself, or the
+ * HuggingFace page for a repo-id source. Null for local paths and anything
+ * else that has no linkable home.
+ */
+export const getModelSourceHref = (source: string, sourceType: string): string | null => {
+  if (source.startsWith('https://') || source.startsWith('http://')) {
+    return source;
+  }
+
+  if (sourceType === 'hf_repo_id') {
+    // Strip the :variant[:path] qualifiers an install source may carry.
+    return `https://huggingface.co/${source.split(':')[0]}`;
+  }
+
+  return null;
+};
+
 /** Long display names for every known variant value. */
 export const MODEL_VARIANT_LABELS: Record<string, string> = {
   '5b': 'Wan 2.2 5B LoRA',

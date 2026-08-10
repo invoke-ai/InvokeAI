@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   EDITABLE_MODEL_FORMATS,
+  getModelSourceHref,
   formatBytes,
   getModelFormatLabel,
   getModelTypeLabel,
@@ -74,5 +75,23 @@ describe('variant options', () => {
     expect(EDITABLE_MODEL_FORMATS).not.toContain('external_api');
     expect(EDITABLE_MODEL_FORMATS).toContain('checkpoint');
     expect(EDITABLE_MODEL_FORMATS).toContain('diffusers');
+  });
+});
+
+describe('getModelSourceHref', () => {
+  it('links http(s) sources directly and repo ids to their HuggingFace page', () => {
+    expect(getModelSourceHref('https://civitai.com/api/download/models/1', 'url')).toBe(
+      'https://civitai.com/api/download/models/1'
+    );
+    expect(getModelSourceHref('owner/repo', 'hf_repo_id')).toBe('https://huggingface.co/owner/repo');
+    expect(getModelSourceHref('owner/repo:fp16:path/x.safetensors', 'hf_repo_id')).toBe(
+      'https://huggingface.co/owner/repo'
+    );
+  });
+
+  it('returns null for local paths and unlinkable sources', () => {
+    expect(getModelSourceHref('/models/x.safetensors', 'path')).toBeNull();
+    expect(getModelSourceHref('C:\\models\\x.safetensors', 'path')).toBeNull();
+    expect(getModelSourceHref('some-name', 'unknown')).toBeNull();
   });
 });

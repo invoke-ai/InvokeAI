@@ -2,16 +2,16 @@
 import type { ModelConfig } from '@features/models/core/types';
 import type { ReactNode } from 'react';
 
-import { DataList, HStack, Icon, Menu, Portal, Separator, Stack, Text } from '@chakra-ui/react';
+import { chakra, DataList, HStack, Icon, Menu, Portal, Separator, Stack, Text } from '@chakra-ui/react';
 import { isConvertibleToDiffusers } from '@features/models/core/baseIdentity';
 import { isLinkableType } from '@features/models/core/relationships';
 import { isAbsoluteModelPath, resolveModelAbsolutePath } from '@features/models/core/schemas';
-import { formatBytes } from '@features/models/core/taxonomy';
+import { formatBytes, getModelSourceHref } from '@features/models/core/taxonomy';
 import { useModelsSelector } from '@features/models/data/modelsStore';
 import { useNotify } from '@features/models/ui/useModelsNotify';
 import { areArraysEqual } from '@platform/state/selectors';
 import { Button, IconButton, ConfirmDialog, MenuContent } from '@platform/ui';
-import { MoreHorizontalIcon, PencilIcon, RefreshCcwIcon, Trash2Icon } from 'lucide-react';
+import { ExternalLinkIcon, MoreHorizontalIcon, PencilIcon, RefreshCcwIcon, Trash2Icon } from 'lucide-react';
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SiHuggingface } from 'react-icons/si';
@@ -52,6 +52,7 @@ type ModelIdentityModel = Pick<
   | 'provider_model_id'
   | 'repo_variant'
   | 'source'
+  | 'source_type'
   | 'source_url'
   | 'type'
   | 'variant'
@@ -87,6 +88,7 @@ const selectModelIdentity = (models: readonly ModelConfig[], modelKey: string): 
         provider_model_id: model.provider_model_id,
         repo_variant: model.repo_variant,
         source: model.source,
+        source_type: model.source_type,
         source_url: model.source_url,
         type: model.type,
         variant: model.variant,
@@ -445,7 +447,7 @@ const ModelAttributes = ({ isMissing, model }: { isMissing: boolean; model: Mode
   // a missing model gets the affordance too — that is exactly when it helps.
   const canUpdatePath = isAbsoluteModelPath(model.path) || isMissing;
 
-  const attributes: { action?: ReactNode; label: string; value: string }[] = [
+  const attributes: { action?: ReactNode; href?: string; label: string; value: string }[] = [
     { label: t('models.fileSize'), value: formatBytes(model.file_size) },
     { label: t('models.variant'), value: model.variant ?? '—' },
     { label: t('models.predictionType'), value: model.prediction_type ?? '—' },
@@ -464,7 +466,23 @@ const ModelAttributes = ({ isMissing, model }: { isMissing: boolean; model: Mode
       label: t('models.path'),
       value: fullPath,
     },
-    { label: t('models.source'), value: model.source },
+    {
+      href: getModelSourceHref(model.source, model.source_type) ?? undefined,
+      label: t('models.source'),
+      value: model.source,
+    },
+    // The user-editable page link (e.g. a Civitai listing); only visible in
+    // the edit form until now. Old records may predate the http(s)
+    // validation, so unlinkable values still render as text.
+    ...(model.source_url
+      ? [
+          {
+            href: model.source_url.startsWith('http') ? model.source_url : undefined,
+            label: t('models.sourceUrl'),
+            value: model.source_url,
+          },
+        ]
+      : []),
     // Format-specific attrs; truthiness also skips repo_variant's '' default.
     ...(model.format === 'diffusers' && model.repo_variant
       ? [{ label: t('models.repoVariant'), value: model.repo_variant }]
@@ -488,7 +506,24 @@ const ModelAttributes = ({ isMissing, model }: { isMissing: boolean; model: Mode
               {attribute.label}
             </DataList.ItemLabel>
             <DataList.ItemValue alignItems="center" display="flex" fontSize="2xs" gap="1" overflowWrap="anywhere">
-              {attribute.value}
+              {attribute.href ? (
+                <chakra.a
+                  alignItems="center"
+                  display="inline-flex"
+                  gap="1"
+                  href={attribute.href}
+                  minW="0"
+                  rel="noreferrer"
+                  target="_blank"
+                  wordBreak="break-all"
+                  _hover={{ textDecoration: 'underline' }}
+                >
+                  {attribute.value}
+                  <Icon as={ExternalLinkIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
+                </chakra.a>
+              ) : (
+                attribute.value
+              )}
               {attribute.action ?? null}
             </DataList.ItemValue>
           </DataList.Item>
