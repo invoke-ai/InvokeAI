@@ -140,8 +140,6 @@ export const getModelBaseLongLabel = (base: ModelBase): string => {
 
 export const getModelBaseColorPalette = (base: ModelBase): ModelBaseColorPalette => getModelBaseInfo(base).colorPalette;
 
-export const isKnownModelBase = (base: ModelBase): base is KnownModelBase => base in MODEL_BASES;
-
 export const isConvertibleToDiffusers = (model: Pick<ModelConfig, 'base' | 'format' | 'type'>): boolean =>
   model.format === 'checkpoint' &&
   model.type === 'main' &&

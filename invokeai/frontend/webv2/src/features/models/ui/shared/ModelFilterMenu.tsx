@@ -44,7 +44,6 @@ export const ModelFilterMenu = <Field extends ModelSortField>({
   sortField,
   sortFields,
   typeAllChecked,
-  typeAllLabel,
   typeFilter,
 }: {
   ariaLabel: string;
@@ -60,11 +59,9 @@ export const ModelFilterMenu = <Field extends ModelSortField>({
   sortField: Field;
   sortFields: readonly ModelFilterSortOption<Field>[];
   typeAllChecked?: boolean;
-  typeAllLabel?: string;
   typeFilter: ModelTaxonomyType | null;
 }) => {
   const { t } = useTranslation();
-  const resolvedTypeAllLabel = typeAllLabel ?? t('models.allModels');
   // Safe to widen: the menu only reports fields drawn from `sortFields`.
   const reportSort = onSortChange as (field: ModelSortField, direction: 'asc' | 'desc') => void;
 
@@ -84,7 +81,7 @@ export const ModelFilterMenu = <Field extends ModelSortField>({
               </Menu.ItemGroupLabel>
               <AllTypesFilterMenuItem
                 isChecked={typeAllChecked ?? typeFilter === null}
-                label={resolvedTypeAllLabel}
+                label={t('models.allModels')}
                 onTypeFilterChange={onTypeFilterChange}
               />
               {extraTypeItems}

@@ -47,7 +47,6 @@ export interface ModelPickerOptions {
   modelTypes: readonly ModelTaxonomyType[];
   /** Models linked to the current selection, floated to the top of their group. */
   relatedKeys?: ReadonlySet<string>;
-  searchTerm: string;
 }
 
 /**
@@ -64,7 +63,7 @@ export interface ModelPickerGroup {
 export interface ModelPickerResult {
   /** Distinct bases among candidates (pre-search, pre-base-filter), for chips. */
   availableBases: string[];
-  /** Models available before text search, used for empty-state copy. */
+  /** Models available before the base filter (text search is the Picker's own concern), used for empty-state copy. */
   candidates: ModelConfig[];
   groups: ModelPickerGroup[];
 }
@@ -135,19 +134,7 @@ export const groupModelsByType = (models: ModelConfig[]): ModelGroup[] => {
     .map(([type, groupModels]) => ({ label: getModelTypePluralLabel(type), models: groupModels, type }));
 };
 
-const matchesPickerSearch = (model: ModelConfig, searchTerm: string): boolean => {
-  const terms = searchTerm.trim().toLowerCase().split(/\s+/).filter(Boolean);
-
-  if (terms.length === 0) {
-    return true;
-  }
-
-  const haystack = `${model.name} ${model.base} ${model.type}`.toLowerCase();
-
-  return terms.every((term) => haystack.includes(term));
-};
-
-/** Candidate, search, sort, and grouping rules shared by every model picker instance. */
+/** Candidate, sort, and grouping rules shared by every model picker instance. */
 export const getModelPickerGroups = (models: ModelConfig[], options: ModelPickerOptions): ModelPickerResult => {
   const allowedTypes = new Set(options.modelTypes);
   const candidates = models.filter(
@@ -156,19 +143,15 @@ export const getModelPickerGroups = (models: ModelConfig[], options: ModelPicker
       !options.excludeKeys?.has(model.key) &&
       (options.filter ? options.filter(model) : true)
   );
-  // Chips are derived from candidates — before text search and the base filter —
-  // so the chip row stays stable while the user types or toggles chips.
+  // Chips are derived from candidates — before the base filter — so the chip
+  // row stays stable while the user toggles chips.
   const availableBases = collectBasesForDisplay(candidates);
   const { baseFilter } = options;
   const { relatedKeys } = options;
   // Bases order the groups; within a group, related models lead, then category
   // rank keeps main models above LoRAs in a cross-type picker, then name.
   const visibleModels = candidates
-    .filter(
-      (model) =>
-        matchesPickerSearch(model, options.searchTerm) &&
-        (!baseFilter || baseFilter.size === 0 || baseFilter.has(String(model.base)))
-    )
+    .filter((model) => !baseFilter || baseFilter.size === 0 || baseFilter.has(String(model.base)))
     .sort(
       (a, b) =>
         getBaseDisplayRank(String(a.base)) - getBaseDisplayRank(String(b.base)) ||

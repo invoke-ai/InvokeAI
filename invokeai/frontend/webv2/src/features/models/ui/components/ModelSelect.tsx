@@ -149,7 +149,6 @@ export const ModelSelect = ({
             filter,
             modelTypes,
             relatedKeys,
-            searchTerm: '',
           })
         : { availableBases: [], candidates: [], groups: [] },
     [excludeKeys, filter, isOpen, modelTypes, models, relatedKeys, selectedBases]

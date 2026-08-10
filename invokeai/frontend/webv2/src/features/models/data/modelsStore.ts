@@ -149,5 +149,3 @@ export const setModelsSnapshotForTests = (next: Partial<ModelsSnapshot>): void =
 };
 
 export const useModelsSelector = store.useSelector;
-
-export const useModelsSnapshot = (): ModelsSnapshot => store.useSnapshot();

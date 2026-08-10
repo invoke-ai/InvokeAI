@@ -142,9 +142,6 @@ export const setPickerCompactView = (pickerId: string, isCompact: boolean): void
   updateModelsUi({ pickerCompactViews: { ...snapshot.pickerCompactViews, [pickerId]: isCompact } });
 };
 
-export const getPickerCompactView = (pickerId: string): boolean =>
-  store.getSnapshot().pickerCompactViews[pickerId] ?? false;
-
 export const getModelsUiSnapshotForTests = (): ModelsUiSnapshot => store.getSnapshot();
 
 export const useModelsUiSelector = store.useSelector;

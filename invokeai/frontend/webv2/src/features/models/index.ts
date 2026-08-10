@@ -13,7 +13,6 @@ export {
   refreshModels,
   subscribeModels,
   useModelsSelector,
-  useModelsSnapshot,
   type ModelsSnapshot,
 } from './data/modelsStore';
 export {

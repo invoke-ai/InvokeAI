@@ -932,7 +932,6 @@
     "huggingFaceRejectedToken": "HuggingFace rejected this token. Check that it has read access.",
     "huggingFaceToken": "HuggingFace token",
     "install": "Install",
-    "installAll": "Install all",
     "installAllCount": "Install all ({{count}})",
     "installAllQueued": "Installs queued",
     "installAllQueuedDescription_one": "{{count}} install queued.",
