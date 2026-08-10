@@ -45,25 +45,32 @@ def has_net_prefix(state_dict: dict[Any, Any]) -> bool:
     return any(isinstance(k, str) and k.startswith(NET_PREFIX) for k in state_dict)
 
 
-def strip_net_prefix(state_dict: dict[Any, T]) -> dict[str, T]:
+def strip_net_prefix(state_dict: dict[Any, T]) -> dict[Any, T]:
     """Reduce a checkpoint to `PidNet`'s own key space.
 
     A checkpoint with no `net.` prefix is already in that space and is returned untouched — the
     distill-only filter is not applied there, because without the prefix there is no evidence this
     is a distill serialisation, and a stray `discriminator.*` key should reach the unexpected-key
     checks (identification's and the loader's) rather than be silently dropped.
+
+    That pass-through is why the result is not `dict[str, T]`. A `.pth` unpickles to whatever it
+    contains, so a bare checkpoint can hand back keys that are not strings, and they are kept on
+    purpose: `PidNet.load_state_dict` counts them as unexpected, so identification has to see them
+    too or it would accept a file the loader refuses. Callers must not assume the key type —
+    notably, sorting such a key set raises `TypeError`.
     """
     if not has_net_prefix(state_dict):
-        return state_dict  # type: ignore[return-value]
+        return state_dict
     return {nk: v for k, v in state_dict.items() if (nk := _normalized_key(k)) is not None}
 
 
-def pid_net_shapes(state_dict: dict[Any, Any]) -> dict[str, tuple[int, ...] | None]:
+def pid_net_shapes(state_dict: dict[Any, Any]) -> dict[Any, tuple[int, ...] | None]:
     """The checkpoint's keys as `PidNet` will see them, each mapped to its tensor's shape.
 
-    Mirrors :func:`strip_net_prefix` exactly. The value is None for anything carrying no ``.shape``:
-    a checkpoint is free to hold arbitrary objects, and one sitting under a PidNet parameter name is
-    malformed rather than grounds for an AttributeError mid-identification.
+    Mirrors :func:`strip_net_prefix` exactly, including its key type: a bare checkpoint's keys are
+    passed through as they are and need not all be strings. The value is None for anything carrying
+    no ``.shape``: a checkpoint is free to hold arbitrary objects, and one sitting under a PidNet
+    parameter name is malformed rather than grounds for an AttributeError mid-identification.
 
     Identification works from this rather than from the raw dict so that a weight is found by *name*
     and not by suffix. Suffix-matching the raw dict reads `net_ema.lq_proj.latent_proj.0.weight` as

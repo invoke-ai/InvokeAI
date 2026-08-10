@@ -63,7 +63,9 @@ _LATENT_CHANNELS_TO_BASES: dict[int, set[BaseModelType]] = {
 # v1.5 checkpoints use 1024 (plus PiT injection, scalar gates, etc.) and cannot be loaded into it.
 _SUPPORTED_LQ_HIDDEN_DIM = 512
 
-_Shapes = Mapping[str, tuple[int, ...] | None]
+# Keyed by `Any`, not `str`: a bare checkpoint reaches identification with its keys untouched, so a
+# `.pth` is free to supply keys that are not strings (see `strip_net_prefix`).
+_Shapes = Mapping[Any, tuple[int, ...] | None]
 
 
 def _raise_if_discriminator_malformed(shapes: _Shapes, contract: Mapping[str, tuple[int, ...]]) -> None:
@@ -146,13 +148,18 @@ def _raise_if_pid_net_contract_unmet(shapes: _Shapes, contract: Mapping[str, tup
     # No "this is a base PixDiT_T2I checkpoint" special case, unlike `load_pid_decoder`: those weights
     # carry no `lq_proj` key at all, so such a file never reaches here — `_looks_like_pid_decoder`
     # has already turned it away, and with a better message.
-    if missing := sorted(contract.keys() - shapes.keys()):
+    # Both sorts take `key=str`: a bare checkpoint's keys need not all be strings (see
+    # `strip_net_prefix`), and sorting a mixed set raises TypeError — which the factory answers with
+    # the `Unknown_Config` registration these checks exist to prevent, so the crash fails as a silent
+    # accept rather than loudly. Only `unexpected` can hold one today; sorting both the same way keeps
+    # that from depending on which set is on which side of the subtraction.
+    if missing := sorted(contract.keys() - shapes.keys(), key=str):
         raise InvalidMatchError(
             f"PiD checkpoint is missing {len(missing)} of the weights required by PidNet; the file is "
             f"incomplete and cannot be used as a PiD decoder: {missing[:5]}{_and_more(missing)}"
         )
 
-    if unexpected := sorted(shapes.keys() - contract.keys()):
+    if unexpected := sorted(shapes.keys() - contract.keys(), key=str):
         raise InvalidMatchError(
             f"PiD checkpoint has {len(unexpected)} keys PidNet does not expect, which `load_pid_decoder` "
             f"rejects too: {unexpected[:5]}{_and_more(unexpected)}"

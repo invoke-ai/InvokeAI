@@ -19,6 +19,7 @@ rather than fall through to the factory's `Unknown_Config` fallback — see
 
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -246,7 +247,7 @@ class TestPidNetContract:
                 PiDDecoder_Checkpoint_FLUX_Config.from_model_on_disk(mod, dict(_OVERRIDE_FIELDS))
 
 
-def _write_pid_checkpoint(root: Path, state_dict: dict[str, object]) -> Path:
+def _write_pid_checkpoint(root: Path, state_dict: dict[Any, object]) -> Path:
     """Write a state dict as a real `.pth`, the format NVIDIA ships, so the factory reaches it through
     the same pickle-scan-and-`torch.load` path a real download would."""
     path = root / "model_ema_bf16.pth"
@@ -307,6 +308,21 @@ class TestUnusableCheckpointIsNeverRegistered:
         sd[f"{_NET_PREFIX}{_LATENT_PROJ_KEY}"] = torch.zeros(512)
         return sd
 
+    def _bare_with_a_non_string_key(self) -> dict[Any, object]:
+        """A complete *bare* contract plus two keys PidNet does not expect, one of them not a string.
+
+        A bare checkpoint is passed through `strip_net_prefix` untouched, so a `.pth` can hand
+        identification whatever it was pickled with. Reporting the unexpected keys sorts them, and
+        sorting `{1, "not_a_pid_key"}` raises TypeError — which the factory catches as a generic
+        candidate failure and answers with the Unknown_Config registration this class is about. A
+        crash in an unusability check therefore does not fail loudly; it fails as a silent accept.
+        """
+        scalar = torch.zeros(())
+        sd: dict[Any, object] = {k: scalar.expand(shape) for k, shape in required_pid_net_shapes().items()}
+        sd[1] = torch.zeros(1)
+        sd["not_a_pid_key"] = torch.zeros(1)
+        return sd
+
     @pytest.mark.parametrize(
         ("case", "expected_reason"),
         [
@@ -316,6 +332,7 @@ class TestUnusableCheckpointIsNeverRegistered:
             ("_intact_v1_5", "lq_proj hidden dim 1024"),
             ("_unsupported_latent_channels", "32 latent channels"),
             ("_malformed_discriminator", "malformed lq_proj.latent_proj.0.weight"),
+            ("_bare_with_a_non_string_key", "2 keys PidNet does not expect"),
         ],
     )
     def test_factory_returns_no_config_even_with_allow_unknown(self, case: str, expected_reason: str) -> None:

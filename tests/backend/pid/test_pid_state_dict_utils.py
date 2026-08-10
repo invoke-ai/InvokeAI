@@ -41,6 +41,18 @@ class TestStripNetPrefix:
         # non-string keys, and neither consumer should raise on one.
         assert set(strip_net_prefix({"net.lq_proj.a": torch.zeros(1), 0: torch.zeros(1)})) == {"lq_proj.a"}
 
+    def test_a_bare_checkpoints_non_string_keys_survive(self) -> None:
+        """The other half of the pass-through, and the reason the result is not `dict[str, T]`.
+
+        A prefixed checkpoint has its non-string keys filtered out by the rename above; a bare one is
+        returned as-is, so callers get whatever the `.pth` was pickled with. That is deliberate —
+        `PidNet.load_state_dict` counts such a key as unexpected, so identification must see it too —
+        but it means a caller that sorts the key set has to tolerate mixed types.
+        """
+        sd = {"lq_proj.a": torch.zeros(1), 0: torch.zeros(1)}
+        assert set(strip_net_prefix(sd)) == {"lq_proj.a", 0}
+        assert set(pid_net_shapes(sd)) == {"lq_proj.a", 0}
+
 
 class TestPidNetShapes:
     def test_matches_strip_net_prefix_exactly(self) -> None:
