@@ -33,6 +33,7 @@ type VaeCpuOnlyModel = Pick<ModelConfig, 'cpu_only' | 'key' | 'name' | 'type'>;
 type ModelIdentityModel = Pick<
   ModelConfig,
   | 'base'
+  | 'config_path'
   | 'cover_image'
   | 'description'
   | 'file_size'
@@ -63,6 +64,7 @@ const selectModelIdentity = (models: readonly ModelConfig[], modelKey: string): 
   return model
     ? {
         base: model.base,
+        config_path: model.config_path,
         cover_image: model.cover_image,
         description: model.description,
         file_size: model.file_size,

@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatBytes, getModelFormatLabel, getModelTypeLabel } from './taxonomy';
+import {
+  EDITABLE_MODEL_FORMATS,
+  formatBytes,
+  getModelFormatLabel,
+  getModelTypeLabel,
+  getModelVariantLabel,
+  getVariantOptionsFor,
+} from './taxonomy';
 
 describe('formatBytes', () => {
   it('renders a dash for missing or invalid sizes', () => {
@@ -31,5 +38,41 @@ describe('label fallbacks', () => {
     expect(getModelTypeLabel('gemma2_encoder')).toBe('Gemma 2 Encoder');
     expect(getModelTypeLabel('pid_decoder')).toBe('PiD Decoder');
     expect(getModelFormatLabel('gguf_quantized')).toBe('GGUF');
+  });
+});
+
+describe('variant options', () => {
+  it('offers main-model variants keyed by base', () => {
+    expect(getVariantOptionsFor('sd-1', 'main')).toEqual(['normal', 'inpaint']);
+    expect(getVariantOptionsFor('sd-2', 'main')).toEqual(['normal', 'inpaint', 'depth']);
+    expect(getVariantOptionsFor('flux', 'main')).toEqual(['schnell', 'dev', 'dev_fill']);
+    expect(getVariantOptionsFor('wan', 'main')).toEqual(['t2v_a14b', 'i2v_a14b', 'ti2v_5b']);
+  });
+
+  it('distinguishes wan main and wan lora variants', () => {
+    expect(getVariantOptionsFor('wan', 'lora')).toEqual(['a14b', '5b']);
+    expect(getVariantOptionsFor('sdxl', 'lora')).toEqual([]);
+  });
+
+  it('offers per-type variants for encoder-style types regardless of base', () => {
+    expect(getVariantOptionsFor('any', 'clip_embed')).toEqual(['large', 'gigantic']);
+    expect(getVariantOptionsFor('flux2', 'qwen3_encoder')).toEqual(['qwen3_4b', 'qwen3_8b', 'qwen3_06b']);
+  });
+
+  it('returns empty for pairs with no variant concept, enabling free text', () => {
+    expect(getVariantOptionsFor('sdxl', 'vae')).toEqual([]);
+    expect(getVariantOptionsFor('unknown', 'main')).toEqual([]);
+  });
+
+  it('labels known variants and title-cases unknown ones', () => {
+    expect(getModelVariantLabel('dev_fill')).toBe('FLUX Dev - Fill');
+    expect(getModelVariantLabel('some_new_variant')).toBe('Some New Variant');
+  });
+
+  it('keeps unknown and external_api out of the assignable formats', () => {
+    expect(EDITABLE_MODEL_FORMATS).not.toContain('unknown');
+    expect(EDITABLE_MODEL_FORMATS).not.toContain('external_api');
+    expect(EDITABLE_MODEL_FORMATS).toContain('checkpoint');
+    expect(EDITABLE_MODEL_FORMATS).toContain('diffusers');
   });
 });

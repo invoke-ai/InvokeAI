@@ -4,7 +4,14 @@ import type { ModelConfig, PredictionType } from '@features/models/core/types';
 import { createListCollection, HStack, Input, Stack, Text, Textarea } from '@chakra-ui/react';
 import { getModelBaseLabel, KNOWN_MODEL_BASES } from '@features/models/core/baseIdentity';
 import { modelEditSchema, type ModelEditFormValues } from '@features/models/core/schemas';
-import { getModelTypeLabel, MODEL_CATEGORIES } from '@features/models/core/taxonomy';
+import {
+  EDITABLE_MODEL_FORMATS,
+  getModelFormatLabel,
+  getModelTypeLabel,
+  getModelVariantLabel,
+  getVariantOptionsFor,
+  MODEL_CATEGORIES,
+} from '@features/models/core/taxonomy';
 import { updateModel } from '@features/models/data/api';
 import { replaceModelInStore } from '@features/models/data/modelsStore';
 import { useZodForm } from '@platform/react/useZodForm';
@@ -28,7 +35,16 @@ const MODEL_TYPE_COLLECTION = createListCollection({
 /** Zod-validated editor for a model's identity fields. */
 type ModelEditTarget = Pick<
   ModelConfig,
-  'base' | 'description' | 'key' | 'name' | 'prediction_type' | 'source_url' | 'type' | 'variant'
+  | 'base'
+  | 'config_path'
+  | 'description'
+  | 'format'
+  | 'key'
+  | 'name'
+  | 'prediction_type'
+  | 'source_url'
+  | 'type'
+  | 'variant'
 >;
 
 export const ModelEditForm = ({
@@ -41,9 +57,14 @@ export const ModelEditForm = ({
   onSaved: () => void;
 }) => {
   const { t } = useTranslation();
+  // `config_path` only exists on checkpoint-style config classes; its absence
+  // (not emptiness) hides the field, since the PATCH would silently drop it.
+  const hasConfigPath = model.config_path !== undefined;
   const form = useZodForm(modelEditSchema, {
     base: String(model.base),
+    configPath: model.config_path ?? '',
     description: model.description ?? '',
+    format: String(model.format),
     name: model.name,
     predictionType: (model.prediction_type ?? '') as ModelEditFormValues['predictionType'],
     sourceUrl: model.source_url ?? '',
@@ -72,6 +93,34 @@ export const ModelEditForm = ({
       }),
     [t]
   );
+  const formatCollection = useMemo(() => {
+    const formats: readonly string[] = EDITABLE_MODEL_FORMATS.includes(String(model.format))
+      ? EDITABLE_MODEL_FORMATS
+      : [String(model.format), ...EDITABLE_MODEL_FORMATS];
+
+    return createListCollection({
+      items: formats.map((format) => ({ label: getModelFormatLabel(format), value: format })),
+    });
+  }, [model.format]);
+  // Reacts to base/type edits so the offered variants always match the
+  // combination being saved; an unknown current value stays selectable.
+  const { variantCollection, variantOptions } = useMemo(() => {
+    const options = getVariantOptionsFor(form.values.base, form.values.type);
+    const withCurrent =
+      form.values.variant !== '' && !options.includes(form.values.variant)
+        ? [form.values.variant, ...options]
+        : options;
+
+    return {
+      variantCollection: createListCollection({
+        items: [
+          { label: t('common.none'), value: '' },
+          ...withCurrent.map((variant) => ({ label: getModelVariantLabel(variant), value: variant })),
+        ],
+      }),
+      variantOptions: options,
+    };
+  }, [form.values.base, form.values.type, form.values.variant, t]);
 
   const handleSave = () =>
     form.handleSubmit(async (values) => {
@@ -83,11 +132,13 @@ export const ModelEditForm = ({
           {
             base: values.base,
             description: values.description || null,
+            format: values.format,
             name: values.name,
             prediction_type: values.predictionType === '' ? null : (values.predictionType as PredictionType),
             source_url: values.sourceUrl === '' ? null : values.sourceUrl,
             type: values.type,
             variant: values.variant === '' ? null : values.variant,
+            ...(hasConfigPath ? { config_path: values.configPath === '' ? null : values.configPath } : {}),
           },
           owner.signal
         );
@@ -156,11 +207,27 @@ export const ModelEditForm = ({
       </HStack>
       <HStack align="start" gap="2">
         <Field error={form.errors.variant} helpText={t('models.variantHelp')} label={t('models.variant')}>
-          <Input
-            size="sm"
-            value={form.values.variant}
-            onChange={(event) => form.setValue('variant', event.currentTarget.value)}
-          />
+          {variantOptions.length > 0 ? (
+            <Select
+              aria-label={t('models.variant')}
+              collection={variantCollection}
+              size="sm"
+              value={[form.values.variant]}
+              onValueChange={({ value }) => {
+                const variant = value[0];
+
+                if (variant !== undefined) {
+                  form.setValue('variant', variant);
+                }
+              }}
+            />
+          ) : (
+            <Input
+              size="sm"
+              value={form.values.variant}
+              onChange={(event) => form.setValue('variant', event.currentTarget.value)}
+            />
+          )}
         </Field>
         <Field error={form.errors.predictionType} label={t('models.predictionType')}>
           <Select
@@ -177,6 +244,32 @@ export const ModelEditForm = ({
             }}
           />
         </Field>
+      </HStack>
+      <HStack align="start" gap="2">
+        <Field error={form.errors.format} helpText={t('models.formatHelp')} label={t('models.format')}>
+          <Select
+            aria-label={t('models.format')}
+            collection={formatCollection}
+            size="sm"
+            value={[form.values.format]}
+            onValueChange={({ value }) => {
+              const format = value[0];
+
+              if (format !== undefined) {
+                form.setValue('format', format);
+              }
+            }}
+          />
+        </Field>
+        {hasConfigPath ? (
+          <Field error={form.errors.configPath} helpText={t('models.configPathHelp')} label={t('models.configPath')}>
+            <Input
+              size="sm"
+              value={form.values.configPath}
+              onChange={(event) => form.setValue('configPath', event.currentTarget.value)}
+            />
+          </Field>
+        ) : null}
       </HStack>
       <Field error={form.errors.sourceUrl} helpText={t('models.sourceUrlHelp')} label={t('models.sourceUrl')}>
         <Input

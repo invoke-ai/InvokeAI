@@ -11,7 +11,9 @@ const trimmed = z.string().trim();
 
 export const modelEditSchema = z.object({
   base: trimmed.min(1, 'Base architecture is required.'),
+  configPath: trimmed,
   description: trimmed.max(2000, 'Keep the description under 2000 characters.'),
+  format: trimmed.min(1, 'Format is required.'),
   name: trimmed.min(1, 'Name is required.').max(200, 'Keep the name under 200 characters.'),
   predictionType: z.union([z.literal(''), z.enum(['epsilon', 'v_prediction', 'sample'])]),
   sourceUrl: z.union([z.literal(''), z.url({ error: 'Must be a valid http(s) URL.' })]),
