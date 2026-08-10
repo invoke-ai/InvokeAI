@@ -8,7 +8,6 @@ import { refreshStartersIfLoaded } from '@features/models/data/startersStore';
 import { MaintenanceMenu } from '@features/models/ui/library/MaintenanceMenu';
 import { ModelFilterBar } from '@features/models/ui/library/ModelFilterBar';
 import { ModelLibraryList } from '@features/models/ui/library/ModelLibraryList';
-import { useScopedAction } from '@features/models/ui/shared/useScopedAction';
 import {
   openModelDetail,
   pruneModelsUiKeys,
@@ -17,6 +16,7 @@ import {
   useModelsUiSelector,
 } from '@features/models/ui/uiStore';
 import { useNotify } from '@features/models/ui/useModelsNotify';
+import { useScopedAction } from '@platform/react/useScopedAction';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { Button, IconButton, ConfirmDialog } from '@platform/ui';
 import { RefreshCcwIcon, Trash2Icon, XIcon } from 'lucide-react';

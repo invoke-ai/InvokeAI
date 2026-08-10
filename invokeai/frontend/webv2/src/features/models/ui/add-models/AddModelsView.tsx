@@ -14,10 +14,10 @@ import {
   useExternalProvidersSelector,
 } from '@features/models/data/externalProvidersStore';
 import { ensureStartersLoaded, useStartersSelector } from '@features/models/data/startersStore';
-import { useScopedAction } from '@features/models/ui/shared/useScopedAction';
 import { updateModelsUi, useModelsUiSelector } from '@features/models/ui/uiStore';
 import { useNotify } from '@features/models/ui/useModelsNotify';
 import { useMountEffect } from '@platform/react/useMountEffect';
+import { useScopedAction } from '@platform/react/useScopedAction';
 import {
   assertAccountScopeCurrent,
   captureAccountScope,

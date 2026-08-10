@@ -4,7 +4,7 @@ import type { ModelConfig } from '@features/models/core/types';
 import { Box, Flex, Icon, Image, Stack, Text } from '@chakra-ui/react';
 import { deleteModelImage, getModelImageUrl, updateModelImage } from '@features/models/data/api';
 import { markCoverImageChanged, useModelsSelector } from '@features/models/data/modelsStore';
-import { useScopedAction } from '@features/models/ui/shared/useScopedAction';
+import { useScopedAction } from '@platform/react/useScopedAction';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { DropZone, IconButton, Tooltip } from '@platform/ui';
 import { ImageIcon, UploadIcon, XIcon } from 'lucide-react';

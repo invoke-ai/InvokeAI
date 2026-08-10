@@ -5,7 +5,7 @@ import { createListCollection, Grid, HStack, Icon, NumberInput, Stack, Switch, T
 import { updateModel } from '@features/models/data/api';
 import { replaceModelInStore } from '@features/models/data/modelsStore';
 import { ModelSelect } from '@features/models/ui/components/ModelSelect';
-import { useScopedAction } from '@features/models/ui/shared/useScopedAction';
+import { useScopedAction } from '@platform/react/useScopedAction';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { Button, Combobox, FieldLabel, Panel, Select } from '@platform/ui';
 import { MoveHorizontalIcon } from 'lucide-react';

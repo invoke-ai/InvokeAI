@@ -13,10 +13,10 @@ import {
   refreshInstalls,
   useInstallsSelector,
 } from '@features/models/data/installsStore';
-import { getErrorMessage, useScopedAction } from '@features/models/ui/shared/useScopedAction';
 import { setQueueExpanded, useModelsUiSelector } from '@features/models/ui/uiStore';
 import { useNotify } from '@features/models/ui/useModelsNotify';
 import { useMountEffect } from '@platform/react/useMountEffect';
+import { getErrorMessage, useScopedAction } from '@platform/react/useScopedAction';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { Button, IconButton, Tooltip } from '@platform/ui';
 import { ChevronUpIcon, ListOrderedIcon, PauseIcon, PlayIcon, RefreshCcwIcon, Trash2Icon, XIcon } from 'lucide-react';

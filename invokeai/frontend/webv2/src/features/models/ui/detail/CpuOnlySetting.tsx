@@ -3,7 +3,7 @@ import type { ModelConfig } from '@features/models/core/types';
 import { Stack, Switch, Text } from '@chakra-ui/react';
 import { updateModel } from '@features/models/data/api';
 import { patchModelInStore, replaceModelInStore } from '@features/models/data/modelsStore';
-import { useScopedAction } from '@features/models/ui/shared/useScopedAction';
+import { useScopedAction } from '@platform/react/useScopedAction';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { useCallback } from 'react';

@@ -5,9 +5,9 @@ import { Checkbox, Dialog, Flex, Icon, Menu, Portal, Spinner, Stack, Text } from
 import { formatBytes } from '@features/models/core/taxonomy';
 import { deleteOrphanedModels, emptyModelCache, getOrphanedModels } from '@features/models/data/api';
 import { getModelsSnapshot, refreshModels } from '@features/models/data/modelsStore';
-import { useScopedAction } from '@features/models/ui/shared/useScopedAction';
 import { useNotify } from '@features/models/ui/useModelsNotify';
 import { useMountEffect } from '@platform/react/useMountEffect';
+import { useScopedAction } from '@platform/react/useScopedAction';
 import {
   assertAccountScopeCurrent,
   captureAccountScope,

@@ -10,8 +10,8 @@ import {
 } from '@features/models/core/modelSettingsIO';
 import { getModelImageUrl, updateModel, updateModelImage } from '@features/models/data/api';
 import { getModelsSnapshot, markCoverImageChanged, replaceModelInStore } from '@features/models/data/modelsStore';
-import { useScopedAction } from '@features/models/ui/shared/useScopedAction';
 import { useNotify } from '@features/models/ui/useModelsNotify';
+import { useScopedAction } from '@platform/react/useScopedAction';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { DownloadIcon, UploadIcon } from 'lucide-react';
 import { useRef, type ChangeEvent } from 'react';

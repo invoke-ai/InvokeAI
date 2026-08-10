@@ -15,7 +15,7 @@ import {
   refreshInstalls,
   replaceInstallJob,
 } from '@features/models/data/installsStore';
-import { useScopedAction } from '@features/models/ui/shared/useScopedAction';
+import { useScopedAction } from '@platform/react/useScopedAction';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { useConnectionStatusSelector } from '@platform/transport/connectionStore';
 import { IconButton, Tooltip } from '@platform/ui';

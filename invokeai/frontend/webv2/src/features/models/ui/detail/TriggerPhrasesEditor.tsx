@@ -3,7 +3,7 @@ import { HStack, Icon, Input, Tag, Text, Wrap } from '@chakra-ui/react';
 import { triggerPhraseSchema } from '@features/models/core/schemas';
 import { updateModel } from '@features/models/data/api';
 import { replaceModelInStore } from '@features/models/data/modelsStore';
-import { useScopedAction } from '@features/models/ui/shared/useScopedAction';
+import { useScopedAction } from '@platform/react/useScopedAction';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { Button, Field } from '@platform/ui';
 import { PlusIcon } from 'lucide-react';

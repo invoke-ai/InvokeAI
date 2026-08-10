@@ -7,9 +7,9 @@ import { getHFTokenStatus, resetHFToken, setHFToken } from '@features/models/dat
 import { clearCivitaiApiKey, getCivitaiApiKey, setCivitaiApiKey } from '@features/models/data/apiKeys';
 import { ExternalProviderKeyCards } from '@features/models/ui/credentials/ExternalProviderKeyCards';
 import { KeyCardShell, type KeyStatusBadge } from '@features/models/ui/credentials/KeyCardShell';
-import { useScopedAction } from '@features/models/ui/shared/useScopedAction';
 import { useNotify } from '@features/models/ui/useModelsNotify';
 import { useMountEffect } from '@platform/react/useMountEffect';
+import { useScopedAction } from '@platform/react/useScopedAction';
 import {
   assertAccountScopeCurrent,
   captureAccountScope,

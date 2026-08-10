@@ -4,9 +4,9 @@ import { convertModelToDiffusers, deleteModel, reidentifyModel } from '@features
 import { removeModelsFromStore, replaceModelInStore } from '@features/models/data/modelsStore';
 import { removeModelsFromRelationships } from '@features/models/data/relationshipsStore';
 import { refreshStartersIfLoaded } from '@features/models/data/startersStore';
-import { useScopedAction } from '@features/models/ui/shared/useScopedAction';
 import { pruneModelsUiKeys } from '@features/models/ui/uiStore';
 import { useNotify } from '@features/models/ui/useModelsNotify';
+import { useScopedAction } from '@platform/react/useScopedAction';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';

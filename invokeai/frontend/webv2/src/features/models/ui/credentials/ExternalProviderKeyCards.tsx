@@ -12,8 +12,8 @@ import {
 import { refreshInstalls } from '@features/models/data/installsStore';
 import { refreshStartersIfLoaded } from '@features/models/data/startersStore';
 import { KeyCardShell } from '@features/models/ui/credentials/KeyCardShell';
-import { useScopedAction } from '@features/models/ui/shared/useScopedAction';
 import { useMountEffect } from '@platform/react/useMountEffect';
+import { useScopedAction } from '@platform/react/useScopedAction';
 import { assertAccountScopeCurrent, type AccountScope } from '@platform/state/accountLifecycle';
 import { Button } from '@platform/ui';
 import { BotIcon, HexagonIcon } from 'lucide-react';
