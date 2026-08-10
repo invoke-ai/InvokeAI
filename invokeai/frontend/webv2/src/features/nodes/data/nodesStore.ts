@@ -7,6 +7,7 @@ import {
   registerAccountOwnedResource,
 } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
+import { createTrailingSingleFlight } from '@platform/state/singleFlight';
 import { getApiErrorMessage } from '@platform/transport/http';
 
 import { listCustomNodePacks } from './api';
@@ -26,61 +27,58 @@ const EMPTY_CUSTOM_NODES_SNAPSHOT: CustomNodesSnapshot = {
 };
 const store = createExternalStore<CustomNodesSnapshot>(EMPTY_CUSTOM_NODES_SNAPSHOT);
 
-let inflightRefresh: Promise<void> | null = null;
+const refreshFlight = createTrailingSingleFlight();
 
 registerAccountOwnedResource({
   clear: () => {
-    inflightRefresh = null;
+    refreshFlight.reset();
     store.setSnapshot(EMPTY_CUSTOM_NODES_SNAPSHOT);
   },
   name: 'custom-node-packs',
 });
 
-export const refreshCustomNodePacks = (owner: AccountScope = captureAccountScope()): Promise<void> => {
-  if (inflightRefresh) {
-    return inflightRefresh;
+/** Re-fetch the pack list; concurrent calls share one request, and a call made mid-flight queues one trailing rerun. */
+export const refreshCustomNodePacks = (owner: AccountScope = captureAccountScope()): Promise<void> =>
+  refreshFlight.run(() => {
+    store.patchSnapshot({ status: store.getSnapshot().status === 'loaded' ? 'loaded' : 'loading' });
+
+    return listCustomNodePacks(owner.signal)
+      .then((response) => {
+        if (!isAccountScopeCurrent(owner)) {
+          return;
+        }
+
+        store.patchSnapshot({
+          customNodesPath: response.customNodesPath,
+          error: null,
+          nodePacks: response.nodePacks,
+          status: 'loaded',
+        });
+      })
+      .catch((error: unknown) => {
+        if (!isAccountScopeCurrent(owner)) {
+          return;
+        }
+
+        store.patchSnapshot({
+          error: getApiErrorMessage(error, 'Failed to load custom node packs.'),
+          status: store.getSnapshot().nodePacks.length > 0 ? 'loaded' : 'error',
+        });
+      });
+  });
+
+/** Fetch on first use or retry after an error; callers share and can await the request. */
+export const ensureCustomNodePacksLoaded = (): Promise<void> => {
+  const { status } = store.getSnapshot();
+
+  if (status === 'idle' || status === 'error') {
+    return refreshCustomNodePacks();
   }
 
-  store.patchSnapshot({ status: store.getSnapshot().status === 'loaded' ? 'loaded' : 'loading' });
-
-  const refresh = listCustomNodePacks(owner.signal)
-    .then((response) => {
-      if (!isAccountScopeCurrent(owner)) {
-        return;
-      }
-
-      store.patchSnapshot({
-        customNodesPath: response.customNodesPath,
-        error: null,
-        nodePacks: response.nodePacks,
-        status: 'loaded',
-      });
-    })
-    .catch((error: unknown) => {
-      if (!isAccountScopeCurrent(owner)) {
-        return;
-      }
-
-      store.patchSnapshot({
-        error: getApiErrorMessage(error, 'Failed to load custom node packs.'),
-        status: store.getSnapshot().nodePacks.length > 0 ? 'loaded' : 'error',
-      });
-    })
-    .finally(() => {
-      if (inflightRefresh === refresh) {
-        inflightRefresh = null;
-      }
-    });
-
-  inflightRefresh = refresh;
-  return inflightRefresh;
+  return refreshFlight.inflight() ?? Promise.resolve();
 };
 
-export const ensureCustomNodePacksLoaded = (): void => {
-  if (store.getSnapshot().status === 'idle') {
-    void refreshCustomNodePacks();
-  }
-};
+export const getCustomNodesSnapshot = (): CustomNodesSnapshot => store.getSnapshot();
 
 export const removeCustomNodePackFromStore = (packName: string): void => {
   store.patchSnapshot({ nodePacks: store.getSnapshot().nodePacks.filter((pack) => pack.name !== packName) });
