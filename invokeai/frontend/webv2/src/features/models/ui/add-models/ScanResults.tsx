@@ -4,6 +4,7 @@ import type { FoundModel } from '@features/models/core/types';
 import { Checkbox, HStack, Icon, Stack, Text } from '@chakra-ui/react';
 import { ResultsListHeader } from '@features/models/ui/shared/ResultsListHeader';
 import { InstallSourceButton, SourceListItem } from '@features/models/ui/shared/SourceListItem';
+import { useInstalledSources } from '@features/models/ui/shared/useInstalledSources';
 import { IconButton } from '@platform/ui';
 import { XIcon } from 'lucide-react';
 import { useDeferredValue, useMemo, useState } from 'react';
@@ -32,6 +33,10 @@ export const ScanResults = ({
   const { t } = useTranslation();
   const [filter, setFilter] = useState('');
   const deferredFilter = useDeferredValue(filter);
+  // Live library state: `is_installed` is a scan-time snapshot, so a model
+  // installed from this list would otherwise keep offering Install forever.
+  const installedSources = useInstalledSources();
+  const isRowInstalled = (result: FoundModel) => result.is_installed || installedSources.has(result.path);
 
   const filteredResults = useMemo(() => {
     const term = deferredFilter.trim().toLowerCase();
@@ -43,8 +48,8 @@ export const ScanResults = ({
     return scan.results.filter((result) => fileNameOf(result.path).toLowerCase().includes(term));
   }, [deferredFilter, scan.results]);
 
-  const notInstalledCount = scan.results.filter((result) => !result.is_installed).length;
-  const installable = filteredResults.filter((result) => !result.is_installed);
+  const notInstalledCount = scan.results.filter((result) => !isRowInstalled(result)).length;
+  const installable = filteredResults.filter((result) => !isRowInstalled(result));
 
   const installAll = () => {
     onInstallAll(installable.map((result) => result.path));
@@ -98,7 +103,7 @@ export const ScanResults = ({
           titleTooltip={result.path}
           trailing={
             <InstallSourceButton
-              isInstalled={result.is_installed}
+              isInstalled={isRowInstalled(result)}
               isPending={pendingSources.has(result.path)}
               source={result.path}
               onInstall={() => onInstall(result.path)}

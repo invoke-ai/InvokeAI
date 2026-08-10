@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { isAbsoluteModelPath, modelPathSchema } from './schemas';
+import { isAbsoluteModelPath, modelPathSchema, resolveModelAbsolutePath } from './schemas';
 
 describe('isAbsoluteModelPath', () => {
   it.each([
@@ -28,5 +28,23 @@ describe('modelPathSchema', () => {
   it('rejects empty and relative paths', () => {
     expect(modelPathSchema.safeParse('   ').success).toBe(false);
     expect(modelPathSchema.safeParse('models/x.safetensors').success).toBe(false);
+  });
+});
+
+describe('resolveModelAbsolutePath', () => {
+  it('resolves managed relative paths against the models directory', () => {
+    expect(resolveModelAbsolutePath('sdxl/main/model.safetensors', '/data/models')).toBe(
+      '/data/models/sdxl/main/model.safetensors'
+    );
+    expect(resolveModelAbsolutePath('sdxl/main/model.safetensors', '/data/models/')).toBe(
+      '/data/models/sdxl/main/model.safetensors'
+    );
+  });
+
+  it('keeps absolute in-place paths and falls back when the directory is unknown', () => {
+    expect(resolveModelAbsolutePath('/home/user/model.safetensors', '/data/models')).toBe(
+      '/home/user/model.safetensors'
+    );
+    expect(resolveModelAbsolutePath('sdxl/model.safetensors', null)).toBe('sdxl/model.safetensors');
   });
 });

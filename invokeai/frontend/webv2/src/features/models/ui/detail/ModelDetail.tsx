@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import { DataList, HStack, Icon, Menu, Portal, Separator, Stack, Text } from '@chakra-ui/react';
 import { isConvertibleToDiffusers } from '@features/models/core/baseIdentity';
 import { isLinkableType } from '@features/models/core/relationships';
-import { isAbsoluteModelPath } from '@features/models/core/schemas';
+import { isAbsoluteModelPath, resolveModelAbsolutePath } from '@features/models/core/schemas';
 import { formatBytes } from '@features/models/core/taxonomy';
 import { useModelsSelector } from '@features/models/data/modelsStore';
 import { useNotify } from '@features/models/ui/useModelsNotify';
@@ -440,8 +440,7 @@ const ModelAttributes = ({ isMissing, model }: { isMissing: boolean; model: Mode
   const [isPathDialogOpen, setIsPathDialogOpen] = useState(false);
   // Managed models store paths relative to the models directory; show the
   // resolved absolute path so it can be found on disk.
-  const fullPath =
-    isAbsoluteModelPath(model.path) || !modelsDir ? model.path : `${modelsDir.replace(/\/+$/, '')}/${model.path}`;
+  const fullPath = resolveModelAbsolutePath(model.path, modelsDir);
   // In-place installs (absolute paths) may be repointed after the file moves;
   // a missing model gets the affordance too — that is exactly when it helps.
   const canUpdatePath = isAbsoluteModelPath(model.path) || isMissing;

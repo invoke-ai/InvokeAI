@@ -95,6 +95,14 @@ export const isAbsoluteModelPath = (path: string): boolean =>
   path.startsWith('/') || path.startsWith('\\\\') || /^[A-Za-z]:[\\/]/.test(path);
 
 /**
+ * Mirrors the backend's `models_path / model.path` resolution: managed models
+ * store paths relative to the models directory, in-place installs store them
+ * absolute. Falls back to the stored path when the directory is unknown.
+ */
+export const resolveModelAbsolutePath = (path: string, modelsDir: string | null): string =>
+  isAbsoluteModelPath(path) || !modelsDir ? path : `${modelsDir.replace(/\/+$/, '')}/${path}`;
+
+/**
  * Replacement path for a relocated model. Only absolute paths are accepted:
  * managed models store paths relative to the models directory and must not be
  * relocated this way.
