@@ -1,6 +1,6 @@
 from typing import Optional
 
-from invokeai.app.services.board_records.board_records_common import BoardChanges, BoardRecordOrderBy
+from invokeai.app.services.board_records.board_records_common import BoardChanges, BoardRecord, BoardRecordOrderBy
 from invokeai.app.services.boards.boards_base import BoardServiceABC
 from invokeai.app.services.boards.boards_common import BoardDTO, board_record_to_dto
 from invokeai.app.services.invoker import Invoker
@@ -100,31 +100,7 @@ class BoardService(BoardServiceABC):
         board_records = self.__invoker.services.board_records.get_many(
             user_id, is_admin, order_by, direction, offset, limit, include_archived
         )
-        summaries = self.__invoker.services.gallery.get_board_media_summaries(
-            [record.board_id for record in board_records.items]
-        )
-        board_dtos = []
-        for r in board_records.items:
-            summary = summaries[r.board_id]
-
-            # For admin users, include owner username
-            owner_username = None
-            if is_admin:
-                owner = self.__invoker.services.users.get(r.user_id)
-                if owner:
-                    owner_username = owner.display_name or owner.email
-
-            board_dtos.append(
-                board_record_to_dto(
-                    r,
-                    summary.cover_image_name,
-                    summary.image_count,
-                    summary.asset_count,
-                    owner_username,
-                    cover_video_name=summary.cover_video_name,
-                    video_count=summary.video_count,
-                )
-            )
+        board_dtos = self._to_dtos(board_records.items, is_admin)
 
         return OffsetPaginatedResults[BoardDTO](items=board_dtos, offset=offset, limit=limit, total=len(board_dtos))
 
@@ -139,19 +115,30 @@ class BoardService(BoardServiceABC):
         board_records = self.__invoker.services.board_records.get_all(
             user_id, is_admin, order_by, direction, include_archived
         )
+        return self._to_dtos(board_records, is_admin)
+
+    def _to_dtos(self, board_records: list[BoardRecord], is_admin: bool) -> list[BoardDTO]:
+        """Builds board DTOs for a listing with a fixed number of queries.
+
+        Both the media summaries and (for admins) the owner display names are fetched for
+        the whole page at once. The owner lookup used to run one `users.get` per board, so
+        an admin listing 50 boards issued 50 extra queries for what is usually a handful of
+        distinct owners.
+        """
         summaries = self.__invoker.services.gallery.get_board_media_summaries(
             [record.board_id for record in board_records]
         )
-        board_dtos = []
+        owners = (
+            self.__invoker.services.users.get_many([record.user_id for record in board_records]) if is_admin else {}
+        )
+
+        board_dtos: list[BoardDTO] = []
         for r in board_records:
             summary = summaries[r.board_id]
 
             # For admin users, include owner username
-            owner_username = None
-            if is_admin:
-                owner = self.__invoker.services.users.get(r.user_id)
-                if owner:
-                    owner_username = owner.display_name or owner.email
+            owner = owners.get(r.user_id)
+            owner_username = (owner.display_name or owner.email) if owner else None
 
             board_dtos.append(
                 board_record_to_dto(
