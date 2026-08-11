@@ -1,5 +1,6 @@
 import type { ImageRecallKind } from '@workbench/image-actions/imageRecall';
 import type { ResultDestination } from '@workbench/invocationContracts';
+import type { AccountState } from '@workbench/projectContracts';
 
 import { invalidateGallery } from '@features/gallery/queries';
 import {
@@ -19,23 +20,38 @@ import {
 } from '@platform/state/accountLifecycle';
 import { useQueryClient } from '@tanstack/react-query';
 import { submitActiveInvocation } from '@workbench/activeInvocationSubmission';
-import { createLayoutPresetActivator, loadLayoutPresetWidgets } from '@workbench/layoutPresetActivation';
-import { builtInLayoutPresetDescriptors, getLayoutPreset } from '@workbench/layoutPresets';
+import { builtInLayoutPresetDescriptors } from '@workbench/layoutPresets';
+import { resolveSavedLayoutPreset } from '@workbench/layoutPresetSnapshots';
 import { toggleCommandPalette } from '@workbench/palette/paletteStore';
 import { getWorkbenchPreferences } from '@workbench/settings/store';
 import { openProjectSwitcher } from '@workbench/shell/topbar/projectSwitcherStore';
 import { openWidgetPlacement } from '@workbench/widgetPlacementCommands';
 import { getWidgetsForRegion } from '@workbench/widgetRegistry';
 import { getProjectWidgetValues } from '@workbench/widgetState';
-import { useWorkbenchCommands, useWorkbenchExtensions, useWorkbenchQueries } from '@workbench/WorkbenchContext';
-import { useEffect, useEffectEvent, useMemo } from 'react';
+import {
+  useWorkbenchCommands,
+  useWorkbenchExtensions,
+  useWorkbenchQueries,
+  useWorkbenchSelector,
+} from '@workbench/WorkbenchContext';
+import { useEffect, useEffectEvent } from 'react';
 
 /** ⌥1 / ⌥2 / ⌥3 — the three shipped layout presets, in strip order. */
 const layoutPresetCommands = builtInLayoutPresetDescriptors.map(({ hotkeyId, preset }) => ({
   id: `app.${hotkeyId}`,
   presetId: preset.id,
-  title: `${preset.label} layout`,
 }));
+
+export const getLayoutPresetCommands = (account: AccountState) =>
+  layoutPresetCommands.map((command) => ({
+    ...command,
+    title: `${resolveSavedLayoutPreset(account, command.presetId).label} layout`,
+  }));
+
+const areLayoutPresetCommandsEqual = (
+  left: ReturnType<typeof getLayoutPresetCommands>,
+  right: ReturnType<typeof getLayoutPresetCommands>
+): boolean => left.length === right.length && left.every((command, index) => command.title === right[index]?.title);
 
 const imageRecallCommands: Record<string, ImageRecallKind> = {
   'gallery.remix': 'remix',
@@ -87,9 +103,9 @@ export const useRegisterFirstPartyCommands = () => {
   const queries = useWorkbenchQueries();
   const queryClient = useQueryClient();
   const { layout, notifications, queue, widgets } = commands;
-  const activateLayoutPreset = useMemo(
-    () => createLayoutPresetActivator({ apply: layout.applyPreset, load: loadLayoutPresetWidgets }),
-    [layout.applyPreset]
+  const currentLayoutPresetCommands = useWorkbenchSelector(
+    (snapshot) => getLayoutPresetCommands(snapshot.account),
+    areLayoutPresetCommandsEqual
   );
   useInvocationTemplatesSelector((snapshot) => snapshot.status);
 
@@ -187,8 +203,8 @@ export const useRegisterFirstPartyCommands = () => {
         id: 'app.saveLayoutPreset',
         title: 'Save changes to the active layout preset',
       }),
-      ...layoutPresetCommands.map(({ id, presetId, title }) =>
-        commandApi.register({ handler: () => void activateLayoutPreset(getLayoutPreset(presetId)), id, title })
+      ...currentLayoutPresetCommands.map(({ id, presetId, title }) =>
+        commandApi.register({ handler: () => void layout.activatePreset(presetId), id, title })
       ),
       commandApi.register({
         handler: () => {
@@ -360,5 +376,5 @@ export const useRegisterFirstPartyCommands = () => {
     return () => {
       disposers.forEach((dispose) => dispose());
     };
-  }, [activateLayoutPreset, commandApi, commands, layout, notifications, queries, queryClient, queue, widgets]);
+  }, [commandApi, commands, currentLayoutPresetCommands, layout, notifications, queries, queryClient, queue, widgets]);
 };

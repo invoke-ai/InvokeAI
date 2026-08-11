@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { LayoutPresetRoute } from './layoutContracts';
+import type { LayoutPreset, LayoutPresetRoute } from './layoutContracts';
 import type { WorkbenchInternalStore, WorkbenchSnapshot } from './workbenchStore';
 
 import { clearProjectDiagnostics, configureDiagnostics, getProjectDiagnostics } from './diagnostics/logger';
@@ -55,6 +55,31 @@ describe('createWorkbenchStore', () => {
     expect(store.queries).toBe(store.queries);
     expect(snapshot.hasHydrated).toBe(false);
     expect(snapshot.projects).toHaveLength(1);
+  });
+
+  it('coordinates layout preset activation across every command caller', async () => {
+    const deferred = new Map<string, { promise: Promise<void>; resolve: () => void }>();
+    const loadLayoutPresetWidgets = (preset: LayoutPreset): Promise<void> => {
+      let resolve!: () => void;
+      const promise = new Promise<void>((next) => {
+        resolve = next;
+      });
+
+      deferred.set(preset.id, { promise, resolve });
+      return promise;
+    };
+    const store = createWorkbenchStore(createInitialWorkbenchState(), { loadLayoutPresetWidgets });
+
+    const stripActivation = store.commands.layout.activatePreset('compose');
+    const hotkeyActivation = store.commands.layout.activatePreset('edit');
+
+    deferred.get('edit')?.resolve();
+    await hotkeyActivation;
+    deferred.get('compose')?.resolve();
+    await stripActivation;
+
+    expect(store.getSnapshot().activeProject.layout.presetId).toBe('edit');
+    expect(store.getSnapshot().activeProject.invocation).toMatchObject({ destination: 'canvas', sourceId: 'canvas' });
   });
 
   it('notifies subscribers once for reducer changes and not for no-op reducer results', () => {

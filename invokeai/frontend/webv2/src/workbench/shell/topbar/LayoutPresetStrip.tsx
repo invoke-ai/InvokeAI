@@ -13,11 +13,7 @@ import { MenuContent } from '@platform/ui/Menu';
 import { Tabs } from '@platform/ui/Tabs';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { getPlacedWidgetTypeIds, graphWidgetSources } from '@workbench/graphWidgets';
-import {
-  createLayoutPresetActivator,
-  loadLayoutPresetWidgets,
-  preloadLayoutPresetWidgets,
-} from '@workbench/layoutPresetActivation';
+import { preloadLayoutPresetWidgets } from '@workbench/layoutPresetActivation';
 import { getOrderedLayoutPresets } from '@workbench/layoutPresetCollection';
 import { useActiveProjectSelector, useWorkbenchCommands, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import {
@@ -71,18 +67,13 @@ export const LayoutPresetStrip = () => {
     () => ({ destination: invocation.destination, sourceId: invocation.sourceId }),
     [invocation.destination, invocation.sourceId]
   );
-  const activatePreset = useMemo(
-    () => createLayoutPresetActivator({ apply: layout.applyPreset, load: loadLayoutPresetWidgets }),
-    [layout.applyPreset]
-  );
-
   const applyPreset = useCallback(
     (preset: LayoutPreset) => {
       if (preset.id !== activePreset.id) {
-        void activatePreset(preset);
+        void layout.activatePreset(preset.id);
       }
     },
-    [activatePreset, activePreset.id]
+    [activePreset.id, layout]
   );
   const handleValueChange = useCallback(
     (event: { value: string }) => {
