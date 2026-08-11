@@ -7,6 +7,7 @@ describe('built-in layout preset descriptors', () => {
     expect(
       builtInLayoutPresetDescriptors.map(({ defaultKeys, hotkeyId, iconId, preset, tooltip }) => ({
         defaultKeys,
+        defaultRoute: preset.defaultRoute,
         hotkeyId,
         iconId,
         label: preset.label,
@@ -16,6 +17,7 @@ describe('built-in layout preset descriptors', () => {
     ).toEqual([
       {
         defaultKeys: ['alt+1'],
+        defaultRoute: { destination: 'gallery', sourceId: 'generate' },
         hotkeyId: 'selectComposePreset',
         iconId: 'type',
         label: 'Compose',
@@ -24,6 +26,7 @@ describe('built-in layout preset descriptors', () => {
       },
       {
         defaultKeys: ['alt+2'],
+        defaultRoute: { destination: 'canvas', sourceId: 'canvas' },
         hotkeyId: 'selectEditPreset',
         iconId: 'layers',
         label: 'Edit',
@@ -32,6 +35,7 @@ describe('built-in layout preset descriptors', () => {
       },
       {
         defaultKeys: ['alt+3'],
+        defaultRoute: { destination: 'gallery', sourceId: 'workflow' },
         hotkeyId: 'selectAutomatePreset',
         iconId: 'workflow',
         label: 'Automate',

@@ -2,6 +2,7 @@ import type {
   BuiltInLayoutPresetId,
   CenterViewId,
   LayoutPreset,
+  LayoutPresetRoute,
   LayoutPresetSnapshot,
   LayoutPresetWidgetInstanceSnapshot,
   PanelState,
@@ -101,6 +102,7 @@ export interface BuiltInLayoutPresetDescriptor {
 const createPresetDescriptor = ({
   centerViewId,
   defaultKeys,
+  defaultRoute,
   hotkeyId,
   id,
   iconId,
@@ -111,6 +113,7 @@ const createPresetDescriptor = ({
 }: {
   centerViewId: CenterViewId;
   defaultKeys: readonly string[];
+  defaultRoute: LayoutPresetRoute;
   hotkeyId: string;
   id: BuiltInLayoutPresetId;
   iconId: string;
@@ -123,6 +126,7 @@ const createPresetDescriptor = ({
   hotkeyId,
   iconId,
   preset: {
+    defaultRoute,
     id,
     isBuiltIn: true,
     label,
@@ -141,6 +145,7 @@ export const builtInLayoutPresetDescriptors: BuiltInLayoutPresetDescriptor[] = [
   createPresetDescriptor({
     centerViewId: 'preview',
     defaultKeys: ['alt+1'],
+    defaultRoute: { destination: 'gallery', sourceId: 'generate' },
     hotkeyId: 'selectComposePreset',
     id: 'compose',
     iconId: 'type',
@@ -174,6 +179,7 @@ export const builtInLayoutPresetDescriptors: BuiltInLayoutPresetDescriptor[] = [
   createPresetDescriptor({
     centerViewId: 'canvas',
     defaultKeys: ['alt+2'],
+    defaultRoute: { destination: 'canvas', sourceId: 'canvas' },
     hotkeyId: 'selectEditPreset',
     id: 'edit',
     iconId: 'layers',
@@ -207,6 +213,7 @@ export const builtInLayoutPresetDescriptors: BuiltInLayoutPresetDescriptor[] = [
   createPresetDescriptor({
     centerViewId: 'workflow',
     defaultKeys: ['alt+3'],
+    defaultRoute: { destination: 'gallery', sourceId: 'workflow' },
     hotkeyId: 'selectAutomatePreset',
     id: 'automate',
     iconId: 'workflow',

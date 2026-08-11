@@ -29,8 +29,11 @@ export const resolveSavedLayoutPreset = (account: AccountState, presetId: Layout
 
   const builtInPreset = getLayoutPreset(presetId);
   const override = account.layoutPresetOverrides?.[builtInPreset.id];
+  const defaultRoute = account.layoutPresetRouteOverrides?.[builtInPreset.id] ?? builtInPreset.defaultRoute;
 
-  return override ? { ...builtInPreset, snapshot: override } : builtInPreset;
+  return override || defaultRoute !== builtInPreset.defaultRoute
+    ? { ...builtInPreset, defaultRoute, snapshot: override ?? builtInPreset.snapshot }
+    : builtInPreset;
 };
 
 export const cloneLayoutPresetWidgetRegions = (

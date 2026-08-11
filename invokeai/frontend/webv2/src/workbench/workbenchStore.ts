@@ -243,7 +243,13 @@ const createCommands = (dispatch: WorkbenchDispatch, getState: () => WorkbenchSt
       applyPreset: command('applyPreset', (presetId: ActionPayload<'applyPreset'>['presetId']) => ({ presetId })),
       createPreset: command(
         'addLayoutPreset',
-        (presetId: ActionPayload<'addLayoutPreset'>['presetId'], label: string, iconId?: string) => ({
+        (
+          presetId: ActionPayload<'addLayoutPreset'>['presetId'],
+          label: string,
+          iconId?: string,
+          defaultRoute?: ActionPayload<'addLayoutPreset'>['defaultRoute']
+        ) => ({
+          defaultRoute,
           iconId,
           label,
           presetId,
@@ -252,6 +258,13 @@ const createCommands = (dispatch: WorkbenchDispatch, getState: () => WorkbenchSt
       setPresetIcon: command(
         'setLayoutPresetIcon',
         (presetId: ActionPayload<'setLayoutPresetIcon'>['presetId'], iconId: string) => ({ iconId, presetId })
+      ),
+      setPresetRoute: command(
+        'setLayoutPresetRoute',
+        (
+          presetId: ActionPayload<'setLayoutPresetRoute'>['presetId'],
+          defaultRoute: ActionPayload<'setLayoutPresetRoute'>['defaultRoute']
+        ) => ({ defaultRoute, presetId })
       ),
       deletePreset: command('deleteLayoutPreset', (presetId: ActionPayload<'deleteLayoutPreset'>['presetId']) => ({
         presetId,

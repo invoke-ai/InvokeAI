@@ -16,6 +16,7 @@ import type {
   LayoutPreset,
   LayoutPresetId,
   LayoutPresetOverrides,
+  LayoutPresetRoute,
   LayoutPresetSnapshot,
   ProjectLayoutState,
   WidgetRegion,
@@ -126,9 +127,11 @@ import {
   defaultInvocationRoute,
   isInvocationRouteValid,
   isInvocationSourceAvailable,
+  isResultDestinationAvailable,
   resolveInvocationRoute,
 } from './invocation';
-import { defaultLayoutPreset, isBuiltInLayoutPresetId, resolveLayoutPresetId } from './layoutPresets';
+import { getInvocationAfterLayoutPreset } from './layoutPresetRouting';
+import { defaultLayoutPreset, getLayoutPreset, isBuiltInLayoutPresetId, resolveLayoutPresetId } from './layoutPresets';
 import {
   cloneLayoutPresetWidgetRegions,
   createLayoutPresetSnapshot,
@@ -151,8 +154,15 @@ type WorkbenchReducerAction =
   | { type: 'switchProject'; projectId: string }
   | { type: 'setCenterView'; centerViewId: CenterViewId }
   | { type: 'applyPreset'; presetId: LayoutPresetId }
-  | { type: 'addLayoutPreset'; presetId: LayoutPresetId; label: string; iconId?: string }
+  | {
+      type: 'addLayoutPreset';
+      presetId: LayoutPresetId;
+      label: string;
+      iconId?: string;
+      defaultRoute?: LayoutPresetRoute | null;
+    }
   | { type: 'setLayoutPresetIcon'; presetId: LayoutPresetId; iconId: string }
+  | { type: 'setLayoutPresetRoute'; presetId: LayoutPresetId; defaultRoute: LayoutPresetRoute | null }
   | { type: 'saveLayoutPreset'; presetId: LayoutPresetId }
   | { type: 'restoreLayoutPresetDefault'; presetId: LayoutPresetId }
   | { type: 'renameLayoutPreset'; presetId: LayoutPresetId; label: string }
@@ -1403,7 +1413,7 @@ const createProject = (index: number, id = `project-${index}`): Project => ({
   ],
   graphHistory: [],
   id,
-  invocation: { ...defaultInvocationRoute },
+  invocation: { ...defaultInvocationRoute, ...defaultLayoutPreset.defaultRoute },
   layout: { ...defaultLayoutPreset.snapshot.layout, panels: { ...defaultLayoutPreset.snapshot.layout.panels } },
   name: `Project Name #${index}`,
   promptHistory: [],
@@ -1551,6 +1561,25 @@ const isLayoutPresetSnapshot = (value: unknown): value is LayoutPresetSnapshot =
   );
 };
 
+const normalizeLayoutPresetRoute = (value: unknown): LayoutPresetRoute | undefined => {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+
+  const route = value as Partial<LayoutPresetRoute>;
+
+  if (
+    typeof route.sourceId !== 'string' ||
+    !isInvocationSourceAvailable(route.sourceId as InvocationSourceId) ||
+    typeof route.destination !== 'string' ||
+    !isResultDestinationAvailable(route.destination as ResultDestination)
+  ) {
+    return undefined;
+  }
+
+  return { destination: route.destination as ResultDestination, sourceId: route.sourceId as InvocationSourceId };
+};
+
 const normalizeCustomLayoutPresets = (presets: unknown): LayoutPreset[] => {
   if (!Array.isArray(presets)) {
     return [];
@@ -1567,8 +1596,11 @@ const normalizeCustomLayoutPresets = (presets: unknown): LayoutPreset[] => {
       return [];
     }
 
+    const defaultRoute = normalizeLayoutPresetRoute(record.defaultRoute);
+
     return [
       {
+        ...(defaultRoute ? { defaultRoute } : {}),
         ...(typeof record.iconId === 'string' ? { iconId: record.iconId } : {}),
         id: record.id,
         label: record.label,
@@ -1576,6 +1608,20 @@ const normalizeCustomLayoutPresets = (presets: unknown): LayoutPreset[] => {
       },
     ];
   });
+};
+
+const normalizeLayoutPresetRouteOverrides = (overrides: unknown) => {
+  if (!overrides || typeof overrides !== 'object') {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(overrides as Record<string, unknown>).flatMap(([presetId, route]) => {
+      const normalizedRoute = normalizeLayoutPresetRoute(route);
+
+      return normalizedRoute ? [[resolveLayoutPresetId(presetId), normalizedRoute]] : [];
+    })
+  );
 };
 
 const normalizeLayoutPresetOverrides = (overrides: unknown): LayoutPresetOverrides => {
@@ -1594,6 +1640,7 @@ const normalizeAccount = (account: Partial<WorkbenchState['account']> | undefine
   activeLayoutPresetId: resolveLayoutPresetId(account?.activeLayoutPresetId ?? defaultLayoutPreset.id),
   customLayoutPresets: normalizeCustomLayoutPresets(account?.customLayoutPresets),
   layoutPresetOverrides: normalizeLayoutPresetOverrides(account?.layoutPresetOverrides),
+  layoutPresetRouteOverrides: normalizeLayoutPresetRouteOverrides(account?.layoutPresetRouteOverrides),
 });
 
 const normalizeWorkbenchState = (state: WorkbenchState): WorkbenchState => ({
@@ -1653,12 +1700,17 @@ const applyLayoutPresetToProject = (project: Project, preset: LayoutPreset): Pro
   };
 };
 
-const updateActiveProjectLayoutPreset = (state: WorkbenchState, preset: LayoutPreset): WorkbenchState =>
+const updateActiveProjectLayoutPreset = (
+  state: WorkbenchState,
+  preset: LayoutPreset,
+  { applyDefaultRoute }: { applyDefaultRoute: boolean }
+): WorkbenchState =>
   updateActiveProject(state, (project) => {
     const nextProject = pushUndo(project, 'Update layout');
+    const nextLayoutProject = applyLayoutPresetToProject(nextProject, preset);
 
     return {
-      ...applyLayoutPresetToProject(nextProject, preset),
+      ...nextLayoutProject,
       events: [
         {
           createdAt: now(),
@@ -1668,6 +1720,9 @@ const updateActiveProjectLayoutPreset = (state: WorkbenchState, preset: LayoutPr
         },
         ...nextProject.events,
       ],
+      invocation: applyDefaultRoute
+        ? getInvocationAfterLayoutPreset(nextProject.invocation, preset)
+        : nextLayoutProject.invocation,
     };
   });
 
@@ -2540,7 +2595,7 @@ export const __workbenchReducerInternal = (
     }
     case 'applyPreset': {
       const preset = getAvailableLayoutPreset(state, action.presetId);
-      const nextState = updateActiveProjectLayoutPreset(state, preset);
+      const nextState = updateActiveProjectLayoutPreset(state, preset, { applyDefaultRoute: true });
 
       return {
         ...nextState,
@@ -2555,6 +2610,16 @@ export const __workbenchReducerInternal = (
       }
 
       const preset: LayoutPreset = {
+        ...(action.defaultRoute === null
+          ? {}
+          : {
+              defaultRoute: action.defaultRoute
+                ? { ...action.defaultRoute }
+                : {
+                    destination: activeProject.invocation.destination,
+                    sourceId: activeProject.invocation.sourceId,
+                  },
+            }),
         iconId: action.iconId,
         id: action.presetId,
         label: action.label.trim() || 'Custom layout',
@@ -2600,8 +2665,12 @@ export const __workbenchReducerInternal = (
     }
     case 'restoreLayoutPresetDefault': {
       const { [action.presetId]: removed, ...layoutPresetOverrides } = state.account.layoutPresetOverrides ?? {};
+      const { [action.presetId]: removedRoute, ...layoutPresetRouteOverrides } =
+        state.account.layoutPresetRouteOverrides ?? {};
 
-      return removed ? { ...state, account: { ...state.account, layoutPresetOverrides } } : state;
+      return removed || removedRoute
+        ? { ...state, account: { ...state.account, layoutPresetOverrides, layoutPresetRouteOverrides } }
+        : state;
     }
     case 'setLayoutPresetIcon': {
       return {
@@ -2611,6 +2680,53 @@ export const __workbenchReducerInternal = (
           customLayoutPresets: (state.account.customLayoutPresets ?? []).map((preset) =>
             preset.id === action.presetId ? { ...preset, iconId: action.iconId } : preset
           ),
+        },
+      };
+    }
+    case 'setLayoutPresetRoute': {
+      if (isBuiltInLayoutPresetId(action.presetId)) {
+        const shippedRoute = getLayoutPreset(action.presetId).defaultRoute;
+        const matchesShippedRoute =
+          action.defaultRoute !== null &&
+          shippedRoute !== undefined &&
+          action.defaultRoute.destination === shippedRoute.destination &&
+          action.defaultRoute.sourceId === shippedRoute.sourceId;
+
+        if (action.defaultRoute === null || matchesShippedRoute) {
+          const { [action.presetId]: _removed, ...layoutPresetRouteOverrides } =
+            state.account.layoutPresetRouteOverrides ?? {};
+
+          return { ...state, account: { ...state.account, layoutPresetRouteOverrides } };
+        }
+
+        return {
+          ...state,
+          account: {
+            ...state.account,
+            layoutPresetRouteOverrides: {
+              ...state.account.layoutPresetRouteOverrides,
+              [action.presetId]: { ...action.defaultRoute },
+            },
+          },
+        };
+      }
+
+      return {
+        ...state,
+        account: {
+          ...state.account,
+          customLayoutPresets: (state.account.customLayoutPresets ?? []).map((preset) => {
+            if (preset.id !== action.presetId) {
+              return preset;
+            }
+            if (action.defaultRoute) {
+              return { ...preset, defaultRoute: { ...action.defaultRoute } };
+            }
+
+            const { defaultRoute: _removed, ...withoutRoute } = preset;
+
+            return withoutRoute;
+          }),
         },
       };
     }
@@ -2661,7 +2777,7 @@ export const __workbenchReducerInternal = (
           state.account.activeLayoutPresetId
       );
 
-      return updateActiveProjectLayoutPreset(state, preset);
+      return updateActiveProjectLayoutPreset(state, preset, { applyDefaultRoute: false });
     }
     case 'recoverShellLayout': {
       return updateActiveLayout(state, (layout) => ({

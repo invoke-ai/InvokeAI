@@ -8,6 +8,7 @@ import type {
   LayoutPreset,
   LayoutPresetId,
   LayoutPresetOverrides,
+  LayoutPresetRouteOverrides,
   ProjectLayoutState,
   WidgetRegion,
   WidgetRegionState,
@@ -131,4 +132,6 @@ export interface AccountState {
   customLayoutPresets?: LayoutPreset[];
   /** Saved edits to a built-in preset's arrangement; see {@link LayoutPresetOverrides}. */
   layoutPresetOverrides?: LayoutPresetOverrides;
+  /** Saved edits to built-in preset routes, kept separate from spatial layout drift. */
+  layoutPresetRouteOverrides?: LayoutPresetRouteOverrides;
 }

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { LayoutPresetRoute } from './layoutContracts';
 import type { WorkbenchInternalStore, WorkbenchSnapshot } from './workbenchStore';
 
 import { clearProjectDiagnostics, configureDiagnostics, getProjectDiagnostics } from './diagnostics/logger';
@@ -127,6 +128,30 @@ describe('createWorkbenchStore', () => {
     store.commands.gallery.setSearchTerm('positional form', projectId);
 
     expect(getProjectWidgetValues(store.getSnapshot().activeProject, 'gallery').searchTerm).toBe('positional form');
+  });
+
+  it('edits a preset default route through the layout capability', () => {
+    const store = createWorkbenchStore();
+
+    store.commands.layout.setPresetRoute('compose', { destination: 'canvas', sourceId: 'upscale' });
+
+    expect(store.getSnapshot().account.layoutPresetRouteOverrides?.compose).toEqual({
+      destination: 'canvas',
+      sourceId: 'upscale',
+    });
+  });
+
+  it('creates a custom preset with an explicitly selected default route in one command', () => {
+    const store = createWorkbenchStore();
+    const defaultRoute: LayoutPresetRoute = { destination: 'gallery', sourceId: 'workflow' };
+
+    store.commands.layout.createPreset('custom-explicit-route', 'Workflow layout', 'workflow', defaultRoute);
+    defaultRoute.destination = 'canvas';
+
+    expect(store.getSnapshot().account.customLayoutPresets?.[0]?.defaultRoute).toEqual({
+      destination: 'gallery',
+      sourceId: 'workflow',
+    });
   });
 
   it('dispatches nullary commands with no payload', () => {
