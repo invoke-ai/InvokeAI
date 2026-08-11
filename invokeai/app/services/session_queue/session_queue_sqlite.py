@@ -1394,7 +1394,8 @@ class SqliteSessionQueue(SessionQueueBase):
                         sq.user_id,
                         u.display_name AS user_display_name,
                         u.email AS user_email,
-                        sq.field_values
+                        sq.field_values,
+                        sq.parent_item_id
                     FROM session_queue sq
                     LEFT JOIN users u ON sq.user_id = u.user_id
                     WHERE sq.queue_id = ? AND sq.item_id IN ({placeholders})

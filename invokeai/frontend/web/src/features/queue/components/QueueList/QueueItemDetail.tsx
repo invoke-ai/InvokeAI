@@ -18,11 +18,11 @@ import type { S } from 'services/api/types';
 import { getQueueItemActionVisibility } from './getQueueItemActionVisibility';
 
 type Props = {
-  queueItem: S['SessionQueueItem'];
+  queueItem: S['SessionQueueItemSummary'];
 };
 
-const QueueItemComponent = ({ queueItem: queueItemDTO }: Props) => {
-  const { session_id, batch_id, item_id, origin, destination } = queueItemDTO;
+const QueueItemComponent = ({ queueItem: queueItemSummary }: Props) => {
+  const { batch_id, item_id, origin, destination } = queueItemSummary;
   const { t } = useTranslation();
   const isBatchCanceled = useBatchIsCanceled(batch_id);
   const cancelBatch = useCancelBatch();
@@ -54,8 +54,8 @@ const QueueItemComponent = ({ queueItem: queueItemDTO }: Props) => {
 
   const isFailed = useMemo(() => !!queueItem && ['canceled', 'failed'].includes(queueItem.status), [queueItem]);
   const { canShowCancelQueueItem, canShowRetryQueueItem } = useMemo(
-    () => getQueueItemActionVisibility(queueItemDTO),
-    [queueItemDTO]
+    () => getQueueItemActionVisibility(queueItemSummary),
+    [queueItemSummary]
   );
 
   const onCancelBatch = useCallback(() => {
@@ -86,7 +86,7 @@ const QueueItemComponent = ({ queueItem: queueItemDTO }: Props) => {
         <QueueItemData label={t('queue.destination')} data={destinationText} />
         <QueueItemData label={t('queue.item')} data={item_id} />
         <QueueItemData label={t('queue.batch')} data={batch_id} />
-        <QueueItemData label={t('queue.session')} data={session_id} />
+        <QueueItemData label={t('queue.session')} data={queueItem?.session_id ?? t('common.loading')} />
         <ButtonGroup size="xs" orientation="vertical">
           {canShowCancelQueueItem && !isFailed && (
             <Button

@@ -32,10 +32,10 @@ export type GetQueueItemIdsResult =
   paths['/api/v1/queue/{queue_id}/item_ids']['get']['responses']['200']['content']['application/json'];
 export type GetQueueItemIdsArgs = NonNullable<paths['/api/v1/queue/{queue_id}/item_ids']['get']['parameters']['query']>;
 
-export type GetQueueItemDTOsByItemIdsResult =
-  paths['/api/v1/queue/{queue_id}/items_by_ids']['post']['responses']['200']['content']['application/json'];
-export type GetQueueItemDTOsByItemIdsArgs =
-  paths['/api/v1/queue/{queue_id}/items_by_ids']['post']['requestBody']['content']['application/json'];
+export type GetQueueItemSummariesByItemIdsResult =
+  paths['/api/v1/queue/{queue_id}/item_summaries_by_ids']['post']['responses']['200']['content']['application/json'];
+export type GetQueueItemSummariesByItemIdsArgs =
+  paths['/api/v1/queue/{queue_id}/item_summaries_by_ids']['post']['requestBody']['content']['application/json'];
 
 export type InputFieldJSONSchemaExtra = S['InputFieldJSONSchemaExtra'];
 export type OutputFieldJSONSchemaExtra = S['OutputFieldJSONSchemaExtra'];

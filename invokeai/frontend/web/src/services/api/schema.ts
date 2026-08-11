@@ -34128,6 +34128,11 @@ export type components = {
              * @description The batch field values used for this queue item
              */
             field_values: components["schemas"]["NodeFieldValue"][] | null;
+            /**
+             * Parent Item Id
+             * @description The ID of the parent queue item, if this is a child item
+             */
+            parent_item_id: number | null;
         };
         /** SessionQueueStatus */
         SessionQueueStatus: {
