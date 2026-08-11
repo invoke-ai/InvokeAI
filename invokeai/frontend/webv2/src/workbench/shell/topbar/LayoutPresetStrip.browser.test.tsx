@@ -80,9 +80,24 @@ const presetTabIds = () =>
 const presetTab = (id: string): HTMLButtonElement | null =>
   document.querySelector<HTMLButtonElement>(`[role="tab"][data-layout-preset-id="${id}"]`);
 
-const pointer = (type: string, target: EventTarget, clientX: number, clientY: number): void => {
+const mouse = (type: string, target: EventTarget, clientX: number, clientY: number): void => {
   target.dispatchEvent(
-    new PointerEvent(type, { bubbles: true, button: 0, clientX, clientY, isPrimary: true, pointerId: 1 })
+    new MouseEvent(type, { bubbles: true, button: 0, buttons: type === 'mouseup' ? 0 : 1, clientX, clientY })
+  );
+};
+
+const touch = (type: string, target: EventTarget, touchTarget: EventTarget, clientX: number, clientY: number): void => {
+  const point = new Touch({ clientX, clientY, identifier: 1, target: touchTarget });
+  const isEnd = type === 'touchend' || type === 'touchcancel';
+
+  target.dispatchEvent(
+    new TouchEvent(type, {
+      bubbles: true,
+      cancelable: true,
+      changedTouches: [point],
+      targetTouches: isEnd ? [] : [point],
+      touches: isEnd ? [] : [point],
+    })
   );
 };
 
@@ -127,16 +142,48 @@ describe('LayoutPresetStrip', () => {
     const startY = start.top + start.height / 2;
     const endX = end.left + end.width / 2;
 
-    await act(() => pointer('pointerdown', source!, startX, startY));
-    await act(() => pointer('pointermove', source!.ownerDocument, startX + 8, startY));
-    await act(() => pointer('pointermove', source!.ownerDocument, endX, startY));
-    await act(() => pointer('pointerup', source!.ownerDocument, endX, startY));
+    await act(() => mouse('mousedown', source!, startX, startY));
+    await act(() => mouse('mousemove', source!.ownerDocument, startX + 8, startY));
+    await act(() => mouse('mousemove', source!.ownerDocument, endX, startY));
+    await act(() => mouse('mouseup', source!.ownerDocument, endX, startY));
 
     expect(store.getSnapshot().account.layoutPresetOrder).toEqual(['custom-1', 'edit', 'automate', 'compose']);
     expect(store.getSnapshot().activeProject.layout.presetId).toBe(activeBeforeDrag);
   });
 
-  it('does not auto-scroll the strip while dragging near its right edge', async () => {
+  it('keeps a non-overflowing strip stationary while dragging near its right edge', async () => {
+    await renderStrip();
+    const scrollContainer = document.querySelector<HTMLElement>('[data-layout-preset-scroll]');
+    const source = presetTab('compose');
+    expect(scrollContainer).not.toBeNull();
+    expect(source).not.toBeNull();
+    Object.defineProperty(scrollContainer!, 'scrollWidth', {
+      configurable: true,
+      value: scrollContainer!.clientWidth,
+    });
+    expect(scrollContainer!.scrollWidth).toBeLessThanOrEqual(scrollContainer!.clientWidth);
+    const sourceRect = source!.getBoundingClientRect();
+    const containerRect = scrollContainer!.getBoundingClientRect();
+    const startX = sourceRect.left + sourceRect.width / 2;
+    const startY = sourceRect.top + sourceRect.height / 2;
+    const edgeX = containerRect.right - 2;
+
+    await act(() => mouse('mousedown', source!, startX, startY));
+    await act(() => mouse('mousemove', source!.ownerDocument, startX + 8, startY));
+    await act(() => mouse('mousemove', source!.ownerDocument, edgeX, startY));
+    await act(
+      () =>
+        new Promise<void>((resolve) => {
+          globalThis.setTimeout(resolve, 150);
+        })
+    );
+
+    expect(scrollContainer!.scrollLeft).toBe(0);
+
+    await act(() => mouse('mouseup', source!.ownerDocument, edgeX, startY));
+  });
+
+  it('auto-scrolls only an overflowing strip and stops when the drag ends', async () => {
     for (let index = 2; index <= 8; index += 1) {
       store.commands.layout.createPreset(`custom-${index}`, `Custom ${index}`, 'star');
     }
@@ -152,18 +199,63 @@ describe('LayoutPresetStrip', () => {
     const startY = sourceRect.top + sourceRect.height / 2;
     const edgeX = containerRect.right - 2;
 
-    await act(() => pointer('pointerdown', source!, startX, startY));
-    await act(() => pointer('pointermove', source!.ownerDocument, startX + 8, startY));
-    await act(() => pointer('pointermove', source!.ownerDocument, edgeX, startY));
+    await act(() => mouse('mousedown', source!, startX, startY));
+    await act(() => mouse('mousemove', source!.ownerDocument, startX + 8, startY));
+    await act(() => mouse('mousemove', source!.ownerDocument, edgeX, startY));
     await act(
       () =>
         new Promise<void>((resolve) => {
-          globalThis.setTimeout(resolve, 150);
+          globalThis.setTimeout(resolve, 250);
         })
     );
 
-    expect(scrollContainer!.scrollLeft).toBe(0);
+    expect(scrollContainer!.scrollLeft).toBeGreaterThan(0);
 
-    await act(() => pointer('pointerup', source!.ownerDocument, edgeX, startY));
+    await act(() => mouse('mouseup', source!.ownerDocument, edgeX, startY));
+    const scrollLeftAfterDrop = scrollContainer!.scrollLeft;
+    await act(
+      () =>
+        new Promise<void>((resolve) => {
+          globalThis.setTimeout(resolve, 100);
+        })
+    );
+
+    expect(scrollContainer!.scrollLeft).toBe(scrollLeftAfterDrop);
+  });
+
+  it('preserves horizontal touch panning and reorders after a long press', async () => {
+    await renderStrip();
+    const source = presetTab('compose');
+    const target = presetTab('automate');
+    expect(source).not.toBeNull();
+    expect(target).not.toBeNull();
+    expect(getComputedStyle(source!).touchAction).toBe('pan-x');
+    const start = source!.getBoundingClientRect();
+    const end = target!.getBoundingClientRect();
+    const startX = start.left + start.width / 2;
+    const startY = start.top + start.height / 2;
+    const endX = end.left + end.width / 2;
+
+    await act(() => touch('touchstart', source!, source!, startX, startY));
+    expect(source!.style.opacity).not.toBe('0.5');
+    await act(
+      () =>
+        new Promise<void>((resolve) => {
+          globalThis.setTimeout(resolve, 100);
+        })
+    );
+    expect(source!.style.opacity).not.toBe('0.5');
+    await act(
+      () =>
+        new Promise<void>((resolve) => {
+          globalThis.setTimeout(resolve, 200);
+        })
+    );
+    expect(source!.style.opacity).toBe('0.5');
+    await act(() => touch('touchmove', source!, source!, endX, startY));
+    await act(() => touch('touchend', source!, source!, endX, startY));
+
+    expect(source!.style.opacity).not.toBe('0.5');
+    expect(store.getSnapshot().account.layoutPresetOrder).toEqual(['custom-1', 'edit', 'automate', 'compose']);
   });
 });

@@ -1,10 +1,10 @@
-import type { DragEndEvent } from '@dnd-kit/core';
+import type { AutoScrollOptions, DragEndEvent } from '@dnd-kit/core';
 import type { LayoutPreset, LayoutPresetId } from '@workbench/layoutContracts';
 import type { Project } from '@workbench/projectContracts';
 import type { KeyboardEvent, MouseEvent } from 'react';
 
 import { Box, HStack, Icon, Menu, Portal, Text, VisuallyHidden } from '@chakra-ui/react';
-import { closestCenter, DndContext, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { closestCenter, DndContext, MouseSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { restrictToHorizontalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
 import { horizontalListSortingStrategy, SortableContext, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -26,7 +26,7 @@ import {
   SettingsIcon,
   Trash2Icon,
 } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { LayoutPresetDialogValue } from './layoutPresetDialogModel';
@@ -41,7 +41,8 @@ import { useTopbarShortcut } from './useTopbarShortcut';
 const PRESET_MENU_ATTRIBUTE = 'data-preset-menu';
 const PRESET_SCROLL_CSS = { '&::-webkit-scrollbar': { display: 'none' }, scrollbarWidth: 'none' } as const;
 const DND_MODIFIERS = [restrictToHorizontalAxis, restrictToParentElement];
-const POINTER_SENSOR_OPTIONS = { activationConstraint: { distance: 6 } } as const;
+const MOUSE_SENSOR_OPTIONS = { activationConstraint: { distance: 6 } } as const;
+const TOUCH_SENSOR_OPTIONS = { activationConstraint: { delay: 250, tolerance: 5 } } as const;
 
 const createCustomPresetId = (): string =>
   `custom-layout-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -56,6 +57,7 @@ export const LayoutPresetStrip = () => {
   const { t } = useTranslation();
   const { activePreset, hasDrifted } = useLayoutDrift();
   const { layout } = useWorkbenchCommands();
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isSaveAsOpen, setIsSaveAsOpen] = useState(false);
   const [menuTarget, setMenuTarget] = useState<{ anchor: DOMRect; preset: LayoutPreset } | null>(null);
 
@@ -64,7 +66,16 @@ export const LayoutPresetStrip = () => {
   const sourceOptions = useActiveProjectSelector(selectPlacedGraphWidgetSources);
   const presets = useMemo(() => getOrderedLayoutPresets(account), [account]);
   const presetIds = useMemo(() => presets.map(({ id }) => id), [presets]);
-  const sensors = useSensors(useSensor(PointerSensor, POINTER_SENSOR_OPTIONS));
+  const sensors = useSensors(
+    useSensor(MouseSensor, MOUSE_SENSOR_OPTIONS),
+    useSensor(TouchSensor, TOUCH_SENSOR_OPTIONS)
+  );
+  const autoScroll = useMemo<AutoScrollOptions>(
+    () => ({
+      canScroll: (element) => element === scrollContainerRef.current && element.scrollWidth > element.clientWidth,
+    }),
+    []
+  );
   const saveAsDefaultRoute = useMemo(
     () => ({ destination: invocation.destination, sourceId: invocation.sourceId }),
     [invocation.destination, invocation.sourceId]
@@ -111,9 +122,16 @@ export const LayoutPresetStrip = () => {
   return (
     <>
       <HStack gap="1" justify="center" maxW="min(36vw, 44rem)" minW="0">
-        <Box css={PRESET_SCROLL_CSS} data-layout-preset-scroll="" maxW="full" minW="0" overflowX="auto">
+        <Box
+          ref={scrollContainerRef}
+          css={PRESET_SCROLL_CSS}
+          data-layout-preset-scroll=""
+          maxW="full"
+          minW="0"
+          overflowX="auto"
+        >
           <DndContext
-            autoScroll={false}
+            autoScroll={autoScroll}
             collisionDetection={closestCenter}
             modifiers={DND_MODIFIERS}
             sensors={sensors}
@@ -269,6 +287,7 @@ const PresetTab = ({
       data-layout-preset-id={preset.id}
       gap="1.5"
       style={dndStyle}
+      touchAction="pan-x"
       value={preset.id}
       onClick={handleClick}
       onContextMenu={handleContextMenu}
