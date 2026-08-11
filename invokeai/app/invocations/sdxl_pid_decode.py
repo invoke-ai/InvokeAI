@@ -178,8 +178,6 @@ class SDXLPiDDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
             latents,
             BaseModelType.StableDiffusionXL,
             pid_memory_optimization,
-            model=pid_info.model,
-            device=pid_info.compute_device,
         )
         with pid_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, pid_net):
             if not isinstance(pid_net, PidNet):

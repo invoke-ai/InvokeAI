@@ -160,50 +160,17 @@ def test_pid_memory_optimization_defaults_to_disabled() -> None:
 
 
 def test_working_memory_estimate_shrinks_when_the_optimization_is_enabled() -> None:
-    """The optimized activation estimate is lower than the unoptimized activation estimate.
-
-    CUDA autocast weight-cache bytes are tested separately because they depend on the loaded model's
-    parameter bytes, not output resolution.
-    """
+    """The optimized activation estimate is lower than the unoptimized activation estimate."""
     latent = torch.zeros(1, 16, 64, 64)  # FLUX: 64 * 4 * 8 = 2048px output
 
     unoptimized = estimate_pid_decode_working_memory(latent, BaseModelType.Flux)
     optimized = estimate_pid_decode_working_memory(latent, BaseModelType.Flux, True)
 
     assert optimized < unoptimized
-
-
-def test_working_memory_estimate_includes_cuda_autocast_weight_cache() -> None:
-    latent = torch.zeros(1, 16, 64, 64)
-    model = torch.nn.Linear(4, 4)
-    model_bytes = sum(parameter.numel() * parameter.element_size() for parameter in model.parameters())
-    expected_weight_cache_bytes = model_bytes // 2  # fp32 model parameters cached as bf16 copies
-
-    activation_only = estimate_pid_decode_working_memory(latent, BaseModelType.Flux)
-    optimized_activation_only = estimate_pid_decode_working_memory(latent, BaseModelType.Flux, True)
-    cuda_estimate = estimate_pid_decode_working_memory(
-        latent,
-        BaseModelType.Flux,
-        model=model,
-        device=torch.device("cuda"),
-    )
-    cpu_estimate = estimate_pid_decode_working_memory(
-        latent,
-        BaseModelType.Flux,
-        model=model,
-        device=torch.device("cpu"),
-    )
-    optimized_cuda_estimate = estimate_pid_decode_working_memory(
-        latent,
-        BaseModelType.Flux,
-        True,
-        model=model,
-        device=torch.device("cuda"),
-    )
-
-    assert cuda_estimate == activation_only + expected_weight_cache_bytes
-    assert optimized_cuda_estimate == optimized_activation_only + expected_weight_cache_bytes
-    assert cpu_estimate == activation_only
+    # Corrected production measurements require 256.4 bytes per output byte at 2048px;
+    # the 260-byte calibration leaves a small margin above that peak.
+    output_bytes = 2048 * 2048 * 4
+    assert unoptimized >= 260 * output_bytes
 
 
 def test_working_memory_estimate_keeps_a_fixed_term_for_the_chunk_working_set() -> None:

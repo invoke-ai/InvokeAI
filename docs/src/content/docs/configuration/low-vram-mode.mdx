@@ -157,7 +157,7 @@ To reduce PiD's peak VRAM use, enable its experimental memory optimization in `i
 pid_memory_optimization: true
 ```
 
-This setting processes parts of the PiD pixel pathway in chunks and uses float32 instead of float64 sampler intermediates. It applies to every supported PiD decoder. Measured on an RTX 4090, peak activation memory for a 2048px decode drops from ~3.7 GB to ~1.5 GB (1024px: ~0.9 GB to ~0.5 GB). CUDA working-memory reservations also include temporary bf16 autocast copies of the float32 PiD weights; those model-sized copies are not included in the activation figures.
+This setting processes parts of the PiD pixel pathway in chunks and uses float32 instead of float64 sampler intermediates. It applies to every supported PiD decoder. Measured on an RTX 4090, peak activation memory for a 2048px decode drops from ~3.7 GB to ~1.5 GB (1024px: ~0.9 GB to ~0.5 GB).
 
 `device_working_mem_gb` sets a floor for the reservation. To realize the full PiD savings at 1024px-2048px, lower that setting as needed for your GPU.
 

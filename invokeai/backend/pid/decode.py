@@ -125,15 +125,14 @@ PID_MODEL_MAX_LENGTH: int = 300
 
 # Working-memory estimate for the PiD decode, mirroring `estimate_vae_working_memory_*` (see #8414).
 # PiD runs a multi-step pixel-diffusion in float32 at the full super-resolved output resolution, so its peak
-# activation memory scales with the total OUTPUT pixel count across the batch. CUDA autocast also caches bf16
-# copies of the fp32 PidNet weights; that model-sized term is added from the loaded model below.
+# activation memory scales with the total OUTPUT pixel count across the batch.
 #
 # This is working-memory headroom reserved for the decode itself - it does NOT do the heavy lifting of evicting
 # the main transformer/encoders (the nodes call context.models.offload_all_from_vram() for that before loading
-# PidNet). It includes activation headroom plus the CUDA autocast weight-cache term when a model is supplied.
+# PidNet).
 # The cache uses max(this_estimate, device_working_mem_gb=3GB), and an over-large value pushes the working set
 # negative and forces PidNet to partial-load onto the CPU (slow). Experimentally-tunable; calibrate to peak.
-_PID_DECODE_WORKING_MEMORY_SCALING_CONSTANT = 250
+_PID_DECODE_WORKING_MEMORY_SCALING_CONSTANT = 260
 
 # The same estimate for `pid_memory_optimization=True`. Chunking bounds the per-block activations to a fixed
 # working set, so the peak stops being a pure multiple of the output size: it is a smaller per-pixel term plus a
@@ -143,8 +142,8 @@ _PID_DECODE_WORKING_MEMORY_SCALING_CONSTANT = 250
 #   1024px  509 MiB (127.2 * U)   1536px  934 MiB (103.8 * U)   2048px  1533 MiB (95.8 * U)
 # Least-squares fit: 85.3 * U + 167 MiB. The earlier 95 * U + 224 MiB calibration carried ~15% headroom
 # over that fit at the measured sizes.
-# The fit underestimates the larger, default-cache path; 120 * U + 224 MiB keeps a small safety margin
-# over the measured 2048px-4096px peaks after the bf16 weight-cache term is added below.
+# The fit underestimates the larger-output path; 120 * U + 224 MiB keeps a small safety margin over the
+# measured 2048px-4096px peaks.
 #
 # Keeping the unoptimized constant here would be the bug the flag is supposed to avoid: the cache takes
 # max(this_estimate, device_working_mem_gb) and subtracts it from the weight budget, so reserving 4GB for a decode
@@ -158,17 +157,13 @@ def estimate_pid_decode_working_memory(
     latent: Tensor,
     backbone: BaseModelType,
     pid_memory_optimization: bool = False,
-    *,
-    model: Optional[torch.nn.Module] = None,
-    device: Optional[torch.device] = None,
 ) -> int:
     """Estimate the working memory in bytes for a PiD decode of *latent*.
 
     Each decoded image is ``latent_spatial * sr_scale * latent_spatial_down_factor`` pixels per side. PidNet
     runs in float32 (see ``model_loaders/pid_decoder.py``), so the element size is 4 bytes. The per-pixel term
-    covers every image in the latent batch. When a CUDA model is supplied, the estimate also includes the bf16
-    autocast cache for its fp32 parameters. Returns 0 for unsupported backbones so callers fall back to the
-    cache's default working-memory reservation.
+    covers every image in the latent batch. Returns 0 for unsupported backbones so callers fall back to the cache's
+    default working-memory reservation.
 
     ``pid_memory_optimization`` must mirror the flag passed to :class:`PiDDecodeConfig` for the same decode -
     otherwise the cache reserves headroom for a peak that will not happen.
@@ -182,16 +177,7 @@ def estimate_pid_decode_working_memory(
     element_size = 4  # PidNet runs in float32 (see model_loaders/pid_decoder.py)
     batch_size = int(latent.shape[0])
     output_bytes = batch_size * out_h * out_w * element_size
-    autocast_weight_cache_bytes = 0
-    if model is not None and device is not None and device.type == "cuda":
-        # CUDA autocast caches fp32 parameters as bf16 tensors for the duration of the autocast context.
-        # PidNet is intentionally kept in fp32; see PiDDecoderLoader._load_model().
-        autocast_weight_cache_bytes = sum(
-            parameter.numel() * 2  # bfloat16 element size
-            for parameter in model.parameters()
-            if parameter.dtype == torch.float32
-        )
-    unoptimized = int(output_bytes * _PID_DECODE_WORKING_MEMORY_SCALING_CONSTANT) + autocast_weight_cache_bytes
+    unoptimized = int(output_bytes * _PID_DECODE_WORKING_MEMORY_SCALING_CONSTANT)
     if not pid_memory_optimization:
         return unoptimized
     patch_size = int(_PID_SR4X_BASE["patch_size"])
@@ -199,10 +185,7 @@ def estimate_pid_decode_working_memory(
     if patch_tokens <= _PID_ACTIVATION_CHUNK_SIZE:
         # The pixel blocks take the unchunked path at and below the threshold.
         return unoptimized
-    chunked = (
-        int(output_bytes * _PID_DECODE_CHUNKED_SCALING_CONSTANT + _PID_DECODE_CHUNKED_FIXED_BYTES)
-        + autocast_weight_cache_bytes
-    )
+    chunked = int(output_bytes * _PID_DECODE_CHUNKED_SCALING_CONSTANT + _PID_DECODE_CHUNKED_FIXED_BYTES)
     # The fixed term makes the calibrated chunked formula temporarily greater than the unoptimized
     # formula just after chunking engages. Keep the unoptimized estimate until the formulas cross;
     # after that point the chunked estimate is the lower (optimized) reservation.
