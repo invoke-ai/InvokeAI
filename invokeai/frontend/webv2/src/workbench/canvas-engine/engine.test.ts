@@ -12626,6 +12626,108 @@ describe('document mirror wiring: prop vs source change (paint-pixel survival)',
     uploadImage.mockRestore();
   });
 
+  it('defers paint-cache trimming while a guarded canvas operation owns the layer', async () => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
+    const reducer = createReducerBackedStore(paintDoc());
+    const uploadImage = vi
+      .spyOn(canvasApplicationPort, 'uploadImage')
+      .mockResolvedValue({ height: 40, imageName: 'persisted-after-operation.png', width: 60 });
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend({ readbackAlpha: 255 }),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: reducer.projectId,
+      store: reducer.store,
+    });
+    const overlay = createInputCanvas();
+    engine.surface.attach(createInputCanvas().element, overlay.element);
+    engine.tools.setTool('brush');
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+
+    overlay.fire('pointerdown', pointerAt(20, 20));
+    overlay.fire('pointermove', pointerAt(40, 40));
+    overlay.fire('pointerup', pointerAt(40, 40, { buttons: 0 }));
+    expect(getCanvasOperations(engine).startFilterOperation('paint1')).toBe('started');
+    expect(getCanvasOperations(engine).setFilterOperationAutoProcess(false)).toBe('updated');
+
+    await expect(engine.lifecycle.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed');
+    expect(uploadImage).not.toHaveBeenCalled();
+    expect(getCanvasOperations(engine).controller.getSnapshot()).toMatchObject({ status: 'active' });
+
+    getCanvasOperations(engine).cancelFilterOperation();
+    await expect(engine.lifecycle.flushPendingUploads()).resolves.toBeUndefined();
+    expect(uploadImage).toHaveBeenCalledOnce();
+
+    engine.lifecycle.dispose();
+    uploadImage.mockRestore();
+  });
+
+  it('defers paint-cache trimming while a raster snapshot pins the layer', async () => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
+    const reducer = createReducerBackedStore(paintDoc());
+    const uploadImage = vi
+      .spyOn(canvasApplicationPort, 'uploadImage')
+      .mockResolvedValue({ height: 40, imageName: 'persisted-after-snapshot.png', width: 60 });
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend({ readbackAlpha: 255 }),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: reducer.projectId,
+      store: reducer.store,
+    });
+    const overlay = createInputCanvas();
+    engine.surface.attach(createInputCanvas().element, overlay.element);
+    engine.tools.setTool('brush');
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+
+    overlay.fire('pointerdown', pointerAt(20, 20));
+    overlay.fire('pointermove', pointerAt(40, 40));
+    overlay.fire('pointerup', pointerAt(40, 40, { buttons: 0 }));
+    const documentSnapshot = engine.document.captureSnapshot();
+    if (!documentSnapshot) {
+      throw new Error('expected a document snapshot');
+    }
+    const capture = engine.exports.captureRasterSnapshot(documentSnapshot, ['paint1']);
+
+    await expect(engine.lifecycle.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed');
+    expect(uploadImage).not.toHaveBeenCalled();
+
+    const captured = await capture;
+    expect(captured.status).toBe('ok');
+    if (captured.status === 'ok') {
+      captured.snapshot.release();
+    }
+    await expect(engine.lifecycle.flushPendingUploads()).resolves.toBeUndefined();
+    expect(uploadImage).toHaveBeenCalledOnce();
+
+    engine.lifecycle.dispose();
+    uploadImage.mockRestore();
+  });
+
   it('keeps an unflushed paint layer’s pixels on a transform/opacity-only change (no re-rasterize)', async () => {
     const { engine, paintCache, raf, resolver, setDocument } = await paintOneStroke();
 

@@ -41,13 +41,12 @@ export interface StubRasterBackend extends RasterBackend {
 /** Options for {@link createTestStubRasterBackend}. */
 export interface StubRasterBackendOptions {
   /**
-   * The alpha every pixel of a synthetic readback reports (default `0`).
+   * The alpha every pixel of a synthetic readback reports (default `255`).
    *
    * A transparent readback MEANS something: the paint-cache trim reads alpha to
    * decide whether a layer still has content, and clears one that has none. A test
-   * driving persistence through the engine's OWN bitmap store must therefore declare
-   * `readbackAlpha: 255`, or no upload will happen. Tests that inject their own
-   * bitmap store are unaffected.
+   * driving an explicitly empty-cache path must therefore declare
+   * `readbackAlpha: 0`; ordinary engine-integration tests default to visible pixels.
    */
   readbackAlpha?: number;
 }
@@ -177,7 +176,7 @@ class StubRasterSurfaceImpl implements StubRasterSurface {
   width: number;
   height: number;
 
-  constructor(width: number, height: number, readbackAlpha = 0) {
+  constructor(width: number, height: number, readbackAlpha = 255) {
     this.width = width;
     this.height = height;
     this.canvas = { height, width } as unknown as OffscreenCanvas | HTMLCanvasElement;
@@ -213,7 +212,7 @@ export const createTestStubRasterBackend = (options: StubRasterBackendOptions = 
     return Promise.resolve({ close: () => {}, height: 0, width: 0 } as unknown as ImageBitmap);
   },
   createSurface: (width: number, height: number): StubRasterSurface =>
-    new StubRasterSurfaceImpl(width, height, options.readbackAlpha ?? 0),
+    new StubRasterSurfaceImpl(width, height, options.readbackAlpha ?? 255),
   // Deterministic fake blob keyed on the surface size, so encode calls are
   // reproducible in node without touching a real canvas.
   encodeSurface: (surface: RasterSurface, type = 'image/png'): Promise<Blob> =>

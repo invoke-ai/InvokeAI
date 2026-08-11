@@ -241,10 +241,8 @@ const pointerAt = (x: number, y: number, buttons = 1): Partial<PointerEvent> =>
   }) as Partial<PointerEvent>;
 
 /**
- * `readbackAlpha` declares that the stub's surfaces report pixels — required by any
- * test that drives persistence through the engine's own bitmap store, since the
- * paint-cache trim reads alpha to decide whether a layer still has content. See
- * `StubRasterBackendOptions`.
+ * `readbackAlpha` overrides the stub's opaque readback when a test needs to model
+ * transparent pixels explicitly. See `StubRasterBackendOptions`.
  */
 const setupEngine = (doc: CanvasDocumentContractV2, options: { readbackAlpha?: number } = {}) => {
   const raf = createControllableRaf();
@@ -262,7 +260,7 @@ const setupEngine = (doc: CanvasDocumentContractV2, options: { readbackAlpha?: n
 
   const reactive = createReactiveStore(doc);
   const engine = createCanvasEngine({
-    backend: createTestStubRasterBackend({ readbackAlpha: options.readbackAlpha ?? 0 }),
+    backend: createTestStubRasterBackend(options),
     imageResolver: () => Promise.resolve(new Blob()),
     projectId: 'p1',
     store: reactive.store,

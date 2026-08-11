@@ -11,7 +11,7 @@ import { describe, expect, it, vi } from 'vitest';
  * case and the guard matrix. Real cropping is asserted in the browser suite.
  */
 const harness = (options: { busy?: boolean } = {}) => {
-  const store = createLayerCacheStore(createTestStubRasterBackend());
+  const store = createLayerCacheStore(createTestStubRasterBackend({ readbackAlpha: 0 }));
   const isLayerBusy = vi.fn(() => options.busy ?? false);
   return { deps: { isLayerBusy, layers: store }, isLayerBusy, store };
 };

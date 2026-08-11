@@ -36,14 +36,17 @@ describe('createTestStubRasterBackend', () => {
     expect(surface.callLog[2]).toEqual({ op: 'setTransform', args: [1, 0, 0, 1, 5, 5] });
   });
 
-  it('getImageData returns a correctly-sized, zeroed buffer by default', () => {
+  it('getImageData reports opaque pixels by default so integration tests persist rendered surfaces', () => {
     const backend = createTestStubRasterBackend();
     const surface = backend.createSurface(4, 3);
     const imageData = surface.ctx.getImageData(0, 0, 4, 3);
     expect(imageData.width).toBe(4);
     expect(imageData.height).toBe(3);
     expect(imageData.data.length).toBe(4 * 3 * 4);
-    expect(Array.from(imageData.data).every((v) => v === 0)).toBe(true);
+    const alphas = [...imageData.data].filter((_, index) => index % 4 === 3);
+    const colors = [...imageData.data].filter((_, index) => index % 4 !== 3);
+    expect(alphas.every((value) => value === 255)).toBe(true);
+    expect(colors.every((value) => value === 0)).toBe(true);
   });
 
   it('readbackAlpha fills the alpha channel only, leaving RGB zeroed', () => {

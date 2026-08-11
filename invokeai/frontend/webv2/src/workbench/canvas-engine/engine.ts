@@ -568,6 +568,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     if (pipeline.isGestureActive()) {
       return true;
     }
+    if (stores.documentEditingLocked.get() || rasterController.memory.isPinned(layerId)) {
+      return true;
+    }
     if (stores.transformSession.get()?.layerId === layerId || stores.textEditSession.get()?.layerId === layerId) {
       return true;
     }

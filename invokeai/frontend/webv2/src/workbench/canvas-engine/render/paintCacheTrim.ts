@@ -6,8 +6,9 @@
  * is what the move outline, the transform frame and fit-to-content read. So a fully
  * erased layer kept a draggable rectangle around nothing.
  *
- * Runs from the debounced persistence flush, which already reads the whole surface
- * to encode it, so the alpha scan never touches the paint hot path.
+ * Runs from the debounced persistence flush, so its synchronous full-surface alpha
+ * readback never touches the paint hot path. The readback is distinct from the
+ * asynchronous PNG encode and its cost scales with the cache extent.
  *
  * Zero React, zero import-time side effects.
  */
