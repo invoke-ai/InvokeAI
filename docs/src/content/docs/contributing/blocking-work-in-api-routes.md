@@ -68,6 +68,20 @@ The SQLite layer uses a single connection behind a process-wide lock, so databas
 remains serialized regardless of which thread requests it. The benefit is confined to —
 and this is the point — keeping everything *else* responsive while it runs.
 
+It also does not make the responsiveness unbounded. Starlette dispatches `def` handlers
+through anyio's thread limiter, which holds **40 tokens by default**. Forty concurrent
+blocking requests occupy every worker, and the forty-first waits for a free one — as does
+anything else that needs a thread, including the synchronous auth dependency that runs
+before a handler is even reached. So the stall does not vanish past that point, it moves:
+from "one slow request freezes the server" to "the server keeps up until forty of them are
+in flight at once". Note that `test_event_loop_blocking.py` probes `/api/v1/app/version`,
+which has no auth dependency and no database access, so it would not show this.
+
+Getting past that bound is not a matter of raising the token count — the single-connection
+lock below it is the real ceiling. It is the reason a route that can block for minutes
+(model conversion, a git clone) is worth serializing explicitly rather than letting an
+arbitrary number of them pile into the pool.
+
 ## Testing it
 
 Two tests cover this, and they do different jobs.
