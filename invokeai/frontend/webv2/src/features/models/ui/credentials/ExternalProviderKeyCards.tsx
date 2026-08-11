@@ -15,6 +15,7 @@ import { KeyCardShell } from '@features/models/ui/credentials/KeyCardShell';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { useScopedAction } from '@platform/react/useScopedAction';
 import { assertAccountScopeCurrent, type AccountScope } from '@platform/state/accountLifecycle';
+import { getApiErrorMessage } from '@platform/transport/http';
 import { Button } from '@platform/ui';
 import { BotIcon, HexagonIcon } from 'lucide-react';
 import { useState } from 'react';
@@ -134,7 +135,7 @@ const ExternalProviderKeyCard = ({
         setOverrideBaseUrl(nextConfig.base_url !== null);
         onSuccess?.(nextConfig, owner);
       },
-      (_message, error) => onError(error instanceof Error ? error.message : t('common.somethingWentWrong'))
+      (_message, error) => onError(getApiErrorMessage(error, t('common.somethingWentWrong')))
     );
 
   const handleSave = async () => {

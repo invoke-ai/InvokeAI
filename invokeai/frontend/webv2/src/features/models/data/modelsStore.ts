@@ -8,6 +8,7 @@ import {
 } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
 import { createTrailingSingleFlight } from '@platform/state/singleFlight';
+import { getApiErrorMessage } from '@platform/transport/http';
 
 import { getModelsDir, listMissingModels, listModels } from './api';
 
@@ -86,7 +87,7 @@ export const refreshModels = (owner: AccountScope = captureAccountScope()): Prom
         }
 
         store.patchSnapshot({
-          error: error instanceof Error ? error.message : 'Failed to load models.',
+          error: getApiErrorMessage(error, 'Failed to load models.'),
           status: store.getSnapshot().models.length > 0 ? 'loaded' : 'error',
         });
       });

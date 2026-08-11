@@ -7,6 +7,7 @@ import {
   captureAccountScope,
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
+import { getApiErrorMessage } from '@platform/transport/http';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -50,7 +51,7 @@ export const useInstallActions = () => {
           return false;
         }
 
-        notify.error(t('models.modelInstallFailedToStart'), error instanceof Error ? error.message : String(error));
+        notify.error(t('models.modelInstallFailedToStart'), getApiErrorMessage(error, t('common.unknownError')));
 
         return false;
       } finally {

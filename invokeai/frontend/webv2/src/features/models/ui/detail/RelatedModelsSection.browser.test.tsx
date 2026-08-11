@@ -5,6 +5,7 @@ import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
 import { setRelationshipsSnapshotForTests } from '@features/models/data/relationshipsStore';
 import { ModelsUiProvider } from '@features/models/ui/ModelsUiContext';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { ApiError } from '@platform/transport/http';
 import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -73,20 +74,23 @@ describe('RelatedModelsSection', () => {
     setRelationshipsSnapshotForTests({ relatedKeysByModelKey: {} });
   });
 
-  const renderSection = async (model: Parameters<typeof RelatedModelsSection>[0]['model'] = SECTION_MODEL) => {
+  const renderSection = async (
+    model: Parameters<typeof RelatedModelsSection>[0]['model'] = SECTION_MODEL,
+    onError: (message: string) => void = vi.fn()
+  ) => {
     await act(() => {
       root.render(
         <ChakraProvider value={system}>
           <ModelsUiProvider adapter={MODELS_UI_ADAPTER}>
-            <RelatedModelsSection model={model} onError={vi.fn()} />
+            <RelatedModelsSection model={model} onError={onError} />
           </ModelsUiProvider>
         </ChakraProvider>
       );
     });
   };
 
-  const renderSectionAndOpenPicker = async () => {
-    await renderSection();
+  const renderSectionAndOpenPicker = async (onError: (message: string) => void = vi.fn()) => {
+    await renderSection(SECTION_MODEL, onError);
     await act(() => host.querySelector<HTMLButtonElement>('[aria-haspopup="listbox"]')?.click());
     await expect.poll(() => document.querySelectorAll('[role="option"]').length).toBeGreaterThan(0);
   };
@@ -122,6 +126,22 @@ describe('RelatedModelsSection', () => {
     // The shared store patch renders the row; no second fetch happens.
     await expect.poll(() => host.textContent).toContain('T5 XXL');
     expect(api.getRelatedModelKeys).toHaveBeenCalledTimes(1);
+  });
+
+  it('unwraps a backend detail body into the error callback', async () => {
+    const onError = vi.fn();
+
+    api.addModelRelationship.mockRejectedValue(new ApiError('{"detail":"Models are incompatible"}', 409));
+    await renderSectionAndOpenPicker(onError);
+
+    const t5Option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find((option) =>
+      option.textContent?.includes('T5 XXL')
+    );
+
+    await act(() => t5Option?.click());
+
+    await expect.poll(() => onError.mock.calls.length).toBeGreaterThan(0);
+    expect(onError).toHaveBeenCalledWith('Models are incompatible');
   });
 
   it('shows persisted links but no picker for an unlinkable base', async () => {

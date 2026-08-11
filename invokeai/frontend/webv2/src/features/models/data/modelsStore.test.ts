@@ -45,6 +45,16 @@ describe('models store loading', () => {
     expect(api.listModels).toHaveBeenCalledTimes(2);
   });
 
+  it('unwraps FastAPI detail bodies into the snapshot error', async () => {
+    const { ApiError } = await import('@platform/transport/http');
+    api.listModels.mockRejectedValueOnce(new ApiError('{"detail":"Model records unavailable"}', 500));
+    const { getModelsSnapshot, refreshModels } = await import('./modelsStore');
+
+    await refreshModels();
+
+    expect(getModelsSnapshot()).toMatchObject({ error: 'Model records unavailable', status: 'error' });
+  });
+
   it('keeps the new account request authoritative when the old request resolves last', async () => {
     const account = await import('@platform/state/accountLifecycle');
     account.accountLifecycle.activate('user-a');

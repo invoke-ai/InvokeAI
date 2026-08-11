@@ -16,6 +16,7 @@ import {
   isAccountScopeCurrent,
   type AccountScope,
 } from '@platform/state/accountLifecycle';
+import { getApiErrorMessage } from '@platform/transport/http';
 import { Button } from '@platform/ui';
 import { HexagonIcon } from 'lucide-react';
 import { useState } from 'react';
@@ -76,7 +77,7 @@ const ApiKeyCard = ({
   const { isBusy, run } = useScopedAction();
 
   const handleActionError = (_message: string, error: unknown) =>
-    onError(error instanceof Error ? error.message : t('common.somethingWentWrong'));
+    onError(getApiErrorMessage(error, t('common.somethingWentWrong')));
 
   const handleSave = () => {
     const key = draft.trim();

@@ -8,6 +8,7 @@ import {
 } from '@platform/state/accountLifecycle';
 import { createExternalStore, createKeyedTransientStore } from '@platform/state/externalStore';
 import { createTrailingSingleFlight } from '@platform/state/singleFlight';
+import { getApiErrorMessage } from '@platform/transport/http';
 
 import { listModelInstalls } from './api';
 import { refreshModels } from './modelsStore';
@@ -127,7 +128,7 @@ export const refreshInstalls = (owner: AccountScope = captureAccountScope()): Pr
         }
 
         store.patchSnapshot({
-          error: error instanceof Error ? error.message : 'Failed to load install queue.',
+          error: getApiErrorMessage(error, 'Failed to load install queue.'),
           status: store.getSnapshot().jobs.length > 0 ? 'loaded' : 'error',
         });
       });

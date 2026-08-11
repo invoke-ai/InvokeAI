@@ -16,6 +16,7 @@ import { ModelSelect } from '@features/models/ui/components';
 import { SourceListItem } from '@features/models/ui/shared/SourceListItem';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { isAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
+import { getApiErrorMessage } from '@platform/transport/http';
 import { IconButton, FieldLabel, Tooltip } from '@platform/ui';
 import { Link2OffIcon } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -48,7 +49,7 @@ const RelatedModelsForModel = ({ model, onError }: RelatedModelsSectionProps) =>
 
     refreshRelatedModelKeys(model.key).catch((error: unknown) => {
       if (isMounted && isAccountScopeCurrent(owner)) {
-        onError(error instanceof Error ? error.message : t('models.failedToLoadRelatedModels'));
+        onError(getApiErrorMessage(error, t('models.failedToLoadRelatedModels')));
       }
     });
 
@@ -81,7 +82,7 @@ const RelatedModelsForModel = ({ model, onError }: RelatedModelsSectionProps) =>
         return;
       }
 
-      onError(error instanceof Error ? error.message : t('models.failedToLinkModels'));
+      onError(getApiErrorMessage(error, t('models.failedToLinkModels')));
     } finally {
       if (isAccountScopeCurrent(owner)) {
         setIsMutating(false);
@@ -101,7 +102,7 @@ const RelatedModelsForModel = ({ model, onError }: RelatedModelsSectionProps) =>
         return;
       }
 
-      onError(error instanceof Error ? error.message : t('models.failedToUnlink'));
+      onError(getApiErrorMessage(error, t('models.failedToUnlink')));
     } finally {
       if (isAccountScopeCurrent(owner)) {
         setIsMutating(false);

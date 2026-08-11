@@ -14,6 +14,7 @@ import {
   isAccountScopeCurrent,
   type AccountScope,
 } from '@platform/state/accountLifecycle';
+import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, CloseButton, ConfirmDialog, IconButton, MenuContent, Panel } from '@platform/ui';
 import { BrushCleaningIcon, FolderSearchIcon, MoreHorizontalIcon, RefreshCcwIcon } from 'lucide-react';
 import { useState } from 'react';
@@ -123,7 +124,7 @@ const OrphanedModelsDialog = ({ onClose }: { onClose: () => void }) => {
       }
     } catch (error) {
       if (isAccountScopeCurrent(owner)) {
-        setLoadError(error instanceof Error ? error.message : t('models.failedToScanOrphaned'));
+        setLoadError(getApiErrorMessage(error, t('models.failedToScanOrphaned')));
       }
     }
   };

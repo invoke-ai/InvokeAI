@@ -5,6 +5,7 @@ import {
 } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
 import { createTrailingSingleFlight } from '@platform/state/singleFlight';
+import { getApiErrorMessage } from '@platform/transport/http';
 
 import {
   getExternalProviderConfigs,
@@ -57,7 +58,8 @@ export const refreshExternalProviders = (): Promise<void> =>
       .catch((error: unknown) => {
         if (isAccountScopeCurrent(owner)) {
           store.patchSnapshot({
-            error: error instanceof Error ? error.message : null,
+            // Nullable by design: consumers render their own copy when absent.
+            error: getApiErrorMessage(error, '') || null,
             status: store.getSnapshot().configs ? 'loaded' : 'error',
           });
         }

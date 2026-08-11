@@ -7,6 +7,7 @@ import {
 } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
 import { createTrailingSingleFlight } from '@platform/state/singleFlight';
+import { getApiErrorMessage } from '@platform/transport/http';
 
 import { getStarterModels } from './api';
 
@@ -54,7 +55,7 @@ export const refreshStarters = (): Promise<void> =>
         }
 
         store.patchSnapshot({
-          error: error instanceof Error ? error.message : 'Failed to load starter models.',
+          error: getApiErrorMessage(error, 'Failed to load starter models.'),
           status: store.getSnapshot().response ? 'loaded' : 'error',
         });
       });

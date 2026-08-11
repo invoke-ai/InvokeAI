@@ -6,6 +6,7 @@ import { deleteModelImage, getModelImageUrl, updateModelImage } from '@features/
 import { markCoverImageChanged, useModelsSelector } from '@features/models/data/modelsStore';
 import { useScopedAction } from '@platform/react/useScopedAction';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
+import { getApiErrorMessage } from '@platform/transport/http';
 import { DropZone, IconButton, Tooltip } from '@platform/ui';
 import { ImageIcon, UploadIcon, XIcon } from 'lucide-react';
 import { useRef, useState, type DragEvent } from 'react';
@@ -62,7 +63,7 @@ const ModelImageUploadForModel = ({ model, onError, onUpdated }: ModelImageUploa
         markCoverImageChanged(modelKey, true);
         onUpdated();
       },
-      (_message, error) => onError(error instanceof Error ? error.message : t('models.failedToUploadModelImage'))
+      (_message, error) => onError(getApiErrorMessage(error, t('models.failedToUploadModelImage')))
     );
   };
 
@@ -78,7 +79,7 @@ const ModelImageUploadForModel = ({ model, onError, onUpdated }: ModelImageUploa
         markCoverImageChanged(modelKey, false);
         onUpdated();
       },
-      (_message, error) => onError(error instanceof Error ? error.message : t('models.failedToRemoveModelImage'))
+      (_message, error) => onError(getApiErrorMessage(error, t('models.failedToRemoveModelImage')))
     );
   };
 

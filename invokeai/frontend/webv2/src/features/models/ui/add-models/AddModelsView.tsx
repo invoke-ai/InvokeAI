@@ -23,6 +23,7 @@ import {
   captureAccountScope,
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
+import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, Scrollable, Tooltip } from '@platform/ui';
 import { DownloadIcon, FileIcon, FolderIcon, FolderSearchIcon, LinkIcon, SearchIcon } from 'lucide-react';
 import { useDeferredValue, useMemo, useState } from 'react';
@@ -89,10 +90,7 @@ export const AddModelsView = () => {
 
     ensureExternalProvidersLoaded().catch((error: unknown) => {
       if (isMounted && isAccountScopeCurrent(owner)) {
-        notify.error(
-          t('models.externalProviderKeysUnavailable'),
-          error instanceof Error ? error.message : String(error)
-        );
+        notify.error(t('models.externalProviderKeysUnavailable'), getApiErrorMessage(error, t('common.unknownError')));
       }
     });
 
