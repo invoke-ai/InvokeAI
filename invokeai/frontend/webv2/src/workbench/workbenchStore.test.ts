@@ -141,6 +141,14 @@ describe('createWorkbenchStore', () => {
     });
   });
 
+  it('reorders presets through the layout capability', () => {
+    const store = createWorkbenchStore();
+
+    store.commands.layout.reorderPresets('compose', 'edit');
+
+    expect(store.getSnapshot().account.layoutPresetOrder).toEqual(['edit', 'compose', 'automate']);
+  });
+
   it('creates a custom preset with an explicitly selected default route in one command', () => {
     const store = createWorkbenchStore();
     const defaultRoute: LayoutPresetRoute = { destination: 'gallery', sourceId: 'workflow' };

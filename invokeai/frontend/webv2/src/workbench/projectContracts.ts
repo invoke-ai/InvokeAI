@@ -130,6 +130,8 @@ export interface AutosaveState {
 export interface AccountState {
   activeLayoutPresetId: LayoutPresetId;
   customLayoutPresets?: LayoutPreset[];
+  /** One account-wide order shared by every layout-preset surface. */
+  layoutPresetOrder?: LayoutPresetId[];
   /** Saved edits to a built-in preset's arrangement; see {@link LayoutPresetOverrides}. */
   layoutPresetOverrides?: LayoutPresetOverrides;
   /** Saved edits to built-in preset routes, kept separate from spatial layout drift. */

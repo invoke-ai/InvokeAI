@@ -255,6 +255,13 @@ const createCommands = (dispatch: WorkbenchDispatch, getState: () => WorkbenchSt
           presetId,
         })
       ),
+      reorderPresets: command(
+        'reorderLayoutPresets',
+        (
+          activeId: ActionPayload<'reorderLayoutPresets'>['activeId'],
+          overId: ActionPayload<'reorderLayoutPresets'>['overId']
+        ) => ({ activeId, overId })
+      ),
       setPresetIcon: command(
         'setLayoutPresetIcon',
         (presetId: ActionPayload<'setLayoutPresetIcon'>['presetId'], iconId: string) => ({ iconId, presetId })

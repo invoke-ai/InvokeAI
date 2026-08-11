@@ -130,8 +130,15 @@ import {
   isResultDestinationAvailable,
   resolveInvocationRoute,
 } from './invocation';
+import { getOrderedLayoutPresets, normalizeLayoutPresetOrder, reorderLayoutPresetIds } from './layoutPresetCollection';
 import { getInvocationAfterLayoutPreset } from './layoutPresetRouting';
-import { defaultLayoutPreset, getLayoutPreset, isBuiltInLayoutPresetId, resolveLayoutPresetId } from './layoutPresets';
+import {
+  defaultLayoutPreset,
+  getLayoutPreset,
+  isBuiltInLayoutPresetId,
+  layoutPresets,
+  resolveLayoutPresetId,
+} from './layoutPresets';
 import {
   cloneLayoutPresetWidgetRegions,
   createLayoutPresetSnapshot,
@@ -154,6 +161,7 @@ type WorkbenchReducerAction =
   | { type: 'switchProject'; projectId: string }
   | { type: 'setCenterView'; centerViewId: CenterViewId }
   | { type: 'applyPreset'; presetId: LayoutPresetId }
+  | { type: 'reorderLayoutPresets'; activeId: LayoutPresetId; overId: LayoutPresetId }
   | {
       type: 'addLayoutPreset';
       presetId: LayoutPresetId;
@@ -1636,12 +1644,20 @@ const normalizeLayoutPresetOverrides = (overrides: unknown): LayoutPresetOverrid
   );
 };
 
-const normalizeAccount = (account: Partial<WorkbenchState['account']> | undefined): WorkbenchState['account'] => ({
-  activeLayoutPresetId: resolveLayoutPresetId(account?.activeLayoutPresetId ?? defaultLayoutPreset.id),
-  customLayoutPresets: normalizeCustomLayoutPresets(account?.customLayoutPresets),
-  layoutPresetOverrides: normalizeLayoutPresetOverrides(account?.layoutPresetOverrides),
-  layoutPresetRouteOverrides: normalizeLayoutPresetRouteOverrides(account?.layoutPresetRouteOverrides),
-});
+const normalizeAccount = (account: Partial<WorkbenchState['account']> | undefined): WorkbenchState['account'] => {
+  const customLayoutPresets = normalizeCustomLayoutPresets(account?.customLayoutPresets);
+
+  return {
+    activeLayoutPresetId: resolveLayoutPresetId(account?.activeLayoutPresetId ?? defaultLayoutPreset.id),
+    customLayoutPresets,
+    layoutPresetOrder: normalizeLayoutPresetOrder(account?.layoutPresetOrder, [
+      ...layoutPresets,
+      ...customLayoutPresets,
+    ]),
+    layoutPresetOverrides: normalizeLayoutPresetOverrides(account?.layoutPresetOverrides),
+    layoutPresetRouteOverrides: normalizeLayoutPresetRouteOverrides(account?.layoutPresetRouteOverrides),
+  };
+};
 
 const normalizeWorkbenchState = (state: WorkbenchState): WorkbenchState => ({
   ...state,
@@ -2602,6 +2618,11 @@ export const __workbenchReducerInternal = (
         account: { ...state.account, activeLayoutPresetId: preset.id },
       };
     }
+    case 'reorderLayoutPresets': {
+      const layoutPresetOrder = reorderLayoutPresetIds(state.account, action.activeId, action.overId);
+
+      return layoutPresetOrder ? { ...state, account: { ...state.account, layoutPresetOrder } } : state;
+    }
     case 'addLayoutPreset': {
       const activeProject = state.projects.find((project) => project.id === state.activeProjectId);
 
@@ -2629,10 +2650,16 @@ export const __workbenchReducerInternal = (
         ...(state.account.customLayoutPresets ?? []).filter((candidate) => candidate.id !== action.presetId),
         preset,
       ];
+      const layoutPresetOrder = [
+        ...getOrderedLayoutPresets(state.account)
+          .map(({ id }) => id)
+          .filter((id) => id !== preset.id),
+        preset.id,
+      ];
 
       return {
         ...state,
-        account: { ...state.account, activeLayoutPresetId: preset.id, customLayoutPresets },
+        account: { ...state.account, activeLayoutPresetId: preset.id, customLayoutPresets, layoutPresetOrder },
       };
     }
     case 'saveLayoutPreset': {
@@ -2748,6 +2775,9 @@ export const __workbenchReducerInternal = (
       };
     }
     case 'deleteLayoutPreset': {
+      const layoutPresetOrder = getOrderedLayoutPresets(state.account)
+        .map(({ id }) => id)
+        .filter((id) => id !== action.presetId);
       const customLayoutPresets = (state.account.customLayoutPresets ?? []).filter(
         (preset) => preset.id !== action.presetId
       );
@@ -2766,6 +2796,7 @@ export const __workbenchReducerInternal = (
               ? defaultLayoutPreset.id
               : state.account.activeLayoutPresetId,
           customLayoutPresets,
+          layoutPresetOrder,
         },
         projects,
       };

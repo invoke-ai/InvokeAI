@@ -18,6 +18,7 @@ import type { CanvasProjectMutation } from './canvasProjectMutations';
 
 import { createEmptyCanvasDocumentV2 } from './canvasMigration';
 import { getCanvasStagingCandidateFingerprint, getCanvasStagingSlots } from './canvasStagingView';
+import { layoutPresets } from './layoutPresets';
 import { DEFAULT_PROJECT_SETTINGS } from './settings/store';
 import { getProjectWidgetValues } from './widgetState';
 import { GRAPH_HISTORY_BYTE_BUDGET, normalizeGraphHistory } from './workbenchState';
@@ -824,6 +825,52 @@ describe('workbench layout presets', () => {
     expect(state.account.customLayoutPresets?.[0]).toMatchObject({ id: 'custom-layout-1', label: 'Queue review' });
     expect(project.widgetRegions.right).toMatchObject({ activeInstanceId: 'queue', sizePx: 336 });
     expect(project.widgetRegions.center.activeInstanceId).toBe('preview');
+  });
+
+  it('persists one account-wide order through reordering and custom preset deletion', () => {
+    let state = createInitialWorkbenchState();
+
+    state = workbenchReducer(state, {
+      label: 'Custom',
+      presetId: 'custom-layout-1',
+      type: 'addLayoutPreset',
+    });
+
+    expect(state.account.layoutPresetOrder).toEqual(['compose', 'edit', 'automate', 'custom-layout-1']);
+
+    state = workbenchReducer(state, {
+      activeId: 'custom-layout-1',
+      overId: 'edit',
+      type: 'reorderLayoutPresets',
+    });
+
+    expect(state.account.layoutPresetOrder).toEqual(['compose', 'custom-layout-1', 'edit', 'automate']);
+
+    state = workbenchReducer(state, { presetId: 'custom-layout-1', type: 'deleteLayoutPreset' });
+
+    expect(state.account.layoutPresetOrder).toEqual(['compose', 'edit', 'automate']);
+  });
+
+  it('normalizes stale and duplicate preset ids when hydrating an account', () => {
+    const initial = createInitialWorkbenchState();
+    const custom = {
+      id: 'custom-layout-1',
+      label: 'Custom',
+      snapshot: layoutPresets[0].snapshot,
+    };
+    const state = workbenchReducer(initial, {
+      state: {
+        ...initial,
+        account: {
+          ...initial.account,
+          customLayoutPresets: [custom],
+          layoutPresetOrder: ['automate', 'missing', 'automate'],
+        },
+      },
+      type: 'hydrateWorkbench',
+    });
+
+    expect(state.account.layoutPresetOrder).toEqual(['automate', 'compose', 'edit', 'custom-layout-1']);
   });
 
   it('captures the live source and destination without routing locks when creating a custom preset', () => {
@@ -2732,6 +2779,7 @@ describe('workbench account and project settings', () => {
     expect(state.account).toEqual({
       activeLayoutPresetId: 'compose',
       customLayoutPresets: [],
+      layoutPresetOrder: ['compose', 'edit', 'automate'],
       layoutPresetOverrides: {},
       layoutPresetRouteOverrides: {},
     });
