@@ -8,7 +8,7 @@ import { LibraryColumn } from './manager/LibraryColumn';
 /** Full custom nodes manager: persistent pack library plus right-side detail pane. */
 export const NodeManagerView = () => {
   useMountEffect(() => {
-    ensureCustomNodePacksLoaded();
+    void ensureCustomNodePacksLoaded();
   });
 
   return (

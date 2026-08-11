@@ -7,6 +7,8 @@ import {
   registerAccountOwnedResource,
 } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
+import { createTrailingSingleFlight } from '@platform/state/singleFlight';
+import { getApiErrorMessage } from '@platform/transport/http';
 
 import { getModelsDir, listMissingModels, listModels } from './api';
 
@@ -21,6 +23,8 @@ import { getModelsDir, listMissingModels, listModels } from './api';
 
 export interface ModelsSnapshot {
   models: ModelConfig[];
+  /** Same models keyed for point lookups; always derived from `models`. */
+  modelsByKey: ReadonlyMap<string, ModelConfig>;
   /** Keys of models whose files are missing on disk. */
   missingModelKeys: ReadonlySet<string>;
   /** Bumped when a model's cover image changes; cache-busts thumbnail URLs. */
@@ -32,75 +36,72 @@ export interface ModelsSnapshot {
 }
 
 const EMPTY_MISSING_KEYS: ReadonlySet<string> = new Set<string>();
+const EMPTY_MODELS_BY_KEY: ReadonlyMap<string, ModelConfig> = new Map<string, ModelConfig>();
 
 const EMPTY_MODELS_SNAPSHOT: ModelsSnapshot = {
   coverImageVersions: {},
   error: null,
   missingModelKeys: EMPTY_MISSING_KEYS,
   models: [],
+  modelsByKey: EMPTY_MODELS_BY_KEY,
   modelsDir: null,
   status: 'idle',
 };
+
+/** Every `models` write goes through here so the by-key index never drifts. */
+const withModels = (models: ModelConfig[]): Pick<ModelsSnapshot, 'models' | 'modelsByKey'> => ({
+  models,
+  modelsByKey: new Map(models.map((model) => [model.key, model])),
+});
 const store = createExternalStore<ModelsSnapshot>(EMPTY_MODELS_SNAPSHOT);
 
-let inflightRefresh: Promise<void> | null = null;
+const refreshFlight = createTrailingSingleFlight();
 
 registerAccountOwnedResource({
   clear: () => {
-    inflightRefresh = null;
+    refreshFlight.reset();
     store.setSnapshot(EMPTY_MODELS_SNAPSHOT);
   },
   name: 'models-library',
 });
 
-/** Re-fetch the library; concurrent calls share one request. */
-export const refreshModels = (owner: AccountScope = captureAccountScope()): Promise<void> => {
-  if (inflightRefresh) {
-    return inflightRefresh;
-  }
+/** Re-fetch the library; concurrent calls share one request, and a call made mid-flight queues one trailing rerun. */
+export const refreshModels = (owner: AccountScope = captureAccountScope()): Promise<void> =>
+  refreshFlight.run(() => {
+    store.patchSnapshot({ status: store.getSnapshot().status === 'loaded' ? 'loaded' : 'loading' });
 
-  store.patchSnapshot({ status: store.getSnapshot().status === 'loaded' ? 'loaded' : 'loading' });
+    return Promise.all([
+      listModels(owner.signal),
+      // Missing-file detection is best-effort; never fail the whole library.
+      listMissingModels(owner.signal).catch(() => [] as ModelConfig[]),
+      // Static server config: fetched once, best-effort.
+      store.getSnapshot().modelsDir ?? getModelsDir(owner.signal).catch(() => null),
+    ])
+      .then(([models, missingModels, modelsDir]) => {
+        if (!isAccountScopeCurrent(owner)) {
+          return;
+        }
 
-  const refresh = Promise.all([
-    listModels(owner.signal),
-    // Missing-file detection is best-effort; never fail the whole library.
-    listMissingModels(owner.signal).catch(() => [] as ModelConfig[]),
-    // Static server config: fetched once, best-effort.
-    store.getSnapshot().modelsDir ?? getModelsDir(owner.signal).catch(() => null),
-  ])
-    .then(([models, missingModels, modelsDir]) => {
-      if (!isAccountScopeCurrent(owner)) {
-        return;
-      }
+        store.patchSnapshot({
+          ...withModels(models),
+          error: null,
+          missingModelKeys:
+            missingModels.length > 0 ? new Set(missingModels.map((model) => model.key)) : EMPTY_MISSING_KEYS,
+          modelsDir,
+          status: 'loaded',
+        });
+      })
+      .catch((error: unknown) => {
+        if (!isAccountScopeCurrent(owner)) {
+          return;
+        }
 
-      store.patchSnapshot({
-        error: null,
-        missingModelKeys:
-          missingModels.length > 0 ? new Set(missingModels.map((model) => model.key)) : EMPTY_MISSING_KEYS,
-        models,
-        modelsDir,
-        status: 'loaded',
+        store.patchSnapshot({
+          error: getApiErrorMessage(error, 'Failed to load models.'),
+          status: store.getSnapshot().models.length > 0 ? 'loaded' : 'error',
+        });
       });
-    })
-    .catch((error: unknown) => {
-      if (!isAccountScopeCurrent(owner)) {
-        return;
-      }
-
-      store.patchSnapshot({
-        error: error instanceof Error ? error.message : 'Failed to load models.',
-        status: store.getSnapshot().models.length > 0 ? 'loaded' : 'error',
-      });
-    })
-    .finally(() => {
-      if (inflightRefresh === refresh) {
-        inflightRefresh = null;
-      }
-    });
-
-  inflightRefresh = refresh;
-  return inflightRefresh;
-};
+  });
 
 /** Fetch on first use or retry after an error; callers share and can await the request. */
 export const ensureModelsLoaded = (): Promise<void> => {
@@ -110,7 +111,7 @@ export const ensureModelsLoaded = (): Promise<void> => {
     return refreshModels();
   }
 
-  return inflightRefresh ?? Promise.resolve();
+  return refreshFlight.inflight() ?? Promise.resolve();
 };
 
 export const getModelsSnapshot = (): ModelsSnapshot => store.getSnapshot();
@@ -120,22 +121,22 @@ export const subscribeModels = (listener: () => void): (() => void) => store.sub
 
 /** Patch one model in place after a successful update/convert. */
 export const replaceModelInStore = (model: ModelConfig): void => {
-  store.patchSnapshot({
-    models: store.getSnapshot().models.map((existing) => (existing.key === model.key ? model : existing)),
-  });
+  store.patchSnapshot(
+    withModels(store.getSnapshot().models.map((existing) => (existing.key === model.key ? model : existing)))
+  );
 };
 
 /** Apply a narrow optimistic model patch without replacing unrelated server fields. */
 export const patchModelInStore = (key: string, changes: Partial<ModelConfig>): void => {
-  store.patchSnapshot({
-    models: store.getSnapshot().models.map((model) => (model.key === key ? { ...model, ...changes } : model)),
-  });
+  store.patchSnapshot(
+    withModels(store.getSnapshot().models.map((model) => (model.key === key ? { ...model, ...changes } : model)))
+  );
 };
 
 export const removeModelsFromStore = (keys: string[]): void => {
   const removed = new Set(keys);
 
-  store.patchSnapshot({ models: store.getSnapshot().models.filter((model) => !removed.has(model.key)) });
+  store.patchSnapshot(withModels(store.getSnapshot().models.filter((model) => !removed.has(model.key))));
 };
 
 /**
@@ -147,17 +148,17 @@ export const markCoverImageChanged = (key: string, hasImage: boolean): void => {
   const { coverImageVersions, models } = store.getSnapshot();
 
   store.patchSnapshot({
-    coverImageVersions: { ...coverImageVersions, [key]: (coverImageVersions[key] ?? 0) + 1 },
-    models: models.map((model) =>
-      model.key === key ? { ...model, cover_image: hasImage ? (model.cover_image ?? 'present') : null } : model
+    ...withModels(
+      models.map((model) =>
+        model.key === key ? { ...model, cover_image: hasImage ? (model.cover_image ?? 'present') : null } : model
+      )
     ),
+    coverImageVersions: { ...coverImageVersions, [key]: (coverImageVersions[key] ?? 0) + 1 },
   });
 };
 
 export const setModelsSnapshotForTests = (next: Partial<ModelsSnapshot>): void => {
-  store.patchSnapshot(next);
+  store.patchSnapshot(next.models ? { ...next, ...withModels(next.models) } : next);
 };
 
 export const useModelsSelector = store.useSelector;
-
-export const useModelsSnapshot = (): ModelsSnapshot => store.useSnapshot();
