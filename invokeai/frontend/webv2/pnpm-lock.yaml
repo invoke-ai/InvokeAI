@@ -4,6 +4,11 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  react-hook-tanstack-virtual:
+    hash: 119a9cedcb9c36b5d48245aa5aa28f14975030962eca3644dcd9f381eaecf999
+    path: patches/react-hook-tanstack-virtual.patch
+
 importers:
 
   .:
@@ -44,6 +49,9 @@ importers:
       ag-psd:
         specifier: ^31.0.2
         version: 31.0.2
+      fflate:
+        specifier: ^0.8.3
+        version: 0.8.3
       fuzzysort:
         specifier: ^3.1.0
         version: 3.1.0
@@ -67,7 +75,7 @@ importers:
         version: 19.2.8(react@19.2.8)
       react-hook-tanstack-virtual:
         specifier: ^0.0.4
-        version: 0.0.4(@tanstack/react-virtual@3.14.9(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@tanstack/virtual-core@3.17.7)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        version: 0.0.4(patch_hash=119a9cedcb9c36b5d48245aa5aa28f14975030962eca3644dcd9f381eaecf999)(@tanstack/react-virtual@3.14.9(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@tanstack/virtual-core@3.17.7)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       react-i18next:
         specifier: ^17.0.11
         version: 17.0.11(i18next@26.3.6(typescript@7.0.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2)
@@ -1506,6 +1514,9 @@ packages:
     peerDependenciesMeta:
       picomatch:
         optional: true
+
+  fflate@0.8.3:
+    resolution: {integrity: sha512-tbZNuJrLwGUp3zshBtdy4W+ORxZuIh8a5ilyIEQDC5rY1f3U20JMry0Ll3WBzU58EZKsEuJFXhb5gwv8CsPvgA==}
 
   find-root@1.1.0:
     resolution: {integrity: sha512-NKfW6bec6GfKc0SGx1e07QZY9PE99u0Bft/0rzSD5k3sO/vwkVUpDUKVm5Gpp5Ue3YfShPFTX2070tDs5kB9Ng==}
@@ -3637,6 +3648,8 @@ snapshots:
     optionalDependencies:
       picomatch: 4.0.5
 
+  fflate@0.8.3: {}
+
   find-root@1.1.0: {}
 
   fsevents@2.3.2:
@@ -3859,7 +3872,7 @@ snapshots:
       react: 19.2.8
       scheduler: 0.27.0
 
-  react-hook-tanstack-virtual@0.0.4(@tanstack/react-virtual@3.14.9(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@tanstack/virtual-core@3.17.7)(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
+  react-hook-tanstack-virtual@0.0.4(patch_hash=119a9cedcb9c36b5d48245aa5aa28f14975030962eca3644dcd9f381eaecf999)(@tanstack/react-virtual@3.14.9(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@tanstack/virtual-core@3.17.7)(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
     dependencies:
       '@tanstack/react-virtual': 3.14.9(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@tanstack/virtual-core': 3.17.7

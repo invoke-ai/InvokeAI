@@ -377,8 +377,14 @@ const ThemeCard = ({
 };
 
 const BehaviorSection = () => {
-  const { autoSwitchInvocationRoute, confirmImageDeletion, enableInformationalPopovers, enableModelDescriptions } =
-    useWorkbenchPreferences();
+  const {
+    autoSwitchInvocationRoute,
+    confirmImageDeletion,
+    enableInformationalPopovers,
+    enableModelDescriptions,
+    preferNumericAttentionStyle,
+    showPromptSyntaxHighlighting,
+  } = useWorkbenchPreferences();
   const updateAutoSwitchInvocationRoute = useCallback((checked: boolean) => {
     updatePreferences({ autoSwitchInvocationRoute: checked });
   }, []);
@@ -391,9 +397,15 @@ const BehaviorSection = () => {
   const updateEnableModelDescriptions = useCallback((checked: boolean) => {
     updatePreferences({ enableModelDescriptions: checked });
   }, []);
+  const updatePreferNumericAttentionStyle = useCallback((checked: boolean) => {
+    updatePreferences({ preferNumericAttentionStyle: checked });
+  }, []);
+  const updateShowPromptSyntaxHighlighting = useCallback((checked: boolean) => {
+    updatePreferences({ showPromptSyntaxHighlighting: checked });
+  }, []);
 
   return (
-    <SettingsSection description="Safety checks and user-assistance behavior." title="Behavior">
+    <SettingsSection description="Safety checks, prompt editing, and user-assistance behavior." title="Behavior">
       <SettingToggle
         checked={autoSwitchInvocationRoute}
         description="Switch the Invoke source and destination to match the surface you are editing. Locked sources and destinations are never changed."
@@ -417,6 +429,18 @@ const BehaviorSection = () => {
         description="Include model descriptions in model dropdowns where available."
         label="Enable model descriptions in dropdowns"
         onChange={updateEnableModelDescriptions}
+      />
+      <SettingToggle
+        checked={preferNumericAttentionStyle}
+        description="Prefer numeric prompt attention syntax when controls insert attention weights."
+        label="Prefer numeric attention style"
+        onChange={updatePreferNumericAttentionStyle}
+      />
+      <SettingToggle
+        checked={showPromptSyntaxHighlighting}
+        description="Experimental. Color prompt syntax in prompt fields without changing the prompt text or validation behavior."
+        label="Highlight prompt syntax (experimental)"
+        onChange={updateShowPromptSyntaxHighlighting}
       />
     </SettingsSection>
   );
@@ -453,24 +477,6 @@ const ProjectSection = () => {
     },
     [updateProjectSettings]
   );
-  const updateShowProgressImagesInViewer = useCallback(
-    (checked: boolean) => {
-      updateProjectSettings({ showProgressImagesInViewer: checked });
-    },
-    [updateProjectSettings]
-  );
-  const updatePreferNumericAttentionStyle = useCallback(
-    (checked: boolean) => {
-      updateProjectSettings({ preferNumericAttentionStyle: checked });
-    },
-    [updateProjectSettings]
-  );
-  const updateShowPromptSyntaxHighlighting = useCallback(
-    (checked: boolean) => {
-      updateProjectSettings({ showPromptSyntaxHighlighting: checked });
-    },
-    [updateProjectSettings]
-  );
 
   if (!activeProject || !commands) {
     return null;
@@ -501,24 +507,6 @@ const ProjectSection = () => {
         description="Smooth progress previews instead of rendering them pixelated."
         label="Antialias progress images"
         onChange={updateAntialiasProgressImages}
-      />
-      <SettingToggle
-        checked={settings.showProgressImagesInViewer}
-        description="Show progress images in the viewer when an image is still generating."
-        label="Show progress images in viewer"
-        onChange={updateShowProgressImagesInViewer}
-      />
-      <SettingToggle
-        checked={settings.preferNumericAttentionStyle}
-        description="Prefer numeric prompt attention syntax when controls insert attention weights."
-        label="Prefer numeric attention style"
-        onChange={updatePreferNumericAttentionStyle}
-      />
-      <SettingToggle
-        checked={settings.showPromptSyntaxHighlighting}
-        description="Experimental. Color prompt syntax in prompt fields without changing the prompt text or validation behavior."
-        label="Highlight prompt syntax (experimental)"
-        onChange={updateShowPromptSyntaxHighlighting}
       />
     </SettingsSection>
   );

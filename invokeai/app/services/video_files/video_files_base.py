@@ -24,10 +24,16 @@ class VideoFileStorageBase(ABC):
         workflow: Optional[str] = None,
         graph: Optional[str] = None,
         first_frame: Optional[Image.Image] = None,
+        move_source: bool = True,
     ) -> None:
-        """Saves a video by moving/copying the file at `source_path` into storage, then writes a sibling
+        """Saves a video by moving the file at `source_path` into storage, then writes a sibling
         WEBP thumbnail extracted from the first frame, plus an optional sidecar JSON of metadata/workflow/graph.
         A caller that already decoded frame 0 can pass it as `first_frame` to skip the extraction.
+
+        `source_path` is **consumed** by default: almost every caller hands over a temp file it just
+        wrote, and moving it is both cheaper and the correct lifetime. A caller whose source is a
+        file the server still owns — copying an existing video — must pass ``move_source=False``,
+        or the copy will take the original's bytes with it.
         """
         pass
 

@@ -18,6 +18,8 @@ import type * as persistenceModule from './syncedPersistence';
 const api = vi.hoisted(() => {
   interface MockRecord {
     project_id: string;
+    /** Every project owns one, and the server is the only thing that decides which. */
+    board_id: string;
     name: string;
     revision: number;
     created_at: string;
@@ -31,6 +33,7 @@ const api = vi.hoisted(() => {
   const conflictError = (): Error => Object.assign(new Error('conflict'), { __status: 409 });
   const notFoundError = (): Error => Object.assign(new Error('not found'), { __status: 404 });
   const toSummary = (record: MockRecord) => ({
+    board_id: record.board_id,
     created_at: record.created_at,
     name: record.name,
     project_id: record.project_id,
@@ -46,6 +49,7 @@ const api = vi.hoisted(() => {
       const id = data.id as string;
 
       records.set(id, {
+        board_id: `board-for-${id}`,
         created_at: '2026-06-10 08:00:00.000',
         data: structuredClone(data),
         name: data.name as string,
@@ -54,26 +58,29 @@ const api = vi.hoisted(() => {
         updated_at: '2026-06-10 08:00:00.000',
       });
     },
-    createProject: vi.fn((request: { project_id?: string; name: string; data: Record<string, unknown> }) => {
-      const id = request.project_id ?? `generated-${records.size}`;
+    createProject: vi.fn(
+      (request: { project_id?: string; board_id?: string; name: string; data: Record<string, unknown> }) => {
+        const id = request.project_id ?? `generated-${records.size}`;
 
-      if (records.has(id)) {
-        return Promise.reject(conflictError());
+        if (records.has(id)) {
+          return Promise.reject(conflictError());
+        }
+
+        const record: MockRecord = {
+          board_id: request.board_id ?? `board-for-${id}`,
+          created_at: '2026-06-10 09:00:00.000',
+          data: structuredClone(request.data),
+          name: request.name,
+          project_id: id,
+          revision: 1,
+          updated_at: '2026-06-10 09:00:00.000',
+        };
+
+        records.set(id, record);
+
+        return Promise.resolve(clone(record));
       }
-
-      const record: MockRecord = {
-        created_at: '2026-06-10 09:00:00.000',
-        data: structuredClone(request.data),
-        name: request.name,
-        project_id: id,
-        revision: 1,
-        updated_at: '2026-06-10 09:00:00.000',
-      };
-
-      records.set(id, record);
-
-      return Promise.resolve(clone(record));
-    }),
+    ),
     deleteClientStateValue: vi.fn((key: string) => {
       clientState.delete(key);
 
@@ -312,6 +319,40 @@ describe('loadWorkbench session hydration', () => {
     expect(snapshot?.state.projects).toHaveLength(2);
     expect(snapshot?.state.activeProjectId).not.toBe(first.id);
     expect(service.hasPendingChanges()).toBe(true);
+  });
+
+  it('still starts a draft for a new-project request when the backend is unreachable', async () => {
+    const state = createInitialWorkbenchState();
+    const cachedProjectId = state.projects[0]?.id ?? '';
+
+    storage.set(
+      'invokeai:v7:webv2:workbench',
+      JSON.stringify({ savedAt: '2026-07-19T00:00:00.000Z', state, version: 1 })
+    );
+    api.listProjects.mockRejectedValueOnce(new Error('offline'));
+
+    const snapshot = await service.loadWorkbench({ createNew: true });
+
+    // Returning the cache verbatim here used to reopen whichever project was
+    // last active, so an offline "New project" landed the user in existing work
+    // — and let the Launchpad's intent rearrange it.
+    expect(snapshot?.state.projects).toHaveLength(state.projects.length + 1);
+    expect(snapshot?.state.activeProjectId).not.toBe(cachedProjectId);
+  });
+
+  it('reopens the cached session when the backend is unreachable and no draft was requested', async () => {
+    const state = createInitialWorkbenchState();
+
+    storage.set(
+      'invokeai:v7:webv2:workbench',
+      JSON.stringify({ savedAt: '2026-07-19T00:00:00.000Z', state, version: 1 })
+    );
+    api.listProjects.mockRejectedValueOnce(new Error('offline'));
+
+    const snapshot = await service.loadWorkbench();
+
+    expect(snapshot?.state.projects).toHaveLength(state.projects.length);
+    expect(snapshot?.state.activeProjectId).toBe(state.activeProjectId);
   });
 });
 
@@ -596,5 +637,282 @@ describe('hydrateProjectFromServer', () => {
 
   it('returns null for unknown projects', async () => {
     expect(await service.hydrateProjectFromServer('nope')).toBeNull();
+  });
+});
+
+/**
+ * The document's `projectBoardId` is a cache of a relationship SQLite owns. Every path that learns
+ * the real answer has to write it down, or the project points at a board that means nothing here.
+ */
+describe('authoritative project boards', () => {
+  const galleryBoardIds = (project: Project): { projectBoardId?: unknown; selectedBoardId?: unknown } => {
+    const instance = Object.values(project.widgetInstances).find((entry) => entry.typeId === 'gallery');
+
+    return (instance?.state.values ?? {}) as { projectBoardId?: unknown; selectedBoardId?: unknown };
+  };
+
+  it('reports the board the server minted for a project it created', async () => {
+    const draft = createDraftProject([]);
+
+    const result = await service.saveWorkbench(stateWithProjects([draft]));
+
+    expect(result.projectBoardAssignments).toEqual([{ boardId: `board-for-${draft.id}`, projectId: draft.id }]);
+    // Drained, so the next save does not re-apply it.
+    expect((await service.saveWorkbench(stateWithProjects([draft]))).projectBoardAssignments).toEqual([]);
+  });
+
+  it('overwrites a stale board id when hydrating a record', async () => {
+    const draft = createDraftProject([]);
+    const document = persistence.serializeProjectDocument(draft) as Record<string, unknown>;
+    const instances = document.widgetInstances as Record<string, { state: { values: Record<string, unknown> } }>;
+    const galleryId = Object.keys(instances).find(
+      (key) => (instances[key] as unknown as { typeId: string }).typeId === 'gallery'
+    )!;
+
+    // A board id written by some other install, naming a board that does not exist here.
+    instances[galleryId]!.state.values.projectBoardId = 'board-from-another-machine';
+    instances[galleryId]!.state.values.selectedBoardId = 'deliberate-destination';
+    api.__seed(document);
+
+    const hydrated = await service.hydrateProjectFromServer(draft.id);
+
+    expect(galleryBoardIds(hydrated!).projectBoardId).toBe(`board-for-${draft.id}`);
+    // The chosen destination is the user's, not ours; resolving it is the gallery's job.
+    expect(galleryBoardIds(hydrated!).selectedBoardId).toBe('deliberate-destination');
+  });
+
+  /**
+   * Patching the document is not enough on its own. A project saved by a build that never opened
+   * its Gallery widget has no gallery values for the patch to land in, and the instance the reducer
+   * creates during normalization arrives afterwards, empty — so the board has to be written again
+   * once the project is hydrated.
+   */
+  it('tells a project its board even when its document had no gallery state', async () => {
+    const draft = createDraftProject([]);
+    const document = persistence.serializeProjectDocument(draft) as Record<string, unknown>;
+
+    delete document.widgetInstances;
+    delete document.widgetStates;
+    api.__seed(document);
+
+    const hydrated = await service.hydrateProjectFromServer(draft.id);
+
+    expect(galleryBoardIds(hydrated!).projectBoardId).toBe(`board-for-${draft.id}`);
+  });
+
+  it('forks rather than resurrects a project deleted on another device', async () => {
+    const project = seedServerProject('Deleted elsewhere');
+    const opened = await service.hydrateProjectFromServer(project.id);
+    const edited = { ...opened!, name: 'Edited locally' };
+
+    // Deleted on the other device, after this one had already synced.
+    api.__records.delete(project.id);
+
+    const result = await service.saveWorkbench(stateWithProjects([edited]));
+
+    // The deletion stands...
+    expect(api.__records.has(project.id)).toBe(false);
+    // ...and the work survives under a fresh id, with a board of its own.
+    expect(result.deletedProjectForks).toHaveLength(1);
+    const [fork] = result.deletedProjectForks;
+    expect(fork!.projectId).toBe(project.id);
+    expect(fork!.recoveredProject.id).not.toBe(project.id);
+    expect(fork!.recoveredProject.name).toBe('Edited locally (recovered)');
+    expect(api.__records.get(fork!.recoveredProject.id)).toBeDefined();
+    expect(result.projectBoardAssignments).toEqual([
+      { boardId: `board-for-${fork!.recoveredProject.id}`, projectId: fork!.recoveredProject.id },
+    ]);
+  });
+
+  it('carries a flush-time fork to the next save instead of dropping it', async () => {
+    // A flush has no caller to return outcomes to — rename, export and duplicate all go through
+    // one. If the fork it produced were dropped, the aggregate would never hear about it.
+    const project = seedServerProject('Deleted elsewhere');
+    const opened = await service.hydrateProjectFromServer(project.id);
+    const edited = { ...opened!, name: 'Edited locally' };
+
+    api.__records.delete(project.id);
+    await service.flushProjectToServer(edited);
+
+    const result = await service.saveWorkbench(stateWithProjects([edited]));
+
+    expect(result.deletedProjectForks).toHaveLength(1);
+    expect(result.deletedProjectForks[0]!.projectId).toBe(project.id);
+    expect(result.projectBoardAssignments).toHaveLength(1);
+  });
+
+  /**
+   * The two callers that read a project back from the server — export and duplicate — have to be
+   * able to tell a push that landed from one that merely failed recoverably. Every branch below
+   * resolves, by design; the outcome is the only thing that distinguishes them.
+   */
+  describe('what a flush reports', () => {
+    /**
+     * `arrange` runs after the project is open and before the flush, so each row states exactly
+     * what makes its outcome different. The un-renamed row still pushes: hydration normalizes the
+     * document, so its serialized form differs from what the server holds.
+     */
+    it.each([
+      ['acknowledged', 'a push the server took', 'Edited', () => undefined],
+      ['acknowledged', 'a project the server already holds unchanged', undefined, () => undefined],
+      [
+        'unsynced',
+        'a push the server never took',
+        'Edited',
+        () => {
+          api.updateProject.mockRejectedValueOnce(new Error('the proxy refused the body'));
+        },
+      ],
+      [
+        'superseded',
+        'a fork, because the id now holds the other version',
+        'My version',
+        (id: string, project: Project) => {
+          // The other device wins the race with content of its own, so this is a genuine
+          // divergence rather than a revision that merely drifted.
+          api.__records.set(id, {
+            ...api.__records.get(id)!,
+            data: persistence.serializeProjectDocument({ ...project, name: 'Their version' }),
+            name: 'Their version',
+            revision: 99,
+          });
+        },
+      ],
+      [
+        'superseded',
+        'a project deleted elsewhere',
+        'Edited locally',
+        (id: string) => {
+          api.__records.delete(id);
+        },
+      ],
+    ])('reports %s for %s', async (kind, _label, rename, arrange) => {
+      const project = seedServerProject('Synced');
+      const opened = await service.hydrateProjectFromServer(project.id);
+
+      arrange(project.id, project);
+
+      const flushed = rename === undefined ? opened! : { ...opened!, name: rename };
+
+      await expect(service.flushProjectToServer(flushed)).resolves.toMatchObject({ kind });
+
+      if (kind === 'unsynced') {
+        expect(service.hasPendingChanges()).toBe(true);
+      }
+    });
+  });
+
+  /**
+   * The delete is queued behind the push rather than racing it. Were it not, a slow PUT would come
+   * back 404 after the DELETE committed, and the engine's answer to a 404 is to fork — recreating,
+   * server-side, exactly what the person deleted, pointing at media the deletion already removed.
+   */
+  it('does not fork a project this browser is deleting', async () => {
+    const project = seedServerProject('Doomed');
+    const opened = await service.hydrateProjectFromServer(project.id);
+    const edited = { ...opened!, name: 'Edited just before deleting' };
+
+    let releaseUpdate: () => void = () => undefined;
+    const updateReached = new Promise<void>((resolve) => {
+      releaseUpdate = resolve;
+    });
+    const realUpdate = api.updateProject.getMockImplementation()!;
+
+    api.updateProject.mockImplementationOnce(async (...args: Parameters<typeof realUpdate>) => {
+      releaseUpdate();
+      // Long enough for the delete below to be requested while this is still on the wire.
+      await new Promise((resolve) => {
+        setTimeout(resolve, 0);
+      });
+
+      return realUpdate(...args);
+    });
+
+    const flush = service.flushProjectToServer(edited);
+
+    await updateReached;
+
+    const deletion = service.deleteProjectOnServer(project.id);
+
+    await Promise.all([flush, deletion]);
+
+    expect(api.__records.has(project.id)).toBe(false);
+    // No "(recovered)" project anywhere: the deletion is the whole answer.
+    expect([...api.__records.keys()]).toEqual([]);
+
+    const result = await service.saveWorkbench(stateWithProjects([edited]));
+
+    expect(result.deletedProjectForks).toEqual([]);
+    expect(api.__records.size).toBe(0);
+  });
+
+  /**
+   * The belt to the queue's braces. Queueing removes the race for every caller that goes through
+   * `deleteProjectOnServer`, but the check at the top of a push runs before its awaits — so a
+   * deletion recorded while a `PUT` is on the wire has to be re-read when that `PUT` comes back 404,
+   * or the fork happens anyway.
+   */
+  it('re-reads the deletion set when a push it started comes back 404', async () => {
+    const project = seedServerProject('Doomed');
+    const opened = await service.hydrateProjectFromServer(project.id);
+    const realUpdate = api.updateProject.getMockImplementation()!;
+
+    api.updateProject.mockImplementationOnce((...args: Parameters<typeof realUpdate>) => {
+      // Exactly the window the check at the top of the push cannot see: the deletion lands after
+      // the request left, so this push is the one that discovers the 404.
+      api.__records.delete(project.id);
+      service.markProjectDeleted(project.id);
+
+      return realUpdate(...args);
+    });
+
+    await expect(service.flushProjectToServer({ ...opened!, name: 'Edited locally' })).resolves.toMatchObject({
+      kind: 'superseded',
+    });
+
+    // No "(recovered)" project was left behind on the server.
+    expect([...api.__records.keys()]).toEqual([]);
+
+    const result = await service.saveWorkbench(stateWithProjects([{ ...opened!, name: 'Edited locally' }]));
+
+    expect(result.deletedProjectForks).toEqual([]);
+    expect(api.__records.size).toBe(0);
+  });
+
+  it('lets a project save again when its deletion fails', async () => {
+    const project = seedServerProject('Survives');
+    const opened = await service.hydrateProjectFromServer(project.id);
+
+    api.deleteProject.mockRejectedValueOnce(new Error('offline'));
+
+    await expect(service.deleteProjectOnServer(project.id)).rejects.toThrow('offline');
+
+    // Its place in the revision chain comes back with it, so the next push is a PUT rather than a
+    // create that has to recover through a 409.
+    const result = await service.saveWorkbench(stateWithProjects([{ ...opened!, name: 'Edited after' }]));
+
+    expect(result.deletedProjectForks).toEqual([]);
+    expect(api.createProject).not.toHaveBeenCalled();
+    expect(api.__records.get(project.id)?.name).toBe('Edited after');
+  });
+
+  it('never re-creates a project it has already forked', async () => {
+    // The original stays in the aggregate until the reconciliation reaches it. A push in that
+    // window would POST the old id back and undo the deletion on every device — the exact outcome
+    // forking exists to avoid.
+    const project = seedServerProject('Deleted elsewhere');
+    const opened = await service.hydrateProjectFromServer(project.id);
+    const edited = { ...opened!, name: 'Edited locally' };
+
+    api.__records.delete(project.id);
+    await service.flushProjectToServer(edited);
+    expect(api.__records.has(project.id)).toBe(false);
+
+    // The aggregate has not applied the fork yet, so the original is still in the saved state.
+    const result = await service.saveWorkbench(stateWithProjects([edited]));
+
+    expect(api.__records.has(project.id)).toBe(false);
+    // And the fork is reported exactly once, not once per push.
+    expect(result.deletedProjectForks).toHaveLength(1);
   });
 });

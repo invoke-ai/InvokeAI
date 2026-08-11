@@ -3,12 +3,8 @@ import { HStack, Icon, Input, Tag, Text, Wrap } from '@chakra-ui/react';
 import { triggerPhraseSchema } from '@features/models/core/schemas';
 import { updateModel } from '@features/models/data/api';
 import { replaceModelInStore } from '@features/models/data/modelsStore';
-import {
-  type AccountScope,
-  assertAccountScopeCurrent,
-  captureAccountScope,
-  isAccountScopeCurrent,
-} from '@platform/state/accountLifecycle';
+import { useScopedAction } from '@platform/react/useScopedAction';
+import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { Button, Field } from '@platform/ui';
 import { PlusIcon } from 'lucide-react';
 import { memo, useState } from 'react';
@@ -45,8 +41,11 @@ export const TriggerPhrasesEditor = ({
   const draft = isEditorCurrent ? editor.draft : '';
   const error = isEditorCurrent ? editor.error : null;
   const isSaving = isEditorCurrent ? editor.isSaving : false;
+  // The saving flag lives in the modelKey-scoped editor state (so it resets on
+  // model switch); the hook's own isBusy is unused, only its scope plumbing.
+  const { run } = useScopedAction();
 
-  const persist = async (nextPhrases: string[], owner: AccountScope = captureAccountScope()): Promise<boolean> => {
+  const persist = async (nextPhrases: string[]): Promise<boolean> => {
     setEditor((current) => ({
       draft: current.modelKey === modelKey ? current.draft : '',
       error: current.modelKey === modelKey ? current.error : null,
@@ -54,25 +53,26 @@ export const TriggerPhrasesEditor = ({
       modelKey,
     }));
 
-    try {
-      const updated = await updateModel(modelKey, { trigger_phrases: nextPhrases }, owner.signal);
+    const stopSaving = () =>
+      setEditor((current) => (current.modelKey === modelKey ? { ...current, isSaving: false } : current));
+    let saved = false;
 
-      assertAccountScopeCurrent(owner);
-      replaceModelInStore(updated);
-      return true;
-    } catch (persistError) {
-      if (!isAccountScopeCurrent(owner)) {
-        return false;
+    await run(
+      async (owner) => {
+        const updated = await updateModel(modelKey, { trigger_phrases: nextPhrases }, owner.signal);
+
+        assertAccountScopeCurrent(owner);
+        replaceModelInStore(updated);
+        saved = true;
+        stopSaving();
+      },
+      (_message, persistError) => {
+        onError(persistError instanceof Error ? persistError.message : t('models.failedToUpdateTriggerPhrases'));
+        stopSaving();
       }
+    );
 
-      onError(persistError instanceof Error ? persistError.message : t('models.failedToUpdateTriggerPhrases'));
-
-      return false;
-    } finally {
-      if (isAccountScopeCurrent(owner)) {
-        setEditor((current) => (current.modelKey === modelKey ? { ...current, isSaving: false } : current));
-      }
-    }
+    return saved;
   };
 
   const addPhrase = async () => {
@@ -96,9 +96,7 @@ export const TriggerPhrasesEditor = ({
     setEditor({ draft, error: null, isSaving, modelKey });
 
     // Clear the draft only once it is saved, so a failure never eats the text.
-    const owner = captureAccountScope();
-
-    if ((await persist([...phrases, parsed.data], owner)) && isAccountScopeCurrent(owner)) {
+    if (await persist([...phrases, parsed.data])) {
       setEditor((current) => (current.modelKey === modelKey ? { ...current, draft: '' } : current));
     }
   };
@@ -152,7 +150,7 @@ export const TriggerPhrasesEditor = ({
         </Wrap>
       ) : (
         <Text color="fg.subtle" fontSize="2xs">
-          No trigger phrases yet.
+          {t('models.noTriggerPhrasesYet')}
         </Text>
       )}
     </Field>
@@ -160,4 +158,3 @@ export const TriggerPhrasesEditor = ({
 };
 
 export const MemoizedTriggerPhrasesEditor = memo(TriggerPhrasesEditor);
-/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */

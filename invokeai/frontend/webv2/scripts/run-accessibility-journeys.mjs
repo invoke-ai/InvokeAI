@@ -74,8 +74,21 @@ const openRepresentativePage = async (browser, path, viewport = { height: 1_000,
   return { consoleErrors, context, page, pageErrors };
 };
 
-const waitForProjects = async (page) => {
+/** `/` is Home: the greeting, the resume card, and the intent tiles. */
+const waitForHome = async (page) => {
   await page.getByRole('heading', { exact: true, name: 'Welcome to Invoke' }).waitFor();
+  await page.getByRole('link', { exact: true, name: 'Open Fixture Project 001' }).waitFor();
+  await page.getByText('Generate from text', { exact: true }).waitFor();
+};
+
+/**
+ * `/projects` is the library itself, which is where the grid lives. The
+ * heading is matched at level 2 because the shell also renders a visually
+ * hidden level-1 heading naming the active section, which on this page is the
+ * same word.
+ */
+const waitForProjects = async (page) => {
+  await page.getByRole('heading', { exact: true, level: 2, name: 'Projects' }).waitFor();
   await page.getByRole('link', { exact: true, name: 'Open Fixture Project 001' }).waitFor();
 };
 
@@ -129,8 +142,13 @@ const selectCenterView = async (page, from, to) => {
 
 const surfaces = [
   {
-    id: 'launchpad-projects-representative',
+    id: 'launchpad-home-representative',
     path: '/#/',
+    ready: waitForHome,
+  },
+  {
+    id: 'launchpad-projects-representative',
+    path: '/#/projects',
     ready: waitForProjects,
   },
   {
@@ -240,11 +258,13 @@ const runKeyboardJourney = async (browser) => {
   const { context, page, pageErrors } = await openRepresentativePage(browser, '/#/');
 
   try {
-    await waitForProjects(page);
+    await waitForHome(page);
 
     const projectsTab = page.getByRole('tab', { exact: true, name: 'Projects' });
     const modelsTab = page.getByRole('tab', { exact: true, name: 'Models' });
 
+    // The rail is grouped, but it is still one tablist: arrowing off the last
+    // Workspace tab has to land on the first Manage tab, skipping the headings.
     await projectsTab.focus();
     await projectsTab.press('ArrowDown');
     await expectFocused(modelsTab, 'ArrowDown should move focus from Projects to Models.');

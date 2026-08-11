@@ -6,6 +6,7 @@ import { useActiveInstallSources } from '@features/models/data/installsStore';
 import { openInstallQueue } from '@features/models/ui/uiStore';
 import { Button, Panel } from '@platform/ui';
 import { DownloadIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 /**
  * The shared row used by every installable-source list (starter models,
@@ -34,7 +35,9 @@ export const SourceListItem = ({
         {badges}
       </HStack>
       {description ? (
-        <Text color="fg.subtle" fontSize="2xs" lineClamp={2}>
+        // `fg.subtle` at this size only reaches 3.56:1 on the panel surface,
+        // short of WCAG AA. `fg.muted` clears 4.5:1.
+        <Text color="fg.muted" fontSize="2xs" lineClamp={2}>
           {description}
         </Text>
       ) : null}
@@ -61,13 +64,14 @@ export const InstallSourceButton = ({
   /** Source string used to match an active install job. */
   source: string;
 }) => {
+  const { t } = useTranslation();
   const activeSources = useActiveInstallSources();
   const isInstalling = isPending || activeSources.has(source);
 
   if (isInstalled) {
     return (
       <Badge colorPalette="green" flexShrink={0} fontSize="2xs" size="sm" variant="surface">
-        Installed
+        {t('models.installed')}
       </Badge>
     );
   }
@@ -77,7 +81,7 @@ export const InstallSourceButton = ({
       <HStack flexShrink={0} gap="1.5">
         <Badge colorPalette="blue" fontSize="2xs" size="sm" variant="surface">
           <Spinner borderWidth="1.5px" boxSize="2.5" />
-          Installing
+          {t('models.installing')}
         </Badge>
         <Button
           size="2xs"
@@ -87,7 +91,7 @@ export const InstallSourceButton = ({
             openInstallQueue();
           }}
         >
-          View queue
+          {t('models.viewQueue')}
         </Button>
       </HStack>
     );
@@ -104,8 +108,7 @@ export const InstallSourceButton = ({
       }}
     >
       <Icon as={DownloadIcon} boxSize="3" />
-      Install
+      {t('models.install')}
     </Button>
   );
 };
-/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */

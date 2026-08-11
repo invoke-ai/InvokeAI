@@ -1,5 +1,11 @@
 import type { DeveloperLogLevel, DeveloperLogNamespace } from '@workbench/diagnostics/contracts';
-import type { ProjectSettings, StoredRebalancePreset, WorkbenchPreferences } from '@workbench/settings/contracts';
+import type {
+  ProjectSettings,
+  ProjectSortId,
+  ProjectsViewId,
+  StoredRebalancePreset,
+  WorkbenchPreferences,
+} from '@workbench/settings/contracts';
 
 import { getUserStorageScope } from '@features/identity';
 import { normalizeWorkbenchLanguage } from '@platform/i18n/languages';
@@ -41,8 +47,6 @@ export const DEVELOPER_LOG_NAMESPACES: DeveloperLogNamespace[] = [
 
 export const DEFAULT_PROJECT_SETTINGS: ProjectSettings = {
   antialiasProgressImages: false,
-  preferNumericAttentionStyle: false,
-  showPromptSyntaxHighlighting: false,
   showProgressDetails: false,
   showProgressImagesInViewer: true,
   useCpuNoise: true,
@@ -61,8 +65,13 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   generateSectionsOpen: {},
   krea2RebalancePresets: [],
   language: 'en',
+  launchpadPinnedProjectIds: [],
+  launchpadProjectsSort: 'edited',
+  launchpadProjectsView: 'grid',
+  preferNumericAttentionStyle: false,
   queueJobsScope: 'all',
   reduceMotion: false,
+  showPromptSyntaxHighlighting: false,
   showFocusRegionHighlight: true,
   themeId: DEFAULT_THEME_ID,
   workflowEdgeStyle: 'curved',
@@ -132,6 +141,20 @@ const normalizeDeveloperLogNamespaces = (values: unknown): DeveloperLogNamespace
 
   return DEVELOPER_LOG_NAMESPACES.filter((namespace) => enabled.has(namespace));
 };
+
+/**
+ * Guards for the Launchpad library's view state. Deliberately local rather
+ * than imported from the Launchpad: these settings load on every route, and a
+ * value import would put launchpad view code in the editor's bundle too. The
+ * types come from `contracts`, which is type-only and therefore free.
+ */
+const isProjectsViewId = (value: unknown): value is ProjectsViewId => value === 'grid' || value === 'list';
+
+const isProjectSortId = (value: unknown): value is ProjectSortId =>
+  value === 'edited' || value === 'created' || value === 'name';
+
+const normalizePinnedProjectIds = (values: unknown): string[] =>
+  Array.isArray(values) ? [...new Set(values.filter((value): value is string => typeof value === 'string'))] : [];
 
 const normalizeCustomHotkeys = (values: unknown): Record<string, string[]> => {
   if (!values || typeof values !== 'object' || Array.isArray(values)) {
@@ -208,14 +231,6 @@ export const normalizeProjectSettings = (settings?: Partial<ProjectSettings>): P
     typeof settings?.antialiasProgressImages === 'boolean'
       ? settings.antialiasProgressImages
       : DEFAULT_PROJECT_SETTINGS.antialiasProgressImages,
-  preferNumericAttentionStyle:
-    typeof settings?.preferNumericAttentionStyle === 'boolean'
-      ? settings.preferNumericAttentionStyle
-      : DEFAULT_PROJECT_SETTINGS.preferNumericAttentionStyle,
-  showPromptSyntaxHighlighting:
-    typeof settings?.showPromptSyntaxHighlighting === 'boolean'
-      ? settings.showPromptSyntaxHighlighting
-      : DEFAULT_PROJECT_SETTINGS.showPromptSyntaxHighlighting,
   showProgressDetails:
     typeof settings?.showProgressDetails === 'boolean'
       ? settings.showProgressDetails
@@ -227,7 +242,12 @@ export const normalizeProjectSettings = (settings?: Partial<ProjectSettings>): P
   useCpuNoise: typeof settings?.useCpuNoise === 'boolean' ? settings.useCpuNoise : DEFAULT_PROJECT_SETTINGS.useCpuNoise,
 });
 
-type WorkbenchPreferencesInput = Omit<Partial<WorkbenchPreferences>, 'queueJobsScope' | 'workflowEdgeStyle'> & {
+type WorkbenchPreferencesInput = Omit<
+  Partial<WorkbenchPreferences>,
+  'launchpadProjectsSort' | 'launchpadProjectsView' | 'queueJobsScope' | 'workflowEdgeStyle'
+> & {
+  launchpadProjectsSort?: unknown;
+  launchpadProjectsView?: unknown;
   queueJobsScope?: unknown;
   workflowEdgeStyle?: unknown;
 };
@@ -265,6 +285,17 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
   generateSectionsOpen: normalizeGenerateSectionsOpen(preferences?.generateSectionsOpen),
   krea2RebalancePresets: normalizeRebalancePresets(preferences?.krea2RebalancePresets),
   language: normalizeWorkbenchLanguage(preferences?.language) ?? DEFAULT_PREFERENCES.language,
+  launchpadPinnedProjectIds: normalizePinnedProjectIds(preferences?.launchpadPinnedProjectIds),
+  launchpadProjectsSort: isProjectSortId(preferences?.launchpadProjectsSort)
+    ? preferences.launchpadProjectsSort
+    : DEFAULT_PREFERENCES.launchpadProjectsSort,
+  launchpadProjectsView: isProjectsViewId(preferences?.launchpadProjectsView)
+    ? preferences.launchpadProjectsView
+    : DEFAULT_PREFERENCES.launchpadProjectsView,
+  preferNumericAttentionStyle:
+    typeof preferences?.preferNumericAttentionStyle === 'boolean'
+      ? preferences.preferNumericAttentionStyle
+      : DEFAULT_PREFERENCES.preferNumericAttentionStyle,
   queueJobsScope:
     preferences?.queueJobsScope === 'all-projects'
       ? 'all'
@@ -277,6 +308,10 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
     typeof preferences?.showFocusRegionHighlight === 'boolean'
       ? preferences.showFocusRegionHighlight
       : DEFAULT_PREFERENCES.showFocusRegionHighlight,
+  showPromptSyntaxHighlighting:
+    typeof preferences?.showPromptSyntaxHighlighting === 'boolean'
+      ? preferences.showPromptSyntaxHighlighting
+      : DEFAULT_PREFERENCES.showPromptSyntaxHighlighting,
   themeId: isWorkbenchThemeId(preferences?.themeId) ? preferences.themeId : DEFAULT_PREFERENCES.themeId,
   workflowEdgeStyle:
     preferences?.workflowEdgeStyle === 'square' || preferences?.workflowEdgeStyle === 'straight'

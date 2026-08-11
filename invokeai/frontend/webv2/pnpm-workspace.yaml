@@ -1,0 +1,2 @@
+patchedDependencies:
+  react-hook-tanstack-virtual: patches/react-hook-tanstack-virtual.patch

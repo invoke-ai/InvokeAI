@@ -166,6 +166,7 @@ const createGenerateValues = (overrides: Partial<GenerateWidgetValues> = {}): Ge
   positivePromptHeightPx: 96,
   promptTemplate: null,
   promptTemplateViewMode: false,
+  mistralEncoderModel: null,
   qwen3EncoderModel: null,
   qwenVLEncoderModel: null,
   qwen3VLEncoderModel: null,
@@ -2477,16 +2478,14 @@ describe('workbench account and project settings', () => {
     let state = createInitialWorkbenchState();
 
     state = workbenchReducer(state, {
-      settings: { antialiasProgressImages: true, preferNumericAttentionStyle: true, useCpuNoise: false },
+      settings: { antialiasProgressImages: true, useCpuNoise: false },
       type: 'setActiveProjectSettings',
     });
 
     expect(getActiveProject(state).settings).toEqual({
       antialiasProgressImages: true,
-      preferNumericAttentionStyle: true,
       showProgressDetails: false,
       showProgressImagesInViewer: true,
-      showPromptSyntaxHighlighting: false,
       useCpuNoise: false,
     });
   });

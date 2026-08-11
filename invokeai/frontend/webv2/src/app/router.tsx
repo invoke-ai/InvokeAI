@@ -8,6 +8,7 @@ import {
   useAuthSession,
   type Capabilities,
 } from '@features/identity';
+import { ModelInstallRuntime } from '@features/models';
 import {
   createHashHistory,
   createRootRoute,
@@ -22,6 +23,7 @@ import {
   useRouter,
 } from '@tanstack/react-router';
 import { WorkbenchSplashScreen } from '@workbench/components/WorkbenchSplashScreen';
+import { isLaunchpadIntentId } from '@workbench/launchpad/intents';
 import { Launchpad } from '@workbench/launchpad/Launchpad';
 import { peekOpenProjectIds, type WorkbenchSearch } from '@workbench/projects/session';
 import { loadWorkbenchSettings } from '@workbench/settings/store';
@@ -63,9 +65,11 @@ const RouterError = ({ error }: ErrorComponentProps) => {
 const rootRoute = createRootRoute({ component: Outlet, errorComponent: RouterError });
 
 /**
- * Wraps every authenticated route with the shared backend socket transport.
- * Feature runtimes attach their own listeners only where needed, keeping the
- * light Launchpad bundle free of editor/model-manager code.
+ * Wraps every authenticated route with the shared backend socket transport
+ * and the model-install runtime — installs must progress and toast no matter
+ * which surface started them. Heavier feature runtimes still attach their own
+ * listeners only where needed, keeping the light Launchpad bundle free of
+ * editor/model-manager view code.
  */
 const AuthenticatedLayout = () => {
   const session = useAuthSession();
@@ -81,6 +85,7 @@ const AuthenticatedLayout = () => {
   return (
     <Fragment key={session.accountEpoch}>
       <SocketHubRuntime />
+      <ModelInstallRuntime />
       <Outlet />
     </Fragment>
   );
@@ -178,6 +183,7 @@ const workbenchRoute = createRoute({
   getParentRoute: () => authenticatedRoute,
   path: '/app',
   validateSearch: (search: Record<string, unknown>): WorkbenchSearch => ({
+    intent: isLaunchpadIntentId(search.intent) ? search.intent : undefined,
     new: search.new === true || search.new === 'true' || search.new === 1 ? true : undefined,
     project: typeof search.project === 'string' && search.project.length > 0 ? search.project : undefined,
   }),

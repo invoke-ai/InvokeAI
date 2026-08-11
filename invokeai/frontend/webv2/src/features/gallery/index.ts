@@ -63,6 +63,7 @@ import {
   type GalleryItemOrganizationTransportResult,
   unstarGalleryImages,
   uploadGalleryImage,
+  uploadGalleryVideo,
 } from './data/backend';
 
 /** Resolve backend Gallery images without exposing transport DTOs or endpoints. */
@@ -87,6 +88,7 @@ export const galleryVideos = {
 export const galleryTransfers = {
   downloadArchive: downloadGalleryArchive,
   upload: uploadGalleryImage,
+  uploadVideo: uploadGalleryVideo,
 } as const;
 
 /** Durability transitions for intermediate results. */

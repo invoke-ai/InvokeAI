@@ -9,15 +9,29 @@ import { createExternalStore } from '@platform/state/externalStore';
 import { createSingleFlight } from '@platform/state/singleFlight';
 import { normalizeServerTimestamp } from '@platform/time/serverTimestamp';
 
+import type { ProjectTransferIssues } from './invk/transfer';
+
 import {
-  createProject as apiCreateProject,
   deleteProject as apiDeleteProject,
   getProject as apiGetProject,
+  getProjectBoardSnapshot,
   listProjects,
   updateProject as apiUpdateProject,
+  type ProjectRecordDTO,
   type ProjectSummaryDTO,
 } from './api';
-import { createProjectId } from './ids';
+import {
+  forgetProjectCover,
+  getProjectCoverImageName,
+  getProjectCoverUrl,
+  loadProjectCovers,
+  recordProjectCover,
+  subscribeProjectCovers,
+} from './covers';
+import { refreshOpenProjects } from './openProjects';
+import { assertProjectFlushed } from './projectFlush';
+import { pruneSessionProject } from './session';
+import { getOpenProject } from './syncStore';
 
 /**
  * The project library: every project saved on the server for the current
@@ -37,6 +51,13 @@ export interface ProjectSummary {
   revision: number;
   createdAt: string;
   updatedAt: string;
+  /**
+   * Thumbnail for the library grid, resolved from the per-user cover index
+   * (`covers.ts`) rather than from the project document, which listings do not
+   * carry. Absent for a project that has produced no images, and for one last
+   * saved by a build that did not record covers.
+   */
+  coverUrl?: string;
 }
 
 export type ProjectLibraryStatus = 'idle' | 'loading' | 'ready' | 'error';
@@ -57,12 +78,44 @@ registerAccountOwnedResource({
   name: 'project-library',
 });
 
-const toSummary = (dto: ProjectSummaryDTO): ProjectSummary => ({
-  createdAt: normalizeServerTimestamp(dto.created_at),
-  id: dto.project_id,
-  name: dto.name,
-  revision: dto.revision,
-  updatedAt: normalizeServerTimestamp(dto.updated_at),
+const withCover = <T extends { id: string }>(summary: T): T & { coverUrl?: string } => {
+  const coverImageName = getProjectCoverImageName(summary.id);
+
+  return coverImageName === undefined ? summary : { ...summary, coverUrl: getProjectCoverUrl(coverImageName) };
+};
+
+const toSummary = (dto: ProjectSummaryDTO): ProjectSummary =>
+  withCover({
+    createdAt: normalizeServerTimestamp(dto.created_at),
+    id: dto.project_id,
+    name: dto.name,
+    revision: dto.revision,
+    updatedAt: normalizeServerTimestamp(dto.updated_at),
+  });
+
+/**
+ * The cover index loads and updates independently of the listing, so summaries
+ * are re-derived whenever it changes. Without this a cover recorded after the
+ * library rendered — the first generation in a new project — would not appear
+ * until the next refresh.
+ */
+subscribeProjectCovers(() => {
+  const { status, summaries } = store.getSnapshot();
+
+  if (status !== 'ready') {
+    return;
+  }
+
+  const next = summaries.map((summary) => {
+    const coverImageName = getProjectCoverImageName(summary.id);
+    const coverUrl = coverImageName === undefined ? undefined : getProjectCoverUrl(coverImageName);
+
+    return coverUrl === summary.coverUrl ? summary : { ...summary, coverUrl };
+  });
+
+  if (next.some((summary, index) => summary !== summaries[index])) {
+    store.patchSnapshot({ summaries: next });
+  }
 });
 
 /** Most recently edited first — the order Home and the Open dialog present. */
@@ -92,8 +145,11 @@ export const refreshProjectLibrary = (): Promise<void> =>
     const owner = captureAccountScope();
 
     return refreshFlight.run(`project-library:${owner.epoch}`, () =>
-      listProjects(owner.signal)
-        .then((dtos) => {
+      // Covers resolve alongside the listing rather than after it: they come
+      // from a different store, and seeding without them would show a grid of
+      // glyphs that fills in a moment later.
+      Promise.all([listProjects(owner.signal), loadProjectCovers()])
+        .then(([dtos]) => {
           seedProjectLibrary(dtos, owner);
         })
         .catch((error: unknown) => {
@@ -125,13 +181,13 @@ export const upsertProjectSummary = (
   const { summaries } = store.getSnapshot();
   const existing = summaries.find((summary) => summary.id === entry.id);
   const updatedAt = new Date().toISOString();
-  const next: ProjectSummary = {
+  const next: ProjectSummary = withCover({
     createdAt: existing?.createdAt ?? updatedAt,
     id: entry.id,
     name: entry.name,
     revision: entry.revision ?? existing?.revision ?? 0,
     updatedAt,
-  };
+  });
 
   store.patchSnapshot({
     status: 'ready',
@@ -139,22 +195,59 @@ export const upsertProjectSummary = (
   });
 };
 
-/** Permanently remove a project from the server. The only deletion path. */
+/**
+ * Every mutation below branches on one question: does the workbench hold this project? If so it
+ * goes through {@link getOpenProject} — the sync engine — otherwise over HTTP. A library write
+ * landing beside an open project's revision chain forks it into a conflict copy, and now that a
+ * board renames with its project, would rename the board from outside the owning transaction.
+ */
+
+/** Permanently remove a project from the server, its board with it. The only deletion path. */
 export const deleteLibraryProject = async (projectId: string): Promise<void> => {
   const owner = captureAccountScope();
+  const openProject = getOpenProject(projectId);
 
-  await apiDeleteProject(projectId, owner.signal);
+  if (openProject) {
+    // Through the sync engine's queue, not beside it. Marking the project first stops a save that
+    // has not begun, but a PUT already on the wire is past every check the engine has: it comes
+    // back 404 once this DELETE commits, and the engine answers a 404 by forking the local document
+    // into a new server project — a copy of the thing just deleted, pointing at media the deletion
+    // removed. Queueing means the push finishes before the DELETE is sent. Marking and unmarking
+    // are the handle's business too, because a project left marked stops autosaving for the rest of
+    // the session, silently and with no way to notice.
+    await openProject.deleteOnServer();
+  } else {
+    await apiDeleteProject(projectId, owner.signal);
+  }
+
   assertAccountScopeCurrent(owner);
+  openProject?.close();
+  forgetProjectCover(projectId, owner);
   store.patchSnapshot({ summaries: store.getSnapshot().summaries.filter((summary) => summary.id !== projectId) });
+
+  // The saved session outlives the editor, so a deleted project has to leave it here or the next
+  // boot tries to open something the server no longer has.
+  await pruneSessionProject(projectId, owner.signal);
+  await refreshOpenProjects();
 };
 
 /**
- * Rename a project that is not open in the editor. Open projects rename
- * through the workbench reducer instead, so their document and the autosave
- * revision chain stay consistent.
+ * Rename a project. An open one renames through the reducer so its document, its revision chain and
+ * its board stay in step; a closed one is a read-modify-write against the server.
  */
 export const renameLibraryProject = async (projectId: string, name: string): Promise<void> => {
   const owner = captureAccountScope();
+  const openProject = getOpenProject(projectId);
+
+  if (openProject) {
+    await openProject.rename(name);
+    assertAccountScopeCurrent(owner);
+    // The flush has already told the server; this only keeps the grid from waiting for a refetch.
+    upsertProjectSummary({ id: projectId, name, revision: null }, owner);
+
+    return;
+  }
+
   const record = await apiGetProject(projectId, owner.signal);
 
   assertAccountScopeCurrent(owner);
@@ -172,26 +265,70 @@ export const renameLibraryProject = async (projectId: string, name: string): Pro
   upsertProjectSummary({ id: updated.project_id, name: updated.name, revision: updated.revision }, owner);
 };
 
-/** Copy a project under a fresh id; returns the new summary. */
-export const duplicateLibraryProject = async (projectId: string): Promise<ProjectSummary> => {
-  const owner = captureAccountScope();
-  const record = await apiGetProject(projectId, owner.signal);
+/**
+ * The server record for a project about to be copied or exported, flushed first when the editor
+ * holds it, and fatal if that flush does not land. The GET returns the last *acknowledged*
+ * document, so without this an unacknowledged push is indistinguishable from a successful one and
+ * the copy silently omits the last ten minutes of work under a success toast.
+ */
+export const readAcknowledgedProject = async (projectId: string, owner: AccountScope): Promise<ProjectRecordDTO> => {
+  const openProject = getOpenProject(projectId);
+
+  if (openProject) {
+    assertProjectFlushed(await openProject.flush());
+  }
 
   assertAccountScopeCurrent(owner);
-  const newId = createProjectId();
-  const name = `${record.name} copy`;
-  const created = await apiCreateProject(
-    {
-      data: { ...record.data, id: newId, name },
-      name,
-      project_id: newId,
-    },
-    owner.signal
-  );
-  assertAccountScopeCurrent(owner);
-  const summary = toSummary(created);
+
+  return apiGetProject(projectId, owner.signal);
+};
+
+/** Adopt a project this account just created elsewhere (an import, a duplication). */
+export const adoptCreatedProject = (record: ProjectRecordDTO, owner: AccountScope): ProjectSummary => {
+  const summary = toSummary(record);
 
   upsertProjectSummary({ id: summary.id, name: summary.name, revision: summary.revision }, owner);
 
   return summary;
+};
+
+export interface DuplicatedProject extends ProjectTransferIssues {
+  summary: ProjectSummary;
+}
+
+/**
+ * Copy a project, its board and everything on it, under a fresh id. Enumerating the board is fatal:
+ * a board that came back silently empty would look like a successful copy of a project that had
+ * produced nothing. The copying shares import's restore engine behind the lazy `invk/` boundary.
+ */
+export const duplicateLibraryProject = async (
+  projectId: string,
+  options: { onProgress?: (progress: { completed: number; total: number }) => void; owner?: AccountScope } = {}
+): Promise<DuplicatedProject> => {
+  const owner = options.owner ?? captureAccountScope();
+  const record = await readAcknowledgedProject(projectId, owner);
+
+  assertAccountScopeCurrent(owner);
+
+  const snapshot = await getProjectBoardSnapshot(projectId, owner.signal);
+
+  assertAccountScopeCurrent(owner);
+
+  const { duplicateProjectRecord } = await import('./invk/duplicateProject');
+  const duplicated = await duplicateProjectRecord(
+    { boardItems: snapshot.items, owner, record },
+    options.onProgress ? { onProgress: options.onProgress } : {}
+  );
+
+  assertAccountScopeCurrent(owner);
+
+  if (duplicated.coverImageName) {
+    recordProjectCover(duplicated.record.project_id, duplicated.coverImageName, owner);
+  }
+
+  return {
+    boardItemIssues: duplicated.boardItemIssues,
+    documentReferenceIssues: duplicated.documentReferenceIssues,
+    summary: adoptCreatedProject(duplicated.record, owner),
+  };
 };

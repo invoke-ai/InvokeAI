@@ -135,7 +135,10 @@ export const LayerGroupSection = ({
           />
         </IconButton>
         <Text
-          color="fg.subtle"
+          // `fg.subtle` at this size reaches only 3.56:1 on the panel surface,
+          // short of WCAG AA. The axe gate catches it intermittently, because
+          // the header has to be scrolled into view to be scanned.
+          color="fg.muted"
           cursor="pointer"
           flex="1"
           fontSize="2xs"
