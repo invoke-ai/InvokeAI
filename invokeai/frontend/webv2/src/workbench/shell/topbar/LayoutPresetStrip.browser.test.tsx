@@ -133,4 +133,35 @@ describe('LayoutPresetStrip', () => {
     expect(store.getSnapshot().account.layoutPresetOrder).toEqual(['custom-1', 'edit', 'automate', 'compose']);
     expect(store.getSnapshot().activeProject.layout.presetId).toBe(activeBeforeDrag);
   });
+
+  it('does not auto-scroll the strip while dragging near its right edge', async () => {
+    for (let index = 2; index <= 8; index += 1) {
+      store.commands.layout.createPreset(`custom-${index}`, `Custom ${index}`, 'star');
+    }
+    await renderStrip();
+    const scrollContainer = document.querySelector<HTMLElement>('[data-layout-preset-scroll]');
+    const source = presetTab('compose');
+    expect(scrollContainer).not.toBeNull();
+    expect(source).not.toBeNull();
+    expect(scrollContainer!.scrollWidth).toBeGreaterThan(scrollContainer!.clientWidth);
+    const sourceRect = source!.getBoundingClientRect();
+    const containerRect = scrollContainer!.getBoundingClientRect();
+    const startX = sourceRect.left + sourceRect.width / 2;
+    const startY = sourceRect.top + sourceRect.height / 2;
+    const edgeX = containerRect.right - 2;
+
+    await act(() => pointer('pointerdown', source!, startX, startY));
+    await act(() => pointer('pointermove', source!.ownerDocument, startX + 8, startY));
+    await act(() => pointer('pointermove', source!.ownerDocument, edgeX, startY));
+    await act(
+      () =>
+        new Promise<void>((resolve) => {
+          globalThis.setTimeout(resolve, 150);
+        })
+    );
+
+    expect(scrollContainer!.scrollLeft).toBe(0);
+
+    await act(() => pointer('pointerup', source!.ownerDocument, edgeX, startY));
+  });
 });

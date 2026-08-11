@@ -120,6 +120,7 @@ export const LayoutPresetStrip = () => {
       <HStack gap="1" justify="center" maxW="min(36vw, 44rem)" minW="0">
         <Box css={PRESET_SCROLL_CSS} data-layout-preset-scroll="" maxW="full" minW="0" overflowX="auto">
           <DndContext
+            autoScroll={false}
             collisionDetection={closestCenter}
             modifiers={DND_MODIFIERS}
             sensors={sensors}
