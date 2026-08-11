@@ -8,10 +8,15 @@ import { isLinkableType } from '@features/models/core/relationships';
 import { isAbsoluteModelPath, resolveModelAbsolutePath } from '@features/models/core/schemas';
 import { formatBytes, getModelSourceHref } from '@features/models/core/taxonomy';
 import { useModelsSelector, type ModelsSnapshot } from '@features/models/data/modelsStore';
+import {
+  ModelActionConfirmDialog,
+  ModelActionMenuItems,
+  type PendingModelAction,
+} from '@features/models/ui/shared/ModelActionsMenu';
 import { useNotify } from '@features/models/ui/useModelsNotify';
 import { areArraysEqual } from '@platform/state/selectors';
-import { Button, IconButton, ConfirmDialog, MenuContent } from '@platform/ui';
-import { ExternalLinkIcon, MoreHorizontalIcon, PencilIcon, RefreshCcwIcon, Trash2Icon } from 'lucide-react';
+import { Button, IconButton, MenuContent } from '@platform/ui';
+import { ExternalLinkIcon, MoreHorizontalIcon, PencilIcon } from 'lucide-react';
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SiHuggingface } from 'react-icons/si';
@@ -26,7 +31,6 @@ import { ModelSettingsMenuItems } from './ModelSettingsMenuItems';
 import { RelatedModelsSection } from './RelatedModelsSection';
 import { MemoizedTriggerPhrasesEditor } from './TriggerPhrasesEditor';
 import { UpdatePathDialog } from './UpdatePathDialog';
-import { useModelActions } from './useModelActions';
 
 const TRIGGER_PHRASE_TYPES = new Set(['main', 'lora', 'embedding']);
 const EMPTY_TRIGGER_PHRASES: readonly string[] = [];
@@ -275,24 +279,13 @@ const ModelDetailActions = ({
   onToggleEditing: () => void;
 }) => {
   const { t } = useTranslation();
-  const { convert, reidentify, remove } = useModelActions();
-  const [pendingAction, setPendingAction] = useState<'delete' | 'convert' | null>(null);
+  const [pendingAction, setPendingAction] = useState<PendingModelAction>(null);
   const [isActionBusy, setIsActionBusy] = useState(false);
-
-  const handleReidentify = async () => {
-    setIsActionBusy(true);
-
-    try {
-      await reidentify(model);
-    } finally {
-      setIsActionBusy(false);
-    }
-  };
 
   return (
     <HStack flexShrink={0} gap="1" wrap="wrap">
       {isConvertibleToDiffusers(model) ? (
-        <Button size="xs" variant="outline" onClick={() => setPendingAction('convert')}>
+        <Button size="xs" variant="outline" onClick={() => setPendingAction({ kind: 'convert', model })}>
           <Icon as={SiHuggingface} boxSize="3" />
           {t('models.convertToDiffusers')}
         </Button>
@@ -310,43 +303,17 @@ const ModelDetailActions = ({
         <Portal>
           <Menu.Positioner>
             <MenuContent minW="12rem">
-              <Menu.Item value="reidentify" onClick={() => void handleReidentify()}>
-                <Icon as={RefreshCcwIcon} boxSize="3.5" />
-                <Menu.ItemText fontSize="xs">{t('models.reidentify')}</Menu.ItemText>
-              </Menu.Item>
-              <ModelSettingsMenuItems modelKey={model.key} />
-              <Menu.Separator />
-              <Menu.Item color="fg.error" value="delete" onClick={() => setPendingAction('delete')}>
-                <Icon as={Trash2Icon} boxSize="3.5" />
-                <Menu.ItemText fontSize="xs">{t('models.deleteModel')}</Menu.ItemText>
-              </Menu.Item>
+              <ModelActionMenuItems
+                extraItems={<ModelSettingsMenuItems modelKey={model.key} />}
+                model={model}
+                onBusyChange={setIsActionBusy}
+                onRequestConfirm={setPendingAction}
+              />
             </MenuContent>
           </Menu.Positioner>
         </Portal>
       </Menu.Root>
-      <ConfirmDialog
-        body={t('models.deleteBody', { name: model.name })}
-        confirmLabel={t('models.deleteModel')}
-        isOpen={pendingAction === 'delete'}
-        title={t('models.deleteModel')}
-        onClose={() => setPendingAction(null)}
-        onConfirm={async () => {
-          if (await remove(model)) {
-            onDeleted();
-          }
-        }}
-      />
-      {/* Destructive styling: the original checkpoint file is replaced. */}
-      <ConfirmDialog
-        body={t('models.convertBody', { name: model.name })}
-        confirmLabel={t('models.convert')}
-        isOpen={pendingAction === 'convert'}
-        title={t('models.convertToDiffusers')}
-        onClose={() => setPendingAction(null)}
-        onConfirm={async () => {
-          await convert(model);
-        }}
-      />
+      <ModelActionConfirmDialog pending={pendingAction} onClose={() => setPendingAction(null)} onDeleted={onDeleted} />
     </HStack>
   );
 };
