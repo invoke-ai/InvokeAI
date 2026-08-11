@@ -103,6 +103,8 @@
     "invocationSubmit.ts": "workbench",
     "layoutContracts.ts": "workbench",
     "layoutPresetActivation.ts": "workbench",
+    "layoutPresetCollection.ts": "workbench",
+    "layoutPresetRouting.ts": "workbench",
     "layoutPresetSnapshots.ts": "workbench",
     "layoutPresets.ts": "workbench",
     "panZoom.ts": "workbench",

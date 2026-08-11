@@ -17,13 +17,15 @@ describe('layout preset activation', () => {
     const composeLoad = createDeferred();
     const editLoad = createDeferred();
     const appliedPresetIds: string[] = [];
-    const activate = createLayoutPresetActivator({
+    const activator = createLayoutPresetActivator({
       apply: (presetId) => appliedPresetIds.push(presetId),
+      getActiveProjectId: () => 'project-a',
+      isCurrent: () => true,
       load: (preset) => (preset.id === 'compose' ? composeLoad.promise : editLoad.promise),
     });
 
-    const composeActivation = activate(layoutPresets[0]);
-    const editActivation = activate(layoutPresets[1]);
+    const composeActivation = activator.activate(layoutPresets[0]);
+    const editActivation = activator.activate(layoutPresets[1]);
 
     editLoad.resolve();
     await editActivation;

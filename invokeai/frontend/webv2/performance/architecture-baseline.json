@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 830433,
+        "brotliBytes": 831144,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 830077,
+        "gzipBytes": 830553,
         "imageRawBytes": 156376,
-        "initialRawBytes": 1927437,
-        "largestAssetRawBytes": 746170,
+        "initialRawBytes": 1928509,
+        "largestAssetRawBytes": 746314,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 66629,
+        "ownedRawBytes": 66631,
         "requestCount": 41,
         "scriptRequestCount": 25,
         "sourceOwners": [
@@ -279,15 +279,15 @@
         ]
       },
       "limits": {
-        "brotliBytes": 838738,
+        "brotliBytes": 839456,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 838378,
+        "gzipBytes": 838859,
         "imageRawBytes": 157940,
-        "initialRawBytes": 1946712,
-        "largestAssetRawBytes": 753632,
+        "initialRawBytes": 1947795,
+        "largestAssetRawBytes": 753778,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 66629,
+        "ownedRawBytes": 66631,
         "requestCount": 41,
         "scriptRequestCount": 25
       },
@@ -297,15 +297,15 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1014369,
+        "brotliBytes": 1019671,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1011775,
+        "gzipBytes": 1016688,
         "imageRawBytes": 156376,
-        "initialRawBytes": 2484075,
-        "largestAssetRawBytes": 746170,
+        "initialRawBytes": 2497187,
+        "largestAssetRawBytes": 746314,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 114347,
+        "ownedRawBytes": 105926,
         "requestCount": 85,
         "scriptRequestCount": 69,
         "sourceOwners": [
@@ -696,6 +696,8 @@
           "source:src/workbench/launchpad/formatRelativeTime.ts",
           "source:src/workbench/launchpad/intents.ts",
           "source:src/workbench/layoutPresetActivation.ts",
+          "source:src/workbench/layoutPresetCollection.ts",
+          "source:src/workbench/layoutPresetRouting.ts",
           "source:src/workbench/layoutPresetSnapshots.ts",
           "source:src/workbench/layoutPresets.ts",
           "source:src/workbench/palette/WorkbenchCommandPalette.tsx",
@@ -748,11 +750,12 @@
           "source:src/workbench/shell/topbar/ProjectSwitcher.tsx",
           "source:src/workbench/shell/topbar/QueueCluster.tsx",
           "source:src/workbench/shell/topbar/RoutingControl.tsx",
+          "source:src/workbench/shell/topbar/RoutingDestinationSegments.tsx",
           "source:src/workbench/shell/topbar/TopBar.tsx",
           "source:src/workbench/shell/topbar/index.ts",
+          "source:src/workbench/shell/topbar/layoutPresetDialogModel.ts",
           "source:src/workbench/shell/topbar/layoutPresetIcons.ts",
           "source:src/workbench/shell/topbar/layoutPresetManagerStore.ts",
-          "source:src/workbench/shell/topbar/layoutPresetPresentation.ts",
           "source:src/workbench/shell/topbar/projectSwitcherStore.ts",
           "source:src/workbench/shell/topbar/topbarBreakpoints.ts",
           "source:src/workbench/shell/topbar/useInvocationState.ts",
@@ -808,15 +811,15 @@
         ]
       },
       "limits": {
-        "brotliBytes": 1024513,
+        "brotliBytes": 1029868,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 1021893,
+        "gzipBytes": 1026855,
         "imageRawBytes": 157940,
-        "initialRawBytes": 2508916,
-        "largestAssetRawBytes": 753632,
+        "initialRawBytes": 2522159,
+        "largestAssetRawBytes": 753778,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 114347,
+        "ownedRawBytes": 105926,
         "requestCount": 85,
         "scriptRequestCount": 69
       },
@@ -825,7 +828,7 @@
       "source": "src/app/WorkbenchApp.tsx"
     }
   },
-  "capturedAt": "2026-08-10",
+  "capturedAt": "2026-08-11",
   "developmentInvalidation": {
     "platformUiBarrel": {
       "specifier": "@platform/ui",

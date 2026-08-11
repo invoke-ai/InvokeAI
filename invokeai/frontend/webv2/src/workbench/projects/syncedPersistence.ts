@@ -11,6 +11,7 @@ import {
 import {
   createDraftProject,
   createInitialWorkbenchState,
+  normalizeWorkbenchAccount,
   normalizeWorkbenchProject,
   withAuthoritativeProjectBoard,
 } from '@workbench/workbenchState';
@@ -637,6 +638,11 @@ const loadFromBackend = async (
   // First contact: a backend with no projects adopts the browser's existing
   // workbench (one-time import of the pre-backend localStorage data).
   if (summaries.length === 0 && local && local.state.projects.length > 0) {
+    const importedState: WorkbenchState = {
+      ...local.state,
+      account: normalizeWorkbenchAccount(sessionBlob?.account ?? local.state.account),
+    };
+
     for (const project of local.state.projects) {
       if (!(await pushNewProject(syncState, project))) {
         assertOwner(syncState);
@@ -649,11 +655,25 @@ const loadFromBackend = async (
       upsertProjectSummary({ id: project.id, name: project.name, revision: entry?.revision ?? null }, syncState.owner);
     }
 
-    await pushSessionState(syncState, local.state);
+    await pushSessionState(syncState, importedState);
     assertOwner(syncState);
     persistSyncMap(syncState);
 
-    return local;
+    if (!options?.createNew) {
+      return { ...local, state: importedState };
+    }
+
+    const draft = createDraftProject(importedState.projects, importedState.account);
+    syncState.hasPending = true;
+
+    return {
+      ...local,
+      state: {
+        ...importedState,
+        activeProjectId: draft.id,
+        projects: [...importedState.projects, draft],
+      },
+    };
   }
 
   // The session blob says which projects are open as tabs; blobs from before
@@ -721,6 +741,7 @@ const loadFromBackend = async (
   }
 
   const base = local?.state ?? createInitialWorkbenchState();
+  const account = normalizeWorkbenchAccount(sessionBlob?.account ?? base.account);
   let activeProjectId =
     options?.openProjectId && projects.some((project) => project.id === options.openProjectId)
       ? options.openProjectId
@@ -734,7 +755,7 @@ const loadFromBackend = async (
   // (first run, or /app reached directly with an empty session): start a
   // fresh draft. The first autosave creates it server-side.
   if (options?.createNew || projects.length === 0) {
-    const draft = createDraftProject(projects);
+    const draft = createDraftProject(projects, account);
 
     projects = [...projects, draft];
     activeProjectId = draft.id;
@@ -742,7 +763,7 @@ const loadFromBackend = async (
 
   const state: WorkbenchState = {
     ...base,
-    account: sessionBlob?.account ?? base.account,
+    account,
     activeProjectId,
     autosave: { status: 'idle' },
     backendConnection: { status: 'connecting' },
@@ -1024,10 +1045,20 @@ export const createSyncedWorkbenchPersistence = (
             ),
           });
 
-          // A cache holding an empty session (last tab closed offline) cannot
-          // hydrate the editor; boot a fresh draft instead.
-          if (!local || local.state.projects.length === 0) {
+          if (!local) {
             return null;
+          }
+
+          // A cache holding an empty session (last tab closed offline) still
+          // owns the account's preset defaults, so build the replacement draft
+          // here instead of falling back to the store's shipped defaults.
+          if (local.state.projects.length === 0) {
+            const draft = createDraftProject([], local.state.account);
+
+            return {
+              ...local,
+              state: { ...local.state, activeProjectId: draft.id, projects: [draft] },
+            };
           }
 
           // `?new=true` means a fresh draft whether or not the backend answered.
@@ -1036,7 +1067,7 @@ export const createSyncedWorkbenchPersistence = (
           // reopened — and then let the Launchpad's intent rearrange — existing
           // work.
           if (options?.createNew) {
-            const draft = createDraftProject(local.state.projects);
+            const draft = createDraftProject(local.state.projects, local.state.account);
 
             return {
               ...local,
