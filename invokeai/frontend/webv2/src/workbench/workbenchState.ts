@@ -15,6 +15,8 @@ import type {
   CenterViewId,
   LayoutPreset,
   LayoutPresetId,
+  LayoutPresetMetadataOverride,
+  LayoutPresetMetadataOverrides,
   LayoutPresetOverrides,
   LayoutPresetRoute,
   LayoutPresetSnapshot,
@@ -1632,6 +1634,31 @@ const normalizeLayoutPresetRouteOverrides = (overrides: unknown) => {
   );
 };
 
+const normalizeLayoutPresetMetadataOverrides = (overrides: unknown): LayoutPresetMetadataOverrides => {
+  if (!overrides || typeof overrides !== 'object') {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(overrides as Record<string, unknown>).flatMap(([presetId, metadata]) => {
+      const resolvedPresetId = resolveLayoutPresetId(presetId);
+
+      if (!isBuiltInLayoutPresetId(resolvedPresetId) || !metadata || typeof metadata !== 'object') {
+        return [];
+      }
+
+      const record = metadata as Partial<LayoutPresetMetadataOverride>;
+      const label = typeof record.label === 'string' ? record.label.trim() : '';
+      const normalized: LayoutPresetMetadataOverride = {
+        ...(typeof record.iconId === 'string' ? { iconId: record.iconId } : {}),
+        ...(label ? { label } : {}),
+      };
+
+      return Object.keys(normalized).length > 0 ? [[resolvedPresetId, normalized]] : [];
+    })
+  );
+};
+
 const normalizeLayoutPresetOverrides = (overrides: unknown): LayoutPresetOverrides => {
   if (!overrides || typeof overrides !== 'object') {
     return {};
@@ -1650,6 +1677,7 @@ const normalizeAccount = (account: Partial<WorkbenchState['account']> | undefine
   return {
     activeLayoutPresetId: resolveLayoutPresetId(account?.activeLayoutPresetId ?? defaultLayoutPreset.id),
     customLayoutPresets,
+    layoutPresetMetadataOverrides: normalizeLayoutPresetMetadataOverrides(account?.layoutPresetMetadataOverrides),
     layoutPresetOrder: normalizeLayoutPresetOrder(account?.layoutPresetOrder, [
       ...layoutPresets,
       ...customLayoutPresets,
@@ -1693,6 +1721,29 @@ const updateActiveLayout = (
 
 const getAvailableLayoutPreset = (state: WorkbenchState, presetId: LayoutPresetId): LayoutPreset =>
   resolveSavedLayoutPreset(state.account, presetId);
+
+const setBuiltInLayoutPresetMetadata = (
+  state: WorkbenchState,
+  presetId: LayoutPresetId,
+  metadata: Required<LayoutPresetMetadataOverride>
+): WorkbenchState => {
+  const shippedPreset = getLayoutPreset(presetId);
+  const override: LayoutPresetMetadataOverride = {
+    ...(metadata.iconId !== shippedPreset.iconId ? { iconId: metadata.iconId } : {}),
+    ...(metadata.label !== shippedPreset.label ? { label: metadata.label } : {}),
+  };
+  const layoutPresetMetadataOverrides: LayoutPresetMetadataOverrides = {
+    ...state.account.layoutPresetMetadataOverrides,
+  };
+
+  if (Object.keys(override).length > 0) {
+    layoutPresetMetadataOverrides[presetId] = override;
+  } else {
+    delete layoutPresetMetadataOverrides[presetId];
+  }
+
+  return { ...state, account: { ...state.account, layoutPresetMetadataOverrides } };
+};
 
 const applyLayoutPresetToProject = (project: Project, preset: LayoutPreset): Project => {
   const snapshot = preset.snapshot;
@@ -2691,15 +2742,34 @@ export const __workbenchReducerInternal = (
       return { ...state, account: { ...state.account, customLayoutPresets } };
     }
     case 'restoreLayoutPresetDefault': {
+      const { [action.presetId]: removedMetadata, ...layoutPresetMetadataOverrides } =
+        state.account.layoutPresetMetadataOverrides ?? {};
       const { [action.presetId]: removed, ...layoutPresetOverrides } = state.account.layoutPresetOverrides ?? {};
       const { [action.presetId]: removedRoute, ...layoutPresetRouteOverrides } =
         state.account.layoutPresetRouteOverrides ?? {};
 
-      return removed || removedRoute
-        ? { ...state, account: { ...state.account, layoutPresetOverrides, layoutPresetRouteOverrides } }
+      return removedMetadata || removed || removedRoute
+        ? {
+            ...state,
+            account: {
+              ...state.account,
+              layoutPresetMetadataOverrides,
+              layoutPresetOverrides,
+              layoutPresetRouteOverrides,
+            },
+          }
         : state;
     }
     case 'setLayoutPresetIcon': {
+      if (isBuiltInLayoutPresetId(action.presetId)) {
+        const preset = resolveSavedLayoutPreset(state.account, action.presetId);
+
+        return setBuiltInLayoutPresetMetadata(state, action.presetId, {
+          iconId: action.iconId,
+          label: preset.label,
+        });
+      }
+
       return {
         ...state,
         account: {
@@ -2762,6 +2832,15 @@ export const __workbenchReducerInternal = (
 
       if (!label) {
         return state;
+      }
+
+      if (isBuiltInLayoutPresetId(action.presetId)) {
+        const preset = resolveSavedLayoutPreset(state.account, action.presetId);
+
+        return setBuiltInLayoutPresetMetadata(state, action.presetId, {
+          iconId: preset.iconId ?? '',
+          label,
+        });
       }
 
       return {

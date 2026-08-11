@@ -40,7 +40,7 @@ afterEach(async () => {
 });
 
 describe('LayoutPresetDialog', () => {
-  it('edits only routing for a built-in preset and limits sources to its saved arrangement', async () => {
+  it('edits identity and routing for a built-in preset within its saved arrangement', async () => {
     const onClose = vi.fn();
     const onSubmit = vi.fn();
     host = document.createElement('div');
@@ -52,7 +52,7 @@ describe('LayoutPresetDialog', () => {
         <ChakraProvider value={system}>
           <LayoutPresetDialog
             defaultRoute={BUILT_IN_DEFAULT_ROUTE}
-            isBuiltIn
+            iconId="workflow"
             isOpen
             name="Automate"
             sourceOptions={BUILT_IN_SOURCE_OPTIONS}
@@ -68,10 +68,17 @@ describe('LayoutPresetDialog', () => {
       });
     });
 
-    expect(document.querySelector('input[name="layout-preset-name"]')).toBeNull();
-    expect(document.querySelector('[role="radiogroup"][aria-label="Layout preset icon"]')).toBeNull();
+    const nameInput = document.querySelector<HTMLInputElement>('input[name="layout-preset-name"]');
+    expect(nameInput).not.toBeNull();
+    expect(document.querySelector('[role="radiogroup"][aria-label="Layout preset icon"]')).not.toBeNull();
     expect(document.body.textContent).toContain('Default source');
     expect(document.body.textContent).toContain('Default destination');
+
+    await act(() => userEvent.clear(nameInput!));
+    await act(() => userEvent.type(nameInput!, 'Build'));
+    const starIcon = document.querySelector<HTMLButtonElement>('button[aria-label="Star"]');
+    expect(starIcon).not.toBeNull();
+    await act(() => userEvent.click(starIcon!));
 
     const sourceSelect = document.querySelector<HTMLSelectElement>('select');
     expect(Array.from(sourceSelect?.options ?? []).map((option) => option.value)).toEqual(['generate', 'workflow']);
@@ -105,7 +112,8 @@ describe('LayoutPresetDialog', () => {
     expect(onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({
         defaultRoute: { destination: 'canvas', sourceId: 'generate' },
-        name: 'Automate',
+        iconId: 'star',
+        name: 'Build',
       })
     );
     expect(onClose).toHaveBeenCalledOnce();

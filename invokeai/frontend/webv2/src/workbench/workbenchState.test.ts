@@ -19,6 +19,7 @@ import type { CanvasProjectMutation } from './canvasProjectMutations';
 import { createEmptyCanvasDocumentV2 } from './canvasMigration';
 import { getCanvasStagingCandidateFingerprint, getCanvasStagingSlots } from './canvasStagingView';
 import { layoutPresets } from './layoutPresets';
+import { resolveSavedLayoutPreset } from './layoutPresetSnapshots';
 import { DEFAULT_PROJECT_SETTINGS } from './settings/store';
 import { getProjectWidgetValues } from './widgetState';
 import { GRAPH_HISTORY_BYTE_BUDGET, normalizeGraphHistory } from './workbenchState';
@@ -968,7 +969,7 @@ describe('workbench layout presets', () => {
     expect(state.account.layoutPresetRouteOverrides?.compose).toBeUndefined();
   });
 
-  it('renames and deletes only custom layout presets', () => {
+  it('renames and deletes a custom layout preset', () => {
     let state = createInitialWorkbenchState();
 
     state = workbenchReducer(state, {
@@ -981,10 +982,30 @@ describe('workbench layout presets', () => {
       presetId: 'custom-layout-1',
       type: 'renameLayoutPreset',
     });
-    state = workbenchReducer(state, { presetId: 'compose', type: 'renameLayoutPreset', label: 'Nope' });
     state = workbenchReducer(state, { presetId: 'custom-layout-1', type: 'deleteLayoutPreset' });
 
     expect(state.account.customLayoutPresets).toEqual([]);
+  });
+
+  it('edits and restores a built-in preset name and icon for the account', () => {
+    let state = createInitialWorkbenchState();
+
+    state = workbenchReducer(state, { label: 'Writing', presetId: 'compose', type: 'renameLayoutPreset' });
+    state = workbenchReducer(state, { iconId: 'star', presetId: 'compose', type: 'setLayoutPresetIcon' });
+
+    expect(state.account.layoutPresetMetadataOverrides?.compose).toEqual({ iconId: 'star', label: 'Writing' });
+    expect(resolveSavedLayoutPreset(state.account, 'compose')).toMatchObject({ iconId: 'star', label: 'Writing' });
+
+    state = workbenchReducer(state, { label: 'Compose', presetId: 'compose', type: 'renameLayoutPreset' });
+
+    expect(state.account.layoutPresetMetadataOverrides?.compose).toEqual({ iconId: 'star' });
+
+    const layoutPresetOrder = state.account.layoutPresetOrder;
+    state = workbenchReducer(state, { presetId: 'compose', type: 'restoreLayoutPresetDefault' });
+
+    expect(state.account.layoutPresetMetadataOverrides?.compose).toBeUndefined();
+    expect(resolveSavedLayoutPreset(state.account, 'compose')).toMatchObject({ iconId: 'type', label: 'Compose' });
+    expect(state.account.layoutPresetOrder).toBe(layoutPresetOrder);
   });
 
   it('moves every project off a deleted custom layout preset', () => {
@@ -2779,6 +2800,7 @@ describe('workbench account and project settings', () => {
     expect(state.account).toEqual({
       activeLayoutPresetId: 'compose',
       customLayoutPresets: [],
+      layoutPresetMetadataOverrides: {},
       layoutPresetOrder: ['compose', 'edit', 'automate'],
       layoutPresetOverrides: {},
       layoutPresetRouteOverrides: {},

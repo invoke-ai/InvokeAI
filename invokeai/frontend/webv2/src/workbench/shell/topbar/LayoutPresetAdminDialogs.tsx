@@ -48,11 +48,8 @@ export const LayoutPresetAdminDialogs = () => {
     }) => {
       if (editTarget) {
         layout.setPresetRoute(editTarget.id, defaultRoute);
-
-        if (!editTarget.isBuiltIn) {
-          layout.renamePreset(editTarget.id, name);
-          layout.setPresetIcon(editTarget.id, iconId);
-        }
+        layout.renamePreset(editTarget.id, name);
+        layout.setPresetIcon(editTarget.id, iconId);
       }
     },
     [editTarget, layout]
@@ -70,7 +67,6 @@ export const LayoutPresetAdminDialogs = () => {
           key={editTarget.id}
           defaultRoute={editTarget.defaultRoute}
           iconId={editTarget.iconId}
-          isBuiltIn={editTarget.isBuiltIn}
           isOpen
           name={editTarget.label}
           sourceOptions={sourceOptions}

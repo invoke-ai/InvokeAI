@@ -64,18 +64,15 @@ const getNextIconId = (currentIconId: string, key: string): string | null => {
 };
 
 /**
- * Name and icon for a custom layout preset.
+ * Identity and default routing for a layout preset.
  *
- * Custom presets sit in the same strip as the built-ins and collapse to
- * icon-only below 1280px, so an icon is not decoration — without one every
- * custom preset would be an identical anonymous square at that width. The
- * picker offers a curated set for exactly that reason: the job is to tell your
- * own layouts apart at a glance, not to browse an icon library.
+ * Presets collapse to icon-only below 1280px, so the icon is not decoration.
+ * The curated picker keeps the task focused on telling layouts apart at a
+ * glance instead of turning it into an icon-library search.
  */
 export const LayoutPresetDialog = ({
   defaultRoute: initialDefaultRoute,
   iconId: initialIconId,
-  isBuiltIn = false,
   isOpen,
   name: initialName,
   onClose,
@@ -86,7 +83,6 @@ export const LayoutPresetDialog = ({
 }: {
   defaultRoute?: LayoutPresetRoute;
   iconId?: string;
-  isBuiltIn?: boolean;
   isOpen: boolean;
   name: string;
   onClose: () => void;
@@ -112,7 +108,7 @@ export const LayoutPresetDialog = ({
   const sourceTriggerProps = useMemo(() => ({ 'aria-label': t('topbar.presets.defaultSource') }), [t]);
   const selectedSource = sourceOptions.find((source) => source.sourceId === defaultRoute?.sourceId);
   const sourceValue = useMemo(() => (defaultRoute ? [defaultRoute.sourceId] : []), [defaultRoute]);
-  const canSubmit = (isBuiltIn || name.trim().length > 0) && (sourceOptions.length === 0 || defaultRoute !== undefined);
+  const canSubmit = name.trim().length > 0 && (sourceOptions.length === 0 || defaultRoute !== undefined);
 
   // Without this the focus trap lands on the header's close button, so opening
   // the dialog and typing does nothing. `initialFocusEl` rather than `autoFocus`
@@ -185,13 +181,7 @@ export const LayoutPresetDialog = ({
   }, []);
 
   return (
-    <Dialog.Root
-      initialFocusEl={isBuiltIn ? undefined : initialFocusEl}
-      open={isOpen}
-      lazyMount
-      unmountOnExit
-      onOpenChange={handleOpenChange}
-    >
+    <Dialog.Root initialFocusEl={initialFocusEl} open={isOpen} lazyMount unmountOnExit onOpenChange={handleOpenChange}>
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>
@@ -205,50 +195,46 @@ export const LayoutPresetDialog = ({
               </Dialog.Header>
               <Dialog.Body>
                 <Stack gap="4">
-                  {isBuiltIn ? null : (
-                    <>
-                      <Field label={t('topbar.presets.name')}>
-                        <Input
-                          ref={nameRef}
-                          autoComplete="off"
-                          name="layout-preset-name"
-                          size="sm"
-                          value={name}
-                          onChange={handleNameChange}
-                        />
-                      </Field>
-                      <Stack
-                        aria-label={t('topbar.presets.iconPicker')}
-                        gap="3"
-                        role="radiogroup"
-                        tabIndex={-1}
-                        onKeyDown={handleIconKeyDown}
-                      >
-                        <Text color="fg.subtle" fontSize="2xs" fontWeight="700" textTransform="uppercase">
-                          {t('topbar.presets.icon')}
+                  <Field label={t('topbar.presets.name')}>
+                    <Input
+                      ref={nameRef}
+                      autoComplete="off"
+                      name="layout-preset-name"
+                      size="sm"
+                      value={name}
+                      onChange={handleNameChange}
+                    />
+                  </Field>
+                  <Stack
+                    aria-label={t('topbar.presets.iconPicker')}
+                    gap="3"
+                    role="radiogroup"
+                    tabIndex={-1}
+                    onKeyDown={handleIconKeyDown}
+                  >
+                    <Text color="fg.subtle" fontSize="2xs" fontWeight="700" textTransform="uppercase">
+                      {t('topbar.presets.icon')}
+                    </Text>
+                    {layoutPresetIconGroups.map((group) => (
+                      <Stack key={group.label} gap="1.5">
+                        <Text color="fg.muted" fontSize="2xs">
+                          {group.label}
                         </Text>
-                        {layoutPresetIconGroups.map((group) => (
-                          <Stack key={group.label} gap="1.5">
-                            <Text color="fg.muted" fontSize="2xs">
-                              {group.label}
-                            </Text>
-                            <SimpleGrid columns={8} gap="1">
-                              {group.options.map((entry) => (
-                                <IconOption
-                                  key={entry.id}
-                                  icon={entry.icon}
-                                  iconId={entry.id}
-                                  isSelected={entry.id === iconId}
-                                  label={entry.label}
-                                  onSelect={setIconId}
-                                />
-                              ))}
-                            </SimpleGrid>
-                          </Stack>
-                        ))}
+                        <SimpleGrid columns={8} gap="1">
+                          {group.options.map((entry) => (
+                            <IconOption
+                              key={entry.id}
+                              icon={entry.icon}
+                              iconId={entry.id}
+                              isSelected={entry.id === iconId}
+                              label={entry.label}
+                              onSelect={setIconId}
+                            />
+                          ))}
+                        </SimpleGrid>
                       </Stack>
-                    </>
-                  )}
+                    ))}
+                  </Stack>
                   <Field
                     helpText={sourceOptions.length === 0 ? t('topbar.presets.noInvocationSource') : undefined}
                     label={t('topbar.presets.defaultSource')}
@@ -257,7 +243,7 @@ export const LayoutPresetDialog = ({
                       collection={sourceCollection}
                       disabled={sourceOptions.length === 0}
                       renderItem={renderSourceOption}
-                      size="sm"
+                      size="xs"
                       triggerProps={sourceTriggerProps}
                       value={sourceValue}
                       valueText={

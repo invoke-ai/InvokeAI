@@ -127,6 +127,7 @@ const createPresetDescriptor = ({
   iconId,
   preset: {
     defaultRoute,
+    iconId,
     id,
     isBuiltIn: true,
     label,

@@ -79,3 +79,11 @@ export type LayoutPresetOverrides = Record<string, LayoutPresetSnapshot>;
 
 /** Per-account edits to the default routes shipped with built-in presets. */
 export type LayoutPresetRouteOverrides = Record<string, LayoutPresetRoute>;
+
+/** Per-account edits to the identity shipped with a built-in preset. */
+export interface LayoutPresetMetadataOverride {
+  iconId?: string;
+  label?: string;
+}
+
+export type LayoutPresetMetadataOverrides = Record<string, LayoutPresetMetadataOverride>;

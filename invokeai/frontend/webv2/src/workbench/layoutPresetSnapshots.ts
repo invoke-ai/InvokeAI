@@ -28,11 +28,12 @@ export const resolveSavedLayoutPreset = (account: AccountState, presetId: Layout
   }
 
   const builtInPreset = getLayoutPreset(presetId);
+  const metadata = account.layoutPresetMetadataOverrides?.[builtInPreset.id];
   const override = account.layoutPresetOverrides?.[builtInPreset.id];
   const defaultRoute = account.layoutPresetRouteOverrides?.[builtInPreset.id] ?? builtInPreset.defaultRoute;
 
-  return override || defaultRoute !== builtInPreset.defaultRoute
-    ? { ...builtInPreset, defaultRoute, snapshot: override ?? builtInPreset.snapshot }
+  return metadata || override || defaultRoute !== builtInPreset.defaultRoute
+    ? { ...builtInPreset, ...metadata, defaultRoute, snapshot: override ?? builtInPreset.snapshot }
     : builtInPreset;
 };
 
