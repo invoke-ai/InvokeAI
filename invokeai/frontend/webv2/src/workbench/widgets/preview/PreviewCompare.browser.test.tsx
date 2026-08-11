@@ -8,6 +8,7 @@ import { act, useCallback, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 
 import type { PreviewComparisonMode } from './previewSettings';
 
@@ -136,19 +137,39 @@ afterEach(async () => {
 });
 
 describe('PreviewCompare', () => {
-  it('reveals the comparison on focus and touch press, then restores the selected image', async () => {
+  it('reveals the comparison on hover and restores the selected image on pointer exit', async () => {
     await renderComparison();
     const frame = host!.querySelector<HTMLElement>('[aria-label*="Reveal comparison"]')!;
     const compareOverlay = host!.querySelector<HTMLImageElement>('img[alt="compare"]')?.parentElement as HTMLElement;
 
+    await act(() => userEvent.hover(frame));
+    await waitForMotion();
+    expect(getComputedStyle(compareOverlay).opacity).toBe('1');
+    await act(() => userEvent.unhover(frame));
+    await waitForMotion();
     expect(getComputedStyle(compareOverlay).opacity).toBe('0');
+  });
+
+  it('reveals the comparison on focus and restores the selected image on blur', async () => {
+    await renderComparison();
+    const frame = host!.querySelector<HTMLElement>('[aria-label*="Reveal comparison"]')!;
+    const compareOverlay = host!.querySelector<HTMLImageElement>('img[alt="compare"]')?.parentElement as HTMLElement;
+
+    await act(() => userEvent.unhover(frame));
     await interact(() => frame.focus());
     await waitForMotion();
     expect(getComputedStyle(compareOverlay).opacity).toBe('1');
     await interact(() => frame.blur());
     await waitForMotion();
     expect(getComputedStyle(compareOverlay).opacity).toBe('0');
+  });
 
+  it('reveals the comparison during a touch press and restores the selected image on release', async () => {
+    await renderComparison();
+    const frame = host!.querySelector<HTMLElement>('[aria-label*="Reveal comparison"]')!;
+    const compareOverlay = host!.querySelector<HTMLImageElement>('img[alt="compare"]')?.parentElement as HTMLElement;
+
+    await act(() => userEvent.unhover(frame));
     Object.defineProperties(frame, {
       hasPointerCapture: { value: () => true },
       releasePointerCapture: { value: vi.fn() },
