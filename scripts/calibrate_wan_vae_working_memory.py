@@ -6,8 +6,9 @@ single Wan ``.safetensors`` checkpoint:
     python scripts/calibrate_wan_vae_working_memory.py --vae /path/to/vae-or-checkpoint
 
 The default shape matches the 12 GiB-card calibration point. Use ``--no-streaming``
-to measure the full-frame decode path. The reported reserved delta excludes VAE
-weights loaded before peak statistics are reset.
+to measure the full-frame decode path, or ``--tiling`` to measure the spatially
+tiled path used as a low-VRAM fallback. Tiling overrides streaming. The reported
+reserved delta excludes VAE weights loaded before peak statistics are reset.
 """
 
 from __future__ import annotations
@@ -63,7 +64,9 @@ def _measure(
     pixel_width: int,
     pixel_frames: int,
     streaming: bool,
-) -> dict[str, int | float | bool | str]:
+    tiling: bool = False,
+    tile_size: int | None = None,
+) -> dict[str, int | float | bool | str | None]:
     temporal_scale = int(getattr(vae.config, "scale_factor_temporal", None) or 4)
     spatial_scale = int(getattr(vae.config, "scale_factor_spatial", None) or 8)
     if pixel_frames < 1 or (pixel_frames - 1) % temporal_scale != 0:
@@ -73,7 +76,16 @@ def _measure(
 
     device = torch.device("cuda")
     vae.to(device=device)
-    vae.disable_tiling()
+    if tiling:
+        streaming = False
+        if tile_size is None:
+            tile_size = int(getattr(vae, "tile_sample_min_height", 256))
+        if tile_size < spatial_scale or tile_size % spatial_scale:
+            raise ValueError(f"tile_size must be a positive multiple of {spatial_scale}")
+        vae.enable_tiling(tile_sample_min_height=tile_size, tile_sample_min_width=tile_size)
+    else:
+        tile_size = None
+        vae.disable_tiling()
     element_size = next(vae.parameters()).element_size()
     latent_frames = (pixel_frames - 1) // temporal_scale + 1
     latent_height = pixel_height // spatial_scale
@@ -94,6 +106,7 @@ def _measure(
         pixel_height=pixel_height,
         pixel_width=pixel_width,
         pixel_frames=pixel_frames,
+        tile_size=tile_size,
         streaming=streaming,
     )
     if streaming:
@@ -108,11 +121,15 @@ def _measure(
     torch.cuda.empty_cache()
     torch.cuda.reset_peak_memory_stats(device)
     baseline_reserved = torch.cuda.memory_reserved(device)
-    if streaming:
-        for chunk in iter_wan_vae_decode_chunks(vae, latents):
-            chunk = chunk[0].cpu()
-    else:
-        vae.decode(latents, return_dict=False)[0].cpu()
+    try:
+        if streaming:
+            for chunk in iter_wan_vae_decode_chunks(vae, latents):
+                chunk = chunk[0].cpu()
+        else:
+            vae.decode(latents, return_dict=False)[0].cpu()
+    finally:
+        if tiling:
+            vae.disable_tiling()
     torch.cuda.synchronize()
     peak_reserved = torch.cuda.max_memory_reserved(device)
     measured_delta = peak_reserved - baseline_reserved
@@ -122,6 +139,8 @@ def _measure(
         "backend": "ROCm" if torch.version.hip is not None else "CUDA",
         "dtype": str(next(vae.parameters()).dtype),
         "streaming": streaming,
+        "tiling": tiling,
+        "tile_size": tile_size,
         "pixel_height": pixel_height,
         "pixel_width": pixel_width,
         "pixel_frames": pixel_frames,
@@ -146,19 +165,45 @@ def main() -> None:
         default=True,
         help="Measure chunked streaming decode. Use --no-streaming for full decode.",
     )
+    parser.add_argument(
+        "--tiling",
+        action="store_true",
+        help="Measure spatially tiled full decode. Overrides --streaming; use --tile-size to override the tile size.",
+    )
+    parser.add_argument(
+        "--tile-size",
+        type=int,
+        default=None,
+        help="Spatial tile size in pixels. Requires --tiling; defaults to the VAE tile size.",
+    )
     args = parser.parse_args()
+
+    if args.tile_size is not None and not args.tiling:
+        parser.error("--tile-size requires --tiling")
+    if args.tile_size is not None and args.tile_size <= 0:
+        parser.error("--tile-size must be positive")
 
     if not torch.cuda.is_available():
         raise SystemExit("CUDA or ROCm device required")
     vae = _load_vae(args.vae, DTYPES[args.dtype])
     try:
-        result = _measure(vae, args.height, args.width, args.frames, args.streaming)
+        result = _measure(
+            vae,
+            args.height,
+            args.width,
+            args.frames,
+            args.streaming,
+            tiling=args.tiling,
+            tile_size=args.tile_size,
+        )
     except torch.cuda.OutOfMemoryError as exc:
         raise SystemExit("VAE decode ran out of device memory; reduce --height, --width, or --frames") from exc
 
     gib = 2**30
     print(f"device: {result['device']} ({result['backend']})")
-    print(f"dtype: {result['dtype']}; streaming: {result['streaming']}")
+    print(f"dtype: {result['dtype']}; streaming: {result['streaming']}; tiling: {result['tiling']}")
+    if result["tiling"]:
+        print(f"tile size: {result['tile_size']}px")
     print(f"shape: {result['pixel_height']}x{result['pixel_width']}x{result['pixel_frames']}")
     print(f"estimate: {result['estimate_bytes'] / gib:.3f} GiB")
     print(f"measured reserved delta: {result['measured_reserved_delta_bytes'] / gib:.3f} GiB")

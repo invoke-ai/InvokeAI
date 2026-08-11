@@ -1,6 +1,7 @@
 from contextlib import nullcontext
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import torch
@@ -50,3 +51,43 @@ def test_load_vae_accepts_diffusers_directory(tmp_path, monkeypatch):
         directory, local_files_only=True, torch_dtype=torch.bfloat16
     )
     fake_vae.eval.assert_called_once_with()
+
+
+def test_measure_tiling_uses_full_decode_and_tile_estimate(monkeypatch):
+    script = _load_calibration_script()
+    parameter = torch.nn.Parameter(torch.zeros(1, dtype=torch.bfloat16))
+    fake_vae = MagicMock()
+    fake_vae.config = SimpleNamespace(scale_factor_temporal=4, scale_factor_spatial=8, z_dim=16)
+    fake_vae.parameters.side_effect = lambda: iter([parameter])
+    fake_vae.tile_sample_min_height = 256
+    fake_vae.tile_sample_min_width = 256
+    fake_vae.decode.return_value = (torch.zeros(1, 3, 4, 64, 64),)
+
+    monkeypatch.setattr(script.torch, "randn", lambda *args, **kwargs: torch.zeros(*args, dtype=kwargs["dtype"]))
+    monkeypatch.setattr(script.torch.cuda, "synchronize", lambda *args, **kwargs: None)
+    monkeypatch.setattr(script.torch.cuda, "empty_cache", lambda: None)
+    monkeypatch.setattr(script.torch.cuda, "reset_peak_memory_stats", lambda *args, **kwargs: None)
+    monkeypatch.setattr(script.torch.cuda, "memory_reserved", lambda device: 100)
+    monkeypatch.setattr(script.torch.cuda, "max_memory_reserved", lambda device: 200)
+    monkeypatch.setattr(script.torch.cuda, "get_device_name", lambda device: "test-device")
+    estimate = MagicMock(return_value=123)
+    monkeypatch.setattr(script, "estimate_vae_working_memory_wan", estimate)
+    monkeypatch.setattr(script, "iter_wan_vae_decode_chunks", MagicMock(side_effect=AssertionError))
+
+    result = script._measure(fake_vae, 512, 512, 81, streaming=True, tiling=True, tile_size=128)
+
+    assert result["streaming"] is False
+    assert result["tiling"] is True
+    assert result["tile_size"] == 128
+    fake_vae.enable_tiling.assert_called_once_with(tile_sample_min_height=128, tile_sample_min_width=128)
+    fake_vae.disable_tiling.assert_called_once_with()
+    fake_vae.decode.assert_called_once()
+    estimate.assert_called_once_with(
+        operation="decode",
+        vae=fake_vae,
+        pixel_height=512,
+        pixel_width=512,
+        pixel_frames=81,
+        tile_size=128,
+        streaming=False,
+    )
