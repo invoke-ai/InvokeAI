@@ -5,10 +5,10 @@ import { Stack } from '@chakra-ui/react';
 import { ResultsListHeader } from '@features/models/ui/shared/ResultsListHeader';
 import { InstallSourceButton, SourceListItem } from '@features/models/ui/shared/SourceListItem';
 import { useInstalledSources } from '@features/models/ui/shared/useInstalledSources';
-import { useDeferredValue, useMemo, useState } from 'react';
+import { sourceFileName, useSourceNameFilter } from '@features/models/ui/shared/useSourceNameFilter';
 import { useTranslation } from 'react-i18next';
 
-const fileNameOf = (url: string): string => url.split(/[\\/]/).at(-1) ?? url;
+const urlOf = (url: string): string => url;
 
 export const HuggingFaceFiles = ({
   lookup,
@@ -25,24 +25,13 @@ export const HuggingFaceFiles = ({
   pendingSources: ReadonlySet<string>;
 }) => {
   const { t } = useTranslation();
-  const [filter, setFilter] = useState('');
-  const deferredFilter = useDeferredValue(filter);
+  const { filter, filteredItems: filteredUrls, setFilter } = useSourceNameFilter(lookup.urls, urlOf);
   // A model's recorded install source is the URL it was pulled from, so this
   // marks rows Installed live once the library refresh lands.
   const installedSources = useInstalledSources();
 
-  const filteredUrls = useMemo(() => {
-    const term = deferredFilter.trim().toLowerCase();
-
-    if (!term) {
-      return lookup.urls;
-    }
-
-    return lookup.urls.filter((url) => fileNameOf(url).toLowerCase().includes(term));
-  }, [deferredFilter, lookup.urls]);
-
   const installAll = () => {
-    onInstallAll(filteredUrls);
+    onInstallAll([...filteredUrls]);
   };
 
   return (
@@ -60,7 +49,7 @@ export const HuggingFaceFiles = ({
       {filteredUrls.map((url) => (
         <SourceListItem
           key={url}
-          title={fileNameOf(url)}
+          title={sourceFileName(url)}
           titleTooltip={url}
           trailing={
             <InstallSourceButton

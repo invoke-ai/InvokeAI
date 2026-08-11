@@ -5,12 +5,12 @@ import { Checkbox, HStack, Icon, Stack, Text } from '@chakra-ui/react';
 import { ResultsListHeader } from '@features/models/ui/shared/ResultsListHeader';
 import { InstallSourceButton, SourceListItem } from '@features/models/ui/shared/SourceListItem';
 import { useInstalledSources } from '@features/models/ui/shared/useInstalledSources';
+import { sourceFileName, useSourceNameFilter } from '@features/models/ui/shared/useSourceNameFilter';
 import { IconButton } from '@platform/ui';
 import { XIcon } from 'lucide-react';
-import { useDeferredValue, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const fileNameOf = (path: string): string => path.split(/[\\/]/).at(-1) ?? path;
+const pathOf = (result: FoundModel): string => result.path;
 
 export const ScanResults = ({
   inplace,
@@ -31,22 +31,11 @@ export const ScanResults = ({
   scan: { path: string; results: FoundModel[] };
 }) => {
   const { t } = useTranslation();
-  const [filter, setFilter] = useState('');
-  const deferredFilter = useDeferredValue(filter);
+  const { filter, filteredItems: filteredResults, setFilter } = useSourceNameFilter(scan.results, pathOf);
   // Live library state: `is_installed` is a scan-time snapshot, so a model
   // installed from this list would otherwise keep offering Install forever.
   const installedSources = useInstalledSources();
   const isRowInstalled = (result: FoundModel) => result.is_installed || installedSources.has(result.path);
-
-  const filteredResults = useMemo(() => {
-    const term = deferredFilter.trim().toLowerCase();
-
-    if (!term) {
-      return scan.results;
-    }
-
-    return scan.results.filter((result) => fileNameOf(result.path).toLowerCase().includes(term));
-  }, [deferredFilter, scan.results]);
 
   const notInstalledCount = scan.results.filter((result) => !isRowInstalled(result)).length;
   const installable = filteredResults.filter((result) => !isRowInstalled(result));
@@ -99,7 +88,7 @@ export const ScanResults = ({
         <SourceListItem
           key={result.path}
           description={result.path}
-          title={fileNameOf(result.path)}
+          title={sourceFileName(result.path)}
           titleTooltip={result.path}
           trailing={
             <InstallSourceButton

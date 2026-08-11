@@ -72,7 +72,9 @@ export const getInstallSourceLabel = (source: unknown): string => {
 };
 
 const REFRESH_COALESCE_MS = 250;
-const OUTCOME_LIMIT = 16;
+// Display cap and eviction margin in one: comfortably above any completion
+// burst that could land between two toast-effect flushes.
+const OUTCOME_LIMIT = 64;
 
 const EMPTY_INSTALLS_SNAPSHOT: InstallsSnapshot = { error: null, jobs: [], status: 'idle' };
 const EMPTY_INSTALL_OUTCOMES: { outcomes: InstallOutcome[] } = { outcomes: [] };
@@ -298,8 +300,6 @@ const ACTIVE_STATUSES: ModelInstallStatus[] = ['waiting', 'downloading', 'downlo
 export const isActiveInstallStatus = (status: ModelInstallStatus): boolean => ACTIVE_STATUSES.includes(status);
 
 export const useInstallsSelector = store.useSelector;
-
-export const useInstallsSnapshot = (): InstallsSnapshot => store.useSnapshot();
 
 export const getInstallsSnapshot = (): InstallsSnapshot => store.getSnapshot();
 

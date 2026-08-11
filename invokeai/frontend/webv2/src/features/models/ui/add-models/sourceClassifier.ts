@@ -10,15 +10,29 @@ const FILE_EXTENSION_PATTERN = /\.[A-Za-z0-9]{1,12}$/;
 const MODEL_FILE_EXTENSION_PATTERN = /\.(safetensors|ckpt|pt|pth|bin|gguf|onnx|pkl)$/i;
 const RELATIVE_PATH_PATTERN = /^\.{1,2}[\\/]/;
 
-export interface SourceKind {
-  looksLocal: boolean;
-  looksUrl: boolean;
-  looksRepo: boolean;
-  isInstallable: boolean;
-  localKind: 'file' | 'folder' | null;
-  /** i18n key for the detected source kind, or null when it reads as a search. */
-  labelKey: string | null;
-}
+/**
+ * Discriminated on `isInstallable`: an installable source always carries a
+ * label key, and a search never looks like any source shape — so consumers
+ * need no null fallbacks inside an installable branch.
+ */
+export type SourceKind =
+  | {
+      isInstallable: true;
+      looksLocal: boolean;
+      looksUrl: boolean;
+      looksRepo: boolean;
+      localKind: 'file' | 'folder' | null;
+      /** i18n key for the detected source kind. */
+      labelKey: string;
+    }
+  | {
+      isInstallable: false;
+      looksLocal: false;
+      looksUrl: false;
+      looksRepo: false;
+      localKind: null;
+      labelKey: null;
+    };
 
 const classifyLocalPath = (value: string): 'file' | 'folder' => {
   if (/[\\/]$/.test(value)) {
@@ -41,20 +55,29 @@ export const classifySource = (value: string): SourceKind => {
   const looksRelativePath =
     RELATIVE_PATH_PATTERN.test(value) || MODEL_FILE_EXTENSION_PATTERN.test(value.split(':', 1)[0] ?? '');
   const looksRepo = !looksLocal && !looksUrl && !looksRelativePath && HF_REPO_PATTERN.test(value);
-  const isInstallable = looksLocal || looksUrl || looksRepo;
+
+  if (!looksLocal && !looksUrl && !looksRepo) {
+    return {
+      isInstallable: false,
+      labelKey: null,
+      localKind: null,
+      looksLocal: false,
+      looksRepo: false,
+      looksUrl: false,
+    };
+  }
+
   const localKind = looksLocal ? classifyLocalPath(value) : null;
 
   return {
-    isInstallable,
+    isInstallable: true,
     labelKey: looksLocal
       ? localKind === 'file'
         ? 'models.sourceKind.filePath'
         : 'models.sourceKind.folderPath'
       : looksUrl
         ? 'models.sourceKind.url'
-        : looksRepo
-          ? 'models.sourceKind.hfRepo'
-          : null,
+        : 'models.sourceKind.hfRepo',
     localKind,
     looksLocal,
     looksRepo,

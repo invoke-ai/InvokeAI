@@ -1,5 +1,6 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import type { StarterModel } from '@features/models/core/types';
+import type { ElementType } from 'react';
 
 import { Box, Checkbox, Flex, HStack, Icon, Input, InputGroup, Stack, Text } from '@chakra-ui/react';
 import { collectBases, collectTypes } from '@features/models/core/library';
@@ -40,6 +41,14 @@ import { StarterFilterMenu } from './StarterFilterMenu';
 import { StarterList } from './StarterList';
 import { getStarterBundleInstallSources, getStarterModelInstallSources } from './starterModelInstallSources';
 import { useInstallActions } from './useInstallActions';
+
+/** Keyed by the classifier's label so icon and label can never disagree. */
+const SOURCE_KIND_ICONS: Record<string, ElementType> = {
+  'models.sourceKind.filePath': FileIcon,
+  'models.sourceKind.folderPath': FolderIcon,
+  'models.sourceKind.hfRepo': SiHuggingface,
+  'models.sourceKind.url': LinkIcon,
+};
 
 /**
  * One box to add any model. The same field searches the curated starter
@@ -105,15 +114,7 @@ export const AddModelsView = () => {
   // browse-only chrome (bundles, filter menu, starter catalog).
   const hasResults = hfLookup !== null || scan !== null;
   const kind = useMemo(() => classifySource(trimmed), [trimmed]);
-  const searchIcon = kind.looksRepo
-    ? SiHuggingface
-    : kind.looksUrl
-      ? LinkIcon
-      : kind.localKind === 'file'
-        ? FileIcon
-        : kind.localKind === 'folder'
-          ? FolderIcon
-          : SearchIcon;
+  const searchIcon = (kind.labelKey ? SOURCE_KIND_ICONS[kind.labelKey] : undefined) ?? SearchIcon;
   const token = accessToken.trim() === '' ? undefined : accessToken.trim();
   // The primary action depends on the detected input: folders are scanned for
   // models; files, URLs, and HF repos are pulled. Access tokens only apply to URLs.
@@ -330,7 +331,7 @@ export const AddModelsView = () => {
                 <Text as="span" color="fg.muted" fontWeight="600">
                   {t('models.pull')}
                 </Text>{' '}
-                {t('models.toInstallFrom', { source: kind.labelKey ? t(kind.labelKey) : '' })}
+                {t('models.toInstallFrom', { source: t(kind.labelKey) })}
               </Text>
             )}
             {kind.localKind === 'file' ? (
