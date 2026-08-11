@@ -64,8 +64,8 @@ export const LayoutPresetStrip = () => {
   const account = useWorkbenchSelector((snapshot) => snapshot.account);
   const invocation = useActiveProjectSelector((project) => project.invocation);
   const sourceOptions = useActiveProjectSelector(selectPlacedGraphWidgetSources);
-  const presets = getOrderedLayoutPresets(account);
-  const presetIds = presets.map(({ id }) => id);
+  const presets = useMemo(() => getOrderedLayoutPresets(account), [account]);
+  const presetIds = useMemo(() => presets.map(({ id }) => id), [presets]);
   const sensors = useSensors(useSensor(PointerSensor, POINTER_SENSOR_OPTIONS));
   const saveAsDefaultRoute = useMemo(
     () => ({ destination: invocation.destination, sourceId: invocation.sourceId }),

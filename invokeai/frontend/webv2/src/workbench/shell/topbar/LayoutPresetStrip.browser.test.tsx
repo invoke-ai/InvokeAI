@@ -1,3 +1,5 @@
+import type * as LayoutPresetActivationModule from '@workbench/layoutPresetActivation';
+
 import { ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
 import { createWorkbenchStore, type WorkbenchInternalStore } from '@workbench/workbenchStore';
@@ -35,7 +37,7 @@ vi.mock('@workbench/WorkbenchContext', () => {
 });
 
 vi.mock('@workbench/layoutPresetActivation', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@workbench/layoutPresetActivation')>();
+  const actual = await importOriginal<typeof LayoutPresetActivationModule>();
 
   return {
     ...actual,

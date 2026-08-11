@@ -33,13 +33,17 @@ export const LayoutPresetManagerDialogBody = () => {
   const { t } = useTranslation();
   const { layout } = useWorkbenchCommands();
   const account = useWorkbenchSelector((snapshot) => snapshot.account);
-  const presets = getOrderedLayoutPresets(account);
-  const presetIds = presets.map(({ id }) => id);
-  const overriddenPresetIds = new Set([
-    ...Object.keys(account.layoutPresetMetadataOverrides ?? {}),
-    ...Object.keys(account.layoutPresetOverrides ?? {}),
-    ...Object.keys(account.layoutPresetRouteOverrides ?? {}),
-  ]);
+  const presets = useMemo(() => getOrderedLayoutPresets(account), [account]);
+  const presetIds = useMemo(() => presets.map(({ id }) => id), [presets]);
+  const overriddenPresetIds = useMemo(
+    () =>
+      new Set([
+        ...Object.keys(account.layoutPresetMetadataOverrides ?? {}),
+        ...Object.keys(account.layoutPresetOverrides ?? {}),
+        ...Object.keys(account.layoutPresetRouteOverrides ?? {}),
+      ]),
+    [account.layoutPresetMetadataOverrides, account.layoutPresetOverrides, account.layoutPresetRouteOverrides]
+  );
   const sensors = useSensors(
     useSensor(PointerSensor, POINTER_SENSOR_OPTIONS),
     useSensor(KeyboardSensor, KEYBOARD_SENSOR_OPTIONS)
