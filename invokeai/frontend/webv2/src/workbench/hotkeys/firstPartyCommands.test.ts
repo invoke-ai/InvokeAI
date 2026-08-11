@@ -1,6 +1,6 @@
+import { createInitialWorkbenchState } from '@workbench/workbenchState';
 import { describe, expect, it } from 'vitest';
 
-import { createInitialWorkbenchState } from '../workbenchState';
 import { firstPartyHotkeyCatalog } from './catalog';
 import {
   FIRST_PARTY_APP_COMMAND_IDS,
