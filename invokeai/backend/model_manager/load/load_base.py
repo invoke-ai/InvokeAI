@@ -153,6 +153,7 @@ class LoadedModelWithoutConfig:
 
         The model may be partially resident. The caller must keep its model handle
         alive while unloading; the cache entry can be evicted independently.
+        Full-load-only entries ignore the requested byte count and unload all weights.
         """
         with MODEL_LOAD_LOCK.read_lock():
             return self._cache.unload_model_from_vram(

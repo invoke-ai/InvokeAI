@@ -153,9 +153,10 @@ def estimate_vae_working_memory_wan(
 
     # The original 2900-byte calibration covers a single Wan 2.1 frame. Multi-frame video
     # decodes retain causal-convolution state that makes that constant unsafe at video
-    # resolutions. These conservative constants are based on measured reserved-memory peaks:
-    # 6500 for the z_dim=16 A14B VAE and 7000 for the larger z_dim=48 TI2V VAE. Keep the
-    # single-frame value for image decode and the existing encode calibration.
+    # resolutions. These conservative constants are based on measured allocated-memory
+    # peaks with allocator headroom: 6500 for the z_dim=16 A14B VAE and 7000 for the
+    # larger z_dim=48 TI2V VAE. Keep the single-frame value for image decode and the
+    # existing encode calibration.
     if operation == "decode" and pixel_frames > 1:
         try:
             z_dim = int(getattr(vae.config, "z_dim", 16))

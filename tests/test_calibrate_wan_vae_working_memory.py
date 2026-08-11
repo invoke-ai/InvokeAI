@@ -4,6 +4,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import pytest
 import torch
 
 
@@ -69,6 +70,8 @@ def test_measure_tiling_uses_full_decode_and_tile_estimate(monkeypatch):
     monkeypatch.setattr(script.torch.cuda, "reset_peak_memory_stats", lambda *args, **kwargs: None)
     monkeypatch.setattr(script.torch.cuda, "memory_reserved", lambda device: 100)
     monkeypatch.setattr(script.torch.cuda, "max_memory_reserved", lambda device: 200)
+    monkeypatch.setattr(script.torch.cuda, "memory_allocated", lambda device: 50)
+    monkeypatch.setattr(script.torch.cuda, "max_memory_allocated", lambda device: 150)
     monkeypatch.setattr(script.torch.cuda, "get_device_name", lambda device: "test-device")
     estimate = MagicMock(return_value=123)
     monkeypatch.setattr(script, "estimate_vae_working_memory_wan", estimate)
@@ -91,3 +94,45 @@ def test_measure_tiling_uses_full_decode_and_tile_estimate(monkeypatch):
         tile_size=128,
         streaming=False,
     )
+
+
+def test_measure_tiling_implied_constant_uses_tiled_area(monkeypatch):
+    script = _load_calibration_script()
+    parameter = torch.nn.Parameter(torch.zeros(1, dtype=torch.bfloat16))
+    fake_vae = MagicMock()
+    fake_vae.config = SimpleNamespace(scale_factor_temporal=4, scale_factor_spatial=8, z_dim=16)
+    fake_vae.parameters.side_effect = lambda: iter([parameter])
+    fake_vae.decode.return_value = (torch.zeros(1, 3, 81, 64, 64),)
+
+    tile_size = 128
+    constant = 4321.0
+    element_size = parameter.element_size()
+    pixel_height = pixel_width = 512
+    pixel_frames = 81
+    clip_bytes = 2 * 3 * pixel_frames * pixel_height * pixel_width * element_size
+    measured_delta = int(tile_size**2 * element_size * constant * 1.25 + clip_bytes)
+
+    monkeypatch.setattr(script.torch, "randn", lambda *args, **kwargs: torch.zeros(*args, dtype=kwargs["dtype"]))
+    monkeypatch.setattr(script.torch.cuda, "synchronize", lambda *args, **kwargs: None)
+    monkeypatch.setattr(script.torch.cuda, "empty_cache", lambda: None)
+    monkeypatch.setattr(script.torch.cuda, "reset_peak_memory_stats", lambda *args, **kwargs: None)
+    monkeypatch.setattr(script.torch.cuda, "memory_reserved", lambda device: 100)
+    monkeypatch.setattr(script.torch.cuda, "max_memory_reserved", lambda device: measured_delta + 100 + 12345)
+    monkeypatch.setattr(script.torch.cuda, "memory_allocated", lambda device: 0)
+    monkeypatch.setattr(script.torch.cuda, "max_memory_allocated", lambda device: measured_delta)
+    monkeypatch.setattr(script.torch.cuda, "get_device_name", lambda device: "test-device")
+    monkeypatch.setattr(script, "estimate_vae_working_memory_wan", lambda **kwargs: measured_delta)
+
+    result = script._measure(
+        fake_vae,
+        pixel_height,
+        pixel_width,
+        pixel_frames,
+        streaming=True,
+        tiling=True,
+        tile_size=tile_size,
+    )
+
+    assert result["measured_allocated_delta_bytes"] == measured_delta
+    assert result["measured_reserved_delta_bytes"] == measured_delta + 12345
+    assert result["implied_scaling_constant"] == pytest.approx(constant, abs=0.01)

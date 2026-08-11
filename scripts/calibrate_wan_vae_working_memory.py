@@ -7,8 +7,9 @@ single Wan ``.safetensors`` checkpoint:
 
 The default shape matches the 12 GiB-card calibration point. Use ``--no-streaming``
 to measure the full-frame decode path, or ``--tiling`` to measure the spatially
-tiled path used as a low-VRAM fallback. Tiling overrides streaming. The reported
-reserved delta excludes VAE weights loaded before peak statistics are reset.
+tiled path used as a low-VRAM fallback. Tiling overrides streaming. The script
+reports allocated and reserved deltas; the implied scaling constant uses allocated
+memory to match the shipped estimator, while reserved memory shows allocator headroom.
 """
 
 from __future__ import annotations
@@ -120,7 +121,13 @@ def _measure(
     torch.cuda.synchronize()
     torch.cuda.empty_cache()
     torch.cuda.reset_peak_memory_stats(device)
+    baseline_allocated = torch.cuda.memory_allocated(device)
     baseline_reserved = torch.cuda.memory_reserved(device)
+    if tiling:
+        assert tile_size is not None
+        scaling_basis_bytes = tile_size**2 * element_size * 1.25
+    else:
+        scaling_basis_bytes = pixel_height * pixel_width * element_size
     try:
         if streaming:
             for chunk in iter_wan_vae_decode_chunks(vae, latents):
@@ -131,9 +138,11 @@ def _measure(
         if tiling:
             vae.disable_tiling()
     torch.cuda.synchronize()
+    peak_allocated = torch.cuda.max_memory_allocated(device)
     peak_reserved = torch.cuda.max_memory_reserved(device)
-    measured_delta = peak_reserved - baseline_reserved
-    implied_constant = (measured_delta - clip_bytes) / (pixel_height * pixel_width * element_size)
+    measured_allocated_delta = peak_allocated - baseline_allocated
+    measured_reserved_delta = peak_reserved - baseline_reserved
+    implied_constant = (measured_allocated_delta - clip_bytes) / scaling_basis_bytes
     return {
         "device": torch.cuda.get_device_name(device),
         "backend": "ROCm" if torch.version.hip is not None else "CUDA",
@@ -145,7 +154,8 @@ def _measure(
         "pixel_width": pixel_width,
         "pixel_frames": pixel_frames,
         "estimate_bytes": estimate,
-        "measured_reserved_delta_bytes": measured_delta,
+        "measured_allocated_delta_bytes": measured_allocated_delta,
+        "measured_reserved_delta_bytes": measured_reserved_delta,
         "implied_scaling_constant": implied_constant,
     }
 
@@ -206,8 +216,9 @@ def main() -> None:
         print(f"tile size: {result['tile_size']}px")
     print(f"shape: {result['pixel_height']}x{result['pixel_width']}x{result['pixel_frames']}")
     print(f"estimate: {result['estimate_bytes'] / gib:.3f} GiB")
+    print(f"measured allocated delta: {result['measured_allocated_delta_bytes'] / gib:.3f} GiB")
     print(f"measured reserved delta: {result['measured_reserved_delta_bytes'] / gib:.3f} GiB")
-    print(f"implied scaling constant: {result['implied_scaling_constant']:.1f}")
+    print(f"implied scaling constant (allocated): {result['implied_scaling_constant']:.1f}")
 
 
 if __name__ == "__main__":
