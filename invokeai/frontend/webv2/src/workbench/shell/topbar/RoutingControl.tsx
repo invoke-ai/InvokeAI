@@ -1,13 +1,12 @@
 import type { GraphWidgetSource } from '@workbench/graphWidgets';
 import type { InvocationSourceId, ResultDestination } from '@workbench/invocationContracts';
 
-import { Box, Icon, Menu, Portal, SegmentGroup, Stack, Status, Text } from '@chakra-ui/react';
+import { Box, Icon, Menu, Portal, Stack, Status, Text } from '@chakra-ui/react';
 import { Button } from '@platform/ui/Button';
 import { MenuContent } from '@platform/ui/Menu';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { describeRoute, getWidgetTypeIdForSourceId } from '@workbench/graphWidgets';
 import { WidgetIcon } from '@workbench/iconResolver';
-import { getDestinationLabel, resultDestinations } from '@workbench/invocation';
 import { getWidgetById } from '@workbench/widgetRegistry';
 import { useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { LockKeyholeIcon, UnlockKeyholeIcon } from 'lucide-react';
@@ -15,6 +14,8 @@ import { useCallback, useId, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { InvocationState } from './useInvocationState';
+
+import { RoutingDestinationSegments } from './RoutingDestinationSegments';
 
 const MENU_POSITIONING = { placement: 'bottom-end' } as const;
 
@@ -167,31 +168,15 @@ const DestinationSegments = ({ destination }: { destination: ResultDestination }
   const { generation } = useWorkbenchCommands();
   const { t } = useTranslation();
   const handleChange = useCallback(
-    (event: { value: string | null }) => {
-      if (event.value) {
-        generation.setDestination(event.value as ResultDestination);
-      }
-    },
+    (nextDestination: ResultDestination) => generation.setDestination(nextDestination),
     [generation]
   );
 
   return (
-    <SegmentGroup.Root
-      aria-label={t('topbar.routing.destination')}
-      size="xs"
+    <RoutingDestinationSegments
+      ariaLabel={t('topbar.routing.destination')}
       value={destination}
-      onValueChange={handleChange}
-    >
-      <SegmentGroup.Indicator />
-      {resultDestinations.map((option) => (
-        <SegmentGroup.Item key={option.id} flex="1" justifyContent="center" value={option.id}>
-          <SegmentGroup.ItemHiddenInput />
-          <SegmentGroup.ItemText display="flex" alignItems="center" gap="1.5">
-            <WidgetIcon boxSize="3.5" icon={getWidgetById(destinationWidgetTypeIds[option.id])?.manifest.icon} />
-            {getDestinationLabel(option.id)}
-          </SegmentGroup.ItemText>
-        </SegmentGroup.Item>
-      ))}
-    </SegmentGroup.Root>
+      onChange={handleChange}
+    />
   );
 };

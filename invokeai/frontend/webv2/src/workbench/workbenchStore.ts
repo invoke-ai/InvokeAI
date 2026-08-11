@@ -299,7 +299,7 @@ const createCommands = (
       savePreset: command('saveLayoutPreset', (presetId: ActionPayload<'saveLayoutPreset'>['presetId']) => ({
         presetId,
       })),
-      /** Drops saved edits to a built-in preset, restoring its shipped arrangement. */
+      /** Drops saved arrangement, identity, and route edits from a built-in preset. */
       restorePresetDefault: command(
         'restoreLayoutPresetDefault',
         (presetId: ActionPayload<'restoreLayoutPresetDefault'>['presetId']) => ({ presetId })

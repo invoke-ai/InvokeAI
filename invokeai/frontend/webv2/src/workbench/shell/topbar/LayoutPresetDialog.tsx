@@ -11,7 +11,6 @@ import {
   Icon,
   Input,
   Portal,
-  SegmentGroup,
   SimpleGrid,
   Stack,
   Text,
@@ -22,7 +21,6 @@ import { Select } from '@platform/ui/Select';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { getNaturalDestination } from '@workbench/graphWidgets';
 import { WidgetIcon } from '@workbench/iconResolver';
-import { getDestinationLabel, resultDestinations } from '@workbench/invocation';
 import { getWidgetById } from '@workbench/widgetRegistry';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -31,12 +29,9 @@ import type { LayoutPresetDialogValue } from './layoutPresetDialogModel';
 
 import { getInitialLayoutPresetIconId, getInitialLayoutPresetRoute } from './layoutPresetDialogModel';
 import { layoutPresetIconGroups } from './layoutPresetIcons';
+import { RoutingDestinationSegments } from './RoutingDestinationSegments';
 
 const layoutPresetIconIds = layoutPresetIconGroups.flatMap((group) => group.options.map((option) => option.id));
-const destinationWidgetTypeIds: Record<ResultDestination, 'canvas' | 'gallery'> = {
-  canvas: 'canvas',
-  gallery: 'gallery',
-};
 
 type SourceSelectItem = GraphWidgetSource & { value: InvocationSourceId };
 
@@ -174,12 +169,8 @@ export const LayoutPresetDialog = ({
       sourceId,
     }));
   }, []);
-  const handleDestinationChange = useCallback((event: { value: string | null }) => {
-    if (!event.value) {
-      return;
-    }
-
-    setDefaultRoute((route) => (route ? { ...route, destination: event.value as ResultDestination } : route));
+  const handleDestinationChange = useCallback((destination: ResultDestination) => {
+    setDefaultRoute((route) => (route ? { ...route, destination } : route));
   }, []);
 
   return (
@@ -257,27 +248,12 @@ export const LayoutPresetDialog = ({
                     />
                   </Field>
                   <Field disabled={!defaultRoute} label={t('topbar.presets.defaultDestination')}>
-                    <SegmentGroup.Root
-                      aria-label={t('topbar.presets.defaultDestination')}
+                    <RoutingDestinationSegments
+                      ariaLabel={t('topbar.presets.defaultDestination')}
                       disabled={!defaultRoute}
-                      size="xs"
                       value={defaultRoute?.destination ?? null}
-                      onValueChange={handleDestinationChange}
-                    >
-                      <SegmentGroup.Indicator />
-                      {resultDestinations.map((destination) => (
-                        <SegmentGroup.Item key={destination.id} flex="1" justifyContent="center" value={destination.id}>
-                          <SegmentGroup.ItemHiddenInput />
-                          <SegmentGroup.ItemText display="flex" alignItems="center" gap="1.5">
-                            <WidgetIcon
-                              boxSize="3.5"
-                              icon={getWidgetById(destinationWidgetTypeIds[destination.id])?.manifest.icon}
-                            />
-                            {getDestinationLabel(destination.id)}
-                          </SegmentGroup.ItemText>
-                        </SegmentGroup.Item>
-                      ))}
-                    </SegmentGroup.Root>
+                      onChange={handleDestinationChange}
+                    />
                   </Field>
                 </Stack>
               </Dialog.Body>

@@ -137,10 +137,9 @@ const createPresetDescriptor = ({
 });
 
 /**
- * The three shipped presets. Each is an arrangement, named for the work it
- * supports rather than the widget it happens to open — several graph widgets
- * are placed in every one of them, which is exactly why a preset can never
- * imply an invocation source.
+ * The three shipped presets. Each combines an arrangement with an editable
+ * default route. The route is explicit preset data rather than something
+ * inferred from whichever graph widgets happen to be placed in the layout.
  */
 export const builtInLayoutPresetDescriptors: BuiltInLayoutPresetDescriptor[] = [
   createPresetDescriptor({
