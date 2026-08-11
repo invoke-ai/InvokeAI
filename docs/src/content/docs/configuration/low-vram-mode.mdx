@@ -55,7 +55,7 @@ This reserves VRAM so partial-load Wan transformer weights target about 2 GiB re
 
 The optimized BF16 transformer path can produce small numerical differences because chunked matrix operations accumulate in a different order. Same-seed output is not guaranteed to be bit-identical; set `wan_memory_optimization: false` for the baseline path.
 
-Developers with a CUDA or ROCm device can validate Wan VAE memory estimates against measured peak reserved memory with `python scripts/calibrate_wan_vae_working_memory.py --vae <path>`. The script reports the estimate, measured peak, and implied scaling constant for the selected VAE and clip shape.
+Developers with a CUDA or ROCm device can validate Wan VAE memory estimates against measured peak reserved memory with `python scripts/calibrate_wan_vae_working_memory.py --vae <directory-or-safetensors-file>`. The script reports the estimate, measured peak, and implied scaling constant for the selected VAE and clip shape.
 
 Direct MP4 streaming keeps the VAE cache lock while chunks are decoded and written. Wan's causal decoder state and weights must remain live for the sequence; releasing the lock would require a separate bounded decode and encode queue.
 
