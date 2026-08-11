@@ -71,6 +71,46 @@ describe('relationships store', () => {
     expect(store.getRelationshipsSnapshot().relatedKeysByModelKey).toEqual({ a: ['c'], c: ['a'] });
   });
 
+  it('prunes a library delete exactly once via the subscription', async () => {
+    const libraryModel = (key: string): ModelConfig => ({ base: 'sdxl', key, name: key, type: 'main' }) as ModelConfig;
+    const models = await import('./modelsStore');
+
+    // Loaded before this module evaluates: the seeded baseline must cover it.
+    models.setModelsSnapshotForTests({ models: [libraryModel('a'), libraryModel('b')], status: 'loaded' });
+
+    const store = await import('./relationshipsStore');
+
+    store.setRelationshipsSnapshotForTests({ relatedKeysByModelKey: { a: ['b'], b: ['a'] } });
+
+    let notifications = 0;
+    const unsubscribe = store.subscribeToRelationships(() => {
+      notifications += 1;
+    });
+
+    models.removeModelsFromStore(['b']);
+
+    expect(store.getRelationshipsSnapshot().relatedKeysByModelKey).toEqual({ a: [] });
+    expect(notifications).toBe(1);
+    unsubscribe();
+  });
+
+  it('records tombstones without notifying when nothing referenced the removed keys', async () => {
+    const store = await import('./relationshipsStore');
+
+    store.setRelationshipsSnapshotForTests({ relatedKeysByModelKey: { a: ['b'] } });
+
+    let notifications = 0;
+    const unsubscribe = store.subscribeToRelationships(() => {
+      notifications += 1;
+    });
+
+    store.removeModelsFromRelationships(['unrelated']);
+
+    expect(notifications).toBe(0);
+    expect(store.getRelationshipsSnapshot().relatedKeysByModelKey).toEqual({ a: ['b'] });
+    unsubscribe();
+  });
+
   it('discards a stale refresh that resolves after a link and keeps the patched entry', async () => {
     let resolveStale: ((keys: string[]) => void) | undefined;
     api.getRelatedModelKeys

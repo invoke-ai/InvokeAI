@@ -82,7 +82,7 @@ registerAccountOwnedResource({
  */
 let lastLoadedModels: readonly ModelConfig[] | null = null;
 
-subscribeModels(() => {
+const pruneAgainstLibrary = (): void => {
   const { models, status } = getModelsSnapshot();
 
   if (status !== 'loaded' || models === lastLoadedModels) {
@@ -99,7 +99,12 @@ subscribeModels(() => {
   }
 
   lastLoadedModels = models;
-});
+};
+
+subscribeModels(pruneAgainstLibrary);
+// The library may already be loaded when this lazy module first evaluates;
+// seed the baseline now so the very next delete still prunes.
+pruneAgainstLibrary();
 
 const setEntry = (modelKey: string, keys: readonly string[]): void => {
   store.patchSnapshot({
@@ -255,16 +260,26 @@ export const removeModelsFromRelationships = (keys: readonly string[]): void => 
 
   const removed = new Set(keys);
   const next: Record<string, readonly string[]> = {};
+  let changed = false;
 
   for (const [key, entry] of Object.entries(store.getSnapshot().relatedKeysByModelKey)) {
-    if (!removed.has(key)) {
-      next[key] = entry.some((related) => removed.has(related))
-        ? entry.filter((related) => !removed.has(related))
-        : entry;
+    if (removed.has(key)) {
+      changed = true;
+      continue;
+    }
+
+    if (entry.some((related) => removed.has(related))) {
+      changed = true;
+      next[key] = entry.filter((related) => !removed.has(related));
+    } else {
+      next[key] = entry;
     }
   }
 
-  store.patchSnapshot({ relatedKeysByModelKey: next });
+  // Tombstones above always record; only broadcast when an entry moved.
+  if (changed) {
+    store.patchSnapshot({ relatedKeysByModelKey: next });
+  }
 };
 
 export const getRelationshipsSnapshot = (): ModelRelationshipsSnapshot => store.getSnapshot();

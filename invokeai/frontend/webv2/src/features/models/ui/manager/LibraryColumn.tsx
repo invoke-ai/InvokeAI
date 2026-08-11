@@ -3,7 +3,6 @@ import { Box, Flex, HStack, Icon, Separator, Text } from '@chakra-ui/react';
 import { collectBases, collectTypes, filterModels } from '@features/models/core/library';
 import { bulkDeleteModels, bulkReidentifyModels } from '@features/models/data/api';
 import { refreshModels, removeModelsFromStore, useModelsSelector } from '@features/models/data/modelsStore';
-import { removeModelsFromRelationships } from '@features/models/data/relationshipsStore';
 import { refreshStartersIfLoaded } from '@features/models/data/startersStore';
 import { MaintenanceMenu } from '@features/models/ui/library/MaintenanceMenu';
 import { ModelFilterBar } from '@features/models/ui/library/ModelFilterBar';
@@ -78,8 +77,8 @@ export const LibraryColumn = () => {
         const result = await bulkDeleteModels(keys, owner.signal);
 
         assertAccountScopeCurrent(owner);
+        // The relationships store prunes itself off this library change.
         removeModelsFromStore(result.deleted);
-        removeModelsFromRelationships(result.deleted);
         pruneModelsUiKeys(result.deleted);
         updateModelsUi({ selectedKeys: new Set(result.failed.map((failure) => failure.key)) });
         if (result.deleted.length > 0) {

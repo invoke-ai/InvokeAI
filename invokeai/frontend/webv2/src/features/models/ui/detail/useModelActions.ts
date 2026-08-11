@@ -2,7 +2,6 @@ import type { ModelConfig } from '@features/models/core/types';
 
 import { convertModelToDiffusers, deleteModel, reidentifyModel } from '@features/models/data/api';
 import { removeModelsFromStore, replaceModelInStore } from '@features/models/data/modelsStore';
-import { removeModelsFromRelationships } from '@features/models/data/relationshipsStore';
 import { refreshStartersIfLoaded } from '@features/models/data/startersStore';
 import { pruneModelsUiKeys } from '@features/models/ui/uiStore';
 import { useNotify } from '@features/models/ui/useModelsNotify';
@@ -35,8 +34,8 @@ export const useModelActions = () => {
           await deleteModel(model.key, owner.signal);
 
           assertAccountScopeCurrent(owner);
+          // The relationships store prunes itself off this library change.
           removeModelsFromStore([model.key]);
-          removeModelsFromRelationships([model.key]);
           pruneModelsUiKeys([model.key]);
           // A deleted starter must lose its "Installed" badge in Add Models.
           refreshStartersIfLoaded();
