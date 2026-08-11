@@ -1,9 +1,12 @@
-import { Box, ChakraProvider, Stack, Tabs } from '@chakra-ui/react';
+import { Box, ChakraProvider, Stack } from '@chakra-ui/react';
 import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
 import { userEvent } from 'vitest/browser';
+
+import { Button } from './Button';
+import { Tabs } from './Tabs';
 
 const variants = ['line', 'subtle', 'enclosed', 'outline', 'plain'] as const;
 
@@ -16,6 +19,44 @@ afterEach(async () => {
   host?.remove();
   host = null;
   root = null;
+});
+
+describe('tab sizes', () => {
+  it('matches xs button height and compact inline padding', async () => {
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+
+    await act(async () => {
+      root?.render(
+        <ChakraProvider value={system}>
+          <Stack align="start">
+            <Button aria-label="xs button" size="xs">
+              Action
+            </Button>
+            <Tabs.Root size="xs" value="preset">
+              <Tabs.List>
+                <Tabs.Trigger aria-label="xs tab" value="preset">
+                  Preset
+                </Tabs.Trigger>
+              </Tabs.List>
+            </Tabs.Root>
+          </Stack>
+        </ChakraProvider>
+      );
+      await new Promise<void>((resolve) => {
+        globalThis.setTimeout(resolve, 0);
+      });
+    });
+
+    const buttonStyles = getComputedStyle(host.querySelector<HTMLElement>('[aria-label="xs button"]')!);
+    const tabStyles = getComputedStyle(host.querySelector<HTMLElement>('[aria-label="xs tab"]')!);
+
+    expect(buttonStyles.height).toBe('32px');
+    expect(tabStyles.height).toBe(buttonStyles.height);
+    expect(tabStyles.paddingInlineStart).toBe('10px');
+    expect(tabStyles.paddingInlineEnd).toBe('10px');
+  });
 });
 
 describe('tab hover styles', () => {

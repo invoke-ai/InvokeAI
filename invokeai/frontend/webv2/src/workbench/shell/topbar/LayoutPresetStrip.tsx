@@ -87,7 +87,7 @@ export const LayoutPresetStrip = () => {
         <Box css={PRESET_SCROLL_CSS} data-layout-preset-scroll="" maxW="full" minW="0" overflowX="auto">
           <Tabs.Root
             minW="max-content"
-            size="sm"
+            size="xs"
             value={activePreset.id}
             variant="subtle"
             onValueChange={handleValueChange}
