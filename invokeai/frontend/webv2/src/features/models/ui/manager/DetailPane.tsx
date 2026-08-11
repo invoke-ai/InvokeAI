@@ -21,7 +21,7 @@ export const DetailPane = () => {
     (left, right) => left.activeModelKey === right.activeModelKey && left.activeTab === right.activeTab
   );
   const detailLabel = useModelsSelector(
-    (snapshot) => snapshot.models.find((model) => model.key === activeModelKey)?.name ?? t('models.details')
+    (snapshot) => (activeModelKey ? snapshot.modelsByKey.get(activeModelKey)?.name : undefined) ?? t('models.details')
   );
 
   return (

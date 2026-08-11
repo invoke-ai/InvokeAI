@@ -45,6 +45,24 @@ describe('models store loading', () => {
     expect(api.listModels).toHaveBeenCalledTimes(2);
   });
 
+  it('keeps the by-key index in lockstep with every models write', async () => {
+    api.listModels.mockResolvedValueOnce([
+      { base: 'sdxl', key: 'a', name: 'A', type: 'main' },
+      { base: 'sdxl', key: 'b', name: 'B', type: 'main' },
+    ]);
+    const store = await import('./modelsStore');
+
+    await store.refreshModels();
+    expect(store.getModelsSnapshot().modelsByKey.get('b')?.name).toBe('B');
+
+    store.patchModelInStore('a', { name: 'A2' });
+    expect(store.getModelsSnapshot().modelsByKey.get('a')?.name).toBe('A2');
+
+    store.removeModelsFromStore(['b']);
+    expect(store.getModelsSnapshot().modelsByKey.has('b')).toBe(false);
+    expect(store.getModelsSnapshot().models.map((model) => model.key)).toEqual(['a']);
+  });
+
   it('unwraps FastAPI detail bodies into the snapshot error', async () => {
     const { ApiError } = await import('@platform/transport/http');
     api.listModels.mockRejectedValueOnce(new ApiError('{"detail":"Model records unavailable"}', 500));

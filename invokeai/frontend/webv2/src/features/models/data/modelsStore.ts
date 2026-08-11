@@ -23,6 +23,8 @@ import { getModelsDir, listMissingModels, listModels } from './api';
 
 export interface ModelsSnapshot {
   models: ModelConfig[];
+  /** Same models keyed for point lookups; always derived from `models`. */
+  modelsByKey: ReadonlyMap<string, ModelConfig>;
   /** Keys of models whose files are missing on disk. */
   missingModelKeys: ReadonlySet<string>;
   /** Bumped when a model's cover image changes; cache-busts thumbnail URLs. */
@@ -34,15 +36,23 @@ export interface ModelsSnapshot {
 }
 
 const EMPTY_MISSING_KEYS: ReadonlySet<string> = new Set<string>();
+const EMPTY_MODELS_BY_KEY: ReadonlyMap<string, ModelConfig> = new Map<string, ModelConfig>();
 
 const EMPTY_MODELS_SNAPSHOT: ModelsSnapshot = {
   coverImageVersions: {},
   error: null,
   missingModelKeys: EMPTY_MISSING_KEYS,
   models: [],
+  modelsByKey: EMPTY_MODELS_BY_KEY,
   modelsDir: null,
   status: 'idle',
 };
+
+/** Every `models` write goes through here so the by-key index never drifts. */
+const withModels = (models: ModelConfig[]): Pick<ModelsSnapshot, 'models' | 'modelsByKey'> => ({
+  models,
+  modelsByKey: new Map(models.map((model) => [model.key, model])),
+});
 const store = createExternalStore<ModelsSnapshot>(EMPTY_MODELS_SNAPSHOT);
 
 const refreshFlight = createTrailingSingleFlight();
@@ -73,10 +83,10 @@ export const refreshModels = (owner: AccountScope = captureAccountScope()): Prom
         }
 
         store.patchSnapshot({
+          ...withModels(models),
           error: null,
           missingModelKeys:
             missingModels.length > 0 ? new Set(missingModels.map((model) => model.key)) : EMPTY_MISSING_KEYS,
-          models,
           modelsDir,
           status: 'loaded',
         });
@@ -111,22 +121,22 @@ export const subscribeModels = (listener: () => void): (() => void) => store.sub
 
 /** Patch one model in place after a successful update/convert. */
 export const replaceModelInStore = (model: ModelConfig): void => {
-  store.patchSnapshot({
-    models: store.getSnapshot().models.map((existing) => (existing.key === model.key ? model : existing)),
-  });
+  store.patchSnapshot(
+    withModels(store.getSnapshot().models.map((existing) => (existing.key === model.key ? model : existing)))
+  );
 };
 
 /** Apply a narrow optimistic model patch without replacing unrelated server fields. */
 export const patchModelInStore = (key: string, changes: Partial<ModelConfig>): void => {
-  store.patchSnapshot({
-    models: store.getSnapshot().models.map((model) => (model.key === key ? { ...model, ...changes } : model)),
-  });
+  store.patchSnapshot(
+    withModels(store.getSnapshot().models.map((model) => (model.key === key ? { ...model, ...changes } : model)))
+  );
 };
 
 export const removeModelsFromStore = (keys: string[]): void => {
   const removed = new Set(keys);
 
-  store.patchSnapshot({ models: store.getSnapshot().models.filter((model) => !removed.has(model.key)) });
+  store.patchSnapshot(withModels(store.getSnapshot().models.filter((model) => !removed.has(model.key))));
 };
 
 /**
@@ -138,15 +148,17 @@ export const markCoverImageChanged = (key: string, hasImage: boolean): void => {
   const { coverImageVersions, models } = store.getSnapshot();
 
   store.patchSnapshot({
-    coverImageVersions: { ...coverImageVersions, [key]: (coverImageVersions[key] ?? 0) + 1 },
-    models: models.map((model) =>
-      model.key === key ? { ...model, cover_image: hasImage ? (model.cover_image ?? 'present') : null } : model
+    ...withModels(
+      models.map((model) =>
+        model.key === key ? { ...model, cover_image: hasImage ? (model.cover_image ?? 'present') : null } : model
+      )
     ),
+    coverImageVersions: { ...coverImageVersions, [key]: (coverImageVersions[key] ?? 0) + 1 },
   });
 };
 
 export const setModelsSnapshotForTests = (next: Partial<ModelsSnapshot>): void => {
-  store.patchSnapshot(next);
+  store.patchSnapshot(next.models ? { ...next, ...withModels(next.models) } : next);
 };
 
 export const useModelsSelector = store.useSelector;

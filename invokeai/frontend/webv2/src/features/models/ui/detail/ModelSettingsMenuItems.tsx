@@ -29,7 +29,7 @@ export const ModelSettingsMenuItems = ({ modelKey }: { modelKey: string }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { run } = useScopedAction();
 
-  const findModel = () => getModelsSnapshot().models.find((candidate) => candidate.key === modelKey);
+  const findModel = () => getModelsSnapshot().modelsByKey.get(modelKey);
 
   const handleExport = async () => {
     const model = findModel();

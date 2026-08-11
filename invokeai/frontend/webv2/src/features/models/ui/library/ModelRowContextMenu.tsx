@@ -32,9 +32,7 @@ export const ModelRowContextMenu = ({
   const { t } = useTranslation();
   const { convert, reidentify, remove } = useModelActions();
   const [pendingConfirm, setPendingConfirm] = useState<{ kind: 'delete' | 'convert'; model: ModelConfig } | null>(null);
-  const model = useModelsSelector((snapshot) =>
-    target ? (snapshot.models.find((candidate) => candidate.key === target.modelKey) ?? null) : null
-  );
+  const model = useModelsSelector((snapshot) => (target ? (snapshot.modelsByKey.get(target.modelKey) ?? null) : null));
 
   return (
     <>

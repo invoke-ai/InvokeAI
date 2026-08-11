@@ -154,7 +154,7 @@ export const ModelSelect = ({
     [excludeKeys, filter, isOpen, modelTypes, models, relatedKeys, selectedBases]
   );
 
-  const selectedModel = useMemo(() => models.find((model) => model.key === value) ?? null, [models, value]);
+  const selectedModel = useModelsSelector((snapshot) => (value ? (snapshot.modelsByKey.get(value) ?? null) : null));
   const hasMixedTypes = useMemo(() => new Set(candidates.map((model) => model.type)).size > 1, [candidates]);
   const scopeLabel =
     modelTypes.length === 1 ? getModelTypePluralLabel(modelTypes[0] ?? 'main').toLowerCase() : t('models.scopeModels');

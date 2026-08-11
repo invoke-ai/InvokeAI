@@ -7,7 +7,7 @@ import { isConvertibleToDiffusers } from '@features/models/core/baseIdentity';
 import { isLinkableType } from '@features/models/core/relationships';
 import { isAbsoluteModelPath, resolveModelAbsolutePath } from '@features/models/core/schemas';
 import { formatBytes, getModelSourceHref } from '@features/models/core/taxonomy';
-import { useModelsSelector } from '@features/models/data/modelsStore';
+import { useModelsSelector, type ModelsSnapshot } from '@features/models/data/modelsStore';
 import { useNotify } from '@features/models/ui/useModelsNotify';
 import { areArraysEqual } from '@platform/state/selectors';
 import { Button, IconButton, ConfirmDialog, MenuContent } from '@platform/ui';
@@ -58,17 +58,17 @@ type ModelIdentityModel = Pick<
   | 'variant'
 >;
 
-const findModel = (models: readonly ModelConfig[], modelKey: string): ModelConfig | undefined =>
-  models.find((candidate) => candidate.key === modelKey);
+const findModel = (snapshot: ModelsSnapshot, modelKey: string): ModelConfig | undefined =>
+  snapshot.modelsByKey.get(modelKey);
 
-const selectModelShell = (models: readonly ModelConfig[], modelKey: string): ModelDetailShellModel | null => {
-  const model = findModel(models, modelKey);
+const selectModelShell = (snapshot: ModelsSnapshot, modelKey: string): ModelDetailShellModel | null => {
+  const model = findModel(snapshot, modelKey);
 
   return model ? { key: model.key, type: model.type } : null;
 };
 
-const selectModelIdentity = (models: readonly ModelConfig[], modelKey: string): ModelIdentityModel | null => {
-  const model = findModel(models, modelKey);
+const selectModelIdentity = (snapshot: ModelsSnapshot, modelKey: string): ModelIdentityModel | null => {
+  const model = findModel(snapshot, modelKey);
 
   return model
     ? {
@@ -96,8 +96,8 @@ const selectModelIdentity = (models: readonly ModelConfig[], modelKey: string): 
     : null;
 };
 
-const selectDefaultSettingsModel = (models: readonly ModelConfig[], modelKey: string): DefaultSettingsModel | null => {
-  const model = findModel(models, modelKey);
+const selectDefaultSettingsModel = (snapshot: ModelsSnapshot, modelKey: string): DefaultSettingsModel | null => {
+  const model = findModel(snapshot, modelKey);
 
   // `base` is projected too: the FP8 storage default is unavailable for Z-Image.
   return model
@@ -105,14 +105,14 @@ const selectDefaultSettingsModel = (models: readonly ModelConfig[], modelKey: st
     : null;
 };
 
-const selectTriggerPhrasesModel = (models: readonly ModelConfig[], modelKey: string): TriggerPhrasesModel | null => {
-  const model = findModel(models, modelKey);
+const selectTriggerPhrasesModel = (snapshot: ModelsSnapshot, modelKey: string): TriggerPhrasesModel | null => {
+  const model = findModel(snapshot, modelKey);
 
   return model ? { key: model.key, trigger_phrases: model.trigger_phrases } : null;
 };
 
-const selectCpuOnlyModel = (models: readonly ModelConfig[], modelKey: string): CpuOnlyModel | null => {
-  const model = findModel(models, modelKey);
+const selectCpuOnlyModel = (snapshot: ModelsSnapshot, modelKey: string): CpuOnlyModel | null => {
+  const model = findModel(snapshot, modelKey);
 
   return model ? { cpu_only: model.cpu_only, key: model.key, name: model.name, type: model.type } : null;
 };
@@ -128,7 +128,7 @@ const areTriggerPhrasesModelsEqual = (left: TriggerPhrasesModel | null, right: T
  */
 export const ModelDetail = ({ modelKey, onDeleted }: { modelKey: string; onDeleted: () => void }) => {
   const { t } = useTranslation();
-  const model = useModelsSelector((snapshot) => selectModelShell(snapshot.models, modelKey));
+  const model = useModelsSelector((snapshot) => selectModelShell(snapshot, modelKey));
 
   if (!model) {
     return (
@@ -188,7 +188,7 @@ const ModelIdentitySectionContainer = memo(function ModelIdentitySectionContaine
   modelKey: string;
   onDeleted: () => void;
 }) {
-  const model = useModelsSelector((snapshot) => selectModelIdentity(snapshot.models, modelKey));
+  const model = useModelsSelector((snapshot) => selectModelIdentity(snapshot, modelKey));
   const isMissing = useModelsSelector((snapshot) => snapshot.missingModelKeys.has(modelKey));
 
   if (!model) {
@@ -358,7 +358,7 @@ const DefaultSettingsSectionContainer = memo(function DefaultSettingsSectionCont
 }) {
   const notify = useNotify();
   const { t } = useTranslation();
-  const model = useModelsSelector((snapshot) => selectDefaultSettingsModel(snapshot.models, modelKey));
+  const model = useModelsSelector((snapshot) => selectDefaultSettingsModel(snapshot, modelKey));
 
   if (!model || !supportsDefaultSettings(model)) {
     return null;
@@ -376,7 +376,7 @@ const DefaultSettingsSectionContainer = memo(function DefaultSettingsSectionCont
 const CpuOnlySettingContainer = memo(function CpuOnlySettingContainer({ modelKey }: { modelKey: string }) {
   const notify = useNotify();
   const { t } = useTranslation();
-  const model = useModelsSelector((snapshot) => selectCpuOnlyModel(snapshot.models, modelKey));
+  const model = useModelsSelector((snapshot) => selectCpuOnlyModel(snapshot, modelKey));
 
   if (!model || !supportsCpuOnlySetting(model)) {
     return null;
@@ -396,7 +396,7 @@ const TriggerPhrasesEditorContainer = memo(function TriggerPhrasesEditorContaine
   const { t } = useTranslation();
   const handleError = useCallback((message: string) => notify.error(t('models.triggerPhrases'), message), [notify, t]);
   const model = useModelsSelector(
-    (snapshot) => selectTriggerPhrasesModel(snapshot.models, modelKey),
+    (snapshot) => selectTriggerPhrasesModel(snapshot, modelKey),
     areTriggerPhrasesModelsEqual
   );
 
@@ -418,7 +418,7 @@ const RelatedModelsSectionContainer = memo(function RelatedModelsSectionContaine
   const { t } = useTranslation();
   const model = useModelsSelector(
     (snapshot) => {
-      const candidate = snapshot.models.find((model) => model.key === modelKey);
+      const candidate = snapshot.modelsByKey.get(modelKey);
 
       return candidate ? { base: candidate.base, key: candidate.key, type: candidate.type } : null;
     },

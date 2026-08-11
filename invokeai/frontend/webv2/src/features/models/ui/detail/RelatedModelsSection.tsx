@@ -39,7 +39,7 @@ export const RelatedModelsSection = (props: RelatedModelsSectionProps) => (
 
 const RelatedModelsForModel = ({ model, onError }: RelatedModelsSectionProps) => {
   const { t } = useTranslation();
-  const models = useModelsSelector((snapshot) => snapshot.models);
+  const modelsByKey = useModelsSelector((snapshot) => snapshot.modelsByKey);
   const relatedKeys = useRelatedModelKeys(model.key);
   const [isMutating, setIsMutating] = useState(false);
 
@@ -58,11 +58,10 @@ const RelatedModelsForModel = ({ model, onError }: RelatedModelsSectionProps) =>
     };
   });
 
-  const relatedModels = useMemo(() => {
-    const byKey = new Map(models.map((candidate) => [candidate.key, candidate]));
-
-    return (relatedKeys ?? []).map((key) => ({ key, model: byKey.get(key) ?? null }));
-  }, [models, relatedKeys]);
+  const relatedModels = useMemo(
+    () => (relatedKeys ?? []).map((key) => ({ key, model: modelsByKey.get(key) ?? null })),
+    [modelsByKey, relatedKeys]
+  );
 
   const excludeKeys = useMemo(() => new Set([model.key, ...(relatedKeys ?? [])]), [model.key, relatedKeys]);
 
