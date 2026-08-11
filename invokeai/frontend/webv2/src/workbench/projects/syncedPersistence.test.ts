@@ -360,6 +360,32 @@ describe('loadWorkbench session hydration', () => {
     ).toMatchObject({ destination: 'canvas', sourceId: 'canvas' });
   });
 
+  it('starts an account-resolved draft from an empty offline session', async () => {
+    const initial = createInitialWorkbenchState();
+    const state: WorkbenchState = {
+      ...initial,
+      account: {
+        ...initial.account,
+        layoutPresetRouteOverrides: {
+          compose: { destination: 'canvas', sourceId: 'canvas' },
+        },
+      },
+      activeProjectId: '',
+      projects: [],
+    };
+
+    storage.set(
+      'invokeai:v7:webv2:workbench',
+      JSON.stringify({ savedAt: '2026-07-19T00:00:00.000Z', state, version: 1 })
+    );
+    api.listProjects.mockRejectedValueOnce(new Error('offline'));
+
+    const snapshot = await service.loadWorkbench();
+
+    expect(snapshot?.state.projects).toHaveLength(1);
+    expect(snapshot?.state.projects[0]?.invocation).toMatchObject({ destination: 'canvas', sourceId: 'canvas' });
+  });
+
   it('reopens the cached session when the backend is unreachable and no draft was requested', async () => {
     const state = createInitialWorkbenchState();
 

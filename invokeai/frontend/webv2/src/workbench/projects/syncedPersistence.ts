@@ -1025,10 +1025,20 @@ export const createSyncedWorkbenchPersistence = (
             ),
           });
 
-          // A cache holding an empty session (last tab closed offline) cannot
-          // hydrate the editor; boot a fresh draft instead.
-          if (!local || local.state.projects.length === 0) {
+          if (!local) {
             return null;
+          }
+
+          // A cache holding an empty session (last tab closed offline) still
+          // owns the account's preset defaults, so build the replacement draft
+          // here instead of falling back to the store's shipped defaults.
+          if (local.state.projects.length === 0) {
+            const draft = createDraftProject([], local.state.account);
+
+            return {
+              ...local,
+              state: { ...local.state, activeProjectId: draft.id, projects: [draft] },
+            };
           }
 
           // `?new=true` means a fresh draft whether or not the backend answered.
