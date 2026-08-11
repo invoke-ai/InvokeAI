@@ -11,6 +11,11 @@ type ImageFieldCollection = z.infer<typeof zImageFieldCollection>;
 export const isImageFieldCollection = (field: unknown): field is ImageFieldCollection =>
   zImageFieldCollection.safeParse(field).success;
 
+export const zFileField = z.object({
+  file_id: z.string().trim().min(1),
+});
+export type FileField = z.infer<typeof zFileField>;
+
 export const zVideoField = z.object({
   video_name: z.string().trim().min(1),
 });

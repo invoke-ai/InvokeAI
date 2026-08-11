@@ -3,6 +3,7 @@ import type {
   Classification,
   ColorField,
   ControlField,
+  FileField,
   ImageField,
   ImageOutput,
   IPAdapterField,
@@ -36,6 +37,7 @@ import type z from 'zod';
 describe('Common types', () => {
   // Complex field types
   test('ImageField', () => assert<Equals<ImageField, S['ImageField']>>());
+  test('FileField', () => assert<Equals<FileField, S['FileField']>>());
   test('BoardField', () => assert<Equals<BoardField, S['BoardField']>>());
   test('ColorField', () => assert<Equals<ColorField, S['ColorField']>>());
   test('SchedulerField', () => assert<Equals<SchedulerField, NonNullable<Invocation<'scheduler'>['scheduler']>>>());

@@ -29,6 +29,7 @@ from invokeai.app.api.routers import (
     client_state,
     custom_nodes,
     download_queue,
+    files,
     gallery,
     image_moves,
     images,
@@ -157,6 +158,62 @@ class SlidingWindowTokenMiddleware(BaseHTTPMiddleware):
                     pass  # Don't fail the request if token refresh fails
 
         return response
+
+
+MANAGED_FILE_UPLOAD_MULTIPART_OVERHEAD_BYTES = 1024 * 1024
+
+
+class RequestBodyTooLarge(Exception):
+    pass
+
+
+class ManagedFileUploadSizeLimitMiddleware:
+    def __init__(self, app: ASGIApp, max_file_bytes: int) -> None:
+        self.app = app
+        self.max_file_bytes = max_file_bytes
+        self.max_body_bytes = max_file_bytes + MANAGED_FILE_UPLOAD_MULTIPART_OVERHEAD_BYTES
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope.get("type") != "http" or scope.get("method") != "POST" or scope.get("path") != "/api/v1/files/upload":
+            await self.app(scope, receive, send)
+            return
+
+        headers = dict(scope.get("headers", []))
+        content_length_header = headers.get(b"content-length")
+        content_length = None
+        if content_length_header is not None:
+            try:
+                content_length = int(content_length_header)
+            except ValueError:
+                content_length = None
+
+        if content_length is not None and content_length > self.max_body_bytes:
+            response = JSONResponse(
+                {"detail": f"File exceeds the maximum size of {self.max_file_bytes} bytes."},
+                status_code=413,
+            )
+            await response(scope, receive, send)
+            return
+
+        received_bytes = 0
+
+        async def limited_receive() -> Message:
+            nonlocal received_bytes
+            message = await receive()
+            if message["type"] == "http.request":
+                received_bytes += len(message.get("body", b""))
+                if received_bytes > self.max_body_bytes:
+                    raise RequestBodyTooLarge
+            return message
+
+        try:
+            await self.app(scope, limited_receive, send)
+        except RequestBodyTooLarge:
+            response = JSONResponse(
+                {"detail": f"File exceeds the maximum size of {self.max_file_bytes} bytes."},
+                status_code=413,
+            )
+            await response(scope, receive, send)
 
 
 class RedirectRootWithQueryStringMiddleware(BaseHTTPMiddleware):
@@ -372,6 +429,7 @@ class SubPathASGIMiddleware:
 # Add the middleware
 app.add_middleware(RedirectRootWithQueryStringMiddleware)
 app.add_middleware(SlidingWindowTokenMiddleware)
+app.add_middleware(ManagedFileUploadSizeLimitMiddleware, max_file_bytes=app_config.max_file_upload_size_bytes)
 app.add_middleware(
     VideoUploadLimitASGIMiddleware,
     max_body_bytes=videos.MAX_UPLOAD_REQUEST_SIZE,
@@ -409,6 +467,7 @@ app.include_router(auth.auth_router, prefix="/api")
 app.include_router(utilities.utilities_router, prefix="/api")
 app.include_router(model_manager.model_manager_router, prefix="/api")
 app.include_router(download_queue.download_queue_router, prefix="/api")
+app.include_router(files.files_router, prefix="/api")
 app.include_router(image_moves.image_moves_router, prefix="/api")
 app.include_router(images.images_router, prefix="/api")
 app.include_router(videos.videos_router, prefix="/api")

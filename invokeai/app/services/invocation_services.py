@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from invokeai.app.services.download import DownloadQueueServiceBase
     from invokeai.app.services.events.events_base import EventServiceBase
     from invokeai.app.services.external_generation.external_generation_base import ExternalGenerationServiceBase
+    from invokeai.app.services.files.files_base import FileServiceBase
     from invokeai.app.services.gallery.gallery_base import GalleryServiceABC
     from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
     from invokeai.app.services.image_moves.image_moves_default import ImageMoveService
@@ -92,6 +93,7 @@ class InvocationServices:
         video_records: "VideoRecordStorageBase",
         board_video_records: "BoardVideoRecordStorageBase",
         gallery: "GalleryServiceABC",
+        files: "FileServiceBase | None" = None,
         image_moves: "ImageMoveService | None" = None,
     ):
         self.board_images = board_images
@@ -127,6 +129,7 @@ class InvocationServices:
         self.workflow_thumbnails = workflow_thumbnails
         self.client_state_persistence = client_state_persistence
         self.users = users
+        self.files = files
         self.videos = videos
         self.video_files = video_files
         self.video_records = video_records
