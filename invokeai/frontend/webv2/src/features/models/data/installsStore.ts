@@ -133,8 +133,11 @@ export const refreshInstalls = (owner: AccountScope = captureAccountScope()): Pr
       });
   });
 
+/** Fetch on first use or retry after an error, so one failed load never sticks. */
 export const ensureInstallsLoaded = (): void => {
-  if (store.getSnapshot().status === 'idle') {
+  const { status } = store.getSnapshot();
+
+  if (status === 'idle' || status === 'error') {
     void refreshInstalls();
   }
 };

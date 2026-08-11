@@ -60,8 +60,11 @@ export const refreshStarters = (): Promise<void> =>
       });
   });
 
+/** Fetch on first use or retry after an error, so one failed load never sticks. */
 export const ensureStartersLoaded = (): void => {
-  if (store.getSnapshot().status === 'idle') {
+  const { status } = store.getSnapshot();
+
+  if (status === 'idle' || status === 'error') {
     void refreshStarters();
   }
 };

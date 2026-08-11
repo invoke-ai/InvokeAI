@@ -149,6 +149,28 @@ describe('model install event interpretation', () => {
     expect(store.getInstallsSnapshot().jobs).toEqual([{ id: 1, source: 'org/model', status: 'completed' }]);
   });
 
+  it('retries a failed load on the next ensure instead of sticking in error', async () => {
+    dependencies.listModelInstalls
+      .mockReset()
+      .mockRejectedValueOnce(new Error('outage'))
+      .mockResolvedValueOnce([{ id: 1, source: 'org/model', status: 'waiting' }]);
+
+    const store = await import('./installsStore');
+
+    store.ensureInstallsLoaded();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(store.getInstallsSnapshot().status).toBe('error');
+
+    store.ensureInstallsLoaded();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(store.getInstallsSnapshot()).toEqual({
+      error: null,
+      jobs: [{ id: 1, source: 'org/model', status: 'waiting' }],
+      status: 'loaded',
+    });
+    expect(dependencies.listModelInstalls).toHaveBeenCalledTimes(2);
+  });
+
   it('ignores socket events owned by an expired account scope', async () => {
     const store = await import('./installsStore');
     const { accountLifecycle } = await import('@platform/state/accountLifecycle');

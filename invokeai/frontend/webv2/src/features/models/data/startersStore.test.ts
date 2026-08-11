@@ -42,6 +42,22 @@ describe('starters store', () => {
     expect(api.getStarterModels).toHaveBeenCalledTimes(1);
   });
 
+  it('retries a failed load on the next ensure instead of sticking in error', async () => {
+    api.getStarterModels.mockRejectedValueOnce(new Error('outage')).mockResolvedValueOnce(response);
+    const store = await import('./startersStore');
+
+    store.ensureStartersLoaded();
+    await vi.waitFor(() => {
+      expect(store.getStartersSnapshot().status).toBe('error');
+    });
+
+    store.ensureStartersLoaded();
+    await vi.waitFor(() => {
+      expect(store.getStartersSnapshot()).toMatchObject({ response, status: 'loaded' });
+    });
+    expect(api.getStarterModels).toHaveBeenCalledTimes(2);
+  });
+
   it('clears the catalog on account switch', async () => {
     const account = await import('@platform/state/accountLifecycle');
     account.accountLifecycle.activate('user-a');
