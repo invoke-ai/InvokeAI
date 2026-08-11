@@ -5,6 +5,7 @@ import asyncio
 import contextlib
 import io
 import pathlib
+import threading
 import traceback
 from copy import deepcopy
 from enum import Enum
@@ -57,6 +58,19 @@ from invokeai.backend.model_manager.starter_models import (
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
 
 model_manager_router = APIRouter(prefix="/v2/models", tags=["model_manager"])
+
+# Conversion loads a model, writes a diffusers copy, then swaps the record. As an `async def`
+# body with no `await` it could not overlap with another request; running in the threadpool it
+# can, and two conversions in flight means two models resident at once with nothing bounding the
+# RAM/VRAM that takes - plus, for the same key, a second conversion reading a record the first is
+# midway through replacing. Held non-blocking: an admin gets a 409 telling them to wait rather
+# than an HTTP request that hangs for the minutes a conversion takes.
+_MODEL_CONVERSION_LOCK = threading.Lock()
+
+# The HF token is process-global state backed by a file in the HF cache. Concurrent writers would
+# interleave set/reset with the status read that follows it, so the reported status need not
+# describe the token that was just written.
+_HF_TOKEN_LOCK = threading.Lock()
 
 # images are immutable; set a high max-age
 IMAGE_MAX_AGE = 31536000
@@ -1161,6 +1175,19 @@ def convert_model(
     Note that during the conversion process the key and model hash will change.
     The return value is the model configuration for the converted model.
     """
+    if not _MODEL_CONVERSION_LOCK.acquire(blocking=False):
+        raise HTTPException(
+            status_code=409,
+            detail="Another model conversion is already in progress. Wait for it to finish and try again.",
+        )
+    try:
+        return _convert_model(key, user_id=current_admin.user_id)
+    finally:
+        _MODEL_CONVERSION_LOCK.release()
+
+
+def _convert_model(key: str, user_id: str) -> AnyModelConfig:
+    """Converts one model. Callers must hold `_MODEL_CONVERSION_LOCK`."""
     model_manager = ApiDependencies.invoker.services.model_manager
     loader = model_manager.load
     logger = ApiDependencies.invoker.services.logger
@@ -1188,7 +1215,7 @@ def convert_model(
 
     with TemporaryDirectory(dir=ApiDependencies.invoker.services.configuration.models_path) as tmpdir:
         convert_path = pathlib.Path(tmpdir) / pathlib.Path(model_config.path).stem
-        converted_model = loader.load_model(model_config, user_id=current_admin.user_id)
+        converted_model = loader.load_model(model_config, user_id=user_id)
         # write the converted file to the convert path
         raw_model = converted_model.model
         assert hasattr(raw_model, "save_pretrained")
@@ -1418,8 +1445,10 @@ def do_hf_login(
     current_admin: AdminUserOrDefault,
     token: str = Body(description="Hugging Face token to use for login", embed=True),
 ) -> HFTokenStatus:
-    HFTokenHelper.set_token(token)
-    token_status = HFTokenHelper.get_status()
+    # Write and read-back as one step; see _HF_TOKEN_LOCK.
+    with _HF_TOKEN_LOCK:
+        HFTokenHelper.set_token(token)
+        token_status = HFTokenHelper.get_status()
 
     if token_status is HFTokenStatus.UNKNOWN:
         ApiDependencies.invoker.services.logger.warning("Unable to verify HF token")
@@ -1429,7 +1458,8 @@ def do_hf_login(
 
 @model_manager_router.delete("/hf_login", operation_id="reset_hf_token", response_model=HFTokenStatus)
 def reset_hf_token(current_admin: AdminUserOrDefault) -> HFTokenStatus:
-    return HFTokenHelper.reset_token()
+    with _HF_TOKEN_LOCK:
+        return HFTokenHelper.reset_token()
 
 
 # Orphaned Models Management Routes

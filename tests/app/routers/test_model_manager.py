@@ -280,3 +280,50 @@ def test_get_stats_returns_null_when_no_stats(monkeypatch: Any, client: TestClie
 
     assert response.status_code == 200
     assert response.json() is None
+
+
+def test_convert_model_rejects_a_second_conversion_while_one_is_running() -> None:
+    """Conversions are serialized, and the loser is told so instead of being made to wait.
+
+    Two conversions in flight means two models resident at once, which nothing bounds, and for
+    the same key the second reads a record the first is midway through replacing. As `async def`
+    handlers with no `await` they could not overlap; in the threadpool they can.
+    """
+    from unittest.mock import MagicMock
+
+    from starlette.exceptions import HTTPException
+
+    from invokeai.app.api.routers.model_manager import _MODEL_CONVERSION_LOCK, convert_model
+
+    assert _MODEL_CONVERSION_LOCK.acquire(blocking=False), "lock leaked by an earlier test"
+    try:
+        with pytest.raises(HTTPException) as exc_info:
+            # Never reaches the model store: the guard is the first thing the handler does.
+            convert_model(MagicMock(), key="some-key")
+    finally:
+        _MODEL_CONVERSION_LOCK.release()
+
+    assert exc_info.value.status_code == 409
+    assert "already in progress" in exc_info.value.detail
+
+
+def test_convert_model_releases_the_lock_when_the_conversion_fails() -> None:
+    """A failed conversion must not wedge the endpoint for the rest of the process's life."""
+    from unittest.mock import MagicMock, patch
+
+    from starlette.exceptions import HTTPException
+
+    from invokeai.app.api.routers.model_manager import _MODEL_CONVERSION_LOCK, convert_model
+
+    with patch("invokeai.app.api.routers.model_manager._convert_model", side_effect=RuntimeError("boom")):
+        with pytest.raises(RuntimeError):
+            convert_model(MagicMock(), key="some-key")
+
+    assert _MODEL_CONVERSION_LOCK.acquire(blocking=False), "the lock was not released on failure"
+    _MODEL_CONVERSION_LOCK.release()
+
+    # And the endpoint still works afterwards - the next caller gets past the guard.
+    with patch("invokeai.app.api.routers.model_manager._convert_model", side_effect=HTTPException(424, "not found")):
+        with pytest.raises(HTTPException) as exc_info:
+            convert_model(MagicMock(), key="some-key")
+    assert exc_info.value.status_code == 424

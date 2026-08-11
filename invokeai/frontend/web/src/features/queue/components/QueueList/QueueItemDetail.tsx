@@ -28,14 +28,16 @@ const QueueItemComponent = ({ queueItem: queueItemSummary }: Props) => {
   const cancelBatch = useCancelBatch();
   const cancelQueueItem = useCancelQueueItem();
   const retryQueueItem = useRetryQueueItem();
-  const { data: queueItem } = useGetQueueItemQuery(item_id);
+  const { data: queueItem, isError } = useGetQueueItemQuery(item_id);
 
   const originText = useOriginText(origin);
   const destinationText = useDestinationText(destination);
 
   const statusAndTiming = useMemo(() => {
     if (!queueItem) {
-      return t('common.loading');
+      // Distinguish the two, or a queue item the backend cannot serve — one whose graph
+      // references a node type this build no longer registers, say — reads as loading forever.
+      return isError ? t('common.error') : t('common.loading');
     }
     if (!queueItem.completed_at || !queueItem.started_at) {
       return t(`queue.${queueItem.status}`);
@@ -45,7 +47,7 @@ const QueueItemComponent = ({ queueItem: queueItemSummary }: Props) => {
       return `${t('queue.completedIn')} ${seconds}${seconds === 1 ? '' : 's'}`;
     }
     return `${seconds}s`;
-  }, [queueItem, t]);
+  }, [isError, queueItem, t]);
 
   const isCanceled = useMemo(
     () => !!queueItem && ['canceled', 'completed', 'failed'].includes(queueItem.status),
@@ -86,7 +88,10 @@ const QueueItemComponent = ({ queueItem: queueItemSummary }: Props) => {
         <QueueItemData label={t('queue.destination')} data={destinationText} />
         <QueueItemData label={t('queue.item')} data={item_id} />
         <QueueItemData label={t('queue.batch')} data={batch_id} />
-        <QueueItemData label={t('queue.session')} data={queueItem?.session_id ?? t('common.loading')} />
+        <QueueItemData
+          label={t('queue.session')}
+          data={queueItem?.session_id ?? (isError ? t('common.error') : t('common.loading'))}
+        />
         <ButtonGroup size="xs" orientation="vertical">
           {canShowCancelQueueItem && !isFailed && (
             <Button
@@ -147,6 +152,8 @@ const QueueItemComponent = ({ queueItem: queueItemSummary }: Props) => {
             data={queueItem}
             extraCopyActions={[{ label: 'Graph', getData: (data) => get(data, 'session.graph') }]}
           />
+        ) : isError ? (
+          <Text color="error.400">{t('queue.queueItemLoadFailed')}</Text>
         ) : (
           <Spinner opacity={0.5} />
         )}
