@@ -310,7 +310,12 @@ describe('loadWorkbench session hydration', () => {
 
   it('appends and activates a draft when a new project is requested', async () => {
     const first = seedServerProject('First');
-    const account = createInitialWorkbenchState().account;
+    const account = {
+      ...createInitialWorkbenchState().account,
+      layoutPresetRouteOverrides: {
+        compose: { destination: 'canvas' as const, sourceId: 'canvas' as const },
+      },
+    };
 
     seedSessionBlob({ account, activeProjectId: first.id, openProjectIds: [first.id] });
 
@@ -318,11 +323,23 @@ describe('loadWorkbench session hydration', () => {
 
     expect(snapshot?.state.projects).toHaveLength(2);
     expect(snapshot?.state.activeProjectId).not.toBe(first.id);
+    expect(
+      snapshot?.state.projects.find((project) => project.id === snapshot.state.activeProjectId)?.invocation
+    ).toMatchObject({ destination: 'canvas', sourceId: 'canvas' });
     expect(service.hasPendingChanges()).toBe(true);
   });
 
   it('still starts a draft for a new-project request when the backend is unreachable', async () => {
-    const state = createInitialWorkbenchState();
+    const initial = createInitialWorkbenchState();
+    const state: WorkbenchState = {
+      ...initial,
+      account: {
+        ...initial.account,
+        layoutPresetRouteOverrides: {
+          compose: { destination: 'canvas', sourceId: 'canvas' },
+        },
+      },
+    };
     const cachedProjectId = state.projects[0]?.id ?? '';
 
     storage.set(
@@ -338,6 +355,9 @@ describe('loadWorkbench session hydration', () => {
     // — and let the Launchpad's intent rearrange it.
     expect(snapshot?.state.projects).toHaveLength(state.projects.length + 1);
     expect(snapshot?.state.activeProjectId).not.toBe(cachedProjectId);
+    expect(
+      snapshot?.state.projects.find((project) => project.id === snapshot.state.activeProjectId)?.invocation
+    ).toMatchObject({ destination: 'canvas', sourceId: 'canvas' });
   });
 
   it('reopens the cached session when the backend is unreachable and no draft was requested', async () => {

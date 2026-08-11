@@ -721,6 +721,7 @@ const loadFromBackend = async (
   }
 
   const base = local?.state ?? createInitialWorkbenchState();
+  const account = sessionBlob?.account ?? base.account;
   let activeProjectId =
     options?.openProjectId && projects.some((project) => project.id === options.openProjectId)
       ? options.openProjectId
@@ -734,7 +735,7 @@ const loadFromBackend = async (
   // (first run, or /app reached directly with an empty session): start a
   // fresh draft. The first autosave creates it server-side.
   if (options?.createNew || projects.length === 0) {
-    const draft = createDraftProject(projects);
+    const draft = createDraftProject(projects, account);
 
     projects = [...projects, draft];
     activeProjectId = draft.id;
@@ -742,7 +743,7 @@ const loadFromBackend = async (
 
   const state: WorkbenchState = {
     ...base,
-    account: sessionBlob?.account ?? base.account,
+    account,
     activeProjectId,
     autosave: { status: 'idle' },
     backendConnection: { status: 'connecting' },
@@ -1036,7 +1037,7 @@ export const createSyncedWorkbenchPersistence = (
           // reopened — and then let the Launchpad's intent rearrange — existing
           // work.
           if (options?.createNew) {
-            const draft = createDraftProject(local.state.projects);
+            const draft = createDraftProject(local.state.projects, local.state.account);
 
             return {
               ...local,

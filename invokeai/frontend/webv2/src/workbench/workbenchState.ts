@@ -1411,30 +1411,34 @@ const clampPanelSize = (region: WidgetRegion, sizePx: number): number => {
 
 const createCanvasState = (): CanvasStateContractV2 => createNewCanvasStateV2();
 
-const createProject = (index: number, id = `project-${index}`): Project => ({
-  canvas: createCanvasState(),
-  events: [
+const createProject = (index: number, id: string, preset: LayoutPreset): Project =>
+  applyLayoutPresetToProject(
     {
-      createdAt: now(),
-      id: createId('event'),
-      summary: `Created Project Name #${index}`,
-      type: 'project-created',
+      canvas: createCanvasState(),
+      events: [
+        {
+          createdAt: now(),
+          id: createId('event'),
+          summary: `Created Project Name #${index}`,
+          type: 'project-created',
+        },
+      ],
+      graphHistory: [],
+      id,
+      invocation: { ...defaultInvocationRoute, ...preset.defaultRoute },
+      layout: { ...defaultLayoutPreset.snapshot.layout, panels: { ...defaultLayoutPreset.snapshot.layout.panels } },
+      name: `Project Name #${index}`,
+      promptHistory: [],
+      projectGraph: createProjectGraph(`${id}-graph`),
+      queue: { items: [] },
+      settings: normalizeProjectSettings(),
+      undoRedo: { future: [], past: [] },
+      widgetGraphs: {},
+      widgetInstances: createWidgetInstances(),
+      widgetRegions: createWidgetRegions(),
     },
-  ],
-  graphHistory: [],
-  id,
-  invocation: { ...defaultInvocationRoute, ...defaultLayoutPreset.defaultRoute },
-  layout: { ...defaultLayoutPreset.snapshot.layout, panels: { ...defaultLayoutPreset.snapshot.layout.panels } },
-  name: `Project Name #${index}`,
-  promptHistory: [],
-  projectGraph: createProjectGraph(`${id}-graph`),
-  queue: { items: [] },
-  settings: normalizeProjectSettings(),
-  undoRedo: { future: [], past: [] },
-  widgetGraphs: {},
-  widgetInstances: createWidgetInstances(),
-  widgetRegions: createWidgetRegions(),
-});
+    preset
+  );
 
 const getNextProjectIndex = (projects: Project[]): number => {
   const usedIndices = projects.map((project) => Number(project.name.match(/#(\d+)$/)?.[1] ?? 0));
@@ -1447,8 +1451,12 @@ const getNextProjectIndex = (projects: Project[]): number => {
  * draft can never collide with a project that already exists on the server
  * (which an autosave would then silently overwrite).
  */
-export const createDraftProject = (projects: Project[]): Project =>
-  createProject(getNextProjectIndex(projects), createId('project'));
+export const createDraftProject = (projects: Project[], account?: WorkbenchState['account']): Project =>
+  createProject(
+    getNextProjectIndex(projects),
+    createId('project'),
+    account ? resolveSavedLayoutPreset(account, defaultLayoutPreset.id) : defaultLayoutPreset
+  );
 
 const updateActiveProject = (state: WorkbenchState, getProject: (project: Project) => Project): WorkbenchState => {
   let didChange = false;
@@ -2603,7 +2611,7 @@ export const __workbenchReducerInternal = (
 ): WorkbenchState => {
   switch (action.type) {
     case 'createProject': {
-      const project = createDraftProject(state.projects);
+      const project = createDraftProject(state.projects, state.account);
 
       return { ...state, activeProjectId: project.id, projects: [...state.projects, project] };
     }

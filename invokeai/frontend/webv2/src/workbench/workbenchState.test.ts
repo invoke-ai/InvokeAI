@@ -629,6 +629,37 @@ describe('workbench layout presets', () => {
     });
   });
 
+  it("starts new projects from the account's saved Compose preset", () => {
+    const initial = createInitialWorkbenchState();
+    const compose = layoutPresets[0]!;
+    const customized: WorkbenchState = {
+      ...initial,
+      account: {
+        ...initial.account,
+        layoutPresetOverrides: {
+          compose: {
+            ...compose.snapshot,
+            layout: { ...compose.snapshot.layout, centerViewId: 'gallery' },
+          },
+        },
+        layoutPresetRouteOverrides: {
+          compose: { destination: 'canvas', sourceId: 'canvas' },
+        },
+      },
+    };
+
+    const withNewProject = workbenchReducer(customized, { type: 'createProject' });
+    const project = getProject(withNewProject, withNewProject.activeProjectId);
+
+    expect(project.invocation).toEqual({
+      destination: 'canvas',
+      destinationLocked: false,
+      sourceId: 'canvas',
+      sourceLocked: false,
+    });
+    expect(project.layout).toMatchObject({ centerViewId: 'gallery', presetId: 'compose' });
+  });
+
   it('applies each built-in preset default route with its layout', () => {
     let state = createInitialWorkbenchState();
 
