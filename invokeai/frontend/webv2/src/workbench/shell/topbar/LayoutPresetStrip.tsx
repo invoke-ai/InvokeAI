@@ -1,4 +1,4 @@
-import type { AutoScrollOptions, DragEndEvent } from '@dnd-kit/core';
+import type { DragEndEvent } from '@dnd-kit/core';
 import type { LayoutPreset, LayoutPresetId } from '@workbench/layoutContracts';
 import type { Project } from '@workbench/projectContracts';
 import type { KeyboardEvent, MouseEvent } from 'react';
@@ -39,7 +39,7 @@ import {
   SettingsIcon,
   Trash2Icon,
 } from 'lucide-react';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { LayoutPresetDialogValue } from './layoutPresetDialogModel';
@@ -75,7 +75,6 @@ export const LayoutPresetStrip = () => {
   const { t } = useTranslation();
   const { activePreset, hasDrifted } = useLayoutDrift();
   const { layout } = useWorkbenchCommands();
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isSaveAsOpen, setIsSaveAsOpen] = useState(false);
   const [menuTarget, setMenuTarget] = useState<{ anchor: DOMRect; preset: LayoutPreset } | null>(null);
 
@@ -92,12 +91,6 @@ export const LayoutPresetStrip = () => {
     useSensor(MouseSensor, MOUSE_SENSOR_OPTIONS),
     useSensor(TouchSensor, TOUCH_SENSOR_OPTIONS),
     useSensor(KeyboardSensor, KEYBOARD_SENSOR_OPTIONS)
-  );
-  const autoScroll = useMemo<AutoScrollOptions>(
-    () => ({
-      canScroll: (element) => element === scrollContainerRef.current && element.scrollWidth > element.clientWidth,
-    }),
-    []
   );
   const saveAsDefaultRoute = useMemo(
     () => ({ destination: invocation.destination, sourceId: invocation.sourceId }),
@@ -145,17 +138,10 @@ export const LayoutPresetStrip = () => {
   return (
     <>
       <HStack gap="1" justify="center" maxW="min(36vw, 44rem)" minW="0">
-        <Box
-          ref={scrollContainerRef}
-          css={PRESET_SCROLL_CSS}
-          data-layout-preset-scroll=""
-          maxW="full"
-          minW="0"
-          overflowX="auto"
-        >
+        <Box css={PRESET_SCROLL_CSS} data-layout-preset-scroll="" maxW="full" minW="0" overflowX="auto">
           <DndContext
             accessibility={dndAccessibility}
-            autoScroll={autoScroll}
+            autoScroll={false}
             collisionDetection={closestCenter}
             modifiers={DND_MODIFIERS}
             sensors={sensors}

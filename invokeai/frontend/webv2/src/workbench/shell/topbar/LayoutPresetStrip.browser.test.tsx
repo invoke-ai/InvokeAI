@@ -225,7 +225,7 @@ describe('LayoutPresetStrip', () => {
     await act(() => mouse('mouseup', source!.ownerDocument, edgeX, startY));
   });
 
-  it('auto-scrolls only an overflowing strip and stops when the drag ends', async () => {
+  it('keeps an overflowing strip stationary while dragging near its right edge', async () => {
     for (let index = 2; index <= 8; index += 1) {
       store.commands.layout.createPreset(`custom-${index}`, `Custom ${index}`, 'star');
     }
@@ -251,7 +251,7 @@ describe('LayoutPresetStrip', () => {
         })
     );
 
-    expect(scrollContainer!.scrollLeft).toBeGreaterThan(0);
+    expect(scrollContainer!.scrollLeft).toBe(0);
 
     await act(() => mouse('mouseup', source!.ownerDocument, edgeX, startY));
     const scrollLeftAfterDrop = scrollContainer!.scrollLeft;
@@ -262,7 +262,8 @@ describe('LayoutPresetStrip', () => {
         })
     );
 
-    expect(scrollContainer!.scrollLeft).toBe(scrollLeftAfterDrop);
+    expect(scrollLeftAfterDrop).toBe(0);
+    expect(scrollContainer!.scrollLeft).toBe(0);
   });
 
   it('preserves horizontal touch panning and reorders after a long press', async () => {
